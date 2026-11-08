@@ -18,8 +18,10 @@ namespace Stealth.UI
 
         public const float HelpDuration = 30f;
 
+        public const float BannerDuration = 3.5f;
+        readonly Queue<string> m_BannerQueue = new();
         string m_Banner;
-        float m_BannerUntil;
+        float m_BannerStart = -10f;
         float m_HitFlash;
         bool m_ShowHelp = true;
         float m_HelpUntil = -1f;
@@ -52,6 +54,7 @@ namespace Stealth.UI
                 m_Subscribed = gm;
             }
             m_HitFlash = Mathf.MoveTowards(m_HitFlash, 0f, Time.deltaTime * 1.5f);
+            UpdateBanner();
             if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame)
             {
                 m_ShowHelp = !m_ShowHelp;
@@ -74,10 +77,17 @@ namespace Stealth.UI
             CurrentPrompt = gm != null && PlayerController.Local != null ? BuildPrompt(gm, PlayerController.Local) : default;
         }
 
-        void ShowBanner(string text)
+        public void ShowBanner(string text)
         {
-            m_Banner = text;
-            m_BannerUntil = Time.time + 5f;
+            if (m_BannerQueue.Count < 4 && text != m_Banner) m_BannerQueue.Enqueue(text);
+        }
+
+        void UpdateBanner()
+        {
+            if (Time.time - m_BannerStart < BannerDuration) return;
+            if (m_BannerQueue.Count == 0) { m_Banner = null; return; }
+            m_Banner = m_BannerQueue.Dequeue();
+            m_BannerStart = Time.time;
         }
 
         Prompt BuildPrompt(GameManager gm, PlayerController me)
@@ -159,8 +169,20 @@ namespace Stealth.UI
                 if (gm.Phase.Value == RunPhase.Playing) UiDraw.Label(new Rect(0, Screen.height * 0.35f, Screen.width, 60),
                     "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
             }
-            if (gm.AlarmActive && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
-                UiDraw.Label(new Rect(0, 56, Screen.width, 40), "ТРЕВОГА", 28, TextAnchor.MiddleCenter, new Color(1f, 0.2f, 0.15f), true);
+            if (gm.AlarmActive)
+            {
+                // Thin pulsing frame + a small label with the time left: clear, but does not cover the view.
+                float left = (float)(gm.AlarmUntil.Value - gm.NetworkManager.ServerTime.Time);
+                float pulse = 0.35f + 0.25f * Mathf.Sin(Time.time * 7f);
+                var red = new Color(1f, 0.15f, 0.1f, pulse);
+                UiDraw.Rect(new Rect(0, 0, Screen.width, 4), red);
+                UiDraw.Rect(new Rect(0, Screen.height - 4, Screen.width, 4), red);
+                UiDraw.Rect(new Rect(0, 0, 4, Screen.height), red);
+                UiDraw.Rect(new Rect(Screen.width - 4, 0, 4, Screen.height), red);
+                var tag = new Rect(Screen.width / 2f - 70, 14, 140, 24);
+                UiDraw.Rect(tag, new Color(0.5f, 0f, 0f, 0.6f));
+                UiDraw.Label(tag, $"ТРЕВОГА · {Mathf.Max(0, left):0} c", 14, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.8f), true);
+            }
         }
 
         /// <summary>Arcs around the crosshair towards every sensor that is noticing you.</summary>
@@ -319,10 +341,12 @@ namespace Stealth.UI
 
         void DrawBanner()
         {
-            if (Time.time >= m_BannerUntil || string.IsNullOrEmpty(m_Banner)) return;
-            var r = new Rect(Screen.width / 2f - 340, Screen.height * 0.18f, 680, 56);
-            UiDraw.Rect(r, new Color(0, 0, 0, 0.6f));
-            UiDraw.Label(r, m_Banner, 18, TextAnchor.MiddleCenter, Color.white, true);
+            if (string.IsNullOrEmpty(m_Banner)) return;
+            float a = UiMath.MessageAlpha(Time.time - m_BannerStart, BannerDuration);
+            if (a <= 0f) return;
+            var r = new Rect(Screen.width / 2f - 320, Screen.height * 0.16f - (1f - a) * 10f, 640, 40);
+            UiDraw.Rect(r, new Color(0, 0, 0, 0.5f * a));
+            UiDraw.Label(r, m_Banner, 16, TextAnchor.MiddleCenter, new Color(1, 1, 1, a), true);
         }
 
         static void DrawRunOver(GameManager gm)

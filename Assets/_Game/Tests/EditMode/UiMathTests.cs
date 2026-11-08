@@ -63,6 +63,16 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void MessageFadesInHoldsAndFadesOut()
+        {
+            Assert.AreEqual(0f, UiMath.MessageAlpha(-1f, 3f));
+            Assert.AreEqual(0.5f, UiMath.MessageAlpha(0.125f, 3f), 1e-4f);
+            Assert.AreEqual(1f, UiMath.MessageAlpha(1.5f, 3f));
+            Assert.AreEqual(0.5f, UiMath.MessageAlpha(2.875f, 3f), 1e-4f);
+            Assert.AreEqual(0f, UiMath.MessageAlpha(3.1f, 3f));
+        }
+
+        [Test]
         public void ScaleIsClamped()
         {
             Assert.AreEqual(1f, UiMath.Scale(1080));

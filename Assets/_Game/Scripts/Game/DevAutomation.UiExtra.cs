@@ -14,6 +14,7 @@ namespace Stealth.Game
         {
             steps.Add(NoiseMeterShots());
             steps.Add(QuotaShots());
+            steps.Add(BannerAndAlarmShots());
             steps.Add(DetectionIndicatorCheck());
         }
 
@@ -106,6 +107,17 @@ namespace Stealth.Game
                 Log($"teammate: {host?.Nick} downed={host?.Downed.Value}");
                 yield return Shot("downed_marker");
             }
+        }
+
+        IEnumerator BannerAndAlarmShots()
+        {
+            UI.GameHUD.Instance.ShowBanner("Первое сообщение");
+            UI.GameHUD.Instance.ShowBanner("Второе сообщение ждёт своей очереди");
+            if (Me.IsServer) GameManager.Instance.RaiseAlarmServer(Me.transform.position + Vector3.forward * 50f, 1f);
+            yield return new WaitForSeconds(1f);
+            yield return Shot("banner_alarm");
+            yield return new WaitForSeconds(3.2f);
+            yield return Shot("banner_second");
         }
     }
 }

@@ -74,6 +74,13 @@ namespace Stealth.UI
         /// <summary>Noise radius (m) to meter bars: 0 silent, 1 quiet (crouch), 2 audible (walk), 3 loud (run / fall).</summary>
         public static int NoiseBars(float radius) => radius <= 0.1f ? 0 : radius <= 3f ? 1 : radius <= 8f ? 2 : 3;
 
+        /// <summary>Fade for a timed message: 0 → 1 over <paramref name="fade"/>, holds, then 1 → 0 at the end.</summary>
+        public static float MessageAlpha(float age, float duration, float fade = 0.25f)
+        {
+            if (age < 0f || age > duration) return 0f;
+            return Mathf.Clamp01(Mathf.Min(age / fade, (duration - age) / fade));
+        }
+
         /// <summary>UI scale relative to a 1080p reference, clamped for tiny / huge windows.</summary>
         public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 1080f, 0.6f, 2f);
     }
