@@ -14,6 +14,7 @@ namespace Stealth.Game
             steps.Add(StaminaCheck());
             steps.Add(CrouchToggleCheck());
             steps.Add(KnockbackCheck());
+            steps.Add(SettingsShot());
         }
 
         IEnumerator JumpCheck()
@@ -133,6 +134,13 @@ namespace Stealth.Game
             yield return new WaitForSeconds(0.8f);
             var d = Me.transform.position - p0;
             Log($"knockback: moved {new Vector3(d.x, 0, d.z).magnitude:0.00} m backwards={d.z < -0.5f}, hp={Me.Hp.Value}");
+        }
+
+        IEnumerator SettingsShot()
+        {
+            UI.GameMenu.OpenSettingsForTest();
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("settings");
         }
     }
 }
