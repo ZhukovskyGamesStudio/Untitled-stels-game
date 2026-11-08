@@ -71,6 +71,9 @@ namespace Stealth.UI
             return new Vector2(screen.x * width, (1f - screen.y) * height);
         }
 
+        /// <summary>Noise radius (m) to meter bars: 0 silent, 1 quiet (crouch), 2 audible (walk), 3 loud (run / fall).</summary>
+        public static int NoiseBars(float radius) => radius <= 0.1f ? 0 : radius <= 3f ? 1 : radius <= 8f ? 2 : 3;
+
         /// <summary>UI scale relative to a 1080p reference, clamped for tiny / huge windows.</summary>
         public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 1080f, 0.6f, 2f);
     }

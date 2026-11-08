@@ -100,6 +100,7 @@ namespace Stealth.UI
             DrawOverlays(gm, me);
             DrawDetection(me);
             DrawStamina(me);
+            DrawNoise(me);
             DrawQuota(gm);
             DrawHealth(me);
             DrawTeam(me);
@@ -163,6 +164,28 @@ namespace Stealth.UI
                     : Color.Lerp(new Color(1f, 0.95f, 0.4f, 0.35f), new Color(1f, 0.55f, 0.1f, 0.95f), a);
                 UiDraw.DirectionArc(angle, 70f + (1f - a) * 25f, color);
             }
+        }
+
+        /// <summary>How loud you are right now: three short bars above the inventory, fading out when silent.</summary>
+        static void DrawNoise(PlayerController me)
+        {
+            float age = Time.time - me.LastNoiseTime;
+            if (age > 0.9f || me.Downed.Value) return;
+            int bars = UiMath.NoiseBars(me.LastNoiseRadius);
+            float alpha = Mathf.Clamp01(1f - age / 0.9f);
+            var labels = new[] { "", "тихо", "слышно", "громко" };
+            var colors = new[] { Color.white, new Color(0.6f, 0.9f, 1f), new Color(1f, 0.85f, 0.35f), new Color(1f, 0.35f, 0.25f) };
+            float x0 = Screen.width / 2f - 30f, y0 = Screen.height - 150f;
+            for (int i = 0; i < 3; i++)
+            {
+                var c = i < bars ? colors[bars] : new Color(1, 1, 1, 0.25f);
+                c.a *= alpha;
+                float h = 6f + i * 5f;
+                UiDraw.Rect(new Rect(x0 + i * 9f, y0 + 16f - h, 6f, h), c);
+            }
+            var lc = colors[bars];
+            lc.a = alpha * 0.9f;
+            UiDraw.Label(new Rect(x0 + 32f, y0, 120f, 18f), labels[bars], 12, TextAnchor.MiddleLeft, lc);
         }
 
         static void DrawStamina(PlayerController me)

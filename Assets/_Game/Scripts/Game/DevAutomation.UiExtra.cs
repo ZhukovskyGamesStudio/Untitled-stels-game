@@ -11,6 +11,7 @@ namespace Stealth.Game
     {
         partial void UiScenarioExtraImpl(List<IEnumerator> steps)
         {
+            steps.Add(NoiseMeterShots());
             steps.Add(DetectionIndicatorCheck());
         }
 
@@ -42,6 +43,20 @@ namespace Stealth.Game
             foreach (var d in DetectorAwareness.All)
                 Log($"  detector {d.name} pos={d.Position} aw={d.AwarenessOf(Me.OwnerClientId):0.00} angle={UI.UiMath.ScreenAngle(cam.position, cam.forward, d.Position):0} guard={(d.gameObject == guard.gameObject)}");
             Log($"  me={Me.transform.position} fwd={cam.forward}");
+        }
+
+        IEnumerator NoiseMeterShots()
+        {
+            var c = LevelGenerator.Current.HatchPosition + new Vector3(-3f, 0.05f, -3f);
+            Me.TeleportOwner(c, Quaternion.LookRotation(Vector3.forward));
+            Drive(Vector2.up, crouch: true);
+            yield return new WaitForSeconds(1.3f);
+            yield return Shot("noise_crouch");
+            Me.TeleportOwner(c, Quaternion.LookRotation(Vector3.forward));
+            Drive(Vector2.up, sprint: true);
+            yield return new WaitForSeconds(0.8f);
+            yield return Shot("noise_sprint");
+            Release();
         }
     }
 }

@@ -53,6 +53,16 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void NoiseBarsMatchMovementModes()
+        {
+            Assert.AreEqual(0, UiMath.NoiseBars(0f));
+            Assert.AreEqual(1, UiMath.NoiseBars(2f));   // crouch
+            Assert.AreEqual(2, UiMath.NoiseBars(6f));   // walk
+            Assert.AreEqual(3, UiMath.NoiseBars(13f));  // sprint
+            Assert.AreEqual(3, UiMath.NoiseBars(9f));   // laughing in gas
+        }
+
+        [Test]
         public void ScaleIsClamped()
         {
             Assert.AreEqual(1f, UiMath.Scale(1080));

@@ -94,7 +94,7 @@ namespace Stealth.Player
         {
             if (!IsOwner || !IsSpawned || impactSpeed < 3.5f) return;
             // A normal jump lands at ~4 m/s: audible nearby. Falling from a floor above is loud.
-            NoiseRpc(transform.position, Mathf.Lerp(4f, 14f, Mathf.InverseLerp(3.5f, 10f, impactSpeed)));
+            EmitNoise(Mathf.Lerp(4f, 14f, Mathf.InverseLerp(3.5f, 10f, impactSpeed)));
         }
 
         public override void OnNetworkSpawn()
@@ -238,7 +238,7 @@ namespace Stealth.Player
             if (m_StepTimer < interval) return;
             m_StepTimer = 0;
             float radius = Crouching.Value ? CrouchNoise : IsSprinting ? SprintNoise : WalkNoise;
-            NoiseRpc(transform.position, radius);
+            EmitNoise(radius);
         }
 
         void UpdateGas()
@@ -253,7 +253,7 @@ namespace Stealth.Player
                 if (m_LaughTimer <= 0f)
                 {
                     m_LaughTimer = 1.2f;
-                    NoiseRpc(transform.position, LaughNoise);
+                    EmitNoise(LaughNoise);
                 }
             }
             if (GasTime >= GasLimit && !Downed.Value) GasKnockoutRpc();
@@ -322,6 +322,17 @@ namespace Stealth.Player
             Motor.AddImpulse(awayFromSource * 6f + Vector3.up * 2.5f);
             Motor.AddTrauma(0.7f);
             if (GameHUD.Instance != null) GameHUD.Instance.FlashHit(awayFromSource);
+        }
+
+        /// <summary>Last noise this player made (owner side, for the HUD meter).</summary>
+        public float LastNoiseRadius { get; private set; }
+        public float LastNoiseTime { get; private set; } = -10f;
+
+        void EmitNoise(float radius)
+        {
+            LastNoiseRadius = radius;
+            LastNoiseTime = Time.time;
+            NoiseRpc(transform.position, radius);
         }
 
         [Rpc(SendTo.Server)]
