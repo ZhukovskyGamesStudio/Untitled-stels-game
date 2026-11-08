@@ -12,6 +12,7 @@ namespace Stealth.Game
         partial void RegisterExtraScenarios()
         {
             m_Scenarios["ui"] = UiScenario;
+            m_Scenarios["floors"] = FloorsScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

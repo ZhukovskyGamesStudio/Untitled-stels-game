@@ -56,6 +56,56 @@ namespace Stealth.Tests
             }
         }
 
+        [Test]
+        public void BuildingsHaveSeveralFloorsConnectedByStairs()
+        {
+            foreach (var seed in Seeds)
+                for (int level = 0; level < 6; level++)
+                {
+                    var l = LevelGenerator.Generate(seed, level);
+                    Assert.GreaterOrEqual(l.Floors, 2);
+                    Assert.AreEqual(l.Floors - 1, l.Stairs.Count);
+                    var cells = new HashSet<Vector2Int>();
+                    foreach (var s in l.Stairs)
+                    {
+                        Assert.IsTrue(cells.Add(s.Cell), "every staircase in its own cell");
+                        Assert.AreNotEqual(l.StartCell, s.Cell, "not in the lobby");
+                    }
+                }
+        }
+
+        [Test]
+        public void NothingIsPlacedOnTheStairs()
+        {
+            foreach (var seed in Seeds)
+            {
+                var l = LevelGenerator.Generate(seed, 5);
+                foreach (var s in l.Stairs)
+                    for (int f = s.Floor; f <= s.Floor + 1; f++)
+                    {
+                        var c = l.CellCenter(f, s.Cell.x, s.Cell.y);
+                        var corner = c + new Vector3(s.Corner.x * LevelGenerator.Cell / 2f, 0, s.Corner.y * LevelGenerator.Cell / 2f);
+                        // u, v = distance from the corner walls into this room (the stair occupies [0, StairSize]²).
+                        bool OnStair(Vector3 p)
+                        {
+                            float u = (p.x - corner.x) * -s.Corner.x, v = (p.z - corner.z) * -s.Corner.y;
+                            return LevelLayout.FloorOf(p.y) == f && u > -0.05f && v > -0.05f &&
+                                   u < LevelGenerator.StairSize + 0.3f && v < LevelGenerator.StairSize + 0.3f;
+                        }
+                        foreach (var p in l.Props) Assert.IsFalse(OnStair(p.Position), $"seed {seed}: {p.Kind} on stairs at {p.Position}");
+                        foreach (var p in l.ItemSpots) Assert.IsFalse(OnStair(p), $"seed {seed}: item on stairs at {p}");
+                    }
+            }
+        }
+
+        [Test]
+        public void RobotsAreSpreadOverAllFloors()
+        {
+            var l = LevelGenerator.Generate(3, 3);
+            for (int f = 0; f < l.Floors; f++)
+                Assert.IsTrue(l.RobotSpawns.Exists(r => r.Floor == f), $"floor {f} has a robot");
+        }
+
         /// <summary>Flood fill over doors/openings inside a floor and stairwells between floors.</summary>
         static int CountReachable(LevelLayout l)
         {
