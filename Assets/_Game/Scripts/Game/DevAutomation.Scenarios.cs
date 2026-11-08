@@ -13,6 +13,7 @@ namespace Stealth.Game
         {
             m_Scenarios["ui"] = UiScenario;
             m_Scenarios["floors"] = FloorsScenario;
+            m_Scenarios["rooms"] = RoomsScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

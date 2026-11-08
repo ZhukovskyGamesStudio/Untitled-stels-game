@@ -70,9 +70,11 @@ namespace Stealth.Tests
             Build(seed, 4);
             foreach (var spot in m_Layout.ItemSpots)
             {
-                // Spots on desks are above the navmesh; there must be walkable floor within reach (1.6 m).
-                Assert.IsTrue(NavMesh.SamplePosition(spot, out var hit, 1.6f, NavMesh.AllAreas), $"seed {seed}: item at {spot} unreachable");
-                Assert.AreEqual(LevelLayout.FloorOf(spot.y), LevelLayout.FloorOf(hit.position.y), $"item at {spot} is reachable from the same floor");
+                // Spots on desks / shelves are above the floor: there must be walkable floor of the same storey nearby.
+                int floor = LevelLayout.FloorOf(spot.y);
+                var atFloor = new Vector3(spot.x, LevelLayout.FloorY(floor), spot.z);
+                Assert.IsTrue(NavMesh.SamplePosition(atFloor, out var hit, 1.5f, NavMesh.AllAreas), $"seed {seed}: item at {spot} unreachable");
+                Assert.AreEqual(floor, LevelLayout.FloorOf(hit.position.y), $"item at {spot} is reachable from its own floor");
             }
         }
     }

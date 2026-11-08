@@ -261,6 +261,50 @@ def model_kitchen_counter():
     export("kitchen_counter")
 
 
+def model_shelf():
+    """Storage rack 2.0 x 0.6 x 2.0 with three shelves (0.45, 1.05, 1.65) and a few boxes."""
+    parts = [box((0.05, 0.6, 2.0), (x, 0, 1.0)) for x in (-0.98, 0.98)]
+    parts += [box((2.0, 0.6, 0.04), (0, 0, h)) for h in (0.05, 0.45, 1.05, 1.65)]
+    merge("Body", parts)
+    merge("Accent", [
+        box((0.45, 0.4, 0.3), (-0.6, 0, 0.62)), box((0.35, 0.35, 0.25), (0.5, 0.05, 0.6)),
+        box((0.5, 0.45, 0.35), (0.3, 0, 1.25)), box((0.4, 0.4, 0.3), (-0.55, 0, 1.82)),
+    ])
+    export("shelf")
+
+
+def model_boxes():
+    merge("Accent", [box((0.6, 0.6, 0.5), (0, 0, 0.25)), box((0.5, 0.5, 0.4), (0.05, -0.05, 0.7)), box((0.45, 0.45, 0.4), (0.55, 0.1, 0.2))])
+    export("boxes")
+
+
+def model_water_cooler():
+    merge("Body", [box((0.35, 0.35, 1.0), (0, 0, 0.5))])
+    merge("Eye", [cylinder(0.15, 0.45, (0, 0, 1.25), segments=12)])
+    export("water_cooler")
+
+
+def model_whiteboard():
+    merge("Body", [box((1.8, 0.05, 1.0), (0, 0.0, 1.5))])
+    merge("Accent", [box((0.05, 0.05, 1.4), (-0.8, 0, 0.7)), box((0.05, 0.05, 1.4), (0.8, 0, 0.7)), box((1.9, 0.08, 0.06), (0, 0, 1.0))])
+    export("whiteboard")
+
+
+def model_sofa():
+    merge("Body", [box((2.0, 0.85, 0.45), (0, 0, 0.22)), box((2.0, 0.2, 0.45), (0, 0.33, 0.66))])
+    merge("Accent", [box((0.2, 0.85, 0.65), (-1.0, 0, 0.33)), box((0.2, 0.85, 0.65), (1.0, 0, 0.33))])
+    export("sofa")
+
+
+def model_toilet_stall():
+    """1.0 wide, 1.5 deep cubicle walls (2.0 high, raised), door side open towards -Y."""
+    merge("Body", [
+        box((0.05, 1.5, 1.9), (-0.5, 0, 1.05)), box((0.05, 1.5, 1.9), (0.5, 0, 1.05)), box((1.0, 0.05, 1.9), (0, 0.75, 1.05)),
+    ])
+    merge("Accent", [cylinder(0.2, 0.42, (0, 0.4, 0.21), segments=12)])
+    export("toilet_stall")
+
+
 # --------------------------------------------------------------------------- tetris items
 
 ITEM_CELL = 0.22
@@ -301,5 +345,11 @@ model_cabinet()
 model_meeting_table()
 model_plant()
 model_kitchen_counter()
+model_shelf()
+model_boxes()
+model_water_cooler()
+model_whiteboard()
+model_sofa()
+model_toilet_stall()
 model_items()
 print("DONE")

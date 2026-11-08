@@ -156,6 +156,10 @@ namespace Stealth.EditorTools
             Mat("Rack", new Color(0.12f, 0.13f, 0.15f), smoothness: 0.5f);
             Mat("RackLights", new Color(0.2f, 1f, 0.4f), new Color(0.2f, 1.6f, 0.5f));
             Mat("Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
+            Mat("Cardboard", new Color(0.62f, 0.47f, 0.3f));
+            Mat("Water", new Color(0.4f, 0.7f, 1f), new Color(0.05f, 0.15f, 0.3f), smoothness: 0.9f);
+            Mat("Fabric", new Color(0.35f, 0.25f, 0.45f), smoothness: 0.05f);
+            Mat("Stall", new Color(0.55f, 0.65f, 0.6f), smoothness: 0.5f);
             Mat("HatchRing", new Color(1f, 0.8f, 0.1f), new Color(0.8f, 0.6f, 0.05f));
             Mat("RobotBody", new Color(0.86f, 0.87f, 0.9f), smoothness: 0.6f);
             Mat("RobotAccent", new Color(0.18f, 0.19f, 0.22f), smoothness: 0.5f);
@@ -263,6 +267,12 @@ namespace Stealth.EditorTools
             art.MeetingTable = Save(Prop("MeetingTable", "meeting_table", "PropBody", "PropAccent", "PropScreen"), p + "MeetingTable.prefab");
             art.Plant = Save(Prop("Plant", "plant", "Plant", "PlantPot", "Plant"), p + "Plant.prefab");
             art.KitchenCounter = Save(Prop("KitchenCounter", "kitchen_counter", "PropBody", "PropAccent", "PropAccent"), p + "KitchenCounter.prefab");
+            art.Shelf = Save(Prop("Shelf", "shelf", "Rack", "Cardboard", "PropScreen"), p + "Shelf.prefab");
+            art.Boxes = Save(Prop("Boxes", "boxes", "Cardboard", "Cardboard", "Cardboard"), p + "Boxes.prefab");
+            art.WaterCooler = Save(Prop("WaterCooler", "water_cooler", "PropBody", "PropAccent", "Water"), p + "WaterCooler.prefab");
+            art.Whiteboard = Save(Prop("Whiteboard", "whiteboard", "Ceiling", "PropAccent", "PropScreen"), p + "Whiteboard.prefab");
+            art.Sofa = Save(Prop("Sofa", "sofa", "Fabric", "PropAccent", "PropAccent"), p + "Sofa.prefab");
+            art.ToiletStall = Save(Prop("ToiletStall", "toilet_stall", "Stall", "Ceiling", "Ceiling"), p + "ToiletStall.prefab");
             var hatch = Prop("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing");
             hatch.AddComponent<Hatch>();
             var box = hatch.GetComponent<BoxCollider>();

@@ -3,9 +3,9 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
-    public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server }
+    public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge }
     public enum EdgeType { Wall, Door, Open }
-    public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch }
+    public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall }
 
     public struct PropPlacement
     {

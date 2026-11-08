@@ -87,11 +87,14 @@ namespace Stealth.Level
                     {
                         if (f == 0 && new Vector2Int(x, y) == l.StartCell) { l.Rooms[f, x, y] = RoomType.Lobby; continue; }
                         int r = rng.Next(100);
-                        l.Rooms[f, x, y] = r < 35 ? RoomType.OpenSpace
-                            : r < 55 ? RoomType.Office
-                            : r < 70 ? RoomType.Meeting
-                            : r < 82 ? RoomType.Kitchen
-                            : RoomType.Server;
+                        l.Rooms[f, x, y] = r < 28 ? RoomType.OpenSpace
+                            : r < 44 ? RoomType.Office
+                            : r < 56 ? RoomType.Meeting
+                            : r < 66 ? RoomType.Kitchen
+                            : r < 78 ? RoomType.Server
+                            : r < 88 ? RoomType.Storage
+                            : r < 94 ? RoomType.Restroom
+                            : RoomType.Lounge;
                     }
 
             for (int f = 0; f < floors; f++)
@@ -230,6 +233,10 @@ namespace Stealth.Level
                     }
                     int pq = rng.Next(4);
                     if (Free(pq)) Prop(l, PropKind.Plant, c + quads[pq] * 1.5f, 0);
+                    // Whiteboard on the wall beside the doorway (never in the door, never at the stairs).
+                    float wbSide = rng.Next(2) == 0 ? 1f : -1f;
+                    if (Free(LevelLayout.QuadrantOf(new Vector2Int(wbSide > 0 ? 1 : -1, 1))))
+                        Prop(l, PropKind.Whiteboard, c + new Vector3(wbSide * 2.6f, 0, 4.82f), 180f);
                     l.ItemSpots.Add(c + new Vector3(Range(rng, -1.2f, 1.2f), 0.78f, Range(rng, -0.3f, 0.3f)));
                     int iq = rng.Next(4);
                     if (Free(iq)) l.ItemSpots.Add(c + quads[iq]);
@@ -250,6 +257,50 @@ namespace Stealth.Level
                     int iq = rng.Next(4);
                     if (Free(iq)) l.ItemSpots.Add(c + quads[iq]);
                     else l.ItemSpots.Add(c + new Vector3(Range(rng, -1f, 1f), 0, Range(rng, -1f, 1f)));
+                    break;
+                }
+
+                case RoomType.Storage:
+                    // Racks with goods: loot sits on the shelves at three heights.
+                    for (int q = 0; q < 4; q++)
+                    {
+                        if (!Free(q)) continue;
+                        var p = c + quads[q] * 1.25f;
+                        Prop(l, PropKind.Shelf, p, 0f);
+                        if (rng.NextDouble() < 0.7)
+                            l.ItemSpots.Add(p + new Vector3(Range(rng, -0.6f, 0.6f), new[] { 0.47f, 1.07f, 1.67f }[rng.Next(3)], 0f));
+                        Prop(l, PropKind.Boxes, c + quads[q] * 0.55f, rng.Next(4) * 90f);
+                    }
+                    break;
+
+                case RoomType.Restroom:
+                {
+                    // A row of cubicles along one wall, on a side without stairs.
+                    float side = Free(LevelLayout.QuadrantOf(new Vector2Int(1, 1))) && Free(LevelLayout.QuadrantOf(new Vector2Int(-1, 1))) ? 1f : -1f;
+                    float zWall = side * 4.1f;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float px = 1.6f + i * 1.05f;
+                        float sx = rng.Next(2) == 0 ? 1f : -1f;
+                        if (!Free(LevelLayout.QuadrantOf(new Vector2Int((int)sx, (int)side)))) sx = -sx;
+                        if (!Free(LevelLayout.QuadrantOf(new Vector2Int((int)sx, (int)side)))) continue;
+                        Prop(l, PropKind.ToiletStall, c + new Vector3(sx * px, 0, zWall), side > 0 ? 180f : 0f);
+                        if (i == 1) l.ItemSpots.Add(c + new Vector3(sx * px, 0, zWall - side * 0.4f));
+                    }
+                    break;
+                }
+
+                case RoomType.Lounge:
+                {
+                    int sofaQ = rng.Next(4);
+                    if (!Free(sofaQ)) sofaQ = (sofaQ + 2) % 4;
+                    var sp = c + quads[sofaQ] * 1.2f;
+                    Prop(l, PropKind.Sofa, sp, quads[sofaQ].z > 0 ? 180f : 0f);
+                    l.ItemSpots.Add(sp + new Vector3(Range(rng, -0.6f, 0.6f), 0.46f, 0f));
+                    int coolerQ = (sofaQ + 1) % 4;
+                    if (Free(coolerQ)) Prop(l, PropKind.WaterCooler, c + quads[coolerQ] * 1.55f, 0f);
+                    int plantQ = (sofaQ + 3) % 4;
+                    if (Free(plantQ)) Prop(l, PropKind.Plant, c + quads[plantQ] * 1.5f, 0f);
                     break;
                 }
 
@@ -508,6 +559,12 @@ namespace Stealth.Level
             PropKind.Plant => art.Plant,
             PropKind.KitchenCounter => art.KitchenCounter,
             PropKind.Hatch => art.Hatch,
+            PropKind.Shelf => art.Shelf,
+            PropKind.Boxes => art.Boxes,
+            PropKind.WaterCooler => art.WaterCooler,
+            PropKind.Whiteboard => art.Whiteboard,
+            PropKind.Sofa => art.Sofa,
+            PropKind.ToiletStall => art.ToiletStall,
             _ => null,
         };
 

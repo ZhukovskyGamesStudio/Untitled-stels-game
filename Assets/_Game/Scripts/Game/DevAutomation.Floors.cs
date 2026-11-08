@@ -98,5 +98,28 @@ namespace Stealth.Game
             }
             Log($"floor rules: wheeled robots that left their floor={wheeledLeft}, walkers that changed floor={walkersMoved}");
         }
+
+        /// <summary>One screenshot of every room type present in the building.</summary>
+        IEnumerator RoomsScenario()
+        {
+            var l = LevelGenerator.Current;
+            var seen = new System.Collections.Generic.HashSet<RoomType>();
+            for (int f = 0; f < l.Floors; f++)
+                for (int x = 0; x < l.Width; x++)
+                    for (int y = 0; y < l.Height; y++)
+                    {
+                        var type = l.Rooms[f, x, y];
+                        if (!seen.Add(type)) continue;
+                        var c = l.CellCenter(f, x, y);
+                        // Stand near one corner and look across the room towards the opposite one.
+                        int q = l.StairQuadrant(f, new Vector2Int(x, y));
+                        var from = c + LevelGenerator.Quadrants[q == 3 ? 0 : 3] * 1.45f + Vector3.up * 0.05f;
+                        var to = c - (from - c) + Vector3.up * 0.6f;
+                        LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
+                        yield return new WaitForSeconds(0.5f);
+                        yield return Shot($"room_{type}");
+                    }
+            Log($"room types: {string.Join(", ", seen)}");
+        }
     }
 }

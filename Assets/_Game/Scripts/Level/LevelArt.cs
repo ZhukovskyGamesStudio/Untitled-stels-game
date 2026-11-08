@@ -22,5 +22,11 @@ namespace Stealth.Level
         public GameObject Plant;
         public GameObject KitchenCounter;
         public GameObject Hatch;
+        public GameObject Shelf;
+        public GameObject Boxes;
+        public GameObject WaterCooler;
+        public GameObject Whiteboard;
+        public GameObject Sofa;
+        public GameObject ToiletStall;
     }
 }
