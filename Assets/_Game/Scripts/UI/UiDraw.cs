@@ -47,5 +47,33 @@ namespace Stealth.UI
             }
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), s_Vignette, ScaleMode.StretchToFill, true, 0, c, 0, 0);
         }
+
+        static Texture2D s_Arc;
+
+        /// <summary>Soft arc segment centred on the screen centre, rotated by <paramref name="angle"/> (0 = up, clockwise).</summary>
+        public static void DirectionArc(float angle, float radius, Color c)
+        {
+            if (s_Arc == null)
+            {
+                const int w = 128, h = 32;
+                s_Arc = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        float u = x / (w - 1f) * 2f - 1f;          // -1..1 across
+                        float v = y / (h - 1f);                     // 0 bottom .. 1 top
+                        float curve = 1f - u * u * 0.6f;            // bow towards the centre
+                        float band = Mathf.Clamp01(1f - Mathf.Abs(v - curve * 0.6f) * 4f);
+                        float fade = Mathf.Clamp01(1f - Mathf.Abs(u) * 1.1f);
+                        s_Arc.SetPixel(x, y, new Color(1, 1, 1, band * fade));
+                    }
+                s_Arc.Apply();
+            }
+            var centre = new Vector2(Screen.width / 2f, Screen.height / 2f);
+            var matrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(angle, centre);
+            GUI.DrawTexture(new Rect(centre.x - radius * 0.7f, centre.y - radius - 20f, radius * 1.4f, 36f), s_Arc, ScaleMode.StretchToFill, true, 0, c, 0, 0);
+            GUI.matrix = matrix;
+        }
     }
 }

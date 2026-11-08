@@ -112,8 +112,16 @@ namespace Stealth.UI
 
         void DrawOverlays(GameManager gm, PlayerController me)
         {
-            if (me.Hp.Value == 1 && !me.Downed.Value) UiDraw.Vignette(new Color(0.85f, 0f, 0f, 0.65f + 0.15f * Mathf.Sin(Time.time * 4f)));
-            if (m_HitFlash > 0f) UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(1f, 0f, 0f, 0.35f * m_HitFlash));
+            // Last hit point left: a light red edge, slow pulse. A fresh hit: short flash + an arc towards the attacker.
+            if (me.Hp.Value == 1 && !me.Downed.Value) UiDraw.Vignette(new Color(0.8f, 0f, 0f, 0.32f + 0.1f * Mathf.Sin(Time.time * 2.5f)));
+            if (m_HitFlash > 0.6f) UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(1f, 0f, 0f, 0.5f * (m_HitFlash - 0.6f)));
+            float sinceHit = Time.time - LastHitTime;
+            if (sinceHit < 1.6f && me.Camera != null)
+            {
+                var cam = me.Camera.transform;
+                float angle = UiMath.ScreenAngle(cam.position, cam.forward, cam.position + LastHitDirection);
+                UiDraw.DirectionArc(angle, 120f, new Color(1f, 0.15f, 0.1f, Mathf.Clamp01(1.6f - sinceHit)));
+            }
             if (me.GasTime > 0f)
             {
                 float g = me.GasTime / PlayerController.GasLimit;

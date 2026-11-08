@@ -46,6 +46,16 @@ namespace Stealth.Game
             yield return new WaitForSeconds(0.6f);
             Log($"at hatch prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
             yield return Shot("hatch_with_item");
+
+            // Hit from the right side: arc should point right, light vignette afterwards.
+            if (Me.IsServer)
+            {
+                Me.TakeHitServer(Me.transform.position + Me.transform.right * 1.5f);
+                yield return new WaitForSeconds(0.25f);
+                yield return Shot("hit_from_right");
+                yield return new WaitForSeconds(2f);
+                yield return Shot("low_hp");
+            }
             yield return UiScenarioExtra();
         }
 
