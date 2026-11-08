@@ -50,8 +50,19 @@ namespace Stealth.Level
         public Vector3 CellCenter(int x, int y) =>
             new Vector3((x + 0.5f) * LevelGenerator.Cell, 0f, (y + 0.5f) * LevelGenerator.Cell);
 
+        public int Floors = 1;
+
         public bool IsInside(Vector3 p) =>
             p.x > 0f && p.z > 0f && p.x < Width * LevelGenerator.Cell && p.z < Height * LevelGenerator.Cell;
+
+        /// <summary>Rooms reachable from a cell in one step (through doors / openings). Result: (x, y, floor).</summary>
+        public IEnumerable<Vector3Int> Neighbours(int floor, Vector2Int c)
+        {
+            if (c.x > 0 && EdgesX[c.x - 1, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x - 1, c.y, floor);
+            if (c.x < Width - 1 && EdgesX[c.x, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x + 1, c.y, floor);
+            if (c.y > 0 && EdgesZ[c.x, c.y - 1] != EdgeType.Wall) yield return new Vector3Int(c.x, c.y - 1, floor);
+            if (c.y < Height - 1 && EdgesZ[c.x, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x, c.y + 1, floor);
+        }
     }
 
     /// <summary>
