@@ -45,6 +45,7 @@ EOF
     shots="$P/Builds/shots/$scenario"
     rm -rf "$ROOT/Builds/shots/$scenario"; mkdir -p "$ROOT/Builds/shots/$scenario"
     exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+    rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
     "$exe" -nosteam -host-local -autotest "$scenario" $linger -shotdir "$shots" -screen-width 1280 -screen-height 720 -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
     pids=($!)
@@ -54,8 +55,10 @@ EOF
       pids+=($!)
     done
     for pid in "${pids[@]}"; do wait "$pid"; done
-    grep -h -E "AUTOTEST" "$ROOT/Builds/host.log" $(ls "$ROOT"/Builds/client*.log 2>/dev/null) | grep -v screenshot
-    grep -h -i -E "exception|error" "$ROOT/Builds/host.log" $(ls "$ROOT"/Builds/client*.log 2>/dev/null) | grep -v -i -E "memorysetup|d3d12|licens" | sort | uniq -c | head -20
+    shopt -s nullglob
+    logs=("$ROOT/Builds/host.log" "$ROOT"/Builds/client*.log)
+    grep -h -E "AUTOTEST" "${logs[@]}" | grep -v screenshot
+    grep -h -i -E "exception|error" "${logs[@]}" | grep -v -i -E "memorysetup|d3d12|licens" | sort | uniq -c | head -20
     ls "$ROOT/Builds/shots/$scenario" ;;
   *) echo "usage: $0 tests|assets|player|run <scenario> [clients]"; exit 1 ;;
 esac

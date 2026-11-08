@@ -34,11 +34,10 @@ namespace Stealth.Player
         public Transform Model;
         public Renderer[] BodyRenderers;
 
-        [Header("Movement")]
-        public float WalkSpeed = 3.6f;
-        public float SprintSpeed = 6.2f;
-        public float CrouchSpeed = 1.8f;
-        public float MouseSensitivity = 0.1f;
+        public PlayerMotor Motor;
+
+        /// <summary>Test hook: when set, replaces keyboard/mouse input of the local player.</summary>
+        public static PlayerInputState? Autopilot;
 
         [Header("Noise radius (m)")]
         public float WalkNoise = 6f;
@@ -56,7 +55,7 @@ namespace Stealth.Player
         public float ReviveProgress { get; private set; }
         public PlayerController ReviveTarget { get; private set; }
         public float Height => Crouching.Value ? CrouchHeight : StandHeight;
-        public bool IsSprinting { get; private set; }
+        public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
         static readonly Color[] Palette =
         {
@@ -65,13 +64,10 @@ namespace Stealth.Player
 
         CharacterController m_Controller;
         NetworkTransform m_NetTransform;
-        float m_Pitch;
-        float m_VerticalVelocity;
         int m_PlacedSeed;
         float m_StepTimer;
         float m_LaughTimer;
         float m_InvulnerableUntil;
-        float m_HeadHeight = 1.6f;
 
         public static PlayerController Find(ulong clientId)
         {
@@ -83,6 +79,7 @@ namespace Stealth.Player
         {
             m_Controller = GetComponent<CharacterController>();
             m_NetTransform = GetComponent<NetworkTransform>();
+            if (Motor == null) Motor = GetComponent<PlayerMotor>();
         }
 
         public override void OnNetworkSpawn()
@@ -132,56 +129,18 @@ namespace Stealth.Player
             PlaceOnLevelIfNeeded();
             bool menu = GameMenu.IsOpen;
             var kb = Keyboard.current;
-            var mouse = Mouse.current;
-            if (kb == null || mouse == null) return;
+            if (kb == null) return;
 
             CursorMode = !menu && !Downed.Value && kb.tabKey.isPressed;
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
-            // Look.
-            if (!freeCursor)
-            {
-                var delta = mouse.delta.ReadValue() * MouseSensitivity;
-                transform.Rotate(0f, delta.x, 0f);
-                m_Pitch = Mathf.Clamp(m_Pitch - delta.y, -85f, 85f);
-            }
+            var input = Autopilot ?? PlayerInputState.FromDevices(!freeCursor);
+            Motor.Tick(input, !menu && !Downed.Value, Downed.Value, Head, Time.deltaTime);
+            if (Motor.IsCrouching != Crouching.Value) Crouching.Value = Motor.IsCrouching;
 
-            // Move.
-            var input = Vector2.zero;
-            if (!menu && !Downed.Value)
-            {
-                if (kb.wKey.isPressed) input.y += 1;
-                if (kb.sKey.isPressed) input.y -= 1;
-                if (kb.dKey.isPressed) input.x += 1;
-                if (kb.aKey.isPressed) input.x -= 1;
-            }
-            bool crouch = !menu && !Downed.Value && (kb.leftCtrlKey.isPressed || kb.cKey.isPressed);
-            if (!crouch && Crouching.Value && !CanStandUp()) crouch = true;
-            if (crouch != Crouching.Value) Crouching.Value = crouch;
-            IsSprinting = !crouch && kb.leftShiftKey.isPressed && input.y > 0;
-
-            float speed = crouch ? CrouchSpeed : IsSprinting ? SprintSpeed : WalkSpeed;
-            var move = (transform.forward * input.y + transform.right * input.x);
-            if (move.sqrMagnitude > 1f) move.Normalize();
-            move *= speed;
-
-            if (m_Controller.isGrounded) m_VerticalVelocity = -1f;
-            else m_VerticalVelocity += Physics.gravity.y * Time.deltaTime;
-            move.y = m_VerticalVelocity;
-            m_Controller.Move(move * Time.deltaTime);
-
-            // Crouch height & camera.
-            float targetHeight = Height;
-            m_Controller.height = Mathf.MoveTowards(m_Controller.height, targetHeight, Time.deltaTime * 4f);
-            m_Controller.center = new Vector3(0, m_Controller.height / 2f, 0);
-            float targetHead = Downed.Value ? 0.35f : (crouch ? 0.95f : 1.6f);
-            m_HeadHeight = Mathf.MoveTowards(m_HeadHeight, targetHead, Time.deltaTime * 3f);
-            Head.localPosition = new Vector3(0, m_HeadHeight, 0);
-            Head.localRotation = Quaternion.Euler(m_Pitch, 0, Downed.Value ? 25f : 0f);
-
-            UpdateNoise(input);
+            UpdateNoise();
             UpdateGas();
             UpdateInteractions(kb);
             UpdateFog();
@@ -197,10 +156,6 @@ namespace Stealth.Player
             RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 0.25f);
             Camera.backgroundColor = RenderSettings.fogColor;
         }
-
-        bool CanStandUp() =>
-            !Physics.SphereCast(transform.position + Vector3.up * 0.5f, m_Controller.radius * 0.9f, Vector3.up, out _,
-                StandHeight - 0.5f, ~(1 << 2), QueryTriggerInteraction.Ignore);
 
         void UpdateModelPose()
         {
@@ -218,7 +173,7 @@ namespace Stealth.Player
             var toHatch = layout.HatchPosition - spawn;
             toHatch.y = 0;
             TeleportOwner(spawn + Vector3.up * 0.1f, Quaternion.LookRotation(toHatch.sqrMagnitude > 0.01f ? toHatch : Vector3.forward));
-            m_Pitch = 15f;
+            Motor.SetPitch(15f);
             GasTime = 0;
         }
 
@@ -227,12 +182,13 @@ namespace Stealth.Player
             m_Controller.enabled = false;
             transform.SetPositionAndRotation(position, rotation);
             m_Controller.enabled = true;
+            if (Motor != null) Motor.ResetMotion();
             if (m_NetTransform != null && m_NetTransform.IsSpawned) m_NetTransform.Teleport(position, rotation, transform.localScale);
         }
 
-        void UpdateNoise(Vector2 input)
+        void UpdateNoise()
         {
-            if (input.sqrMagnitude < 0.01f || Downed.Value) { m_StepTimer = 0; return; }
+            if (Motor.HorizontalSpeed < 0.6f || !Motor.Grounded || Downed.Value) { m_StepTimer = 0; return; }
             float interval = Crouching.Value ? 0.6f : IsSprinting ? 0.32f : 0.45f;
             m_StepTimer += Time.deltaTime;
             if (m_StepTimer < interval) return;

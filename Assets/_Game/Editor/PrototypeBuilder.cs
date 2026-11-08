@@ -342,7 +342,9 @@ namespace Stealth.EditorTools
             var listener = head.AddComponent<AudioListener>();
             listener.enabled = false;
 
+            var motor = root.AddComponent<PlayerMotor>();
             var pc = root.AddComponent<PlayerController>();
+            pc.Motor = motor;
             pc.Head = head.transform;
             pc.Camera = cam;
             pc.Listener = listener;

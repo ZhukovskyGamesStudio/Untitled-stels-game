@@ -73,6 +73,7 @@ namespace Stealth.Level
     {
         public const float Cell = 10f;
         public const float WallHeight = 3f;
+        public const float FloorHeight = 3.5f; // floor-to-floor: walls + slab
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
