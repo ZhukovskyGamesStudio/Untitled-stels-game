@@ -11,6 +11,7 @@ namespace Stealth.Player
         public bool Sprint;
         public bool CrouchHeld;
         public bool Jump; // pressed this frame
+        public bool CrouchToggle; // pressed this frame
 
         public static PlayerInputState FromDevices(bool allowLook)
         {
@@ -23,7 +24,10 @@ namespace Stealth.Player
             if (kb.dKey.isPressed) s.Move.x += 1;
             if (kb.aKey.isPressed) s.Move.x -= 1;
             s.Sprint = kb.leftShiftKey.isPressed;
-            s.CrouchHeld = kb.leftCtrlKey.isPressed || kb.cKey.isPressed;
+            // Ctrl = hold to crouch (or toggle, if chosen in the settings), C = always toggles.
+            bool ctrl = kb.leftCtrlKey.isPressed;
+            s.CrouchHeld = ctrl && !GameSettings.CrouchToggle;
+            s.CrouchToggle = kb.cKey.wasPressedThisFrame || (GameSettings.CrouchToggle && kb.leftCtrlKey.wasPressedThisFrame);
             s.Jump = kb.spaceKey.wasPressedThisFrame;
             if (allowLook && mouse != null) s.Look = mouse.delta.ReadValue();
             return s;
@@ -67,6 +71,8 @@ namespace Stealth.Player
         public float HorizontalSpeed => new Vector3(m_Velocity.x, 0, m_Velocity.z).magnitude;
         public bool IsSprinting { get; private set; }
         public bool IsCrouching { get; private set; }
+        /// <summary>The player wants to stand up but something is right above the head.</summary>
+        public bool BlockedByCeiling { get; private set; }
         public bool Grounded => m_Controller.isGrounded;
         public float Pitch => m_Pitch;
         public readonly Stamina Stamina = new();
@@ -83,6 +89,7 @@ namespace Stealth.Player
         float m_JumpQueuedUntil = -10f;
         bool m_WasGrounded = true;
         float m_FallSpeed;
+        bool m_CrouchToggled;
         float m_Fov = GameSettings.DefaultFov;
         float m_HeadVelocity;
         float m_BobPhase;
@@ -94,7 +101,11 @@ namespace Stealth.Player
 
         public void SetPitch(float pitch) => m_Pitch = pitch;
 
-        public void ResetMotion() => m_Velocity = Vector3.zero;
+        public void ResetMotion()
+        {
+            m_Velocity = Vector3.zero;
+            m_CrouchToggled = false;
+        }
 
         /// <summary>Simulates one frame. <paramref name="canAct"/> = false while downed or in a menu.</summary>
         public void Tick(PlayerInputState input, bool canAct, bool downed, Transform head, Camera cam, float dt)
@@ -106,8 +117,12 @@ namespace Stealth.Player
             transform.Rotate(0f, input.Look.x * sens, 0f);
             m_Pitch = Mathf.Clamp(m_Pitch - input.Look.y * sens * (GameSettings.InvertY ? -1f : 1f), -88f, 88f);
 
-            bool crouch = input.CrouchHeld && !downed;
-            if (!crouch && IsCrouching && !CanStandUp()) crouch = true;
+            if (input.CrouchToggle) m_CrouchToggled = !m_CrouchToggled;
+            if (input.Sprint && input.Move.y > 0.1f && m_CrouchToggled && CanStandUp()) m_CrouchToggled = false; // sprint stands up
+            if (downed) m_CrouchToggled = false;
+            bool crouch = (input.CrouchHeld || m_CrouchToggled) && !downed;
+            BlockedByCeiling = !crouch && IsCrouching && !CanStandUp();
+            if (BlockedByCeiling) crouch = true;
             IsCrouching = crouch;
             bool wantsSprint = !crouch && input.Sprint && input.Move.y > 0.1f;
             IsSprinting = wantsSprint && Stamina.CanSprint;

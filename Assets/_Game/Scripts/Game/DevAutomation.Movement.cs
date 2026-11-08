@@ -12,6 +12,7 @@ namespace Stealth.Game
             steps.Add(JumpCheck());
             steps.Add(StepDownCheck());
             steps.Add(StaminaCheck());
+            steps.Add(CrouchToggleCheck());
         }
 
         IEnumerator JumpCheck()
@@ -99,6 +100,22 @@ namespace Stealth.Game
             }
             Release();
             Log($"stamina: exhausted after {Time.time - t:0.0}s of sprint, sprinting now={Me.Motor.IsSprinting}");
+        }
+
+        IEnumerator CrouchToggleCheck()
+        {
+            Release();
+            yield return new WaitForSeconds(0.3f);
+            PlayerController.Autopilot = new PlayerInputState { CrouchToggle = true };
+            yield return null;
+            Release();
+            yield return new WaitForSeconds(0.4f);
+            bool crouchedAfterToggle = Me.Motor.IsCrouching;
+            Drive(Vector2.up, sprint: true);
+            yield return new WaitForSeconds(0.3f);
+            bool crouchedWhileSprinting = Me.Motor.IsCrouching;
+            Release();
+            Log($"crouch toggle: crouched={crouchedAfterToggle}, sprint cancels it={!crouchedWhileSprinting}");
         }
     }
 }
