@@ -50,6 +50,9 @@ namespace Stealth.Player
         public readonly NetworkVariable<bool> Downed = new();
         public readonly NetworkVariable<bool> Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>Camera pitch in degrees (owner writes ~10 times per second) so teammates see where you look.</summary>
+        public readonly NetworkVariable<Unity.Collections.FixedString32Bytes> DisplayName =
+            new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public string Nick => DisplayName.Value.Length > 0 ? DisplayName.Value.ToString() : $"Игрок {OwnerClientId + 1}";
         public readonly NetworkVariable<sbyte> LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         public bool CursorMode { get; private set; }
@@ -105,6 +108,9 @@ namespace Stealth.Player
             {
                 Local = this;
                 GameSettings.EnsureLoaded();
+                var nick = SteamManager.Initialized ? SteamManager.PersonaName : $"Игрок {OwnerClientId + 1}";
+                if (nick.Length > 28) nick = nick.Substring(0, 28);
+                DisplayName.Value = new Unity.Collections.FixedString32Bytes(nick);
                 Camera.enabled = true;
                 Camera.clearFlags = CameraClearFlags.SolidColor; // no sky: outside is a wall of gas
                 Listener.enabled = true;

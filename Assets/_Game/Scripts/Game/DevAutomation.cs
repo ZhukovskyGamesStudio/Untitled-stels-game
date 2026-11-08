@@ -47,6 +47,7 @@ namespace Stealth.Game
         IEnumerator Start()
         {
             if (int.TryParse(Arg("-seed"), out var seed)) GameManager.ForcedSeed = seed;
+            GameManager.Peaceful = Arg("-peaceful") != null;
             yield return new WaitForSeconds(0.5f);
             if (Arg("-host-local") != null) GameNetwork.Instance.StartHostLocal();
             var join = Arg("-join-local");
@@ -257,6 +258,7 @@ namespace Stealth.Game
         /// <summary>Two players: the host walks and looks around, the client watches and takes pictures.</summary>
         IEnumerator CoopScenario()
         {
+            yield return CoopTeamShots();
             var hatch = LevelGenerator.Current.HatchPosition;
             float t0 = Time.time;
             while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;

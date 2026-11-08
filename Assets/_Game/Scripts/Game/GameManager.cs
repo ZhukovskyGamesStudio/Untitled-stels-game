@@ -29,6 +29,8 @@ namespace Stealth.Game
         public static GameManager Instance { get; private set; }
         /// <summary>Test hook: seed for the first level (0 = random).</summary>
         public static int ForcedSeed;
+        /// <summary>Test hook: robots and sensors ignore players (UI screenshots).</summary>
+        public static bool Peaceful;
 
         [Header("Content")]
         public LevelArt Art;

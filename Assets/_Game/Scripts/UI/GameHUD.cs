@@ -156,7 +156,7 @@ namespace Stealth.UI
             if (me.Downed.Value)
             {
                 UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0.25f, 0f, 0f, 0.55f));
-                UiDraw.Label(new Rect(0, Screen.height * 0.35f, Screen.width, 60),
+                if (gm.Phase.Value == RunPhase.Playing) UiDraw.Label(new Rect(0, Screen.height * 0.35f, Screen.width, 60),
                     "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
             }
             if (gm.AlarmActive && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
@@ -259,15 +259,40 @@ namespace Stealth.UI
                 UiDraw.Rect(new Rect(hp.x + 56 + i * 54, hp.y + 10, 46, 20), i < me.Hp.Value ? new Color(0.9f, 0.2f, 0.2f) : new Color(1, 1, 1, 0.15f));
         }
 
+        /// <summary>
+        /// Teammates: a compact list under the health panel; names over heads only when close and visible;
+        /// a downed teammate gets a red marker through walls so the team can come and help.
+        /// </summary>
         static void DrawTeam(PlayerController me)
         {
-            float ty = 64;
+            float ty = 62;
+            var cam = me.Camera;
             foreach (var p in PlayerController.All)
             {
                 if (p == me) continue;
-                string state = p.Downed.Value ? "<color=#ff5050>выведен из строя</color>" : $"ХП {p.Hp.Value}";
-                UiDraw.Label(new Rect(Screen.width - 260, ty, 244, 20), $"Игрок {p.OwnerClientId}: {state}", 13, TextAnchor.MiddleRight, Color.white);
-                ty += 20;
+                var c = p.Downed.Value ? new Color(1f, 0.35f, 0.3f) : new Color(1, 1, 1, 0.8f);
+                string state = p.Downed.Value ? "упал" : new string('■', Mathf.Max(0, p.Hp.Value));
+                UiDraw.Label(new Rect(Screen.width - 260, ty, 244, 18), $"{p.Nick}  {state}", 12, TextAnchor.MiddleRight, c);
+                ty += 18;
+                if (cam == null) continue;
+
+                var head = p.transform.position + Vector3.up * (p.Downed.Value ? 0.6f : p.Height + 0.25f);
+                var vp = cam.WorldToViewportPoint(head);
+                float dist = Vector3.Distance(cam.transform.position, head);
+                if (p.Downed.Value)
+                {
+                    var pos = UiMath.EdgeMarker(vp, Screen.width, Screen.height, 48f, out _);
+                    float pulse = 0.7f + 0.3f * Mathf.Sin(Time.time * 6f);
+                    UiDraw.Rect(new Rect(pos.x - 3, pos.y - 10, 6, 20), new Color(1f, 0.25f, 0.2f, pulse));
+                    UiDraw.Rect(new Rect(pos.x - 10, pos.y - 3, 20, 6), new Color(1f, 0.25f, 0.2f, pulse));
+                    UiDraw.Label(new Rect(pos.x - 80, pos.y + 12, 160, 18), $"{p.Nick} · {dist:0} м", 12, TextAnchor.MiddleCenter, new Color(1f, 0.5f, 0.45f));
+                }
+                else if (vp.z > 0f && dist < 14f && !Physics.Linecast(cam.transform.position, head, ~(1 << 2), QueryTriggerInteraction.Ignore))
+                {
+                    float a = Mathf.Clamp01((14f - dist) / 4f) * 0.8f;
+                    var pos = new Vector2(vp.x * Screen.width, (1f - vp.y) * Screen.height);
+                    UiDraw.Label(new Rect(pos.x - 80, pos.y - 18, 160, 18), p.Nick, 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, a));
+                }
             }
         }
 

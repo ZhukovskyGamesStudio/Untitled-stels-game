@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Stealth.Enemies;
 using Stealth.Level;
+using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Game
@@ -73,6 +74,38 @@ namespace Stealth.Game
             Me.Motor.SetPitch(0);
             yield return new WaitForSeconds(0.4f);
             yield return Shot("hatch_marker_edge");
+        }
+
+        /// <summary>Coop: names over heads nearby, then the host goes down and the client sees the marker through walls.</summary>
+        IEnumerator CoopTeamShots()
+        {
+            float t0 = Time.time;
+            while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
+            var hatch = LevelGenerator.Current.HatchPosition;
+            if (Me.IsHost)
+            {
+                Me.TeleportOwner(hatch + new Vector3(-2f, 0.05f, 0f), Quaternion.LookRotation(Vector3.right));
+                yield return new WaitForSeconds(5f);
+                Me.TakeHitServer(Me.transform.position + Vector3.right);
+                yield return new WaitForSeconds(1.7f); // after the invulnerability window
+                Me.TakeHitServer(Me.transform.position + Vector3.right);
+                Log($"host downed={Me.Downed.Value}");
+                yield return new WaitForSeconds(6f);
+            }
+            else
+            {
+                Me.TeleportOwner(hatch + new Vector3(3f, 0.05f, 0f), Quaternion.LookRotation(Vector3.left));
+                Me.Motor.SetPitch(5f);
+                yield return new WaitForSeconds(3f);
+                yield return Shot("teammate_name");
+                // Go to a neighbouring room so a wall is between us.
+                var other = LevelGenerator.Current.PatrolPoints.OrderBy(p => Vector3.Distance(p, hatch)).Skip(1).First();
+                Me.TeleportOwner(other + new Vector3(0, 0.05f, 0), Quaternion.LookRotation(Flat(hatch - other)));
+                yield return new WaitForSeconds(5f);
+                var host = PlayerController.All.FirstOrDefault(p => p != Me);
+                Log($"teammate: {host?.Nick} downed={host?.Downed.Value}");
+                yield return Shot("downed_marker");
+            }
         }
     }
 }
