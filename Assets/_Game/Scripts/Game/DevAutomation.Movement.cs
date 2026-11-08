@@ -10,6 +10,7 @@ namespace Stealth.Game
         partial void MoveScenarioExtraImpl(List<IEnumerator> steps)
         {
             steps.Add(JumpCheck());
+            steps.Add(StepDownCheck());
         }
 
         IEnumerator JumpCheck()
@@ -44,6 +45,41 @@ namespace Stealth.Game
             while (Time.time - t < 1f) { peak2 = Mathf.Max(peak2, Me.transform.position.y); yield return null; }
             Log($"buffered jump: second jump height {peak2 - y0:0.00} m");
             yield return Shot("after_jumps");
+        }
+
+        /// <summary>Builds a few 0.25 m steps locally and walks down them: the player must stay grounded.</summary>
+        IEnumerator StepDownCheck()
+        {
+            var basePos = Level.LevelGenerator.Current.HatchPosition + new Vector3(-4f, 0f, -2.5f);
+            var root = new GameObject("TestSteps");
+            for (int i = 0; i < 4; i++)
+            {
+                var step = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                step.transform.SetParent(root.transform);
+                float h = 1f - i * 0.25f;
+                step.transform.position = basePos + new Vector3(i * 0.5f, h / 2f, 0);
+                step.transform.localScale = new Vector3(0.5f, h, 1.4f);
+            }
+            Me.TeleportOwner(basePos + new Vector3(0, 1.05f, 0), Quaternion.LookRotation(Vector3.right));
+            Release();
+            yield return new WaitForSeconds(0.5f);
+            int snaps0 = Me.Motor.SnapCount, airFrames = 0, frames = 0;
+            float landed = 0;
+            System.Action<float> onLand = v => landed = Mathf.Max(landed, v);
+            Me.Motor.Landed += onLand;
+            Drive(Vector2.up);
+            float t = Time.time;
+            while (Time.time - t < 1.1f)
+            {
+                frames++;
+                if (!Me.Motor.Grounded) airFrames++;
+                yield return null;
+            }
+            Release();
+            Me.Motor.Landed -= onLand;
+            Log($"steps down: snaps={Me.Motor.SnapCount - snaps0} airborne {airFrames}/{frames} frames, hardest landing {landed:0.0} m/s, y={Me.transform.position.y:0.00}");
+            yield return Shot("steps");
+            Object.Destroy(root);
         }
     }
 }

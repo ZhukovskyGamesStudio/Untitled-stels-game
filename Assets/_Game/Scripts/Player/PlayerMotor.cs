@@ -51,6 +51,10 @@ namespace Stealth.Player
         [Tooltip("A jump pressed this long before landing is executed on landing.")]
         public float JumpBuffer = 0.15f;
 
+        [Header("Ground")]
+        [Tooltip("When walking down steps or slopes, stick to the ground below if it is at most this far.")]
+        public float GroundSnapDistance = 0.45f;
+
         [Header("Camera")]
         [Tooltip("Extra field of view while sprinting, degrees.")]
         public float SprintFovKick = 7f;
@@ -118,6 +122,7 @@ namespace Stealth.Player
             if (input.Jump) m_JumpQueuedUntil = now + JumpBuffer;
             bool canJump = !crouch && !downed && canAct && MovementMath.CanJump(now, m_LastGroundedTime, m_JumpQueuedUntil, CoyoteTime);
             float vertical;
+            bool jumpedNow = canJump;
             if (canJump)
             {
                 vertical = MovementMath.JumpVelocity(JumpHeight, Physics.gravity.y);
@@ -127,10 +132,20 @@ namespace Stealth.Player
             }
             else vertical = grounded && m_Velocity.y <= 0f ? -2f : m_Velocity.y + Physics.gravity.y * dt;
             m_Velocity = new Vector3(horizontal.x, vertical, horizontal.z);
-            var flags = m_Controller.Move(m_Velocity * dt);
+            var step = m_Velocity * dt;
+            // While grounded push down by at least a few centimeters per frame: at high frame rates a tiny push
+            // stays inside the skin width and isGrounded starts flickering.
+            if (grounded && !jumpedNow && m_Velocity.y <= 0f) step.y = Mathf.Min(step.y, -0.03f);
+            var flags = m_Controller.Move(step);
             if ((flags & CollisionFlags.Above) != 0 && m_Velocity.y > 0f) m_Velocity.y = 0f;
 
             bool nowGrounded = m_Controller.isGrounded;
+            bool recentlyGrounded = grounded || now - m_LastGroundedTime < 0.15f;
+            if (!nowGrounded && recentlyGrounded && !jumpedNow && m_Velocity.y <= 0.5f && TrySnapToGround())
+            {
+                nowGrounded = true;
+                SnapCount++;
+            }
             if (!nowGrounded) m_FallSpeed = Mathf.Max(0f, -m_Velocity.y);
             if (nowGrounded && !m_WasGrounded)
             {
@@ -171,6 +186,23 @@ namespace Stealth.Player
             m_Fov = Mathf.Lerp(m_Fov, targetFov, 1f - Mathf.Exp(-8f * dt));
             if (cam != null) cam.fieldOfView = m_Fov;
         }
+
+        /// <summary>Pulls the controller down onto walkable ground right below (stairs, curbs, slopes).</summary>
+        bool TrySnapToGround()
+        {
+            const float lift = 0.1f;
+            var origin = transform.position + Vector3.up * lift;
+            if (!Physics.Raycast(origin, Vector3.down, out var hit, GroundSnapDistance + lift, ~(1 << 2), QueryTriggerInteraction.Ignore))
+                return false;
+            if (Vector3.Angle(hit.normal, Vector3.up) > m_Controller.slopeLimit + 1f) return false;
+            float drop = hit.distance - lift;
+            if (drop <= 0.001f) return false;
+            m_Controller.Move(Vector3.down * (drop + m_Controller.skinWidth));
+            m_Velocity.y = -2f;
+            return m_Controller.isGrounded;
+        }
+
+        public int SnapCount { get; private set; }
 
         bool CanStandUp() =>
             !Physics.SphereCast(transform.position + Vector3.up * 0.5f, m_Controller.radius * 0.9f, Vector3.up, out _,

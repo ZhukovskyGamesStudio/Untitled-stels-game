@@ -29,6 +29,7 @@ namespace Stealth.Net
         {
             Instance = this;
             Application.runInBackground = true;
+            if (QualitySettings.vSyncCount == 0) Application.targetFrameRate = 144;
             Manager.OnClientDisconnectCallback += OnClientDisconnect;
             Manager.OnClientConnectedCallback += id =>
             {
