@@ -28,5 +28,18 @@ namespace Stealth.Player
 
         /// <summary>Initial vertical speed for a jump of the given height.</summary>
         public static float JumpVelocity(float height, float gravity) => Mathf.Sqrt(2f * Mathf.Abs(gravity) * height);
+
+        /// <summary>Critically-damped-ish spring step used for camera dips. Returns the new position.</summary>
+        public static float SpringStep(float x, ref float velocity, float target, float frequency, float damping, float dt)
+        {
+            float omega = 2f * Mathf.PI * frequency;
+            float accel = omega * omega * (target - x) - 2f * damping * omega * velocity;
+            velocity += accel * dt;
+            return x + velocity * dt;
+        }
+
+        /// <summary>Head bob offset (x = sideways, y = up) for a phase in radians and amplitude in meters.</summary>
+        public static Vector2 HeadBob(float phase, float amplitude) =>
+            new(Mathf.Sin(phase) * amplitude * 0.5f, Mathf.Abs(Mathf.Sin(phase)) * amplitude - amplitude * 0.5f);
     }
 }

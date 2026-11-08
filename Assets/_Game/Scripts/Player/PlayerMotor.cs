@@ -54,6 +54,10 @@ namespace Stealth.Player
         [Header("Camera")]
         [Tooltip("Extra field of view while sprinting, degrees.")]
         public float SprintFovKick = 7f;
+        [Tooltip("Head bob amplitude at walking speed, meters.")]
+        public float BobAmplitude = 0.035f;
+        [Tooltip("Steps per meter travelled (one step = half a bob cycle).")]
+        public float StepsPerMeter = 0.75f;
 
         public Vector3 Velocity => m_Velocity;
         public float HorizontalSpeed => new Vector3(m_Velocity.x, 0, m_Velocity.z).magnitude;
@@ -75,6 +79,11 @@ namespace Stealth.Player
         bool m_WasGrounded = true;
         float m_FallSpeed;
         float m_Fov = GameSettings.DefaultFov;
+        float m_HeadVelocity;
+        float m_BobPhase;
+        float m_BobWeight;
+        float m_Dip;
+        float m_DipVelocity;
 
         void Awake() => m_Controller = GetComponent<CharacterController>();
 
@@ -123,7 +132,11 @@ namespace Stealth.Player
 
             bool nowGrounded = m_Controller.isGrounded;
             if (!nowGrounded) m_FallSpeed = Mathf.Max(0f, -m_Velocity.y);
-            if (nowGrounded && !m_WasGrounded) Landed?.Invoke(m_FallSpeed);
+            if (nowGrounded && !m_WasGrounded)
+            {
+                Landed?.Invoke(m_FallSpeed);
+                m_DipVelocity -= Mathf.Min(m_FallSpeed, 12f) * 0.35f; // camera sinks a little on landing
+            }
             m_WasGrounded = nowGrounded;
             if ((flags & CollisionFlags.Sides) != 0)
             {
@@ -138,8 +151,18 @@ namespace Stealth.Player
             m_Controller.height = Mathf.MoveTowards(m_Controller.height, targetHeight, dt * 5f);
             m_Controller.center = new Vector3(0, m_Controller.height / 2f, 0);
             float targetHead = downed ? 0.35f : (crouch ? 0.95f : 1.6f);
-            m_HeadHeight = Mathf.MoveTowards(m_HeadHeight, targetHead, dt * 4f);
-            head.localPosition = new Vector3(0, m_HeadHeight, 0);
+            m_HeadHeight = Mathf.SmoothDamp(m_HeadHeight, targetHead, ref m_HeadVelocity, 0.09f, Mathf.Infinity, dt);
+
+            // Head bob follows the distance travelled, so it matches the footsteps at any speed.
+            float speedNow = HorizontalSpeed;
+            m_BobPhase += speedNow * StepsPerMeter * Mathf.PI * dt;
+            float targetWeight = GameSettings.HeadBob && nowGrounded && !downed ? Mathf.Clamp01(speedNow / WalkSpeed) : 0f;
+            m_BobWeight = Mathf.MoveTowards(m_BobWeight, targetWeight, dt * 6f);
+            float amplitude = BobAmplitude * (crouch ? 0.5f : IsSprinting ? 1.6f : 1f) * m_BobWeight;
+            var bob = MovementMath.HeadBob(m_BobPhase, amplitude);
+            m_Dip = MovementMath.SpringStep(m_Dip, ref m_DipVelocity, 0f, 2.2f, 0.7f, dt);
+            m_Dip = Mathf.Clamp(m_Dip, -0.25f, 0.1f);
+            head.localPosition = new Vector3(bob.x, m_HeadHeight + bob.y + m_Dip, 0);
             head.localRotation = Quaternion.Euler(m_Pitch, 0, downed ? 25f : 0f);
 
             // Field of view: a subtle widening while actually running fast.

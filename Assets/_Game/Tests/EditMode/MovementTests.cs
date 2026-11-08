@@ -89,5 +89,30 @@ namespace Stealth.Tests
             Assert.IsTrue(MovementMath.CanJump(5f, 5f, 5.05f, 0.12f), "pressed shortly before landing");
             Assert.IsFalse(MovementMath.CanJump(5f, 5f, 4.9f, 0.12f), "press expired before landing");
         }
+
+        [Test]
+        public void SpringSettlesAfterDip()
+        {
+            float x = 0f, v = -1.5f, min = 0f, max = 0f; // landing at ~4.3 m/s
+            for (int i = 0; i < 120; i++)
+            {
+                x = MovementMath.SpringStep(x, ref v, 0f, 2.2f, 0.7f, Dt);
+                min = Mathf.Min(min, x);
+                max = Mathf.Max(max, x);
+            }
+            Assert.AreEqual(0f, x, 0.01f, "back to rest within 2 s");
+            Assert.Less(min, -0.03f, "a visible dip");
+            Assert.Less(max, 0.03f, "barely overshoots upwards");
+        }
+
+        [Test]
+        public void HeadBobIsZeroWithoutAmplitudeAndSymmetric()
+        {
+            Assert.AreEqual(Vector2.zero, MovementMath.HeadBob(1.3f, 0f));
+            var a = MovementMath.HeadBob(0.5f, 0.04f);
+            var b = MovementMath.HeadBob(-0.5f, 0.04f);
+            Assert.AreEqual(a.y, b.y, 1e-6f);
+            Assert.AreEqual(a.x, -b.x, 1e-6f);
+        }
     }
 }
