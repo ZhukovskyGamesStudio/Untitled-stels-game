@@ -73,6 +73,30 @@ namespace Stealth.Game
             LookAtFrom(new Pose(top, Quaternion.LookRotation(new Vector3(1, 0, 1))), top + new Vector3(10, 1.2f, 10));
             yield return new WaitForSeconds(0.5f);
             yield return Shot("top_floor");
+
+            // Patrol for a while: wheeled robots must stay on their floor, walkers may change floors.
+            var start = new System.Collections.Generic.Dictionary<Enemies.RobotController, int>();
+            var visited = new System.Collections.Generic.Dictionary<Enemies.RobotController, System.Collections.Generic.HashSet<int>>();
+            foreach (var r in Enemies.RobotController.All)
+            {
+                start[r] = LevelLayout.FloorOf(r.transform.position.y);
+                visited[r] = new System.Collections.Generic.HashSet<int> { start[r] };
+            }
+            float t = Time.time;
+            while (Time.time - t < 40f)
+            {
+                foreach (var r in Enemies.RobotController.All) visited[r].Add(LevelLayout.FloorOf(r.transform.position.y));
+                yield return new WaitForSeconds(0.5f);
+            }
+            int wheeledLeft = 0, walkersMoved = 0;
+            foreach (var kv in visited)
+            {
+                bool moved = kv.Value.Count > 1;
+                if (!kv.Key.CanUseStairs && moved) wheeledLeft++;
+                if (kv.Key.CanUseStairs && moved) walkersMoved++;
+                Log($"  {kv.Key.name} stairs={kv.Key.CanUseStairs} floors visited: {string.Join(",", kv.Value)}");
+            }
+            Log($"floor rules: wheeled robots that left their floor={wheeledLeft}, walkers that changed floor={walkersMoved}");
         }
     }
 }

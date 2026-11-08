@@ -428,6 +428,7 @@ namespace Stealth.EditorTools
             else
             {
                 rc.HasEyes = false;
+                rc.CanUseStairs = false; // wheels
                 rc.HearingMultiplier = 1.6f;
                 rc.ChaseHearingShare = 0.6f;
                 rc.PatrolSpeed = 1.5f;

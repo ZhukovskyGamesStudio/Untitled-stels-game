@@ -34,6 +34,8 @@ namespace Stealth.Enemies
         public float ContactDistance = 1.3f;
 
         [Header("Movement")]
+        [Tooltip("Legs: can use stairs and move between floors. Wheels / tracks: stays on its floor.")]
+        public bool CanUseStairs = true;
         public float PatrolSpeed = 2f;
         public float InvestigateSpeed = 3f;
         public float ChaseSpeed = 4.6f;
@@ -73,6 +75,7 @@ namespace Stealth.Enemies
             ApplyVisual(State.Value);
             if (!IsServer) return;
             m_Agent.enabled = true;
+            m_Agent.areaMask = CanUseStairs ? NavMesh.AllAreas : NavMesh.AllAreas & ~(1 << LevelGenerator.StairsArea);
             m_Agent.Warp(transform.position);
             m_Agent.speed = PatrolSpeed;
             NoiseSystem.OnNoise += OnNoise;
@@ -181,6 +184,8 @@ namespace Stealth.Enemies
         {
             float hearing = radius * HearingMultiplier;
             float d = Vector3.Distance(position, transform.position);
+            // Sound through a slab is muffled: other floors hear only half as far.
+            if (LevelLayout.FloorOf(position.y) != LevelLayout.FloorOf(transform.position.y)) d *= 2f;
             if (d > hearing) return;
             var player = PlayerController.Find(source);
 
@@ -301,15 +306,20 @@ namespace Stealth.Enemies
             m_WaitUntil = -1f;
             var layout = LevelGenerator.Current;
             if (layout == null || layout.PatrolPoints.Count == 0) return;
+            int myFloor = LevelLayout.FloorOf(transform.position.y);
+            // Robots without legs patrol only their floor; walkers mostly stay but sometimes change floors.
+            bool sameFloorOnly = !CanUseStairs || Random.value < 0.75f;
+            var options = layout.PatrolPoints.FindAll(p => !sameFloorOnly || LevelLayout.FloorOf(p.y) == myFloor);
+            if (options.Count == 0) options = layout.PatrolPoints;
             // Prefer nearby rooms so that robots keep "their" area.
-            Vector3 best = layout.PatrolPoints[Random.Range(0, layout.PatrolPoints.Count)];
+            Vector3 best = options[Random.Range(0, options.Count)];
             for (int i = 0; i < 3; i++)
             {
-                var p = layout.PatrolPoints[Random.Range(0, layout.PatrolPoints.Count)];
+                var p = options[Random.Range(0, options.Count)];
                 if (Vector3.Distance(p, transform.position) < Vector3.Distance(best, transform.position) && Vector3.Distance(p, transform.position) > 3f) best = p;
             }
             best += new Vector3(Random.Range(-2.5f, 2.5f), 0, Random.Range(-2.5f, 2.5f));
-            if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) m_Agent.SetDestination(hit.position);
+            if (NavMesh.SamplePosition(best, out var hit, 3f, m_Agent.areaMask)) m_Agent.SetDestination(hit.position);
         }
     }
 }

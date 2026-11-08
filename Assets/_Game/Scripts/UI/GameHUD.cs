@@ -242,7 +242,9 @@ namespace Stealth.UI
             bool met = gm.Collected.Value >= gm.Quota.Value;
             var panel = new Rect(16, 16, 232, 50);
             UiDraw.Rect(panel, new Color(0, 0, 0, 0.45f));
-            UiDraw.Label(new Rect(26, 18, 120, 22), $"Дом {gm.Level.Value.Index + 1}", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
+            var me = PlayerController.Local;
+            int floor = me != null ? LevelLayout.FloorOf(me.transform.position.y) + 1 : 1;
+            UiDraw.Label(new Rect(26, 18, 140, 22), $"Дом {gm.Level.Value.Index + 1} · этаж {floor}", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
             UiDraw.Label(new Rect(26, 18, 212, 22), $"{gm.Collected.Value} / {gm.Quota.Value}", 14, TextAnchor.MiddleRight,
                 met ? new Color(0.45f, 1f, 0.5f) : Color.white, true);
             UiDraw.Bar(new Rect(26, 44, 212, 10), gm.Quota.Value > 0 ? gm.Collected.Value / (float)gm.Quota.Value : 0f,

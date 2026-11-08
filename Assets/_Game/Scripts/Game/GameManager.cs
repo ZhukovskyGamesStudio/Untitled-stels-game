@@ -150,7 +150,8 @@ namespace Stealth.Game
                 var obj = Instantiate(ItemPrefab, pos, Quaternion.Euler(0, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f, 0));
                 var item = obj.GetComponent<WorldItem>();
                 item.Shape.Value = (byte)rng.Next(ItemCatalog.Shapes.Length);
-                item.Color.Value = (byte)ItemCatalog.RandomColor(rng, index * 2);
+                // Higher floors are riskier and richer.
+                item.Color.Value = (byte)ItemCatalog.RandomColor(rng, index * 2 + LevelLayout.FloorOf(pos.y) * 4);
                 obj.Spawn(true);
                 total += item.Value;
             }
@@ -159,7 +160,7 @@ namespace Stealth.Game
             foreach (var spawn in layout.RobotSpawns)
             {
                 var prefab = spawn.Type == 0 ? GuardRobotPrefab : ListenerRobotPrefab;
-                var pos = NavMesh.SamplePosition(spawn.Position, out var hit, 4f, NavMesh.AllAreas) ? hit.position : spawn.Position;
+                var pos = NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas) ? hit.position : spawn.Position;
                 var obj = Instantiate(prefab, pos, Quaternion.Euler(0, rng.Next(360), 0));
                 obj.Spawn(true);
                 m_Spawned.Add(obj);
