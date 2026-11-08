@@ -409,6 +409,7 @@ namespace Stealth.EditorTools
             light.intensity = 2.5f;
             light.shadows = LightShadows.None;
 
+            root.AddComponent<DetectorAwareness>().Point = eye.transform;
             var rc = root.AddComponent<RobotController>();
             rc.Eye = eye.transform;
             rc.StatusRenderers = Parts(model, "Eye");
@@ -455,6 +456,7 @@ namespace Stealth.EditorTools
             spot.type = LightType.Spot;
             spot.shadows = LightShadows.None;
 
+            root.AddComponent<DetectorAwareness>().Point = spotGo.transform;
             var sc = root.AddComponent<SecurityCamera>();
             sc.Pivot = pivot.transform;
             sc.Spot = spot;

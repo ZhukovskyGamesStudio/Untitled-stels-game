@@ -32,10 +32,13 @@ namespace Stealth.Enemies
         float m_Phase;
         float m_AlarmUntil;
         MaterialPropertyBlock m_Block;
+        DetectorAwareness m_Awareness;
+        PlayerController m_LastSeen;
 
         public override void OnNetworkSpawn()
         {
             m_Phase = (NetworkObjectId % 11) * 0.73f;
+            m_Awareness = GetComponent<DetectorAwareness>();
             Alert.OnValueChanged += (_, a) => ApplyVisual(a);
             ApplyVisual(Alert.Value);
             if (Spot != null)
@@ -87,6 +90,8 @@ namespace Stealth.Enemies
             byte alert = Time.time < m_AlarmUntil ? (byte)2 : m_Meter > 0.15f ? (byte)1 : (byte)0;
             if (Alert.Value != alert) Alert.Value = alert;
             if (alert == 2 && seen == null) m_Meter = Mathf.Min(m_Meter, 0.9f);
+            if (seen != null) m_LastSeen = seen;
+            if (m_Awareness != null) m_Awareness.ReportServer(alert == 2 ? 1f : Mathf.Clamp01(m_Meter), m_LastSeen);
         }
 
         bool CanSee(PlayerController p, out float distance)

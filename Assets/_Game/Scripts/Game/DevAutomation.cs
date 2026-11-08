@@ -46,6 +46,7 @@ namespace Stealth.Game
 
         IEnumerator Start()
         {
+            if (int.TryParse(Arg("-seed"), out var seed)) GameManager.ForcedSeed = seed;
             yield return new WaitForSeconds(0.5f);
             if (Arg("-host-local") != null) GameNetwork.Instance.StartHostLocal();
             var join = Arg("-join-local");
@@ -89,6 +90,27 @@ namespace Stealth.Game
         static void Release() => PlayerController.Autopilot = new PlayerInputState();
 
         static Vector3 Flat(Vector3 v) => new(v.x, 0, v.z);
+
+        /// <summary>A standing spot near <paramref name="target"/> on the open side (towards the room centre), facing it.</summary>
+        static Pose ViewPoint(Vector3 target, float distance)
+        {
+            var center = LevelGenerator.Current.RoomCenterAt(target);
+            var dir = Flat(center - target);
+            if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
+            var floorY = Mathf.Floor((target.y + 0.5f) / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight;
+            var stand = target + dir.normalized * Mathf.Min(distance, dir.magnitude + 1f);
+            stand.y = floorY + 0.05f;
+            return new Pose(stand, Quaternion.LookRotation(Flat(target - stand)));
+        }
+
+        /// <summary>Teleports in front of a world point and pitches the camera to look right at it.</summary>
+        void LookAtFrom(Pose pose, Vector3 target)
+        {
+            Me.TeleportOwner(pose.position, pose.rotation);
+            var head = pose.position + Vector3.up * 1.6f;
+            var to = target - head;
+            Me.Motor.SetPitch(-Mathf.Atan2(to.y, Flat(to).magnitude) * Mathf.Rad2Deg);
+        }
 
         // ------------------------------------------------------------------ scenarios
 

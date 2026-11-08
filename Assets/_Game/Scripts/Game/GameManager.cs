@@ -27,6 +27,8 @@ namespace Stealth.Game
     public class GameManager : NetworkBehaviour
     {
         public static GameManager Instance { get; private set; }
+        /// <summary>Test hook: seed for the first level (0 = random).</summary>
+        public static int ForcedSeed;
 
         [Header("Content")]
         public LevelArt Art;
@@ -105,7 +107,8 @@ namespace Stealth.Game
             foreach (var item in WorldItem.All.ToArray())
                 if (item.IsSpawned) item.NetworkObject.Despawn();
 
-            int seed = UnityEngine.Random.Range(1, int.MaxValue);
+            int seed = ForcedSeed != 0 ? ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
+            ForcedSeed = 0;
             Level.Value = new LevelInfo { Seed = seed, Index = index };
             BuildLocal();
             var layout = LevelGenerator.Current;

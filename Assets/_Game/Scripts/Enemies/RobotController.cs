@@ -60,6 +60,7 @@ namespace Stealth.Enemies
         float m_NextAttack;
         float m_StateTime;
         MaterialPropertyBlock m_Block;
+        DetectorAwareness m_Awareness;
 
         public float Suspicion => m_Suspicion;
 
@@ -67,6 +68,7 @@ namespace Stealth.Enemies
         {
             All.Add(this);
             m_Agent = GetComponent<NavMeshAgent>();
+            m_Awareness = GetComponent<DetectorAwareness>();
             State.OnValueChanged += (_, s) => ApplyVisual(s);
             ApplyVisual(State.Value);
             if (!IsServer) return;
@@ -118,6 +120,11 @@ namespace Stealth.Enemies
             }
             Sense();
             Think();
+            if (m_Awareness != null)
+            {
+                bool chasing = State.Value == RobotState.Chase && m_Target != null;
+                m_Awareness.ReportServer(chasing ? 1f : m_Suspicion, chasing ? m_Target : m_Suspect);
+            }
         }
 
         void Sense()

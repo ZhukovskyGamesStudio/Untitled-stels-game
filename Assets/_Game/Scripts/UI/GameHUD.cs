@@ -98,6 +98,7 @@ namespace Stealth.UI
             GUI.depth = 10;
 
             DrawOverlays(gm, me);
+            DrawDetection(me);
             DrawStamina(me);
             DrawQuota(gm);
             DrawHealth(me);
@@ -144,6 +145,24 @@ namespace Stealth.UI
             }
             if (gm.AlarmActive && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
                 UiDraw.Label(new Rect(0, 56, Screen.width, 40), "ТРЕВОГА", 28, TextAnchor.MiddleCenter, new Color(1f, 0.2f, 0.15f), true);
+        }
+
+        /// <summary>Arcs around the crosshair towards every sensor that is noticing you.</summary>
+        static void DrawDetection(PlayerController me)
+        {
+            if (me.Camera == null || me.Downed.Value) return;
+            var cam = me.Camera.transform;
+            foreach (var d in Stealth.Enemies.DetectorAwareness.All)
+            {
+                float a = d.AwarenessOf(me.OwnerClientId);
+                if (a < 0.03f) continue;
+                float angle = UiMath.ScreenAngle(cam.position, cam.forward, d.Position);
+                bool detected = a >= 0.99f;
+                var color = detected
+                    ? new Color(1f, 0.12f, 0.08f, 0.75f + 0.25f * Mathf.Sin(Time.time * 12f))
+                    : Color.Lerp(new Color(1f, 0.95f, 0.4f, 0.35f), new Color(1f, 0.55f, 0.1f, 0.95f), a);
+                UiDraw.DirectionArc(angle, 70f + (1f - a) * 25f, color);
+            }
         }
 
         static void DrawStamina(PlayerController me)

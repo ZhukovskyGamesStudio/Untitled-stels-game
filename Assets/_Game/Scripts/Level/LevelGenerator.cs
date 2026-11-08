@@ -52,6 +52,15 @@ namespace Stealth.Level
 
         public int Floors = 1;
 
+        /// <summary>Center of the room containing <paramref name="p"/> (same height as p's floor).</summary>
+        public Vector3 RoomCenterAt(Vector3 p)
+        {
+            int x = Mathf.Clamp(Mathf.FloorToInt(p.x / LevelGenerator.Cell), 0, Width - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt(p.z / LevelGenerator.Cell), 0, Height - 1);
+            int f = Mathf.Clamp(Mathf.FloorToInt((p.y + 0.5f) / LevelGenerator.FloorHeight), 0, Floors - 1);
+            return CellCenter(x, y) + Vector3.up * (f * LevelGenerator.FloorHeight);
+        }
+
         public bool IsInside(Vector3 p) =>
             p.x > 0f && p.z > 0f && p.x < Width * LevelGenerator.Cell && p.z < Height * LevelGenerator.Cell;
 

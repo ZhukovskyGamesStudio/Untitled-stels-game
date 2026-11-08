@@ -26,12 +26,8 @@ namespace Stealth.Game
             var item = WorldItem.All.OrderBy(i => Vector3.Distance(i.transform.position, Me.transform.position)).FirstOrDefault();
             if (item != null)
             {
-                var ip = item.transform.position;
-                var floorY = Mathf.Floor((ip.y + 0.1f) / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight;
-                var stand = new Vector3(ip.x, floorY + 0.05f, ip.z) - Flat(item.transform.forward).normalized * 1.4f;
-                Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(ip - stand)));
-                var head = stand + Vector3.up * 1.6f;
-                Me.Motor.SetPitch(Vector3.SignedAngle(Flat(ip - stand), ip - head, Vector3.Cross(Vector3.up, Flat(ip - stand))));
+                var ip = item.transform.position + Vector3.up * 0.1f;
+                LookAtFrom(ViewPoint(ip, 1.6f), ip);
                 yield return new WaitForSeconds(0.6f);
                 Log($"hover item: {(UI.InventoryUI.Local.Hover != null)} prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
                 yield return Shot("hover_item");
