@@ -51,8 +51,9 @@ namespace Stealth.Player
         [Tooltip("A jump pressed this long before landing is executed on landing.")]
         public float JumpBuffer = 0.15f;
 
-        [Header("Look")]
-        public float MouseSensitivity = 0.1f;
+        [Header("Camera")]
+        [Tooltip("Extra field of view while sprinting, degrees.")]
+        public float SprintFovKick = 7f;
 
         public Vector3 Velocity => m_Velocity;
         public float HorizontalSpeed => new Vector3(m_Velocity.x, 0, m_Velocity.z).magnitude;
@@ -73,6 +74,7 @@ namespace Stealth.Player
         float m_JumpQueuedUntil = -10f;
         bool m_WasGrounded = true;
         float m_FallSpeed;
+        float m_Fov = GameSettings.DefaultFov;
 
         void Awake() => m_Controller = GetComponent<CharacterController>();
 
@@ -81,12 +83,14 @@ namespace Stealth.Player
         public void ResetMotion() => m_Velocity = Vector3.zero;
 
         /// <summary>Simulates one frame. <paramref name="canAct"/> = false while downed or in a menu.</summary>
-        public void Tick(PlayerInputState input, bool canAct, bool downed, Transform head, float dt)
+        public void Tick(PlayerInputState input, bool canAct, bool downed, Transform head, Camera cam, float dt)
         {
             if (!canAct) input = default;
 
-            transform.Rotate(0f, input.Look.x * MouseSensitivity, 0f);
-            m_Pitch = Mathf.Clamp(m_Pitch - input.Look.y * MouseSensitivity, -85f, 85f);
+            // Raw mouse delta, no smoothing: the camera reacts on the same frame.
+            float sens = GameSettings.Sensitivity;
+            transform.Rotate(0f, input.Look.x * sens, 0f);
+            m_Pitch = Mathf.Clamp(m_Pitch - input.Look.y * sens * (GameSettings.InvertY ? -1f : 1f), -88f, 88f);
 
             bool crouch = input.CrouchHeld && !downed;
             if (!crouch && IsCrouching && !CanStandUp()) crouch = true;
@@ -137,6 +141,12 @@ namespace Stealth.Player
             m_HeadHeight = Mathf.MoveTowards(m_HeadHeight, targetHead, dt * 4f);
             head.localPosition = new Vector3(0, m_HeadHeight, 0);
             head.localRotation = Quaternion.Euler(m_Pitch, 0, downed ? 25f : 0f);
+
+            // Field of view: a subtle widening while actually running fast.
+            bool fast = IsSprinting && HorizontalSpeed > WalkSpeed + 0.5f;
+            float targetFov = GameSettings.Fov + (fast ? SprintFovKick : 0f);
+            m_Fov = Mathf.Lerp(m_Fov, targetFov, 1f - Mathf.Exp(-8f * dt));
+            if (cam != null) cam.fieldOfView = m_Fov;
         }
 
         bool CanStandUp() =>

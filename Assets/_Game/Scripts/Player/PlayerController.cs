@@ -97,6 +97,7 @@ namespace Stealth.Player
             if (IsOwner)
             {
                 Local = this;
+                GameSettings.EnsureLoaded();
                 Camera.enabled = true;
                 Camera.clearFlags = CameraClearFlags.SolidColor; // no sky: outside is a wall of gas
                 Listener.enabled = true;
@@ -145,7 +146,7 @@ namespace Stealth.Player
             Cursor.visible = freeCursor;
 
             var input = Autopilot ?? PlayerInputState.FromDevices(!freeCursor);
-            Motor.Tick(input, !menu && !Downed.Value, Downed.Value, Head, Time.deltaTime);
+            Motor.Tick(input, !menu && !Downed.Value, Downed.Value, Head, Camera, Time.deltaTime);
             if (Motor.IsCrouching != Crouching.Value) Crouching.Value = Motor.IsCrouching;
 
             UpdateNoise();
