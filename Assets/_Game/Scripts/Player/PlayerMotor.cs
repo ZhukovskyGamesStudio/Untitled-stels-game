@@ -69,6 +69,7 @@ namespace Stealth.Player
         public bool IsCrouching { get; private set; }
         public bool Grounded => m_Controller.isGrounded;
         public float Pitch => m_Pitch;
+        public readonly Stamina Stamina = new();
 
         /// <summary>Raised on landing with the downward speed at impact (m/s).</summary>
         public event System.Action<float> Landed;
@@ -108,7 +109,9 @@ namespace Stealth.Player
             bool crouch = input.CrouchHeld && !downed;
             if (!crouch && IsCrouching && !CanStandUp()) crouch = true;
             IsCrouching = crouch;
-            IsSprinting = !crouch && input.Sprint && input.Move.y > 0.1f;
+            bool wantsSprint = !crouch && input.Sprint && input.Move.y > 0.1f;
+            IsSprinting = wantsSprint && Stamina.CanSprint;
+            Stamina.Tick(IsSprinting && HorizontalSpeed > 0.5f, dt);
 
             float speed = crouch ? CrouchSpeed : IsSprinting ? SprintSpeed : WalkSpeed;
             var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
@@ -128,6 +131,7 @@ namespace Stealth.Player
                 vertical = MovementMath.JumpVelocity(JumpHeight, Physics.gravity.y);
                 m_JumpQueuedUntil = -10f;
                 m_LastGroundedTime = -10f;
+                Stamina.SpendJump();
                 Jumped?.Invoke();
             }
             else vertical = grounded && m_Velocity.y <= 0f ? -2f : m_Velocity.y + Physics.gravity.y * dt;

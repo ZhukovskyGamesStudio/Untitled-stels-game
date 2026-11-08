@@ -183,6 +183,7 @@ namespace Stealth.Player
             toHatch.y = 0;
             TeleportOwner(spawn + Vector3.up * 0.1f, Quaternion.LookRotation(toHatch.sqrMagnitude > 0.01f ? toHatch : Vector3.forward));
             Motor.SetPitch(15f);
+            Motor.Stamina.Refill();
             GasTime = 0;
         }
 

@@ -11,6 +11,7 @@ namespace Stealth.Game
         {
             steps.Add(JumpCheck());
             steps.Add(StepDownCheck());
+            steps.Add(StaminaCheck());
         }
 
         IEnumerator JumpCheck()
@@ -80,6 +81,24 @@ namespace Stealth.Game
             Log($"steps down: snaps={Me.Motor.SnapCount - snaps0} airborne {airFrames}/{frames} frames, hardest landing {landed:0.0} m/s, y={Me.transform.position.y:0.00}");
             yield return Shot("steps");
             Object.Destroy(root);
+        }
+
+        IEnumerator StaminaCheck()
+        {
+            Me.TeleportOwner(Level.LevelGenerator.Current.HatchPosition + new Vector3(0, 0.05f, -2.5f), Quaternion.LookRotation(Vector3.right));
+            Me.Motor.Stamina.Refill();
+            yield return new WaitForSeconds(0.3f);
+            float t = Time.time;
+            bool shot = false;
+            while (Time.time - t < 9f && !Me.Motor.Stamina.Exhausted)
+            {
+                // Run in a circle around the hatch.
+                Drive(Vector2.up, sprint: true, look: new Vector2(600f * Time.deltaTime, 0));
+                if (!shot && Time.time - t > 3f) { shot = true; yield return Shot("stamina"); }
+                yield return null;
+            }
+            Release();
+            Log($"stamina: exhausted after {Time.time - t:0.0}s of sprint, sprinting now={Me.Motor.IsSprinting}");
         }
     }
 }

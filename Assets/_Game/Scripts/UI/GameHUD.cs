@@ -73,6 +73,17 @@ namespace Stealth.UI
             if (gm.AlarmActive && Mathf.Repeat(Time.time, 0.6f) < 0.4f)
                 UiDraw.Label(new Rect(0, 56, Screen.width, 40), "ТРЕВОГА", 28, TextAnchor.MiddleCenter, new Color(1f, 0.2f, 0.15f), true);
 
+            // Stamina: only visible while not full.
+            var stamina = me.Motor.Stamina;
+            if (stamina.Value < 0.999f && !me.Downed.Value)
+            {
+                float w = 120f;
+                var r = new Rect(Screen.width / 2f - w / 2f, Screen.height / 2f + 34f, w, 6f);
+                UiDraw.Rect(r, new Color(0, 0, 0, 0.45f));
+                UiDraw.Rect(new Rect(r.x, r.y, w * stamina.Value, r.height),
+                    stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
+            }
+
             // Quota.
             var panel = new Rect(16, 16, 300, 92);
             UiDraw.Rect(panel, new Color(0, 0, 0, 0.55f));
