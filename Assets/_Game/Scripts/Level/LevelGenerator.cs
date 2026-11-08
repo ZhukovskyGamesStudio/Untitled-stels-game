@@ -97,6 +97,18 @@ namespace Stealth.Level
                             : RoomType.Lounge;
                     }
 
+            l.Dark = new bool[floors, w, h];
+            l.Flicker = new bool[floors, w, h];
+            for (int f = 0; f < floors; f++)
+                for (int x = 0; x < w; x++)
+                    for (int y = 0; y < h; y++)
+                    {
+                        if (l.Rooms[f, x, y] == RoomType.Lobby) continue;
+                        double r = rng.NextDouble();
+                        l.Dark[f, x, y] = r < 0.15 + 0.03 * Mathf.Min(levelIndex, 5);
+                        l.Flicker[f, x, y] = !l.Dark[f, x, y] && r > 0.88;
+                    }
+
             for (int f = 0; f < floors; f++)
                 for (int x = 0; x < w; x++)
                     for (int y = 0; y < h; y++)
@@ -436,15 +448,17 @@ namespace Stealth.Level
                         var light = go.AddComponent<Light>();
                         light.type = LightType.Point;
                         light.range = 10f;
+                        light.shadows = LightShadows.None;
                         var room = l.Rooms[f, x, y];
-                        light.intensity = room == RoomType.Server ? 1f : 1.5f;
-                        light.color = room switch
+                        bool dark = l.Dark[f, x, y];
+                        float intensity = dark ? 0.18f : room == RoomType.Server ? 1f : 1.5f;
+                        var color = dark ? new Color(0.5f, 0.6f, 0.9f) : room switch
                         {
                             RoomType.Server => new Color(0.55f, 0.75f, 1f),
                             RoomType.Lobby => new Color(0.75f, 1f, 0.8f),
                             _ => new Color(1f, 0.95f, 0.85f),
                         };
-                        light.shadows = LightShadows.None;
+                        go.AddComponent<RoomLight>().Init(color, intensity, l.Flicker[f, x, y], f * 13.1f + x * 3.7f + y * 1.9f);
                     }
             }
 

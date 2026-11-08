@@ -45,6 +45,8 @@ namespace Stealth.Level
     {
         public int Seed, LevelIndex, Width, Height, Floors;
         public RoomType[,,] Rooms;   // [floor, x, y]
+        public bool[,,] Dark;        // lights off: robots' eyes work worse there
+        public bool[,,] Flicker;     // broken light
         public EdgeType[,,] EdgesX;  // [floor, x, y]: between (x,y) and (x+1,y): wall at X = (x+1)*Cell
         public EdgeType[,,] EdgesZ;  // [floor, x, y]: between (x,y) and (x,y+1): wall at Z = (y+1)*Cell
         public readonly List<Stair> Stairs = new();
@@ -76,6 +78,15 @@ namespace Stealth.Level
             int y = Mathf.Clamp(Mathf.FloorToInt(p.z / LevelGenerator.Cell), 0, Height - 1);
             int f = Mathf.Clamp(FloorOf(p.y), 0, Floors - 1);
             return CellCenter(f, x, y);
+        }
+
+        public bool IsDarkAt(Vector3 p)
+        {
+            if (Dark == null) return false;
+            int x = Mathf.FloorToInt(p.x / LevelGenerator.Cell), y = Mathf.FloorToInt(p.z / LevelGenerator.Cell);
+            int f = FloorOf(p.y);
+            if (x < 0 || y < 0 || x >= Width || y >= Height || f >= Floors) return false;
+            return Dark[f, x, y];
         }
 
         /// <summary>Inside the building footprint (gas is everywhere else).</summary>

@@ -78,7 +78,8 @@ namespace Stealth.Enemies
             if (seen != null)
             {
                 float closeness = 1f - Mathf.Clamp01(bestDist / ViewDistance);
-                m_Meter += Time.deltaTime / DetectTime * Mathf.Lerp(0.5f, 2f, closeness) * (seen.Crouching.Value ? 0.7f : 1f);
+                m_Meter += Time.deltaTime / DetectTime * Mathf.Lerp(0.5f, 2f, closeness) * (seen.Crouching.Value ? 0.7f : 1f)
+                           * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(seen.transform.position));
             }
             else m_Meter = Mathf.Max(0f, m_Meter - Time.deltaTime * 0.5f);
 

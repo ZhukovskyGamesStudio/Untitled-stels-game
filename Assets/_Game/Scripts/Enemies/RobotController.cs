@@ -152,7 +152,8 @@ namespace Stealth.Enemies
                     return;
                 }
                 float closeness = 1f - Mathf.Clamp01(seenDist / ViewDistance);
-                float rate = DetectionSpeed * Mathf.Lerp(0.35f, 2.5f, closeness) * (seen.Crouching.Value ? 0.6f : 1f);
+                float rate = DetectionSpeed * Mathf.Lerp(0.35f, 2.5f, closeness) * (seen.Crouching.Value ? 0.6f : 1f)
+                             * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(seen.transform.position));
                 m_Suspicion += rate * Time.deltaTime;
                 m_Suspect = seen;
                 if (m_Suspicion >= 1f) StartChase(seen);

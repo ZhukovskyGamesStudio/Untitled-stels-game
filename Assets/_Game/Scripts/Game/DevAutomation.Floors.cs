@@ -120,6 +120,25 @@ namespace Stealth.Game
                         yield return Shot($"room_{type}");
                     }
             Log($"room types: {string.Join(", ", seen)}");
+
+            // A dark room, then the lobby during an alarm.
+            for (int f = 0; f < l.Floors; f++)
+                for (int x = 0; x < l.Width; x++)
+                    for (int y = 0; y < l.Height; y++)
+                    {
+                        if (!l.Dark[f, x, y]) continue;
+                        var c = l.CellCenter(f, x, y);
+                        var from = c + new Vector3(-1.5f, 0.05f, -1.5f);
+                        LookAtFrom(new Pose(from, Quaternion.LookRotation(new Vector3(1, 0, 1))), c + new Vector3(4, 0.5f, 4));
+                        yield return new WaitForSeconds(0.5f);
+                        yield return Shot("dark_room");
+                        f = l.Floors; x = l.Width; break;
+                    }
+            var hatch = l.HatchPosition;
+            LookAtFrom(new Pose(hatch + new Vector3(-3f, 0.05f, -3f), Quaternion.LookRotation(new Vector3(1, 0, 1))), hatch + new Vector3(3, 1, 3));
+            if (Me.IsServer) GameManager.Instance.RaiseAlarmServer(hatch + Vector3.forward * 80f, 1f);
+            yield return new WaitForSeconds(0.6f);
+            yield return Shot("alarm_lights");
         }
     }
 }
