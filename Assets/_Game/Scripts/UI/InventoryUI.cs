@@ -18,6 +18,17 @@ namespace Stealth.UI
         /// <summary>Test hook: behave as if Tab is held.</summary>
         public static bool ForceHandsModeForTest;
         public WorldItem Hover => m_Hover;
+        WorldItem m_Highlighted;
+
+        void LateUpdate()
+        {
+            if (!IsOwner) return;
+            var want = m_Source == DragSource.World ? m_DragWorld : m_Hover;
+            if (want == m_Highlighted) return;
+            if (m_Highlighted != null) m_Highlighted.SetHighlighted(false);
+            m_Highlighted = want;
+            if (m_Highlighted != null) m_Highlighted.SetHighlighted(true);
+        }
 
         public PlayerController Player;
         public PlayerInventory Inventory;
@@ -253,7 +264,18 @@ namespace Stealth.UI
 
             if (!Player.CursorMode)
             {
-                UiDraw.Rect(new Rect(Screen.width / 2f - 2, Screen.height / 2f - 2, 4, 4), new Color(1, 1, 1, 0.8f));
+                float cx = Screen.width / 2f, cy = Screen.height / 2f;
+                if (m_Hover == null) UiDraw.Rect(new Rect(cx - 2, cy - 2, 4, 4), new Color(1, 1, 1, 0.8f));
+                else
+                {
+                    // Corner brackets: "this can be taken".
+                    var bc = new Color(1f, 1f, 1f, 0.95f);
+                    const float r = 11f, l = 6f, t = 2f;
+                    UiDraw.Rect(new Rect(cx - r, cy - r, l, t), bc); UiDraw.Rect(new Rect(cx - r, cy - r, t, l), bc);
+                    UiDraw.Rect(new Rect(cx + r - l, cy - r, l, t), bc); UiDraw.Rect(new Rect(cx + r - t, cy - r, t, l), bc);
+                    UiDraw.Rect(new Rect(cx - r, cy + r - t, l, t), bc); UiDraw.Rect(new Rect(cx - r, cy + r - l, t, l), bc);
+                    UiDraw.Rect(new Rect(cx + r - l, cy + r - t, l, t), bc); UiDraw.Rect(new Rect(cx + r - t, cy + r - l, t, l), bc);
+                }
             }
             else if (m_Tooltip != null && m_Source == DragSource.None)
             {

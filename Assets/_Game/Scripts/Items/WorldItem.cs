@@ -19,6 +19,19 @@ namespace Stealth.Items
 
         public int Value => ItemCatalog.Value(Shape.Value, Color.Value);
 
+        MaterialPropertyBlock m_Block;
+
+        /// <summary>Local-only highlight while the item is under the crosshair / cursor.</summary>
+        public void SetHighlighted(bool on)
+        {
+            if (Renderer == null || Visuals == null) return;
+            if (!on) { Renderer.SetPropertyBlock(null); return; }
+            m_Block ??= new MaterialPropertyBlock();
+            var c = ItemCatalog.Colors[Mathf.Clamp(Color.Value, 0, ItemCatalog.Colors.Length - 1)].Color;
+            m_Block.SetColor("_EmissionColor", c * 1.5f); // brighter, but keeps its colour (= value)
+            Renderer.SetPropertyBlock(m_Block);
+        }
+
         public override void OnNetworkSpawn()
         {
             All.Add(this);
