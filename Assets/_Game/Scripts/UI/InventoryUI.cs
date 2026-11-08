@@ -14,6 +14,9 @@ namespace Stealth.UI
     /// </summary>
     public class InventoryUI : NetworkBehaviour
     {
+        public static InventoryUI Local { get; private set; }
+        public WorldItem Hover => m_Hover;
+
         public PlayerController Player;
         public PlayerInventory Inventory;
 
@@ -26,6 +29,16 @@ namespace Stealth.UI
         Vector2Int m_GrabCell;
         WorldItem m_Hover;
         string m_Tooltip;
+
+        public override void OnNetworkSpawn()
+        {
+            if (IsOwner) Local = this;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (Local == this) Local = null;
+        }
 
         float CellPx => Mathf.Round(Mathf.Clamp(Screen.height / 22f, 26f, 56f));
 
@@ -231,10 +244,6 @@ namespace Stealth.UI
             if (!Player.CursorMode)
             {
                 UiDraw.Rect(new Rect(Screen.width / 2f - 2, Screen.height / 2f - 2, 4, 4), new Color(1, 1, 1, 0.8f));
-                if (m_Hover != null)
-                    UiDraw.Label(new Rect(Screen.width / 2f - 200, Screen.height / 2f + 16, 400, 40),
-                        $"{ItemCatalog.Describe(m_Hover.Shape.Value, m_Hover.Color.Value)}\nУдерживай Tab и перетащи в инвентарь",
-                        13, TextAnchor.UpperCenter, Color.white);
             }
             else if (m_Tooltip != null && m_Source == DragSource.None)
             {

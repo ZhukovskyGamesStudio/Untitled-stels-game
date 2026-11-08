@@ -1,0 +1,61 @@
+using System.Collections;
+using System.Linq;
+using Stealth.Items;
+using Stealth.Level;
+using Stealth.Player;
+using UnityEngine;
+
+namespace Stealth.Game
+{
+    public partial class DevAutomation
+    {
+        partial void RegisterExtraScenarios()
+        {
+            m_Scenarios["ui"] = UiScenario;
+        }
+
+        /// <summary>Screenshots of the HUD in typical situations.</summary>
+        IEnumerator UiScenario()
+        {
+            var layout = LevelGenerator.Current;
+            Me.TeleportOwner(layout.PlayerSpawns[0] + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(layout.HatchPosition - layout.PlayerSpawns[0])));
+            Me.Motor.SetPitch(10f);
+            yield return new WaitForSeconds(0.5f);
+            yield return Shot("spawn");
+
+            var item = WorldItem.All.OrderBy(i => Vector3.Distance(i.transform.position, Me.transform.position)).FirstOrDefault();
+            if (item != null)
+            {
+                var ip = item.transform.position;
+                var floorY = Mathf.Floor((ip.y + 0.1f) / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight;
+                var stand = new Vector3(ip.x, floorY + 0.05f, ip.z) - Flat(item.transform.forward).normalized * 1.4f;
+                Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(ip - stand)));
+                var head = stand + Vector3.up * 1.6f;
+                Me.Motor.SetPitch(Vector3.SignedAngle(Flat(ip - stand), ip - head, Vector3.Cross(Vector3.up, Flat(ip - stand))));
+                yield return new WaitForSeconds(0.6f);
+                Log($"hover item: {(UI.InventoryUI.Local.Hover != null)} prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
+                yield return Shot("hover_item");
+
+                var inv = Me.GetComponent<PlayerInventory>();
+                if (inv.FindSpot(item.Shape.Value, out var x, out var y, out var rot)) inv.PickupRpc(item.NetworkObject, x, y, rot);
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            Me.TeleportOwner(layout.HatchPosition + new Vector3(1.3f, 0.05f, 0), Quaternion.LookRotation(Vector3.left));
+            Me.Motor.SetPitch(30f);
+            yield return new WaitForSeconds(0.6f);
+            Log($"at hatch prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
+            yield return Shot("hatch_with_item");
+            yield return UiScenarioExtra();
+        }
+
+        partial void UiScenarioExtraImpl(System.Collections.Generic.List<IEnumerator> steps);
+
+        IEnumerator UiScenarioExtra()
+        {
+            var steps = new System.Collections.Generic.List<IEnumerator>();
+            UiScenarioExtraImpl(steps);
+            foreach (var s in steps) yield return s;
+        }
+    }
+}
