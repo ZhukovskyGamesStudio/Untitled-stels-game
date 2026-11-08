@@ -332,6 +332,13 @@ namespace Stealth.EditorTools
             model.transform.SetParent(root.transform, false);
             Paint(model, "PlayerBody", "PlayerAccent", "PlayerGlasses");
 
+            // Head pivot at the neck: teammates see where this player is looking.
+            var headPivot = new GameObject("HeadPivot");
+            headPivot.transform.SetParent(model.transform, false);
+            headPivot.transform.localPosition = new Vector3(0, 1.3f, 0);
+            foreach (var part in model.GetComponentsInChildren<Transform>(true).Where(t => t.name == "AccentHead" || t.name == "EyeGlasses").ToArray())
+                part.SetParent(headPivot.transform, true);
+
             var head = new GameObject("Head");
             head.transform.SetParent(root.transform, false);
             head.transform.localPosition = new Vector3(0, 1.6f, 0);
@@ -349,6 +356,7 @@ namespace Stealth.EditorTools
             pc.Camera = cam;
             pc.Listener = listener;
             pc.Model = model.transform;
+            pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);
             var inv = root.AddComponent<PlayerInventory>();
             var ui = root.AddComponent<InventoryUI>();

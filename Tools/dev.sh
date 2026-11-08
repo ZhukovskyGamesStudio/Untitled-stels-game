@@ -47,11 +47,12 @@ EOF
     exe="$ROOT/Builds/Windows/StealthPrototype.exe"
     rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
+    cscenario="client"; [ "$scenario" != "full" ] && cscenario="$scenario"
     "$exe" -nosteam -host-local -autotest "$scenario" $linger -shotdir "$shots" -screen-width 1280 -screen-height 720 -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
     pids=($!)
     for i in $(seq 1 "$clients"); do
       sleep 5
-      "$exe" -nosteam -join-local 127.0.0.1 -autotest "client" -shotdir "$shots" -screen-width 1280 -screen-height 720 -screen-fullscreen 0 -logFile "$P/Builds/client$i.log" &
+      "$exe" -nosteam -join-local 127.0.0.1 -autotest "$cscenario" -shotdir "$shots" -screen-width 1280 -screen-height 720 -screen-fullscreen 0 -logFile "$P/Builds/client$i.log" &
       pids+=($!)
     done
     for pid in "${pids[@]}"; do wait "$pid"; done

@@ -32,6 +32,7 @@ namespace Stealth.Player
         public Camera Camera;
         public AudioListener Listener;
         public Transform Model;
+        public Transform HeadPivot;
         public Renderer[] BodyRenderers;
 
         public PlayerMotor Motor;
@@ -48,6 +49,8 @@ namespace Stealth.Player
         public readonly NetworkVariable<int> Hp = new(MaxHp);
         public readonly NetworkVariable<bool> Downed = new();
         public readonly NetworkVariable<bool> Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>Camera pitch in degrees (owner writes ~10 times per second) so teammates see where you look.</summary>
+        public readonly NetworkVariable<sbyte> LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         public bool CursorMode { get; private set; }
         public float GasTime { get; private set; }
@@ -68,6 +71,10 @@ namespace Stealth.Player
         float m_StepTimer;
         float m_LaughTimer;
         float m_InvulnerableUntil;
+        float m_PitchSyncTimer;
+        Vector3 m_LastModelPos;
+        float m_RemoteSpeed;
+        float m_RemoteBobPhase;
 
         public static PlayerController Find(ulong clientId)
         {
@@ -148,6 +155,7 @@ namespace Stealth.Player
             var input = Autopilot ?? PlayerInputState.FromDevices(!freeCursor);
             Motor.Tick(input, !menu && !Downed.Value, Downed.Value, Head, Camera, Time.deltaTime);
             if (Motor.IsCrouching != Crouching.Value) Crouching.Value = Motor.IsCrouching;
+            SyncLookPitch();
 
             UpdateNoise();
             UpdateGas();
@@ -171,6 +179,32 @@ namespace Stealth.Player
             if (Model == null) return;
             float y = Downed.Value ? 0.35f : (Crouching.Value ? 0.65f : 1f);
             Model.localScale = new Vector3(1f, Mathf.MoveTowards(Model.localScale.y, y, Time.deltaTime * 4f), 1f);
+            if (IsOwner || Time.deltaTime <= 0f) return;
+
+            // Remote players: tilt the head to the synced pitch and bob a little while walking.
+            if (HeadPivot != null)
+                HeadPivot.localRotation = Quaternion.Slerp(HeadPivot.localRotation,
+                    Quaternion.Euler(Mathf.Clamp(LookPitch.Value, -60, 60), 0, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
+            var pos = transform.position;
+            var delta = pos - m_LastModelPos;
+            m_LastModelPos = pos;
+            delta.y = 0;
+            float speed = delta.magnitude / Time.deltaTime;
+            if (speed > 20f) speed = 0f; // teleport
+            m_RemoteSpeed = Mathf.Lerp(m_RemoteSpeed, speed, 1f - Mathf.Exp(-10f * Time.deltaTime));
+            float walk = Mathf.Clamp01(m_RemoteSpeed / 3.6f);
+            m_RemoteBobPhase += m_RemoteSpeed * 0.75f * Mathf.PI * Time.deltaTime;
+            Model.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(m_RemoteBobPhase)) * 0.05f * walk, 0);
+            Model.localRotation = Quaternion.Euler(Mathf.Clamp(m_RemoteSpeed * 1.2f, 0f, 8f), 0, Mathf.Sin(m_RemoteBobPhase) * 2f * walk);
+        }
+
+        void SyncLookPitch()
+        {
+            m_PitchSyncTimer -= Time.deltaTime;
+            if (m_PitchSyncTimer > 0f) return;
+            m_PitchSyncTimer = 0.1f;
+            var pitch = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.Pitch), -88, 88);
+            if (Mathf.Abs(pitch - LookPitch.Value) >= 2) LookPitch.Value = pitch;
         }
 
         void PlaceOnLevelIfNeeded()

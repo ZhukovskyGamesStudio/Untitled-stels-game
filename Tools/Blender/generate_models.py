@@ -116,10 +116,11 @@ def model_player():
         box((0.12, 0.12, 0.6), (0.38, 0, 0.95)),
     ])
     merge("Accent", [
-        box((0.36, 0.34, 0.34), (0, 0, 1.47)),                      # head
         box((0.44, 0.16, 0.5), (0, 0.3, 0.95)),                     # backpack (behind, +Y)
     ])
-    merge("Eye", [box((0.3, 0.04, 0.09), (0, -0.18, 1.52))])        # glasses strip, front
+    # Head parts are separate objects so the game can tilt them (look direction of teammates).
+    merge("AccentHead", [box((0.36, 0.34, 0.34), (0, 0, 1.47))])
+    merge("EyeGlasses", [box((0.3, 0.04, 0.09), (0, -0.18, 1.52))])  # glasses strip, front
     export("player")
 
 

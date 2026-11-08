@@ -37,6 +37,7 @@ namespace Stealth.Game
         {
             m_Scenarios["full"] = FullScenario;
             m_Scenarios["client"] = FullScenario;
+            m_Scenarios["coop"] = CoopScenario;
             m_Scenarios["move"] = MoveScenario;
             RegisterExtraScenarios();
         }
@@ -229,6 +230,38 @@ namespace Stealth.Game
             yield return new WaitForSeconds(10f);
             Log($"gas: time={Me.GasTime:0.0} laughing={Me.Laughing}");
             yield return Shot("gas");
+        }
+
+        /// <summary>Two players: the host walks and looks around, the client watches and takes pictures.</summary>
+        IEnumerator CoopScenario()
+        {
+            var hatch = LevelGenerator.Current.HatchPosition;
+            float t0 = Time.time;
+            while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
+            if (Me.IsHost)
+            {
+                Me.TeleportOwner(hatch + new Vector3(-1f, 0.05f, -2.5f), Quaternion.LookRotation(Vector3.right));
+                yield return new WaitForSeconds(4f);
+                Drive(new Vector2(0, 0), look: new Vector2(0, -350f)); // look up 35 deg
+                yield return null;
+                Drive(new Vector2(-1, 0)); // strafe left, towards +z
+                yield return new WaitForSeconds(1.2f);
+                Drive(Vector2.zero, look: new Vector2(0, 700f)); // look down
+                yield return null;
+                Release();
+                yield return new WaitForSeconds(4f);
+            }
+            else
+            {
+                Me.TeleportOwner(hatch + new Vector3(3.8f, 0.05f, 0f), Quaternion.LookRotation(Vector3.left));
+                Me.Motor.SetPitch(3f);
+                yield return new WaitForSeconds(4.6f);
+                yield return Shot("host_looking_up_walking");
+                yield return new WaitForSeconds(1.6f);
+                yield return Shot("host_looking_down");
+                var host = PlayerController.All.FirstOrDefault(p => p != Me);
+                Log($"remote host pitch={host?.LookPitch.Value}");
+            }
         }
 
         static void Quit()
