@@ -80,6 +80,14 @@ namespace Stealth.Player
             m_Controller = GetComponent<CharacterController>();
             m_NetTransform = GetComponent<NetworkTransform>();
             if (Motor == null) Motor = GetComponent<PlayerMotor>();
+            Motor.Landed += OnLanded;
+        }
+
+        void OnLanded(float impactSpeed)
+        {
+            if (!IsOwner || !IsSpawned || impactSpeed < 3.5f) return;
+            // A normal jump lands at ~4 m/s: audible nearby. Falling from a floor above is loud.
+            NoiseRpc(transform.position, Mathf.Lerp(4f, 14f, Mathf.InverseLerp(3.5f, 10f, impactSpeed)));
         }
 
         public override void OnNetworkSpawn()

@@ -75,5 +75,19 @@ namespace Stealth.Tests
             float v0 = MovementMath.JumpVelocity(1.1f, -9.81f);
             Assert.AreEqual(1.1f, v0 * v0 / (2f * 9.81f), 1e-3f);
         }
+
+        [Test]
+        public void CoyoteTimeAllowsLateJump()
+        {
+            Assert.IsTrue(MovementMath.CanJump(10.1f, 10f, 10.2f, 0.12f), "left the edge 0.1 s ago");
+            Assert.IsFalse(MovementMath.CanJump(10.2f, 10f, 10.3f, 0.12f), "too late");
+        }
+
+        [Test]
+        public void BufferedPressExpires()
+        {
+            Assert.IsTrue(MovementMath.CanJump(5f, 5f, 5.05f, 0.12f), "pressed shortly before landing");
+            Assert.IsFalse(MovementMath.CanJump(5f, 5f, 4.9f, 0.12f), "press expired before landing");
+        }
     }
 }

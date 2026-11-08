@@ -22,6 +22,10 @@ namespace Stealth.Player
         /// <summary>Time needed to reach <paramref name="fraction"/> of the target speed from rest.</summary>
         public static float TimeToReach(float speed, float accel, float fraction = 0.9f) => speed * fraction / accel;
 
+        /// <summary>Coyote time + input buffering: jump if we were grounded recently and the press is still queued.</summary>
+        public static bool CanJump(float now, float lastGroundedTime, float jumpQueuedUntil, float coyoteTime) =>
+            now - lastGroundedTime <= coyoteTime && now <= jumpQueuedUntil;
+
         /// <summary>Initial vertical speed for a jump of the given height.</summary>
         public static float JumpVelocity(float height, float gravity) => Mathf.Sqrt(2f * Mathf.Abs(gravity) * height);
     }
