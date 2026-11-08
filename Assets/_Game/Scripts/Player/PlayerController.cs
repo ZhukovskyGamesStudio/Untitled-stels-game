@@ -291,13 +291,15 @@ namespace Stealth.Player
 
         // ------------------------------------------------------------------ server
 
-        public void TakeHitServer()
+        public void TakeHitServer(Vector3 source)
         {
             if (!IsServer || Downed.Value || Time.time < m_InvulnerableUntil) return;
             m_InvulnerableUntil = Time.time + 1.5f; // a moment to run after the first hit
             Hp.Value = Mathf.Max(0, Hp.Value - 1);
             if (Hp.Value == 0) Downed.Value = true;
-            HitFeedbackRpc();
+            var away = transform.position - source;
+            away.y = 0;
+            HitFeedbackRpc(away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward);
         }
 
         public void ReviveServer()
@@ -315,9 +317,11 @@ namespace Stealth.Player
         }
 
         [Rpc(SendTo.Owner)]
-        void HitFeedbackRpc()
+        void HitFeedbackRpc(Vector3 awayFromSource)
         {
-            if (GameHUD.Instance != null) GameHUD.Instance.FlashHit();
+            Motor.AddImpulse(awayFromSource * 6f + Vector3.up * 2.5f);
+            Motor.AddTrauma(0.7f);
+            if (GameHUD.Instance != null) GameHUD.Instance.FlashHit(awayFromSource);
         }
 
         [Rpc(SendTo.Server)]

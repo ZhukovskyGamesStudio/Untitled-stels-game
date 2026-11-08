@@ -38,6 +38,16 @@ namespace Stealth.Player
             return x + velocity * dt;
         }
 
+        /// <summary>Camera shake angles (degrees) for a trauma level 0..1; quadratic falloff feels punchy but short.</summary>
+        public static Vector3 Shake(float trauma, float time, float maxAngle)
+        {
+            float k = trauma * trauma * maxAngle;
+            return new Vector3(
+                (Mathf.PerlinNoise(time * 25f, 0.1f) * 2f - 1f) * k,
+                (Mathf.PerlinNoise(0.3f, time * 25f) * 2f - 1f) * k,
+                (Mathf.PerlinNoise(time * 25f, 7.7f) * 2f - 1f) * k * 0.5f);
+        }
+
         /// <summary>Head bob offset (x = sideways, y = up) for a phase in radians and amplitude in meters.</summary>
         public static Vector2 HeadBob(float phase, float amplitude) =>
             new(Mathf.Sin(phase) * amplitude * 0.5f, Mathf.Abs(Mathf.Sin(phase)) * amplitude - amplitude * 0.5f);

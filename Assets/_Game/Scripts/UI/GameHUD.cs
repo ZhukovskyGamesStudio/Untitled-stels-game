@@ -19,7 +19,15 @@ namespace Stealth.UI
 
         void Awake() => Instance = this;
 
-        public void FlashHit() => m_HitFlash = 1f;
+        public Vector3 LastHitDirection { get; private set; }
+        public float LastHitTime { get; private set; } = -10f;
+
+        public void FlashHit(Vector3 awayFromSource)
+        {
+            m_HitFlash = 1f;
+            LastHitDirection = -awayFromSource;
+            LastHitTime = Time.time;
+        }
 
         void Update()
         {

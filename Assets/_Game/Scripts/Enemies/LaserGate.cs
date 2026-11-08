@@ -90,7 +90,7 @@ namespace Stealth.Enemies
                 if (!touches) continue;
                 if (m_HitCooldown.TryGetValue(p.OwnerClientId, out var until) && Time.time < until) continue;
                 m_HitCooldown[p.OwnerClientId] = Time.time + 1.5f;
-                p.TakeHitServer();
+                p.TakeHitServer(transform.position);
                 GameManager.Instance?.RaiseAlarmServer(transform.position, AlarmRadius);
             }
         }

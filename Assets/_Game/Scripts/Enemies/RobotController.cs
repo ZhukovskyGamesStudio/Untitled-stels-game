@@ -272,7 +272,7 @@ namespace Stealth.Enemies
                         if (Time.time >= m_NextAttack)
                         {
                             m_NextAttack = Time.time + AttackCooldown;
-                            m_Target.TakeHitServer();
+                            m_Target.TakeHitServer(transform.position);
                         }
                     }
                     break;

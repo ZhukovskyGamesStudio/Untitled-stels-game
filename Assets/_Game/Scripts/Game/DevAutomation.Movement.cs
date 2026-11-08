@@ -13,6 +13,7 @@ namespace Stealth.Game
             steps.Add(StepDownCheck());
             steps.Add(StaminaCheck());
             steps.Add(CrouchToggleCheck());
+            steps.Add(KnockbackCheck());
         }
 
         IEnumerator JumpCheck()
@@ -116,6 +117,22 @@ namespace Stealth.Game
             bool crouchedWhileSprinting = Me.Motor.IsCrouching;
             Release();
             Log($"crouch toggle: crouched={crouchedAfterToggle}, sprint cancels it={!crouchedWhileSprinting}");
+        }
+
+        IEnumerator KnockbackCheck()
+        {
+            var c = Level.LevelGenerator.Current.HatchPosition + new Vector3(0, 0.05f, 2f);
+            Me.TeleportOwner(c, Quaternion.LookRotation(Vector3.forward));
+            Release();
+            yield return new WaitForSeconds(0.5f);
+            if (!Me.IsServer) yield break;
+            var p0 = Me.transform.position;
+            Me.TakeHitServer(p0 + Vector3.forward * 1.2f); // hit from the front
+            yield return new WaitForSeconds(0.05f);
+            yield return Shot("hit_shake");
+            yield return new WaitForSeconds(0.8f);
+            var d = Me.transform.position - p0;
+            Log($"knockback: moved {new Vector3(d.x, 0, d.z).magnitude:0.00} m backwards={d.z < -0.5f}, hp={Me.Hp.Value}");
         }
     }
 }

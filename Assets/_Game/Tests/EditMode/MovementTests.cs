@@ -77,6 +77,20 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ShakeScalesWithTraumaAndVanishesAtZero()
+        {
+            Assert.AreEqual(Vector3.zero, MovementMath.Shake(0f, 1.23f, 6f));
+            float small = 0f, big = 0f;
+            for (int i = 0; i < 50; i++)
+            {
+                small = Mathf.Max(small, MovementMath.Shake(0.3f, i * 0.07f, 6f).magnitude);
+                big = Mathf.Max(big, MovementMath.Shake(1f, i * 0.07f, 6f).magnitude);
+            }
+            Assert.Greater(big, small * 3f, "quadratic falloff");
+            Assert.LessOrEqual(big, 6f * 1.5f);
+        }
+
+        [Test]
         public void CoyoteTimeAllowsLateJump()
         {
             Assert.IsTrue(MovementMath.CanJump(10.1f, 10f, 10.2f, 0.12f), "left the edge 0.1 s ago");

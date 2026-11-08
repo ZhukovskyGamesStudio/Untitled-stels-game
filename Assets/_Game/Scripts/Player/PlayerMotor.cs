@@ -90,6 +90,8 @@ namespace Stealth.Player
         bool m_WasGrounded = true;
         float m_FallSpeed;
         bool m_CrouchToggled;
+        float m_Trauma;
+        Vector3 m_Impulse;
         float m_Fov = GameSettings.DefaultFov;
         float m_HeadVelocity;
         float m_BobPhase;
@@ -101,8 +103,15 @@ namespace Stealth.Player
 
         public void SetPitch(float pitch) => m_Pitch = pitch;
 
+        /// <summary>Knockback: applied as velocity, horizontal part decays through normal deceleration.</summary>
+        public void AddImpulse(Vector3 impulse) => m_Impulse += impulse;
+
+        public void AddTrauma(float amount) => m_Trauma = Mathf.Clamp01(m_Trauma + amount);
+
         public void ResetMotion()
         {
+            m_Impulse = Vector3.zero;
+            m_Trauma = 0f;
             m_Velocity = Vector3.zero;
             m_CrouchToggled = false;
         }
@@ -139,6 +148,12 @@ namespace Stealth.Player
             if (grounded) m_LastGroundedTime = now;
             if (input.Jump) m_JumpQueuedUntil = now + JumpBuffer;
             bool canJump = !crouch && !downed && canAct && MovementMath.CanJump(now, m_LastGroundedTime, m_JumpQueuedUntil, CoyoteTime);
+            if (m_Impulse.sqrMagnitude > 0f)
+            {
+                horizontal += new Vector3(m_Impulse.x, 0f, m_Impulse.z);
+                if (m_Impulse.y > 0f) { m_Velocity.y = m_Impulse.y; grounded = false; }
+                m_Impulse = Vector3.zero;
+            }
             float vertical;
             bool jumpedNow = canJump;
             if (canJump)
@@ -197,7 +212,9 @@ namespace Stealth.Player
             m_Dip = MovementMath.SpringStep(m_Dip, ref m_DipVelocity, 0f, 2.2f, 0.7f, dt);
             m_Dip = Mathf.Clamp(m_Dip, -0.25f, 0.1f);
             head.localPosition = new Vector3(bob.x, m_HeadHeight + bob.y + m_Dip, 0);
-            head.localRotation = Quaternion.Euler(m_Pitch, 0, downed ? 25f : 0f);
+            m_Trauma = Mathf.Max(0f, m_Trauma - dt * 1.6f);
+            var shake = MovementMath.Shake(m_Trauma, Time.time, 6f);
+            head.localRotation = Quaternion.Euler(m_Pitch + shake.x, shake.y, (downed ? 25f : 0f) + shake.z);
 
             // Field of view: a subtle widening while actually running fast.
             bool fast = IsSprinting && HorizontalSpeed > WalkSpeed + 0.5f;
