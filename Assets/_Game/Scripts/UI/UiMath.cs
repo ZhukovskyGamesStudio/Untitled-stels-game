@@ -81,7 +81,7 @@ namespace Stealth.UI
             return Mathf.Clamp01(Mathf.Min(age / fade, (duration - age) / fade));
         }
 
-        /// <summary>UI scale relative to a 1080p reference, clamped for tiny / huge windows.</summary>
-        public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 1080f, 0.6f, 2f);
+        /// <summary>UI scale: the layout is designed for 720p and scaled up for bigger windows (clamped).</summary>
+        public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 720f, 0.75f, 3f);
     }
 }

@@ -75,9 +75,10 @@ namespace Stealth.Tests
         [Test]
         public void ScaleIsClamped()
         {
-            Assert.AreEqual(1f, UiMath.Scale(1080));
-            Assert.AreEqual(0.6f, UiMath.Scale(200));
-            Assert.AreEqual(2f, UiMath.Scale(5000));
+            Assert.AreEqual(1f, UiMath.Scale(720));
+            Assert.AreEqual(1.5f, UiMath.Scale(1080));
+            Assert.AreEqual(0.75f, UiMath.Scale(200));
+            Assert.AreEqual(3f, UiMath.Scale(5000));
         }
     }
 }

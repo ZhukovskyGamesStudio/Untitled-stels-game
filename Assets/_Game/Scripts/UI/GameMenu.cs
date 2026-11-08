@@ -36,6 +36,7 @@ namespace Stealth.UI
             var net = GameNetwork.Instance;
             if (net == null) return;
             GUI.depth = 0;
+            UiDraw.Begin();
             if (SettingsOpen && (IsOpen || !net.IsRunning)) DrawSettings();
             else if (!net.IsRunning) DrawMainMenu(net);
             else if (IsOpen) DrawPauseMenu(net);
@@ -43,8 +44,8 @@ namespace Stealth.UI
 
         void DrawMainMenu(GameNetwork net)
         {
-            UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0.06f, 0.07f, 0.08f, 1f));
-            var area = new Rect(Screen.width / 2f - 220, Screen.height * 0.16f, 440, 520);
+            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.06f, 0.07f, 0.08f, 1f));
+            var area = new Rect(UiDraw.W / 2f - 220, UiDraw.H * 0.16f, 440, 520);
             UiDraw.Label(new Rect(area.x, area.y, area.width, 50), "АЙТИШНИКИ: ВЫЛАЗКА", 30, TextAnchor.MiddleCenter, Color.white, true);
             UiDraw.Label(new Rect(area.x, area.y + 46, area.width, 24), "прототип кор-лупа", 14, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.6f));
 
@@ -72,8 +73,8 @@ namespace Stealth.UI
 
         void DrawPauseMenu(GameNetwork net)
         {
-            UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.6f));
-            GUILayout.BeginArea(new Rect(Screen.width / 2f - 180, Screen.height * 0.3f, 360, 260));
+            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0, 0, 0, 0.6f));
+            GUILayout.BeginArea(new Rect(UiDraw.W / 2f - 180, UiDraw.H * 0.3f, 360, 260));
             GUILayout.Label(net.Manager.IsHost ? "Ты хост" : "Ты подключён к хосту");
             if (net.UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby &&
                 GUILayout.Button("Пригласить друзей (Steam)", GUILayout.Height(36)))
@@ -102,8 +103,8 @@ namespace Stealth.UI
 
         void DrawSettings()
         {
-            UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0.04f, 0.05f, 0.06f, 0.92f));
-            var area = new Rect(Screen.width / 2f - 230, Screen.height * 0.18f, 460, 420);
+            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.04f, 0.05f, 0.06f, 0.92f));
+            var area = new Rect(UiDraw.W / 2f - 230, UiDraw.H * 0.18f, 460, 420);
             UiDraw.Label(new Rect(area.x, area.y - 46, area.width, 40), "Настройки", 26, TextAnchor.MiddleCenter, Color.white, true);
             GUILayout.BeginArea(area);
             GUILayout.Label($"Чувствительность мыши: {Stealth.Player.GameSettings.Sensitivity * 10f:0.0}");

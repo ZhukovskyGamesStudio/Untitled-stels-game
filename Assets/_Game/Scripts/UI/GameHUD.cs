@@ -120,6 +120,7 @@ namespace Stealth.UI
             var me = PlayerController.Local;
             if (gm == null || me == null) return;
             GUI.depth = 10;
+            UiDraw.Begin();
 
             DrawOverlays(gm, me);
             DrawDetection(me);
@@ -141,7 +142,7 @@ namespace Stealth.UI
         {
             // Last hit point left: a light red edge, slow pulse. A fresh hit: short flash + an arc towards the attacker.
             if (me.Hp.Value == 1 && !me.Downed.Value) UiDraw.Vignette(new Color(0.8f, 0f, 0f, 0.32f + 0.1f * Mathf.Sin(Time.time * 2.5f)));
-            if (m_HitFlash > 0.6f) UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(1f, 0f, 0f, 0.5f * (m_HitFlash - 0.6f)));
+            if (m_HitFlash > 0.6f) UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(1f, 0f, 0f, 0.5f * (m_HitFlash - 0.6f)));
             float sinceHit = Time.time - LastHitTime;
             if (sinceHit < 1.6f && me.Camera != null)
             {
@@ -153,20 +154,20 @@ namespace Stealth.UI
             {
                 float g = me.GasTime / PlayerController.GasLimit;
                 UiDraw.Vignette(new Color(0.4f, 0.95f, 0.3f, Mathf.Clamp01(g * 1.4f)));
-                UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0.5f, 0.9f, 0.3f, g * 0.35f));
+                UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.5f, 0.9f, 0.3f, g * 0.35f));
                 if (me.Laughing)
                 {
                     var jitter = new Vector2(Mathf.Sin(Time.time * 37f), Mathf.Cos(Time.time * 29f)) * 6f * g;
-                    UiDraw.Label(new Rect(Screen.width / 2f - 200 + jitter.x, Screen.height * 0.3f + jitter.y, 400, 50),
+                    UiDraw.Label(new Rect(UiDraw.W / 2f - 200 + jitter.x, UiDraw.H * 0.3f + jitter.y, 400, 50),
                         "ХА-ХА-ХА-ХА", 30, TextAnchor.MiddleCenter, new Color(0.8f, 1f, 0.6f, 0.9f), true);
                 }
-                UiDraw.Label(new Rect(Screen.width / 2f - 200, Screen.height * 0.3f + 44, 400, 24),
+                UiDraw.Label(new Rect(UiDraw.W / 2f - 200, UiDraw.H * 0.3f + 44, 400, 24),
                     $"Весёлый газ: {Mathf.Max(0, PlayerController.GasLimit - me.GasTime):0} c до отключки", 15, TextAnchor.MiddleCenter, Color.white);
             }
             if (me.Downed.Value)
             {
-                UiDraw.Rect(new Rect(0, 0, Screen.width, Screen.height), new Color(0.25f, 0f, 0f, 0.55f));
-                if (gm.Phase.Value == RunPhase.Playing) UiDraw.Label(new Rect(0, Screen.height * 0.35f, Screen.width, 60),
+                UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.25f, 0f, 0f, 0.55f));
+                if (gm.Phase.Value == RunPhase.Playing) UiDraw.Label(new Rect(0, UiDraw.H * 0.35f, UiDraw.W, 60),
                     "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
             }
             if (gm.AlarmActive)
@@ -175,11 +176,11 @@ namespace Stealth.UI
                 float left = (float)(gm.AlarmUntil.Value - gm.NetworkManager.ServerTime.Time);
                 float pulse = 0.35f + 0.25f * Mathf.Sin(Time.time * 7f);
                 var red = new Color(1f, 0.15f, 0.1f, pulse);
-                UiDraw.Rect(new Rect(0, 0, Screen.width, 4), red);
-                UiDraw.Rect(new Rect(0, Screen.height - 4, Screen.width, 4), red);
-                UiDraw.Rect(new Rect(0, 0, 4, Screen.height), red);
-                UiDraw.Rect(new Rect(Screen.width - 4, 0, 4, Screen.height), red);
-                var tag = new Rect(Screen.width / 2f - 70, 14, 140, 24);
+                UiDraw.Rect(new Rect(0, 0, UiDraw.W, 4), red);
+                UiDraw.Rect(new Rect(0, UiDraw.H - 4, UiDraw.W, 4), red);
+                UiDraw.Rect(new Rect(0, 0, 4, UiDraw.H), red);
+                UiDraw.Rect(new Rect(UiDraw.W - 4, 0, 4, UiDraw.H), red);
+                var tag = new Rect(UiDraw.W / 2f - 70, 14, 140, 24);
                 UiDraw.Rect(tag, new Color(0.5f, 0f, 0f, 0.6f));
                 UiDraw.Label(tag, $"ТРЕВОГА · {Mathf.Max(0, left):0} c", 14, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.8f), true);
             }
@@ -212,7 +213,7 @@ namespace Stealth.UI
             float alpha = Mathf.Clamp01(1f - age / 0.9f);
             var labels = new[] { "", "тихо", "слышно", "громко" };
             var colors = new[] { Color.white, new Color(0.6f, 0.9f, 1f), new Color(1f, 0.85f, 0.35f), new Color(1f, 0.35f, 0.25f) };
-            float x0 = Screen.width / 2f - 30f, y0 = Screen.height - 150f;
+            float x0 = UiDraw.W / 2f - 30f, y0 = UiDraw.H - 150f;
             for (int i = 0; i < 3; i++)
             {
                 var c = i < bars ? colors[bars] : new Color(1, 1, 1, 0.25f);
@@ -230,7 +231,7 @@ namespace Stealth.UI
             var stamina = me.Motor.Stamina;
             if (stamina.Value >= 0.999f || me.Downed.Value) return;
             float w = 120f;
-            var r = new Rect(Screen.width / 2f - w / 2f, Screen.height / 2f + 34f, w, 6f);
+            var r = new Rect(UiDraw.W / 2f - w / 2f, UiDraw.H / 2f + 34f, w, 6f);
             UiDraw.Rect(r, new Color(0, 0, 0, 0.45f));
             UiDraw.Rect(new Rect(r.x, r.y, w * stamina.Value, r.height),
                 stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
@@ -262,7 +263,7 @@ namespace Stealth.UI
             if (gm.Collected.Value < gm.Quota.Value || Hatch.IsNear(me.transform.position)) return;
             var target = layout.HatchPosition + Vector3.up * 0.4f;
             var vp = me.Camera.WorldToViewportPoint(target);
-            var pos = UiMath.EdgeMarker(vp, Screen.width, Screen.height, 48f, out bool clamped);
+            var pos = UiMath.EdgeMarker(vp, UiDraw.W, UiDraw.H, 48f, out bool clamped);
             float dist = Vector3.Distance(me.transform.position, layout.HatchPosition);
             var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
             var m = GUI.matrix;
@@ -274,7 +275,7 @@ namespace Stealth.UI
 
         static void DrawHealth(PlayerController me)
         {
-            var hp = new Rect(Screen.width - 196, 16, 180, 40);
+            var hp = new Rect(UiDraw.W - 196, 16, 180, 40);
             UiDraw.Rect(hp, new Color(0, 0, 0, 0.55f));
             UiDraw.Label(new Rect(hp.x + 12, hp.y, 60, 40), "ХП", 15, TextAnchor.MiddleLeft, Color.white, true);
             for (int i = 0; i < PlayerController.MaxHp; i++)
@@ -294,7 +295,7 @@ namespace Stealth.UI
                 if (p == me) continue;
                 var c = p.Downed.Value ? new Color(1f, 0.35f, 0.3f) : new Color(1, 1, 1, 0.8f);
                 string state = p.Downed.Value ? "упал" : new string('■', Mathf.Max(0, p.Hp.Value));
-                UiDraw.Label(new Rect(Screen.width - 260, ty, 244, 18), $"{p.Nick}  {state}", 12, TextAnchor.MiddleRight, c);
+                UiDraw.Label(new Rect(UiDraw.W - 260, ty, 244, 18), $"{p.Nick}  {state}", 12, TextAnchor.MiddleRight, c);
                 ty += 18;
                 if (cam == null) continue;
 
@@ -303,7 +304,7 @@ namespace Stealth.UI
                 float dist = Vector3.Distance(cam.transform.position, head);
                 if (p.Downed.Value)
                 {
-                    var pos = UiMath.EdgeMarker(vp, Screen.width, Screen.height, 48f, out _);
+                    var pos = UiMath.EdgeMarker(vp, UiDraw.W, UiDraw.H, 48f, out _);
                     float pulse = 0.7f + 0.3f * Mathf.Sin(Time.time * 6f);
                     UiDraw.Rect(new Rect(pos.x - 3, pos.y - 10, 6, 20), new Color(1f, 0.25f, 0.2f, pulse));
                     UiDraw.Rect(new Rect(pos.x - 10, pos.y - 3, 20, 6), new Color(1f, 0.25f, 0.2f, pulse));
@@ -312,7 +313,7 @@ namespace Stealth.UI
                 else if (vp.z > 0f && dist < 14f && !Physics.Linecast(cam.transform.position, head, ~(1 << 2), QueryTriggerInteraction.Ignore))
                 {
                     float a = Mathf.Clamp01((14f - dist) / 4f) * 0.8f;
-                    var pos = new Vector2(vp.x * Screen.width, (1f - vp.y) * Screen.height);
+                    var pos = new Vector2(vp.x * UiDraw.W, (1f - vp.y) * UiDraw.H);
                     UiDraw.Label(new Rect(pos.x - 80, pos.y - 18, 160, 18), p.Nick, 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, a));
                 }
             }
@@ -325,7 +326,7 @@ namespace Stealth.UI
             float textW = Mathf.Min(560f, p.Text.Length * 7.6f + 16f);
             float keyW = string.IsNullOrEmpty(p.Key) ? 0f : Mathf.Max(26f, p.Key.Length * 10f + 12f);
             float w = textW + keyW + (keyW > 0 ? 8f : 0f) + 16f;
-            var r = new Rect(Screen.width / 2f - w / 2f, Screen.height / 2f + 52f, w, 30f);
+            var r = new Rect(UiDraw.W / 2f - w / 2f, UiDraw.H / 2f + 52f, w, 30f);
             UiDraw.Rect(r, new Color(0f, 0f, 0f, 0.5f));
             float x = r.x + 8f;
             if (keyW > 0f)
@@ -344,7 +345,7 @@ namespace Stealth.UI
             if (string.IsNullOrEmpty(m_Banner)) return;
             float a = UiMath.MessageAlpha(Time.time - m_BannerStart, BannerDuration);
             if (a <= 0f) return;
-            var r = new Rect(Screen.width / 2f - 320, Screen.height * 0.16f - (1f - a) * 10f, 640, 40);
+            var r = new Rect(UiDraw.W / 2f - 320, UiDraw.H * 0.16f - (1f - a) * 10f, 640, 40);
             UiDraw.Rect(r, new Color(0, 0, 0, 0.5f * a));
             UiDraw.Label(r, m_Banner, 16, TextAnchor.MiddleCenter, new Color(1, 1, 1, a), true);
         }
@@ -352,7 +353,7 @@ namespace Stealth.UI
         static void DrawRunOver(GameManager gm)
         {
             if (gm.Phase.Value != RunPhase.Failed) return;
-            var r = new Rect(Screen.width / 2f - 260, Screen.height * 0.38f, 520, 120);
+            var r = new Rect(UiDraw.W / 2f - 260, UiDraw.H * 0.38f, 520, 120);
             UiDraw.Rect(r, new Color(0, 0, 0, 0.8f));
             UiDraw.Label(new Rect(r.x, r.y + 14, r.width, 40), "Забег окончен", 26, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.35f), true);
             UiDraw.Label(new Rect(r.x, r.y + 56, r.width, 24), $"Сдано за забег: {gm.RunTotal.Value} очк.", 16, TextAnchor.MiddleCenter, Color.white);
@@ -365,7 +366,7 @@ namespace Stealth.UI
             const string help = "WASD — ходить · Shift — бег · Пробел — прыжок · Ctrl/C — присесть\n" +
                                 "Tab (держать) — руки: тащи предметы мышкой, R — повернуть\n" +
                                 "E — поднять союзника · F у люка — следующий дом · Esc — меню · H — эта справка";
-            UiDraw.Label(new Rect(16, Screen.height - 76, 560, 64), help, 12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.7f));
+            UiDraw.Label(new Rect(16, UiDraw.H - 76, 560, 64), help, 12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.7f));
         }
     }
 }

@@ -53,14 +53,14 @@ namespace Stealth.UI
             if (Local == this) Local = null;
         }
 
-        float CellPx => Mathf.Round(Mathf.Clamp(Screen.height / 22f, 26f, 56f));
+        float CellPx => Mathf.Round(Mathf.Clamp(UiDraw.H / 22f, 26f, 56f));
 
         Rect GridRect => GridRectFor(CellPx);
 
         static Rect GridRectFor(float c)
         {
             float w = InventoryLayout.Width * c, h = InventoryLayout.Height * c;
-            return new Rect((Screen.width - w) / 2f, Screen.height - h - 18f, w, h);
+            return new Rect((UiDraw.W - w) / 2f, UiDraw.H - h - 18f, w, h);
         }
 
         float m_Expand; // 0 = compact (just carrying), 1 = hands mode (Tab)
@@ -69,8 +69,8 @@ namespace Stealth.UI
         {
             get
             {
-                var m = Mouse.current.position.ReadValue();
-                return new Vector2(m.x, Screen.height - m.y);
+                var m = Mouse.current.position.ReadValue() / UiDraw.ScaleFactor;
+                return new Vector2(m.x, UiDraw.H - m.y);
             }
         }
 
@@ -213,6 +213,7 @@ namespace Stealth.UI
         void OnGUI()
         {
             if (!IsOwner || Inventory == null) return;
+            UiDraw.Begin();
             if (Event.current.type == EventType.Repaint)
                 m_Expand = Mathf.MoveTowards(m_Expand, Player.CursorMode ? 1f : 0f, Time.unscaledDeltaTime * 8f);
             // Compact while walking around: small and quiet, it only shows what you carry.
@@ -264,7 +265,7 @@ namespace Stealth.UI
 
             if (!Player.CursorMode)
             {
-                float cx = Screen.width / 2f, cy = Screen.height / 2f;
+                float cx = UiDraw.W / 2f, cy = UiDraw.H / 2f;
                 if (m_Hover == null) UiDraw.Rect(new Rect(cx - 2, cy - 2, 4, 4), new Color(1, 1, 1, 0.8f));
                 else
                 {

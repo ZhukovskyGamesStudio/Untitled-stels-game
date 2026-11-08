@@ -6,6 +6,18 @@ namespace Stealth.UI
     public static class UiDraw
     {
         static GUIStyle s_Label;
+
+        public static float ScaleFactor { get; private set; } = 1f;
+        /// <summary>Virtual screen size the UI is laid out in (pixels / scale).</summary>
+        public static float W => Screen.width / ScaleFactor;
+        public static float H => Screen.height / ScaleFactor;
+
+        /// <summary>Call at the start of every OnGUI: scales the whole interface with the window height.</summary>
+        public static void Begin()
+        {
+            ScaleFactor = UiMath.Scale(Screen.height);
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(ScaleFactor, ScaleFactor, 1f));
+        }
         static Texture2D s_Vignette;
 
         public static void Rect(Rect r, Color c) =>
@@ -45,7 +57,7 @@ namespace Stealth.UI
                     }
                 s_Vignette.Apply();
             }
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), s_Vignette, ScaleMode.StretchToFill, true, 0, c, 0, 0);
+            GUI.DrawTexture(new Rect(0, 0, UiDraw.W, UiDraw.H), s_Vignette, ScaleMode.StretchToFill, true, 0, c, 0, 0);
         }
 
         static Texture2D s_Arc;
@@ -69,7 +81,7 @@ namespace Stealth.UI
                     }
                 s_Arc.Apply();
             }
-            var centre = new Vector2(Screen.width / 2f, Screen.height / 2f);
+            var centre = new Vector2(UiDraw.W / 2f, UiDraw.H / 2f);
             var matrix = GUI.matrix;
             GUIUtility.RotateAroundPivot(angle, centre);
             GUI.DrawTexture(new Rect(centre.x - radius * 0.7f, centre.y - radius - 20f, radius * 1.4f, 36f), s_Arc, ScaleMode.StretchToFill, true, 0, c, 0, 0);
