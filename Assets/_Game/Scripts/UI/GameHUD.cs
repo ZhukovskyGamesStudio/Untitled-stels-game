@@ -25,6 +25,9 @@ namespace Stealth.UI
         float m_HelpUntil = -1f;
         GameManager m_Subscribed;
         readonly List<Prompt> m_Prompts = new();
+        int m_LastCollected = -1;
+        int m_GainAmount;
+        float m_GainTime = -10f;
 
         public Vector3 LastHitDirection { get; private set; }
         public float LastHitTime { get; private set; } = -10f;
@@ -56,6 +59,17 @@ namespace Stealth.UI
             }
             if (m_HelpUntil < 0f && PlayerController.Local != null) m_HelpUntil = Time.time + HelpDuration;
             if (m_HelpUntil > 0f && Time.time > m_HelpUntil) m_ShowHelp = false;
+
+            if (gm != null)
+            {
+                int c = gm.Collected.Value;
+                if (m_LastCollected >= 0 && c > m_LastCollected)
+                {
+                    m_GainAmount = (Time.time - m_GainTime < 1.5f ? m_GainAmount : 0) + (c - m_LastCollected);
+                    m_GainTime = Time.time;
+                }
+                m_LastCollected = c;
+            }
 
             CurrentPrompt = gm != null && PlayerController.Local != null ? BuildPrompt(gm, PlayerController.Local) : default;
         }
@@ -102,6 +116,7 @@ namespace Stealth.UI
             DrawStamina(me);
             DrawNoise(me);
             DrawQuota(gm);
+            DrawHatchMarker(gm, me);
             DrawHealth(me);
             DrawTeam(me);
             DrawPrompt(CurrentPrompt);
@@ -199,15 +214,40 @@ namespace Stealth.UI
                 stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
         }
 
-        static void DrawQuota(GameManager gm)
+        void DrawQuota(GameManager gm)
         {
-            var panel = new Rect(16, 16, 300, 92);
-            UiDraw.Rect(panel, new Color(0, 0, 0, 0.55f));
-            UiDraw.Label(new Rect(28, 22, 280, 22), $"Дом №{gm.Level.Value.Index + 1}", 15, TextAnchor.MiddleLeft, Color.white, true);
-            UiDraw.Label(new Rect(28, 44, 280, 20), $"Квота: {gm.Collected.Value} / {gm.Quota.Value}", 14, TextAnchor.MiddleLeft, Color.white);
-            UiDraw.Bar(new Rect(28, 68, 276, 14), gm.Quota.Value > 0 ? gm.Collected.Value / (float)gm.Quota.Value : 0f,
-                gm.Collected.Value >= gm.Quota.Value ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
-            UiDraw.Label(new Rect(28, 84, 280, 20), $"За забег: {gm.RunTotal.Value}", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
+            bool met = gm.Collected.Value >= gm.Quota.Value;
+            var panel = new Rect(16, 16, 232, 50);
+            UiDraw.Rect(panel, new Color(0, 0, 0, 0.45f));
+            UiDraw.Label(new Rect(26, 18, 120, 22), $"Дом {gm.Level.Value.Index + 1}", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
+            UiDraw.Label(new Rect(26, 18, 212, 22), $"{gm.Collected.Value} / {gm.Quota.Value}", 14, TextAnchor.MiddleRight,
+                met ? new Color(0.45f, 1f, 0.5f) : Color.white, true);
+            UiDraw.Bar(new Rect(26, 44, 212, 10), gm.Quota.Value > 0 ? gm.Collected.Value / (float)gm.Quota.Value : 0f,
+                met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
+            float age = Time.time - m_GainTime;
+            if (age < 2f)
+                UiDraw.Label(new Rect(panel.xMax + 8, 26 - age * 8f, 120, 26), $"+{m_GainAmount}", 18, TextAnchor.MiddleLeft,
+                    new Color(0.45f, 1f, 0.5f, Mathf.Clamp01(2f - age)), true);
+            if (met && gm.Phase.Value == RunPhase.Playing)
+                UiDraw.Label(new Rect(26, panel.yMax + 2, 400, 20), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
+        }
+
+        /// <summary>Once the quota is met: a small diamond over the hatch (clamped to the screen edge) with distance.</summary>
+        static void DrawHatchMarker(GameManager gm, PlayerController me)
+        {
+            var layout = LevelGenerator.Current;
+            if (layout == null || me.Camera == null || gm.Phase.Value != RunPhase.Playing) return;
+            if (gm.Collected.Value < gm.Quota.Value || Hatch.IsNear(me.transform.position)) return;
+            var target = layout.HatchPosition + Vector3.up * 0.4f;
+            var vp = me.Camera.WorldToViewportPoint(target);
+            var pos = UiMath.EdgeMarker(vp, Screen.width, Screen.height, 48f, out bool clamped);
+            float dist = Vector3.Distance(me.transform.position, layout.HatchPosition);
+            var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
+            var m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(45f, pos);
+            UiDraw.Rect(new Rect(pos.x - 7, pos.y - 7, 14, 14), c);
+            GUI.matrix = m;
+            UiDraw.Label(new Rect(pos.x - 60, pos.y + 10, 120, 18), $"люк · {dist:0} м", 12, TextAnchor.MiddleCenter, c);
         }
 
         static void DrawHealth(PlayerController me)

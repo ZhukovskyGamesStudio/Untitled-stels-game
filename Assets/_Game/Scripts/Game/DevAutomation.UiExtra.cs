@@ -12,6 +12,7 @@ namespace Stealth.Game
         partial void UiScenarioExtraImpl(List<IEnumerator> steps)
         {
             steps.Add(NoiseMeterShots());
+            steps.Add(QuotaShots());
             steps.Add(DetectionIndicatorCheck());
         }
 
@@ -57,6 +58,21 @@ namespace Stealth.Game
             yield return new WaitForSeconds(0.8f);
             yield return Shot("noise_sprint");
             Release();
+        }
+
+        IEnumerator QuotaShots()
+        {
+            var gm = GameManager.Instance;
+            if (!Me.IsServer) yield break;
+            gm.AddCollectedServer(Mathf.Max(5, gm.Quota.Value - gm.Collected.Value)); // fill the quota
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("quota_gain");
+            // Walk away from the hatch, facing away: the marker must sit on the screen edge.
+            var hatch = LevelGenerator.Current.HatchPosition;
+            Me.TeleportOwner(hatch + new Vector3(3.5f, 0.05f, 3.5f), Quaternion.LookRotation(new Vector3(1, 0, 0.3f)));
+            Me.Motor.SetPitch(0);
+            yield return new WaitForSeconds(0.4f);
+            yield return Shot("hatch_marker_edge");
         }
     }
 }
