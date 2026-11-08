@@ -56,6 +56,11 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(2f);
                 yield return Shot("low_hp");
             }
+            yield return Shot("compact_inventory");
+            UI.InventoryUI.ForceHandsModeForTest = true;
+            yield return new WaitForSeconds(0.4f);
+            yield return Shot("hands_mode");
+            UI.InventoryUI.ForceHandsModeForTest = false;
             yield return UiScenarioExtra();
         }
 

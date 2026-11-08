@@ -147,7 +147,7 @@ namespace Stealth.Player
             var kb = Keyboard.current;
             if (kb == null) return;
 
-            CursorMode = !menu && !Downed.Value && kb.tabKey.isPressed;
+            CursorMode = !menu && !Downed.Value && (kb.tabKey.isPressed || InventoryUI.ForceHandsModeForTest);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;

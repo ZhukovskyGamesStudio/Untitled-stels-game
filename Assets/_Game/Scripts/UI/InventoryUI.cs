@@ -15,6 +15,8 @@ namespace Stealth.UI
     public class InventoryUI : NetworkBehaviour
     {
         public static InventoryUI Local { get; private set; }
+        /// <summary>Test hook: behave as if Tab is held.</summary>
+        public static bool ForceHandsModeForTest;
         public WorldItem Hover => m_Hover;
 
         public PlayerController Player;
@@ -42,15 +44,15 @@ namespace Stealth.UI
 
         float CellPx => Mathf.Round(Mathf.Clamp(Screen.height / 22f, 26f, 56f));
 
-        Rect GridRect
+        Rect GridRect => GridRectFor(CellPx);
+
+        static Rect GridRectFor(float c)
         {
-            get
-            {
-                float c = CellPx;
-                float w = InventoryLayout.Width * c, h = InventoryLayout.Height * c;
-                return new Rect((Screen.width - w) / 2f, Screen.height - h - 18f, w, h);
-            }
+            float w = InventoryLayout.Width * c, h = InventoryLayout.Height * c;
+            return new Rect((Screen.width - w) / 2f, Screen.height - h - 18f, w, h);
         }
+
+        float m_Expand; // 0 = compact (just carrying), 1 = hands mode (Tab)
 
         static Vector2 MouseGui
         {
@@ -196,22 +198,30 @@ namespace Stealth.UI
 
         // ------------------------------------------------------------------ drawing
 
-        static readonly Color GridBg = new(0f, 0f, 0f, 0.55f);
-        static readonly Color CellBg = new(1f, 1f, 1f, 0.08f);
 
         void OnGUI()
         {
             if (!IsOwner || Inventory == null) return;
-            float c = CellPx;
-            var grid = GridRect;
-            UiDraw.Rect(new Rect(grid.x - 6, grid.y - 26, grid.width + 12, grid.height + 32), GridBg);
-            UiDraw.Label(new Rect(grid.x, grid.y - 24, grid.width, 20), $"Инвентарь · {Inventory.TotalValue} очк.", 13, TextAnchor.MiddleLeft, Color.white);
-            UiDraw.Label(new Rect(grid.x, grid.y - 24, grid.width, 20), Player.CursorMode ? "R — повернуть" : "Tab — руки", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f));
+            if (Event.current.type == EventType.Repaint)
+                m_Expand = Mathf.MoveTowards(m_Expand, Player.CursorMode ? 1f : 0f, Time.unscaledDeltaTime * 8f);
+            // Compact while walking around: small and quiet, it only shows what you carry.
+            float c = Mathf.Round(Mathf.Lerp(CellPx * 0.55f, CellPx, m_Expand));
+            var grid = GridRectFor(c);
+            float panelAlpha = Mathf.Lerp(0.3f, 0.6f, m_Expand);
+            float headerH = m_Expand > 0.5f || Inventory.Items.Count > 0 ? 22f : 0f;
+            UiDraw.Rect(new Rect(grid.x - 5, grid.y - headerH - 4, grid.width + 10, grid.height + headerH + 9), new Color(0, 0, 0, panelAlpha));
+            if (headerH > 0f)
+            {
+                UiDraw.Label(new Rect(grid.x, grid.y - headerH - 2, grid.width, 20), $"{Inventory.TotalValue} очк.", 13, TextAnchor.MiddleLeft, Color.white);
+                if (m_Expand > 0.5f)
+                    UiDraw.Label(new Rect(grid.x, grid.y - headerH - 2, grid.width, 20), "R — повернуть", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f));
+            }
 
+            var cellBg = new Color(1f, 1f, 1f, Mathf.Lerp(0.05f, 0.09f, m_Expand));
             for (int y = 0; y < InventoryLayout.Height; y++)
                 for (int x = 0; x < InventoryLayout.Width; x++)
                     if (InventoryLayout.IsCell(x, y))
-                        UiDraw.Rect(new Rect(grid.x + x * c + 1, grid.y + y * c + 1, c - 2, c - 2), CellBg);
+                        UiDraw.Rect(new Rect(grid.x + x * c + 1, grid.y + y * c + 1, c - 2, c - 2), cellBg);
 
             for (int i = 0; i < Inventory.Items.Count; i++)
             {
