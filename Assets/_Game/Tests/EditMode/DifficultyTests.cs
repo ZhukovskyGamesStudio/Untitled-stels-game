@@ -41,6 +41,18 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void HunterArrivesAfterAlarmsOrTime()
+        {
+            Assert.IsFalse(GameManager.HunterDue(0, 10f, 0, 0));
+            Assert.IsFalse(GameManager.HunterDue(2, 10f, 0, 0), "two alarms are forgiven on the first house");
+            Assert.IsTrue(GameManager.HunterDue(3, 10f, 0, 0));
+            Assert.IsTrue(GameManager.HunterDue(2, 10f, 1, 0), "deeper houses are less forgiving");
+            Assert.IsTrue(GameManager.HunterDue(0, 400f, 0, 0), "lingering too long");
+            Assert.IsFalse(GameManager.HunterDue(3, 10f, 0, 1), "only one hunter on the first houses");
+            Assert.IsTrue(GameManager.HunterDue(4, 10f, 3, 1), "a second hunter deeper after more alarms");
+        }
+
+        [Test]
         public void QuotaGrowsWithDepthAndPenalties()
         {
             Assert.Greater(GameManager.QuotaFor(1000, 3, 0), GameManager.QuotaFor(1000, 0, 0));

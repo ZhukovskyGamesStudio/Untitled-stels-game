@@ -126,5 +126,30 @@ namespace Stealth.Game
             GameManager.FreezeRobots = true;
             if (Me.IsServer) Me.ResetForLevelServer();
         }
+
+        /// <summary>Three alarms → the hunter arrives.</summary>
+        IEnumerator HunterScenario()
+        {
+            var gm = GameManager.Instance;
+            gm.GracePeriod = 0f;
+            var far = LevelGenerator.Current.HatchPosition + Vector3.forward * 100f;
+            for (int i = 0; i < 3; i++)
+            {
+                gm.RaiseAlarmServer(far, 1f);
+                yield return new WaitForSeconds(4.3f);
+            }
+            yield return new WaitForSeconds(0.5f);
+            RobotController hunter = null;
+            foreach (var r in RobotController.All) if (r.name.Contains("Hunter")) hunter = r;
+            Log($"hunter: present={hunter != null}" + (hunter != null ? $" at {hunter.transform.position}, state {hunter.State.Value}" : ""));
+            if (hunter != null)
+            {
+                GameManager.FreezeRobots = true;
+                var hp = hunter.transform.position;
+                LookAtFrom(ViewPoint(hp, 3.5f), hp + Vector3.up * 1.4f);
+                yield return new WaitForSeconds(0.8f);
+                yield return Shot("hunter");
+            }
+        }
     }
 }

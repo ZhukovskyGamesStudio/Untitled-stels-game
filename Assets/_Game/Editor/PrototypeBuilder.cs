@@ -55,6 +55,7 @@ namespace Stealth.EditorTools
             var hound = BuildHound();
             var sorter = BuildSorter();
             var worker = BuildWorker();
+            var hunter = BuildHunter();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
@@ -65,6 +66,7 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Hound] = hound;
             robots[(int)RobotKind.Sorter] = sorter;
             robots[(int)RobotKind.Worker] = worker;
+            robots[(int)RobotKind.Hunter] = hunter;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -185,6 +187,7 @@ namespace Stealth.EditorTools
             Mat("HoundBody", new Color(0.45f, 0.2f, 0.2f), smoothness: 0.4f);
             Mat("SorterBody", new Color(0.9f, 0.9f, 0.85f), smoothness: 0.8f);
             Mat("WorkerBody", new Color(0.95f, 0.8f, 0.1f), smoothness: 0.4f);
+            Mat("HunterBody", new Color(0.12f, 0.12f, 0.14f), smoothness: 0.85f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -530,6 +533,23 @@ namespace Stealth.EditorTools
             rc.InvestigateSpeed = 1.8f;
             rc.ChaseSpeed = 1.8f;
             rc.ContactDistance = 0.9f;
+        });
+
+        static GameObject BuildHunter() => BuildRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), rc =>
+        {
+            rc.HasEyes = true;           // everything at once
+            rc.ViewDistance = 16f;
+            rc.ViewAngle = 120f;
+            rc.DetectionSpeed = 2f;
+            rc.HearingMultiplier = 1.2f;
+            rc.ChaseHearingShare = 0.4f;
+            rc.SeismicRange = 6f;
+            rc.SmellRange = 3f;
+            rc.PatrolSpeed = 2.8f;
+            rc.InvestigateSpeed = 4.5f;
+            rc.ChaseSpeed = 5.8f;
+            rc.LoseTargetAfter = 7f;
+            rc.AttackCooldown = 1.3f;
         });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>

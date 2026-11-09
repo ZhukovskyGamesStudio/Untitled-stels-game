@@ -57,6 +57,19 @@ namespace Stealth.Game
         public static float LevelStartTime { get; private set; }
         public static bool InGracePeriod => Instance != null && Time.time - LevelStartTime < Instance.GracePeriod;
 
+        /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
+        public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar)
+        {
+            if (huntersSoFar >= 1 + levelIndex / 3) return false;
+            int alarmLimit = (levelIndex == 0 ? 3 : 2) * (huntersSoFar + 1);
+            float timeLimit = Mathf.Max(180f, 360f - levelIndex * 20f) * (huntersSoFar + 1);
+            return alarms >= alarmLimit || elapsed >= timeLimit;
+        }
+
+        int m_AlarmCount;
+        int m_Hunters;
+        double m_LastAlarmCounted = -10;
+
         /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
         public static int QuotaFor(int totalValue, int levelIndex, int penalties, float share = 0.35f, float growth = 0.04f, float penalty = 0.15f)
         {
@@ -141,6 +154,8 @@ namespace Stealth.Game
             int totalValue = SpawnContent(layout, seed);
             Quota.Value = QuotaFor(totalValue, index, m_PendingPenalties, QuotaShare, QuotaShareGrowth, DeathPenalty);
             LevelStartTime = Time.time;
+            m_AlarmCount = 0;
+            m_Hunters = 0;
             Collected.Value = 0;
             Phase.Value = RunPhase.Playing;
             AlarmUntil.Value = 0;
@@ -215,6 +230,12 @@ namespace Stealth.Game
 
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
+            // Count distinct alarms (one per few seconds), hunters arrive after enough of them.
+            if (NetworkManager.ServerTime.Time - m_LastAlarmCounted > 4.0)
+            {
+                m_AlarmCount++;
+                m_LastAlarmCounted = NetworkManager.ServerTime.Time;
+            }
             AlarmUntil.Value = NetworkManager.ServerTime.Time + AlarmDuration;
             foreach (var robot in RobotController.All)
                 if ((robot.transform.position - position).magnitude <= radius)
@@ -227,9 +248,36 @@ namespace Stealth.Game
                 foreach (var p in PlayerController.All)
                     if (!p.Downed.Value) ScentTrail.Record(p.OwnerClientId, p.transform.position, Time.time);
             if (!IsServer || Phase.Value != RunPhase.Playing || PlayerController.All.Count == 0) return;
+            if (!InGracePeriod && HunterDue(m_AlarmCount, Time.time - LevelStartTime, Level.Value.Index, m_Hunters)) SpawnHunter();
             foreach (var p in PlayerController.All)
                 if (!p.Downed.Value) return;
             Fail("Вся команда выведена из строя");
+        }
+
+        /// <summary>The hunter enters through the furthest room of the ground floor from the players.</summary>
+        void SpawnHunter()
+        {
+            m_Hunters++;
+            var layout = LevelGenerator.Current;
+            Vector3 best = layout.PatrolPoints[0];
+            float bestScore = -1f;
+            foreach (var p in layout.PatrolPoints)
+            {
+                if (LevelLayout.FloorOf(p.y) != 0) continue;
+                float score = float.MaxValue;
+                foreach (var pl in PlayerController.All) score = Mathf.Min(score, Vector3.Distance(p, pl.transform.position));
+                if (score > bestScore) { bestScore = score; best = p; }
+            }
+            if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
+            var obj = DebugSpawnServer(RobotKind.Hunter, best, Quaternion.identity);
+            if (obj == null) return;
+            // It knows roughly where you are: starts by investigating the nearest player.
+            var robot = obj.GetComponent<RobotController>();
+            PlayerController target = null;
+            foreach (var pl in PlayerController.All) if (target == null || Vector3.Distance(pl.transform.position, best) < Vector3.Distance(target.transform.position, best)) target = pl;
+            if (target != null) robot.InvestigateServer(target.transform.position, true);
+            BannerRpc("В здание вошёл Охотник");
+            Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_AlarmCount})");
         }
 
         void Fail(string reason)
