@@ -246,5 +246,41 @@ namespace Stealth.Game
             Log($"radio: guard={guard.State.Value}, listener after the call={listener.State.Value}");
             GameManager.FreezeRobots = true;
         }
+
+        /// <summary>Hack a guard from behind and a turret up close, then check both are switched off.</summary>
+        IEnumerator HackScenario()
+        {
+            var gm = GameManager.Instance;
+            gm.GracePeriod = 0f;
+            GameManager.FreezeRobots = true;
+            foreach (var r in RobotController.All.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            var hatch = LevelGenerator.Current.HatchPosition;
+            var guard = gm.DebugSpawnServer(RobotKind.Guard, hatch + new Vector3(-2f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
+            var turret = gm.DebugSpawnServer(RobotKind.Turret, hatch + new Vector3(2.5f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<SecurityDevice>();
+            // Behind the guard.
+            LookAtFrom(new Pose(hatch + new Vector3(-2f, 0.05f, 1.8f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(-2f, 1.2f, 3f));
+            yield return new WaitForSeconds(0.4f);
+            string prompt = UI.GameHUD.Instance.CurrentPrompt.Text;
+            Player.PlayerController.AutoInteract = true;
+            yield return new WaitForSeconds(1.2f);
+            yield return Shot("hacking_progress");
+            yield return new WaitForSeconds(1.6f);
+            Player.PlayerController.AutoInteract = false;
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("guard_hacked");
+            Log($"hack guard: prompt='{prompt}' hacked={guard.IsHacked}");
+            // Next to the turret.
+            Me.TeleportOwner(hatch + new Vector3(2.5f, 0.05f, 1.6f), Quaternion.LookRotation(Vector3.forward));
+            yield return new WaitForSeconds(0.3f);
+            Player.PlayerController.AutoInteract = true;
+            yield return new WaitForSeconds(2.8f);
+            Player.PlayerController.AutoInteract = false;
+            yield return new WaitForSeconds(0.3f);
+            Log($"hack turret: hacked={turret.IsHacked}");
+            // Robots wake up: a hacked turret must not see the player.
+            GameManager.FreezeRobots = false;
+            yield return new WaitForSeconds(2f);
+            Log($"hacked turret awareness while hacked: {turret.GetComponent<DetectorAwareness>().AwarenessOf(Me.OwnerClientId):0.00}");
+        }
     }
 }

@@ -29,6 +29,13 @@ namespace Stealth.Enemies
         public readonly NetworkVariable<byte> Alert = new();
 
         float m_Meter;
+        float m_HackedUntil;
+
+        public void HackServer(float seconds)
+        {
+            m_HackedUntil = Time.time + seconds;
+            m_Meter = 0f;
+        }
         float m_Phase;
         float m_AlarmUntil;
         MaterialPropertyBlock m_Block;
@@ -67,6 +74,7 @@ namespace Stealth.Enemies
             Pivot.localRotation = Quaternion.Euler(Tilt, yaw, 0f);
 
             if (!IsServer || GameManager.Peaceful || GameManager.InGracePeriod) return;
+            if (Time.time < m_HackedUntil) { if (Alert.Value != 0) Alert.Value = 0; m_Awareness?.ReportServer(0f, null); return; }
             PlayerController seen = null;
             float bestDist = float.MaxValue;
             foreach (var p in PlayerController.All)

@@ -72,6 +72,20 @@ namespace Stealth.Enemies
         public Light StatusLight;
 
         public readonly NetworkVariable<RobotState> State = new();
+        public readonly NetworkVariable<bool> Hacked = new();
+        public bool IsHacked => Hacked.Value;
+        float m_HackedUntil;
+
+        /// <summary>Server: switch the robot off for a while (it forgets what it was doing).</summary>
+        public void HackServer(float seconds)
+        {
+            m_HackedUntil = Time.time + seconds;
+            Hacked.Value = true;
+            m_Target = null;
+            m_Suspicion = 0f;
+            SetState(RobotState.Patrol);
+            m_Awareness?.ReportServer(0f, null);
+        }
 
         NavMeshAgent m_Agent;
         PlayerController m_Target;
@@ -93,6 +107,7 @@ namespace Stealth.Enemies
             m_Agent = GetComponent<NavMeshAgent>();
             m_Awareness = GetComponent<DetectorAwareness>();
             State.OnValueChanged += (_, s) => ApplyVisual(s);
+            Hacked.OnValueChanged += (_, _) => ApplyVisual(State.Value);
             ColorFilter.OnValueChanged += (_, _) => ApplyVisual(State.Value);
             ApplyVisual(State.Value);
             if (!IsServer) return;
@@ -114,6 +129,15 @@ namespace Stealth.Enemies
 
         void ApplyVisual(RobotState state)
         {
+            if (Hacked.Value)
+            {
+                m_Block ??= new MaterialPropertyBlock();
+                m_Block.SetColor("_BaseColor", new Color(0.15f, 0.15f, 0.15f));
+                m_Block.SetColor("_EmissionColor", Color.black);
+                foreach (var r in StatusRenderers) if (r != null) r.SetPropertyBlock(m_Block);
+                if (StatusLight != null) StatusLight.color = Color.black;
+                return;
+            }
             var calm = ColorFilter.Value >= 0 ? Items.ItemCatalog.Colors[ColorFilter.Value].Color : new Color(0.2f, 0.85f, 1f);
             var c = state switch
             {
@@ -142,6 +166,12 @@ namespace Stealth.Enemies
         {
             if (!IsServer || m_Agent == null || !m_Agent.isOnNavMesh) return;
             if (GameManager.FreezeRobots) { m_Agent.isStopped = true; return; }
+            if (IsHacked)
+            {
+                m_Agent.isStopped = true;
+                if (Time.time >= m_HackedUntil) { Hacked.Value = false; m_Agent.isStopped = false; }
+                return;
+            }
             if (GameManager.Instance != null && GameManager.Instance.Phase.Value != RunPhase.Playing)
             {
                 m_Agent.isStopped = true;

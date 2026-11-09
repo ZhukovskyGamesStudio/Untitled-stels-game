@@ -135,6 +135,18 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void HackingRules()
+        {
+            var robot = Vector3.zero;
+            Assert.IsTrue(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(0, 0, -1.2f), false), "from behind");
+            Assert.IsFalse(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(0, 0, 1.2f), false), "not from the front");
+            Assert.IsFalse(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(0, 0, -1.2f), true), "not while it chases you");
+            Assert.IsFalse(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(0, 0, -3f), false), "too far");
+            Assert.IsTrue(Hacking.CanHackDevice(new Vector3(0, 2.2f, 0), new Vector3(1f, 0, 0)), "wall device from below");
+            Assert.IsFalse(Hacking.CanHackDevice(new Vector3(0, 0, 0), new Vector3(3f, 0, 0)));
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);

@@ -39,6 +39,8 @@ namespace Stealth.Player
 
         /// <summary>Test hook: when set, replaces keyboard/mouse input of the local player.</summary>
         public static PlayerInputState? Autopilot;
+        /// <summary>Test hook: behave as if E is held.</summary>
+        public static bool AutoInteract;
 
         [Header("Noise radius (m)")]
         public float WalkNoise = 6f;
@@ -60,6 +62,9 @@ namespace Stealth.Player
         public bool Laughing => GasTime > 8f;
         public float ReviveProgress { get; private set; }
         public PlayerController ReviveTarget { get; private set; }
+        /// <summary>Robot or device that can be hacked right now (hold E).</summary>
+        public Stealth.Enemies.DetectorAwareness HackTarget { get; private set; }
+        public float HackProgress { get; private set; }
         public float Height => Crouching.Value ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
@@ -288,7 +293,7 @@ namespace Stealth.Player
                 if (p == this || !p.Downed.Value) continue;
                 if ((p.transform.position - transform.position).magnitude <= ReviveDistance) { ReviveTarget = p; break; }
             }
-            if (ReviveTarget != null && kb.eKey.isPressed)
+            if (ReviveTarget != null && (kb.eKey.isPressed || AutoInteract))
             {
                 ReviveProgress += Time.deltaTime;
                 if (ReviveProgress >= ReviveTime)
@@ -299,12 +304,63 @@ namespace Stealth.Player
             }
             else ReviveProgress = 0;
 
+            // Hack: hold E next to a device, or behind a robot that is not chasing you.
+            HackTarget = ReviveTarget == null ? FindHackTarget() : null;
+            if (HackTarget != null && (kb.eKey.isPressed || AutoInteract))
+            {
+                HackProgress += Time.deltaTime;
+                if (HackProgress >= Stealth.Enemies.Hacking.HoldTime)
+                {
+                    HackRpc(HackTarget.NetworkObject);
+                    HackProgress = 0;
+                }
+            }
+            else HackProgress = 0;
+
             var gm = GameManager.Instance;
             if (gm == null) return;
             if (kb.fKey.wasPressedThisFrame && Hatch.IsNear(transform.position) && gm.Phase.Value == RunPhase.Playing)
                 gm.FinishLevelRpc();
             if (kb.rKey.wasPressedThisFrame && gm.Phase.Value == RunPhase.Failed && !CursorMode)
                 gm.RestartRunRpc();
+        }
+
+        Stealth.Enemies.DetectorAwareness FindHackTarget()
+        {
+            Stealth.Enemies.DetectorAwareness best = null;
+            float bestDist = float.MaxValue;
+            foreach (var d in Stealth.Enemies.DetectorAwareness.All)
+            {
+                if (!IsHackable(d, transform.position)) continue;
+                float dist = (d.transform.position - transform.position).sqrMagnitude;
+                if (dist < bestDist) { best = d; bestDist = dist; }
+            }
+            return best;
+        }
+
+        static bool IsHackable(Stealth.Enemies.DetectorAwareness d, Vector3 player)
+        {
+            if (d.IsCamera) return Stealth.Enemies.Hacking.CanHackDevice(d.transform.position, player);
+            var robot = d.GetComponent<Stealth.Enemies.RobotController>();
+            if (robot != null)
+                return !robot.IsHacked && Stealth.Enemies.Hacking.CanHackRobot(robot.transform.position, robot.transform.forward, player,
+                    robot.State.Value == Stealth.Enemies.RobotState.Chase);
+            var device = d.GetComponent<Stealth.Enemies.SecurityDevice>();
+            return device != null && !device.IsHacked && Stealth.Enemies.Hacking.CanHackDevice(device.transform.position, player);
+        }
+
+        [Rpc(SendTo.Server)]
+        void HackRpc(NetworkObjectReference target)
+        {
+            if (Downed.Value || !target.TryGet(out var obj)) return;
+            var d = obj.GetComponent<Stealth.Enemies.DetectorAwareness>();
+            if (d == null || !IsHackable(d, transform.position)) return;
+            var robot = obj.GetComponent<Stealth.Enemies.RobotController>();
+            if (robot != null) robot.HackServer(Stealth.Enemies.Hacking.Duration);
+            var device = obj.GetComponent<Stealth.Enemies.SecurityDevice>();
+            if (device != null) device.HackServer(Stealth.Enemies.Hacking.Duration);
+            var cam = obj.GetComponent<Stealth.Enemies.SecurityCamera>();
+            if (cam != null) cam.HackServer(Stealth.Enemies.Hacking.Duration);
         }
 
         // ------------------------------------------------------------------ server

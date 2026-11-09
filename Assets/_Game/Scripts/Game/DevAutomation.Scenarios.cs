@@ -20,6 +20,7 @@ namespace Stealth.Game
             m_Scenarios["hunter"] = HunterScenario;
             m_Scenarios["lasers"] = LasersScenario;
             m_Scenarios["radio"] = RadioScenario;
+            m_Scenarios["hack"] = HackScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

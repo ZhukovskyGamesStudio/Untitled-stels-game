@@ -27,8 +27,19 @@ namespace Stealth.Enemies
         float m_AlarmUntil;
         MaterialPropertyBlock m_Block;
 
-        /// <summary>Server-side while the device is temporarily disabled (hacking).</summary>
-        public bool Disabled { get; set; }
+        public readonly NetworkVariable<bool> Hacked = new();
+        public bool IsHacked => Hacked.Value;
+        float m_HackedUntil;
+
+        /// <summary>True while hacked (server and clients).</summary>
+        public bool Disabled => Hacked.Value;
+
+        public void HackServer(float seconds)
+        {
+            m_HackedUntil = Time.time + seconds;
+            Hacked.Value = true;
+            Meter = 0f;
+        }
 
         protected bool SensorsActive => IsServer && !GameManager.Peaceful && !GameManager.InGracePeriod && !GameManager.FreezeRobots && !Disabled;
 
@@ -37,6 +48,7 @@ namespace Stealth.Enemies
             All.Add(this);
             Awareness = GetComponent<DetectorAwareness>();
             Alert.OnValueChanged += (_, a) => ApplyVisual(a);
+            Hacked.OnValueChanged += (_, _) => ApplyVisual(Alert.Value);
             ApplyVisual(Alert.Value);
             OnSpawned();
         }
@@ -60,6 +72,7 @@ namespace Stealth.Enemies
             if (!IsSpawned) return;
             TickLocal();
             if (!IsServer) return;
+            if (Hacked.Value && Time.time >= m_HackedUntil) Hacked.Value = false;
             if (SensorsActive) TickServer();
             else Decay(1f);
             byte alert = Time.time < m_AlarmUntil ? (byte)2 : Meter > 0.15f ? (byte)1 : (byte)0;
@@ -97,7 +110,7 @@ namespace Stealth.Enemies
 
         void ApplyVisual(byte alert)
         {
-            var c = alert switch { 0 => IdleColor, 1 => new Color(1f, 0.85f, 0.1f), _ => new Color(1f, 0.1f, 0.05f) };
+            var c = Hacked.Value ? new Color(0.12f, 0.12f, 0.12f) : alert switch { 0 => IdleColor, 1 => new Color(1f, 0.85f, 0.1f), _ => new Color(1f, 0.1f, 0.05f) };
             m_Block ??= new MaterialPropertyBlock();
             m_Block.SetColor("_BaseColor", c);
             m_Block.SetColor("_EmissionColor", c * 2.5f);

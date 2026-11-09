@@ -96,6 +96,12 @@ namespace Stealth.UI
             if (me.Downed.Value || GameMenu.IsOpen) return default;
             if (me.ReviveTarget != null)
                 m_Prompts.Add(new Prompt(100, "E", "Удерживай — поднять союзника", me.ReviveProgress / PlayerController.ReviveTime));
+            if (me.HackTarget != null)
+            {
+                var hd = me.HackTarget;
+                m_Prompts.Add(new Prompt(70, "E", $"Удерживай — взломать: {Stealth.Enemies.RobotInfo.Name(hd.Kind, hd.IsCamera)} (20 с)",
+                    me.HackProgress / Stealth.Enemies.Hacking.HoldTime));
+            }
             if (me.Motor.BlockedByCeiling)
                 m_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
             if (gm.Phase.Value == RunPhase.Playing && Hatch.IsNear(me.transform.position))
