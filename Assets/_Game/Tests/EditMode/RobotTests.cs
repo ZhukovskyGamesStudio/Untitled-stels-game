@@ -93,6 +93,18 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void MotionSensorAndPressurePlateRules()
+        {
+            Assert.IsTrue(MotionSensor.Triggers(3.6f, 2.2f), "walking");
+            Assert.IsFalse(MotionSensor.Triggers(1.8f, 2.2f), "crouch-walking");
+            var plate = new Vector3(5, 0, 5);
+            Assert.IsTrue(PressurePlate.Steps(plate, 0.45f, new Vector3(5.3f, 0.02f, 4.8f)));
+            Assert.IsFalse(PressurePlate.Steps(plate, 0.45f, new Vector3(6f, 0.02f, 5f)), "beside the plate");
+            Assert.IsFalse(PressurePlate.Steps(plate, 0.45f, new Vector3(5f, 0.6f, 5f)), "jumping over");
+            Assert.IsFalse(PressurePlate.Steps(plate, 0.45f, new Vector3(5f, 3.5f, 5f)), "a floor above");
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);

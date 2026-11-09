@@ -29,7 +29,7 @@ namespace Stealth.Game
                 var stage = hatch + new Vector3(0, 0, 2.6f);
                 var pos = stage;
                 var rot = Quaternion.LookRotation(Vector3.back);
-                if (kind == RobotKind.MotionSensor) { pos = hatch + new Vector3(0, 2.2f, 4.75f); }
+                if (kind == RobotKind.MotionSensor) { pos = hatch + new Vector3(0, 2.2f, 4.75f); stage = pos - Vector3.up * 2.2f; }
                 var obj = gm.DebugSpawnServer(kind, pos, rot);
                 if (obj == null) { Log($"gallery: {kind} has no prefab yet"); continue; }
                 var view = hatch + new Vector3(0.6f, 0.05f, -1.6f);

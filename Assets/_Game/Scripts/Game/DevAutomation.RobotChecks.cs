@@ -15,7 +15,9 @@ namespace Stealth.Game
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
             if (kind == RobotKind.Hound) { steps.Add(TrailCheck(obj)); return; }
             if (kind == RobotKind.Sorter) steps.Add(SorterCheck(obj));
-            if (kind == RobotKind.Vacuum) { steps.Add(CrossLineCheck(kind, obj)); return; }
+            if (kind == RobotKind.Vacuum || kind == RobotKind.Lidar) { steps.Add(CrossLineCheck(kind, obj)); return; }
+            if (kind == RobotKind.PressurePlate) { steps.Add(PlateCheck(obj)); return; }
+            if (kind == RobotKind.MotionSensor) steps.Add(SneakCheck(kind, obj, crouch: true));
             steps.Add(DetectionCheck(kind, obj));
         }
 
@@ -92,7 +94,8 @@ namespace Stealth.Game
             gm.AlarmUntil.Value = 0;
             var p = obj.transform.position;
             // Ceiling robots hang just under the next slab: measure the floor from a point below them.
-            var stand = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y - 2.5f)) + 0.05f, p.z) + new Vector3(1.5f, 0, 0.5f);
+            float below = kind == RobotKind.Vacuum ? 2.5f : 0f;
+            var stand = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y - below)) + 0.05f, p.z) + new Vector3(1.5f, 0, 0.5f);
             LookAtFrom(new Pose(stand, Quaternion.LookRotation(Vector3.left)), new Vector3(p.x, stand.y, p.z));
             GameManager.FreezeRobots = false;
             float t0 = Time.time;
@@ -103,6 +106,34 @@ namespace Stealth.Game
                 yield return null;
             }
             Log($"{kind}: line swept over the player after {Time.time - t0:0.0}s, alarm={gm.AlarmActive}");
+            GameManager.FreezeRobots = true;
+        }
+
+        /// <summary>Jump over the plate (nothing happens), then walk over it (alarm).</summary>
+        IEnumerator PlateCheck(NetworkObject obj)
+        {
+            var gm = GameManager.Instance;
+            gm.AlarmUntil.Value = 0;
+            var p = obj.transform.position;
+            GameManager.FreezeRobots = false;
+            LookAtFrom(new Pose(p + new Vector3(0, 0.05f, -1.6f), Quaternion.LookRotation(Vector3.forward)), p);
+            yield return new WaitForSeconds(0.4f);
+            yield return Shot("kind_PressurePlate_close");
+            // Run-up and jump over.
+            Drive(Vector2.up, sprint: true);
+            yield return new WaitForSeconds(0.08f);
+            Player.PlayerController.Autopilot = new Player.PlayerInputState { Move = Vector2.up, Sprint = true, Jump = true };
+            yield return null;
+            Drive(Vector2.up, sprint: true);
+            yield return new WaitForSeconds(0.7f);
+            Release();
+            bool jumped = !gm.AlarmActive;
+            yield return new WaitForSeconds(0.3f);
+            Me.TeleportOwner(p + new Vector3(0, 0.05f, -1.6f), Quaternion.LookRotation(Vector3.forward));
+            Drive(Vector2.up);
+            yield return new WaitForSeconds(0.9f);
+            Release();
+            Log($"pressure plate: jumping over → no alarm={jumped}, walking over → alarm={gm.AlarmActive}");
             GameManager.FreezeRobots = true;
         }
 

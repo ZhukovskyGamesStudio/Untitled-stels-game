@@ -59,6 +59,9 @@ namespace Stealth.EditorTools
             var turret = BuildTurret();
             var spider = BuildSpider();
             var vacuum = BuildVacuum();
+            var lidar = BuildLidar();
+            var pir = BuildMotionSensor();
+            var plate = BuildPressurePlate();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
@@ -73,6 +76,9 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Turret] = turret;
             robots[(int)RobotKind.Spider] = spider;
             robots[(int)RobotKind.Vacuum] = vacuum;
+            robots[(int)RobotKind.Lidar] = lidar;
+            robots[(int)RobotKind.MotionSensor] = pir;
+            robots[(int)RobotKind.PressurePlate] = plate;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -628,6 +634,24 @@ namespace Stealth.EditorTools
         static GameObject BuildVacuum() => BuildDevice<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
         {
             v.Line = Beam(root, "ScanLine", 0.03f);
+        });
+
+        static GameObject BuildLidar() => BuildDevice<LidarScanner>("SensorLidar", "sensor_lidar", "TurretBody", false, false, (root, l) =>
+        {
+            l.Line = Beam(root, "LidarBeam", 0.02f);
+        });
+
+        static GameObject BuildMotionSensor() => BuildDevice<MotionSensor>("SensorMotion", "sensor_pir", "RobotBody", false, false, (root, m) =>
+        {
+            Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // on the wall, nothing to bump into
+        });
+
+        static GameObject BuildPressurePlate() => BuildDevice<PressurePlate>("SensorPlate", "sensor_plate", "Floor", false, false, (root, p) =>
+        {
+            Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // flush with the floor
+            var light = root.GetComponentInChildren<Light>();
+            light.range = 1.2f;
+            light.intensity = 0.6f;
         });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>
