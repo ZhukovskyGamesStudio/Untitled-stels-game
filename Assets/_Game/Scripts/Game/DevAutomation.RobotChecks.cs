@@ -29,7 +29,8 @@ namespace Stealth.Game
             int hp0 = Me.Hp.Value;
             gm.AlarmUntil.Value = 0;
             var p = obj.transform.position;
-            var front = obj.transform.forward;
+            // Wall / ceiling crawlers look into the room (their "up"), everybody else looks forward.
+            var front = kind == RobotKind.Spider ? obj.transform.up : obj.transform.forward;
             var stand = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y)) + 0.05f, p.z) + Flat(front).normalized * 3.5f;
             Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(p - stand)));
             yield return CustomDetectionSetup(kind, obj);
