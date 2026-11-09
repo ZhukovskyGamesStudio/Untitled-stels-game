@@ -177,6 +177,13 @@ namespace Stealth.Game
             Log($"connected: players={PlayerController.All.Count} level={gm.Level.Value.Index} seed={gm.Level.Value.Seed} rooms={layout.Width}x{layout.Height}x{layout.Floors} " +
                 $"items={WorldItem.All.Count} robots={RobotController.All.Count} cameras={FindObjectsByType<SecurityCamera>().Length} " +
                 $"lasers={FindObjectsByType<LaserGate>().Length} quota={gm.Quota.Value}");
+            var kinds = new System.Collections.Generic.Dictionary<string, int>();
+            foreach (var d in Enemies.DetectorAwareness.All)
+            {
+                string k = d.IsCamera ? "Camera" : d.Kind.ToString();
+                kinds[k] = kinds.TryGetValue(k, out var n) ? n + 1 : 1;
+            }
+            Log("security on this level: " + string.Join(", ", kinds.Select(kv => $"{kv.Key}x{kv.Value}")));
             yield return Shot("spawn");
 
             // Pick up an item through the same RPC the UI uses; each player takes a different one.
