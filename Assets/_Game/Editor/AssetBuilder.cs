@@ -18,7 +18,7 @@ namespace Stealth.EditorTools
     ///  * <b>overwrite</b> ("Stealth / Rebuild All Assets", batch flag -force): everything is regenerated
     ///    in place (GUIDs and network hashes are preserved because paths do not change).
     ///
-    /// Tuning assets (Data/Config, Data/Robots, Resources/GameConfig) are only ever created, never overwritten —
+    /// Tuning assets (Data/Config, …Config.asset next to robot / device prefabs, Resources/GameConfig) are only ever created, never overwritten —
     /// even with -force: they hold hand-tuned balance.
     ///
     /// Batch: Unity -batchmode -executeMethod Stealth.EditorTools.AssetBuilder.BuildAllBatch [-force]

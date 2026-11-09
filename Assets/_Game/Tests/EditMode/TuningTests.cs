@@ -28,9 +28,41 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void EveryRobotAndDeviceHasItsConfigNextToThePrefab()
+        {
+            int count = 0;
+            foreach (var path in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs" }).Select(AssetDatabase.GUIDToAssetPath))
+            {
+                var go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                ScriptableObject profile = go.GetComponent<Detector>()?.ProfileBase;
+                if (go.GetComponent<LaserGate>() != null) profile = go.GetComponent<LaserGate>().Profile;
+                if (go.GetComponent<Detector>() == null && go.GetComponent<LaserGate>() == null) continue;
+                count++;
+                Assert.IsNotNull(profile, $"{path} has a config");
+                var configPath = AssetDatabase.GetAssetPath(profile);
+                Assert.AreEqual(System.IO.Path.GetDirectoryName(path), System.IO.Path.GetDirectoryName(configPath), $"{path}: config lies next to the prefab");
+                Assert.AreEqual(System.IO.Path.GetFileNameWithoutExtension(path) + "Config", System.IO.Path.GetFileNameWithoutExtension(configPath));
+            }
+            Assert.AreEqual(RobotRoster.KindCount + 1, count, "every kind and the laser gate");
+        }
+
+        [Test]
+        public void PrefabsHoldNoTuningNumbers()
+        {
+            // Robots and devices keep only references on the prefab; numbers belong to their config.
+            foreach (var type in new[] { typeof(SentryTurret), typeof(SpiderBot), typeof(CeilingVacuum), typeof(LidarScanner),
+                         typeof(MotionSensor), typeof(PressurePlate), typeof(SecurityCamera), typeof(LaserGate), typeof(RobotController), typeof(RobotAnimator) })
+            {
+                var numbers = type.GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                    .Where(f => f.FieldType == typeof(float) || f.FieldType == typeof(int)).Select(f => f.Name).ToArray();
+                CollectionAssert.IsEmpty(numbers, $"{type.Name} has tuning fields on the prefab: {string.Join(", ", numbers)}");
+            }
+        }
+
+        [Test]
         public void EveryMobileRobotHasItsOwnProfile()
         {
-            var profiles = AssetDatabase.FindAssets("t:RobotProfile", new[] { "Assets/_Game/Data/Robots" });
+            var profiles = AssetDatabase.FindAssets("t:RobotProfile", new[] { "Assets/_Game/Prefabs/Robots" });
             Assert.GreaterOrEqual(profiles.Length, 8, "guard, listener, drone, thumper, hound, sorter, worker, hunter");
             var guard = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Robots/RobotGuard.prefab").GetComponent<RobotController>();
             var hound = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Robots/RobotHound.prefab").GetComponent<RobotController>();

@@ -7,9 +7,9 @@ namespace Stealth.Enemies
     /// <summary>Wall PIR sensor: notices fast movement in its cone. Sneaking slowly (crouched) or freezing beats it.</summary>
     public class MotionSensor : SecurityDevice
     {
-        public float Range = 9f;
-        public float ViewAngle = 100f;
-        public float SpeedThreshold = 2.2f; // crouch-walk is 1.8, walking 3.6
+        [Tooltip("Tuning (MotionSensorProfile) — a separate asset next to the prefab.")]
+        public MotionSensorProfile Profile;
+        protected override DeviceProfile Device => Profile;
 
         protected override Color IdleColor => new(1f, 0.55f, 0.85f);
 
@@ -20,13 +20,13 @@ namespace Stealth.Enemies
             var eye = transform.position + transform.forward * 0.1f;
             foreach (var p in PlayerController.All)
             {
-                if (p.IsDown || !Triggers(p.GroundSpeed, SpeedThreshold)) continue;
+                if (p.IsDown || !Triggers(p.GroundSpeed, Profile.SpeedThreshold)) continue;
                 var target = p.Position + Vector3.up;
-                if (!Perception.InCone(eye, transform.forward, target, Range, ViewAngle) || !Perception.LineOfSight(eye, p, 0.6f)) continue;
-                Notice(p, 3f);
+                if (!Perception.InCone(eye, transform.forward, target, Profile.Range, Profile.ViewAngle) || !Perception.LineOfSight(eye, p, 0.6f)) continue;
+                Notice(p, Profile.DetectionRate);
                 return;
             }
-            Decay(0.5f);
+            Forget();
         }
     }
 }

@@ -9,14 +9,11 @@ namespace Stealth.Enemies
     /// </summary>
     public class SentryTurret : SecurityDevice
     {
+        [Tooltip("Tuning (TurretProfile) — a separate asset next to the prefab.")]
+        public TurretProfile Profile;
+        protected override DeviceProfile Device => Profile;
         public Transform Head;
         public LineRenderer Sight;
-        public float Range = 14f;
-        public float ViewAngle = 60f;
-        public float SweepAngle = 120f;
-        public float SweepPeriod = 7f;
-        public float LockTime = 1.1f;
-        public float Cooldown = 2.5f;
 
         /// <summary>Client id being aimed at (for the laser sight on every peer), Nobody = sweeping.</summary>
         public ulong AimTarget => TargetClient;
@@ -44,7 +41,7 @@ namespace Stealth.Enemies
                 var to = target.Position - transform.position;
                 yaw = Vector3.SignedAngle(transform.forward, new Vector3(to.x, 0, to.z), Vector3.up);
             }
-            else yaw = Mathf.Sin(Stealth.Game.Session.ServerTimeF * Mathf.PI * 2f / SweepPeriod) * SweepAngle / 2f;
+            else yaw = Mathf.Sin(Stealth.Game.Session.ServerTimeF * Mathf.PI * 2f / Profile.SweepPeriod) * Profile.SweepAngle / 2f;
             m_Yaw = Mathf.MoveTowardsAngle(m_Yaw, yaw, 180f * Time.deltaTime);
             if (Head != null) Head.localRotation = Quaternion.Euler(0f, m_Yaw, 0f);
 
@@ -73,24 +70,24 @@ namespace Stealth.Enemies
                 if (p.IsDown) continue;
                 var target = p.Position + Vector3.up * p.Height * 0.7f;
                 float d = Vector3.Distance(EyePos, target);
-                bool inView = AimTarget == p.ClientId || Perception.InCone(EyePos, HeadForward, target, Range, ViewAngle);
-                if (inView && d < bestDist && d <= Range && Perception.LineOfSight(EyePos, p, 0.7f)) { seen = p; bestDist = d; }
+                bool inView = AimTarget == p.ClientId || Perception.InCone(EyePos, HeadForward, target, Profile.Range, Profile.ViewAngle);
+                if (inView && d < bestDist && d <= Profile.Range && Perception.LineOfSight(EyePos, p, 0.7f)) { seen = p; bestDist = d; }
             }
 
             if (seen == null)
             {
-                Decay(0.6f);
+                Forget();
                 if (Meter.Value < 0.2f) { SetTarget(Nobody); m_LockStart = -1f; }
                 return;
             }
-            Notice(seen, 2.2f * (seen.IsCrouching ? 0.7f : 1f));
+            Notice(seen, Profile.DetectionRate * (seen.IsCrouching ? Profile.CrouchFactor : 1f));
             if (Meter.Value < 1f) return;
 
             // Locked on: aim, warn with the laser, then fire.
             if (AimTarget != seen.ClientId) { SetTarget(seen.ClientId); m_LockStart = Time.time; }
-            if (m_LockStart >= 0f && Time.time - m_LockStart >= LockTime && Time.time >= m_NextShot)
+            if (m_LockStart >= 0f && Time.time - m_LockStart >= Profile.LockTime && Time.time >= m_NextShot)
             {
-                m_NextShot = Time.time + Cooldown;
+                m_NextShot = Time.time + Profile.Cooldown;
                 m_LockStart = Time.time; // next shot needs another lock
                 seen.HitServer(transform.position);
                 Pulse(PulseShot);

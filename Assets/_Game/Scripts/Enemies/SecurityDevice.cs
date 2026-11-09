@@ -11,9 +11,9 @@ namespace Stealth.Enemies
     /// </summary>
     public abstract class SecurityDevice : Detector
     {
-        [Header("Alarm")]
-        public float AlarmRadius = 30f;
-        public float AlarmCooldown = 6f;
+        /// <summary>The device's tuning (alarm, forgetting) — the typed Profile field of the subclass.</summary>
+        protected abstract DeviceProfile Device { get; }
+        public override DetectorProfile ProfileBase => Device;
 
         /// <summary>0 idle, 1 noticing, 2 detected (replicated, drives the status colour).</summary>
         public byte Alert => Mode;
@@ -26,7 +26,7 @@ namespace Stealth.Enemies
 
         protected override void OnSpawned()
         {
-            Meter.AlarmCooldown = AlarmCooldown;
+            Meter.AlarmCooldown = Device.AlarmCooldown;
             OnDeviceSpawned();
         }
 
@@ -53,7 +53,7 @@ namespace Stealth.Enemies
             if (!IsServer) return;
             UpdateHackServer();
             if (SensorsActive) TickServer();
-            else Decay(1f);
+            else Decay(Mathf.Max(1f, Device.ForgetRate));
             byte alert = IsHacked ? (byte)0 : Meter.AlertLevel(Time.time);
             SetMode(alert);
             if (!IsHacked) ReportAwarenessServer(Meter.Awareness(Time.time), Suspect);
@@ -68,6 +68,9 @@ namespace Stealth.Enemies
 
         protected void Decay(float ratePerSecond) => Meter.Decay(ratePerSecond, Time.deltaTime);
 
+        /// <summary>Nobody in sight: forget at the configured rate.</summary>
+        protected void Forget() => Decay(Device.ForgetRate);
+
         /// <summary>Instant detection (pressure plates, beams).</summary>
         protected void Trip(IIntruder p)
         {
@@ -77,7 +80,7 @@ namespace Stealth.Enemies
 
         protected void RaiseAlarm(Vector3 at)
         {
-            if (GameManager.Instance != null) GameManager.Instance.RaiseAlarmServer(at, AlarmRadius);
+            if (GameManager.Instance != null) GameManager.Instance.RaiseAlarmServer(at, Device.AlarmRadius);
         }
     }
 }

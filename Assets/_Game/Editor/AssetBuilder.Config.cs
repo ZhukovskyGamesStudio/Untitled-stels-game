@@ -9,7 +9,6 @@ namespace Stealth.EditorTools
     public static partial class AssetBuilder
     {
         const string ConfigDir = DataDir + "/Config";
-        const string RobotProfilesDir = DataDir + "/Robots";
         const string GameConfigPath = Root + "/Resources/" + GameConfig.ResourcePath + ".asset";
 
         /// <summary>
@@ -43,11 +42,18 @@ namespace Stealth.EditorTools
             return asset;
         }
 
-        /// <summary>Profile of a mobile robot kind; <c>created</c> tells the caller to fill in the initial tuning.</summary>
-        static (RobotProfile profile, bool created) RobotProfileAsset(string kind)
+        /// <summary>
+        /// Tuning of a robot / device: <c>&lt;PrefabName&gt;Config.asset</c> next to its prefab. A separate file, so that
+        /// changing the numbers and changing the prefab never conflict. <paramref name="initial"/> runs only on creation.
+        /// </summary>
+        static T Profile<T>(string prefabName, System.Action<T> initial = null) where T : ScriptableObject
         {
-            var profile = TuningAsset<RobotProfile>($"{RobotProfilesDir}/{kind}.asset", out bool created);
-            return (profile, created);
+            var folder = prefabName.StartsWith("Robot") ? RobotPrefabs : SensorPrefabs;
+            var profile = TuningAsset<T>($"{folder}/{prefabName}Config.asset", out bool created);
+            if (!created) return profile;
+            initial?.Invoke(profile);
+            EditorUtility.SetDirty(profile);
+            return profile;
         }
     }
 }

@@ -100,11 +100,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fc599d8aaaefc64f96b7275b349a87f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotAnimator
-  RotorSpeed: 1800
-  StepFrequency: 1.6
-  LegSwing: 25
-  Lean: 0
-  Bob: 0
   Model: {fileID: 7765064922544549901}
 --- !u!114 &2870162741526569849
 MonoBehaviour:
@@ -125,13 +120,9 @@ MonoBehaviour:
     - {fileID: 398532723121787717}
     Light: {fileID: 4984054885804779707}
     Emission: 2.5
-  AlarmRadius: 30
-  AlarmCooldown: 6
+  Profile: {fileID: 11400000, guid: 3c2378c7341b69e4ab0e522a2f074242, type: 2}
   Line: {fileID: 2401267074792842384}
   Head: {fileID: 8049669571030337246}
-  BeamHeight: 0.38
-  Range: 6
-  Speed: 110
 --- !u!114 &3055348506003521102
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -10,13 +10,9 @@ namespace Stealth.Enemies
     /// </summary>
     public class SpiderBot : SecurityDevice
     {
-        public float CrawlHeight = 2.6f;
-        public float CrawlSpeed = 1.3f;
-        public float Range = 9f;
-        public float ViewAngle = 120f;
-        public float LeapTime = 0.7f;
-        public float ReturnTime = 1.3f;
-        public float Cooldown = 3f;
+        [Tooltip("Tuning (SpiderProfile) — a separate asset next to the prefab.")]
+        public SpiderProfile Profile;
+        protected override DeviceProfile Device => Profile;
 
         enum Mode { Crawl, Leap, Return }
 
@@ -54,7 +50,7 @@ namespace Stealth.Enemies
             else if (t < w + d) { p = new Vector3(m_Max.x, 0, m_Min.z + (t - w)); tangent = Vector3.forward; inward = Vector3.left; }
             else if (t < 2 * w + d) { p = new Vector3(m_Max.x - (t - w - d), 0, m_Max.z); tangent = Vector3.left; inward = Vector3.back; }
             else { p = new Vector3(m_Min.x, 0, m_Max.z - (t - 2 * w - d)); tangent = Vector3.back; inward = Vector3.right; }
-            p.y = m_FloorY + CrawlHeight;
+            p.y = m_FloorY + Profile.CrawlHeight;
             return (p, Quaternion.LookRotation(tangent * dir, inward));
         }
 
@@ -67,7 +63,7 @@ namespace Stealth.Enemies
                 case Mode.Crawl:
                     if (Time.time > m_PauseUntil)
                     {
-                        m_T += CrawlSpeed * m_Dir * Time.deltaTime;
+                        m_T += Profile.CrawlSpeed * m_Dir * Time.deltaTime;
                         if (Random.value < 0.002f) { m_Dir = -m_Dir; m_PauseUntil = Time.time + Random.Range(0.5f, 2f); }
                     }
                     var (p, rot) = OnWall(m_T, m_Dir);
@@ -77,9 +73,9 @@ namespace Stealth.Enemies
 
                 case Mode.Leap:
                 {
-                    float k = Mathf.Clamp01((Time.time - m_ModeStart) / LeapTime);
+                    float k = Mathf.Clamp01((Time.time - m_ModeStart) / Profile.LeapTime);
                     // Mild homing: a sidestep at the last moment still works, standing still does not.
-                    if (m_Prey != null) m_To = Vector3.MoveTowards(m_To, m_Prey.Position + Vector3.up * 0.2f, 2.2f * Time.deltaTime);
+                    if (m_Prey != null) m_To = Vector3.MoveTowards(m_To, m_Prey.Position + Vector3.up * 0.2f, Profile.Homing * Time.deltaTime);
                     var pos = Vector3.Lerp(m_From, m_To, k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * 0.8f;
                     transform.position = pos;
                     var flat = m_To - m_From;
@@ -87,7 +83,7 @@ namespace Stealth.Enemies
                     if (flat.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(flat, Vector3.up);
                     if (k >= 1f)
                     {
-                        if (m_Prey != null && !m_Prey.IsDown && Vector3.Distance(m_Prey.Position, transform.position) < 1.5f)
+                        if (m_Prey != null && !m_Prey.IsDown && Vector3.Distance(m_Prey.Position, transform.position) < Profile.HitDistance)
                             m_Prey.HitServer(transform.position);
                         m_Mode = Mode.Return;
                         m_ModeStart = Time.time;
@@ -98,7 +94,7 @@ namespace Stealth.Enemies
 
                 case Mode.Return:
                 {
-                    float k = Mathf.Clamp01((Time.time - m_ModeStart) / ReturnTime);
+                    float k = Mathf.Clamp01((Time.time - m_ModeStart) / Profile.ReturnTime);
                     var (wall, wallRot) = OnWall(m_T, m_Dir);
                     transform.SetPositionAndRotation(Vector3.Lerp(m_From, wall, k), Quaternion.Slerp(transform.rotation, wallRot, k));
                     if (k >= 1f) m_Mode = Mode.Crawl;
@@ -116,17 +112,17 @@ namespace Stealth.Enemies
                 if (p.IsDown || !Perception.SameFloor(p.Position, new Vector3(0, m_FloorY, 0))) continue;
                 var target = p.Position + Vector3.up;
                 float d = Vector3.Distance(transform.position, target);
-                if (d < best && Perception.InCone(transform.position, LookDirection, target, Range, ViewAngle) && Perception.LineOfSight(transform.position + transform.up * 0.3f, p))
+                if (d < best && Perception.InCone(transform.position, LookDirection, target, Profile.Range, Profile.ViewAngle) && Perception.LineOfSight(transform.position + transform.up * 0.3f, p))
                 { seen = p; best = d; }
             }
-            if (seen == null) { Decay(0.5f); return; }
-            Notice(seen, 1.6f * (seen.IsCrouching ? 0.6f : 1f) * Perception.LightFactor(seen.Position));
+            if (seen == null) { Forget(); return; }
+            Notice(seen, Profile.DetectionRate * (seen.IsCrouching ? Profile.CrouchFactor : 1f) * Perception.LightFactor(seen.Position));
         }
 
         protected override void OnDetected(IIntruder p)
         {
             if (Time.time < m_NextLeap) return;
-            m_NextLeap = Time.time + Cooldown + LeapTime + ReturnTime;
+            m_NextLeap = Time.time + Profile.Cooldown + Profile.LeapTime + Profile.ReturnTime;
             m_Prey = p;
             m_Mode = Mode.Leap;
             m_ModeStart = Time.time;

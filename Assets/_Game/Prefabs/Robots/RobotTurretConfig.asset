@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ac2c4444fea38546bc1317a8b915ce0, type: 3}
+  m_Name: RobotTurretConfig
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.TurretProfile
+  Animation:
+    RotorSpeed: 1800
+    StepFrequency: 1.6
+    LegSwing: 25
+    Lean: 0
+    Bob: 0
+  AlarmRadius: 30
+  AlarmCooldown: 6
+  ForgetRate: 0.6
+  Range: 14
+  ViewAngle: 60
+  DetectionRate: 2.2
+  CrouchFactor: 0.7
+  SweepAngle: 120
+  SweepPeriod: 7
+  LockTime: 1.1
+  Cooldown: 2.5

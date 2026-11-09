@@ -82,6 +82,9 @@ namespace Stealth.Enemies
         /// <summary>Awareness of a specific player (0 if it is focused on someone else).</summary>
         public float AwarenessOf(ulong clientId) => FocusClient == clientId ? Awareness : 0f;
 
+        /// <summary>Tuning asset of this kind (next to the prefab).</summary>
+        public abstract DetectorProfile ProfileBase { get; }
+
         /// <summary>Walking over to check a spot (orange "?").</summary>
         public virtual bool IsInvestigating => false;
         /// <summary>Chasing someone (red "!").</summary>

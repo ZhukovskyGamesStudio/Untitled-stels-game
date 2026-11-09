@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a59d7ee17c455b34b9a6056ba503a2de, type: 3}
+  m_Name: SecurityCameraConfig
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.CameraProfile
+  Animation:
+    RotorSpeed: 1800
+    StepFrequency: 1.6
+    LegSwing: 25
+    Lean: 0
+    Bob: 0
+  AlarmRadius: 35
+  AlarmCooldown: 6
+  ForgetRate: 0.5
+  Tilt: 28
+  SweepAngle: 80
+  SweepPeriod: 8
+  ViewDistance: 14
+  ViewAngle: 50
+  DetectTime: 1.1

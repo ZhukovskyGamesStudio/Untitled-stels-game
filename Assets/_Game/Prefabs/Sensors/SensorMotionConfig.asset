@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8936742f115d2b04c9ad20831ac2c646, type: 3}
+  m_Name: SensorMotionConfig
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.MotionSensorProfile
+  Animation:
+    RotorSpeed: 1800
+    StepFrequency: 1.6
+    LegSwing: 25
+    Lean: 0
+    Bob: 0
+  AlarmRadius: 30
+  AlarmCooldown: 6
+  ForgetRate: 0.5
+  Range: 9
+  ViewAngle: 100
+  SpeedThreshold: 2.2
+  DetectionRate: 3

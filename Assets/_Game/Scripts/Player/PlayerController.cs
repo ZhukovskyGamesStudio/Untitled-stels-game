@@ -297,6 +297,9 @@ namespace Stealth.Player
             m_Controller.enabled = true;
             if (Motor != null) Motor.ResetMotion();
             m_Link?.Teleport(position, rotation);
+            // A teleport is not running: motion and seismic sensors must not feel it (host side; remote jumps are filtered by speed).
+            m_ServerLastPos = position;
+            ServerSpeed = 0f;
         }
 
         void UpdateNoise()

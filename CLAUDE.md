@@ -38,11 +38,11 @@ Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Too
 Art/Sprites/                                               текстуры UI (виньетка, дуга)
 Data/            LevelArt, ItemVisuals, NetworkPrefabs (ScriptableObject)
 Data/Config/     НАСТРОЙКИ БАЛАНСА: Player, Run, Level, Items (правятся руками в инспекторе)
-Data/Robots/     профили подвижных роботов: чувства и характеристики (Guard, Listener, Drone…)
+Prefabs/Robots/<Префаб>Config.asset, Prefabs/Sensors/<Префаб>Config.asset — настройки каждого робота, устройства и лазера рядом с его префабом
 Resources/GameConfig.asset            корень настроек (ссылки на Data/Config/*), его находит любой билд
 Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
 Prefabs/Props    мебель
-Prefabs/Robots   подвижные роботы · Prefabs/Sensors — датчики, камера, лазер
+Prefabs/Robots   роботы + их конфиги · Prefabs/Sensors — датчики, камера, лазер + их конфиги
 Prefabs/Player, Items, Network (Session), FX (RadioRipple)
 Prefabs/UI       экраны HUD, Inventory, Menu + UI/Elements (кнопка, слайдер, дуга, маркеры…)
 Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов, EventSystem
@@ -127,12 +127,16 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 | `Data/Config/Run` | квота (доля, рост, потолок), штраф за упавших, тревога, льготный период, когда приходит охотник |
 | `Data/Config/Level` | размер здания по домам, веса типов комнат, темнота и мерцание, проходы/двери/лазы, сколько охраны и **кто** с какого дома (ростер), лут |
 | `Data/Config/Items` | цвета лута: название, цвет, множитель ценности, частота |
-| `Data/Robots/<Kind>` | профиль подвижного робота: глаза, слух, сейсмика, нюх, скорости, лестницы, атака, тревога |
+| `Prefabs/Robots/Robot<Kind>Config` | подвижный робот (`RobotProfile`): глаза, слух, сейсмика, нюх, скорости, лестницы, атака, радиус тревоги, внимание (паузы, затухание подозрения), анимация |
+| `Prefabs/Robots/RobotTurretConfig` и др. | устройства: турель, паук, пылесос (`TurretProfile`, `SpiderProfile`, `VacuumProfile`) |
+| `Prefabs/Sensors/<Префаб>Config` | лидар, датчик движения, плита, камера, лазер (`LidarProfile`, `MotionSensorProfile`, `PressurePlateProfile`, `CameraProfile`, `LaserGateProfile`) |
 
 - Чистые правила получают **группы настроек** параметром (`MovementSettings`, `StaminaSettings`, `RunSettings`, `BuildingSettings`,
   `SecuritySettings`, `RosterSettings`, `LootSettings`…); без параметра — значения по умолчанию из кода (их же видят тесты).
 - Компоненты берут настройки через `Tuning` (`Tuning.Player.Movement`, `Tuning.Level.Security`…), который грузит `Resources/GameConfig`.
-- Устройства со своими скриптами (турель, паук, пылесос, лидар, датчик движения, плита, камера, лазер) настраиваются полями своих префабов.
+- **В префабах роботов и устройств нет чисел** — только ссылки на части модели и на свой конфиг. Конфиг — отдельный файл рядом с префабом
+  (`<Префаб>Config.asset`): один правит префаб, другой — числа, конфликтов нет. Общая база — `DetectorProfile` (анимация) → `DeviceProfile`
+  (радиус тревоги, остывание, забывание) → конфиг устройства. Проверяют `TuningTests` (конфиг рядом с каждым префабом, в префабах нет числовых полей).
 - Сборщик создаёт конфиги один раз и **никогда не перезаписывает** (даже `FORCE=1`). Добавил поле в группу настроек — в старом ассете оно получит значение по умолчанию из кода.
 - Уровень строится детерминированно из сида на каждом пире: у хоста и клиентов должен быть один и тот же билд (одни и те же конфиги).
 

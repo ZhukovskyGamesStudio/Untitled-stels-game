@@ -136,7 +136,7 @@ namespace Stealth.Tests
             m_Traits.AlarmOnDetect = true;
             Sense(5f, 1f);
             Assert.AreEqual(1, m_Body.Alarms.Count);
-            Assert.AreEqual(RobotBrain.DroneAlarmRadius, m_Body.Alarms[0].radius);
+            Assert.AreEqual(m_Traits.AlarmRadius, m_Body.Alarms[0].radius);
         }
 
         [Test]
@@ -151,7 +151,7 @@ namespace Stealth.Tests
             Sense(5f, 5f);
             Assert.AreEqual(1, m_Body.Alarms.Count, "and not again during the cooldown");
             Assert.AreEqual(RobotState.Patrol, m_Brain.State, "goes back to work");
-            Sense(5f, RobotBrain.SnitchCooldown);
+            Sense(5f, m_Traits.SnitchCooldown);
             Assert.AreEqual(2, m_Body.Alarms.Count);
         }
 

@@ -6,7 +6,9 @@ namespace Stealth.Enemies
     /// <summary>Pressure plate in the floor: stepping on it raises an alarm. A thin glowing border gives it away.</summary>
     public class PressurePlate : SecurityDevice
     {
-        public float HalfSize = 0.45f;
+        [Tooltip("Tuning (PressurePlateProfile) — a separate asset next to the prefab.")]
+        public PressurePlateProfile Profile;
+        protected override DeviceProfile Device => Profile;
 
         protected override Color IdleColor => new(0.35f, 0.5f, 0.55f);
 
@@ -19,8 +21,8 @@ namespace Stealth.Enemies
         protected override void TickServer()
         {
             foreach (var p in PlayerController.All)
-                if (!p.IsDown && Steps(transform.position, HalfSize, p.Position)) { Trip(p); return; }
-            Decay(0.4f);
+                if (!p.IsDown && Steps(transform.position, Profile.HalfSize, p.Position)) { Trip(p); return; }
+            Forget();
         }
     }
 }

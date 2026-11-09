@@ -46,10 +46,11 @@ description: How to write and change code in the «Айтишники: выла�
 - Приватные поля `m_Name`, статические приватные `s_Name`, всё публичное и константы — `PascalCase`.
 - Идентификаторы и комментарии — английские; всё, что видит игрок, — русское.
 - `<summary>` у каждого публичного типа: что это и зачем (не пересказ кода).
-- Числа баланса — в конфиги (`Data/Config/*`, профили роботов `Data/Robots/*`): поле в нужной группе настроек
+- Числа баланса — в конфиги (`Data/Config/*`; у робота, устройства и лазера — свой `<Префаб>Config.asset` рядом с префабом): поле в нужной группе настроек
   (`[Serializable]` класс рядом с правилом, например `RunSettings` в `RunState.cs`) с `[Tooltip]` и значением по умолчанию.
   Правило получает группу параметром (`new RunState(settings)`, `LevelGenerator.Generate(seed, level, building, security)`),
-  компонент — через `Tuning.Player/Run/Level/Items`. Тюнинг устройств со своими скриптами — полями их префабов.
+  компонент — через `Tuning.Player/Run/Level/Items`, робот/устройство — через своё поле `Profile`.
+- В компонентах префабов роботов и устройств **не бывает** `public float/int` полей (`TuningTests.PrefabsHoldNoTuningNumbers`): только ссылки.
 - Геометрия и то, что не тюнится (размер клетки, высота этажа), — константы (`LevelMetrics`).
 - Никаких `GetComponent` в `Update` по всем объектам — держи ссылки или используй виртуальные свойства базового класса (`Detector.IsChasing`).
 
@@ -57,9 +58,11 @@ description: How to write and change code in the «Айтишники: выла�
 
 1. Значение в `RobotKind` (в конец перечисления) → `RobotInfo.Name/Senses` → строка в ростере `RobotRoster.DefaultRobots/DefaultDevices`
    (и в `Data/Config/Level.asset` → Security → Roster, если ассет уже создан), `CanUseStairs`, `IsDevice`.
-2. Подвижный на навмеше: только префаб — `MobileRobot(...)` в `AssetBuilder.Actors.cs`; начальные `RobotSenses`/`RobotTraits` из лямбды
-   попадут в новый профиль `Data/Robots/<Kind>.asset` (дальше настраивается он, сборщик его не трогает). Новый канал чувств — в `RobotController.Sense()` + формула в `SensorMath` + тест.
-   Своё движение: класс `: SecurityDevice`, датчики в `TickServer()` через `Notice/Decay/Trip`, визуал в `TickLocal()`; префаб — `Device<T>(...)`.
+2. Подвижный на навмеше: только префаб — `MobileRobot(...)` в `AssetBuilder.Actors.cs`; начальные `RobotSenses`/`RobotTraits`/`AnimationSettings`
+   из лямбды попадут в новый `Robot<Kind>Config.asset` рядом с префабом (дальше настраивается он, сборщик его не трогает). Новый канал чувств — в `RobotController.Sense()` + формула в `SensorMath` + тест.
+   Своё движение: класс `: SecurityDevice`, датчики в `TickServer()` через `Notice/Forget/Trip`, визуал в `TickLocal()`; префаб — `Device<T>(...)`.
+   Его числа — класс `…Profile : DeviceProfile` (свой файл в `Scripts/Config`), поле `public …Profile Profile` + `Device => Profile`,
+   в сборщике `x.Profile = Profile<…Profile>("ИмяПрефаба")`.
 3. Модель — в `Tools/Blender/robots.py` (части `Body`/`Accent*`/`Eye*`; `AccentLeg*`, `AccentWheel*`, `AccentRotor*`, `AccentHead` анимируются автоматически).
 4. `FORCE=1 Tools/dev.sh assets`, `Tools/dev.sh tests` (`PrefabIntegrityTests` проверит ссылки и вид), сценарий `gallery` со скриншотом.
 

@@ -20,8 +20,10 @@ namespace Stealth.Game
             DevFlags.FreezeRobots = true;
             DevFlags.SkipGracePeriod = true; // sensors on immediately
             var hatch = ActiveLevel.Layout.HatchPosition;
-            // Clear the stage: robots that wander into the lobby would photobomb the gallery.
-            foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
+            // Clear the stage: the level's own guards (robots, turrets, sensors, lasers) would photobomb the gallery
+            // and hit the player during the reaction checks (a knockback looks like running to a motion sensor).
+            foreach (var d in Detector.All.ToArray()) Session.Despawn(d.gameObject);
+            foreach (var gate in FindObjectsByType<LaserGate>()) Session.Despawn(gate.gameObject);
 
             foreach (RobotKind kind in Enum.GetValues(typeof(RobotKind)))
             {

@@ -73,16 +73,23 @@ namespace Stealth.Game
             var stand = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y)) + 0.05f, p.z) + Flat(obj.transform.right).normalized * 3.5f;
             Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(obj.transform.forward)));
             DevFlags.FreezeRobots = false;
-            float t0 = Time.time, max = 0f;
+            float t0 = Time.time, max = 0f, maxSpeed = 0f, maxMotor = 0f;
+            bool alwaysCrouched = true;
             while (Time.time - t0 < 4f)
             {
                 Drive(new Vector2(0, Mathf.Sin(Time.time * 2f) > 0 ? 1 : -1), crouch: crouch);
                 max = Mathf.Max(max, aw.AwarenessOf(Me.ClientId));
+                if (Time.time - t0 > 0.2f)
+                {
+                    maxSpeed = Mathf.Max(maxSpeed, Me.GroundSpeed);
+                    maxMotor = Mathf.Max(maxMotor, Me.Motor.HorizontalSpeed);
+                    alwaysCrouched &= Me.Crouching == crouch;
+                }
                 yield return null;
             }
             Release();
             DevFlags.FreezeRobots = true;
-            Log($"sneak past {kind} (crouch={crouch}): max awareness {max:0.00}");
+            Log($"sneak past {kind} (crouch={crouch}): max awareness {max:0.00}, max speed server {maxSpeed:0.00} / motor {maxMotor:0.00}, posture held={alwaysCrouched}");
             yield return new WaitForSeconds(0.5f);
         }
 

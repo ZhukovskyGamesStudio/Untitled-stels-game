@@ -56,8 +56,25 @@ namespace Stealth.Enemies
         public bool CanAttack = true;
         [Tooltip("Raise a building-wide alarm when it starts chasing.")]
         public bool AlarmOnDetect;
+        [Tooltip("Radius of its alarms (alarm robots, snitches).")]
+        public float AlarmRadius = 30f;
+        [Tooltip("A snitch reports again only after this many seconds.")]
+        public float SnitchCooldown = 12f;
         public float AttackRange = 1.7f;
         public float AttackCooldown = 1.7f;
+
+        [Header("Attention")]
+        [Tooltip("Above this suspicion a patrolling robot stops and stares.")]
+        public float SuspiciousAt = 0.25f;
+        [Tooltip("Suspicion lost per second while it senses nobody.")]
+        public float SuspicionDecay = 0.35f;
+        [Tooltip("Pause at a patrol point, seconds (random between min and max).")]
+        public float PatrolWaitMin = 1f;
+        public float PatrolWaitMax = 3.5f;
+        [Tooltip("Seconds it looks around after reaching a spot it went to check.")]
+        public float InvestigateLookTime = 3f;
+        [Tooltip("Seconds of staring before it walks over to check.")]
+        public float StareTime = 4f;
     }
 
     /// <summary>Strongest sensor contact of one frame (computed by the robot's sensors).</summary>
@@ -81,11 +98,6 @@ namespace Stealth.Enemies
     /// </summary>
     public sealed class RobotBrain
     {
-        public const float SuspiciousAt = 0.25f;
-        public const float SuspicionDecay = 0.35f;
-        public const float SnitchCooldown = 12f;
-        public const float SnitchAlarmRadius = 40f;
-        public const float DroneAlarmRadius = 30f;
 
         readonly RobotSenses m_Senses;
         readonly RobotTraits m_Traits;
@@ -125,7 +137,7 @@ namespace Stealth.Enemies
         {
             if (s.Target == null)
             {
-                Suspicion = Mathf.Max(0f, Suspicion - SuspicionDecay * dt);
+                Suspicion = Mathf.Max(0f, Suspicion - m_Traits.SuspicionDecay * dt);
                 return;
             }
             if (s.Contact)
@@ -143,7 +155,7 @@ namespace Stealth.Enemies
             Suspect = s.Target;
             if (Suspicion >= 1f) StartChase(s.Target, now);
             // Only a patrolling robot stops to stare; one already walking over to check keeps walking.
-            else if (Suspicion > SuspiciousAt && State == RobotState.Patrol) SetState(RobotState.Suspicious, now);
+            else if (Suspicion > m_Traits.SuspiciousAt && State == RobotState.Patrol) SetState(RobotState.Suspicious, now);
         }
 
         /// <summary>A noise at <paramref name="position"/>, <paramref name="distance"/> away (already muffled by floors).</summary>
@@ -201,9 +213,9 @@ namespace Stealth.Enemies
             {
                 // Snitch: cannot fight, so it reports the intruder to everyone and goes back to work.
                 if (now < m_SnitchUntil) return;
-                m_SnitchUntil = now + SnitchCooldown;
+                m_SnitchUntil = now + m_Traits.SnitchCooldown;
                 Suspicion = 0f;
-                m_Body.RaiseAlarm(p.Position, SnitchAlarmRadius);
+                m_Body.RaiseAlarm(p.Position, m_Traits.AlarmRadius);
                 SetState(RobotState.Suspicious, now);
                 m_Body.Stop();
                 Suspect = p;
@@ -211,7 +223,7 @@ namespace Stealth.Enemies
             }
             if (State != RobotState.Chase)
             {
-                if (m_Traits.AlarmOnDetect) m_Body.RaiseAlarm(p.Position, DroneAlarmRadius);
+                if (m_Traits.AlarmOnDetect) m_Body.RaiseAlarm(p.Position, m_Traits.AlarmRadius);
                 m_Body.CallForBackup(p.Position);
             }
             Target = p;
@@ -230,7 +242,7 @@ namespace Stealth.Enemies
                     m_Body.Move(m_Traits.PatrolSpeed);
                     if (m_Body.Arrived)
                     {
-                        if (m_WaitUntil < 0f) m_WaitUntil = now + Range(1f, 3.5f);
+                        if (m_WaitUntil < 0f) m_WaitUntil = now + Range(m_Traits.PatrolWaitMin, m_Traits.PatrolWaitMax);
                         else if (now > m_WaitUntil) NextPatrolPoint();
                     }
                     break;
@@ -243,13 +255,13 @@ namespace Stealth.Enemies
                         if (now - m_StateTime > 3f) BackToPatrol(now);
                     }
                     else if (Suspicion <= 0.05f) SetState(RobotState.Patrol, now);
-                    else if (Suspect != null && now - m_StateTime > 4f) BeginInvestigation(Suspect.Position, false, now);
+                    else if (Suspect != null && now - m_StateTime > m_Traits.StareTime) BeginInvestigation(Suspect.Position, false, now);
                     break;
 
                 case RobotState.Investigate:
                     if (m_Body.Arrived)
                     {
-                        if (m_WaitUntil < 0f) m_WaitUntil = now + 3f;
+                        if (m_WaitUntil < 0f) m_WaitUntil = now + m_Traits.InvestigateLookTime;
                         // Look around: sweep left and right instead of spinning on the spot.
                         m_Body.Turn(Mathf.Sin((now - m_StateTime) * 1.8f) * 120f * dt);
                         if (now > m_WaitUntil) BackToPatrol(now);

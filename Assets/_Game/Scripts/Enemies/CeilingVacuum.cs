@@ -10,10 +10,10 @@ namespace Stealth.Enemies
     /// </summary>
     public class CeilingVacuum : SecurityDevice
     {
+        [Tooltip("Tuning (VacuumProfile) — a separate asset next to the prefab.")]
+        public VacuumProfile Profile;
+        protected override DeviceProfile Device => Profile;
         public LineRenderer Line;
-        public float Speed = 1.1f;
-        public float ScanSpeed = 75f;      // degrees per second
-        public float HalfLength = 3f;
 
         Vector3 m_Min, m_Max, m_Dir;
         float m_FloorY;
@@ -35,14 +35,14 @@ namespace Stealth.Enemies
 
         float CeilingY => m_FloorY + LevelMetrics.WallHeight - 0.05f;
 
-        Vector3 ScanDir => ScanLine.Direction(Stealth.Game.Session.ServerTimeF, ScanSpeed, NetId * 37f);
+        Vector3 ScanDir => ScanLine.Direction(Stealth.Game.Session.ServerTimeF, Profile.ScanSpeed, NetId * 37f);
 
         protected override void TickLocal()
         {
             if (Line == null) return;
             // The line on the floor (both ways), drawn from the shared clock so every peer agrees.
             var c = new Vector3(transform.position.x, m_FloorY + 0.02f, transform.position.z);
-            var d = ScanDir * HalfLength;
+            var d = ScanDir * Profile.HalfLength;
             Line.enabled = true;
             Line.SetPosition(0, c - d);
             Line.SetPosition(1, c + d);
@@ -51,7 +51,7 @@ namespace Stealth.Enemies
         protected override void TickServer()
         {
             // Bounce around the ceiling.
-            var p = transform.position + m_Dir * Speed * Time.deltaTime;
+            var p = transform.position + m_Dir * Profile.Speed * Time.deltaTime;
             if (p.x < m_Min.x || p.x > m_Max.x) { m_Dir.x = -m_Dir.x; p.x = Mathf.Clamp(p.x, m_Min.x, m_Max.x); }
             if (p.z < m_Min.z || p.z > m_Max.z) { m_Dir.z = -m_Dir.z; p.z = Mathf.Clamp(p.z, m_Min.z, m_Max.z); }
             p.y = CeilingY;
@@ -63,9 +63,9 @@ namespace Stealth.Enemies
             {
                 if (pl.IsDown || LevelLayout.FloorOf(pl.Position.y) != LevelLayout.FloorOf(m_FloorY + 0.1f)) continue;
                 if (ScanLine.Above(pl.Position.y, m_FloorY + 0.1f)) continue; // in the air
-                if (ScanLine.Crosses(center, ScanDir, HalfLength, true, pl.Position)) { Trip(pl); return; }
+                if (ScanLine.Crosses(center, ScanDir, Profile.HalfLength, true, pl.Position)) { Trip(pl); return; }
             }
-            Decay(0.6f);
+            Forget();
         }
     }
 }

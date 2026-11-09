@@ -10,16 +10,12 @@ namespace Stealth.Enemies
     /// </summary>
     public class SecurityCamera : SecurityDevice
     {
+        [Tooltip("Tuning (CameraProfile) — a separate asset next to the prefab.")]
+        public CameraProfile Profile;
+        protected override DeviceProfile Device => Profile;
         [Header("Camera")]
         public Transform Pivot;
         public Light Spot;
-        public float Tilt = 28f;
-        public float SweepAngle = 80f;
-        public float SweepPeriod = 8f;
-        public float ViewDistance = 14f;
-        public float ViewAngle = 50f;
-        [Tooltip("Seconds to detect a standing player at mid range in a lit room.")]
-        public float DetectTime = 1.1f;
 
         static readonly Color s_Idle = new(0.75f, 0.9f, 1f);
 
@@ -31,9 +27,9 @@ namespace Stealth.Enemies
         {
             m_Phase = NetId % 11 * 0.73f;
             if (Spot == null) return;
-            Spot.range = ViewDistance;
-            Spot.spotAngle = ViewAngle;
-            Spot.innerSpotAngle = ViewAngle * 0.7f;
+            Spot.range = Profile.ViewDistance;
+            Spot.spotAngle = Profile.ViewAngle;
+            Spot.innerSpotAngle = Profile.ViewAngle * 0.7f;
         }
 
         /// <summary>Yaw of the sweep at a moment of the shared clock (pure).</summary>
@@ -42,7 +38,7 @@ namespace Stealth.Enemies
         protected override void TickLocal()
         {
             float t = Session.ServerTimeF + m_Phase;
-            Pivot.localRotation = Quaternion.Euler(Tilt, SweepYaw(t, SweepAngle, SweepPeriod), 0f);
+            Pivot.localRotation = Quaternion.Euler(Profile.Tilt, SweepYaw(t, Profile.SweepAngle, Profile.SweepPeriod), 0f);
         }
 
         protected override void OnStatusChanged()
@@ -63,14 +59,14 @@ namespace Stealth.Enemies
                 if (target.IsDown) continue;
                 var aim = Perception.AimPoint(target, 0.7f);
                 float d = Vector3.Distance(eye, aim);
-                if (d < bestDist && Perception.InCone(eye, Pivot.forward, aim, ViewDistance, ViewAngle) && Perception.LineOfSight(eye, target, 0.7f))
+                if (d < bestDist && Perception.InCone(eye, Pivot.forward, aim, Profile.ViewDistance, Profile.ViewAngle) && Perception.LineOfSight(eye, target, 0.7f))
                 {
                     seen = target;
                     bestDist = d;
                 }
             }
-            if (seen == null) { Decay(0.5f); return; }
-            Notice(seen, SensorMath.CameraRate(DetectTime, bestDist, ViewDistance, seen.IsCrouching, Perception.LightFactor(seen.Position)));
+            if (seen == null) { Forget(); return; }
+            Notice(seen, SensorMath.CameraRate(Profile.DetectTime, bestDist, Profile.ViewDistance, seen.IsCrouching, Perception.LightFactor(seen.Position)));
         }
     }
 }

@@ -92,6 +92,7 @@ namespace Stealth.EditorTools
             {
                 s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 1.2f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
                 t.CanAttack = false;    // harmless, but a snitch
+                t.AlarmRadius = 40f;
                 t.CanUseStairs = false; // wheels
                 t.PatrolSpeed = 1.6f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
             }));
@@ -104,26 +105,34 @@ namespace Stealth.EditorTools
 
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
             {
+                t.Profile = Profile<TurretProfile>("RobotTurret", p => p.ForgetRate = 0.6f);
                 t.Sight = Beam(root, "Sight", 0.025f);
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
-            Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) => { }));
+            Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) =>
+            {
+                s.Profile = Profile<SpiderProfile>("RobotSpider");
+            }));
             Robot(RobotKind.Vacuum, RobotPrefabs + "/RobotVacuum.prefab", () => Device<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
             {
+                v.Profile = Profile<VacuumProfile>("RobotVacuum", p => p.ForgetRate = 0.6f);
                 v.Line = Beam(root, "ScanLine", 0.03f);
             }));
             Robot(RobotKind.Lidar, SensorPrefabs + "/SensorLidar.prefab", () => Device<LidarScanner>("SensorLidar", "sensor_lidar", "TurretBody", false, false, (root, l) =>
             {
+                l.Profile = Profile<LidarProfile>("SensorLidar", p => p.ForgetRate = 0.6f);
                 l.Line = Beam(root, "LidarBeam", 0.02f);
                 l.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
             }));
             Robot(RobotKind.MotionSensor, SensorPrefabs + "/SensorMotion.prefab", () => Device<MotionSensor>("SensorMotion", "sensor_pir", "RobotBody", false, false, (root, m) =>
             {
+                m.Profile = Profile<MotionSensorProfile>("SensorMotion");
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // on the wall, nothing to bump into
             }));
             Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "Floor", false, false, (root, p) =>
             {
+                p.Profile = Profile<PressurePlateProfile>("SensorPlate", c => c.ForgetRate = 0.4f);
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // flush with the floor
                 p.Status.Light.range = 1.2f;
                 p.Status.Light.intensity = 0.6f;
@@ -228,7 +237,7 @@ namespace Stealth.EditorTools
 
         /// <summary>Navmesh robot: NetworkObject + server NetworkTransform + NavMeshAgent + RobotController + animator.</summary>
         static GameObject MobileRobot(string name, string file, string bodyMat, float radius, Vector3 eyePos, RadioRipple ripple,
-            Action<RobotSenses, RobotTraits, RobotAnimator> config)
+            Action<RobotSenses, RobotTraits, AnimationSettings> config)
         {
             var root = NetworkedRoot(name, true, false);
             var model = Model(file);
@@ -261,11 +270,8 @@ namespace Stealth.EditorTools
             rc.Status.Renderers = Parts(model, "Eye");
             rc.Status.Light = StatusLight(root.transform, eyePos + new Vector3(0, 0.05f, 0.15f), 3.5f, 2.5f);
             rc.RadioRipplePrefab = ripple;
-            // Senses and traits live in a profile asset (tuned by hand, never overwritten); the animation stays on the prefab.
-            var (profile, created) = RobotProfileAsset(name.Replace("Robot", ""));
-            rc.Profile = profile;
-            config(created ? profile.Senses : new RobotSenses(), created ? profile.Traits : new RobotTraits(), anim);
-            if (created) EditorUtility.SetDirty(profile);
+            // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
+            rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
             return root;
         }
 
@@ -323,7 +329,7 @@ namespace Stealth.EditorTools
             sc.Point = spotGo.transform;
             sc.Pivot = pivot.transform;
             sc.Spot = spot;
-            sc.AlarmRadius = 35f;
+            sc.Profile = Profile<CameraProfile>("SecurityCamera", p => p.AlarmRadius = 35f);
             sc.Status.Renderers = Parts(model, "Eye");
             sc.Status.Emission = 3f;
             return root;
@@ -342,6 +348,7 @@ namespace Stealth.EditorTools
                 return holder.transform;
             }
             var gate = root.AddComponent<LaserGate>();
+            gate.Profile = Profile<LaserGateProfile>("LaserGate");
             root.AddComponent<LaserGateNet>();
             gate.EmitterA = Emitter("EmitterA", 90f);
             gate.EmitterB = Emitter("EmitterB", -90f);

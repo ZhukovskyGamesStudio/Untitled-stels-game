@@ -18,9 +18,10 @@ namespace Stealth.Enemies
     {
         public static readonly List<RobotController> Robots = new();
 
-        [Tooltip("How this kind senses and moves (Data/Robots/<Kind>.asset).")]
+        [Tooltip("How this kind senses, moves and is animated (Robot<Kind>Config next to the prefab).")]
         public RobotProfile Profile;
 
+        public override DetectorProfile ProfileBase => Profile;
         public RobotSenses Senses => Profile.Senses;
         public RobotTraits Traits => Profile.Traits;
 

@@ -14,14 +14,15 @@ namespace Stealth.Enemies
     {
         public const string PivotSuffix = "_Pivot";
 
-        public float RotorSpeed = 1800f;
-        public float StepFrequency = 1.6f;
-        public float LegSwing = 25f;
-        [Tooltip("Flying bodies lean into the direction of travel (degrees at full speed).")]
-        public float Lean;
-        [Tooltip("Walkers bob up and down a little (meters).")]
-        public float Bob;
         public Transform Model;
+
+        /// <summary>From the robot's profile (DetectorProfile.Animation); defaults without one.</summary>
+        AnimationSettings m_S = new();
+        float RotorSpeed => m_S.RotorSpeed;
+        float StepFrequency => m_S.StepFrequency;
+        float LegSwing => m_S.LegSwing;
+        float Lean => m_S.Lean;
+        float Bob => m_S.Bob;
 
         Vector3 m_ModelBase;
         Vector3 m_Velocity;
@@ -62,6 +63,8 @@ namespace Stealth.Enemies
 
         void Awake()
         {
+            var detector = GetComponent<Detector>();
+            if (detector != null && detector.ProfileBase != null) m_S = detector.ProfileBase.Animation;
             foreach (var t in GetComponentsInChildren<Transform>(true))
             {
                 if (!t.name.EndsWith(PivotSuffix)) continue;
