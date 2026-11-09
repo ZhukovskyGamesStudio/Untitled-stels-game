@@ -1,0 +1,107 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b710418488e9ac54eb38b5a067a7f465, type: 3}
+  m_Name: Level
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.LevelConfig
+  Building:
+    FloorsPerHouse: 020000000200000003000000030000000300000004000000i
+    BaseWidth: 3
+    MaxExtraWidth: 2
+    BaseDepth: 3
+    HousesPerExtraDepth: 3
+    MaxExtraDepth: 1
+    RoomWeights:
+    - Room: 1
+      Weight: 28
+    - Room: 2
+      Weight: 16
+    - Room: 3
+      Weight: 12
+    - Room: 4
+      Weight: 10
+    - Room: 5
+      Weight: 12
+    - Room: 6
+      Weight: 10
+    - Room: 7
+      Weight: 6
+    - Room: 8
+      Weight: 6
+    DarkChance: 0.15
+    DarkChancePerHouse: 0.03
+    MaxDarkHouses: 5
+    FlickerChance: 0.12
+    OpenPassageChance: 0.3
+    ExtraDoorChance: 0.2
+    VentChance: 0.35
+    AutoDoorChance: 0.45
+  Security:
+    Robots: 2
+    RobotsPerHouse: 1
+    RobotsPerExtraFloor: 1
+    Devices: 1
+    DevicesPerHouse: 1
+    Cameras: 2
+    CamerasPerHouse: 1
+    Lasers: 1
+    LasersPerHouse: 1
+    MovingLasersFromHouse: 2
+    Roster:
+      Robots:
+      - Kind: 0
+        MinLevel: 0
+        Weight: 5
+      - Kind: 1
+        MinLevel: 0
+        Weight: 3
+      - Kind: 9
+        MinLevel: 0
+        Weight: 2
+      - Kind: 4
+        MinLevel: 0
+        Weight: 1.5
+      - Kind: 2
+        MinLevel: 1
+        Weight: 2
+      - Kind: 3
+        MinLevel: 1
+        Weight: 2
+      - Kind: 6
+        MinLevel: 2
+        Weight: 2
+      - Kind: 8
+        MinLevel: 2
+        Weight: 1.5
+      - Kind: 5
+        MinLevel: 2
+        Weight: 1.5
+      - Kind: 7
+        MinLevel: 3
+        Weight: 2
+      Devices:
+      - Kind: 13
+        MinLevel: 0
+        Weight: 2
+      - Kind: 12
+        MinLevel: 1
+        Weight: 2
+      - Kind: 11
+        MinLevel: 1
+        Weight: 1.5
+  Loot:
+    BaseItems: 6
+    ItemsPerHouse: 2
+    RoomsPerExtraItem: 3
+    MinSpacing: 1.5
+    BonusPerHouse: 2
+    BonusPerFloor: 4
+    DarkRoomBonus: 6

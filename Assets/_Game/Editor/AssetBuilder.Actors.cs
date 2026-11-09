@@ -32,8 +32,10 @@ namespace Stealth.EditorTools
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
                 v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath($"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
-                v.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
             });
+            // One material per configured colour (ItemsConfig can grow).
+            visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
+            EditorUtility.SetDirty(visuals);
 
             var a = new Actors
             {
@@ -259,7 +261,11 @@ namespace Stealth.EditorTools
             rc.Status.Renderers = Parts(model, "Eye");
             rc.Status.Light = StatusLight(root.transform, eyePos + new Vector3(0, 0.05f, 0.15f), 3.5f, 2.5f);
             rc.RadioRipplePrefab = ripple;
-            config(rc.Senses, rc.Traits, anim);
+            // Senses and traits live in a profile asset (tuned by hand, never overwritten); the animation stays on the prefab.
+            var (profile, created) = RobotProfileAsset(name.Replace("Robot", ""));
+            rc.Profile = profile;
+            config(created ? profile.Senses : new RobotSenses(), created ? profile.Traits : new RobotTraits(), anim);
+            if (created) EditorUtility.SetDirty(profile);
             return root;
         }
 

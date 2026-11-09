@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56c884357518fcc44ace9d9445da94b2, type: 3}
+  m_Name: Run
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.RunConfig
+  Rules:
+    QuotaShare: 0.35
+    QuotaShareGrowth: 0.04
+    MaxQuotaShare: 0.85
+    DeathPenalty: 0.15
+    AlarmDuration: 6
+    AlarmCountSpacing: 4
+    GracePeriod: 8
+    HunterAlarmsFirstHouse: 3
+    HunterAlarmsLater: 2
+    HunterTime: 360
+    HunterTimeStepPerHouse: 20
+    HunterMinTime: 180
+    HousesPerExtraHunter: 3

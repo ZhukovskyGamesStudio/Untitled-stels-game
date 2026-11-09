@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Stealth.Game;
 using Stealth.Level;
 using Stealth.Player;
@@ -136,7 +137,17 @@ namespace Stealth.Net
         string ISessionLauncher.LocalPlayerName => SteamManager.Initialized ? SteamManager.PersonaName : null;
         bool ISessionLauncher.CanInviteFriends => UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby;
 
+        IReadOnlyList<FriendLobby> ISessionLauncher.FriendLobbies =>
+            SteamLobby.Instance != null ? SteamLobby.Instance.Friends.Lobbies : System.Array.Empty<FriendLobby>();
+
         void ISessionLauncher.HostSteam() => SteamLobby.Instance.HostLobby();
+        void ISessionLauncher.RefreshFriendLobbies() => SteamLobby.Instance?.RefreshFriends();
+
+        void ISessionLauncher.JoinFriendLobby(ulong lobbyId)
+        {
+            if (IsRunning) Leave();
+            SteamLobby.Instance.JoinLobby(lobbyId);
+        }
         void ISessionLauncher.HostLocal() => StartHostLocal();
         void ISessionLauncher.JoinLocal(string address) => StartClientLocal(address);
         void ISessionLauncher.InviteFriends() => SteamLobby.Instance.OpenInviteDialog();

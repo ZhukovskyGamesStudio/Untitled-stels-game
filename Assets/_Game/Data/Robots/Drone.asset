@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ef6c256c790aa64faf5e440bfbaa18d, type: 3}
+  m_Name: Drone
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotProfile
+  Senses:
+    HasEyes: 1
+    ViewDistance: 11
+    ViewAngle: 120
+    PeripheralDistance: 2.5
+    DetectionSpeed: 1.6
+    EyePitch: 35
+    ColorSorter: 0
+    HearingMultiplier: 0.5
+    ChaseHearingShare: 0
+    ContactDistance: 1.3
+    SeismicRange: 0
+    SeismicSpeed: 1.2
+    SmellRange: 0
+    SmellSpeed: 1.5
+  Traits:
+    CanUseStairs: 1
+    HoverHeight: 2.1
+    PatrolSpeed: 2.6
+    InvestigateSpeed: 3.6
+    ChaseSpeed: 5.2
+    LoseTargetAfter: 4
+    CanAttack: 1
+    AlarmOnDetect: 1
+    AttackRange: 1.4
+    AttackCooldown: 1.7

@@ -27,8 +27,8 @@ namespace Stealth.Enemies
     public interface IHackable
     {
         bool IsHacked { get; }
-        /// <summary>Can a player standing at <paramref name="player"/> hack it right now?</summary>
-        bool CanBeHackedFrom(Vector3 player);
+        /// <summary>Can a player standing at <paramref name="player"/> (reach <paramref name="reach"/> m) hack it right now?</summary>
+        bool CanBeHackedFrom(Vector3 player, float reach);
         /// <summary>Server: disable for <paramref name="seconds"/>.</summary>
         void HackServer(float seconds);
     }

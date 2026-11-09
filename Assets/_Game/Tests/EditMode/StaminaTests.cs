@@ -32,7 +32,7 @@ namespace Stealth.Tests
             Assert.IsTrue(s.Exhausted, "still exhausted right after the delay");
             Run(s, false, 1.5f);
             Assert.IsFalse(s.Exhausted);
-            Assert.GreaterOrEqual(s.Value, s.RecoverThreshold);
+            Assert.GreaterOrEqual(s.Value, new StaminaSettings().RecoverThreshold);
         }
 
         [Test]

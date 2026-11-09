@@ -22,6 +22,10 @@ namespace Stealth.Game
         public static bool AutoInteract;
         /// <summary>Behave as if Tab is held (hands mode, cursor visible).</summary>
         public static bool ForceHandsMode;
+        /// <summary>Sensors work from the first second of a house (robot checks).</summary>
+        public static bool SkipGracePeriod;
+        /// <summary>Show these friends' sessions in the main menu instead of asking Steam (menu screenshots).</summary>
+        public static System.Collections.Generic.IReadOnlyList<FriendLobby> FriendLobbiesOverride;
 
         public static void Reset()
         {
@@ -32,6 +36,8 @@ namespace Stealth.Game
             Autopilot = null;
             AutoInteract = false;
             ForceHandsMode = false;
+            SkipGracePeriod = false;
+            FriendLobbiesOverride = null;
         }
     }
 }

@@ -12,6 +12,8 @@ namespace Stealth.UI
         /// <summary>Name of the robot / device that can be hacked, null if none.</summary>
         public string HackTarget;
         public float HackProgress;
+        /// <summary>How long a hack lasts (shown in the prompt).</summary>
+        public float HackSeconds;
         public bool BlockedByCeiling;
         public bool Playing, NearHatch;
         public int CarriedItems, Collected, Quota;
@@ -34,7 +36,7 @@ namespace Stealth.UI
             s_Prompts.Clear();
             if (c.Downed || c.MenuOpen) return default;
             if (c.CanRevive) s_Prompts.Add(new Prompt(100, "E", "Удерживай — поднять союзника", c.ReviveProgress));
-            if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, "E", $"Удерживай — взломать: {c.HackTarget} (20 с)", c.HackProgress));
+            if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, "E", $"Удерживай — взломать: {c.HackTarget} ({c.HackSeconds:0} с)", c.HackProgress));
             if (c.BlockedByCeiling) s_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
             if (c.Playing && c.NearHatch)
             {

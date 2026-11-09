@@ -18,8 +18,11 @@ namespace Stealth.EditorTools
     ///  * <b>overwrite</b> ("Stealth / Rebuild All Assets", batch flag -force): everything is regenerated
     ///    in place (GUIDs and network hashes are preserved because paths do not change).
     ///
+    /// Tuning assets (Data/Config, Data/Robots, Resources/GameConfig) are only ever created, never overwritten —
+    /// even with -force: they hold hand-tuned balance.
+    ///
     /// Batch: Unity -batchmode -executeMethod Stealth.EditorTools.AssetBuilder.BuildAllBatch [-force]
-    /// The parts live in partial files: Materials, Level, Actors, UI, Scene.
+    /// The parts live in partial files: Config, Materials, Level, Actors, UI, Scene.
     /// </summary>
     public static partial class AssetBuilder
     {
@@ -64,6 +67,7 @@ namespace Stealth.EditorTools
             try
             {
                 ConfigureModelImport();
+                BuildConfigs();
                 BuildMaterials();
                 BuildSprites();
                 var art = BuildLevelArt();

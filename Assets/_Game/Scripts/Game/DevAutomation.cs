@@ -59,6 +59,16 @@ namespace Stealth.Game
             {
                 yield return new WaitForSeconds(0.5f);
                 yield return Shot("main_menu");
+                // The friends list as it looks when friends are playing (Steam is off in autotests).
+                DevFlags.FriendLobbiesOverride = new[]
+                {
+                    new FriendLobby { LobbyId = 1, FriendName = "Саша", Players = 2, MaxPlayers = 4, Compatible = true },
+                    new FriendLobby { LobbyId = 2, FriendName = "Коля", Players = 4, MaxPlayers = 4, Compatible = true },
+                    new FriendLobby { LobbyId = 3, FriendName = "Лёша", Players = 1, MaxPlayers = 4, Compatible = false },
+                };
+                yield return new WaitForSeconds(0.3f);
+                yield return Shot("main_menu_friends");
+                DevFlags.FriendLobbiesOverride = null;
             }
             if (Arg("-host-local") != null) Session.Launcher.HostLocal();
             var join = Arg("-join-local");

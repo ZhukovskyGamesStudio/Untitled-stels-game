@@ -94,7 +94,14 @@ namespace Stealth.EditorTools
             for (int i = 0; i < ItemCatalog.Colors.Length; i++)
             {
                 var c = ItemCatalog.Colors[i].Color;
-                Mat("Items", $"Item_{i}", c, c * 0.7f, smoothness: 0.55f); // glow a bit so loot is readable in dark rooms
+                var m = Mat("Items", $"Item_{i}", c, c * 0.7f, smoothness: 0.55f); // glow a bit so loot is readable in dark rooms
+                // Colours are tuned in ItemsConfig: keep the materials in sync even without a full rebuild.
+                if (m.GetColor("_BaseColor") != c)
+                {
+                    m.SetColor("_BaseColor", c);
+                    m.SetColor("_EmissionColor", c * 0.7f);
+                    EditorUtility.SetDirty(m);
+                }
             }
         }
 

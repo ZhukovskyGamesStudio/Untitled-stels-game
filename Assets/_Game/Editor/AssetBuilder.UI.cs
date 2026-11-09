@@ -30,6 +30,7 @@ namespace Stealth.EditorTools
             public Text WorldIcon, TeamRow;
             public TeamMarkerView TeamMarker;
             public InventoryBlockView InventoryBlock;
+            public FriendLobbyRowView FriendRow;
             public Image CellHighlight;
         }
 
@@ -238,6 +239,22 @@ namespace Stealth.EditorTools
             e.WorldIcon = Prefab(ElementsDir + "/WorldIcon.prefab", () =>
                 Txt(R(null, "WorldIcon", BottomLeft, BottomCenter, Vector2.zero, new Vector2(40, 32)), "?", 22, TextAnchor.LowerCenter, Color.yellow, true).gameObject)
                 .GetComponent<Text>();
+
+            e.FriendRow = Prefab(ElementsDir + "/FriendLobbyRow.prefab", () =>
+            {
+                var root = R(null, "FriendLobbyRow", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 34));
+                Img(root, new Color(1, 1, 1, 0.06f));
+                Fixed(root.GetComponent<Image>(), 34);
+                var view = root.gameObject.AddComponent<FriendLobbyRowView>();
+                view.Label = Txt(R(root, "Label", Left, Left, new Vector2(10, 0), new Vector2(200, 30)), "Друг · 1/4", 14, TextAnchor.MiddleLeft, Color.white);
+                view.Join = Instance<Button>(e.Button, root, "Join");
+                view.Join.GetComponentInChildren<Text>().text = "Войти";
+                var jrt = (RectTransform)view.Join.transform;
+                jrt.anchorMin = jrt.anchorMax = jrt.pivot = new Vector2(1, 0.5f);
+                jrt.anchoredPosition = new Vector2(-4, 0);
+                jrt.sizeDelta = new Vector2(100, 28);
+                return root.gameObject;
+            }).GetComponent<FriendLobbyRowView>();
 
             e.TeamRow = Prefab(ElementsDir + "/TeamRow.prefab", () =>
             {
@@ -509,7 +526,7 @@ namespace Stealth.EditorTools
             menu.MainPage = main.gameObject;
             var bg = Img(main, new Color(0.06f, 0.07f, 0.08f, 1f));
             bg.raycastTarget = true;
-            var col = Column(main, "Column", new Vector2(0, -100), 440);
+            var col = Column(main, "Column", new Vector2(-190, -100), 440); // with the friends panel the pair is centred
             ColumnText(col, "Title", "АЙТИШНИКИ: ВЫЛАЗКА", 30, Color.white, 50, true, TextAnchor.MiddleCenter);
             ColumnText(col, "Subtitle", "прототип кор-лупа", 14, dim, 24, anchor: TextAnchor.MiddleCenter);
             Spacer(col, 20);
@@ -535,6 +552,25 @@ namespace Stealth.EditorTools
             menu.NetStatus = ColumnText(col, "NetStatus", "", 14, new Color(1f, 0.85f, 0.5f), 22);
             menu.MainSettings = ButtonIn(e, col, "Settings", "Настройки", 30);
             menu.Quit = ButtonIn(e, col, "Quit", "Выход", 30);
+
+            // Friends playing right now (Steam): one click to join.
+            var friends = R(main, "Friends", TopCenter, TopLeft, new Vector2(60, -196), new Vector2(350, 0));
+            var fl = friends.gameObject.AddComponent<VerticalLayoutGroup>();
+            fl.spacing = 6;
+            fl.childControlWidth = fl.childControlHeight = true;
+            fl.childForceExpandWidth = true;
+            fl.childForceExpandHeight = false;
+            friends.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            ColumnText(friends, "Caption", "Друзья в игре", 16, Color.white, 26, true);
+            menu.FriendsStatus = ColumnText(friends, "Status", "Никого из друзей нет в игре", 13, dim, 40);
+            menu.FriendList = R(friends, "List", Center, Center, Vector2.zero, Vector2.zero);
+            var ll = menu.FriendList.gameObject.AddComponent<VerticalLayoutGroup>();
+            ll.spacing = 4;
+            ll.childControlWidth = ll.childControlHeight = true;
+            ll.childForceExpandWidth = true;
+            ll.childForceExpandHeight = false;
+            menu.FriendRowPrefab = e.FriendRow;
+            menu.RefreshFriends = ButtonIn(e, friends, "Refresh", "Обновить", 28);
 
             // Pause menu.
             var pause = Stretch(root.transform, "Pause");

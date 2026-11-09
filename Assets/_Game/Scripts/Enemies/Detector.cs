@@ -153,7 +153,7 @@ namespace Stealth.Enemies
 
         // ------------------------------------------------------------------ hacking
 
-        public virtual bool CanBeHackedFrom(Vector3 player) => !IsHacked && Hacking.CanHackDevice(transform.position, player);
+        public virtual bool CanBeHackedFrom(Vector3 player, float reach) => !IsHacked && Hacking.CanHackDevice(transform.position, player, reach);
 
         public void HackServer(float seconds)
         {

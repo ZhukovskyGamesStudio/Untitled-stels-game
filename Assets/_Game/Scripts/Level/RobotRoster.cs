@@ -22,20 +22,34 @@ namespace Stealth.Level
         Camera,         // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
     }
 
+    /// <summary>One line of the security roster: from which house a kind appears and how often.</summary>
+    [System.Serializable]
+    public struct RosterEntry
+    {
+        public RobotKind Kind;
+        [Tooltip("First house (0-based) where it can appear.")]
+        public int MinLevel;
+        [Tooltip("Relative chance among the unlocked kinds.")]
+        public float Weight;
+        public RosterEntry(RobotKind k, int min, float w) { Kind = k; MinLevel = min; Weight = w; }
+    }
+
+    /// <summary>Who guards the houses (LevelConfig): mobile robots and fixed devices, with unlock depth and weights.</summary>
+    [System.Serializable]
+    public class RosterSettings
+    {
+        public RosterEntry[] Robots = RobotRoster.DefaultRobots();
+        public RosterEntry[] Devices = RobotRoster.DefaultDevices();
+    }
+
     /// <summary>Which robots appear on which level (weights, unlock depth). Pure, unit tested.</summary>
     public static class RobotRoster
     {
         public static readonly int KindCount = System.Enum.GetValues(typeof(RobotKind)).Length;
 
-        struct Entry
-        {
-            public RobotKind Kind;
-            public int MinLevel;
-            public float Weight;
-            public Entry(RobotKind k, int min, float w) { Kind = k; MinLevel = min; Weight = w; }
-        }
+        static readonly RosterSettings s_Default = new();
 
-        static readonly Entry[] Mobile =
+        public static RosterEntry[] DefaultRobots() => new RosterEntry[]
         {
             new(RobotKind.Guard, 0, 5f),
             new(RobotKind.Listener, 0, 3f),
@@ -49,7 +63,7 @@ namespace Stealth.Level
             new(RobotKind.Hound, 3, 2f),
         };
 
-        static readonly Entry[] Devices =
+        public static RosterEntry[] DefaultDevices() => new RosterEntry[]
         {
             new(RobotKind.PressurePlate, 0, 2f),
             new(RobotKind.MotionSensor, 1, 2f),
@@ -62,17 +76,18 @@ namespace Stealth.Level
         public static bool CanUseStairs(RobotKind k) =>
             k == RobotKind.Guard || k == RobotKind.Drone || k == RobotKind.Hound || k == RobotKind.Hunter || k == RobotKind.Sorter;
 
-        public static RobotKind PickRobot(int level, System.Random rng) => Pick(Mobile, level, rng);
-        public static RobotKind PickDevice(int level, System.Random rng) => Pick(Devices, level, rng);
+        public static RobotKind PickRobot(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Robots, level, rng);
+        public static RobotKind PickDevice(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Devices, level, rng);
 
-        public static bool IsUnlocked(RobotKind k, int level)
+        public static bool IsUnlocked(RobotKind k, int level, RosterSettings roster = null)
         {
-            foreach (var e in Mobile) if (e.Kind == k) return level >= e.MinLevel;
-            foreach (var e in Devices) if (e.Kind == k) return level >= e.MinLevel;
+            roster ??= s_Default;
+            foreach (var e in roster.Robots) if (e.Kind == k) return level >= e.MinLevel;
+            foreach (var e in roster.Devices) if (e.Kind == k) return level >= e.MinLevel;
             return false; // Hunter: spawned by alarms; cameras: own spots — never picked from the roster
         }
 
-        static RobotKind Pick(Entry[] table, int level, System.Random rng)
+        static RobotKind Pick(RosterEntry[] table, int level, System.Random rng)
         {
             float total = 0f;
             foreach (var e in table) if (level >= e.MinLevel) total += e.Weight;

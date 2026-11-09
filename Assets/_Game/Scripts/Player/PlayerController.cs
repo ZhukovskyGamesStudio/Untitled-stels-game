@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Stealth.Configs;
 using Stealth.Enemies;
 using Stealth.Game;
 using Stealth.Level;
@@ -27,8 +28,6 @@ namespace Stealth.Player
 
         public const float StandHeight = 1.8f;
         public const float CrouchHeight = 1.1f;
-        public const float ReviveTime = 2f;
-        public const float ReviveDistance = 2.2f;
 
         [Header("Refs")]
         public Transform Head;
@@ -40,9 +39,10 @@ namespace Stealth.Player
 
         public PlayerMotor Motor;
 
-        [Header("Noise radius (m)")]
-        public FootstepNoise Footsteps = new();
-        public float LaughNoise = 9f;
+        /// <summary>Tuning from PlayerConfig (applied in Awake; defaults until then).</summary>
+        FootstepNoise m_Footsteps = new();
+        InteractionSettings m_Interaction = new();
+        HealthSettings m_HealthSettings;
 
         // ------------------------------------------------------------------ replicated state
 
@@ -66,12 +66,17 @@ namespace Stealth.Player
         public bool IsSpawned { get; private set; }
 
         public bool CursorMode { get; private set; }
-        public GasExposure Gas { get; } = new();
+        public GasExposure Gas { get; private set; } = new();
         public float ReviveProgress { get; private set; }
         public PlayerController ReviveTarget { get; private set; }
         /// <summary>Robot or device that can be hacked right now (hold E).</summary>
         public Detector HackTarget { get; private set; }
         public float HackProgress { get; private set; }
+        /// <summary>0..1 of holding E over a downed teammate.</summary>
+        public float ReviveShare => ReviveProgress / m_Interaction.ReviveTime;
+        /// <summary>0..1 of holding E at a robot / device.</summary>
+        public float HackShare => HackProgress / m_Interaction.HackHoldTime;
+        public float HackReach => m_Interaction.HackReach;
         public float Height => Crouching ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
@@ -114,6 +119,12 @@ namespace Stealth.Player
             m_Controller = GetComponent<CharacterController>();
             m_Inventory = GetComponent<PlayerInventory>();
             if (Motor == null) Motor = GetComponent<PlayerMotor>();
+            var tuning = Tuning.Player;
+            Motor.Configure(tuning.Movement, tuning.Stamina);
+            m_Footsteps = new FootstepNoise(tuning.Noise);
+            Gas = new GasExposure(tuning.Gas);
+            m_Interaction = tuning.Interaction;
+            m_HealthSettings = tuning.Health;
             Motor.Landed += OnLanded;
         }
 
@@ -290,7 +301,7 @@ namespace Stealth.Player
 
         void UpdateNoise()
         {
-            float radius = Footsteps.Tick(Motor.HorizontalSpeed, Motor.Grounded && !Downed, Crouching, IsSprinting, Time.deltaTime);
+            float radius = m_Footsteps.Tick(Motor.HorizontalSpeed, Motor.Grounded && !Downed, Crouching, IsSprinting, Time.deltaTime);
             if (radius > 0f) EmitNoise(radius);
         }
 
@@ -300,7 +311,7 @@ namespace Stealth.Player
             bool outside = layout != null && !layout.IsInside(transform.position);
             var effect = Gas.Tick(outside, Time.deltaTime);
             if (Downed) return;
-            if (effect == GasExposure.Effect.Laugh) EmitNoise(LaughNoise);
+            if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
             else if (effect == GasExposure.Effect.Knockout)
             {
                 if (m_Link != null) m_Link.SendGasKnockout();
@@ -317,13 +328,13 @@ namespace Stealth.Player
             foreach (var p in All)
             {
                 if (p == this || !p.Downed) continue;
-                if ((p.transform.position - transform.position).magnitude <= ReviveDistance) { ReviveTarget = p; break; }
+                if ((p.transform.position - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
             }
             bool holdE = kb.eKey.isPressed || DevFlags.AutoInteract;
             if (ReviveTarget != null && holdE)
             {
                 ReviveProgress += Time.deltaTime;
-                if (ReviveProgress >= ReviveTime)
+                if (ReviveProgress >= m_Interaction.ReviveTime)
                 {
                     if (m_Link != null) m_Link.SendRevive(ReviveTarget);
                     else OnReviveRequest(ReviveTarget);
@@ -337,7 +348,7 @@ namespace Stealth.Player
             if (HackTarget != null && holdE)
             {
                 HackProgress += Time.deltaTime;
-                if (HackProgress >= Hacking.HoldTime)
+                if (HackProgress >= m_Interaction.HackHoldTime)
                 {
                     if (m_Link != null) m_Link.SendHack(HackTarget);
                     else OnHackRequest(HackTarget);
@@ -361,7 +372,7 @@ namespace Stealth.Player
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)
             {
-                if (!d.CanBeHackedFrom(transform.position)) continue;
+                if (!d.CanBeHackedFrom(transform.position, HackReach)) continue;
                 float dist = (d.transform.position - transform.position).sqrMagnitude;
                 if (dist < bestDist) { best = d; bestDist = dist; }
             }
@@ -389,7 +400,7 @@ namespace Stealth.Player
 
         public void ResetForLevelServer()
         {
-            m_Health = HealthState.Full(Time.time);
+            m_Health = HealthState.Full(Time.time, m_HealthSettings);
             PublishHealth();
         }
 
@@ -440,15 +451,15 @@ namespace Stealth.Player
         public void OnReviveRequest(PlayerController other)
         {
             if (Downed || other == null || !other.Downed) return;
-            if ((other.transform.position - transform.position).magnitude > ReviveDistance + 1f) return;
+            if ((other.transform.position - transform.position).magnitude > m_Interaction.ReviveDistance + 1f) return;
             other.ReviveServer();
         }
 
         /// <summary>Server: the owner finished holding E at a robot / device.</summary>
         public void OnHackRequest(IHackable target)
         {
-            if (Downed || target == null || !target.CanBeHackedFrom(transform.position)) return;
-            target.HackServer(Hacking.Duration);
+            if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f)) return;
+            target.HackServer(m_Interaction.HackDuration);
         }
     }
 }

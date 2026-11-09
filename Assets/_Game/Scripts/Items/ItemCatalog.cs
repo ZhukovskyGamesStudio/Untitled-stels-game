@@ -5,7 +5,8 @@ namespace Stealth.Items
 {
     /// <summary>
     /// Placeholder items: tetris pieces. Quota value depends on size (cell count) and color.
-    /// Static table so that server and clients agree without extra assets.
+    /// Shapes are fixed in code (they match the meshes); colours, values and spawn weights come from ItemsConfig
+    /// (the same asset in every build, so server and clients agree).
     /// </summary>
     public static class ItemCatalog
     {
@@ -15,15 +16,27 @@ namespace Stealth.Items
             public Vector2Int[] Cells;
         }
 
+        [System.Serializable]
         public struct ItemColor
         {
             public string Name;
             public Color Color;
+            [Tooltip("Value per cell = PointsPerCell × Multiplier.")]
             public int Multiplier;
+            [Tooltip("Relative chance to spawn (deeper houses shift towards valuable colours).")]
             public int SpawnWeight;
         }
 
-        public const int PointsPerCell = 5;
+        /// <summary>Colour table and points per cell; replaced by the tuning in ItemsConfig at startup.</summary>
+        public static ItemColor[] Colors { get; private set; } = DefaultColors();
+        public static int PointsPerCell { get; private set; } = 5;
+
+        /// <summary>Use these colours and values (all peers load the same config).</summary>
+        public static void Configure(ItemColor[] colors, int pointsPerCell)
+        {
+            if (colors != null && colors.Length > 0) Colors = colors;
+            if (pointsPerCell > 0) PointsPerCell = pointsPerCell;
+        }
 
         // Order must match the meshes in ItemVisuals (item_<id>.fbx).
         public static readonly Shape[] Shapes =
@@ -38,7 +51,7 @@ namespace Stealth.Items
             new Shape { Id = "tet_s",  Cells = new[] { V(0, 0), V(1, 0), V(1, 1), V(2, 1) } },
         };
 
-        public static readonly ItemColor[] Colors =
+        public static ItemColor[] DefaultColors() => new[]
         {
             new ItemColor { Name = "Серый",      Color = new Color(0.62f, 0.64f, 0.66f), Multiplier = 1, SpawnWeight = 40 },
             new ItemColor { Name = "Зелёный",    Color = new Color(0.30f, 0.80f, 0.35f), Multiplier = 2, SpawnWeight = 28 },

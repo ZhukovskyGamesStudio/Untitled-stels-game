@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ef6c256c790aa64faf5e440bfbaa18d, type: 3}
+  m_Name: Thumper
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotProfile
+  Senses:
+    HasEyes: 0
+    ViewDistance: 13
+    ViewAngle: 100
+    PeripheralDistance: 2.5
+    DetectionSpeed: 1.6
+    EyePitch: 0
+    ColorSorter: 0
+    HearingMultiplier: 0
+    ChaseHearingShare: 0
+    ContactDistance: 1.6
+    SeismicRange: 10
+    SeismicSpeed: 1.1
+    SmellRange: 0
+    SmellSpeed: 1.5
+  Traits:
+    CanUseStairs: 0
+    HoverHeight: 0
+    PatrolSpeed: 1.2
+    InvestigateSpeed: 2.2
+    ChaseSpeed: 3.3
+    LoseTargetAfter: 4
+    CanAttack: 1
+    AlarmOnDetect: 0
+    AttackRange: 1.9
+    AttackCooldown: 1.7

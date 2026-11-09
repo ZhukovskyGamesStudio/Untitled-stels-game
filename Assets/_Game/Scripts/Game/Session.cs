@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Player;
@@ -37,8 +38,13 @@ namespace Stealth.Game
         /// <summary>Steam persona name, or null without Steam.</summary>
         string LocalPlayerName { get; }
         bool CanInviteFriends { get; }
+        /// <summary>Friends' sessions of this game (Steam), refreshed by <see cref="RefreshFriendLobbies"/>.</summary>
+        IReadOnlyList<FriendLobby> FriendLobbies { get; }
 
         void HostSteam();
+        /// <summary>Ask Steam which friends are in a session now (results arrive asynchronously).</summary>
+        void RefreshFriendLobbies();
+        void JoinFriendLobby(ulong lobbyId);
         void HostLocal();
         void JoinLocal(string address);
         void InviteFriends();

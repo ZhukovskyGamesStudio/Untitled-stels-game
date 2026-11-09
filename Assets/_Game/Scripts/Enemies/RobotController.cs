@@ -18,8 +18,11 @@ namespace Stealth.Enemies
     {
         public static readonly List<RobotController> Robots = new();
 
-        public RobotSenses Senses = new();
-        public RobotTraits Traits = new();
+        [Tooltip("How this kind senses and moves (Data/Robots/<Kind>.asset).")]
+        public RobotProfile Profile;
+
+        public RobotSenses Senses => Profile.Senses;
+        public RobotTraits Traits => Profile.Traits;
 
         [Header("Parts")]
         public Transform Eye;
@@ -68,8 +71,8 @@ namespace Stealth.Enemies
             if (IsServer) NoiseSystem.OnNoise -= OnNoise;
         }
 
-        public override bool CanBeHackedFrom(Vector3 player) =>
-            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State == RobotState.Chase);
+        public override bool CanBeHackedFrom(Vector3 player, float reach) =>
+            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State == RobotState.Chase, reach);
 
         protected override void OnHackedServer()
         {

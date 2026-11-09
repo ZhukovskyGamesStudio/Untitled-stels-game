@@ -184,7 +184,7 @@ namespace Stealth.Game
         IEnumerator HunterScenario()
         {
             var gm = GameManager.Instance;
-            gm.GracePeriod = 0f;
+            DevFlags.SkipGracePeriod = true;
             var far = ActiveLevel.Layout.HatchPosition + Vector3.forward * 100f;
             for (int i = 0; i < 3; i++)
             {
@@ -227,7 +227,7 @@ namespace Stealth.Game
         IEnumerator RadioScenario()
         {
             var gm = GameManager.Instance;
-            gm.GracePeriod = 0f;
+            DevFlags.SkipGracePeriod = true;
             DevFlags.FreezeRobots = true;
             foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
             var hatch = ActiveLevel.Layout.HatchPosition;
@@ -248,7 +248,7 @@ namespace Stealth.Game
         IEnumerator HackScenario()
         {
             var gm = GameManager.Instance;
-            gm.GracePeriod = 0f;
+            DevFlags.SkipGracePeriod = true;
             DevFlags.FreezeRobots = true;
             foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
             var hatch = ActiveLevel.Layout.HatchPosition;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Stealth.Configs;
 using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Level;
@@ -27,18 +28,9 @@ namespace Stealth.Game
         public GameObject[] RobotPrefabs = new GameObject[RobotRoster.KindCount];
         public GameObject LaserPrefab;
 
-        [Header("Balance")]
-        [Tooltip("Share of the total item value on a level required by the quota (level 0).")]
-        public float QuotaShare = 0.35f;
-        public float QuotaShareGrowth = 0.04f;
-        [Tooltip("Quota increase per player who was down at the end of the previous level.")]
-        public float DeathPenalty = 0.15f;
-        public float AlarmDuration = 6f;
-        [Tooltip("Sensors stay off for this long after a level starts: a moment to get your bearings.")]
-        public float GracePeriod = 8f;
-
         public static float LevelStartTime { get; private set; }
-        public static bool InGracePeriod => Instance != null && Time.time - LevelStartTime < Instance.GracePeriod;
+        /// <summary>Sensors stay off for a moment after a house starts (RunConfig.GracePeriod).</summary>
+        public static bool InGracePeriod => Instance != null && !DevFlags.SkipGracePeriod && Time.time - LevelStartTime < Instance.m_Run.Settings.GracePeriod;
 
         /// <summary>Robots and devices may sense players now (not in the grace period, not disabled by a test flag).</summary>
         public static bool SensorsAllowed => !DevFlags.Peaceful && !DevFlags.FreezeRobots && !InGracePeriod;
@@ -46,7 +38,7 @@ namespace Stealth.Game
         /// <summary>The run is going on (or there is no session yet, e.g. in tools): robots may act.</summary>
         public static bool IsPlaying => Instance == null || Instance.Phase == RunPhase.Playing;
 
-        readonly RunState m_Run = new();
+        RunState m_Run = new();
         readonly List<GameObject> m_Spawned = new();
         IGameLink m_Link;
         bool m_IsServer;
@@ -70,10 +62,7 @@ namespace Stealth.Game
             Instance = this;
             m_Link = link;
             m_IsServer = isServer;
-            m_Run.QuotaShare = QuotaShare;
-            m_Run.QuotaShareGrowth = QuotaShareGrowth;
-            m_Run.DeathPenalty = DeathPenalty;
-            m_Run.AlarmDuration = AlarmDuration;
+            m_Run = new RunState(Tuning.Run.Rules);
             if (!isServer) return;
             StartLevel(DevFlags.ForcedLevel);
             DevFlags.ForcedLevel = 0;
@@ -104,7 +93,8 @@ namespace Stealth.Game
             var info = Level;
             if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
             m_BuiltSeed = info.Seed;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index);
+            var level = Tuning.Level;
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security);
             ActiveLevel.Load(layout, Art);
             ApplyAtmosphere();
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms");
@@ -147,7 +137,7 @@ namespace Stealth.Game
         {
             var rng = new System.Random(seed ^ 0x5bd1e995);
             int total = 0;
-            foreach (var loot in LootPlanner.Plan(layout, rng))
+            foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
             {
                 var item = SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f);
                 total += item.Value;
@@ -264,7 +254,7 @@ namespace Stealth.Game
                     int next = Level.Index + 1;
                     StartLevel(next);
                     Banner(down > 0
-                        ? $"Уровень пройден! Погибших: {down}, квота следующего дома выше на {Mathf.RoundToInt(DeathPenalty * down * 100)}%"
+                        ? $"Уровень пройден! Погибших: {down}, квота следующего дома выше на {Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)}%"
                         : $"Уровень пройден! Дом №{next + 1}");
                     break;
             }

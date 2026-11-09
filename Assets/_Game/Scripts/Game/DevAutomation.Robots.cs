@@ -18,7 +18,7 @@ namespace Stealth.Game
             if (!Me.IsServer) yield break;
             var only = Arg("-kinds");
             DevFlags.FreezeRobots = true;
-            gm.GracePeriod = 0f; // sensors on immediately
+            DevFlags.SkipGracePeriod = true; // sensors on immediately
             var hatch = ActiveLevel.Layout.HatchPosition;
             // Clear the stage: robots that wander into the lobby would photobomb the gallery.
             foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);

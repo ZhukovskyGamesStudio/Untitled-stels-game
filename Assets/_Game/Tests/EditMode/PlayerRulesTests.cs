@@ -37,14 +37,14 @@ namespace Stealth.Tests
             var gas = new GasExposure();
             int laughs = 0;
             GasExposure.Effect last = GasExposure.Effect.None;
-            for (float t = 0; t < GasExposure.Limit + 0.5f; t += 0.1f)
+            for (float t = 0; t < gas.Limit + 0.5f; t += 0.1f)
             {
                 last = gas.Tick(true, 0.1f);
                 if (last == GasExposure.Effect.Laugh) laughs++;
                 if (last == GasExposure.Effect.Knockout) break;
             }
             Assert.AreEqual(GasExposure.Effect.Knockout, last);
-            int expected = (int)((GasExposure.Limit - GasExposure.LaughAfter) / GasExposure.LaughInterval);
+            int expected = (int)((gas.Limit - gas.LaughAfter) / gas.LaughInterval);
             Assert.That(laughs, Is.InRange(expected - 1, expected + 2), "laughs every 1.2 s once it kicks in");
         }
 

@@ -4,6 +4,96 @@ using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
+    /// <summary>Relative chance of a room type (LevelConfig).</summary>
+    [System.Serializable]
+    public struct RoomWeight
+    {
+        public RoomType Room;
+        public int Weight;
+        public RoomWeight(RoomType room, int weight) { Room = room; Weight = weight; }
+    }
+
+    /// <summary>Tuning of the building (LevelConfig): size by depth, rooms, light, doors and vents.</summary>
+    [System.Serializable]
+    public class BuildingSettings
+    {
+        [Header("Size by house (0-based); the last entry repeats")]
+        public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
+        public int BaseWidth = 3;
+        [Tooltip("+1 room in width per house, up to this.")]
+        public int MaxExtraWidth = 2;
+        public int BaseDepth = 3;
+        [Tooltip("+1 room in depth every this many houses…")]
+        public int HousesPerExtraDepth = 3;
+        [Tooltip("…up to this.")]
+        public int MaxExtraDepth = 1;
+
+        [Header("Rooms")]
+        public RoomWeight[] RoomWeights =
+        {
+            new(RoomType.OpenSpace, 28), new(RoomType.Office, 16), new(RoomType.Meeting, 12), new(RoomType.Kitchen, 10),
+            new(RoomType.Server, 12), new(RoomType.Storage, 10), new(RoomType.Restroom, 6), new(RoomType.Lounge, 6),
+        };
+
+        [Header("Light")]
+        [Tooltip("Chance of a dark room in the first house.")]
+        public float DarkChance = 0.15f;
+        [Tooltip("Added per house, up to MaxDarkHouses houses.")]
+        public float DarkChancePerHouse = 0.03f;
+        public int MaxDarkHouses = 5;
+        [Tooltip("Chance of a flickering lamp in a lit room.")]
+        public float FlickerChance = 0.12f;
+
+        [Header("Passages")]
+        [Tooltip("Share of the main passages that are open arches instead of doors.")]
+        public float OpenPassageChance = 0.3f;
+        [Tooltip("Chance of an extra door in a remaining wall (loops).")]
+        public float ExtraDoorChance = 0.2f;
+        [Tooltip("Chance of a crawl vent in a remaining wall.")]
+        public float VentChance = 0.35f;
+        [Tooltip("Chance of a sliding door in a doorway without a laser.")]
+        public float AutoDoorChance = 0.45f;
+
+        public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
+        public int WidthFor(int house) => BaseWidth + Mathf.Min(house, MaxExtraWidth);
+        public int DepthFor(int house) => BaseDepth + Mathf.Min(house / Mathf.Max(1, HousesPerExtraDepth), MaxExtraDepth);
+
+        public RoomType PickRoom(System.Random rng)
+        {
+            int total = 0;
+            foreach (var w in RoomWeights) total += Mathf.Max(0, w.Weight);
+            int roll = rng.Next(Mathf.Max(1, total));
+            foreach (var w in RoomWeights)
+            {
+                roll -= Mathf.Max(0, w.Weight);
+                if (roll < 0) return w.Room;
+            }
+            return RoomType.OpenSpace;
+        }
+    }
+
+    /// <summary>Tuning of the guards (LevelConfig): how many robots, devices, cameras and lasers per house.</summary>
+    [System.Serializable]
+    public class SecuritySettings
+    {
+        [Header("Counts: base + per house")]
+        public int Robots = 2;
+        public int RobotsPerHouse = 1;
+        [Tooltip("Extra robots per floor above the ground floor.")]
+        public int RobotsPerExtraFloor = 1;
+        public int Devices = 1;
+        public int DevicesPerHouse = 1;
+        public int Cameras = 2;
+        public int CamerasPerHouse = 1;
+        public int Lasers = 1;
+        public int LasersPerHouse = 1;
+        [Tooltip("House (0-based) from which lasers can move up and down.")]
+        public int MovingLasersFromHouse = 2;
+
+        [Header("Who")]
+        public RosterSettings Roster = new();
+    }
+
     /// <summary>
     /// Room-based multi-storey office generator (pure: seed in, <see cref="LevelLayout"/> out; geometry is built by
     /// <see cref="LevelBuilder"/>). Every floor is a grid of rooms; a randomized spanning tree per floor
@@ -13,20 +103,21 @@ namespace Stealth.Level
     {
         static readonly Vector2Int[] Dirs = { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
 
-        public static int FloorsFor(int levelIndex) => levelIndex < 2 ? 2 : levelIndex < 5 ? 3 : 4;
-
         // ------------------------------------------------------------------ layout
 
-        public static LevelLayout Generate(int seed, int levelIndex)
+        /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
+        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null)
         {
+            building ??= new BuildingSettings();
+            security ??= new SecuritySettings();
             var rng = new System.Random(seed);
             var l = new LevelLayout
             {
                 Seed = seed,
                 LevelIndex = levelIndex,
-                Width = 3 + Mathf.Min(levelIndex, 2),
-                Height = 3 + Mathf.Min(levelIndex / 3, 1),
-                Floors = FloorsFor(levelIndex),
+                Width = building.WidthFor(levelIndex),
+                Height = building.DepthFor(levelIndex),
+                Floors = building.FloorsFor(levelIndex),
             };
             int w = l.Width, h = l.Height, floors = l.Floors;
             l.Rooms = new RoomType[floors, w, h];
@@ -34,7 +125,7 @@ namespace Stealth.Level
             l.EdgesZ = new EdgeType[floors, w, h - 1];
             l.StartCell = new Vector2Int(0, rng.Next(h));
 
-            for (int f = 0; f < floors; f++) GenerateFloorPlan(l, f, rng);
+            for (int f = 0; f < floors; f++) GenerateFloorPlan(l, f, rng, building);
             PlaceStairs(l, rng);
 
             // Exterior doors on the ground floor: a way out into the gas, to hide or to walk around the building.
@@ -62,15 +153,7 @@ namespace Stealth.Level
                     for (int y = 0; y < h; y++)
                     {
                         if (f == 0 && new Vector2Int(x, y) == l.StartCell) { l.Rooms[f, x, y] = RoomType.Lobby; continue; }
-                        int r = rng.Next(100);
-                        l.Rooms[f, x, y] = r < 28 ? RoomType.OpenSpace
-                            : r < 44 ? RoomType.Office
-                            : r < 56 ? RoomType.Meeting
-                            : r < 66 ? RoomType.Kitchen
-                            : r < 78 ? RoomType.Server
-                            : r < 88 ? RoomType.Storage
-                            : r < 94 ? RoomType.Restroom
-                            : RoomType.Lounge;
+                        l.Rooms[f, x, y] = building.PickRoom(rng);
                     }
 
             l.Dark = new bool[floors, w, h];
@@ -81,8 +164,8 @@ namespace Stealth.Level
                     {
                         if (l.Rooms[f, x, y] == RoomType.Lobby) continue;
                         double r = rng.NextDouble();
-                        l.Dark[f, x, y] = r < 0.15 + 0.03 * Mathf.Min(levelIndex, 5);
-                        l.Flicker[f, x, y] = !l.Dark[f, x, y] && r > 0.88;
+                        l.Dark[f, x, y] = r < building.DarkChance + building.DarkChancePerHouse * Mathf.Min(levelIndex, building.MaxDarkHouses);
+                        l.Flicker[f, x, y] = !l.Dark[f, x, y] && r > 1.0 - building.FlickerChance;
                     }
 
             for (int f = 0; f < floors; f++)
@@ -90,14 +173,14 @@ namespace Stealth.Level
                     for (int y = 0; y < h; y++)
                         FurnishRoom(l, f, x, y, rng);
 
-            PlaceSecurity(l, rng);
+            PlaceSecurity(l, rng, building, security);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(w * Cell / 2f, height / 2f, h * Cell / 2f), new Vector3(w * Cell, height, h * Cell));
             return l;
         }
 
-        static void GenerateFloorPlan(LevelLayout l, int f, System.Random rng)
+        static void GenerateFloorPlan(LevelLayout l, int f, System.Random rng, BuildingSettings b)
         {
             int w = l.Width, h = l.Height;
             var start = f == 0 ? l.StartCell : new Vector2Int(rng.Next(w), rng.Next(h));
@@ -116,23 +199,23 @@ namespace Stealth.Level
                 }
                 if (options.Count == 0) { stack.Pop(); continue; }
                 var next = options[rng.Next(options.Count)];
-                SetEdge(l, f, cur, next, rng.NextDouble() < 0.3 ? EdgeType.Open : EdgeType.Door);
+                SetEdge(l, f, cur, next, rng.NextDouble() < b.OpenPassageChance ? EdgeType.Open : EdgeType.Door);
                 visited[next.x, next.y] = true;
                 stack.Push(next);
             }
             for (int x = 0; x < w - 1; x++)
                 for (int y = 0; y < h; y++)
-                    if (l.EdgesX[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.2) l.EdgesX[f, x, y] = EdgeType.Door;
+                    if (l.EdgesX[f, x, y] == EdgeType.Wall && rng.NextDouble() < b.ExtraDoorChance) l.EdgesX[f, x, y] = EdgeType.Door;
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h - 1; y++)
-                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.2) l.EdgesZ[f, x, y] = EdgeType.Door;
+                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < b.ExtraDoorChance) l.EdgesZ[f, x, y] = EdgeType.Door;
             // Crawl vents in some of the remaining walls: shortcuts for crouching players only.
             for (int x = 0; x < w - 1; x++)
                 for (int y = 0; y < h; y++)
-                    if (l.EdgesX[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.35) l.EdgesX[f, x, y] = EdgeType.Vent;
+                    if (l.EdgesX[f, x, y] == EdgeType.Wall && rng.NextDouble() < b.VentChance) l.EdgesX[f, x, y] = EdgeType.Vent;
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h - 1; y++)
-                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.35) l.EdgesZ[f, x, y] = EdgeType.Vent;
+                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < b.VentChance) l.EdgesZ[f, x, y] = EdgeType.Vent;
         }
 
         /// <summary>One staircase per pair of floors, each in a different cell (never the lobby).</summary>
@@ -313,7 +396,7 @@ namespace Stealth.Level
             }
         }
 
-        static void PlaceSecurity(LevelLayout l, System.Random rng)
+        static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s)
         {
             int level = l.LevelIndex;
             var candidates = new List<Vector3Int>(); // x, y, floor
@@ -325,7 +408,7 @@ namespace Stealth.Level
                         if (dist >= 2) candidates.Add(new Vector3Int(x, y, f));
                     }
 
-            int robots = 2 + level + (l.Floors - 1);
+            int robots = s.Robots + level * s.RobotsPerHouse + (l.Floors - 1) * s.RobotsPerExtraFloor;
             for (int i = 0; i < robots; i++)
             {
                 // Make sure every floor gets at least one robot, then spread randomly.
@@ -337,17 +420,17 @@ namespace Stealth.Level
                 }
                 else cell = candidates[rng.Next(candidates.Count)];
                 var pos = l.CellCenter(cell.z, cell.x, cell.y) + new Vector3(Range(rng, -1f, 1f), 0, Range(rng, -1f, 1f));
-                var kind = RobotRoster.PickRobot(level, rng);
+                var kind = RobotRoster.PickRobot(level, rng, s.Roster);
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
 
             // Fixed security devices: pressure plates in the room's walkways, motion sensors on walls, lidar poles.
-            int devices = 1 + level;
+            int devices = s.Devices + level * s.DevicesPerHouse;
             for (int i = 0; i < devices; i++)
             {
                 var cell = candidates[rng.Next(candidates.Count)];
                 var c = l.CellCenter(cell.z, cell.x, cell.y);
-                var kind = RobotRoster.PickDevice(level, rng);
+                var kind = RobotRoster.PickDevice(level, rng, s.Roster);
                 Vector3 pos;
                 Quaternion rot;
                 switch (kind)
@@ -374,7 +457,7 @@ namespace Stealth.Level
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = rot });
             }
 
-            int cameras = 2 + level;
+            int cameras = s.Cameras + level * s.CamerasPerHouse;
             var used = new HashSet<Vector3Int>();
             for (int i = 0; i < cameras && used.Count < candidates.Count; i++)
             {
@@ -399,19 +482,19 @@ namespace Stealth.Level
                         if (l.EdgesZ[f, x, y] == EdgeType.Door)
                             doors.Add(new LaserSpot { Position = new Vector3((x + 0.5f) * Cell, fy, (y + 1) * Cell), Rotation = Quaternion.identity, Width = DoorWidth });
             }
-            int lasers = 1 + level;
+            int lasers = s.Lasers + level * s.LasersPerHouse;
             while (l.LaserSpots.Count < lasers && doors.Count > 0)
             {
                 int idx = rng.Next(doors.Count);
                 var spot = doors[idx];
                 doors.RemoveAt(idx);
                 if ((spot.Position - l.HatchPosition).magnitude < Cell * 0.75f) continue; // keep the lobby doorways free
-                spot.Kind = (LaserPattern)rng.Next(level >= 2 ? 3 : 2); // moving beams from the third house on
+                spot.Kind = (LaserPattern)rng.Next(level >= s.MovingLasersFromHouse ? 3 : 2);
                 l.LaserSpots.Add(spot);
             }
             // Sliding doors in some of the remaining doorways (never together with a laser).
             foreach (var d in doors)
-                if (rng.NextDouble() < 0.45) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+                if (rng.NextDouble() < b.AutoDoorChance) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
         }
     }
 }

@@ -71,7 +71,7 @@ namespace Stealth.Tests
         [Test]
         public void AlarmsCloseTogetherCountOnce()
         {
-            var run = new RunState { AlarmDuration = 6f };
+            var run = new RunState(new RunSettings { AlarmDuration = 6f });
             run.BeginLevel(0, 1000);
             run.RaiseAlarm(10.0);
             run.RaiseAlarm(11.0);

@@ -41,6 +41,14 @@ namespace Stealth.UI
         public Button MainSettings;
         public Button Quit;
 
+        [Header("Friends in game (Steam)")]
+        public Text FriendsStatus;
+        public RectTransform FriendList;
+        public FriendLobbyRowView FriendRowPrefab;
+        public Button RefreshFriends;
+        [Tooltip("Seconds between automatic refreshes while the main menu is open.")]
+        public float FriendsRefreshInterval = 5f;
+
         [Header("Pause")]
         public Text Role;
         public Button Invite;
@@ -59,8 +67,13 @@ namespace Stealth.UI
         public Button Defaults;
         public Button Done;
 
+        UiPool<FriendLobbyRowView> m_FriendRows;
+        float m_NextFriendsRefresh;
+
         void Awake()
         {
+            m_FriendRows = new UiPool<FriendLobbyRowView>(FriendRowPrefab, FriendList);
+            RefreshFriends.onClick.AddListener(() => m_NextFriendsRefresh = 0f);
             HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());
             HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
@@ -133,6 +146,27 @@ namespace Stealth.UI
             LocalCaption.text = $"Локальная сеть / тест на одном ПК (UDP, порт {net.LocalPort}):";
             Ui.Show(NetStatus, !string.IsNullOrEmpty(net.Status));
             NetStatus.text = net.Status;
+            UpdateFriends(net);
+        }
+
+        /// <summary>Friends hosting a session: refreshed every few seconds, one click to join.</summary>
+        void UpdateFriends(ISessionLauncher net)
+        {
+            if (net.SteamAvailable && Time.unscaledTime >= m_NextFriendsRefresh)
+            {
+                m_NextFriendsRefresh = Time.unscaledTime + FriendsRefreshInterval;
+                net.RefreshFriendLobbies();
+            }
+            var lobbies = DevFlags.FriendLobbiesOverride ?? net.FriendLobbies;
+            RefreshFriends.interactable = net.SteamAvailable;
+            m_FriendRows.Begin();
+            foreach (var lobby in lobbies) m_FriendRows.Next().Set(lobby, id => net.JoinFriendLobby(id));
+            m_FriendRows.End();
+            string status = lobbies.Count > 0 ? null
+                : !net.SteamAvailable && DevFlags.FriendLobbiesOverride == null ? "Нужен запущенный Steam"
+                : "Никого из друзей нет в игре. Друг создаёт игру через Steam — она появится здесь.";
+            Ui.Show(FriendsStatus, status != null);
+            if (status != null) FriendsStatus.text = status;
         }
 
         void UpdatePause(ISessionLauncher net)

@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1715436298c96e045bbb8198b16e45f4, type: 3}
+  m_Name: Items
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.ItemsConfig
+  PointsPerCell: 5
+  Colors:
+  - Name: "\u0421\u0435\u0440\u044B\u0439"
+    Color: {r: 0.62, g: 0.64, b: 0.66, a: 1}
+    Multiplier: 1
+    SpawnWeight: 40
+  - Name: "\u0417\u0435\u043B\u0451\u043D\u044B\u0439"
+    Color: {r: 0.3, g: 0.8, b: 0.35, a: 1}
+    Multiplier: 2
+    SpawnWeight: 28
+  - Name: "\u0421\u0438\u043D\u0438\u0439"
+    Color: {r: 0.25, g: 0.5, b: 0.95, a: 1}
+    Multiplier: 3
+    SpawnWeight: 18
+  - Name: "\u0424\u0438\u043E\u043B\u0435\u0442\u043E\u0432\u044B\u0439"
+    Color: {r: 0.7, g: 0.35, b: 0.9, a: 1}
+    Multiplier: 5
+    SpawnWeight: 10
+  - Name: "\u0417\u043E\u043B\u043E\u0442\u043E\u0439"
+    Color: {r: 1, g: 0.8, b: 0.15, a: 1}
+    Multiplier: 8
+    SpawnWeight: 4

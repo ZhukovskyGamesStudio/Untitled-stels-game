@@ -13,18 +13,54 @@ namespace Stealth.Game
         public bool Equals(LevelInfo other) => Seed == other.Seed && Index == other.Index;
     }
 
+    /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, hunters.</summary>
+    [Serializable]
+    public class RunSettings
+    {
+        [Header("Quota")]
+        [Tooltip("Share of all loot value in a house that the quota asks for (first house).")]
+        public float QuotaShare = 0.35f;
+        [Tooltip("The share grows by this much with every house.")]
+        public float QuotaShareGrowth = 0.04f;
+        [Tooltip("The share never goes above this.")]
+        public float MaxQuotaShare = 0.85f;
+        [Tooltip("Quota increase per teammate left down at the end of the previous house.")]
+        public float DeathPenalty = 0.15f;
+
+        [Header("Alarms")]
+        [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]
+        public float AlarmDuration = 6f;
+        [Tooltip("Alarms closer together than this count once towards the hunter.")]
+        public float AlarmCountSpacing = 4f;
+        [Tooltip("Sensors are off for this long after a house starts.")]
+        public float GracePeriod = 8f;
+
+        [Header("Hunter")]
+        [Tooltip("Alarms that bring the hunter in the first house.")]
+        public int HunterAlarmsFirstHouse = 3;
+        [Tooltip("Alarms that bring the hunter in later houses.")]
+        public int HunterAlarmsLater = 2;
+        [Tooltip("Seconds in a house after which the hunter comes anyway (first house).")]
+        public float HunterTime = 360f;
+        [Tooltip("The time limit shrinks by this much per house…")]
+        public float HunterTimeStepPerHouse = 20f;
+        [Tooltip("…but never below this.")]
+        public float HunterMinTime = 180f;
+        [Tooltip("One more hunter is allowed every this many houses.")]
+        public int HousesPerExtraHunter = 3;
+    }
+
     /// <summary>
     /// Rules of a run (pure, unit tested): quota per house, deposits, death penalties, alarms and hunters,
     /// how a level ends. <see cref="GameManager"/> owns one on the server and replicates the public state.
     /// </summary>
     public sealed class RunState
     {
-        public const double AlarmCountSpacing = 4.0;
+        readonly RunSettings m_S;
 
-        public float QuotaShare = 0.35f;
-        public float QuotaShareGrowth = 0.04f;
-        public float DeathPenalty = 0.15f;
-        public float AlarmDuration = 6f;
+        public RunState(RunSettings settings = null) => m_S = settings ?? new RunSettings();
+
+        public RunSettings Settings => m_S;
 
         public int LevelIndex { get; private set; }
         public int Quota { get; private set; }
@@ -40,18 +76,20 @@ namespace Stealth.Game
         double m_LastAlarmCounted = double.NegativeInfinity;
 
         /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
-        public static int QuotaFor(int totalValue, int levelIndex, int penalties, float share = 0.35f, float growth = 0.04f, float penalty = 0.15f)
+        public static int QuotaFor(int totalValue, int levelIndex, int penalties, RunSettings s = null)
         {
-            float s = Mathf.Min(0.85f, share + growth * levelIndex);
-            return Mathf.Max(10, Mathf.RoundToInt(totalValue * s * (1f + penalty * penalties) / 5f) * 5);
+            s ??= new RunSettings();
+            float share = Mathf.Min(s.MaxQuotaShare, s.QuotaShare + s.QuotaShareGrowth * levelIndex);
+            return Mathf.Max(10, Mathf.RoundToInt(totalValue * share * (1f + s.DeathPenalty * penalties) / 5f) * 5);
         }
 
         /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
-        public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar)
+        public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
         {
-            if (huntersSoFar >= 1 + levelIndex / 3) return false;
-            int alarmLimit = (levelIndex == 0 ? 3 : 2) * (huntersSoFar + 1);
-            float timeLimit = Mathf.Max(180f, 360f - levelIndex * 20f) * (huntersSoFar + 1);
+            s ??= new RunSettings();
+            if (huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return false;
+            int alarmLimit = (levelIndex == 0 ? s.HunterAlarmsFirstHouse : s.HunterAlarmsLater) * (huntersSoFar + 1);
+            float timeLimit = Mathf.Max(s.HunterMinTime, s.HunterTime - levelIndex * s.HunterTimeStepPerHouse) * (huntersSoFar + 1);
             return alarms >= alarmLimit || elapsed >= timeLimit;
         }
 
@@ -59,7 +97,7 @@ namespace Stealth.Game
         public void BeginLevel(int index, int lootValue)
         {
             LevelIndex = index;
-            Quota = QuotaFor(lootValue, index, Penalties, QuotaShare, QuotaShareGrowth, DeathPenalty);
+            Quota = QuotaFor(lootValue, index, Penalties, m_S);
             Collected = 0;
             Phase = RunPhase.Playing;
             AlarmUntil = 0;
@@ -81,18 +119,18 @@ namespace Stealth.Game
         /// <summary>An alarm goes off. Alarms within a few seconds of each other count once (towards the hunter).</summary>
         public void RaiseAlarm(double now)
         {
-            if (now - m_LastAlarmCounted > AlarmCountSpacing)
+            if (now - m_LastAlarmCounted > m_S.AlarmCountSpacing)
             {
                 Alarms++;
                 m_LastAlarmCounted = now;
             }
-            AlarmUntil = now + AlarmDuration;
+            AlarmUntil = now + m_S.AlarmDuration;
         }
 
         /// <summary>End the current alarm at once (the red lights go off).</summary>
         public void CalmDown() => AlarmUntil = 0;
 
-        public bool ShouldSendHunter(float elapsed) => Phase == RunPhase.Playing && HunterDue(Alarms, elapsed, LevelIndex, Hunters);
+        public bool ShouldSendHunter(float elapsed) => Phase == RunPhase.Playing && HunterDue(Alarms, elapsed, LevelIndex, Hunters, m_S);
 
         public void HunterSent() => Hunters++;
 

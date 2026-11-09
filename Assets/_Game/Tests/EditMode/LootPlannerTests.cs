@@ -18,7 +18,7 @@ namespace Stealth.Tests
                 var loot = LootPlanner.Plan(LevelGenerator.Generate(seed, 3), new System.Random(seed));
                 for (int i = 0; i < loot.Count; i++)
                     for (int j = i + 1; j < loot.Count; j++)
-                        Assert.GreaterOrEqual(Vector3.Distance(loot[i].Position, loot[j].Position), LootPlanner.MinSpacing - 1e-4f);
+                        Assert.GreaterOrEqual(Vector3.Distance(loot[i].Position, loot[j].Position), new LootSettings().MinSpacing - 1e-4f);
             }
         }
 

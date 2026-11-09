@@ -34,9 +34,9 @@ namespace Stealth.Player
         }
     }
 
-    /// <summary>Owner-side first person motor: acceleration based movement, crouch and camera.</summary>
-    [RequireComponent(typeof(CharacterController))]
-    public class PlayerMotor : MonoBehaviour
+    /// <summary>Tuning of the first person motor (PlayerConfig).</summary>
+    [System.Serializable]
+    public class MovementSettings
     {
         [Header("Speed (m/s)")]
         public float WalkSpeed = 3.6f;
@@ -66,6 +66,34 @@ namespace Stealth.Player
         public float BobAmplitude = 0.035f;
         [Tooltip("Steps per meter travelled (one step = half a bob cycle).")]
         public float StepsPerMeter = 0.75f;
+    }
+
+    /// <summary>Owner-side first person motor: acceleration based movement, crouch and camera. Tuning: <see cref="MovementSettings"/>.</summary>
+    [RequireComponent(typeof(CharacterController))]
+    public class PlayerMotor : MonoBehaviour
+    {
+        MovementSettings m_S = new();
+
+        /// <summary>Applies the tuning (from PlayerConfig): movement and stamina.</summary>
+        public void Configure(MovementSettings movement, StaminaSettings stamina)
+        {
+            m_S = movement ?? new MovementSettings();
+            Stamina = new Stamina(stamina);
+        }
+
+        public float WalkSpeed => m_S.WalkSpeed;
+        public float SprintSpeed => m_S.SprintSpeed;
+        public float CrouchSpeed => m_S.CrouchSpeed;
+        float GroundAccel => m_S.GroundAccel;
+        float GroundDecel => m_S.GroundDecel;
+        float AirAccel => m_S.AirAccel;
+        float JumpHeight => m_S.JumpHeight;
+        float CoyoteTime => m_S.CoyoteTime;
+        float JumpBuffer => m_S.JumpBuffer;
+        float GroundSnapDistance => m_S.GroundSnapDistance;
+        float SprintFovKick => m_S.SprintFovKick;
+        float BobAmplitude => m_S.BobAmplitude;
+        float StepsPerMeter => m_S.StepsPerMeter;
 
         public Vector3 Velocity => m_Velocity;
         public float HorizontalSpeed => new Vector3(m_Velocity.x, 0, m_Velocity.z).magnitude;
@@ -75,7 +103,7 @@ namespace Stealth.Player
         public bool BlockedByCeiling { get; private set; }
         public bool Grounded => m_Controller.isGrounded;
         public float Pitch => m_Pitch;
-        public readonly Stamina Stamina = new();
+        public Stamina Stamina { get; private set; } = new();
 
         /// <summary>Raised on landing with the downward speed at impact (m/s).</summary>
         public event System.Action<float> Landed;
