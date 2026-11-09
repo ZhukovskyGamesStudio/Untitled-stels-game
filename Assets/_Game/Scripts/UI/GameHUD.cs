@@ -124,6 +124,7 @@ namespace Stealth.UI
 
             DrawOverlays(gm, me);
             DrawDetection(me);
+            DrawRobotIcons(me);
             DrawStamina(me);
             DrawNoise(me);
             DrawQuota(gm);
@@ -224,6 +225,38 @@ namespace Stealth.UI
             var lc = colors[bars];
             lc.a = alpha * 0.9f;
             UiDraw.Label(new Rect(x0 + 32f, y0, 120f, 18f), labels[bars], 12, TextAnchor.MiddleLeft, lc);
+        }
+
+        /// <summary>"?" / "!" over robots and devices that you can actually see, within 25 m.</summary>
+        static void DrawRobotIcons(PlayerController me)
+        {
+            var cam = me.Camera;
+            if (cam == null) return;
+            var camPos = cam.transform.position;
+            foreach (var d in Stealth.Enemies.DetectorAwareness.All)
+            {
+                var robot = d.GetComponent<Stealth.Enemies.RobotController>();
+                bool investigating = robot != null && robot.State.Value == Stealth.Enemies.RobotState.Investigate;
+                bool chasing = robot != null && robot.State.Value == Stealth.Enemies.RobotState.Chase;
+                int icon = UiMath.StateIcon(d.Value, investigating, chasing);
+                if (icon == 0) continue;
+                var top = d.Position + Vector3.up * 0.6f;
+                var to = top - camPos;
+                if (to.magnitude > 25f) continue;
+                var vp = cam.WorldToViewportPoint(top);
+                if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f) continue;
+                if (Physics.Raycast(camPos, to.normalized, out var hit, to.magnitude - 0.8f, Stealth.Enemies.Perception.SightMask, QueryTriggerInteraction.Ignore)
+                    && hit.collider.GetComponentInParent<Stealth.Enemies.DetectorAwareness>() != d) continue;
+                var pos = new Vector2(vp.x * UiDraw.W, (1f - vp.y) * UiDraw.H);
+                var (text, color) = icon switch
+                {
+                    1 => ("?", new Color(1f, 0.9f, 0.3f)),
+                    2 => ("?", new Color(1f, 0.55f, 0.15f)),
+                    _ => ("!", new Color(1f, 0.15f, 0.1f)),
+                };
+                float s = Mathf.Lerp(26f, 16f, to.magnitude / 25f);
+                UiDraw.Label(new Rect(pos.x - 20, pos.y - s, 40, s + 6), text, Mathf.RoundToInt(s), TextAnchor.MiddleCenter, color, true);
+            }
         }
 
         static void DrawStamina(PlayerController me)

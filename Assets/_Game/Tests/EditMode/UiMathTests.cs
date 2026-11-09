@@ -73,6 +73,16 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void RobotStateIcons()
+        {
+            Assert.AreEqual(0, UiMath.StateIcon(0f, false, false));
+            Assert.AreEqual(1, UiMath.StateIcon(0.3f, false, false));
+            Assert.AreEqual(2, UiMath.StateIcon(0f, true, false));
+            Assert.AreEqual(3, UiMath.StateIcon(0.2f, false, true));
+            Assert.AreEqual(3, UiMath.StateIcon(1f, false, false));
+        }
+
+        [Test]
         public void ScaleIsClamped()
         {
             Assert.AreEqual(1f, UiMath.Scale(720));

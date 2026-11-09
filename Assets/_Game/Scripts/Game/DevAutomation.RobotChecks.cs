@@ -242,7 +242,7 @@ namespace Stealth.Game
             float t0 = Time.time;
             while (Time.time - t0 < 5f && guard.State.Value != RobotState.Chase) yield return null;
             yield return null;
-            yield return Shot("radio");
+            yield return Shot("radio_icons");
             Log($"radio: guard={guard.State.Value}, listener after the call={listener.State.Value}");
             GameManager.FreezeRobots = true;
         }

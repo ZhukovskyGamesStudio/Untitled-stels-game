@@ -81,6 +81,16 @@ namespace Stealth.UI
             return Mathf.Clamp01(Mathf.Min(age / fade, (duration - age) / fade));
         }
 
+        /// <summary>
+        /// Robot status icon: 0 none, 1 "?" (noticing something), 2 "?" (investigating), 3 "!" (chasing / alarm).
+        /// </summary>
+        public static int StateIcon(float awareness, bool investigating, bool chasing)
+        {
+            if (chasing || awareness >= 0.99f) return 3;
+            if (investigating) return 2;
+            return awareness > 0.05f ? 1 : 0;
+        }
+
         /// <summary>UI scale: the layout is designed for 720p and scaled up for bigger windows (clamped).</summary>
         public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 720f, 0.75f, 3f);
     }
