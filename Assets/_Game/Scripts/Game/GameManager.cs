@@ -139,19 +139,13 @@ namespace Stealth.Game
             int index = layout.LevelIndex;
 
             // Items.
-            var spots = new List<Vector3>(layout.ItemSpots);
-            int count = Mathf.Min(spots.Count, 6 + index * 2 + layout.Width * layout.Height / 2);
             int total = 0;
-            for (int i = 0; i < count; i++)
+            foreach (var loot in LootPlanner.Plan(layout, rng))
             {
-                int pick = rng.Next(spots.Count);
-                var pos = spots[pick];
-                spots.RemoveAt(pick);
-                var obj = Instantiate(ItemPrefab, pos, Quaternion.Euler(0, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f, 0));
+                var obj = Instantiate(ItemPrefab, loot.Position, Quaternion.Euler(0, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f, 0));
                 var item = obj.GetComponent<WorldItem>();
-                item.Shape.Value = (byte)rng.Next(ItemCatalog.Shapes.Length);
-                // Higher floors are riskier and richer.
-                item.Color.Value = (byte)ItemCatalog.RandomColor(rng, index * 2 + LevelLayout.FloorOf(pos.y) * 4);
+                item.Shape.Value = (byte)loot.Shape;
+                item.Color.Value = (byte)loot.Color;
                 obj.Spawn(true);
                 total += item.Value;
             }
