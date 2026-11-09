@@ -120,6 +120,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void RadioReachesNearbyRobotsOnTheSameFloor()
+        {
+            var sender = new Vector3(0, 0, 0);
+            var robots = new[]
+            {
+                sender,                       // itself
+                new Vector3(8, 0, 0),         // near
+                new Vector3(20, 0, 0),        // too far
+                new Vector3(4, 3.5f, 0),      // floor above
+                new Vector3(5, 2.1f, 5),      // a drone hovering on this floor
+            };
+            CollectionAssert.AreEquivalent(new[] { 1, 4 }, RobotRadio.Recipients(sender, robots));
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);

@@ -291,6 +291,7 @@ namespace Stealth.Enemies
             }
             if (AlarmOnDetect && State.Value != RobotState.Chase && GameManager.Instance != null)
                 GameManager.Instance.RaiseAlarmServer(p.transform.position, 30f);
+            if (State.Value != RobotState.Chase) CallForBackup(p.transform.position);
             m_Target = p;
             m_Suspicion = 1f;
             m_LastKnown = p.transform.position;
@@ -298,6 +299,24 @@ namespace Stealth.Enemies
             SetState(RobotState.Chase);
             m_Agent.isStopped = false;
             m_Agent.speed = ChaseSpeed;
+        }
+
+        public Material RadioMaterial;
+
+        /// <summary>Radio: nearby robots on the same floor come to check the spot (they do not chase right away).</summary>
+        void CallForBackup(Vector3 at)
+        {
+            var positions = new List<Vector3>();
+            foreach (var r in All) positions.Add(r.transform.position);
+            foreach (int i in RobotRadio.Recipients(transform.position, positions))
+                if (All[i].State.Value != RobotState.Chase) All[i].InvestigateServer(at, false);
+            RadioRpc();
+        }
+
+        [Rpc(SendTo.Everyone)]
+        void RadioRpc()
+        {
+            if (RadioMaterial != null) RobotRadio.Ripple(transform.position, RadioMaterial);
         }
 
         void Think()

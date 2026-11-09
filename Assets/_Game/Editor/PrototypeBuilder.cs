@@ -208,6 +208,7 @@ namespace Stealth.EditorTools
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
             Mat("PlayerGlasses", new Color(0.05f, 0.05f, 0.06f), smoothness: 0.9f);
             Mat("Laser", new Color(1f, 0.1f, 0.05f), unlit: true);
+            Mat("Radio", new Color(1f, 0.6f, 0.2f), unlit: true);
             Mat("LaserPost", new Color(0.15f, 0.15f, 0.17f), smoothness: 0.6f);
             for (int i = 0; i < ItemCatalog.Colors.Length; i++)
             {
@@ -467,6 +468,7 @@ namespace Stealth.EditorTools
             rc.Eye = eye.transform;
             rc.StatusRenderers = Parts(model, "Eye");
             rc.StatusLight = light;
+            rc.RadioMaterial = s_Mats["Radio"];
             config(rc);
             return Save(root, $"{Prefabs}/{name}.prefab");
         }

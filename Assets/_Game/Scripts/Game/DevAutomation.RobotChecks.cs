@@ -225,5 +225,26 @@ namespace Stealth.Game
             yield return new WaitForSeconds(1.6f);
             yield return Shot("lasers_b");
         }
+
+        /// <summary>A guard spots the player and radios a listener standing nearby, which comes to check.</summary>
+        IEnumerator RadioScenario()
+        {
+            var gm = GameManager.Instance;
+            gm.GracePeriod = 0f;
+            GameManager.FreezeRobots = true;
+            foreach (var r in RobotController.All.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            var hatch = LevelGenerator.Current.HatchPosition;
+            var guard = gm.DebugSpawnServer(RobotKind.Guard, hatch + new Vector3(0, 0, 3f), Quaternion.LookRotation(Vector3.back)).GetComponent<RobotController>();
+            var listener = gm.DebugSpawnServer(RobotKind.Listener, hatch + new Vector3(3.5f, 0, 3.5f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
+            LookAtFrom(new Pose(hatch + new Vector3(0, 0.05f, -1.5f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(0, 1.2f, 3f));
+            yield return new WaitForSeconds(0.5f);
+            GameManager.FreezeRobots = false;
+            float t0 = Time.time;
+            while (Time.time - t0 < 5f && guard.State.Value != RobotState.Chase) yield return null;
+            yield return null;
+            yield return Shot("radio");
+            Log($"radio: guard={guard.State.Value}, listener after the call={listener.State.Value}");
+            GameManager.FreezeRobots = true;
+        }
     }
 }
