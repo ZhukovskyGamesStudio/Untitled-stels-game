@@ -272,8 +272,23 @@ namespace Stealth.Enemies
             m_WaitUntil = -1f;
         }
 
+        float m_SnitchCooldownUntil;
+
         void StartChase(PlayerController p)
         {
+            if (!CanAttack)
+            {
+                // Snitch: cannot fight, so it reports the intruder to everyone and goes back to work.
+                if (Time.time < m_SnitchCooldownUntil) return;
+                m_SnitchCooldownUntil = Time.time + 12f;
+                m_Suspicion = 0f;
+                GameManager.Instance?.RaiseAlarmServer(p.transform.position, 40f);
+                m_Awareness?.ReportServer(1f, p);
+                SetState(RobotState.Suspicious);
+                m_Agent.isStopped = true;
+                m_Suspect = p;
+                return;
+            }
             if (AlarmOnDetect && State.Value != RobotState.Chase && GameManager.Instance != null)
                 GameManager.Instance.RaiseAlarmServer(p.transform.position, 30f);
             m_Target = p;
@@ -302,7 +317,8 @@ namespace Stealth.Enemies
                 case RobotState.Suspicious:
                     m_Agent.isStopped = true;
                     if (m_Suspect != null) FaceTowards(m_Suspect.transform.position);
-                    if (m_Suspicion <= 0.05f) { SetState(RobotState.Patrol); m_Agent.isStopped = false; }
+                    if (!CanAttack && Time.time - m_StateTime > 3f) { SetState(RobotState.Patrol); m_Agent.isStopped = false; PickPatrolPoint(); }
+                    else if (m_Suspicion <= 0.05f && CanAttack) { SetState(RobotState.Patrol); m_Agent.isStopped = false; }
                     else if (m_Suspect != null && Time.time - m_StateTime > 4f) InvestigateServer(m_Suspect.transform.position, false);
                     break;
 
