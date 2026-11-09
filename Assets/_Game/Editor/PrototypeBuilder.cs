@@ -476,6 +476,7 @@ namespace Stealth.EditorTools
         static GameObject BuildGuard() => BuildRobot("RobotGuard", "robot_guard", "RobotBody", 0.4f, new Vector3(0, 1.84f, 0.3f), rc =>
         {
             rc.HasEyes = true;
+            rc.GetComponent<RobotAnimator>().Bob = 0.06f;
             rc.ViewDistance = 13f;
             rc.ViewAngle = 100f;
             rc.HearingMultiplier = 0.8f;
@@ -659,6 +660,7 @@ namespace Stealth.EditorTools
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>
         {
             rc.HoverHeight = 2.1f;
+            rc.GetComponent<RobotAnimator>().Lean = 14f;
             rc.HasEyes = true;
             rc.ViewDistance = 11f;
             rc.ViewAngle = 120f;

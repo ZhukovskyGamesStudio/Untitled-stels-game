@@ -13,6 +13,14 @@ namespace Stealth.Enemies
         public float RotorSpeed = 1800f;
         public float StepFrequency = 1.6f;
         public float LegSwing = 25f;
+        [Tooltip("Flying bodies lean into the direction of travel (degrees at full speed).")]
+        public float Lean = 0f;
+        [Tooltip("Walkers bob up and down a little (meters).")]
+        public float Bob = 0f;
+
+        Transform m_Model;
+        Vector3 m_ModelBase;
+        Vector3 m_Velocity;
 
         readonly List<Transform> m_Rotors = new();
         readonly List<Transform> m_Wheels = new();
@@ -31,6 +39,8 @@ namespace Stealth.Enemies
                 else if (t.name.StartsWith("AccentLeg")) m_Legs.Add((Pivot(t, top: true), m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
             }
             m_LastPos = transform.position;
+            m_Model = transform.Find("Model");
+            if (m_Model != null) m_ModelBase = m_Model.localPosition;
         }
 
         /// <summary>Mesh pivots are at the model origin; insert a pivot at the part's centre (or its top for legs).</summary>
@@ -54,6 +64,7 @@ namespace Stealth.Enemies
             var d = transform.position - m_LastPos;
             m_LastPos = transform.position;
             d.y = 0;
+            if (d.magnitude / dt < 30f) m_Velocity = Vector3.Lerp(m_Velocity, d / dt, 1f - Mathf.Exp(-6f * dt));
             float speed = d.magnitude / dt;
             if (speed > 30f) speed = 0f;
             m_Speed = Mathf.Lerp(m_Speed, speed, 1f - Mathf.Exp(-8f * dt));
@@ -64,6 +75,17 @@ namespace Stealth.Enemies
             float swing = Mathf.Clamp01(m_Speed / 2f) * LegSwing;
             foreach (var (leg, phase) in m_Legs)
                 leg.localRotation = Quaternion.Euler(Mathf.Sin(m_Phase + phase) * swing, 0f, 0f);
+
+            if (m_Model == null) return;
+            if (Lean > 0f)
+            {
+                // Tilt towards the local velocity (forward speed pitches, sideways rolls).
+                var local = transform.InverseTransformDirection(m_Velocity);
+                m_Model.localRotation = Quaternion.Euler(Mathf.Clamp(local.z * Lean / 5f, -Lean, Lean), 0f, Mathf.Clamp(-local.x * Lean / 5f, -Lean, Lean));
+                m_Model.localPosition = m_ModelBase + Vector3.up * Mathf.Sin(Time.time * 2.2f) * 0.05f; // hover wobble
+            }
+            else if (Bob > 0f)
+                m_Model.localPosition = m_ModelBase + Vector3.up * Mathf.Abs(Mathf.Sin(m_Phase)) * Bob * Mathf.Clamp01(m_Speed / 2f);
         }
     }
 }

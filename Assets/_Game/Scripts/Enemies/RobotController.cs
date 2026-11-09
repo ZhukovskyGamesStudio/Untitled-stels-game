@@ -345,7 +345,9 @@ namespace Stealth.Enemies
                     if (Arrived())
                     {
                         if (m_WaitUntil < 0f) m_WaitUntil = Time.time + 3f;
-                        transform.Rotate(0f, 90f * Time.deltaTime, 0f); // look around
+                        // Look around: sweep left and right instead of spinning on the spot.
+                        float sweep = Mathf.Sin((Time.time - m_StateTime) * 1.8f) * 120f * Time.deltaTime;
+                        transform.Rotate(0f, sweep, 0f);
                         if (Time.time > m_WaitUntil) { SetState(RobotState.Patrol); PickPatrolPoint(); }
                     }
                     break;

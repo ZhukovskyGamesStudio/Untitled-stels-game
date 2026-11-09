@@ -128,18 +128,17 @@ def model_robot_guard():
     """Bipedal guard robot with a big camera eye. Height ~2.0m."""
     merge("Body", [
         box((0.7, 0.45, 0.75), (0, 0, 1.25)),                       # torso
-        box((0.18, 0.18, 0.9), (-0.22, 0, 0.45)),                   # legs
-        box((0.18, 0.18, 0.9), (0.22, 0, 0.45)),
         box((0.14, 0.14, 0.75), (-0.45, 0, 1.15)),                  # arms
         box((0.14, 0.14, 0.75), (0.45, 0, 1.15)),
     ])
     merge("Accent", [
         box((0.45, 0.4, 0.32), (0, 0, 1.82)),                       # head
-        box((0.26, 0.32, 0.08), (-0.22, -0.06, 0.04)),              # feet
-        box((0.26, 0.32, 0.08), (0.22, -0.06, 0.04)),
         box((0.2, 0.2, 0.2), (-0.45, 0, 0.7)),                      # fists
         box((0.2, 0.2, 0.2), (0.45, 0, 0.7)),
     ])
+    # Legs (with feet) are separate so the game can swing them.
+    merge("AccentLeg0", [box((0.18, 0.18, 0.9), (-0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (-0.22, -0.06, 0.04))])
+    merge("AccentLeg1", [box((0.18, 0.18, 0.9), (0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (0.22, -0.06, 0.04))])
     merge("Eye", [cylinder(0.11, 0.08, (0, -0.22, 1.84), axis="Y", segments=16)])
     export("robot_guard")
 
@@ -150,12 +149,8 @@ def model_robot_listener():
         box((0.8, 1.0, 0.4), (0, 0, 0.42)),                         # chassis
         cylinder(0.08, 0.6, (0, 0.1, 0.9), segments=8),             # mast
     ])
-    merge("Accent", [
-        cylinder(0.22, 0.12, (-0.46, -0.3, 0.22), axis="X"),        # wheels
-        cylinder(0.22, 0.12, (0.46, -0.3, 0.22), axis="X"),
-        cylinder(0.22, 0.12, (-0.46, 0.3, 0.22), axis="X"),
-        cylinder(0.22, 0.12, (0.46, 0.3, 0.22), axis="X"),
-    ])
+    for i, (x, y) in enumerate([(-0.46, -0.3), (0.46, -0.3), (-0.46, 0.3), (0.46, 0.3)]):
+        merge(f"AccentWheel{i}", [cylinder(0.22, 0.12, (x, y, 0.22), axis="X")])   # wheels roll in game
     merge("Eye", [
         cylinder(0.25, 0.12, (-0.25, 0.1, 1.2), axis="X", radius2=0.05),  # ear dishes
         cylinder(0.25, 0.12, (0.25, 0.1, 1.2), axis="X", radius2=0.05),
