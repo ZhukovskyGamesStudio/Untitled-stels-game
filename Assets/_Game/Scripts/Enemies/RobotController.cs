@@ -38,6 +38,11 @@ namespace Stealth.Enemies
         [Tooltip("Smell: follows scent trails found within this radius (0 = no nose).")]
         public float SmellRange;
         public float SmellSpeed = 1.5f;
+        [Tooltip("Colour sorter: on spawn picks an item colour and only sees players carrying that colour.")]
+        public bool ColorSorter;
+
+        /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
+        public readonly NetworkVariable<sbyte> ColorFilter = new(-1);
 
         [Header("Body")]
         [Tooltip("Flying robots hover this high above the navmesh.")]
@@ -88,10 +93,12 @@ namespace Stealth.Enemies
             m_Agent = GetComponent<NavMeshAgent>();
             m_Awareness = GetComponent<DetectorAwareness>();
             State.OnValueChanged += (_, s) => ApplyVisual(s);
+            ColorFilter.OnValueChanged += (_, _) => ApplyVisual(State.Value);
             ApplyVisual(State.Value);
             if (!IsServer) return;
             m_Agent.enabled = true;
             m_Agent.areaMask = CanUseStairs ? NavMesh.AllAreas : NavMesh.AllAreas & ~(1 << LevelGenerator.StairsArea);
+            if (ColorSorter) ColorFilter.Value = (sbyte)Random.Range(0, Items.ItemCatalog.Colors.Length);
             m_Agent.baseOffset = HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = PatrolSpeed;
@@ -107,9 +114,10 @@ namespace Stealth.Enemies
 
         void ApplyVisual(RobotState state)
         {
+            var calm = ColorFilter.Value >= 0 ? Items.ItemCatalog.Colors[ColorFilter.Value].Color : new Color(0.2f, 0.85f, 1f);
             var c = state switch
             {
-                RobotState.Patrol => new Color(0.2f, 0.85f, 1f),
+                RobotState.Patrol => calm,
                 RobotState.Suspicious => new Color(1f, 0.85f, 0.1f),
                 RobotState.Investigate => new Color(1f, 0.5f, 0.1f),
                 _ => new Color(1f, 0.1f, 0.05f),
@@ -163,7 +171,8 @@ namespace Stealth.Enemies
                 if (d <= ContactDistance) { StartChase(p); return; } // bumped into the robot
 
                 float rate = 0f;
-                if (HasEyes && CanSee(p, out var dist)) rate = Mathf.Max(rate, VisionRate(p, dist));
+                bool visibleToFilter = ColorFilter.Value < 0 || p.GetComponent<PlayerInventory>().Carries(ColorFilter.Value);
+                if (HasEyes && visibleToFilter && CanSee(p, out var dist)) rate = Mathf.Max(rate, VisionRate(p, dist));
                 if (SeismicRange > 0f) rate = Mathf.Max(rate, SeismicRate(p));
                 if (SmellRange > 0f) rate = Mathf.Max(rate, ScentTrail.Smell(p.OwnerClientId, transform.position, SmellRange, Time.time) * SmellSpeed);
                 if (rate > bestRate) { best = p; bestRate = rate; }

@@ -14,6 +14,7 @@ namespace Stealth.Game
             if (Arg("-hostile") == null) return;
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
             if (kind == RobotKind.Hound) { steps.Add(TrailCheck(obj)); return; }
+            if (kind == RobotKind.Sorter) steps.Add(SorterCheck(obj));
             steps.Add(DetectionCheck(kind, obj));
         }
 
@@ -80,6 +81,26 @@ namespace Stealth.Game
             GameManager.FreezeRobots = true;
             Log($"sneak past {kind} (crouch={crouch}): max awareness {max:0.00}");
             yield return new WaitForSeconds(0.5f);
+        }
+
+        /// <summary>Empty-handed in front of a sorter: ignored. Then the player picks up loot of its colour.</summary>
+        IEnumerator SorterCheck(NetworkObject obj)
+        {
+            var robot = obj.GetComponent<RobotController>();
+            var aw = obj.GetComponent<DetectorAwareness>();
+            var inv = Me.GetComponent<Player.PlayerInventory>();
+            if (Me.IsServer) inv.ClearServer();
+            var p = obj.transform.position;
+            var stand = new Vector3(p.x, 0.05f, p.z) + Flat(obj.transform.forward).normalized * 4f;
+            Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(p - stand)));
+            GameManager.FreezeRobots = false;
+            float t0 = Time.time, max = 0f;
+            while (Time.time - t0 < 3f) { max = Mathf.Max(max, aw.AwarenessOf(Me.OwnerClientId)); yield return null; }
+            Log($"sorter (colour {robot.ColorFilter.Value}): empty-handed max awareness {max:0.00}");
+            GameManager.FreezeRobots = true;
+            // Give the player an item of the sorter's colour; the detection check that follows must now succeed.
+            if (Me.IsServer) inv.Items.Add(new Player.InventoryEntry { Shape = 0, Color = (byte)robot.ColorFilter.Value });
+            yield return new WaitForSeconds(0.3f);
         }
 
         /// <summary>The player walks past the hound's nose and away out of the room; the hound must follow the trail.</summary>

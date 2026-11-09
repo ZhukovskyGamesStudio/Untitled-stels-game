@@ -36,6 +36,12 @@ namespace Stealth.Player
             }
         }
 
+        public bool Carries(int color)
+        {
+            foreach (var e in Items) if (e.Color == color) return true;
+            return false;
+        }
+
         public HashSet<Vector2Int> Occupied(int ignoreIndex = -1)
         {
             var set = new HashSet<Vector2Int>();
