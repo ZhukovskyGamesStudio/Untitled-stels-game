@@ -477,6 +477,7 @@ namespace Stealth.Level
             foreach (var s in l.Stairs) BuildStair(root, art, s);
             foreach (var d in l.AutoDoors) BuildAutoDoor(root, art, d);
             BuildFacade(root, art, l);
+            if (Application.isPlaying) CombineStatic(root);
 
             foreach (var p in l.Props)
             {
@@ -572,6 +573,15 @@ namespace Stealth.Level
             // Between the flights: a thin wall so nobody walks off flight B onto flight A.
             // Starts two steps away from the landing: a divider right at the landing would leave no room to turn.
             Box("Divider", LandingEnd + 2 * StepRun, FlightStart, aV1, bV0, 0f, FloorHeight - 0.4f, rail);
+        }
+
+        /// <summary>Static batching of everything that never moves (walls, slabs, stairs, furniture). Doors stay dynamic.</summary>
+        static void CombineStatic(GameObject root)
+        {
+            var list = new List<GameObject>();
+            foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
+                if (r.GetComponentInParent<AutoDoor>() == null) list.Add(r.gameObject);
+            StaticBatchingUtility.Combine(list.ToArray(), root);
         }
 
         /// <summary>Windows on every floor (visual only) and street lamps in the gas around the building.</summary>

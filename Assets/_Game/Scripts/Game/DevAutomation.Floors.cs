@@ -99,6 +99,36 @@ namespace Stealth.Game
             Log($"floor rules: wheeled robots that left their floor={wheeledLeft}, walkers that changed floor={walkersMoved}");
         }
 
+        /// <summary>Average FPS (uncapped) at a few viewpoints on a big building.</summary>
+        IEnumerator PerfScenario()
+        {
+            Application.targetFrameRate = -1;
+            QualitySettings.vSyncCount = 0;
+            var l = LevelGenerator.Current;
+            int renderers = LevelGenerator.CurrentRoot.GetComponentsInChildren<Renderer>().Length;
+            var views = new[]
+            {
+                new Pose(l.HatchPosition + new Vector3(-3, 0.05f, -3), Quaternion.LookRotation(new Vector3(1, 0, 1))),
+                new Pose(new Vector3(-9f, 0.05f, l.Height * 5f), Quaternion.LookRotation(Vector3.right)),
+                new Pose(l.CellCenter(l.Floors - 1, l.Width / 2, l.Height / 2) + Vector3.up * 0.05f, Quaternion.LookRotation(Vector3.forward)),
+            };
+            float sum = 0;
+            for (int i = 0; i < views.Length; i++)
+            {
+                Me.TeleportOwner(views[i].position, views[i].rotation);
+                Me.Motor.SetPitch(0);
+                yield return new WaitForSeconds(0.5f);
+                int frames = 0;
+                float t0 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t0 < 3f) { frames++; yield return null; }
+                float fps = frames / (Time.realtimeSinceStartup - t0);
+                sum += fps;
+                Log($"perf view {i}: {fps:0} fps");
+            }
+            Log($"perf: building {l.Width}x{l.Height}x{l.Floors}, {renderers} renderers, avg {sum / views.Length:0} fps");
+            Application.targetFrameRate = 144;
+        }
+
         /// <summary>Standing players are blocked by a vent, crouching players crawl through.</summary>
         IEnumerator VentScenario()
         {

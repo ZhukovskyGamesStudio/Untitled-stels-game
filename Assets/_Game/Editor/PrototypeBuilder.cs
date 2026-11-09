@@ -111,7 +111,7 @@ namespace Stealth.EditorTools
                 if (importer.materialImportMode != ModelImporterMaterialImportMode.None) { importer.materialImportMode = ModelImporterMaterialImportMode.None; dirty = true; }
                 if (importer.importAnimation) { importer.importAnimation = false; dirty = true; }
                 if (importer.animationType != ModelImporterAnimationType.None) { importer.animationType = ModelImporterAnimationType.None; dirty = true; }
-                if (importer.isReadable) { importer.isReadable = false; dirty = true; }
+                if (!importer.isReadable) { importer.isReadable = true; dirty = true; } // runtime static batching of props
                 if (dirty) importer.SaveAndReimport();
             }
         }

@@ -31,6 +31,8 @@ namespace Stealth.Game
         public static int ForcedSeed;
         /// <summary>Test hook: robots and sensors ignore players (UI screenshots).</summary>
         public static bool Peaceful;
+        /// <summary>Test hook: start the run at this level index.</summary>
+        public static int ForcedLevel;
 
         [Header("Content")]
         public LevelArt Art;
@@ -68,7 +70,7 @@ namespace Stealth.Game
         {
             Instance = this;
             Level.OnValueChanged += (_, _) => BuildLocal();
-            if (IsServer) StartLevel(0);
+            if (IsServer) { StartLevel(ForcedLevel); ForcedLevel = 0; }
             else if (Level.Value.Seed != 0) BuildLocal();
         }
 

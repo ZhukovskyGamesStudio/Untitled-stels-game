@@ -48,6 +48,7 @@ namespace Stealth.Game
         {
             if (int.TryParse(Arg("-seed"), out var seed)) GameManager.ForcedSeed = seed;
             GameManager.Peaceful = Arg("-peaceful") != null;
+            if (int.TryParse(Arg("-level"), out var level)) GameManager.ForcedLevel = level;
             yield return new WaitForSeconds(0.5f);
             if (Arg("-host-local") != null) GameNetwork.Instance.StartHostLocal();
             var join = Arg("-join-local");
