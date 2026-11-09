@@ -20,12 +20,12 @@ namespace Stealth.Enemies
 
         protected override Color IdleColor => new(1f, 0.3f, 0.3f);
 
-        protected override void OnSpawned()
+        protected override void OnDeviceSpawned()
         {
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             var c = layout != null ? layout.RoomCenterAt(transform.position) : transform.position;
             m_FloorY = c.y;
-            float half = LevelGenerator.Cell / 2f - 0.8f;
+            float half = LevelMetrics.Cell / 2f - 0.8f;
             m_Min = new Vector3(c.x - half, 0, c.z - half);
             m_Max = new Vector3(c.x + half, 0, c.z + half);
             if (!IsServer) return;
@@ -33,7 +33,7 @@ namespace Stealth.Enemies
             transform.SetPositionAndRotation(new Vector3(c.x, CeilingY, c.z), Quaternion.Euler(180f, 0f, 0f));
         }
 
-        float CeilingY => m_FloorY + LevelGenerator.WallHeight - 0.05f;
+        float CeilingY => m_FloorY + LevelMetrics.WallHeight - 0.05f;
 
         Vector3 ScanDir => ScanLine.Direction(Unity.Netcode.NetworkManager.Singleton.ServerTime.TimeAsFloat, ScanSpeed, NetworkObjectId * 37f);
 
@@ -61,9 +61,9 @@ namespace Stealth.Enemies
             var center = new Vector3(p.x, m_FloorY, p.z);
             foreach (var pl in PlayerController.All)
             {
-                if (pl.Downed.Value || LevelLayout.FloorOf(pl.transform.position.y) != LevelLayout.FloorOf(m_FloorY + 0.1f)) continue;
-                if (ScanLine.Above(pl.transform.position.y, m_FloorY + 0.1f)) continue; // in the air
-                if (ScanLine.Crosses(center, ScanDir, HalfLength, true, pl.transform.position)) { Trip(pl); return; }
+                if (pl.IsDown || LevelLayout.FloorOf(pl.Position.y) != LevelLayout.FloorOf(m_FloorY + 0.1f)) continue;
+                if (ScanLine.Above(pl.Position.y, m_FloorY + 0.1f)) continue; // in the air
+                if (ScanLine.Crosses(center, ScanDir, HalfLength, true, pl.Position)) { Trip(pl); return; }
             }
             Decay(0.6f);
         }

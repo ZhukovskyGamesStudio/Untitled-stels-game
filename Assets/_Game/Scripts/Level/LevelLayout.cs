@@ -23,9 +23,12 @@ namespace Stealth.Level
         public Quaternion Rotation;
     }
 
+    /// <summary>Laser gate patterns: one low beam, three blinking beams, one moving beam (from the third house on).</summary>
+    public enum LaserPattern : byte { Low, Blinking, Moving }
+
     public struct LaserSpot
     {
-        public int Kind; // 0 = static low beam (crouch under), 1 = blinking gate
+        public LaserPattern Kind;
         public Vector3 Position;
         public Quaternion Rotation;
         public float Width;
@@ -65,20 +68,20 @@ namespace Stealth.Level
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
 
-        public static float FloorY(int floor) => floor * LevelGenerator.FloorHeight;
+        public static float FloorY(int floor) => floor * LevelMetrics.FloorHeight;
 
-        public static int FloorOf(float y) => Mathf.Max(0, Mathf.FloorToInt((y + 0.75f) / LevelGenerator.FloorHeight));
+        public static int FloorOf(float y) => Mathf.Max(0, Mathf.FloorToInt((y + 0.75f) / LevelMetrics.FloorHeight));
 
         public Vector3 CellCenter(int x, int y) =>
-            new Vector3((x + 0.5f) * LevelGenerator.Cell, 0f, (y + 0.5f) * LevelGenerator.Cell);
+            new Vector3((x + 0.5f) * LevelMetrics.Cell, 0f, (y + 0.5f) * LevelMetrics.Cell);
 
         public Vector3 CellCenter(int floor, int x, int y) => CellCenter(x, y) + Vector3.up * FloorY(floor);
 
         /// <summary>Center of the room containing <paramref name="p"/> (at the height of p's floor).</summary>
         public Vector3 RoomCenterAt(Vector3 p)
         {
-            int x = Mathf.Clamp(Mathf.FloorToInt(p.x / LevelGenerator.Cell), 0, Width - 1);
-            int y = Mathf.Clamp(Mathf.FloorToInt(p.z / LevelGenerator.Cell), 0, Height - 1);
+            int x = Mathf.Clamp(Mathf.FloorToInt(p.x / LevelMetrics.Cell), 0, Width - 1);
+            int y = Mathf.Clamp(Mathf.FloorToInt(p.z / LevelMetrics.Cell), 0, Height - 1);
             int f = Mathf.Clamp(FloorOf(p.y), 0, Floors - 1);
             return CellCenter(f, x, y);
         }
@@ -86,7 +89,7 @@ namespace Stealth.Level
         public bool IsDarkAt(Vector3 p)
         {
             if (Dark == null) return false;
-            int x = Mathf.FloorToInt(p.x / LevelGenerator.Cell), y = Mathf.FloorToInt(p.z / LevelGenerator.Cell);
+            int x = Mathf.FloorToInt(p.x / LevelMetrics.Cell), y = Mathf.FloorToInt(p.z / LevelMetrics.Cell);
             int f = FloorOf(p.y);
             if (x < 0 || y < 0 || x >= Width || y >= Height || f >= Floors) return false;
             return Dark[f, x, y];
@@ -94,9 +97,9 @@ namespace Stealth.Level
 
         /// <summary>Inside the building footprint (gas is everywhere else).</summary>
         public bool IsInside(Vector3 p) =>
-            p.x > 0f && p.z > 0f && p.x < Width * LevelGenerator.Cell && p.z < Height * LevelGenerator.Cell;
+            p.x > 0f && p.z > 0f && p.x < Width * LevelMetrics.Cell && p.z < Height * LevelMetrics.Cell;
 
-        /// <summary>Quadrant index (0..3) of a stair corner, matching <see cref="LevelGenerator.Quadrants"/>.</summary>
+        /// <summary>Quadrant index (0..3) of a stair corner, matching <see cref="LevelMetrics.Quadrants"/>.</summary>
         public static int QuadrantOf(Vector2Int corner) => corner.x > 0 ? (corner.y > 0 ? 0 : 2) : (corner.y > 0 ? 1 : 3);
 
         /// <summary>Quadrant of the cell occupied by stairs (going up or arriving from below), or -1.</summary>

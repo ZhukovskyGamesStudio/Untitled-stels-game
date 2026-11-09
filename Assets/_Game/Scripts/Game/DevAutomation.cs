@@ -46,21 +46,28 @@ namespace Stealth.Game
 
         IEnumerator Start()
         {
-            if (int.TryParse(Arg("-seed"), out var seed)) GameManager.ForcedSeed = seed;
-            GameManager.Peaceful = Arg("-peaceful") != null;
-            if (int.TryParse(Arg("-level"), out var level)) GameManager.ForcedLevel = level;
+            if (int.TryParse(Arg("-seed"), out var seed)) DevFlags.ForcedSeed = seed;
+            DevFlags.Peaceful = Arg("-peaceful") != null;
+            if (int.TryParse(Arg("-level"), out var level)) DevFlags.ForcedLevel = level;
+            m_Name = Arg("-autotest");
+            if (m_Name != null)
+            {
+                m_ShotDir = Arg("-shotdir") ?? Path.Combine(Application.persistentDataPath, "shots");
+                Directory.CreateDirectory(m_ShotDir);
+            }
             yield return new WaitForSeconds(0.5f);
+            if (m_Name == "menu")
+            {
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("main_menu");
+            }
             if (Arg("-host-local") != null) GameNetwork.Instance.StartHostLocal();
             var join = Arg("-join-local");
             if (join != null) GameNetwork.Instance.StartClientLocal(string.IsNullOrEmpty(join) ? "127.0.0.1" : join);
-
-            m_Name = Arg("-autotest");
             if (m_Name == null) yield break;
-            m_ShotDir = Arg("-shotdir") ?? Path.Combine(Application.persistentDataPath, "shots");
-            Directory.CreateDirectory(m_ShotDir);
 
             float timeout = Time.time + 30f;
-            while ((PlayerController.Local == null || LevelGenerator.Current == null || GameManager.Instance == null) && Time.time < timeout)
+            while ((PlayerController.Local == null || ActiveLevel.Layout == null || GameManager.Instance == null) && Time.time < timeout)
                 yield return null;
             if (PlayerController.Local == null) { Log("FAIL: no local player"); Quit(); yield break; }
             yield return new WaitForSeconds(2f);
@@ -68,7 +75,7 @@ namespace Stealth.Game
             if (m_Scenarios.TryGetValue(m_Name, out var scenario)) yield return scenario();
             else Log($"FAIL: unknown scenario '{m_Name}'");
 
-            PlayerController.Autopilot = null;
+            DevFlags.Autopilot = null;
             Log("DONE");
             yield return new WaitForSeconds(Arg("-autotest-linger") != null ? 20f : 1f);
             Quit();
@@ -87,19 +94,19 @@ namespace Stealth.Game
         static PlayerController Me => PlayerController.Local;
 
         static void Drive(Vector2 move, bool sprint = false, bool crouch = false, Vector2 look = default) =>
-            PlayerController.Autopilot = new PlayerInputState { Move = move, Sprint = sprint, CrouchHeld = crouch, Look = look };
+            DevFlags.Autopilot = new PlayerInputState { Move = move, Sprint = sprint, CrouchHeld = crouch, Look = look };
 
-        static void Release() => PlayerController.Autopilot = new PlayerInputState();
+        static void Release() => DevFlags.Autopilot = new PlayerInputState();
 
         static Vector3 Flat(Vector3 v) => new(v.x, 0, v.z);
 
         /// <summary>A standing spot near <paramref name="target"/> on the open side (towards the room centre), facing it.</summary>
         static Pose ViewPoint(Vector3 target, float distance)
         {
-            var center = LevelGenerator.Current.RoomCenterAt(target);
+            var center = ActiveLevel.Layout.RoomCenterAt(target);
             var dir = Flat(center - target);
             if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
-            var floorY = Mathf.Floor((target.y + 0.5f) / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight;
+            var floorY = Mathf.Floor((target.y + 0.5f) / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight;
             var stand = target + dir.normalized * Mathf.Min(distance, dir.magnitude + 1f);
             stand.y = floorY + 0.05f;
             return new Pose(stand, Quaternion.LookRotation(Flat(target - stand)));
@@ -118,7 +125,7 @@ namespace Stealth.Game
 
         IEnumerator MoveScenario()
         {
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             var start = layout.HatchPosition + new Vector3(-3.5f, 0.05f, 1.6f);
             Me.TeleportOwner(start, Quaternion.LookRotation(Vector3.right));
             Release();
@@ -173,14 +180,14 @@ namespace Stealth.Game
         IEnumerator FullScenario()
         {
             var gm = GameManager.Instance;
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             Log($"connected: players={PlayerController.All.Count} level={gm.Level.Value.Index} seed={gm.Level.Value.Seed} rooms={layout.Width}x{layout.Height}x{layout.Floors} " +
-                $"items={WorldItem.All.Count} robots={RobotController.All.Count} cameras={FindObjectsByType<SecurityCamera>().Length} " +
+                $"items={WorldItem.All.Count} robots={RobotController.Robots.Count} cameras={FindObjectsByType<SecurityCamera>().Length} " +
                 $"lasers={FindObjectsByType<LaserGate>().Length} quota={gm.Quota.Value}");
             var kinds = new System.Collections.Generic.Dictionary<string, int>();
-            foreach (var d in Enemies.DetectorAwareness.All)
+            foreach (var d in Detector.All)
             {
-                string k = d.IsCamera ? "Camera" : d.Kind.ToString();
+                string k = d.Kind.ToString();
                 kinds[k] = kinds.TryGetValue(k, out var n) ? n + 1 : 1;
             }
             Log("security on this level: " + string.Join(", ", kinds.Select(kv => $"{kv.Key}x{kv.Value}")));
@@ -194,7 +201,7 @@ namespace Stealth.Game
             {
                 var itemPos = item.transform.position;
                 var stand = itemPos + Flat(Me.transform.position - itemPos).normalized * 1.6f;
-                stand.y = itemPos.y < 0.5f ? itemPos.y + 0.05f : Mathf.Floor(itemPos.y / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight + 0.05f;
+                stand.y = itemPos.y < 0.5f ? itemPos.y + 0.05f : Mathf.Floor(itemPos.y / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight + 0.05f;
                 Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(itemPos - stand)));
                 yield return new WaitForSeconds(1f);
                 yield return Shot("item");
@@ -212,7 +219,7 @@ namespace Stealth.Game
             }
             else Log("no items found");
 
-            var guard = RobotController.All.FirstOrDefault(r => r.HasEyes) ?? RobotController.All.FirstOrDefault();
+            var guard = RobotController.Robots.FirstOrDefault(r => r.Senses.HasEyes) ?? RobotController.Robots.FirstOrDefault();
             if (guard != null)
             {
                 int hpBefore = Me.Hp.Value;
@@ -233,7 +240,7 @@ namespace Stealth.Game
             if (cam != null && !Me.Downed.Value)
             {
                 var c = cam.transform.position;
-                var spot = new Vector3(c.x, Mathf.Floor(c.y / LevelGenerator.FloorHeight) * LevelGenerator.FloorHeight + 0.05f, c.z) + cam.transform.forward * 5f;
+                var spot = new Vector3(c.x, Mathf.Floor(c.y / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight + 0.05f, c.z) + cam.transform.forward * 5f;
                 Me.TeleportOwner(spot, Quaternion.LookRotation(Flat(c - spot)));
                 float until = Time.time + 5f;
                 while (Time.time < until && cam.Alert.Value != 2) yield return null;
@@ -253,13 +260,13 @@ namespace Stealth.Game
                 while (Time.time < until && !laser.BeamsOn) yield return null;
                 Me.TeleportOwner(lp + Vector3.up * 0.05f, Quaternion.LookRotation(laser.transform.forward));
                 yield return new WaitForSeconds(0.6f);
-                Log($"laser kind={laser.Kind.Value}: hp {hpBefore} -> {Me.Hp.Value}, downed={Me.Downed.Value}");
+                Log($"laser pattern={laser.Pattern.Value}: hp {hpBefore} -> {Me.Hp.Value}, downed={Me.Downed.Value}");
             }
 
             var outside = new Vector3(-6f, 0.05f, layout.HatchPosition.z);
             Me.TeleportOwner(outside, Quaternion.LookRotation(Vector3.right));
             yield return new WaitForSeconds(10f);
-            Log($"gas: time={Me.GasTime:0.0} laughing={Me.Laughing}");
+            Log($"gas: time={Me.Gas.Time:0.0} laughing={Me.Gas.Laughing}");
             yield return Shot("gas");
         }
 
@@ -267,7 +274,7 @@ namespace Stealth.Game
         IEnumerator CoopScenario()
         {
             yield return CoopTeamShots();
-            var hatch = LevelGenerator.Current.HatchPosition;
+            var hatch = ActiveLevel.Layout.HatchPosition;
             float t0 = Time.time;
             while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
             if (Me.IsHost)

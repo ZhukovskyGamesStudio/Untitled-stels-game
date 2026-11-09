@@ -1,0 +1,599 @@
+using System.Collections.Generic;
+using System.Linq;
+using Stealth.Items;
+using Stealth.UI;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace Stealth.EditorTools
+{
+    /// <summary>
+    /// Interface prefabs: small element prefabs (UI/Elements) and three screens composed of them
+    /// (UI/HUD, UI/Inventory, UI/Menu). Screens are uGUI canvases laid out for 1280x720 and scaled with the
+    /// window height. The scene holds linked instances of the screens.
+    /// </summary>
+    public static partial class AssetBuilder
+    {
+        const string UiPrefabsDir = PrefabsDir + "/UI";
+        const string ElementsDir = UiPrefabsDir + "/Elements";
+
+        struct UiPrefabs
+        {
+            public GameObject[] Screens;
+        }
+
+        struct UiElements
+        {
+            public GameObject Button, Slider, Toggle, InputField;
+            public ArcView Arc;
+            public Text WorldIcon, TeamRow;
+            public TeamMarkerView TeamMarker;
+            public InventoryBlockView InventoryBlock;
+            public Image CellHighlight;
+        }
+
+        static Font s_Font;
+        static Font UiFont => s_Font != null ? s_Font : s_Font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        static readonly Vector2 TopLeft = new(0, 1), TopCenter = new(0.5f, 1), TopRight = new(1, 1), Center = new(0.5f, 0.5f),
+            BottomLeft = new(0, 0), BottomCenter = new(0.5f, 0), Left = new(0, 0.5f);
+
+        static readonly Color PanelColor = new(0, 0, 0, 0.45f);
+
+        static UiPrefabs BuildUi()
+        {
+            var e = BuildUiElements();
+            return new UiPrefabs
+            {
+                Screens = new[]
+                {
+                    Prefab(UiPrefabsDir + "/HUD.prefab", () => BuildHud(e)),
+                    Prefab(UiPrefabsDir + "/Inventory.prefab", () => BuildInventoryScreen(e)),
+                    Prefab(UiPrefabsDir + "/Menu.prefab", () => BuildMenu(e)),
+                },
+            };
+        }
+
+        // ------------------------------------------------------------------ building blocks
+
+        static RectTransform R(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size)
+        {
+            var rt = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = pivot;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            return rt;
+        }
+
+        static RectTransform Stretch(Transform parent, string name, float inset = 0f)
+        {
+            var rt = (RectTransform)new GameObject(name, typeof(RectTransform)).transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(inset, inset);
+            rt.offsetMax = new Vector2(-inset, -inset);
+            return rt;
+        }
+
+        static Image Img(RectTransform rt, Color color, Sprite sprite = null)
+        {
+            var i = rt.gameObject.AddComponent<Image>();
+            i.color = color;
+            i.sprite = sprite;
+            i.raycastTarget = false;
+            return i;
+        }
+
+        static Text Txt(RectTransform rt, string text, int size, TextAnchor anchor, Color color, bool bold = false, bool shadow = true)
+        {
+            var t = rt.gameObject.AddComponent<Text>();
+            t.font = UiFont;
+            t.text = text;
+            t.fontSize = size;
+            t.alignment = anchor;
+            t.color = color;
+            t.fontStyle = bold ? FontStyle.Bold : FontStyle.Normal;
+            t.supportRichText = true;
+            t.raycastTarget = false;
+            if (shadow)
+            {
+                var s = rt.gameObject.AddComponent<Shadow>();
+                s.effectColor = new Color(0, 0, 0, 0.8f);
+                s.effectDistance = new Vector2(1, -1);
+            }
+            return t;
+        }
+
+        static GameObject CanvasRoot(string name, int order, bool raycasts)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = order;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 1f; // laid out for 720p, scaled with the window height
+            if (raycasts) go.AddComponent<GraphicRaycaster>();
+            return go;
+        }
+
+        static void Fixed(Component c, float height, float width = -1f)
+        {
+            var le = c.gameObject.GetComponent<LayoutElement>() ?? c.gameObject.AddComponent<LayoutElement>();
+            le.minHeight = le.preferredHeight = height;
+            if (width > 0f) le.minWidth = le.preferredWidth = width;
+        }
+
+        static RectTransform Column(Transform parent, string name, Vector2 pos, float width, float spacing = 6f)
+        {
+            var rt = R(parent, name, TopCenter, TopCenter, pos, new Vector2(width, 0));
+            var v = rt.gameObject.AddComponent<VerticalLayoutGroup>();
+            v.spacing = spacing;
+            v.childControlWidth = v.childControlHeight = true;
+            v.childForceExpandWidth = true;
+            v.childForceExpandHeight = false;
+            rt.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return rt;
+        }
+
+        static Text ColumnText(Transform column, string name, string text, int size, Color color, float height, bool bold = false, TextAnchor anchor = TextAnchor.MiddleLeft)
+        {
+            var t = Txt(R(column, name, Center, Center, Vector2.zero, Vector2.zero), text, size, anchor, color, bold);
+            Fixed(t, height);
+            return t;
+        }
+
+        static void Spacer(Transform column, float height) => Fixed(R(column, "Space", Center, Center, Vector2.zero, Vector2.zero), height);
+
+        static T Instance<T>(GameObject prefab, Transform parent, string name) where T : Component => Nested(prefab, parent, name).GetComponent<T>();
+
+        static Button ButtonIn(UiElements e, Transform parent, string name, string label, float height)
+        {
+            var b = Instance<Button>(e.Button, parent, name);
+            b.GetComponentInChildren<Text>().text = label;
+            Fixed(b, height);
+            return b;
+        }
+
+        // ------------------------------------------------------------------ elements
+
+        static UiElements BuildUiElements()
+        {
+            var res = new DefaultControls.Resources
+            {
+                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"),
+                background = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd"),
+                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/InputFieldBackground.psd"),
+                knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd"),
+                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Checkmark.psd"),
+                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/DropdownArrow.psd"),
+                mask = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UIMask.psd"),
+            };
+            GameObject Styled(GameObject go)
+            {
+                foreach (var t in go.GetComponentsInChildren<Text>(true)) t.font = UiFont;
+                return go;
+            }
+
+            var e = new UiElements();
+            e.Button = Prefab(ElementsDir + "/Button.prefab", () =>
+            {
+                var go = Styled(DefaultControls.CreateButton(res));
+                go.name = "Button";
+                ((RectTransform)go.transform).sizeDelta = new Vector2(320, 36);
+                go.GetComponent<Image>().color = Color.white;
+                var b = go.GetComponent<Button>();
+                var colors = b.colors;
+                colors.normalColor = new Color(0.2f, 0.22f, 0.26f, 0.95f);
+                colors.highlightedColor = new Color(0.32f, 0.35f, 0.41f, 1f);
+                colors.pressedColor = new Color(0.14f, 0.15f, 0.18f, 1f);
+                colors.selectedColor = colors.normalColor;
+                colors.disabledColor = new Color(0.2f, 0.22f, 0.26f, 0.4f);
+                b.colors = colors;
+                var label = go.GetComponentInChildren<Text>();
+                label.color = Color.white;
+                label.fontSize = 15;
+                return go;
+            });
+            e.Slider = Prefab(ElementsDir + "/Slider.prefab", () =>
+            {
+                var go = Styled(DefaultControls.CreateSlider(res));
+                go.name = "Slider";
+                return go;
+            });
+            e.Toggle = Prefab(ElementsDir + "/Toggle.prefab", () =>
+            {
+                var go = Styled(DefaultControls.CreateToggle(res));
+                go.name = "Toggle";
+                var label = go.GetComponentInChildren<Text>();
+                label.color = Color.white;
+                label.fontSize = 14;
+                return go;
+            });
+            e.InputField = Prefab(ElementsDir + "/InputField.prefab", () =>
+            {
+                var go = Styled(DefaultControls.CreateInputField(res));
+                go.name = "InputField";
+                foreach (var t in go.GetComponentsInChildren<Text>(true)) t.fontSize = 15;
+                return go;
+            });
+
+            e.Arc = Prefab(ElementsDir + "/Arc.prefab", () =>
+            {
+                var root = R(null, "Arc", Center, Center, Vector2.zero, Vector2.zero);
+                var arc = R(root, "Shape", Center, Center, new Vector2(0, 92), new Vector2(126, 36));
+                var view = root.gameObject.AddComponent<ArcView>();
+                view.Rotator = root;
+                view.Arc = arc;
+                view.Image = Img(arc, Color.white, S("Arc"));
+                return root.gameObject;
+            }).GetComponent<ArcView>();
+
+            e.WorldIcon = Prefab(ElementsDir + "/WorldIcon.prefab", () =>
+                Txt(R(null, "WorldIcon", BottomLeft, BottomCenter, Vector2.zero, new Vector2(40, 32)), "?", 22, TextAnchor.LowerCenter, Color.yellow, true).gameObject)
+                .GetComponent<Text>();
+
+            e.TeamRow = Prefab(ElementsDir + "/TeamRow.prefab", () =>
+            {
+                var t = Txt(R(null, "TeamRow", TopRight, TopRight, Vector2.zero, new Vector2(244, 18)), "Игрок  ■■", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.8f));
+                Fixed(t, 18);
+                return t.gameObject;
+            }).GetComponent<Text>();
+
+            e.TeamMarker = Prefab(ElementsDir + "/TeamMarker.prefab", () =>
+            {
+                var root = R(null, "TeamMarker", BottomLeft, Center, Vector2.zero, Vector2.zero);
+                var view = root.gameObject.AddComponent<TeamMarkerView>();
+                view.Rect = root;
+                var cross = R(root, "Cross", Center, Center, Vector2.zero, new Vector2(20, 20));
+                view.Cross = cross.gameObject;
+                view.CrossBars = new[]
+                {
+                    Img(R(cross, "Vertical", Center, Center, Vector2.zero, new Vector2(6, 20)), Color.red),
+                    Img(R(cross, "Horizontal", Center, Center, Vector2.zero, new Vector2(20, 6)), Color.red),
+                };
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -21), new Vector2(160, 18)), "Игрок", 12, TextAnchor.MiddleCenter, Color.white);
+                return root.gameObject;
+            }).GetComponent<TeamMarkerView>();
+
+            e.InventoryBlock = Prefab(ElementsDir + "/InventoryBlock.prefab", () =>
+            {
+                var root = R(null, "InventoryBlock", TopLeft, TopLeft, Vector2.zero, new Vector2(28, 28));
+                var view = root.gameObject.AddComponent<InventoryBlockView>();
+                view.Rect = root;
+                view.Border = Img(root, Color.gray);
+                view.Core = Img(Stretch(root, "Core", 3f), Color.white);
+                return root.gameObject;
+            }).GetComponent<InventoryBlockView>();
+
+            e.CellHighlight = Prefab(ElementsDir + "/CellHighlight.prefab", () =>
+                Img(R(null, "CellHighlight", TopLeft, TopLeft, Vector2.zero, new Vector2(InventoryUI.Cell - 2, InventoryUI.Cell - 2)), new Color(0.3f, 1f, 0.4f, 0.35f)).gameObject)
+                .GetComponent<Image>();
+            return e;
+        }
+
+        // ------------------------------------------------------------------ HUD
+
+        static GameObject BuildHud(UiElements e)
+        {
+            var root = CanvasRoot("HUD", 0, false);
+            var hud = root.AddComponent<GameHUD>();
+            hud.Canvas = (RectTransform)root.transform;
+            var content = Stretch(root.transform, "Content");
+            hud.Content = content.gameObject;
+            var white = new Color(1, 1, 1, 0.8f);
+
+            // Overlays (full screen, hidden until needed).
+            var overlays = Stretch(content, "Overlays");
+            hud.LowHpVignette = Img(Stretch(overlays, "LowHpVignette"), new Color(0.8f, 0, 0, 0.35f), S("Vignette"));
+            hud.HitFlash = Img(Stretch(overlays, "HitFlash"), new Color(1, 0, 0, 0.2f));
+            hud.GasVignette = Img(Stretch(overlays, "GasVignette"), new Color(0.4f, 0.95f, 0.3f, 0.5f), S("Vignette"));
+            hud.GasTint = Img(Stretch(overlays, "GasTint"), new Color(0.5f, 0.9f, 0.3f, 0.1f));
+            hud.LaughText = Txt(R(overlays, "Laugh", TopCenter, TopCenter, new Vector2(0, -216), new Vector2(400, 50)), "ХА-ХА-ХА-ХА", 30, TextAnchor.MiddleCenter, new Color(0.8f, 1f, 0.6f, 0.9f), true);
+            hud.GasText = Txt(R(overlays, "GasTimer", TopCenter, TopCenter, new Vector2(0, -260), new Vector2(400, 24)), "Весёлый газ", 15, TextAnchor.MiddleCenter, Color.white);
+            hud.DownedTint = Img(Stretch(overlays, "DownedTint"), new Color(0.25f, 0f, 0f, 0.55f));
+            hud.DownedText = Txt(R(overlays, "Downed", TopCenter, TopCenter, new Vector2(0, -252), new Vector2(900, 60)),
+                "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
+            var alarm = Stretch(overlays, "Alarm");
+            hud.AlarmFrame = alarm.gameObject;
+            var red = new Color(1f, 0.15f, 0.1f, 0.5f);
+            hud.AlarmEdges = new[]
+            {
+                Img(R(alarm, "Top", TopCenter, TopCenter, Vector2.zero, new Vector2(4000, 4)), red),
+                Img(R(alarm, "Bottom", BottomCenter, BottomCenter, Vector2.zero, new Vector2(4000, 4)), red),
+                Img(R(alarm, "Left", Left, Left, Vector2.zero, new Vector2(4, 4000)), red),
+                Img(R(alarm, "Right", new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(4, 4000)), red),
+            };
+            var tag = R(alarm, "Tag", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(140, 24));
+            Img(tag, new Color(0.5f, 0f, 0f, 0.6f));
+            hud.AlarmLabel = Txt(Stretch(tag, "Label"), "ТРЕВОГА · 6 c", 14, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.8f), true);
+
+            // Around the crosshair.
+            hud.ArcLayer = R(content, "Arcs", Center, Center, Vector2.zero, Vector2.zero);
+            hud.ArcPrefab = e.Arc;
+            hud.HitArc = Instance<ArcView>(e.Arc.gameObject, hud.ArcLayer, "HitArc");
+            var dot = R(content, "CrosshairDot", Center, Center, Vector2.zero, new Vector2(4, 4));
+            Img(dot, white);
+            hud.CrosshairDot = dot.gameObject;
+            var brackets = R(content, "CrosshairBrackets", Center, Center, Vector2.zero, new Vector2(22, 22));
+            hud.CrosshairBrackets = brackets.gameObject;
+            const float r = 11f, l = 6f, t = 2f;
+            foreach (var (sx, sy) in new[] { (-1, 1), (1, 1), (-1, -1), (1, -1) })
+            {
+                var corner = new Vector2(sx * r, sy * r);
+                var piv = new Vector2(sx < 0 ? 0 : 1, sy > 0 ? 1 : 0);
+                Img(R(brackets, "H", Center, piv, corner, new Vector2(l, t)), new Color(1, 1, 1, 0.95f));
+                Img(R(brackets, "V", Center, piv, corner, new Vector2(t, l)), new Color(1, 1, 1, 0.95f));
+            }
+            hud.Stamina = Bar(content, "Stamina", Center, TopCenter, new Vector2(0, -34), new Vector2(120, 6), new Color(0, 0, 0, 0.45f), white, 0f);
+            hud.Prompt = BuildPrompt(content);
+
+            // World markers.
+            hud.IconLayer = Stretch(content, "RobotIcons");
+            hud.IconPrefab = e.WorldIcon;
+            hud.MarkerLayer = Stretch(content, "TeamMarkers");
+            hud.TeamMarkerPrefab = e.TeamMarker;
+            hud.HatchMarker = R(content, "HatchMarker", BottomLeft, Center, new Vector2(640, 360), Vector2.zero);
+            var diamond = R(hud.HatchMarker, "Diamond", Center, Center, Vector2.zero, new Vector2(14, 14));
+            diamond.localEulerAngles = new Vector3(0, 0, 45);
+            hud.HatchDiamond = Img(diamond, new Color(0.45f, 1f, 0.5f, 0.8f));
+            hud.HatchLabel = Txt(R(hud.HatchMarker, "Label", Center, Center, new Vector2(0, -19), new Vector2(120, 18)), "люк · 12 м", 12, TextAnchor.MiddleCenter, new Color(0.45f, 1f, 0.5f));
+
+            // Noise meter above the inventory.
+            var noise = R(content, "Noise", BottomCenter, BottomLeft, new Vector2(-30, 134), new Vector2(160, 18));
+            hud.NoiseGroup = noise.gameObject.AddComponent<CanvasGroup>();
+            hud.NoiseGroup.blocksRaycasts = false;
+            hud.NoiseBars = Enumerable.Range(0, 3)
+                .Select(i => Img(R(noise, $"Bar{i}", BottomLeft, BottomLeft, new Vector2(i * 9f, 0), new Vector2(6, 6 + i * 5)), Color.white)).ToArray();
+            hud.NoiseLabel = Txt(R(noise, "Label", BottomLeft, BottomLeft, new Vector2(32, -2), new Vector2(120, 18)), "слышно", 12, TextAnchor.MiddleLeft, Color.white);
+
+            // Quota panel, top left.
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(232, 50));
+            Img(quota, PanelColor);
+            hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(150, 22)), "Дом 1 · этаж 1", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
+            hud.QuotaLabel = Txt(R(quota, "Count", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(212, 22)), "0 / 100", 14, TextAnchor.MiddleRight, Color.white, true);
+            hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(10, -28), new Vector2(212, 10), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
+            hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(240, -23), new Vector2(120, 26));
+            hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
+            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -52), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
+
+            // Health, top right, and the team list under it.
+            var hp = R(content, "Health", TopRight, TopRight, new Vector2(-16, -16), new Vector2(180, 40));
+            Img(hp, new Color(0, 0, 0, 0.55f));
+            Txt(R(hp, "Caption", TopLeft, TopLeft, new Vector2(12, 0), new Vector2(60, 40)), "ХП", 15, TextAnchor.MiddleLeft, Color.white, true);
+            hud.HpPips = Enumerable.Range(0, Stealth.Player.HealthState.MaxHp)
+                .Select(i => Img(R(hp, $"Pip{i}", TopLeft, TopLeft, new Vector2(56 + i * 54, -10), new Vector2(46, 20)), new Color(0.9f, 0.2f, 0.2f))).ToArray();
+            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -62), new Vector2(244, 0));
+            var team = hud.TeamList.gameObject.AddComponent<VerticalLayoutGroup>();
+            team.childControlHeight = true;
+            team.childControlWidth = true;
+            team.childForceExpandHeight = false;
+            team.childAlignment = TextAnchor.UpperRight;
+            hud.TeamRowPrefab = e.TeamRow;
+
+            // Banner, run over, help.
+            hud.BannerRect = R(content, "Banner", TopCenter, TopCenter, new Vector2(0, -115), new Vector2(640, 40));
+            hud.Banner = hud.BannerRect.gameObject.AddComponent<CanvasGroup>();
+            hud.Banner.blocksRaycasts = false;
+            Img(hud.BannerRect, new Color(0, 0, 0, 0.5f));
+            hud.BannerLabel = Txt(Stretch(hud.BannerRect, "Label"), "Сообщение", 16, TextAnchor.MiddleCenter, Color.white, true);
+
+            var over = R(content, "RunOver", TopCenter, TopCenter, new Vector2(0, -274), new Vector2(520, 120));
+            Img(over, new Color(0, 0, 0, 0.8f));
+            Txt(R(over, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(520, 40)), "Забег окончен", 26, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.35f), true);
+            hud.RunOverTotal = Txt(R(over, "Total", TopCenter, TopCenter, new Vector2(0, -56), new Vector2(520, 24)), "Сдано за забег: 0 очк.", 16, TextAnchor.MiddleCenter, Color.white);
+            Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R — начать новый забег", 15, TextAnchor.MiddleCenter, Color.white);
+            hud.RunOver = over.gameObject;
+
+            hud.Help = Txt(R(content, "Help", BottomLeft, BottomLeft, new Vector2(16, 12), new Vector2(620, 64)),
+                "WASD — ходить · Shift — бег · Пробел — прыжок · Ctrl/C — присесть\n" +
+                "Tab (держать) — руки: тащи предметы мышкой, R — повернуть\n" +
+                "E — поднять союзника / взломать · F у люка — следующий дом · Esc — меню · H — справка",
+                12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.7f)).gameObject;
+            return root;
+        }
+
+        /// <summary>Background + fill (pivot left, stretched by anchorMax.x).</summary>
+        static BarView Bar(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, Color background, Color fill, float inset)
+        {
+            var rt = R(parent, name, anchor, pivot, pos, size);
+            Img(rt, background);
+            var area = Stretch(rt, "Area", inset);
+            var f = Stretch(area, "Fill");
+            f.anchorMax = new Vector2(0.5f, 1f);
+            var view = rt.gameObject.AddComponent<BarView>();
+            view.Fill = f;
+            view.FillImage = Img(f, fill);
+            return view;
+        }
+
+        /// <summary>The pill under the crosshair: auto-sized by layout groups to the key and the text.</summary>
+        static PromptView BuildPrompt(Transform parent)
+        {
+            var pill = R(parent, "Prompt", Center, TopCenter, new Vector2(0, -52), new Vector2(200, 30));
+            Img(pill, new Color(0, 0, 0, 0.5f));
+            var h = pill.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.padding = new RectOffset(8, 8, 4, 4);
+            h.spacing = 8;
+            h.childAlignment = TextAnchor.MiddleCenter;
+            h.childControlWidth = h.childControlHeight = true;
+            h.childForceExpandWidth = h.childForceExpandHeight = false;
+            var fit = pill.gameObject.AddComponent<ContentSizeFitter>();
+            fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var keyBox = R(pill, "Key", Center, Center, Vector2.zero, new Vector2(26, 22));
+            Img(keyBox, new Color(1, 1, 1, 0.9f));
+            var kh = keyBox.gameObject.AddComponent<HorizontalLayoutGroup>();
+            kh.padding = new RectOffset(7, 7, 2, 2);
+            kh.childAlignment = TextAnchor.MiddleCenter;
+            kh.childControlWidth = kh.childControlHeight = true;
+            var kle = keyBox.gameObject.AddComponent<LayoutElement>();
+            kle.minWidth = 26;
+            kle.minHeight = kle.preferredHeight = 22;
+            var key = Txt(R(keyBox, "Label", Center, Center, Vector2.zero, Vector2.zero), "E", 13, TextAnchor.MiddleCenter, new Color(0.08f, 0.08f, 0.1f), true, shadow: false);
+
+            var label = Txt(R(pill, "Text", Center, Center, Vector2.zero, Vector2.zero), "Подсказка", 15, TextAnchor.MiddleLeft, Color.white);
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+
+            var progress = Bar(pill, "Progress", BottomCenter, TopCenter, new Vector2(0, -2), new Vector2(0, 6), new Color(0, 0, 0, 0.5f), Color.white, 2f);
+            var prt = (RectTransform)progress.transform;
+            prt.anchorMin = new Vector2(0, 0);
+            prt.anchorMax = new Vector2(1, 0);
+            prt.sizeDelta = new Vector2(0, 6);
+            progress.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+
+            var view = pill.gameObject.AddComponent<PromptView>();
+            view.KeyBox = keyBox.gameObject;
+            view.Key = key;
+            view.Label = label;
+            view.Progress = progress;
+            return view;
+        }
+
+        // ------------------------------------------------------------------ inventory
+
+        static GameObject BuildInventoryScreen(UiElements e)
+        {
+            var root = CanvasRoot("Inventory", 5, false);
+            var ui = root.AddComponent<InventoryUI>();
+            ui.Canvas = (RectTransform)root.transform;
+            const float c = InventoryUI.Cell;
+            float gw = InventoryLayout.Width * c, gh = InventoryLayout.Height * c;
+
+            ui.Panel = R(root.transform, "Panel", BottomCenter, BottomCenter, new Vector2(0, 13), new Vector2(gw + 10, gh + 9 + 22));
+            ui.GridBackground = Img(R(ui.Panel, "GridBackground", BottomCenter, BottomCenter, Vector2.zero, new Vector2(gw + 10, gh + 9)), new Color(0, 0, 0, 0.6f));
+            var header = R(ui.Panel, "Header", BottomCenter, BottomCenter, new Vector2(0, gh + 9), new Vector2(gw + 10, 22));
+            ui.Header = header.gameObject;
+            ui.HeaderBackground = Img(header, new Color(0, 0, 0, 0.6f));
+            ui.ValueLabel = Txt(R(header, "Value", Left, Left, new Vector2(5, 0), new Vector2(120, 20)), "0 очк.", 13, TextAnchor.MiddleLeft, Color.white);
+            ui.RotateHint = Txt(R(header, "RotateHint", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-5, 0), new Vector2(120, 20)),
+                "R — повернуть", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f)).gameObject;
+
+            ui.Grid = R(ui.Panel, "Grid", BottomCenter, TopCenter, new Vector2(0, 5 + gh), new Vector2(gw, gh));
+            ui.Grid.pivot = TopLeft;
+            ui.Grid.anchoredPosition = new Vector2(-gw / 2f, 5 + gh);
+            var cells = new List<Image>();
+            for (int y = 0; y < InventoryLayout.Height; y++)
+                for (int x = 0; x < InventoryLayout.Width; x++)
+                    if (InventoryLayout.IsCell(x, y))
+                        cells.Add(Img(R(ui.Grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), new Color(1, 1, 1, 0.09f)));
+            ui.Cells = cells.ToArray();
+            ui.ItemLayer = Stretch(ui.Grid, "Items");
+            ui.ItemLayer.pivot = TopLeft;
+            ui.HighlightLayer = Stretch(ui.Grid, "Highlights");
+            ui.HighlightLayer.pivot = TopLeft;
+
+            ui.Ghost = R(root.transform, "DragGhost", BottomLeft, TopLeft, Vector2.zero, Vector2.zero);
+            ui.BlockPrefab = e.InventoryBlock;
+            ui.HighlightPrefab = e.CellHighlight;
+            ui.Tooltip = Txt(R(root.transform, "Tooltip", BottomLeft, TopLeft, Vector2.zero, new Vector2(320, 22)), "Подсказка", 13, TextAnchor.MiddleLeft, Color.white);
+            return root;
+        }
+
+        // ------------------------------------------------------------------ menu
+
+        static GameObject BuildMenu(UiElements e)
+        {
+            var root = CanvasRoot("Menu", 100, true);
+            var menu = root.AddComponent<GameMenu>();
+            var dim = new Color(1, 1, 1, 0.6f);
+
+            // Main menu.
+            var main = Stretch(root.transform, "Main");
+            menu.MainPage = main.gameObject;
+            var bg = Img(main, new Color(0.06f, 0.07f, 0.08f, 1f));
+            bg.raycastTarget = true;
+            var col = Column(main, "Column", new Vector2(0, -100), 440);
+            ColumnText(col, "Title", "АЙТИШНИКИ: ВЫЛАЗКА", 30, Color.white, 50, true, TextAnchor.MiddleCenter);
+            ColumnText(col, "Subtitle", "прототип кор-лупа", 14, dim, 24, anchor: TextAnchor.MiddleCenter);
+            Spacer(col, 20);
+            menu.SteamStatus = ColumnText(col, "SteamStatus", "Steam: …", 14, Color.white, 22);
+            menu.HostSteam = ButtonIn(e, col, "HostSteam", "Создать игру через Steam", 44);
+            ColumnText(col, "SteamHint", "Друзья заходят через приглашение или «Присоединиться к игре» в Steam.", 13, dim, 36);
+            Spacer(col, 14);
+            menu.LocalCaption = ColumnText(col, "LocalCaption", "Локальная сеть / тест на одном ПК (UDP, порт 7777):", 14, Color.white, 22);
+            menu.HostLocal = ButtonIn(e, col, "HostLocal", "Создать локальную игру", 36);
+            var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
+            Fixed(row, 34);
+            var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            hr.spacing = 8;
+            hr.childControlWidth = hr.childControlHeight = true;
+            hr.childForceExpandWidth = false;
+            hr.childForceExpandHeight = true;
+            menu.Address = Instance<InputField>(e.InputField, row, "Address");
+            menu.Address.text = "127.0.0.1";
+            menu.Address.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+            menu.Join = ButtonIn(e, row, "Join", "Подключиться по IP", 34);
+            menu.Join.GetComponent<LayoutElement>().preferredWidth = 200;
+            Spacer(col, 14);
+            menu.NetStatus = ColumnText(col, "NetStatus", "", 14, new Color(1f, 0.85f, 0.5f), 22);
+            menu.MainSettings = ButtonIn(e, col, "Settings", "Настройки", 30);
+            menu.Quit = ButtonIn(e, col, "Quit", "Выход", 30);
+
+            // Pause menu.
+            var pause = Stretch(root.transform, "Pause");
+            menu.PausePage = pause.gameObject;
+            Img(pause, new Color(0, 0, 0, 0.6f)).raycastTarget = true;
+            var pc = Column(pause, "Column", new Vector2(0, -216), 360);
+            menu.Role = ColumnText(pc, "Role", "Ты хост", 15, Color.white, 26, anchor: TextAnchor.MiddleCenter);
+            menu.Invite = ButtonIn(e, pc, "Invite", "Пригласить друзей (Steam)", 36);
+            menu.Resume = ButtonIn(e, pc, "Resume", "Продолжить", 36);
+            menu.PauseSettings = ButtonIn(e, pc, "Settings", "Настройки", 36);
+            menu.Leave = ButtonIn(e, pc, "Leave", "Покинуть игру", 36);
+
+            // Settings.
+            var settings = Stretch(root.transform, "Settings");
+            menu.SettingsPage = settings.gameObject;
+            Img(settings, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
+            var sc = Column(settings, "Column", new Vector2(0, -84), 460);
+            ColumnText(sc, "Title", "Настройки", 26, Color.white, 44, true, TextAnchor.MiddleCenter);
+            Spacer(sc, 8);
+            menu.SensitivityLabel = ColumnText(sc, "SensitivityLabel", "Чувствительность мыши", 15, Color.white, 22);
+            menu.Sensitivity = SliderIn(e, sc, "Sensitivity", 0.02f, 0.4f, false);
+            Spacer(sc, 8);
+            menu.FovLabel = ColumnText(sc, "FovLabel", "Поле зрения", 15, Color.white, 22);
+            menu.Fov = SliderIn(e, sc, "Fov", 60f, 100f, true);
+            Spacer(sc, 10);
+            menu.InvertY = ToggleIn(e, sc, "InvertY", "Инвертировать мышь по вертикали");
+            menu.HeadBob = ToggleIn(e, sc, "HeadBob", "Покачивание камеры при ходьбе");
+            menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", "Ctrl переключает присед (иначе — удерживать)");
+            Spacer(sc, 14);
+            var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
+            Fixed(buttons, 32);
+            var bh = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
+            bh.spacing = 10;
+            bh.childControlWidth = bh.childControlHeight = true;
+            bh.childForceExpandWidth = bh.childForceExpandHeight = true;
+            menu.Defaults = ButtonIn(e, buttons, "Defaults", "По умолчанию", 32);
+            menu.Done = ButtonIn(e, buttons, "Done", "Готово", 32);
+
+            pause.gameObject.SetActive(false);
+            settings.gameObject.SetActive(false);
+            return root;
+        }
+
+        static Slider SliderIn(UiElements e, Transform parent, string name, float min, float max, bool whole)
+        {
+            var s = Instance<Slider>(e.Slider, parent, name);
+            s.minValue = min;
+            s.maxValue = max;
+            s.wholeNumbers = whole;
+            Fixed(s, 20);
+            return s;
+        }
+
+        static Toggle ToggleIn(UiElements e, Transform parent, string name, string label)
+        {
+            var t = Instance<Toggle>(e.Toggle, parent, name);
+            t.GetComponentInChildren<Text>().text = label;
+            Fixed(t, 24);
+            return t;
+        }
+    }
+}

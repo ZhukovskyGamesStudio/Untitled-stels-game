@@ -5,7 +5,7 @@ namespace Stealth.Enemies
     /// <summary>What players learn by looking at a robot: its name and how it senses (shown under the crosshair).</summary>
     public static class RobotInfo
     {
-        public static string Name(RobotKind k, bool camera = false) => camera ? "Камера" : k switch
+        public static string Name(RobotKind k) => k switch
         {
             RobotKind.Guard => "Охранник",
             RobotKind.Listener => "Слухач",
@@ -21,10 +21,11 @@ namespace Stealth.Enemies
             RobotKind.Lidar => "Лидар",
             RobotKind.MotionSensor => "Датчик движения",
             RobotKind.PressurePlate => "Нажимная плита",
+            RobotKind.Camera => "Камера",
             _ => "Робот",
         };
 
-        public static string Senses(RobotKind k, bool camera = false) => camera ? "обзор · поднимает тревогу" : k switch
+        public static string Senses(RobotKind k) => k switch
         {
             RobotKind.Guard => "глаза · слабый слух · ходит по лестницам",
             RobotKind.Listener => "слепой · микрофоны · колёса, свой этаж",
@@ -40,6 +41,7 @@ namespace Stealth.Enemies
             RobotKind.Lidar => "луч у пола · перепрыгни",
             RobotKind.MotionSensor => "замечает быстрое движение · крадись",
             RobotKind.PressurePlate => "не наступай · перепрыгни",
+            RobotKind.Camera => "обзор · поднимает тревогу",
             _ => "",
         };
     }

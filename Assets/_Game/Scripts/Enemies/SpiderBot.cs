@@ -24,18 +24,18 @@ namespace Stealth.Enemies
         Vector3 m_Min, m_Max;
         float m_FloorY, m_T, m_Dir = 1f, m_ModeStart, m_NextLeap, m_PauseUntil;
         Vector3 m_From, m_To;
-        PlayerController m_Prey;
+        IIntruder m_Prey;
 
         public float Perimeter => 2f * ((m_Max.x - m_Min.x) + (m_Max.z - m_Min.z));
 
         protected override Color IdleColor => new(0.6f, 1f, 0.3f);
 
-        protected override void OnSpawned()
+        protected override void OnDeviceSpawned()
         {
             if (!IsServer) return;
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             var c = layout != null ? layout.RoomCenterAt(transform.position) : transform.position;
-            float half = LevelGenerator.Cell / 2f - 0.35f;
+            float half = LevelMetrics.Cell / 2f - 0.35f;
             m_FloorY = c.y;
             m_Min = new Vector3(c.x - half, 0, c.z - half);
             m_Max = new Vector3(c.x + half, 0, c.z + half);
@@ -79,7 +79,7 @@ namespace Stealth.Enemies
                 {
                     float k = Mathf.Clamp01((Time.time - m_ModeStart) / LeapTime);
                     // Mild homing: a sidestep at the last moment still works, standing still does not.
-                    if (m_Prey != null) m_To = Vector3.MoveTowards(m_To, m_Prey.transform.position + Vector3.up * 0.2f, 2.2f * Time.deltaTime);
+                    if (m_Prey != null) m_To = Vector3.MoveTowards(m_To, m_Prey.Position + Vector3.up * 0.2f, 2.2f * Time.deltaTime);
                     var pos = Vector3.Lerp(m_From, m_To, k) + Vector3.up * Mathf.Sin(k * Mathf.PI) * 0.8f;
                     transform.position = pos;
                     var flat = m_To - m_From;
@@ -87,8 +87,8 @@ namespace Stealth.Enemies
                     if (flat.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(flat, Vector3.up);
                     if (k >= 1f)
                     {
-                        if (m_Prey != null && !m_Prey.Downed.Value && Vector3.Distance(m_Prey.transform.position, transform.position) < 1.5f)
-                            m_Prey.TakeHitServer(transform.position);
+                        if (m_Prey != null && !m_Prey.IsDown && Vector3.Distance(m_Prey.Position, transform.position) < 1.5f)
+                            m_Prey.HitServer(transform.position);
                         m_Mode = Mode.Return;
                         m_ModeStart = Time.time;
                         m_From = transform.position;
@@ -109,21 +109,21 @@ namespace Stealth.Enemies
 
         void Look()
         {
-            PlayerController seen = null;
+            IIntruder seen = null;
             float best = float.MaxValue;
             foreach (var p in PlayerController.All)
             {
-                if (p.Downed.Value || !Perception.SameFloor(p.transform.position, new Vector3(0, m_FloorY, 0))) continue;
-                var target = p.transform.position + Vector3.up;
+                if (p.IsDown || !Perception.SameFloor(p.Position, new Vector3(0, m_FloorY, 0))) continue;
+                var target = p.Position + Vector3.up;
                 float d = Vector3.Distance(transform.position, target);
                 if (d < best && Perception.InCone(transform.position, LookDirection, target, Range, ViewAngle) && Perception.LineOfSight(transform.position + transform.up * 0.3f, p))
                 { seen = p; best = d; }
             }
             if (seen == null) { Decay(0.5f); return; }
-            Notice(seen, 1.6f * (seen.Crouching.Value ? 0.6f : 1f) * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(seen.transform.position)));
+            Notice(seen, 1.6f * (seen.IsCrouching ? 0.6f : 1f) * Perception.LightFactor(seen.Position));
         }
 
-        protected override void OnDetected(PlayerController p)
+        protected override void OnDetected(IIntruder p)
         {
             if (Time.time < m_NextLeap) return;
             m_NextLeap = Time.time + Cooldown + LeapTime + ReturnTime;
@@ -131,7 +131,7 @@ namespace Stealth.Enemies
             m_Mode = Mode.Leap;
             m_ModeStart = Time.time;
             m_From = transform.position;
-            m_To = p.transform.position + Vector3.up * 0.2f;
+            m_To = p.Position + Vector3.up * 0.2f;
         }
     }
 }

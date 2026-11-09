@@ -18,19 +18,15 @@ namespace Stealth.Tests
             var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
             Assert.IsNotNull(art, "run Stealth/Build Prototype Assets first");
             m_Layout = LevelGenerator.Generate(seed, level);
-            m_Root = LevelGenerator.Build(m_Layout, art);
-            var surface = m_Root.AddComponent<NavMeshSurface>();
-            surface.collectObjects = CollectObjects.Children;
-            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
-            surface.layerMask = ~(1 << LevelGenerator.CeilingLayer);
-            surface.BuildNavMesh();
+            m_Root = ActiveLevel.Load(m_Layout, art);
+            m_Root.GetComponent<NavMeshSurface>().BuildNavMesh(); // configured in the LevelRoot prefab
         }
 
         [TearDown]
         public void Cleanup()
         {
             NavMesh.RemoveAllNavMeshData();
-            LevelGenerator.Clear();
+            ActiveLevel.Clear();
         }
 
         static bool Reach(Vector3 from, Vector3 to, int areaMask)
@@ -58,7 +54,7 @@ namespace Stealth.Tests
         public void WithoutStairsAreaRobotsStayOnTheirFloor([Values(7, 99991)] int seed)
         {
             Build(seed, 2);
-            int noStairs = NavMesh.AllAreas & ~(1 << LevelGenerator.StairsArea);
+            int noStairs = NavMesh.AllAreas & ~(1 << LevelMetrics.StairsArea);
             var upstairs = m_Layout.CellCenter(1, m_Layout.Width / 2, m_Layout.Height / 2);
             Assert.IsTrue(Reach(m_Layout.HatchPosition, upstairs, NavMesh.AllAreas));
             Assert.IsFalse(Reach(m_Layout.HatchPosition, upstairs, noStairs), "wheels cannot climb stairs");
@@ -75,7 +71,7 @@ namespace Stealth.Tests
                     {
                         if (m_Layout.EdgesX[f, x, y] != EdgeType.Vent) continue;
                         // Points right on both sides of the vent opening (middle of the edge, see EdgeWall).
-                        float vz = y * LevelGenerator.Cell + LevelGenerator.Cell * 0.5f, wx = (x + 1) * LevelGenerator.Cell;
+                        float vz = y * LevelMetrics.Cell + LevelMetrics.Cell * 0.5f, wx = (x + 1) * LevelMetrics.Cell;
                         var a = new Vector3(wx - 0.8f, LevelLayout.FloorY(f), vz);
                         var b = new Vector3(wx + 0.8f, LevelLayout.FloorY(f), vz);
                         if (!NavMesh.SamplePosition(a, out var ha, 0.6f, NavMesh.AllAreas) || !NavMesh.SamplePosition(b, out var hb, 0.6f, NavMesh.AllAreas)) continue;

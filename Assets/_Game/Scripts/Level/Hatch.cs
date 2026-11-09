@@ -12,7 +12,7 @@ namespace Stealth.Level
 
         public static bool IsNear(Vector3 position)
         {
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             if (layout == null) return false;
             var d = position - layout.HatchPosition;
             d.y = 0;

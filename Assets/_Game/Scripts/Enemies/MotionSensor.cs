@@ -20,8 +20,8 @@ namespace Stealth.Enemies
             var eye = transform.position + transform.forward * 0.1f;
             foreach (var p in PlayerController.All)
             {
-                if (p.Downed.Value || !Triggers(p.ServerSpeed, SpeedThreshold)) continue;
-                var target = p.transform.position + Vector3.up;
+                if (p.IsDown || !Triggers(p.GroundSpeed, SpeedThreshold)) continue;
+                var target = p.Position + Vector3.up;
                 if (!Perception.InCone(eye, transform.forward, target, Range, ViewAngle) || !Perception.LineOfSight(eye, p, 0.6f)) continue;
                 Notice(p, 3f);
                 return;

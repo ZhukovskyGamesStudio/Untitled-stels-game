@@ -84,13 +84,13 @@ namespace Stealth.Tests
                     for (int f = s.Floor; f <= s.Floor + 1; f++)
                     {
                         var c = l.CellCenter(f, s.Cell.x, s.Cell.y);
-                        var corner = c + new Vector3(s.Corner.x * LevelGenerator.Cell / 2f, 0, s.Corner.y * LevelGenerator.Cell / 2f);
+                        var corner = c + new Vector3(s.Corner.x * LevelMetrics.Cell / 2f, 0, s.Corner.y * LevelMetrics.Cell / 2f);
                         // u, v = distance from the corner walls into this room (the stair occupies [0, StairSize]²).
                         bool OnStair(Vector3 p)
                         {
                             float u = (p.x - corner.x) * -s.Corner.x, v = (p.z - corner.z) * -s.Corner.y;
                             return LevelLayout.FloorOf(p.y) == f && u > -0.05f && v > -0.05f &&
-                                   u < LevelGenerator.StairSize + 0.3f && v < LevelGenerator.StairSize + 0.3f;
+                                   u < LevelMetrics.StairSize + 0.3f && v < LevelMetrics.StairSize + 0.3f;
                         }
                         foreach (var p in l.Props) Assert.IsFalse(OnStair(p.Position), $"seed {seed}: {p.Kind} on stairs at {p.Position}");
                         foreach (var p in l.ItemSpots) Assert.IsFalse(OnStair(p), $"seed {seed}: item on stairs at {p}");

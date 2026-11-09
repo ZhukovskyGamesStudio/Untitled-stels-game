@@ -17,11 +17,11 @@ namespace Stealth.Game
             var gm = GameManager.Instance;
             if (!Me.IsServer) yield break;
             var only = Arg("-kinds");
-            GameManager.FreezeRobots = true;
+            DevFlags.FreezeRobots = true;
             gm.GracePeriod = 0f; // sensors on immediately
-            var hatch = LevelGenerator.Current.HatchPosition;
+            var hatch = ActiveLevel.Layout.HatchPosition;
             // Clear the stage: robots that wander into the lobby would photobomb the gallery.
-            foreach (var r in RobotController.All.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            foreach (var r in RobotController.Robots.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
 
             foreach (RobotKind kind in Enum.GetValues(typeof(RobotKind)))
             {
@@ -29,16 +29,20 @@ namespace Stealth.Game
                 var stage = hatch + new Vector3(0, 0, 2.6f);
                 var pos = stage;
                 var rot = Quaternion.LookRotation(Vector3.back);
-                if (kind == RobotKind.MotionSensor) { pos = hatch + new Vector3(0, 2.2f, 4.75f); stage = pos - Vector3.up * 2.2f; }
+                bool onWall = kind == RobotKind.MotionSensor || kind == RobotKind.Camera;
+                if (onWall) { pos = hatch + new Vector3(0, kind == RobotKind.Camera ? 2.6f : 2.2f, 4.75f); stage = pos; stage.y = hatch.y; }
                 var obj = gm.DebugSpawnServer(kind, pos, rot);
                 if (obj == null) { Log($"gallery: {kind} has no prefab yet"); continue; }
                 var view = hatch + new Vector3(0.6f, 0.05f, -1.6f);
-                LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(stage - view))), stage + Vector3.up * (kind == RobotKind.MotionSensor ? 2.2f : kind == RobotKind.PressurePlate ? 0f : 0.9f));
+                // Robots: aim at the body. Small devices without much of a body: at the sensor itself (its indicator point).
+                bool small = RobotRoster.IsDevice(kind) || kind == RobotKind.Camera;
+                var aim = small ? obj.GetComponent<Detector>().Position : stage + Vector3.up * 0.9f;
+                LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(stage - view))), aim);
                 yield return new WaitForSeconds(1.5f);
                 // Some robots move to their place on spawn (walls, ceiling): look at where they ended up.
                 var at = obj.transform.position;
                 if ((at - pos).sqrMagnitude > 0.25f)
-                    LookAtFrom(ViewPoint(at, 3.5f), at);
+                    LookAtFrom(ViewPoint(at, 3.5f), obj.GetComponent<Detector>().Position);
                 yield return new WaitForSeconds(0.6f);
                 Log($"gallery: {kind} at {obj.transform.position}, look prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
                 yield return Shot($"kind_{kind}");

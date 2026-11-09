@@ -1,6 +1,7 @@
 """Generates placeholder FBX models for the prototype.
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/generate_models.py -- <output_dir>
+Run:  blender.exe -b --factory-startup --python Tools/Blender/generate_models.py -- Assets/_Game/Art/Models
+      (models land in sub-folders by category: Props, Level, Player, Items, Robots, Sensors)
 
 Conventions:
   * meters, model front faces Blender -Y  ->  Unity +Z (forward)
@@ -19,8 +20,22 @@ import bmesh
 from mathutils import Vector
 
 argv = sys.argv
-out_dir = argv[argv.index("--") + 1] if "--" in argv else os.path.join(os.getcwd(), "Assets", "_Game", "Models")
-os.makedirs(out_dir, exist_ok=True)
+out_dir = argv[argv.index("--") + 1] if "--" in argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
+
+
+def category(filename):
+    """Sub-folder of Art/Models for a model (keeps the project sorted the same way the Unity builder expects)."""
+    if filename.startswith("item_"):
+        return "Items"
+    if filename.startswith("robot_"):
+        return "Robots"
+    if filename.startswith("sensor_") or filename in ("security_camera", "laser_emitter"):
+        return "Sensors"
+    if filename == "player":
+        return "Player"
+    if filename == "hatch":
+        return "Level"
+    return "Props"
 
 
 def clear_scene():
@@ -88,7 +103,9 @@ def export(filename):
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:
             poly.use_smooth = False
-    path = os.path.join(out_dir, filename + ".fbx")
+    folder = os.path.join(out_dir, category(filename))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, filename + ".fbx")
     bpy.ops.export_scene.fbx(
         filepath=path,
         use_selection=True,

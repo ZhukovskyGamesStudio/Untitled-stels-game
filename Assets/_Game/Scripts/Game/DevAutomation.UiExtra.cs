@@ -21,7 +21,7 @@ namespace Stealth.Game
         /// <summary>Stand in a guard's view, off-centre, and capture the indicator while it fills up.</summary>
         IEnumerator DetectionIndicatorCheck()
         {
-            var guard = RobotController.All.FirstOrDefault(r => r.HasEyes);
+            var guard = RobotController.Robots.FirstOrDefault(r => r.Senses.HasEyes);
             if (guard == null) { Log("detection: no guard on this level"); yield break; }
             var gp = guard.transform.position;
             // Stay in the guard's room so nothing blocks the view, at the far side in front of it.
@@ -34,7 +34,7 @@ namespace Stealth.Game
             var toRobot = Flat(gp - spot);
             Me.TeleportOwner(spot, Quaternion.AngleAxis(-50f, Vector3.up) * Quaternion.LookRotation(toRobot));
             Me.Motor.SetPitch(0f);
-            var aw = guard.GetComponent<DetectorAwareness>();
+            var aw = guard.GetComponent<Detector>();
             float t = Time.time;
             while (Time.time - t < 4f && aw.AwarenessOf(Me.OwnerClientId) < 0.4f) yield return null;
             Log($"detection: awareness {aw.AwarenessOf(Me.OwnerClientId):0.00} after {Time.time - t:0.0}s");
@@ -43,14 +43,14 @@ namespace Stealth.Game
             Log($"detection: awareness {aw.AwarenessOf(Me.OwnerClientId):0.00}, state {guard.State.Value}");
             yield return Shot("detected");
             var cam = Me.Camera.transform;
-            foreach (var d in DetectorAwareness.All)
+            foreach (var d in Detector.All)
                 Log($"  detector {d.name} pos={d.Position} aw={d.AwarenessOf(Me.OwnerClientId):0.00} angle={UI.UiMath.ScreenAngle(cam.position, cam.forward, d.Position):0} guard={(d.gameObject == guard.gameObject)}");
             Log($"  me={Me.transform.position} fwd={cam.forward}");
         }
 
         IEnumerator NoiseMeterShots()
         {
-            var c = LevelGenerator.Current.HatchPosition + new Vector3(-3f, 0.05f, -3f);
+            var c = ActiveLevel.Layout.HatchPosition + new Vector3(-3f, 0.05f, -3f);
             Me.TeleportOwner(c, Quaternion.LookRotation(Vector3.forward));
             Drive(Vector2.up, crouch: true);
             yield return new WaitForSeconds(1.3f);
@@ -70,7 +70,7 @@ namespace Stealth.Game
             yield return new WaitForSeconds(0.3f);
             yield return Shot("quota_gain");
             // Walk away from the hatch, facing away: the marker must sit on the screen edge.
-            var hatch = LevelGenerator.Current.HatchPosition;
+            var hatch = ActiveLevel.Layout.HatchPosition;
             Me.TeleportOwner(hatch + new Vector3(3.5f, 0.05f, 3.5f), Quaternion.LookRotation(new Vector3(1, 0, 0.3f)));
             Me.Motor.SetPitch(0);
             yield return new WaitForSeconds(0.4f);
@@ -82,14 +82,14 @@ namespace Stealth.Game
         {
             float t0 = Time.time;
             while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
-            var hatch = LevelGenerator.Current.HatchPosition;
+            var hatch = ActiveLevel.Layout.HatchPosition;
             if (Me.IsHost)
             {
                 Me.TeleportOwner(hatch + new Vector3(-2f, 0.05f, 0f), Quaternion.LookRotation(Vector3.right));
                 yield return new WaitForSeconds(5f);
-                Me.TakeHitServer(Me.transform.position + Vector3.right);
+                Me.HitServer(Me.transform.position + Vector3.right);
                 yield return new WaitForSeconds(1.7f); // after the invulnerability window
-                Me.TakeHitServer(Me.transform.position + Vector3.right);
+                Me.HitServer(Me.transform.position + Vector3.right);
                 Log($"host downed={Me.Downed.Value}");
                 yield return new WaitForSeconds(6f);
             }
@@ -100,7 +100,7 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(3f);
                 yield return Shot("teammate_name");
                 // Go to a neighbouring room so a wall is between us.
-                var other = LevelGenerator.Current.PatrolPoints.OrderBy(p => Vector3.Distance(p, hatch)).Skip(1).First();
+                var other = ActiveLevel.Layout.PatrolPoints.OrderBy(p => Vector3.Distance(p, hatch)).Skip(1).First();
                 Me.TeleportOwner(other + new Vector3(0, 0.05f, 0), Quaternion.LookRotation(Flat(hatch - other)));
                 yield return new WaitForSeconds(5f);
                 var host = PlayerController.All.FirstOrDefault(p => p != Me);

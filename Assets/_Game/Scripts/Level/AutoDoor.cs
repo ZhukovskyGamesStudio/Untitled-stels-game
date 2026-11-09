@@ -19,7 +19,7 @@ namespace Stealth.Level
 
         public Transform PanelA, PanelB;
         public BoxCollider Blocker;
-        public float Width = LevelGenerator.DoorWidth;
+        public float Width = LevelMetrics.DoorWidth;
 
         float m_Open; // 0 closed .. 1 open
         public bool IsOpen => m_Open > 0.5f;
@@ -47,7 +47,7 @@ namespace Stealth.Level
         {
             s_Agents.Clear();
             foreach (var p in PlayerController.All) s_Agents.Add(p.transform.position);
-            foreach (var r in RobotController.All) s_Agents.Add(r.transform.position);
+            foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
             bool open = ShouldOpen(transform.position, s_Agents);
             m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / SlideTime);
             float slide = Width / 4f * m_Open;

@@ -19,7 +19,7 @@ namespace Stealth.Game
                 if (to.magnitude < 0.35f) { i++; continue; }
                 float yaw = Vector3.SignedAngle(Flat(Me.transform.forward), to, Vector3.up);
                 float px = Mathf.Clamp(yaw, -12f, 12f) / GameSettings.Sensitivity;
-                PlayerController.Autopilot = new PlayerInputState { Move = Mathf.Abs(yaw) < 50f ? Vector2.up : Vector2.zero, Look = new Vector2(px, 0), Sprint = sprint };
+                DevFlags.Autopilot = new PlayerInputState { Move = Mathf.Abs(yaw) < 50f ? Vector2.up : Vector2.zero, Look = new Vector2(px, 0), Sprint = sprint };
                 yield return null;
             }
             Release();
@@ -27,10 +27,10 @@ namespace Stealth.Game
 
         IEnumerator FloorsScenario()
         {
-            var l = LevelGenerator.Current;
+            var l = ActiveLevel.Layout;
             Log($"building: {l.Width}x{l.Height} rooms, {l.Floors} floors, stairs={l.Stairs.Count}");
             var s = l.Stairs[0];
-            float cx = (s.Cell.x + (s.Corner.x > 0 ? 1 : 0)) * LevelGenerator.Cell, cz = (s.Cell.y + (s.Corner.y > 0 ? 1 : 0)) * LevelGenerator.Cell;
+            float cx = (s.Cell.x + (s.Corner.x > 0 ? 1 : 0)) * LevelMetrics.Cell, cz = (s.Cell.y + (s.Corner.y > 0 ? 1 : 0)) * LevelMetrics.Cell;
             var corner = new Vector3(cx, LevelLayout.FloorY(s.Floor), cz);
             var room = l.CellCenter(s.Floor, s.Cell.x, s.Cell.y);
 
@@ -77,7 +77,7 @@ namespace Stealth.Game
             // Patrol for a while: wheeled robots must stay on their floor, walkers may change floors.
             var start = new System.Collections.Generic.Dictionary<Enemies.RobotController, int>();
             var visited = new System.Collections.Generic.Dictionary<Enemies.RobotController, System.Collections.Generic.HashSet<int>>();
-            foreach (var r in Enemies.RobotController.All)
+            foreach (var r in Enemies.RobotController.Robots)
             {
                 start[r] = LevelLayout.FloorOf(r.transform.position.y);
                 visited[r] = new System.Collections.Generic.HashSet<int> { start[r] };
@@ -85,16 +85,16 @@ namespace Stealth.Game
             float t = Time.time;
             while (Time.time - t < 40f)
             {
-                foreach (var r in Enemies.RobotController.All) visited[r].Add(LevelLayout.FloorOf(r.transform.position.y));
+                foreach (var r in Enemies.RobotController.Robots) visited[r].Add(LevelLayout.FloorOf(r.transform.position.y));
                 yield return new WaitForSeconds(0.5f);
             }
             int wheeledLeft = 0, walkersMoved = 0;
             foreach (var kv in visited)
             {
                 bool moved = kv.Value.Count > 1;
-                if (!kv.Key.CanUseStairs && moved) wheeledLeft++;
-                if (kv.Key.CanUseStairs && moved) walkersMoved++;
-                Log($"  {kv.Key.name} stairs={kv.Key.CanUseStairs} floors visited: {string.Join(",", kv.Value)}");
+                if (!kv.Key.Traits.CanUseStairs && moved) wheeledLeft++;
+                if (kv.Key.Traits.CanUseStairs && moved) walkersMoved++;
+                Log($"  {kv.Key.name} stairs={kv.Key.Traits.CanUseStairs} floors visited: {string.Join(",", kv.Value)}");
             }
             Log($"floor rules: wheeled robots that left their floor={wheeledLeft}, walkers that changed floor={walkersMoved}");
         }
@@ -104,8 +104,8 @@ namespace Stealth.Game
         {
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
-            var l = LevelGenerator.Current;
-            int renderers = LevelGenerator.CurrentRoot.GetComponentsInChildren<Renderer>().Length;
+            var l = ActiveLevel.Layout;
+            int renderers = ActiveLevel.Root.GetComponentsInChildren<Renderer>().Length;
             var views = new[]
             {
                 new Pose(l.HatchPosition + new Vector3(-3, 0.05f, -3), Quaternion.LookRotation(new Vector3(1, 0, 1))),
@@ -132,12 +132,12 @@ namespace Stealth.Game
         /// <summary>Standing players are blocked by a vent, crouching players crawl through.</summary>
         IEnumerator VentScenario()
         {
-            var l = LevelGenerator.Current;
+            var l = ActiveLevel.Layout;
             for (int x = 0; x < l.Width - 1; x++)
                 for (int y = 0; y < l.Height; y++)
                 {
                     if (l.EdgesX[0, x, y] != EdgeType.Vent) continue;
-                    float wx = (x + 1) * LevelGenerator.Cell, vz = y * LevelGenerator.Cell + LevelGenerator.Cell * 0.5f;
+                    float wx = (x + 1) * LevelMetrics.Cell, vz = y * LevelMetrics.Cell + LevelMetrics.Cell * 0.5f;
                     var from = new Vector3(wx - 2.2f, 0.05f, vz);
                     LookAtFrom(new Pose(from, Quaternion.LookRotation(Vector3.right)), new Vector3(wx, 0.6f, vz));
                     yield return new WaitForSeconds(0.5f);
@@ -164,7 +164,7 @@ namespace Stealth.Game
         /// <summary>One screenshot of every room type present in the building.</summary>
         IEnumerator RoomsScenario()
         {
-            var l = LevelGenerator.Current;
+            var l = ActiveLevel.Layout;
             var seen = new System.Collections.Generic.HashSet<RoomType>();
             for (int f = 0; f < l.Floors; f++)
                 for (int x = 0; x < l.Width; x++)
@@ -175,7 +175,7 @@ namespace Stealth.Game
                         var c = l.CellCenter(f, x, y);
                         // Stand near one corner and look across the room towards the opposite one.
                         int q = l.StairQuadrant(f, new Vector2Int(x, y));
-                        var from = c + LevelGenerator.Quadrants[q == 3 ? 0 : 3] * 1.45f + Vector3.up * 0.05f;
+                        var from = c + LevelMetrics.Quadrants[q == 3 ? 0 : 3] * 1.45f + Vector3.up * 0.05f;
                         var to = c - (from - c) + Vector3.up * 0.6f;
                         LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
                         yield return new WaitForSeconds(0.5f);
@@ -219,7 +219,7 @@ namespace Stealth.Game
             }
 
             // The building from the street.
-            var outside = new Vector3(-9f, 0.05f, l.Height * LevelGenerator.Cell * 0.5f);
+            var outside = new Vector3(-9f, 0.05f, l.Height * LevelMetrics.Cell * 0.5f);
             LookAtFrom(new Pose(outside, Quaternion.LookRotation(Vector3.right)), new Vector3(0, l.Floors * 1.5f, outside.z));
             yield return new WaitForSeconds(2f);
             yield return Shot("facade");

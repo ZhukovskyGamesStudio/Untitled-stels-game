@@ -1,127 +1,158 @@
 using Stealth.Net;
+using Stealth.Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace Stealth.UI
 {
-    /// <summary>Main menu (host / join) and the in-game Esc menu. Placeholder IMGUI.</summary>
+    /// <summary>
+    /// Main menu (host / join), the in-game Esc menu and the settings page (prefab UI/Menu).
+    /// Buttons, sliders and toggles are pre-built in the prefab; this presenter wires them up and shows the right page.
+    /// </summary>
     public class GameMenu : MonoBehaviour
     {
         public static bool IsOpen { get; private set; }
         public static bool SettingsOpen { get; private set; }
 
+        /// <summary>Test hook: opens the pause menu.</summary>
+        public static void OpenPauseForTest() => IsOpen = true;
+
         /// <summary>Test hook: opens the pause menu with the settings page.</summary>
         public static void OpenSettingsForTest()
         {
             IsOpen = true;
-            SettingsOpen = true;
+            OpenSettings();
         }
 
-        string m_Address = "127.0.0.1";
+        [Header("Pages")]
+        public GameObject MainPage;
+        public GameObject PausePage;
+        public GameObject SettingsPage;
 
-        void Update()
+        [Header("Main")]
+        public Text SteamStatus;
+        public Button HostSteam;
+        public Text LocalCaption;
+        public Button HostLocal;
+        public InputField Address;
+        public Button Join;
+        public Text NetStatus;
+        public Button MainSettings;
+        public Button Quit;
+
+        [Header("Pause")]
+        public Text Role;
+        public Button Invite;
+        public Button Resume;
+        public Button PauseSettings;
+        public Button Leave;
+
+        [Header("Settings")]
+        public Text SensitivityLabel;
+        public Slider Sensitivity;
+        public Text FovLabel;
+        public Slider Fov;
+        public Toggle InvertY;
+        public Toggle HeadBob;
+        public Toggle CrouchToggle;
+        public Button Defaults;
+        public Button Done;
+
+        void Awake()
         {
-            var net = GameNetwork.Instance;
-            if (net == null || Keyboard.current == null) return;
-            if (!net.IsRunning) { IsOpen = false; return; }
-            if (Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                if (SettingsOpen) CloseSettings();
-                else IsOpen = !IsOpen;
-            }
-        }
+            HostSteam.onClick.AddListener(() => SteamLobby.Instance.HostLobby());
+            HostLocal.onClick.AddListener(() => GameNetwork.Instance.StartHostLocal());
+            Join.onClick.AddListener(() => GameNetwork.Instance.StartClientLocal(Address.text));
+            MainSettings.onClick.AddListener(OpenSettings);
+            Quit.onClick.AddListener(Application.Quit);
 
-        void OnGUI()
-        {
-            var net = GameNetwork.Instance;
-            if (net == null) return;
-            GUI.depth = 0;
-            UiDraw.Begin();
-            if (SettingsOpen && (IsOpen || !net.IsRunning)) DrawSettings();
-            else if (!net.IsRunning) DrawMainMenu(net);
-            else if (IsOpen) DrawPauseMenu(net);
-        }
-
-        void DrawMainMenu(GameNetwork net)
-        {
-            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.06f, 0.07f, 0.08f, 1f));
-            var area = new Rect(UiDraw.W / 2f - 220, UiDraw.H * 0.16f, 440, 520);
-            UiDraw.Label(new Rect(area.x, area.y, area.width, 50), "АЙТИШНИКИ: ВЫЛАЗКА", 30, TextAnchor.MiddleCenter, Color.white, true);
-            UiDraw.Label(new Rect(area.x, area.y + 46, area.width, 24), "прототип кор-лупа", 14, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.6f));
-
-            GUILayout.BeginArea(new Rect(area.x, area.y + 96, area.width, 420));
-            GUILayout.Label($"Steam: {(SteamManager.Initialized ? "подключён как " + SteamManager.PersonaName : "недоступен — " + SteamManager.Error)}");
-            GUI.enabled = SteamManager.Initialized;
-            if (GUILayout.Button("Создать игру через Steam", GUILayout.Height(44))) SteamLobby.Instance.HostLobby();
-            GUILayout.Label("Друзья заходят через приглашение или «Присоединиться к игре» в Steam.");
-            GUI.enabled = true;
-
-            GUILayout.Space(18);
-            GUILayout.Label("Локальная сеть / тест на одном ПК (UDP, порт " + net.LocalPort + "):");
-            if (GUILayout.Button("Создать локальную игру", GUILayout.Height(36))) net.StartHostLocal();
-            GUILayout.BeginHorizontal();
-            m_Address = GUILayout.TextField(m_Address, GUILayout.Height(32), GUILayout.Width(220));
-            if (GUILayout.Button("Подключиться по IP", GUILayout.Height(32))) net.StartClientLocal(m_Address);
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(18);
-            if (!string.IsNullOrEmpty(net.Status)) GUILayout.Label(net.Status);
-            if (GUILayout.Button("Настройки", GUILayout.Height(30))) OpenSettings();
-            if (GUILayout.Button("Выход", GUILayout.Height(30))) Application.Quit();
-            GUILayout.EndArea();
-        }
-
-        void DrawPauseMenu(GameNetwork net)
-        {
-            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0, 0, 0, 0.6f));
-            GUILayout.BeginArea(new Rect(UiDraw.W / 2f - 180, UiDraw.H * 0.3f, 360, 260));
-            GUILayout.Label(net.Manager.IsHost ? "Ты хост" : "Ты подключён к хосту");
-            if (net.UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby &&
-                GUILayout.Button("Пригласить друзей (Steam)", GUILayout.Height(36)))
-                SteamLobby.Instance.OpenInviteDialog();
-            if (GUILayout.Button("Продолжить", GUILayout.Height(36))) IsOpen = false;
-            if (GUILayout.Button("Настройки", GUILayout.Height(36))) OpenSettings();
-            if (GUILayout.Button("Покинуть игру", GUILayout.Height(36)))
+            Invite.onClick.AddListener(() => SteamLobby.Instance.OpenInviteDialog());
+            Resume.onClick.AddListener(() => IsOpen = false);
+            PauseSettings.onClick.AddListener(OpenSettings);
+            Leave.onClick.AddListener(() =>
             {
                 IsOpen = false;
-                net.Leave();
-            }
-            GUILayout.EndArea();
+                GameNetwork.Instance.Leave();
+            });
+
+            Sensitivity.onValueChanged.AddListener(v => GameSettings.Sensitivity = v);
+            Fov.onValueChanged.AddListener(v => GameSettings.Fov = Mathf.Round(v));
+            InvertY.onValueChanged.AddListener(v => GameSettings.InvertY = v);
+            HeadBob.onValueChanged.AddListener(v => GameSettings.HeadBob = v);
+            CrouchToggle.onValueChanged.AddListener(v => GameSettings.CrouchToggle = v);
+            Defaults.onClick.AddListener(() =>
+            {
+                GameSettings.ResetToDefaults();
+                SyncSettingsControls();
+            });
+            Done.onClick.AddListener(CloseSettings);
         }
 
         static void OpenSettings()
         {
-            Stealth.Player.GameSettings.EnsureLoaded();
+            GameSettings.EnsureLoaded();
             SettingsOpen = true;
         }
 
         static void CloseSettings()
         {
-            Stealth.Player.GameSettings.Save();
+            GameSettings.Save();
             SettingsOpen = false;
         }
 
-        void DrawSettings()
+        void Update()
         {
-            UiDraw.Rect(new Rect(0, 0, UiDraw.W, UiDraw.H), new Color(0.04f, 0.05f, 0.06f, 0.92f));
-            var area = new Rect(UiDraw.W / 2f - 230, UiDraw.H * 0.18f, 460, 420);
-            UiDraw.Label(new Rect(area.x, area.y - 46, area.width, 40), "Настройки", 26, TextAnchor.MiddleCenter, Color.white, true);
-            GUILayout.BeginArea(area);
-            GUILayout.Label($"Чувствительность мыши: {Stealth.Player.GameSettings.Sensitivity * 10f:0.0}");
-            Stealth.Player.GameSettings.Sensitivity = GUILayout.HorizontalSlider(Stealth.Player.GameSettings.Sensitivity, 0.02f, 0.4f);
-            GUILayout.Space(10);
-            GUILayout.Label($"Поле зрения: {Stealth.Player.GameSettings.Fov:0}°");
-            Stealth.Player.GameSettings.Fov = Mathf.Round(GUILayout.HorizontalSlider(Stealth.Player.GameSettings.Fov, 60f, 100f));
-            GUILayout.Space(10);
-            Stealth.Player.GameSettings.InvertY = GUILayout.Toggle(Stealth.Player.GameSettings.InvertY, " Инвертировать мышь по вертикали");
-            Stealth.Player.GameSettings.HeadBob = GUILayout.Toggle(Stealth.Player.GameSettings.HeadBob, " Покачивание камеры при ходьбе");
-            Stealth.Player.GameSettings.CrouchToggle = GUILayout.Toggle(Stealth.Player.GameSettings.CrouchToggle, " Ctrl переключает присед (иначе — удерживать)");
-            GUILayout.Space(16);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("По умолчанию", GUILayout.Height(32))) Stealth.Player.GameSettings.ResetToDefaults();
-            if (GUILayout.Button("Готово", GUILayout.Height(32))) CloseSettings();
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
+            var net = GameNetwork.Instance;
+            if (net == null) return;
+            if (!net.IsRunning) IsOpen = false;
+            else if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                if (SettingsOpen) CloseSettings();
+                else IsOpen = !IsOpen;
+            }
+
+            bool settings = SettingsOpen && (IsOpen || !net.IsRunning);
+            bool main = !settings && !net.IsRunning;
+            bool pause = !settings && net.IsRunning && IsOpen;
+            if (settings && !SettingsPage.activeSelf) SyncSettingsControls();
+            Ui.Show(SettingsPage, settings);
+            Ui.Show(MainPage, main);
+            Ui.Show(PausePage, pause);
+
+            if (main) UpdateMain(net);
+            if (pause) UpdatePause(net);
+            if (settings) UpdateSettingsLabels();
+        }
+
+        void UpdateMain(GameNetwork net)
+        {
+            SteamStatus.text = $"Steam: {(SteamManager.Initialized ? "подключён как " + SteamManager.PersonaName : "недоступен — " + SteamManager.Error)}";
+            HostSteam.interactable = SteamManager.Initialized;
+            LocalCaption.text = $"Локальная сеть / тест на одном ПК (UDP, порт {net.LocalPort}):";
+            Ui.Show(NetStatus, !string.IsNullOrEmpty(net.Status));
+            NetStatus.text = net.Status;
+        }
+
+        void UpdatePause(GameNetwork net)
+        {
+            Role.text = net.Manager.IsHost ? "Ты хост" : "Ты подключён к хосту";
+            Ui.Show(Invite, net.UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby);
+        }
+
+        void SyncSettingsControls()
+        {
+            Sensitivity.SetValueWithoutNotify(GameSettings.Sensitivity);
+            Fov.SetValueWithoutNotify(GameSettings.Fov);
+            InvertY.SetIsOnWithoutNotify(GameSettings.InvertY);
+            HeadBob.SetIsOnWithoutNotify(GameSettings.HeadBob);
+            CrouchToggle.SetIsOnWithoutNotify(GameSettings.CrouchToggle);
+        }
+
+        void UpdateSettingsLabels()
+        {
+            SensitivityLabel.text = $"Чувствительность мыши: {GameSettings.Sensitivity * 10f:0.0}";
+            FovLabel.text = $"Поле зрения: {GameSettings.Fov:0}°";
         }
     }
 }

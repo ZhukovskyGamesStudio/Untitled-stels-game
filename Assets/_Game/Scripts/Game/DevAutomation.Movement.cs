@@ -22,7 +22,7 @@ namespace Stealth.Game
             Release();
             yield return new WaitForSeconds(0.4f);
             float y0 = Me.transform.position.y, peak = y0;
-            PlayerController.Autopilot = new PlayerInputState { Jump = true };
+            DevFlags.Autopilot = new PlayerInputState { Jump = true };
             yield return null;
             Release();
             float t = Time.time;
@@ -36,12 +36,12 @@ namespace Stealth.Game
             Log($"jump: height {peak - y0:0.00} m, landed={landed} after {Time.time - t:0.00}s");
 
             // Buffered jump: press shortly before landing, expect a second jump.
-            PlayerController.Autopilot = new PlayerInputState { Jump = true };
+            DevFlags.Autopilot = new PlayerInputState { Jump = true };
             yield return null;
             Release();
             t = Time.time;
             while (Time.time - t < 2f && !(Me.Motor.Velocity.y < -1f && Me.transform.position.y - y0 < 0.25f)) yield return null;
-            PlayerController.Autopilot = new PlayerInputState { Jump = true };
+            DevFlags.Autopilot = new PlayerInputState { Jump = true };
             yield return null;
             Release();
             float peak2 = Me.transform.position.y;
@@ -54,7 +54,7 @@ namespace Stealth.Game
         /// <summary>Builds a few 0.25 m steps locally and walks down them: the player must stay grounded.</summary>
         IEnumerator StepDownCheck()
         {
-            var basePos = Level.LevelGenerator.Current.HatchPosition + new Vector3(-4f, 0f, -2.5f);
+            var basePos = Level.ActiveLevel.Layout.HatchPosition + new Vector3(-4f, 0f, -2.5f);
             var root = new GameObject("TestSteps");
             for (int i = 0; i < 4; i++)
             {
@@ -88,7 +88,7 @@ namespace Stealth.Game
 
         IEnumerator StaminaCheck()
         {
-            Me.TeleportOwner(Level.LevelGenerator.Current.HatchPosition + new Vector3(0, 0.05f, -2.5f), Quaternion.LookRotation(Vector3.right));
+            Me.TeleportOwner(Level.ActiveLevel.Layout.HatchPosition + new Vector3(0, 0.05f, -2.5f), Quaternion.LookRotation(Vector3.right));
             Me.Motor.Stamina.Refill();
             yield return new WaitForSeconds(0.3f);
             float t = Time.time;
@@ -108,7 +108,7 @@ namespace Stealth.Game
         {
             Release();
             yield return new WaitForSeconds(0.3f);
-            PlayerController.Autopilot = new PlayerInputState { CrouchToggle = true };
+            DevFlags.Autopilot = new PlayerInputState { CrouchToggle = true };
             yield return null;
             Release();
             yield return new WaitForSeconds(0.4f);
@@ -122,18 +122,28 @@ namespace Stealth.Game
 
         IEnumerator KnockbackCheck()
         {
-            var c = Level.LevelGenerator.Current.HatchPosition + new Vector3(0, 0.05f, 2f);
+            var c = Level.ActiveLevel.Layout.HatchPosition + new Vector3(0, 0.05f, 2f);
             Me.TeleportOwner(c, Quaternion.LookRotation(Vector3.forward));
             Release();
             yield return new WaitForSeconds(0.5f);
             if (!Me.IsServer) yield break;
             var p0 = Me.transform.position;
-            Me.TakeHitServer(p0 + Vector3.forward * 1.2f); // hit from the front
+            Me.HitServer(p0 + Vector3.forward * 1.2f); // hit from the front
             yield return new WaitForSeconds(0.05f);
             yield return Shot("hit_shake");
             yield return new WaitForSeconds(0.8f);
             var d = Me.transform.position - p0;
             Log($"knockback: moved {new Vector3(d.x, 0, d.z).magnitude:0.00} m backwards={d.z < -0.5f}, hp={Me.Hp.Value}");
+        }
+
+        /// <summary>Menu pages (the main menu is captured before hosting): pause, settings.</summary>
+        IEnumerator MenuScenario()
+        {
+            UI.GameMenu.OpenPauseForTest();
+            yield return new WaitForSeconds(0.3f);
+            yield return Shot("pause");
+            yield return SettingsShot();
+            Log($"menu: open={UI.GameMenu.IsOpen} settings={UI.GameMenu.SettingsOpen}");
         }
 
         IEnumerator SettingsShot()

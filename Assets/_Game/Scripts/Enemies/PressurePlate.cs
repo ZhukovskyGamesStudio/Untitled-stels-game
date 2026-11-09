@@ -19,7 +19,7 @@ namespace Stealth.Enemies
         protected override void TickServer()
         {
             foreach (var p in PlayerController.All)
-                if (!p.Downed.Value && Steps(transform.position, HalfSize, p.transform.position)) { Trip(p); return; }
+                if (!p.IsDown && Steps(transform.position, HalfSize, p.Position)) { Trip(p); return; }
             Decay(0.4f);
         }
     }

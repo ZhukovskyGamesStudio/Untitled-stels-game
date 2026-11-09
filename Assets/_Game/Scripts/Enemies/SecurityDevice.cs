@@ -1,130 +1,89 @@
-using System.Collections.Generic;
 using Stealth.Game;
-using Stealth.Player;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Enemies
 {
     /// <summary>
-    /// Base for robots / devices with their own movement (turret, spider, vacuum, lidar, PIR, pressure plate).
-    /// Handles the alert state (0 idle, 1 noticing, 2 detected), status colours, awareness replication and alarms.
+    /// Base for robots / devices with their own movement and a suspicion meter instead of a navmesh brain
+    /// (camera, turret, spider, vacuum, lidar, PIR, pressure plate).
+    /// Subclasses sense in <see cref="TickServer"/> through <see cref="Notice"/> / <see cref="Decay"/> / <see cref="Trip"/>
+    /// and react in <see cref="OnDetected"/> (default: building-wide alarm).
     /// </summary>
-    public abstract class SecurityDevice : NetworkBehaviour
+    public abstract class SecurityDevice : Detector
     {
-        public static readonly List<SecurityDevice> All = new();
-
-        public Renderer[] StatusRenderers;
-        public Light StatusLight;
+        [Header("Alarm")]
         public float AlarmRadius = 30f;
         public float AlarmCooldown = 6f;
 
+        /// <summary>0 idle, 1 noticing, 2 detected (replicated, drives the status colour).</summary>
         public readonly NetworkVariable<byte> Alert = new();
 
-        protected DetectorAwareness Awareness;
-        protected float Meter;
-        protected PlayerController Focus;
-        float m_AlarmUntil;
-        MaterialPropertyBlock m_Block;
+        protected readonly SuspicionMeter Meter = new();
+        protected IIntruder Suspect { get; private set; }
 
-        public readonly NetworkVariable<bool> Hacked = new();
-        public bool IsHacked => Hacked.Value;
-        float m_HackedUntil;
+        protected virtual Color IdleColor => SecurityPalette.Calm;
+        protected override Color StatusColor => SecurityPalette.ForAlert(Alert.Value, IdleColor);
 
-        /// <summary>True while hacked (server and clients).</summary>
-        public bool Disabled => Hacked.Value;
-
-        public void HackServer(float seconds)
+        protected override void OnSpawned()
         {
-            m_HackedUntil = Time.time + seconds;
-            Hacked.Value = true;
-            Meter = 0f;
+            Meter.AlarmCooldown = AlarmCooldown;
+            Alert.OnValueChanged += OnAlertChanged;
+            OnDeviceSpawned();
         }
 
-        protected bool SensorsActive => IsServer && !GameManager.Peaceful && !GameManager.InGracePeriod && !GameManager.FreezeRobots && !Disabled;
+        protected override void OnDespawned() => Alert.OnValueChanged -= OnAlertChanged;
 
-        public override void OnNetworkSpawn()
-        {
-            All.Add(this);
-            Awareness = GetComponent<DetectorAwareness>();
-            Alert.OnValueChanged += (_, a) => ApplyVisual(a);
-            Hacked.OnValueChanged += (_, _) => ApplyVisual(Alert.Value);
-            ApplyVisual(Alert.Value);
-            OnSpawned();
-        }
+        void OnAlertChanged(byte _, byte __) => RefreshStatus();
 
-        public override void OnNetworkDespawn() => All.Remove(this);
+        protected virtual void OnDeviceSpawned() { }
 
-        protected virtual void OnSpawned() { }
-
-        /// <summary>Runs on every peer (visuals, deterministic motion).</summary>
+        /// <summary>Runs on every peer (visuals, deterministic motion from the shared clock).</summary>
         protected virtual void TickLocal() { }
 
-        /// <summary>Server: sensing and decisions. Use <see cref="Notice"/> / <see cref="Decay"/>.</summary>
+        /// <summary>Server: sensing and decisions.</summary>
         protected abstract void TickServer();
 
-        protected virtual void OnDetected(PlayerController p) => RaiseAlarm(p.transform.position);
+        protected virtual void OnDetected(IIntruder p) => RaiseAlarm(p.Position);
 
-        protected virtual Color IdleColor => new(0.2f, 0.85f, 1f);
+        protected override void OnHackedServer()
+        {
+            Meter.Clear();
+            Alert.Value = 0;
+        }
 
         void Update()
         {
             if (!IsSpawned) return;
             TickLocal();
             if (!IsServer) return;
-            if (Hacked.Value && Time.time >= m_HackedUntil) Hacked.Value = false;
+            UpdateHackServer();
             if (SensorsActive) TickServer();
             else Decay(1f);
-            byte alert = Time.time < m_AlarmUntil ? (byte)2 : Meter > 0.15f ? (byte)1 : (byte)0;
-            if (Disabled) alert = 0;
+            byte alert = IsHacked ? (byte)0 : Meter.AlertLevel(Time.time);
             if (Alert.Value != alert) Alert.Value = alert;
-            Awareness?.ReportServer(alert == 2 ? 1f : Mathf.Clamp01(Meter), Focus);
+            if (!IsHacked) ReportAwarenessServer(Meter.Awareness(Time.time), Suspect);
         }
 
         /// <summary>Accumulate suspicion of a player; at 1 the device detects them.</summary>
-        protected void Notice(PlayerController p, float ratePerSecond)
+        protected void Notice(IIntruder p, float ratePerSecond)
         {
-            Focus = p;
-            Meter += ratePerSecond * Time.deltaTime;
-            if (Meter >= 1f && Time.time >= m_AlarmUntil)
-            {
-                m_AlarmUntil = Time.time + AlarmCooldown;
-                OnDetected(p);
-            }
-            Meter = Mathf.Min(Meter, 1.2f);
+            Suspect = p;
+            if (Meter.Notice(ratePerSecond, Time.deltaTime, Time.time)) OnDetected(p);
         }
 
-        protected void Decay(float ratePerSecond) => Meter = Mathf.Max(0f, Meter - ratePerSecond * Time.deltaTime);
+        protected void Decay(float ratePerSecond) => Meter.Decay(ratePerSecond, Time.deltaTime);
 
         /// <summary>Instant detection (pressure plates, beams).</summary>
-        protected void Trip(PlayerController p)
+        protected void Trip(IIntruder p)
         {
-            Focus = p;
-            Meter = 1.2f;
-            if (Time.time < m_AlarmUntil) return;
-            m_AlarmUntil = Time.time + AlarmCooldown;
-            OnDetected(p);
+            Suspect = p;
+            if (Meter.Trip(Time.time)) OnDetected(p);
         }
 
-        protected void RaiseAlarm(Vector3 at) => GameManager.Instance?.RaiseAlarmServer(at, AlarmRadius);
-
-        void ApplyVisual(byte alert)
+        protected void RaiseAlarm(Vector3 at)
         {
-            var c = Hacked.Value ? new Color(0.12f, 0.12f, 0.12f) : alert switch { 0 => IdleColor, 1 => new Color(1f, 0.85f, 0.1f), _ => new Color(1f, 0.1f, 0.05f) };
-            m_Block ??= new MaterialPropertyBlock();
-            m_Block.SetColor("_BaseColor", c);
-            m_Block.SetColor("_EmissionColor", c * 2.5f);
-            if (StatusRenderers != null) foreach (var r in StatusRenderers) if (r != null) r.SetPropertyBlock(m_Block);
-            if (StatusLight != null) StatusLight.color = c;
-            OnAlertVisual(alert);
-        }
-
-        protected virtual void OnAlertVisual(byte alert) { }
-
-        protected static Transform FindPart(Component root, string name)
-        {
-            foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (t.name == name) return t;
-            return null;
+            if (GameManager.Instance != null) GameManager.Instance.RaiseAlarmServer(at, AlarmRadius);
         }
     }
 }

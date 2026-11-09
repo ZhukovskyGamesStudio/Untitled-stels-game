@@ -19,12 +19,13 @@ namespace Stealth.Level
         Lidar,          // floor pole, spinning laser line at knee height
         MotionSensor,   // wall PIR: notices fast movement
         PressurePlate,  // floor tile: stepping on it raises an alarm
+        Camera,         // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
     }
 
     /// <summary>Which robots appear on which level (weights, unlock depth). Pure, unit tested.</summary>
     public static class RobotRoster
     {
-        public const int KindCount = 14;
+        public static readonly int KindCount = System.Enum.GetValues(typeof(RobotKind)).Length;
 
         struct Entry
         {
@@ -68,7 +69,7 @@ namespace Stealth.Level
         {
             foreach (var e in Mobile) if (e.Kind == k) return level >= e.MinLevel;
             foreach (var e in Devices) if (e.Kind == k) return level >= e.MinLevel;
-            return false; // Hunter: spawned by alarms, never placed
+            return false; // Hunter: spawned by alarms; cameras: own spots — never picked from the roster
         }
 
         static RobotKind Pick(Entry[] table, int level, System.Random rng)

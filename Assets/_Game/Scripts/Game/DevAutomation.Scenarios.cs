@@ -12,6 +12,7 @@ namespace Stealth.Game
         partial void RegisterExtraScenarios()
         {
             m_Scenarios["ui"] = UiScenario;
+            m_Scenarios["menu"] = MenuScenario;
             m_Scenarios["floors"] = FloorsScenario;
             m_Scenarios["rooms"] = RoomsScenario;
             m_Scenarios["vent"] = VentScenario;
@@ -26,7 +27,7 @@ namespace Stealth.Game
         /// <summary>Screenshots of the HUD in typical situations.</summary>
         IEnumerator UiScenario()
         {
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             Me.TeleportOwner(layout.PlayerSpawns[0] + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(layout.HatchPosition - layout.PlayerSpawns[0])));
             Me.Motor.SetPitch(10f);
             yield return new WaitForSeconds(0.5f);
@@ -38,7 +39,7 @@ namespace Stealth.Game
                 var ip = item.transform.position + Vector3.up * 0.1f;
                 LookAtFrom(ViewPoint(ip, 1.6f), ip);
                 yield return new WaitForSeconds(0.6f);
-                Log($"hover item: {(UI.InventoryUI.Local.Hover != null)} prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
+                Log($"hover item: {(UI.InventoryUI.Instance.Hover != null)} prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
                 yield return Shot("hover_item");
 
                 var inv = Me.GetComponent<PlayerInventory>();
@@ -55,17 +56,17 @@ namespace Stealth.Game
             // Hit from the right side: arc should point right, light vignette afterwards.
             if (Me.IsServer)
             {
-                Me.TakeHitServer(Me.transform.position + Me.transform.right * 1.5f);
+                Me.HitServer(Me.transform.position + Me.transform.right * 1.5f);
                 yield return new WaitForSeconds(0.25f);
                 yield return Shot("hit_from_right");
                 yield return new WaitForSeconds(2f);
                 yield return Shot("low_hp");
             }
             yield return Shot("compact_inventory");
-            UI.InventoryUI.ForceHandsModeForTest = true;
+            DevFlags.ForceHandsMode = true;
             yield return new WaitForSeconds(0.4f);
             yield return Shot("hands_mode");
-            UI.InventoryUI.ForceHandsModeForTest = false;
+            DevFlags.ForceHandsMode = false;
             yield return UiScenarioExtra();
         }
 

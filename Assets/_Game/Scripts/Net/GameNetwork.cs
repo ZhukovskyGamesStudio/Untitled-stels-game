@@ -89,7 +89,7 @@ namespace Stealth.Net
         {
             Manager.Shutdown();
             if (SteamLobby.Instance != null) SteamLobby.Instance.Leave();
-            LevelGenerator.Clear();
+            ActiveLevel.Clear();
             ShowMenuCamera(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;

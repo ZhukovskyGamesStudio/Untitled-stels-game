@@ -27,21 +27,12 @@ namespace Stealth.Game
     public class GameManager : NetworkBehaviour
     {
         public static GameManager Instance { get; private set; }
-        /// <summary>Test hook: seed for the first level (0 = random).</summary>
-        public static int ForcedSeed;
-        /// <summary>Test hook: robots and sensors ignore players (UI screenshots).</summary>
-        public static bool Peaceful;
-        /// <summary>Test hook: robots stand still (gallery screenshots).</summary>
-        public static bool FreezeRobots;
-        /// <summary>Test hook: start the run at this level index.</summary>
-        public static int ForcedLevel;
 
         [Header("Content")]
         public LevelArt Art;
         public NetworkObject ItemPrefab;
-        [Tooltip("Indexed by RobotKind. Empty entries are skipped.")]
+        [Tooltip("Indexed by RobotKind (robots, devices and the wall camera). Empty entries are skipped.")]
         public NetworkObject[] RobotPrefabs = new NetworkObject[RobotRoster.KindCount];
-        public NetworkObject CameraPrefab;
         public NetworkObject LaserPrefab;
 
         [Header("Balance")]
@@ -56,6 +47,12 @@ namespace Stealth.Game
 
         public static float LevelStartTime { get; private set; }
         public static bool InGracePeriod => Instance != null && Time.time - LevelStartTime < Instance.GracePeriod;
+
+        /// <summary>Robots and devices may sense players now (not in the grace period, not disabled by a test flag).</summary>
+        public static bool SensorsAllowed => !DevFlags.Peaceful && !DevFlags.FreezeRobots && !InGracePeriod;
+
+        /// <summary>The run is going on (or there is no session yet, e.g. in tools): robots may act.</summary>
+        public static bool IsPlaying => Instance == null || Instance.Phase.Value == RunPhase.Playing;
 
         /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
         public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar)
@@ -97,13 +94,13 @@ namespace Stealth.Game
         {
             Instance = this;
             Level.OnValueChanged += (_, _) => BuildLocal();
-            if (IsServer) { StartLevel(ForcedLevel); ForcedLevel = 0; }
+            if (IsServer) { StartLevel(DevFlags.ForcedLevel); DevFlags.ForcedLevel = 0; }
             else if (Level.Value.Seed != 0) BuildLocal();
         }
 
         public override void OnNetworkDespawn()
         {
-            LevelGenerator.Clear();
+            ActiveLevel.Clear();
             if (Instance == this) Instance = null;
         }
 
@@ -115,7 +112,7 @@ namespace Stealth.Game
             if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
             m_BuiltSeed = info.Seed;
             var layout = LevelGenerator.Generate(info.Seed, info.Index);
-            LevelGenerator.Build(layout, Art);
+            ActiveLevel.Load(layout, Art);
             ApplyAtmosphere();
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms");
         }
@@ -139,17 +136,14 @@ namespace Stealth.Game
                 if (item.IsSpawned) item.NetworkObject.Despawn();
 
             ScentTrail.Clear();
-            int seed = ForcedSeed != 0 ? ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
-            ForcedSeed = 0;
+            int seed = DevFlags.ForcedSeed != 0 ? DevFlags.ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
+            DevFlags.ForcedSeed = 0;
             Level.Value = new LevelInfo { Seed = seed, Index = index };
             BuildLocal();
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
 
-            var surface = LevelGenerator.CurrentRoot.AddComponent<NavMeshSurface>();
-            surface.collectObjects = CollectObjects.Children;
-            surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
-            surface.layerMask = ~(1 << LevelGenerator.CeilingLayer);
-            surface.BuildNavMesh();
+            // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
+            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
 
             int totalValue = SpawnContent(layout, seed);
             Quota.Value = QuotaFor(totalValue, index, m_PendingPenalties, QuotaShare, QuotaShareGrowth, DeathPenalty);
@@ -190,18 +184,13 @@ namespace Stealth.Game
                 DebugSpawnServer(spawn.Kind, pos, spawn.Rotation);
             }
 
-            foreach (var pose in layout.CameraSpots)
-            {
-                var obj = Instantiate(CameraPrefab, pose.position, pose.rotation);
-                obj.Spawn(true);
-                m_Spawned.Add(obj);
-            }
+            foreach (var pose in layout.CameraSpots) DebugSpawnServer(RobotKind.Camera, pose.position, pose.rotation);
 
             foreach (var spot in layout.LaserSpots)
             {
                 var obj = Instantiate(LaserPrefab, spot.Position, spot.Rotation);
                 var gate = obj.GetComponent<LaserGate>();
-                gate.Kind.Value = (byte)spot.Kind;
+                gate.Pattern.Value = spot.Kind;
                 gate.Width.Value = spot.Width;
                 obj.Spawn(true);
                 m_Spawned.Add(obj);
@@ -237,7 +226,7 @@ namespace Stealth.Game
                 m_LastAlarmCounted = NetworkManager.ServerTime.Time;
             }
             AlarmUntil.Value = NetworkManager.ServerTime.Time + AlarmDuration;
-            foreach (var robot in RobotController.All)
+            foreach (var robot in RobotController.Robots)
                 if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
         }
@@ -258,7 +247,7 @@ namespace Stealth.Game
         void SpawnHunter()
         {
             m_Hunters++;
-            var layout = LevelGenerator.Current;
+            var layout = ActiveLevel.Layout;
             Vector3 best = layout.PatrolPoints[0];
             float bestScore = -1f;
             foreach (var p in layout.PatrolPoints)

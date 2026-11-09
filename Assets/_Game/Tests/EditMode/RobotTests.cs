@@ -24,7 +24,7 @@ namespace Stealth.Tests
             Assert.IsFalse(first.Contains(RobotKind.Hound), "hounds come later");
             Assert.Greater(deep.Count, first.Count);
             foreach (RobotKind k in System.Enum.GetValues(typeof(RobotKind)))
-                if (k != RobotKind.Hunter) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
+                if (k != RobotKind.Hunter && k != RobotKind.Camera) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
             Assert.IsFalse(deep.Contains(RobotKind.Hunter), "hunters are never placed, they arrive");
         }
 

@@ -1,7 +1,4 @@
-using Stealth.Game;
-using Stealth.Level;
 using Stealth.Player;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Enemies
@@ -10,110 +7,69 @@ namespace Stealth.Enemies
     /// Wall camera sweeping left-right. Rotation is derived from the shared server time, so it is identical
     /// on every peer without syncing transforms. Spotting a player raises an alarm: nearby robots come running.
     /// </summary>
-    public class SecurityCamera : NetworkBehaviour
+    public class SecurityCamera : SecurityDevice
     {
+        [Header("Camera")]
         public Transform Pivot;
         public Light Spot;
-        public Renderer[] StatusRenderers;
-
         public float Tilt = 28f;
         public float SweepAngle = 80f;
         public float SweepPeriod = 8f;
         public float ViewDistance = 14f;
         public float ViewAngle = 50f;
+        [Tooltip("Seconds to detect a standing player at mid range in a lit room.")]
         public float DetectTime = 1.1f;
-        public float AlarmRadius = 35f;
-        public float AlarmCooldown = 6f;
 
-        /// <summary>0 idle, 1 noticing, 2 alarm</summary>
-        public readonly NetworkVariable<byte> Alert = new();
+        static readonly Color s_Idle = new(0.75f, 0.9f, 1f);
 
-        float m_Meter;
-        float m_HackedUntil;
-
-        public void HackServer(float seconds)
-        {
-            m_HackedUntil = Time.time + seconds;
-            m_Meter = 0f;
-        }
         float m_Phase;
-        float m_AlarmUntil;
-        MaterialPropertyBlock m_Block;
-        DetectorAwareness m_Awareness;
-        PlayerController m_LastSeen;
 
-        public override void OnNetworkSpawn()
+        protected override Color IdleColor => s_Idle;
+
+        protected override void OnDeviceSpawned()
         {
-            m_Phase = (NetworkObjectId % 11) * 0.73f;
-            m_Awareness = GetComponent<DetectorAwareness>();
-            Alert.OnValueChanged += (_, a) => ApplyVisual(a);
-            ApplyVisual(Alert.Value);
-            if (Spot != null)
-            {
-                Spot.range = ViewDistance;
-                Spot.spotAngle = ViewAngle;
-                Spot.innerSpotAngle = ViewAngle * 0.7f;
-            }
+            m_Phase = NetworkObjectId % 11 * 0.73f;
+            if (Spot == null) return;
+            Spot.range = ViewDistance;
+            Spot.spotAngle = ViewAngle;
+            Spot.innerSpotAngle = ViewAngle * 0.7f;
         }
 
-        void ApplyVisual(byte alert)
-        {
-            var c = alert switch { 0 => new Color(0.75f, 0.9f, 1f), 1 => new Color(1f, 0.85f, 0.1f), _ => new Color(1f, 0.1f, 0.05f) };
-            if (Spot != null) { Spot.color = c; Spot.intensity = alert == 2 ? 6f : 3f; }
-            m_Block ??= new MaterialPropertyBlock();
-            m_Block.SetColor("_BaseColor", c);
-            m_Block.SetColor("_EmissionColor", c * 3f);
-            foreach (var r in StatusRenderers) if (r != null) r.SetPropertyBlock(m_Block);
-        }
+        /// <summary>Yaw of the sweep at a moment of the shared clock (pure).</summary>
+        public static float SweepYaw(float time, float sweepAngle, float period) => Mathf.Sin(time * Mathf.PI * 2f / period) * sweepAngle / 2f;
 
-        void Update()
+        protected override void TickLocal()
         {
-            if (!IsSpawned) return;
             float t = NetworkManager.ServerTime.TimeAsFloat + m_Phase;
-            float yaw = Mathf.Sin(t * Mathf.PI * 2f / SweepPeriod) * SweepAngle / 2f;
-            Pivot.localRotation = Quaternion.Euler(Tilt, yaw, 0f);
+            Pivot.localRotation = Quaternion.Euler(Tilt, SweepYaw(t, SweepAngle, SweepPeriod), 0f);
+        }
 
-            if (!IsServer || GameManager.Peaceful || GameManager.InGracePeriod) return;
-            if (Time.time < m_HackedUntil) { if (Alert.Value != 0) Alert.Value = 0; m_Awareness?.ReportServer(0f, null); return; }
-            PlayerController seen = null;
+        protected override void OnStatusChanged()
+        {
+            if (Spot == null) return;
+            Spot.color = Status.Current;
+            Spot.intensity = Alert.Value == 2 && !IsHacked ? 6f : IsHacked ? 0f : 3f;
+        }
+
+        protected override void TickServer()
+        {
+            var eye = Pivot.position + Pivot.forward * 0.3f;
+            IIntruder seen = null;
             float bestDist = float.MaxValue;
             foreach (var p in PlayerController.All)
             {
-                if (p.Downed.Value) continue;
-                if (CanSee(p, out var d) && d < bestDist) { seen = p; bestDist = d; }
+                IIntruder target = p;
+                if (target.IsDown) continue;
+                var aim = Perception.AimPoint(target, 0.7f);
+                float d = Vector3.Distance(eye, aim);
+                if (d < bestDist && Perception.InCone(eye, Pivot.forward, aim, ViewDistance, ViewAngle) && Perception.LineOfSight(eye, target, 0.7f))
+                {
+                    seen = target;
+                    bestDist = d;
+                }
             }
-
-            if (seen != null)
-            {
-                float closeness = 1f - Mathf.Clamp01(bestDist / ViewDistance);
-                m_Meter += Time.deltaTime / DetectTime * Mathf.Lerp(0.5f, 2f, closeness) * (seen.Crouching.Value ? 0.7f : 1f)
-                           * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(seen.transform.position));
-            }
-            else m_Meter = Mathf.Max(0f, m_Meter - Time.deltaTime * 0.5f);
-
-            if (m_Meter >= 1f && Time.time >= m_AlarmUntil && seen != null)
-            {
-                m_AlarmUntil = Time.time + AlarmCooldown;
-                GameManager.Instance?.RaiseAlarmServer(seen.transform.position, AlarmRadius);
-            }
-            byte alert = Time.time < m_AlarmUntil ? (byte)2 : m_Meter > 0.15f ? (byte)1 : (byte)0;
-            if (Alert.Value != alert) Alert.Value = alert;
-            if (alert == 2 && seen == null) m_Meter = Mathf.Min(m_Meter, 0.9f);
-            if (seen != null) m_LastSeen = seen;
-            if (m_Awareness != null) m_Awareness.ReportServer(alert == 2 ? 1f : Mathf.Clamp01(m_Meter), m_LastSeen);
-        }
-
-        bool CanSee(PlayerController p, out float distance)
-        {
-            var eye = Pivot.position + Pivot.forward * 0.3f;
-            var target = p.transform.position + Vector3.up * (p.Height * 0.7f);
-            var dir = target - eye;
-            distance = dir.magnitude;
-            if (distance > ViewDistance || Vector3.Angle(Pivot.forward, dir) > ViewAngle / 2f) return false;
-            const int mask = ~(1 << LevelGenerator.CeilingLayer);
-            if (Physics.Raycast(eye, dir.normalized, out var hit, distance + 0.5f, mask, QueryTriggerInteraction.Ignore))
-                return hit.collider.GetComponentInParent<PlayerController>() == p;
-            return true;
+            if (seen == null) { Decay(0.5f); return; }
+            Notice(seen, SensorMath.CameraRate(DetectTime, bestDist, ViewDistance, seen.IsCrouching, Perception.LightFactor(seen.Position)));
         }
     }
 }

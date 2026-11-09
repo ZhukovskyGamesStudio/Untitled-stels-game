@@ -15,11 +15,6 @@ namespace Stealth.Enemies
 
         Vector3 Dir => ScanLine.Direction(Unity.Netcode.NetworkManager.Singleton.ServerTime.TimeAsFloat, Speed, NetworkObjectId * 53f);
 
-        protected override void OnSpawned()
-        {
-            if (Head == null) Head = FindPart(this, "AccentHead");
-        }
-
         protected override void TickLocal()
         {
             var d = Dir;
@@ -40,9 +35,9 @@ namespace Stealth.Enemies
             float len = Physics.Raycast(start, d, out var hit, Range, Perception.SightMask, QueryTriggerInteraction.Ignore) ? hit.distance : Range;
             foreach (var p in PlayerController.All)
             {
-                if (p.Downed.Value || !Perception.SameFloor(p.transform.position, transform.position)) continue;
-                if (ScanLine.Above(p.transform.position.y, transform.position.y + BeamHeight)) continue; // jumped over
-                if (ScanLine.Crosses(transform.position, d, len, false, p.transform.position)) { Trip(p); return; }
+                if (p.IsDown || !Perception.SameFloor(p.Position, transform.position)) continue;
+                if (ScanLine.Above(p.Position.y, transform.position.y + BeamHeight)) continue; // jumped over
+                if (ScanLine.Crosses(transform.position, d, len, false, p.Position)) { Trip(p); return; }
             }
             Decay(0.6f);
         }

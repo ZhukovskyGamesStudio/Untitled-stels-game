@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Stealth.Enemies
 {
-    /// <summary>Robots share sightings over the radio (pure rules, unit tested) + a visual ripple.</summary>
+    /// <summary>Robots share sightings over the radio (pure rules, unit tested). The visual is <see cref="RadioRipple"/>.</summary>
     public static class RobotRadio
     {
         public const float Range = 15f;
@@ -22,42 +22,6 @@ namespace Stealth.Enemies
                 if (d.magnitude <= range) result.Add(i);
             }
             return result;
-        }
-
-        /// <summary>Expanding ring at the sender (every peer).</summary>
-        public static void Ripple(Vector3 at, Material material)
-        {
-            var go = new GameObject("RadioRipple");
-            go.transform.position = at;
-            var lr = go.AddComponent<LineRenderer>();
-            lr.sharedMaterial = material;
-            lr.loop = true;
-            lr.positionCount = 32;
-            lr.widthMultiplier = 0.04f;
-            lr.useWorldSpace = false;
-            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            go.AddComponent<RippleFade>();
-        }
-
-        class RippleFade : MonoBehaviour
-        {
-            float m_T;
-            LineRenderer m_Line;
-
-            void Awake() => m_Line = GetComponent<LineRenderer>();
-
-            void Update()
-            {
-                m_T += Time.deltaTime;
-                float r = Mathf.Lerp(0.3f, 4f, m_T / 0.6f);
-                for (int i = 0; i < m_Line.positionCount; i++)
-                {
-                    float a = i / (float)m_Line.positionCount * Mathf.PI * 2f;
-                    m_Line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, 0.3f, Mathf.Sin(a) * r));
-                }
-                m_Line.widthMultiplier = 0.06f * (1f - m_T / 0.6f);
-                if (m_T > 0.6f) Destroy(gameObject);
-            }
         }
     }
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dev loop helpers (Git Bash on Windows). Usage:
 #   Tools/dev.sh tests            compile + EditMode tests
-#   Tools/dev.sh assets           rebuild generated assets and the scene
+#   Tools/dev.sh assets           build missing assets (FORCE=1: regenerate everything from code)
 #   Tools/dev.sh player           build Windows player
 #   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario>
 set -u
@@ -13,6 +13,7 @@ mkdir -p "$LOGS"
 
 case "${1:-}" in
   tests)
+    rm -f "$LOGS/tests.xml"
     "$UNITY" -batchmode -nographics -projectPath "$P" -runTests -testPlatform EditMode \
       -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log"
     code=$?
@@ -31,12 +32,12 @@ for tc in r.iter("test-case"):
 EOF
     exit $code ;;
   assets)
-    "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.PrototypeBuilder.BuildAllBatch -logFile "$P/Logs/build_assets.log"
+    "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.AssetBuilder.BuildAllBatch ${FORCE:+-force} -logFile "$P/Logs/build_assets.log"
     code=$?
-    grep -E "error CS|Exception|\[Builder\] (Prototype|.*hash.*0)" "$LOGS/build_assets.log" | sort -u | head -30
+    grep -E "error CS|Exception|\[Builder\] Assets built" "$LOGS/build_assets.log" | sort -u | head -30
     exit $code ;;
   player)
-    "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.PrototypeBuilder.BuildPlayerBatch -logFile "$P/Logs/build_player.log"
+    "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.AssetBuilder.BuildPlayerBatch -logFile "$P/Logs/build_player.log"
     code=$?
     grep -E "error CS|\[Builder\] Player" "$LOGS/build_player.log" | sort -u | head -30
     exit $code ;;

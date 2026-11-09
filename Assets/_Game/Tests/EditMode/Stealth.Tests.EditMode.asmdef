@@ -6,12 +6,20 @@
         "Unity.AI.Navigation",
         "Unity.Netcode.Runtime",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
-    "includePlatforms": ["Editor"],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "overrideReferences": true,
-    "precompiledReferences": ["nunit.framework.dll"],
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
     "autoReferenced": false,
-    "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ]
 }
