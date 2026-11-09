@@ -66,7 +66,7 @@ namespace Stealth.Enemies
             float yaw = Mathf.Sin(t * Mathf.PI * 2f / SweepPeriod) * SweepAngle / 2f;
             Pivot.localRotation = Quaternion.Euler(Tilt, yaw, 0f);
 
-            if (!IsServer || GameManager.Peaceful) return;
+            if (!IsServer || GameManager.Peaceful || GameManager.InGracePeriod) return;
             PlayerController seen = null;
             float bestDist = float.MaxValue;
             foreach (var p in PlayerController.All)

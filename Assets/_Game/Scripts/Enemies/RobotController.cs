@@ -121,7 +121,7 @@ namespace Stealth.Enemies
                 m_Agent.isStopped = true;
                 return;
             }
-            if (!GameManager.Peaceful) Sense();
+            if (!GameManager.Peaceful && !GameManager.InGracePeriod) Sense();
             Think();
             if (m_Awareness != null)
             {

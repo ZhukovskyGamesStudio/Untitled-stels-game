@@ -49,6 +49,18 @@ namespace Stealth.Game
         [Tooltip("Quota increase per player who was down at the end of the previous level.")]
         public float DeathPenalty = 0.15f;
         public float AlarmDuration = 6f;
+        [Tooltip("Sensors stay off for this long after a level starts: a moment to get your bearings.")]
+        public float GracePeriod = 8f;
+
+        public static float LevelStartTime { get; private set; }
+        public static bool InGracePeriod => Instance != null && Time.time - LevelStartTime < Instance.GracePeriod;
+
+        /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
+        public static int QuotaFor(int totalValue, int levelIndex, int penalties, float share = 0.35f, float growth = 0.04f, float penalty = 0.15f)
+        {
+            float s = Mathf.Min(0.85f, share + growth * levelIndex);
+            return Mathf.Max(10, Mathf.RoundToInt(totalValue * s * (1f + penalty * penalties) / 5f) * 5);
+        }
 
         public readonly NetworkVariable<LevelInfo> Level = new();
         public readonly NetworkVariable<int> Quota = new();
@@ -124,9 +136,8 @@ namespace Stealth.Game
             surface.BuildNavMesh();
 
             int totalValue = SpawnContent(layout, seed);
-            float share = QuotaShare + QuotaShareGrowth * index;
-            float penalty = 1f + DeathPenalty * m_PendingPenalties;
-            Quota.Value = Mathf.Max(10, Mathf.RoundToInt(totalValue * share * penalty / 5f) * 5);
+            Quota.Value = QuotaFor(totalValue, index, m_PendingPenalties, QuotaShare, QuotaShareGrowth, DeathPenalty);
+            LevelStartTime = Time.time;
             Collected.Value = 0;
             Phase.Value = RunPhase.Playing;
             AlarmUntil.Value = 0;
