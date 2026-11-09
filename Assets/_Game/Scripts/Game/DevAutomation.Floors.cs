@@ -187,6 +187,12 @@ namespace Stealth.Game
                 yield return Shot("door_open");
                 Log($"auto door: closed when far={closedFar}, open when near={door.IsOpen}");
             }
+
+            // The building from the street.
+            var outside = new Vector3(-9f, 0.05f, l.Height * LevelGenerator.Cell * 0.5f);
+            LookAtFrom(new Pose(outside, Quaternion.LookRotation(Vector3.right)), new Vector3(0, l.Floors * 1.5f, outside.z));
+            yield return new WaitForSeconds(2f);
+            yield return Shot("facade");
         }
     }
 }

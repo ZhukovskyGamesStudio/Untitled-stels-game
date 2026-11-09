@@ -13,6 +13,7 @@ namespace Stealth.Level
         public Material OutsideGround;
         public Material DoorFrame;
         public Material Door;
+        public Material Window;
 
         [Header("Props (non-networked)")]
         public GameObject Desk;

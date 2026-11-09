@@ -476,6 +476,7 @@ namespace Stealth.Level
 
             foreach (var s in l.Stairs) BuildStair(root, art, s);
             foreach (var d in l.AutoDoors) BuildAutoDoor(root, art, d);
+            BuildFacade(root, art, l);
 
             foreach (var p in l.Props)
             {
@@ -571,6 +572,58 @@ namespace Stealth.Level
             // Between the flights: a thin wall so nobody walks off flight B onto flight A.
             // Starts two steps away from the landing: a divider right at the landing would leave no room to turn.
             Box("Divider", LandingEnd + 2 * StepRun, FlightStart, aV1, bV0, 0f, FloorHeight - 0.4f, rail);
+        }
+
+        /// <summary>Windows on every floor (visual only) and street lamps in the gas around the building.</summary>
+        static void BuildFacade(GameObject root, LevelArt art, LevelLayout l)
+        {
+            float W = l.Width * Cell, H = l.Height * Cell;
+            var mat = art.Window != null ? art.Window : art.DoorFrame;
+            void Window(Vector3 center, bool alongX)
+            {
+                // Thin panes on both faces of the wall; no collider.
+                var size = alongX ? new Vector3(2.4f, 1.2f, WallThickness + 0.04f) : new Vector3(WallThickness + 0.04f, 1.2f, 2.4f);
+                var go = Block(root, "Window", center, size, mat);
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+            }
+            for (int f = 0; f < l.Floors; f++)
+            {
+                float y = LevelLayout.FloorY(f) + 1.7f;
+                for (int x = 0; x < l.Width; x++)
+                    foreach (float side in new[] { -2.6f, 2.6f })
+                    {
+                        float cx = (x + 0.5f) * Cell + side;
+                        Window(new Vector3(cx, y, 0f), true);
+                        Window(new Vector3(cx, y, H), true);
+                    }
+                for (int z = 0; z < l.Height; z++)
+                    foreach (float side in new[] { -2.6f, 2.6f })
+                    {
+                        float cz = (z + 0.5f) * Cell + side;
+                        Window(new Vector3(0f, y, cz), false);
+                        Window(new Vector3(W, y, cz), false);
+                    }
+            }
+
+            // Street lamps every ~14 m around the building, 6 m out in the fog.
+            const float offset = 6f, step = 14f;
+            var spots = new List<Vector3>();
+            for (float x = 0; x <= W; x += step) { spots.Add(new Vector3(x, 0, -offset)); spots.Add(new Vector3(x, 0, H + offset)); }
+            for (float z = step; z < H; z += step) { spots.Add(new Vector3(-offset, 0, z)); spots.Add(new Vector3(W + offset, 0, z)); }
+            foreach (var p in spots)
+            {
+                var pole = Block(root, "LampPole", p + Vector3.up * 2f, new Vector3(0.15f, 4f, 0.15f), art.DoorFrame);
+                pole.layer = CeilingLayer;
+                var lamp = new GameObject("StreetLamp");
+                lamp.transform.SetParent(root.transform, false);
+                lamp.transform.position = p + Vector3.up * 4.1f;
+                var light = lamp.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.range = 9f;
+                light.intensity = 2.5f;
+                light.color = new Color(1f, 0.85f, 0.55f);
+                light.shadows = LightShadows.None;
+            }
         }
 
         static void BuildAutoDoor(GameObject root, LevelArt art, Pose pose)
