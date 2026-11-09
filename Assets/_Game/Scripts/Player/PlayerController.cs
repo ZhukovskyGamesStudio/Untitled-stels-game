@@ -74,6 +74,10 @@ namespace Stealth.Player
         float m_StepTimer;
         float m_LaughTimer;
         float m_InvulnerableUntil;
+        Vector3 m_ServerLastPos;
+
+        /// <summary>Horizontal speed measured on the server from the replicated position (for vibration sensors).</summary>
+        public float ServerSpeed { get; private set; }
         float m_PitchSyncTimer;
         Vector3 m_LastModelPos;
         float m_RemoteSpeed;
@@ -145,6 +149,14 @@ namespace Stealth.Player
 
         void Update()
         {
+            if (IsServer && Time.deltaTime > 0f)
+            {
+                var d = transform.position - m_ServerLastPos;
+                m_ServerLastPos = transform.position;
+                d.y = 0;
+                float s = d.magnitude / Time.deltaTime;
+                ServerSpeed = s > 20f ? 0f : Mathf.Lerp(ServerSpeed, s, 1f - Mathf.Exp(-10f * Time.deltaTime));
+            }
             UpdateModelPose();
             if (!IsOwner) return;
 

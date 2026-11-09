@@ -32,6 +32,9 @@ namespace Stealth.Enemies
         [Tooltip("Share of the hearing radius at which the robot chases the noise source directly.")]
         public float ChaseHearingShare = 0f;
         public float ContactDistance = 1.3f;
+        [Tooltip("Seismic: feels walking players on the same floor within this range (0 = no seismic sensor).")]
+        public float SeismicRange;
+        public float SeismicSpeed = 1.2f;
 
         [Header("Body")]
         [Tooltip("Flying robots hover this high above the navmesh.")]
@@ -142,39 +145,59 @@ namespace Stealth.Enemies
             }
         }
 
+        /// <summary>
+        /// Every sensor channel gives a detection rate per player; the strongest one wins.
+        /// Channels: eyes (optionally colour-filtered), floor vibrations (seismic).
+        /// </summary>
         void Sense()
         {
-            PlayerController seen = null;
-            float seenDist = float.MaxValue;
+            PlayerController best = null;
+            float bestRate = 0f;
             foreach (var p in PlayerController.All)
             {
                 if (p.Downed.Value) continue;
                 float d = Vector3.Distance(p.transform.position, transform.position);
                 if (d <= ContactDistance) { StartChase(p); return; } // bumped into the robot
 
-                if (HasEyes && CanSee(p, out var dist) && dist < seenDist) { seen = p; seenDist = dist; }
+                float rate = 0f;
+                if (HasEyes && CanSee(p, out var dist)) rate = Mathf.Max(rate, VisionRate(p, dist));
+                if (SeismicRange > 0f) rate = Mathf.Max(rate, SeismicRate(p));
+                if (rate > bestRate) { best = p; bestRate = rate; }
             }
 
-            if (seen != null)
+            if (best != null)
             {
-                if (State.Value == RobotState.Chase && seen == m_Target)
+                if (State.Value == RobotState.Chase && best == m_Target)
                 {
-                    m_LastKnown = seen.transform.position;
+                    m_LastKnown = best.transform.position;
                     m_LastSenseTime = Time.time;
                     return;
                 }
-                float closeness = 1f - Mathf.Clamp01(seenDist / ViewDistance);
-                float rate = DetectionSpeed * Mathf.Lerp(0.35f, 2.5f, closeness) * (seen.Crouching.Value ? 0.6f : 1f)
-                             * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(seen.transform.position));
-                m_Suspicion += rate * Time.deltaTime;
-                m_Suspect = seen;
-                if (m_Suspicion >= 1f) StartChase(seen);
+                m_Suspicion += bestRate * Time.deltaTime;
+                m_Suspect = best;
+                if (m_Suspicion >= 1f) StartChase(best);
                 else if (m_Suspicion > 0.25f && State.Value != RobotState.Chase) SetState(RobotState.Suspicious);
             }
             else
             {
                 m_Suspicion = Mathf.Max(0f, m_Suspicion - 0.35f * Time.deltaTime);
             }
+        }
+
+        float VisionRate(PlayerController p, float dist)
+        {
+            float closeness = 1f - Mathf.Clamp01(dist / ViewDistance);
+            return DetectionSpeed * Mathf.Lerp(0.35f, 2.5f, closeness) * (p.Crouching.Value ? 0.6f : 1f)
+                   * LightMath.VisionFactor(LevelGenerator.Current != null && LevelGenerator.Current.IsDarkAt(p.transform.position));
+        }
+
+        /// <summary>Footsteps through the floor: same storey, no line of sight needed; crouching or standing still is silent.</summary>
+        float SeismicRate(PlayerController p)
+        {
+            if (!SeismicSense.Feels(transform.position, p.transform.position, p.ServerSpeed, p.Crouching.Value, SeismicRange)) return 0f;
+            var d = p.transform.position - transform.position;
+            d.y = 0;
+            return SeismicSpeed * Mathf.Lerp(0.5f, 2f, 1f - Mathf.Clamp01(d.magnitude / SeismicRange));
         }
 
         public bool CanSee(PlayerController p, out float distance)

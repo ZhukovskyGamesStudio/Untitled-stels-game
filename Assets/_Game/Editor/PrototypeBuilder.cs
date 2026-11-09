@@ -51,12 +51,14 @@ namespace Stealth.EditorTools
             var guard = BuildGuard();
             var listener = BuildListener();
             var drone = BuildDrone();
+            var thumper = BuildThumper();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
             robots[(int)RobotKind.Guard] = guard;
             robots[(int)RobotKind.Listener] = listener;
             robots[(int)RobotKind.Drone] = drone;
+            robots[(int)RobotKind.Thumper] = thumper;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -173,6 +175,7 @@ namespace Stealth.EditorTools
             Mat("RobotAccent", new Color(0.18f, 0.19f, 0.22f), smoothness: 0.5f);
             Mat("ListenerBody", new Color(0.95f, 0.55f, 0.15f), smoothness: 0.5f);
             Mat("DroneBody", new Color(0.25f, 0.27f, 0.32f), smoothness: 0.7f);
+            Mat("ThumperBody", new Color(0.55f, 0.5f, 0.2f), smoothness: 0.3f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -463,6 +466,20 @@ namespace Stealth.EditorTools
             rc.ChaseSpeed = 5f;
             rc.LoseTargetAfter = 3f;
             rc.ContactDistance = 1.4f;
+        });
+
+        static GameObject BuildThumper() => BuildRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), rc =>
+        {
+            rc.HasEyes = false;
+            rc.CanUseStairs = false;    // tracks
+            rc.HearingMultiplier = 0f;  // deaf; it listens with its feet
+            rc.SeismicRange = 10f;
+            rc.SeismicSpeed = 1.1f;
+            rc.PatrolSpeed = 1.2f;
+            rc.InvestigateSpeed = 2.2f;
+            rc.ChaseSpeed = 3.3f;
+            rc.AttackRange = 1.9f;
+            rc.ContactDistance = 1.6f;
         });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>

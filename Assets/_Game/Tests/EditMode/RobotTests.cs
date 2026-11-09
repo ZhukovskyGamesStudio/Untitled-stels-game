@@ -62,5 +62,16 @@ namespace Stealth.Tests
             Assert.IsTrue(Perception.InFlatCone(Vector3.zero, Vector3.forward, new Vector3(0, 5, 3), 10, 60), "flat ignores height");
             Assert.IsFalse(Perception.InCone(Vector3.zero, Vector3.forward, new Vector3(0, 5, 3), 10, 60));
         }
+
+        [Test]
+        public void SeismicFeelsWalkersButNotSneakers()
+        {
+            var sensor = new Vector3(0, 0, 0);
+            Assert.IsTrue(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 3.6f, false, 10f), "walking");
+            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 1.8f, true, 10f), "crouching");
+            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 0.2f, false, 10f), "standing still");
+            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(12, 0, 0), 6f, false, 10f), "too far");
+            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(2, 3.5f, 0), 6f, false, 10f), "other floor");
+        }
     }
 }
