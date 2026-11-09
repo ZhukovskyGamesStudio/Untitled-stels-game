@@ -58,6 +58,7 @@ namespace Stealth.EditorTools
             var hunter = BuildHunter();
             var turret = BuildTurret();
             var spider = BuildSpider();
+            var vacuum = BuildVacuum();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
@@ -71,6 +72,7 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Hunter] = hunter;
             robots[(int)RobotKind.Turret] = turret;
             robots[(int)RobotKind.Spider] = spider;
+            robots[(int)RobotKind.Vacuum] = vacuum;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -194,6 +196,7 @@ namespace Stealth.EditorTools
             Mat("HunterBody", new Color(0.12f, 0.12f, 0.14f), smoothness: 0.85f);
             Mat("TurretBody", new Color(0.3f, 0.35f, 0.3f), smoothness: 0.6f);
             Mat("SpiderBody", new Color(0.15f, 0.12f, 0.12f), smoothness: 0.7f);
+            Mat("VacuumBody", new Color(0.2f, 0.2f, 0.22f), smoothness: 0.8f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -621,6 +624,11 @@ namespace Stealth.EditorTools
         });
 
         static GameObject BuildSpider() => BuildDevice<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) => { });
+
+        static GameObject BuildVacuum() => BuildDevice<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
+        {
+            v.Line = Beam(root, "ScanLine", 0.03f);
+        });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>
         {

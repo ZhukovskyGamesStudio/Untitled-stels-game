@@ -77,6 +77,22 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ScanLineCrossing()
+        {
+            var c = Vector3.zero;
+            var dir = ScanLine.Direction(0f, 90f); // +Z at t = 0
+            Assert.AreEqual(1f, dir.z, 1e-4f);
+            Assert.IsTrue(ScanLine.Crosses(c, dir, 3f, true, new Vector3(0.2f, 0, 2f)));
+            Assert.IsTrue(ScanLine.Crosses(c, dir, 3f, true, new Vector3(0f, 0, -2f)), "two-sided");
+            Assert.IsFalse(ScanLine.Crosses(c, dir, 3f, false, new Vector3(0f, 0, -2f)), "one-sided");
+            Assert.IsFalse(ScanLine.Crosses(c, dir, 3f, true, new Vector3(1f, 0, 2f)), "beside the line");
+            Assert.IsFalse(ScanLine.Crosses(c, dir, 3f, true, new Vector3(0f, 0, 4f)), "beyond its end");
+            Assert.AreEqual(1f, ScanLine.Direction(1f, 90f).x, 1e-4f, "a quarter turn per second");
+            Assert.IsTrue(ScanLine.Above(0.6f, 0.4f));
+            Assert.IsFalse(ScanLine.Above(0.0f, 0.4f));
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);

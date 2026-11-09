@@ -15,6 +15,7 @@ namespace Stealth.Game
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
             if (kind == RobotKind.Hound) { steps.Add(TrailCheck(obj)); return; }
             if (kind == RobotKind.Sorter) steps.Add(SorterCheck(obj));
+            if (kind == RobotKind.Vacuum) { steps.Add(CrossLineCheck(kind, obj)); return; }
             steps.Add(DetectionCheck(kind, obj));
         }
 
@@ -82,6 +83,27 @@ namespace Stealth.Game
             GameManager.FreezeRobots = true;
             Log($"sneak past {kind} (crouch={crouch}): max awareness {max:0.00}");
             yield return new WaitForSeconds(0.5f);
+        }
+
+        /// <summary>Stand next to a scan line and wait for it to sweep over you (no jumping).</summary>
+        IEnumerator CrossLineCheck(RobotKind kind, NetworkObject obj)
+        {
+            var gm = GameManager.Instance;
+            gm.AlarmUntil.Value = 0;
+            var p = obj.transform.position;
+            // Ceiling robots hang just under the next slab: measure the floor from a point below them.
+            var stand = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y - 2.5f)) + 0.05f, p.z) + new Vector3(1.5f, 0, 0.5f);
+            LookAtFrom(new Pose(stand, Quaternion.LookRotation(Vector3.left)), new Vector3(p.x, stand.y, p.z));
+            GameManager.FreezeRobots = false;
+            float t0 = Time.time;
+            bool shot = false;
+            while (Time.time - t0 < 8f && !gm.AlarmActive)
+            {
+                if (!shot && Time.time - t0 > 1f) { shot = true; yield return Shot($"kind_{kind}_scanning"); }
+                yield return null;
+            }
+            Log($"{kind}: line swept over the player after {Time.time - t0:0.0}s, alarm={gm.AlarmActive}");
+            GameManager.FreezeRobots = true;
         }
 
         /// <summary>Empty-handed in front of a sorter: ignored. Then the player picks up loot of its colour.</summary>
