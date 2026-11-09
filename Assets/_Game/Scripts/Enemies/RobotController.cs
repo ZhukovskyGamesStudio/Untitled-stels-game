@@ -33,6 +33,16 @@ namespace Stealth.Enemies
         public float ChaseHearingShare = 0f;
         public float ContactDistance = 1.3f;
 
+        [Header("Body")]
+        [Tooltip("Flying robots hover this high above the navmesh.")]
+        public float HoverHeight;
+        [Tooltip("Pitch of the eye in degrees (drones look down).")]
+        public float EyePitch;
+        [Tooltip("Instead of (or before) attacking, raise a building-wide alarm on detection.")]
+        public bool AlarmOnDetect;
+        [Tooltip("Can this robot hit players at all?")]
+        public bool CanAttack = true;
+
         [Header("Movement")]
         [Tooltip("Legs: can use stairs and move between floors. Wheels / tracks: stays on its floor.")]
         public bool CanUseStairs = true;
@@ -76,6 +86,7 @@ namespace Stealth.Enemies
             if (!IsServer) return;
             m_Agent.enabled = true;
             m_Agent.areaMask = CanUseStairs ? NavMesh.AllAreas : NavMesh.AllAreas & ~(1 << LevelGenerator.StairsArea);
+            m_Agent.baseOffset = HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = PatrolSpeed;
             NoiseSystem.OnNoise += OnNoise;
@@ -116,6 +127,7 @@ namespace Stealth.Enemies
         void Update()
         {
             if (!IsServer || m_Agent == null || !m_Agent.isOnNavMesh) return;
+            if (GameManager.FreezeRobots) { m_Agent.isStopped = true; return; }
             if (GameManager.Instance != null && GameManager.Instance.Phase.Value != RunPhase.Playing)
             {
                 m_Agent.isStopped = true;
@@ -221,6 +233,8 @@ namespace Stealth.Enemies
 
         void StartChase(PlayerController p)
         {
+            if (AlarmOnDetect && State.Value != RobotState.Chase && GameManager.Instance != null)
+                GameManager.Instance.RaiseAlarmServer(p.transform.position, 30f);
             m_Target = p;
             m_Suspicion = 1f;
             m_LastKnown = p.transform.position;
@@ -278,8 +292,10 @@ namespace Stealth.Enemies
                     }
                     m_Agent.speed = ChaseSpeed;
                     m_Agent.SetDestination(m_LastKnown);
-                    float dist = Vector3.Distance(m_Target.transform.position, transform.position);
-                    if (dist <= AttackRange)
+                    var toTarget = m_Target.transform.position - transform.position;
+                    toTarget.y = 0; // flying robots dive at the player
+                    float dist = toTarget.magnitude;
+                    if (CanAttack && dist <= AttackRange)
                     {
                         FaceTowards(m_Target.transform.position);
                         if (Time.time >= m_NextAttack)

@@ -48,7 +48,7 @@ EOF
     rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
     cscenario="client"; [ "$scenario" != "full" ] && cscenario="$scenario"
-    "$exe" -nosteam -host-local -autotest "$scenario" $linger ${SEED:+-seed $SEED} ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL} -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
+    "$exe" -nosteam -host-local -autotest "$scenario" $linger ${SEED:+-seed $SEED} ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL} ${HOSTILE:+-hostile} ${KINDS:+-kinds $KINDS} -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
     pids=($!)
     for i in $(seq 1 "$clients"); do
       sleep 5

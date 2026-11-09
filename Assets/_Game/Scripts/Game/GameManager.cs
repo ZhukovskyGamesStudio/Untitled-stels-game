@@ -31,14 +31,16 @@ namespace Stealth.Game
         public static int ForcedSeed;
         /// <summary>Test hook: robots and sensors ignore players (UI screenshots).</summary>
         public static bool Peaceful;
+        /// <summary>Test hook: robots stand still (gallery screenshots).</summary>
+        public static bool FreezeRobots;
         /// <summary>Test hook: start the run at this level index.</summary>
         public static int ForcedLevel;
 
         [Header("Content")]
         public LevelArt Art;
         public NetworkObject ItemPrefab;
-        public NetworkObject GuardRobotPrefab;
-        public NetworkObject ListenerRobotPrefab;
+        [Tooltip("Indexed by RobotKind. Empty entries are skipped.")]
+        public NetworkObject[] RobotPrefabs = new NetworkObject[RobotRoster.KindCount];
         public NetworkObject CameraPrefab;
         public NetworkObject LaserPrefab;
 
@@ -166,11 +168,10 @@ namespace Stealth.Game
             // Robots.
             foreach (var spawn in layout.RobotSpawns)
             {
-                var prefab = spawn.Type == 0 ? GuardRobotPrefab : ListenerRobotPrefab;
-                var pos = NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas) ? hit.position : spawn.Position;
-                var obj = Instantiate(prefab, pos, Quaternion.Euler(0, rng.Next(360), 0));
-                obj.Spawn(true);
-                m_Spawned.Add(obj);
+                var pos = spawn.Position;
+                bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
+                if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
+                DebugSpawnServer(spawn.Kind, pos, spawn.Rotation);
             }
 
             foreach (var pose in layout.CameraSpots)
@@ -193,6 +194,17 @@ namespace Stealth.Game
         }
 
         // ------------------------------------------------------------------ server API
+
+        /// <summary>Spawns a robot / device of the given kind (server). Returns null if there is no prefab yet.</summary>
+        public NetworkObject DebugSpawnServer(RobotKind kind, Vector3 position, Quaternion rotation)
+        {
+            int i = (int)kind;
+            if (RobotPrefabs == null || i >= RobotPrefabs.Length || RobotPrefabs[i] == null) return null;
+            var obj = Instantiate(RobotPrefabs[i], position, rotation);
+            obj.Spawn(true);
+            m_Spawned.Add(obj);
+            return obj;
+        }
 
         public void AddCollectedServer(int value)
         {

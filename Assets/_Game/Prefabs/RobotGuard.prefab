@@ -240,7 +240,7 @@ Transform:
   m_GameObject: {fileID: 5865944042027658926}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.85, z: 0.45}
+  m_LocalPosition: {x: 0, y: 1.89, z: 0.45000002}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -415,6 +415,7 @@ GameObject:
   - component: {fileID: 3122508800144792924}
   - component: {fileID: 1639075504709438904}
   - component: {fileID: 7164417024814979022}
+  - component: {fileID: 5347404183949843918}
   - component: {fileID: 4763823296101050030}
   m_Layer: 0
   m_Name: RobotGuard
@@ -573,6 +574,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.DetectorAwareness
   ShowTopMostFoldoutHeaderGroup: 1
   Point: {fileID: 9102371486318145228}
+--- !u!114 &5347404183949843918
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6943907234937704248}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fc599d8aaaefc64f96b7275b349a87f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotAnimator
+  RotorSpeed: 1800
+  StepFrequency: 1.6
+  LegSwing: 25
 --- !u!114 &4763823296101050030
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -594,6 +610,10 @@ MonoBehaviour:
   HearingMultiplier: 0.8
   ChaseHearingShare: 0
   ContactDistance: 1.3
+  HoverHeight: 0
+  EyePitch: 0
+  AlarmOnDetect: 0
+  CanAttack: 1
   CanUseStairs: 1
   PatrolSpeed: 1.8
   InvestigateSpeed: 2.8

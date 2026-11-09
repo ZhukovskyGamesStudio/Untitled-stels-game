@@ -363,7 +363,41 @@ namespace Stealth.Level
                 }
                 else cell = candidates[rng.Next(candidates.Count)];
                 var pos = l.CellCenter(cell.z, cell.x, cell.y) + new Vector3(Range(rng, -1f, 1f), 0, Range(rng, -1f, 1f));
-                l.RobotSpawns.Add(new RobotSpawn { Type = rng.NextDouble() < 0.6 ? 0 : 1, Floor = cell.z, Position = pos });
+                var kind = RobotRoster.PickRobot(level, rng);
+                l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
+            }
+
+            // Fixed security devices: pressure plates in the room's walkways, motion sensors on walls, lidar poles.
+            int devices = 1 + level;
+            for (int i = 0; i < devices; i++)
+            {
+                var cell = candidates[rng.Next(candidates.Count)];
+                var c = l.CellCenter(cell.z, cell.x, cell.y);
+                var kind = RobotRoster.PickDevice(level, rng);
+                Vector3 pos;
+                Quaternion rot;
+                switch (kind)
+                {
+                    case RobotKind.MotionSensor:
+                    {
+                        var corner = new Vector3(rng.Next(2) == 0 ? -1 : 1, 0, rng.Next(2) == 0 ? -1 : 1);
+                        pos = c + corner * (Cell / 2f - 0.2f) + Vector3.up * 2.2f;
+                        rot = Quaternion.LookRotation(-corner.normalized);
+                        break;
+                    }
+                    case RobotKind.PressurePlate:
+                    {
+                        var dirs = new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+                        pos = c + dirs[rng.Next(4)] * Range(rng, 2f, 3.5f);
+                        rot = Quaternion.identity;
+                        break;
+                    }
+                    default:
+                        pos = c;
+                        rot = Quaternion.identity;
+                        break;
+                }
+                l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = rot });
             }
 
             int cameras = 2 + level;

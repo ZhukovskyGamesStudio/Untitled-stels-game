@@ -1,0 +1,56 @@
+using System;
+using System.Collections;
+using Stealth.Enemies;
+using Stealth.Level;
+using UnityEngine;
+
+namespace Stealth.Game
+{
+    public partial class DevAutomation
+    {
+        /// <summary>
+        /// Every robot / device kind spawned in front of the camera in the lobby, one screenshot each.
+        /// -kinds Guard,Drone limits the list. Robots are peaceful unless -hostile is passed.
+        /// </summary>
+        IEnumerator GalleryScenario()
+        {
+            var gm = GameManager.Instance;
+            if (!Me.IsServer) yield break;
+            var only = Arg("-kinds");
+            GameManager.FreezeRobots = true;
+            gm.GracePeriod = 0f; // sensors on immediately
+            var hatch = LevelGenerator.Current.HatchPosition;
+            // Clear the stage: robots that wander into the lobby would photobomb the gallery.
+            foreach (var r in RobotController.All.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+
+            foreach (RobotKind kind in Enum.GetValues(typeof(RobotKind)))
+            {
+                if (!string.IsNullOrEmpty(only) && Array.IndexOf(only.Split(','), kind.ToString()) < 0) continue;
+                var stage = hatch + new Vector3(0, 0, 2.6f);
+                var pos = stage;
+                var rot = Quaternion.LookRotation(Vector3.back);
+                if (kind == RobotKind.MotionSensor) { pos = hatch + new Vector3(0, 2.2f, 4.75f); }
+                var obj = gm.DebugSpawnServer(kind, pos, rot);
+                if (obj == null) { Log($"gallery: {kind} has no prefab yet"); continue; }
+                var view = hatch + new Vector3(0.6f, 0.05f, -1.6f);
+                LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(stage - view))), stage + Vector3.up * (kind == RobotKind.MotionSensor ? 2.2f : 0.9f));
+                yield return new WaitForSeconds(1.5f);
+                Log($"gallery: {kind} at {obj.transform.position}");
+                yield return Shot($"kind_{kind}");
+                yield return GalleryExtra(kind, obj);
+                if (obj != null && obj.IsSpawned) obj.Despawn();
+                yield return null;
+            }
+        }
+
+        /// <summary>Per-kind behaviour checks hooked in by later iterations.</summary>
+        IEnumerator GalleryExtra(RobotKind kind, Unity.Netcode.NetworkObject obj)
+        {
+            var steps = new System.Collections.Generic.List<IEnumerator>();
+            GalleryExtraImpl(kind, obj, steps);
+            foreach (var s in steps) yield return s;
+        }
+
+        partial void GalleryExtraImpl(RobotKind kind, Unity.Netcode.NetworkObject obj, System.Collections.Generic.List<IEnumerator> steps);
+    }
+}

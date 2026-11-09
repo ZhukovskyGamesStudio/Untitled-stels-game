@@ -76,14 +76,28 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   Art: {fileID: 11400000, guid: 032e56169cd631a49bf1f2127e361ef1, type: 2}
   ItemPrefab: {fileID: 1641255623952430728, guid: 0d3114576345dd743a128ec9fe22d999, type: 3}
-  GuardRobotPrefab: {fileID: 5965668700972537533, guid: fe9b6b9b7cc619143bc21fe7d601fa1d, type: 3}
-  ListenerRobotPrefab: {fileID: 3070939368583792937, guid: 7bb739b3d4fe38244b2570416c54ac14, type: 3}
+  RobotPrefabs:
+  - {fileID: 5965668700972537533, guid: fe9b6b9b7cc619143bc21fe7d601fa1d, type: 3}
+  - {fileID: 3070939368583792937, guid: 7bb739b3d4fe38244b2570416c54ac14, type: 3}
+  - {fileID: 4756499417245271607, guid: 19b984e023190c64fb2c6b570a80ab21, type: 3}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   CameraPrefab: {fileID: 54701004545588399, guid: 1c965ed108d1d344280fdf4fcd2e6c35, type: 3}
   LaserPrefab: {fileID: 6220382670938708600, guid: 279d4dce660342840a28b7a080598665, type: 3}
   QuotaShare: 0.35
   QuotaShareGrowth: 0.04
   DeathPenalty: 0.15
   AlarmDuration: 6
+  GracePeriod: 8
 --- !u!114 &2591685411338274905
 MonoBehaviour:
   m_ObjectHideFlags: 0

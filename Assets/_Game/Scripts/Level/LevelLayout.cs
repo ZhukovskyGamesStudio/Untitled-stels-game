@@ -17,9 +17,10 @@ namespace Stealth.Level
 
     public struct RobotSpawn
     {
-        public int Type;   // index into GameManager robot prefabs (see RobotKind)
+        public RobotKind Kind;
         public int Floor;
         public Vector3 Position;
+        public Quaternion Rotation;
     }
 
     public struct LaserSpot

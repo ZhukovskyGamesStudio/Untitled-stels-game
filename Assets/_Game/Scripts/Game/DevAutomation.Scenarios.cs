@@ -16,6 +16,7 @@ namespace Stealth.Game
             m_Scenarios["rooms"] = RoomsScenario;
             m_Scenarios["vent"] = VentScenario;
             m_Scenarios["perf"] = PerfScenario;
+            m_Scenarios["gallery"] = GalleryScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

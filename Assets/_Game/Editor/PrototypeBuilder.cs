@@ -48,13 +48,19 @@ namespace Stealth.EditorTools
             var visuals = BuildItemVisuals();
             var item = BuildWorldItem(visuals);
             var player = BuildPlayer();
-            var guard = BuildRobot("RobotGuard", "robot_guard", true);
-            var listener = BuildRobot("RobotListener", "robot_listener", false);
+            var guard = BuildGuard();
+            var listener = BuildListener();
+            var drone = BuildDrone();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
-            var session = BuildSession(art, item, guard, listener, cam, laser);
+            var robots = new GameObject[RobotRoster.KindCount];
+            robots[(int)RobotKind.Guard] = guard;
+            robots[(int)RobotKind.Listener] = listener;
+            robots[(int)RobotKind.Drone] = drone;
+            var session = BuildSession(art, item, robots, cam, laser);
 
-            var networkPrefabs = new[] { player, item, guard, listener, cam, laser, session };
+            var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
+            networkPrefabs.AddRange(robots.Where(r => r != null));
             FixNetworkHashes(networkPrefabs);
             var list = BuildPrefabList(networkPrefabs);
             BuildScene(player, session, list);
@@ -166,6 +172,7 @@ namespace Stealth.EditorTools
             Mat("RobotBody", new Color(0.86f, 0.87f, 0.9f), smoothness: 0.6f);
             Mat("RobotAccent", new Color(0.18f, 0.19f, 0.22f), smoothness: 0.5f);
             Mat("ListenerBody", new Color(0.95f, 0.55f, 0.15f), smoothness: 0.5f);
+            Mat("DroneBody", new Color(0.25f, 0.27f, 0.32f), smoothness: 0.7f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -381,7 +388,8 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ enemies
 
-        static GameObject BuildRobot(string name, string file, bool guard)
+        /// <summary>Common robot prefab: NetworkObject + server NetworkTransform + NavMeshAgent + sensors + visuals.</summary>
+        static GameObject BuildRobot(string name, string file, string bodyMat, float radius, Vector3 eyePos, System.Action<RobotController> config)
         {
             var root = new GameObject(name);
             root.AddComponent<NetworkObject>();
@@ -393,18 +401,18 @@ namespace Stealth.EditorTools
 
             var model = Model(file);
             model.transform.SetParent(root.transform, false);
-            Paint(model, guard ? "RobotBody" : "ListenerBody", "RobotAccent", "SensorGlow");
+            Paint(model, bodyMat, "RobotAccent", "SensorGlow");
             var b = LocalBounds(root);
 
             var col = root.AddComponent<CapsuleCollider>();
-            col.height = b.size.y;
-            col.radius = guard ? 0.4f : 0.55f;
-            col.center = new Vector3(0, b.size.y / 2f, 0);
+            col.height = Mathf.Max(b.size.y, radius * 2f);
+            col.radius = radius;
+            col.center = new Vector3(0, b.center.y, 0);
 
             var agent = root.AddComponent<NavMeshAgent>();
             agent.enabled = false;
-            agent.radius = col.radius;
-            agent.height = b.size.y;
+            agent.radius = radius;
+            agent.height = Mathf.Max(0.5f, b.size.y);
             agent.angularSpeed = 360f;
             agent.acceleration = 14f;
             agent.stoppingDistance = 0.4f;
@@ -412,11 +420,11 @@ namespace Stealth.EditorTools
 
             var eye = new GameObject("EyePoint");
             eye.transform.SetParent(root.transform, false);
-            eye.transform.localPosition = guard ? new Vector3(0, 1.84f, 0.3f) : new Vector3(0, 1.2f, 0f);
+            eye.transform.localPosition = eyePos;
 
             var lightGo = new GameObject("StatusLight");
             lightGo.transform.SetParent(root.transform, false);
-            lightGo.transform.localPosition = guard ? new Vector3(0, 1.85f, 0.45f) : new Vector3(0, 1.35f, 0f);
+            lightGo.transform.localPosition = eyePos + new Vector3(0, 0.05f, 0.15f);
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Point;
             light.range = 3.5f;
@@ -424,35 +432,53 @@ namespace Stealth.EditorTools
             light.shadows = LightShadows.None;
 
             root.AddComponent<DetectorAwareness>().Point = eye.transform;
+            root.AddComponent<RobotAnimator>();
             var rc = root.AddComponent<RobotController>();
             rc.Eye = eye.transform;
             rc.StatusRenderers = Parts(model, "Eye");
             rc.StatusLight = light;
-            if (guard)
-            {
-                rc.HasEyes = true;
-                rc.ViewDistance = 13f;
-                rc.ViewAngle = 100f;
-                rc.HearingMultiplier = 0.8f;
-                rc.ChaseHearingShare = 0f;
-                rc.PatrolSpeed = 1.8f;
-                rc.InvestigateSpeed = 2.8f;
-                rc.ChaseSpeed = 4.4f;
-            }
-            else
-            {
-                rc.HasEyes = false;
-                rc.CanUseStairs = false; // wheels
-                rc.HearingMultiplier = 1.6f;
-                rc.ChaseHearingShare = 0.6f;
-                rc.PatrolSpeed = 1.5f;
-                rc.InvestigateSpeed = 3.2f;
-                rc.ChaseSpeed = 5f;
-                rc.LoseTargetAfter = 3f;
-                rc.ContactDistance = 1.4f;
-            }
+            config(rc);
             return Save(root, $"{Prefabs}/{name}.prefab");
         }
+
+        static GameObject BuildGuard() => BuildRobot("RobotGuard", "robot_guard", "RobotBody", 0.4f, new Vector3(0, 1.84f, 0.3f), rc =>
+        {
+            rc.HasEyes = true;
+            rc.ViewDistance = 13f;
+            rc.ViewAngle = 100f;
+            rc.HearingMultiplier = 0.8f;
+            rc.PatrolSpeed = 1.8f;
+            rc.InvestigateSpeed = 2.8f;
+            rc.ChaseSpeed = 4.4f;
+        });
+
+        static GameObject BuildListener() => BuildRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), rc =>
+        {
+            rc.HasEyes = false;
+            rc.CanUseStairs = false; // wheels
+            rc.HearingMultiplier = 1.6f;
+            rc.ChaseHearingShare = 0.6f;
+            rc.PatrolSpeed = 1.5f;
+            rc.InvestigateSpeed = 3.2f;
+            rc.ChaseSpeed = 5f;
+            rc.LoseTargetAfter = 3f;
+            rc.ContactDistance = 1.4f;
+        });
+
+        static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>
+        {
+            rc.HoverHeight = 2.1f;
+            rc.HasEyes = true;
+            rc.ViewDistance = 11f;
+            rc.ViewAngle = 120f;
+            rc.EyePitch = 35f;      // looks down-forward
+            rc.HearingMultiplier = 0.5f;
+            rc.AlarmOnDetect = true;
+            rc.PatrolSpeed = 2.6f;
+            rc.InvestigateSpeed = 3.6f;
+            rc.ChaseSpeed = 5.2f;
+            rc.AttackRange = 1.4f;
+        });
 
         static GameObject BuildSecurityCamera()
         {
@@ -502,15 +528,14 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ session / network
 
-        static GameObject BuildSession(LevelArt art, GameObject item, GameObject guard, GameObject listener, GameObject cam, GameObject laser)
+        static GameObject BuildSession(LevelArt art, GameObject item, GameObject[] robots, GameObject cam, GameObject laser)
         {
             var root = new GameObject("Session");
             root.AddComponent<NetworkObject>();
             var gm = root.AddComponent<GameManager>();
             gm.Art = art;
             gm.ItemPrefab = item.GetComponent<NetworkObject>();
-            gm.GuardRobotPrefab = guard.GetComponent<NetworkObject>();
-            gm.ListenerRobotPrefab = listener.GetComponent<NetworkObject>();
+            gm.RobotPrefabs = robots.Select(r => r != null ? r.GetComponent<NetworkObject>() : null).ToArray();
             gm.CameraPrefab = cam.GetComponent<NetworkObject>();
             gm.LaserPrefab = laser.GetComponent<NetworkObject>();
             root.AddComponent<GameHUD>();
