@@ -17,6 +17,8 @@ namespace Stealth.Level
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
+        public const float VentWidth = 1.2f; // wall pieces overlap the opening by 0.1 on each side: 1.0 m clear
+        public const float VentHeight = 1.4f; // crouched capsule 1.1 m + PhysX step-up probe (stepOffset 0.35); standing 1.8 m does not fit // crouched player is 1.1 m
         public const int CeilingLayer = 2; // "Ignore Raycast": kept out of the navmesh and vision checks
         public const int StairsArea = 3;   // NavMesh area "Stairs": robots without legs exclude it
 
@@ -150,6 +152,13 @@ namespace Stealth.Level
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h - 1; y++)
                     if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.2) l.EdgesZ[f, x, y] = EdgeType.Door;
+            // Crawl vents in some of the remaining walls: shortcuts for crouching players only.
+            for (int x = 0; x < w - 1; x++)
+                for (int y = 0; y < h; y++)
+                    if (l.EdgesX[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.35) l.EdgesX[f, x, y] = EdgeType.Vent;
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h - 1; y++)
+                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < 0.35) l.EdgesZ[f, x, y] = EdgeType.Vent;
         }
 
         /// <summary>One staircase per pair of floors, each in a different cell (never the lobby).</summary>
@@ -268,7 +277,7 @@ namespace Stealth.Level
                     }
                     int iq = rng.Next(4);
                     if (Free(iq)) l.ItemSpots.Add(c + quads[iq]);
-                    else l.ItemSpots.Add(c + new Vector3(Range(rng, -1f, 1f), 0, Range(rng, -1f, 1f)));
+                    else l.ItemSpots.Add(c + new Vector3(Range(rng, -0.9f, 0.9f), 0, Range(rng, -0.9f, 0.9f)));
                     break;
                 }
 
@@ -323,7 +332,7 @@ namespace Stealth.Level
                         Prop(l, PropKind.ServerRack, c + quads[q] + new Vector3(-0.45f, 0, 0), 0);
                         Prop(l, PropKind.ServerRack, c + quads[q] + new Vector3(0.45f, 0, 0), 0);
                     }
-                    l.ItemSpots.Add(c + new Vector3(Range(rng, -1.5f, 1.5f), 0, Range(rng, -1.5f, 1.5f)));
+                    l.ItemSpots.Add(c + new Vector3(Range(rng, -0.9f, 0.9f), 0, Range(rng, -0.9f, 0.9f))); // the centre cross is always free
                     int sq = rng.Next(4);
                     if (Free(sq)) l.ItemSpots.Add(c + quads[sq] * 0.45f);
                     break;
@@ -592,11 +601,35 @@ namespace Stealth.Level
             }
             var dir = (b - a).normalized;
             var mid = (a + b) / 2f;
-            var d0 = mid - dir * (DoorWidth / 2f);
-            var d1 = mid + dir * (DoorWidth / 2f);
+            bool vent = type == EdgeType.Vent;
+            // Vents sit in the middle of the wall like doors: the centre cross of a room is always kept free of furniture.
+            float width = vent ? VentWidth : DoorWidth;
+            var d0 = mid - dir * (width / 2f);
+            var d1 = mid + dir * (width / 2f);
             WallPiece(root, art.Wall, a, d0, 0, WallHeight);
             WallPiece(root, art.Wall, d1, b, 0, WallHeight);
-            WallPiece(root, art.DoorFrame != null ? art.DoorFrame : art.Wall, d0, d1, DoorHeight, WallHeight);
+            WallPiece(root, art.DoorFrame != null ? art.DoorFrame : art.Wall, d0, d1, vent ? VentHeight : DoorHeight, WallHeight);
+            if (vent) VentFrame(root, art, d0, d1);
+        }
+
+        /// <summary>A dark metal frame around the crawl hole so it reads as a vent from across the room (no collider).</summary>
+        static void VentFrame(GameObject root, LevelArt art, Vector3 d0, Vector3 d1)
+        {
+            var dir = (d1 - d0).normalized;
+            var side = new Vector3(-dir.z, 0, dir.x) * (WallThickness / 2f + 0.02f);
+            foreach (var s in new[] { side, -side })
+            {
+                foreach (var (p, size) in new[]
+                {
+                    ((d0 + d1) / 2f + Vector3.up * VentHeight, new Vector3(VentWidth + 0.16f, 0.08f, 0.04f)),
+                    (d0 + Vector3.up * VentHeight / 2f, new Vector3(0.08f, VentHeight, 0.04f)),
+                    (d1 + Vector3.up * VentHeight / 2f, new Vector3(0.08f, VentHeight, 0.04f)),
+                })
+                {
+                    var go = Block(root, "VentFrame", p + s, Mathf.Abs(dir.x) > 0.5f ? size : new Vector3(size.z, size.y, size.x), art.DoorFrame);
+                    Object.DestroyImmediate(go.GetComponent<Collider>());
+                }
+            }
         }
 
         static void WallPiece(GameObject root, Material mat, Vector3 a, Vector3 b, float y0, float y1)

@@ -65,6 +65,31 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void RobotsCannotUseVents([Values(1, 2, 3)] int seed)
+        {
+            Build(seed, 4);
+            int checkedVents = 0;
+            for (int f = 0; f < m_Layout.Floors; f++)
+                for (int x = 0; x < m_Layout.Width - 1; x++)
+                    for (int y = 0; y < m_Layout.Height; y++)
+                    {
+                        if (m_Layout.EdgesX[f, x, y] != EdgeType.Vent) continue;
+                        // Points right on both sides of the vent opening (middle of the edge, see EdgeWall).
+                        float vz = y * LevelGenerator.Cell + LevelGenerator.Cell * 0.5f, wx = (x + 1) * LevelGenerator.Cell;
+                        var a = new Vector3(wx - 0.8f, LevelLayout.FloorY(f), vz);
+                        var b = new Vector3(wx + 0.8f, LevelLayout.FloorY(f), vz);
+                        if (!NavMesh.SamplePosition(a, out var ha, 0.6f, NavMesh.AllAreas) || !NavMesh.SamplePosition(b, out var hb, 0.6f, NavMesh.AllAreas)) continue;
+                        var path = new NavMeshPath();
+                        NavMesh.CalculatePath(ha.position, hb.position, NavMesh.AllAreas, path);
+                        float len = 0f;
+                        for (int i = 1; i < path.corners.Length; i++) len += Vector3.Distance(path.corners[i - 1], path.corners[i]);
+                        Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots squeeze through the vent at {wx},{vz} floor {f}");
+                        checkedVents++;
+                    }
+            Assert.Greater(checkedVents, 0, "the level has vents");
+        }
+
+        [Test]
         public void ItemSpotsAreOnTheNavMeshOrFurniture([Values(5, 123456789)] int seed)
         {
             Build(seed, 4);

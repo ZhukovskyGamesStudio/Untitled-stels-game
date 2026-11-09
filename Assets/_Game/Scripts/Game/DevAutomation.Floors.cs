@@ -99,6 +99,38 @@ namespace Stealth.Game
             Log($"floor rules: wheeled robots that left their floor={wheeledLeft}, walkers that changed floor={walkersMoved}");
         }
 
+        /// <summary>Standing players are blocked by a vent, crouching players crawl through.</summary>
+        IEnumerator VentScenario()
+        {
+            var l = LevelGenerator.Current;
+            for (int x = 0; x < l.Width - 1; x++)
+                for (int y = 0; y < l.Height; y++)
+                {
+                    if (l.EdgesX[0, x, y] != EdgeType.Vent) continue;
+                    float wx = (x + 1) * LevelGenerator.Cell, vz = y * LevelGenerator.Cell + LevelGenerator.Cell * 0.5f;
+                    var from = new Vector3(wx - 2.2f, 0.05f, vz);
+                    LookAtFrom(new Pose(from, Quaternion.LookRotation(Vector3.right)), new Vector3(wx, 0.6f, vz));
+                    yield return new WaitForSeconds(0.5f);
+                    yield return Shot("vent");
+
+                    Drive(Vector2.up);
+                    yield return new WaitForSeconds(1.6f);
+                    Release();
+                    bool standingPassed = Me.transform.position.x > wx + 0.3f;
+                    Me.TeleportOwner(from, Quaternion.LookRotation(Vector3.right));
+                    Drive(Vector2.up, crouch: true);
+                    yield return new WaitForSeconds(0.5f);
+                    yield return Shot("crawling");
+                    yield return new WaitForSeconds(2.5f);
+                    Release();
+                    bool crouchPassed = Me.transform.position.x > wx + 0.3f;
+                    var cc = Me.GetComponent<CharacterController>();
+                    Log($"vent at x={wx} z={vz}: standing passed={standingPassed}, crouching passed={crouchPassed} pos={Me.transform.position} crouch={Me.Motor.IsCrouching} h={cc.height:0.00} r={cc.radius}");
+                    yield break;
+                }
+            Log("no vent on the ground floor");
+        }
+
         /// <summary>One screenshot of every room type present in the building.</summary>
         IEnumerator RoomsScenario()
         {

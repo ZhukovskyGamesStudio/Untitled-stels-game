@@ -4,7 +4,8 @@ using UnityEngine;
 namespace Stealth.Level
 {
     public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge }
-    public enum EdgeType { Wall, Door, Open }
+    /// <summary>Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not.</summary>
+    public enum EdgeType { Wall, Door, Open, Vent }
     public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall }
 
     public struct PropPlacement
@@ -107,10 +108,12 @@ namespace Stealth.Level
         /// <summary>Rooms reachable from a cell in one step (doors, openings, stairs). Result: (x, y, floor).</summary>
         public IEnumerable<Vector3Int> Neighbours(int floor, Vector2Int c)
         {
-            if (c.x > 0 && EdgesX[floor, c.x - 1, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x - 1, c.y, floor);
-            if (c.x < Width - 1 && EdgesX[floor, c.x, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x + 1, c.y, floor);
-            if (c.y > 0 && EdgesZ[floor, c.x, c.y - 1] != EdgeType.Wall) yield return new Vector3Int(c.x, c.y - 1, floor);
-            if (c.y < Height - 1 && EdgesZ[floor, c.x, c.y] != EdgeType.Wall) yield return new Vector3Int(c.x, c.y + 1, floor);
+            // Walkable connections only (vents are for crouching players, not part of the room graph).
+            static bool Pass(EdgeType e) => e == EdgeType.Door || e == EdgeType.Open;
+            if (c.x > 0 && Pass(EdgesX[floor, c.x - 1, c.y])) yield return new Vector3Int(c.x - 1, c.y, floor);
+            if (c.x < Width - 1 && Pass(EdgesX[floor, c.x, c.y])) yield return new Vector3Int(c.x + 1, c.y, floor);
+            if (c.y > 0 && Pass(EdgesZ[floor, c.x, c.y - 1])) yield return new Vector3Int(c.x, c.y - 1, floor);
+            if (c.y < Height - 1 && Pass(EdgesZ[floor, c.x, c.y])) yield return new Vector3Int(c.x, c.y + 1, floor);
             foreach (var s in Stairs)
             {
                 if (s.Cell != c) continue;
