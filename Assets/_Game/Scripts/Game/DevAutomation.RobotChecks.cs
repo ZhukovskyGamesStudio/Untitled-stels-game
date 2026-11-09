@@ -13,6 +13,7 @@ namespace Stealth.Game
         {
             if (Arg("-hostile") == null) return;
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
+            if (kind == RobotKind.Hound) { steps.Add(TrailCheck(obj)); return; }
             steps.Add(DetectionCheck(kind, obj));
         }
 
@@ -79,6 +80,30 @@ namespace Stealth.Game
             GameManager.FreezeRobots = true;
             Log($"sneak past {kind} (crouch={crouch}): max awareness {max:0.00}");
             yield return new WaitForSeconds(0.5f);
+        }
+
+        /// <summary>The player walks past the hound's nose and away out of the room; the hound must follow the trail.</summary>
+        IEnumerator TrailCheck(NetworkObject obj)
+        {
+            var robot = obj.GetComponent<RobotController>();
+            var p = obj.transform.position;
+            var start = new Vector3(p.x, 0.05f, p.z) + Flat(obj.transform.right).normalized * 1.5f;
+            Me.TeleportOwner(start, Quaternion.LookRotation(Flat(-obj.transform.forward)));
+            // Walk away (towards the lobby side) for ~2.5 s, leaving a trail, with the robot still frozen.
+            Drive(Vector2.up);
+            yield return new WaitForSeconds(2.5f);
+            Release();
+            float before = Vector3.Distance(Flat(p), Flat(Me.transform.position));
+            GameManager.FreezeRobots = false;
+            float t0 = Time.time;
+            while (Time.time - t0 < 8f && robot.State.Value != RobotState.Chase) yield return null;
+            float tChase = Time.time - t0;
+            yield return new WaitForSeconds(2f);
+            float after = Vector3.Distance(Flat(obj.transform.position), Flat(Me.transform.position));
+            yield return Shot("kind_Hound_tracking");
+            Log($"hound: started tracking after {tChase:0.0}s, state={robot.State.Value}, distance {before:0.0} -> {after:0.0} m");
+            GameManager.FreezeRobots = true;
+            if (Me.IsServer) Me.ResetForLevelServer();
         }
     }
 }

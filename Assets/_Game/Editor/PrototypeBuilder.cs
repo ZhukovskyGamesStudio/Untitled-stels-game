@@ -52,6 +52,7 @@ namespace Stealth.EditorTools
             var listener = BuildListener();
             var drone = BuildDrone();
             var thumper = BuildThumper();
+            var hound = BuildHound();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
@@ -59,6 +60,7 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Listener] = listener;
             robots[(int)RobotKind.Drone] = drone;
             robots[(int)RobotKind.Thumper] = thumper;
+            robots[(int)RobotKind.Hound] = hound;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -176,6 +178,7 @@ namespace Stealth.EditorTools
             Mat("ListenerBody", new Color(0.95f, 0.55f, 0.15f), smoothness: 0.5f);
             Mat("DroneBody", new Color(0.25f, 0.27f, 0.32f), smoothness: 0.7f);
             Mat("ThumperBody", new Color(0.55f, 0.5f, 0.2f), smoothness: 0.3f);
+            Mat("HoundBody", new Color(0.45f, 0.2f, 0.2f), smoothness: 0.4f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -480,6 +483,19 @@ namespace Stealth.EditorTools
             rc.ChaseSpeed = 3.3f;
             rc.AttackRange = 1.9f;
             rc.ContactDistance = 1.6f;
+        });
+
+        static GameObject BuildHound() => BuildRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), rc =>
+        {
+            rc.HasEyes = false;
+            rc.CanUseStairs = true;     // legs
+            rc.HearingMultiplier = 0.6f;
+            rc.SmellRange = 3f;
+            rc.SmellSpeed = 1.6f;
+            rc.PatrolSpeed = 2.2f;
+            rc.InvestigateSpeed = 3.4f;
+            rc.ChaseSpeed = 5.4f;
+            rc.LoseTargetAfter = 6f;
         });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>

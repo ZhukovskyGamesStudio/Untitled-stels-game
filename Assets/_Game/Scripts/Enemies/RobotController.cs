@@ -35,6 +35,9 @@ namespace Stealth.Enemies
         [Tooltip("Seismic: feels walking players on the same floor within this range (0 = no seismic sensor).")]
         public float SeismicRange;
         public float SeismicSpeed = 1.2f;
+        [Tooltip("Smell: follows scent trails found within this radius (0 = no nose).")]
+        public float SmellRange;
+        public float SmellSpeed = 1.5f;
 
         [Header("Body")]
         [Tooltip("Flying robots hover this high above the navmesh.")]
@@ -162,6 +165,7 @@ namespace Stealth.Enemies
                 float rate = 0f;
                 if (HasEyes && CanSee(p, out var dist)) rate = Mathf.Max(rate, VisionRate(p, dist));
                 if (SeismicRange > 0f) rate = Mathf.Max(rate, SeismicRate(p));
+                if (SmellRange > 0f) rate = Mathf.Max(rate, ScentTrail.Smell(p.OwnerClientId, transform.position, SmellRange, Time.time) * SmellSpeed);
                 if (rate > bestRate) { best = p; bestRate = rate; }
             }
 
@@ -169,7 +173,12 @@ namespace Stealth.Enemies
             {
                 if (State.Value == RobotState.Chase && best == m_Target)
                 {
-                    m_LastKnown = best.transform.position;
+                    // A hound that only smells the target walks along the trail; anything else goes straight for it.
+                    bool closeEnough = (best.transform.position - transform.position).magnitude < 4f;
+                    if (SmellRange > 0f && !HasEyes && !closeEnough && ScentTrail.NextAlongTrail(best.OwnerClientId, transform.position, 7f, out var next))
+                        m_LastKnown = next;
+                    else
+                        m_LastKnown = best.transform.position;
                     m_LastSenseTime = Time.time;
                     return;
                 }

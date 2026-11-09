@@ -64,6 +64,19 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ScentTrailLeadsTowardsThePlayer()
+        {
+            ScentTrail.Clear();
+            for (int i = 0; i <= 20; i++) ScentTrail.Record(7, new Vector3(i, 0, 0), i * 0.5f); // walked 20 m along +X
+            Assert.Greater(ScentTrail.Smell(7, new Vector3(2, 0, 1), 3f, 10f), 0.5f, "fresh scent near the start");
+            Assert.AreEqual(0f, ScentTrail.Smell(7, new Vector3(2, 0, 10), 3f, 10f), "nothing far from the trail");
+            Assert.IsTrue(ScentTrail.NextAlongTrail(7, new Vector3(3, 0, 0), 7f, out var next));
+            Assert.Greater(next.x, 3f, "the next breadcrumb is further along (newer)");
+            Assert.AreEqual(0f, ScentTrail.Smell(7, Vector3.zero, 3f, 200f), "scent fades");
+            ScentTrail.Clear();
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);

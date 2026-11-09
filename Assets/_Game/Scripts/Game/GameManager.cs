@@ -125,6 +125,7 @@ namespace Stealth.Game
             foreach (var item in WorldItem.All.ToArray())
                 if (item.IsSpawned) item.NetworkObject.Despawn();
 
+            ScentTrail.Clear();
             int seed = ForcedSeed != 0 ? ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
             ForcedSeed = 0;
             Level.Value = new LevelInfo { Seed = seed, Index = index };
@@ -222,6 +223,9 @@ namespace Stealth.Game
 
         void Update()
         {
+            if (IsServer)
+                foreach (var p in PlayerController.All)
+                    if (!p.Downed.Value) ScentTrail.Record(p.OwnerClientId, p.transform.position, Time.time);
             if (!IsServer || Phase.Value != RunPhase.Playing || PlayerController.All.Count == 0) return;
             foreach (var p in PlayerController.All)
                 if (!p.Downed.Value) return;
