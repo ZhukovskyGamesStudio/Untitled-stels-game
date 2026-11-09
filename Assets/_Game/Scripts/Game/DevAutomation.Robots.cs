@@ -35,6 +35,11 @@ namespace Stealth.Game
                 var view = hatch + new Vector3(0.6f, 0.05f, -1.6f);
                 LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(stage - view))), stage + Vector3.up * (kind == RobotKind.MotionSensor ? 2.2f : 0.9f));
                 yield return new WaitForSeconds(1.5f);
+                // Some robots move to their place on spawn (walls, ceiling): look at where they ended up.
+                var at = obj.transform.position;
+                if ((at - pos).sqrMagnitude > 0.25f)
+                    LookAtFrom(ViewPoint(at, 3.5f), at);
+                yield return new WaitForSeconds(0.3f);
                 Log($"gallery: {kind} at {obj.transform.position}");
                 yield return Shot($"kind_{kind}");
                 yield return GalleryExtra(kind, obj);

@@ -56,6 +56,7 @@ namespace Stealth.EditorTools
             var sorter = BuildSorter();
             var worker = BuildWorker();
             var hunter = BuildHunter();
+            var turret = BuildTurret();
             var cam = BuildSecurityCamera();
             var laser = BuildLaser();
             var robots = new GameObject[RobotRoster.KindCount];
@@ -67,6 +68,7 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Sorter] = sorter;
             robots[(int)RobotKind.Worker] = worker;
             robots[(int)RobotKind.Hunter] = hunter;
+            robots[(int)RobotKind.Turret] = turret;
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -188,6 +190,7 @@ namespace Stealth.EditorTools
             Mat("SorterBody", new Color(0.9f, 0.9f, 0.85f), smoothness: 0.8f);
             Mat("WorkerBody", new Color(0.95f, 0.8f, 0.1f), smoothness: 0.4f);
             Mat("HunterBody", new Color(0.12f, 0.12f, 0.14f), smoothness: 0.85f);
+            Mat("TurretBody", new Color(0.3f, 0.35f, 0.3f), smoothness: 0.6f);
             Mat("SensorGlow", new Color(0.2f, 0.85f, 1f), new Color(0.4f, 1.7f, 2.4f));
             Mat("PlayerBody", Color.white);
             Mat("PlayerAccent", new Color(0.9f, 0.78f, 0.65f));
@@ -550,6 +553,68 @@ namespace Stealth.EditorTools
             rc.ChaseSpeed = 5.8f;
             rc.LoseTargetAfter = 7f;
             rc.AttackCooldown = 1.3f;
+        });
+
+        /// <summary>Common prefab for robots / devices with their own movement script (SecurityDevice).</summary>
+        static GameObject BuildDevice<T>(string name, string file, string bodyMat, bool moves, bool fullRotation, System.Action<GameObject, T> config) where T : SecurityDevice
+        {
+            var root = new GameObject(name);
+            root.AddComponent<NetworkObject>();
+            if (moves)
+            {
+                var nt = root.AddComponent<NetworkTransform>();
+                nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
+                nt.SyncRotAngleX = fullRotation;
+                nt.SyncRotAngleZ = fullRotation;
+                nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            }
+            var model = Model(file);
+            model.transform.SetParent(root.transform, false);
+            Paint(model, bodyMat, "RobotAccent", "SensorGlow");
+            var b = LocalBounds(root);
+            var col = root.AddComponent<BoxCollider>();
+            col.center = b.center;
+            col.size = b.size;
+
+            var lightGo = new GameObject("StatusLight");
+            lightGo.transform.SetParent(root.transform, false);
+            lightGo.transform.localPosition = b.center + Vector3.up * (b.extents.y + 0.1f);
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 3f;
+            light.intensity = 2f;
+            light.shadows = LightShadows.None;
+
+            var eye = new GameObject("EyePoint");
+            eye.transform.SetParent(root.transform, false);
+            eye.transform.localPosition = b.center;
+            root.AddComponent<DetectorAwareness>().Point = eye.transform;
+            root.AddComponent<RobotAnimator>();
+            var device = root.AddComponent<T>();
+            device.StatusRenderers = Parts(model, "Eye");
+            device.StatusLight = light;
+            config(root, device);
+            return Save(root, $"{Prefabs}/{name}.prefab");
+        }
+
+        static LineRenderer Beam(GameObject root, string name, float width)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root.transform, false);
+            var lr = go.AddComponent<LineRenderer>();
+            lr.sharedMaterial = s_Mats["Laser"];
+            lr.widthMultiplier = width;
+            lr.positionCount = 2;
+            lr.useWorldSpace = true;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.enabled = false;
+            return lr;
+        }
+
+        static GameObject BuildTurret() => BuildDevice<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
+        {
+            t.Sight = Beam(root, "Sight", 0.025f);
+            root.GetComponentInChildren<DetectorAwareness>().Point.localPosition = new Vector3(0, 1.35f, 0);
         });
 
         static GameObject BuildDrone() => BuildRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), rc =>
