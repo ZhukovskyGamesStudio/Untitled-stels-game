@@ -79,6 +79,13 @@ namespace Stealth.EditorTools
             robots[(int)RobotKind.Lidar] = lidar;
             robots[(int)RobotKind.MotionSensor] = pir;
             robots[(int)RobotKind.PressurePlate] = plate;
+            for (int i = 0; i < robots.Length; i++)
+            {
+                if (robots[i] == null) continue;
+                robots[i].GetComponent<DetectorAwareness>().Kind = (RobotKind)i;
+                EditorUtility.SetDirty(robots[i]);
+                PrefabUtility.SavePrefabAsset(robots[i]);
+            }
             var session = BuildSession(art, item, robots, cam, laser);
 
             var networkPrefabs = new List<GameObject> { player, item, cam, laser, session };
@@ -690,7 +697,9 @@ namespace Stealth.EditorTools
             spot.type = LightType.Spot;
             spot.shadows = LightShadows.None;
 
-            root.AddComponent<DetectorAwareness>().Point = spotGo.transform;
+            var camAw = root.AddComponent<DetectorAwareness>();
+            camAw.Point = spotGo.transform;
+            camAw.IsCamera = true;
             var sc = root.AddComponent<SecurityCamera>();
             sc.Pivot = pivot.transform;
             sc.Spot = spot;

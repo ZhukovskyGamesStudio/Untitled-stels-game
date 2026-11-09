@@ -20,6 +20,8 @@ namespace Stealth.Enemies
 
         [Tooltip("World point the indicator should point to (eye / lens). Defaults to the transform.")]
         public Transform Point;
+        public Level.RobotKind Kind;
+        public bool IsCamera;
 
         float m_NextSend;
 

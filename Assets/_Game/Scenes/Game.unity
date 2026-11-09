@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &288567027
+--- !u!1 &1095177009
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,15 +127,15 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 288567036}
-  - component: {fileID: 288567035}
-  - component: {fileID: 288567034}
-  - component: {fileID: 288567033}
-  - component: {fileID: 288567032}
-  - component: {fileID: 288567031}
-  - component: {fileID: 288567030}
-  - component: {fileID: 288567029}
-  - component: {fileID: 288567028}
+  - component: {fileID: 1095177018}
+  - component: {fileID: 1095177017}
+  - component: {fileID: 1095177016}
+  - component: {fileID: 1095177015}
+  - component: {fileID: 1095177014}
+  - component: {fileID: 1095177013}
+  - component: {fileID: 1095177012}
+  - component: {fileID: 1095177011}
+  - component: {fileID: 1095177010}
   m_Layer: 0
   m_Name: Network
   m_TagString: Untagged
@@ -143,92 +143,92 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &288567028
+--- !u!114 &1095177010
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5d71e694af3529e469fc3ad1af646528, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Game.DevAutomation
---- !u!114 &288567029
+--- !u!114 &1095177011
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d04666e760799ac44a317023bc2ae9ed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.UI.GameMenu
---- !u!114 &288567030
+--- !u!114 &1095177012
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 80aa16e1ac86e954ab9947eb40956805, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Net.GameNetwork
-  Manager: {fileID: 288567035}
-  LocalTransport: {fileID: 288567034}
-  SteamTransport: {fileID: 288567033}
+  Manager: {fileID: 1095177017}
+  LocalTransport: {fileID: 1095177016}
+  SteamTransport: {fileID: 1095177015}
   SessionPrefab: {fileID: 4598846925603026726, guid: bcfd6137fb7b4164298d8120dc1b3951, type: 3}
-  MenuCamera: {fileID: 713273878}
+  MenuCamera: {fileID: 1740656765}
   LocalPort: 7777
---- !u!114 &288567031
+--- !u!114 &1095177013
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4bfcf8f520e36b4468457402443a32fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Net.SteamLobby
---- !u!114 &288567032
+--- !u!114 &1095177014
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b34382907f61b7f4b8948f1dc1625807, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Net.SteamManager
---- !u!114 &288567033
+--- !u!114 &1095177015
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8d99406d02f6a7f4983e486f07886bfb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Net.SteamNetworkingTransport
   ConnectToSteamId: 0
---- !u!114 &288567034
+--- !u!114 &1095177016
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6960e84d07fb87f47956e7a81d71c4e6, type: 3}
@@ -253,13 +253,13 @@ MonoBehaviour:
     PacketDelayMS: 0
     PacketJitterMS: 0
     PacketDropRate: 0
---- !u!114 &288567035
+--- !u!114 &1095177017
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 593a2fe42fa9d37498c96f9a383b6521, type: 3}
@@ -268,7 +268,7 @@ MonoBehaviour:
   NetworkManagerExpanded: 0
   NetworkConfig:
     ProtocolVersion: 0
-    NetworkTransport: {fileID: 288567034}
+    NetworkTransport: {fileID: 1095177016}
     PlayerPrefab: {fileID: 2713312316762577673, guid: 6889c67352f247f4ca1e85d83fb54f67, type: 3}
     Prefabs:
       NetworkPrefabsLists:
@@ -295,13 +295,13 @@ MonoBehaviour:
     OldPrefabList: []
   RunInBackground: 1
   LogLevel: 1
---- !u!4 &288567036
+--- !u!4 &1095177018
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 288567027}
+  m_GameObject: {fileID: 1095177009}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -310,7 +310,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &424551984
+--- !u!1 &1695900871
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -318,8 +318,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 424551986}
-  - component: {fileID: 424551985}
+  - component: {fileID: 1695900873}
+  - component: {fileID: 1695900872}
   m_Layer: 0
   m_Name: Moonlight
   m_TagString: Untagged
@@ -327,13 +327,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!108 &424551985
+--- !u!108 &1695900872
 Light:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 424551984}
+  m_GameObject: {fileID: 1695900871}
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
@@ -392,13 +392,13 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
---- !u!4 &424551986
+--- !u!4 &1695900873
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 424551984}
+  m_GameObject: {fileID: 1695900871}
   serializedVersion: 2
   m_LocalRotation: {x: 0.44601488, y: 0.22957529, z: -0.11950933, w: 0.85678667}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -407,7 +407,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &713273877
+--- !u!1 &1740656764
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -415,9 +415,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 713273880}
-  - component: {fileID: 713273878}
-  - component: {fileID: 713273879}
+  - component: {fileID: 1740656767}
+  - component: {fileID: 1740656765}
+  - component: {fileID: 1740656766}
   m_Layer: 0
   m_Name: MenuCamera
   m_TagString: Untagged
@@ -425,13 +425,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &713273878
+--- !u!20 &1740656765
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713273877}
+  m_GameObject: {fileID: 1740656764}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -476,21 +476,21 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!81 &713273879
+--- !u!81 &1740656766
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713273877}
+  m_GameObject: {fileID: 1740656764}
   m_Enabled: 1
---- !u!4 &713273880
+--- !u!4 &1740656767
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 713273877}
+  m_GameObject: {fileID: 1740656764}
   serializedVersion: 2
   m_LocalRotation: {x: 0.34202015, y: 0, z: 0, w: 0.9396927}
   m_LocalPosition: {x: 0, y: 30, z: -30}
@@ -503,6 +503,6 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 424551986}
-  - {fileID: 713273880}
-  - {fileID: 288567036}
+  - {fileID: 1695900873}
+  - {fileID: 1740656767}
+  - {fileID: 1095177018}

@@ -108,10 +108,42 @@ namespace Stealth.UI
                 else
                     m_Prompts.Add(new Prompt(40, "F", $"Уйти, не набрав квоту ({gm.Collected.Value}/{gm.Quota.Value})"));
             }
+            var looked = LookedAtRobot(me);
+            if (looked != null)
+                m_Prompts.Add(new Prompt(45, "", $"{Stealth.Enemies.RobotInfo.Name(looked.Kind, looked.IsCamera)}: {Stealth.Enemies.RobotInfo.Senses(looked.Kind, looked.IsCamera)}"));
             var hover = InventoryUI.Local != null ? InventoryUI.Local.Hover : null;
             if (hover != null && !me.CursorMode)
                 m_Prompts.Add(new Prompt(50, "Tab", $"Взять: {ItemCatalog.Describe(hover.Shape.Value, hover.Color.Value)}"));
             return UiMath.Choose(m_Prompts);
+        }
+
+        Stealth.Enemies.DetectorAwareness m_LookCandidate;
+        float m_LookSince;
+
+        /// <summary>The robot / device in the crosshair for at least 0.4 s (18 m, in plain sight).</summary>
+        Stealth.Enemies.DetectorAwareness LookedAtRobot(PlayerController me)
+        {
+            var cam = me.Camera;
+            if (cam == null) return null;
+            Stealth.Enemies.DetectorAwareness best = null;
+            // 1) The crosshair ray hits the robot's body.
+            if (Physics.Raycast(cam.transform.position, cam.transform.forward, out var direct, 18f, Stealth.Enemies.Perception.SightMask, QueryTriggerInteraction.Ignore))
+                best = direct.collider.GetComponentInParent<Stealth.Enemies.DetectorAwareness>();
+            // 2) Small devices without a body (PIR, plates): close enough to the centre of the view.
+            float bestAngle = best != null ? -1f : 6f;
+            foreach (var d in Stealth.Enemies.DetectorAwareness.All)
+            {
+                var to = d.Position - cam.transform.position;
+                if (to.magnitude > 18f) continue;
+                float angle = Vector3.Angle(cam.transform.forward, to);
+                if (angle >= bestAngle) continue;
+                if (Physics.Raycast(cam.transform.position, to.normalized, out var hit, to.magnitude - 0.6f, Stealth.Enemies.Perception.SightMask, QueryTriggerInteraction.Ignore)
+                    && hit.collider.GetComponentInParent<Stealth.Enemies.DetectorAwareness>() != d) continue;
+                best = d;
+                bestAngle = angle;
+            }
+            if (best != m_LookCandidate) { m_LookCandidate = best; m_LookSince = Time.time; }
+            return best != null && Time.time - m_LookSince > 0.4f ? best : null;
         }
 
         void OnGUI()
