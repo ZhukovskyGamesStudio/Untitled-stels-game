@@ -39,6 +39,29 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void AutoDoorOpensOnlyForNearbyAgentsOnTheSameFloor()
+        {
+            var door = new Vector3(10, 0, 5);
+            Assert.IsFalse(AutoDoor.ShouldOpen(door, new Vector3[0]));
+            Assert.IsTrue(AutoDoor.ShouldOpen(door, new[] { new Vector3(11.5f, 0, 5) }));
+            Assert.IsFalse(AutoDoor.ShouldOpen(door, new[] { new Vector3(14f, 0, 5) }), "too far");
+            Assert.IsFalse(AutoDoor.ShouldOpen(door, new[] { new Vector3(10.5f, 3.5f, 5) }), "a floor above");
+        }
+
+        [Test]
+        public void DoorsAndLasersNeverShareADoorway()
+        {
+            foreach (var seed in new[] { 1, 2, 3, 4, 5 })
+            {
+                var l = LevelGenerator.Generate(seed, 5);
+                Assert.Greater(l.AutoDoors.Count, 0);
+                foreach (var d in l.AutoDoors)
+                    foreach (var laser in l.LaserSpots)
+                        Assert.Greater(Vector3.Distance(d.position, laser.Position), 0.5f);
+            }
+        }
+
+        [Test]
         public void FlickerStaysInRangeAndActuallyFlickers()
         {
             float min = 1f, max = 0f;

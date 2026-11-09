@@ -171,6 +171,22 @@ namespace Stealth.Game
             if (Me.IsServer) GameManager.Instance.RaiseAlarmServer(hatch + Vector3.forward * 80f, 1f);
             yield return new WaitForSeconds(0.6f);
             yield return Shot("alarm_lights");
+
+            // A sliding door: closed from afar, open when close.
+            var door = AutoDoor.All.Count > 0 ? AutoDoor.All[0] : null;
+            if (door != null)
+            {
+                var dp = door.transform.position;
+                var away = door.transform.forward * 4.5f;
+                LookAtFrom(new Pose(dp + away + Vector3.up * 0.05f, Quaternion.LookRotation(-away)), dp + Vector3.up * 1.2f);
+                yield return new WaitForSeconds(1f);
+                bool closedFar = !door.IsOpen;
+                yield return Shot("door_closed");
+                LookAtFrom(new Pose(dp + away * 0.35f + Vector3.up * 0.05f, Quaternion.LookRotation(-away)), dp + Vector3.up * 1.2f);
+                yield return new WaitForSeconds(1f);
+                yield return Shot("door_open");
+                Log($"auto door: closed when far={closedFar}, open when near={door.IsOpen}");
+            }
         }
     }
 }

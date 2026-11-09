@@ -401,6 +401,9 @@ namespace Stealth.Level
                 spot.Kind = rng.Next(2);
                 l.LaserSpots.Add(spot);
             }
+            // Sliding doors in some of the remaining doorways (never together with a laser).
+            foreach (var d in doors)
+                if (rng.NextDouble() < 0.45) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
         }
 
         // ------------------------------------------------------------------ geometry
@@ -472,6 +475,7 @@ namespace Stealth.Level
             }
 
             foreach (var s in l.Stairs) BuildStair(root, art, s);
+            foreach (var d in l.AutoDoors) BuildAutoDoor(root, art, d);
 
             foreach (var p in l.Props)
             {
@@ -567,6 +571,34 @@ namespace Stealth.Level
             // Between the flights: a thin wall so nobody walks off flight B onto flight A.
             // Starts two steps away from the landing: a divider right at the landing would leave no room to turn.
             Box("Divider", LandingEnd + 2 * StepRun, FlightStart, aV1, bV0, 0f, FloorHeight - 0.4f, rail);
+        }
+
+        static void BuildAutoDoor(GameObject root, LevelArt art, Pose pose)
+        {
+            var go = new GameObject("AutoDoor");
+            go.transform.SetParent(root.transform, false);
+            go.transform.SetPositionAndRotation(pose.position, pose.rotation);
+            // Not part of the navmesh: robots plan through doorways and open the doors when they arrive.
+            go.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
+            float h = DoorHeight - 0.02f, w = DoorWidth / 2f;
+            Transform Panel(string name, float x)
+            {
+                var p = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                p.name = name;
+                Object.DestroyImmediate(p.GetComponent<Collider>());
+                p.transform.SetParent(go.transform, false);
+                p.transform.localPosition = new Vector3(x, h / 2f, 0);
+                p.transform.localScale = new Vector3(w, h, 0.06f);
+                p.GetComponent<MeshRenderer>().sharedMaterial = art.Door != null ? art.Door : art.DoorFrame;
+                return p.transform;
+            }
+            var door = go.AddComponent<AutoDoor>();
+            door.PanelA = Panel("PanelA", -DoorWidth / 4f);
+            door.PanelB = Panel("PanelB", DoorWidth / 4f);
+            var blocker = go.AddComponent<BoxCollider>();
+            blocker.center = new Vector3(0, h / 2f, 0);
+            blocker.size = new Vector3(DoorWidth, h, 0.1f);
+            door.Blocker = blocker;
         }
 
         static EdgeType Exterior(LevelLayout l, int f, int x, int y, Vector2Int dir) =>

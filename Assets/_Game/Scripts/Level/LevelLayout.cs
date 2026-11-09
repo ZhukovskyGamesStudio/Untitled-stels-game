@@ -59,6 +59,7 @@ namespace Stealth.Level
         public readonly List<Vector3> PatrolPoints = new();
         public readonly List<Pose> CameraSpots = new();
         public readonly List<LaserSpot> LaserSpots = new();
+        public readonly List<Pose> AutoDoors = new(); // sliding doors in doorways (local X along the wall)
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;

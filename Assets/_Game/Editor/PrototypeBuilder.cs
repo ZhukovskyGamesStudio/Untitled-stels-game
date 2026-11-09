@@ -148,6 +148,7 @@ namespace Stealth.EditorTools
             Mat("Ceiling", new Color(0.86f, 0.86f, 0.84f));
             Mat("OutsideGround", new Color(0.24f, 0.29f, 0.22f));
             Mat("DoorFrame", new Color(0.45f, 0.38f, 0.30f));
+            Mat("Door", new Color(0.55f, 0.68f, 0.75f), smoothness: 0.85f);
             Mat("PropBody", new Color(0.62f, 0.60f, 0.56f));
             Mat("PropAccent", new Color(0.22f, 0.23f, 0.26f));
             Mat("PropScreen", new Color(0.15f, 0.35f, 0.5f), new Color(0.1f, 0.35f, 0.6f));
@@ -259,6 +260,7 @@ namespace Stealth.EditorTools
             art.Ceiling = s_Mats["Ceiling"];
             art.OutsideGround = s_Mats["OutsideGround"];
             art.DoorFrame = s_Mats["DoorFrame"];
+            art.Door = s_Mats["Door"];
             string p = Prefabs + "/Props/";
             art.Desk = Save(Prop("Desk", "desk", "PropBody", "PropAccent", "PropScreen"), p + "Desk.prefab");
             art.Chair = Save(Prop("Chair", "chair", "PropAccent", "PropBody", "PropScreen"), p + "Chair.prefab");
