@@ -1,0 +1,116 @@
+# CLAUDE.md — «Айтишники: вылазка»
+
+Кооперативный стелс-рогалик (прототип кор-лупа). Дизайн-документ: https://claude.ai/artifact/GdaGu25vZ1ezVUmZ8KWFap.
+Обзор для людей, управление и таблица роботов — в [README.md](README.md). Этот файл — как устроен код и как с ним работать.
+
+- Unity **6000.6.0f1**, URP, новый Input System (только `Keyboard.current` / `Mouse.current`).
+- Сеть: Netcode for GameObjects 2.13 (`NetworkVariable`, `[Rpc(SendTo.*)]`). Транспорт Steam (Steamworks.NET, AppID 480) или UnityTransport UDP 7777.
+- Интерфейс: uGUI (legacy `Text`, шрифт `LegacyRuntime.ttf`). IMGUI больше не используется.
+- Навмеш: com.unity.ai.navigation, запекание в рантайме; зона 3 `Stairs` — по ней ходят только роботы с ногами.
+
+## Ветки
+
+Только три ветки: `main`, `george`, `sasha`. Новых не создавать. Работа Claude идёт в `george`; в `main` вливаем только по явной просьбе.
+Как коммитить — скилл [`stealth-commit`](.claude/skills/stealth-commit/SKILL.md).
+
+## Команды
+
+Unity в batchmode не запустится, если проект открыт в редакторе — закрой его или работай через редактор.
+
+```bash
+Tools/dev.sh tests              # компиляция + все EditMode-тесты (итог и упавшие — в конце вывода)
+Tools/dev.sh assets             # дособрать недостающие ассеты (существующие префабы не трогает)
+FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
+Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
+SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
+Tools/dev.sh run full 1         # хост + 1 клиент по сети
+```
+
+Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`).
+Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
+
+## Структура `Assets/_Game`
+
+```
+Art/Materials/<Environment|Props|Robots|Player|Items|FX>   материалы (создаёт AssetBuilder)
+Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Tools/Blender/*.py)
+Art/Sprites/                                               текстуры UI (виньетка, дуга)
+Data/            LevelArt, ItemVisuals, NetworkPrefabs (ScriptableObject)
+Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
+Prefabs/Props    мебель
+Prefabs/Robots   подвижные роботы · Prefabs/Sensors — датчики, камера, лазер
+Prefabs/Player, Items, Network (Session), FX (RadioRipple)
+Prefabs/UI       экраны HUD, Inventory, Menu + UI/Elements (кнопка, слайдер, дуга, маркеры…)
+Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов, EventSystem
+Scripts/<Enemies|Game|Items|Level|Net|Player|UI>   код игры (asmdef Stealth.Game)
+Editor/AssetBuilder*.cs               генератор ассетов (asmdef Stealth.Editor)
+Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
+```
+
+## Архитектура
+
+Три слоя, сверху вниз:
+
+1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
+   `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
+   `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
+   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`.
+2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
+3. **Презентеры UI** — `GameHUD`, `InventoryUI`, `GameMenu`: только показывают/двигают/красят элементы, заранее собранные в префабах.
+
+### Роботы и датчики
+
+```
+Detector (abstract NetworkBehaviour, IHackable)   — вид (RobotKind), точка для HUD, осведомлённость (AwarenessLevel/FocusClient),
+ │                                                   взлом (Hacked), лампы статуса (StatusLights), реестр Detector.All
+ ├─ RobotController (IRobotBody)                  — робот на навмеше: тело и датчики; решения — в RobotBrain
+ └─ SecurityDevice (abstract)                     — шкала подозрения SuspicionMeter, Alert 0/1/2, тревога
+     ├─ SecurityCamera, SentryTurret, SpiderBot, CeilingVacuum
+     └─ LidarScanner, MotionSensor, PressurePlate
+LaserGate — отдельная ловушка (не детектор)
+```
+
+Интерфейсы (`Scripts/Enemies/Contracts.cs`) отвязывают логику от движка, в тестах их подменяют фейками (`Tests/EditMode/Fakes.cs`):
+- `IIntruder` — игрок глазами охраны (реализует `PlayerController`);
+- `IHackable` — что можно взломать (реализует `Detector`);
+- `IRobotBody` — что «мозг» робота делает телом (реализует `RobotController`).
+
+Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
+Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
+
+### Уровень
+
+`LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`). `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
+**только из префабов `LevelArt`**: блоки-кубы масштабируются под размер, лестницы/двери/лазы/лампы/мебель ставятся как есть.
+Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
+Размеры здания — `LevelMetrics`.
+
+### Сеть и состояние
+
+`GameNetwork` — запуск/остановка сессии. `GameManager` (на префабе `Session`, спавнит хост) — жизненный цикл уровня, квота, тревоги, охотник.
+Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
+Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
+
+### Ассеты из кода
+
+`Editor/AssetBuilder*.cs` создаёт материалы, спрайты, все префабы, `LevelArt`, список сетевых префабов и сцену.
+Меню **Stealth → Build Missing Assets** дособирает только отсутствующее (ручные правки префабов сохраняются),
+**Rebuild All Assets** (или `FORCE=1`) перезаписывает всё. Пути не меняются, поэтому GUID и сетевые хэши стабильны.
+Если меняешь структуру префаба в коде — пересобери с `FORCE=1` и закоммить изменённые префабы вместе с кодом.
+
+## Правила кода (коротко; подробно — скилл [`stealth-code`](.claude/skills/stealth-code/SKILL.md))
+
+- В рантайме **не собирать объекты кодом** (`new GameObject` + `AddComponent`, `CreatePrimitive`, процедурные текстуры): только `Instantiate` префабов, на которые ссылаются поля/`LevelArt`.
+- Один `MonoBehaviour` — один файл с тем же именем (иначе Unity теряет скрипт в префабах).
+- Логику, которую можно проверить без движка, выносить в чистый класс и покрывать тестом. Время и случайность — параметрами.
+- Сервер решает, клиенты показывают. Запросы клиента — `[Rpc(SendTo.Server)]` с проверкой на сервере.
+- Приватные поля `m_Name`, статические `s_Name`, константы и публичное — `PascalCase`. Комментарии и идентификаторы — по-английски, тексты для игрока — по-русски.
+- Найденный баг — чинить и, если можно, закрыть тестом.
+
+## Точки стыковки для коллеги
+
+- Войс-чат: `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере — роботы с микрофонами услышат.
+- Предметы: `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`, в мире — `WorldItem`, инвентарь — `PlayerInventory`.
+- Мета-прогрессия: итог забега `GameManager.RunTotal`, конец забега `GameManager.Phase == RunPhase.Failed`.
+- Новый робот или датчик: чек-лист в скилле `stealth-code`.

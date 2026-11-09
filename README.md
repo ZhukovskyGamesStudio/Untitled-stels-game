@@ -9,9 +9,10 @@ Unity 6000.6.0f1, URP, Netcode for GameObjects 2.13, Steamworks.NET (AppID 480 /
 - Сцена: `Assets/_Game/Scenes/Game.unity`.
 - **Через Steam:** «Создать игру через Steam», затем Esc → «Пригласить друзей». Друг заходит по приглашению или через «Присоединиться к игре» в Steam.
 - **На одном ПК / в локалке:** «Создать локальную игру» в одном окне, «Подключиться по IP» в другом (UDP, порт 7777). В редакторе второго игрока удобно запускать через Window → Multiplayer → Multiplayer Play Mode.
-- Пересобрать всё сгенерированное (материалы, префабы, сцену): меню **Stealth → Build Prototype Assets**. Windows-билд: **Stealth → Build Windows Player** (в `Builds/Windows`).
+- Ассеты (материалы, префабы уровня, роботов, интерфейса, сцену) собирает код: меню **Stealth → Build Missing Assets** — только недостающее (ручные правки префабов сохраняются), **Stealth → Rebuild All Assets** — всё заново. Windows-билд: **Stealth → Build Windows Player** (в `Builds/Windows`).
 - Модели-заглушки генерируются в Blender: `generate_models.py` (офис, игрок, предметы) и `robots.py` (роботы и датчики):
-  `blender.exe -b --factory-startup --python Tools/Blender/robots.py -- Assets/_Game/Models`.
+  `blender.exe -b --factory-startup --python Tools/Blender/robots.py -- Assets/_Game/Art/Models` (раскладываются по подпапкам).
+- Как устроен код и как с ним работать — [CLAUDE.md](CLAUDE.md).
 
 ## Управление
 
@@ -64,12 +65,12 @@ Unity 6000.6.0f1, URP, Netcode for GameObjects 2.13, Steamworks.NET (AppID 480 /
 - **Войс-чат:** вызывать `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере, радиус — от громкости микрофона. Роботы с микрофонами услышат.
 - **Предметы:** сейчас `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`. Для настоящих предметов — заменить каталог и `WorldItem`; инвентарь работает с формой в клетках.
 - **Мета-прогрессия:** итог забега — `GameManager.RunTotal`, конец забега — `GameManager.Phase == Failed`.
-- **Новый робот:** значение в `RobotKind`, строка в `RobotRoster`, префаб в `PrototypeBuilder` (`BuildRobot` для наземных на навмеше, `BuildDevice<T>` для своих скриптов на базе `SecurityDevice`), описание в `RobotInfo`.
+- **Новый робот:** чек-лист в `.claude/skills/stealth-code/SKILL.md` (значение в `RobotKind`, строка в `RobotRoster`, префаб в `AssetBuilder.Actors.cs`, описание в `RobotInfo`).
 
 ## Тесты и автопилот
 
-- `Tools/dev.sh tests` — EditMode-тесты (72: движение, инвентарь, генерация и навмеш этажей, правила датчиков, UI-математика).
-- `Tools/dev.sh assets` / `Tools/dev.sh player` — пересобрать ассеты / Windows-билд в batchmode.
+- `Tools/dev.sh tests` — EditMode-тесты (≈260: движение, здоровье и газ, инвентарь, генерация и навмеш этажей, сборка уровня из префабов, «мозг» роботов, датчики, подсказки HUD, целостность префабов).
+- `Tools/dev.sh assets` (`FORCE=1` — перезаписать всё) / `Tools/dev.sh player` — собрать ассеты / Windows-билд в batchmode.
 - `Tools/dev.sh run <сценарий> [клиенты]` — запустить билд с автопилотом, он пишет `[AUTOTEST]` в лог и сохраняет скриншоты в `Builds/shots/<сценарий>`.
   Переменные: `SEED`, `LEVEL`, `PEACEFUL=1`, `HOSTILE=1`, `KINDS=Guard,Drone`, `RESW/RESH`.
-  Сценарии: `full`, `coop`, `move`, `ui`, `floors`, `rooms`, `vent`, `perf`, `gallery` (все роботы, с `HOSTILE=1` — проверка реакции), `hunter`, `lasers`, `radio`, `hack`.
+  Сценарии: `full`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery` (все роботы, с `HOSTILE=1` — проверка реакции), `hunter`, `lasers`, `radio`, `hack`.
