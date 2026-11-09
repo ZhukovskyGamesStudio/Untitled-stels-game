@@ -1,5 +1,6 @@
 using Stealth.Game;
 using Stealth.Level;
+using Stealth.Player;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -7,10 +8,11 @@ using UnityEngine;
 namespace Stealth.Net
 {
     /// <summary>
-    /// Entry point for starting / stopping a session.
+    /// Entry point for starting / stopping a session and the bridge between Netcode and the game:
+    /// registers <see cref="Session.Backend"/> (NGO) and <see cref="Session.Launcher"/> (this) on start.
     /// Steam: real online play with friends. Local: UDP on 127.0.0.1 / LAN for testing two instances on one PC.
     /// </summary>
-    public class GameNetwork : MonoBehaviour
+    public class GameNetwork : MonoBehaviour, ISessionLauncher
     {
         public static GameNetwork Instance { get; private set; }
 
@@ -28,6 +30,9 @@ namespace Stealth.Net
         void Awake()
         {
             Instance = this;
+            Session.Backend = new NgoSessionBackend(Manager);
+            Session.Launcher = this;
+            PlayerController.LocalChanged += OnLocalPlayerChanged;
             Application.runInBackground = true;
             if (QualitySettings.vSyncCount == 0) Application.targetFrameRate = 144;
             Manager.OnClientDisconnectCallback += OnClientDisconnect;
@@ -36,6 +41,15 @@ namespace Stealth.Net
                 if (id == Manager.LocalClientId) SetStatus("");
             };
         }
+
+        void OnDestroy()
+        {
+            PlayerController.LocalChanged -= OnLocalPlayerChanged;
+            if (Session.Launcher == (ISessionLauncher)this) Session.Launcher = null;
+            if (Instance == this) Session.Backend = null;
+        }
+
+        void OnLocalPlayerChanged(bool present) => ShowMenuCamera(!present);
 
         public void SetStatus(string status)
         {
@@ -112,5 +126,19 @@ namespace Stealth.Net
         {
             if (IsRunning) Manager.Shutdown();
         }
+
+        // ------------------------------------------------------------------ ISessionLauncher (menu)
+
+        ushort ISessionLauncher.LocalPort => LocalPort;
+        bool ISessionLauncher.IsHost => Manager.IsHost;
+        bool ISessionLauncher.SteamAvailable => SteamManager.Initialized;
+        string ISessionLauncher.SteamStatus => SteamManager.Initialized ? "подключён как " + SteamManager.PersonaName : "недоступен — " + SteamManager.Error;
+        string ISessionLauncher.LocalPlayerName => SteamManager.Initialized ? SteamManager.PersonaName : null;
+        bool ISessionLauncher.CanInviteFriends => UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby;
+
+        void ISessionLauncher.HostSteam() => SteamLobby.Instance.HostLobby();
+        void ISessionLauncher.HostLocal() => StartHostLocal();
+        void ISessionLauncher.JoinLocal(string address) => StartClientLocal(address);
+        void ISessionLauncher.InviteFriends() => SteamLobby.Instance.OpenInviteDialog();
     }
 }

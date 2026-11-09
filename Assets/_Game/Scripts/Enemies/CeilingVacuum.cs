@@ -35,7 +35,7 @@ namespace Stealth.Enemies
 
         float CeilingY => m_FloorY + LevelMetrics.WallHeight - 0.05f;
 
-        Vector3 ScanDir => ScanLine.Direction(Unity.Netcode.NetworkManager.Singleton.ServerTime.TimeAsFloat, ScanSpeed, NetworkObjectId * 37f);
+        Vector3 ScanDir => ScanLine.Direction(Stealth.Game.Session.ServerTimeF, ScanSpeed, NetId * 37f);
 
         protected override void TickLocal()
         {

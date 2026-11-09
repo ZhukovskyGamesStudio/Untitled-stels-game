@@ -1,5 +1,4 @@
 using Stealth.Game;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Enemies
@@ -17,24 +16,19 @@ namespace Stealth.Enemies
         public float AlarmCooldown = 6f;
 
         /// <summary>0 idle, 1 noticing, 2 detected (replicated, drives the status colour).</summary>
-        public readonly NetworkVariable<byte> Alert = new();
+        public byte Alert => Mode;
 
         protected readonly SuspicionMeter Meter = new();
         protected IIntruder Suspect { get; private set; }
 
         protected virtual Color IdleColor => SecurityPalette.Calm;
-        protected override Color StatusColor => SecurityPalette.ForAlert(Alert.Value, IdleColor);
+        protected override Color StatusColor => SecurityPalette.ForAlert(Alert, IdleColor);
 
         protected override void OnSpawned()
         {
             Meter.AlarmCooldown = AlarmCooldown;
-            Alert.OnValueChanged += OnAlertChanged;
             OnDeviceSpawned();
         }
-
-        protected override void OnDespawned() => Alert.OnValueChanged -= OnAlertChanged;
-
-        void OnAlertChanged(byte _, byte __) => RefreshStatus();
 
         protected virtual void OnDeviceSpawned() { }
 
@@ -49,7 +43,7 @@ namespace Stealth.Enemies
         protected override void OnHackedServer()
         {
             Meter.Clear();
-            Alert.Value = 0;
+            SetMode(0);
         }
 
         void Update()
@@ -61,7 +55,7 @@ namespace Stealth.Enemies
             if (SensorsActive) TickServer();
             else Decay(1f);
             byte alert = IsHacked ? (byte)0 : Meter.AlertLevel(Time.time);
-            if (Alert.Value != alert) Alert.Value = alert;
+            SetMode(alert);
             if (!IsHacked) ReportAwarenessServer(Meter.Awareness(Time.time), Suspect);
         }
 

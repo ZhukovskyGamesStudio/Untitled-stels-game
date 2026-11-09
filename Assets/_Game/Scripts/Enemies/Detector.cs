@@ -1,26 +1,54 @@
+using System;
 using System.Collections.Generic;
 using Stealth.Game;
 using Stealth.Level;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Enemies
 {
+    /// <summary>
+    /// Everything about a detector that the other peers need to see. The server owns it; the network twin
+    /// (DetectorNet, assembly Stealth.Net) replicates it as a whole for every kind of robot and device.
+    /// </summary>
+    public struct DetectorSnapshot : IEquatable<DetectorSnapshot>
+    {
+        /// <summary>0..255 = 0..1 awareness; 255 = fully detected (chasing / alarm).</summary>
+        public byte Awareness;
+        /// <summary>Client id of the player it is noticing, <see cref="Detector.Nobody"/> if none.</summary>
+        public ulong Focus;
+        public bool Hacked;
+        /// <summary>Kind-specific mode: robot state, device alert level.</summary>
+        public byte Mode;
+        /// <summary>Kind-specific variant: colour of a sorter (-1 none).</summary>
+        public sbyte Variant;
+        /// <summary>Kind-specific target client: turret aim (<see cref="Detector.Nobody"/> if none).</summary>
+        public ulong Target;
+
+        public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody };
+
+        public bool Equals(DetectorSnapshot o) =>
+            Awareness == o.Awareness && Focus == o.Focus && Hacked == o.Hacked && Mode == o.Mode && Variant == o.Variant && Target == o.Target;
+    }
+
     /// <summary>
     /// Base of everything that watches the players: mobile robots (<see cref="RobotController"/>) and devices
     /// (<see cref="SecurityDevice"/>: camera, turret, spider, vacuum, lidar, PIR, pressure plate).
     ///
     /// Owns what they all share:
     ///  * identity (<see cref="Kind"/>) and the indicator point for the HUD;
-    ///  * replicated awareness — how much it notices whom (detection arcs, "?" / "!" icons);
+    ///  * awareness — how much it notices whom (detection arcs, "?" / "!" icons);
     ///  * hacking (<see cref="IHackable"/>): a hacked detector is dark and senses nothing;
     ///  * status lights coloured by the subclass state;
     ///  * a registry of spawned detectors (<see cref="All"/>).
+    /// No networking here: the twin calls <see cref="Spawned"/> / <see cref="ApplyReplicated"/> and carries pulses.
     /// </summary>
-    public abstract class Detector : NetworkBehaviour, IHackable
+    public abstract class Detector : MonoBehaviour, IHackable
     {
         public const ulong Nobody = ulong.MaxValue;
         public static readonly List<Detector> All = new();
+
+        /// <summary>One-shot effects shown on every peer (see <see cref="Pulse"/>).</summary>
+        protected const byte PulseRadio = 1, PulseShot = 2;
 
         [Header("Detector")]
         public RobotKind Kind;
@@ -28,23 +56,31 @@ namespace Stealth.Enemies
         public Transform Point;
         public StatusLights Status = new();
 
-        /// <summary>0..255 = 0..1 awareness; 255 = fully detected (chasing / alarm).</summary>
-        public readonly NetworkVariable<byte> AwarenessLevel = new();
-        /// <summary>Client id of the player it is noticing, <see cref="Nobody"/> if none.</summary>
-        public readonly NetworkVariable<ulong> FocusClient = new(Nobody);
-        public readonly NetworkVariable<bool> Hacked = new();
-
+        DetectorSnapshot m_State = DetectorSnapshot.Initial;
+        IDetectorLink m_Link;
         float m_HackedUntil;
         float m_NextAwarenessSend;
 
-        public float Awareness => AwarenessLevel.Value / 255f;
+        /// <summary>This peer is the server (senses and decides).</summary>
+        public bool IsServer { get; private set; }
+        public bool IsSpawned { get; private set; }
+        /// <summary>Stable id shared by all peers (phases of sweeps and scans).</summary>
+        public ulong NetId { get; private set; }
+
+        public DetectorSnapshot Snapshot => m_State;
+        public float Awareness => m_State.Awareness / 255f;
+        public ulong FocusClient => m_State.Focus;
+        public bool IsHacked => m_State.Hacked;
+        protected byte Mode => m_State.Mode;
+        protected sbyte Variant => m_State.Variant;
+        protected ulong TargetClient => m_State.Target;
+
         public Vector3 Position => Point != null ? Point.position : transform.position + Vector3.up;
-        public bool IsHacked => Hacked.Value;
         public string DisplayName => RobotInfo.Name(Kind);
         public string SensesDescription => RobotInfo.Senses(Kind);
 
         /// <summary>Awareness of a specific player (0 if it is focused on someone else).</summary>
-        public float AwarenessOf(ulong clientId) => FocusClient.Value == clientId ? Awareness : 0f;
+        public float AwarenessOf(ulong clientId) => FocusClient == clientId ? Awareness : 0f;
 
         /// <summary>Walking over to check a spot (orange "?").</summary>
         public virtual bool IsInvestigating => false;
@@ -54,27 +90,66 @@ namespace Stealth.Enemies
         /// <summary>Sensors may run this frame: server, the session allows sensing, not hacked.</summary>
         protected bool SensorsActive => IsServer && GameManager.SensorsAllowed && !IsHacked;
 
-        // ------------------------------------------------------------------ lifecycle
+        // ------------------------------------------------------------------ lifecycle (called by the network twin)
 
-        public override void OnNetworkSpawn()
+        public void Spawned(IDetectorLink link, ulong netId, bool isServer)
         {
+            m_Link = link;
+            NetId = netId;
+            IsServer = isServer;
+            IsSpawned = true;
             All.Add(this);
-            Hacked.OnValueChanged += OnHackedChanged;
             OnSpawned();
             RefreshStatus();
         }
 
-        public override void OnNetworkDespawn()
+        public void Despawned()
         {
             All.Remove(this);
-            Hacked.OnValueChanged -= OnHackedChanged;
+            IsSpawned = false;
+            m_Link = null;
             OnDespawned();
         }
 
-        void OnHackedChanged(bool _, bool __) => RefreshStatus();
+        /// <summary>Client: the server's state of this detector.</summary>
+        public void ApplyReplicated(DetectorSnapshot s)
+        {
+            if (s.Equals(m_State)) return;
+            m_State = s;
+            RefreshStatus();
+        }
+
+        /// <summary>Every peer: a one-shot effect announced by the server.</summary>
+        public void ReceivePulse(byte effect) => OnPulse(effect);
 
         protected virtual void OnSpawned() { }
         protected virtual void OnDespawned() { }
+        protected virtual void OnPulse(byte effect) { }
+
+        /// <summary>Server: show an effect on every peer.</summary>
+        protected void Pulse(byte effect)
+        {
+            if (m_Link != null) m_Link.BroadcastPulse(effect);
+            else OnPulse(effect);
+        }
+
+        // ------------------------------------------------------------------ server-side state
+
+        protected void SetMode(byte mode)
+        {
+            if (m_State.Mode == mode) return;
+            m_State.Mode = mode;
+            RefreshStatus();
+        }
+
+        protected void SetVariant(sbyte variant)
+        {
+            if (m_State.Variant == variant) return;
+            m_State.Variant = variant;
+            RefreshStatus();
+        }
+
+        protected void SetTarget(ulong target) => m_State.Target = target;
 
         // ------------------------------------------------------------------ hacking
 
@@ -84,9 +159,10 @@ namespace Stealth.Enemies
         {
             if (!IsServer) return;
             m_HackedUntil = Time.time + seconds;
-            Hacked.Value = true;
+            m_State.Hacked = true;
             ReportAwarenessServer(0f, null);
             OnHackedServer();
+            RefreshStatus();
         }
 
         /// <summary>Server: forget the current target / suspicion.</summary>
@@ -95,8 +171,12 @@ namespace Stealth.Enemies
         /// <summary>Server, every frame: ends an expired hack. Returns true while still hacked.</summary>
         protected bool UpdateHackServer()
         {
-            if (Hacked.Value && Time.time >= m_HackedUntil) Hacked.Value = false;
-            return Hacked.Value;
+            if (m_State.Hacked && Time.time >= m_HackedUntil)
+            {
+                m_State.Hacked = false;
+                RefreshStatus();
+            }
+            return m_State.Hacked;
         }
 
         // ------------------------------------------------------------------ awareness
@@ -107,12 +187,12 @@ namespace Stealth.Enemies
             if (!IsServer) return;
             byte b = (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(level) * 255f), 0, 255);
             ulong f = focus != null && b > 0 ? focus.ClientId : Nobody;
-            var old = AwarenessLevel.Value;
-            bool important = (b == 255) != (old == 255) || f != FocusClient.Value || (b == 0) != (old == 0);
+            var old = m_State.Awareness;
+            bool important = (b == 255) != (old == 255) || f != m_State.Focus || (b == 0) != (old == 0);
             if (!important && (Time.time < m_NextAwarenessSend || Mathf.Abs(b - old) < 6)) return;
             m_NextAwarenessSend = Time.time + 0.08f;
-            AwarenessLevel.Value = b;
-            FocusClient.Value = f;
+            m_State.Awareness = b;
+            m_State.Focus = f;
         }
 
         // ------------------------------------------------------------------ status lights

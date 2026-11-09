@@ -112,6 +112,7 @@ GameObject:
   - component: {fileID: 9081305155318382723}
   - component: {fileID: 5912467504861279748}
   - component: {fileID: 3440945559738487395}
+  - component: {fileID: 7801259971588036002}
   m_Layer: 0
   m_Name: RobotThumper
   m_TagString: Untagged
@@ -285,7 +286,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 52fd8901c4ddcee4eb843bd047fa530f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotController
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 6
   Point: {fileID: 7415115655184370344}
   Status:
@@ -321,6 +321,19 @@ MonoBehaviour:
     AttackCooldown: 1.7
   Eye: {fileID: 7415115655184370344}
   RadioRipplePrefab: {fileID: 6632636445288678081, guid: 265ebd535c076e54383c1be7dbd55814, type: 3}
+--- !u!114 &7801259971588036002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2027905470119683578}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3220046523311731253
 GameObject:
   m_ObjectHideFlags: 0

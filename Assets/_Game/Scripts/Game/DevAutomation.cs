@@ -6,7 +6,6 @@ using System.Linq;
 using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Level;
-using Stealth.Net;
 using Stealth.Player;
 using UnityEngine;
 
@@ -61,9 +60,9 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(0.5f);
                 yield return Shot("main_menu");
             }
-            if (Arg("-host-local") != null) GameNetwork.Instance.StartHostLocal();
+            if (Arg("-host-local") != null) Session.Launcher.HostLocal();
             var join = Arg("-join-local");
-            if (join != null) GameNetwork.Instance.StartClientLocal(string.IsNullOrEmpty(join) ? "127.0.0.1" : join);
+            if (join != null) Session.Launcher.JoinLocal(string.IsNullOrEmpty(join) ? "127.0.0.1" : join);
             if (m_Name == null) yield break;
 
             float timeout = Time.time + 30f;
@@ -181,9 +180,9 @@ namespace Stealth.Game
         {
             var gm = GameManager.Instance;
             var layout = ActiveLevel.Layout;
-            Log($"connected: players={PlayerController.All.Count} level={gm.Level.Value.Index} seed={gm.Level.Value.Seed} rooms={layout.Width}x{layout.Height}x{layout.Floors} " +
+            Log($"connected: players={PlayerController.All.Count} level={gm.Level.Index} seed={gm.Level.Seed} rooms={layout.Width}x{layout.Height}x{layout.Floors} " +
                 $"items={WorldItem.All.Count} robots={RobotController.Robots.Count} cameras={FindObjectsByType<SecurityCamera>().Length} " +
-                $"lasers={FindObjectsByType<LaserGate>().Length} quota={gm.Quota.Value}");
+                $"lasers={FindObjectsByType<LaserGate>().Length} quota={gm.Quota}");
             var kinds = new System.Collections.Generic.Dictionary<string, int>();
             foreach (var d in Detector.All)
             {
@@ -196,7 +195,7 @@ namespace Stealth.Game
             // Pick up an item through the same RPC the UI uses; each player takes a different one.
             var inv = Me.GetComponent<PlayerInventory>();
             var item = WorldItem.All.OrderBy(i => Vector3.Distance(i.transform.position, Me.transform.position))
-                .Skip((int)Me.OwnerClientId).FirstOrDefault();
+                .Skip((int)Me.ClientId).FirstOrDefault();
             if (item != null)
             {
                 var itemPos = item.transform.position;
@@ -205,16 +204,16 @@ namespace Stealth.Game
                 Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(itemPos - stand)));
                 yield return new WaitForSeconds(1f);
                 yield return Shot("item");
-                if (inv.FindSpot(item.Shape.Value, out var x, out var y, out var rot)) inv.PickupRpc(item.NetworkObject, x, y, rot);
+                if (inv.FindSpot(item.Shape, out var x, out var y, out var rot)) inv.RequestPickup(item, x, y, rot);
                 yield return new WaitForSeconds(1f);
-                Log($"pickup: inventory={inv.Items.Count} value={inv.TotalValue} itemStillInWorld={item != null && item.IsSpawned}");
+                Log($"pickup: inventory={inv.Items.Count} value={inv.TotalValue} itemStillInWorld={item != null && item.isActiveAndEnabled}");
 
                 Me.TeleportOwner(layout.HatchPosition + new Vector3(1.2f, 0.05f, 0), Quaternion.LookRotation(Vector3.left));
                 yield return new WaitForSeconds(1f);
-                int before = gm.Collected.Value;
-                if (inv.Items.Count > 0) inv.DepositRpc(0);
+                int before = gm.Collected;
+                if (inv.Items.Count > 0) inv.RequestDeposit(0);
                 yield return new WaitForSeconds(1f);
-                Log($"deposit: collected {before} -> {gm.Collected.Value}, inventory={inv.Items.Count}");
+                Log($"deposit: collected {before} -> {gm.Collected}, inventory={inv.Items.Count}");
                 yield return Shot("hatch");
             }
             else Log("no items found");
@@ -222,7 +221,7 @@ namespace Stealth.Game
             var guard = RobotController.Robots.FirstOrDefault(r => r.Senses.HasEyes) ?? RobotController.Robots.FirstOrDefault();
             if (guard != null)
             {
-                int hpBefore = Me.Hp.Value;
+                int hpBefore = Me.Hp;
                 var gp = guard.transform.position;
                 var spot = gp + guard.transform.forward * 5f;
                 spot.y = gp.y + 0.05f;
@@ -230,28 +229,28 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(0.6f);
                 yield return Shot("robot");
                 float until = Time.time + 6f;
-                while (Time.time < until && guard != null && guard.State.Value != RobotState.Chase) yield return null;
-                Log($"robot '{guard.name}': state={guard.State.Value}");
+                while (Time.time < until && guard != null && guard.State != RobotState.Chase) yield return null;
+                Log($"robot '{guard.name}': state={guard.State}");
                 yield return new WaitForSeconds(3f);
-                Log($"robot attack: hp {hpBefore} -> {Me.Hp.Value}, downed={Me.Downed.Value}");
+                Log($"robot attack: hp {hpBefore} -> {Me.Hp}, downed={Me.Downed}");
             }
 
             var cam = FindObjectsByType<SecurityCamera>().FirstOrDefault();
-            if (cam != null && !Me.Downed.Value)
+            if (cam != null && !Me.Downed)
             {
                 var c = cam.transform.position;
                 var spot = new Vector3(c.x, Mathf.Floor(c.y / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight + 0.05f, c.z) + cam.transform.forward * 5f;
                 Me.TeleportOwner(spot, Quaternion.LookRotation(Flat(c - spot)));
                 float until = Time.time + 5f;
-                while (Time.time < until && cam.Alert.Value != 2) yield return null;
-                Log($"camera: alert={cam.Alert.Value} alarmActive={gm.AlarmActive}");
+                while (Time.time < until && cam.Alert != 2) yield return null;
+                Log($"camera: alert={cam.Alert} alarmActive={gm.AlarmActive}");
                 yield return Shot("camera");
             }
 
             var laser = FindObjectsByType<LaserGate>().FirstOrDefault();
             if (laser != null)
             {
-                int hpBefore = Me.Hp.Value;
+                int hpBefore = Me.Hp;
                 var lp = laser.transform.position;
                 Me.TeleportOwner(lp - laser.transform.forward * 2.5f + Vector3.up * 0.05f, Quaternion.LookRotation(laser.transform.forward));
                 yield return new WaitForSeconds(0.8f);
@@ -260,7 +259,7 @@ namespace Stealth.Game
                 while (Time.time < until && !laser.BeamsOn) yield return null;
                 Me.TeleportOwner(lp + Vector3.up * 0.05f, Quaternion.LookRotation(laser.transform.forward));
                 yield return new WaitForSeconds(0.6f);
-                Log($"laser pattern={laser.Pattern.Value}: hp {hpBefore} -> {Me.Hp.Value}, downed={Me.Downed.Value}");
+                Log($"laser pattern={laser.Pattern}: hp {hpBefore} -> {Me.Hp}, downed={Me.Downed}");
             }
 
             var outside = new Vector3(-6f, 0.05f, layout.HatchPosition.z);
@@ -277,7 +276,7 @@ namespace Stealth.Game
             var hatch = ActiveLevel.Layout.HatchPosition;
             float t0 = Time.time;
             while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
-            if (Me.IsHost)
+            if (Me.IsServer)
             {
                 Me.TeleportOwner(hatch + new Vector3(-1f, 0.05f, -2.5f), Quaternion.LookRotation(Vector3.right));
                 yield return new WaitForSeconds(4f);
@@ -299,7 +298,7 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(1.6f);
                 yield return Shot("host_looking_down");
                 var host = PlayerController.All.FirstOrDefault(p => p != Me);
-                Log($"remote host pitch={host?.LookPitch.Value}");
+                Log($"remote host pitch={host?.LookPitch}");
             }
         }
 

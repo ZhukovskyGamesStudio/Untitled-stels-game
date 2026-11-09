@@ -5,35 +5,27 @@ using Stealth.Items;
 using Stealth.Level;
 using Stealth.Player;
 using Unity.AI.Navigation;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
 namespace Stealth.Game
 {
-    public enum RunPhase : byte { Playing, Failed }
-
-    public struct LevelInfo : INetworkSerializeByMemcpy, IEquatable<LevelInfo>
-    {
-        public int Seed;
-        public int Index;
-        public bool Equals(LevelInfo other) => Seed == other.Seed && Index == other.Index;
-    }
-
     /// <summary>
-    /// Session state, spawned by the host. Owns the level lifecycle: generation (on every peer from a shared seed),
-    /// navmesh + content spawning (server), quota checks and alarms.
+    /// Session state, spawned by the host on the Session prefab. Owns the level lifecycle: generation (on every peer
+    /// from a shared seed), navmesh + content spawning (server), quota, alarms and hunters. The rules are in
+    /// <see cref="RunState"/>; the network twin (GameManagerNet) replicates <see cref="Level"/> and the run state and
+    /// carries requests and banners (<see cref="IGameLink"/>).
     /// </summary>
-    public class GameManager : NetworkBehaviour
+    public class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
 
         [Header("Content")]
         public LevelArt Art;
-        public NetworkObject ItemPrefab;
+        public GameObject ItemPrefab;
         [Tooltip("Indexed by RobotKind (robots, devices and the wall camera). Empty entries are skipped.")]
-        public NetworkObject[] RobotPrefabs = new NetworkObject[RobotRoster.KindCount];
-        public NetworkObject LaserPrefab;
+        public GameObject[] RobotPrefabs = new GameObject[RobotRoster.KindCount];
+        public GameObject LaserPrefab;
 
         [Header("Balance")]
         [Tooltip("Share of the total item value on a level required by the quota (level 0).")]
@@ -52,63 +44,64 @@ namespace Stealth.Game
         public static bool SensorsAllowed => !DevFlags.Peaceful && !DevFlags.FreezeRobots && !InGracePeriod;
 
         /// <summary>The run is going on (or there is no session yet, e.g. in tools): robots may act.</summary>
-        public static bool IsPlaying => Instance == null || Instance.Phase.Value == RunPhase.Playing;
+        public static bool IsPlaying => Instance == null || Instance.Phase == RunPhase.Playing;
 
-        /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
-        public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar)
-        {
-            if (huntersSoFar >= 1 + levelIndex / 3) return false;
-            int alarmLimit = (levelIndex == 0 ? 3 : 2) * (huntersSoFar + 1);
-            float timeLimit = Mathf.Max(180f, 360f - levelIndex * 20f) * (huntersSoFar + 1);
-            return alarms >= alarmLimit || elapsed >= timeLimit;
-        }
+        readonly RunState m_Run = new();
+        readonly List<GameObject> m_Spawned = new();
+        IGameLink m_Link;
+        bool m_IsServer;
+        int m_BuiltSeed;
 
-        int m_AlarmCount;
-        int m_Hunters;
-        double m_LastAlarmCounted = -10;
-
-        /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
-        public static int QuotaFor(int totalValue, int levelIndex, int penalties, float share = 0.35f, float growth = 0.04f, float penalty = 0.15f)
-        {
-            float s = Mathf.Min(0.85f, share + growth * levelIndex);
-            return Mathf.Max(10, Mathf.RoundToInt(totalValue * s * (1f + penalty * penalties) / 5f) * 5);
-        }
-
-        public readonly NetworkVariable<LevelInfo> Level = new();
-        public readonly NetworkVariable<int> Quota = new();
-        public readonly NetworkVariable<int> Collected = new();
-        public readonly NetworkVariable<int> RunTotal = new();
-        public readonly NetworkVariable<RunPhase> Phase = new();
-        public readonly NetworkVariable<double> AlarmUntil = new();
+        public LevelInfo Level { get; private set; }
+        public RunState Run => m_Run;
+        public int Quota => m_Run.Quota;
+        public int Collected => m_Run.Collected;
+        public int RunTotal => m_Run.RunTotal;
+        public RunPhase Phase => m_Run.Phase;
+        public double AlarmUntil => m_Run.AlarmUntil;
+        public bool AlarmActive => m_Run.AlarmActive(Session.ServerTime);
 
         public event Action<string> OnBanner;
 
-        public bool AlarmActive => NetworkManager != null && NetworkManager.ServerTime.Time < AlarmUntil.Value;
-        public string FailReason { get; private set; } = "";
+        // ------------------------------------------------------------------ binding (called by the network twin)
 
-        readonly List<NetworkObject> m_Spawned = new();
-        int m_BuiltSeed;
-        int m_PendingPenalties;
-
-        public override void OnNetworkSpawn()
+        public void Bind(IGameLink link, bool isServer)
         {
             Instance = this;
-            Level.OnValueChanged += (_, _) => BuildLocal();
-            if (IsServer) { StartLevel(DevFlags.ForcedLevel); DevFlags.ForcedLevel = 0; }
-            else if (Level.Value.Seed != 0) BuildLocal();
+            m_Link = link;
+            m_IsServer = isServer;
+            m_Run.QuotaShare = QuotaShare;
+            m_Run.QuotaShareGrowth = QuotaShareGrowth;
+            m_Run.DeathPenalty = DeathPenalty;
+            m_Run.AlarmDuration = AlarmDuration;
+            if (!isServer) return;
+            StartLevel(DevFlags.ForcedLevel);
+            DevFlags.ForcedLevel = 0;
         }
 
-        public override void OnNetworkDespawn()
+        public void Unbind()
         {
             ActiveLevel.Clear();
+            m_Link = null;
             if (Instance == this) Instance = null;
+        }
+
+        /// <summary>Client: the server's view of the run.</summary>
+        public void ApplyReplicated(LevelInfo level, int quota, int collected, int runTotal, RunPhase phase, double alarmUntil)
+        {
+            m_Run.ApplyReplicated(level.Index, quota, collected, runTotal, phase, alarmUntil);
+            if (!level.Equals(Level))
+            {
+                Level = level;
+                BuildLocal();
+            }
         }
 
         // ------------------------------------------------------------------ level lifecycle
 
         void BuildLocal()
         {
-            var info = Level.Value;
+            var info = Level;
             if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
             m_BuiltSeed = info.Seed;
             var layout = LevelGenerator.Generate(info.Seed, info.Index);
@@ -129,16 +122,14 @@ namespace Stealth.Game
 
         void StartLevel(int index)
         {
-            foreach (var obj in m_Spawned)
-                if (obj != null && obj.IsSpawned) obj.Despawn();
+            foreach (var obj in m_Spawned) Session.Despawn(obj);
             m_Spawned.Clear();
-            foreach (var item in WorldItem.All.ToArray())
-                if (item.IsSpawned) item.NetworkObject.Despawn();
+            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
 
             ScentTrail.Clear();
             int seed = DevFlags.ForcedSeed != 0 ? DevFlags.ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
             DevFlags.ForcedSeed = 0;
-            Level.Value = new LevelInfo { Seed = seed, Index = index };
+            Level = new LevelInfo { Seed = seed, Index = index };
             BuildLocal();
             var layout = ActiveLevel.Layout;
 
@@ -146,86 +137,59 @@ namespace Stealth.Game
             ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
 
             int totalValue = SpawnContent(layout, seed);
-            Quota.Value = QuotaFor(totalValue, index, m_PendingPenalties, QuotaShare, QuotaShareGrowth, DeathPenalty);
+            m_Run.BeginLevel(index, totalValue);
             LevelStartTime = Time.time;
-            m_AlarmCount = 0;
-            m_Hunters = 0;
-            Collected.Value = 0;
-            Phase.Value = RunPhase.Playing;
-            AlarmUntil.Value = 0;
-
             foreach (var p in PlayerController.All) p.ResetForLevelServer();
-            Debug.Log($"[Game] Level {index} started: items worth {totalValue}, quota {Quota.Value}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
+            Debug.Log($"[Game] Level {index} started: items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
 
         int SpawnContent(LevelLayout layout, int seed)
         {
             var rng = new System.Random(seed ^ 0x5bd1e995);
-            int index = layout.LevelIndex;
-
-            // Items.
             int total = 0;
             foreach (var loot in LootPlanner.Plan(layout, rng))
             {
-                var obj = Instantiate(ItemPrefab, loot.Position, Quaternion.Euler(0, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f, 0));
-                var item = obj.GetComponent<WorldItem>();
-                item.Shape.Value = (byte)loot.Shape;
-                item.Color.Value = (byte)loot.Color;
-                obj.Spawn(true);
+                var item = SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f);
                 total += item.Value;
             }
 
-            // Robots.
             foreach (var spawn in layout.RobotSpawns)
             {
                 var pos = spawn.Position;
                 bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
-                DebugSpawnServer(spawn.Kind, pos, spawn.Rotation);
+                SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
             }
 
-            foreach (var pose in layout.CameraSpots) DebugSpawnServer(RobotKind.Camera, pose.position, pose.rotation);
+            foreach (var pose in layout.CameraSpots) SpawnRobotServer(RobotKind.Camera, pose.position, pose.rotation);
 
             foreach (var spot in layout.LaserSpots)
-            {
-                var obj = Instantiate(LaserPrefab, spot.Position, spot.Rotation);
-                var gate = obj.GetComponent<LaserGate>();
-                gate.Pattern.Value = spot.Kind;
-                gate.Width.Value = spot.Width;
-                obj.Spawn(true);
-                m_Spawned.Add(obj);
-            }
+                m_Spawned.Add(Session.Spawn(LaserPrefab, spot.Position, spot.Rotation, go => go.GetComponent<LaserGate>().Configure(spot.Kind, spot.Width)));
             return total;
         }
 
         // ------------------------------------------------------------------ server API
 
-        /// <summary>Spawns a robot / device of the given kind (server). Returns null if there is no prefab yet.</summary>
-        public NetworkObject DebugSpawnServer(RobotKind kind, Vector3 position, Quaternion rotation)
+        /// <summary>Spawns a robot / device of the given kind (server). Returns null if there is no prefab.</summary>
+        public GameObject SpawnRobotServer(RobotKind kind, Vector3 position, Quaternion rotation)
         {
             int i = (int)kind;
             if (RobotPrefabs == null || i >= RobotPrefabs.Length || RobotPrefabs[i] == null) return null;
-            var obj = Instantiate(RobotPrefabs[i], position, rotation);
-            obj.Spawn(true);
+            var obj = Session.Spawn(RobotPrefabs[i], position, rotation);
             m_Spawned.Add(obj);
             return obj;
         }
 
-        public void AddCollectedServer(int value)
-        {
-            Collected.Value += value;
-            RunTotal.Value += value;
-        }
+        /// <summary>Spawns a loot item (server): level loot and items dropped from inventories.</summary>
+        public WorldItem SpawnItemServer(byte shape, byte color, Vector3 position, float yaw) =>
+            Session.Spawn(ItemPrefab, position, Quaternion.Euler(0, yaw, 0), go => go.GetComponent<WorldItem>().SetLook(shape, color))
+                .GetComponent<WorldItem>();
+
+        public void AddCollectedServer(int value) => m_Run.Deposit(value);
 
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
-            // Count distinct alarms (one per few seconds), hunters arrive after enough of them.
-            if (NetworkManager.ServerTime.Time - m_LastAlarmCounted > 4.0)
-            {
-                m_AlarmCount++;
-                m_LastAlarmCounted = NetworkManager.ServerTime.Time;
-            }
-            AlarmUntil.Value = NetworkManager.ServerTime.Time + AlarmDuration;
+            m_Run.RaiseAlarm(Session.ServerTime);
             foreach (var robot in RobotController.Robots)
                 if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
@@ -233,20 +197,20 @@ namespace Stealth.Game
 
         void Update()
         {
-            if (IsServer)
-                foreach (var p in PlayerController.All)
-                    if (!p.Downed.Value) ScentTrail.Record(p.OwnerClientId, p.transform.position, Time.time);
-            if (!IsServer || Phase.Value != RunPhase.Playing || PlayerController.All.Count == 0) return;
-            if (!InGracePeriod && HunterDue(m_AlarmCount, Time.time - LevelStartTime, Level.Value.Index, m_Hunters)) SpawnHunter();
+            if (!m_IsServer) return;
             foreach (var p in PlayerController.All)
-                if (!p.Downed.Value) return;
-            Fail("Вся команда выведена из строя");
+                if (!p.Downed) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
+            if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
+            if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            foreach (var p in PlayerController.All)
+                if (!p.Downed) return;
+            if (m_Run.Wipe()) Banner($"Забег окончен: Вся команда выведена из строя. Итог забега: {RunTotal} очк.");
         }
 
         /// <summary>The hunter enters through the furthest room of the ground floor from the players.</summary>
         void SpawnHunter()
         {
-            m_Hunters++;
+            m_Run.HunterSent();
             var layout = ActiveLevel.Layout;
             Vector3 best = layout.PatrolPoints[0];
             float bestScore = -1f;
@@ -258,58 +222,73 @@ namespace Stealth.Game
                 if (score > bestScore) { bestScore = score; best = p; }
             }
             if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
-            var obj = DebugSpawnServer(RobotKind.Hunter, best, Quaternion.identity);
+            var obj = SpawnRobotServer(RobotKind.Hunter, best, Quaternion.identity);
             if (obj == null) return;
             // It knows roughly where you are: starts by investigating the nearest player.
-            var robot = obj.GetComponent<RobotController>();
             PlayerController target = null;
-            foreach (var pl in PlayerController.All) if (target == null || Vector3.Distance(pl.transform.position, best) < Vector3.Distance(target.transform.position, best)) target = pl;
-            if (target != null) robot.InvestigateServer(target.transform.position, true);
-            BannerRpc("В здание вошёл Охотник");
-            Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_AlarmCount})");
+            foreach (var pl in PlayerController.All)
+                if (target == null || Vector3.Distance(pl.transform.position, best) < Vector3.Distance(target.transform.position, best)) target = pl;
+            if (target != null) obj.GetComponent<RobotController>().InvestigateServer(target.transform.position, true);
+            Banner("В здание вошёл Охотник");
+            Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_Run.Alarms})");
         }
 
-        void Fail(string reason)
+        // ------------------------------------------------------------------ requests
+
+        public void RequestFinishLevel()
         {
-            Phase.Value = RunPhase.Failed;
-            BannerRpc($"Забег окончен: {reason}. Итог забега: {RunTotal.Value} очк.");
+            if (m_Link != null) m_Link.RequestFinishLevel();
+            else FinishLevelServer(Session.LocalClientId);
         }
 
-        [Rpc(SendTo.Server)]
-        public void FinishLevelRpc(RpcParams rpcParams = default)
+        public void RequestRestart()
         {
-            if (Phase.Value != RunPhase.Playing) return;
-            var sender = PlayerController.Find(rpcParams.Receive.SenderClientId);
+            if (m_Link != null) m_Link.RequestRestart();
+            else RestartRunServer();
+        }
+
+        /// <summary>Server: a player at the hatch pressed F.</summary>
+        public void FinishLevelServer(ulong senderClientId)
+        {
+            var sender = PlayerController.Find(senderClientId);
             if (sender == null || !Hatch.IsNear(sender.transform.position)) return;
-
-            if (Collected.Value < Quota.Value)
-            {
-                Fail($"квота не выполнена ({Collected.Value} / {Quota.Value})");
-                return;
-            }
             int down = 0;
-            foreach (var p in PlayerController.All) if (p.Downed.Value) down++;
-            m_PendingPenalties = down;
-            int next = Level.Value.Index + 1;
-            StartLevel(next);
-            BannerRpc(down > 0
-                ? $"Уровень пройден! Погибших: {down}, квота следующего дома выше на {Mathf.RoundToInt(DeathPenalty * down * 100)}%"
-                : $"Уровень пройден! Дом №{next + 1}");
+            foreach (var p in PlayerController.All) if (p.Downed) down++;
+            int collected = Collected, quota = Quota;
+            switch (m_Run.Leave(down))
+            {
+                case RunState.Exit.Failed:
+                    Banner($"Забег окончен: квота не выполнена ({collected} / {quota}). Итог забега: {RunTotal} очк.");
+                    break;
+                case RunState.Exit.NextLevel:
+                    int next = Level.Index + 1;
+                    StartLevel(next);
+                    Banner(down > 0
+                        ? $"Уровень пройден! Погибших: {down}, квота следующего дома выше на {Mathf.RoundToInt(DeathPenalty * down * 100)}%"
+                        : $"Уровень пройден! Дом №{next + 1}");
+                    break;
+            }
         }
 
-        [Rpc(SendTo.Server)]
-        public void RestartRunRpc()
+        /// <summary>Server: a player pressed R after a failed run.</summary>
+        public void RestartRunServer()
         {
-            if (Phase.Value != RunPhase.Failed) return;
-            m_PendingPenalties = 0;
-            RunTotal.Value = 0;
+            if (!m_Run.Restart()) return;
             foreach (var p in PlayerController.All) p.GetComponent<PlayerInventory>().ClearServer();
             StartLevel(0);
-            BannerRpc("Новый забег");
+            Banner("Новый забег");
         }
 
-        [Rpc(SendTo.Everyone)]
-        void BannerRpc(string text)
+        // ------------------------------------------------------------------ banners
+
+        void Banner(string text)
+        {
+            if (m_Link != null) m_Link.BroadcastBanner(text);
+            else ShowBanner(text);
+        }
+
+        /// <summary>Every peer: show a banner (delivered by the network twin).</summary>
+        public void ShowBanner(string text)
         {
             Debug.Log("[Game] " + text);
             OnBanner?.Invoke(text);

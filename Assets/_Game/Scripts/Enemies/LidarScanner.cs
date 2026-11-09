@@ -13,7 +13,7 @@ namespace Stealth.Enemies
         public float Range = 6f;
         public float Speed = 110f; // degrees per second
 
-        Vector3 Dir => ScanLine.Direction(Unity.Netcode.NetworkManager.Singleton.ServerTime.TimeAsFloat, Speed, NetworkObjectId * 53f);
+        Vector3 Dir => ScanLine.Direction(Stealth.Game.Session.ServerTimeF, Speed, NetId * 53f);
 
         protected override void TickLocal()
         {

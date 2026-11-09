@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.Level;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Player
 {
-    public struct InventoryEntry : INetworkSerializeByMemcpy, IEquatable<InventoryEntry>
+    public struct InventoryEntry : IEquatable<InventoryEntry>
     {
         public byte Shape, Color, X, Y, Rot;
 
@@ -17,38 +16,57 @@ namespace Stealth.Player
         public Vector2Int[] Cells => ItemCatalog.RotatedCells(Shape, Rot);
     }
 
-    /// <summary>Tarkov-like grid inventory. Server-authoritative; the owner sends requests.</summary>
-    public class PlayerInventory : NetworkBehaviour
+    /// <summary>
+    /// Tarkov-like grid inventory. Server-authoritative: the owner calls <c>Request…</c>, the server validates in
+    /// <c>…Server</c> handlers. The network twin (InventoryNet) replicates <see cref="Items"/> and carries the requests.
+    /// </summary>
+    public class PlayerInventory : MonoBehaviour
     {
         public const float ReachDistance = 3.5f;
 
-        public NetworkList<InventoryEntry> Items;
+        readonly List<InventoryEntry> m_Items = new();
+        IInventoryLink m_Link;
+        PlayerController m_Player;
 
-        void Awake() => Items = new NetworkList<InventoryEntry>();
+        public IReadOnlyList<InventoryEntry> Items => m_Items;
+        /// <summary>Bumped on every change (the network twin replicates on change).</summary>
+        public int Version { get; private set; }
+
+        void Awake() => m_Player = GetComponent<PlayerController>();
+
+        public void Bind(IInventoryLink link) => m_Link = link;
+
+        /// <summary>Client: contents as decided by the server.</summary>
+        public void ApplyReplicated(IEnumerable<InventoryEntry> items)
+        {
+            m_Items.Clear();
+            m_Items.AddRange(items);
+            Version++;
+        }
 
         public int TotalValue
         {
             get
             {
                 int sum = 0;
-                foreach (var e in Items) sum += e.Value;
+                foreach (var e in m_Items) sum += e.Value;
                 return sum;
             }
         }
 
         public bool Carries(int color)
         {
-            foreach (var e in Items) if (e.Color == color) return true;
+            foreach (var e in m_Items) if (e.Color == color) return true;
             return false;
         }
 
         public HashSet<Vector2Int> Occupied(int ignoreIndex = -1)
         {
             var set = new HashSet<Vector2Int>();
-            for (int i = 0; i < Items.Count; i++)
+            for (int i = 0; i < m_Items.Count; i++)
             {
                 if (i == ignoreIndex) continue;
-                var e = Items[i];
+                var e = m_Items[i];
                 foreach (var c in e.Cells) set.Add(new Vector2Int(e.X + c.x, e.Y + c.y));
             }
             return set;
@@ -56,9 +74,9 @@ namespace Stealth.Player
 
         public int IndexAt(Vector2Int cell)
         {
-            for (int i = 0; i < Items.Count; i++)
+            for (int i = 0; i < m_Items.Count; i++)
             {
-                var e = Items[i];
+                var e = m_Items[i];
                 foreach (var c in e.Cells)
                     if (e.X + c.x == cell.x && e.Y + c.y == cell.y) return i;
             }
@@ -87,59 +105,94 @@ namespace Stealth.Player
             return false;
         }
 
-        bool CanAct => !GetComponent<PlayerController>().Downed.Value;
+        // ------------------------------------------------------------------ requests (owner → server)
 
-        // ------------------------------------------------------------------ requests (owner -> server)
-
-        [Rpc(SendTo.Server)]
-        public void PickupRpc(NetworkObjectReference itemRef, byte x, byte y, byte rot)
+        public void RequestPickup(WorldItem item, byte x, byte y, byte rot)
         {
-            if (!CanAct || !itemRef.TryGet(out var obj)) return;
-            var item = obj.GetComponent<WorldItem>();
-            if (item == null) return;
-            if ((item.transform.position - transform.position).magnitude > ReachDistance + 1.5f) return;
-            if (!CanPlace(item.Shape.Value, rot, x, y)) return;
-            Items.Add(new InventoryEntry { Shape = item.Shape.Value, Color = item.Color.Value, X = x, Y = y, Rot = rot });
-            obj.Despawn();
+            if (m_Link != null) m_Link.RequestPickup(item, x, y, rot);
+            else PickupServer(item, x, y, rot);
         }
 
-        [Rpc(SendTo.Server)]
-        public void MoveRpc(int index, byte x, byte y, byte rot)
+        public void RequestMove(int index, byte x, byte y, byte rot)
         {
-            if (index < 0 || index >= Items.Count) return;
-            var e = Items[index];
+            if (m_Link != null) m_Link.RequestMove(index, x, y, rot);
+            else MoveServer(index, x, y, rot);
+        }
+
+        public void RequestDrop(int index, Vector3 position, float yaw)
+        {
+            if (m_Link != null) m_Link.RequestDrop(index, position, yaw);
+            else DropServer(index, position, yaw);
+        }
+
+        public void RequestDeposit(int index)
+        {
+            if (m_Link != null) m_Link.RequestDeposit(index);
+            else DepositServer(index);
+        }
+
+        // ------------------------------------------------------------------ server
+
+        bool CanAct => m_Player == null || !m_Player.Downed;
+
+        void Changed() => Version++;
+
+        public void PickupServer(WorldItem item, byte x, byte y, byte rot)
+        {
+            if (!CanAct || item == null) return;
+            if ((item.transform.position - transform.position).magnitude > ReachDistance + 1.5f) return;
+            if (!CanPlace(item.Shape, rot, x, y)) return;
+            m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
+            Changed();
+            Session.Despawn(item.gameObject);
+        }
+
+        public void MoveServer(int index, byte x, byte y, byte rot)
+        {
+            if (index < 0 || index >= m_Items.Count) return;
+            var e = m_Items[index];
             if (!CanPlace(e.Shape, rot, x, y, index)) return;
             e.X = x; e.Y = y; e.Rot = rot;
-            Items[index] = e;
+            m_Items[index] = e;
+            Changed();
         }
 
-        [Rpc(SendTo.Server)]
-        public void DropRpc(int index, Vector3 position, float yaw)
+        public void DropServer(int index, Vector3 position, float yaw)
         {
-            if (index < 0 || index >= Items.Count) return;
+            if (index < 0 || index >= m_Items.Count) return;
             if ((position - transform.position).magnitude > ReachDistance + 1.5f)
                 position = transform.position + transform.forward * 0.8f;
-            var e = Items[index];
-            Items.RemoveAt(index);
+            var e = m_Items[index];
+            m_Items.RemoveAt(index);
+            Changed();
             var gm = GameManager.Instance;
-            var obj = Instantiate(gm.ItemPrefab, position, Quaternion.Euler(0, yaw, 0));
-            var item = obj.GetComponent<WorldItem>();
-            item.Shape.Value = e.Shape;
-            item.Color.Value = e.Color;
-            obj.Spawn(true);
+            if (gm != null) gm.SpawnItemServer(e.Shape, e.Color, position, yaw);
         }
 
-        [Rpc(SendTo.Server)]
-        public void DepositRpc(int index)
+        public void DepositServer(int index)
         {
-            if (index < 0 || index >= Items.Count || !Hatch.IsNear(transform.position)) return;
+            if (index < 0 || index >= m_Items.Count || !Hatch.IsNear(transform.position)) return;
             var gm = GameManager.Instance;
-            if (gm == null || gm.Phase.Value != RunPhase.Playing) return;
-            var e = Items[index];
-            Items.RemoveAt(index);
+            if (gm == null || gm.Phase != RunPhase.Playing) return;
+            var e = m_Items[index];
+            m_Items.RemoveAt(index);
+            Changed();
             gm.AddCollectedServer(e.Value);
         }
 
-        public void ClearServer() => Items.Clear();
+        /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>
+        public bool GiveServer(byte shape, byte color)
+        {
+            if (!FindSpot(shape, out var x, out var y, out var rot)) return false;
+            m_Items.Add(new InventoryEntry { Shape = shape, Color = color, X = x, Y = y, Rot = rot });
+            Changed();
+            return true;
+        }
+
+        public void ClearServer()
+        {
+            m_Items.Clear();
+            Changed();
+        }
     }
 }

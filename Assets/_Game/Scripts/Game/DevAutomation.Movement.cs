@@ -133,7 +133,7 @@ namespace Stealth.Game
             yield return Shot("hit_shake");
             yield return new WaitForSeconds(0.8f);
             var d = Me.transform.position - p0;
-            Log($"knockback: moved {new Vector3(d.x, 0, d.z).magnitude:0.00} m backwards={d.z < -0.5f}, hp={Me.Hp.Value}");
+            Log($"knockback: moved {new Vector3(d.x, 0, d.z).magnitude:0.00} m backwards={d.z < -0.5f}, hp={Me.Hp}");
         }
 
         /// <summary>Menu pages (the main menu is captured before hosting): pause, settings.</summary>

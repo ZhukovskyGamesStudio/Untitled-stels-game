@@ -43,23 +43,23 @@ namespace Stealth.Tests
         [Test]
         public void HunterArrivesAfterAlarmsOrTime()
         {
-            Assert.IsFalse(GameManager.HunterDue(0, 10f, 0, 0));
-            Assert.IsFalse(GameManager.HunterDue(2, 10f, 0, 0), "two alarms are forgiven on the first house");
-            Assert.IsTrue(GameManager.HunterDue(3, 10f, 0, 0));
-            Assert.IsTrue(GameManager.HunterDue(2, 10f, 1, 0), "deeper houses are less forgiving");
-            Assert.IsTrue(GameManager.HunterDue(0, 400f, 0, 0), "lingering too long");
-            Assert.IsFalse(GameManager.HunterDue(3, 10f, 0, 1), "only one hunter on the first houses");
-            Assert.IsTrue(GameManager.HunterDue(4, 10f, 3, 1), "a second hunter deeper after more alarms");
+            Assert.IsFalse(RunState.HunterDue(0, 10f, 0, 0));
+            Assert.IsFalse(RunState.HunterDue(2, 10f, 0, 0), "two alarms are forgiven on the first house");
+            Assert.IsTrue(RunState.HunterDue(3, 10f, 0, 0));
+            Assert.IsTrue(RunState.HunterDue(2, 10f, 1, 0), "deeper houses are less forgiving");
+            Assert.IsTrue(RunState.HunterDue(0, 400f, 0, 0), "lingering too long");
+            Assert.IsFalse(RunState.HunterDue(3, 10f, 0, 1), "only one hunter on the first houses");
+            Assert.IsTrue(RunState.HunterDue(4, 10f, 3, 1), "a second hunter deeper after more alarms");
         }
 
         [Test]
         public void QuotaGrowsWithDepthAndPenalties()
         {
-            Assert.Greater(GameManager.QuotaFor(1000, 3, 0), GameManager.QuotaFor(1000, 0, 0));
-            Assert.Greater(GameManager.QuotaFor(1000, 0, 2), GameManager.QuotaFor(1000, 0, 0));
-            Assert.AreEqual(0, GameManager.QuotaFor(1000, 2, 1) % 5, "rounded to 5");
-            Assert.AreEqual(10, GameManager.QuotaFor(0, 0, 0), "never zero");
-            Assert.LessOrEqual(GameManager.QuotaFor(1000, 50, 0), 850, "never more than 85% of the loot");
+            Assert.Greater(RunState.QuotaFor(1000, 3, 0), RunState.QuotaFor(1000, 0, 0));
+            Assert.Greater(RunState.QuotaFor(1000, 0, 2), RunState.QuotaFor(1000, 0, 0));
+            Assert.AreEqual(0, RunState.QuotaFor(1000, 2, 1) % 5, "rounded to 5");
+            Assert.AreEqual(10, RunState.QuotaFor(0, 0, 0), "never zero");
+            Assert.LessOrEqual(RunState.QuotaFor(1000, 50, 0), 850, "never more than 85% of the loot");
         }
     }
 }

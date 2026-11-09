@@ -21,7 +21,7 @@ namespace Stealth.Game
             gm.GracePeriod = 0f; // sensors on immediately
             var hatch = ActiveLevel.Layout.HatchPosition;
             // Clear the stage: robots that wander into the lobby would photobomb the gallery.
-            foreach (var r in RobotController.Robots.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
 
             foreach (RobotKind kind in Enum.GetValues(typeof(RobotKind)))
             {
@@ -31,7 +31,7 @@ namespace Stealth.Game
                 var rot = Quaternion.LookRotation(Vector3.back);
                 bool onWall = kind == RobotKind.MotionSensor || kind == RobotKind.Camera;
                 if (onWall) { pos = hatch + new Vector3(0, kind == RobotKind.Camera ? 2.6f : 2.2f, 4.75f); stage = pos; stage.y = hatch.y; }
-                var obj = gm.DebugSpawnServer(kind, pos, rot);
+                var obj = gm.SpawnRobotServer(kind, pos, rot);
                 if (obj == null) { Log($"gallery: {kind} has no prefab yet"); continue; }
                 var view = hatch + new Vector3(0.6f, 0.05f, -1.6f);
                 // Robots: aim at the body. Small devices without much of a body: at the sensor itself (its indicator point).
@@ -47,19 +47,19 @@ namespace Stealth.Game
                 Log($"gallery: {kind} at {obj.transform.position}, look prompt='{UI.GameHUD.Instance.CurrentPrompt.Text}'");
                 yield return Shot($"kind_{kind}");
                 yield return GalleryExtra(kind, obj);
-                if (obj != null && obj.IsSpawned) obj.Despawn();
+                Session.Despawn(obj);
                 yield return null;
             }
         }
 
         /// <summary>Per-kind behaviour checks hooked in by later iterations.</summary>
-        IEnumerator GalleryExtra(RobotKind kind, Unity.Netcode.NetworkObject obj)
+        IEnumerator GalleryExtra(RobotKind kind, GameObject obj)
         {
             var steps = new System.Collections.Generic.List<IEnumerator>();
             GalleryExtraImpl(kind, obj, steps);
             foreach (var s in steps) yield return s;
         }
 
-        partial void GalleryExtraImpl(RobotKind kind, Unity.Netcode.NetworkObject obj, System.Collections.Generic.List<IEnumerator> steps);
+        partial void GalleryExtraImpl(RobotKind kind, GameObject obj, System.Collections.Generic.List<IEnumerator> steps);
     }
 }

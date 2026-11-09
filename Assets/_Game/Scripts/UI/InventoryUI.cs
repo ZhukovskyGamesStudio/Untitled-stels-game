@@ -139,19 +139,19 @@ namespace Stealth.UI
                 }
                 else if (m_Hover != null)
                 {
-                    m_Tooltip = ItemCatalog.Describe(m_Hover.Shape.Value, m_Hover.Color.Value);
+                    m_Tooltip = ItemCatalog.Describe(m_Hover.Shape, m_Hover.Color);
                     if (mouse.leftButton.wasPressedThisFrame)
                     {
                         m_Source = DragSource.World;
                         m_DragWorld = m_Hover;
-                        m_DragShape = m_Hover.Shape.Value; m_DragColor = m_Hover.Color.Value; m_DragRot = 0;
+                        m_DragShape = m_Hover.Shape; m_DragColor = m_Hover.Color; m_DragRot = 0;
                         m_GrabCell = Vector2Int.zero;
                     }
                 }
                 return;
             }
 
-            if (m_Source == DragSource.World && (m_DragWorld == null || !m_DragWorld.IsSpawned)) { CancelDrag(); return; }
+            if (m_Source == DragSource.World && (m_DragWorld == null || !m_DragWorld.isActiveAndEnabled)) { CancelDrag(); return; }
 
             if (Keyboard.current.rKey.wasPressedThisFrame)
             {
@@ -164,10 +164,10 @@ namespace Stealth.UI
             if (overGrid)
             {
                 if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, m_DragRot, target.x, target.y))
-                    inv.PickupRpc(m_DragWorld.NetworkObject, (byte)target.x, (byte)target.y, (byte)m_DragRot);
+                    inv.RequestPickup(m_DragWorld, (byte)target.x, (byte)target.y, (byte)m_DragRot);
                 else if (m_Source == DragSource.Inventory && target.x >= 0 && target.y >= 0 &&
                          inv.CanPlace(m_DragShape, m_DragRot, target.x, target.y, m_DragIndex))
-                    inv.MoveRpc(m_DragIndex, (byte)target.x, (byte)target.y, (byte)m_DragRot);
+                    inv.RequestMove(m_DragIndex, (byte)target.x, (byte)target.y, (byte)m_DragRot);
             }
             else if (m_Source == DragSource.Inventory)
             {
@@ -183,23 +183,23 @@ namespace Stealth.UI
             {
                 if (hit.collider.GetComponentInParent<Hatch>() != null)
                 {
-                    inv.DepositRpc(m_DragIndex);
+                    inv.RequestDeposit(m_DragIndex);
                     return;
                 }
                 var point = hit.point;
                 if (hit.normal.y < 0.5f &&
                     Physics.Raycast(hit.point + hit.normal * 0.3f + Vector3.up * 0.2f, Vector3.down, out var floor, 3f, mask, QueryTriggerInteraction.Ignore))
                     point = floor.point;
-                inv.DropRpc(m_DragIndex, point + Vector3.up * 0.01f, me.transform.eulerAngles.y);
+                inv.RequestDrop(m_DragIndex, point + Vector3.up * 0.01f, me.transform.eulerAngles.y);
                 return;
             }
             // Nothing in reach: drop at the feet (or into the hatch when looking down at it).
             if (Hatch.IsNear(me.transform.position) && Vector3.Dot(ray.direction, Vector3.down) > 0.5f)
             {
-                inv.DepositRpc(m_DragIndex);
+                inv.RequestDeposit(m_DragIndex);
                 return;
             }
-            inv.DropRpc(m_DragIndex, me.transform.position + me.transform.forward * 0.8f, me.transform.eulerAngles.y);
+            inv.RequestDrop(m_DragIndex, me.transform.position + me.transform.forward * 0.8f, me.transform.eulerAngles.y);
         }
 
         void CancelDrag()

@@ -43,7 +43,7 @@ namespace Stealth.Game
                 yield return Shot("hover_item");
 
                 var inv = Me.GetComponent<PlayerInventory>();
-                if (inv.FindSpot(item.Shape.Value, out var x, out var y, out var rot)) inv.PickupRpc(item.NetworkObject, x, y, rot);
+                if (inv.FindSpot(item.Shape, out var x, out var y, out var rot)) inv.RequestPickup(item, x, y, rot);
                 yield return new WaitForSeconds(0.5f);
             }
 

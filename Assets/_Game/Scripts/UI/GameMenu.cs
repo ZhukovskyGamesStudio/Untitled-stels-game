@@ -1,4 +1,4 @@
-using Stealth.Net;
+using Stealth.Game;
 using Stealth.Player;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -61,19 +61,19 @@ namespace Stealth.UI
 
         void Awake()
         {
-            HostSteam.onClick.AddListener(() => SteamLobby.Instance.HostLobby());
-            HostLocal.onClick.AddListener(() => GameNetwork.Instance.StartHostLocal());
-            Join.onClick.AddListener(() => GameNetwork.Instance.StartClientLocal(Address.text));
+            HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());
+            HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
+            Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);
             Quit.onClick.AddListener(Application.Quit);
 
-            Invite.onClick.AddListener(() => SteamLobby.Instance.OpenInviteDialog());
+            Invite.onClick.AddListener(() => Session.Launcher.InviteFriends());
             Resume.onClick.AddListener(() => IsOpen = false);
             PauseSettings.onClick.AddListener(OpenSettings);
             Leave.onClick.AddListener(() =>
             {
                 IsOpen = false;
-                GameNetwork.Instance.Leave();
+                Session.Launcher.Leave();
             });
 
             Sensitivity.onValueChanged.AddListener(v => GameSettings.Sensitivity = v);
@@ -103,18 +103,19 @@ namespace Stealth.UI
 
         void Update()
         {
-            var net = GameNetwork.Instance;
+            var net = Session.Launcher;
             if (net == null) return;
-            if (!net.IsRunning) IsOpen = false;
+            bool running = Session.IsRunning;
+            if (!running) IsOpen = false;
             else if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 if (SettingsOpen) CloseSettings();
                 else IsOpen = !IsOpen;
             }
 
-            bool settings = SettingsOpen && (IsOpen || !net.IsRunning);
-            bool main = !settings && !net.IsRunning;
-            bool pause = !settings && net.IsRunning && IsOpen;
+            bool settings = SettingsOpen && (IsOpen || !running);
+            bool main = !settings && !running;
+            bool pause = !settings && running && IsOpen;
             if (settings && !SettingsPage.activeSelf) SyncSettingsControls();
             Ui.Show(SettingsPage, settings);
             Ui.Show(MainPage, main);
@@ -125,19 +126,19 @@ namespace Stealth.UI
             if (settings) UpdateSettingsLabels();
         }
 
-        void UpdateMain(GameNetwork net)
+        void UpdateMain(ISessionLauncher net)
         {
-            SteamStatus.text = $"Steam: {(SteamManager.Initialized ? "подключён как " + SteamManager.PersonaName : "недоступен — " + SteamManager.Error)}";
-            HostSteam.interactable = SteamManager.Initialized;
+            SteamStatus.text = $"Steam: {net.SteamStatus}";
+            HostSteam.interactable = net.SteamAvailable;
             LocalCaption.text = $"Локальная сеть / тест на одном ПК (UDP, порт {net.LocalPort}):";
             Ui.Show(NetStatus, !string.IsNullOrEmpty(net.Status));
             NetStatus.text = net.Status;
         }
 
-        void UpdatePause(GameNetwork net)
+        void UpdatePause(ISessionLauncher net)
         {
-            Role.text = net.Manager.IsHost ? "Ты хост" : "Ты подключён к хосту";
-            Ui.Show(Invite, net.UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby);
+            Role.text = net.IsHost ? "Ты хост" : "Ты подключён к хосту";
+            Ui.Show(Invite, net.CanInviteFriends);
         }
 
         void SyncSettingsControls()

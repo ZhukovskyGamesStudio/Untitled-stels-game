@@ -2,14 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using Stealth.Enemies;
 using Stealth.Level;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Game
 {
     public partial class DevAutomation
     {
-        partial void GalleryExtraImpl(RobotKind kind, NetworkObject obj, List<IEnumerator> steps)
+        partial void GalleryExtraImpl(RobotKind kind, GameObject obj, List<IEnumerator> steps)
         {
             if (Arg("-hostile") == null) return;
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
@@ -25,12 +24,12 @@ namespace Stealth.Game
         /// The robot is switched on, the player stands in front of it (walking in place to make some noise and
         /// vibration) and we log how it reacts: awareness, alarm, damage.
         /// </summary>
-        IEnumerator DetectionCheck(RobotKind kind, NetworkObject obj)
+        IEnumerator DetectionCheck(RobotKind kind, GameObject obj)
         {
             var gm = GameManager.Instance;
             var aw = obj.GetComponent<Detector>();
-            int hp0 = Me.Hp.Value;
-            gm.AlarmUntil.Value = 0;
+            int hp0 = Me.Hp;
+            gm.Run.CalmDown();
             var p = obj.transform.position;
             // Wall / ceiling crawlers look into the room (their "up"), everybody else looks forward.
             var front = kind == RobotKind.Spider ? obj.transform.up : obj.transform.forward;
@@ -43,23 +42,23 @@ namespace Stealth.Game
             {
                 // Shuffle back and forth: footsteps for microphones / seismic sensors, movement for PIR.
                 Drive(new Vector2(Mathf.Sin(Time.time * 3f) > 0 ? 1 : -1, 0));
-                float a = aw != null ? aw.AwarenessOf(Me.OwnerClientId) : 0f;
+                float a = aw != null ? aw.AwarenessOf(Me.ClientId) : 0f;
                 aware = Mathf.Max(aware, a);
                 if (firstAware < 0 && a > 0.05f) firstAware = Time.time - t0;
-                if (a >= 0.99f && (gm.AlarmActive || Me.Hp.Value < hp0)) break;
+                if (a >= 0.99f && (gm.AlarmActive || Me.Hp < hp0)) break;
                 yield return null;
             }
             Release();
             yield return Shot($"kind_{kind}_reacting");
-            Log($"detect {kind}: noticed after {firstAware:0.0}s, max awareness {aware:0.00}, alarm={gm.AlarmActive}, hp {hp0}->{Me.Hp.Value}");
+            Log($"detect {kind}: noticed after {firstAware:0.0}s, max awareness {aware:0.00}, alarm={gm.AlarmActive}, hp {hp0}->{Me.Hp}");
             DevFlags.FreezeRobots = true;
-            if (Me.Hp.Value < hp0 && Me.IsServer) Me.ResetForLevelServer();
+            if (Me.Hp < hp0 && Me.IsServer) Me.ResetForLevelServer();
             yield return new WaitForSeconds(0.3f);
         }
 
-        partial void CustomDetectionSetupImpl(RobotKind kind, NetworkObject obj, List<IEnumerator> steps);
+        partial void CustomDetectionSetupImpl(RobotKind kind, GameObject obj, List<IEnumerator> steps);
 
-        IEnumerator CustomDetectionSetup(RobotKind kind, NetworkObject obj)
+        IEnumerator CustomDetectionSetup(RobotKind kind, GameObject obj)
         {
             var steps = new List<IEnumerator>();
             CustomDetectionSetupImpl(kind, obj, steps);
@@ -67,7 +66,7 @@ namespace Stealth.Game
         }
 
         /// <summary>Moves near the robot in a specific way (e.g. crouching) and logs whether it notices.</summary>
-        IEnumerator SneakCheck(RobotKind kind, NetworkObject obj, bool crouch)
+        IEnumerator SneakCheck(RobotKind kind, GameObject obj, bool crouch)
         {
             var aw = obj.GetComponent<Detector>();
             var p = obj.transform.position;
@@ -78,7 +77,7 @@ namespace Stealth.Game
             while (Time.time - t0 < 4f)
             {
                 Drive(new Vector2(0, Mathf.Sin(Time.time * 2f) > 0 ? 1 : -1), crouch: crouch);
-                max = Mathf.Max(max, aw.AwarenessOf(Me.OwnerClientId));
+                max = Mathf.Max(max, aw.AwarenessOf(Me.ClientId));
                 yield return null;
             }
             Release();
@@ -88,10 +87,10 @@ namespace Stealth.Game
         }
 
         /// <summary>Stand next to a scan line and wait for it to sweep over you (no jumping).</summary>
-        IEnumerator CrossLineCheck(RobotKind kind, NetworkObject obj)
+        IEnumerator CrossLineCheck(RobotKind kind, GameObject obj)
         {
             var gm = GameManager.Instance;
-            gm.AlarmUntil.Value = 0;
+            gm.Run.CalmDown();
             var p = obj.transform.position;
             // Ceiling robots hang just under the next slab: measure the floor from a point below them.
             float below = kind == RobotKind.Vacuum ? 2.5f : 0f;
@@ -110,10 +109,10 @@ namespace Stealth.Game
         }
 
         /// <summary>Jump over the plate (nothing happens), then walk over it (alarm).</summary>
-        IEnumerator PlateCheck(NetworkObject obj)
+        IEnumerator PlateCheck(GameObject obj)
         {
             var gm = GameManager.Instance;
-            gm.AlarmUntil.Value = 0;
+            gm.Run.CalmDown();
             var p = obj.transform.position;
             DevFlags.FreezeRobots = false;
             LookAtFrom(new Pose(p + new Vector3(0, 0.05f, -1.6f), Quaternion.LookRotation(Vector3.forward)), p);
@@ -138,7 +137,7 @@ namespace Stealth.Game
         }
 
         /// <summary>Empty-handed in front of a sorter: ignored. Then the player picks up loot of its colour.</summary>
-        IEnumerator SorterCheck(NetworkObject obj)
+        IEnumerator SorterCheck(GameObject obj)
         {
             var robot = obj.GetComponent<RobotController>();
             var aw = obj.GetComponent<Detector>();
@@ -149,16 +148,16 @@ namespace Stealth.Game
             Me.TeleportOwner(stand, Quaternion.LookRotation(Flat(p - stand)));
             DevFlags.FreezeRobots = false;
             float t0 = Time.time, max = 0f;
-            while (Time.time - t0 < 3f) { max = Mathf.Max(max, aw.AwarenessOf(Me.OwnerClientId)); yield return null; }
-            Log($"sorter (colour {robot.ColorFilter.Value}): empty-handed max awareness {max:0.00}");
+            while (Time.time - t0 < 3f) { max = Mathf.Max(max, aw.AwarenessOf(Me.ClientId)); yield return null; }
+            Log($"sorter (colour {robot.ColorFilter}): empty-handed max awareness {max:0.00}");
             DevFlags.FreezeRobots = true;
             // Give the player an item of the sorter's colour; the detection check that follows must now succeed.
-            if (Me.IsServer) inv.Items.Add(new Player.InventoryEntry { Shape = 0, Color = (byte)robot.ColorFilter.Value });
+            if (Me.IsServer) inv.GiveServer(0, (byte)robot.ColorFilter);
             yield return new WaitForSeconds(0.3f);
         }
 
         /// <summary>The player walks past the hound's nose and away out of the room; the hound must follow the trail.</summary>
-        IEnumerator TrailCheck(NetworkObject obj)
+        IEnumerator TrailCheck(GameObject obj)
         {
             var robot = obj.GetComponent<RobotController>();
             var p = obj.transform.position;
@@ -171,12 +170,12 @@ namespace Stealth.Game
             float before = Vector3.Distance(Flat(p), Flat(Me.transform.position));
             DevFlags.FreezeRobots = false;
             float t0 = Time.time;
-            while (Time.time - t0 < 8f && robot.State.Value != RobotState.Chase) yield return null;
+            while (Time.time - t0 < 8f && robot.State != RobotState.Chase) yield return null;
             float tChase = Time.time - t0;
             yield return new WaitForSeconds(2f);
             float after = Vector3.Distance(Flat(obj.transform.position), Flat(Me.transform.position));
             yield return Shot("kind_Hound_tracking");
-            Log($"hound: started tracking after {tChase:0.0}s, state={robot.State.Value}, distance {before:0.0} -> {after:0.0} m");
+            Log($"hound: started tracking after {tChase:0.0}s, state={robot.State}, distance {before:0.0} -> {after:0.0} m");
             DevFlags.FreezeRobots = true;
             if (Me.IsServer) Me.ResetForLevelServer();
         }
@@ -195,7 +194,7 @@ namespace Stealth.Game
             yield return new WaitForSeconds(0.5f);
             RobotController hunter = null;
             foreach (var r in RobotController.Robots) if (r.name.Contains("Hunter")) hunter = r;
-            Log($"hunter: present={hunter != null}" + (hunter != null ? $" at {hunter.transform.position}, state {hunter.State.Value}" : ""));
+            Log($"hunter: present={hunter != null}" + (hunter != null ? $" at {hunter.transform.position}, state {hunter.State}" : ""));
             if (hunter != null)
             {
                 DevFlags.FreezeRobots = true;
@@ -213,11 +212,9 @@ namespace Stealth.Game
             var hatch = ActiveLevel.Layout.HatchPosition;
             for (int k = 0; k < 3; k++)
             {
-                var obj = Instantiate(gm.LaserPrefab, hatch + new Vector3(-2.5f + k * 2.5f, 0, 3f), Quaternion.identity);
-                var gate = obj.GetComponent<LaserGate>();
-                gate.Pattern.Value = (LaserPattern)k;
-                gate.Width.Value = 1.8f;
-                obj.Spawn(true);
+                var pattern = (LaserPattern)k;
+                Session.Spawn(gm.LaserPrefab, hatch + new Vector3(-2.5f + k * 2.5f, 0, 3f), Quaternion.identity,
+                    go => go.GetComponent<LaserGate>().Configure(pattern, 1.8f));
             }
             LookAtFrom(new Pose(hatch + new Vector3(0, 0.05f, -1.5f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(0, 0.8f, 3f));
             yield return new WaitForSeconds(0.8f);
@@ -232,18 +229,18 @@ namespace Stealth.Game
             var gm = GameManager.Instance;
             gm.GracePeriod = 0f;
             DevFlags.FreezeRobots = true;
-            foreach (var r in RobotController.Robots.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
             var hatch = ActiveLevel.Layout.HatchPosition;
-            var guard = gm.DebugSpawnServer(RobotKind.Guard, hatch + new Vector3(0, 0, 3f), Quaternion.LookRotation(Vector3.back)).GetComponent<RobotController>();
-            var listener = gm.DebugSpawnServer(RobotKind.Listener, hatch + new Vector3(3.5f, 0, 3.5f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
+            var guard = gm.SpawnRobotServer(RobotKind.Guard, hatch + new Vector3(0, 0, 3f), Quaternion.LookRotation(Vector3.back)).GetComponent<RobotController>();
+            var listener = gm.SpawnRobotServer(RobotKind.Listener, hatch + new Vector3(3.5f, 0, 3.5f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
             LookAtFrom(new Pose(hatch + new Vector3(0, 0.05f, -1.5f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(0, 1.2f, 3f));
             yield return new WaitForSeconds(0.5f);
             DevFlags.FreezeRobots = false;
             float t0 = Time.time;
-            while (Time.time - t0 < 5f && guard.State.Value != RobotState.Chase) yield return null;
+            while (Time.time - t0 < 5f && guard.State != RobotState.Chase) yield return null;
             yield return null;
             yield return Shot("radio_icons");
-            Log($"radio: guard={guard.State.Value}, listener after the call={listener.State.Value}");
+            Log($"radio: guard={guard.State}, listener after the call={listener.State}");
             DevFlags.FreezeRobots = true;
         }
 
@@ -253,10 +250,10 @@ namespace Stealth.Game
             var gm = GameManager.Instance;
             gm.GracePeriod = 0f;
             DevFlags.FreezeRobots = true;
-            foreach (var r in RobotController.Robots.ToArray()) if (r.IsSpawned) r.NetworkObject.Despawn();
+            foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
             var hatch = ActiveLevel.Layout.HatchPosition;
-            var guard = gm.DebugSpawnServer(RobotKind.Guard, hatch + new Vector3(-2f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
-            var turret = gm.DebugSpawnServer(RobotKind.Turret, hatch + new Vector3(2.5f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<SecurityDevice>();
+            var guard = gm.SpawnRobotServer(RobotKind.Guard, hatch + new Vector3(-2f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<RobotController>();
+            var turret = gm.SpawnRobotServer(RobotKind.Turret, hatch + new Vector3(2.5f, 0, 3f), Quaternion.LookRotation(Vector3.forward)).GetComponent<SecurityDevice>();
             // Behind the guard.
             LookAtFrom(new Pose(hatch + new Vector3(-2f, 0.05f, 1.8f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(-2f, 1.2f, 3f));
             yield return new WaitForSeconds(0.4f);
@@ -280,7 +277,7 @@ namespace Stealth.Game
             // Robots wake up: a hacked turret must not see the player.
             DevFlags.FreezeRobots = false;
             yield return new WaitForSeconds(2f);
-            Log($"hacked turret awareness while hacked: {turret.GetComponent<Detector>().AwarenessOf(Me.OwnerClientId):0.00}");
+            Log($"hacked turret awareness while hacked: {turret.GetComponent<Detector>().AwarenessOf(Me.ClientId):0.00}");
         }
     }
 }

@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 2908079675499138875}
   - component: {fileID: 1468703018602267700}
   - component: {fileID: 6692949189549223011}
+  - component: {fileID: 1975195433317107041}
   m_Layer: 0
   m_Name: WorldItem
   m_TagString: Untagged
@@ -153,8 +154,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e83e1dd52e1fab541975b8016afc93da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Items.WorldItem
-  ShowTopMostFoldoutHeaderGroup: 1
   Visuals: {fileID: 11400000, guid: c6e33e82c46858548a8f75cd4b90f694, type: 2}
   MeshFilter: {fileID: 2765988009277308874}
   Renderer: {fileID: 2908079675499138875}
   Collider: {fileID: 1468703018602267700}
+--- !u!114 &1975195433317107041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3176259696040781262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dedeed8474c37f049b70566a860be83b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.WorldItemNet
+  ShowTopMostFoldoutHeaderGroup: 1

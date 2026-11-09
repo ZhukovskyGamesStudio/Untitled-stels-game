@@ -139,7 +139,7 @@ namespace Stealth.UI
             float now = Time.time;
             m_Hit.Update(Time.deltaTime);
             m_Banners.Update(now);
-            m_Gain.Observe(gm.Collected.Value, now);
+            m_Gain.Observe(gm.Collected, now);
             UpdateHelp(me);
             CurrentPrompt = PromptRules.Choose(BuildContext(gm, me));
 
@@ -155,8 +155,8 @@ namespace Stealth.UI
             ShowTeam(me, now);
             Prompt.Set(CurrentPrompt);
             ShowBannerLine(now);
-            Ui.Show(RunOver, gm.Phase.Value == RunPhase.Failed);
-            if (gm.Phase.Value == RunPhase.Failed) RunOverTotal.text = $"Сдано за забег: {gm.RunTotal.Value} очк.";
+            Ui.Show(RunOver, gm.Phase == RunPhase.Failed);
+            if (gm.Phase == RunPhase.Failed) RunOverTotal.text = $"Сдано за забег: {gm.RunTotal} очк.";
             Ui.Show(Help, m_ShowHelp);
         }
 
@@ -177,7 +177,7 @@ namespace Stealth.UI
             var hover = InventoryUI.Instance != null ? InventoryUI.Instance.Hover : null;
             return new PromptContext
             {
-                Downed = me.Downed.Value,
+                Downed = me.Downed,
                 MenuOpen = GameMenu.IsOpen,
                 CursorMode = me.CursorMode,
                 CanRevive = me.ReviveTarget != null,
@@ -185,13 +185,13 @@ namespace Stealth.UI
                 HackTarget = me.HackTarget != null ? me.HackTarget.DisplayName : null,
                 HackProgress = me.HackProgress / Hacking.HoldTime,
                 BlockedByCeiling = me.Motor.BlockedByCeiling,
-                Playing = gm.Phase.Value == RunPhase.Playing,
+                Playing = gm.Phase == RunPhase.Playing,
                 NearHatch = Hatch.IsNear(me.transform.position),
                 CarriedItems = me.GetComponent<PlayerInventory>().Items.Count,
-                Collected = gm.Collected.Value,
-                Quota = gm.Quota.Value,
+                Collected = gm.Collected,
+                Quota = gm.Quota,
                 LookedAt = looked != null ? $"{looked.DisplayName}: {looked.SensesDescription}" : null,
-                HoverItem = hover != null ? ItemCatalog.Describe(hover.Shape.Value, hover.Color.Value) : null,
+                HoverItem = hover != null ? ItemCatalog.Describe(hover.Shape, hover.Color) : null,
             };
         }
 
@@ -228,10 +228,10 @@ namespace Stealth.UI
 
         void ShowOverlays(GameManager gm, PlayerController me, float now)
         {
-            bool down = me.Downed.Value;
+            bool down = me.Downed;
             // Last hit point left: a light red edge, slow pulse.
-            Ui.Show(LowHpVignette, me.Hp.Value == 1 && !down);
-            if (me.Hp.Value == 1 && !down) LowHpVignette.color = new Color(0.8f, 0f, 0f, 0.32f + 0.1f * Mathf.Sin(now * 2.5f));
+            Ui.Show(LowHpVignette, me.Hp == 1 && !down);
+            if (me.Hp == 1 && !down) LowHpVignette.color = new Color(0.8f, 0f, 0f, 0.32f + 0.1f * Mathf.Sin(now * 2.5f));
             // A fresh hit: short flash + an arc towards the attacker.
             Ui.Show(HitFlash, m_Hit.Flash > 0.6f);
             if (m_Hit.Flash > 0.6f) HitFlash.color = new Color(1f, 0f, 0f, 0.5f * (m_Hit.Flash - 0.6f));
@@ -261,13 +261,13 @@ namespace Stealth.UI
             }
 
             Ui.Show(DownedTint, down);
-            Ui.Show(DownedText, down && gm.Phase.Value == RunPhase.Playing);
+            Ui.Show(DownedText, down && gm.Phase == RunPhase.Playing);
 
             // Alarm: thin pulsing frame + a small label with the time left: clear, but does not cover the view.
             bool alarm = gm.AlarmActive;
             Ui.Show(AlarmFrame, alarm);
             if (!alarm) return;
-            float left = (float)(gm.AlarmUntil.Value - gm.NetworkManager.ServerTime.Time);
+            float left = (float)(gm.AlarmUntil - Session.ServerTime);
             var red = new Color(1f, 0.15f, 0.1f, 0.35f + 0.25f * Mathf.Sin(now * 7f));
             foreach (var e in AlarmEdges) e.color = red;
             AlarmLabel.text = $"ТРЕВОГА · {Mathf.Max(0, left):0} c";
@@ -277,12 +277,12 @@ namespace Stealth.UI
         void ShowDetection(PlayerController me, float now)
         {
             m_Arcs.Begin();
-            if (me.Camera != null && !me.Downed.Value)
+            if (me.Camera != null && !me.Downed)
             {
                 var cam = me.Camera.transform;
                 foreach (var d in Detector.All)
                 {
-                    float a = d.AwarenessOf(me.OwnerClientId);
+                    float a = d.AwarenessOf(me.ClientId);
                     if (a < 0.03f) continue;
                     bool detected = a >= 0.99f;
                     var color = detected
@@ -332,7 +332,7 @@ namespace Stealth.UI
 
         void ShowCrosshair(PlayerController me)
         {
-            bool hands = me.CursorMode || me.Downed.Value;
+            bool hands = me.CursorMode || me.Downed;
             bool hover = InventoryUI.Instance != null && InventoryUI.Instance.Hover != null;
             Ui.Show(CrosshairDot, !hands && !hover);
             Ui.Show(CrosshairBrackets, !hands && hover); // "this can be taken"
@@ -341,7 +341,7 @@ namespace Stealth.UI
         void ShowStamina(PlayerController me)
         {
             var stamina = me.Motor.Stamina;
-            bool visible = stamina.Value < 0.999f && !me.Downed.Value;
+            bool visible = stamina.Value < 0.999f && !me.Downed;
             Ui.Show(Stamina, visible);
             if (visible) Stamina.Set(stamina.Value, stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
         }
@@ -350,7 +350,7 @@ namespace Stealth.UI
         void ShowNoise(PlayerController me, float now)
         {
             float age = now - me.LastNoiseTime;
-            bool visible = age <= 0.9f && !me.Downed.Value;
+            bool visible = age <= 0.9f && !me.Downed;
             Ui.Show(NoiseGroup, visible);
             if (!visible) return;
             int bars = UiMath.NoiseBars(me.LastNoiseRadius);
@@ -362,9 +362,9 @@ namespace Stealth.UI
 
         void ShowQuota(GameManager gm, PlayerController me, float now)
         {
-            int collected = gm.Collected.Value, quota = gm.Quota.Value;
+            int collected = gm.Collected, quota = gm.Quota;
             bool met = collected >= quota;
-            HouseLabel.text = $"Дом {gm.Level.Value.Index + 1} · этаж {LevelLayout.FloorOf(me.transform.position.y) + 1}";
+            HouseLabel.text = $"Дом {gm.Level.Index + 1} · этаж {LevelLayout.FloorOf(me.transform.position.y) + 1}";
             Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
             QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
             bool gain = m_Gain.Visible(now);
@@ -375,15 +375,15 @@ namespace Stealth.UI
                 GainRect.anchoredPosition = new Vector2(240f, -23f + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
-            Ui.Show(QuotaHint, met && gm.Phase.Value == RunPhase.Playing);
+            Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing);
         }
 
         /// <summary>Once the quota is met: a small diamond over the hatch (clamped to the screen edge) with distance.</summary>
         void ShowHatchMarker(GameManager gm, PlayerController me)
         {
             var layout = ActiveLevel.Layout;
-            bool visible = layout != null && me.Camera != null && gm.Phase.Value == RunPhase.Playing &&
-                           gm.Collected.Value >= gm.Quota.Value && !Hatch.IsNear(me.transform.position);
+            bool visible = layout != null && me.Camera != null && gm.Phase == RunPhase.Playing &&
+                           gm.Collected >= gm.Quota && !Hatch.IsNear(me.transform.position);
             Ui.Show(HatchMarker, visible);
             if (!visible) return;
             var size = Size;
@@ -398,7 +398,7 @@ namespace Stealth.UI
         void ShowHealth(PlayerController me)
         {
             for (int i = 0; i < HpPips.Length; i++)
-                HpPips[i].color = i < me.Hp.Value ? new Color(0.9f, 0.2f, 0.2f) : new Color(1, 1, 1, 0.15f);
+                HpPips[i].color = i < me.Hp ? new Color(0.9f, 0.2f, 0.2f) : new Color(1, 1, 1, 0.15f);
         }
 
         /// <summary>
@@ -414,8 +414,8 @@ namespace Stealth.UI
             foreach (var p in PlayerController.All)
             {
                 if (p == me) continue;
-                bool down = p.Downed.Value;
-                string state = down ? "упал" : new string('■', Mathf.Max(0, p.Hp.Value));
+                bool down = p.Downed;
+                string state = down ? "упал" : new string('■', Mathf.Max(0, p.Hp));
                 Ui.Set(m_TeamRows.Next(), $"{p.Nick}  {state}", down ? new Color(1f, 0.35f, 0.3f) : new Color(1, 1, 1, 0.8f));
                 if (cam == null) continue;
 

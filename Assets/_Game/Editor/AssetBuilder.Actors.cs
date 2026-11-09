@@ -3,6 +3,7 @@ using System.Linq;
 using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Level;
+using Stealth.Net;
 using Stealth.Player;
 using Unity.Netcode;
 using Unity.Netcode.Components;
@@ -142,6 +143,7 @@ namespace Stealth.EditorTools
             mf.sharedMesh = visuals.Meshes[0];
             mr.sharedMaterial = visuals.ColorMaterials[0];
             var item = root.AddComponent<WorldItem>();
+            root.AddComponent<WorldItemNet>();
             item.Visuals = visuals;
             item.MeshFilter = mf;
             item.Renderer = mr;
@@ -185,6 +187,8 @@ namespace Stealth.EditorTools
             var motor = root.AddComponent<PlayerMotor>();
             root.AddComponent<PlayerInventory>();
             var pc = root.AddComponent<PlayerController>();
+            root.AddComponent<PlayerNet>();
+            root.AddComponent<InventoryNet>();
             pc.Motor = motor;
             pc.Head = head.transform;
             pc.Camera = cam;
@@ -249,6 +253,7 @@ namespace Stealth.EditorTools
             var anim = root.AddComponent<RobotAnimator>();
             anim.Model = model.transform;
             var rc = root.AddComponent<RobotController>();
+            root.AddComponent<DetectorNet>();
             rc.Point = eye.transform;
             rc.Eye = eye.transform;
             rc.Status.Renderers = Parts(model, "Eye");
@@ -274,6 +279,7 @@ namespace Stealth.EditorTools
             var eye = Child(root.transform, "EyePoint", b.center);
             root.AddComponent<RobotAnimator>().Model = model.transform;
             var device = root.AddComponent<T>();
+            root.AddComponent<DetectorNet>();
             device.Point = eye.transform;
             device.Status.Renderers = Parts(model, "Eye");
             device.Status.Light = StatusLight(root.transform, b.center + Vector3.up * (b.extents.y + 0.1f), 3f, 2f);
@@ -307,6 +313,7 @@ namespace Stealth.EditorTools
             spot.shadows = LightShadows.None;
 
             var sc = root.AddComponent<SecurityCamera>();
+            root.AddComponent<DetectorNet>();
             sc.Point = spotGo.transform;
             sc.Pivot = pivot.transform;
             sc.Spot = spot;
@@ -329,6 +336,7 @@ namespace Stealth.EditorTools
                 return holder.transform;
             }
             var gate = root.AddComponent<LaserGate>();
+            root.AddComponent<LaserGateNet>();
             gate.EmitterA = Emitter("EmitterA", 90f);
             gate.EmitterB = Emitter("EmitterB", -90f);
             gate.Beams = Enumerable.Range(0, 3)

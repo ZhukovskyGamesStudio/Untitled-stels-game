@@ -353,6 +353,7 @@ GameObject:
   - component: {fileID: 6409639161541854586}
   - component: {fileID: 3363311280111986736}
   - component: {fileID: 6849126284746694535}
+  - component: {fileID: 1458084562289377026}
   m_Layer: 0
   m_Name: SensorMotion
   m_TagString: Untagged
@@ -435,7 +436,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ad338135e56931489c6a1b8cd621d73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.MotionSensor
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 12
   Point: {fileID: 4176402269426588200}
   Status:
@@ -448,3 +448,16 @@ MonoBehaviour:
   Range: 9
   ViewAngle: 100
   SpeedThreshold: 2.2
+--- !u!114 &1458084562289377026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7251431598536964534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1

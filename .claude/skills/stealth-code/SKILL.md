@@ -27,11 +27,18 @@ description: How to write and change code in the «Айтишники: выла�
   Новый префаб: метод `Build…()` в нужном partial-файле + вызов `Prefab(path, Build…)` + ссылка в поле, откуда его инстанцируют.
 - Один `MonoBehaviour` = один файл с тем же именем. Иначе в префабе будет «Missing Script» (`PrefabIntegrityTests` это ловит).
 
-## Сеть
+## Сеть — отдельная сборка
 
-- Сервер авторитетен для здоровья, лута, роботов, тревог. Клиент шлёт запрос `[Rpc(SendTo.Server)]`, сервер **перепроверяет** условия (дистанция, состояние).
-- Состояние для всех — `NetworkVariable` (запись только сервером, кроме явно owner-полей игрока). Эффекты для всех — `[Rpc(SendTo.Everyone)]`.
-- Детерминированное (уровень из сида, качание камер и лидаров) считается на каждом пире от `NetworkManager.ServerTime`, не синхронизируется.
+- `Stealth.Game` не ссылается на Netcode и Steam (`NetworkBoundaryTests` упадут). `NetworkBehaviour`, `NetworkVariable`, `Rpc`, `NetworkManager` — только в `Scripts/Net` (`Stealth.Net`).
+- Сетевой игровой объект = игровой компонент (`MonoBehaviour`, обычные поля) + **двойник** `…Net : NetworkBehaviour` на том же префабе.
+  - Состояние: игровой компонент держит поля; двойник на авторитете зовёт `PushState()` (только изменения → `NetworkVariable`), на остальных — `Apply…(...)` в игровой компонент.
+  - Запросы клиента: игровой компонент зовёт метод link-интерфейса (`IPlayerLink.SendRevive`, `IInventoryLink.RequestPickup`…), двойник шлёт RPC,
+    на сервере вызывает обработчик игрового компонента (`OnReviveRequest`, `PickupServer`), который **перепроверяет** условия. Без link (тесты) — вызывай обработчик сразу.
+  - Эффекты для всех: link-метод (`IDetectorLink.BroadcastPulse`, `IGameLink.BroadcastBanner`) → RPC `SendTo.Everyone` → `Receive…/Show…` в игровом компоненте.
+- Спавн/деспавн сетевых префабов — `Session.Spawn(prefab, pos, rot, configure)` / `Session.Despawn(go)`; настройку делай в `configure`, двойник отправит её вместе со спавном.
+- Сервер ли мы — `IsServer` компонента (выставляет двойник) или `Session.IsServer`; общее время — `Session.ServerTime` (детерминированные качания камер, лидаров, лазеров).
+- Новый сетевой объект: игровой компонент + двойник в `Scripts/Net` + `AddComponent` двойника в `AssetBuilder.Actors.cs` + строка в `NetworkBoundaryTests.EveryNetworkedGameComponentHasItsTwin`.
+- Новое поле, которое должны видеть все: поле в игровом компоненте → `NetworkVariable` + строка в `PushState`/`Pull` двойника. Для `Detector` — поле в `DetectorSnapshot`.
 - Тестовые хуки — только в `DevFlags`. Не добавляй статические «ForTest»-флаги в игровые классы.
 
 ## Стиль

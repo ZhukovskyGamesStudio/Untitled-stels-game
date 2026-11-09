@@ -1,3 +1,4 @@
+using Stealth.Game;
 using Stealth.Player;
 using UnityEngine;
 
@@ -28,7 +29,7 @@ namespace Stealth.Enemies
 
         protected override void OnDeviceSpawned()
         {
-            m_Phase = NetworkObjectId % 11 * 0.73f;
+            m_Phase = NetId % 11 * 0.73f;
             if (Spot == null) return;
             Spot.range = ViewDistance;
             Spot.spotAngle = ViewAngle;
@@ -40,7 +41,7 @@ namespace Stealth.Enemies
 
         protected override void TickLocal()
         {
-            float t = NetworkManager.ServerTime.TimeAsFloat + m_Phase;
+            float t = Session.ServerTimeF + m_Phase;
             Pivot.localRotation = Quaternion.Euler(Tilt, SweepYaw(t, SweepAngle, SweepPeriod), 0f);
         }
 
@@ -48,7 +49,7 @@ namespace Stealth.Enemies
         {
             if (Spot == null) return;
             Spot.color = Status.Current;
-            Spot.intensity = Alert.Value == 2 && !IsHacked ? 6f : IsHacked ? 0f : 3f;
+            Spot.intensity = Alert == 2 && !IsHacked ? 6f : IsHacked ? 0f : 3f;
         }
 
         protected override void TickServer()

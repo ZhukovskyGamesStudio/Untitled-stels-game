@@ -353,6 +353,7 @@ GameObject:
   - component: {fileID: 987770970074476695}
   - component: {fileID: 6619727416703517479}
   - component: {fileID: 7984745207015641170}
+  - component: {fileID: 5642877970306233910}
   m_Layer: 0
   m_Name: SensorPlate
   m_TagString: Untagged
@@ -435,7 +436,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5241c75a783793b41a3b3856100ba768, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.PressurePlate
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 13
   Point: {fileID: 3133121290861786847}
   Status:
@@ -446,3 +446,16 @@ MonoBehaviour:
   AlarmRadius: 30
   AlarmCooldown: 6
   HalfSize: 0.45
+--- !u!114 &5642877970306233910
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8708273154956419151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1

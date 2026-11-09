@@ -36,15 +36,15 @@ namespace Stealth.Game
             Me.Motor.SetPitch(0f);
             var aw = guard.GetComponent<Detector>();
             float t = Time.time;
-            while (Time.time - t < 4f && aw.AwarenessOf(Me.OwnerClientId) < 0.4f) yield return null;
-            Log($"detection: awareness {aw.AwarenessOf(Me.OwnerClientId):0.00} after {Time.time - t:0.0}s");
+            while (Time.time - t < 4f && aw.AwarenessOf(Me.ClientId) < 0.4f) yield return null;
+            Log($"detection: awareness {aw.AwarenessOf(Me.ClientId):0.00} after {Time.time - t:0.0}s");
             yield return Shot("noticed");
-            while (Time.time - t < 8f && aw.AwarenessOf(Me.OwnerClientId) < 0.99f) yield return null;
-            Log($"detection: awareness {aw.AwarenessOf(Me.OwnerClientId):0.00}, state {guard.State.Value}");
+            while (Time.time - t < 8f && aw.AwarenessOf(Me.ClientId) < 0.99f) yield return null;
+            Log($"detection: awareness {aw.AwarenessOf(Me.ClientId):0.00}, state {guard.State}");
             yield return Shot("detected");
             var cam = Me.Camera.transform;
             foreach (var d in Detector.All)
-                Log($"  detector {d.name} pos={d.Position} aw={d.AwarenessOf(Me.OwnerClientId):0.00} angle={UI.UiMath.ScreenAngle(cam.position, cam.forward, d.Position):0} guard={(d.gameObject == guard.gameObject)}");
+                Log($"  detector {d.name} pos={d.Position} aw={d.AwarenessOf(Me.ClientId):0.00} angle={UI.UiMath.ScreenAngle(cam.position, cam.forward, d.Position):0} guard={(d.gameObject == guard.gameObject)}");
             Log($"  me={Me.transform.position} fwd={cam.forward}");
         }
 
@@ -66,7 +66,7 @@ namespace Stealth.Game
         {
             var gm = GameManager.Instance;
             if (!Me.IsServer) yield break;
-            gm.AddCollectedServer(Mathf.Max(5, gm.Quota.Value - gm.Collected.Value)); // fill the quota
+            gm.AddCollectedServer(Mathf.Max(5, gm.Quota - gm.Collected)); // fill the quota
             yield return new WaitForSeconds(0.3f);
             yield return Shot("quota_gain");
             // Walk away from the hatch, facing away: the marker must sit on the screen edge.
@@ -83,14 +83,14 @@ namespace Stealth.Game
             float t0 = Time.time;
             while (PlayerController.All.Count < 2 && Time.time - t0 < 20f) yield return null;
             var hatch = ActiveLevel.Layout.HatchPosition;
-            if (Me.IsHost)
+            if (Me.IsServer)
             {
                 Me.TeleportOwner(hatch + new Vector3(-2f, 0.05f, 0f), Quaternion.LookRotation(Vector3.right));
                 yield return new WaitForSeconds(5f);
                 Me.HitServer(Me.transform.position + Vector3.right);
                 yield return new WaitForSeconds(1.7f); // after the invulnerability window
                 Me.HitServer(Me.transform.position + Vector3.right);
-                Log($"host downed={Me.Downed.Value}");
+                Log($"host downed={Me.Downed}");
                 yield return new WaitForSeconds(6f);
             }
             else
@@ -104,7 +104,7 @@ namespace Stealth.Game
                 Me.TeleportOwner(other + new Vector3(0, 0.05f, 0), Quaternion.LookRotation(Flat(hatch - other)));
                 yield return new WaitForSeconds(5f);
                 var host = PlayerController.All.FirstOrDefault(p => p != Me);
-                Log($"teammate: {host?.Nick} downed={host?.Downed.Value}");
+                Log($"teammate: {host?.Nick} downed={host?.Downed}");
                 yield return Shot("downed_marker");
             }
         }

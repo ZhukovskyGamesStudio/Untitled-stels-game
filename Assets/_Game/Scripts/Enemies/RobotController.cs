@@ -3,7 +3,6 @@ using Stealth.Game;
 using Stealth.Items;
 using Stealth.Level;
 using Stealth.Player;
-using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -27,20 +26,20 @@ namespace Stealth.Enemies
         [Tooltip("Expanding ring shown on every peer when the robot radios for backup.")]
         public RadioRipple RadioRipplePrefab;
 
-        public readonly NetworkVariable<RobotState> State = new();
+        public RobotState State => (RobotState)Mode;
         /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
-        public readonly NetworkVariable<sbyte> ColorFilter = new(-1);
+        public sbyte ColorFilter => Variant;
 
         NavMeshAgent m_Agent;
         RobotBrain m_Brain;
 
         public RobotBrain Brain => m_Brain;
         public float Suspicion => m_Brain?.Suspicion ?? 0f;
-        public override bool IsInvestigating => State.Value == RobotState.Investigate;
-        public override bool IsChasing => State.Value == RobotState.Chase;
+        public override bool IsInvestigating => State == RobotState.Investigate;
+        public override bool IsChasing => State == RobotState.Chase;
 
         protected override Color StatusColor =>
-            SecurityPalette.ForState(State.Value, ColorFilter.Value >= 0 ? ItemCatalog.Colors[ColorFilter.Value].Color : SecurityPalette.Calm);
+            SecurityPalette.ForState(State, ColorFilter >= 0 ? ItemCatalog.Colors[ColorFilter].Color : SecurityPalette.Calm);
 
         // ------------------------------------------------------------------ lifecycle
 
@@ -48,8 +47,6 @@ namespace Stealth.Enemies
         {
             Robots.Add(this);
             m_Agent = GetComponent<NavMeshAgent>();
-            State.OnValueChanged += OnStateChanged;
-            ColorFilter.OnValueChanged += OnColorChanged;
             if (!IsServer) return;
 
             m_Agent.enabled = true;
@@ -57,10 +54,10 @@ namespace Stealth.Enemies
             m_Agent.baseOffset = Traits.HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = Traits.PatrolSpeed;
-            if (Senses.ColorSorter) ColorFilter.Value = (sbyte)Random.Range(0, ItemCatalog.Colors.Length);
+            if (Senses.ColorSorter) SetVariant((sbyte)Random.Range(0, ItemCatalog.Colors.Length));
 
-            m_Brain = new RobotBrain(Senses, Traits, this, new System.Random((int)NetworkObjectId * 7919 + 17));
-            m_Brain.StateChanged += s => State.Value = s;
+            m_Brain = new RobotBrain(Senses, Traits, this, new System.Random((int)NetId * 7919 + 17));
+            m_Brain.StateChanged += s => SetMode((byte)s);
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
         }
@@ -68,16 +65,11 @@ namespace Stealth.Enemies
         protected override void OnDespawned()
         {
             Robots.Remove(this);
-            State.OnValueChanged -= OnStateChanged;
-            ColorFilter.OnValueChanged -= OnColorChanged;
             if (IsServer) NoiseSystem.OnNoise -= OnNoise;
         }
 
-        void OnStateChanged(RobotState _, RobotState __) => RefreshStatus();
-        void OnColorChanged(sbyte _, sbyte __) => RefreshStatus();
-
         public override bool CanBeHackedFrom(Vector3 player) =>
-            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State.Value == RobotState.Chase);
+            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State == RobotState.Chase);
 
         protected override void OnHackedServer()
         {
@@ -118,7 +110,7 @@ namespace Stealth.Enemies
                 if (d <= Senses.ContactDistance) return new Sighting { Target = target, Contact = true, ChasePoint = target.Position };
 
                 float rate = 0f;
-                bool visibleToFilter = ColorFilter.Value < 0 || target.Carries(ColorFilter.Value);
+                bool visibleToFilter = ColorFilter < 0 || target.Carries(ColorFilter);
                 if (Senses.HasEyes && visibleToFilter && CanSee(target, out var dist))
                     rate = Mathf.Max(rate, SensorMath.VisionRate(Senses.DetectionSpeed, dist, Senses.ViewDistance, target.IsCrouching, Perception.LightFactor(target.Position)));
                 if (Senses.SeismicRange > 0f && SeismicSense.Feels(transform.position, target.Position, target.GroundSpeed, target.IsCrouching, Senses.SeismicRange))
@@ -212,13 +204,12 @@ namespace Stealth.Enemies
             foreach (var r in Robots) positions.Add(r.transform.position);
             foreach (int i in RobotRadio.Recipients(transform.position, positions))
                 Robots[i].InvestigateServer(at, false);
-            RadioRpc();
+            Pulse(PulseRadio);
         }
 
-        [Rpc(SendTo.Everyone)]
-        void RadioRpc()
+        protected override void OnPulse(byte effect)
         {
-            if (RadioRipplePrefab != null) Instantiate(RadioRipplePrefab, transform.position, Quaternion.identity);
+            if (effect == PulseRadio && RadioRipplePrefab != null) Instantiate(RadioRipplePrefab, transform.position, Quaternion.identity);
         }
 
         public void PatrolToNextPoint()

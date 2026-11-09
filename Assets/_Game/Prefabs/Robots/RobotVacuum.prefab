@@ -190,6 +190,7 @@ GameObject:
   - component: {fileID: 1534795962868791619}
   - component: {fileID: 1419903075540489223}
   - component: {fileID: 2376463188125432327}
+  - component: {fileID: 5848846576859440924}
   m_Layer: 0
   m_Name: RobotVacuum
   m_TagString: Untagged
@@ -340,7 +341,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 823bfa529ff86bb46a3206b574073b6d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.CeilingVacuum
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 4
   Point: {fileID: 1343606648367500478}
   Status:
@@ -354,6 +354,19 @@ MonoBehaviour:
   Speed: 1.1
   ScanSpeed: 75
   HalfLength: 3
+--- !u!114 &5848846576859440924
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3470240825115711631}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &4037357966179694599
 GameObject:
   m_ObjectHideFlags: 0

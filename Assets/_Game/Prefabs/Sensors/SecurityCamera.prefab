@@ -314,6 +314,7 @@ GameObject:
   - component: {fileID: 927830060915602576}
   - component: {fileID: 54701004545588399}
   - component: {fileID: 1630860861971997728}
+  - component: {fileID: 9037429204370551866}
   m_Layer: 0
   m_Name: SecurityCamera
   m_TagString: Untagged
@@ -376,7 +377,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e1dd40bcf0e7ae749881b51ff48b250c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.SecurityCamera
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 14
   Point: {fileID: 8793697746802421401}
   Status:
@@ -394,6 +394,19 @@ MonoBehaviour:
   ViewDistance: 14
   ViewAngle: 50
   DetectTime: 1.1
+--- !u!114 &9037429204370551866
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5287284115975961562}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &7503725619083764858
 GameObject:
   m_ObjectHideFlags: 0

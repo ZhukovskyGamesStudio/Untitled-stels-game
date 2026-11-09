@@ -43,14 +43,15 @@ Prefabs/Robots   подвижные роботы · Prefabs/Sensors — датч
 Prefabs/Player, Items, Network (Session), FX (RadioRipple)
 Prefabs/UI       экраны HUD, Inventory, Menu + UI/Elements (кнопка, слайдер, дуга, маркеры…)
 Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов, EventSystem
-Scripts/<Enemies|Game|Items|Level|Net|Player|UI>   код игры (asmdef Stealth.Game)
+Scripts/<Enemies|Game|Items|Level|Player|UI>   код игры (asmdef Stealth.Game — без Netcode и Steam)
+Scripts/Net/                          сетевой слой (asmdef Stealth.Net): NGO, Steam, сетевые двойники компонентов
 Editor/AssetBuilder*.cs               генератор ассетов (asmdef Stealth.Editor)
 Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 ```
 
 ## Архитектура
 
-Три слоя, сверху вниз:
+Три слоя игры плюс отдельный сетевой слой:
 
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
@@ -58,6 +59,7 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
    `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI** — `GameHUD`, `InventoryUI`, `GameMenu`: только показывают/двигают/красят элементы, заранее собранные в префабах.
+4. **Сеть** — сборка `Stealth.Net`, единственное место, где есть Netcode и Steamworks (см. ниже).
 
 ### Роботы и датчики
 
@@ -86,10 +88,30 @@ LaserGate — отдельная ловушка (не детектор)
 Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
 Размеры здания — `LevelMetrics`.
 
-### Сеть и состояние
+### Сеть
 
-`GameNetwork` — запуск/остановка сессии. `GameManager` (на префабе `Session`, спавнит хост) — жизненный цикл уровня, квота, тревоги, охотник.
-Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
+Игровая сборка `Stealth.Game` **не ссылается** на Netcode/Steam (проверяет `NetworkBoundaryTests`). Всё сетевое — в `Stealth.Net`:
+
+```
+Игра (Stealth.Game)                         Сеть (Stealth.Net)
+PlayerController + PlayerInventory   ⇄  PlayerNet + InventoryNet
+GameManager (+ RunState)              ⇄  GameManagerNet
+Detector (все роботы и датчики)        ⇄  DetectorNet
+WorldItem                             ⇄  WorldItemNet
+LaserGate                             ⇄  LaserGateNet
+Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork (ISessionLauncher), Steam*
+```
+
+- Игровой компонент — обычный `MonoBehaviour` с простыми полями. Его **сетевой двойник** (`…Net : NetworkBehaviour` на том же объекте)
+  при спавне вызывает `Bind(...)`/`Spawned(...)`, на авторитетной стороне каждый кадр копирует поля в `NetworkVariable` (`PushState`, пишет только изменения),
+  на остальных — применяет их (`ApplyReplicated`/`ApplyServerState`/`ApplyOwnerState`).
+- Сообщения идут через интерфейсы из `Scripts/Game/Session.cs`: `IPlayerLink`, `IInventoryLink`, `IGameLink`, `IDetectorLink`. Двойник реализует их RPC-шками
+  и вызывает серверные обработчики игрового компонента (`OnReviveRequest`, `PickupServer`, `FinishLevelServer`…). Без двойника (тесты, офлайн) запросы выполняются сразу.
+- `Session` — фасад сессии: `IsServer`, `ServerTime`, `Spawn`/`Despawn` (сетевые префабы), `Launcher` (меню: хост, подключение, Steam).
+  Без запущенной сессии этот пир — сам себе сервер, время — локальное, спавн — обычный `Instantiate`.
+- Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
+- Правила забега (квота, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
+
 Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
 
 ### Ассеты из кода
@@ -104,13 +126,15 @@ LaserGate — отдельная ловушка (не детектор)
 - В рантайме **не собирать объекты кодом** (`new GameObject` + `AddComponent`, `CreatePrimitive`, процедурные текстуры): только `Instantiate` префабов, на которые ссылаются поля/`LevelArt`.
 - Один `MonoBehaviour` — один файл с тем же именем (иначе Unity теряет скрипт в префабах).
 - Логику, которую можно проверить без движка, выносить в чистый класс и покрывать тестом. Время и случайность — параметрами.
-- Сервер решает, клиенты показывают. Запросы клиента — `[Rpc(SendTo.Server)]` с проверкой на сервере.
+- Сервер решает, клиенты показывают. В игровом коде нет `NetworkVariable`/`Rpc`/`NetworkManager`: состояние — обычные поля, запросы — через link-интерфейсы,
+  проверка — в серверном обработчике игрового компонента. Netcode — только в `Scripts/Net`.
 - Приватные поля `m_Name`, статические `s_Name`, константы и публичное — `PascalCase`. Комментарии и идентификаторы — по-английски, тексты для игрока — по-русски.
 - Найденный баг — чинить и, если можно, закрыть тестом.
 
 ## Точки стыковки для коллеги
 
 - Войс-чат: `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере — роботы с микрофонами услышат.
+- Сеть: всё сетевое — в `Scripts/Net` (сборка `Stealth.Net`), игровой код от Netcode не зависит; как добавить сетевой объект — в скилле `stealth-code`.
 - Предметы: `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`, в мире — `WorldItem`, инвентарь — `PlayerInventory`.
 - Мета-прогрессия: итог забега `GameManager.RunTotal`, конец забега `GameManager.Phase == RunPhase.Failed`.
 - Новый робот или датчик: чек-лист в скилле `stealth-code`.

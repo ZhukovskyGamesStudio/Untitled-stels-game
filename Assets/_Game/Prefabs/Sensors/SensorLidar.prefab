@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5781136232855680315}
   - component: {fileID: 8755581264381827491}
   - component: {fileID: 2870162741526569849}
+  - component: {fileID: 3055348506003521102}
   m_Layer: 0
   m_Name: SensorLidar
   m_TagString: Untagged
@@ -117,7 +118,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31328503295d545458666c1eb0ec8547, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.LidarScanner
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 11
   Point: {fileID: 8003215859859942210}
   Status:
@@ -132,6 +132,19 @@ MonoBehaviour:
   BeamHeight: 0.38
   Range: 6
   Speed: 110
+--- !u!114 &3055348506003521102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1206346656281232735}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &2844711278422542855
 GameObject:
   m_ObjectHideFlags: 0

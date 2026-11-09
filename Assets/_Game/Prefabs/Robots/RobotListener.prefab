@@ -573,6 +573,7 @@ GameObject:
   - component: {fileID: 4327433651098308357}
   - component: {fileID: 4923713079511259793}
   - component: {fileID: 1003001519588481346}
+  - component: {fileID: 4328728480850456600}
   m_Layer: 0
   m_Name: RobotListener
   m_TagString: Untagged
@@ -746,7 +747,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 52fd8901c4ddcee4eb843bd047fa530f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotController
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 1
   Point: {fileID: 5296439856561657907}
   Status:
@@ -782,6 +782,19 @@ MonoBehaviour:
     AttackCooldown: 1.7
   Eye: {fileID: 5296439856561657907}
   RadioRipplePrefab: {fileID: 6632636445288678081, guid: 265ebd535c076e54383c1be7dbd55814, type: 3}
+--- !u!114 &4328728480850456600
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6615151993003470592}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &7815164836984595831
 GameObject:
   m_ObjectHideFlags: 0

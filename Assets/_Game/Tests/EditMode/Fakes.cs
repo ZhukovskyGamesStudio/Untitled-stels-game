@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using Stealth.Enemies;
+using Stealth.Game;
+using Stealth.Items;
+using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Tests
@@ -54,5 +57,40 @@ namespace Stealth.Tests
         public void Attack(IIntruder target) => Attacks.Add(target);
         public void RaiseAlarm(Vector3 at, float radius) => Alarms.Add((at, radius));
         public void CallForBackup(Vector3 at) => BackupCalls++;
+    }
+
+    /// <summary>Stands in for the player's network twin: records what would be sent.</summary>
+    public class FakePlayerLink : IPlayerLink
+    {
+        public readonly List<float> Noises = new();
+        public readonly List<Vector3> HitFeedback = new();
+        public readonly List<PlayerController> Revives = new();
+        public readonly List<Detector> Hacks = new();
+        public int GasKnockouts, Teleports;
+
+        public void Teleport(Vector3 position, Quaternion rotation) => Teleports++;
+        public void SendNoise(Vector3 position, float radius) => Noises.Add(radius);
+        public void SendGasKnockout() => GasKnockouts++;
+        public void SendRevive(PlayerController target) => Revives.Add(target);
+        public void SendHack(Detector target) => Hacks.Add(target);
+        public void SendHitFeedback(Vector3 awayFromSource) => HitFeedback.Add(awayFromSource);
+    }
+
+    /// <summary>Stands in for the inventory's network twin.</summary>
+    public class FakeInventoryLink : IInventoryLink
+    {
+        public readonly List<string> Requests = new();
+
+        public void RequestPickup(WorldItem item, byte x, byte y, byte rot) => Requests.Add($"pickup {x},{y},{rot}");
+        public void RequestMove(int index, byte x, byte y, byte rot) => Requests.Add($"move {index} {x},{y},{rot}");
+        public void RequestDrop(int index, Vector3 position, float yaw) => Requests.Add($"drop {index}");
+        public void RequestDeposit(int index) => Requests.Add($"deposit {index}");
+    }
+
+    /// <summary>Stands in for a detector's network twin.</summary>
+    public class FakeDetectorLink : IDetectorLink
+    {
+        public readonly List<byte> Pulses = new();
+        public void BroadcastPulse(byte effect) => Pulses.Add(effect);
     }
 }

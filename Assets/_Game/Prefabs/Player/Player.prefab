@@ -195,6 +195,8 @@ GameObject:
   - component: {fileID: 2220721355182153854}
   - component: {fileID: 3241906689404897102}
   - component: {fileID: 4369170676590080337}
+  - component: {fileID: 1589316108183038216}
+  - component: {fileID: 7656917091446484349}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -354,11 +356,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ddf407c88e81089428595c0aebe57430, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Player.PlayerInventory
-  ShowTopMostFoldoutHeaderGroup: 1
-  Items:
-    UpdateTraits:
-      MinSecondsBetweenUpdates: 0
-      MaxSecondsBetweenUpdates: 0
 --- !u!114 &4369170676590080337
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -371,7 +368,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b8ed656ba72c4e4cbede8a56232d02d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Player.PlayerController
-  ShowTopMostFoldoutHeaderGroup: 1
   Head: {fileID: 7207166517813897498}
   Camera: {fileID: 5374320441457490364}
   Listener: {fileID: 6163376607080136652}
@@ -384,6 +380,32 @@ MonoBehaviour:
   - {fileID: 8386933785274624381}
   Motor: {fileID: 2220721355182153854}
   LaughNoise: 9
+--- !u!114 &1589316108183038216
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2713312316762577673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e615b7568983cb47bc33a5c33e4a6a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.PlayerNet
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &7656917091446484349
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2713312316762577673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6f892b996bcd5c444be1fdadc159cd57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.InventoryNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3901116721948219565
 GameObject:
   m_ObjectHideFlags: 0

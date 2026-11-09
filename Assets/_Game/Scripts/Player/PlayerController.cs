@@ -2,26 +2,28 @@ using System.Collections.Generic;
 using Stealth.Enemies;
 using Stealth.Game;
 using Stealth.Level;
-using Stealth.Net;
 using Stealth.UI;
-using Unity.Netcode;
-using Unity.Netcode.Components;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Stealth.Player
 {
     /// <summary>
-    /// First person controller. Movement is owner-authoritative (NetworkTransform in Owner mode),
-    /// health and "downed" state are server-authoritative. Rules live in pure classes
-    /// (<see cref="PlayerMotor"/>, <see cref="HealthState"/>, <see cref="GasExposure"/>, <see cref="FootstepNoise"/>);
-    /// this component wires them to input, networking and the world. Security sees it as an <see cref="IIntruder"/>.
+    /// First person controller. Movement is owner-authoritative, health and "downed" state are server-authoritative.
+    /// Rules live in pure classes (<see cref="PlayerMotor"/>, <see cref="HealthState"/>, <see cref="GasExposure"/>,
+    /// <see cref="FootstepNoise"/>); this component wires them to input and the world. Security sees it as an <see cref="IIntruder"/>.
+    ///
+    /// No networking here: the twin component (PlayerNet, assembly Stealth.Net) calls <see cref="Bind"/> on spawn,
+    /// replicates the state below (<see cref="ApplyServerState"/>, <see cref="ApplyOwnerState"/>) and carries the
+    /// messages of <see cref="IPlayerLink"/>.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class PlayerController : NetworkBehaviour, IIntruder
+    public class PlayerController : MonoBehaviour, IIntruder
     {
         public static PlayerController Local { get; private set; }
         public static readonly List<PlayerController> All = new();
+        /// <summary>The local player appeared (true) or left (false): the menu camera reacts.</summary>
+        public static event System.Action<bool> LocalChanged;
 
         public const float StandHeight = 1.8f;
         public const float CrouchHeight = 1.1f;
@@ -42,14 +44,26 @@ namespace Stealth.Player
         public FootstepNoise Footsteps = new();
         public float LaughNoise = 9f;
 
-        public readonly NetworkVariable<int> Hp = new(HealthState.MaxHp);
-        public readonly NetworkVariable<bool> Downed = new();
-        public readonly NetworkVariable<bool> Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-        /// <summary>Camera pitch in degrees (owner writes ~10 times per second) so teammates see where you look.</summary>
-        public readonly NetworkVariable<Unity.Collections.FixedString32Bytes> DisplayName =
-            new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-        public string Nick => DisplayName.Value.Length > 0 ? DisplayName.Value.ToString() : $"Игрок {OwnerClientId + 1}";
-        public readonly NetworkVariable<sbyte> LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        // ------------------------------------------------------------------ replicated state
+
+        /// <summary>Server-owned.</summary>
+        public int Hp { get; private set; } = HealthState.MaxHp;
+        /// <summary>Server-owned.</summary>
+        public bool Downed { get; private set; }
+        /// <summary>Owner-owned.</summary>
+        public bool Crouching { get; private set; }
+        /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
+        public sbyte LookPitch { get; private set; }
+        /// <summary>Owner-owned: Steam name or empty.</summary>
+        public string DisplayName { get; private set; } = "";
+        public string Nick => DisplayName.Length > 0 ? DisplayName : $"Игрок {ClientId + 1}";
+
+        public ulong ClientId { get; private set; }
+        /// <summary>This peer controls the player (input, camera).</summary>
+        public bool IsOwner { get; private set; }
+        /// <summary>This peer is the server (health, requests).</summary>
+        public bool IsServer { get; private set; } = true;
+        public bool IsSpawned { get; private set; }
 
         public bool CursorMode { get; private set; }
         public GasExposure Gas { get; } = new();
@@ -58,7 +72,7 @@ namespace Stealth.Player
         /// <summary>Robot or device that can be hacked right now (hold E).</summary>
         public Detector HackTarget { get; private set; }
         public float HackProgress { get; private set; }
-        public float Height => Crouching.Value ? CrouchHeight : StandHeight;
+        public float Height => Crouching ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
         static readonly Color[] Palette =
@@ -67,7 +81,7 @@ namespace Stealth.Player
         };
 
         CharacterController m_Controller;
-        NetworkTransform m_NetTransform;
+        IPlayerLink m_Link;
         int m_PlacedSeed;
         HealthState m_Health = HealthState.Full(0f);
         Vector3 m_ServerLastPos;
@@ -81,10 +95,9 @@ namespace Stealth.Player
 
         // ------------------------------------------------------------------ IIntruder
 
-        public ulong ClientId => OwnerClientId;
         public Vector3 Position => transform.position;
-        public bool IsCrouching => Crouching.Value;
-        public bool IsDown => !IsSpawned || Downed.Value;
+        public bool IsCrouching => Crouching;
+        public bool IsDown => !IsSpawned || Downed;
         public float GroundSpeed => ServerSpeed;
         public bool Carries(int color) => m_Inventory != null && m_Inventory.Carries(color);
 
@@ -92,14 +105,13 @@ namespace Stealth.Player
 
         public static PlayerController Find(ulong clientId)
         {
-            foreach (var p in All) if (p.OwnerClientId == clientId) return p;
+            foreach (var p in All) if (p.ClientId == clientId) return p;
             return null;
         }
 
         void Awake()
         {
             m_Controller = GetComponent<CharacterController>();
-            m_NetTransform = GetComponent<NetworkTransform>();
             m_Inventory = GetComponent<PlayerInventory>();
             if (Motor == null) Motor = GetComponent<PlayerMotor>();
             Motor.Landed += OnLanded;
@@ -111,22 +123,29 @@ namespace Stealth.Player
             if (IsOwner && IsSpawned && radius > 0f) EmitNoise(radius);
         }
 
-        public override void OnNetworkSpawn()
+        // ------------------------------------------------------------------ binding (called by the network twin)
+
+        public void Bind(IPlayerLink link, ulong clientId, bool isOwner, bool isServer)
         {
+            m_Link = link;
+            ClientId = clientId;
+            IsOwner = isOwner;
+            IsServer = isServer;
+            IsSpawned = true;
             All.Add(this);
             ApplyColor();
+            name = $"Player_{clientId}";
             if (IsOwner)
             {
                 Local = this;
                 GameSettings.EnsureLoaded();
-                var nick = SteamManager.Initialized ? SteamManager.PersonaName : $"Игрок {OwnerClientId + 1}";
-                if (nick.Length > 28) nick = nick.Substring(0, 28);
-                DisplayName.Value = new Unity.Collections.FixedString32Bytes(nick);
+                var nick = Session.Launcher?.LocalPlayerName ?? "";
+                DisplayName = nick.Length > 28 ? nick.Substring(0, 28) : nick;
                 Camera.enabled = true;
                 Camera.clearFlags = CameraClearFlags.SolidColor; // no sky: outside is a wall of gas
                 Listener.enabled = true;
-                if (GameNetwork.Instance != null) GameNetwork.Instance.ShowMenuCamera(false);
                 foreach (var r in BodyRenderers) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                LocalChanged?.Invoke(true);
             }
             else
             {
@@ -134,23 +153,37 @@ namespace Stealth.Player
                 Listener.enabled = false;
                 // CharacterController stays enabled: it is the collider robots raycast against.
             }
-            name = $"Player_{OwnerClientId}";
         }
 
-        public override void OnNetworkDespawn()
+        public void Unbind()
         {
             All.Remove(this);
-            if (Local == this)
-            {
-                Local = null;
-                if (GameNetwork.Instance != null) GameNetwork.Instance.ShowMenuCamera(true);
-            }
+            IsSpawned = false;
+            m_Link = null;
+            if (Local != this) return;
+            Local = null;
+            LocalChanged?.Invoke(false);
+        }
+
+        /// <summary>Client: health as decided by the server.</summary>
+        public void ApplyServerState(int hp, bool downed)
+        {
+            Hp = hp;
+            Downed = downed;
+        }
+
+        /// <summary>Other peers: what the owner reports.</summary>
+        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName)
+        {
+            Crouching = crouching;
+            LookPitch = lookPitch;
+            DisplayName = displayName ?? "";
         }
 
         void ApplyColor()
         {
             var block = new MaterialPropertyBlock();
-            block.SetColor("_BaseColor", Palette[(int)(OwnerClientId % (ulong)Palette.Length)]);
+            block.SetColor("_BaseColor", Palette[(int)(ClientId % (ulong)Palette.Length)]);
             foreach (var r in BodyRenderers) r.SetPropertyBlock(block);
         }
 
@@ -172,14 +205,14 @@ namespace Stealth.Player
             var kb = Keyboard.current;
             if (kb == null) return;
 
-            CursorMode = !menu && !Downed.Value && (kb.tabKey.isPressed || DevFlags.ForceHandsMode);
+            CursorMode = !menu && !Downed && (kb.tabKey.isPressed || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
             var input = DevFlags.Autopilot ?? PlayerInputState.FromDevices(!freeCursor);
-            Motor.Tick(input, !menu && !Downed.Value, Downed.Value, Head, Camera, Time.deltaTime);
-            if (Motor.IsCrouching != Crouching.Value) Crouching.Value = Motor.IsCrouching;
+            Motor.Tick(input, !menu && !Downed, Downed, Head, Camera, Time.deltaTime);
+            Crouching = Motor.IsCrouching;
             SyncLookPitch();
 
             UpdateNoise();
@@ -202,14 +235,14 @@ namespace Stealth.Player
         void UpdateModelPose()
         {
             if (Model == null) return;
-            float y = Downed.Value ? 0.35f : (Crouching.Value ? 0.65f : 1f);
+            float y = Downed ? 0.35f : (Crouching ? 0.65f : 1f);
             Model.localScale = new Vector3(1f, Mathf.MoveTowards(Model.localScale.y, y, Time.deltaTime * 4f), 1f);
             if (IsOwner || Time.deltaTime <= 0f) return;
 
             // Remote players: tilt the head to the synced pitch and bob a little while walking.
             if (HeadPivot != null)
                 HeadPivot.localRotation = Quaternion.Slerp(HeadPivot.localRotation,
-                    Quaternion.Euler(Mathf.Clamp(LookPitch.Value, -60, 60), 0, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
+                    Quaternion.Euler(Mathf.Clamp(LookPitch, -60, 60), 0, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
             var pos = transform.position;
             var delta = pos - m_LastModelPos;
             m_LastModelPos = pos;
@@ -229,7 +262,7 @@ namespace Stealth.Player
             if (m_PitchSyncTimer > 0f) return;
             m_PitchSyncTimer = 0.1f;
             var pitch = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.Pitch), -88, 88);
-            if (Mathf.Abs(pitch - LookPitch.Value) >= 2) LookPitch.Value = pitch;
+            if (Mathf.Abs(pitch - LookPitch) >= 2) LookPitch = pitch;
         }
 
         void PlaceOnLevelIfNeeded()
@@ -237,7 +270,7 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             if (layout == null || layout.Seed == m_PlacedSeed || layout.PlayerSpawns.Count == 0) return;
             m_PlacedSeed = layout.Seed;
-            var spawn = layout.PlayerSpawns[(int)(OwnerClientId % (ulong)layout.PlayerSpawns.Count)];
+            var spawn = layout.PlayerSpawns[(int)(ClientId % (ulong)layout.PlayerSpawns.Count)];
             var toHatch = layout.HatchPosition - spawn;
             toHatch.y = 0;
             TeleportOwner(spawn + Vector3.up * 0.1f, Quaternion.LookRotation(toHatch.sqrMagnitude > 0.01f ? toHatch : Vector3.forward));
@@ -252,12 +285,12 @@ namespace Stealth.Player
             transform.SetPositionAndRotation(position, rotation);
             m_Controller.enabled = true;
             if (Motor != null) Motor.ResetMotion();
-            if (m_NetTransform != null && m_NetTransform.IsSpawned) m_NetTransform.Teleport(position, rotation, transform.localScale);
+            m_Link?.Teleport(position, rotation);
         }
 
         void UpdateNoise()
         {
-            float radius = Footsteps.Tick(Motor.HorizontalSpeed, Motor.Grounded && !Downed.Value, Crouching.Value, IsSprinting, Time.deltaTime);
+            float radius = Footsteps.Tick(Motor.HorizontalSpeed, Motor.Grounded && !Downed, Crouching, IsSprinting, Time.deltaTime);
             if (radius > 0f) EmitNoise(radius);
         }
 
@@ -266,20 +299,24 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             bool outside = layout != null && !layout.IsInside(transform.position);
             var effect = Gas.Tick(outside, Time.deltaTime);
-            if (Downed.Value) return;
+            if (Downed) return;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(LaughNoise);
-            else if (effect == GasExposure.Effect.Knockout) GasKnockoutRpc();
+            else if (effect == GasExposure.Effect.Knockout)
+            {
+                if (m_Link != null) m_Link.SendGasKnockout();
+                else OnGasKnockoutRequest();
+            }
         }
 
         void UpdateInteractions(Keyboard kb)
         {
-            if (GameMenu.IsOpen || Downed.Value) { ReviveProgress = 0; ReviveTarget = null; return; }
+            if (GameMenu.IsOpen || Downed) { ReviveProgress = 0; ReviveTarget = null; return; }
 
             // Revive: hold E next to a downed teammate.
             ReviveTarget = null;
             foreach (var p in All)
             {
-                if (p == this || !p.Downed.Value) continue;
+                if (p == this || !p.Downed) continue;
                 if ((p.transform.position - transform.position).magnitude <= ReviveDistance) { ReviveTarget = p; break; }
             }
             bool holdE = kb.eKey.isPressed || DevFlags.AutoInteract;
@@ -288,7 +325,8 @@ namespace Stealth.Player
                 ReviveProgress += Time.deltaTime;
                 if (ReviveProgress >= ReviveTime)
                 {
-                    ReviveRpc(ReviveTarget.NetworkObject);
+                    if (m_Link != null) m_Link.SendRevive(ReviveTarget);
+                    else OnReviveRequest(ReviveTarget);
                     ReviveProgress = 0;
                 }
             }
@@ -301,7 +339,8 @@ namespace Stealth.Player
                 HackProgress += Time.deltaTime;
                 if (HackProgress >= Hacking.HoldTime)
                 {
-                    HackRpc(HackTarget.NetworkObject);
+                    if (m_Link != null) m_Link.SendHack(HackTarget);
+                    else OnHackRequest(HackTarget);
                     HackProgress = 0;
                 }
             }
@@ -309,10 +348,10 @@ namespace Stealth.Player
 
             var gm = GameManager.Instance;
             if (gm == null) return;
-            if (kb.fKey.wasPressedThisFrame && Hatch.IsNear(transform.position) && gm.Phase.Value == RunPhase.Playing)
-                gm.FinishLevelRpc();
-            if (kb.rKey.wasPressedThisFrame && gm.Phase.Value == RunPhase.Failed && !CursorMode)
-                gm.RestartRunRpc();
+            if (kb.fKey.wasPressedThisFrame && Hatch.IsNear(transform.position) && gm.Phase == RunPhase.Playing)
+                gm.RequestFinishLevel();
+            if (kb.rKey.wasPressedThisFrame && gm.Phase == RunPhase.Failed && !CursorMode)
+                gm.RequestRestart();
         }
 
         /// <summary>The nearest robot / device that can be hacked from where we stand.</summary>
@@ -329,14 +368,6 @@ namespace Stealth.Player
             return best;
         }
 
-        [Rpc(SendTo.Server)]
-        void HackRpc(NetworkObjectReference target)
-        {
-            if (Downed.Value || !target.TryGet(out var obj)) return;
-            var hackable = obj.GetComponent<IHackable>();
-            if (hackable != null && hackable.CanBeHackedFrom(transform.position)) hackable.HackServer(Hacking.Duration);
-        }
-
         // ------------------------------------------------------------------ server
 
         public void HitServer(Vector3 source)
@@ -345,7 +376,9 @@ namespace Stealth.Player
             PublishHealth();
             var away = transform.position - source;
             away.y = 0;
-            HitFeedbackRpc(away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward);
+            away = away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward;
+            if (m_Link != null) m_Link.SendHitFeedback(away);
+            else OnHitFeedback(away);
         }
 
         public void ReviveServer()
@@ -362,12 +395,14 @@ namespace Stealth.Player
 
         void PublishHealth()
         {
-            Hp.Value = m_Health.Hp;
-            Downed.Value = m_Health.Downed;
+            Hp = m_Health.Hp;
+            Downed = m_Health.Downed;
         }
 
-        [Rpc(SendTo.Owner)]
-        void HitFeedbackRpc(Vector3 awayFromSource)
+        // ------------------------------------------------------------------ messages (delivered by the network twin)
+
+        /// <summary>Owner: the server says we were hit.</summary>
+        public void OnHitFeedback(Vector3 awayFromSource)
         {
             Motor.AddImpulse(awayFromSource * 6f + Vector3.up * 2.5f);
             Motor.AddTrauma(0.7f);
@@ -382,32 +417,38 @@ namespace Stealth.Player
         {
             LastNoiseRadius = radius;
             LastNoiseTime = Time.time;
-            NoiseRpc(transform.position, radius);
+            if (m_Link != null) m_Link.SendNoise(transform.position, radius);
+            else OnNoiseRequest(transform.position, radius);
         }
 
-        [Rpc(SendTo.Server)]
-        void NoiseRpc(Vector3 position, float radius)
+        /// <summary>Server: the owner made a noise.</summary>
+        public void OnNoiseRequest(Vector3 position, float radius)
         {
-            if (Downed.Value) return;
-            NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), OwnerClientId);
+            if (Downed) return;
+            NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), ClientId);
         }
 
-        [Rpc(SendTo.Server)]
-        void GasKnockoutRpc()
+        /// <summary>Server: the owner passed out from the gas.</summary>
+        public void OnGasKnockoutRequest()
         {
-            if (Downed.Value) return;
+            if (Downed) return;
             m_Health.Knockout();
             PublishHealth();
         }
 
-        [Rpc(SendTo.Server)]
-        void ReviveRpc(NetworkObjectReference target)
+        /// <summary>Server: the owner finished holding E over a downed teammate.</summary>
+        public void OnReviveRequest(PlayerController other)
         {
-            if (Downed.Value || !target.TryGet(out var obj)) return;
-            var other = obj.GetComponent<PlayerController>();
-            if (other == null || !other.Downed.Value) return;
+            if (Downed || other == null || !other.Downed) return;
             if ((other.transform.position - transform.position).magnitude > ReviveDistance + 1f) return;
             other.ReviveServer();
+        }
+
+        /// <summary>Server: the owner finished holding E at a robot / device.</summary>
+        public void OnHackRequest(IHackable target)
+        {
+            if (Downed || target == null || !target.CanBeHackedFrom(transform.position)) return;
+            target.HackServer(Hacking.Duration);
         }
     }
 }

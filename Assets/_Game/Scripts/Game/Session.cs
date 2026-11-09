@@ -1,0 +1,119 @@
+using System;
+using Stealth.Enemies;
+using Stealth.Items;
+using Stealth.Player;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+namespace Stealth.Game
+{
+    /// <summary>
+    /// The running multiplayer session as game code sees it. Implemented by the network layer (assembly Stealth.Net,
+    /// <c>NgoSessionBackend</c>); game code never touches Netcode directly.
+    /// </summary>
+    public interface ISessionBackend
+    {
+        bool IsRunning { get; }
+        bool IsServer { get; }
+        ulong LocalClientId { get; }
+        /// <summary>Clock shared by all peers (seconds). Drives deterministic motion: camera sweeps, lidars, lasers.</summary>
+        double ServerTime { get; }
+
+        /// <summary>Server: instantiate a networked prefab, let <paramref name="configure"/> set it up, then spawn it for everyone.</summary>
+        GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Action<GameObject> configure);
+        /// <summary>Server: remove a networked object for everyone.</summary>
+        void Despawn(GameObject instance);
+    }
+
+    /// <summary>Starting and leaving sessions (menu). Implemented by <c>GameNetwork</c> in Stealth.Net.</summary>
+    public interface ISessionLauncher
+    {
+        string Status { get; }
+        ushort LocalPort { get; }
+        bool IsHost { get; }
+        bool SteamAvailable { get; }
+        /// <summary>"connected as …" / "unavailable — reason".</summary>
+        string SteamStatus { get; }
+        /// <summary>Steam persona name, or null without Steam.</summary>
+        string LocalPlayerName { get; }
+        bool CanInviteFriends { get; }
+
+        void HostSteam();
+        void HostLocal();
+        void JoinLocal(string address);
+        void InviteFriends();
+        void Leave();
+    }
+
+    /// <summary>
+    /// Static access point to the session. Without a running session (tools, tests, the menu) this peer is its own
+    /// authority, time is local time and spawning is a plain Instantiate.
+    /// </summary>
+    public static class Session
+    {
+        public static ISessionBackend Backend { get; set; }
+        public static ISessionLauncher Launcher { get; set; }
+
+        public static bool IsRunning => Backend != null && Backend.IsRunning;
+        public static bool IsServer => !IsRunning || Backend.IsServer;
+        public static ulong LocalClientId => IsRunning ? Backend.LocalClientId : 0;
+        public static double ServerTime => IsRunning ? Backend.ServerTime : Time.timeAsDouble;
+        public static float ServerTimeF => (float)ServerTime;
+
+        public static GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Action<GameObject> configure = null)
+        {
+            if (IsRunning) return Backend.Spawn(prefab, position, rotation, configure);
+            var go = Object.Instantiate(prefab, position, rotation);
+            configure?.Invoke(go);
+            return go;
+        }
+
+        public static void Despawn(GameObject instance)
+        {
+            if (instance == null) return;
+            if (IsRunning) Backend.Despawn(instance);
+            else if (Application.isPlaying) Object.Destroy(instance);
+            else Object.DestroyImmediate(instance);
+        }
+    }
+
+    // ---------------------------------------------------------------------- links to the network twins
+    // Each networked game component has a twin in Stealth.Net that replicates its state and carries its messages.
+    // The game component talks to the twin only through these interfaces.
+
+    /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
+    public interface IPlayerLink
+    {
+        /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>
+        void Teleport(Vector3 position, Quaternion rotation);
+        void SendNoise(Vector3 position, float radius);
+        void SendGasKnockout();
+        void SendRevive(PlayerController target);
+        void SendHack(Detector target);
+        /// <summary>Server → owner: you were hit, knock the camera back.</summary>
+        void SendHitFeedback(Vector3 awayFromSource);
+    }
+
+    /// <summary>Inventory → network: owner requests (the server validates them in <see cref="PlayerInventory"/>).</summary>
+    public interface IInventoryLink
+    {
+        void RequestPickup(WorldItem item, byte x, byte y, byte rot);
+        void RequestMove(int index, byte x, byte y, byte rot);
+        void RequestDrop(int index, Vector3 position, float yaw);
+        void RequestDeposit(int index);
+    }
+
+    /// <summary>Run state → network: requests from any player and banners for everyone.</summary>
+    public interface IGameLink
+    {
+        void RequestFinishLevel();
+        void RequestRestart();
+        void BroadcastBanner(string text);
+    }
+
+    /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>
+    public interface IDetectorLink
+    {
+        void BroadcastPulse(byte effect);
+    }
+}

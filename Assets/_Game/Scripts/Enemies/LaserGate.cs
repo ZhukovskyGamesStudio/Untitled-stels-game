@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using Stealth.Game;
 using Stealth.Level;
 using Stealth.Player;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace Stealth.Enemies
@@ -15,7 +14,7 @@ namespace Stealth.Enemies
     /// Touching a beam hurts and raises an alarm. The cycle uses the shared server time, so every peer agrees.
     /// The beams are pre-built children of the prefab (<see cref="Beams"/>); unused ones stay hidden.
     /// </summary>
-    public class LaserGate : NetworkBehaviour
+    public class LaserGate : MonoBehaviour
     {
         public Transform EmitterA;
         public Transform EmitterB;
@@ -28,8 +27,11 @@ namespace Stealth.Enemies
         public const float MovePeriod = 3.2f;
         public const float BeamThickness = 0.025f;
 
-        public readonly NetworkVariable<LaserPattern> Pattern = new();
-        public readonly NetworkVariable<float> Width = new(1.8f);
+        /// <summary>Set by the server before spawning; replicated by the network twin (LaserGateNet).</summary>
+        public LaserPattern Pattern { get; private set; }
+        public float Width { get; private set; } = 1.8f;
+        public bool IsServer { get; private set; } = true;
+        public bool IsSpawned { get; private set; }
 
         static readonly float[] LowBeam = { 1.25f };
         static readonly float[] Blinking = { 0.35f, 0.95f, 1.55f };
@@ -57,14 +59,14 @@ namespace Stealth.Enemies
         public static bool BlinkWarning(float cycleTime, float onTime, float offTime) =>
             cycleTime > onTime + offTime - 0.45f && Mathf.Repeat(cycleTime * 12f, 1f) < 0.5f;
 
-        float Clock => NetworkManager.ServerTime.TimeAsFloat;
+        float Clock => Session.ServerTimeF;
         float CycleTime => Mathf.Repeat(Clock + m_Phase, OnTime + OffTime);
 
         float[] Heights
         {
             get
             {
-                switch (Pattern.Value)
+                switch (Pattern)
                 {
                     case LaserPattern.Low: return LowBeam;
                     case LaserPattern.Blinking: return Blinking;
@@ -75,12 +77,21 @@ namespace Stealth.Enemies
             }
         }
 
-        public bool BeamsOn => Pattern.Value != LaserPattern.Blinking || BlinkOn(CycleTime, OnTime);
+        public bool BeamsOn => Pattern != LaserPattern.Blinking || BlinkOn(CycleTime, OnTime);
 
-        public override void OnNetworkSpawn()
+        public void Configure(LaserPattern pattern, float width)
         {
-            m_Phase = NetworkObjectId % 5 * 0.8f;
-            float w = Width.Value;
+            Pattern = pattern;
+            Width = width;
+        }
+
+        /// <summary>Called by the network twin once the pattern is known on this peer.</summary>
+        public void Spawned(ulong netId, bool isServer)
+        {
+            IsServer = isServer;
+            IsSpawned = true;
+            m_Phase = netId % 5 * 0.8f;
+            float w = Width;
             EmitterA.localPosition = new Vector3(-w / 2f, 0, 0);
             EmitterB.localPosition = new Vector3(w / 2f, 0, 0);
             foreach (var b in Beams) b.localScale = new Vector3(w, BeamThickness, BeamThickness);
@@ -102,16 +113,16 @@ namespace Stealth.Enemies
         {
             if (!IsSpawned) return;
             bool on = BeamsOn;
-            bool visible = on || Pattern.Value == LaserPattern.Blinking && BlinkWarning(CycleTime, OnTime, OffTime);
+            bool visible = on || Pattern == LaserPattern.Blinking && BlinkWarning(CycleTime, OnTime, OffTime);
             var heights = Heights;
             for (int i = 0; i < Beams.Length && i < heights.Length; i++)
             {
                 Beams[i].gameObject.SetActive(visible);
-                if (Pattern.Value == LaserPattern.Moving) Beams[i].localPosition = new Vector3(0, heights[i], 0);
+                if (Pattern == LaserPattern.Moving) Beams[i].localPosition = new Vector3(0, heights[i], 0);
             }
 
             if (!IsServer || !on) return;
-            float half = Width.Value / 2f;
+            float half = Width / 2f;
             foreach (var p in PlayerController.All)
             {
                 if (p.IsDown) continue;

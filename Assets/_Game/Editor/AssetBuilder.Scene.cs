@@ -24,10 +24,11 @@ namespace Stealth.EditorTools
                 var root = new GameObject("Session");
                 root.AddComponent<NetworkObject>();
                 var gm = root.AddComponent<GameManager>();
+                root.AddComponent<GameManagerNet>();
                 gm.Art = art;
-                gm.ItemPrefab = actors.Item.GetComponent<NetworkObject>();
-                gm.RobotPrefabs = actors.Robots.Select(r => r != null ? r.GetComponent<NetworkObject>() : null).ToArray();
-                gm.LaserPrefab = actors.Laser.GetComponent<NetworkObject>();
+                gm.ItemPrefab = actors.Item;
+                gm.RobotPrefabs = actors.Robots.ToArray();
+                gm.LaserPrefab = actors.Laser;
                 return root;
             });
 

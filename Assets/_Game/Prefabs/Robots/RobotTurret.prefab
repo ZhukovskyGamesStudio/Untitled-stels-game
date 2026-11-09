@@ -464,6 +464,7 @@ GameObject:
   - component: {fileID: 6760735211495968422}
   - component: {fileID: 9198125268428253982}
   - component: {fileID: 5149516450588291596}
+  - component: {fileID: 3365102079115672202}
   m_Layer: 0
   m_Name: RobotTurret
   m_TagString: Untagged
@@ -568,7 +569,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d6dc30e27f675904cbdf8efe957b77ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.SentryTurret
-  ShowTopMostFoldoutHeaderGroup: 1
   Kind: 5
   Point: {fileID: 4779294876408871470}
   Status:
@@ -586,6 +586,19 @@ MonoBehaviour:
   SweepPeriod: 7
   LockTime: 1.1
   Cooldown: 2.5
+--- !u!114 &3365102079115672202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3968179035194901836}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6480c019e82ee94a8f740aa149e2a12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Net::Stealth.Net.DetectorNet
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &4277751523003579964
 GameObject:
   m_ObjectHideFlags: 0
