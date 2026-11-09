@@ -432,7 +432,7 @@ namespace Stealth.Level
                 var spot = doors[idx];
                 doors.RemoveAt(idx);
                 if ((spot.Position - l.HatchPosition).magnitude < Cell * 0.75f) continue; // keep the lobby doorways free
-                spot.Kind = rng.Next(2);
+                spot.Kind = rng.Next(level >= 2 ? 3 : 2); // moving beams from the third house on
                 l.LaserSpots.Add(spot);
             }
             // Sliding doors in some of the remaining doorways (never together with a laser).

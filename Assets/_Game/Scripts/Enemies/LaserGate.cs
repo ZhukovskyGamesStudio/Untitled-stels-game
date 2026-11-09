@@ -31,7 +31,25 @@ namespace Stealth.Enemies
         readonly Dictionary<ulong, float> m_HitCooldown = new();
         float m_Phase;
 
-        float[] Heights => Kind.Value == 0 ? LowBeam : Blinking;
+        static readonly float[] Moving = { 0.8f };
+        public const float MovePeriod = 3.2f;
+
+        /// <summary>Kind 2: one beam sliding between 0.25 m (jump over) and 1.6 m (crouch under).</summary>
+        public static float MovingHeight(float t, float phase = 0f) =>
+            0.25f + 1.35f * (0.5f + 0.5f * Mathf.Sin((t + phase) * Mathf.PI * 2f / MovePeriod));
+
+        float[] m_Current = new float[1];
+
+        float[] Heights
+        {
+            get
+            {
+                if (Kind.Value == 0) return LowBeam;
+                if (Kind.Value == 1) return Blinking;
+                m_Current[0] = MovingHeight(NetworkManager.ServerTime.TimeAsFloat, m_Phase);
+                return m_Current;
+            }
+        }
 
         public override void OnNetworkSpawn()
         {
@@ -58,7 +76,7 @@ namespace Stealth.Enemies
         {
             get
             {
-                if (Kind.Value == 0) return true;
+                if (Kind.Value != 1) return true;
                 float t = Mathf.Repeat(NetworkManager.ServerTime.TimeAsFloat + m_Phase, OnTime + OffTime);
                 return t < OnTime;
             }
@@ -76,6 +94,8 @@ namespace Stealth.Enemies
                 warn = t > OnTime + OffTime - 0.45f && Mathf.Repeat(t * 12f, 1f) < 0.5f;
             }
             foreach (var b in m_Beams) b.SetActive(on || warn);
+            if (Kind.Value == 2 && m_Beams.Count > 0)
+                m_Beams[0].transform.localPosition = new Vector3(0, Heights[0], 0);
 
             if (!IsServer || !on) return;
             float half = Width.Value / 2f;

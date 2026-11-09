@@ -205,5 +205,25 @@ namespace Stealth.Game
                 yield return Shot("hunter");
             }
         }
+
+        /// <summary>The three laser gate kinds side by side (static low beam, blinking, moving).</summary>
+        IEnumerator LasersScenario()
+        {
+            var gm = GameManager.Instance;
+            var hatch = LevelGenerator.Current.HatchPosition;
+            for (int k = 0; k < 3; k++)
+            {
+                var obj = Instantiate(gm.LaserPrefab, hatch + new Vector3(-2.5f + k * 2.5f, 0, 3f), Quaternion.identity);
+                var gate = obj.GetComponent<LaserGate>();
+                gate.Kind.Value = (byte)k;
+                gate.Width.Value = 1.8f;
+                obj.Spawn(true);
+            }
+            LookAtFrom(new Pose(hatch + new Vector3(0, 0.05f, -1.5f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(0, 0.8f, 3f));
+            yield return new WaitForSeconds(0.8f);
+            yield return Shot("lasers_a");
+            yield return new WaitForSeconds(1.6f);
+            yield return Shot("lasers_b");
+        }
     }
 }

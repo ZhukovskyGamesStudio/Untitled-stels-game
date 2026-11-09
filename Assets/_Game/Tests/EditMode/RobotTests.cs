@@ -105,6 +105,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void MovingLaserSweepsBetweenJumpAndCrouchHeights()
+        {
+            float min = 10f, max = 0f;
+            for (float t = 0; t < LaserGate.MovePeriod; t += 0.01f)
+            {
+                float h = LaserGate.MovingHeight(t);
+                min = Mathf.Min(min, h);
+                max = Mathf.Max(max, h);
+            }
+            Assert.Less(min, 0.3f, "low enough to jump over (jump ~0.9 m)");
+            Assert.Greater(max, 1.5f, "high enough to crouch under (crouched 1.1 m)");
+            Assert.AreEqual(LaserGate.MovingHeight(0.3f), LaserGate.MovingHeight(0.3f + LaserGate.MovePeriod), 1e-4f);
+        }
+
+        [Test]
         public void SeismicFeelsWalkersButNotSneakers()
         {
             var sensor = new Vector3(0, 0, 0);
