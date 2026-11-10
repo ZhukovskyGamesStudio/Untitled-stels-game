@@ -275,6 +275,13 @@ namespace Stealth.EditorTools
             return light;
         }
 
+        /// <summary>Legs cut at the knee (AccentLeg{n}Upper / Lower) walk by inverse kinematics.</summary>
+        static void WalkingLegs(GameObject root, GameObject model)
+        {
+            var legs = root.AddComponent<ProceduralLegs>();
+            if (!ProceduralLegs.Bake(root.transform, model.transform, legs)) Object.DestroyImmediate(legs);
+        }
+
         /// <summary>Navmesh robot: NetworkObject + server NetworkTransform + NavMeshAgent + RobotController + animator.</summary>
         static GameObject MobileRobot(string name, string file, string bodyMat, float radius, Vector3 eyePos, RadioRipple ripple,
             Action<RobotSenses, RobotTraits, AnimationSettings> config)
@@ -285,6 +292,7 @@ namespace Stealth.EditorTools
             Paint(model, bodyMat, "RobotAccent", "SensorGlow");
             var b = LocalBounds(root);
             RobotAnimator.BakePivots(model.transform);
+            WalkingLegs(root, model);
 
             var col = root.AddComponent<CapsuleCollider>();
             col.height = Mathf.Max(b.size.y, radius * 2f);
@@ -362,6 +370,7 @@ namespace Stealth.EditorTools
             Paint(model, bodyMat, "RobotAccent", "SensorGlow");
             var b = LocalBounds(root);
             RobotAnimator.BakePivots(model.transform);
+            WalkingLegs(root, model);
             var col = root.AddComponent<BoxCollider>();
             col.center = b.center;
             col.size = b.size;

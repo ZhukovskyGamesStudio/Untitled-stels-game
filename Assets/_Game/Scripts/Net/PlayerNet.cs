@@ -17,6 +17,7 @@ namespace Stealth.Net
     {
         readonly NetworkVariable<int> m_Hp = new(HealthState.MaxHp);
         readonly NetworkVariable<bool> m_Downed = new();
+        readonly NetworkVariable<bool> m_InHatch = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -36,6 +37,7 @@ namespace Stealth.Net
             m_Player.Bind(this, OwnerClientId, IsOwner, IsServer);
             m_Hp.OnValueChanged += (_, _) => Pull();
             m_Downed.OnValueChanged += (_, _) => Pull();
+            m_InHatch.OnValueChanged += (_, _) => Pull();
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
@@ -56,6 +58,7 @@ namespace Stealth.Net
             {
                 NetSync.Set(m_Hp, m_Player.Hp);
                 NetSync.Set(m_Downed, m_Player.Downed);
+                NetSync.Set(m_InHatch, m_Player.InHatch);
             }
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
@@ -67,7 +70,7 @@ namespace Stealth.Net
 
         void Pull()
         {
-            if (!IsServer) m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value);
+            if (!IsServer) m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value);
             if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString());
         }
 
@@ -88,6 +91,18 @@ namespace Stealth.Net
         public void SendHack(Detector target) => HackRpc(target.GetComponent<NetworkObject>());
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedbackRpc(awayFromSource);
         public void SendPing(Vector3 position) => PingRpc(position);
+        public void SendHatch(bool hide) => HatchRpc(hide);
+        public void SendUnlockDoor(int door) => UnlockDoorRpc(door);
+        public void SendOpenSafe(int safe) => OpenSafeRpc(safe);
+
+        [Rpc(SendTo.Server)]
+        void HatchRpc(bool hide) => m_Player.OnHatchRequest(hide);
+
+        [Rpc(SendTo.Server)]
+        void UnlockDoorRpc(int door) => GameManager.Instance?.UnlockDoorServer(m_Player, door);
+
+        [Rpc(SendTo.Server)]
+        void OpenSafeRpc(int safe) => GameManager.Instance?.OpenSafeServer(m_Player, safe);
         public void SendMark(Detector target) => MarkRpc(target.GetComponent<NetworkObject>());
 
         [Rpc(SendTo.Server)]

@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Stealth.Game
 {
-    public enum RunPhase : byte { Playing, Failed }
+    /// <summary>In a house · the run is over · in the sewer between houses (sell, pay the quota, vote for the next house).</summary>
+    public enum RunPhase : byte { Playing, Failed, Sewer }
 
     /// <summary>Which house the team is in: every peer generates the same building from it.</summary>
     public struct LevelInfo : IEquatable<LevelInfo>
@@ -12,7 +14,12 @@ namespace Stealth.Game
         public int Index;
         /// <summary>Team size the house was generated for: every peer must build the same house.</summary>
         public int Players;
-        public bool Equals(LevelInfo other) => Seed == other.Seed && Index == other.Index && Players == other.Players;
+        /// <summary>Row of the house in its column of the route (<see cref="RunMap"/>).</summary>
+        public int Lane;
+        /// <summary>The seed of the whole run: every peer draws the same route from it.</summary>
+        public int RunSeed;
+        public bool Equals(LevelInfo other) =>
+            Seed == other.Seed && Index == other.Index && Players == other.Players && Lane == other.Lane && RunSeed == other.RunSeed;
     }
 
     /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, hunters.</summary>
@@ -30,6 +37,12 @@ namespace Stealth.Game
         public float[] QuotaByPlayers = { 1f, 1.1f, 1.18f, 1.25f };
         [Tooltip("Quota increase per teammate left down at the end of the previous house.")]
         public float DeathPenalty = 0.15f;
+
+        [Header("Leaving a house")]
+        [Tooltip("Seconds from the moment the whole team is hiding in the hatch to the sewer (anyone can climb back out).")]
+        public float HatchCountdown = 5f;
+        [Tooltip("Seconds the result of the vote for the next house is shown before the team goes.")]
+        public float VoteDelay = 3f;
 
         [Header("Alarms")]
         [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]
@@ -159,17 +172,44 @@ namespace Stealth.Game
 
         public enum Exit { Ignored, Failed, NextLevel }
 
-        /// <summary>The team leaves through the hatch with <paramref name="playersDown"/> teammates down.</summary>
-        public Exit Leave(int playersDown)
+        /// <summary>
+        /// The team has hidden in the hatch and goes down into the sewer, leaving <paramref name="playersDown"/> knocked-out
+        /// teammates behind (each one raises the next quota). The house's quota can still be paid there.
+        /// </summary>
+        public bool EnterSewer(int playersDown)
         {
-            if (Phase != RunPhase.Playing) return Exit.Ignored;
-            if (!QuotaMet)
-            {
-                Phase = RunPhase.Failed;
-                return Exit.Failed;
-            }
+            if (Phase != RunPhase.Playing) return false;
             Penalties = playersDown;
-            return Exit.NextLevel;
+            Phase = RunPhase.Sewer;
+            AlarmUntil = 0;
+            return true;
+        }
+
+        /// <summary>The team goes on to the house it voted for: only with the quota paid, otherwise the run ends here.</summary>
+        public Exit Advance()
+        {
+            if (Phase != RunPhase.Sewer) return Exit.Ignored;
+            if (QuotaMet) return Exit.NextLevel;
+            Phase = RunPhase.Failed;
+            return Exit.Failed;
+        }
+
+        /// <summary>Can the team trade (sell, use the stash) now: in a house at the hatch, or in the sewer.</summary>
+        public bool CanTrade => Phase == RunPhase.Playing || Phase == RunPhase.Sewer;
+
+        /// <summary>
+        /// The team may leave the house: at least one player hides in the hatch and every other one either hides too or
+        /// is knocked out (lying with no HP — they stay behind). Pure.
+        /// </summary>
+        public static bool TeamInHatch(IEnumerable<(bool inHatch, bool knockedOut)> players)
+        {
+            bool someone = false;
+            foreach (var (inHatch, knockedOut) in players)
+            {
+                if (inHatch) { someone = true; continue; }
+                if (!knockedOut) return false;
+            }
+            return someone;
         }
 
         /// <summary>Everybody is down: the run is over.</summary>

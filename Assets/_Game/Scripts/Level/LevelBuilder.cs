@@ -111,16 +111,23 @@ namespace Stealth.Level
                 BuildLights(f);
             }
             foreach (var s in l.Stairs) BuildStair(s);
-            foreach (var d in l.AutoDoors) Place(m_Art.AutoDoor, "AutoDoor", d.position, d.rotation);
+            for (int i = 0; i < l.AutoDoors.Count; i++)
+            {
+                var d = l.AutoDoors[i];
+                var door = Place(m_Art.AutoDoor, "AutoDoor", d.position, d.rotation).GetComponent<AutoDoor>();
+                if (door != null) door.Configure(i, l.LockedDoors.Contains(i));
+            }
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
 
-            foreach (var p in l.Props)
+            for (int i = 0; i < l.Props.Count; i++)
             {
+                var p = l.Props[i];
                 var prefab = m_Art.Prop(p.Kind);
                 if (prefab == null) continue;
                 var go = Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
                 RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
+                if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
                 Props.Add(go);
             }
             return root;

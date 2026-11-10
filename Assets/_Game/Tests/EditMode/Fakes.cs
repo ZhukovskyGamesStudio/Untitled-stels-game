@@ -80,6 +80,11 @@ namespace Stealth.Tests
         public readonly List<Detector> Marks = new();
         public void SendPing(Vector3 position) => Pings.Add(position);
         public void SendMark(Detector target) => Marks.Add(target);
+        public readonly List<bool> Hatch = new();
+        public readonly List<int> Doors = new(), Safes = new();
+        public void SendHatch(bool hide) => Hatch.Add(hide);
+        public void SendUnlockDoor(int door) => Doors.Add(door);
+        public void SendOpenSafe(int safe) => Safes.Add(safe);
     }
 
     /// <summary>Stands in for the inventory's network twin.</summary>

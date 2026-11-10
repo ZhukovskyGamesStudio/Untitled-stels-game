@@ -69,6 +69,8 @@ namespace Stealth.Level
         public readonly List<Pose> CameraSpots = new();
         public readonly List<LaserSpot> LaserSpots = new();
         public readonly List<Pose> AutoDoors = new(); // sliding doors in doorways (local X along the wall)
+        /// <summary>Indices into <see cref="AutoDoors"/> that are locked: players hack them open, robots pass.</summary>
+        public readonly HashSet<int> LockedDoors = new();
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;

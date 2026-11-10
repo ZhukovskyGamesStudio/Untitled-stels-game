@@ -99,12 +99,23 @@ namespace Stealth.EditorTools
         static GameObject Prefab(string path, Func<GameObject> build)
         {
             var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null && !s_Force) return existing;
+            if (existing != null && !s_Force && !Rebuild(path)) return existing;
             EnsureFolder(Path.GetDirectoryName(path)!.Replace('\\', '/'));
             var go = build();
             var prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
             Object.DestroyImmediate(go);
             return prefab;
+        }
+
+        /// <summary>REBUILD=AutoDoor,Safe rebuilds just these prefabs (by file name) from code, keeping their GUIDs.</summary>
+        static bool Rebuild(string path)
+        {
+            var list = Environment.GetEnvironmentVariable("REBUILD");
+            if (string.IsNullOrEmpty(list)) return false;
+            var name = Path.GetFileNameWithoutExtension(path);
+            foreach (var n in list.Split(','))
+                if (n.Trim() == name) return true;
+            return false;
         }
 
         /// <summary>Loads or creates a ScriptableObject; <paramref name="fill"/> runs on creation and in overwrite mode.</summary>

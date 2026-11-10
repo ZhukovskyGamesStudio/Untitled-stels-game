@@ -53,6 +53,10 @@ namespace Stealth.Level
         public float VentChance = 0.35f;
         [Tooltip("Chance of a sliding door in a doorway without a laser.")]
         public float AutoDoorChance = 0.45f;
+        [Tooltip("Chance that a sliding door is locked: players must hack it (robots have the key).")]
+        public float LockedDoorChance = 0.35f;
+        [Tooltip("House (0-based) from which doors can be locked.")]
+        public int LockedDoorsFromHouse = 1;
 
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
@@ -702,6 +706,15 @@ namespace Stealth.Level
             // Sliding doors in some of the remaining doorways (never together with a laser).
             foreach (var d in doors)
                 if (rng.NextDouble() < b.AutoDoorChance) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+
+            // Some of them are locked (own stream: the rest of the house does not shift). Never next to the lobby.
+            if (level < b.LockedDoorsFromHouse) return;
+            var locks = new System.Random(LevelRandom.Mix(l.Seed, 0x10C4, 0));
+            for (int i = 0; i < l.AutoDoors.Count; i++)
+            {
+                bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < Cell * 0.75f;
+                if (locks.NextDouble() < b.LockedDoorChance && !lobby) l.LockedDoors.Add(i);
+            }
         }
     }
 }

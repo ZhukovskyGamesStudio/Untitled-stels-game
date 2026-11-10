@@ -118,7 +118,7 @@ namespace Stealth.Tests
             m_Player = Spawn("Player/Player.prefab", Vector3.zero);
             var p = m_Player.GetComponent<PlayerController>();
             p.Bind(new FakePlayerLink(), 4, isOwner: false, isServer: false);
-            p.ApplyServerState(1, false);
+            p.ApplyServerState(1, false, false);
             p.ApplyOwnerState(true, -20, "Саша");
             Assert.AreEqual(1, p.Hp);
             Assert.IsTrue(p.IsCrouching);

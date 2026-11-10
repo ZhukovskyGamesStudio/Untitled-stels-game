@@ -32,14 +32,38 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void LeavingWithoutTheQuotaEndsTheRun()
+        public void GoingOnWithoutTheQuotaEndsTheRunInTheSewer()
         {
             var run = new RunState();
             run.BeginLevel(0, 1000);
             run.Deposit(10);
-            Assert.AreEqual(RunState.Exit.Failed, run.Leave(0));
+            Assert.IsTrue(run.EnterSewer(0), "leaving a house is always possible");
+            Assert.AreEqual(RunPhase.Sewer, run.Phase);
+            Assert.IsTrue(run.CanTrade, "the rest can be sold down there");
+            Assert.AreEqual(RunState.Exit.Failed, run.Advance());
             Assert.AreEqual(RunPhase.Failed, run.Phase);
-            Assert.AreEqual(RunState.Exit.Ignored, run.Leave(0), "nothing happens after the end");
+            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(), "nothing happens after the end");
+            Assert.IsFalse(run.EnterSewer(0));
+        }
+
+        [Test]
+        public void TheQuotaCanBePaidInTheSewer()
+        {
+            var run = new RunState();
+            run.BeginLevel(0, 1000);
+            run.EnterSewer(0);
+            run.Deposit(run.Quota);
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+        }
+
+        [Test]
+        public void TheTeamLeavesWhenEveryoneWhoCanIsInTheHatch()
+        {
+            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, false), (true, false) }));
+            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, false), (false, false) }), "one is still upstairs");
+            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, false), (false, true) }), "the knocked-out one stays behind");
+            Assert.IsFalse(RunState.TeamInHatch(new[] { (false, true), (false, true) }), "nobody is in the hatch");
+            Assert.IsFalse(RunState.TeamInHatch(new (bool, bool)[0]));
         }
 
         [Test]
@@ -48,7 +72,8 @@ namespace Stealth.Tests
             var run = new RunState();
             run.BeginLevel(0, 1000);
             run.Deposit(run.Quota);
-            Assert.AreEqual(RunState.Exit.NextLevel, run.Leave(2));
+            run.EnterSewer(2);
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
             run.BeginLevel(1, 1000);
             Assert.AreEqual(RunState.QuotaFor(1000, 1, 2), run.Quota);
             Assert.Greater(run.Quota, RunState.QuotaFor(1000, 1, 0));

@@ -17,6 +17,14 @@ namespace Stealth.UI
         public float HackSeconds;
         public bool BlockedByCeiling;
         public bool Playing, NearHatch;
+        /// <summary>At the stash board (the hatch of a house or the board in the sewer).</summary>
+        public bool NearTrade;
+        public bool InHatch, InSewer;
+        /// <summary>A locked door in reach and how far its hack is (0..1).</summary>
+        public bool LockedDoor;
+        public float DoorProgress;
+        /// <summary>A closed safe in reach / turning a safe's dial now.</summary>
+        public bool SafeNear, Cracking;
         public int CarriedItems, Collected, Quota;
         /// <summary>Robot / device in the crosshair: "name: senses", null if none.</summary>
         public string LookedAt;
@@ -26,7 +34,8 @@ namespace Stealth.UI
 
     /// <summary>
     /// Which single hint to show under the crosshair (pure, unit tested). Higher priority wins:
-    /// revive 100 · cannot stand 80 · hack 70 · deposit 60 · next house 55 · take item 50 · robot info 45 · leave early 40.
+    /// out of the hatch 90 · revive 100 · cannot stand 80 · hack 70 · door 68 · safe 66 · deposit 60 · hatch 55 · take item 50 ·
+    /// robot info 45 · route map in the sewer 30.
     /// </summary>
     public static class PromptRules
     {
@@ -34,25 +43,30 @@ namespace Stealth.UI
 
         /// <summary>What a player lying on the floor reads.</summary>
         public static string DownedText(int hp, bool canGetUp) =>
-            hp <= 0 ? $"Без сознания. Союзник может поднять тебя ({Controls.Label(GameAction.Interact)} рядом)"
-            : canGetUp ? $"Ты на полу. Лежачих роботы не трогают — дождись, пока уйдут. {Controls.Label(GameAction.Jump)} — встать"
+            hp <= 0 ? $"Без сознания\nСоюзник может поднять тебя ({Controls.Label(GameAction.Interact)} рядом)"
+            : canGetUp ? $"Ты на полу\nЛежачих роботы не трогают — дождись, пока уйдут\n{Controls.Label(GameAction.Jump)} — встать"
             : "Сбит с ног!";
 
         public static Prompt Choose(in PromptContext c)
         {
             s_Prompts.Clear();
-            if (c.Downed || c.MenuOpen) return default;
-            string use = Controls.Label(GameAction.Interact), hatch = Controls.Label(GameAction.Hatch);
+            if (c.Downed || c.MenuOpen || c.Cracking) return default;
+            string hatch = Controls.Label(GameAction.Hatch);
+            if (c.InHatch) return new Prompt(90, hatch, "Вылезти из люка");
+            string use = Controls.Label(GameAction.Interact);
             if (c.CanRevive) s_Prompts.Add(new Prompt(100, use, "Удерживай — поднять союзника", c.ReviveProgress));
             if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, use, $"Удерживай — взломать: {c.HackTarget} ({c.HackSeconds:0} с)", c.HackProgress));
             if (c.BlockedByCeiling) s_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
+            if (c.LockedDoor) s_Prompts.Add(new Prompt(68, use, "Удерживай — взломать замок двери", c.DoorProgress));
+            if (c.SafeNear) s_Prompts.Add(new Prompt(66, use, "Вскрыть сейф: подобрать код на слух"));
+            // With the cursor out the board speaks for itself.
+            if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)
+                s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), "Разложить добычу: на склад или в «Продать»"));
             if (c.Playing && c.NearHatch)
-            {
-                // With the cursor out the board above the hatch speaks for itself.
-                if (c.CarriedItems > 0) { if (!c.CursorMode) s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), "Разложить добычу: на склад над люком или в «Продать»")); }
-                else if (c.Collected >= c.Quota) s_Prompts.Add(new Prompt(55, hatch, "Следующий дом"));
-                else s_Prompts.Add(new Prompt(40, hatch, $"Уйти, не набрав квоту ({c.Collected}/{c.Quota})"));
-            }
+                s_Prompts.Add(new Prompt(55, hatch, c.Collected >= c.Quota
+                    ? "Спрятаться в люк — уйти в канализацию"
+                    : $"Спрятаться в люк ({c.Collected}/{c.Quota}: квоту можно доплатить внизу)"));
+            if (c.InSewer) s_Prompts.Add(new Prompt(30, Controls.Label(GameAction.Map), "Карта маршрута: голосовать за следующий дом"));
             if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
             if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));
             return UiMath.Choose(s_Prompts);

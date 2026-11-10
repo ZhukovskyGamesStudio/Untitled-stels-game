@@ -31,7 +31,8 @@ def spider():
         side = 1 if i < 4 else -1
         k = i % 4
         y = 0.25 - k * 0.17
-        merge(f"AccentLeg{i}", [box((0.55, 0.05, 0.05), (side * 0.38, y, 0.25)), box((0.05, 0.05, 0.3), (side * 0.65, y, 0.1))])
+        # femur out from the body, shin down to the surface: the knee is the corner (ProceduralLegs bends it)
+        g.leg(f"AccentLeg{i}", [box((0.55, 0.05, 0.05), (side * 0.38, y, 0.25)), box((0.05, 0.05, 0.3), (side * 0.65, y, 0.1))], 0.15)
     merge("Eye", [sphere(0.05, (dx, -0.43, 0.22 + dz), segments=8) for dx, dz in [(-0.06, 0.03), (0.06, 0.03), (-0.1, -0.03), (0.1, -0.03)]])
     export("robot_spider")
 
@@ -66,7 +67,7 @@ def hound():
     """Quadruped with a long sniffing snout."""
     merge("Body", [box((0.4, 1.0, 0.35), (0, 0, 0.75)), box((0.3, 0.35, 0.3), (0, -0.6, 0.95))])
     for i, (x, y) in enumerate([(0.15, -0.35), (-0.15, -0.35), (0.15, 0.35), (-0.15, 0.35)]):
-        merge(f"AccentLeg{i}", [box((0.09, 0.09, 0.6), (x, y, 0.3))])
+        g.leg(f"AccentLeg{i}", [box((0.09, 0.09, 0.6), (x, y, 0.3))], 0.3)
     merge("Eye", [cylinder(0.08, 0.4, (0, -0.95, 0.9), axis="Y", radius2=0.03)])
     export("robot_hound")
 

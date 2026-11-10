@@ -28,6 +28,8 @@ namespace Stealth.Game
             m_Scenarios["fog"] = FogScenario;
             m_Scenarios["styles"] = StylesScenario;
             m_Scenarios["map"] = MapScenario;
+            m_Scenarios["sewer"] = SewerScenario;
+            m_Scenarios["legs"] = LegsScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

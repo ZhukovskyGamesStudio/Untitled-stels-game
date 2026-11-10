@@ -30,6 +30,8 @@ namespace Stealth.Level
         public GameObject Window;
         [Tooltip("Green exit sign over every door, with a small light: the only light in a dark room besides the lamps.")]
         public GameObject ExitSign;
+        [Tooltip("The sewer between houses: the team sells, pays the quota and votes for the next house there.")]
+        public GameObject Sewer;
 
         [Header("Props")]
         public GameObject Desk;

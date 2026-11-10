@@ -50,6 +50,8 @@ namespace Stealth.Player
         public int Hp { get; private set; } = HealthState.MaxHp;
         /// <summary>Server-owned.</summary>
         public bool Downed { get; private set; }
+        /// <summary>Server-owned: hiding in the hatch (robots do not see you; when the whole team is in, it leaves the house).</summary>
+        public bool InHatch { get; private set; }
         /// <summary>Owner-owned.</summary>
         public bool Crouching { get; private set; }
         /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
@@ -102,7 +104,7 @@ namespace Stealth.Player
 
         public Vector3 Position => transform.position;
         public bool IsCrouching => Crouching;
-        public bool IsDown => !IsSpawned || Downed;
+        public bool IsDown => !IsSpawned || Downed || InHatch;
         /// <summary>Lying with no HP: only a teammate can lift you (lying with HP left you get up yourself).</summary>
         public bool KnockedOut => Downed && Hp == 0;
         /// <summary>Owner: lying with HP left long enough to get up (Space).</summary>
@@ -183,11 +185,12 @@ namespace Stealth.Player
         }
 
         /// <summary>Client: health as decided by the server.</summary>
-        public void ApplyServerState(int hp, bool downed)
+        public void ApplyServerState(int hp, bool downed, bool inHatch)
         {
             if (downed && !Downed) m_DownedSince = Time.time;
             Hp = hp;
             Downed = downed;
+            InHatch = inHatch;
         }
 
         /// <summary>Other peers: what the owner reports.</summary>
@@ -226,13 +229,15 @@ namespace Stealth.Player
             bool menu = GameMenu.IsOpen;
             if (Keyboard.current == null) return;
 
-            CursorMode = !menu && !Downed && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
-            bool freeCursor = menu || CursorMode;
+            bool cracking = Cracking != null;
+            CursorMode = !menu && !Downed && !InHatch && !cracking && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
+            bool freeCursor = menu || CursorMode || ScreenWantsCursor;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
-            var input = DevFlags.Autopilot ?? PlayerInputState.FromDevices(!freeCursor);
-            Motor.Tick(input, !menu && !Downed, Downed, Head, Camera, Time.deltaTime);
+            // Hiding in the hatch or turning a safe's dial: the player stays put (the mouse turns the dial).
+            var input = DevFlags.Autopilot ?? PlayerInputState.FromDevices(!freeCursor && !cracking);
+            Motor.Tick(input, !menu && !Downed && !InHatch && !cracking, Downed, Head, Camera, Time.deltaTime);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
 
@@ -260,6 +265,7 @@ namespace Stealth.Player
         void UpdateModelPose()
         {
             if (Model == null) return;
+            if (Model.gameObject.activeSelf == InHatch) Model.gameObject.SetActive(!InHatch); // down in the hatch
             float y = Downed ? 0.35f : (Crouching ? 0.65f : 1f);
             Model.localScale = new Vector3(1f, Mathf.MoveTowards(Model.localScale.y, y, Time.deltaTime * 4f), 1f);
             if (IsOwner || Time.deltaTime <= 0f) return;
@@ -290,8 +296,22 @@ namespace Stealth.Player
             if (Mathf.Abs(pitch - LookPitch) >= 2) LookPitch = pitch;
         }
 
+        /// <summary>Set by a screen that needs the mouse (the route map in the sewer).</summary>
+        public static bool ScreenWantsCursor { get; set; }
+
+        SewerLocation m_PlacedSewer;
+
         void PlaceOnLevelIfNeeded()
         {
+            var sewer = SewerLocation.Active;
+            if (sewer != null && sewer != m_PlacedSewer)
+            {
+                m_PlacedSewer = sewer;
+                TeleportOwner(sewer.SpawnFor(PlayerLooks.SlotOf(ClientId)), sewer.transform.rotation);
+                Motor.SetPitch(0f);
+                Cracking = null;
+                return;
+            }
             var layout = ActiveLevel.Layout;
             if (layout == null || layout.Seed == m_PlacedSeed || layout.PlayerSpawns.Count == 0) return;
             m_PlacedSeed = layout.Seed;
@@ -385,10 +405,121 @@ namespace Stealth.Player
             }
             else HackProgress = 0;
 
+            // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
+            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position) : null;
+            if (DoorTarget != null && holdE)
+            {
+                DoorProgress += Time.deltaTime;
+                if (DoorProgress >= m_Interaction.DoorHackTime)
+                {
+                    if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
+                    else GameManager.Instance?.UnlockDoorServer(this, DoorTarget.Index);
+                    DoorProgress = 0;
+                }
+            }
+            else DoorProgress = 0;
+
+            UpdateSafe();
+
             var gm = GameManager.Instance;
-            if (gm == null) return;
-            if (Controls.Pressed(GameAction.Hatch) && Hatch.IsNear(transform.position) && gm.Phase == RunPhase.Playing)
-                gm.RequestFinishLevel();
+            if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
+            // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
+            if (InHatch) SetHatch(false);
+            else if (Hatch.IsNear(transform.position)) SetHatch(true);
+        }
+
+        /// <summary>Owner: hide in the hatch or climb out (also a test hook).</summary>
+        public void SetHatch(bool hide)
+        {
+            if (m_Link != null) m_Link.SendHatch(hide);
+            else OnHatchRequest(hide);
+        }
+
+        /// <summary>Locked door in reach (hold E to hack), or null.</summary>
+        public AutoDoor DoorTarget { get; private set; }
+        public float DoorProgress { get; private set; }
+        public float DoorShare => DoorProgress / m_Interaction.DoorHackTime;
+
+        // ------------------------------------------------------------------ safes
+
+        /// <summary>Owner: the dial being turned (null when not cracking a safe).</summary>
+        public Items.SafeLock Cracking { get; private set; }
+        public Items.SafeBox CrackingSafe { get; private set; }
+        /// <summary>Owner: a closed safe in reach (press E to start), null if none.</summary>
+        public Items.SafeBox SafeTarget { get; private set; }
+        /// <summary>Owner: the last try on the dial and when (for the minigame's feedback).</summary>
+        public Items.SafeLock.Result LastTry { get; private set; }
+        public float LastTryTime { get; private set; } = -10f;
+        int m_CrackStartFrame;
+
+        /// <summary>Test hook: start cracking this safe as if E was pressed next to it.</summary>
+        public void StartCrackForTest(Items.SafeBox safe)
+        {
+            Cracking = new Items.SafeLock(safe.Seed, Tuning.Items.Safes);
+            CrackingSafe = safe;
+            m_CrackStartFrame = Time.frameCount;
+        }
+
+        void UpdateSafe()
+        {
+            SafeTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null ? Items.SafeBox.ClosedNear(transform.position) : null;
+            if (Cracking == null)
+            {
+                if (SafeTarget == null || !Controls.Pressed(GameAction.Interact) || CursorMode) return;
+                var settings = Tuning.Items.Safes;
+                Cracking = new Items.SafeLock(SafeTarget.Seed, settings);
+                Cracking.SetDial(new System.Random(SafeTarget.Seed ^ Time.frameCount).Next(settings.DialSize));
+                CrackingSafe = SafeTarget;
+                m_CrackStartFrame = Time.frameCount;
+                LastTry = Items.SafeLock.Result.Nothing;
+                return;
+            }
+            var safe = CrackingSafe;
+            bool away = safe == null || safe.Opened || (safe.transform.position - transform.position).magnitude > Items.SafeBox.Reach + 0.6f;
+            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
+            {
+                Cracking = null;
+                CrackingSafe = null;
+                return;
+            }
+            var mouse = Mouse.current;
+            if (mouse != null)
+            {
+                int ticks = Cracking.Turn(mouse.delta.ReadValue().x);
+                if (ticks > 0)
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, safe.transform.position + Vector3.up, 0.15f + 0.85f * Cracking.Closeness(), Audio.Sfx.Group.Items,
+                        0.8f + 0.5f * Cracking.Closeness());
+            }
+            bool tryNow = Time.frameCount != m_CrackStartFrame &&
+                          (Controls.Pressed(GameAction.Interact) || (mouse != null && mouse.leftButton.wasPressedThisFrame));
+            if (tryNow) TryDial();
+        }
+
+        /// <summary>Owner: try the number under the pointer (LMB / E; also a test hook).</summary>
+        public void TryDial()
+        {
+            var safe = CrackingSafe;
+            if (Cracking == null || safe == null) return;
+            LastTry = Cracking.Try();
+            LastTryTime = Time.time;
+            switch (LastTry)
+            {
+                case Items.SafeLock.Result.Wrong:
+                    // A loud clank: robots with ears may come.
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Drop, safe.transform.position + Vector3.up, 1f, Audio.Sfx.Group.Items, 0.6f);
+                    EmitNoise(Tuning.Items.Safes.WrongNoise);
+                    break;
+                case Items.SafeLock.Result.Digit:
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Pickup, safe.transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items, 1.3f);
+                    break;
+                case Items.SafeLock.Result.Opened:
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Stash, safe.transform.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
+                    if (m_Link != null) m_Link.SendOpenSafe(safe.Index);
+                    else GameManager.Instance?.OpenSafeServer(this, safe.Index);
+                    Cracking = null;
+                    CrackingSafe = null;
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------ callouts: pings and marks
@@ -455,6 +586,18 @@ namespace Stealth.Player
             return best;
         }
 
+        /// <summary>Server: the owner hides in the hatch or climbs out of it.</summary>
+        public void OnHatchRequest(bool hide)
+        {
+            var gm = GameManager.Instance;
+            if (!hide) { InHatch = false; return; }
+            if (Downed || gm == null || gm.Phase != RunPhase.Playing || !Hatch.IsNear(transform.position)) return;
+            InHatch = true;
+        }
+
+        /// <summary>Server: the team left the house (or a new one starts).</summary>
+        public void LeaveHatchServer() => InHatch = false;
+
         /// <summary>Server: the owner pinged a spot.</summary>
         public void OnPingRequest(Vector3 position)
         {
@@ -508,6 +651,7 @@ namespace Stealth.Player
         public void ResetForLevelServer()
         {
             m_Health = HealthState.Full(Time.time, m_HealthSettings);
+            InHatch = false;
             PublishHealth();
         }
 

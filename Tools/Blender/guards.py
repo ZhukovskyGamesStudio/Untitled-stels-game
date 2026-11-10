@@ -173,9 +173,12 @@ def export(style):
 
 
 def legs(make):
-    """Both legs from one function of the side (-1 left, +1 right)."""
-    merge("AccentLeg0", make(-1))
-    merge("AccentLeg1", make(1))
+    """Both legs from one function of the side (-1 left, +1 right), each cut at the knee into Upper and Lower."""
+    g.split_leg(merge("AccentLeg0", make(-1)), KNEE)
+    g.split_leg(merge("AccentLeg1", make(1)), KNEE)
+
+
+KNEE = 0.45  # every design: hip ~0.9 m, knee at half of it, like the original guard
 
 
 # --------------------------------------------------------------------------- the designs

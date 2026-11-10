@@ -22,13 +22,14 @@ Tools/dev.sh tests              # компиляция + все EditMode-тес�
 Tools/dev.sh assets             # дособрать недостающие ассеты (существующие префабы не трогает)
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
 REBUILD_UI=1 Tools/dev.sh assets  # пересобрать только UI-префабы (HUD, меню, инвентарь, элементы)
+REBUILD=RobotGuard,Safe Tools/dev.sh assets  # пересобрать только эти префабы (по имени файла), GUID сохраняются
 Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -70,7 +71,8 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
    `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
-   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`.
+   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`,
+   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
    показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
@@ -161,6 +163,26 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
 → `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
 `PC_Renderer` рисует их сквозь стены (`Art/Shaders/MarkedXray.shader`). Настройки — `PlayerConfig.Team`.
+
+**Между домами — канализация.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. Уйти из дома — спрятаться
+в люк (`PlayerController.InHatch`, сервер; `IPlayerLink.SendHatch`); когда `RunState.TeamInHatch` — отсчёт `GameManager.LeaveAt`
+(`RunSettings.HatchCountdown`), потом `GoToSewerServer`: контент дома деспавнится, `RunState.EnterSewer(упавшие)`. Канализацию каждый пир
+строит сам из префаба `LevelArt.Sewer` (`SewerLocation`: спавны, точка доски, вода), дом при этом убирается (`GameManager.SyncLocation`).
+Торговать можно у `GameManager.TradePosition` (люк в доме, доска в канализации; `CanTradeAt`). Маршрут — `RunMap` из `LevelInfo.RunSeed`
+(столбцы 2–4 дома, из дома 1–3 пути, ряд 0 = классический сид дома), голоса — `RouteVotes` (`IGameLink.RequestVote`, ничья — жребий по сиду);
+`RouteScreen` (внутри префаба Menu — нужна мышь). Решили → `RunState.Advance()`: квота выплачена — `StartLevel(глубина + 1, ряд)`, нет — `Failed`
+и вода поднимается (`SewerLocation.Flood`). Номер ряда и сид забега — часть `LevelInfo`.
+
+**Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
+не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.
+Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки
+`ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `IPlayerLink.SendOpenSafe` → лут на сервере. Открытые двери и сейфы дома —
+`GameManager.Opened` (ключи `DoorKey`/`SafeKey`), реплицирует `GameManagerNet`.
+
+**Ноги роботов** — `ProceduralLegs`: ноги, разрезанные в Blender по колену (`AccentLeg{n}Upper` / `Lower`, `generate_models.split_leg`),
+сборщик превращает в пары шарниров бедро/колено (`ProceduralLegs.Bake`); в игре ступни стоят на поверхности под ними (пол, у паука —
+стена), отстающая ступня шагает дугой, ноги — двумя чередующимися группами, колени — двухзвенная ИК (`LegMath`). Охранник, пёс, паук.
+Шаг — `AnimationSettings.StepStride/StepTime/StepLift` в конфиге робота.
 
 **Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
 `RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).

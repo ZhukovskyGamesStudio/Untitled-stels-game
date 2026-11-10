@@ -104,7 +104,7 @@ namespace Stealth.UI
         bool StashActive(PlayerController me)
         {
             var gm = GameManager.Instance;
-            return Board != null && gm != null && gm.Phase == RunPhase.Playing && ActiveLevel.Layout != null && Hatch.IsNear(me.transform.position);
+            return Board != null && gm != null && gm.CanTradeAt(me.transform.position);
         }
 
         /// <summary>What the cursor is over: the backpack grid, the stash grid, the sell area or nothing.</summary>
@@ -153,7 +153,7 @@ namespace Stealth.UI
             Board.Show(on);
             if (!on) return;
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
-            if (!me.CursorMode || !was) Board.Place(ActiveLevel.Layout.HatchPosition, me.Camera.transform.position);
+            if ((!me.CursorMode || !was) && GameManager.Instance.TradePosition is Vector3 at) Board.Place(at, me.Camera.transform.position);
             if (m_StashItems == null)
             {
                 m_StashItems = new UiPool<InventoryBlockView>(BlockPrefab, Board.ItemLayer);

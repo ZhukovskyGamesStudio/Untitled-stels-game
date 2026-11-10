@@ -207,21 +207,21 @@ namespace Stealth.Player
 
         public void DepositServer(int index)
         {
-            if (index < 0 || index >= m_Items.Count || !Hatch.IsNear(transform.position)) return;
+            if (index < 0 || index >= m_Items.Count) return;
             var gm = GameManager.Instance;
-            if (gm == null || gm.Phase != RunPhase.Playing) return;
+            if (gm == null || !gm.CanTradeAt(transform.position)) return;
             var e = m_Items[index];
             m_Items.RemoveAt(index);
             Changed();
             gm.AddCollectedServer(e.Value);
         }
 
-        // Team stash: only at the hatch, only while the house is being played.
+        // Team stash: at the hatch of a house, or at the board in the sewer.
 
         bool AtHatch(out GameManager gm)
         {
             gm = GameManager.Instance;
-            return CanAct && gm != null && gm.Phase == RunPhase.Playing && Hatch.IsNear(transform.position);
+            return CanAct && gm != null && gm.CanTradeAt(transform.position);
         }
 
         bool InReach(WorldItem item) => item != null && (item.transform.position - transform.position).magnitude <= ReachDistance + 1.5f;

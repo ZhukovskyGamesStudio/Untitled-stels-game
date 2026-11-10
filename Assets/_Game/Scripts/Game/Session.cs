@@ -102,6 +102,12 @@ namespace Stealth.Game
         void SendPing(Vector3 position);
         /// <summary>Owner → server: mark this robot / device for the team.</summary>
         void SendMark(Detector target);
+        /// <summary>Owner → server: hide in the hatch (true) or climb back out (false).</summary>
+        void SendHatch(bool hide);
+        /// <summary>Owner → server: finished hacking the lock of this door (index in the layout's doors).</summary>
+        void SendUnlockDoor(int door);
+        /// <summary>Owner → server: cracked the dial of this safe (index in the layout's props).</summary>
+        void SendOpenSafe(int safe);
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>
         void SendHitFeedback(Vector3 awayFromSource);
     }
@@ -125,7 +131,8 @@ namespace Stealth.Game
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>
     public interface IGameLink
     {
-        void RequestFinishLevel();
+        /// <summary>Player → server: my vote for a house of the next column (in the sewer).</summary>
+        void RequestVote(int lane);
         void RequestRestart();
         void BroadcastBanner(string text);
         /// <summary>Server → everyone: a teammate's ping or mark.</summary>

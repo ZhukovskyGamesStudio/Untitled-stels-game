@@ -55,6 +55,31 @@ def _new_object(name, bm):
     return obj
 
 
+def split_leg(obj, knee_z):
+    """Cut a leg at the knee height into <name>Upper (thigh, from the hip) and <name>Lower (shin with the foot); the cuts
+    are closed. The game bends the two parts with inverse kinematics (ProceduralLegs): hip, knee and foot are found from
+    their bounds, so the cut is all a model needs."""
+    name = obj.name
+    for part, keep_above in (("Upper", True), ("Lower", False)):
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+        res = bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(0, 0, knee_z), plane_no=(0, 0, 1),
+                                     clear_inner=keep_above, clear_outer=not keep_above)
+        cut = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
+        if cut:
+            bmesh.ops.holes_fill(bm, edges=cut, sides=0)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        new = _new_object(name + part, bm)
+        new.matrix_world = obj.matrix_world.copy()
+    bpy.data.objects.remove(obj, do_unlink=True)
+
+
+def leg(name, parts, knee_z):
+    """A leg in two parts that bend at the knee (see split_leg)."""
+    split_leg(merge(name, parts), knee_z)
+
+
 def box(size, loc, rot_z=0.0):
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
@@ -153,9 +178,9 @@ def model_robot_guard():
         box((0.2, 0.2, 0.2), (-0.45, 0, 0.7)),                      # fists
         box((0.2, 0.2, 0.2), (0.45, 0, 0.7)),
     ])
-    # Legs (with feet) are separate so the game can swing them.
-    merge("AccentLeg0", [box((0.18, 0.18, 0.9), (-0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (-0.22, -0.06, 0.04))])
-    merge("AccentLeg1", [box((0.18, 0.18, 0.9), (0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (0.22, -0.06, 0.04))])
+    # Legs (with feet) in two parts: the game plants the feet and bends the knees.
+    leg("AccentLeg0", [box((0.18, 0.18, 0.9), (-0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (-0.22, -0.06, 0.04))], 0.45)
+    leg("AccentLeg1", [box((0.18, 0.18, 0.9), (0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (0.22, -0.06, 0.04))], 0.45)
     merge("Eye", [cylinder(0.11, 0.08, (0, -0.22, 1.84), axis="Y", segments=16)])
     export("robot_guard")
 

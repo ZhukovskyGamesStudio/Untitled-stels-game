@@ -17,6 +17,14 @@ namespace Stealth.Enemies
         public float Lean;
         [Tooltip("Walkers bob up and down a little (meters).")]
         public float Bob;
+
+        [Header("Walking legs (inverse kinematics)")]
+        [Tooltip("A foot steps once it is this far behind its spot, in leg lengths.")]
+        public float StepStride = 0.45f;
+        [Tooltip("Seconds one step takes.")]
+        public float StepTime = 0.22f;
+        [Tooltip("How high a foot lifts while stepping, in leg lengths.")]
+        public float StepLift = 0.22f;
     }
 
     /// <summary>

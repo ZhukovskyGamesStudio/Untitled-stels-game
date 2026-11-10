@@ -163,6 +163,8 @@ namespace Stealth.Player
         public float HackDuration = 20f;
         [Tooltip("How close you must be to hack, meters.")]
         public float HackReach = 1.9f;
+        [Tooltip("Seconds to hold E to hack the lock of a door.")]
+        public float DoorHackTime = 3f;
     }
 
     /// <summary>

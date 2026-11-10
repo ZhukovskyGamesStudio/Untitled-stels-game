@@ -13,5 +13,7 @@ namespace Stealth.Configs
         [Tooltip("Points per cell of a grey (×1) item.")]
         public int PointsPerCell = 5;
         public ItemCatalog.ItemColor[] Colors = ItemCatalog.DefaultColors();
+        [Tooltip("Safes: the dial minigame and the loot inside.")]
+        public SafeSettings Safes = new();
     }
 }

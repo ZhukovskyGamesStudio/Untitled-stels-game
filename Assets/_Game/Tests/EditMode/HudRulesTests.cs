@@ -34,13 +34,34 @@ namespace Stealth.Tests
         {
             var c = Idle;
             c.NearHatch = true;
+            c.NearTrade = true;
             c.CarriedItems = 2;
-            StringAssert.Contains("люк", PromptRules.Choose(c).Text);
+            StringAssert.Contains("Разложить", PromptRules.Choose(c).Text);
             c.CarriedItems = 0;
             c.Collected = 40;
-            StringAssert.Contains("Уйти", PromptRules.Choose(c).Text);
+            StringAssert.Contains("доплатить", PromptRules.Choose(c).Text, "leaving without the quota is allowed: it is paid below");
             c.Collected = 100;
-            Assert.AreEqual("Следующий дом", PromptRules.Choose(c).Text);
+            StringAssert.Contains("канализацию", PromptRules.Choose(c).Text);
+            c.InHatch = true;
+            Assert.AreEqual("Вылезти из люка", PromptRules.Choose(c).Text);
+        }
+
+        [Test]
+        public void DoorsSafesAndTheSewer()
+        {
+            var c = Idle;
+            c.LockedDoor = true;
+            c.DoorProgress = 0.4f;
+            var p = PromptRules.Choose(c);
+            StringAssert.Contains("замок", p.Text);
+            Assert.AreEqual(0.4f, p.Progress, 1e-4f);
+            c.LockedDoor = false;
+            c.SafeNear = true;
+            StringAssert.Contains("сейф", PromptRules.Choose(c).Text);
+            c.Cracking = true;
+            Assert.IsFalse(PromptRules.Choose(c).IsValid, "the dial has its own screen");
+            var s = new PromptContext { InSewer = true, Quota = 100 };
+            StringAssert.Contains("маршрут", PromptRules.Choose(s).Text);
         }
 
         [Test]

@@ -38,6 +38,11 @@ namespace Stealth.UI
         public Text GasText;
         public Image DownedTint;
         public Text DownedText;
+        [Tooltip("Hiding in the hatch: the view goes dark, who is still missing, the countdown.")]
+        public Image HatchTint;
+        public Text HatchText;
+        [Tooltip("For the ones still upstairs: who is waiting in the hatch.")]
+        public Text HatchStatus;
         public GameObject AlarmFrame;
         public Image[] AlarmEdges;
         public Text AlarmLabel;
@@ -163,6 +168,7 @@ namespace Stealth.UI
             CurrentPrompt = PromptRules.Choose(BuildContext(gm, me));
 
             ShowOverlays(gm, me, now);
+            ShowHatch(gm, me);
             ShowDetection(me, now);
             ShowRobotIcons(me);
             ShowCrosshair(me);
@@ -189,13 +195,39 @@ namespace Stealth.UI
             if (m_KeysVersion == Controls.Version) return;
             m_KeysVersion = Controls.Version;
             string K(GameAction a) => Controls.Label(a);
-            HelpLabel.text =
-                $"{Controls.MoveLabel()} — ходить · {K(GameAction.Sprint)} — бег · {K(GameAction.Jump)} — прыжок · {K(GameAction.CrouchHold)}/{K(GameAction.CrouchToggle)} — присесть\n" +
-                $"{K(GameAction.Hands)} (держать) — руки: тащи предметы мышкой, {K(GameAction.Rotate)} — повернуть · {K(GameAction.Interact)} — поднять союзника / взломать\n" +
-                $"{K(GameAction.Ping)} — пинг · {K(GameAction.Mark)} — пометить робота · {K(GameAction.Map)} — карта · {K(GameAction.Hatch)} у люка — следующий дом\n" +
-                $"Esc — меню и всё управление · {K(GameAction.Help)} — убрать подсказку";
+            // All the controls are on the pause page; the corner only says where to find them.
+            HelpLabel.text = $"Esc — меню и всё управление · {K(GameAction.Help)} — скрыть";
             RunOverRestart.text = $"{K(GameAction.Restart)} — начать новый забег";
-            QuotaHint.text = $"Квота набрана — к люку, {K(GameAction.Hatch)}: следующий дом";
+            QuotaHint.text = $"Квота набрана — к люку, {K(GameAction.Hatch)}: спрятаться и уйти";
+        }
+
+        /// <summary>
+        /// Leaving a house: in the hatch the view goes dark and says who is still missing or how long until the sewer;
+        /// the ones still upstairs see who waits in the hatch.
+        /// </summary>
+        void ShowHatch(GameManager gm, PlayerController me)
+        {
+            bool playing = gm.Phase == RunPhase.Playing;
+            int hidden = 0;
+            string missing = "", waiting = "";
+            foreach (var p in PlayerController.All)
+            {
+                if (p.InHatch) { hidden++; waiting += (waiting.Length > 0 ? ", " : "") + p.Nick; }
+                else if (!p.KnockedOut) missing += (missing.Length > 0 ? ", " : "") + p.Nick;
+            }
+            float left = gm.LeaveAt > 0 ? Mathf.Max(0f, (float)(gm.LeaveAt - Session.ServerTime)) : -1f;
+            bool inside = playing && me.InHatch;
+            Ui.Show(HatchTint, inside);
+            Ui.Show(HatchText, inside);
+            if (inside)
+            {
+                HatchText.text = left >= 0f
+                    ? $"Вся команда в люке\nУходим в канализацию через {Mathf.CeilToInt(left)}…"
+                    : $"Ты в люке — роботы тебя не видят\nЖдём: {missing}";
+            }
+            bool status = playing && !me.InHatch && hidden > 0;
+            Ui.Show(HatchStatus, status);
+            if (status) Ui.Set(HatchStatus, $"В люке ждут: {waiting} — когда спрячутся все, команда уйдёт в канализацию", new Color(0.6f, 1f, 0.65f));
         }
 
         // ------------------------------------------------------------------ map and callouts
@@ -211,8 +243,8 @@ namespace Stealth.UI
                 m_BigMapOpen = !m_BigMapOpen;
                 BigMap.ViewFloor = -1;
             }
-            if (GameMenu.IsOpen) m_BigMapOpen = false;
             bool hasMap = gm.Exploration != null;
+            if (GameMenu.IsOpen || !hasMap) m_BigMapOpen = false;
             Ui.Show(Minimap, hasMap && !m_BigMapOpen);
             Ui.Show(BigMap, hasMap && m_BigMapOpen);
             if (!hasMap) return;
@@ -309,7 +341,14 @@ namespace Stealth.UI
                 HackSeconds = Configs.Tuning.Player.Interaction.HackDuration,
                 BlockedByCeiling = me.Motor.BlockedByCeiling,
                 Playing = gm.Phase == RunPhase.Playing,
-                NearHatch = Hatch.IsNear(me.transform.position),
+                NearHatch = gm.Phase == RunPhase.Playing && Hatch.IsNear(me.transform.position),
+                NearTrade = gm.CanTradeAt(me.transform.position),
+                InHatch = me.InHatch,
+                InSewer = gm.Phase == RunPhase.Sewer && !RouteScreen.IsOpen,
+                LockedDoor = me.DoorTarget != null,
+                DoorProgress = me.DoorShare,
+                SafeNear = me.SafeTarget != null && me.Cracking == null,
+                Cracking = me.Cracking != null,
                 CarriedItems = me.GetComponent<PlayerInventory>().Items.Count,
                 Collected = gm.Collected,
                 Quota = gm.Quota,
@@ -516,7 +555,8 @@ namespace Stealth.UI
         {
             int collected = gm.Collected, quota = gm.Quota;
             bool met = collected >= quota;
-            HouseLabel.text = $"Дом {gm.Level.Index + 1} · этаж {LevelLayout.FloorOf(me.transform.position.y) + 1}";
+            HouseLabel.text = SewerLocation.Active != null ? "Канализация"
+                : $"Дом {gm.Level.Index + 1} · этаж {LevelLayout.FloorOf(me.transform.position.y) + 1}";
             Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
             QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
             bool gain = m_Gain.Visible(now);
@@ -527,7 +567,7 @@ namespace Stealth.UI
                 GainRect.anchoredPosition = new Vector2(240f, -23f + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
-            Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing);
+            Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing && !me.InHatch);
         }
 
         /// <summary>Once the quota is met: a small diamond over the hatch (clamped to the screen edge) with distance.</summary>

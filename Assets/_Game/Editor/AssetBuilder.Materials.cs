@@ -70,6 +70,14 @@ namespace Stealth.EditorTools
             Mat(env, "Blinds", new Color(0.82f, 0.8f, 0.72f), smoothness: 0.3f);
             Mat(env, "Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
             Mat(env, "HatchRing", new Color(1f, 0.8f, 0.1f), new Color(2.4f, 1.8f, 0.15f));
+            Mat(env, "LockLamp", new Color(1f, 0.15f, 0.1f), new Color(2.4f, 0.3f, 0.2f));
+            // The sewer between houses: wet brick, concrete walkways, murky water, rusty pipes, dim lamps.
+            Mat(env, "SewerWall", new Color(0.36f, 0.3f, 0.26f), smoothness: 0.35f);
+            Mat(env, "SewerWalk", new Color(0.33f, 0.33f, 0.31f), smoothness: 0.3f);
+            Mat(env, "SewerWater", new Color(0.12f, 0.2f, 0.14f), smoothness: 0.92f);
+            Mat(env, "SewerPipe", new Color(0.4f, 0.27f, 0.18f), smoothness: 0.5f);
+            Mat(env, "SewerDark", new Color(0.02f, 0.02f, 0.02f));
+            Mat(env, "SewerLamp", new Color(1f, 0.85f, 0.5f), new Color(2.6f, 2.1f, 1.1f));
 
             Mat(env, "LampHousing", new Color(0.82f, 0.83f, 0.85f), smoothness: 0.5f);
             Mat(env, "LampPanel", new Color(1f, 0.97f, 0.9f), new Color(2.2f, 2.1f, 1.9f));

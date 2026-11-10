@@ -121,8 +121,9 @@ namespace Stealth.Tests
                 Assert.Greater(p.Scale.x, 0.05f); Assert.Greater(p.Scale.y, 0.05f); Assert.Greater(p.Scale.z, 0.05f);
                 foreach (var c in p.Prefab.GetComponentsInChildren<Collider>(true)) Assert.Fail($"{p.Prefab.name} has a collider");
             }
-            // every style but the base look has its own guard robot, with all five parts of the original
-            Assert.AreEqual(config.Styles.Length - 1, config.StyleModels.Count(m => m.Variant < 0 && m.To.Length == 5), "a style without its own guard");
+            // every style but the base look has its own guard robot, with all seven parts of the original
+            // (body, accent, eye and both legs as thigh + shin for the walking legs)
+            Assert.AreEqual(config.Styles.Length - 1, config.StyleModels.Count(m => m.Variant < 0 && m.To.Length == 7), "a style without its own guard");
             // every style has the four departments of players, each with the four parts of the player model
             foreach (var style in config.Styles)
                 for (int d = 0; d < 4; d++)

@@ -59,7 +59,10 @@ namespace Stealth.Enemies
         }
 
         static bool IsMovingPart(string n) =>
-            n.StartsWith("AccentRotor") || n.StartsWith("AccentWheel") || n.StartsWith("AccentLeg") || n.StartsWith("AccentHead");
+            n.StartsWith("AccentRotor") || n.StartsWith("AccentWheel") || (n.StartsWith("AccentLeg") && !IsJointedLeg(n)) || n.StartsWith("AccentHead");
+
+        /// <summary>Thigh / shin of a leg that walks by inverse kinematics (<see cref="ProceduralLegs"/>), not by swinging.</summary>
+        static bool IsJointedLeg(string n) => n.Contains(ProceduralLegs.UpperSuffix) || n.Contains(ProceduralLegs.LowerSuffix);
 
         Detector m_Detector;
         RobotController m_Robot;
@@ -89,7 +92,7 @@ namespace Stealth.Enemies
                 if (!t.name.EndsWith(PivotSuffix)) continue;
                 if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
                 else if (t.name.StartsWith("AccentWheel")) m_Wheels.Add(t);
-                else if (t.name.StartsWith("AccentLeg")) m_Legs.Add((t, m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
+                else if (t.name.StartsWith("AccentLeg") && !IsJointedLeg(t.name)) m_Legs.Add((t, m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
             }
             m_LastPos = transform.position;
             m_LastYaw = transform.eulerAngles.y;
