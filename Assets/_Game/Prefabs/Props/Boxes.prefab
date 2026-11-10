@@ -9,7 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8604610323934715553}
-  - component: {fileID: 3439972159424455610}
   m_Layer: 0
   m_Name: Boxes
   m_TagString: Untagged
@@ -33,27 +32,6 @@ Transform:
   - {fileID: 3107874795351601861}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &3439972159424455610
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2806506359074657612}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.075, y: 0.9, z: 0.625}
-  m_Center: {x: -0.23749997, y: 0.45, z: -0.012499988}
 --- !u!1 &4455469033838984439
 GameObject:
   m_ObjectHideFlags: 0
@@ -65,6 +43,7 @@ GameObject:
   - component: {fileID: 3107874795351601861}
   - component: {fileID: 7681278961936442660}
   - component: {fileID: 7708794716012388403}
+  - component: {fileID: 5537397639920625214}
   m_Layer: 0
   m_Name: Model
   m_TagString: Untagged
@@ -144,3 +123,25 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &5537397639920625214
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4455469033838984439}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -938679423908619351, guid: 1c7e422cbec127646a64256e8c4c288f, type: 3}

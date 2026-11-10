@@ -272,7 +272,43 @@ namespace Stealth.EditorTools
             rc.RadioRipplePrefab = ripple;
             // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
+            BuildSensorRig(root, model, rc, eyePos, radius);
+            rc.Status.Renderers = Parts(model, "Eye"); // the sensor lenses glow in the status colour too
             return root;
+        }
+
+        /// <summary>
+        /// Every kind of sensor mount on the model (camera eye, two microphones, two ground probes, a snout);
+        /// <see cref="SensorRig"/> keeps only those the robot's senses use.
+        /// </summary>
+        static void BuildSensorRig(GameObject root, GameObject model, RobotController rc, Vector3 eye, float radius)
+        {
+            var rig = root.AddComponent<SensorRig>();
+            rig.Robot = rc;
+            float scale = Mathf.Clamp(radius / 0.45f, 0.85f, 1.4f), side = Mathf.Max(0.2f, radius * 0.75f);
+            GameObject Mount(string file, string name, Vector3 position, Quaternion rotation)
+            {
+                var go = Model(file);
+                go.name = name;
+                go.transform.SetParent(model.transform, false);
+                go.transform.localPosition = position;
+                go.transform.localRotation = rotation;
+                go.transform.localScale = Vector3.one * scale;
+                Paint(go, "RobotAccent", "RobotAccent", "SensorGlow");
+                return go;
+            }
+            rig.Eyes = new[] { Mount("attach_eye", "SensorEye", eye + new Vector3(0, 0, 0.08f), Quaternion.Euler(rc.Profile.Senses.EyePitch, 0, 0)) };
+            rig.Microphones = new[]
+            {
+                Mount("attach_mic", "SensorMicL", eye + new Vector3(-side, 0.05f, -0.1f), Quaternion.Euler(0, 0, 15f)),
+                Mount("attach_mic", "SensorMicR", eye + new Vector3(side, 0.05f, -0.1f), Quaternion.Euler(0, 0, -15f)),
+            };
+            rig.GroundProbes = new[]
+            {
+                Mount("attach_seismic", "SensorGroundL", new Vector3(-side, 0, radius + 0.1f), Quaternion.identity),
+                Mount("attach_seismic", "SensorGroundR", new Vector3(side, 0, radius + 0.1f), Quaternion.identity),
+            };
+            rig.Noses = new[] { Mount("attach_nose", "SensorNose", eye + new Vector3(0, -0.15f, 0.12f), Quaternion.identity) };
         }
 
         /// <summary>Robot / device with its own movement script (<see cref="SecurityDevice"/>).</summary>

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 4534007396929292151}
   - component: {fileID: 6951617090337783861}
   - component: {fileID: 5337087326426537967}
+  - component: {fileID: 718691194638913298}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -90,6 +91,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &718691194638913298
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1751554927584048406}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 2959467708922500008, guid: d35ebc3b9eac3d247aa89fb3e204c1f6, type: 3}
 --- !u!1 &2991484957769804052
 GameObject:
   m_ObjectHideFlags: 0
@@ -135,6 +158,7 @@ GameObject:
   - component: {fileID: 9181905824814030166}
   - component: {fileID: 6945394326643260699}
   - component: {fileID: 1915862232411846501}
+  - component: {fileID: 2503106310877736668}
   m_Layer: 0
   m_Name: Eye
   m_TagString: Untagged
@@ -214,6 +238,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &2503106310877736668
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6548916692441596297}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 2943395109716765318, guid: d35ebc3b9eac3d247aa89fb3e204c1f6, type: 3}
 --- !u!1 &7789335388280679964
 GameObject:
   m_ObjectHideFlags: 0
@@ -223,7 +269,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2418032032617831424}
-  - component: {fileID: 2429349868259703665}
   m_Layer: 0
   m_Name: Desk
   m_TagString: Untagged
@@ -247,27 +292,6 @@ Transform:
   - {fileID: 2678726951566233951}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &2429349868259703665
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7789335388280679964}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1.6, y: 1.15, z: 0.8}
-  m_Center: {x: 0, y: 0.575, z: 0}
 --- !u!1 &8716265244241846412
 GameObject:
   m_ObjectHideFlags: 0
@@ -279,6 +303,7 @@ GameObject:
   - component: {fileID: 6020695226893547887}
   - component: {fileID: 2374776898234284435}
   - component: {fileID: 9065061552889390563}
+  - component: {fileID: 3205495647451086026}
   m_Layer: 0
   m_Name: Accent
   m_TagString: Untagged
@@ -358,3 +383,25 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &3205495647451086026
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8716265244241846412}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -938679423908619351, guid: d35ebc3b9eac3d247aa89fb3e204c1f6, type: 3}

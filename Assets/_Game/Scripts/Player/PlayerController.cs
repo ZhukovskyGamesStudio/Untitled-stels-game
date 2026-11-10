@@ -324,7 +324,12 @@ namespace Stealth.Player
 
         void UpdateInteractions(Keyboard kb)
         {
-            if (GameMenu.IsOpen || Downed) { ReviveProgress = 0; ReviveTarget = null; return; }
+            if (GameMenu.IsOpen) { ReviveProgress = 0; ReviveTarget = null; return; }
+            // A failed run is restarted by any player — usually everybody is down by then.
+            var game = GameManager.Instance;
+            if (game != null && kb.rKey.wasPressedThisFrame && game.Phase == RunPhase.Failed && !CursorMode)
+                game.RequestRestart();
+            if (Downed) { ReviveProgress = 0; ReviveTarget = null; return; }
 
             // Revive: hold E next to a downed teammate.
             ReviveTarget = null;
@@ -364,8 +369,6 @@ namespace Stealth.Player
             if (gm == null) return;
             if (kb.fKey.wasPressedThisFrame && Hatch.IsNear(transform.position) && gm.Phase == RunPhase.Playing)
                 gm.RequestFinishLevel();
-            if (kb.rKey.wasPressedThisFrame && gm.Phase == RunPhase.Failed && !CursorMode)
-                gm.RequestRestart();
         }
 
         /// <summary>The nearest robot / device that can be hacked from where we stand.</summary>

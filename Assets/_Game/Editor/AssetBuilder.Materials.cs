@@ -54,6 +54,8 @@ namespace Stealth.EditorTools
             Mat(env, "DoorFrame", new Color(0.45f, 0.38f, 0.30f));
             Mat(env, "Door", new Color(0.55f, 0.68f, 0.75f), smoothness: 0.85f);
             Mat(env, "Window", new Color(0.12f, 0.18f, 0.22f), new Color(0.05f, 0.09f, 0.08f), smoothness: 0.95f);
+            Mat(env, "WindowFrame", new Color(0.88f, 0.88f, 0.86f), smoothness: 0.5f);
+            Mat(env, "Blinds", new Color(0.82f, 0.8f, 0.72f), smoothness: 0.3f);
             Mat(env, "Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
             Mat(env, "HatchRing", new Color(1f, 0.8f, 0.1f), new Color(0.8f, 0.6f, 0.05f));
 
@@ -68,6 +70,13 @@ namespace Stealth.EditorTools
             Mat(props, "Water", new Color(0.4f, 0.7f, 1f), new Color(0.05f, 0.15f, 0.3f), smoothness: 0.9f);
             Mat(props, "Fabric", new Color(0.35f, 0.25f, 0.45f), smoothness: 0.05f);
             Mat(props, "Stall", new Color(0.55f, 0.65f, 0.6f), smoothness: 0.5f);
+            Mat(props, "Wood", new Color(0.58f, 0.42f, 0.28f), smoothness: 0.35f);
+            Mat(props, "Metal", new Color(0.55f, 0.57f, 0.6f), smoothness: 0.75f);
+            Mat(props, "Folders", new Color(0.25f, 0.4f, 0.65f), smoothness: 0.2f);
+            Mat(props, "Lockers", new Color(0.35f, 0.5f, 0.62f), smoothness: 0.55f);
+            Mat(props, "Mirror", new Color(0.7f, 0.78f, 0.82f), new Color(0.08f, 0.1f, 0.12f), smoothness: 0.98f);
+            Mat(props, "Vending", new Color(0.75f, 0.12f, 0.12f), smoothness: 0.6f);
+            Mat(props, "VendingGlass", new Color(0.6f, 0.85f, 1f), new Color(0.5f, 0.7f, 0.9f), smoothness: 0.9f);
 
             Mat(robots, "RobotBody", new Color(0.86f, 0.87f, 0.9f), smoothness: 0.6f);
             Mat(robots, "RobotAccent", new Color(0.18f, 0.19f, 0.22f), smoothness: 0.5f);

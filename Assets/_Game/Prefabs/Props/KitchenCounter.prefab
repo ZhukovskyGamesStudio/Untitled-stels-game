@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 1255964122964131205}
   - component: {fileID: 5892187268970638452}
   - component: {fileID: 4339359862423144346}
+  - component: {fileID: 4781850087131850002}
   m_Layer: 0
   m_Name: Accent
   m_TagString: Untagged
@@ -90,6 +91,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &4781850087131850002
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 130290480733633722}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -938679423908619351, guid: dcaf13379aecdc94fb5de37a7bc8c6da, type: 3}
 --- !u!1 &1010169852932803137
 GameObject:
   m_ObjectHideFlags: 0
@@ -135,6 +158,7 @@ GameObject:
   - component: {fileID: 1844913792440933103}
   - component: {fileID: 5823493349298141644}
   - component: {fileID: 2200317372441040802}
+  - component: {fileID: 2620930462416229311}
   m_Layer: 0
   m_Name: Body
   m_TagString: Untagged
@@ -214,6 +238,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &2620930462416229311
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3127610422985537871}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 2959467708922500008, guid: dcaf13379aecdc94fb5de37a7bc8c6da, type: 3}
 --- !u!1 &3964512730490714729
 GameObject:
   m_ObjectHideFlags: 0
@@ -223,7 +269,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5466285716031209961}
-  - component: {fileID: 4141761305593590338}
   m_Layer: 0
   m_Name: KitchenCounter
   m_TagString: Untagged
@@ -247,27 +292,6 @@ Transform:
   - {fileID: 7251098460091572821}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &4141761305593590338
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3964512730490714729}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 2.44, y: 1.25, z: 0.7}
-  m_Center: {x: 0, y: 0.625, z: 0}
 --- !u!1 &5211388391460179838
 GameObject:
   m_ObjectHideFlags: 0
@@ -279,6 +303,7 @@ GameObject:
   - component: {fileID: 6128476716480885022}
   - component: {fileID: 6343100338111456167}
   - component: {fileID: 5422195056623262037}
+  - component: {fileID: 3454762050348578206}
   m_Layer: 0
   m_Name: Eye
   m_TagString: Untagged
@@ -358,3 +383,25 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &3454762050348578206
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5211388391460179838}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 2943395109716765318, guid: dcaf13379aecdc94fb5de37a7bc8c6da, type: 3}

@@ -27,13 +27,13 @@ def category(filename):
     """Sub-folder of Art/Models for a model (keeps the project sorted the same way the Unity builder expects)."""
     if filename.startswith("item_"):
         return "Items"
-    if filename.startswith("robot_"):
+    if filename.startswith("robot_") or filename.startswith("attach_"):
         return "Robots"
     if filename.startswith("sensor_") or filename in ("security_camera", "laser_emitter"):
         return "Sensors"
     if filename == "player":
         return "Player"
-    if filename == "hatch":
+    if filename in ("hatch", "window"):
         return "Level"
     return "Props"
 
@@ -317,6 +317,157 @@ def model_toilet_stall():
     export("toilet_stall")
 
 
+# --------------------------------------------------------------------------- more office furniture (layouts after office planning guides:
+# back-to-back desk clusters with privacy screens, storage walls, kitchenette along a wall + tables, lounge corners)
+
+def model_partition():
+    """Privacy screen between back-to-back desks: 1.6 x 0.05 x 1.25, fabric with a dark frame."""
+    merge("Body", [box((1.56, 0.04, 1.2), (0, 0, 0.62))])
+    merge("Accent", [box((1.6, 0.06, 0.04), (0, 0, 1.24)), box((0.04, 0.06, 1.25), (-0.79, 0, 0.62)), box((0.04, 0.06, 1.25), (0.79, 0, 0.62))])
+    export("partition")
+
+
+def model_bookshelf():
+    """Office bookcase 1.0 x 0.35 x 2.0 with rows of folders."""
+    parts = [box((0.04, 0.35, 2.0), (x, 0, 1.0)) for x in (-0.48, 0.48)]
+    parts += [box((1.0, 0.35, 0.03), (0, 0, h)) for h in (0.02, 0.5, 1.0, 1.5, 1.98)]
+    parts.append(box((1.0, 0.02, 2.0), (0, 0.17, 1.0)))
+    merge("Body", parts)
+    folders = []
+    for i, h in enumerate((0.04, 0.53, 1.03, 1.53)):
+        x = -0.42
+        for k in range(6 + i % 2):
+            w = 0.07 + 0.03 * ((k + i) % 3)
+            folders.append(box((w, 0.26, 0.32 - 0.04 * ((k * 7 + i) % 3)), (x + w / 2, 0.02, h + 0.17)))
+            x += w + 0.015
+    merge("Accent", folders)
+    export("bookshelf")
+
+
+def model_printer():
+    """Office copier 0.6 x 0.6 x 1.1 with a paper tray and a glowing panel."""
+    merge("Body", [box((0.6, 0.6, 0.95), (0, 0, 0.475)), box((0.55, 0.5, 0.12), (0, 0.02, 1.01))])
+    merge("Accent", [box((0.35, 0.3, 0.03), (-0.1, -0.35, 0.8)), box((0.5, 0.05, 0.25), (0, -0.31, 0.3))])
+    merge("Eye", [box((0.15, 0.03, 0.08), (0.18, -0.29, 0.97))])
+    export("printer")
+
+
+def model_fridge():
+    merge("Body", [box((0.7, 0.7, 1.8), (0, 0, 0.9))])
+    merge("Accent", [box((0.04, 0.05, 0.5), (0.28, -0.37, 1.35)), box((0.04, 0.05, 0.35), (0.28, -0.37, 0.6)), box((0.7, 0.02, 0.02), (0, -0.351, 1.05))])
+    export("fridge")
+
+
+def model_coffee_machine():
+    """Stands on a counter (0.93 m): 0.35 x 0.4 x 0.5."""
+    merge("Body", [box((0.35, 0.4, 0.5), (0, 0, 0.25))])
+    merge("Accent", [box((0.2, 0.15, 0.05), (0, -0.17, 0.08)), cylinder(0.04, 0.09, (0, -0.15, 0.17), segments=10)])
+    merge("Eye", [box((0.12, 0.02, 0.06), (0, -0.205, 0.4))])
+    export("coffee_machine")
+
+
+def model_round_table():
+    merge("Body", [cylinder(0.5, 0.04, (0, 0, 0.74), segments=24)])
+    merge("Accent", [cylinder(0.05, 0.72, (0, 0, 0.36), segments=10), cylinder(0.28, 0.03, (0, 0, 0.015), segments=16)])
+    export("round_table")
+
+
+def model_armchair():
+    merge("Body", [box((0.75, 0.75, 0.42), (0, 0, 0.21)), box((0.75, 0.18, 0.45), (0, 0.29, 0.64))])
+    merge("Accent", [box((0.14, 0.75, 0.6), (-0.37, 0, 0.3)), box((0.14, 0.75, 0.6), (0.37, 0, 0.3))])
+    export("armchair")
+
+
+def model_coffee_table():
+    merge("Body", [box((1.0, 0.55, 0.04), (0, 0, 0.4))])
+    merge("Accent", [box((0.04, 0.04, 0.38), (x, y, 0.19)) for x in (-0.46, 0.46) for y in (-0.23, 0.23)] + [box((0.9, 0.45, 0.02), (0, 0, 0.12))])
+    export("coffee_table")
+
+
+def model_tv_stand():
+    """Low cabinet with a big screen on it, 1.4 wide."""
+    merge("Body", [box((1.4, 0.4, 0.5), (0, 0, 0.25))])
+    merge("Accent", [box((1.36, 0.06, 0.8), (0, 0.08, 1.05)), box((0.3, 0.2, 0.05), (0, 0.08, 0.525)), box((0.06, 0.06, 0.15), (0, 0.1, 0.6))])
+    merge("Eye", [box((1.28, 0.02, 0.72), (0, 0.045, 1.05))])
+    export("tv_stand")
+
+
+def model_reception_desk():
+    """Front counter 2.4 x 0.8: high front panel towards the visitor (-Y), work top behind."""
+    merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.08, 0.8, 1.1), (-1.16, 0, 0.55)), box((0.08, 0.8, 1.1), (1.16, 0, 0.55))])
+    merge("Accent", [box((2.5, 0.3, 0.04), (0, -0.33, 1.12)), box((2.3, 0.7, 0.04), (0, 0.02, 0.74))])
+    merge("Eye", [box((0.5, 0.04, 0.32), (0.4, 0.15, 0.96)), box((0.06, 0.06, 0.2), (0.4, 0.2, 0.82))])
+    export("reception_desk")
+
+
+def model_trash_bin():
+    merge("Body", [cylinder(0.17, 0.42, (0, 0, 0.21), segments=14, radius2=0.19)])
+    merge("Accent", [cylinder(0.195, 0.03, (0, 0, 0.43), segments=14)])
+    export("trash_bin")
+
+
+def model_coat_rack():
+    merge("Accent", [cylinder(0.03, 1.8, (0, 0, 0.9), segments=8), cylinder(0.25, 0.04, (0, 0, 0.02), segments=12)]
+          + [box((0.25, 0.03, 0.03), (0.1 * math.cos(a), 0.1 * math.sin(a), 1.7), rot_z=a) for a in (0.0, 2.1, 4.2)])
+    merge("Body", [box((0.35, 0.12, 0.6), (0.12, 0, 1.35)), box((0.3, 0.12, 0.55), (-0.08, 0.1, 1.38), rot_z=2.1)])
+    export("coat_rack")
+
+
+def model_lockers():
+    """Three staff lockers, 0.9 x 0.5 x 1.9."""
+    merge("Body", [box((0.9, 0.5, 1.9), (0, 0, 0.95))])
+    merge("Accent", [box((0.01, 0.02, 1.85), (x, -0.255, 0.95)) for x in (-0.15, 0.15)]
+          + [box((0.03, 0.03, 0.12), (x + 0.1, -0.265, 1.0)) for x in (-0.3, 0.0, 0.3)]
+          + [box((0.2, 0.02, 0.02), (x, -0.258, 1.75 - k * 0.04)) for x in (-0.3, 0.0, 0.3) for k in range(3)])
+    export("lockers")
+
+
+def model_pallet():
+    """Warehouse pallet 1.2 x 1.0 with a wrapped stack of boxes."""
+    merge("Accent", [box((1.2, 1.0, 0.04), (0, 0, 0.13))] + [box((1.2, 0.1, 0.1), (0, y, 0.05)) for y in (-0.45, 0, 0.45)])
+    merge("Body", [box((0.55, 0.45, 0.4), (x, y, 0.35)) for x in (-0.3, 0.3) for y in (-0.24, 0.24)]
+          + [box((0.55, 0.45, 0.4), (-0.3, y, 0.75)) for y in (-0.24, 0.24)])
+    export("pallet")
+
+
+def model_wash_basin():
+    """Restroom counter 1.6 x 0.5 with two sinks and a mirror on the wall behind (+Y)."""
+    merge("Body", [box((1.6, 0.5, 0.06), (0, 0, 0.85)), box((1.6, 0.45, 0.8), (0, 0.02, 0.4))])
+    merge("Accent", [cylinder(0.17, 0.08, (x, -0.02, 0.86), segments=14) for x in (-0.4, 0.4)]
+          + [box((0.04, 0.12, 0.15), (x, 0.17, 0.95)) for x in (-0.4, 0.4)])
+    merge("Eye", [box((1.5, 0.02, 0.8), (0, 0.24, 1.55))])
+    export("wash_basin")
+
+
+def model_vending_machine():
+    merge("Body", [box((0.9, 0.8, 1.9), (0, 0, 0.95))])
+    merge("Accent", [box((0.6, 0.02, 0.15), (-0.1, -0.41, 0.25)), box((0.12, 0.02, 0.5), (0.33, -0.41, 1.2))])
+    merge("Eye", [box((0.6, 0.02, 1.1), (-0.1, -0.405, 1.15))])
+    export("vending_machine")
+
+
+def model_window():
+    """
+    Window for the facade: 2.4 x 1.2 opening, centred in a 0.2 m wall. The glass slab shows on both faces (5 mm proud
+    of the wall). Outside (+Y): a frame with a mullion and a sill. Inside (-Y = Unity +Z, the room): a slim frame,
+    half-closed blinds and a sill — everything within 15 cm of the wall's centre line, so furniture can stand under it.
+    """
+    w, h = 2.4, 1.2
+    merge("Eye", [box((w - 0.1, 0.21, h - 0.1), (0, 0, 0))])  # night glass, glows a little
+    frame = [box((w + 0.12, 0.05, 0.08), (0, 0.135, h / 2)), box((w + 0.12, 0.05, 0.08), (0, 0.135, -h / 2)),
+             box((0.08, 0.05, h), (-w / 2, 0.135, 0)), box((0.08, 0.05, h), (w / 2, 0.135, 0)),
+             box((0.05, 0.05, h), (0, 0.135, 0)),                                     # mullion (outside)
+             box((w + 0.25, 0.1, 0.04), (0, 0.15, -h / 2 - 0.03))]                    # exterior sill
+    frame += [box((w + 0.12, 0.03, 0.08), (0, -0.115, h / 2)), box((w + 0.12, 0.03, 0.08), (0, -0.115, -h / 2)),
+              box((0.08, 0.03, h), (-w / 2, -0.115, 0)), box((0.08, 0.03, h), (w / 2, -0.115, 0)),
+              box((w + 0.2, 0.05, 0.04), (0, -0.125, -h / 2 - 0.05))]               # interior sill
+    merge("Accent", frame)
+    slats = [box((w - 0.14, 0.015, 0.03), (0, -0.12, h / 2 - 0.1 - i * 0.07)) for i in range(8)]
+    slats.append(box((w - 0.14, 0.04, 0.05), (0, -0.125, h / 2 - 0.06)))                # blind head rail
+    merge("Body", slats)
+    export("window")
+
+
 # --------------------------------------------------------------------------- tetris items
 
 ITEM_CELL = 0.22
@@ -364,5 +515,22 @@ if __name__ == "__main__":
     model_whiteboard()
     model_sofa()
     model_toilet_stall()
+    model_partition()
+    model_bookshelf()
+    model_printer()
+    model_fridge()
+    model_coffee_machine()
+    model_round_table()
+    model_armchair()
+    model_coffee_table()
+    model_tv_stand()
+    model_reception_desk()
+    model_trash_bin()
+    model_coat_rack()
+    model_lockers()
+    model_pallet()
+    model_wash_basin()
+    model_vending_machine()
+    model_window()
     model_items()
     print("DONE")

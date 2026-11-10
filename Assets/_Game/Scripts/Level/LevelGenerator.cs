@@ -245,153 +245,299 @@ namespace Stealth.Level
 
         static float Range(System.Random rng, float min, float max) => min + (float)rng.NextDouble() * (max - min);
 
+        // ------------------------------------------------------------------ furniture
+        // Layouts follow office planning guides: back-to-back desk clusters with privacy screens and chair push-back,
+        // storage along the walls, a kitchenette + tables, a lounge corner. Every room keeps its centre cross free
+        // (doors and vents sit in the middle of the walls); the furniture fills the four quadrants. A quadrant is
+        // addressed in "outward" coordinates: u along x, v along z, both measured from the room centre towards the
+        // quadrant's walls (the quadrant spans 1.1 .. 4.9 m on both axes).
+
+        readonly struct Quad
+        {
+            public readonly Vector3 Center;
+            public readonly int Sx, Sz;
+            public Quad(Vector3 center, int sx, int sz) { Center = center; Sx = sx; Sz = sz; }
+
+            public Vector3 P(float u, float v, float y = 0f) => Center + new Vector3(Sx * u, y, Sz * v);
+            /// <summary>Yaw that turns a model's front (+Z) outwards along v (towards the quadrant's z wall).</summary>
+            public float OutV => Sz > 0 ? 0f : 180f;
+            public float InV => Sz > 0 ? 180f : 0f;
+            public float OutU => Sx > 0 ? 90f : -90f;
+            public float InU => Sx > 0 ? -90f : 90f;
+            /// <summary>+1 / -1: the direction along u of a model's local +X when the model is turned by <see cref="InV"/>.</summary>
+            public int LocalXAlongU => -Sx * Sz;
+        }
+
         static void FurnishRoom(LevelLayout l, int f, int x, int y, System.Random rng)
         {
             var c = l.CellCenter(f, x, y);
-            var quads = Quadrants;
             int blocked = l.StairQuadrant(f, new Vector2Int(x, y));
-            bool Free(int q) => q != blocked;
             l.PatrolPoints.Add(c);
+            var room = l.Rooms[f, x, y];
+            if (room == RoomType.Lobby) l.HatchPosition = c;
 
-            switch (l.Rooms[f, x, y])
+            // Rooms built around their centre first.
+            if (room == RoomType.Lobby)
             {
-                case RoomType.Lobby:
-                    l.HatchPosition = c;
-                    Prop(l, PropKind.Hatch, c, 0);
-                    for (int q = 0; q < 4; q++)
-                    {
-                        Prop(l, PropKind.Plant, c + quads[q] * 1.45f, 0);
-                        l.PlayerSpawns.Add(c + quads[q] * 0.45f);
-                    }
-                    break;
+                Prop(l, PropKind.Hatch, c, 0);
+                for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(c + Quadrants[q] * 0.45f);
+            }
+            if (room == RoomType.Meeting) MeetingCentre(l, c, blocked, rng);
 
-                case RoomType.OpenSpace:
-                    for (int q = 0; q < 4; q++)
-                    {
-                        if (!Free(q)) continue;
-                        if (rng.NextDouble() > 0.85) { l.ItemSpots.Add(c + quads[q]); continue; }
-                        float rot = rng.Next(2) * 90f;
-                        var p = c + quads[q];
-                        Prop(l, PropKind.Desk, p, rot);
-                        Prop(l, PropKind.Chair, p + Quaternion.Euler(0, rot, 0) * new Vector3(0, 0, 0.75f), rot + 180f);
-                        l.ItemSpots.Add(p + Quaternion.Euler(0, rot, 0) * new Vector3(Range(rng, -0.5f, 0.5f), 0.77f, 0.1f));
-                    }
-                    break;
-
-                case RoomType.Office:
+            for (int q = 0; q < 4; q++)
+            {
+                if (q == blocked) continue;
+                var quad = new Quad(c, Quadrants[q].x > 0 ? 1 : -1, Quadrants[q].z > 0 ? 1 : -1);
+                switch (room)
                 {
-                    int deskQ = rng.Next(4);
-                    if (!Free(deskQ)) deskQ = (deskQ + 1) % 4;
-                    var p = c + quads[deskQ];
-                    float rot = rng.Next(4) * 90f;
-                    Prop(l, PropKind.Desk, p, rot);
-                    Prop(l, PropKind.Chair, p + Quaternion.Euler(0, rot, 0) * new Vector3(0, 0, 0.75f), rot + 180f);
-                    l.ItemSpots.Add(p + new Vector3(0, 0.77f, 0));
-                    if (Free((deskQ + 1) % 4))
-                    {
-                        var cab = c + quads[(deskQ + 1) % 4] * 1.4f;
-                        Prop(l, PropKind.Cabinet, cab, rng.Next(4) * 90f);
-                        l.ItemSpots.Add(cab + new Vector3(0, 1.4f, 0));
-                    }
-                    if (Free((deskQ + 2) % 4)) Prop(l, PropKind.Plant, c + quads[(deskQ + 2) % 4] * 1.5f, 0);
-                    if (Free((deskQ + 3) % 4)) l.ItemSpots.Add(c + quads[(deskQ + 3) % 4]);
-                    break;
+                    case RoomType.Lobby: LobbyQuadrant(l, quad, q, rng); break;
+                    case RoomType.OpenSpace: OpenSpaceQuadrant(l, quad, rng); break;
+                    case RoomType.Office: OfficeQuadrant(l, quad, q, rng); break;
+                    case RoomType.Meeting: MeetingQuadrant(l, quad, q, rng); break;
+                    case RoomType.Kitchen: KitchenQuadrant(l, quad, q, rng); break;
+                    case RoomType.Server: ServerQuadrant(l, quad, rng); break;
+                    case RoomType.Storage: StorageQuadrant(l, quad, rng); break;
+                    case RoomType.Restroom: RestroomQuadrant(l, quad, q, rng); break;
+                    case RoomType.Lounge: LoungeQuadrant(l, quad, q, rng); break;
                 }
+            }
+        }
 
-                case RoomType.Meeting:
-                {
-                    Prop(l, PropKind.MeetingTable, c, 0);
-                    for (int i = 0; i < 3; i++)
-                    {
-                        int sx = i - 1; // -1, 0, 1
-                        float px = sx * 1.1f;
-                        // Corner chairs would touch a staircase in that corner.
-                        if (sx == 0 || Free(LevelLayout.QuadrantOf(new Vector2Int(sx, 1)))) Prop(l, PropKind.Chair, c + new Vector3(px, 0, 1.05f), 180f);
-                        if (sx == 0 || Free(LevelLayout.QuadrantOf(new Vector2Int(sx, -1)))) Prop(l, PropKind.Chair, c + new Vector3(px, 0, -1.05f), 0f);
-                    }
-                    int pq = rng.Next(4);
-                    if (Free(pq)) Prop(l, PropKind.Plant, c + quads[pq] * 1.5f, 0);
-                    // Whiteboard on the wall beside the doorway (never in the door, never at the stairs).
-                    float wbSide = rng.Next(2) == 0 ? 1f : -1f;
-                    if (Free(LevelLayout.QuadrantOf(new Vector2Int(wbSide > 0 ? 1 : -1, 1))))
-                        Prop(l, PropKind.Whiteboard, c + new Vector3(wbSide * 2.6f, 0, 4.82f), 180f);
-                    l.ItemSpots.Add(c + new Vector3(Range(rng, -1.2f, 1.2f), 0.78f, Range(rng, -0.3f, 0.3f)));
-                    int iq = rng.Next(4);
-                    if (Free(iq)) l.ItemSpots.Add(c + quads[iq]);
+        static void Item(LevelLayout l, Vector3 p) => l.ItemSpots.Add(p);
+
+        /// <summary>
+        /// Back-to-back cluster of four desks with privacy screens, pushed towards the room's centre cross: the aisle
+        /// behind the outer chairs stays about a metre wide. Loot lies on the inner desks, within reach from the cross.
+        /// </summary>
+        static void DeskCluster(LevelLayout l, Quad q, System.Random rng)
+        {
+            foreach (float u in new[] { 1.9f, 3.5f })
+            {
+                Prop(l, PropKind.Desk, q.P(u, 2.85f), q.OutV);
+                Prop(l, PropKind.Chair, q.P(u + Range(rng, -0.1f, 0.1f), 3.6f), q.InV + Range(rng, -12f, 12f));
+                Prop(l, PropKind.Desk, q.P(u, 2.05f), q.InV);
+                Prop(l, PropKind.Chair, q.P(u + Range(rng, -0.1f, 0.1f), 1.35f), q.OutV + Range(rng, -12f, 12f));
+                Prop(l, PropKind.Partition, q.P(u, 2.45f), 0f);
+                if (rng.NextDouble() < 0.6) Item(l, q.P(u + (rng.Next(2) == 0 ? -0.5f : 0.5f), 1.85f, 0.77f));
+            }
+            if (rng.NextDouble() < 0.5) Prop(l, PropKind.TrashBin, q.P(4.6f, 1.4f), 0f);
+            else Prop(l, PropKind.Cabinet, q.P(4.57f, 3.2f), q.InU);
+        }
+
+        /// <summary>Copier, cabinets and a cooler: the "services" corner of an open space.</summary>
+        static void ServiceCorner(LevelLayout l, Quad q, System.Random rng)
+        {
+            Prop(l, PropKind.Printer, q.P(2.0f, 4.45f), q.InV);
+            Prop(l, PropKind.Cabinet, q.P(3.0f, 4.55f), q.InV);
+            Prop(l, PropKind.Cabinet, q.P(4.0f, 4.55f), q.InV);
+            Prop(l, PropKind.WaterCooler, q.P(4.55f, 3.4f), q.InU);
+            Prop(l, PropKind.Plant, q.P(4.4f, 1.6f), 0f);
+            Prop(l, PropKind.TrashBin, q.P(2.0f, 3.6f), 0f);
+            Item(l, q.P(3.0f, 4.55f, 1.4f));
+            Item(l, q.P(2.6f, 2.4f));
+        }
+
+        static void OpenSpaceQuadrant(LevelLayout l, Quad q, System.Random rng)
+        {
+            if (rng.NextDouble() < 0.8) DeskCluster(l, q, rng);
+            else ServiceCorner(l, q, rng);
+        }
+
+        static void LobbyQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            switch (index)
+            {
+                case 0:
+                    Prop(l, PropKind.ReceptionDesk, q.P(3.0f, 3.2f), q.InV);
+                    Prop(l, PropKind.Chair, q.P(3.0f, 3.95f), q.InV);
+                    Item(l, q.P(2.6f, 3.2f, 0.76f));
                     break;
-                }
-
-                case RoomType.Kitchen:
-                {
-                    float side = rng.Next(2) == 0 ? 1f : -1f;
-                    for (int i = -1; i <= 1; i += 2)
-                    {
-                        int q = LevelLayout.QuadrantOf(new Vector2Int(i, (int)side));
-                        if (!Free(q)) continue;
-                        var p = c + new Vector3(i * 2.9f, 0, side * 4.45f);
-                        Prop(l, PropKind.KitchenCounter, p, side > 0 ? 180f : 0f);
-                        l.ItemSpots.Add(p + new Vector3(Range(rng, -0.8f, 0.4f), 0.93f, 0));
-                    }
-                    int iq = rng.Next(4);
-                    if (Free(iq)) l.ItemSpots.Add(c + quads[iq]);
-                    else l.ItemSpots.Add(c + new Vector3(Range(rng, -0.9f, 0.9f), 0, Range(rng, -0.9f, 0.9f)));
+                case 1:
+                    Prop(l, PropKind.Sofa, q.P(3.0f, 4.3f), q.InV);
+                    Prop(l, PropKind.CoffeeTable, q.P(3.0f, 3.1f), 0f);
+                    Prop(l, PropKind.Plant, q.P(4.5f, 1.6f), 0f);
+                    Item(l, q.P(3.0f, 3.1f, 0.42f));
                     break;
-                }
-
-                case RoomType.Storage:
-                    // Racks with goods: loot sits on the shelves at three heights.
-                    for (int q = 0; q < 4; q++)
-                    {
-                        if (!Free(q)) continue;
-                        var p = c + quads[q] * 1.25f;
-                        Prop(l, PropKind.Shelf, p, 0f);
-                        if (rng.NextDouble() < 0.7)
-                            l.ItemSpots.Add(p + new Vector3(Range(rng, -0.6f, 0.6f), new[] { 0.47f, 1.07f, 1.67f }[rng.Next(3)], 0f));
-                        Prop(l, PropKind.Boxes, c + quads[q] * 0.55f, rng.Next(4) * 90f);
-                    }
+                case 2:
+                    Prop(l, PropKind.CoatRack, q.P(4.4f, 4.4f), 0f);
+                    Prop(l, PropKind.Lockers, q.P(2.4f, 4.55f), q.InV);
+                    Prop(l, PropKind.Lockers, q.P(3.35f, 4.55f), q.InV);
+                    Prop(l, PropKind.Plant, q.P(1.6f, 1.6f), 0f);
                     break;
-
-                case RoomType.Restroom:
-                {
-                    // A row of cubicles along one wall, on a side without stairs.
-                    float side = Free(LevelLayout.QuadrantOf(new Vector2Int(1, 1))) && Free(LevelLayout.QuadrantOf(new Vector2Int(-1, 1))) ? 1f : -1f;
-                    float zWall = side * 4.1f;
-                    for (int i = 0; i < 3; i++)
-                    {
-                        float px = 1.6f + i * 1.05f;
-                        float sx = rng.Next(2) == 0 ? 1f : -1f;
-                        if (!Free(LevelLayout.QuadrantOf(new Vector2Int((int)sx, (int)side)))) sx = -sx;
-                        if (!Free(LevelLayout.QuadrantOf(new Vector2Int((int)sx, (int)side)))) continue;
-                        Prop(l, PropKind.ToiletStall, c + new Vector3(sx * px, 0, zWall), side > 0 ? 180f : 0f);
-                        if (i == 1) l.ItemSpots.Add(c + new Vector3(sx * px, 0, zWall - side * 0.4f));
-                    }
+                default:
+                    Prop(l, PropKind.VendingMachine, q.P(4.4f, 3.0f), q.InU);
+                    Prop(l, PropKind.Armchair, q.P(2.6f, 3.6f), q.InV + 20f);
+                    Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f);
+                    Item(l, q.P(2.0f, 2.2f));
                     break;
-                }
+            }
+        }
 
-                case RoomType.Lounge:
-                {
-                    int sofaQ = rng.Next(4);
-                    if (!Free(sofaQ)) sofaQ = (sofaQ + 2) % 4;
-                    var sp = c + quads[sofaQ] * 1.2f;
-                    Prop(l, PropKind.Sofa, sp, quads[sofaQ].z > 0 ? 180f : 0f);
-                    l.ItemSpots.Add(sp + new Vector3(Range(rng, -0.6f, 0.6f), 0.46f, 0f));
-                    int coolerQ = (sofaQ + 1) % 4;
-                    if (Free(coolerQ)) Prop(l, PropKind.WaterCooler, c + quads[coolerQ] * 1.55f, 0f);
-                    int plantQ = (sofaQ + 3) % 4;
-                    if (Free(plantQ)) Prop(l, PropKind.Plant, c + quads[plantQ] * 1.5f, 0f);
+        static void OfficeQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            switch ((index + l.Seed) & 3)
+            {
+                case 0: // manager's desk facing the room, bookcase behind
+                    Prop(l, PropKind.Desk, q.P(2.8f, 3.1f), q.InV);
+                    Prop(l, PropKind.Chair, q.P(2.8f, 3.9f), q.InV);
+                    Prop(l, PropKind.Bookshelf, q.P(4.35f, 4.65f), q.InV);
+                    Prop(l, PropKind.Chair, q.P(2.5f, 2.0f), q.OutV);
+                    Item(l, q.P(2.5f, 3.2f, 0.77f));
                     break;
-                }
+                case 1: // bookcases along the wall
+                    Prop(l, PropKind.Bookshelf, q.P(1.8f, 4.65f), q.InV);
+                    Prop(l, PropKind.Bookshelf, q.P(2.85f, 4.65f), q.InV);
+                    Prop(l, PropKind.Cabinet, q.P(4.0f, 4.55f), q.InV);
+                    Prop(l, PropKind.Plant, q.P(4.4f, 2.0f), 0f);
+                    Item(l, q.P(4.0f, 4.55f, 1.4f));
+                    break;
+                case 2: // guest corner
+                    Prop(l, PropKind.Armchair, q.P(2.2f, 3.8f), q.InV);
+                    Prop(l, PropKind.Armchair, q.P(3.8f, 2.4f), q.InU);
+                    Prop(l, PropKind.CoffeeTable, q.P(2.6f, 2.5f), 0f);
+                    Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f);
+                    Item(l, q.P(2.6f, 2.5f, 0.42f));
+                    break;
+                default: // files and the copier
+                    Prop(l, PropKind.Cabinet, q.P(4.55f, 2.0f), q.InU);
+                    Prop(l, PropKind.Cabinet, q.P(4.55f, 3.0f), q.InU);
+                    Prop(l, PropKind.Printer, q.P(4.5f, 4.3f), q.InU);
+                    Prop(l, PropKind.CoatRack, q.P(1.6f, 4.4f), 0f);
+                    Prop(l, PropKind.TrashBin, q.P(2.6f, 4.55f), 0f);
+                    Item(l, q.P(4.55f, 3.0f, 1.4f));
+                    break;
+            }
+        }
 
-                case RoomType.Server:
-                    for (int q = 0; q < 4; q++)
-                    {
-                        if (!Free(q)) continue;
-                        Prop(l, PropKind.ServerRack, c + quads[q] + new Vector3(-0.45f, 0, 0), 0);
-                        Prop(l, PropKind.ServerRack, c + quads[q] + new Vector3(0.45f, 0, 0), 0);
-                    }
-                    l.ItemSpots.Add(c + new Vector3(Range(rng, -0.9f, 0.9f), 0, Range(rng, -0.9f, 0.9f))); // the centre cross is always free
-                    int sq = rng.Next(4);
-                    if (Free(sq)) l.ItemSpots.Add(c + quads[sq] * 0.45f);
+        static void MeetingCentre(LevelLayout l, Vector3 c, int blocked, System.Random rng)
+        {
+            Prop(l, PropKind.MeetingTable, c, 0);
+            for (int i = 0; i < 3; i++)
+            {
+                int sx = i - 1; // -1, 0, 1
+                float px = sx * 1.1f;
+                // Corner chairs would touch a staircase in that corner.
+                if (sx == 0 || LevelLayout.QuadrantOf(new Vector2Int(sx, 1)) != blocked) Prop(l, PropKind.Chair, c + new Vector3(px, 0, 1.05f), 180f);
+                if (sx == 0 || LevelLayout.QuadrantOf(new Vector2Int(sx, -1)) != blocked) Prop(l, PropKind.Chair, c + new Vector3(px, 0, -1.05f), 0f);
+            }
+            l.ItemSpots.Add(c + new Vector3(Range(rng, -1.2f, 1.2f), 0.78f, Range(rng, -0.3f, 0.3f)));
+        }
+
+        static void MeetingQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            switch (index)
+            {
+                case 0: Prop(l, PropKind.TvStand, q.P(2.6f, 4.55f), q.InV); Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f); break;
+                case 1: Prop(l, PropKind.Whiteboard, q.P(2.6f, 4.75f), q.InV); Prop(l, PropKind.Chair, q.P(4.3f, 3.2f), q.InU); break;
+                case 2: Prop(l, PropKind.Cabinet, q.P(2.4f, 4.55f), q.InV); Prop(l, PropKind.Cabinet, q.P(3.4f, 4.55f), q.InV); Item(l, q.P(2.4f, 4.55f, 1.4f)); break;
+                default: Prop(l, PropKind.WaterCooler, q.P(4.55f, 4.45f), q.InU); Prop(l, PropKind.Plant, q.P(1.6f, 4.4f), 0f); Prop(l, PropKind.Chair, q.P(4.3f, 2.2f), q.InU); break;
+            }
+        }
+
+        /// <summary>Counters with a sink and a coffee machine along the wall, a fridge; tables with chairs.</summary>
+        static void KitchenQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            if (index < 2)
+            {
+                Prop(l, PropKind.KitchenCounter, q.P(2.6f, 4.45f), q.InV);
+                Prop(l, PropKind.CoffeeMachine, q.P(2.6f + 0.75f * q.LocalXAlongU, 4.5f, 0.93f), q.InV); // the microwave sits at local -X
+                Prop(l, PropKind.Fridge, q.P(4.35f, 4.45f), q.InV);
+                Prop(l, PropKind.TrashBin, q.P(4.6f, 3.6f), 0f);
+                Prop(l, PropKind.RoundTable, q.P(2.8f, 2.4f), 0f);
+                Prop(l, PropKind.Chair, q.P(2.8f, 1.55f), q.OutV);
+                Prop(l, PropKind.Chair, q.P(3.75f, 2.4f), q.InU);
+                Item(l, q.P(2.6f, 4.45f, 0.93f));
+                Item(l, q.P(2.8f, 2.4f, 0.76f));
+            }
+            else
+            {
+                Prop(l, PropKind.VendingMachine, q.P(2.4f, 4.4f), q.InV);
+                Prop(l, PropKind.WaterCooler, q.P(3.6f, 4.6f), q.InV);
+                Prop(l, PropKind.RoundTable, q.P(2.8f, 2.6f), 0f);
+                Prop(l, PropKind.Chair, q.P(2.8f, 1.7f), q.OutV);
+                Prop(l, PropKind.Chair, q.P(3.7f, 2.6f), q.InU);
+                Prop(l, PropKind.Chair, q.P(1.9f, 2.6f), q.OutU);
+                Item(l, q.P(2.8f, 2.6f, 0.76f));
+            }
+        }
+
+        /// <summary>Two rows of racks with a cold aisle between them.</summary>
+        static void ServerQuadrant(LevelLayout l, Quad q, System.Random rng)
+        {
+            foreach (float u in new[] { 1.85f, 2.6f, 3.35f })
+            {
+                Prop(l, PropKind.ServerRack, q.P(u, 4.25f), q.InV);
+                Prop(l, PropKind.ServerRack, q.P(u, 1.75f), q.OutV);
+            }
+            Prop(l, PropKind.Cabinet, q.P(4.55f, 3.0f), q.InU);
+            Item(l, q.P(Range(rng, 1.6f, 2.8f), 3.0f));
+        }
+
+        /// <summary>Shelving rows, pallets and boxes; loot on the shelves at three heights.</summary>
+        static void StorageQuadrant(LevelLayout l, Quad q, System.Random rng)
+        {
+            var levels = new[] { 0.47f, 1.07f, 1.67f };
+            Prop(l, PropKind.Shelf, q.P(2.6f, 4.5f), q.InV);
+            if (rng.NextDouble() < 0.7) Item(l, q.P(2.6f + Range(rng, -0.6f, 0.6f), 4.5f, levels[rng.Next(3)]));
+            if (rng.NextDouble() < 0.5)
+            {
+                Prop(l, PropKind.Shelf, q.P(2.25f, 2.4f), q.InV);
+                if (rng.NextDouble() < 0.7) Item(l, q.P(2.25f + Range(rng, -0.6f, 0.6f), 2.4f, levels[rng.Next(3)]));
+            }
+            else
+            {
+                Prop(l, PropKind.Pallet, q.P(2.4f, 2.4f), rng.Next(2) * 90f);
+                Item(l, q.P(3.7f, 3.3f));
+            }
+            Prop(l, PropKind.Boxes, q.P(4.05f, 1.95f), rng.Next(4) * 90f); // reaches 0.78 m from its origin
+            Prop(l, PropKind.Lockers, q.P(4.55f, 3.6f), q.InU);
+        }
+
+        static void RestroomQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            if (index < 2)
+            {
+                // A row of cubicles along the wall.
+                foreach (float u in new[] { 1.65f, 2.7f, 3.75f }) Prop(l, PropKind.ToiletStall, q.P(u, 4.05f), q.InV);
+                Item(l, q.P(2.7f, 3.0f));
+            }
+            else
+            {
+                Prop(l, PropKind.WashBasin, q.P(2.8f, 4.55f), q.InV);
+                Prop(l, PropKind.TrashBin, q.P(4.4f, 4.5f), 0f);
+                if (rng.NextDouble() < 0.5) Item(l, q.P(2.4f, 4.5f, 0.88f));
+            }
+        }
+
+        static void LoungeQuadrant(LevelLayout l, Quad q, int index, System.Random rng)
+        {
+            switch (index)
+            {
+                case 0:
+                    Prop(l, PropKind.Sofa, q.P(2.9f, 4.3f), q.InV);
+                    Prop(l, PropKind.CoffeeTable, q.P(2.9f, 3.1f), 0f);
+                    Prop(l, PropKind.Armchair, q.P(4.3f, 2.4f), q.InU);
+                    Item(l, q.P(2.9f, 4.3f, 0.46f));
+                    Item(l, q.P(2.9f, 3.1f, 0.42f));
+                    break;
+                case 1:
+                    Prop(l, PropKind.TvStand, q.P(2.8f, 4.55f), q.InV);
+                    Prop(l, PropKind.Armchair, q.P(2.2f, 2.6f), q.OutV);
+                    Prop(l, PropKind.Armchair, q.P(3.4f, 2.6f), q.OutV);
+                    Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f);
+                    break;
+                case 2:
+                    Prop(l, PropKind.Bookshelf, q.P(2.0f, 4.65f), q.InV);
+                    Prop(l, PropKind.Bookshelf, q.P(3.05f, 4.65f), q.InV);
+                    Prop(l, PropKind.Armchair, q.P(2.6f, 2.8f), q.OutV);
+                    Prop(l, PropKind.Plant, q.P(4.4f, 2.0f), 0f);
+                    break;
+                default:
+                    Prop(l, PropKind.VendingMachine, q.P(4.4f, 3.0f), q.InU);
+                    Prop(l, PropKind.WaterCooler, q.P(4.6f, 4.4f), q.InU);
+                    Prop(l, PropKind.RoundTable, q.P(2.5f, 2.6f), 0f);
+                    Prop(l, PropKind.Chair, q.P(2.5f, 3.5f), q.InV);
+                    Item(l, q.P(2.5f, 2.6f, 0.76f));
                     break;
             }
         }
@@ -476,11 +622,11 @@ namespace Stealth.Level
                 for (int x = 0; x < l.Width - 1; x++)
                     for (int y = 0; y < l.Height; y++)
                         if (l.EdgesX[f, x, y] == EdgeType.Door)
-                            doors.Add(new LaserSpot { Position = new Vector3((x + 1) * Cell, fy, (y + 0.5f) * Cell), Rotation = Quaternion.Euler(0, 90, 0), Width = DoorWidth });
+                            doors.Add(new LaserSpot { Position = new Vector3((x + 1) * Cell, fy, (y + 0.5f) * Cell), Rotation = Quaternion.Euler(0, 90, 0), Width = ClearWidth(DoorWidth) });
                 for (int x = 0; x < l.Width; x++)
                     for (int y = 0; y < l.Height - 1; y++)
                         if (l.EdgesZ[f, x, y] == EdgeType.Door)
-                            doors.Add(new LaserSpot { Position = new Vector3((x + 0.5f) * Cell, fy, (y + 1) * Cell), Rotation = Quaternion.identity, Width = DoorWidth });
+                            doors.Add(new LaserSpot { Position = new Vector3((x + 0.5f) * Cell, fy, (y + 1) * Cell), Rotation = Quaternion.identity, Width = ClearWidth(DoorWidth) });
             }
             int lasers = s.Lasers + level * s.LasersPerHouse;
             while (l.LaserSpots.Count < lasers && doors.Count > 0)

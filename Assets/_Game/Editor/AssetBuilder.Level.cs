@@ -18,7 +18,6 @@ namespace Stealth.EditorTools
             var slab = Prefab($"{LevelPrefabs}/FloorSlab.prefab", () => Block("FloorSlab", M("Floor")));
             var roof = Prefab($"{LevelPrefabs}/Roof.prefab", () => Block("Roof", M("Ceiling"), layer: LevelMetrics.CeilingLayer));
             var ground = Prefab($"{LevelPrefabs}/OutsideGround.prefab", () => Block("OutsideGround", M("OutsideGround"), layer: LevelMetrics.CeilingLayer));
-            var window = Prefab($"{LevelPrefabs}/WindowPane.prefab", () => Block("WindowPane", M("Window"), collider: false));
             var fence = Prefab($"{LevelPrefabs}/Fence.prefab", BuildFence);
 
             // Pieces.
@@ -29,6 +28,7 @@ namespace Stealth.EditorTools
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var lamp = Prefab($"{LevelPrefabs}/StreetLamp.prefab", BuildStreetLamp);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
+            var window = Prefab($"{LevelPrefabs}/Window.prefab", () => PropObject("Window", "window", "Blinds", "WindowFrame", "Window", collider: false));
 
             string p = PropPrefabs + "/";
             var desk = Prefab(p + "Desk.prefab", () => PropObject("Desk", "desk", "PropBody", "PropAccent", "PropScreen"));
@@ -44,6 +44,22 @@ namespace Stealth.EditorTools
             var board = Prefab(p + "Whiteboard.prefab", () => PropObject("Whiteboard", "whiteboard", "Ceiling", "PropAccent", "PropScreen"));
             var sofa = Prefab(p + "Sofa.prefab", () => PropObject("Sofa", "sofa", "Fabric", "PropAccent", "PropAccent"));
             var stall = Prefab(p + "ToiletStall.prefab", () => PropObject("ToiletStall", "toilet_stall", "Stall", "Ceiling", "Ceiling"));
+            var pPartition = Prefab(p + "Partition.prefab", () => PropObject("Partition", "partition", "Fabric", "PropAccent", "PropAccent"));
+            var pBookshelf = Prefab(p + "Bookshelf.prefab", () => PropObject("Bookshelf", "bookshelf", "Wood", "Folders", "Folders"));
+            var pPrinter = Prefab(p + "Printer.prefab", () => PropObject("Printer", "printer", "Ceiling", "PropAccent", "PropScreen"));
+            var pFridge = Prefab(p + "Fridge.prefab", () => PropObject("Fridge", "fridge", "Ceiling", "Metal", "Metal"));
+            var pCoffeeMachine = Prefab(p + "CoffeeMachine.prefab", () => PropObject("CoffeeMachine", "coffee_machine", "Rack", "Metal", "RackLights"));
+            var pRoundTable = Prefab(p + "RoundTable.prefab", () => PropObject("RoundTable", "round_table", "Wood", "Metal", "Metal"));
+            var pArmchair = Prefab(p + "Armchair.prefab", () => PropObject("Armchair", "armchair", "Fabric", "PropAccent", "PropAccent"));
+            var pCoffeeTable = Prefab(p + "CoffeeTable.prefab", () => PropObject("CoffeeTable", "coffee_table", "Wood", "Metal", "Metal"));
+            var pTvStand = Prefab(p + "TvStand.prefab", () => PropObject("TvStand", "tv_stand", "Wood", "Rack", "PropScreen"));
+            var pReceptionDesk = Prefab(p + "ReceptionDesk.prefab", () => PropObject("ReceptionDesk", "reception_desk", "Wood", "Ceiling", "PropScreen"));
+            var pTrashBin = Prefab(p + "TrashBin.prefab", () => PropObject("TrashBin", "trash_bin", "Metal", "PropAccent", "PropAccent"));
+            var pCoatRack = Prefab(p + "CoatRack.prefab", () => PropObject("CoatRack", "coat_rack", "Fabric", "Metal", "Metal"));
+            var pLockers = Prefab(p + "Lockers.prefab", () => PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent"));
+            var pPallet = Prefab(p + "Pallet.prefab", () => PropObject("Pallet", "pallet", "Cardboard", "Wood", "Wood"));
+            var pWashBasin = Prefab(p + "WashBasin.prefab", () => PropObject("WashBasin", "wash_basin", "Ceiling", "Metal", "Mirror"));
+            var pVendingMachine = Prefab(p + "VendingMachine.prefab", () => PropObject("VendingMachine", "vending_machine", "Vending", "PropAccent", "VendingGlass"));
 
             return DataAsset<LevelArt>(DataDir + "/LevelArt.asset", art =>
             {
@@ -53,7 +69,6 @@ namespace Stealth.EditorTools
                 art.FloorSlab = slab;
                 art.Roof = roof;
                 art.OutsideGround = ground;
-                art.WindowPane = window;
                 art.Fence = fence;
                 art.Stairs = stairs;
                 art.StairsMirrored = stairsMirrored;
@@ -61,6 +76,7 @@ namespace Stealth.EditorTools
                 art.AutoDoor = door;
                 art.RoomLight = light;
                 art.StreetLamp = lamp;
+                art.Window = window;
                 art.Hatch = hatch;
                 art.Desk = desk;
                 art.Chair = chair;
@@ -75,6 +91,22 @@ namespace Stealth.EditorTools
                 art.Whiteboard = board;
                 art.Sofa = sofa;
                 art.ToiletStall = stall;
+                art.Partition = pPartition;
+                art.Bookshelf = pBookshelf;
+                art.Printer = pPrinter;
+                art.Fridge = pFridge;
+                art.CoffeeMachine = pCoffeeMachine;
+                art.RoundTable = pRoundTable;
+                art.Armchair = pArmchair;
+                art.CoffeeTable = pCoffeeTable;
+                art.TvStand = pTvStand;
+                art.ReceptionDesk = pReceptionDesk;
+                art.TrashBin = pTrashBin;
+                art.CoatRack = pCoatRack;
+                art.Lockers = pLockers;
+                art.Pallet = pPallet;
+                art.WashBasin = pWashBasin;
+                art.VendingMachine = pVendingMachine;
             });
         }
 
@@ -190,16 +222,21 @@ namespace Stealth.EditorTools
 
         static GameObject BuildHatch()
         {
-            var hatch = PropObject("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing");
+            var hatch = PropObject("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing", collider: false);
             hatch.AddComponent<Hatch>();
-            var box = hatch.GetComponent<BoxCollider>();
-            box.size = new Vector3(box.size.x, 0.3f, box.size.z); // easy target for dropping items
-            box.center = new Vector3(box.center.x, 0.1f, box.center.z);
+            var b = LocalBounds(hatch);
+            var box = hatch.AddComponent<BoxCollider>();
+            box.size = new Vector3(b.size.x, 0.3f, b.size.z); // easy target for dropping items
+            box.center = new Vector3(b.center.x, 0.1f, b.center.z);
             return hatch;
         }
 
         // ------------------------------------------------------------------ props
 
+        /// <summary>
+        /// Furniture: the model plus a mesh collider on every part, so the colliders follow the shape — an item on a desk
+        /// next to the monitor or on a shelf is not buried inside one big bounding box and can be grabbed from any side.
+        /// </summary>
         static GameObject PropObject(string name, string file, string body, string accent, string eye, bool collider = true)
         {
             var root = new GameObject(name);
@@ -207,12 +244,8 @@ namespace Stealth.EditorTools
             model.transform.SetParent(root.transform, false);
             Paint(model, body, accent, eye);
             if (collider)
-            {
-                var b = LocalBounds(root);
-                var box = root.AddComponent<BoxCollider>();
-                box.center = b.center;
-                box.size = b.size;
-            }
+                foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true))
+                    mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
             return root;
         }
     }

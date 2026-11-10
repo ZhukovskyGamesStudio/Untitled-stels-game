@@ -18,7 +18,6 @@ namespace Stealth.Level
         public GameObject FloorSlab;
         public GameObject Roof;
         public GameObject OutsideGround;
-        public GameObject WindowPane;
         public GameObject Fence;
 
         [Header("Pieces")]
@@ -28,6 +27,8 @@ namespace Stealth.Level
         public GameObject AutoDoor;
         public GameObject RoomLight;
         public GameObject StreetLamp;
+        [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
+        public GameObject Window;
 
         [Header("Props")]
         public GameObject Desk;
@@ -44,6 +45,22 @@ namespace Stealth.Level
         public GameObject Whiteboard;
         public GameObject Sofa;
         public GameObject ToiletStall;
+        public GameObject Partition;
+        public GameObject Bookshelf;
+        public GameObject Printer;
+        public GameObject Fridge;
+        public GameObject CoffeeMachine;
+        public GameObject RoundTable;
+        public GameObject Armchair;
+        public GameObject CoffeeTable;
+        public GameObject TvStand;
+        public GameObject ReceptionDesk;
+        public GameObject TrashBin;
+        public GameObject CoatRack;
+        public GameObject Lockers;
+        public GameObject Pallet;
+        public GameObject WashBasin;
+        public GameObject VendingMachine;
 
         public GameObject Prop(PropKind kind) => kind switch
         {
@@ -61,6 +78,22 @@ namespace Stealth.Level
             PropKind.Whiteboard => Whiteboard,
             PropKind.Sofa => Sofa,
             PropKind.ToiletStall => ToiletStall,
+            PropKind.Partition => Partition,
+            PropKind.Bookshelf => Bookshelf,
+            PropKind.Printer => Printer,
+            PropKind.Fridge => Fridge,
+            PropKind.CoffeeMachine => CoffeeMachine,
+            PropKind.RoundTable => RoundTable,
+            PropKind.Armchair => Armchair,
+            PropKind.CoffeeTable => CoffeeTable,
+            PropKind.TvStand => TvStand,
+            PropKind.ReceptionDesk => ReceptionDesk,
+            PropKind.TrashBin => TrashBin,
+            PropKind.CoatRack => CoatRack,
+            PropKind.Lockers => Lockers,
+            PropKind.Pallet => Pallet,
+            PropKind.WashBasin => WashBasin,
+            PropKind.VendingMachine => VendingMachine,
             _ => null,
         };
     }

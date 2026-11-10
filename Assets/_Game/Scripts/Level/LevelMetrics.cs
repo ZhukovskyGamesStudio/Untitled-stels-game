@@ -13,7 +13,7 @@ namespace Stealth.Level
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
-        public const float VentWidth = 1.2f;  // wall pieces overlap the opening by 0.1 on each side: 1.0 m clear
+        public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
         public const float VentHeight = 1.4f; // crouched capsule 1.1 m + PhysX step-up probe (stepOffset 0.35); standing 1.8 m does not fit
         public const int CeilingLayer = 2;    // "Ignore Raycast": kept out of the navmesh and vision checks
         public const int StairsArea = 3;      // NavMesh area "Stairs": robots without legs exclude it
@@ -24,6 +24,9 @@ namespace Stealth.Level
         public const float StairSize = 4f;    // the stair + hole occupy [0, 4] x [0, 4] from the corner
         public const float FlightStart = 3.8f; // u where flight A starts / flight B ends
         public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.28
+
+        /// <summary>Clear width of an opening (door, vent): the jambs take half a wall thickness on each side.</summary>
+        public static float ClearWidth(float nominal) => nominal - WallThickness;
 
         /// <summary>Furniture quadrants of a room (offsets from its centre).</summary>
         public static readonly Vector3[] Quadrants =

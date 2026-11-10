@@ -154,12 +154,18 @@ namespace Stealth.Level
             Block(m_Art.FloorSlab, "Slab", new Vector3((x0 + x1) / 2f, y, (z0 + z1) / 2f), new Vector3(x1 - x0, LevelMetrics.SlabThickness, z1 - z0));
         }
 
+        /// <summary>
+        /// Walls of a floor without any overlapping geometry (overlaps z-fight and look like clipping): every wall
+        /// segment stops half a wall thickness short of the grid corners, and every corner that walls meet gets one post.
+        /// Openings are cut between the segments; the lintel above a doorway fills exactly the gap.
+        /// </summary>
         void BuildWalls(int f)
         {
             var l = m_Layout;
             const float cell = LevelMetrics.Cell;
             float W = l.Width * cell, H = l.Height * cell;
             var up = Vector3.up * LevelLayout.FloorY(f);
+            m_Corners.Clear();
             for (int x = 0; x < l.Width - 1; x++)
                 for (int y = 0; y < l.Height; y++)
                     EdgeWall(new Vector3((x + 1) * cell, 0, y * cell) + up, new Vector3((x + 1) * cell, 0, (y + 1) * cell) + up, l.EdgesX[f, x, y]);
@@ -176,7 +182,12 @@ namespace Stealth.Level
                 EdgeWall(new Vector3(0, 0, y * cell) + up, new Vector3(0, 0, (y + 1) * cell) + up, Exterior(f, 0, y, Vector2Int.left));
                 EdgeWall(new Vector3(W, 0, y * cell) + up, new Vector3(W, 0, (y + 1) * cell) + up, Exterior(f, l.Width - 1, y, Vector2Int.right));
             }
+            const float t = LevelMetrics.WallThickness;
+            foreach (var c in m_Corners)
+                Block(m_Art.WallBlock, "WallPost", c + Vector3.up * (LevelMetrics.WallHeight / 2f), new Vector3(t, LevelMetrics.WallHeight, t));
         }
+
+        readonly HashSet<Vector3> m_Corners = new();
 
         EdgeType Exterior(int f, int x, int y, Vector2Int dir) =>
             f == 0 && m_Layout.ExteriorDoors.Exists(e => e.cell == new Vector2Int(x, y) && e.dir == dir) ? EdgeType.Door : EdgeType.Wall;
@@ -184,32 +195,40 @@ namespace Stealth.Level
         void EdgeWall(Vector3 a, Vector3 b, EdgeType type)
         {
             if (type == EdgeType.Open) return;
+            m_Corners.Add(Snap(a));
+            m_Corners.Add(Snap(b));
+            const float t = LevelMetrics.WallThickness;
+            var dir = (b - a).normalized;
+            var a1 = a + dir * (t / 2f); // segments end at the corner posts
+            var b1 = b - dir * (t / 2f);
             if (type == EdgeType.Wall)
             {
-                WallPiece(m_Art.WallBlock, a, b, 0, LevelMetrics.WallHeight);
+                WallPiece(m_Art.WallBlock, a1, b1, 0, LevelMetrics.WallHeight);
                 return;
             }
-            var dir = (b - a).normalized;
             var mid = (a + b) / 2f;
             bool vent = type == EdgeType.Vent;
             // Vents sit in the middle of the wall like doors: the centre cross of a room is always kept free of furniture.
-            float width = vent ? LevelMetrics.VentWidth : LevelMetrics.DoorWidth;
-            var d0 = mid - dir * (width / 2f);
-            var d1 = mid + dir * (width / 2f);
-            WallPiece(m_Art.WallBlock, a, d0, 0, LevelMetrics.WallHeight);
-            WallPiece(m_Art.WallBlock, d1, b, 0, LevelMetrics.WallHeight);
+            float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : LevelMetrics.DoorWidth);
+            var d0 = mid - dir * (clear / 2f);
+            var d1 = mid + dir * (clear / 2f);
+            WallPiece(m_Art.WallBlock, a1, d0, 0, LevelMetrics.WallHeight);
+            WallPiece(m_Art.WallBlock, d1, b1, 0, LevelMetrics.WallHeight);
             WallPiece(m_Art.TrimBlock, d0, d1, vent ? LevelMetrics.VentHeight : LevelMetrics.DoorHeight, LevelMetrics.WallHeight);
             // The vent frame prefab is modelled along local X; turn it to the wall direction.
             if (vent) Place(m_Art.VentFrame, "VentFrame", mid, Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x)));
         }
 
+        static Vector3 Snap(Vector3 p) => new(Mathf.Round(p.x * 100f) / 100f, Mathf.Round(p.y * 100f) / 100f, Mathf.Round(p.z * 100f) / 100f);
+
+        /// <summary>A wall block exactly from <paramref name="a"/> to <paramref name="b"/> (no overlap with neighbours).</summary>
         void WallPiece(GameObject prefab, Vector3 a, Vector3 b, float y0, float y1)
         {
             var len = (b - a).magnitude;
             if (len < 0.01f) return;
             bool alongX = Mathf.Abs(b.x - a.x) > Mathf.Abs(b.z - a.z);
             const float t = LevelMetrics.WallThickness;
-            var size = alongX ? new Vector3(len + t, y1 - y0, t) : new Vector3(t, y1 - y0, len + t);
+            var size = alongX ? new Vector3(len, y1 - y0, t) : new Vector3(t, y1 - y0, len);
             Block(prefab, "Wall", (a + b) / 2f + Vector3.up * ((y0 + y1) / 2f), size);
         }
 
@@ -231,31 +250,46 @@ namespace Stealth.Level
             Place(mirrored ? m_Art.StairsMirrored : m_Art.Stairs, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
         }
 
-        /// <summary>Windows on every floor (visual only) and street lamps in the gas around the building.</summary>
+        /// <summary>Windows on every floor (visual only, blinds facing the room) and street lamps in the gas around the building.</summary>
         void BuildFacade()
         {
             var l = m_Layout;
-            const float cell = LevelMetrics.Cell, pane = LevelMetrics.WallThickness + 0.04f;
+            const float cell = LevelMetrics.Cell;
             float W = l.Width * cell, H = l.Height * cell;
+            void Window(Vector3 p, float yaw) => Place(m_Art.Window, "Window", p, Quaternion.Euler(0f, yaw, 0f));
             for (int f = 0; f < l.Floors; f++)
             {
                 float y = LevelLayout.FloorY(f) + 1.7f;
-                for (int x = 0; x < l.Width; x++)
-                    foreach (float side in new[] { -2.6f, 2.6f })
-                    {
-                        float cx = (x + 0.5f) * cell + side;
-                        Block(m_Art.WindowPane, "Window", new Vector3(cx, y, 0f), new Vector3(2.4f, 1.2f, pane));
-                        Block(m_Art.WindowPane, "Window", new Vector3(cx, y, H), new Vector3(2.4f, 1.2f, pane));
-                    }
-                for (int z = 0; z < l.Height; z++)
-                    foreach (float side in new[] { -2.6f, 2.6f })
-                    {
-                        float cz = (z + 0.5f) * cell + side;
-                        Block(m_Art.WindowPane, "Window", new Vector3(0f, y, cz), new Vector3(pane, 1.2f, 2.4f));
-                        Block(m_Art.WindowPane, "Window", new Vector3(W, y, cz), new Vector3(pane, 1.2f, 2.4f));
-                    }
+                foreach (var (p, yaw) in WindowSpots(l.Width, l.Height, y)) Window(p, yaw);
             }
             foreach (var p in StreetLampSpots(W, H)) Place(m_Art.StreetLamp, "StreetLamp", p, Quaternion.identity);
+        }
+
+        /// <summary>
+        /// Two windows per outer wall of every cell, at height <paramref name="y"/>; the yaw turns the window's interior
+        /// side (local +Z) into the building (pure).
+        /// </summary>
+        public static List<(Vector3 pos, float yaw)> WindowSpots(int width, int height, float y)
+        {
+            const float cell = LevelMetrics.Cell;
+            float W = width * cell, H = height * cell;
+            var list = new List<(Vector3, float)>();
+            foreach (float side in new[] { -2.6f, 2.6f })
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float cx = (x + 0.5f) * cell + side;
+                    list.Add((new Vector3(cx, y, 0f), 0f));
+                    list.Add((new Vector3(cx, y, H), 180f));
+                }
+                for (int z = 0; z < height; z++)
+                {
+                    float cz = (z + 0.5f) * cell + side;
+                    list.Add((new Vector3(0f, y, cz), 90f));
+                    list.Add((new Vector3(W, y, cz), -90f));
+                }
+            }
+            return list;
         }
 
         /// <summary>Street lamps every ~14 m around the building, 6 m out in the fog (pure).</summary>

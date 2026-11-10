@@ -9,6 +9,35 @@ namespace Stealth.Tests
     public class RobotTests
     {
         [Test]
+        public void SensorMountsFollowTheSenses()
+        {
+            var guard = new RobotSenses { HasEyes = true, HearingMultiplier = 0.8f };
+            Assert.AreEqual((true, true, false, false), SensorRig.Mounts(guard));
+            var thumper = new RobotSenses { HasEyes = false, HearingMultiplier = 0f, SeismicRange = 10f };
+            Assert.AreEqual((false, false, true, false), SensorRig.Mounts(thumper));
+            var hound = new RobotSenses { HasEyes = false, HearingMultiplier = 0.6f, SmellRange = 3f };
+            Assert.AreEqual((false, true, false, true), SensorRig.Mounts(hound));
+        }
+
+        [Test]
+        public void EveryMobileRobotPrefabWearsItsSensors()
+        {
+            foreach (var path in UnityEditor.AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs/Robots" }))
+            {
+                var go = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(UnityEditor.AssetDatabase.GUIDToAssetPath(path));
+                var rc = go.GetComponent<RobotController>();
+                if (rc == null) continue;
+                var rig = go.GetComponent<SensorRig>();
+                Assert.IsNotNull(rig, $"{go.name} has a sensor rig");
+                Assert.AreSame(rc, rig.Robot);
+                var (eyes, ears, ground, nose) = SensorRig.Mounts(rc.Senses);
+                Assert.IsTrue(eyes || ears || ground || nose, $"{go.name} shows at least one sensor");
+                foreach (var r in rig.Eyes[0].GetComponentsInChildren<Renderer>())
+                    if (r.name.StartsWith("Eye")) CollectionAssert.Contains(rc.Status.Renderers, r, $"{go.name}: the eye lens glows in the status colour");
+            }
+        }
+
+        [Test]
         public void RosterUnlocksNewRobotsDeeper()
         {
             HashSet<RobotKind> Kinds(int level)

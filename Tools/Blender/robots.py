@@ -121,8 +121,42 @@ def plate():
     export("sensor_plate")
 
 
+# --------------------------------------------------------------------------- sensor attachments
+# Mounted on mobile robots by the asset builder according to their senses, so that a player can tell what a robot
+# perceives by looking at it. Origin = mount point, front = -Y (Unity +Z). Glowing parts (Eye*) show the robot state.
+
+def attach_eye():
+    """Camera eye: a housing with a hood and a big glowing lens."""
+    merge("Accent", [cylinder(0.1, 0.14, (0, 0.02, 0), axis="Y", segments=16), cylinder(0.115, 0.05, (0, -0.06, 0), axis="Y", segments=16, radius2=0.1)])
+    merge("Eye", [cylinder(0.07, 0.03, (0, -0.07, 0), axis="Y", segments=16)])
+    export("attach_eye")
+
+
+def attach_mic():
+    """Microphone on a stalk: thin rod, a grilled ball on top (glows)."""
+    merge("Accent", [cylinder(0.015, 0.28, (0, 0, 0.14), segments=8), cylinder(0.05, 0.02, (0, 0, 0.01), segments=10)])
+    merge("Eye", [sphere(0.065, (0, 0, 0.32), segments=12)])
+    merge("Body", [cylinder(0.07, 0.015, (0, 0, 0.32 + d), segments=12) for d in (-0.03, 0.0, 0.03)])
+    export("attach_mic")
+
+
+def attach_seismic():
+    """Ground probe: a plate with a spike down to the floor (origin at floor level)."""
+    merge("Accent", [cylinder(0.08, 0.03, (0, 0, 0.3), segments=12), cylinder(0.02, 0.2, (0, 0, 0.18), segments=8)])
+    merge("Eye", [cylinder(0.04, 0.1, (0, 0, 0.05), segments=10, radius2=0.002)])
+    export("attach_seismic")
+
+
+def attach_nose():
+    """Sniffer snout pointing forward with glowing vents at the tip."""
+    merge("Accent", [cylinder(0.09, 0.26, (0, -0.13, 0), axis="Y", segments=12, radius2=0.05)])
+    merge("Eye", [box((0.03, 0.02, 0.02), (x, -0.265, 0)) for x in (-0.02, 0.02)] + [box((0.07, 0.02, 0.015), (0, -0.265, -0.03))])
+    export("attach_nose")
+
+
 if __name__ == "__main__":
     clear_scene()
-    for fn in (drone, spider, vacuum, turret, thumper, hound, sorter, worker, hunter, scanner, pir, plate):
+    for fn in (drone, spider, vacuum, turret, thumper, hound, sorter, worker, hunter, scanner, pir, plate,
+               attach_eye, attach_mic, attach_seismic, attach_nose):
         fn()
     print("ROBOTS DONE")

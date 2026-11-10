@@ -139,6 +139,14 @@ namespace Stealth.UI
             if (settings) UpdateSettingsLabels();
         }
 
+        void LateUpdate()
+        {
+            // Menus always get a free cursor — also right after leaving a session, when the player that locked it is gone.
+            if (Session.IsRunning && !IsOpen && !SettingsOpen) return;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
         void UpdateMain(ISessionLauncher net)
         {
             SteamStatus.text = $"Steam: {net.SteamStatus}";

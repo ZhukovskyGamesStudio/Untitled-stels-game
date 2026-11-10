@@ -6,7 +6,9 @@ namespace Stealth.Level
     public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge }
     /// <summary>Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not.</summary>
     public enum EdgeType { Wall, Door, Open, Vent }
-    public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall }
+    public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall,
+        Partition, Bookshelf, Printer, Fridge, CoffeeMachine, RoundTable, Armchair, CoffeeTable, TvStand, ReceptionDesk,
+        TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine }
 
     public struct PropPlacement
     {
