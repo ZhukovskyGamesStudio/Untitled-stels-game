@@ -18,6 +18,7 @@ namespace Stealth.Configs
         public ItemsConfig Items;
         public AudioConfig Audio;
         public PerceptionConfig Perception;
+        public StyleConfig Styles;
     }
 
     /// <summary>
@@ -34,6 +35,7 @@ namespace Stealth.Configs
         static ItemsConfig s_Items;
         static AudioConfig s_Audio;
         static PerceptionConfig s_Perception;
+        static StyleConfig s_Styles;
 
         public static PlayerConfig Player => Pick(Root != null ? Root.Player : null, ref s_Player);
         public static RunConfig Run => Pick(Root != null ? Root.Run : null, ref s_Run);
@@ -41,6 +43,8 @@ namespace Stealth.Configs
         public static ItemsConfig Items => Pick(Root != null ? Root.Items : null, ref s_Items);
         public static AudioConfig Audio => Pick(Root != null ? Root.Audio : null, ref s_Audio);
         public static PerceptionConfig Perception => Pick(Root != null ? Root.Perception : null, ref s_Perception);
+        /// <summary>Visual styles (an empty list without the asset: the game keeps its base look).</summary>
+        public static StyleConfig Styles => Pick(Root != null ? Root.Styles : null, ref s_Styles);
 
         static GameConfig Root
         {

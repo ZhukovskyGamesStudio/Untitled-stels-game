@@ -69,15 +69,14 @@ namespace Stealth.Enemies
             m_Agent.baseOffset = Traits.HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = Traits.PatrolSpeed;
-            if (Senses.ColorSorter) SetVariant((sbyte)Random.Range(0, ItemCatalog.Colors.Length));
-            if (Traits.CargoChance > 0f && Random.value < Traits.CargoChance)
-            {
-                var rng = new System.Random((int)NetId * 31 + 7);
+            // Everything random about this robot comes from its own stream of the house seed (the n-th robot spawned).
+            var rng = LevelRandom.Next(RandomChannel.Robots);
+            if (Senses.ColorSorter) SetVariant((sbyte)rng.Next(ItemCatalog.Colors.Length));
+            if (Traits.CargoChance > 0f && rng.Value() < Traits.CargoChance)
                 SetCargo(EncodeCargo((byte)rng.Next(ItemCatalog.Shapes.Length), (byte)ItemCatalog.RandomColor(rng, 0)));
-            }
-            m_NextStomp = Time.time + Random.Range(0.5f, Senses.SeismicPeriod);
+            m_NextStomp = Time.time + rng.Range(0.5f, Senses.SeismicPeriod);
 
-            m_Brain = new RobotBrain(Senses, Traits, this, new System.Random((int)NetId * 7919 + 17));
+            m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
             m_Brain.StateChanged += s => SetMode((byte)s);
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
@@ -336,7 +335,7 @@ namespace Stealth.Enemies
                     ring.EndRadius = Senses.SeismicRange;
                     ring.Duration = Senses.SeismicRange / Mathf.Max(Senses.SeismicWaveSpeed, 0.1f);
                 }
-                Audio.Sfx.At(Audio.Sfx.Bank?.SeismicThump, transform.position, 1f, Audio.Sfx.Group.Robots, Random.Range(0.92f, 1.05f));
+                Audio.Sfx.At(Audio.Sfx.Bank?.SeismicThump, transform.position, 1f, Audio.Sfx.Group.Robots, LevelRandom.Shared(RandomChannel.Audio).Range(0.92f, 1.05f));
                 var anim = GetComponent<RobotAnimator>();
                 if (anim != null) anim.Stomp();
                 return;
@@ -352,18 +351,19 @@ namespace Stealth.Enemies
             if (layout == null || layout.PatrolPoints.Count == 0) return;
             int myFloor = LevelLayout.FloorOf(transform.position.y);
             // Robots without legs patrol only their floor; walkers mostly stay but sometimes change floors.
-            bool sameFloorOnly = !Traits.CanUseStairs || Random.value < 0.75f;
+            var rng = LevelRandom.Shared(RandomChannel.Patrol);
+            bool sameFloorOnly = !Traits.CanUseStairs || rng.Value() < 0.75f;
             var options = layout.PatrolPoints.FindAll(p => !sameFloorOnly || LevelLayout.FloorOf(p.y) == myFloor);
             if (options.Count == 0) options = layout.PatrolPoints;
             // Prefer nearby rooms so that robots keep "their" area.
             var here = transform.position;
-            Vector3 best = options[Random.Range(0, options.Count)];
+            Vector3 best = options[rng.Next(options.Count)];
             for (int i = 0; i < 3; i++)
             {
-                var p = options[Random.Range(0, options.Count)];
+                var p = options[rng.Next(options.Count)];
                 if (Vector3.Distance(p, here) < Vector3.Distance(best, here) && Vector3.Distance(p, here) > 3f) best = p;
             }
-            best += new Vector3(Random.Range(-2.5f, 2.5f), 0, Random.Range(-2.5f, 2.5f));
+            best += new Vector3(rng.Range(-2.5f, 2.5f), 0, rng.Range(-2.5f, 2.5f));
             if (NavMesh.SamplePosition(best, out var hit, 3f, m_Agent.areaMask)) m_Agent.SetDestination(hit.position);
         }
     }

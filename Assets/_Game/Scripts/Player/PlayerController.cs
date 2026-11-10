@@ -247,9 +247,10 @@ namespace Stealth.Player
             if (layout == null) return;
             bool outside = !layout.IsInside(transform.position);
             // Outside the gas is a wall: 1.5 m away nothing is seen — lose sight of the house and you are lost.
-            float target = outside ? LightMath.GasFogDensity : 0.03f;
+            var air = VisualStyles.World; // the gas density is gameplay; a style changes only the colours and the indoor haze
+            float target = outside ? LightMath.GasFogDensity : air.IndoorFogDensity;
             RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 3f);
-            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, outside ? LightMath.GasFog : LightMath.NightFog, Time.deltaTime * 2f);
+            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, outside ? air.GasFog : air.IndoorFog, Time.deltaTime * 2f);
             Camera.backgroundColor = RenderSettings.fogColor;
         }
 

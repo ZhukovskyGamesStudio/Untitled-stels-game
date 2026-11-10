@@ -43,6 +43,10 @@ namespace Stealth.Game
         IGameLink m_Link;
         bool m_IsServer;
         int m_BuiltSeed;
+        int m_RunSeed;
+
+        /// <summary>Server: the seed of the whole run — every house, loot, robot and patrol follows from it (<see cref="LevelRandom"/>).</summary>
+        public int RunSeed => m_RunSeed;
 
         public LevelInfo Level { get; private set; }
         /// <summary>The team's shared stash at the hatch: kept for the whole run, emptied by a new run.</summary>
@@ -97,10 +101,14 @@ namespace Stealth.Game
             var info = Level;
             if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
             m_BuiltSeed = info.Seed;
+            // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
+            LevelRandom.Begin(info.Seed);
+            UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
             var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security);
             ActiveLevel.Load(layout, Art);
             ApplyAtmosphere();
+            VisualStyles.Reapply();
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms");
         }
 
@@ -123,8 +131,11 @@ namespace Stealth.Game
             foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
 
             ScentTrail.Clear();
-            int seed = DevFlags.ForcedSeed != 0 ? DevFlags.ForcedSeed : UnityEngine.Random.Range(1, int.MaxValue);
+            // One seed per run: forced from the command line, or a fresh one when a run (house 0 or a test level) starts.
+            if (DevFlags.ForcedSeed != 0) m_RunSeed = DevFlags.ForcedSeed;
+            else if (index == DevFlags.ForcedLevel || m_RunSeed == 0) m_RunSeed = new System.Random().Next(1, int.MaxValue);
             DevFlags.ForcedSeed = 0;
+            int seed = LevelRandom.LevelSeed(m_RunSeed, index);
             Level = new LevelInfo { Seed = seed, Index = index };
             BuildLocal();
             var layout = ActiveLevel.Layout;
@@ -136,12 +147,12 @@ namespace Stealth.Game
             m_Run.BeginLevel(index, totalValue);
             LevelStartTime = Time.time;
             foreach (var p in PlayerController.All) p.ResetForLevelServer();
-            Debug.Log($"[Game] Level {index} started: items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
+            Debug.Log($"[Game] Level {index} started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
 
         int SpawnContent(LevelLayout layout, int seed)
         {
-            var rng = new System.Random(seed ^ 0x5bd1e995);
+            var rng = LevelRandom.Stream(RandomChannel.Loot);
             int total = 0;
             foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
             {

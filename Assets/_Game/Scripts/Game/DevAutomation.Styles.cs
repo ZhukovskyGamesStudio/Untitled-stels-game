@@ -1,0 +1,229 @@
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Stealth.Configs;
+using Stealth.Enemies;
+using Stealth.Items;
+using Stealth.Level;
+using Stealth.Player;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+namespace Stealth.Game
+{
+    public partial class DevAutomation
+    {
+        bool m_StyleArgApplied;
+
+        /// <summary>F8 — next visual style (any build); -style &lt;name&gt; picks one at start.</summary>
+        void Update()
+        {
+            if (!m_StyleArgApplied)
+            {
+                m_StyleArgApplied = true;
+                var name = Arg("-style");
+                if (!string.IsNullOrEmpty(name))
+                {
+                    var style = VisualStyles.Find(name);
+                    if (style != null) VisualStyles.Apply(style);
+                    else Debug.LogWarning($"[Style] no style '{name}'");
+                }
+            }
+            var kb = Keyboard.current;
+            if (kb == null || !kb.f8Key.wasPressedThisFrame) return;
+            var next = VisualStyles.Next();
+            if (next == null) return;
+            VisualStyles.SnapFog(PlayerController.Local != null && ActiveLevel.Layout != null && !ActiveLevel.Layout.IsInside(PlayerController.Local.transform.position));
+            GameManager.Instance?.ShowBanner($"Стиль: {next.Title} ({next.References})");
+        }
+
+        /// <summary>
+        /// The same frozen moments of a house in every visual style: the lobby with a teammate, a guard noticing the
+        /// player, a dark room with a lamp and the sweeper, loot up close, the gas outside the door. Screenshots are
+        /// named &lt;pose&gt;__&lt;style asset&gt; (Tools/style_compare.py builds the comparison page from them).
+        /// </summary>
+        IEnumerator StylesScenario()
+        {
+            DevFlags.SkipGracePeriod = true;
+            DevFlags.FreezeRobots = true;
+            foreach (var r in RobotController.Robots.ToArray()) Session.Despawn(r.gameObject);
+            var gm = GameManager.Instance;
+            var layout = ActiveLevel.Layout;
+            var styles = VisualStyles.All.Where(s => s != null).ToList();
+            Log($"styles: {styles.Count} styles, run seed {gm.RunSeed}, house seed {layout.Seed}");
+            if (styles.Count == 0) { Log("FAIL: no styles"); yield break; }
+
+            var mate = Instantiate(Me.Model.gameObject);
+            foreach (var r in mate.GetComponentsInChildren<Renderer>())
+            {
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                var block = new MaterialPropertyBlock();
+                block.SetColor("_BaseColor", new Color(1f, 0.55f, 0.15f)); // a teammate in orange
+                r.SetPropertyBlock(block);
+            }
+
+            // 1. Lobby: the hatch, the stash board, a teammate by the hatch.
+            {
+                var spawn = layout.PlayerSpawns[0];
+                var hatch = layout.HatchPosition;
+                var dir = Flat(hatch - spawn).sqrMagnitude > 0.01f ? Flat(hatch - spawn).normalized : Vector3.forward;
+                var side = Vector3.Cross(Vector3.up, dir);
+                var eye = hatch - dir * 4.2f + side * 0.8f;
+                PlaceMate(mate, hatch + dir * 1.1f - side * 1.1f, eye, 1f);
+                LookAtFrom(new Pose(eye + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(hatch + dir * 1.2f - eye))), hatch + dir * 1.2f + Vector3.up * 1.1f);
+                yield return EveryStyle(styles, "1_lobby", false);
+            }
+
+            // 2. A guard in a lit room has half noticed the player; a teammate hides behind furniture.
+            var room = LitRoom(layout);
+            var (stand, look) = RoomView(layout, room);
+            {
+                var guardAt = Vector3.Lerp(stand, look, 0.75f);
+                if (UnityEngine.AI.NavMesh.SamplePosition(guardAt, out var hit, 2f, UnityEngine.AI.NavMesh.AllAreas)) guardAt = hit.position;
+                LookAtFrom(new Pose(stand, Quaternion.LookRotation(Flat(look - stand))), guardAt + Vector3.up * 1.1f);
+                var guard = gm.SpawnRobotServer(RobotKind.Guard, guardAt, Quaternion.LookRotation(Flat(stand - guardAt))).GetComponent<RobotController>();
+                var right = Vector3.Cross(Vector3.up, Flat(look - stand).normalized);
+                PlaceMate(mate, Vector3.Lerp(stand, guardAt, 0.35f) + right * 0.9f, guardAt, 0.65f);
+                yield return new WaitForSeconds(0.6f);
+                DevFlags.FreezeRobots = false;
+                DevFlags.HoldRobots = true;
+                float t0 = Time.time;
+                while (Time.time - t0 < 12f && guard.Suspicion < 0.55f) yield return null;
+                Log($"guard: suspicion {guard.Suspicion:0.00} after {Time.time - t0:0.0} s, {Vector3.Distance(guard.transform.position, Me.transform.position):0.0} m");
+                yield return EveryStyle(styles, "2_guard", false);
+                DevFlags.FreezeRobots = true;
+                DevFlags.HoldRobots = false;
+                Session.Despawn(guard.gameObject);
+            }
+
+            // 3. A dark room lit by a desk lamp, the sweeper's floor lidar crossing it.
+            {
+                var lamp = layout.Props.Where(p => p.Kind == PropKind.DeskLamp).OrderByDescending(p => layout.IsDarkAt(p.Position) ? 1 : 0)
+                    .ThenBy(p => LevelLayout.FloorOf(p.Position.y)).Select(p => (Vector3?)p.Position).FirstOrDefault();
+                var target = lamp ?? layout.CellCenter(0, room.x, room.y);
+                var pose = ViewPoint(target, 3.2f);
+                LookAtFrom(pose, target + Vector3.up * 0.5f);
+                var sweeperAt = Vector3.Lerp(pose.position, target, 0.55f) + Vector3.Cross(Vector3.up, pose.forward) * 1.2f;
+                if (UnityEngine.AI.NavMesh.SamplePosition(sweeperAt, out var hit, 2f, UnityEngine.AI.NavMesh.AllAreas)) sweeperAt = hit.position;
+                var sweeper = gm.SpawnRobotServer(RobotKind.Sweeper, sweeperAt, Quaternion.LookRotation(-Vector3.Cross(Vector3.up, pose.forward)));
+                mate.SetActive(false);
+                yield return new WaitForSeconds(0.8f);
+                Log($"dark room: lamp {(lamp.HasValue ? "found" : "none")}, dark={layout.IsDarkAt(target)}");
+                yield return EveryStyle(styles, "3_dark_room", false);
+                Session.Despawn(sweeper);
+            }
+
+            // 4. A pile of loot in the lit room, a teammate crouching at it.
+            {
+                var c = layout.CellCenter(0, room.x, room.y);
+                var pile = c + (stand - c) * 0.15f;
+                if (UnityEngine.AI.NavMesh.SamplePosition(pile, out var hit, 3f, UnityEngine.AI.NavMesh.AllAreas)) pile = hit.position;
+                var spawned = new List<WorldItem>();
+                for (int i = 0; i < 5; i++)
+                {
+                    var off = Quaternion.Euler(0, i * 72f, 0) * new Vector3(0.45f + 0.1f * i, 0, 0);
+                    spawned.Add(gm.SpawnItemServer((byte)(i % ItemCatalog.Shapes.Length), (byte)(i % ItemCatalog.Colors.Length), pile + off + Vector3.up * 0.3f, i * 40f));
+                }
+                var toward = Flat(stand - pile).normalized;
+                var side = Vector3.Cross(Vector3.up, toward);
+                var eye = pile + toward * 2.3f + side * 0.6f;
+                LookAtFrom(new Pose(eye, Quaternion.LookRotation(Flat(pile - eye))), pile + Vector3.up * 0.2f);
+                PlaceMate(mate, pile - toward * 1.0f + side * 0.3f, eye, 0.65f);
+                yield return new WaitForSeconds(1.2f);
+                yield return EveryStyle(styles, "4_loot", false);
+                foreach (var w in spawned) if (w != null) Session.Despawn(w.gameObject);
+            }
+
+            // 5. Lasers across a doorway, a wall camera watching (or the exterior door when the house has no lasers).
+            if (layout.LaserSpots.Count > 0)
+            {
+                var spot = layout.LaserSpots[0];
+                var across = spot.Rotation * Vector3.forward;
+                var eye = spot.Position - Flat(across).normalized * 3.2f + Vector3.Cross(Vector3.up, across) * 0.7f;
+                eye.y = Mathf.Floor((spot.Position.y + 0.5f) / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight + 0.05f;
+                LookAtFrom(new Pose(eye, Quaternion.LookRotation(Flat(spot.Position - eye))), spot.Position + Vector3.up * 0.4f);
+                PlaceMate(mate, spot.Position + Flat(across).normalized * 1.8f, eye, 1f);
+                yield return new WaitForSeconds(1.2f);
+                Log($"lasers: {spot.Kind} gate, {layout.LaserSpots.Count} in the house");
+                yield return EveryStyle(styles, "5_lasers", false);
+            }
+            else
+            {
+                var (cell, dir) = layout.ExteriorDoors.Count > 0 ? layout.ExteriorDoors[0] : (layout.StartCell, Vector2Int.down);
+                var door = layout.CellCenter(0, cell.x, cell.y) + new Vector3(dir.x, 0, dir.y) * (LevelMetrics.Cell / 2f);
+                var outward = new Vector3(dir.x, 0, dir.y);
+                var at = door - outward * 1.7f + Vector3.Cross(Vector3.up, outward) * 0.5f;
+                LookAtFrom(new Pose(at + Vector3.up * 0.05f, Quaternion.LookRotation(outward)), door + outward * 2f + Vector3.up * 1.2f);
+                PlaceMate(mate, door + outward * 0.9f - Vector3.Cross(Vector3.up, outward) * 0.3f, at, 1f);
+                yield return new WaitForSeconds(2.5f);
+                yield return EveryStyle(styles, "5_doorway", false);
+            }
+
+            Destroy(mate);
+            VisualStyles.Apply(styles[0]);
+        }
+
+        /// <summary>Freezes the moment and shoots it in every style.</summary>
+        IEnumerator EveryStyle(List<VisualStyle> styles, string pose, bool outside)
+        {
+            Time.timeScale = 0f;
+            foreach (var style in styles)
+            {
+                VisualStyles.Apply(style);
+                VisualStyles.SnapFog(outside);
+                yield return null;
+                yield return null;
+                yield return Shot($"{pose}__{style.name}");
+            }
+            Time.timeScale = 1f;
+            VisualStyles.Apply(styles[0]);
+        }
+
+        static void PlaceMate(GameObject mate, Vector3 at, Vector3 lookAt, float height)
+        {
+            var floor = Mathf.Floor((at.y + 0.5f) / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight;
+            at.y = floor;
+            mate.SetActive(true);
+            mate.transform.SetPositionAndRotation(at, Quaternion.LookRotation(Flat(lookAt - at).sqrMagnitude > 0.01f ? Flat(lookAt - at) : Vector3.forward));
+            mate.transform.localScale = new Vector3(1f, height, 1f);
+        }
+
+        /// <summary>A lit, furnished room near the start (offices first).</summary>
+        static Vector2Int LitRoom(LevelLayout l)
+        {
+            Vector2Int best = l.StartCell;
+            float bestScore = float.MinValue;
+            for (int x = 0; x < l.Width; x++)
+                for (int y = 0; y < l.Height; y++)
+                {
+                    if (l.Dark[0, x, y] || l.Flicker[0, x, y] || new Vector2Int(x, y) == l.StartCell) continue;
+                    var type = l.Rooms[0, x, y];
+                    if (type is RoomType.Lobby or RoomType.Restroom or RoomType.Storage) continue;
+                    var c = l.CellCenter(0, x, y);
+                    int props = l.Props.Count(p => Flat(p.Position - c).magnitude < LevelMetrics.Cell * 0.5f && LevelLayout.FloorOf(p.Position.y) == 0);
+                    float score = props * 2f - Vector2Int.Distance(new Vector2Int(x, y), l.StartCell) + (type is RoomType.Office or RoomType.OpenSpace ? 4f : 0f);
+                    if (score > bestScore) { bestScore = score; best = new Vector2Int(x, y); }
+                }
+            return best;
+        }
+
+        /// <summary>A corner of the room with a clear view across it.</summary>
+        static (Vector3 stand, Vector3 look) RoomView(LevelLayout l, Vector2Int room)
+        {
+            var c = l.CellCenter(0, room.x, room.y);
+            float r = LevelMetrics.Cell * 0.36f;
+            var corners = new[] { new Vector3(-r, 0, -r), new Vector3(r, 0, -r), new Vector3(-r, 0, r), new Vector3(r, 0, r) };
+            foreach (var k in corners)
+            {
+                var stand = c + k + Vector3.up * 0.05f;
+                var head = stand + Vector3.up * 1.6f;
+                var look = c - k;
+                if (Physics.CheckSphere(head, 0.35f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (Physics.CheckCapsule(stand + Vector3.up * 0.4f, head, 0.3f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (Physics.Linecast(head, look + Vector3.up * 1.2f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                return (stand, look);
+            }
+            return (c + corners[0] + Vector3.up * 0.05f, c - corners[0]);
+        }
+    }
+}

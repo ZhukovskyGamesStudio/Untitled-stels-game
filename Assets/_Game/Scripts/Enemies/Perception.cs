@@ -66,7 +66,7 @@ namespace Stealth.Enemies
         public static float Illumination(Vector3 point, IlluminationSettings s = null)
         {
             s ??= Tuning.Perception.Illumination;
-            var a = RenderSettings.ambientLight;
+            var a = VisualStyles.GameplayAmbient;
             float sum = (0.2126f * a.r + 0.7152f * a.g + 0.0722f * a.b) * RenderSettings.ambientIntensity * s.AmbientWeight;
             foreach (var src in LightSource.All)
             {

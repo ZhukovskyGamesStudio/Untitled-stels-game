@@ -1,3 +1,4 @@
+using Stealth.Level;
 using Stealth.Configs;
 using UnityEngine;
 
@@ -23,7 +24,7 @@ namespace Stealth.Audio
             Source.volume = mix.Loops;
             Source.dopplerLevel = 0f;
             if (Source.clip == null) return;
-            Source.time = Random.Range(0f, Source.clip.length * 0.95f);
+            Source.time = Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0f, Source.clip.length * 0.95f);
             Source.Play();
         }
 

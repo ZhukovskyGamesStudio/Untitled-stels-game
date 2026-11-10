@@ -27,7 +27,7 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -39,6 +39,7 @@ Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Too
 Art/Sprites/                                               текстуры UI (виньетка, дуга)
 Data/            LevelArt, ItemVisuals, NetworkPrefabs, SoundBank (ScriptableObject)
 Data/Config/     НАСТРОЙКИ: Player, Run, Level, Items, Audio (правятся руками в инспекторе)
+Data/Styles/     визуальные стили (VisualStyle) + Styles.asset (список и материалы по видам) + материал экранного фильтра
 Prefabs/Robots/<Префаб>Config.asset, Prefabs/Sensors/<Префаб>Config.asset — настройки каждого робота, устройства и лазера рядом с его префабом
 Resources/GameConfig.asset            корень настроек (ссылки на Data/Config/*), его находит любой билд
 Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
@@ -59,7 +60,7 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
-   `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
+   `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
    `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
@@ -143,6 +144,11 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 
 Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
 
+**Рандом — только по сиду.** Один сид забега (`GameManager.RunSeed`, `-seed`) даёт сиды домов (`LevelRandom.LevelSeed`), сид дома — отдельный
+поток на каждую цель (`RandomChannel`: планировка, лут, роботы, патрули, устройства, звук) и на каждый объект (`LevelRandom.Next` — n-й робот).
+`UnityEngine.Random` в игровом коде не используется (проверяет `LevelRandomTests`), он только засеян на всякий случай; новый бросок — новый канал
+или поток объекта, чтобы не сдвигать остальные.
+
 ### Настройки (конфиги)
 
 Логика отделена от данных: всё, что крутим при итерациях над игрой, лежит в ScriptableObject-конфигах, а не в коде.
@@ -167,6 +173,15 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
   (радиус тревоги, остывание, забывание) → конфиг устройства. Проверяют `TuningTests` (конфиг рядом с каждым префабом, в префабах нет числовых полей).
 - Сборщик создаёт конфиги один раз и **никогда не перезаписывает** (даже `FORCE=1`). Добавил поле в группу настроек — в старом ассете оно получит значение по умолчанию из кода.
 - Уровень строится детерминированно из сида на каждом пире: у хоста и клиентов должен быть один и тот же билд (одни и те же конфиги).
+
+### Визуальные стили
+
+`VisualStyle` (`Data/Styles/*.asset`) — один вид игры: грейдинг на URP-объёме, экранный фильтр `Art/Shaders/StyleScreen.shader`
+(пиксели, цел-ступени, «масло», контуры, штриховка, бумага, 1 бит, камкордер, неон — `FullScreenPassRendererFeature` на `PC_Renderer` после пост-обработки),
+воздух (эмбиент, дымка, цвет газа) и палитра материалов по видам (`StyleConfig`). `VisualStyles.Apply` меняет только картинку на этом пире: роботы считают
+свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. F8 листает стили, `-style <имя>` включает при запуске,
+сценарий `styles` снимает одни и те же замороженные кадры во всех стилях. Ассеты стилей создаются один раз из `AssetBuilder.Styles`
+и дальше правятся руками; `REBUILD_STYLES=1 Tools/dev.sh assets` пересоздаёт их из кода.
 
 ### Ассеты из кода
 

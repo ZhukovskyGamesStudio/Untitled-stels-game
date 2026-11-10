@@ -252,7 +252,7 @@ namespace Stealth.Audio
                 w.NextStep = Time.time + interval;
                 var clips = Bank.Footsteps;
                 if (clips == null || clips.Length == 0) continue;
-                Sfx.At(clips[Random.Range(0, clips.Length)], pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Random.Range(0.92f, 1.08f));
+                Sfx.At(clips[Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Next(clips.Length)], pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
             }
             Prune(m_Players, PlayerController.All);
         }
@@ -298,7 +298,7 @@ namespace Stealth.Audio
                     if (!float.IsInfinity(interval) && Time.time >= w.NextStep && speed < 15f)
                     {
                         w.NextStep = Time.time + interval;
-                        Sfx.At(Bank.RobotStep, pos, 0.6f, Sfx.Group.Robots, Random.Range(0.9f, 1.1f));
+                        Sfx.At(Bank.RobotStep, pos, 0.6f, Sfx.Group.Robots, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.9f, 1.1f));
                     }
                 }
             }

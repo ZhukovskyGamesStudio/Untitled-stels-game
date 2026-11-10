@@ -20,6 +20,7 @@ namespace Stealth.Enemies
         Mode m_Mode;
         Vector3 m_Min, m_Max;
         float m_FloorY, m_T, m_Dir = 1f, m_ModeStart, m_NextLeap, m_PauseUntil;
+        System.Random m_Rng = new(1);
         Vector3 m_From, m_To;
         IIntruder m_Prey;
 
@@ -36,7 +37,8 @@ namespace Stealth.Enemies
             m_FloorY = c.y;
             m_Min = new Vector3(c.x - half, 0, c.z - half);
             m_Max = new Vector3(c.x + half, 0, c.z + half);
-            m_T = Random.value * Perimeter;
+            m_Rng = LevelRandom.Next(RandomChannel.Devices);
+            m_T = m_Rng.Value() * Perimeter;
             var (p, rot) = OnWall(m_T, m_Dir);
             transform.SetPositionAndRotation(p, rot);
         }
@@ -65,7 +67,7 @@ namespace Stealth.Enemies
                     if (Time.time > m_PauseUntil)
                     {
                         m_T += Profile.CrawlSpeed * m_Dir * Time.deltaTime;
-                        if (Random.value < 0.002f) { m_Dir = -m_Dir; m_PauseUntil = Time.time + Random.Range(0.5f, 2f); }
+                        if (m_Rng.Value() < 0.002f) { m_Dir = -m_Dir; m_PauseUntil = Time.time + m_Rng.Range(0.5f, 2f); }
                     }
                     var (p, rot) = OnWall(m_T, m_Dir);
                     transform.SetPositionAndRotation(p, rot);

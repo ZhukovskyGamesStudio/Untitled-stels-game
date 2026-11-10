@@ -29,7 +29,7 @@ namespace Stealth.Enemies
             m_Min = new Vector3(c.x - half, 0, c.z - half);
             m_Max = new Vector3(c.x + half, 0, c.z + half);
             if (!IsServer) return;
-            m_Dir = Quaternion.Euler(0, Random.Range(0, 360), 0) * Vector3.forward;
+            m_Dir = Quaternion.Euler(0, LevelRandom.Next(RandomChannel.Devices).Range(0f, 360f), 0) * Vector3.forward;
             transform.SetPositionAndRotation(new Vector3(c.x, CeilingY, c.z), Quaternion.Euler(180f, 0f, 0f));
         }
 

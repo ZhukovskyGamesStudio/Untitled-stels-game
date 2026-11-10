@@ -69,6 +69,7 @@ namespace Stealth.EditorTools
                 ConfigureModelImport();
                 BuildConfigs();
                 BuildMaterials();
+                BuildStyles();
                 BuildSprites();
                 s_AudioDirector = BuildAudioDirector(BuildSoundBank());
                 var art = BuildLevelArt();

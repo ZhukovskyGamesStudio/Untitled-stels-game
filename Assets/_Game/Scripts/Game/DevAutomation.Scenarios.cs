@@ -26,6 +26,7 @@ namespace Stealth.Game
             m_Scenarios["darkbox"] = DarkBoxScenario;
             m_Scenarios["newbots"] = NewBotsScenario;
             m_Scenarios["fog"] = FogScenario;
+            m_Scenarios["styles"] = StylesScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>
