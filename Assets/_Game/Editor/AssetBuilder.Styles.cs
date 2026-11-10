@@ -89,6 +89,17 @@ namespace Stealth.EditorTools
                 if (meshes.Length == 0) continue;
                 list.Add(new StyleMeshes { Style = style, From = meshes.Select(m => originals[m.name]).ToArray(), To = meshes });
             }
+            // the players by department (Tools/Blender/players.py → Styles/Players/player__<style>__<department>.fbx)
+            var player = AssetDatabase.LoadAllAssetsAtPath(ModelPath("player")).OfType<Mesh>().ToDictionary(m => m.name, m => m);
+            string[] departments = { "backend", "qa", "sysadmin", "designer" };
+            foreach (var style in styles)
+                for (int d = 0; d < departments.Length; d++)
+                {
+                    var path = $"{ModelsDir}/Styles/Players/player__{style.name}__{departments[d]}.fbx";
+                    var meshes = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>().Where(m => player.ContainsKey(m.name)).ToArray();
+                    if (meshes.Length == 0) continue;
+                    list.Add(new StyleMeshes { Style = style, Variant = d, From = meshes.Select(m => player[m.name]).ToArray(), To = meshes });
+                }
             return list.ToArray();
         }
 

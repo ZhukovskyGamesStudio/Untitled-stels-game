@@ -53,14 +53,7 @@ namespace Stealth.Game
             Log($"styles: {styles.Count} styles, run seed {gm.RunSeed}, house seed {layout.Seed}");
             if (styles.Count == 0) { Log("FAIL: no styles"); yield break; }
 
-            var mate = Instantiate(Me.Model.gameObject);
-            foreach (var r in mate.GetComponentsInChildren<Renderer>())
-            {
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                var block = new MaterialPropertyBlock();
-                block.SetColor("_BaseColor", new Color(1f, 0.55f, 0.15f)); // a teammate in orange
-                r.SetPropertyBlock(block);
-            }
+            var mate = Mannequin(1); // a teammate from QA
 
             // 1. Lobby: the hatch, the stash board, a teammate by the hatch.
             {
@@ -134,6 +127,42 @@ namespace Stealth.Game
                 foreach (var w in spawned) if (w != null) Session.Despawn(w.gameObject);
             }
 
+            // 7 (shot before the guard portrait). The team: four IT people of the four departments in the lobby, facing us.
+            {
+                mate.SetActive(false);
+                // a ceiling lamp between the camera and the team lights their faces
+                var c = layout.CellCenter(0, layout.StartCell.x, layout.StartCell.y);
+                Vector3 lamp = c + Vector3.right * RoomLighting.LampOffset, dir = Vector3.forward;
+                bool clear = false;
+                foreach (float lx in new[] { RoomLighting.LampOffset, -RoomLighting.LampOffset })
+                    foreach (var d in new[] { Vector3.forward, Vector3.back })
+                    {
+                        if (clear) break;
+                        var l = c + Vector3.right * lx;
+                        var teamAt = l + d * 0.9f;
+                        var cam = l - d * 3.4f;
+                        if (Physics.Linecast(cam + Vector3.up * 1.6f, teamAt + Vector3.up * 1.2f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        if (Physics.CheckCapsule(teamAt + Vector3.up * 0.4f, teamAt + Vector3.up * 1.6f, 0.5f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        lamp = l; dir = d; clear = true;
+                    }
+                var side = Vector3.Cross(Vector3.up, dir);
+                var centre = lamp + dir * 0.9f;
+                var eye = lamp - dir * 3.4f;
+                var team = new List<GameObject>();
+                for (int k = 0; k < 4; k++)
+                {
+                    var m = Mannequin(k);
+                    PlaceMate(m, centre + side * ((k - 1.5f) * 0.9f), eye, 1f);
+                    team.Add(m);
+                }
+                LookAtFrom(new Pose(eye + Vector3.up * 0.05f, Quaternion.LookRotation(dir)), centre + Vector3.up * 1.1f);
+                Log($"team: four departments under a lamp {(clear ? "with a clear view" : "(no clear spot)")}");
+                yield return new WaitForSeconds(0.5f);
+                yield return EveryStyle(styles, "7_team", false);
+                foreach (var m in team) Destroy(m);
+                mate.SetActive(true);
+            }
+
             // 6 (shot before the lasers). The style's own guard robot up close, standing under a ceiling lamp of the lobby.
             {
                 mate.SetActive(false);
@@ -205,6 +234,16 @@ namespace Stealth.Game
             }
             Time.timeScale = 1f;
             VisualStyles.Apply(styles[0]);
+        }
+
+        /// <summary>A copy of the player model dressed as the player of a slot (department, team colour) in the style.</summary>
+        static GameObject Mannequin(int slot)
+        {
+            var m = Instantiate(Me.Model.gameObject);
+            foreach (var r in m.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            VisualStyles.SetVariant(m, slot);
+            PlayerLooks.Paint(m.transform, slot);
+            return m;
         }
 
         static void PlaceMate(GameObject mate, Vector3 at, Vector3 lookAt, float height)

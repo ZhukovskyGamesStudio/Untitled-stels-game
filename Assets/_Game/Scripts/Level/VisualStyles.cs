@@ -129,9 +129,27 @@ namespace Stealth.Level
         static readonly Dictionary<Material, Material>[] s_MatVariants = NewMaps<Material>();
         static readonly Dictionary<Material, Material> s_MatOriginal = new();
         static readonly Dictionary<Mesh, PropReplacement>[] s_Props = NewMaps2();
-        /// <summary>Models of the current style itself (its own guard), over the family's.</summary>
-        static readonly Dictionary<Mesh, Mesh> s_StyleMeshes = new();
+        /// <summary>Models of the current style itself (its own guard, the players by department), over the family's; key = variant.</summary>
+        static readonly Dictionary<int, Dictionary<Mesh, Mesh>> s_StyleMeshes = new();
         static VisualStyle s_StyleMeshesOf;
+        static bool s_StyleMeshesLoaded;
+        /// <summary>Objects that take a variant of the style models (players: their slot picks the department).</summary>
+        static readonly Dictionary<Transform, int> s_Variants = new();
+
+        /// <summary>Marks an object (a player model) to take the style models of this variant (its department slot).</summary>
+        public static void SetVariant(GameObject root, int variant)
+        {
+            if (root == null) return;
+            s_Variants[root.transform] = variant;
+            Dress(root);
+        }
+
+        static int VariantOf(Transform t)
+        {
+            for (; t != null; t = t.parent)
+                if (s_Variants.TryGetValue(t, out var v)) return v;
+            return -1;
+        }
         /// <summary>Models replaced as a whole: their root, the replacement and the renderers hidden for it.</summary>
         static readonly List<(Transform root, GameObject replacement, List<Renderer> hidden)> s_Replaced = new();
 
@@ -190,14 +208,27 @@ namespace Stealth.Level
 
         static void LoadStyleMeshes()
         {
-            if (s_StyleMeshesOf == s_Current && s_StyleMeshes.Count > 0) return;
+            if (s_StyleMeshesLoaded && s_StyleMeshesOf == s_Current) return;
+            s_StyleMeshesLoaded = true;
             s_StyleMeshesOf = s_Current;
             s_StyleMeshes.Clear();
             if (Config == null || s_Current == null) return;
             foreach (var set in Config.StyleModels ?? new StyleMeshes[0])
-                if (set.Style == s_Current)
-                    for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
-                        if (set.From[i] != null && set.To[i] != null) s_StyleMeshes[set.From[i]] = set.To[i];
+            {
+                if (set.Style != s_Current) continue;
+                if (!s_StyleMeshes.TryGetValue(set.Variant, out var map)) s_StyleMeshes[set.Variant] = map = new Dictionary<Mesh, Mesh>();
+                for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
+                    if (set.From[i] != null && set.To[i] != null) map[set.From[i]] = set.To[i];
+            }
+        }
+
+        static bool StyleMesh(Mesh original, Transform at, out Mesh mesh)
+        {
+            mesh = null;
+            if (s_StyleMeshes.Count == 0) return false;
+            int v = VariantOf(at);
+            if (v >= 0 && s_StyleMeshes.TryGetValue(v, out var own) && own.TryGetValue(original, out mesh)) return true;
+            return s_StyleMeshes.TryGetValue(-1, out var all) && all.TryGetValue(original, out mesh);
         }
 
         /// <summary>
@@ -220,7 +251,7 @@ namespace Stealth.Level
             {
                 var mesh = mf.sharedMesh;
                 var original = s_MeshOriginal.TryGetValue(mesh, out var o) ? o : mesh;
-                var target = s_StyleMeshes.TryGetValue(original, out var own) ? own
+                var target = StyleMesh(original, r.transform, out var own) ? own
                            : s_MeshVariants[f].TryGetValue(original, out var v) ? v : original;
                 if (target != mesh) mf.sharedMesh = target;
                 if (s_Props[f].TryGetValue(original, out var prop)) Replace(mf.transform.parent, prop);

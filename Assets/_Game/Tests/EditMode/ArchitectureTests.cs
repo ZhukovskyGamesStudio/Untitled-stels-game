@@ -122,7 +122,12 @@ namespace Stealth.Tests
                 foreach (var c in p.Prefab.GetComponentsInChildren<Collider>(true)) Assert.Fail($"{p.Prefab.name} has a collider");
             }
             // every style but the base look has its own guard robot, with all five parts of the original
-            Assert.AreEqual(config.Styles.Length - 1, config.StyleModels.Count(m => m.To.Length == 5), "a style without its own guard");
+            Assert.AreEqual(config.Styles.Length - 1, config.StyleModels.Count(m => m.Variant < 0 && m.To.Length == 5), "a style without its own guard");
+            // every style has the four departments of players, each with the four parts of the player model
+            foreach (var style in config.Styles)
+                for (int d = 0; d < 4; d++)
+                    Assert.AreEqual(1, config.StyleModels.Count(m => m.Style == style && m.Variant == d && m.To.Length == 4),
+                        $"{style.name}: no player of department {d}");
             foreach (ModelFamily t in System.Enum.GetValues(typeof(ModelFamily)))
             {
                 if (t == ModelFamily.None) continue;

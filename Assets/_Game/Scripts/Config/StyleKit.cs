@@ -30,6 +30,8 @@ namespace Stealth.Configs
     public class StyleMeshes
     {
         public VisualStyle Style;
+        [Tooltip("-1 = every object; otherwise only objects registered with this variant (a player's department slot)")]
+        public int Variant = -1;
         public Mesh[] From = new Mesh[0];
         public Mesh[] To = new Mesh[0];
     }

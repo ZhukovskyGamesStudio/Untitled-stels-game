@@ -335,8 +335,9 @@ def grid():
 DESIGNS = [("lofi", night_shift), ("toy", scrapyard), ("realistic", heist), ("realistic", hunted), ("lowpoly", toon),
            ("clean", storybook), ("clean", logbook), ("toy", footage), ("crystal", white_room), ("clean", grid)]
 
-g.clear_scene()
-for FINISH, make in DESIGNS:
-    make()
-    print("guard", make.__name__)
-print("DONE")
+if __name__ == "__main__":
+    g.clear_scene()
+    for FINISH, make in DESIGNS:
+        make()
+        print("guard", make.__name__)
+    print("DONE")

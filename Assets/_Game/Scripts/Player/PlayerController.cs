@@ -82,10 +82,8 @@ namespace Stealth.Player
         public float Height => Crouching ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
-        static readonly Color[] Palette =
-        {
-            new(0.95f, 0.55f, 0.2f), new(0.3f, 0.7f, 0.95f), new(0.6f, 0.9f, 0.3f), new(0.9f, 0.4f, 0.8f),
-        };
+        /// <summary>The department of this player (by slot): an IT person from backend, QA, sysadmins or design.</summary>
+        public Department Department => PlayerLooks.DepartmentOf(PlayerLooks.SlotOf(ClientId));
 
         CharacterController m_Controller;
         IPlayerLink m_Link;
@@ -200,11 +198,15 @@ namespace Stealth.Player
             DisplayName = displayName ?? "";
         }
 
+        /// <summary>Team colour on the small things only, the department's clothes, skin, dark details (PlayerLooks).</summary>
         void ApplyColor()
         {
-            var block = new MaterialPropertyBlock();
-            block.SetColor("_BaseColor", Palette[(int)(ClientId % (ulong)Palette.Length)]);
-            foreach (var r in BodyRenderers) r.SetPropertyBlock(block);
+            int slot = PlayerLooks.SlotOf(ClientId);
+            if (Model != null)
+            {
+                VisualStyles.SetVariant(Model.gameObject, slot); // the department's model in the current style
+                PlayerLooks.Paint(Model, slot);
+            }
         }
 
         void Update()
