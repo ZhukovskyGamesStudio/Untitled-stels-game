@@ -52,6 +52,8 @@ namespace Stealth.Level
     public class LevelLayout
     {
         public int Seed, LevelIndex, Width, Height, Floors;
+        /// <summary>Team size the house was generated for (a bigger team gets a bigger house).</summary>
+        public int Players = 1;
         public RoomType[,,] Rooms;   // [floor, x, y]
         public bool[,,] Dark;        // lights off: robots' eyes work worse there
         public bool[,,] Flicker;     // broken light

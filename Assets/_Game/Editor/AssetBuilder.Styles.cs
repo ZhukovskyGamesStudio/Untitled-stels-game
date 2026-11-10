@@ -32,6 +32,7 @@ namespace Stealth.EditorTools
             }
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
             AddStyleFeature(mat);
+            AddXrayFeature();
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
@@ -109,6 +110,58 @@ namespace Stealth.EditorTools
             AssetDatabase.FindAssets("t:Material", new[] { $"{MaterialsDir}/{category}" })
                 .Select(g => AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(g)))
                 .Where(m => m != null).OrderBy(m => m.name).ToArray();
+
+        const string XrayMaterialPath = MaterialsDir + "/FX/MarkedXray.mat";
+
+        /// <summary>
+        /// Robots marked by a teammate are seen through walls: a RenderObjects pass draws the Marked layer
+        /// (<see cref="Stealth.Enemies.Detector.XrayLayer"/>) again where it is hidden (depth test Greater), as a red glow.
+        /// </summary>
+        static void AddXrayFeature()
+        {
+            var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
+            var shader = Shader.Find("Stealth/MarkedXray");
+            if (data == null || shader == null) { Debug.LogWarning("[Builder] no PC renderer or x-ray shader: marked robots are not seen through walls"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(XrayMaterialPath);
+            if (mat == null)
+            {
+                EnsureFolder(MaterialsDir + "/FX");
+                mat = new Material(shader) { name = "MarkedXray" };
+                AssetDatabase.CreateAsset(mat, XrayMaterialPath);
+            }
+            else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
+
+            var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == "MarkedXray");
+            if (feature == null)
+            {
+                feature = ScriptableObject.CreateInstance<RenderObjects>();
+                feature.name = "MarkedXray";
+                AssetDatabase.AddObjectToAsset(feature, data);
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long id);
+                var so = new SerializedObject(data);
+                var list = so.FindProperty("m_RendererFeatures");
+                var map = so.FindProperty("m_RendererFeatureMap");
+                list.arraySize++;
+                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = feature;
+                map.arraySize++;
+                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = id;
+                so.ApplyModifiedProperties();
+            }
+            var s = feature.settings;
+            s.passTag = "MarkedXray";
+            s.Event = RenderPassEvent.AfterRenderingTransparents;
+            s.filterSettings.RenderQueueType = RenderQueueType.Opaque;
+            s.filterSettings.LayerMask = 1 << Stealth.Enemies.Detector.XrayLayer;
+            s.overrideMode = RenderObjects.RenderObjectsSettings.OverrideMaterialMode.Material;
+            s.overrideMaterial = mat;
+            s.overrideMaterialPassIndex = 0;
+            s.overrideDepthState = true;
+            s.depthCompareFunction = UnityEngine.Rendering.CompareFunction.Greater;
+            s.enableWrite = false;
+            feature.SetActive(true);
+            EditorUtility.SetDirty(feature);
+            EditorUtility.SetDirty(data);
+        }
 
         /// <summary>A full-screen pass after post-processing that reads depth and normals (for outlines).</summary>
         static void AddStyleFeature(Material mat)

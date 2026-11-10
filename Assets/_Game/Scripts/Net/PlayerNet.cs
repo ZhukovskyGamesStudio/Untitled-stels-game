@@ -87,6 +87,17 @@ namespace Stealth.Net
         void GetUpRpc() => m_Player.OnGetUpRequest();
         public void SendHack(Detector target) => HackRpc(target.GetComponent<NetworkObject>());
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedbackRpc(awayFromSource);
+        public void SendPing(Vector3 position) => PingRpc(position);
+        public void SendMark(Detector target) => MarkRpc(target.GetComponent<NetworkObject>());
+
+        [Rpc(SendTo.Server)]
+        void PingRpc(Vector3 position) => m_Player.OnPingRequest(position);
+
+        [Rpc(SendTo.Server)]
+        void MarkRpc(NetworkObjectReference target)
+        {
+            if (target.TryGet(out var obj)) m_Player.OnMarkRequest(obj.GetComponent<Detector>());
+        }
 
         [Rpc(SendTo.Server)]
         void NoiseRpc(Vector3 position, float radius) => m_Player.OnNoiseRequest(position, radius);

@@ -54,5 +54,16 @@ namespace Stealth.Level
         public readonly List<WallOpening> Openings = new();
         /// <summary>Window centres and yaws (see <see cref="LevelBuilder.WindowSpots"/>).</summary>
         public readonly List<(Vector3 pos, float yaw)> Windows = new();
+        /// <summary>Furniture footprints for the map (x/z in metres, from the placed models).</summary>
+        public readonly List<MapProp> Props = new();
+    }
+
+    /// <summary>The footprint of a piece of furniture on the map.</summary>
+    public struct MapProp
+    {
+        public int Floor;
+        public PropKind Kind;
+        /// <summary>x = world x, y = world z.</summary>
+        public Rect Area;
     }
 }

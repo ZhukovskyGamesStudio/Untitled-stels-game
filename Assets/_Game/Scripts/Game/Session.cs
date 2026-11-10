@@ -98,6 +98,10 @@ namespace Stealth.Game
         /// <summary>Owner → server: get up after being knocked down (HP left).</summary>
         void SendGetUp();
         void SendHack(Detector target);
+        /// <summary>Owner → server: "here!" at a point the owner looks at.</summary>
+        void SendPing(Vector3 position);
+        /// <summary>Owner → server: mark this robot / device for the team.</summary>
+        void SendMark(Detector target);
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>
         void SendHitFeedback(Vector3 awayFromSource);
     }
@@ -124,6 +128,8 @@ namespace Stealth.Game
         void RequestFinishLevel();
         void RequestRestart();
         void BroadcastBanner(string text);
+        /// <summary>Server → everyone: a teammate's ping or mark.</summary>
+        void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target);
     }
 
     /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>

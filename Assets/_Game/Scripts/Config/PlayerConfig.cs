@@ -1,3 +1,4 @@
+using Stealth.Game;
 using Stealth.Player;
 using UnityEngine;
 
@@ -14,5 +15,7 @@ namespace Stealth.Configs
         public GasSettings Gas = new();
         [Tooltip("Holding E: reviving teammates and hacking.")]
         public InteractionSettings Interaction = new();
+        [Tooltip("Pings, marking robots, how far the map reveals.")]
+        public TeamSettings Team = new();
     }
 }

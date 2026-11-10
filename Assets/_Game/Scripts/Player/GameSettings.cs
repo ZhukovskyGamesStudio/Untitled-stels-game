@@ -29,6 +29,7 @@ namespace Stealth.Player
             if (s_Loaded) return;
             s_Loaded = true;
             Load();
+            Controls.Load();
         }
 
         public static void Load()
@@ -51,6 +52,7 @@ namespace Stealth.Player
             PlayerPrefs.SetInt(Prefix + "crouchToggle", CrouchToggle ? 1 : 0);
             PlayerPrefs.SetFloat(Prefix + "volume", MasterVolume);
             PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
+            Controls.Save();
             PlayerPrefs.Save();
         }
 

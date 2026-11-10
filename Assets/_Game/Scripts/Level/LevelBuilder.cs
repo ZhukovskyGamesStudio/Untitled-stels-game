@@ -111,12 +111,29 @@ namespace Stealth.Level
             foreach (var p in l.Props)
             {
                 var prefab = m_Art.Prop(p.Kind);
-                if (prefab != null) Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
+                if (prefab == null) continue;
+                var go = Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
+                RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
             }
             return root;
         }
 
         // ------------------------------------------------------------------ helpers
+
+        /// <summary>The footprint of the placed model on the map (glowing bits such as lamp shades and screens are left out).</summary>
+        void RecordProp(GameObject go, PropKind kind, int floor)
+        {
+            bool any = false;
+            var b = new Bounds();
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+            {
+                if (r.name.StartsWith("Eye")) continue;
+                if (!any) { b = r.bounds; any = true; }
+                else b.Encapsulate(r.bounds);
+            }
+            if (!any || kind == PropKind.Hatch) return;
+            Shell.Props.Add(new MapProp { Floor = floor, Kind = kind, Area = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z) });
+        }
 
         GameObject Place(GameObject prefab, string name, Vector3 position, Quaternion rotation)
         {

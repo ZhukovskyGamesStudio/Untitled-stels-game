@@ -286,6 +286,21 @@ def level_done():
     return fade(out)
 
 
+def ping():
+    """A teammate pings a spot: two bright, short tones going up."""
+    d = 0.45
+    a = (sine(1318.5, 0.2) + 0.25 * sine(2637, 0.2)) * env(int(0.2 * SR), 0.002, 0.16, curve=5)
+    b = (sine(1760, 0.3) + 0.25 * sine(3520, 0.3)) * env(int(0.3 * SR), 0.002, 0.26, curve=5)
+    return fade(mix(at(a * 0.6, 0, d), at(b * 0.6, 0.09, d)))
+
+
+def mark():
+    """A robot marked for the team: a low target-lock double beep."""
+    d = 0.5
+    beep = lambda f: lowpass(square(f, 0.12), 3500) * env(int(0.12 * SR), 0.002, 0.1, curve=3)
+    return fade(mix(at(beep(880) * 0.45, 0, d), at(beep(880) * 0.45, 0.14, d), at(sine(440, 0.4) * env(int(0.4 * SR), 0.005, 0.3) * 0.3, 0, d)))
+
+
 # --------------------------------------------------------------------------- robots
 
 def blip(f0, f1, d=0.22, kind="square"):
@@ -574,6 +589,8 @@ def main():
     write(P("UI", "banner"), banner(), 0.7)
     write(P("UI", "fail"), fail(), 0.8)
     write(P("UI", "level_done"), level_done(), 0.8)
+    write(P("UI", "ping"), ping(), 0.6)
+    write(P("UI", "mark"), mark(), 0.6)
 
     write(P("Robots", "robot_suspicious"), robot_suspicious())
     write(P("Robots", "robot_alert"), robot_alert())

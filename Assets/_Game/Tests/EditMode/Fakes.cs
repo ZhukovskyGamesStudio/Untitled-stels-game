@@ -76,6 +76,10 @@ namespace Stealth.Tests
         public void SendGetUp() => GetUps++;
         public void SendHack(Detector target) => Hacks.Add(target);
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedback.Add(awayFromSource);
+        public readonly List<Vector3> Pings = new();
+        public readonly List<Detector> Marks = new();
+        public void SendPing(Vector3 position) => Pings.Add(position);
+        public void SendMark(Detector target) => Marks.Add(target);
     }
 
     /// <summary>Stands in for the inventory's network twin.</summary>

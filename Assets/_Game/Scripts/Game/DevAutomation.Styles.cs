@@ -29,8 +29,7 @@ namespace Stealth.Game
                     else Debug.LogWarning($"[Style] no style '{name}'");
                 }
             }
-            var kb = Keyboard.current;
-            if (kb == null || !kb.f8Key.wasPressedThisFrame) return;
+            if (UI.ControlsPanel.Rebinding || !Controls.Pressed(GameAction.Style)) return;
             var next = VisualStyles.Next();
             if (next == null) return;
             VisualStyles.SnapFog(PlayerController.Local != null && ActiveLevel.Layout != null && !ActiveLevel.Layout.IsInside(PlayerController.Local.transform.position));

@@ -10,7 +10,9 @@ namespace Stealth.Game
     {
         public int Seed;
         public int Index;
-        public bool Equals(LevelInfo other) => Seed == other.Seed && Index == other.Index;
+        /// <summary>Team size the house was generated for: every peer must build the same house.</summary>
+        public int Players;
+        public bool Equals(LevelInfo other) => Seed == other.Seed && Index == other.Index && Players == other.Players;
     }
 
     /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, hunters.</summary>
@@ -24,6 +26,8 @@ namespace Stealth.Game
         public float QuotaShareGrowth = 0.04f;
         [Tooltip("The share never goes above this.")]
         public float MaxQuotaShare = 0.85f;
+        [Tooltip("Share multiplier by team size (1, 2, 3, 4… players; the last repeats). The bigger house of a bigger team already holds more loot, so this stays mild.")]
+        public float[] QuotaByPlayers = { 1f, 1.1f, 1.18f, 1.25f };
         [Tooltip("Quota increase per teammate left down at the end of the previous house.")]
         public float DeathPenalty = 0.15f;
 
@@ -76,10 +80,12 @@ namespace Stealth.Game
         double m_LastAlarmCounted = double.NegativeInfinity;
 
         /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
-        public static int QuotaFor(int totalValue, int levelIndex, int penalties, RunSettings s = null)
+        public static int QuotaFor(int totalValue, int levelIndex, int penalties, RunSettings s = null, int players = 1)
         {
             s ??= new RunSettings();
-            float share = Mathf.Min(s.MaxQuotaShare, s.QuotaShare + s.QuotaShareGrowth * levelIndex);
+            var byTeam = s.QuotaByPlayers;
+            float team = byTeam == null || byTeam.Length == 0 ? 1f : byTeam[Mathf.Clamp(players - 1, 0, byTeam.Length - 1)];
+            float share = Mathf.Min(s.MaxQuotaShare, (s.QuotaShare + s.QuotaShareGrowth * levelIndex) * team);
             return Mathf.Max(10, Mathf.RoundToInt(totalValue * share * (1f + s.DeathPenalty * penalties) / 5f) * 5);
         }
 
@@ -94,10 +100,12 @@ namespace Stealth.Game
         }
 
         /// <summary>A new house begins with this much loot in it.</summary>
-        public void BeginLevel(int index, int lootValue)
+        public void BeginLevel(int index, int lootValue, int players = 1)
         {
             LevelIndex = index;
-            Quota = QuotaFor(lootValue, index, Penalties, m_S);
+            LootValue = lootValue;
+            Players = Mathf.Max(1, players);
+            Quota = QuotaFor(lootValue, index, Penalties, m_S, Players);
             Collected = 0;
             Phase = RunPhase.Playing;
             AlarmUntil = 0;
@@ -113,6 +121,21 @@ namespace Stealth.Game
         }
 
         public bool QuotaMet => Collected >= Quota;
+
+        /// <summary>Loot value of the current house (the quota is a share of it).</summary>
+        public int LootValue { get; private set; }
+        /// <summary>Players in the team now: the quota follows them (friends join a house that is already running).</summary>
+        public int Players { get; private set; } = 1;
+
+        /// <summary>The team grew or shrank during a house: its quota follows. Returns true if it changed.</summary>
+        public bool SetPlayers(int players)
+        {
+            players = Mathf.Max(1, players);
+            if (players == Players || Phase != RunPhase.Playing) return false;
+            Players = players;
+            Quota = QuotaFor(LootValue, LevelIndex, Penalties, m_S, Players);
+            return true;
+        }
 
         public bool AlarmActive(double now) => now < AlarmUntil;
 

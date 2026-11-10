@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.UI
@@ -33,23 +34,24 @@ namespace Stealth.UI
 
         /// <summary>What a player lying on the floor reads.</summary>
         public static string DownedText(int hp, bool canGetUp) =>
-            hp <= 0 ? "Без сознания. Союзник может поднять тебя (E рядом)"
-            : canGetUp ? "Ты на полу. Лежачих роботы не трогают — дождись, пока уйдут. Пробел — встать"
+            hp <= 0 ? $"Без сознания. Союзник может поднять тебя ({Controls.Label(GameAction.Interact)} рядом)"
+            : canGetUp ? $"Ты на полу. Лежачих роботы не трогают — дождись, пока уйдут. {Controls.Label(GameAction.Jump)} — встать"
             : "Сбит с ног!";
 
         public static Prompt Choose(in PromptContext c)
         {
             s_Prompts.Clear();
             if (c.Downed || c.MenuOpen) return default;
-            if (c.CanRevive) s_Prompts.Add(new Prompt(100, "E", "Удерживай — поднять союзника", c.ReviveProgress));
-            if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, "E", $"Удерживай — взломать: {c.HackTarget} ({c.HackSeconds:0} с)", c.HackProgress));
+            string use = Controls.Label(GameAction.Interact), hatch = Controls.Label(GameAction.Hatch);
+            if (c.CanRevive) s_Prompts.Add(new Prompt(100, use, "Удерживай — поднять союзника", c.ReviveProgress));
+            if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, use, $"Удерживай — взломать: {c.HackTarget} ({c.HackSeconds:0} с)", c.HackProgress));
             if (c.BlockedByCeiling) s_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
             if (c.Playing && c.NearHatch)
             {
                 // With the cursor out the board above the hatch speaks for itself.
-                if (c.CarriedItems > 0) { if (!c.CursorMode) s_Prompts.Add(new Prompt(60, "Tab", "Разложить добычу: на склад над люком или в «Продать»")); }
-                else if (c.Collected >= c.Quota) s_Prompts.Add(new Prompt(55, "F", "Следующий дом"));
-                else s_Prompts.Add(new Prompt(40, "F", $"Уйти, не набрав квоту ({c.Collected}/{c.Quota})"));
+                if (c.CarriedItems > 0) { if (!c.CursorMode) s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), "Разложить добычу: на склад над люком или в «Продать»")); }
+                else if (c.Collected >= c.Quota) s_Prompts.Add(new Prompt(55, hatch, "Следующий дом"));
+                else s_Prompts.Add(new Prompt(40, hatch, $"Уйти, не набрав квоту ({c.Collected}/{c.Quota})"));
             }
             if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
             if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));

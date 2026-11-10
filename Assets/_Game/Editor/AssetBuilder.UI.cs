@@ -35,6 +35,11 @@ namespace Stealth.EditorTools
             public InventoryBlockView InventoryBlock;
             public FriendLobbyRowView FriendRow;
             public Image CellHighlight;
+            public ControlRowView ControlRow;
+            public Text ControlGroup;
+            public Image MapRect;
+            public MapIconView MapIcon;
+            public CalloutMarkerView Callout;
         }
 
         static Font s_Font;
@@ -45,19 +50,29 @@ namespace Stealth.EditorTools
 
         static readonly Color PanelColor = new(0, 0, 0, 0.45f);
 
+        /// <summary>REBUILD_UI=1 rebuilds only the interface prefabs from code (same paths and GUIDs; the scene keeps its instances).</summary>
         static UiPrefabs BuildUi()
         {
-            var e = BuildUiElements();
-            return new UiPrefabs
+            bool force = s_Force;
+            if (System.Environment.GetEnvironmentVariable("REBUILD_UI") == "1") s_Force = true;
+            try
             {
-                Screens = new[]
+                var e = BuildUiElements();
+                return new UiPrefabs
                 {
-                    Prefab(UiPrefabsDir + "/HUD.prefab", () => BuildHud(e)),
-                    Prefab(UiPrefabsDir + "/Inventory.prefab", () => BuildInventoryScreen(e)),
-                    Prefab(UiPrefabsDir + "/Menu.prefab", () => BuildMenu(e)),
-                    Prefab(UiPrefabsDir + "/StashBoard.prefab", () => BuildStashBoard(e)),
-                },
-            };
+                    Screens = new[]
+                    {
+                        Prefab(UiPrefabsDir + "/HUD.prefab", () => BuildHud(e)),
+                        Prefab(UiPrefabsDir + "/Inventory.prefab", () => BuildInventoryScreen(e)),
+                        Prefab(UiPrefabsDir + "/Menu.prefab", () => BuildMenu(e)),
+                        Prefab(UiPrefabsDir + "/StashBoard.prefab", () => BuildStashBoard(e)),
+                    },
+                };
+            }
+            finally
+            {
+                s_Force = force;
+            }
         }
 
         // ------------------------------------------------------------------ building blocks
@@ -306,6 +321,79 @@ namespace Stealth.EditorTools
             e.CellHighlight = Prefab(ElementsDir + "/CellHighlight.prefab", () =>
                 Img(R(null, "CellHighlight", TopLeft, TopLeft, Vector2.zero, new Vector2(InventoryUI.Cell - 2, InventoryUI.Cell - 2)), new Color(0.3f, 1f, 0.4f, 0.35f)).gameObject)
                 .GetComponent<Image>();
+
+            e.ControlRow = Prefab(ElementsDir + "/ControlRow.prefab", () =>
+            {
+                var root = R(null, "ControlRow", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 24));
+                Fixed(root, 24);
+                var view = root.gameObject.AddComponent<ControlRowView>();
+                view.Title = Txt(R(root, "Title", Left, Left, new Vector2(2, 0), new Vector2(220, 24)), "Действие", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.9f));
+                view.Title.horizontalOverflow = HorizontalWrapMode.Wrap;
+                view.Title.resizeTextForBestFit = true;
+                view.Title.resizeTextMinSize = 10;
+                view.Title.resizeTextMaxSize = 13;
+                view.Key = Instance<Button>(e.Button, root, "Key");
+                var krt = (RectTransform)view.Key.transform;
+                krt.anchorMin = krt.anchorMax = krt.pivot = new Vector2(1, 0.5f);
+                krt.anchoredPosition = Vector2.zero;
+                krt.sizeDelta = new Vector2(100, 22);
+                view.KeyLabel = view.Key.GetComponentInChildren<Text>();
+                view.KeyLabel.text = "E";
+                view.KeyLabel.fontSize = 13;
+                view.KeyLabel.fontStyle = FontStyle.Bold;
+                view.KeyBackground = view.Key.GetComponent<Image>();
+                // The key colour is set by the panel (normal / waiting / taken twice): the button only tints it.
+                var colors = view.Key.colors;
+                colors.normalColor = colors.selectedColor = Color.white;
+                colors.highlightedColor = new Color(1.3f, 1.3f, 1.3f, 1f);
+                colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+                colors.disabledColor = new Color(1f, 1f, 1f, 0.55f);
+                colors.colorMultiplier = 1.5f;
+                view.Key.colors = colors;
+                return root.gameObject;
+            }).GetComponent<ControlRowView>();
+
+            e.MapRect = Prefab(ElementsDir + "/MapRect.prefab", () =>
+            {
+                // Anchored at the map's origin, pivot bottom-left: position = corner, size = extent (set by MapView).
+                var rt = R(null, "MapRect", Center, BottomLeft, Vector2.zero, new Vector2(10, 10));
+                return Img(rt, Color.white).gameObject;
+            }).GetComponent<Image>();
+
+            e.MapIcon = Prefab(ElementsDir + "/MapIcon.prefab", () =>
+            {
+                var root = R(null, "MapIcon", Center, Center, Vector2.zero, Vector2.zero);
+                var view = root.gameObject.AddComponent<MapIconView>();
+                view.Rect = root;
+                view.Arrow = Img(R(root, "Arrow", Center, Center, Vector2.zero, new Vector2(14, 14)), Color.white, S("MapArrow"));
+                view.Dot = Img(R(root, "Dot", Center, Center, Vector2.zero, new Vector2(9, 9)), Color.white, S("Disc"));
+                var diamond = R(root, "Diamond", Center, Center, Vector2.zero, new Vector2(9, 9));
+                diamond.localEulerAngles = new Vector3(0, 0, 45);
+                view.Diamond = Img(diamond, Color.white);
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -14), new Vector2(160, 16)), "Игрок", 11, TextAnchor.MiddleCenter, Color.white);
+                return root.gameObject;
+            }).GetComponent<MapIconView>();
+
+            e.Callout = Prefab(ElementsDir + "/CalloutMarker.prefab", () =>
+            {
+                var root = R(null, "CalloutMarker", BottomLeft, Center, Vector2.zero, Vector2.zero);
+                var view = root.gameObject.AddComponent<CalloutMarkerView>();
+                view.Rect = root;
+                var diamond = R(root, "Diamond", Center, Center, Vector2.zero, new Vector2(13, 13));
+                diamond.localEulerAngles = new Vector3(0, 0, 45);
+                view.Diamond = Img(diamond, Color.white);
+                Img(R(diamond, "Hole", Center, Center, Vector2.zero, new Vector2(5, 5)), new Color(0, 0, 0, 0.55f));
+                view.Ring = Img(R(root, "Ring", Center, Center, Vector2.zero, new Vector2(30, 30)), Color.white, S("Ring"));
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, 17), new Vector2(220, 18)), "12 м", 12, TextAnchor.MiddleCenter, Color.white, true);
+                return root.gameObject;
+            }).GetComponent<CalloutMarkerView>();
+
+            e.ControlGroup = Prefab(ElementsDir + "/ControlGroup.prefab", () =>
+            {
+                var t = Txt(R(null, "ControlGroup", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 26)), "Группа", 15, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.45f), true);
+                Fixed(t, 28);
+                return t.gameObject;
+            }).GetComponent<Text>();
             return e;
         }
 
@@ -370,6 +458,8 @@ namespace Stealth.EditorTools
             hud.SuspicionPrefab = e.SuspicionMarker;
             hud.MarkerLayer = Stretch(content, "TeamMarkers");
             hud.TeamMarkerPrefab = e.TeamMarker;
+            hud.CalloutLayer = Stretch(content, "Callouts");
+            hud.CalloutPrefab = e.Callout;
             hud.HatchMarker = R(content, "HatchMarker", BottomLeft, Center, new Vector2(640, 360), Vector2.zero);
             var diamond = R(hud.HatchMarker, "Diamond", Center, Center, Vector2.zero, new Vector2(14, 14));
             diamond.localEulerAngles = new Vector3(0, 0, 45);
@@ -424,15 +514,52 @@ namespace Stealth.EditorTools
             Img(over, new Color(0, 0, 0, 0.8f));
             Txt(R(over, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(520, 40)), "Забег окончен", 26, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.35f), true);
             hud.RunOverTotal = Txt(R(over, "Total", TopCenter, TopCenter, new Vector2(0, -56), new Vector2(520, 24)), "Сдано за забег: 0 очк.", 16, TextAnchor.MiddleCenter, Color.white);
-            Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R — начать новый забег", 15, TextAnchor.MiddleCenter, Color.white);
+            hud.RunOverRestart = Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R — начать новый забег", 15, TextAnchor.MiddleCenter, Color.white);
             hud.RunOver = over.gameObject;
 
-            hud.Help = Txt(R(content, "Help", BottomLeft, BottomLeft, new Vector2(16, 12), new Vector2(620, 64)),
+            // The help text names the current keys (GameHUD rebuilds it after a rebind).
+            hud.HelpLabel = Txt(R(content, "Help", BottomLeft, BottomLeft, new Vector2(16, 12), new Vector2(640, 80)),
                 "WASD — ходить · Shift — бег · Пробел — прыжок · Ctrl/C — присесть\n" +
-                "Tab (держать) — руки: тащи предметы мышкой, R — повернуть\n" +
-                "E — поднять союзника / взломать · F у люка — следующий дом · Esc — меню · H — справка",
-                12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.7f)).gameObject;
+                "Tab (держать) — руки: тащи предметы мышкой, R — повернуть · E — поднять союзника / взломать\n" +
+                "СКМ — пинг · Q — пометить робота · M — карта · F у люка — следующий дом\n" +
+                "Esc — меню и всё управление · H — убрать подсказку",
+                12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.7f));
+            hud.Help = hud.HelpLabel.gameObject;
+
+            // The minimap (bottom right, turns with the view) and the big map (M, the whole floor, north-up).
+            hud.Minimap = BuildMap(e, content, "Minimap", true, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-16, 16), new Vector2(210, 210), 4.5f);
+            hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
+            hud.BigMap.gameObject.SetActive(false);
             return root;
+        }
+
+        /// <summary>
+        /// A map: a panel with a clipped viewport; inside, a pivot (turns with the view on the minimap) and the content in
+        /// metres with a layer of rectangles and a layer of icons. Its own canvas: redrawing the map does not rebuild the HUD.
+        /// </summary>
+        static MapView BuildMap(UiElements e, Transform parent, string name, bool follow, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, float scale)
+        {
+            var root = R(parent, name, anchor, pivot, pos, size);
+            root.gameObject.AddComponent<Canvas>();
+            Img(root, new Color(0.02f, 0.03f, 0.04f, follow ? 0.62f : 0.85f));
+            var view = root.gameObject.AddComponent<MapView>();
+            view.FollowPlayer = follow;
+            view.Scale = scale;
+            float captionH = follow ? 0f : 30f;
+            var viewport = Stretch(root, "Viewport", 4f);
+            viewport.offsetMax = new Vector2(-4f, -4f - captionH);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            view.Viewport = viewport;
+            view.Pivot = R(viewport, "Pivot", Center, Center, Vector2.zero, Vector2.zero);
+            view.Content = R(view.Pivot, "Content", Center, Center, Vector2.zero, Vector2.zero);
+            view.RectLayer = R(view.Content, "Rects", Center, Center, Vector2.zero, Vector2.zero);
+            view.IconLayer = R(view.Content, "Icons", Center, Center, Vector2.zero, Vector2.zero);
+            view.RectPrefab = e.MapRect;
+            view.IconPrefab = e.MapIcon;
+            view.Caption = follow
+                ? Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(6, -2), new Vector2(120, 18)), "этаж 1", 11, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f))
+                : Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(12, -2), new Vector2(size.x - 24, 30)), "Этаж 1", 15, TextAnchor.MiddleLeft, Color.white, true);
+            return view;
         }
 
         /// <summary>Background + fill (pivot left, stretched by anchorMax.x).</summary>
@@ -609,6 +736,7 @@ namespace Stealth.EditorTools
             Spacer(col, 14);
             menu.NetStatus = ColumnText(col, "NetStatus", "", 14, new Color(1f, 0.85f, 0.5f), 22);
             menu.MainSettings = ButtonIn(e, col, "Settings", "Настройки", 30);
+            menu.MainControls = ButtonIn(e, col, "Controls", "Управление", 30);
             menu.Quit = ButtonIn(e, col, "Quit", "Выход", 30);
 
             // Friends playing right now (Steam): one click to join.
@@ -634,12 +762,14 @@ namespace Stealth.EditorTools
             var pause = Stretch(root.transform, "Pause");
             menu.PausePage = pause.gameObject;
             Img(pause, new Color(0, 0, 0, 0.6f)).raycastTarget = true;
-            var pc = Column(pause, "Column", new Vector2(0, -216), 360);
+            var pc = Column(pause, "Column", new Vector2(-430, -150), 300);
+            ColumnText(pc, "Title", "Пауза", 26, Color.white, 44, true, TextAnchor.MiddleCenter);
             menu.Role = ColumnText(pc, "Role", "Ты хост", 15, Color.white, 26, anchor: TextAnchor.MiddleCenter);
             menu.Invite = ButtonIn(e, pc, "Invite", "Пригласить друзей (Steam)", 36);
             menu.Resume = ButtonIn(e, pc, "Resume", "Продолжить", 36);
             menu.PauseSettings = ButtonIn(e, pc, "Settings", "Настройки", 36);
             menu.Leave = ButtonIn(e, pc, "Leave", "Покинуть игру", 36);
+            BuildControlsPanel(e, menu, root.transform);
 
             // Settings.
             var settings = Stretch(root.transform, "Settings");
@@ -662,7 +792,7 @@ namespace Stealth.EditorTools
             Spacer(sc, 10);
             menu.InvertY = ToggleIn(e, sc, "InvertY", "Инвертировать мышь по вертикали");
             menu.HeadBob = ToggleIn(e, sc, "HeadBob", "Покачивание камеры при ходьбе");
-            menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", "Ctrl переключает присед (иначе — удерживать)");
+            menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", "Присед переключается, а не удерживается");
             Spacer(sc, 14);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(buttons, 32);
@@ -676,6 +806,54 @@ namespace Stealth.EditorTools
             pause.gameObject.SetActive(false);
             settings.gameObject.SetActive(false);
             return root;
+        }
+
+        /// <summary>
+        /// Every control of the game in two columns (rows are added by <see cref="ControlsPanel"/> from Controls.All):
+        /// right of the pause buttons in a game, over a backdrop with "Готово" from the main menu.
+        /// </summary>
+        static void BuildControlsPanel(UiElements e, GameMenu menu, Transform root)
+        {
+            var backdrop = Stretch(root, "ControlsBackdrop");
+            Img(backdrop, new Color(0.04f, 0.05f, 0.06f, 0.97f)).raycastTarget = true;
+            menu.ControlsBackdrop = backdrop.gameObject;
+            backdrop.gameObject.SetActive(false);
+
+            const float colW = 330f, gap = 24f, pad = 18f;
+            var rt = R(root, "Controls", TopCenter, TopCenter, new Vector2(170, -60), new Vector2(pad * 2 + colW * 2 + gap, 600));
+            Img(rt, new Color(0.03f, 0.04f, 0.05f, 0.88f)).raycastTarget = true;
+            var panel = rt.gameObject.AddComponent<ControlsPanel>();
+            menu.KeysPanel = panel;
+            Txt(R(rt, "Title", TopLeft, TopLeft, new Vector2(pad, -8), new Vector2(400, 36)), "Управление", 22, TextAnchor.MiddleLeft, Color.white, true);
+            panel.Columns = new RectTransform[2];
+            for (int i = 0; i < 2; i++)
+            {
+                var c = R(rt, $"Column{i}", TopLeft, TopLeft, new Vector2(pad + i * (colW + gap), -46), new Vector2(colW, 0));
+                var v = c.gameObject.AddComponent<VerticalLayoutGroup>();
+                v.spacing = 3;
+                v.childControlWidth = v.childControlHeight = true;
+                v.childForceExpandWidth = true;
+                v.childForceExpandHeight = false;
+                c.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                panel.Columns[i] = c;
+            }
+            panel.RowPrefab = e.ControlRow;
+            panel.GroupPrefab = e.ControlGroup;
+            panel.Hint = Txt(R(rt, "Hint", BottomLeft, BottomLeft, new Vector2(pad, 52), new Vector2(colW * 2 + gap, 22)),
+                "Нажми на клавишу, чтобы переназначить", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.65f));
+            panel.Reset = Instance<Button>(e.Button, rt, "Reset");
+            panel.Reset.GetComponentInChildren<Text>().text = "Сбросить управление";
+            var rrt = (RectTransform)panel.Reset.transform;
+            rrt.anchorMin = rrt.anchorMax = rrt.pivot = BottomLeft;
+            rrt.anchoredPosition = new Vector2(pad, 14);
+            rrt.sizeDelta = new Vector2(220, 32);
+            menu.ControlsDone = Instance<Button>(e.Button, rt, "Done");
+            menu.ControlsDone.GetComponentInChildren<Text>().text = "Готово";
+            var drt = (RectTransform)menu.ControlsDone.transform;
+            drt.anchorMin = drt.anchorMax = drt.pivot = new Vector2(1, 0);
+            drt.anchoredPosition = new Vector2(-pad, 14);
+            drt.sizeDelta = new Vector2(160, 32);
+            rt.gameObject.SetActive(false);
         }
 
         static Slider SliderIn(UiElements e, Transform parent, string name, float min, float max, bool whole)

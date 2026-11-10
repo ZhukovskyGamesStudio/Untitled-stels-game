@@ -171,6 +171,21 @@ namespace Stealth.EditorTools
                 float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
                 return Mathf.Clamp01((1f - d) * 8f);
             });
+            Sprite("Ring", 64, 64, (u, v) =>
+            {
+                float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
+                return Mathf.Clamp01((1f - Mathf.Abs(d - 0.85f) / 0.12f) * 2f);
+            });
+            // A map arrow pointing up (+v): a chevron with a notch at the back.
+            Sprite("MapArrow", 64, 64, (u, v) =>
+            {
+                float x = Mathf.Abs(u - 0.5f) * 2f;   // 0 centre .. 1 edge
+                float tip = 0.95f, back = 0.08f;
+                float edge = tip - (tip - back) * x;      // outer edge of the triangle at this x
+                float notch = back + 0.32f * (1f - x);    // the notch cut into the back
+                float inside = Mathf.Min(edge - v, v - notch) * 40f;
+                return Mathf.Clamp01(inside);
+            });
         }
 
         static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha)

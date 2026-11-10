@@ -21,13 +21,14 @@ Unity в batchmode не запустится, если проект открыт
 Tools/dev.sh tests              # компиляция + все EditMode-тесты (итог и упавшие — в конце вывода)
 Tools/dev.sh assets             # дособрать недостающие ассеты (существующие префабы не трогает)
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
+REBUILD_UI=1 Tools/dev.sh assets  # пересобрать только UI-префабы (HUD, меню, инвентарь, элементы)
 Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -69,7 +70,7 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
    `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
-   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`.
+   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
    показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
@@ -149,6 +150,20 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 - Правила забега (квота, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
 - Склад команды у люка — `TeamStash` в `GameManager.Stash` (сервер), реплицирует `GameManagerNet`; запросы — `PlayerInventory.Request{Stash,Unstash,StashMove,SellStashed,StashWorld,SellWorld}`.
   Записи склада адресуются по значению (`InventoryEntry`), не по индексу: список мог измениться, пока запрос летел. Склад живёт весь забег, `RestartRunServer` его чистит.
+
+**Управление** — `Controls` (`Scripts/Player`): действия `GameAction` с клавишами по умолчанию, переназначение (PlayerPrefs), чтение устройств.
+Игровой код спрашивает `Controls.Held/Pressed(GameAction.X)`, а не `Keyboard.current`; тексты для игрока называют клавиши через `Controls.Label`.
+Новое действие — в `GameAction` и `Controls.All` (название, группа, клавиша), оно само появится в списке на паузе (`ControlsPanel`).
+
+**Карта, пинги, метки.** `ExplorationMap` — что команда видела (плитки 2,5 м, вид не проходит сквозь стены, проходит в проём двери);
+сервер открывает вокруг всех игроков, `GameManagerNet` реплицирует биты (`NetworkList<ulong>`, [0] = сид дома), клиент ещё и сам вокруг себя.
+`MapSketch` превращает видимое в прямоугольники (пол, стены с проёмами, лестницы, мебель из `LevelShell.Props`, люк), `MapView` рисует
+мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
+→ `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
+`PC_Renderer` рисует их сквозь стены (`Art/Shaders/MarkedXray.shader`). Настройки — `PlayerConfig.Team`.
+
+**Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
+`RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).
 
 Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
 

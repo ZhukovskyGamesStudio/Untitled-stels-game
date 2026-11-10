@@ -25,12 +25,14 @@ namespace Stealth.Enemies
         public ulong Target;
         /// <summary>Loot a worker carries: shape * 16 + colour, -1 none (<see cref="Detector.EncodeCargo"/>).</summary>
         public short Cargo;
+        /// <summary>Marked for the team until this server time (shown through walls), 0 = never.</summary>
+        public float MarkedUntil;
 
         public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody, Cargo = -1 };
 
         public bool Equals(DetectorSnapshot o) =>
             Awareness == o.Awareness && Focus == o.Focus && Hacked == o.Hacked && Mode == o.Mode && Variant == o.Variant && Target == o.Target
-            && Cargo == o.Cargo;
+            && Cargo == o.Cargo && MarkedUntil.Equals(o.MarkedUntil);
     }
 
     /// <summary>
@@ -48,6 +50,8 @@ namespace Stealth.Enemies
     public abstract class Detector : MonoBehaviour, IHackable
     {
         public const ulong Nobody = ulong.MaxValue;
+        /// <summary>Layer of a marked detector's models: the renderer draws them through walls (feature "MarkedXray").</summary>
+        public const int XrayLayer = 8;
         public static readonly List<Detector> All = new();
 
         /// <summary>One-shot effects shown on every peer (see <see cref="Pulse"/>).</summary>
@@ -157,6 +161,39 @@ namespace Stealth.Enemies
         }
 
         protected void SetTarget(ulong target) => m_State.Target = target;
+
+        // ------------------------------------------------------------------ marked for the team
+
+        /// <summary>A teammate marked it: everyone sees it through walls for a while.</summary>
+        public bool IsMarked => m_State.MarkedUntil > Session.ServerTimeF;
+        public float MarkedUntil => m_State.MarkedUntil;
+
+        /// <summary>Server: marked by a player until <paramref name="serverTime"/>.</summary>
+        public void MarkServer(float serverTime) => m_State.MarkedUntil = Mathf.Max(m_State.MarkedUntil, serverTime);
+
+        readonly List<(Renderer renderer, int layer)> m_XrayLayers = new();
+        bool m_Xray;
+
+        /// <summary>Every peer: put the models on the x-ray layer while marked (the renderer outlines them through walls).</summary>
+        public void ShowThroughWalls(bool on)
+        {
+            if (on == m_Xray) return;
+            m_Xray = on;
+            if (on)
+            {
+                m_XrayLayers.Clear();
+                foreach (var r in GetComponentsInChildren<Renderer>())
+                {
+                    if (!(r is MeshRenderer || r is SkinnedMeshRenderer) || r.gameObject.layer == LevelMetrics.CeilingLayer) continue;
+                    m_XrayLayers.Add((r, r.gameObject.layer));
+                    r.gameObject.layer = XrayLayer;
+                }
+                return;
+            }
+            foreach (var (r, layer) in m_XrayLayers)
+                if (r != null) r.gameObject.layer = layer;
+            m_XrayLayers.Clear();
+        }
 
         /// <summary>Carried loot (-1 none), see <see cref="EncodeCargo"/>.</summary>
         public short Cargo => m_State.Cargo;

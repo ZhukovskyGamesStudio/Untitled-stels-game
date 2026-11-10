@@ -19,14 +19,14 @@ namespace Stealth.Level
     {
         [Header("Size by house (0-based); the last entry repeats")]
         public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        public int BaseWidth = 3;
-        [Tooltip("+1 room in width per house, up to this.")]
-        public int MaxExtraWidth = 2;
-        public int BaseDepth = 3;
-        [Tooltip("+1 room in depth every this many houses…")]
-        public int HousesPerExtraDepth = 3;
-        [Tooltip("…up to this.")]
-        public int MaxExtraDepth = 1;
+        [Tooltip("Rooms per floor in the first house (9 = 3 x 3).")]
+        public float BaseRooms = 9f;
+        [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
+        public float RoomsPerHouse = 2.5f;
+        [Tooltip("Rooms per floor never go above this (36 = 6 x 6).")]
+        public float MaxRooms = 36f;
+        [Tooltip("Floor area by team size (1, 2, 3, 4… players; the last repeats): a bigger team gets a bigger house, much softer than ×N.")]
+        public float[] AreaByPlayers = { 1f, 1.25f, 1.45f, 1.6f };
 
         [Header("Rooms")]
         public RoomWeight[] RoomWeights =
@@ -55,8 +55,28 @@ namespace Stealth.Level
         public float AutoDoorChance = 0.45f;
 
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
-        public int WidthFor(int house) => BaseWidth + Mathf.Min(house, MaxExtraWidth);
-        public int DepthFor(int house) => BaseDepth + Mathf.Min(house / Mathf.Max(1, HousesPerExtraDepth), MaxExtraDepth);
+
+        public float AreaFor(int players) =>
+            AreaByPlayers == null || AreaByPlayers.Length == 0 ? 1f : AreaByPlayers[Mathf.Clamp(players - 1, 0, AreaByPlayers.Length - 1)];
+
+        /// <summary>Target rooms per floor: grows with every house and (softly) with the team.</summary>
+        public float RoomsFor(int house, int players) => Mathf.Min(MaxRooms, (BaseRooms + RoomsPerHouse * Mathf.Max(0, house)) * AreaFor(players));
+
+        /// <summary>Rooms along X and Z for a house: the grid closest to <see cref="RoomsFor"/> (never less than 2 x 2, X ≥ Z).</summary>
+        public Vector2Int GridFor(int house, int players) => GridOf(RoomsFor(house, players));
+
+        public static Vector2Int GridOf(float rooms)
+        {
+            int w = 2, h = 2;
+            while (w * h < 400)
+            {
+                int nw = w <= h ? w + 1 : w, nh = w <= h ? h : h + 1;
+                if (Mathf.Abs(nw * nh - rooms) > Mathf.Abs(w * h - rooms)) break; // the next size is further from the target
+                w = nw;
+                h = nh;
+            }
+            return new Vector2Int(w, h);
+        }
 
         public RoomType PickRoom(System.Random rng)
         {
@@ -87,6 +107,10 @@ namespace Stealth.Level
         public int CamerasPerHouse = 1;
         public int Lasers = 1;
         public int LasersPerHouse = 1;
+        [Tooltip("A bigger team gets a bigger house: one more robot per this many rooms it adds (all floors).")]
+        public int TeamRoomsPerExtraRobot = 10;
+        [Tooltip("…and one more device per this many.")]
+        public int TeamRoomsPerExtraDevice = 15;
         [Tooltip("House (0-based) from which lasers can move up and down.")]
         public int MovingLasersFromHouse = 2;
 
@@ -106,17 +130,19 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ layout
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
-        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null)
+        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1)
         {
             building ??= new BuildingSettings();
             security ??= new SecuritySettings();
             var rng = new System.Random(seed);
+            var grid = building.GridFor(levelIndex, players);
             var l = new LevelLayout
             {
                 Seed = seed,
                 LevelIndex = levelIndex,
-                Width = building.WidthFor(levelIndex),
-                Height = building.DepthFor(levelIndex),
+                Players = Mathf.Max(1, players),
+                Width = grid.x,
+                Height = grid.y,
                 Floors = building.FloorsFor(levelIndex),
             };
             int w = l.Width, h = l.Height, floors = l.Floors;
@@ -599,7 +625,10 @@ namespace Stealth.Level
                         if (dist >= 2) candidates.Add(new Vector3Int(x, y, f));
                     }
 
-            int robots = s.Robots + level * s.RobotsPerHouse + (l.Floors - 1) * s.RobotsPerExtraFloor;
+            // A bigger team gets a bigger house — and the guards to go with it.
+            var solo = b.GridFor(level, 1);
+            int teamRooms = Mathf.Max(0, l.Width * l.Height - solo.x * solo.y) * l.Floors;
+            int robots = s.Robots + level * s.RobotsPerHouse + (l.Floors - 1) * s.RobotsPerExtraFloor + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraRobot);
             var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
@@ -619,7 +648,7 @@ namespace Stealth.Level
             }
 
             // Fixed security devices: pressure plates in the room's walkways, motion sensors on walls, lidar poles.
-            int devices = s.Devices + level * s.DevicesPerHouse;
+            int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.CellCenter(0, l.StartCell.x, l.StartCell.y);
             for (int i = 0; i < devices; i++)
             {

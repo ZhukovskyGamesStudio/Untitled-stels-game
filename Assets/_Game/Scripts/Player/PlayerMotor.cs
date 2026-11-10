@@ -16,19 +16,16 @@ namespace Stealth.Player
         public static PlayerInputState FromDevices(bool allowLook)
         {
             var s = new PlayerInputState();
-            var kb = Keyboard.current;
             var mouse = Mouse.current;
-            if (kb == null) return s;
-            if (kb.wKey.isPressed) s.Move.y += 1;
-            if (kb.sKey.isPressed) s.Move.y -= 1;
-            if (kb.dKey.isPressed) s.Move.x += 1;
-            if (kb.aKey.isPressed) s.Move.x -= 1;
-            s.Sprint = kb.leftShiftKey.isPressed;
+            if (Controls.Held(GameAction.Forward)) s.Move.y += 1;
+            if (Controls.Held(GameAction.Back)) s.Move.y -= 1;
+            if (Controls.Held(GameAction.Right)) s.Move.x += 1;
+            if (Controls.Held(GameAction.Left)) s.Move.x -= 1;
+            s.Sprint = Controls.Held(GameAction.Sprint);
             // Ctrl = hold to crouch (or toggle, if chosen in the settings), C = always toggles.
-            bool ctrl = kb.leftCtrlKey.isPressed;
-            s.CrouchHeld = ctrl && !GameSettings.CrouchToggle;
-            s.CrouchToggle = kb.cKey.wasPressedThisFrame || (GameSettings.CrouchToggle && kb.leftCtrlKey.wasPressedThisFrame);
-            s.Jump = kb.spaceKey.wasPressedThisFrame;
+            s.CrouchHeld = Controls.Held(GameAction.CrouchHold) && !GameSettings.CrouchToggle;
+            s.CrouchToggle = Controls.Pressed(GameAction.CrouchToggle) || (GameSettings.CrouchToggle && Controls.Pressed(GameAction.CrouchHold));
+            s.Jump = Controls.Pressed(GameAction.Jump);
             if (allowLook && mouse != null) s.Look = mouse.delta.ReadValue();
             return s;
         }

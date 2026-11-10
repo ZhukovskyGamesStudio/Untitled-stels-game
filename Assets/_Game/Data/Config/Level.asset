@@ -14,11 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.LevelConfig
   Building:
     FloorsPerHouse: 020000000200000003000000030000000300000004000000i
-    BaseWidth: 3
-    MaxExtraWidth: 2
-    BaseDepth: 3
-    HousesPerExtraDepth: 3
-    MaxExtraDepth: 1
+    BaseRooms: 9
+    RoomsPerHouse: 2.5
+    MaxRooms: 36
+    AreaByPlayers:
+    - 1
+    - 1.25
+    - 1.45
+    - 1.6
     RoomWeights:
     - Room: 1
       Weight: 28

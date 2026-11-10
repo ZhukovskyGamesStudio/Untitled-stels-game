@@ -155,7 +155,7 @@ namespace Stealth.Player
             if (IsOwner)
             {
                 Local = this;
-                GameSettings.EnsureLoaded();
+                GameSettings.EnsureLoaded(); // and the controls
                 var nick = Session.Launcher?.LocalPlayerName ?? "";
                 DisplayName = nick.Length > 28 ? nick.Substring(0, 28) : nick;
                 Camera.enabled = true;
@@ -224,10 +224,9 @@ namespace Stealth.Player
 
             PlaceOnLevelIfNeeded();
             bool menu = GameMenu.IsOpen;
-            var kb = Keyboard.current;
-            if (kb == null) return;
+            if (Keyboard.current == null) return;
 
-            CursorMode = !menu && !Downed && (kb.tabKey.isPressed || HoldCursor || DevFlags.ForceHandsMode);
+            CursorMode = !menu && !Downed && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
@@ -239,7 +238,8 @@ namespace Stealth.Player
 
             UpdateNoise();
             UpdateGas();
-            UpdateInteractions(kb);
+            UpdateInteractions();
+            UpdateCallouts();
             UpdateFog();
         }
 
@@ -336,10 +336,10 @@ namespace Stealth.Player
             }
         }
 
-        void UpdateInteractions(Keyboard kb)
+        void UpdateInteractions()
         {
             // Knocked down with HP left: Space gets you up — when the robot that hit you has gone.
-            if (Downed && !GameMenu.IsOpen && CanGetUp && kb.spaceKey.wasPressedThisFrame)
+            if (Downed && !GameMenu.IsOpen && CanGetUp && Controls.Pressed(GameAction.Jump))
             {
                 if (m_Link != null) m_Link.SendGetUp();
                 else OnGetUpRequest();
@@ -347,7 +347,7 @@ namespace Stealth.Player
             if (GameMenu.IsOpen) { ReviveProgress = 0; ReviveTarget = null; return; }
             // A failed run is restarted by any player — usually everybody is down by then.
             var game = GameManager.Instance;
-            if (game != null && kb.rKey.wasPressedThisFrame && game.Phase == RunPhase.Failed && !CursorMode)
+            if (game != null && Controls.Pressed(GameAction.Restart) && game.Phase == RunPhase.Failed && !CursorMode)
                 game.RequestRestart();
             if (Downed) { ReviveProgress = 0; ReviveTarget = null; return; }
 
@@ -358,7 +358,7 @@ namespace Stealth.Player
                 if (p == this || !p.Downed) continue;
                 if ((p.transform.position - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
             }
-            bool holdE = kb.eKey.isPressed || DevFlags.AutoInteract;
+            bool holdE = Controls.Held(GameAction.Interact) || DevFlags.AutoInteract;
             if (ReviveTarget != null && holdE)
             {
                 ReviveProgress += Time.deltaTime;
@@ -387,8 +387,89 @@ namespace Stealth.Player
 
             var gm = GameManager.Instance;
             if (gm == null) return;
-            if (kb.fKey.wasPressedThisFrame && Hatch.IsNear(transform.position) && gm.Phase == RunPhase.Playing)
+            if (Controls.Pressed(GameAction.Hatch) && Hatch.IsNear(transform.position) && gm.Phase == RunPhase.Playing)
                 gm.RequestFinishLevel();
+        }
+
+        // ------------------------------------------------------------------ callouts: pings and marks
+
+        TeamSettings Team => Tuning.Player.Team;
+
+        /// <summary>
+        /// Owner: the ping key calls "here!" where the crosshair points; the mark key marks the robot / device in the
+        /// crosshair for the whole team (or pings the spot when there is none).
+        /// </summary>
+        void UpdateCallouts()
+        {
+            if (GameMenu.IsOpen || Downed || CursorMode || Camera == null || GameManager.Instance == null) return;
+            bool ping = Controls.Pressed(GameAction.Ping), mark = Controls.Pressed(GameAction.Mark);
+            if (ping || mark) Callout(mark);
+        }
+
+        /// <summary>Owner: ping where the crosshair points, or mark the robot in it (falls back to a ping). Also a test hook.</summary>
+        public void Callout(bool mark)
+        {
+            if (Camera == null) return;
+            var view = Camera.transform;
+            if (mark)
+            {
+                var target = MarkTarget(view.position, view.forward, Team.MarkRange);
+                if (target != null)
+                {
+                    if (m_Link != null) m_Link.SendMark(target);
+                    else OnMarkRequest(target);
+                    return;
+                }
+            }
+            if (!Physics.Raycast(view.position, view.forward, out var hit, Team.PingRange, Perception.SightMask, QueryTriggerInteraction.Ignore)) return;
+            var spot = hit.point + hit.normal * 0.05f;
+            if (m_Link != null) m_Link.SendPing(spot);
+            else OnPingRequest(spot);
+        }
+
+        /// <summary>
+        /// The robot / device the player aims at: the crosshair ray hits its body, or it is within a few degrees of the
+        /// view and in plain sight (small devices are hard to hit exactly).
+        /// </summary>
+        public static Detector MarkTarget(Vector3 eye, Vector3 forward, float range)
+        {
+            if (Physics.Raycast(eye, forward, out var direct, range, Perception.SightMask, QueryTriggerInteraction.Ignore))
+            {
+                var hit = direct.collider.GetComponentInParent<Detector>();
+                if (hit != null && !hit.IsHacked) return hit;
+            }
+            Detector best = null;
+            float bestAngle = 5f;
+            foreach (var d in Detector.All)
+            {
+                var to = d.Position - eye;
+                float dist = to.magnitude;
+                if (dist > range || dist < 0.01f || d.IsHacked) continue;
+                float angle = Vector3.Angle(forward, to);
+                if (angle >= bestAngle) continue;
+                if (Physics.Raycast(eye, to / dist, out var block, dist - 0.6f, Perception.SightMask, QueryTriggerInteraction.Ignore)
+                    && block.collider.GetComponentInParent<Detector>() != d) continue;
+                best = d;
+                bestAngle = angle;
+            }
+            return best;
+        }
+
+        /// <summary>Server: the owner pinged a spot.</summary>
+        public void OnPingRequest(Vector3 position)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || (position - transform.position).magnitude > Team.PingRange + 5f) return;
+            gm.CalloutServer(ClientId, PingKind.Here, position, null);
+        }
+
+        /// <summary>Server: the owner marked a robot / device.</summary>
+        public void OnMarkRequest(Detector target)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || target == null || target.IsHacked) return;
+            if ((target.Position - transform.position).magnitude > Team.MarkRange + 5f) return;
+            gm.CalloutServer(ClientId, PingKind.Enemy, target.Position, target);
         }
 
         /// <summary>The nearest robot / device that can be hacked from where we stand.</summary>

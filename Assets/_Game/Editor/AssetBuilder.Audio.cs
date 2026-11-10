@@ -44,7 +44,7 @@ namespace Stealth.EditorTools
         static SoundBank BuildSoundBank()
         {
             ConfigureAudioImport();
-            return s_Bank = DataAsset<SoundBank>(DataDir + "/SoundBank.asset", b =>
+            s_Bank = DataAsset<SoundBank>(DataDir + "/SoundBank.asset", b =>
             {
                 b.Footsteps = Enumerable.Range(0, 4).Select(i => Clip($"Player/footstep_{i}")).ToArray();
                 b.Jump = Clip("Player/jump");
@@ -62,6 +62,8 @@ namespace Stealth.EditorTools
                 b.Banner = Clip("UI/banner");
                 b.RunFailed = Clip("UI/fail");
                 b.LevelDone = Clip("UI/level_done");
+                b.Ping = Clip("UI/ping");
+                b.Mark = Clip("UI/mark");
                 b.Suspicious = Clip("Robots/robot_suspicious");
                 b.Alert = Clip("Robots/robot_alert");
                 b.Lost = Clip("Robots/robot_lost");
@@ -86,6 +88,14 @@ namespace Stealth.EditorTools
                 b.ExploreMusic = Clip("Music/music_explore");
                 b.ChaseMusic = Clip("Music/music_chase");
             });
+            // Clips added after the bank was created (the bank itself is never overwritten without FORCE).
+            if (s_Bank.Ping == null || s_Bank.Mark == null)
+            {
+                s_Bank.Ping = Clip("UI/ping");
+                s_Bank.Mark = Clip("UI/mark");
+                EditorUtility.SetDirty(s_Bank);
+            }
+            return s_Bank;
         }
 
         /// <summary>Music, ambience, alarm, a 2D voice and a pool of 3D voices; placed in the scene.</summary>

@@ -49,6 +49,11 @@ namespace Stealth.Game
         public int RunSeed => m_RunSeed;
 
         public LevelInfo Level { get; private set; }
+        /// <summary>What the team has seen of this house (every peer; the server reveals, the twin replicates).</summary>
+        public ExplorationMap Exploration { get; private set; }
+        /// <summary>Teammates' pings and marks on this peer.</summary>
+        public PingBoard Pings { get; } = new();
+        float m_NextReveal;
         /// <summary>The team's shared stash at the hatch: kept for the whole run, emptied by a new run.</summary>
         public TeamStash Stash { get; } = new();
         public RunState Run => m_Run;
@@ -105,11 +110,13 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security);
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players));
             ActiveLevel.Load(layout, Art);
+            Exploration = new ExplorationMap(layout);
+            Pings.Clear();
             ApplyAtmosphere();
             VisualStyles.Reapply();
-            Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms");
+            Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms x {layout.Floors} floors for {layout.Players} players");
         }
 
         static void ApplyAtmosphere()
@@ -136,7 +143,9 @@ namespace Stealth.Game
             else if (index == DevFlags.ForcedLevel || m_RunSeed == 0) m_RunSeed = new System.Random().Next(1, int.MaxValue);
             DevFlags.ForcedSeed = 0;
             int seed = LevelRandom.LevelSeed(m_RunSeed, index);
-            Level = new LevelInfo { Seed = seed, Index = index };
+            // The house is sized for the team that is here now (friends who join later raise only the quota).
+            int players = TeamSize;
+            Level = new LevelInfo { Seed = seed, Index = index, Players = players };
             BuildLocal();
             var layout = ActiveLevel.Layout;
 
@@ -144,7 +153,7 @@ namespace Stealth.Game
             ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
 
             int totalValue = SpawnContent(layout, seed);
-            m_Run.BeginLevel(index, totalValue);
+            m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             foreach (var p in PlayerController.All) p.ResetForLevelServer();
             Debug.Log($"[Game] Level {index} started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
@@ -202,9 +211,16 @@ namespace Stealth.Game
                     robot.InvestigateServer(position, true);
         }
 
+        /// <summary>Players in the session (at least 1).</summary>
+        static int TeamSize => Mathf.Max(1, PlayerController.All.Count);
+
         void Update()
         {
+            Pings.Expire(Time.time);
+            RevealMap();
             if (!m_IsServer) return;
+            if (m_Run.SetPlayers(TeamSize))
+                Banner($"В команде {m_Run.Players} {Plural(m_Run.Players, "игрок", "игрока", "игроков")} — квота этого дома: {Quota}");
             foreach (var p in PlayerController.All)
                 if (!p.Downed) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
@@ -212,6 +228,47 @@ namespace Stealth.Game
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
             if (m_Run.Wipe()) Banner($"Забег окончен: Вся команда выведена из строя. Итог забега: {RunTotal} очк.");
+        }
+
+        /// <summary>
+        /// The map clears around the players: the server reveals around everyone, a client also around itself at once
+        /// (it would arrive from the server a moment later anyway).
+        /// </summary>
+        void RevealMap()
+        {
+            var map = Exploration;
+            if (map == null || Time.time < m_NextReveal) return;
+            m_NextReveal = Time.time + 0.2f;
+            float radius = Tuning.Player.Team.RevealRadius;
+            foreach (var p in PlayerController.All)
+            {
+                if (!m_IsServer && p != PlayerController.Local) continue;
+                var eye = p.Camera != null && p.IsOwner ? p.Camera.transform.position : p.transform.position + Vector3.up * p.Height * 0.9f;
+                map.RevealAround(eye, radius);
+            }
+        }
+
+        // ------------------------------------------------------------------ pings and marks
+
+        /// <summary>Server: a player pinged a spot or marked a robot — everyone hears and sees it.</summary>
+        public void CalloutServer(ulong owner, PingKind kind, Vector3 position, Detector target)
+        {
+            var team = Tuning.Player.Team;
+            if (!Pings.TryCallout(owner, Time.time, team.Cooldown)) return;
+            if (target != null) target.MarkServer(Session.ServerTimeF + team.MarkDuration);
+            ulong id = target != null ? target.NetId : 0;
+            if (m_Link != null) m_Link.BroadcastPing(owner, kind, position, id);
+            else ReceivePing(owner, kind, position, id);
+        }
+
+        /// <summary>Every peer: a teammate's ping (delivered by the network twin).</summary>
+        public void ReceivePing(ulong owner, PingKind kind, Vector3 position, ulong target)
+        {
+            var team = Tuning.Player.Team;
+            float duration = kind == PingKind.Enemy ? team.MarkDuration : team.PingDuration;
+            Pings.Add(new TeamPing { Owner = owner, Kind = kind, Position = position, Target = target, Born = Time.time, Until = Time.time + duration });
+            var bank = Audio.Sfx.Bank;
+            Audio.Sfx.Ui(kind == PingKind.Enemy ? bank?.Mark : bank?.Ping, 0.8f);
         }
 
         /// <summary>The hunter enters through the furthest room of the ground floor from the players.</summary>
@@ -288,6 +345,13 @@ namespace Stealth.Game
         }
 
         // ------------------------------------------------------------------ banners
+
+        static string Plural(int n, string one, string few, string many)
+        {
+            int d = n % 10, h = n % 100;
+            if (d == 1 && h != 11) return one;
+            return d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many;
+        }
 
         void Banner(string text)
         {

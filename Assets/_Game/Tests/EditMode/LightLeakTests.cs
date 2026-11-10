@@ -87,6 +87,7 @@ namespace Stealth.Tests
             foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/_Game/Art/Materials" }))
             {
                 var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+                if (mat.shader.name == "Stealth/MarkedXray") continue; // the renderer's see-through-walls overlay, not a surface
                 if (mat.shader.name.Contains("Unlit"))
                 {
                     Assert.IsTrue(unlitAllowed.Contains(mat.name), $"{mat.name} is unlit: it ignores the lamps");

@@ -7,16 +7,21 @@ using UnityEngine.UI;
 namespace Stealth.UI
 {
     /// <summary>
-    /// Main menu (host / join), the in-game Esc menu and the settings page (prefab UI/Menu).
+    /// Main menu (host / join), the in-game Esc menu with every control (rebindable) and the settings page (prefab UI/Menu).
     /// Buttons, sliders and toggles are pre-built in the prefab; this presenter wires them up and shows the right page.
     /// </summary>
     public class GameMenu : MonoBehaviour
     {
         public static bool IsOpen { get; private set; }
         public static bool SettingsOpen { get; private set; }
+        /// <summary>The controls page opened from the main menu (in a game they are on the pause page).</summary>
+        public static bool ControlsOpen { get; private set; }
 
         /// <summary>Test hook: opens the pause menu.</summary>
         public static void OpenPauseForTest() => IsOpen = true;
+
+        /// <summary>Test hook: closes the pause menu.</summary>
+        public static void ClosePauseForTest() => IsOpen = false;
 
         /// <summary>Test hook: opens the pause menu with the settings page.</summary>
         public static void OpenSettingsForTest()
@@ -39,6 +44,7 @@ namespace Stealth.UI
         public Button Join;
         public Text NetStatus;
         public Button MainSettings;
+        public Button MainControls;
         public Button Quit;
 
         [Header("Friends in game (Steam)")]
@@ -55,6 +61,12 @@ namespace Stealth.UI
         public Button Resume;
         public Button PauseSettings;
         public Button Leave;
+
+        [Header("Controls")]
+        [Tooltip("Every control, rebindable: next to the pause buttons in a game, its own page from the main menu.")]
+        public ControlsPanel KeysPanel;
+        public GameObject ControlsBackdrop;
+        public Button ControlsDone;
 
         [Header("Settings")]
         public Text SensitivityLabel;
@@ -82,6 +94,8 @@ namespace Stealth.UI
             HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);
+            MainControls.onClick.AddListener(() => ControlsOpen = true);
+            ControlsDone.onClick.AddListener(() => ControlsOpen = false);
             Quit.onClick.AddListener(Application.Quit);
 
             Invite.onClick.AddListener(() => Session.Launcher.InviteFriends());
@@ -126,19 +140,27 @@ namespace Stealth.UI
             if (net == null) return;
             bool running = Session.IsRunning;
             if (!running) IsOpen = false;
-            else if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
-                if (SettingsOpen) CloseSettings();
-                else IsOpen = !IsOpen;
+                if (ControlsPanel.Rebinding) KeysPanel.Cancel();
+                else if (SettingsOpen) CloseSettings();
+                else if (ControlsOpen && !running) ControlsOpen = false;
+                else if (running) IsOpen = !IsOpen;
             }
+            if (running) ControlsOpen = false;
 
             bool settings = SettingsOpen && (IsOpen || !running);
             bool main = !settings && !running;
             bool pause = !settings && running && IsOpen;
+            bool keys = pause || (main && ControlsOpen);
             if (settings && !SettingsPage.activeSelf) SyncSettingsControls();
+            if (keys && !KeysPanel.gameObject.activeSelf) GameSettings.EnsureLoaded(); // the saved bindings
             Ui.Show(SettingsPage, settings);
             Ui.Show(MainPage, main);
             Ui.Show(PausePage, pause);
+            Ui.Show(KeysPanel, keys);
+            Ui.Show(ControlsBackdrop, main && ControlsOpen);
+            Ui.Show(ControlsDone, main && ControlsOpen);
 
             if (main) UpdateMain(net);
             if (pause) UpdatePause(net);

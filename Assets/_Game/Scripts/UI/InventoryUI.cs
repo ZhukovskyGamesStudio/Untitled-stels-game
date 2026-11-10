@@ -193,7 +193,7 @@ namespace Stealth.UI
             if (m_Source == DragSource.Stash && (Stash == null || Stash.IndexOf(m_DragStashed) < 0)) { CancelDrag(); return; }
 
             m_DragTravel += mouse.delta.ReadValue().magnitude;
-            if (Keyboard.current.rKey.wasPressedThisFrame)
+            if (Controls.Pressed(GameAction.Rotate))
             {
                 m_DragRot = (m_DragRot + 1) % 4;
                 m_GrabCell = Vector2Int.zero;
@@ -395,6 +395,11 @@ namespace Stealth.UI
             Ui.Show(Header, header);
             if (header) ValueLabel.text = $"{inv.TotalValue} очк.";
             Ui.Show(RotateHint, m_Expand > 0.5f);
+            if (m_Expand > 0.5f && RotateHint.TryGetComponent<Text>(out var rotate))
+            {
+                string rotateText = $"{Controls.Label(GameAction.Rotate)} — повернуть";
+                if (rotate.text != rotateText) rotate.text = rotateText;
+            }
             float cellAlpha = Mathf.Lerp(0.04f, 0.07f, m_Expand);
             foreach (var c in Cells) Ui.Alpha(c, cellAlpha);
 
@@ -455,7 +460,7 @@ namespace Stealth.UI
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);
             bool full = Time.time < m_FullUntil;
-            if (full && tip == null) tip = "Рюкзак полон — освободи место (Tab)";
+            if (full && tip == null) tip = $"Рюкзак полон — освободи место ({Controls.Label(GameAction.Hands)})";
             Ui.Show(Tooltip, tip != null);
             if (tip == null) return;
             Tooltip.text = tip;

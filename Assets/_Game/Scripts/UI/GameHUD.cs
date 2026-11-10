@@ -82,7 +82,17 @@ namespace Stealth.UI
         public Text BannerLabel;
         public GameObject RunOver;
         public Text RunOverTotal;
+        public Text RunOverRestart;
         public GameObject Help;
+        public Text HelpLabel;
+
+        [Header("Map and callouts")]
+        public MapView Minimap;
+        [Tooltip("The whole floor, north-up (toggled with the map key).")]
+        public MapView BigMap;
+        [Tooltip("Pings and marked robots on screen, through walls.")]
+        public RectTransform CalloutLayer;
+        public CalloutMarkerView CalloutPrefab;
 
         static readonly string[] NoiseNames = { "", "тихо", "слышно", "громко" };
         static readonly Color[] NoiseColors = { Color.white, new(0.6f, 0.9f, 1f), new(1f, 0.85f, 0.35f), new(1f, 0.35f, 0.25f) };
@@ -95,6 +105,9 @@ namespace Stealth.UI
         UiPool<SuspicionMarkerView> m_Icons;
         UiPool<TeamMarkerView> m_Markers;
         UiPool<Text> m_TeamRows;
+        UiPool<CalloutMarkerView> m_Callouts;
+        bool m_BigMapOpen;
+        int m_KeysVersion = -1;
         GameManager m_Subscribed;
         bool m_ShowHelp = true;
         float m_HelpUntil = -1f;
@@ -114,6 +127,7 @@ namespace Stealth.UI
             m_Icons = new UiPool<SuspicionMarkerView>(SuspicionPrefab, IconLayer);
             m_Markers = new UiPool<TeamMarkerView>(TeamMarkerPrefab, MarkerLayer);
             m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
+            m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
         }
 
         void OnDestroy()
@@ -159,16 +173,118 @@ namespace Stealth.UI
             ShowHatchMarker(gm, me);
             ShowHealth(me);
             ShowTeam(me, now);
+            ShowCallouts(gm, me, now);
+            ShowMaps(gm, me);
             Prompt.Set(CurrentPrompt);
             ShowBannerLine(now);
             Ui.Show(RunOver, gm.Phase == RunPhase.Failed);
             if (gm.Phase == RunPhase.Failed) RunOverTotal.text = $"Сдано за забег: {gm.RunTotal} очк.";
-            Ui.Show(Help, m_ShowHelp);
+            Ui.Show(Help, m_ShowHelp && !m_BigMapOpen);
+            NameTheKeys(gm);
+        }
+
+        /// <summary>Texts that name keys follow the rebinds.</summary>
+        void NameTheKeys(GameManager gm)
+        {
+            if (m_KeysVersion == Controls.Version) return;
+            m_KeysVersion = Controls.Version;
+            string K(GameAction a) => Controls.Label(a);
+            HelpLabel.text =
+                $"{Controls.MoveLabel()} — ходить · {K(GameAction.Sprint)} — бег · {K(GameAction.Jump)} — прыжок · {K(GameAction.CrouchHold)}/{K(GameAction.CrouchToggle)} — присесть\n" +
+                $"{K(GameAction.Hands)} (держать) — руки: тащи предметы мышкой, {K(GameAction.Rotate)} — повернуть · {K(GameAction.Interact)} — поднять союзника / взломать\n" +
+                $"{K(GameAction.Ping)} — пинг · {K(GameAction.Mark)} — пометить робота · {K(GameAction.Map)} — карта · {K(GameAction.Hatch)} у люка — следующий дом\n" +
+                $"Esc — меню и всё управление · {K(GameAction.Help)} — убрать подсказку";
+            RunOverRestart.text = $"{K(GameAction.Restart)} — начать новый забег";
+            QuotaHint.text = $"Квота набрана — к люку, {K(GameAction.Hatch)}: следующий дом";
+        }
+
+        // ------------------------------------------------------------------ map and callouts
+
+        /// <summary>Test hook: open or close the big map.</summary>
+        public void SetBigMap(bool open) => m_BigMapOpen = open;
+
+        void ShowMaps(GameManager gm, PlayerController me)
+        {
+            bool canToggle = !GameMenu.IsOpen && !me.CursorMode;
+            if (canToggle && Controls.Pressed(GameAction.Map))
+            {
+                m_BigMapOpen = !m_BigMapOpen;
+                BigMap.ViewFloor = -1;
+            }
+            if (GameMenu.IsOpen) m_BigMapOpen = false;
+            bool hasMap = gm.Exploration != null;
+            Ui.Show(Minimap, hasMap && !m_BigMapOpen);
+            Ui.Show(BigMap, hasMap && m_BigMapOpen);
+            if (!hasMap) return;
+            if (m_BigMapOpen)
+            {
+                // Mouse wheel: another floor.
+                float wheel = UnityEngine.InputSystem.Mouse.current != null ? UnityEngine.InputSystem.Mouse.current.scroll.ReadValue().y : 0f;
+                if (Mathf.Abs(wheel) > 0.01f)
+                {
+                    int floors = gm.Exploration.Floors;
+                    int current = BigMap.ViewFloor < 0 ? LevelLayout.FloorOf(me.transform.position.y) : BigMap.ViewFloor;
+                    BigMap.ViewFloor = Mathf.Clamp(current + (wheel > 0f ? 1 : -1), 0, floors - 1);
+                }
+                BigMap.Refresh(gm, me);
+            }
+            else Minimap.Refresh(gm, me);
+        }
+
+        /// <summary>
+        /// Teammates' pings ("here!") and marked robots: a diamond with a name and the distance, seen through walls,
+        /// kept on the screen edge when out of view. Marked robots are also drawn through walls by the renderer.
+        /// </summary>
+        void ShowCallouts(GameManager gm, PlayerController me, float now)
+        {
+            m_Callouts.Begin();
+            var cam = me.Camera;
+            var size = Size;
+            foreach (var d in Detector.All)
+            {
+                bool marked = d.IsMarked && !d.IsHacked;
+                d.ShowThroughWalls(marked);
+                if (!marked || cam == null) continue;
+                var top = d.Position + Vector3.up * 0.7f;
+                float left = d.MarkedUntil - Session.ServerTimeF;
+                var red = new Color(1f, 0.25f, 0.18f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
+                Callout(cam, size, top, red, $"{d.DisplayName} · {Vector3.Distance(me.transform.position, d.Position):0} м", false, 0f);
+            }
+            if (cam != null)
+                foreach (var p in gm.Pings.Active)
+                {
+                    if (p.Kind != PingKind.Here) continue;
+                    var owner = PlayerController.Find(p.Owner);
+                    var color = PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.Owner));
+                    float fade = Mathf.Clamp01(p.Until - now);
+                    color.a = fade;
+                    string who = owner != null && owner != me ? owner.Nick + " · " : "";
+                    Callout(cam, size, p.Position, color, $"{who}{Vector3.Distance(me.transform.position, p.Position):0} м", true, p.Age(now));
+                }
+            m_Callouts.End();
+        }
+
+        void Callout(Camera cam, Vector2 size, Vector3 world, Color color, string label, bool ring, float age)
+        {
+            var vp = cam.WorldToViewportPoint(world);
+            var gui = UiMath.EdgeMarker(vp, size.x, size.y, 40f, out bool clamped);
+            var m = m_Callouts.Next();
+            m.Rect.anchoredPosition = new Vector2(gui.x, size.y - gui.y);
+            m.Diamond.color = color;
+            // A ring that shrinks onto the spot when the ping appears: the eye finds it.
+            bool showRing = ring && age < 0.6f;
+            Ui.Show(m.Ring, showRing);
+            if (showRing)
+            {
+                m.Ring.rectTransform.localScale = Vector3.one * Mathf.Lerp(3f, 1f, age / 0.6f);
+                m.Ring.color = new Color(color.r, color.g, color.b, color.a * (1f - age / 0.6f));
+            }
+            Ui.Set(m.Label, label, new Color(color.r, color.g, color.b, color.a * (clamped ? 0.8f : 1f)));
         }
 
         void UpdateHelp(PlayerController me)
         {
-            if (Keyboard.current != null && Keyboard.current.hKey.wasPressedThisFrame)
+            if (!GameMenu.IsOpen && Controls.Pressed(GameAction.Help))
             {
                 m_ShowHelp = !m_ShowHelp;
                 m_HelpUntil = float.MaxValue;

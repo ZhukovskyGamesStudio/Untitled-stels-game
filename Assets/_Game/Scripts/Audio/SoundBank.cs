@@ -18,6 +18,8 @@ namespace Stealth.Audio
 
         [Header("Interface")]
         public AudioClip Click, Hover, BackpackOpen, Banner, RunFailed, LevelDone;
+        [Tooltip("A teammate's ping / a robot marked for the team.")]
+        public AudioClip Ping, Mark;
 
         [Header("Robots")]
         public AudioClip Suspicious, Alert, Lost, Hacked, Radio, TurretShot, RobotStep, RobotMotor, DroneRotor;

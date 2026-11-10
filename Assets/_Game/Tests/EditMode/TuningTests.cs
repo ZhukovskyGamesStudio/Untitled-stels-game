@@ -74,7 +74,7 @@ namespace Stealth.Tests
         [Test]
         public void BuildingFollowsItsSettings()
         {
-            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseWidth = 2, MaxExtraWidth = 0, VentChance = 0f, AutoDoorChance = 0f };
+            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentChance = 0f, AutoDoorChance = 0f };
             var l = LevelGenerator.Generate(5, 0, b);
             Assert.AreEqual(4, l.Floors);
             Assert.AreEqual(2, l.Width);
