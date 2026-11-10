@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using Stealth.Level;
 using Stealth.Player;
 using UnityEngine;
@@ -105,14 +106,29 @@ namespace Stealth.Game
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             var l = ActiveLevel.Layout;
-            int renderers = ActiveLevel.Root.GetComponentsInChildren<Renderer>().Length;
+            var all = ActiveLevel.Root.GetComponentsInChildren<Renderer>();
+            int renderers = 0, staticBatched = 0;
+            var byKind = new System.Collections.Generic.Dictionary<string, int>();
+            foreach (var r in all)
+            {
+                if (!r.enabled || r.forceRenderingOff) continue;
+                renderers++;
+                if (r.isPartOfStaticBatch) staticBatched++;
+                var top = r.transform;
+                while (top.parent != null && top.parent != ActiveLevel.Root.transform) top = top.parent;
+                var kind = System.Text.RegularExpressions.Regex.Replace(top.name, @"[_\d]+$|\(Clone\)", "");
+                byKind[kind] = byKind.TryGetValue(kind, out var n) ? n + 1 : 1;
+            }
+            Log($"perf: {renderers} renderers drawn ({all.Length} in the level, {staticBatched} static-batched); style decor: {StyleDecor.Count} pieces in {StyleDecor.Renderers} renderers; " +
+                $"furniture: {PropBatches.Merged} renderers merged into {PropBatches.Renderers}");
+            Log("perf: drawn by object: " + string.Join(", ", byKind.OrderByDescending(kv => kv.Value).Take(12).Select(kv => $"{kv.Key} {kv.Value}")));
             var views = new[]
             {
                 new Pose(l.HatchPosition + new Vector3(-3, 0.05f, -3), Quaternion.LookRotation(new Vector3(1, 0, 1))),
                 new Pose(new Vector3(-9f, 0.05f, l.Height * 5f), Quaternion.LookRotation(Vector3.right)),
                 new Pose(l.CellCenter(l.Floors - 1, l.Width / 2, l.Height / 2) + Vector3.up * 0.05f, Quaternion.LookRotation(Vector3.forward)),
             };
-            float sum = 0;
+            float sum = 0, worst = float.MaxValue;
             for (int i = 0; i < views.Length; i++)
             {
                 Me.TeleportOwner(views[i].position, views[i].rotation);
@@ -123,9 +139,10 @@ namespace Stealth.Game
                 while (Time.realtimeSinceStartup - t0 < 3f) { frames++; yield return null; }
                 float fps = frames / (Time.realtimeSinceStartup - t0);
                 sum += fps;
+                worst = Mathf.Min(worst, fps);
                 Log($"perf view {i}: {fps:0} fps");
             }
-            Log($"perf: building {l.Width}x{l.Height}x{l.Floors}, {renderers} renderers, avg {sum / views.Length:0} fps");
+            Log($"perf: building {l.Width}x{l.Height}x{l.Floors}, {renderers} renderers drawn, avg {sum / views.Length:0} fps, worst {worst:0} fps");
             Application.targetFrameRate = 144;
         }
 

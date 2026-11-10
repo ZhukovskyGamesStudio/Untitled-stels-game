@@ -94,7 +94,11 @@ namespace Stealth.Level
         /// <summary>A level was (re)built: the game's atmosphere was reset, put the style back on.</summary>
         public static void Reapply()
         {
-            if (!s_Active) return;
+            if (!s_Active)
+            {
+                if (Application.isPlaying) PropBatches.Rebuild(Config != null ? Config.Batch : null);
+                return;
+            }
             s_BaseAmbient = RenderSettings.ambientLight;
             Apply(s_Current);
         }
@@ -102,6 +106,7 @@ namespace Stealth.Level
         /// <summary>Back to the base look; the materials get their own colours back (they are assets in the editor).</summary>
         public static void Restore()
         {
+            PropBatches.Clear();
             UndoReplacements();
             s_Family = ModelFamily.None;
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
@@ -181,10 +186,14 @@ namespace Stealth.Level
         static void ApplyGeometry(StyleGeometry g)
         {
             var family = g != null ? g.Family : ModelFamily.None;
+            PropBatches.Clear(); // the furniture is about to change: it draws itself until merged again
             if (family != s_Family) UndoReplacements();
             s_Family = family;
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
-            if (Application.isPlaying) StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null);
+            if (!Application.isPlaying) return;
+            var holder = Config != null ? Config.Batch : null;
+            StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null, holder);
+            PropBatches.Rebuild(holder);
         }
 
         static void Load()

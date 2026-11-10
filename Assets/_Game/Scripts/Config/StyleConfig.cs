@@ -28,6 +28,8 @@ namespace Stealth.Configs
         public PropReplacement[] Props = new PropReplacement[0];
         [Tooltip("Models designed for one style (Art/Models/Styles/Guards)")]
         public StyleMeshes[] StyleModels = new StyleMeshes[0];
+        [Tooltip("Draws a merged mesh of the house (style architecture, furniture): MeshFilter + MeshRenderer, nothing else")]
+        public GameObject Batch;
 
         public StyleKit KitFor(ModelFamily family)
         {

@@ -10,6 +10,9 @@ namespace Stealth.Level
         public static GameObject Root { get; private set; }
         /// <summary>Surfaces of the house (walls, floors, openings) that visual styles dress.</summary>
         public static LevelShell Shell { get; private set; }
+        /// <summary>The furniture placed in the house (one object per prop).</summary>
+        public static IReadOnlyList<GameObject> Props => s_Props;
+        static readonly List<GameObject> s_Props = new();
 
         /// <summary>Builds <paramref name="layout"/> from the prefabs in <paramref name="art"/>, replacing the previous level.</summary>
         public static GameObject Load(LevelLayout layout, LevelArt art)
@@ -19,6 +22,7 @@ namespace Stealth.Level
             var builder = new LevelBuilder(art, layout);
             Root = builder.Build();
             Shell = builder.Shell;
+            s_Props.AddRange(builder.Props);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             return Root;
         }
@@ -33,6 +37,7 @@ namespace Stealth.Level
             Root = null;
             Layout = null;
             Shell = null;
+            s_Props.Clear();
         }
     }
 
@@ -69,6 +74,8 @@ namespace Stealth.Level
 
         /// <summary>Surfaces recorded while building.</summary>
         public LevelShell Shell { get; } = new();
+        /// <summary>The furniture placed (not static-batched: styles swap its meshes; <see cref="PropBatches"/> merges it).</summary>
+        public List<GameObject> Props { get; } = new();
 
         public LevelBuilder(LevelArt art, LevelLayout layout)
         {
@@ -114,6 +121,7 @@ namespace Stealth.Level
                 if (prefab == null) continue;
                 var go = Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
                 RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
+                Props.Add(go);
             }
             return root;
         }
@@ -360,7 +368,7 @@ namespace Stealth.Level
             return list;
         }
 
-        /// <summary>Static batching of everything that never moves (walls, slabs, stairs, furniture). Doors stay dynamic.</summary>
+        /// <summary>Static batching of everything that never moves (walls, slabs, stairs, windows). Doors stay dynamic.</summary>
         static void CombineStatic(GameObject root)
         {
             var list = new List<GameObject>();

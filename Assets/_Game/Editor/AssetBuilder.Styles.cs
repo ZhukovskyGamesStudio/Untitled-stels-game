@@ -62,6 +62,7 @@ namespace Stealth.EditorTools
             config.Players = MaterialsIn("Player");
             config.Loot = MaterialsIn("Items");
             config.Kits = BuildStyleKits();
+            config.Batch = BuildBatchHolder();
             config.Meshes = BuildMeshVariants();
             config.Materials = BuildMaterialVariants();
             config.Props = BuildPropReplacements();

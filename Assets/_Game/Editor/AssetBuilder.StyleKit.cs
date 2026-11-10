@@ -179,6 +179,19 @@ namespace Stealth.EditorTools
             return kit;
         }
 
+        /// <summary>
+        /// The object a merged mesh of the house is drawn with (MeshBatcher: style architecture, furniture); the batcher
+        /// gives it the mesh, the materials and the shadow settings of what it merged.
+        /// </summary>
+        static GameObject BuildBatchHolder() => Prefab($"{KitPrefabsDir}/Batch.prefab", () =>
+        {
+            var go = new GameObject("Batch");
+            go.AddComponent<MeshFilter>();
+            var r = go.AddComponent<MeshRenderer>();
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            return go;
+        });
+
         /// <summary>Every model mesh and its variant per family (Art/Models/Styles/&lt;Family&gt;/…/&lt;name&gt;__&lt;family&gt;.fbx), matched by mesh name.</summary>
         static MeshVariants[] BuildMeshVariants()
         {
