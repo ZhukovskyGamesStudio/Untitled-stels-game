@@ -84,6 +84,9 @@ namespace Stealth.Level
         /// <summary>Emission of a lit panel (HDR, catches the bloom).</summary>
         public const float PanelGlow = 2.2f;
 
+        /// <summary>Ceiling lamp cookie (pure): full light below the horizon, none straight up (dir.y = direction's height).</summary>
+        public static float CookieUpFade(float dirY) => 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.02f, 0.2f, dirY));
+
         /// <summary>Broken fluorescent tube: mostly on, with short irregular drop-outs. Returns 0..1.</summary>
         public static float Flicker(float t)
         {

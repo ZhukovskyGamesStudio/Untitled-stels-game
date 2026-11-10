@@ -26,6 +26,28 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void GlowingThingsReallyGlow()
+        {
+            foreach (var name in new[] { "Environment/LampPanel", "Environment/ExitSign", "Props/PropScreen", "Props/LampBulb", "Robots/SensorGlow", "Items/Item_0" })
+            {
+                var mat = AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Art/Materials/{name}.mat");
+                Assert.IsTrue(mat.IsKeywordEnabled("_EMISSION"), $"{name}: emission is switched off");
+            }
+        }
+
+        [Test]
+        public void CeilingLampsShineDownAndHaveNoHiddenGeometry()
+        {
+            var lamp = Art.RoomLight;
+            Assert.IsNotNull(lamp.GetComponentInChildren<Light>().cookie, "the cookie keeps the light off the ceiling");
+            Assert.AreEqual(1f, LightMath.CookieUpFade(-0.5f), 1e-4f, "down: full light");
+            Assert.AreEqual(0f, LightMath.CookieUpFade(0.9f), 1e-4f, "up: none");
+            // A shadow-only renderer still writes depth in Forward+: it hid the glowing panels and the ceiling.
+            foreach (var r in lamp.GetComponentsInChildren<Renderer>(true))
+                Assert.AreNotEqual(ShadowCastingMode.ShadowsOnly, r.shadowCastingMode, $"{r.name}: invisible geometry hides what is behind it");
+        }
+
+        [Test]
         public void LampsThatCouldShineThroughAWallCastShadows()
         {
             var art = Art;
@@ -70,9 +92,12 @@ namespace Stealth.Tests
                     Assert.IsTrue(unlitAllowed.Contains(mat.name), $"{mat.name} is unlit: it ignores the lamps");
                     continue;
                 }
-                if (!mat.IsKeywordEnabled("_EMISSION")) continue;
                 var e = mat.GetColor("_EmissionColor");
-                Assert.GreaterOrEqual(Mathf.Max(e.r, Mathf.Max(e.g, e.b)), 1f, $"{mat.name} glows dimly: make it bloom or not glow");
+                float glow = Mathf.Max(e.r, Mathf.Max(e.g, e.b));
+                bool keyword = mat.IsKeywordEnabled("_EMISSION");
+                if (glow <= 0f && !keyword) continue; // takes light, does not glow
+                Assert.IsTrue(keyword, $"{mat.name} has an emission colour but _EMISSION is off: it does not glow at all");
+                Assert.GreaterOrEqual(glow, 1f, $"{mat.name} glows dimly: make it bloom or not glow");
             }
         }
 

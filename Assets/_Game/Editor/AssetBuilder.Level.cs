@@ -314,17 +314,58 @@ namespace Stealth.EditorTools
                 panels.AddRange(Parts(model, "Eye"));
             }
             // A point light just under the fixture: precise shadows in every direction keep it inside the room.
-            // An invisible shade between it and the ceiling (casts a shadow, is not drawn) keeps the ceiling around the
-            // fixture from lighting up as if by nothing — a recessed panel shines down, not up.
+            // Its cookie lets no light upwards — a recessed panel shines down, so the ceiling around it does not light up
+            // as if by nothing. (No invisible geometry: a shadow-only shade still writes depth and hides the panels.)
             var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.3f, 0f), Quaternion.identity, LightType.Point,
                 Color.white, LightMath.RoomIntensity, 9.5f, LightShadows.Soft);
-            var shade = Cube(root.transform, "CeilingShade", new Vector3(0f, -0.12f, 0f), new Vector3(4.4f, 0.02f, 4.4f), M("LampHousing"), false);
-            shade.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            light.cookie = LampCookie();
             var rl = root.AddComponent<RoomLight>();
             rl.Lamp = light;
             rl.Panels = panels.ToArray();
             return root;
         }
+
+        const string LampCookiePath = SpritesDir + "/LampCookie.cubemap";
+
+        /// <summary>
+        /// Cube cookie of the ceiling lamps: full light downwards and sideways, fading out above the horizon (no light onto
+        /// the ceiling it hangs from).
+        /// </summary>
+        static Cubemap LampCookie()
+        {
+            var cookie = AssetDatabase.LoadAssetAtPath<Cubemap>(LampCookiePath);
+            if (cookie != null && !s_Force) return cookie;
+            const int size = 32;
+            var cube = new Cubemap(size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            var faces = new[] { CubemapFace.PositiveX, CubemapFace.NegativeX, CubemapFace.PositiveY, CubemapFace.NegativeY, CubemapFace.PositiveZ, CubemapFace.NegativeZ };
+            foreach (var face in faces)
+            {
+                var px = new Color[size * size];
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++)
+                    {
+                        float v = LightMath.CookieUpFade(CubeDirection(face, (x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f).y);
+                        px[y * size + x] = new Color(v, v, v, v);
+                    }
+                cube.SetPixels(px, face);
+            }
+            cube.Apply();
+            if (cookie != null) AssetDatabase.DeleteAsset(LampCookiePath);
+            EnsureFolder(SpritesDir);
+            AssetDatabase.CreateAsset(cube, LampCookiePath);
+            return cube;
+        }
+
+        /// <summary>Direction of a cubemap texel (face, s/t in -1..1, t growing down the face — Unity's layout).</summary>
+        static Vector3 CubeDirection(CubemapFace face, float s, float t) => (face switch
+        {
+            CubemapFace.PositiveX => new Vector3(1f, -t, -s),
+            CubemapFace.NegativeX => new Vector3(-1f, -t, s),
+            CubemapFace.PositiveY => new Vector3(s, 1f, t),
+            CubemapFace.NegativeY => new Vector3(s, -1f, -t),
+            CubemapFace.PositiveZ => new Vector3(s, -t, 1f),
+            _ => new Vector3(-s, -t, -1f),
+        }).normalized;
 
         /// <summary>Facade window; the glass lets the moonlight in (no shadow), the blinds stripe it.</summary>
         static GameObject BuildWindow()

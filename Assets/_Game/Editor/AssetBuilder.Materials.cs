@@ -38,11 +38,18 @@ namespace Stealth.EditorTools
             if (!unlit) mat.SetFloat("_Smoothness", smoothness);
             if (emission.HasValue)
             {
-                mat.EnableKeyword("_EMISSION");
                 mat.SetColor("_EmissionColor", emission.Value);
-                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                // Not "None": URP's material validation reads None as "emission is black" and switches _EMISSION off on import —
+                // nothing ever glowed. Baked-emissive keeps the keyword (there is no lightmap baking, so it costs nothing).
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+                mat.EnableKeyword("_EMISSION");
             }
-            else mat.DisableKeyword("_EMISSION");
+            else
+            {
+                mat.SetColor("_EmissionColor", Color.black);
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+                mat.DisableKeyword("_EMISSION");
+            }
             EditorUtility.SetDirty(mat);
             s_Mats[name] = mat;
             return mat;

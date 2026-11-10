@@ -40,6 +40,24 @@ namespace Stealth.Game
             parts.Add(Instantiate(art.FloorLamp, c + new Vector3(h + 0.45f, 0f, 0f), Quaternion.identity));           // right outside
             Physics.SyncTransforms();
 
+            // The lobby's ceiling lamp from below: the panels must glow.
+            var lampPos = ActiveLevel.Layout.HatchPosition + Vector3.up * LevelMetrics.WallHeight;
+            LookAtFrom(new Pose(ActiveLevel.Layout.HatchPosition + new Vector3(-2.2f, 0.05f, -1.2f), Quaternion.LookRotation(Vector3.forward)), lampPos);
+            yield return new WaitForSeconds(0.5f);
+            yield return Shot("lamp_from_below");
+            foreach (var rl in FindObjectsByType<RoomLight>())
+            {
+                if (Vector3.Distance(rl.transform.position, lampPos) > 1f) continue;
+                var block = new MaterialPropertyBlock();
+                foreach (var p in rl.Panels)
+                {
+                    p.GetPropertyBlock(block);
+                    Log($"lamp panel {p.name}: enabled={p.enabled} visible={p.isVisible} mat={p.sharedMaterial?.name} emission(block)={block.GetColor("_EmissionColor")} " +
+                        $"emission(mat)={p.sharedMaterial?.GetColor("_EmissionColor")} keyword={p.sharedMaterial?.IsKeywordEnabled("_EMISSION")} pos={p.bounds.center}");
+                }
+                Log($"lamp light: enabled={rl.Lamp.enabled} intensity={rl.Lamp.intensity:0.00} mask={rl.Lamp.cullingMask} shadows={rl.Lamp.shadows}");
+            }
+
             // Inside, looking at the plant in the corner.
             var inside = c + new Vector3(-0.35f, 0.05f, -0.35f);
             LookAtFrom(new Pose(inside, Quaternion.LookRotation(Flat(new Vector3(0.8f, 0, 0.8f)))), c + new Vector3(0.45f, 0.6f, 0.45f));
