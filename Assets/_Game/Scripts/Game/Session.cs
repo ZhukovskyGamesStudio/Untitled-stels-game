@@ -107,6 +107,13 @@ namespace Stealth.Game
         void RequestMove(int index, byte x, byte y, byte rot);
         void RequestDrop(int index, Vector3 position, float yaw);
         void RequestDeposit(int index);
+        // Team stash at the hatch. Stash entries are named by value: another player may have changed the list meanwhile.
+        void RequestStash(int index, byte x, byte y, byte rot);
+        void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot);
+        void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot);
+        void RequestSellStashed(InventoryEntry from);
+        void RequestStashWorld(WorldItem item, byte x, byte y, byte rot);
+        void RequestSellWorld(WorldItem item);
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

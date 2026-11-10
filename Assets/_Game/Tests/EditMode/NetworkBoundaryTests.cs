@@ -184,7 +184,9 @@ namespace Stealth.Tests
             var link = new FakeInventoryLink();
             inv.Bind(link);
             inv.RequestMove(0, 3, 0, 0);
-            CollectionAssert.AreEqual(new[] { "move 0 3,0,0" }, link.Requests);
+            inv.RequestStash(0, 1, 1, 0);
+            inv.RequestSellStashed(new InventoryEntry { X = 2, Y = 3 });
+            CollectionAssert.AreEqual(new[] { "move 0 3,0,0", "stash 0 1,1,0", "sell-stashed 2,3" }, link.Requests);
             Assert.AreEqual(version, inv.Version, "nothing changes until the server says so");
 
             inv.Bind(null);

@@ -12,10 +12,40 @@ namespace Stealth.Game
     {
         partial void UiScenarioExtraImpl(List<IEnumerator> steps)
         {
+            steps.Add(StashShots());
             steps.Add(NoiseMeterShots());
             steps.Add(QuotaShots());
             steps.Add(BannerAndAlarmShots());
             steps.Add(DetectionIndicatorCheck());
+        }
+
+        /// <summary>The team stash above the hatch: items go in from the backpack and get sold from the stash.</summary>
+        IEnumerator StashShots()
+        {
+            var gm = GameManager.Instance;
+            var inv = Me.GetComponent<PlayerInventory>();
+            if (!Me.IsServer) yield break;
+            inv.GiveServer(1, 3);
+            inv.GiveServer(0, 2);
+            var hatch = ActiveLevel.Layout.HatchPosition;
+            Me.TeleportOwner(hatch + new Vector3(0f, 0.05f, -2.6f), Quaternion.LookRotation(Vector3.forward));
+            Me.Motor.SetPitch(-8f);
+            yield return new WaitForSeconds(0.5f);
+            int before = inv.Items.Count;
+            inv.RequestStash(0, 0, 0, inv.Items[0].Rot);
+            yield return new WaitForSeconds(0.3f);
+            gm.Stash.Add(3, 4, 2, 2, 0);
+            yield return new WaitForSeconds(0.3f);
+            Log($"stash: {gm.Stash.Items.Count} items worth {gm.Stash.TotalValue}, backpack {before} -> {inv.Items.Count}, board visible={UI.StashBoard.Instance != null && UI.StashBoard.Instance.Visible}");
+            yield return Shot("stash_board");
+            DevFlags.ForceHandsMode = true;
+            yield return new WaitForSeconds(0.4f);
+            yield return Shot("stash_board_hands");
+            int collected = gm.Collected;
+            inv.RequestSellStashed(gm.Stash.Items[0]);
+            yield return new WaitForSeconds(0.3f);
+            Log($"sold from stash: collected {collected} -> {gm.Collected}, stash {gm.Stash.Items.Count}");
+            DevFlags.ForceHandsMode = false;
         }
 
         /// <summary>Stand in a guard's view, off-centre, and capture the indicator while it fills up.</summary>

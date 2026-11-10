@@ -45,6 +45,8 @@ namespace Stealth.Game
         int m_BuiltSeed;
 
         public LevelInfo Level { get; private set; }
+        /// <summary>The team's shared stash at the hatch: kept for the whole run, emptied by a new run.</summary>
+        public TeamStash Stash { get; } = new();
         public RunState Run => m_Run;
         public int Quota => m_Run.Quota;
         public int Collected => m_Run.Collected;
@@ -265,6 +267,7 @@ namespace Stealth.Game
         {
             if (!m_Run.Restart()) return;
             foreach (var p in PlayerController.All) p.GetComponent<PlayerInventory>().ClearServer();
+            Stash.Clear();
             StartLevel(0);
             Banner("Новый забег");
         }

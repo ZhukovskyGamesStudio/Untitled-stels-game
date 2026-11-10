@@ -66,6 +66,8 @@ namespace Stealth.Player
         public bool IsSpawned { get; private set; }
 
         public bool CursorMode { get; private set; }
+        /// <summary>Set by the inventory while an item is dragged out of the world: the camera stays put, the cursor is free.</summary>
+        public static bool HoldCursor { get; set; }
         public GasExposure Gas { get; private set; } = new();
         public float ReviveProgress { get; private set; }
         public PlayerController ReviveTarget { get; private set; }
@@ -216,7 +218,7 @@ namespace Stealth.Player
             var kb = Keyboard.current;
             if (kb == null) return;
 
-            CursorMode = !menu && !Downed && (kb.tabKey.isPressed || DevFlags.ForceHandsMode);
+            CursorMode = !menu && !Downed && (kb.tabKey.isPressed || HoldCursor || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;

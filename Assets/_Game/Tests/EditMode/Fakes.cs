@@ -85,6 +85,12 @@ namespace Stealth.Tests
         public void RequestMove(int index, byte x, byte y, byte rot) => Requests.Add($"move {index} {x},{y},{rot}");
         public void RequestDrop(int index, Vector3 position, float yaw) => Requests.Add($"drop {index}");
         public void RequestDeposit(int index) => Requests.Add($"deposit {index}");
+        public void RequestStash(int index, byte x, byte y, byte rot) => Requests.Add($"stash {index} {x},{y},{rot}");
+        public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unstash {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"stash-move {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestSellStashed(InventoryEntry from) => Requests.Add($"sell-stashed {from.X},{from.Y}");
+        public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => Requests.Add($"stash-world {x},{y},{rot}");
+        public void RequestSellWorld(WorldItem item) => Requests.Add("sell-world");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

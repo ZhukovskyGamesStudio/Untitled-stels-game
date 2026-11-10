@@ -40,12 +40,13 @@ namespace Stealth.UI
             if (c.BlockedByCeiling) s_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
             if (c.Playing && c.NearHatch)
             {
-                if (c.CarriedItems > 0) s_Prompts.Add(new Prompt(60, "Tab", "Перетащи предметы на люк, чтобы сдать"));
+                // With the cursor out the board above the hatch speaks for itself.
+                if (c.CarriedItems > 0) { if (!c.CursorMode) s_Prompts.Add(new Prompt(60, "Tab", "Разложить добычу: на склад над люком или в «Продать»")); }
                 else if (c.Collected >= c.Quota) s_Prompts.Add(new Prompt(55, "F", "Следующий дом"));
                 else s_Prompts.Add(new Prompt(40, "F", $"Уйти, не набрав квоту ({c.Collected}/{c.Quota})"));
             }
             if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
-            if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "Tab", $"Взять: {c.HoverItem}"));
+            if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));
             return UiMath.Choose(s_Prompts);
         }
     }

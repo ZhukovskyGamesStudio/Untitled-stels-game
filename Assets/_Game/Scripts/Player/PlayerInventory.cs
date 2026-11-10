@@ -131,6 +131,42 @@ namespace Stealth.Player
             else DepositServer(index);
         }
 
+        public void RequestStash(int index, byte x, byte y, byte rot)
+        {
+            if (m_Link != null) m_Link.RequestStash(index, x, y, rot);
+            else StashServer(index, x, y, rot);
+        }
+
+        public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot)
+        {
+            if (m_Link != null) m_Link.RequestUnstash(from, x, y, rot);
+            else UnstashServer(from, x, y, rot);
+        }
+
+        public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot)
+        {
+            if (m_Link != null) m_Link.RequestStashMove(from, x, y, rot);
+            else StashMoveServer(from, x, y, rot);
+        }
+
+        public void RequestSellStashed(InventoryEntry from)
+        {
+            if (m_Link != null) m_Link.RequestSellStashed(from);
+            else SellStashedServer(from);
+        }
+
+        public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot)
+        {
+            if (m_Link != null) m_Link.RequestStashWorld(item, x, y, rot);
+            else StashWorldServer(item, x, y, rot);
+        }
+
+        public void RequestSellWorld(WorldItem item)
+        {
+            if (m_Link != null) m_Link.RequestSellWorld(item);
+            else SellWorldServer(item);
+        }
+
         // ------------------------------------------------------------------ server
 
         bool CanAct => m_Player == null || !m_Player.Downed;
@@ -178,6 +214,56 @@ namespace Stealth.Player
             m_Items.RemoveAt(index);
             Changed();
             gm.AddCollectedServer(e.Value);
+        }
+
+        // Team stash: only at the hatch, only while the house is being played.
+
+        bool AtHatch(out GameManager gm)
+        {
+            gm = GameManager.Instance;
+            return CanAct && gm != null && gm.Phase == RunPhase.Playing && Hatch.IsNear(transform.position);
+        }
+
+        bool InReach(WorldItem item) => item != null && (item.transform.position - transform.position).magnitude <= ReachDistance + 1.5f;
+
+        public void StashServer(int index, byte x, byte y, byte rot)
+        {
+            if (index < 0 || index >= m_Items.Count || !AtHatch(out var gm)) return;
+            var e = m_Items[index];
+            if (!gm.Stash.Add(e.Shape, e.Color, x, y, rot)) return;
+            m_Items.RemoveAt(index);
+            Changed();
+        }
+
+        public void UnstashServer(InventoryEntry from, byte x, byte y, byte rot)
+        {
+            if (!AtHatch(out var gm) || gm.Stash.IndexOf(from) < 0 || !CanPlace(from.Shape, rot, x, y)) return;
+            gm.Stash.Take(from);
+            m_Items.Add(new InventoryEntry { Shape = from.Shape, Color = from.Color, X = x, Y = y, Rot = rot });
+            Changed();
+        }
+
+        public void StashMoveServer(InventoryEntry from, byte x, byte y, byte rot)
+        {
+            if (AtHatch(out var gm)) gm.Stash.Move(from, x, y, rot);
+        }
+
+        public void SellStashedServer(InventoryEntry from)
+        {
+            if (AtHatch(out var gm) && gm.Stash.Take(from)) gm.AddCollectedServer(from.Value);
+        }
+
+        public void StashWorldServer(WorldItem item, byte x, byte y, byte rot)
+        {
+            if (!InReach(item) || !AtHatch(out var gm) || !gm.Stash.Add(item.Shape, item.Color, x, y, rot)) return;
+            Session.Despawn(item.gameObject);
+        }
+
+        public void SellWorldServer(WorldItem item)
+        {
+            if (!InReach(item) || !AtHatch(out var gm)) return;
+            gm.AddCollectedServer(item.Value);
+            Session.Despawn(item.gameObject);
         }
 
         /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>

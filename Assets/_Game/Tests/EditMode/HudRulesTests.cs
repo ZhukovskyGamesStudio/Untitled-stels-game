@@ -48,7 +48,7 @@ namespace Stealth.Tests
         {
             var c = Idle;
             c.HoverItem = "Синий";
-            Assert.AreEqual("Tab", PromptRules.Choose(c).Key);
+            Assert.AreEqual("ЛКМ", PromptRules.Choose(c).Key);
             c.CursorMode = true;
             Assert.IsFalse(PromptRules.Choose(c).IsValid);
         }

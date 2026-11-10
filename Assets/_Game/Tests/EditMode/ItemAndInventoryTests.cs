@@ -1,13 +1,49 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using Stealth.Game;
 using Stealth.Items;
+using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Tests
 {
     public class ItemAndInventoryTests
     {
+        [Test]
+        public void TeamStashIsARectangularGrid()
+        {
+            var stash = new TeamStash();
+            Assert.IsTrue(stash.CanPlace(0, 0, TeamStash.Width - 1, TeamStash.Height - 1));
+            Assert.IsFalse(stash.CanPlace(0, 0, TeamStash.Width, 0), "right of the grid");
+            Assert.IsFalse(stash.CanPlace(0, 0, 0, -1), "above the grid");
+            int v = stash.Version;
+            Assert.IsTrue(stash.Add(3, 4, 0, 0, 0)); // I piece, gold
+            Assert.Greater(stash.Version, v);
+            Assert.AreEqual(ItemCatalog.Value(3, 4), stash.TotalValue);
+            Assert.IsFalse(stash.Add(0, 0, 0, 0, 0), "cell taken");
+            Assert.AreEqual(0, stash.IndexAt(new Vector2Int(0, 0)));
+            Assert.AreEqual(-1, stash.IndexAt(new Vector2Int(5, 3)));
+        }
+
+        [Test]
+        public void TeamStashActsOnTheEntryARequestNames()
+        {
+            var stash = new TeamStash();
+            stash.Add(0, 1, 2, 1, 0);
+            stash.Add(0, 2, 5, 1, 0);
+            var second = stash.Items[1];
+            Assert.IsTrue(stash.Move(second, 6, 3, 0));
+            Assert.AreEqual(6, stash.Items[1].X);
+            Assert.IsFalse(stash.Take(second), "it moved: the old entry is gone");
+            var stale = new InventoryEntry { Shape = 0, Color = 3, X = 2, Y = 1 };
+            Assert.IsFalse(stash.Take(stale), "another colour at that place is not taken");
+            Assert.IsTrue(stash.Take(stash.Items[0]));
+            Assert.AreEqual(1, stash.Items.Count);
+            stash.Clear();
+            Assert.AreEqual(0, stash.Items.Count);
+        }
+
         [Test]
         public void ValueGrowsWithSizeAndColor()
         {

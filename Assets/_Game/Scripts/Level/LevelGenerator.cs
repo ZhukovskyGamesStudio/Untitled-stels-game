@@ -350,7 +350,7 @@ namespace Stealth.Level
                 case 0:
                     Prop(l, PropKind.ReceptionDesk, q.P(3.0f, 3.2f), q.InV);
                     Prop(l, PropKind.Chair, q.P(3.0f, 3.95f), q.InV);
-                    Item(l, q.P(2.6f, 3.2f, 0.76f));
+                    Item(l, q.P(2.6f, 2.87f, 1.14f)); // on the high counter facing the room
                     break;
                 case 1:
                     Prop(l, PropKind.Sofa, q.P(3.0f, 4.3f), q.InV);

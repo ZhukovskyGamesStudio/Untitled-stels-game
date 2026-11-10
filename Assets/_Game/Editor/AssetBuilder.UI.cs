@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Stealth.Game;
 using Stealth.Items;
 using Stealth.UI;
 using UnityEditor;
@@ -10,7 +11,7 @@ namespace Stealth.EditorTools
 {
     /// <summary>
     /// Interface prefabs: small element prefabs (UI/Elements) and three screens composed of them
-    /// (UI/HUD, UI/Inventory, UI/Menu). Screens are uGUI canvases laid out for 1280x720 and scaled with the
+    /// (UI/HUD, UI/Inventory, UI/Menu, UI/StashBoard in the world above the hatch). Screens are uGUI canvases laid out for 1280x720 and scaled with the
     /// window height. The scene holds linked instances of the screens.
     /// </summary>
     public static partial class AssetBuilder
@@ -52,6 +53,7 @@ namespace Stealth.EditorTools
                     Prefab(UiPrefabsDir + "/HUD.prefab", () => BuildHud(e)),
                     Prefab(UiPrefabsDir + "/Inventory.prefab", () => BuildInventoryScreen(e)),
                     Prefab(UiPrefabsDir + "/Menu.prefab", () => BuildMenu(e)),
+                    Prefab(UiPrefabsDir + "/StashBoard.prefab", () => BuildStashBoard(e)),
                 },
             };
         }
@@ -511,6 +513,45 @@ namespace Stealth.EditorTools
             ui.HighlightPrefab = e.CellHighlight;
             ui.Tooltip = Txt(R(root.transform, "Tooltip", BottomLeft, TopLeft, Vector2.zero, new Vector2(320, 22)), "Подсказка", 13, TextAnchor.MiddleLeft, Color.white);
             return root;
+        }
+
+        /// <summary>
+        /// Team stash above the hatch: a world-space canvas with the stash grid and a "sell" area. Same units as the
+        /// inventory (<see cref="InventoryUI.Cell"/> per cell), scaled down to metres.
+        /// </summary>
+        static GameObject BuildStashBoard(UiElements e)
+        {
+            const float c = InventoryUI.Cell, pad = 8f, gap = 12f, header = 26f, sellW = 96f;
+            float gw = TeamStash.Width * c, gh = TeamStash.Height * c;
+            var go = new GameObject("StashBoard", typeof(RectTransform));
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            go.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 3f;
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(pad + gw + gap + sellW + pad, header + gh + pad * 2f);
+            rt.localScale = Vector3.one * 0.0065f; // ~2.5 m wide
+            var board = go.AddComponent<StashBoard>();
+            board.Canvas = canvas;
+            board.Root = rt;
+
+            Img(Stretch(go.transform, "Background"), new Color(0.02f, 0.03f, 0.05f, 0.7f));
+            board.ValueLabel = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(pad, -2f), new Vector2(gw, header)),
+                "Склад команды · 0 очк.", 16, TextAnchor.MiddleLeft, Color.white, bold: true);
+            board.Grid = R(go.transform, "Grid", TopLeft, TopLeft, new Vector2(pad, -(header + pad)), new Vector2(gw, gh));
+            var cells = new List<Image>();
+            for (int y = 0; y < TeamStash.Height; y++)
+                for (int x = 0; x < TeamStash.Width; x++)
+                    cells.Add(Img(R(board.Grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), new Color(1, 1, 1, 0.12f)));
+            board.Cells = cells.ToArray();
+            board.ItemLayer = Stretch(board.Grid, "Items");
+            board.ItemLayer.pivot = TopLeft;
+            board.HighlightLayer = Stretch(board.Grid, "Highlights");
+            board.HighlightLayer.pivot = TopLeft;
+
+            board.SellZone = R(go.transform, "Sell", TopLeft, TopLeft, new Vector2(pad + gw + gap, -(header + pad)), new Vector2(sellW, gh));
+            board.SellBackground = Img(board.SellZone, new Color(1f, 0.75f, 0.1f, 0.45f));
+            Txt(Stretch(board.SellZone, "Label", 4f), "ПРОДАТЬ\nна квоту", 16, TextAnchor.MiddleCenter, Color.white, bold: true);
+            return go;
         }
 
         // ------------------------------------------------------------------ menu

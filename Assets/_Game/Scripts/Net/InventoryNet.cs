@@ -71,6 +71,12 @@ namespace Stealth.Net
         public void RequestMove(int index, byte x, byte y, byte rot) => MoveRpc(index, x, y, rot);
         public void RequestDrop(int index, Vector3 position, float yaw) => DropRpc(index, position, yaw);
         public void RequestDeposit(int index) => DepositRpc(index);
+        public void RequestStash(int index, byte x, byte y, byte rot) => StashRpc(index, x, y, rot);
+        public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => UnstashRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => StashMoveRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestSellStashed(InventoryEntry from) => SellStashedRpc(NetInventoryEntry.From(from));
+        public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => StashWorldRpc(item.GetComponent<NetworkObject>(), x, y, rot);
+        public void RequestSellWorld(WorldItem item) => SellWorldRpc(item.GetComponent<NetworkObject>());
 
         [Rpc(SendTo.Server)]
         void PickupRpc(NetworkObjectReference itemRef, byte x, byte y, byte rot)
@@ -86,5 +92,29 @@ namespace Stealth.Net
 
         [Rpc(SendTo.Server)]
         void DepositRpc(int index) => m_Inventory.DepositServer(index);
+
+        [Rpc(SendTo.Server)]
+        void StashRpc(int index, byte x, byte y, byte rot) => m_Inventory.StashServer(index, x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void UnstashRpc(NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.UnstashServer(from.ToEntry(), x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void StashMoveRpc(NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.StashMoveServer(from.ToEntry(), x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void SellStashedRpc(NetInventoryEntry from) => m_Inventory.SellStashedServer(from.ToEntry());
+
+        [Rpc(SendTo.Server)]
+        void StashWorldRpc(NetworkObjectReference itemRef, byte x, byte y, byte rot)
+        {
+            if (itemRef.TryGet(out var obj)) m_Inventory.StashWorldServer(obj.GetComponent<WorldItem>(), x, y, rot);
+        }
+
+        [Rpc(SendTo.Server)]
+        void SellWorldRpc(NetworkObjectReference itemRef)
+        {
+            if (itemRef.TryGet(out var obj)) m_Inventory.SellWorldServer(obj.GetComponent<WorldItem>());
+        }
     }
 }
