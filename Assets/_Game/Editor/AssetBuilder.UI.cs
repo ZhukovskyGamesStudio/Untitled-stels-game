@@ -29,7 +29,8 @@ namespace Stealth.EditorTools
         {
             public GameObject Button, Slider, Toggle, InputField;
             public ArcView Arc;
-            public Text WorldIcon, TeamRow;
+            public Text TeamRow;
+            public SuspicionMarkerView SuspicionMarker;
             public TeamMarkerView TeamMarker;
             public InventoryBlockView InventoryBlock;
             public FriendLobbyRowView FriendRow;
@@ -242,9 +243,16 @@ namespace Stealth.EditorTools
                 return root.gameObject;
             }).GetComponent<ArcView>();
 
-            e.WorldIcon = Prefab(ElementsDir + "/WorldIcon.prefab", () =>
-                Txt(R(null, "WorldIcon", BottomLeft, BottomCenter, Vector2.zero, new Vector2(40, 32)), "?", 22, TextAnchor.LowerCenter, Color.yellow, true).gameObject)
-                .GetComponent<Text>();
+            e.SuspicionMarker = Prefab(ElementsDir + "/SuspicionMarker.prefab", () =>
+            {
+                // Pivot at the bottom centre: the bar sits right over the robot, the icon above the bar.
+                var root = R(null, "SuspicionMarker", BottomLeft, BottomCenter, Vector2.zero, new Vector2(84, 44));
+                var view = root.gameObject.AddComponent<SuspicionMarkerView>();
+                view.Root = root;
+                view.Bar = Bar(root, "Bar", BottomCenter, BottomCenter, Vector2.zero, new Vector2(80, 10), new Color(0, 0, 0, 0.6f), new Color(1f, 0.92f, 0.35f), 2f);
+                view.Icon = Txt(R(root, "Icon", BottomCenter, BottomCenter, new Vector2(0, 12), new Vector2(40, 32)), "?", 26, TextAnchor.LowerCenter, Color.yellow, true);
+                return root.gameObject;
+            }).GetComponent<SuspicionMarkerView>();
 
             e.FriendRow = Prefab(ElementsDir + "/FriendLobbyRow.prefab", () =>
             {
@@ -359,7 +367,7 @@ namespace Stealth.EditorTools
 
             // World markers.
             hud.IconLayer = Stretch(content, "RobotIcons");
-            hud.IconPrefab = e.WorldIcon;
+            hud.SuspicionPrefab = e.SuspicionMarker;
             hud.MarkerLayer = Stretch(content, "TeamMarkers");
             hud.TeamMarkerPrefab = e.TeamMarker;
             hud.HatchMarker = R(content, "HatchMarker", BottomLeft, Center, new Vector2(640, 360), Vector2.zero);

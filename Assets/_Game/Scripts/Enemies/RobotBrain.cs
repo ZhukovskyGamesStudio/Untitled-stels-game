@@ -3,7 +3,11 @@ using UnityEngine;
 
 namespace Stealth.Enemies
 {
-    public enum RobotState : byte { Patrol, Suspicious, Investigate, Chase }
+    /// <summary>
+    /// What a mobile robot is doing. <see cref="Alerted"/> is the warning moment between noticing a player
+    /// («Обнаружен нарушитель») and the chase («Веду преследование»). Values are replicated: append only.
+    /// </summary>
+    public enum RobotState : byte { Patrol, Suspicious, Investigate, Chase, Alerted }
 
     /// <summary>How a robot senses players. Set per prefab.</summary>
     [Serializable]
@@ -15,16 +19,18 @@ namespace Stealth.Enemies
         public float ViewAngle = 100f;
         [Tooltip("Players this close are noticed regardless of the view angle (if visible).")]
         public float PeripheralDistance = 2.5f;
-        public float DetectionSpeed = 1.6f;
+        [Tooltip("Suspicion per second for a fully visible, moving player ~5 m away in the middle of the view in a lit room. " +
+                 "Farther, partly hidden, crouching, still, in the dark or at the edge of the view — slower (Data/Config/Perception).")]
+        public float DetectionSpeed = 0.6f;
         [Tooltip("Pitch of the eye in degrees (drones look down-forward). 0 = flat cone on its floor.")]
         public float EyePitch;
         [Tooltip("Colour sorter: on spawn picks an item colour and only sees players carrying that colour.")]
         public bool ColorSorter;
 
         [Header("Hearing")]
-        public float HearingMultiplier = 0.8f;
-        [Tooltip("Share of the hearing radius at which the robot chases the noise source directly.")]
-        public float ChaseHearingShare;
+        [Tooltip("Hears a noise this many times its radius away (0 = deaf). Each heard noise adds suspicion by its loudness " +
+                 "at the robot; walls, doors and slabs muffle it (Data/Config/Perception).")]
+        public float HearingMultiplier;
 
         [Header("Other")]
         [Tooltip("Bumping into the robot this close starts a chase.")]
@@ -50,6 +56,8 @@ namespace Stealth.Enemies
         public float ChaseSpeed = 4.6f;
         [Tooltip("Without any sensor contact for this long the chase turns into an investigation.")]
         public float LoseTargetAfter = 4f;
+        [Tooltip("Seconds between «Обнаружен нарушитель» and the chase: the player's moment to react.")]
+        public float WarningTime = 1.5f;
 
         [Header("Reaction")]
         [Tooltip("Can this robot hit players? If not, it snitches: raises an alarm and goes back to work.")]
@@ -93,12 +101,12 @@ namespace Stealth.Enemies
 
     /// <summary>
     /// Decision making of a mobile robot (pure C#, unit tested with a fake body):
-    /// patrol → suspicious (stops and stares) → investigate (walks to the spot, looks around) → chase (hits).
+    /// patrol → suspicious (stops and stares) → investigate (walks to the spot, looks around) →
+    /// alerted (stops: «Обнаружен нарушитель», a moment to react) → chase (hits).
     /// Sensors feed <see cref="OnSensed"/> / <see cref="OnNoise"/>; <see cref="Tick"/> runs once per frame.
     /// </summary>
     public sealed class RobotBrain
     {
-
         readonly RobotSenses m_Senses;
         readonly RobotTraits m_Traits;
         readonly IRobotBody m_Body;
@@ -109,6 +117,8 @@ namespace Stealth.Enemies
         public IIntruder Target { get; private set; }
         public IIntruder Suspect { get; private set; }
         public Vector3 LastKnown { get; private set; }
+        /// <summary>Where the last thing it noticed was (a seen player, a heard noise): it looks and walks there.</summary>
+        public Vector3 LookPoint { get; private set; }
 
         float m_LastSense;
         float m_WaitUntil = -1f;
@@ -126,43 +136,56 @@ namespace Stealth.Enemies
             m_Rng = rng;
         }
 
-        /// <summary>Awareness for the HUD: full while chasing, otherwise the suspicion.</summary>
-        public float Awareness => State == RobotState.Chase && Target != null ? 1f : Suspicion;
+        bool Detected => State == RobotState.Alerted || State == RobotState.Chase && Target != null;
+
+        /// <summary>Awareness for the HUD: full once it has detected someone, otherwise the suspicion.</summary>
+        public float Awareness => Detected ? 1f : Suspicion;
         /// <summary>Whom the awareness refers to.</summary>
         public IIntruder AwarenessFocus => State == RobotState.Chase && Target != null ? Target : Suspect;
 
         // ------------------------------------------------------------------ input
 
+        /// <summary>The strongest sensor contact of this frame (eyes, floor, nose) — or none.</summary>
         public void OnSensed(in Sighting s, float now, float dt)
         {
             if (s.Target == null)
             {
-                Suspicion = Mathf.Max(0f, Suspicion - m_Traits.SuspicionDecay * dt);
+                if (State != RobotState.Alerted) Suspicion = Mathf.Max(0f, Suspicion - m_Traits.SuspicionDecay * dt);
                 return;
             }
-            if (s.Contact)
+            if (State == RobotState.Chase)
             {
-                StartChase(s.Target, now);
-                return;
-            }
-            if (State == RobotState.Chase && s.Target == Target)
-            {
+                if (s.Target != Target) return; // busy with someone else
                 LastKnown = s.ChasePoint;
                 m_LastSense = now;
                 return;
             }
-            Suspicion += s.Rate * dt;
+            if (State == RobotState.Alerted)
+            {
+                if (s.Target == Suspect) LookPoint = s.Target.Position;
+                return;
+            }
             Suspect = s.Target;
-            if (Suspicion >= 1f) StartChase(s.Target, now);
+            LookPoint = s.Target.Position;
+            if (s.Contact)
+            {
+                Detect(s.Target, now);
+                return;
+            }
+            Suspicion = Mathf.Min(1f, Suspicion + s.Rate * dt);
+            if (Suspicion >= 1f) Detect(s.Target, now);
             // Only a patrolling robot stops to stare; one already walking over to check keeps walking.
             else if (Suspicion > m_Traits.SuspiciousAt && State == RobotState.Patrol) SetState(RobotState.Suspicious, now);
         }
 
-        /// <summary>A noise at <paramref name="position"/>, <paramref name="distance"/> away (already muffled by floors).</summary>
-        public void OnNoise(Vector3 position, float distance, float radius, IIntruder source, float now)
+        /// <summary>
+        /// A noise at <paramref name="position"/> that adds <paramref name="suspicion"/> (by its loudness at the robot,
+        /// see <see cref="SensorMath.NoiseSuspicion"/>). Quiet ones make it glance, louder ones send it to check,
+        /// enough of them — it has detected the source.
+        /// </summary>
+        public void OnNoise(Vector3 position, float suspicion, IIntruder source, float now)
         {
-            float hearing = radius * m_Senses.HearingMultiplier;
-            if (distance > hearing) return;
+            if (suspicion <= 0f || m_Senses.HearingMultiplier <= 0f) return;
             if (State == RobotState.Chase)
             {
                 if (source != null && source == Target)
@@ -172,19 +195,20 @@ namespace Stealth.Enemies
                 }
                 return;
             }
-            if (source != null && !source.IsDown && distance <= hearing * m_Senses.ChaseHearingShare)
-            {
-                StartChase(source, now);
-                LastKnown = position;
-                return;
-            }
-            Investigate(position, false, now);
+            if (State == RobotState.Alerted) return;
+            bool person = source != null && !source.IsDown;
+            if (person) Suspect = source;
+            LookPoint = position;
+            Suspicion = Mathf.Min(1f, Suspicion + suspicion);
+            if (Suspicion >= 1f && person) Detect(source, now);
+            else if (Suspicion > m_Traits.SuspiciousAt) BeginInvestigation(position, false, now);
+            else if (State == RobotState.Patrol) SetState(RobotState.Suspicious, now); // turns to the sound
         }
 
-        /// <summary>Go and check a spot (radio call, alarm, noise). Ignored while chasing.</summary>
+        /// <summary>Go and check a spot (radio call, alarm, noise). Ignored once it has detected someone.</summary>
         public void Investigate(Vector3 position, bool alarm, float now)
         {
-            if (State == RobotState.Chase) return;
+            if (State == RobotState.Chase || State == RobotState.Alerted) return;
             BeginInvestigation(position, alarm, now);
         }
 
@@ -202,33 +226,43 @@ namespace Stealth.Enemies
         void BeginInvestigation(Vector3 position, bool alarm, float now)
         {
             LastKnown = position;
+            LookPoint = position;
             SetState(RobotState.Investigate, now);
             m_Body.MoveTo(position, alarm ? m_Traits.ChaseSpeed * 0.85f : m_Traits.InvestigateSpeed);
             m_WaitUntil = -1f;
         }
 
-        void StartChase(IIntruder p, float now)
+        /// <summary>Noticed for sure: stop, face the intruder and warn («Обнаружен нарушитель») before acting.</summary>
+        void Detect(IIntruder p, float now)
+        {
+            if (State == RobotState.Chase || State == RobotState.Alerted) return;
+            if (!m_Traits.CanAttack && now < m_SnitchUntil) return; // reported recently
+            Suspect = p;
+            Suspicion = 1f;
+            LookPoint = p.Position;
+            m_Body.Stop();
+            SetState(RobotState.Alerted, now);
+        }
+
+        /// <summary>The warning is over: a fighter chases («Веду преследование»), a snitch raises the alarm.</summary>
+        void Act(IIntruder p, float now)
         {
             if (!m_Traits.CanAttack)
             {
                 // Snitch: cannot fight, so it reports the intruder to everyone and goes back to work.
-                if (now < m_SnitchUntil) return;
                 m_SnitchUntil = now + m_Traits.SnitchCooldown;
                 Suspicion = 0f;
-                m_Body.RaiseAlarm(p.Position, m_Traits.AlarmRadius);
+                m_Body.RaiseAlarm(LookPoint, m_Traits.AlarmRadius);
                 SetState(RobotState.Suspicious, now);
                 m_Body.Stop();
-                Suspect = p;
                 return;
             }
-            if (State != RobotState.Chase)
-            {
-                if (m_Traits.AlarmOnDetect) m_Body.RaiseAlarm(p.Position, m_Traits.AlarmRadius);
-                m_Body.CallForBackup(p.Position);
-            }
+            if (m_Traits.AlarmOnDetect) m_Body.RaiseAlarm(LookPoint, m_Traits.AlarmRadius);
+            m_Body.CallForBackup(LookPoint);
             Target = p;
             Suspicion = 1f;
-            LastKnown = p.Position;
+            // Runs to where it last noticed them: hiding during the warning pays off.
+            LastKnown = LookPoint;
             m_LastSense = now;
             SetState(RobotState.Chase, now);
             m_Body.MoveTo(LastKnown, m_Traits.ChaseSpeed);
@@ -249,13 +283,13 @@ namespace Stealth.Enemies
 
                 case RobotState.Suspicious:
                     m_Body.Stop();
-                    if (Suspect != null) m_Body.Face(Suspect.Position, dt);
-                    if (!m_Traits.CanAttack)
+                    m_Body.Face(LookPoint, dt);
+                    if (!m_Traits.CanAttack && now < m_SnitchUntil)
                     {
                         if (now - m_StateTime > 3f) BackToPatrol(now);
                     }
                     else if (Suspicion <= 0.05f) SetState(RobotState.Patrol, now);
-                    else if (Suspect != null && now - m_StateTime > m_Traits.StareTime) BeginInvestigation(Suspect.Position, false, now);
+                    else if (now - m_StateTime > m_Traits.StareTime) BeginInvestigation(LookPoint, false, now);
                     break;
 
                 case RobotState.Investigate:
@@ -266,6 +300,18 @@ namespace Stealth.Enemies
                         m_Body.Turn(Mathf.Sin((now - m_StateTime) * 1.8f) * 120f * dt);
                         if (now > m_WaitUntil) BackToPatrol(now);
                     }
+                    break;
+
+                case RobotState.Alerted:
+                    m_Body.Stop();
+                    m_Body.Face(LookPoint, dt);
+                    if (Suspect == null || Suspect.IsDown)
+                    {
+                        Suspect = null;
+                        Suspicion = 0f;
+                        BackToPatrol(now);
+                    }
+                    else if (now - m_StateTime >= m_Traits.WarningTime) Act(Suspect, now);
                     break;
 
                 case RobotState.Chase:

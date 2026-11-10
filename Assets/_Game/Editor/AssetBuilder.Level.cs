@@ -13,10 +13,10 @@ namespace Stealth.EditorTools
         {
             // Structure: unit cubes, scaled by the level builder.
             var root = Prefab($"{LevelPrefabs}/LevelRoot.prefab", BuildLevelRoot);
-            var wall = Prefab($"{LevelPrefabs}/WallBlock.prefab", () => Block("WallBlock", M("Wall")));
-            var trim = Prefab($"{LevelPrefabs}/TrimBlock.prefab", () => Block("TrimBlock", M("DoorFrame")));
-            var slab = Prefab($"{LevelPrefabs}/FloorSlab.prefab", () => Block("FloorSlab", M("Floor")));
-            var roof = Prefab($"{LevelPrefabs}/Roof.prefab", () => Block("Roof", M("Ceiling"), layer: LevelMetrics.CeilingLayer));
+            var wall = Prefab($"{LevelPrefabs}/WallBlock.prefab", () => Muffles(Block("WallBlock", M("Wall")), SoundMaterial.Wall));
+            var trim = Prefab($"{LevelPrefabs}/TrimBlock.prefab", () => Muffles(Block("TrimBlock", M("DoorFrame")), SoundMaterial.Wall));
+            var slab = Prefab($"{LevelPrefabs}/FloorSlab.prefab", () => Muffles(Block("FloorSlab", M("Floor")), SoundMaterial.Slab));
+            var roof = Prefab($"{LevelPrefabs}/Roof.prefab", () => Muffles(Block("Roof", M("Ceiling"), layer: LevelMetrics.CeilingLayer), SoundMaterial.Slab));
             var ground = Prefab($"{LevelPrefabs}/OutsideGround.prefab", () => Block("OutsideGround", M("OutsideGround"), layer: LevelMetrics.CeilingLayer));
             var fence = Prefab($"{LevelPrefabs}/Fence.prefab", BuildFence);
 
@@ -130,6 +130,13 @@ namespace Stealth.EditorTools
             return go;
         }
 
+        /// <summary>Sounds passing through this piece are muffled as <paramref name="material"/> (Data/Config/Perception).</summary>
+        static GameObject Muffles(GameObject go, SoundMaterial material)
+        {
+            go.AddComponent<SoundBlocker>().Material = material;
+            return go;
+        }
+
         /// <summary>Invisible wall around the yard (scaled by the builder). Ceiling layer: not part of the navmesh.</summary>
         static GameObject BuildFence()
         {
@@ -191,6 +198,7 @@ namespace Stealth.EditorTools
             blocker.center = new Vector3(0, h / 2f, 0);
             blocker.size = new Vector3(w, h, 0.1f);
             door.Blocker = blocker;
+            Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
             return root;
         }
 

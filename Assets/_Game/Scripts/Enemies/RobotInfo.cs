@@ -27,7 +27,7 @@ namespace Stealth.Enemies
 
         public static string Senses(RobotKind k) => k switch
         {
-            RobotKind.Guard => "глаза · слабый слух · ходит по лестницам",
+            RobotKind.Guard => "глаза · глухой · ходит по лестницам",
             RobotKind.Listener => "слепой · микрофоны · колёса, свой этаж",
             RobotKind.Drone => "камера сверху · тревога · летает",
             RobotKind.Spider => "глаза · прыгает со стены · не покидает комнату",

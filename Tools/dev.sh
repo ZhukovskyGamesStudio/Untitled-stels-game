@@ -49,11 +49,15 @@ EOF
     rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
     cscenario="client"; [ "$scenario" != "full" ] && cscenario="$scenario"
-    "$exe" -nosteam -host-local -autotest "$scenario" $linger ${SEED:+-seed $SEED} ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL} ${HOSTILE:+-hostile} ${KINDS:+-kinds $KINDS} -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
+    # Muted and behind other windows (the developer keeps working); SOUND=1 / FRONT=1 to hear / watch it.
+    launch=(python "$ROOT/Tools/launch_quiet.py" "$exe")
+    [ -n "${FRONT:-}" ] && launch=("$exe")
+    extra=(); [ -n "${SOUND:-}" ] && extra+=(-autotest-sound); [ -n "${FRONT:-}" ] && extra+=(-autotest-front)
+    "${launch[@]}" -nosteam -host-local "${extra[@]}" -autotest "$scenario" $linger ${SEED:+-seed $SEED} ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL} ${HOSTILE:+-hostile} ${KINDS:+-kinds $KINDS} -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/host.log" &
     pids=($!)
     for i in $(seq 1 "$clients"); do
       sleep 5
-      "$exe" -nosteam -join-local 127.0.0.1 -autotest "$cscenario" -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/client$i.log" &
+      "${launch[@]}" -nosteam -join-local 127.0.0.1 "${extra[@]}" -autotest "$cscenario" -shotdir "$shots" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0 -logFile "$P/Builds/client$i.log" &
       pids+=($!)
     done
     for pid in "${pids[@]}"; do wait "$pid"; done

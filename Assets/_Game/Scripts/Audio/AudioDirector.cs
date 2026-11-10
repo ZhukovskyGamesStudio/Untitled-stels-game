@@ -29,6 +29,8 @@ namespace Stealth.Audio
 
         /// <summary>One-shots played so far (autopilot checks).</summary>
         public int Played { get; private set; }
+        /// <summary>Robot voice lines played so far (autopilot checks).</summary>
+        public int VoiceLines { get; private set; }
         public MusicTrack Track => m_Track;
 
         AudioMix m_Mix;
@@ -43,7 +45,11 @@ namespace Stealth.Audio
         bool m_WasCursor;
 
         class Walker { public Vector3 Pos; public float NextStep; public float VSpeed; public bool Airborne; public bool Downed; }
-        class Watched { public int Level; public bool Hacked; public float Cooldown; public Vector3 Pos; public float NextStep; }
+        class Watched
+        {
+            public int Level; public bool Hacked; public float Cooldown; public Vector3 Pos; public float NextStep;
+            public RobotState Robot; public float VoiceFree; public AudioClip Queued;
+        }
 
         readonly Dictionary<PlayerController, Walker> m_Players = new();
         readonly Dictionary<Detector, Watched> m_Detectors = new();
@@ -128,7 +134,7 @@ namespace Stealth.Audio
 
         void Update()
         {
-            AudioListener.volume = GameSettings.MasterVolume;
+            AudioListener.volume = DevFlags.Mute ? 0f : GameSettings.MasterVolume;
             var me = PlayerController.Local;
             var gm = GameManager.Instance;
             bool inGame = me != null && gm != null && ActiveLevel.Layout != null;
@@ -260,18 +266,25 @@ namespace Stealth.Audio
                 int level = d.IsHacked ? 0 : AudioRules.AlertLevel(d.Awareness, d.IsInvestigating, d.IsChasing);
                 if (!m_Detectors.TryGetValue(d, out var w))
                 {
-                    m_Detectors[d] = new Watched { Level = level, Hacked = d.IsHacked, Pos = d.transform.position };
+                    m_Detectors[d] = new Watched
+                    {
+                        Level = level, Hacked = d.IsHacked, Pos = d.transform.position,
+                        Robot = d is RobotController rc ? rc.State : RobotState.Patrol,
+                    };
                     continue;
                 }
                 if (d.IsHacked && !w.Hacked) Sfx.At(Bank.Hacked, d.Position);
                 w.Hacked = d.IsHacked;
+                var robot = d as RobotController;
                 var cue = AudioRules.Cue(w.Level, level);
+                if (cue != AlertCue.None) w.Level = level;
+                if (robot != null && cue == AlertCue.Alert) cue = AlertCue.None; // robots say it instead
+                if (robot != null) UpdateVoice(robot, w);
                 if (cue != AlertCue.None && Time.time >= w.Cooldown)
                 {
                     Sfx.At(cue == AlertCue.Alert ? Bank.Alert : cue == AlertCue.Suspicious ? Bank.Suspicious : Bank.Lost, d.Position);
                     w.Cooldown = Time.time + 1.2f;
                 }
-                if (cue != AlertCue.None) w.Level = level;
 
                 if (d is RobotController r && r.Profile != null && r.Traits.CanUseStairs && r.Traits.HoverHeight <= 0f)
                 {
@@ -289,6 +302,28 @@ namespace Stealth.Audio
                 }
             }
             Prune(m_Detectors, Detector.All);
+        }
+
+        /// <summary>A robot's voice lines; one line at a time per robot (the next one waits for the current to finish).</summary>
+        void UpdateVoice(RobotController robot, Watched w)
+        {
+            var state = robot.IsHacked ? RobotState.Patrol : robot.State;
+            var voice = AudioRules.Voice(w.Robot, state);
+            w.Robot = state;
+            var clip = voice switch
+            {
+                RobotVoice.Spotted => Bank.VoiceSpotted,
+                RobotVoice.Chase => Bank.VoiceChase,
+                RobotVoice.Lost => Bank.VoiceLost,
+                _ => null,
+            };
+            if (voice == RobotVoice.Spotted) w.Queued = null; // a new warning replaces anything still waiting
+            if (clip != null) w.Queued = clip;
+            if (w.Queued == null || Time.time < w.VoiceFree) return;
+            Sfx.At(w.Queued, robot.Position, 1f, Sfx.Group.Robots);
+            VoiceLines++;
+            w.VoiceFree = Time.time + w.Queued.length - 0.1f;
+            w.Queued = null;
         }
 
         void UpdateBackpack(PlayerController me)

@@ -27,6 +27,8 @@ namespace Stealth.UI
         public const float CompactScale = 0.55f;
         /// <summary>Mouse travel (pixels) below which a world drag counts as a click.</summary>
         const float ClickTravel = 12f;
+        /// <summary>Aim assist: an item this close to the crosshair ray (meters) counts as aimed at.</summary>
+        const float AimAssist = 0.12f;
 
         [Header("Layout")]
         public RectTransform Canvas;
@@ -59,6 +61,7 @@ namespace Stealth.UI
         float m_DragTravel;
         Vector2Int m_GrabCell;
         WorldItem m_Hover, m_Highlighted;
+        float m_FullUntil = -1f;
         string m_Tooltip;
         float m_Expand; // 0 = compact (just carrying), 1 = hands mode (Tab / dragging)
         UiPool<InventoryBlockView> m_Items, m_GhostBlocks, m_StashItems;
@@ -263,7 +266,7 @@ namespace Stealth.UI
             {
                 case Target.Backpack:
                     if (!inside) return;
-                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestPickup(m_DragWorld, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) Take(inv, x, y, rot);
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, rot, x, y, m_DragIndex)) { inv.RequestMove(m_DragIndex, x, y, rot); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestUnstash(m_DragStashed, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
@@ -271,24 +274,32 @@ namespace Stealth.UI
                     if (!inside || Stash == null) return;
                     bool placed = true;
                     if (m_Source == DragSource.Inventory && Stash.CanPlace(m_DragShape, rot, x, y)) inv.RequestStash(m_DragIndex, x, y, rot);
-                    else if (m_Source == DragSource.World && Stash.CanPlace(m_DragShape, rot, x, y)) inv.RequestStashWorld(m_DragWorld, x, y, rot);
+                    else if (m_Source == DragSource.World && Stash.CanPlace(m_DragShape, rot, x, y)) { inv.RequestStashWorld(m_DragWorld, x, y, rot); m_DragWorld.HideWhileTaking(Time.time); }
                     else if (m_Source == DragSource.Stash && Stash.CanPlace(m_DragShape, rot, x, y, Stash.IndexOf(m_DragStashed))) inv.RequestStashMove(m_DragStashed, x, y, rot);
                     else placed = false;
                     if (placed) Sfx.At(bank?.Stash, Board.Root.position, 0.9f, Sfx.Group.Items);
                     return;
                 case Target.Sell:
                     if (m_Source == DragSource.Inventory) inv.RequestDeposit(m_DragIndex);
-                    else if (m_Source == DragSource.World) inv.RequestSellWorld(m_DragWorld);
+                    else if (m_Source == DragSource.World) { inv.RequestSellWorld(m_DragWorld); m_DragWorld.HideWhileTaking(Time.time); }
                     else if (m_Source == DragSource.Stash) inv.RequestSellStashed(m_DragStashed);
                     return;
             }
             if (m_Source == DragSource.Inventory) DropIntoWorld(me, inv, mouseRay);
-            // A click on a world item (no drag): straight into the first free spot of the backpack.
-            else if (m_Source == DragSource.World && m_DragTravel < ClickTravel && inv.FindSpot(m_DragShape, out var fx, out var fy, out var fr))
+            // A world item released anywhere but a grid (a click, or a drag that missed): into the first free spot.
+            else if (m_Source == DragSource.World)
             {
-                inv.RequestPickup(m_DragWorld, fx, fy, fr);
-                Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items);
+                if (inv.FindSpot(m_DragShape, out var fx, out var fy, out var fr)) Take(inv, fx, fy, fr);
+                else m_FullUntil = Time.time + 1.5f;
             }
+        }
+
+        /// <summary>Pick the dragged world item up into the backpack; it vanishes at once (the server confirms).</summary>
+        void Take(PlayerInventory inv, byte x, byte y, byte rot)
+        {
+            inv.RequestPickup(m_DragWorld, x, y, rot);
+            m_DragWorld.HideWhileTaking(Time.time);
+            Sfx.Ui(Sfx.Bank?.Pickup, 0.8f, Sfx.Group.Items);
         }
 
         void DropIntoWorld(PlayerController me, PlayerInventory inv, Ray ray)
@@ -337,7 +348,28 @@ namespace Stealth.UI
                     wallDist = Mathf.Min(wallDist, h.distance);
                 }
             }
-            return best != null && bestDist <= wallDist + 0.05f ? best : null;
+            if (best != null && bestDist <= wallDist + 0.05f) return best;
+
+            // A near miss: the item closest to the ray within a few centimetres (small things among the clutter on desks).
+            const int mask = ~(1 << LevelMetrics.CeilingLayer);
+            WorldItem near = null;
+            float nearMiss = AimAssist;
+            foreach (var item in WorldItem.All)
+            {
+                if (item.Taking || item.Collider == null) continue;
+                var bounds = item.Collider.bounds;
+                var v = bounds.center - ray.origin;
+                float along = Vector3.Dot(v, ray.direction);
+                if (along <= 0f || along > PlayerInventory.ReachDistance || along > wallDist + 0.3f) continue;
+                float miss = (v - ray.direction * along).magnitude - bounds.extents.magnitude * 0.5f;
+                if (miss >= nearMiss) continue;
+                if (Physics.Linecast(ray.origin, bounds.center, out var block, mask, QueryTriggerInteraction.Ignore) &&
+                    block.collider.GetComponentInParent<WorldItem>() != item && block.collider.GetComponentInParent<PlayerController>() != me)
+                    continue;
+                near = item;
+                nearMiss = miss;
+            }
+            return near;
         }
 
         void LateUpdate()
@@ -409,7 +441,7 @@ namespace Stealth.UI
                 else if (m_Source == DragSource.Inventory)
                     hint = "Отпусти — положить";
                 else if (m_Source == DragSource.World)
-                    hint = m_DragTravel < ClickTravel ? null : "Тащи в рюкзак внизу экрана";
+                    hint = m_DragTravel < ClickTravel ? null : "Отпусти — в рюкзак · или тащи на нужное место в сетке";
                 Ghost.anchoredPosition = MouseCanvas - new Vector2(m_GrabCell.x * Cell + Cell / 2f, -(m_GrabCell.y * Cell + Cell / 2f));
                 AddShape(m_GhostBlocks, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
             }
@@ -422,10 +454,14 @@ namespace Stealth.UI
             }
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);
+            bool full = Time.time < m_FullUntil;
+            if (full && tip == null) tip = "Рюкзак полон — освободи место (Tab)";
             Ui.Show(Tooltip, tip != null);
             if (tip == null) return;
             Tooltip.text = tip;
-            Tooltip.rectTransform.anchoredPosition = MouseCanvas + new Vector2(16f, -8f);
+            // Without a cursor the note sits under the crosshair.
+            var at = me.CursorMode ? MouseCanvas : Canvas.rect.size / 2f;
+            Tooltip.rectTransform.anchoredPosition = at + new Vector2(16f, -8f);
         }
 
         void DrawStashItems()

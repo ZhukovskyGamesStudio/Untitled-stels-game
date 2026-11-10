@@ -52,7 +52,8 @@ namespace Stealth.UI
 
         [Header("World markers")]
         public RectTransform IconLayer;
-        public Text IconPrefab;
+        [Tooltip("Suspicion bar + \"?\" / \"!\" over robots and devices.")]
+        public SuspicionMarkerView SuspicionPrefab;
         public RectTransform MarkerLayer;
         public TeamMarkerView TeamMarkerPrefab;
         public RectTransform HatchMarker;
@@ -87,7 +88,7 @@ namespace Stealth.UI
         readonly GainTracker m_Gain = new();
         readonly HitFeedback m_Hit = new();
         UiPool<ArcView> m_Arcs;
-        UiPool<Text> m_Icons;
+        UiPool<SuspicionMarkerView> m_Icons;
         UiPool<TeamMarkerView> m_Markers;
         UiPool<Text> m_TeamRows;
         GameManager m_Subscribed;
@@ -106,7 +107,7 @@ namespace Stealth.UI
         {
             Instance = this;
             m_Arcs = new UiPool<ArcView>(ArcPrefab, ArcLayer);
-            m_Icons = new UiPool<Text>(IconPrefab, IconLayer);
+            m_Icons = new UiPool<SuspicionMarkerView>(SuspicionPrefab, IconLayer);
             m_Markers = new UiPool<TeamMarkerView>(TeamMarkerPrefab, MarkerLayer);
             m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
         }
@@ -295,7 +296,10 @@ namespace Stealth.UI
             m_Arcs.End();
         }
 
-        /// <summary>"?" / "!" over robots and devices that you can actually see, within 25 m.</summary>
+        /// <summary>
+        /// Over robots and devices you can see (within 25 m): a suspicion bar that fills while it notices you
+        /// (red and blinking during the «Обнаружен нарушитель» moment) and a "?" / "!" for its state.
+        /// </summary>
         void ShowRobotIcons(PlayerController me)
         {
             m_Icons.Begin();
@@ -304,28 +308,30 @@ namespace Stealth.UI
             {
                 var camPos = cam.transform.position;
                 var size = Size;
+                float now = Time.time;
                 foreach (var d in Detector.All)
                 {
-                    int icon = UiMath.StateIcon(d.Awareness, d.IsInvestigating, d.IsChasing);
-                    if (icon == 0) continue;
+                    float mine = d.IsHacked ? 0f : d.AwarenessOf(me.ClientId);
+                    bool bar = UiMath.ShowSuspicionBar(mine, d.IsChasing);
+                    int icon = d.IsHacked ? 0 : UiMath.StateIcon(d.Awareness, d.IsInvestigating, d.IsChasing);
+                    if (icon == 0 && !bar) continue;
                     var top = d.Position + Vector3.up * 0.6f;
                     var to = top - camPos;
-                    if (to.magnitude > IconRange) continue;
+                    float dist = to.magnitude;
+                    if (dist > IconRange) continue;
                     var vp = cam.WorldToViewportPoint(top);
                     if (vp.z <= 0f || vp.x < 0f || vp.x > 1f || vp.y < 0f || vp.y > 1f) continue;
                     if (!Visible(camPos, d, to, 0.8f)) continue;
                     var (text, color) = icon switch
                     {
+                        0 => (null, Color.clear),
                         1 => ("?", new Color(1f, 0.9f, 0.3f)),
                         2 => ("?", new Color(1f, 0.55f, 0.15f)),
                         _ => ("!", new Color(1f, 0.15f, 0.1f)),
                     };
-                    float s = Mathf.Lerp(26f, 16f, to.magnitude / IconRange);
-                    var label = m_Icons.Next();
-                    Ui.Set(label, text, color);
-                    label.fontSize = Mathf.RoundToInt(s);
-                    label.rectTransform.anchoredPosition = Ui.FromViewport(vp, size);
-                    label.rectTransform.sizeDelta = new Vector2(40f, s + 6f);
+                    bool detected = mine >= 0.99f;
+                    m_Icons.Next().Show(Ui.FromViewport(vp, size), Mathf.Lerp(1.15f, 0.7f, dist / IconRange), bar, mine,
+                        UiMath.SuspicionColor(mine, detected, now), text, color);
                 }
             }
             m_Icons.End();

@@ -1,9 +1,13 @@
 using Stealth.Configs;
+using Stealth.Enemies;
 using UnityEngine;
 
 namespace Stealth.Audio
 {
     public enum MusicTrack : byte { None, Menu, Explore, Chase }
+
+    /// <summary>What a mobile robot says when its state changes.</summary>
+    public enum RobotVoice : byte { None, Spotted, Chase, Lost }
 
     /// <summary>What a detector's change of alertness sounds like.</summary>
     public enum AlertCue : byte { None, Suspicious, Alert, Lost }
@@ -25,6 +29,14 @@ namespace Stealth.Audio
         /// <summary>0 calm, 1 suspicious / investigating, 2 chasing / alarmed.</summary>
         public static int AlertLevel(float awareness, bool investigating, bool chasing) =>
             chasing || awareness >= 0.999f ? 2 : investigating || awareness >= 0.35f ? 1 : 0;
+
+        /// <summary>«Обнаружен нарушитель» on noticing, «Веду преследование» when the chase starts, «Нарушитель потерян» when it gives up.</summary>
+        public static RobotVoice Voice(RobotState from, RobotState to) =>
+            from == to ? RobotVoice.None
+            : to == RobotState.Alerted ? RobotVoice.Spotted
+            : to == RobotState.Chase ? RobotVoice.Chase
+            : from == RobotState.Chase && to == RobotState.Investigate ? RobotVoice.Lost
+            : RobotVoice.None;
 
         public static AlertCue Cue(int from, int to) =>
             to > from ? (to == 2 ? AlertCue.Alert : AlertCue.Suspicious) : to == 0 && from > 0 ? AlertCue.Lost : AlertCue.None;

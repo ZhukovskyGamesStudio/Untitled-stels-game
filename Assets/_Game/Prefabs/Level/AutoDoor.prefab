@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8659392509220889968}
   - component: {fileID: 7218539600920691322}
   - component: {fileID: 2305224881226091258}
+  - component: {fileID: 7301139792024541694}
   m_Layer: 0
   m_Name: AutoDoor
   m_TagString: Untagged
@@ -93,6 +94,19 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.8, y: 2.28, z: 0.1}
   m_Center: {x: 0, y: 1.14, z: 0}
+--- !u!114 &7301139792024541694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3894816378439637263}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b6c34b7fc796124f8f8db5ba0296928, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Level.SoundBlocker
+  Material: 2
 --- !u!1 &5999304513735766955
 GameObject:
   m_ObjectHideFlags: 0

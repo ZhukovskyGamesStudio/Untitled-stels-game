@@ -243,9 +243,11 @@ namespace Stealth.Game
             LookAtFrom(new Pose(hatch + new Vector3(0, 0.05f, -1.5f), Quaternion.LookRotation(Vector3.forward)), hatch + new Vector3(0, 1.2f, 3f));
             yield return new WaitForSeconds(0.5f);
             DevFlags.FreezeRobots = false;
+            DevFlags.HoldRobots = true; // the guard keeps looking at the player instead of walking off on patrol
             float t0 = Time.time;
-            while (Time.time - t0 < 5f && guard.State != RobotState.Chase) yield return null;
-            yield return null;
+            while (Time.time - t0 < 8f && guard.State != RobotState.Chase) yield return null;
+            DevFlags.HoldRobots = false;
+            yield return new WaitForSeconds(0.3f);
             yield return Shot("radio_icons");
             Log($"radio: guard={guard.State}, listener after the call={listener.State}");
             DevFlags.FreezeRobots = true;

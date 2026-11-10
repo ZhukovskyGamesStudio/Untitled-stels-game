@@ -16,6 +16,10 @@ namespace Stealth.Game
         public static bool Peaceful;
         /// <summary>Robots stand still (gallery screenshots).</summary>
         public static bool FreezeRobots;
+        /// <summary>Robots sense and decide but stay where they are (measuring detection times).</summary>
+        public static bool HoldRobots;
+        /// <summary>No sound at all (autotests run next to a working developer; -autotest-sound turns it back on).</summary>
+        public static bool Mute;
         /// <summary>Replaces keyboard / mouse input of the local player.</summary>
         public static PlayerInputState? Autopilot;
         /// <summary>Behave as if E is held.</summary>
@@ -33,6 +37,8 @@ namespace Stealth.Game
             ForcedLevel = 0;
             Peaceful = false;
             FreezeRobots = false;
+            HoldRobots = false;
+            Mute = false;
             Autopilot = null;
             AutoInteract = false;
             ForceHandsMode = false;

@@ -90,5 +90,20 @@ namespace Stealth.Tests
             Assert.AreEqual(0.75f, UiMath.Scale(200));
             Assert.AreEqual(3f, UiMath.Scale(5000));
         }
+
+        [Test]
+        public void TheSuspicionBarShowsWhileItNoticesYouUntilTheChase()
+        {
+            Assert.IsFalse(UiMath.ShowSuspicionBar(0f, false));
+            Assert.IsTrue(UiMath.ShowSuspicionBar(0.3f, false));
+            Assert.IsTrue(UiMath.ShowSuspicionBar(1f, false), "full during the warning");
+            Assert.IsFalse(UiMath.ShowSuspicionBar(1f, true), "chasing: just the \"!\"");
+            var empty = UiMath.SuspicionColor(0f, false, 0f);
+            var full = UiMath.SuspicionColor(1f, false, 0f);
+            Assert.Greater(empty.g, full.g, "yellow fills towards orange");
+            var detected = UiMath.SuspicionColor(1f, true, 0f);
+            Assert.Greater(detected.r, 0.9f);
+            Assert.Less(detected.g, 0.3f, "red once detected");
+        }
     }
 }

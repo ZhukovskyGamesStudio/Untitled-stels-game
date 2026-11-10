@@ -1,3 +1,4 @@
+using Stealth.Enemies;
 using NUnit.Framework;
 using Stealth.Audio;
 using Stealth.Configs;
@@ -55,6 +56,18 @@ namespace Stealth.Tests
                 Assert.IsNotNull(p.objectReferenceValue, $"SoundBank.{p.propertyPath}");
             }
             Assert.AreEqual(4, bank.Footsteps.Length);
+        }
+
+        [Test]
+        public void RobotsWarnThenAnnounceTheChaseAndTheLoss()
+        {
+            Assert.AreEqual(RobotVoice.Spotted, AudioRules.Voice(RobotState.Suspicious, RobotState.Alerted));
+            Assert.AreEqual(RobotVoice.Spotted, AudioRules.Voice(RobotState.Patrol, RobotState.Alerted));
+            Assert.AreEqual(RobotVoice.Chase, AudioRules.Voice(RobotState.Alerted, RobotState.Chase));
+            Assert.AreEqual(RobotVoice.Lost, AudioRules.Voice(RobotState.Chase, RobotState.Investigate));
+            Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Patrol, RobotState.Investigate), "checking a noise is silent");
+            Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Chase, RobotState.Patrol), "target downed");
+            Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Alerted, RobotState.Alerted));
         }
     }
 }

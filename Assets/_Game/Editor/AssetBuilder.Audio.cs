@@ -71,6 +71,9 @@ namespace Stealth.EditorTools
                 b.RobotStep = Clip("Robots/robot_step");
                 b.RobotMotor = Clip("Robots/robot_motor");
                 b.DroneRotor = Clip("Robots/drone_rotor");
+                b.VoiceSpotted = Clip("Robots/voice_spotted");
+                b.VoiceChase = Clip("Robots/voice_chase");
+                b.VoiceLost = Clip("Robots/voice_lost");
                 b.LaserHum = Clip("Environment/laser_hum");
                 b.DoorSlide = Clip("Environment/door_slide");
                 b.Alarm = Clip("Environment/alarm");

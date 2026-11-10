@@ -1,3 +1,4 @@
+using Stealth.Configs;
 using Stealth.Game;
 using Stealth.Player;
 using UnityEngine;
@@ -51,22 +52,20 @@ namespace Stealth.Enemies
         protected override void TickServer()
         {
             var eye = Pivot.position + Pivot.forward * 0.3f;
+            var vision = Tuning.Perception.Vision;
             IIntruder seen = null;
-            float bestDist = float.MaxValue;
+            float best = 0f;
             foreach (var p in PlayerController.All)
             {
                 IIntruder target = p;
                 if (target.IsDown) continue;
-                var aim = Perception.AimPoint(target, 0.7f);
-                float d = Vector3.Distance(eye, aim);
-                if (d < bestDist && Perception.InCone(eye, Pivot.forward, aim, Profile.ViewDistance, Profile.ViewAngle) && Perception.LineOfSight(eye, target, 0.7f))
-                {
-                    seen = target;
-                    bestDist = d;
-                }
+                if (!Perception.Look(eye, Pivot.forward, target, Profile.ViewDistance, Profile.ViewAngle, vision, out var g)) continue;
+                // Fully visible and moving at mid range in a lit room: about DetectTime / 0.7 seconds to detect.
+                float rate = SensorMath.VisionFactor(g, -1f, vision) / Mathf.Max(Profile.DetectTime, 0.05f);
+                if (rate > best) { seen = target; best = rate; }
             }
             if (seen == null) { Forget(); return; }
-            Notice(seen, SensorMath.CameraRate(Profile.DetectTime, bestDist, Profile.ViewDistance, seen.IsCrouching, Perception.LightFactor(seen.Position)));
+            Notice(seen, best);
         }
     }
 }

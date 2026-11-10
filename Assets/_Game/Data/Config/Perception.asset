@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9551becfe701c544b3ac20e902c2796, type: 3}
+  m_Name: Perception
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.PerceptionConfig
+  Vision:
+    FarFactor: 0.2
+    NearFactor: 2.2
+    ExposurePower: 1.6
+    MinExposure: 0.12
+    FullViewShare: 0.4
+    EdgeOfViewFactor: 0.35
+    BehindFactor: 0.12
+    CrouchFactor: 0.6
+    CrouchRangeFactor: 0.7
+    StillFactor: 0.6
+    StillSpeed: 0.4
+  Hearing:
+    Wall: 0.35
+    Door: 0.6
+    Slab: 0.3
+    Furniture: 0.85
+    MinLoudness: 0.05
+    SuspicionPerNoise: 0.5
+  Vibration:
+    ReferenceSpeed: 4
+    MinSpeedFactor: 0.4
+    MaxSpeedFactor: 1.8

@@ -1,3 +1,4 @@
+using Stealth.Configs;
 using Stealth.Player;
 using UnityEngine;
 
@@ -63,15 +64,18 @@ namespace Stealth.Enemies
 
         protected override void TickServer()
         {
+            var vision = Tuning.Perception.Vision;
             IIntruder seen = null;
-            float bestDist = float.MaxValue;
+            float best = 0f;
             foreach (var p in PlayerController.All)
             {
                 if (p.IsDown) continue;
-                var target = p.Position + Vector3.up * p.Height * 0.7f;
-                float d = Vector3.Distance(EyePos, target);
-                bool inView = AimTarget == p.ClientId || Perception.InCone(EyePos, HeadForward, target, Profile.Range, Profile.ViewAngle);
-                if (inView && d < bestDist && d <= Profile.Range && Perception.LineOfSight(EyePos, p, 0.7f)) { seen = p; bestDist = d; }
+                // Locked on: the head tracks the target, so it stays in the middle of the view.
+                bool locked = AimTarget == p.ClientId;
+                if (!Perception.Look(EyePos, HeadForward, p, Profile.Range, locked ? 360f : Profile.ViewAngle, vision, out var g)) continue;
+                if (locked) g.OffCentre = 0f;
+                float rate = Profile.DetectionRate * SensorMath.VisionFactor(g, Profile.CrouchFactor, vision);
+                if (rate > best) { seen = p; best = rate; }
             }
 
             if (seen == null)
@@ -80,7 +84,7 @@ namespace Stealth.Enemies
                 if (Meter.Value < 0.2f) { SetTarget(Nobody); m_LockStart = -1f; }
                 return;
             }
-            Notice(seen, Profile.DetectionRate * (seen.IsCrouching ? Profile.CrouchFactor : 1f));
+            Notice(seen, best);
             if (Meter.Value < 1f) return;
 
             // Locked on: aim, warn with the laser, then fire.

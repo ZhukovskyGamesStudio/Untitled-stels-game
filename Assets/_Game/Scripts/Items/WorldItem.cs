@@ -23,6 +23,10 @@ namespace Stealth.Items
         public int Value => ItemCatalog.Value(Shape, Color);
 
         MaterialPropertyBlock m_Block;
+        float m_HiddenUntil = -1f;
+
+        /// <summary>Hidden locally while a pickup request is on its way (see <see cref="HideWhileTaking"/>).</summary>
+        public bool Taking => m_HiddenUntil >= 0f;
 
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
@@ -32,6 +36,25 @@ namespace Stealth.Items
             Shape = shape;
             Color = color;
             Apply();
+        }
+
+        /// <summary>
+        /// Local: vanish right away after asking the server to take it, so a click feels instant even with network lag.
+        /// The server despawns it; if it refused (no room, too far), the item shows up again after <paramref name="seconds"/>.
+        /// </summary>
+        public void HideWhileTaking(float now, float seconds = 1f)
+        {
+            m_HiddenUntil = now + seconds;
+            if (Renderer != null) Renderer.enabled = false;
+            if (Collider != null) Collider.enabled = false;
+        }
+
+        void Update()
+        {
+            if (m_HiddenUntil < 0f || Time.time < m_HiddenUntil) return;
+            m_HiddenUntil = -1f;
+            if (Renderer != null) Renderer.enabled = true;
+            if (Collider != null) Collider.enabled = true;
         }
 
         /// <summary>Local-only highlight while the item is under the crosshair / cursor.</summary>

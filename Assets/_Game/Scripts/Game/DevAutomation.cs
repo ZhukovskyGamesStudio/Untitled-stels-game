@@ -16,6 +16,7 @@ namespace Stealth.Game
     ///   -host-local / -join-local 127.0.0.1     start a local (UDP) host / client
     ///   -autotest &lt;scenario&gt; -shotdir dir      run a scripted scenario, log [AUTOTEST] lines, save screenshots
     ///   -autotest-linger                        keep running 20 s after the scenario (host waiting for clients)
+    ///   -autotest-sound / -autotest-front       autotests are muted and stay behind other windows unless asked
     /// </summary>
     public partial class DevAutomation : MonoBehaviour
     {
@@ -39,6 +40,12 @@ namespace Stealth.Game
             m_Scenarios["coop"] = CoopScenario;
             m_Scenarios["move"] = MoveScenario;
             RegisterExtraScenarios();
+            // Silent from the very first frame (the developer keeps working while autotests run).
+            if (Arg("-autotest") != null && Arg("-autotest-sound") == null)
+            {
+                DevFlags.Mute = true;
+                AudioListener.volume = 0f;
+            }
         }
 
         partial void RegisterExtraScenarios();
@@ -250,10 +257,12 @@ namespace Stealth.Game
                 var spot = gp + guard.transform.forward * 5f;
                 spot.y = gp.y + 0.05f;
                 Me.TeleportOwner(spot, Quaternion.LookRotation(Flat(gp - spot)));
+                DevFlags.HoldRobots = true; // noticing takes seconds now: keep it from walking off meanwhile
                 yield return new WaitForSeconds(0.6f);
                 yield return Shot("robot");
-                float until = Time.time + 6f;
+                float until = Time.time + 10f;
                 while (Time.time < until && guard != null && guard.State != RobotState.Chase) yield return null;
+                DevFlags.HoldRobots = false;
                 Log($"robot '{guard.name}': state={guard.State}");
                 yield return new WaitForSeconds(3f);
                 Log($"robot attack: hp {hpBefore} -> {Me.Hp}, downed={Me.Downed}");
@@ -265,9 +274,13 @@ namespace Stealth.Game
                 var c = cam.transform.position;
                 var spot = new Vector3(c.x, Mathf.Floor(c.y / LevelMetrics.FloorHeight) * LevelMetrics.FloorHeight + 0.05f, c.z) + cam.transform.forward * 5f;
                 Me.TeleportOwner(spot, Quaternion.LookRotation(Flat(c - spot)));
-                float until = Time.time + 5f;
-                while (Time.time < until && cam.Alert != 2) yield return null;
-                Log($"camera: alert={cam.Alert} alarmActive={gm.AlarmActive}");
+                float t0 = Time.time, max = 0f;
+                while (Time.time - t0 < 12f && cam.Alert != 2)
+                {
+                    max = Mathf.Max(max, cam.AwarenessOf(Me.ClientId));
+                    yield return null;
+                }
+                Log($"camera: alert={cam.Alert} after {Time.time - t0:0.0} s (max awareness {max:0.00}), alarmActive={gm.AlarmActive}");
                 yield return Shot("camera");
             }
 

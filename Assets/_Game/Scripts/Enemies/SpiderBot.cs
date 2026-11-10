@@ -1,3 +1,4 @@
+using Stealth.Configs;
 using Stealth.Level;
 using Stealth.Player;
 using UnityEngine;
@@ -105,18 +106,19 @@ namespace Stealth.Enemies
 
         void Look()
         {
+            var vision = Tuning.Perception.Vision;
+            var eye = transform.position + transform.up * 0.3f;
             IIntruder seen = null;
-            float best = float.MaxValue;
+            float best = 0f;
             foreach (var p in PlayerController.All)
             {
                 if (p.IsDown || !Perception.SameFloor(p.Position, new Vector3(0, m_FloorY, 0))) continue;
-                var target = p.Position + Vector3.up;
-                float d = Vector3.Distance(transform.position, target);
-                if (d < best && Perception.InCone(transform.position, LookDirection, target, Profile.Range, Profile.ViewAngle) && Perception.LineOfSight(transform.position + transform.up * 0.3f, p))
-                { seen = p; best = d; }
+                if (!Perception.Look(eye, LookDirection, p, Profile.Range, Profile.ViewAngle, vision, out var g)) continue;
+                float rate = Profile.DetectionRate * SensorMath.VisionFactor(g, Profile.CrouchFactor, vision);
+                if (rate > best) { seen = p; best = rate; }
             }
             if (seen == null) { Forget(); return; }
-            Notice(seen, Profile.DetectionRate * (seen.IsCrouching ? Profile.CrouchFactor : 1f) * Perception.LightFactor(seen.Position));
+            Notice(seen, best);
         }
 
         protected override void OnDetected(IIntruder p)

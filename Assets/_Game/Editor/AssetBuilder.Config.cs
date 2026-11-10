@@ -24,6 +24,7 @@ namespace Stealth.EditorTools
             if (root.Level == null) { root.Level = TuningAsset<LevelConfig>(ConfigDir + "/Level.asset"); dirty = true; }
             if (root.Items == null) { root.Items = TuningAsset<ItemsConfig>(ConfigDir + "/Items.asset"); dirty = true; }
             if (root.Audio == null) { root.Audio = TuningAsset<AudioConfig>(ConfigDir + "/Audio.asset"); dirty = true; }
+            if (root.Perception == null) { root.Perception = TuningAsset<PerceptionConfig>(ConfigDir + "/Perception.asset"); dirty = true; }
             if (dirty) EditorUtility.SetDirty(root);
             AssetDatabase.SaveAssets();
             Tuning.Use(root); // item colours for the materials come from the config

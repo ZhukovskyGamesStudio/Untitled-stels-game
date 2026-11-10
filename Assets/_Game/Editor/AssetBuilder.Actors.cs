@@ -55,12 +55,12 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Guard, RobotPrefabs + "/RobotGuard.prefab", () => MobileRobot("RobotGuard", "robot_guard", "RobotBody", 0.4f, new Vector3(0, 1.84f, 0.3f), ripple, (s, t, anim) =>
             {
                 anim.Bob = 0.06f;
-                s.ViewDistance = 13f; s.ViewAngle = 100f; s.HearingMultiplier = 0.8f;
+                s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
                 t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4.4f;
             }));
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ChaseHearingShare = 0.6f; s.ContactDistance = 1.4f;
+                s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ContactDistance = 1.4f;
                 t.CanUseStairs = false; // wheels
                 t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 5f; t.LoseTargetAfter = 3f;
             }));
@@ -85,12 +85,12 @@ namespace Stealth.EditorTools
             }));
             Robot(RobotKind.Sorter, RobotPrefabs + "/RobotSorter.prefab", () => MobileRobot("RobotSorter", "robot_sorter", "SorterBody", 0.35f, new Vector3(0, 1.25f, 0.3f), ripple, (s, t, anim) =>
             {
-                s.ColorSorter = true; s.ViewDistance = 16f; s.ViewAngle = 160f; s.DetectionSpeed = 2.2f; s.HearingMultiplier = 0.3f;
+                s.ColorSorter = true; s.ViewDistance = 16f; s.ViewAngle = 160f; s.DetectionSpeed = 0.9f; s.HearingMultiplier = 0.3f;
                 t.PatrolSpeed = 1.7f; t.InvestigateSpeed = 2.6f; t.ChaseSpeed = 4.6f;
             }));
             Robot(RobotKind.Worker, RobotPrefabs + "/RobotWorker.prefab", () => MobileRobot("RobotWorker", "robot_worker", "WorkerBody", 0.45f, new Vector3(0, 0.5f, 0.4f), ripple, (s, t, anim) =>
             {
-                s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 1.2f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
+                s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
                 t.CanAttack = false;    // harmless, but a snitch
                 t.AlarmRadius = 40f;
                 t.CanUseStairs = false; // wheels
@@ -98,9 +98,9 @@ namespace Stealth.EditorTools
             }));
             Robot(RobotKind.Hunter, RobotPrefabs + "/RobotHunter.prefab", () => MobileRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), ripple, (s, t, anim) =>
             {
-                s.ViewDistance = 16f; s.ViewAngle = 120f; s.DetectionSpeed = 2f; // everything at once
-                s.HearingMultiplier = 1.2f; s.ChaseHearingShare = 0.4f; s.SeismicRange = 6f; s.SmellRange = 3f;
-                t.PatrolSpeed = 2.8f; t.InvestigateSpeed = 4.5f; t.ChaseSpeed = 5.8f; t.LoseTargetAfter = 7f; t.AttackCooldown = 1.3f;
+                s.ViewDistance = 16f; s.ViewAngle = 120f; s.DetectionSpeed = 1f; // everything at once
+                s.HearingMultiplier = 1.2f; s.SeismicRange = 6f; s.SmellRange = 3f;
+                t.PatrolSpeed = 2.8f; t.InvestigateSpeed = 4.5f; t.ChaseSpeed = 5.8f; t.LoseTargetAfter = 7f; t.AttackCooldown = 1.3f; t.WarningTime = 0.9f;
             }));
 
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>

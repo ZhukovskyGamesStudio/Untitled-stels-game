@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Stealth.Configs;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.Level;
@@ -41,6 +42,8 @@ namespace Stealth.Enemies
         public float Suspicion => m_Brain?.Suspicion ?? 0f;
         public override bool IsInvestigating => State == RobotState.Investigate;
         public override bool IsChasing => State == RobotState.Chase;
+        /// <summary>The warning moment: it has noticed someone and is about to chase («Обнаружен нарушитель»).</summary>
+        public bool IsAlerted => State == RobotState.Alerted;
 
         protected override Color StatusColor =>
             SecurityPalette.ForState(State, ColorFilter >= 0 ? ItemCatalog.Colors[ColorFilter].Color : SecurityPalette.Calm);
@@ -73,7 +76,7 @@ namespace Stealth.Enemies
         }
 
         public override bool CanBeHackedFrom(Vector3 player, float reach) =>
-            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State == RobotState.Chase, reach);
+            !IsHacked && Hacking.CanHackRobot(transform.position, transform.forward, player, State is RobotState.Chase or RobotState.Alerted, reach);
 
         protected override void OnHackedServer()
         {
@@ -97,6 +100,7 @@ namespace Stealth.Enemies
             float now = Time.time, dt = Time.deltaTime;
             if (GameManager.SensorsAllowed) m_Brain.OnSensed(Sense(), now, dt);
             m_Brain.Tick(now, dt);
+            if (DevFlags.HoldRobots) m_Agent.isStopped = true;
             ReportAwarenessServer(m_Brain.Awareness, m_Brain.AwarenessFocus);
         }
 
@@ -106,6 +110,7 @@ namespace Stealth.Enemies
         Sighting Sense()
         {
             var best = Sighting.None;
+            var perception = Tuning.Perception;
             foreach (var p in PlayerController.All)
             {
                 IIntruder target = p;
@@ -115,13 +120,13 @@ namespace Stealth.Enemies
 
                 float rate = 0f;
                 bool visibleToFilter = ColorFilter < 0 || target.Carries(ColorFilter);
-                if (Senses.HasEyes && visibleToFilter && CanSee(target, out var dist))
-                    rate = Mathf.Max(rate, SensorMath.VisionRate(Senses.DetectionSpeed, dist, Senses.ViewDistance, target.IsCrouching, Perception.LightFactor(target.Position)));
+                if (Senses.HasEyes && visibleToFilter && Look(target, perception.Vision, out var glimpse))
+                    rate = Mathf.Max(rate, Senses.DetectionSpeed * SensorMath.VisionFactor(glimpse, -1f, perception.Vision));
                 if (Senses.SeismicRange > 0f && SeismicSense.Feels(transform.position, target.Position, target.GroundSpeed, target.IsCrouching, Senses.SeismicRange))
                 {
                     var flat = target.Position - transform.position;
                     flat.y = 0;
-                    rate = Mathf.Max(rate, SensorMath.SeismicRate(Senses.SeismicSpeed, flat.magnitude, Senses.SeismicRange));
+                    rate = Mathf.Max(rate, SensorMath.SeismicRate(Senses.SeismicSpeed, flat.magnitude, Senses.SeismicRange, target.GroundSpeed, perception.Vibration));
                 }
                 if (Senses.SmellRange > 0f)
                     rate = Mathf.Max(rate, ScentTrail.Smell(target.ClientId, transform.position, Senses.SmellRange, Time.time) * Senses.SmellSpeed);
@@ -140,27 +145,62 @@ namespace Stealth.Enemies
             return target.Position;
         }
 
-        public bool CanSee(IIntruder p, out float distance)
+        Vector3 EyePosition => Eye != null ? Eye.position : transform.position + Vector3.up * 1.6f;
+
+        /// <summary>
+        /// How well the eye sees a player right now: in range and in the cone (or close by — peripheral vision),
+        /// and how much of the body is not hidden. False when nothing of them is visible.
+        /// </summary>
+        public bool Look(IIntruder p, VisionSettings v, out Glimpse glimpse)
         {
-            var eye = Eye != null ? Eye.position : transform.position + Vector3.up * 1.6f;
-            var target = Perception.AimPoint(p);
-            distance = Vector3.Distance(eye, target);
-            float range = Senses.ViewDistance * (p.IsCrouching ? 0.7f : 1f);
+            var eye = EyePosition;
+            var aim = Perception.AimPoint(p, 0.6f);
+            glimpse = default;
+            float distance = Vector3.Distance(eye, aim);
+            float range = Senses.ViewDistance * (p.IsCrouching ? v.CrouchRangeFactor : 1f);
             if (distance > range) return false;
-            if (distance > Senses.PeripheralDistance)
+            var forward = Senses.EyePitch > 0f ? Perception.PitchedForward(transform, Senses.EyePitch) : transform.forward;
+            var to = aim - eye;
+            if (Senses.EyePitch <= 0f)
             {
-                bool inView = Senses.EyePitch > 0f
-                    ? Perception.InCone(eye, Perception.PitchedForward(transform, Senses.EyePitch), target, range, Senses.ViewAngle)
-                    : Perception.InFlatCone(eye, transform.forward, target, range, Senses.ViewAngle);
-                if (!inView) return false;
+                // Robots on the floor look around flat: height differences (stairs) do not leave the cone.
+                forward.y = 0f;
+                to.y = 0f;
             }
-            return Perception.LineOfSight(eye, p);
+            float half = Senses.ViewAngle / 2f;
+            float angle = to.sqrMagnitude < 1e-4f ? 0f : Vector3.Angle(forward, to);
+            if (angle > half && distance > Senses.PeripheralDistance) return false;
+            float exposure = Perception.Exposure(eye, p);
+            if (exposure <= 0f) return false;
+            glimpse = new Glimpse
+            {
+                Distance = distance,
+                Range = range,
+                Exposure = exposure,
+                OffCentre = angle / Mathf.Max(half, 1f), // above 1: outside the cone, sensed close by
+                Crouching = p.IsCrouching,
+                Moving = p.GroundSpeed > v.StillSpeed,
+                Light = Perception.LightFactor(p.Position),
+            };
+            return true;
         }
 
+        /// <summary>
+        /// A noise somewhere on the level: loudness here = distance within its radius × hearing, muffled by every wall,
+        /// door and slab on the way. Quiet noises only add a little suspicion.
+        /// </summary>
         void OnNoise(Vector3 position, float radius, ulong source)
         {
-            if (m_Brain == null || IsHacked) return;
-            m_Brain.OnNoise(position, SensorMath.HearingDistance(position, transform.position), radius, PlayerController.Find(source), Time.time);
+            if (m_Brain == null || IsHacked || Senses.HearingMultiplier <= 0f) return;
+            float hearing = radius * Senses.HearingMultiplier;
+            var from = position + Vector3.up * Perception.EarHeight;
+            var ear = transform.position + Vector3.up * Perception.EarHeight;
+            float distance = Vector3.Distance(from, ear);
+            if (distance >= hearing) return;
+            var settings = Tuning.Perception.Hearing;
+            float loudness = SensorMath.Loudness(distance, hearing, Perception.SoundTransmission(from, ear, settings));
+            float suspicion = SensorMath.NoiseSuspicion(loudness, settings);
+            if (suspicion > 0f) m_Brain.OnNoise(position, suspicion, PlayerController.Find(source), Time.time);
         }
 
         // ------------------------------------------------------------------ IRobotBody

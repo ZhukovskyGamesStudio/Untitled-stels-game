@@ -1,10 +1,14 @@
+using Stealth.Configs;
 using Stealth.Level;
 using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Enemies
 {
-    /// <summary>Wall PIR sensor: notices fast movement in its cone. Sneaking slowly (crouched) or freezing beats it.</summary>
+    /// <summary>
+    /// Wall PIR sensor: notices fast movement in its cone — the faster, closer and more of the body in view, the quicker.
+    /// Sneaking slowly (crouched) or freezing beats it.
+    /// </summary>
     public class MotionSensor : SecurityDevice
     {
         [Tooltip("Tuning (MotionSensorProfile) — a separate asset next to the prefab.")]
@@ -18,15 +22,18 @@ namespace Stealth.Enemies
         protected override void TickServer()
         {
             var eye = transform.position + transform.forward * 0.1f;
+            var perception = Tuning.Perception;
+            IIntruder seen = null;
+            float best = 0f;
             foreach (var p in PlayerController.All)
             {
                 if (p.IsDown || !Triggers(p.GroundSpeed, Profile.SpeedThreshold)) continue;
-                var target = p.Position + Vector3.up;
-                if (!Perception.InCone(eye, transform.forward, target, Profile.Range, Profile.ViewAngle) || !Perception.LineOfSight(eye, p, 0.6f)) continue;
-                Notice(p, Profile.DetectionRate);
-                return;
+                if (!Perception.Look(eye, transform.forward, p, Profile.Range, Profile.ViewAngle, perception.Vision, out var g)) continue;
+                float rate = SensorMath.MotionRate(Profile.DetectionRate, p.GroundSpeed, g.Distance, Profile.Range, g.Exposure, perception.Vibration, perception.Vision);
+                if (rate > best) { seen = p; best = rate; }
             }
-            Forget();
+            if (seen == null) { Forget(); return; }
+            Notice(seen, best);
         }
     }
 }

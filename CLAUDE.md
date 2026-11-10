@@ -23,11 +23,11 @@ Tools/dev.sh assets             # дособрать недостающие ас
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
 Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
-Tools/dev.sh run full 1         # хост + 1 клиент по сети
+Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -86,6 +86,10 @@ LaserGate — отдельная ловушка (не детектор)
 - `IRobotBody` — что «мозг» робота делает телом (реализует `RobotController`).
 
 На мобильных роботах `SensorRig` показывает насадки-датчики (глаз-камера, микрофоны, щупы в пол, нос) по `Senses` из конфига.
+Восприятие плавное: зрение — доля видимого тела (`Perception.Exposure`, 7 лучей), дистанция, место в конусе, присед, неподвижность, свет
+(`SensorMath.VisionFactor`); слух — громкость шага у робота с затуханием через стены/двери/перекрытия (`Perception.SoundTransmission`,
+компонент `SoundBlocker` на префабах стен, плит и дверей). Полная шкала → `RobotState.Alerted` («Обнаружен нарушитель», `Traits.WarningTime`)
+→ `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
 Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
 
@@ -137,6 +141,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 | `Data/Config/Run` | квота (доля, рост, потолок), штраф за упавших, тревога, льготный период, когда приходит охотник |
 | `Data/Config/Level` | размер здания по домам, веса типов комнат, темнота и мерцание, проходы/двери/лазы, сколько охраны и **кто** с какого дома (ростер), лут |
 | `Data/Config/Items` | цвета лута: название, цвет, множитель ценности, частота |
+| `Data/Config/Perception` | как роботы и устройства замечают: зрение (дистанция, доля видимого тела, край обзора, за спиной, присед, неподвижность), слух (сколько пропускают стена, дверь, перекрытие, мебель; подозрение от шага), вибрации |
 | `Data/Config/Audio` | громкость групп (музыка, эмбиент, сирена, UI, шаги, роботы, предметы, петли), дальность слышимости, длина шага, смена музыки |
 | `Prefabs/Robots/Robot<Kind>Config` | подвижный робот (`RobotProfile`): глаза, слух, сейсмика, нюх, скорости, лестницы, атака, радиус тревоги, внимание (паузы, затухание подозрения), анимация |
 | `Prefabs/Robots/RobotTurretConfig` и др. | устройства: турель, паук, пылесос (`TurretProfile`, `SpiderProfile`, `VacuumProfile`) |
@@ -159,7 +164,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 Если меняешь структуру префаба в коде — пересобери с `FORCE=1` и закоммить изменённые префабы вместе с кодом.
 Сцена в режиме «только недостающее» не пересобирается: новый экран или объект сцены появится после `FORCE=1`.
 Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`),
-звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом).
+звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом), голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).
 
 ## Правила кода (коротко; подробно — скилл [`stealth-code`](.claude/skills/stealth-code/SKILL.md))
 

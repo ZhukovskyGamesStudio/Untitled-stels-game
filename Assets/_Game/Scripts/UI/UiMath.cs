@@ -91,6 +91,15 @@ namespace Stealth.UI
             return awareness > 0.05f ? 1 : 0;
         }
 
+        /// <summary>The suspicion bar over a detector: while it is noticing you and has not started chasing yet.</summary>
+        public static bool ShowSuspicionBar(float myAwareness, bool chasing) => !chasing && myAwareness > 0.02f;
+
+        /// <summary>Bar colour: yellow → orange as it fills; red and blinking once it has detected you (the warning moment).</summary>
+        public static Color SuspicionColor(float fill, bool detected, float time) =>
+            detected
+                ? new Color(1f, 0.15f, 0.1f, 0.7f + 0.3f * Mathf.Sin(time * 14f))
+                : Color.Lerp(new Color(1f, 0.92f, 0.35f), new Color(1f, 0.45f, 0.1f), Mathf.Clamp01(fill));
+
         /// <summary>UI scale: the layout is designed for 720p and scaled up for bigger windows (clamped).</summary>
         public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 720f, 0.75f, 3f);
     }

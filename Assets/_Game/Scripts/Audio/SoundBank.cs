@@ -22,6 +22,14 @@ namespace Stealth.Audio
         [Header("Robots")]
         public AudioClip Suspicious, Alert, Lost, Hacked, Radio, TurretShot, RobotStep, RobotMotor, DroneRotor;
 
+        [Header("Robot voice (Tools/Audio/generate_voices.py)")]
+        [Tooltip("«Обнаружен нарушитель» — a robot has noticed someone; the chase starts after its warning time.")]
+        public AudioClip VoiceSpotted;
+        [Tooltip("«Веду преследование» — the chase begins.")]
+        public AudioClip VoiceChase;
+        [Tooltip("«Нарушитель потерян» — lost the target, goes to check the last known spot.")]
+        public AudioClip VoiceLost;
+
         [Header("Environment")]
         public AudioClip LaserHum, DoorSlide, Alarm, OfficeHum, GasWind;
 

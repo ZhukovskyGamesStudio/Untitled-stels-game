@@ -56,42 +56,106 @@ namespace Stealth.Tests
             Assert.AreEqual(idle, SecurityPalette.ForState(RobotState.Patrol, idle));
             Assert.AreEqual(SecurityPalette.Investigating, SecurityPalette.ForState(RobotState.Investigate, idle));
             Assert.AreEqual(SecurityPalette.Alarm, SecurityPalette.ForState(RobotState.Chase, idle));
+            Assert.AreEqual(SecurityPalette.Alarm, SecurityPalette.ForState(RobotState.Alerted, idle));
             Assert.AreNotEqual(SecurityPalette.Hacked, SecurityPalette.Calm, "a hacked robot looks dead");
         }
 
+        static Glimpse Look(float distance = 5f, float exposure = 1f, float offCentre = 0f, bool crouching = false, bool moving = true, float light = 1f) =>
+            new() { Distance = distance, Range = 13f, Exposure = exposure, OffCentre = offCentre, Crouching = crouching, Moving = moving, Light = light };
+
+        /// <summary>Seconds a guard (DetectionSpeed 0.6) needs to fill its suspicion with this look.</summary>
+        static float SecondsToDetect(in Glimpse g) => 1f / (0.6f * SensorMath.VisionFactor(g));
+
         [Test]
-        public void VisionIsFasterUpCloseSlowerCrouchedAndInTheDark()
+        public void AFullyVisibleWalkingPlayerTakesSecondsToNotice()
         {
-            float near = SensorMath.VisionRate(1.6f, 2f, 13f, false, 1f);
-            float far = SensorMath.VisionRate(1.6f, 12f, 13f, false, 1f);
-            Assert.Greater(near, far);
-            Assert.Less(SensorMath.VisionRate(1.6f, 6f, 13f, true, 1f), SensorMath.VisionRate(1.6f, 6f, 13f, false, 1f));
-            Assert.AreEqual(SensorMath.VisionRate(1.6f, 6f, 13f, false, 1f) * 0.5f,
-                SensorMath.VisionRate(1.6f, 6f, 13f, false, LightMath.VisionFactor(true)), 1e-4f);
+            float mid = SecondsToDetect(Look(5f));
+            Assert.That(mid, Is.InRange(1.4f, 2.6f), "5 m away, in plain view: a couple of seconds, not instantly");
+            Assert.Less(SecondsToDetect(Look(2f)), mid, "closer is faster");
+            Assert.Greater(SecondsToDetect(Look(11f)), 2.5f * mid, "far away is much slower");
         }
 
         [Test]
-        public void CameraNeedsAboutItsDetectTimeAtMidRange()
+        public void APartlyHiddenBodyIsNoticedMuchSlower()
         {
-            float rate = SensorMath.CameraRate(1.1f, 7f, 14f, false, 1f);
-            Assert.AreEqual(1.1f / 1.25f, 1f / rate, 0.01f, "mid range is 1.25x faster than the far edge");
-            Assert.Less(SensorMath.CameraRate(1.1f, 7f, 14f, true, 1f), rate, "crouching helps");
+            float full = SensorMath.VisionFactor(Look(5f));
+            float half = SensorMath.VisionFactor(Look(5f, exposure: 0.5f));
+            float sliver = SensorMath.VisionFactor(Look(5f, exposure: 0.15f));
+            Assert.Less(half, full * 0.4f, "half of the body: less than 40% of the speed");
+            Assert.Less(sliver, full * 0.06f, "15% of the body visible from 5 m: very slow");
+            Assert.AreEqual(0f, SensorMath.VisionFactor(Look(5f, exposure: 0.1f)), "a sliver below the minimum is not noticed");
+            Assert.Greater(SecondsToDetect(Look(5f, exposure: 0.15f)), 25f);
         }
 
         [Test]
-        public void SeismicIsStrongerCloseBy()
+        public void CrouchingStandingStillTheDarkAndTheEdgeOfViewAllSlowItDown()
         {
-            Assert.Greater(SensorMath.SeismicRate(1.1f, 1f, 10f), SensorMath.SeismicRate(1.1f, 9f, 10f));
-            Assert.AreEqual(1.1f * 0.5f, SensorMath.SeismicRate(1.1f, 10f, 10f), 1e-4f);
+            float baseRate = SensorMath.VisionFactor(Look());
+            Assert.Less(SensorMath.VisionFactor(Look(crouching: true)), baseRate);
+            Assert.Less(SensorMath.VisionFactor(Look(moving: false)), baseRate);
+            Assert.AreEqual(baseRate * 0.5f, SensorMath.VisionFactor(Look(light: LightMath.VisionFactor(true))), 1e-4f);
+            Assert.AreEqual(baseRate, SensorMath.VisionFactor(Look(offCentre: 0.3f)), 1e-4f, "the middle of the view is seen at full speed");
+            Assert.Less(SensorMath.VisionFactor(Look(offCentre: 1f)), baseRate * 0.5f, "the edge of the view is much slower");
+            float behind = SensorMath.VisionFactor(Look(2f, offCentre: 1.7f, moving: false));
+            Assert.Less(behind * 0.6f * 2.5f, 0.5f, "standing close behind a guard for a 2.5 s hack fills less than half of its suspicion");
+            Assert.Less(SensorMath.VisionFactor(Look(crouching: true, moving: false, light: 0.5f)), baseRate * 0.2f, "all together: sneaking works");
         }
 
         [Test]
-        public void SoundThroughASlabCarriesHalfAsFar()
+        public void BodySamplesCoverHeadToFeetAndBothShoulders()
         {
-            var listener = new Vector3(5, 0.1f, 5);
-            Assert.AreEqual(4f, SensorMath.HearingDistance(new Vector3(9, 0.1f, 5), listener), 1e-4f);
-            var above = new Vector3(5, LevelMetrics.FloorHeight + 0.1f, 5);
-            Assert.AreEqual(2f * LevelMetrics.FloorHeight, SensorMath.HearingDistance(above, listener), 1e-3f);
+            var points = new Vector3[Perception.BodySampleCount];
+            var feet = new Vector3(3, 0, 5);
+            Perception.BodySamples(feet, 1.8f, new Vector3(3, 1.6f, 0), points);
+            float top = float.MinValue, bottom = float.MaxValue;
+            foreach (var p in points)
+            {
+                top = Mathf.Max(top, p.y);
+                bottom = Mathf.Min(bottom, p.y);
+                Assert.Less(Vector2.Distance(new Vector2(p.x, p.z), new Vector2(feet.x, feet.z)), 0.3f, "inside the body");
+            }
+            Assert.Greater(top, 1.6f);
+            Assert.Less(bottom, 0.2f);
+            Assert.AreEqual(0.44f, Mathf.Abs(points[2].x - points[3].x), 1e-3f, "shoulders lie across the line of view");
+        }
+
+        [Test]
+        public void WallsMuffleSoundMoreThanDoorsAndFurniture()
+        {
+            var h = new HearingSettings();
+            float open = SensorMath.Loudness(4f, 9.6f, 1f);
+            float wall = SensorMath.Loudness(4f, 9.6f, SensorMath.Transmission(new[] { SoundMaterial.Wall }, h));
+            float door = SensorMath.Loudness(4f, 9.6f, SensorMath.Transmission(new[] { SoundMaterial.Door }, h));
+            float desk = SensorMath.Loudness(4f, 9.6f, SensorMath.Transmission(new[] { SoundMaterial.Furniture }, h));
+            float twoWalls = SensorMath.Loudness(4f, 9.6f, SensorMath.Transmission(new[] { SoundMaterial.Wall, SoundMaterial.Wall }, h));
+            Assert.Greater(open, desk);
+            Assert.Greater(desk, door);
+            Assert.Greater(door, wall);
+            Assert.Greater(wall, twoWalls);
+            Assert.AreEqual(0f, SensorMath.Loudness(10f, 9.6f, 1f), "out of earshot");
+            Assert.Greater(SensorMath.Loudness(2f, 9.6f, 1f), open, "closer is louder");
+        }
+
+        [Test]
+        public void QuietNoisesAddLittleSuspicionAndBarelyAudibleOnesNone()
+        {
+            var h = new HearingSettings();
+            Assert.AreEqual(0f, SensorMath.NoiseSuspicion(h.MinLoudness * 0.9f, h));
+            Assert.Less(SensorMath.NoiseSuspicion(0.2f, h), SensorMath.NoiseSuspicion(0.8f, h));
+            // A listener (×1.6) hears a walking step (radius 6) through one wall from 5 m: it alone is not enough to check.
+            float step = SensorMath.NoiseSuspicion(SensorMath.Loudness(5f, 9.6f, h.Wall), h);
+            Assert.Less(step, 0.15f);
+        }
+
+        [Test]
+        public void SeismicAndMotionSensorsFeelFastMovementStronger()
+        {
+            Assert.Greater(SensorMath.SeismicRate(1.1f, 1f, 10f, 4f), SensorMath.SeismicRate(1.1f, 9f, 10f, 4f), "closer");
+            Assert.Greater(SensorMath.SeismicRate(1.1f, 5f, 10f, 6.5f), SensorMath.SeismicRate(1.1f, 5f, 10f, 2f), "running");
+            Assert.AreEqual(1.1f * 0.5f, SensorMath.SeismicRate(1.1f, 10f, 10f, 4f), 1e-4f);
+            Assert.Greater(SensorMath.MotionRate(3f, 6f, 4f, 9f, 1f), SensorMath.MotionRate(3f, 3f, 4f, 9f, 1f), "faster");
+            Assert.Greater(SensorMath.MotionRate(3f, 4f, 2f, 9f, 1f), SensorMath.MotionRate(3f, 4f, 8f, 9f, 1f), "closer");
+            Assert.Greater(SensorMath.MotionRate(3f, 4f, 4f, 9f, 1f), SensorMath.MotionRate(3f, 4f, 4f, 9f, 0.4f), "more of the body in view");
         }
 
         [Test]
