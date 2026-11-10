@@ -108,6 +108,57 @@ namespace Stealth.Game
             foreach (var p in parts) Destroy(p);
         }
 
+        /// <summary>The gas outside: a few steps from the house it must be gone in the fog.</summary>
+        IEnumerator FogScenario()
+        {
+            DevFlags.SkipGracePeriod = true;
+            DevFlags.Peaceful = true;
+            var layout = ActiveLevel.Layout;
+            // The middle of the south facade (z = 0), looking at it from outside.
+            var facade = new Vector3(layout.Width * LevelMetrics.Cell / 2f, 0f, 0f);
+            foreach (float d in new[] { 1f, 2f, 4f, 8f })
+            {
+                var at = facade + new Vector3(0.7f, 0.05f, -d);
+                LookAtFrom(new Pose(at, Quaternion.LookRotation(Vector3.forward)), facade + Vector3.up * 1.5f);
+                yield return new WaitForSeconds(1.5f);
+                float fog = FogShare();
+                Log($"fog: {d:0} m from the house — {fog * 100f:0}% of the view is gas (density {RenderSettings.fogDensity:0.00})");
+                yield return Shot($"fog_{d:0}m");
+            }
+        }
+
+        /// <summary>
+        /// Share of the camera's frame that is the same flat colour as its middle — fog swallows everything into one tone
+        /// (compared after post-processing, so no need to know the exact fog colour on screen).
+        /// </summary>
+        static float FogShare()
+        {
+            var cam = Me.Camera;
+            var rt = RenderTexture.GetTemporary(160, 90, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            cam.targetTexture = null;
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+            tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            // The middle half of the frame (the vignette darkens the edges).
+            var mid = tex.GetPixel(rt.width / 2, rt.height / 2);
+            int same = 0, all = 0;
+            for (int y = rt.height / 4; y < rt.height * 3 / 4; y++)
+                for (int x = rt.width / 4; x < rt.width * 3 / 4; x++)
+                {
+                    var p = tex.GetPixel(x, y);
+                    all++;
+                    if (Mathf.Abs(p.r - mid.r) + Mathf.Abs(p.g - mid.g) + Mathf.Abs(p.b - mid.b) < 0.08f) same++;
+                }
+            Destroy(tex);
+            return same / (float)all;
+        }
+
         /// <summary>Renders the player's camera (no UI) and returns the brightest pixel and the mean brightness, 0..1.</summary>
         static (float max, float mean) MeasureFrame()
         {

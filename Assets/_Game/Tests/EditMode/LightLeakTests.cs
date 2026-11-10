@@ -51,7 +51,7 @@ namespace Stealth.Tests
         public void LampsThatCouldShineThroughAWallCastShadows()
         {
             var art = Art;
-            var prefabs = new List<GameObject> { art.RoomLight, art.StreetLamp, art.DeskLamp, art.FloorLamp, art.VendingMachine, art.ExitSign };
+            var prefabs = new List<GameObject> { art.RoomLight, art.DeskLamp, art.FloorLamp, art.VendingMachine, art.ExitSign };
             foreach (var prefab in prefabs)
                 foreach (var light in prefab.GetComponentsInChildren<Light>(true))
                 {

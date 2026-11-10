@@ -31,7 +31,6 @@ namespace Stealth.EditorTools
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", BuildVentFrame);
             var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
-            var lamp = Prefab($"{LevelPrefabs}/StreetLamp.prefab", BuildStreetLamp);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
             var exitSign = Prefab($"{LevelPrefabs}/ExitSign.prefab", BuildExitSign);
@@ -111,7 +110,6 @@ namespace Stealth.EditorTools
                 art.VentFrame = vent;
                 art.AutoDoor = door;
                 art.RoomLight = light;
-                art.StreetLamp = lamp;
                 art.Window = window;
                 art.ExitSign = exitSign;
                 art.DeskLamp = pDeskLamp;
@@ -387,19 +385,6 @@ namespace Stealth.EditorTools
             var glow = Lamp(root.transform, "Glow", new Vector3(0f, -0.12f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(0.35f, 1f, 0.5f), 0.35f, 2.6f);
             glow.spotAngle = 170f;
             glow.innerSpotAngle = 100f;
-            return root;
-        }
-
-        static GameObject BuildStreetLamp()
-        {
-            var root = new GameObject("StreetLamp");
-            var pole = Cube(root.transform, "Pole", new Vector3(0, 2f, 0), new Vector3(0.15f, 4f, 0.15f), M("DoorFrame"));
-            pole.layer = LevelMetrics.CeilingLayer;
-            // Shines down with shadows: the facade keeps it out of the ground-floor rooms.
-            var light = Lamp(root.transform, "Light", new Vector3(0, 4.1f, 0), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(1f, 0.85f, 0.55f), 2.5f, 9f,
-                LightShadows.Soft, UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
-            light.spotAngle = 150f;
-            light.innerSpotAngle = 80f;
             return root;
         }
 

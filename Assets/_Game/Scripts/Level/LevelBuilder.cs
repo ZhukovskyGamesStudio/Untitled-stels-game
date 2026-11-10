@@ -260,19 +260,16 @@ namespace Stealth.Level
             Place(mirrored ? m_Art.StairsMirrored : m_Art.Stairs, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
         }
 
-        /// <summary>Windows on every floor (visual only, blinds facing the room) and street lamps in the gas around the building.</summary>
+        /// <summary>Windows on every floor (visual only, blinds facing the room).</summary>
         void BuildFacade()
         {
             var l = m_Layout;
-            const float cell = LevelMetrics.Cell;
-            float W = l.Width * cell, H = l.Height * cell;
             void Window(Vector3 p, float yaw) => Place(m_Art.Window, "Window", p, Quaternion.Euler(0f, yaw, 0f));
             for (int f = 0; f < l.Floors; f++)
             {
                 float y = LevelLayout.FloorY(f) + 1.7f;
                 foreach (var (p, yaw) in WindowSpots(l.Width, l.Height, y)) Window(p, yaw);
             }
-            foreach (var p in StreetLampSpots(W, H)) Place(m_Art.StreetLamp, "StreetLamp", p, Quaternion.identity);
         }
 
         /// <summary>
@@ -300,15 +297,6 @@ namespace Stealth.Level
                 }
             }
             return list;
-        }
-
-        /// <summary>Street lamps every ~14 m around the building, 6 m out in the fog (pure).</summary>
-        public static List<Vector3> StreetLampSpots(float width, float depth, float offset = 6f, float step = 14f)
-        {
-            var spots = new List<Vector3>();
-            for (float x = 0; x <= width; x += step) { spots.Add(new Vector3(x, 0, -offset)); spots.Add(new Vector3(x, 0, depth + offset)); }
-            for (float z = step; z < depth; z += step) { spots.Add(new Vector3(-offset, 0, z)); spots.Add(new Vector3(width + offset, 0, z)); }
-            return spots;
         }
 
         /// <summary>Static batching of everything that never moves (walls, slabs, stairs, furniture). Doors stay dynamic.</summary>

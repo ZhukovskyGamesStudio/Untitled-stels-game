@@ -126,6 +126,12 @@ namespace Stealth.EditorTools
             // Night: no ambient at all — a closed room without lamps is pitch black; the lamps, the moon and glowing things do the rest.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = LightMath.NightAmbient;
+            // Fog on in the scene itself: builds strip the fog shader variants of scenes that do not use it (indoor haze,
+            // the gas outside — set at runtime — would never render).
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = LightMath.NightFog;
+            RenderSettings.fogDensity = 0.03f;
             RenderSettings.skybox = null;
             RenderSettings.reflectionIntensity = 0f;
 

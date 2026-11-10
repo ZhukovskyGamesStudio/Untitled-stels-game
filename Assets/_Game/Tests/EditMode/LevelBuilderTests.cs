@@ -60,18 +60,6 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void StreetLampsSurroundTheBuilding()
-        {
-            var spots = LevelBuilder.StreetLampSpots(30f, 40f);
-            Assert.Greater(spots.Count, 8);
-            foreach (var p in spots)
-            {
-                bool outside = p.x < 0f || p.x > 30f || p.z < 0f || p.z > 40f;
-                Assert.IsTrue(outside, $"lamp at {p} is outside the walls");
-            }
-        }
-
-        [Test]
         public void BuiltLevelIsMadeOfPrefabInstances()
         {
             var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");

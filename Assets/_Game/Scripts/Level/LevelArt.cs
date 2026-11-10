@@ -26,7 +26,6 @@ namespace Stealth.Level
         public GameObject VentFrame;
         public GameObject AutoDoor;
         public GameObject RoomLight;
-        public GameObject StreetLamp;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
         public GameObject Window;
         [Tooltip("Green exit sign over every door, with a small light: the only light in a dark room besides the lamps.")]
