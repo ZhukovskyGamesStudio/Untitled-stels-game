@@ -36,6 +36,24 @@ namespace Stealth.Enemies
         public float StillSpeed = 0.4f;
     }
 
+    /// <summary>
+    /// How light on the player changes how well eyes see them (PerceptionConfig). The light at the player is the sum of
+    /// every lamp around (brightness / distance², cut by the lamp's range and cone, zero behind an obstacle), the moon
+    /// where it shines in and the ambient light — the same lights the player sees on screen.
+    /// </summary>
+    [Serializable]
+    public class IlluminationSettings
+    {
+        [Tooltip("Light at the player at or below which they are in full darkness.")]
+        public float DarkLevel = 0.04f;
+        [Tooltip("Light at the player at or above which they are fully lit.")]
+        public float LitLevel = 0.4f;
+        [Tooltip("Vision rate multiplier in full darkness (1 = darkness does not help).")]
+        public float DarkFactor = 0.15f;
+        [Tooltip("How much the scene's ambient light counts.")]
+        public float AmbientWeight = 1f;
+    }
+
     /// <summary>How sounds travel to microphones (PerceptionConfig).</summary>
     [Serializable]
     public class HearingSettings
@@ -86,7 +104,7 @@ namespace Stealth.Enemies
         public float OffCentre;
         public bool Crouching;
         public bool Moving;
-        /// <summary>Light multiplier at the player (<see cref="Perception.LightFactor"/>).</summary>
+        /// <summary>Light multiplier at the player (<see cref="Perception.LightFactor"/>): 1 fully lit, down to DarkFactor in darkness.</summary>
         public float Light;
     }
 }

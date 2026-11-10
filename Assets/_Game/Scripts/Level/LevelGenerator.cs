@@ -305,6 +305,12 @@ namespace Stealth.Level
 
         static void Item(LevelLayout l, Vector3 p) => l.ItemSpots.Add(p);
 
+        /// <summary>Height of a desk's top.</summary>
+        const float DeskTop = 0.765f;
+
+        /// <summary>A desk lamp left on (in a dark room it is the light to avoid).</summary>
+        static void DeskLamp(LevelLayout l, Vector3 p, float yaw) => Prop(l, PropKind.DeskLamp, p, yaw);
+
         /// <summary>
         /// Back-to-back cluster of four desks with privacy screens, pushed towards the room's centre cross: the aisle
         /// behind the outer chairs stays about a metre wide. Loot lies on the inner desks, within reach from the cross.
@@ -315,6 +321,7 @@ namespace Stealth.Level
             {
                 Prop(l, PropKind.Desk, q.P(u, 2.85f), q.OutV);
                 Prop(l, PropKind.Chair, q.P(u + Range(rng, -0.1f, 0.1f), 3.6f), q.InV + Range(rng, -12f, 12f));
+                if (rng.NextDouble() < 0.35) DeskLamp(l, q.P(u + (rng.Next(2) == 0 ? -0.6f : 0.6f), 3.05f, DeskTop), q.InV);
                 Prop(l, PropKind.Desk, q.P(u, 2.05f), q.InV);
                 Prop(l, PropKind.Chair, q.P(u + Range(rng, -0.1f, 0.1f), 1.35f), q.OutV + Range(rng, -12f, 12f));
                 Prop(l, PropKind.Partition, q.P(u, 2.45f), 0f);
@@ -356,6 +363,7 @@ namespace Stealth.Level
                     Prop(l, PropKind.Sofa, q.P(3.0f, 4.3f), q.InV);
                     Prop(l, PropKind.CoffeeTable, q.P(3.0f, 3.1f), 0f);
                     Prop(l, PropKind.Plant, q.P(4.5f, 1.6f), 0f);
+                    Prop(l, PropKind.FloorLamp, q.P(4.45f, 4.45f), 0f);
                     Item(l, q.P(3.0f, 3.1f, 0.42f));
                     break;
                 case 2:
@@ -380,6 +388,7 @@ namespace Stealth.Level
                 case 0: // manager's desk facing the room, bookcase behind
                     Prop(l, PropKind.Desk, q.P(2.8f, 3.1f), q.InV);
                     Prop(l, PropKind.Chair, q.P(2.8f, 3.9f), q.InV);
+                    DeskLamp(l, q.P(3.42f, 3.25f, DeskTop), q.InV);
                     Prop(l, PropKind.Bookshelf, q.P(4.35f, 4.65f), q.InV);
                     Prop(l, PropKind.Chair, q.P(2.5f, 2.0f), q.OutV);
                     Item(l, q.P(2.5f, 3.2f, 0.77f));
@@ -395,6 +404,7 @@ namespace Stealth.Level
                     Prop(l, PropKind.Armchair, q.P(2.2f, 3.8f), q.InV);
                     Prop(l, PropKind.Armchair, q.P(3.8f, 2.4f), q.InU);
                     Prop(l, PropKind.CoffeeTable, q.P(2.6f, 2.5f), 0f);
+                    Prop(l, PropKind.FloorLamp, q.P(1.5f, 4.5f), 0f);
                     Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f);
                     Item(l, q.P(2.6f, 2.5f, 0.42f));
                     break;
@@ -517,6 +527,7 @@ namespace Stealth.Level
                     Prop(l, PropKind.Sofa, q.P(2.9f, 4.3f), q.InV);
                     Prop(l, PropKind.CoffeeTable, q.P(2.9f, 3.1f), 0f);
                     Prop(l, PropKind.Armchair, q.P(4.3f, 2.4f), q.InU);
+                    Prop(l, PropKind.FloorLamp, q.P(4.45f, 4.45f), 0f);
                     Item(l, q.P(2.9f, 4.3f, 0.46f));
                     Item(l, q.P(2.9f, 3.1f, 0.42f));
                     break;
@@ -540,6 +551,40 @@ namespace Stealth.Level
                     Item(l, q.P(2.5f, 2.6f, 0.76f));
                     break;
             }
+        }
+
+        /// <summary>Fixed devices keep this far from the hatch on the ground floor (players start there).</summary>
+        const float MinDeviceDistanceToHatch = 12.5f;
+
+        /// <summary>Where a fixed device goes: plates in a room's walkway, motion sensors high in a corner, lidar poles in the middle.</summary>
+        static (Vector3Int cell, Vector3 pos, Quaternion rot) DeviceSpot(LevelLayout l, List<Vector3Int> candidates, RobotKind kind, System.Random rng)
+        {
+            var cell = candidates[rng.Next(candidates.Count)];
+            var c = l.CellCenter(cell.z, cell.x, cell.y);
+            Vector3 pos;
+            Quaternion rot;
+            switch (kind)
+            {
+                case RobotKind.MotionSensor:
+                {
+                    var corner = new Vector3(rng.Next(2) == 0 ? -1 : 1, 0, rng.Next(2) == 0 ? -1 : 1);
+                    pos = c + corner * (Cell / 2f - 0.2f) + Vector3.up * 2.2f;
+                    rot = Quaternion.LookRotation(-corner.normalized);
+                    break;
+                }
+                case RobotKind.PressurePlate:
+                {
+                    var dirs = new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+                    pos = c + dirs[rng.Next(4)] * Range(rng, 2f, 3.5f);
+                    rot = Quaternion.identity;
+                    break;
+                }
+                default:
+                    pos = c;
+                    rot = Quaternion.identity;
+                    break;
+            }
+            return (cell, pos, rot);
         }
 
         static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s)
@@ -572,34 +617,17 @@ namespace Stealth.Level
 
             // Fixed security devices: pressure plates in the room's walkways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse;
+            var hatch = l.CellCenter(0, l.StartCell.x, l.StartCell.y);
             for (int i = 0; i < devices; i++)
             {
-                var cell = candidates[rng.Next(candidates.Count)];
-                var c = l.CellCenter(cell.z, cell.x, cell.y);
                 var kind = RobotRoster.PickDevice(level, rng, s.Roster);
+                Vector3Int cell;
                 Vector3 pos;
                 Quaternion rot;
-                switch (kind)
-                {
-                    case RobotKind.MotionSensor:
-                    {
-                        var corner = new Vector3(rng.Next(2) == 0 ? -1 : 1, 0, rng.Next(2) == 0 ? -1 : 1);
-                        pos = c + corner * (Cell / 2f - 0.2f) + Vector3.up * 2.2f;
-                        rot = Quaternion.LookRotation(-corner.normalized);
-                        break;
-                    }
-                    case RobotKind.PressurePlate:
-                    {
-                        var dirs = new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
-                        pos = c + dirs[rng.Next(4)] * Range(rng, 2f, 3.5f);
-                        rot = Quaternion.identity;
-                        break;
-                    }
-                    default:
-                        pos = c;
-                        rot = Quaternion.identity;
-                        break;
-                }
+                int tries = 0;
+                // A device in the corner of a room diagonal to the lobby could end up right next to the hatch: try again.
+                do (cell, pos, rot) = DeviceSpot(l, candidates, kind, rng);
+                while (cell.z == 0 && Vector3.Distance(pos, hatch) < MinDeviceDistanceToHatch && ++tries < 20);
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = rot });
             }
 

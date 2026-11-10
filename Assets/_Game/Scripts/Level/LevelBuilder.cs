@@ -33,14 +33,18 @@ namespace Stealth.Level
     /// <summary>Light of a room by its type (pure, unit tested).</summary>
     public static class RoomLighting
     {
+        /// <summary>Ceiling panels sit this far either side of the room centre (along x).</summary>
+        public const float LampOffset = 2.5f;
+
         public static (Color color, float intensity) For(RoomType room, bool dark)
         {
-            if (dark) return (new Color(0.5f, 0.6f, 0.9f), 0.18f);
+            if (dark) return (new Color(1f, 0.95f, 0.85f), 0f); // switched off: exit signs, lamps and the moon only
             return room switch
             {
-                RoomType.Server => (new Color(0.55f, 0.75f, 1f), 1f),
-                RoomType.Lobby => (new Color(0.75f, 1f, 0.8f), 1.5f),
-                _ => (new Color(1f, 0.95f, 0.85f), 1.5f),
+                RoomType.Server => (new Color(0.55f, 0.75f, 1f), LightMath.RoomIntensity * 0.6f),
+                RoomType.Storage => (new Color(1f, 0.92f, 0.8f), LightMath.RoomIntensity * 0.75f),
+                RoomType.Lobby => (new Color(0.92f, 1f, 0.95f), LightMath.RoomIntensity * 1.15f),
+                _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
     }
@@ -215,8 +219,10 @@ namespace Stealth.Level
             WallPiece(m_Art.WallBlock, a1, d0, 0, LevelMetrics.WallHeight);
             WallPiece(m_Art.WallBlock, d1, b1, 0, LevelMetrics.WallHeight);
             WallPiece(m_Art.TrimBlock, d0, d1, vent ? LevelMetrics.VentHeight : LevelMetrics.DoorHeight, LevelMetrics.WallHeight);
-            // The vent frame prefab is modelled along local X; turn it to the wall direction.
-            if (vent) Place(m_Art.VentFrame, "VentFrame", mid, Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x)));
+            // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
+            var along = Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x));
+            if (vent) Place(m_Art.VentFrame, "VentFrame", mid, along);
+            else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
         }
 
         static Vector3 Snap(Vector3 p) => new(Mathf.Round(p.x * 100f) / 100f, Mathf.Round(p.y * 100f) / 100f, Mathf.Round(p.z * 100f) / 100f);
@@ -238,9 +244,14 @@ namespace Stealth.Level
             for (int x = 0; x < l.Width; x++)
                 for (int y = 0; y < l.Height; y++)
                 {
-                    var go = Place(m_Art.RoomLight, $"Light_{f}_{x}_{y}", l.CellCenter(f, x, y) + Vector3.up * (LevelMetrics.WallHeight - 0.9f), Quaternion.identity);
                     var (color, intensity) = RoomLighting.For(l.Rooms[f, x, y], l.Dark[f, x, y]);
-                    go.GetComponent<RoomLight>().Init(color, intensity, l.Flicker[f, x, y], f * 13.1f + x * 3.7f + y * 1.9f);
+                    // Two ceiling panels per room, clear of the stair hole (stairs fill a 4 m corner square).
+                    for (int i = 0; i < 2; i++)
+                    {
+                        var at = l.CellCenter(f, x, y) + new Vector3(i == 0 ? -RoomLighting.LampOffset : RoomLighting.LampOffset, LevelMetrics.WallHeight, 0f);
+                        var go = Place(m_Art.RoomLight, $"Light_{f}_{x}_{y}_{i}", at, Quaternion.identity);
+                        go.GetComponent<RoomLight>().Init(color, intensity, l.Flicker[f, x, y], f * 13.1f + x * 3.7f + y * 1.9f + i * 0.31f, castShadows: i == 0);
+                    }
                 }
         }
 

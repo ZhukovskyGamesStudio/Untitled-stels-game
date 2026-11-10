@@ -1,3 +1,4 @@
+using System.Linq;
 using Stealth.Level;
 using Unity.AI.Navigation;
 using UnityEngine;
@@ -28,7 +29,8 @@ namespace Stealth.EditorTools
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var lamp = Prefab($"{LevelPrefabs}/StreetLamp.prefab", BuildStreetLamp);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
-            var window = Prefab($"{LevelPrefabs}/Window.prefab", () => PropObject("Window", "window", "Blinds", "WindowFrame", "Window", collider: false));
+            var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
+            var exitSign = Prefab($"{LevelPrefabs}/ExitSign.prefab", BuildExitSign);
 
             string p = PropPrefabs + "/";
             var desk = Prefab(p + "Desk.prefab", () => PropObject("Desk", "desk", "PropBody", "PropAccent", "PropScreen"));
@@ -59,7 +61,26 @@ namespace Stealth.EditorTools
             var pLockers = Prefab(p + "Lockers.prefab", () => PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent"));
             var pPallet = Prefab(p + "Pallet.prefab", () => PropObject("Pallet", "pallet", "Cardboard", "Wood", "Wood"));
             var pWashBasin = Prefab(p + "WashBasin.prefab", () => PropObject("WashBasin", "wash_basin", "Ceiling", "Metal", "Mirror"));
-            var pVendingMachine = Prefab(p + "VendingMachine.prefab", () => PropObject("VendingMachine", "vending_machine", "Vending", "PropAccent", "VendingGlass"));
+            var pVendingMachine = Prefab(p + "VendingMachine.prefab", () =>
+            {
+                var go = PropObject("VendingMachine", "vending_machine", "Vending", "PropAccent", "VendingGlass");
+                Lamp(go.transform, "Glow", new Vector3(0f, 1.2f, 0.75f), Quaternion.identity, LightType.Point, new Color(0.7f, 0.85f, 1f), 0.6f, 3f);
+                return go;
+            });
+            var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
+            {
+                var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
+                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.27f, 0.16f), Quaternion.Euler(65f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.8f, 3.2f);
+                lamp.spotAngle = 120f;
+                lamp.innerSpotAngle = 50f;
+                return go;
+            });
+            var pFloorLamp = Prefab(p + "FloorLamp.prefab", () =>
+            {
+                var go = PropObject("FloorLamp", "floor_lamp", "Metal", "LampShade", "LampBulb");
+                Lamp(go.transform, "Light", new Vector3(0f, 1.42f, 0f), Quaternion.identity, LightType.Point, new Color(1f, 0.8f, 0.55f), 1.3f, 4.5f);
+                return go;
+            });
 
             return DataAsset<LevelArt>(DataDir + "/LevelArt.asset", art =>
             {
@@ -77,6 +98,9 @@ namespace Stealth.EditorTools
                 art.RoomLight = light;
                 art.StreetLamp = lamp;
                 art.Window = window;
+                art.ExitSign = exitSign;
+                art.DeskLamp = pDeskLamp;
+                art.FloorLamp = pFloorLamp;
                 art.Hatch = hatch;
                 art.Desk = desk;
                 art.Chair = chair;
@@ -202,15 +226,71 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// A light that robots take into account (<see cref="LightSource"/>): robots see a player standing in it better.
+        /// </summary>
+        static Light Lamp(Transform parent, string name, Vector3 position, Quaternion rotation, LightType type, Color color, float intensity, float range,
+            LightShadows shadows = LightShadows.None)
+        {
+            var go = Child(parent, name, position);
+            go.transform.localRotation = rotation;
+            var light = go.AddComponent<Light>();
+            light.type = type;
+            light.color = color;
+            light.intensity = intensity;
+            light.range = range;
+            light.shadows = shadows;
+            go.AddComponent<LightSource>();
+            return light;
+        }
+
+        /// <summary>The model's renderers do not shadow the lamp inside them.</summary>
+        static void NoShadows(GameObject model)
+        {
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        /// <summary>
+        /// Ceiling panel at the ceiling surface (the pivot) with a wide spot light shining down: soft shadows, pools of light
+        /// under it, darker corners. <see cref="RoomLight"/> sets colour / brightness per room and switches it off in dark rooms.
+        /// </summary>
         static GameObject BuildRoomLight()
         {
-            var go = new GameObject("RoomLight");
-            var light = go.AddComponent<Light>();
-            light.type = LightType.Point;
-            light.range = 10f;
-            light.shadows = LightShadows.None;
-            go.AddComponent<RoomLight>();
+            var root = new GameObject("RoomLight");
+            var model = Model("ceiling_lamp");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "LampHousing", "LampHousing", "LampPanel");
+            NoShadows(model);
+            var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.1f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot,
+                Color.white, LightMath.RoomIntensity, 9f, LightShadows.Soft);
+            light.spotAngle = 135f;
+            light.innerSpotAngle = 80f;
+            light.shadowStrength = 0.55f; // many lamps, diffusers: soft, faint office shadows
+            light.shadowNearPlane = 0.2f;
+            var rl = root.AddComponent<RoomLight>();
+            rl.Lamp = light;
+            rl.Panel = Parts(model, "Eye").FirstOrDefault();
+            return root;
+        }
+
+        /// <summary>Facade window; the glass lets the moonlight in (no shadow), the blinds stripe it.</summary>
+        static GameObject BuildWindow()
+        {
+            var go = PropObject("Window", "window", "Blinds", "WindowFrame", "Window", collider: false);
+            foreach (var r in Parts(go, "Eye")) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return go;
+        }
+
+        /// <summary>Green exit sign over a door (sticks out of both faces of the wall) with a small green light.</summary>
+        static GameObject BuildExitSign()
+        {
+            var root = new GameObject("ExitSign");
+            var model = Model("exit_sign");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "PropAccent", "ExitSignMark", "ExitSign");
+            NoShadows(model);
+            Lamp(root.transform, "Glow", new Vector3(0f, -0.2f, 0f), Quaternion.identity, LightType.Point, new Color(0.35f, 1f, 0.5f), 0.7f, 3.5f);
+            return root;
         }
 
         static GameObject BuildStreetLamp()
@@ -225,6 +305,7 @@ namespace Stealth.EditorTools
             light.intensity = 2.5f;
             light.color = new Color(1f, 0.85f, 0.55f);
             light.shadows = LightShadows.None;
+            lightGo.AddComponent<LightSource>();
             return root;
         }
 

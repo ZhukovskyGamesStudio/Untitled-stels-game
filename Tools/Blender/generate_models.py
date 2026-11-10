@@ -33,7 +33,7 @@ def category(filename):
         return "Sensors"
     if filename == "player":
         return "Player"
-    if filename in ("hatch", "window"):
+    if filename in ("hatch", "window", "ceiling_lamp", "exit_sign"):
         return "Level"
     return "Props"
 
@@ -494,6 +494,47 @@ def model_items():
         export("item_" + name)
 
 
+# --------------------------------------------------------------------------- light fixtures
+
+def model_ceiling_lamp():
+    """Recessed fluorescent panel 1.2 x 0.6, hanging from the ceiling: the origin is the ceiling surface, it goes down."""
+    merge("Body", [box((1.24, 0.64, 0.06), (0, 0, -0.03))])                       # housing
+    merge("Accent", [box((1.24, 0.03, 0.03), (0, y, -0.065)) for y in (-0.31, 0.31)]
+          + [box((0.03, 0.64, 0.03), (x, 0, -0.065)) for x in (-0.61, 0.61)])      # trim
+    merge("Eye", [box((1.16, 0.56, 0.02), (0, 0, -0.07))])                         # glowing diffuser
+    export("ceiling_lamp")
+
+
+def model_desk_lamp():
+    """Desk lamp ~0.45 m: round base, angled arm, cone shade looking down-forward (-Y = Unity +Z)."""
+    import mathutils
+    merge("Body", [cylinder(0.08, 0.025, (0, 0, 0.0125), segments=16),
+                   cylinder(0.012, 0.32, (0, 0.02, 0.17), segments=8),
+                   box((0.02, 0.18, 0.02), (0, -0.06, 0.33))])
+    shade = cylinder(0.075, 0.12, (0, 0, 0), segments=16, radius2=0.03)
+    bmesh.ops.rotate(shade, cent=Vector((0, 0, 0)), matrix=mathutils.Matrix.Rotation(-0.5, 3, "X"), verts=shade.verts)
+    bmesh.ops.translate(shade, vec=Vector((0, -0.15, 0.31)), verts=shade.verts)
+    merge("Accent", [shade])
+    merge("Eye", [sphere(0.03, (0, -0.16, 0.27), segments=10)])                   # bulb
+    export("desk_lamp")
+
+
+def model_floor_lamp():
+    """Standing lamp 1.6 m with a fabric drum shade."""
+    merge("Body", [cylinder(0.16, 0.03, (0, 0, 0.015), segments=16), cylinder(0.015, 1.45, (0, 0, 0.75), segments=8)])
+    merge("Accent", [cylinder(0.2, 0.3, (0, 0, 1.5), segments=20, radius2=0.16)])
+    merge("Eye", [cylinder(0.14, 0.02, (0, 0, 1.36), segments=16)])               # glowing bottom of the shade
+    export("floor_lamp")
+
+
+def model_exit_sign():
+    """Emergency exit sign above a door: 0.36 x 0.3 thick (sticks out of both faces of a 0.2 m wall) x 0.15 high."""
+    merge("Body", [box((0.38, 0.26, 0.16), (0, 0, 0))])
+    merge("Eye", [box((0.34, 0.3, 0.12), (0, 0, 0))])                              # green glowing faces
+    merge("Accent", [box((0.05, 0.31, 0.07), (-0.1, 0, 0)), box((0.12, 0.31, 0.02), (0.05, 0, 0))])  # white arrow / figure
+    export("exit_sign")
+
+
 if __name__ == "__main__":
     clear_scene()
     model_player()
@@ -532,5 +573,9 @@ if __name__ == "__main__":
     model_wash_basin()
     model_vending_machine()
     model_window()
+    model_ceiling_lamp()
+    model_desk_lamp()
+    model_floor_lamp()
+    model_exit_sign()
     model_items()
     print("DONE")

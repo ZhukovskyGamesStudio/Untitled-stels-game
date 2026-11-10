@@ -63,5 +63,43 @@ namespace Stealth.Tests
             Box(new Vector3(0, 1.5f, 4f), new Vector3(4f, 3f, 0.2f), SoundMaterial.Wall);
             Assert.AreEqual(settings.Furniture * settings.Wall, Perception.SoundTransmission(from, to, settings), 1e-4f);
         }
+
+        [Test]
+        public void ALampLightsWhatItSeesAndAWallShadesIt()
+        {
+            // Only this lamp: switch off whatever else is registered (the moon of an open scene, levels of other tests).
+            var others = new List<LightSource>(LightSource.All);
+            foreach (var o in others) o.enabled = false;
+            try { LampScene(); }
+            finally { foreach (var o in others) if (o != null) o.enabled = true; }
+        }
+
+        void LampScene()
+        {
+            var lampGo = new GameObject("Lamp");
+            m_Objects.Add(lampGo);
+            lampGo.transform.position = new Vector3(0, 3f, 0);
+            var light = lampGo.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 8f;
+            light.intensity = 2f;
+            light.color = Color.white;
+            lampGo.AddComponent<LightSource>();
+            var s = new IlluminationSettings { AmbientWeight = 0f };
+
+            float under = Perception.Illumination(new Vector3(0, 1f, 0), s);
+            float aside = Perception.Illumination(new Vector3(0, 1f, 5f), s);
+            float outOfRange = Perception.Illumination(new Vector3(0, 1f, 9f), s);
+            Assert.Greater(under, aside, "closer to the lamp is brighter");
+            Assert.Greater(aside, 0f);
+            Assert.AreEqual(0f, outOfRange, 1e-4f);
+            Assert.Greater(SensorMath.LightFactor(under, s), SensorMath.LightFactor(aside, s), "and robots see you better there");
+
+            Box(new Vector3(0, 1.5f, 3f), new Vector3(4f, 3f, 0.2f), SoundMaterial.Wall);
+            Assert.AreEqual(0f, Perception.Illumination(new Vector3(0, 1f, 5f), s), 1e-4f, "behind a wall: in its shadow");
+
+            light.enabled = false;
+            Assert.AreEqual(0f, Perception.Illumination(new Vector3(0, 1f, 0), s), 1e-4f, "a switched-off lamp gives no light");
+        }
     }
 }

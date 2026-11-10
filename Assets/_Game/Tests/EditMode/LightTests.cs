@@ -74,7 +74,40 @@ namespace Stealth.Tests
             }
             Assert.AreEqual(1f, max);
             Assert.Less(min, 0.5f);
-            Assert.AreEqual(0.5f, LightMath.VisionFactor(true));
+        }
+
+        [Test]
+        public void LightFadesLikeURPAndEndsAtTheRange()
+        {
+            Assert.Greater(LightMath.Attenuation(1f, 9f), LightMath.Attenuation(3f, 9f));
+            Assert.AreEqual(1f / 4f, LightMath.Attenuation(2f, 1000f), 1e-3f, "inverse square");
+            Assert.AreEqual(0f, LightMath.Attenuation(9f, 9f));
+            Assert.AreEqual(LightMath.Attenuation(0.5f, 9f), LightMath.Attenuation(0.1f, 9f), 1e-4f, "no infinite hot spot");
+            Assert.AreEqual(1f, LightMath.SpotFactor(10f, 60f, 140f), 1e-4f, "inside the inner cone");
+            Assert.AreEqual(0f, LightMath.SpotFactor(75f, 60f, 140f), 1e-4f, "outside the cone");
+            Assert.That(LightMath.SpotFactor(50f, 60f, 140f), Is.InRange(0.01f, 0.99f), "soft edge");
+        }
+
+        [Test]
+        public void DarkRoomsHaveTheirLampsOff()
+        {
+            Assert.AreEqual(0f, RoomLighting.For(RoomType.Office, true).intensity);
+            Assert.Greater(RoomLighting.For(RoomType.Office, false).intensity, 1f);
+        }
+
+        [Test]
+        public void ThePoorerTheLightTheHarderToSee()
+        {
+            var s = new Stealth.Enemies.IlluminationSettings();
+            float dark = Stealth.Enemies.SensorMath.LightFactor(0f, s);
+            float dim = Stealth.Enemies.SensorMath.LightFactor(0.15f, s);
+            float lit = Stealth.Enemies.SensorMath.LightFactor(1f, s);
+            Assert.AreEqual(s.DarkFactor, dark, 1e-4f);
+            Assert.AreEqual(1f, lit, 1e-4f);
+            Assert.That(dim, Is.InRange(dark + 0.05f, lit - 0.05f), "half-light is in between, not on / off");
+            Assert.Less(Stealth.Enemies.SensorMath.LightFactor(0.1f, s), dim);
+            Assert.AreEqual(0f, Stealth.Enemies.SensorMath.Visibility(dark, s), 1e-4f);
+            Assert.AreEqual(1f, Stealth.Enemies.SensorMath.Visibility(lit, s), 1e-4f);
         }
     }
 }

@@ -1,3 +1,4 @@
+using Stealth.Configs;
 using Stealth.Enemies;
 using Stealth.Game;
 using Stealth.Items;
@@ -61,6 +62,9 @@ namespace Stealth.UI
         public Text HatchLabel;
 
         [Header("Panels")]
+        [Tooltip("How much light is on you = how well robots see you.")]
+        public BarView LightBar;
+        public Text LightLabel;
         public CanvasGroup NoiseGroup;
         public Image[] NoiseBars;
         public Text NoiseLabel;
@@ -150,6 +154,7 @@ namespace Stealth.UI
             ShowCrosshair(me);
             ShowStamina(me);
             ShowNoise(me, now);
+            ShowVisibility(me, now);
             ShowQuota(gm, me, now);
             ShowHatchMarker(gm, me);
             ShowHealth(me);
@@ -351,6 +356,28 @@ namespace Stealth.UI
             bool visible = stamina.Value < 0.999f && !me.Downed;
             Ui.Show(Stamina, visible);
             if (visible) Stamina.Set(stamina.Value, stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
+        }
+
+        float m_NextLight, m_Visibility;
+
+        /// <summary>How lit you are (= how well eyes see you): a bar and a word, like a thief's light gem.</summary>
+        void ShowVisibility(PlayerController me, float now)
+        {
+            bool visible = !me.Downed;
+            Ui.Show(LightBar, visible);
+            Ui.Show(LightLabel, visible);
+            if (!visible) return;
+            if (now >= m_NextLight)
+            {
+                m_NextLight = now + 0.1f;
+                var s = Tuning.Perception.Illumination;
+                float target = SensorMath.Visibility(SensorMath.LightFactor(Perception.IlluminationOf(me), s), s);
+                m_Visibility = Mathf.Lerp(m_Visibility, target, 0.6f);
+            }
+            int level = UiMath.LightLevel(m_Visibility);
+            var color = UiMath.LightColor(level);
+            LightBar.Set(Mathf.Max(0.04f, m_Visibility), color);
+            Ui.Set(LightLabel, UiMath.LightNames[level], color);
         }
 
         /// <summary>How loud you are right now: three short bars above the inventory, fading out when silent.</summary>

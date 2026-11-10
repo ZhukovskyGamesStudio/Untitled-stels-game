@@ -25,14 +25,17 @@ namespace Stealth.Game
             yield return SightCase(at, 8f, false, "guard_8m");
             yield return SightCase(at, 5f, true, "guard_5m_crouched");
             yield return SightCase(at, 2f, false, "guard_2m_behind", facingAway: true);
+            yield return SightCase(at, 5f, false, "guard_5m_lights_off", lightsOff: true);
             DevFlags.HoldRobots = false;
             yield return HearingCase(at, false, "listener_walk");
             yield return HearingCase(at, true, "listener_sneak");
         }
 
         /// <summary>The player stands still in plain view of a guard; how long until it warns, and how long the warning lasts.</summary>
-        IEnumerator SightCase(Vector3 at, float distance, bool crouch, string label, bool facingAway = false)
+        IEnumerator SightCase(Vector3 at, float distance, bool crouch, string label, bool facingAway = false, bool lightsOff = false)
         {
+            var lamps = lightsOff ? FindObjectsByType<RoomLight>() : new RoomLight[0];
+            foreach (var l in lamps) { l.enabled = false; l.Lamp.enabled = false; }
             var gm = GameManager.Instance;
             DevFlags.FreezeRobots = true;
             var robotPos = at + Vector3.forward * distance;
@@ -73,9 +76,11 @@ namespace Stealth.Game
             var state = robot.State;
             yield return new WaitForSeconds(0.3f);
             int lines = (AudioDirector.Instance != null ? AudioDirector.Instance.VoiceLines : 0) - voices;
-            Log($"{label}: sees={sees} exposure={g.Exposure:0.00} distance={g.Distance:0.0} m factor={SensorMath.VisionFactor(g):0.00} → " +
+            Log($"{label}: sees={sees} exposure={g.Exposure:0.00} distance={g.Distance:0.0} m light={Perception.IlluminationOf(Me):0.00} (×{g.Light:0.00}) factor={SensorMath.VisionFactor(g):0.00} → " +
                 $"alerted={alerted} after {toAlert:0.0} s, warning {warning:0.0} s, then {state}; voice lines {lines}");
 
+            if (lightsOff) yield return Shot(label);
+            foreach (var l in lamps) { l.enabled = true; l.Lamp.enabled = true; }
             DevFlags.FreezeRobots = true;
             Release();
             Session.Despawn(robot.gameObject);

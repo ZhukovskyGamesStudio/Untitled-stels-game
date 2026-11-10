@@ -376,6 +376,11 @@ namespace Stealth.EditorTools
             hud.HatchDiamond = Img(diamond, new Color(0.45f, 1f, 0.5f, 0.8f));
             hud.HatchLabel = Txt(R(hud.HatchMarker, "Label", Center, Center, new Vector2(0, -19), new Vector2(120, 18)), "люк · 12 м", 12, TextAnchor.MiddleCenter, new Color(0.45f, 1f, 0.5f));
 
+            // How visible you are (light on you), above the noise meter.
+            var lightRow = R(content, "Visibility", BottomCenter, BottomLeft, new Vector2(-30, 156), new Vector2(200, 18));
+            hud.LightBar = Bar(lightRow, "Bar", BottomLeft, BottomLeft, new Vector2(0, 5), new Vector2(46, 7), new Color(0, 0, 0, 0.55f), Color.white, 1f);
+            hud.LightLabel = Txt(R(lightRow, "Label", BottomLeft, BottomLeft, new Vector2(54, -1), new Vector2(150, 18)), "в тени", 12, TextAnchor.MiddleLeft, Color.white, true);
+
             // Noise meter above the inventory.
             var noise = R(content, "Noise", BottomCenter, BottomLeft, new Vector2(-30, 134), new Vector2(160, 18));
             hud.NoiseGroup = noise.gameObject.AddComponent<CanvasGroup>();

@@ -59,6 +59,13 @@ namespace Stealth.EditorTools
             Mat(env, "Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
             Mat(env, "HatchRing", new Color(1f, 0.8f, 0.1f), new Color(0.8f, 0.6f, 0.05f));
 
+            Mat(env, "LampHousing", new Color(0.82f, 0.83f, 0.85f), smoothness: 0.5f);
+            Mat(env, "LampPanel", new Color(1f, 0.97f, 0.9f), new Color(2.2f, 2.1f, 1.9f));
+            Mat(env, "ExitSign", new Color(0.1f, 0.75f, 0.3f), new Color(0.15f, 2.2f, 0.55f));
+            Mat(env, "ExitSignMark", new Color(0.95f, 1f, 0.95f), new Color(1.3f, 1.4f, 1.3f));
+            Mat(props, "LampShade", new Color(0.9f, 0.84f, 0.7f), new Color(0.35f, 0.28f, 0.16f), smoothness: 0.1f);
+            Mat(props, "LampBulb", new Color(1f, 0.9f, 0.7f), new Color(3f, 2.5f, 1.6f));
+
             Mat(props, "PropBody", new Color(0.62f, 0.60f, 0.56f));
             Mat(props, "PropAccent", new Color(0.22f, 0.23f, 0.26f));
             Mat(props, "PropScreen", new Color(0.15f, 0.35f, 0.5f), new Color(0.1f, 0.35f, 0.6f));

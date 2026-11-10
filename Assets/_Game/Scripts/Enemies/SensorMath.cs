@@ -13,6 +13,7 @@ namespace Stealth.Enemies
         static readonly VisionSettings s_Vision = new();
         static readonly HearingSettings s_Hearing = new();
         static readonly VibrationSettings s_Vibration = new();
+        static readonly IlluminationSettings s_Illumination = new();
 
         // ------------------------------------------------------------------ eyes
 
@@ -49,6 +50,24 @@ namespace Stealth.Enemies
             float crouch = g.Crouching ? (crouchFactor >= 0f ? crouchFactor : v.CrouchFactor) : 1f;
             return DistanceFactor(g.Distance, g.Range, v) * ExposureFactor(g.Exposure, v) * ViewFactor(g.OffCentre, v)
                    * crouch * (g.Moving ? 1f : v.StillFactor) * g.Light;
+        }
+
+        /// <summary>
+        /// Vision multiplier for the light at the player: <see cref="IlluminationSettings.DarkFactor"/> in darkness,
+        /// 1 when fully lit, smooth in between.
+        /// </summary>
+        public static float LightFactor(float illumination, IlluminationSettings s = null)
+        {
+            s ??= s_Illumination;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(s.DarkLevel, s.LitLevel, illumination));
+            return Mathf.Lerp(s.DarkFactor, 1f, t);
+        }
+
+        /// <summary>0 in darkness .. 1 fully lit: how visible light makes the player (HUD).</summary>
+        public static float Visibility(float lightFactor, IlluminationSettings s = null)
+        {
+            s ??= s_Illumination;
+            return Mathf.InverseLerp(s.DarkFactor, 1f, lightFactor);
         }
 
         // ------------------------------------------------------------------ ears

@@ -189,6 +189,7 @@ namespace Stealth.EditorTools
 
             var head = Child(root.transform, "Head", new Vector3(0, 1.6f, 0));
             var cam = head.AddComponent<Camera>();
+            ConfigureCamera(cam);
             cam.nearClipPlane = 0.05f;
             cam.fieldOfView = 75f;
             cam.enabled = false;

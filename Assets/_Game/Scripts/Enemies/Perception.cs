@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Stealth.Configs;
 using Stealth.Level;
 using UnityEngine;
 
@@ -50,8 +52,74 @@ namespace Stealth.Enemies
         /// <summary>Is the point in an unlit room of the current level?</summary>
         public static bool IsDark(Vector3 p) => ActiveLevel.Layout != null && ActiveLevel.Layout.IsDarkAt(p);
 
-        /// <summary>Multiplier of visual detection speed at a point (dark rooms halve it).</summary>
-        public static float LightFactor(Vector3 p) => LightMath.VisionFactor(IsDark(p));
+        // ------------------------------------------------------------------ light
+
+        /// <summary>Every layer, the ceiling layer too (the roof must cast the moon's shadow).</summary>
+        const int ShadowMask = ~0;
+        static readonly RaycastHit[] s_ShadowHits = new RaycastHit[16];
+        static readonly Dictionary<IIntruder, (int frame, float light)> s_LightCache = new();
+
+        /// <summary>
+        /// Light at a point: the ambient light, the moon where nothing shades the point and every <see cref="LightSource"/>
+        /// in range — brightness / distance² (as URP draws it), inside its cone, with nothing solid in between.
+        /// </summary>
+        public static float Illumination(Vector3 point, IlluminationSettings s = null)
+        {
+            s ??= Tuning.Perception.Illumination;
+            var a = RenderSettings.ambientLight;
+            float sum = (0.2126f * a.r + 0.7152f * a.g + 0.0722f * a.b) * RenderSettings.ambientIntensity * s.AmbientWeight;
+            foreach (var src in LightSource.All)
+            {
+                float brightness = src.Brightness;
+                if (brightness <= 0f) continue;
+                var light = src.Light;
+                if (light.type == LightType.Directional)
+                {
+                    if (!Shaded(point, -light.transform.forward, 100f)) sum += brightness;
+                    continue;
+                }
+                var from = light.transform.position;
+                var to = point - from;
+                float d = to.magnitude;
+                if (d >= light.range) continue;
+                float k = LightMath.Attenuation(d, light.range);
+                if (light.type == LightType.Spot) k *= LightMath.SpotFactor(Vector3.Angle(light.transform.forward, to), light.innerSpotAngle, light.spotAngle);
+                if (k * brightness < 0.002f) continue;
+                if (d > 0.2f && Shaded(from, to / d, d - 0.1f)) continue;
+                sum += k * brightness;
+            }
+            return sum;
+        }
+
+        /// <summary>Something solid on the way (players, robots and loot do not cast stealth shadows).</summary>
+        static bool Shaded(Vector3 from, Vector3 dir, float distance)
+        {
+            int n = Physics.RaycastNonAlloc(from, dir, s_ShadowHits, distance, ShadowMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var c = s_ShadowHits[i].collider;
+                if (c.GetComponentInParent<IIntruder>() != null || c.GetComponentInParent<Detector>() != null ||
+                    c.GetComponentInParent<Items.WorldItem>() != null)
+                    continue;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Light on a player: the average of the chest and the knees (crouching behind a desk keeps the legs dark).</summary>
+        public static float IlluminationOf(IIntruder p)
+        {
+            int frame = Time.frameCount;
+            if (s_LightCache.TryGetValue(p, out var c) && c.frame == frame) return c.light;
+            var s = Tuning.Perception.Illumination;
+            float light = 0.5f * (Illumination(p.Position + Vector3.up * (p.Height * 0.7f), s) + Illumination(p.Position + Vector3.up * (p.Height * 0.25f), s));
+            if (s_LightCache.Count > 32) s_LightCache.Clear();
+            s_LightCache[p] = (frame, light);
+            return light;
+        }
+
+        /// <summary>Multiplier of visual detection speed for how lit the player is (darkness hides).</summary>
+        public static float LightFactor(IIntruder p) => SensorMath.LightFactor(IlluminationOf(p), Tuning.Perception.Illumination);
 
         // ------------------------------------------------------------------ how much of the body is visible
 
@@ -124,7 +192,7 @@ namespace Stealth.Enemies
                 OffCentre = Mathf.Min(angle / Mathf.Max(half, 1f), 1f),
                 Crouching = p.IsCrouching,
                 Moving = p.GroundSpeed > v.StillSpeed,
-                Light = LightFactor(p.Position),
+                Light = LightFactor(p),
             };
             return true;
         }

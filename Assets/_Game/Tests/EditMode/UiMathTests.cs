@@ -105,5 +105,15 @@ namespace Stealth.Tests
             Assert.Greater(detected.r, 0.9f);
             Assert.Less(detected.g, 0.3f, "red once detected");
         }
+
+        [Test]
+        public void TheLightGemGoesFromShadowToLight()
+        {
+            Assert.AreEqual(0, UiMath.LightLevel(0f));
+            Assert.AreEqual(1, UiMath.LightLevel(0.3f));
+            Assert.AreEqual(2, UiMath.LightLevel(0.6f));
+            Assert.AreEqual(3, UiMath.LightLevel(1f));
+            Assert.AreEqual(4, UiMath.LightNames.Length);
+        }
     }
 }

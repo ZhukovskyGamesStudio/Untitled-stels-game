@@ -180,7 +180,7 @@ namespace Stealth.Enemies
                 OffCentre = angle / Mathf.Max(half, 1f), // above 1: outside the cone, sensed close by
                 Crouching = p.IsCrouching,
                 Moving = p.GroundSpeed > v.StillSpeed,
-                Light = Perception.LightFactor(p.Position),
+                Light = Perception.LightFactor(p),
             };
             return true;
         }

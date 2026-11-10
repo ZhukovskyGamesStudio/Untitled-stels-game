@@ -91,6 +91,20 @@ namespace Stealth.UI
             return awareness > 0.05f ? 1 : 0;
         }
 
+        /// <summary>Words for how lit the player is (HUD), from <see cref="LightLevel"/>.</summary>
+        public static readonly string[] LightNames = { "в тени", "полумрак", "заметно", "на свету" };
+
+        /// <summary>0 in the shadows, 1 half-light, 2 noticeable, 3 in the light — from visibility 0..1.</summary>
+        public static int LightLevel(float visibility) => visibility < 0.2f ? 0 : visibility < 0.5f ? 1 : visibility < 0.8f ? 2 : 3;
+
+        public static Color LightColor(int level) => level switch
+        {
+            0 => new Color(0.5f, 0.6f, 0.85f),
+            1 => new Color(0.8f, 0.85f, 0.9f),
+            2 => new Color(1f, 0.9f, 0.5f),
+            _ => new Color(1f, 0.97f, 0.75f),
+        };
+
         /// <summary>The suspicion bar over a detector: while it is noticing you and has not started chasing yet.</summary>
         public static bool ShowSuspicionBar(float myAwareness, bool chasing) => !chasing && myAwareness > 0.02f;
 

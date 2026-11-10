@@ -93,7 +93,7 @@ namespace Stealth.Tests
             float baseRate = SensorMath.VisionFactor(Look());
             Assert.Less(SensorMath.VisionFactor(Look(crouching: true)), baseRate);
             Assert.Less(SensorMath.VisionFactor(Look(moving: false)), baseRate);
-            Assert.AreEqual(baseRate * 0.5f, SensorMath.VisionFactor(Look(light: LightMath.VisionFactor(true))), 1e-4f);
+            Assert.AreEqual(baseRate * 0.5f, SensorMath.VisionFactor(Look(light: 0.5f)), 1e-4f);
             Assert.AreEqual(baseRate, SensorMath.VisionFactor(Look(offCentre: 0.3f)), 1e-4f, "the middle of the view is seen at full speed");
             Assert.Less(SensorMath.VisionFactor(Look(offCentre: 1f)), baseRate * 0.5f, "the edge of the view is much slower");
             float behind = SensorMath.VisionFactor(Look(2f, offCentre: 1.7f, moving: false));

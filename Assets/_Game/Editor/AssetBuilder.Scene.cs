@@ -10,6 +10,8 @@ using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 
@@ -68,16 +70,25 @@ namespace Stealth.EditorTools
         {
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
+            // The moon: shadows from the roof and walls, so it only shines in through the windows (striped by the blinds).
             var sun = new GameObject("Moonlight");
             var dl = sun.AddComponent<Light>();
             dl.type = LightType.Directional;
-            dl.intensity = 0.35f;
-            dl.color = new Color(0.7f, 0.8f, 1f);
-            dl.shadows = LightShadows.None;
-            sun.transform.rotation = Quaternion.Euler(55f, 30f, 0f);
+            dl.intensity = 0.32f;
+            dl.color = new Color(0.62f, 0.72f, 1f);
+            dl.shadows = LightShadows.Soft;
+            dl.shadowStrength = 0.95f;
+            // Walls are only 20 cm thick: a small bias keeps the moon from leaking through them.
+            var moonData = dl.GetUniversalAdditionalLightData();
+            moonData.usePipelineSettings = false;
+            dl.shadowBias = 0.05f;
+            dl.shadowNormalBias = 0.1f;
+            sun.AddComponent<LightSource>();
+            sun.transform.rotation = Quaternion.Euler(38f, 30f, 0f);
 
             var menuCam = new GameObject("MenuCamera");
             var mc = menuCam.AddComponent<Camera>();
+            ConfigureCamera(mc);
             mc.clearFlags = CameraClearFlags.SolidColor;
             mc.backgroundColor = new Color(0.06f, 0.07f, 0.08f);
             menuCam.AddComponent<AudioListener>();
@@ -112,12 +123,58 @@ namespace Stealth.EditorTools
             foreach (var prefab in ui.Screens) if (prefab != null) PrefabUtility.InstantiatePrefab(prefab);
             if (s_AudioDirector != null) PrefabUtility.InstantiatePrefab(s_AudioDirector);
 
+            // Night: a dim blue ambient, so unlit rooms are really dark; the lamps, the moon and glowing things do the rest.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.2f, 0.21f, 0.22f);
+            RenderSettings.ambientLight = new Color(0.075f, 0.08f, 0.1f);
+
+            // Post-processing: bloom on lamps and screens, neutral tone mapping, a soft vignette.
+            var volume = new GameObject("PostProcess").AddComponent<Volume>();
+            volume.isGlobal = true;
+            volume.sharedProfile = BuildPostProcess();
 
             EnsureFolder(Path.GetDirectoryName(ScenePath)!.Replace('\\', '/'));
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+        }
+
+        const string PostProcessPath = DataDir + "/PostProcess.asset";
+
+        static VolumeProfile BuildPostProcess()
+        {
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(PostProcessPath);
+            if (profile != null && !s_Force) return profile;
+            if (profile != null) AssetDatabase.DeleteAsset(PostProcessPath);
+            profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(profile, PostProcessPath);
+            T Add<T>() where T : VolumeComponent
+            {
+                var c = profile.Add<T>(true);
+                c.name = typeof(T).Name;
+                AssetDatabase.AddObjectToAsset(c, profile);
+                return c;
+            }
+            var bloom = Add<Bloom>();
+            bloom.threshold.value = 1f;
+            bloom.intensity.value = 0.9f;
+            bloom.scatter.value = 0.7f;
+            Add<Tonemapping>().mode.value = TonemappingMode.Neutral;
+            var vignette = Add<Vignette>();
+            vignette.intensity.value = 0.22f;
+            vignette.smoothness.value = 0.45f;
+            var color = Add<ColorAdjustments>();
+            color.postExposure.value = 0.1f;
+            color.contrast.value = 8f;
+            EditorUtility.SetDirty(profile);
+            AssetDatabase.SaveAssets();
+            return profile;
+        }
+
+        /// <summary>Post-processing and anti-aliasing on (player camera, menu camera).</summary>
+        static void ConfigureCamera(Camera cam)
+        {
+            var data = cam.GetUniversalAdditionalCameraData();
+            data.renderPostProcessing = true;
+            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
         }
 
         static void ConfigurePlayerSettings()

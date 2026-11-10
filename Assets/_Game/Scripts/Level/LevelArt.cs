@@ -29,6 +29,8 @@ namespace Stealth.Level
         public GameObject StreetLamp;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
         public GameObject Window;
+        [Tooltip("Green exit sign over every door, with a small light: the only light in a dark room besides the lamps.")]
+        public GameObject ExitSign;
 
         [Header("Props")]
         public GameObject Desk;
@@ -61,6 +63,8 @@ namespace Stealth.Level
         public GameObject Pallet;
         public GameObject WashBasin;
         public GameObject VendingMachine;
+        public GameObject DeskLamp;
+        public GameObject FloorLamp;
 
         public GameObject Prop(PropKind kind) => kind switch
         {
@@ -94,6 +98,8 @@ namespace Stealth.Level
             PropKind.Pallet => Pallet,
             PropKind.WashBasin => WashBasin,
             PropKind.VendingMachine => VendingMachine,
+            PropKind.DeskLamp => DeskLamp,
+            PropKind.FloorLamp => FloorLamp,
             _ => null,
         };
     }
