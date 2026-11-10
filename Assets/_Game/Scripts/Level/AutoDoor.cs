@@ -22,6 +22,7 @@ namespace Stealth.Level
         public float Width = LevelMetrics.DoorWidth;
 
         float m_Open; // 0 closed .. 1 open
+        bool m_Opening;
         public bool IsOpen => m_Open > 0.5f;
         public float OpenAmount => m_Open;
 
@@ -49,6 +50,11 @@ namespace Stealth.Level
             foreach (var p in PlayerController.All) s_Agents.Add(p.transform.position);
             foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
             bool open = ShouldOpen(transform.position, s_Agents);
+            if (open != m_Opening)
+            {
+                m_Opening = open;
+                Audio.Sfx.At(Audio.Sfx.Bank?.DoorSlide, transform.position + Vector3.up * 1.2f, 0.7f, Audio.Sfx.Group.Items, open ? 1f : 0.92f);
+            }
             m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / SlideTime);
             float slide = Width / 4f * m_Open;
             PanelA.localPosition = new Vector3(-Width / 4f - slide, PanelA.localPosition.y, 0);

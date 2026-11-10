@@ -16,6 +16,7 @@ namespace Stealth.Configs
         public RunConfig Run;
         public LevelConfig Level;
         public ItemsConfig Items;
+        public AudioConfig Audio;
     }
 
     /// <summary>
@@ -30,11 +31,13 @@ namespace Stealth.Configs
         static RunConfig s_Run;
         static LevelConfig s_Level;
         static ItemsConfig s_Items;
+        static AudioConfig s_Audio;
 
         public static PlayerConfig Player => Pick(Root != null ? Root.Player : null, ref s_Player);
         public static RunConfig Run => Pick(Root != null ? Root.Run : null, ref s_Run);
         public static LevelConfig Level => Pick(Root != null ? Root.Level : null, ref s_Level);
         public static ItemsConfig Items => Pick(Root != null ? Root.Items : null, ref s_Items);
+        public static AudioConfig Audio => Pick(Root != null ? Root.Audio : null, ref s_Audio);
 
         static GameConfig Root
         {

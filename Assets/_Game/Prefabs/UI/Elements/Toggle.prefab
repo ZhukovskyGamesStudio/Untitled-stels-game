@@ -165,6 +165,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1575559077010353592}
   - component: {fileID: 3565203875943898985}
+  - component: {fileID: 7043480346610298936}
   m_Layer: 0
   m_Name: Toggle
   m_TagString: Untagged
@@ -241,6 +242,19 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_IsOn: 1
+--- !u!114 &7043480346610298936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7064480206373844529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cf0fdfeb59ca184881ecaf3bf8fe64c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Audio.UiSound
+  Control: {fileID: 3565203875943898985}
 --- !u!1 &9155331810527381463
 GameObject:
   m_ObjectHideFlags: 0

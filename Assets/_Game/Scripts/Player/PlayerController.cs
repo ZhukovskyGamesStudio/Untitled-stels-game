@@ -423,6 +423,7 @@ namespace Stealth.Player
         /// <summary>Owner: the server says we were hit.</summary>
         public void OnHitFeedback(Vector3 awayFromSource)
         {
+            Audio.Sfx.Ui(Audio.Sfx.Bank?.Hurt, 1f, Audio.Sfx.Group.Robots);
             Motor.AddImpulse(awayFromSource * 6f + Vector3.up * 2.5f);
             Motor.AddTrauma(0.7f);
             if (GameHUD.Instance != null) GameHUD.Instance.FlashHit(awayFromSource);

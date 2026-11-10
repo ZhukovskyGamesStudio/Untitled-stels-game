@@ -213,7 +213,9 @@ namespace Stealth.Enemies
 
         protected override void OnPulse(byte effect)
         {
-            if (effect == PulseRadio && RadioRipplePrefab != null) Instantiate(RadioRipplePrefab, transform.position, Quaternion.identity);
+            if (effect != PulseRadio) return;
+            if (RadioRipplePrefab != null) Instantiate(RadioRipplePrefab, transform.position, Quaternion.identity);
+            Audio.Sfx.At(Audio.Sfx.Bank?.Radio, Position);
         }
 
         public void PatrolToNextPoint()

@@ -196,6 +196,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9032191822118229486}
   - component: {fileID: 7561180736885765388}
+  - component: {fileID: 457511400044961521}
   m_Layer: 0
   m_Name: Slider
   m_TagString: Untagged
@@ -276,6 +277,19 @@ MonoBehaviour:
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &457511400044961521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7962716114533800337}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cf0fdfeb59ca184881ecaf3bf8fe64c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Audio.UiSound
+  Control: {fileID: 7561180736885765388}
 --- !u!1 &8875807162838416888
 GameObject:
   m_ObjectHideFlags: 0

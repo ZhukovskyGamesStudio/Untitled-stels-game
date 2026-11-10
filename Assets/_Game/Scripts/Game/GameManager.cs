@@ -56,6 +56,8 @@ namespace Stealth.Game
         public bool AlarmActive => m_Run.AlarmActive(Session.ServerTime);
 
         public event Action<string> OnBanner;
+        /// <summary>Any banner on this peer (the sound director listens).</summary>
+        public static event Action<string> BannerShown;
 
         // ------------------------------------------------------------------ binding (called by the network twin)
 
@@ -285,6 +287,7 @@ namespace Stealth.Game
         {
             Debug.Log("[Game] " + text);
             OnBanner?.Invoke(text);
+            BannerShown?.Invoke(text);
         }
     }
 }

@@ -64,13 +64,24 @@ description: How to write and change code in the «Айтишники: выла�
    Его числа — класс `…Profile : DeviceProfile` (свой файл в `Scripts/Config`), поле `public …Profile Profile` + `Device => Profile`,
    в сборщике `x.Profile = Profile<…Profile>("ИмяПрефаба")`.
 3. Модель — в `Tools/Blender/robots.py` (части `Body`/`Accent*`/`Eye*`; `AccentLeg*`, `AccentWheel*`, `AccentRotor*`, `AccentHead` анимируются автоматически).
+   Насадки-датчики (`SensorRig`: глаз, микрофоны, щупы, нос) ставятся `MobileRobot` сам по `eyePos`/`radius` — проверь на скриншоте `gallery`, что они не утонули в модели.
+   Новое чувство — новая насадка в `robots.py` (`attach_*`) и строка в `SensorRig.Mounts`.
 4. `FORCE=1 Tools/dev.sh assets`, `Tools/dev.sh tests` (`PrefabIntegrityTests` проверит ссылки и вид), сценарий `gallery` со скриншотом.
 
-## Чек-лист: кусок уровня
+## Чек-лист: кусок уровня или мебель
 
-1. Префаб в `AssetBuilder.Level.cs`, поле в `LevelArt`, постановка в `LevelBuilder`.
+1. Префаб в `AssetBuilder.Level.cs`, поле в `LevelArt`, постановка в `LevelBuilder`. Мебель: модель в `generate_models.py`, значение в конец `PropKind`,
+   `PropObject(...)` (коллайдер — меш каждой части), место в раскладке комнаты (`LevelGenerator.*Quadrant`, координаты квадранта `Quad.P(u, v)`).
 2. Если это данные планировки — поле в `LevelLayout`, генерация в `LevelGenerator` (детерминированно от `rng`), тест в `LevelGeneratorTests`.
-3. Проходимость — `LevelNavMeshTests`; внешний вид — сценарии `floors`/`rooms`.
+3. Проходимость — `LevelNavMeshTests`; клиппинг — `LevelBuilderTests.FurnitureDoesNotClip`; внешний вид — сценарии `floors`/`rooms`.
+
+## Чек-лист: звук
+
+1. Клип — функция в `Tools/Audio/generate_sounds.py` + `write(...)` в `main()`, запусти скрипт.
+2. Поле в `SoundBank` + строка в `AssetBuilder.Audio.cs` (`BuildSoundBank`), `FORCE=1 Tools/dev.sh assets` (`AudioTests.SoundBankHasEveryClip`).
+3. Разовый звук — `Sfx.At(Sfx.Bank?.Clip, позиция, громкость, группа)` там, где событие видно **на каждом пире** (реплицированное состояние,
+   пульс детектора), или `Sfx.Ui(...)` для своего игрока. Слежение за состоянием (смены, переходы) — в `AudioDirector`, решения — в `AudioRules` с тестом.
+   Петля на объекте — `AddLoop(root, clip)` в сборщике (`LoopSound` берёт громкость и дальность из `Data/Config/Audio`).
 
 ## Чек-лист: элемент интерфейса
 

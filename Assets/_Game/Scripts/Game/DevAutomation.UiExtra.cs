@@ -45,6 +45,8 @@ namespace Stealth.Game
             inv.RequestSellStashed(gm.Stash.Items[0]);
             yield return new WaitForSeconds(0.3f);
             Log($"sold from stash: collected {collected} -> {gm.Collected}, stash {gm.Stash.Items.Count}");
+            var audio = Audio.AudioDirector.Instance;
+            Log(audio == null ? "audio: no director" : $"audio: music {audio.Track}, one-shots so far {audio.Played}, listener volume {AudioListener.volume:0.00}");
             DevFlags.ForceHandsMode = false;
         }
 

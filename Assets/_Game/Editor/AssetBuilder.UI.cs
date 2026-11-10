@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Stealth.Audio;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.UI;
@@ -192,6 +193,7 @@ namespace Stealth.EditorTools
                 ((RectTransform)go.transform).sizeDelta = new Vector2(320, 36);
                 go.GetComponent<Image>().color = Color.white;
                 var b = go.GetComponent<Button>();
+                go.AddComponent<UiSound>().Control = b;
                 var colors = b.colors;
                 colors.normalColor = new Color(0.2f, 0.22f, 0.26f, 0.95f);
                 colors.highlightedColor = new Color(0.32f, 0.35f, 0.41f, 1f);
@@ -208,12 +210,14 @@ namespace Stealth.EditorTools
             {
                 var go = Styled(DefaultControls.CreateSlider(res));
                 go.name = "Slider";
+                go.AddComponent<UiSound>().Control = go.GetComponent<Slider>();
                 return go;
             });
             e.Toggle = Prefab(ElementsDir + "/Toggle.prefab", () =>
             {
                 var go = Styled(DefaultControls.CreateToggle(res));
                 go.name = "Toggle";
+                go.AddComponent<UiSound>().Control = go.GetComponent<Toggle>();
                 var label = go.GetComponentInChildren<Text>();
                 label.color = Color.white;
                 label.fontSize = 14;
@@ -636,6 +640,12 @@ namespace Stealth.EditorTools
             Spacer(sc, 8);
             menu.FovLabel = ColumnText(sc, "FovLabel", "Поле зрения", 15, Color.white, 22);
             menu.Fov = SliderIn(e, sc, "Fov", 60f, 100f, true);
+            Spacer(sc, 8);
+            menu.VolumeLabel = ColumnText(sc, "VolumeLabel", "Громкость", 15, Color.white, 22);
+            menu.Volume = SliderIn(e, sc, "Volume", 0f, 1f, false);
+            Spacer(sc, 8);
+            menu.MusicLabel = ColumnText(sc, "MusicLabel", "Музыка", 15, Color.white, 22);
+            menu.Music = SliderIn(e, sc, "Music", 0f, 1f, false);
             Spacer(sc, 10);
             menu.InvertY = ToggleIn(e, sc, "InvertY", "Инвертировать мышь по вертикали");
             menu.HeadBob = ToggleIn(e, sc, "HeadBob", "Покачивание камеры при ходьбе");

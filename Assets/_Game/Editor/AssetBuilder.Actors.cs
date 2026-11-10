@@ -273,6 +273,7 @@ namespace Stealth.EditorTools
             // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
             BuildSensorRig(root, model, rc, eyePos, radius);
+            AddLoop(root, rc.Profile.Traits.HoverHeight > 0f ? s_Bank.DroneRotor : s_Bank.RobotMotor);
             rc.Status.Renderers = Parts(model, "Eye"); // the sensor lenses glow in the status colour too
             return root;
         }
@@ -386,6 +387,7 @@ namespace Stealth.EditorTools
             var gate = root.AddComponent<LaserGate>();
             gate.Profile = Profile<LaserGateProfile>("LaserGate");
             root.AddComponent<LaserGateNet>();
+            AddLoop(root, s_Bank.LaserHum);
             gate.EmitterA = Emitter("EmitterA", 90f);
             gate.EmitterB = Emitter("EmitterB", -90f);
             gate.Beams = Enumerable.Range(0, 3)

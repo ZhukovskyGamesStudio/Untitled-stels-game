@@ -110,6 +110,7 @@ namespace Stealth.EditorTools
             events.AddComponent<EventSystem>();
             events.AddComponent<InputSystemUIInputModule>().AssignDefaultActions();
             foreach (var prefab in ui.Screens) if (prefab != null) PrefabUtility.InstantiatePrefab(prefab);
+            if (s_AudioDirector != null) PrefabUtility.InstantiatePrefab(s_AudioDirector);
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.2f, 0.21f, 0.22f);

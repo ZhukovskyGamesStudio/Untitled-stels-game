@@ -220,6 +220,20 @@ namespace Stealth.Game
 
                 Me.TeleportOwner(layout.HatchPosition + new Vector3(1.2f, 0.05f, 0), Quaternion.LookRotation(Vector3.left));
                 yield return new WaitForSeconds(1f);
+                // Through the team stash and back (server-authoritative, replicated to everyone).
+                if (inv.Items.Count > 0)
+                {
+                    inv.RequestStash(0, 0, 0, inv.Items[0].Rot);
+                    yield return new WaitForSeconds(1f);
+                    int stashed = gm.Stash.Items.Count, carried = inv.Items.Count;
+                    if (stashed > 0)
+                    {
+                        var e = gm.Stash.Items[0];
+                        if (inv.FindSpot(e.Shape, out var ux, out var uy, out var ur)) inv.RequestUnstash(e, ux, uy, ur);
+                        yield return new WaitForSeconds(1f);
+                    }
+                    Log($"stash: in -> stash {stashed}, backpack {carried}; back -> stash {gm.Stash.Items.Count}, backpack {inv.Items.Count}");
+                }
                 int before = gm.Collected;
                 if (inv.Items.Count > 0) inv.RequestDeposit(0);
                 yield return new WaitForSeconds(1f);

@@ -64,6 +64,10 @@ namespace Stealth.UI
         public Toggle InvertY;
         public Toggle HeadBob;
         public Toggle CrouchToggle;
+        public Text VolumeLabel;
+        public Slider Volume;
+        public Text MusicLabel;
+        public Slider Music;
         public Button Defaults;
         public Button Done;
 
@@ -94,6 +98,8 @@ namespace Stealth.UI
             InvertY.onValueChanged.AddListener(v => GameSettings.InvertY = v);
             HeadBob.onValueChanged.AddListener(v => GameSettings.HeadBob = v);
             CrouchToggle.onValueChanged.AddListener(v => GameSettings.CrouchToggle = v);
+            Volume.onValueChanged.AddListener(v => GameSettings.MasterVolume = v);
+            Music.onValueChanged.AddListener(v => GameSettings.MusicVolume = v);
             Defaults.onClick.AddListener(() =>
             {
                 GameSettings.ResetToDefaults();
@@ -190,12 +196,16 @@ namespace Stealth.UI
             InvertY.SetIsOnWithoutNotify(GameSettings.InvertY);
             HeadBob.SetIsOnWithoutNotify(GameSettings.HeadBob);
             CrouchToggle.SetIsOnWithoutNotify(GameSettings.CrouchToggle);
+            Volume.SetValueWithoutNotify(GameSettings.MasterVolume);
+            Music.SetValueWithoutNotify(GameSettings.MusicVolume);
         }
 
         void UpdateSettingsLabels()
         {
             SensitivityLabel.text = $"Чувствительность мыши: {GameSettings.Sensitivity * 10f:0.0}";
             FovLabel.text = $"Поле зрения: {GameSettings.Fov:0}°";
+            VolumeLabel.text = $"Громкость: {GameSettings.MasterVolume * 100f:0}%";
+            MusicLabel.text = $"Музыка: {GameSettings.MusicVolume * 100f:0}%";
         }
     }
 }

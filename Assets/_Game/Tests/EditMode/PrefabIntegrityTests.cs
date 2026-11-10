@@ -134,7 +134,7 @@ namespace Stealth.Tests
             try
             {
                 var roots = scene.GetRootGameObjects();
-                foreach (var screen in new[] { "HUD", "Inventory", "Menu", "StashBoard" })
+                foreach (var screen in new[] { "HUD", "Inventory", "Menu", "StashBoard", "AudioDirector" })
                 {
                     var go = roots.FirstOrDefault(r => r.name == screen);
                     Assert.IsNotNull(go, $"{screen} is in the scene");

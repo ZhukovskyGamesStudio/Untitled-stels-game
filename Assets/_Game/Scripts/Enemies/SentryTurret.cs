@@ -98,7 +98,9 @@ namespace Stealth.Enemies
 
         protected override void OnPulse(byte effect)
         {
-            if (effect != PulseShot || Sight == null) return;
+            if (effect != PulseShot) return;
+            Audio.Sfx.At(Audio.Sfx.Bank?.TurretShot, Position);
+            if (Sight == null) return;
             Sight.widthMultiplier = m_BaseWidth * 3f; // muzzle flash
             Invoke(nameof(ResetSight), 0.08f);
         }

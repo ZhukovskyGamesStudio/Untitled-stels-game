@@ -70,6 +70,7 @@ namespace Stealth.EditorTools
                 BuildConfigs();
                 BuildMaterials();
                 BuildSprites();
+                s_AudioDirector = BuildAudioDirector(BuildSoundBank());
                 var art = BuildLevelArt();
                 var actors = BuildActors();
                 var ui = BuildUi();

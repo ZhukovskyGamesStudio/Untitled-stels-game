@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f683dccf625fc614dab4532b1a1fe0bb, type: 3}
+  m_Name: Audio
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.AudioConfig
+  Mix:
+    Music: 0.4
+    Ambience: 0.35
+    Alarm: 0.45
+    Ui: 0.6
+    Footsteps: 0.55
+    Robots: 0.8
+    Items: 0.8
+    Loops: 0.3
+    MinDistance: 1.5
+    MaxDistance: 24
+    LoopMaxDistance: 11
+    StepLength: 1.25
+    CrouchStep: 0.3
+    WalkStep: 0.65
+    RunStep: 1
+    RunSpeed: 5
+    Crossfade: 1.5
+    ChaseHold: 5

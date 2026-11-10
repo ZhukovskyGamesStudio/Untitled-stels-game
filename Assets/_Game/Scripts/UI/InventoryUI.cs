@@ -1,3 +1,4 @@
+using Stealth.Audio;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.Level;
@@ -256,20 +257,24 @@ namespace Stealth.UI
         void Drop(PlayerController me, PlayerInventory inv, Target over, Vector2Int target, Ray mouseRay)
         {
             byte x = (byte)Mathf.Clamp(target.x, 0, 255), y = (byte)Mathf.Clamp(target.y, 0, 255), rot = (byte)m_DragRot;
+            var bank = Sfx.Bank;
             bool inside = target.x >= 0 && target.y >= 0;
             switch (over)
             {
                 case Target.Backpack:
                     if (!inside) return;
-                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) inv.RequestPickup(m_DragWorld, x, y, rot);
-                    else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, rot, x, y, m_DragIndex)) inv.RequestMove(m_DragIndex, x, y, rot);
-                    else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, rot, x, y)) inv.RequestUnstash(m_DragStashed, x, y, rot);
+                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestPickup(m_DragWorld, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, rot, x, y, m_DragIndex)) { inv.RequestMove(m_DragIndex, x, y, rot); Sfx.Ui(bank?.Click, 0.5f); }
+                    else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestUnstash(m_DragStashed, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Stash:
                     if (!inside || Stash == null) return;
+                    bool placed = true;
                     if (m_Source == DragSource.Inventory && Stash.CanPlace(m_DragShape, rot, x, y)) inv.RequestStash(m_DragIndex, x, y, rot);
                     else if (m_Source == DragSource.World && Stash.CanPlace(m_DragShape, rot, x, y)) inv.RequestStashWorld(m_DragWorld, x, y, rot);
                     else if (m_Source == DragSource.Stash && Stash.CanPlace(m_DragShape, rot, x, y, Stash.IndexOf(m_DragStashed))) inv.RequestStashMove(m_DragStashed, x, y, rot);
+                    else placed = false;
+                    if (placed) Sfx.At(bank?.Stash, Board.Root.position, 0.9f, Sfx.Group.Items);
                     return;
                 case Target.Sell:
                     if (m_Source == DragSource.Inventory) inv.RequestDeposit(m_DragIndex);
@@ -280,7 +285,10 @@ namespace Stealth.UI
             if (m_Source == DragSource.Inventory) DropIntoWorld(me, inv, mouseRay);
             // A click on a world item (no drag): straight into the first free spot of the backpack.
             else if (m_Source == DragSource.World && m_DragTravel < ClickTravel && inv.FindSpot(m_DragShape, out var fx, out var fy, out var fr))
+            {
                 inv.RequestPickup(m_DragWorld, fx, fy, fr);
+                Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items);
+            }
         }
 
         void DropIntoWorld(PlayerController me, PlayerInventory inv, Ray ray)
@@ -298,6 +306,7 @@ namespace Stealth.UI
                     Physics.Raycast(hit.point + hit.normal * 0.3f + Vector3.up * 0.2f, Vector3.down, out var floor, 3f, mask, QueryTriggerInteraction.Ignore))
                     point = floor.point;
                 inv.RequestDrop(m_DragIndex, point + Vector3.up * 0.01f, me.transform.eulerAngles.y);
+                Sfx.At(Sfx.Bank?.Drop, point, 0.8f, Sfx.Group.Items);
                 return;
             }
             inv.RequestDrop(m_DragIndex, me.transform.position + me.transform.forward * 0.8f, me.transform.eulerAngles.y);

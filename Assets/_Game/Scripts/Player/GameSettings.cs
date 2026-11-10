@@ -9,12 +9,18 @@ namespace Stealth.Player
 
         public const float DefaultSensitivity = 0.1f;
         public const float DefaultFov = 75f;
+        public const float DefaultVolume = 0.8f;
+        public const float DefaultMusicVolume = 0.7f;
 
         public static float Sensitivity { get; set; } = DefaultSensitivity;
         public static float Fov { get; set; } = DefaultFov;
         public static bool InvertY { get; set; }
         public static bool HeadBob { get; set; } = true;
         public static bool CrouchToggle { get; set; }
+        /// <summary>Master volume (0..1).</summary>
+        public static float MasterVolume { get; set; } = DefaultVolume;
+        /// <summary>Music volume (0..1), on top of the master volume.</summary>
+        public static float MusicVolume { get; set; } = DefaultMusicVolume;
 
         static bool s_Loaded;
 
@@ -32,6 +38,8 @@ namespace Stealth.Player
             InvertY = PlayerPrefs.GetInt(Prefix + "invertY", 0) == 1;
             HeadBob = PlayerPrefs.GetInt(Prefix + "headBob", 1) == 1;
             CrouchToggle = PlayerPrefs.GetInt(Prefix + "crouchToggle", 0) == 1;
+            MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "volume", DefaultVolume));
+            MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "music", DefaultMusicVolume));
         }
 
         public static void Save()
@@ -41,6 +49,8 @@ namespace Stealth.Player
             PlayerPrefs.SetInt(Prefix + "invertY", InvertY ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "headBob", HeadBob ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "crouchToggle", CrouchToggle ? 1 : 0);
+            PlayerPrefs.SetFloat(Prefix + "volume", MasterVolume);
+            PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
             PlayerPrefs.Save();
         }
 
@@ -51,6 +61,8 @@ namespace Stealth.Player
             InvertY = false;
             HeadBob = true;
             CrouchToggle = false;
+            MasterVolume = DefaultVolume;
+            MusicVolume = DefaultMusicVolume;
         }
     }
 }

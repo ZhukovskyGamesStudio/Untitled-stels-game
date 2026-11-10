@@ -34,19 +34,20 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети
 
 ```
 Art/Materials/<Environment|Props|Robots|Player|Items|FX>   материалы (создаёт AssetBuilder)
+Art/Audio/<Player|Items|UI|Robots|Environment|Music>       WAV из Tools/Audio/generate_sounds.py
 Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Tools/Blender/*.py)
 Art/Sprites/                                               текстуры UI (виньетка, дуга)
-Data/            LevelArt, ItemVisuals, NetworkPrefabs (ScriptableObject)
-Data/Config/     НАСТРОЙКИ БАЛАНСА: Player, Run, Level, Items (правятся руками в инспекторе)
+Data/            LevelArt, ItemVisuals, NetworkPrefabs, SoundBank (ScriptableObject)
+Data/Config/     НАСТРОЙКИ: Player, Run, Level, Items, Audio (правятся руками в инспекторе)
 Prefabs/Robots/<Префаб>Config.asset, Prefabs/Sensors/<Префаб>Config.asset — настройки каждого робота, устройства и лазера рядом с его префабом
 Resources/GameConfig.asset            корень настроек (ссылки на Data/Config/*), его находит любой билд
 Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
 Prefabs/Props    мебель
 Prefabs/Robots   роботы + их конфиги · Prefabs/Sensors — датчики, камера, лазер + их конфиги
-Prefabs/Player, Items, Network (Session), FX (RadioRipple)
-Prefabs/UI       экраны HUD, Inventory, Menu + UI/Elements (кнопка, слайдер, дуга, маркеры…)
-Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов, EventSystem
-Scripts/<Enemies|Game|Items|Level|Player|UI>   код игры (asmdef Stealth.Game — без Netcode и Steam)
+Prefabs/Player, Items, Network (Session), FX (RadioRipple), Audio (AudioDirector)
+Prefabs/UI       экраны HUD, Inventory, Menu, StashBoard + UI/Elements (кнопка, слайдер, дуга, маркеры…)
+Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов и AudioDirector, EventSystem
+Scripts/<Audio|Config|Enemies|Game|Items|Level|Player|UI>   код игры (asmdef Stealth.Game — без Netcode и Steam)
 Scripts/Net/                          сетевой слой (asmdef Stealth.Net): NGO, Steam, сетевые двойники компонентов
 Editor/AssetBuilder*.cs               генератор ассетов (asmdef Stealth.Editor)
 Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
@@ -59,9 +60,12 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
    `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
-   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`.
+   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
-3. **Презентеры UI** — `GameHUD`, `InventoryUI`, `GameMenu`: только показывают/двигают/красят элементы, заранее собранные в префабах.
+3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
+   показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
+   реплицированное состояние на каждом пире: музыка (меню / исследование / погоня), эмбиент, сирена, шаги и прыжки всех игроков,
+   «?»/«!» детекторов, взломы. Разовые звуки из кода — через фасад `Sfx.At(Sfx.Bank?.Clip, позиция)` / `Sfx.Ui(...)`; без директора — no-op.
 4. **Сеть** — сборка `Stealth.Net`, единственное место, где есть Netcode и Steamworks (см. ниже).
 
 ### Роботы и датчики
@@ -81,6 +85,7 @@ LaserGate — отдельная ловушка (не детектор)
 - `IHackable` — что можно взломать (реализует `Detector`);
 - `IRobotBody` — что «мозг» робота делает телом (реализует `RobotController`).
 
+На мобильных роботах `SensorRig` показывает насадки-датчики (глаз-камера, микрофоны, щупы в пол, нос) по `Senses` из конфига.
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
 Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
 
@@ -89,7 +94,10 @@ LaserGate — отдельная ловушка (не детектор)
 `LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`). `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
 **только из префабов `LevelArt`**: блоки-кубы масштабируются под размер, лестницы/двери/лазы/лампы/мебель ставятся как есть.
 Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
-Размеры здания — `LevelMetrics`.
+Размеры здания — `LevelMetrics`. Мебель — `LevelGenerator.FurnishRoom`: четыре квадранта комнаты в координатах «от центра к стенам»
+(крест посередине свободен под двери), раскладки по типам комнат. Пристенная мебель держит ≥ 20 см от оси стены (жалюзи и подоконники окон).
+Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
+со стенами, лестницами и друг с другом, `LevelNavMeshTests` — что до лута можно дойти.
 
 ### Сеть
 
@@ -114,6 +122,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
   Без запущенной сессии этот пир — сам себе сервер, время — локальное, спавн — обычный `Instantiate`.
 - Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
 - Правила забега (квота, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
+- Склад команды у люка — `TeamStash` в `GameManager.Stash` (сервер), реплицирует `GameManagerNet`; запросы — `PlayerInventory.Request{Stash,Unstash,StashMove,SellStashed,StashWorld,SellWorld}`.
+  Записи склада адресуются по значению (`InventoryEntry`), не по индексу: список мог измениться, пока запрос летел. Склад живёт весь забег, `RestartRunServer` его чистит.
 
 Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
 
@@ -127,6 +137,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 | `Data/Config/Run` | квота (доля, рост, потолок), штраф за упавших, тревога, льготный период, когда приходит охотник |
 | `Data/Config/Level` | размер здания по домам, веса типов комнат, темнота и мерцание, проходы/двери/лазы, сколько охраны и **кто** с какого дома (ростер), лут |
 | `Data/Config/Items` | цвета лута: название, цвет, множитель ценности, частота |
+| `Data/Config/Audio` | громкость групп (музыка, эмбиент, сирена, UI, шаги, роботы, предметы, петли), дальность слышимости, длина шага, смена музыки |
 | `Prefabs/Robots/Robot<Kind>Config` | подвижный робот (`RobotProfile`): глаза, слух, сейсмика, нюх, скорости, лестницы, атака, радиус тревоги, внимание (паузы, затухание подозрения), анимация |
 | `Prefabs/Robots/RobotTurretConfig` и др. | устройства: турель, паук, пылесос (`TurretProfile`, `SpiderProfile`, `VacuumProfile`) |
 | `Prefabs/Sensors/<Префаб>Config` | лидар, датчик движения, плита, камера, лазер (`LidarProfile`, `MotionSensorProfile`, `PressurePlateProfile`, `CameraProfile`, `LaserGateProfile`) |
@@ -146,6 +157,9 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 Меню **Stealth → Build Missing Assets** дособирает только отсутствующее (ручные правки префабов сохраняются),
 **Rebuild All Assets** (или `FORCE=1`) перезаписывает всё. Пути не меняются, поэтому GUID и сетевые хэши стабильны.
 Если меняешь структуру префаба в коде — пересобери с `FORCE=1` и закоммить изменённые префабы вместе с кодом.
+Сцена в режиме «только недостающее» не пересобирается: новый экран или объект сцены появится после `FORCE=1`.
+Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`),
+звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом).
 
 ## Правила кода (коротко; подробно — скилл [`stealth-code`](.claude/skills/stealth-code/SKILL.md))
 
