@@ -15,6 +15,7 @@ namespace Stealth.Level
             Clear();
             Layout = layout;
             Root = new LevelBuilder(art, layout).Build();
+            if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             return Root;
         }
 
@@ -178,13 +179,13 @@ namespace Stealth.Level
                     EdgeWall(new Vector3(x * cell, 0, (y + 1) * cell) + up, new Vector3((x + 1) * cell, 0, (y + 1) * cell) + up, l.EdgesZ[f, x, y]);
             for (int x = 0; x < l.Width; x++)
             {
-                EdgeWall(new Vector3(x * cell, 0, 0) + up, new Vector3((x + 1) * cell, 0, 0) + up, Exterior(f, x, 0, Vector2Int.down));
-                EdgeWall(new Vector3(x * cell, 0, H) + up, new Vector3((x + 1) * cell, 0, H) + up, Exterior(f, x, l.Height - 1, Vector2Int.up));
+                EdgeWall(new Vector3(x * cell, 0, 0) + up, new Vector3((x + 1) * cell, 0, 0) + up, Exterior(f, x, 0, Vector2Int.down), true);
+                EdgeWall(new Vector3(x * cell, 0, H) + up, new Vector3((x + 1) * cell, 0, H) + up, Exterior(f, x, l.Height - 1, Vector2Int.up), true);
             }
             for (int y = 0; y < l.Height; y++)
             {
-                EdgeWall(new Vector3(0, 0, y * cell) + up, new Vector3(0, 0, (y + 1) * cell) + up, Exterior(f, 0, y, Vector2Int.left));
-                EdgeWall(new Vector3(W, 0, y * cell) + up, new Vector3(W, 0, (y + 1) * cell) + up, Exterior(f, l.Width - 1, y, Vector2Int.right));
+                EdgeWall(new Vector3(0, 0, y * cell) + up, new Vector3(0, 0, (y + 1) * cell) + up, Exterior(f, 0, y, Vector2Int.left), true);
+                EdgeWall(new Vector3(W, 0, y * cell) + up, new Vector3(W, 0, (y + 1) * cell) + up, Exterior(f, l.Width - 1, y, Vector2Int.right), true);
             }
             const float t = LevelMetrics.WallThickness;
             foreach (var c in m_Corners)
@@ -196,7 +197,8 @@ namespace Stealth.Level
         EdgeType Exterior(int f, int x, int y, Vector2Int dir) =>
             f == 0 && m_Layout.ExteriorDoors.Exists(e => e.cell == new Vector2Int(x, y) && e.dir == dir) ? EdgeType.Door : EdgeType.Wall;
 
-        void EdgeWall(Vector3 a, Vector3 b, EdgeType type)
+        /// <param name="outside">An outer wall: its doorways get a sliding door (it keeps the gas out of sight).</param>
+        void EdgeWall(Vector3 a, Vector3 b, EdgeType type, bool outside = false)
         {
             if (type == EdgeType.Open) return;
             m_Corners.Add(Snap(a));
@@ -222,6 +224,7 @@ namespace Stealth.Level
             // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
             var along = Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x));
             if (vent) Place(m_Art.VentFrame, "VentFrame", mid, along);
+            else if (outside) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
             else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
         }
 

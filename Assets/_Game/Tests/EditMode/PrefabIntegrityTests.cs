@@ -28,6 +28,10 @@ namespace Stealth.Tests
         {
             "SecurityCamera.Status.Light",  // the spot light shows the camera's status instead
             "GameNetwork.SteamTransport",
+            "RobotController.Lidar",         // only the sweeper has a floor lidar
+            "RobotController.CargoMesh",     // only workers carry loot
+            "RobotController.CargoRenderer",
+            "RobotController.CargoVisuals",
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

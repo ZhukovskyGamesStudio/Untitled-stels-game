@@ -29,6 +29,7 @@ namespace Stealth.EditorTools
         static Actors BuildActors()
         {
             var ripple = Prefab(PrefabsDir + "/FX/RadioRipple.prefab", BuildRadioRipple).GetComponent<RadioRipple>();
+            s_StompRipple = Prefab(PrefabsDir + "/FX/StompRipple.prefab", BuildStompRipple).GetComponent<RadioRipple>();
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
                 v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath($"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
@@ -74,9 +75,10 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Thumper, RobotPrefabs + "/RobotThumper.prefab", () => MobileRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 0f; // deaf; it listens with its feet
-                s.SeismicRange = 10f; s.SeismicSpeed = 1.1f; s.ContactDistance = 1.6f;
+                s.SeismicRange = 10f; s.SeismicSpeed = 0.8f; s.ContactDistance = 1.6f;
                 t.CanUseStairs = false; // tracks
                 t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.3f; t.AttackRange = 1.9f;
+                t.SuspicionDecay = 0.12f; // waves come seconds apart: it keeps what it felt between them
             }));
             Robot(RobotKind.Hound, RobotPrefabs + "/RobotHound.prefab", () => MobileRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), ripple, (s, t, anim) =>
             {
@@ -88,14 +90,43 @@ namespace Stealth.EditorTools
                 s.ColorSorter = true; s.ViewDistance = 16f; s.ViewAngle = 160f; s.DetectionSpeed = 0.9f; s.HearingMultiplier = 0.3f;
                 t.PatrolSpeed = 1.7f; t.InvestigateSpeed = 2.6f; t.ChaseSpeed = 4.6f;
             }));
-            Robot(RobotKind.Worker, RobotPrefabs + "/RobotWorker.prefab", () => MobileRobot("RobotWorker", "robot_worker", "WorkerBody", 0.45f, new Vector3(0, 0.5f, 0.4f), ripple, (s, t, anim) =>
+            Robot(RobotKind.Worker, RobotPrefabs + "/RobotWorker.prefab", () =>
             {
-                s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
-                t.CanAttack = false;    // harmless, but a snitch
-                t.AlarmRadius = 40f;
-                t.CanUseStairs = false; // wheels
-                t.PatrolSpeed = 1.6f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
-            }));
+                var go = MobileRobot("RobotWorker", "robot_worker", "WorkerBody", 0.45f, new Vector3(0, 0.5f, 0.4f), ripple, (s, t, anim) =>
+                {
+                    s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
+                    t.CanAttack = false;    // harmless, but a snitch
+                    t.AlarmRadius = 40f;
+                    t.CanUseStairs = false; // wheels
+                    t.PatrolSpeed = 1.6f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
+                    t.CargoChance = 0.6f;   // carries loot on its tray: hack it and it drops it
+                });
+                // The tray on top of the box it carries (model: box at 1.15 m, 0.4 high).
+                var rc = go.GetComponent<RobotController>();
+                var cargo = Child(go.transform, "Cargo", new Vector3(0f, 1.36f, 0.15f));
+                rc.CargoMesh = cargo.AddComponent<MeshFilter>();
+                rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
+                rc.CargoRenderer.enabled = false;
+                rc.CargoVisuals = visuals;
+                return go;
+            });
+            Robot(RobotKind.Sweeper, RobotPrefabs + "/RobotSweeper.prefab", () =>
+            {
+                var go = MobileRobot("RobotSweeper", "robot_sweeper", "SweeperBody", 0.4f, new Vector3(0, 0.5f, 0.35f), ripple, (s, t, anim) =>
+                {
+                    s.HasEyes = false; s.HearingMultiplier = 0f; s.ContactDistance = 0.9f; // blind and deaf: only the floor lidar
+                    s.LidarRange = 6f; s.LidarHeight = 0.22f; s.LidarTurnSpeed = 140f; s.LidarRate = 15f;
+                    t.CanUseStairs = false; // wheels
+                    t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.4f; t.AttackRange = 1.3f;
+                });
+                var rc = go.GetComponent<RobotController>();
+                var lidar = go.AddComponent<RobotLidar>();
+                lidar.Robot = rc;
+                lidar.Head = Find(go, "AccentLidar");
+                lidar.Line = Beam(go, "LidarBeam", 0.025f);
+                rc.Lidar = lidar;
+                return go;
+            });
             Robot(RobotKind.Hunter, RobotPrefabs + "/RobotHunter.prefab", () => MobileRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), ripple, (s, t, anim) =>
             {
                 s.ViewDistance = 16f; s.ViewAngle = 120f; s.DetectionSpeed = 1f; // everything at once
@@ -226,13 +257,21 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        static Light StatusLight(Transform parent, Vector3 position, float range, float intensity)
+        /// <summary>
+        /// Status light of a robot / device: a small spot with shadows (pitched <paramref name="pitch"/>° down from the robot's
+        /// forward) — walls and slabs keep it in the room, it never glows through a floor.
+        /// </summary>
+        static Light StatusLight(Transform parent, Vector3 position, float range, float intensity, float pitch)
         {
-            var light = Child(parent, "StatusLight", position).AddComponent<Light>();
-            light.type = LightType.Point;
+            var go = Child(parent, "StatusLight", position);
+            go.transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Spot;
+            light.spotAngle = 130f;
+            light.innerSpotAngle = 60f;
             light.range = range;
             light.intensity = intensity;
-            light.shadows = LightShadows.None;
+            ShadowedLight(light, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
             return light;
         }
 
@@ -269,8 +308,9 @@ namespace Stealth.EditorTools
             rc.Point = eye.transform;
             rc.Eye = eye.transform;
             rc.Status.Renderers = Parts(model, "Eye");
-            rc.Status.Light = StatusLight(root.transform, eyePos + new Vector3(0, 0.05f, 0.15f), 3.5f, 2.5f);
+            rc.Status.Light = StatusLight(root.transform, eyePos + new Vector3(0, 0.05f, 0.15f), 3.5f, 2.5f, 35f);
             rc.RadioRipplePrefab = ripple;
+            rc.StompRipplePrefab = s_StompRipple;
             // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
             BuildSensorRig(root, model, rc, eyePos, radius);
@@ -332,7 +372,7 @@ namespace Stealth.EditorTools
             root.AddComponent<DetectorNet>();
             device.Point = eye.transform;
             device.Status.Renderers = Parts(model, "Eye");
-            device.Status.Light = StatusLight(root.transform, b.center + Vector3.up * (b.extents.y + 0.1f), 3f, 2f);
+            device.Status.Light = StatusLight(root.transform, b.center + Vector3.up * (b.extents.y + 0.1f), 3f, 2f, 90f);
             config(root, device);
             return root;
         }
@@ -360,7 +400,7 @@ namespace Stealth.EditorTools
             var spotGo = Child(pivot.transform, "Spot", new Vector3(0, -0.02f, 0.25f));
             var spot = spotGo.AddComponent<Light>();
             spot.type = LightType.Spot;
-            spot.shadows = LightShadows.None;
+            ShadowedLight(spot, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium);
 
             var sc = root.AddComponent<SecurityCamera>();
             root.AddComponent<DetectorNet>();
@@ -395,6 +435,25 @@ namespace Stealth.EditorTools
                 .Select(i => Cube(root.transform, $"Beam{i}", new Vector3(0, 1f, 0), new Vector3(1.8f, LaserGate.BeamThickness, LaserGate.BeamThickness), M("Laser"), false).transform)
                 .ToArray();
             return root;
+        }
+
+        static RadioRipple s_StompRipple;
+
+        /// <summary>The floor wave of a seismic stomp: a wide ring running out along the floor (radius set per robot).</summary>
+        static GameObject BuildStompRipple()
+        {
+            var go = BuildRadioRipple();
+            go.name = "StompRipple";
+            var lr = go.GetComponent<LineRenderer>();
+            lr.sharedMaterial = M("Stomp");
+            lr.positionCount = 64;
+            var r = go.GetComponent<RadioRipple>();
+            r.Duration = 1.1f;
+            r.StartRadius = 0.6f;
+            r.EndRadius = 10f;
+            r.Height = 0.04f;
+            r.Width = 0.14f;
+            return go;
         }
 
         static GameObject BuildRadioRipple()

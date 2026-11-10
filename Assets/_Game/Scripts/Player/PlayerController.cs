@@ -105,6 +105,11 @@ namespace Stealth.Player
         public Vector3 Position => transform.position;
         public bool IsCrouching => Crouching;
         public bool IsDown => !IsSpawned || Downed;
+        /// <summary>Lying with no HP: only a teammate can lift you (lying with HP left you get up yourself).</summary>
+        public bool KnockedOut => Downed && Hp == 0;
+        /// <summary>Owner: lying with HP left long enough to get up (Space).</summary>
+        public bool CanGetUp => Downed && Hp > 0 && Time.time >= m_DownedSince + m_HealthSettings.GetUpDelay;
+        float m_DownedSince;
         public float GroundSpeed => ServerSpeed;
         public bool Carries(int color) => m_Inventory != null && m_Inventory.Carries(color);
 
@@ -181,6 +186,7 @@ namespace Stealth.Player
         /// <summary>Client: health as decided by the server.</summary>
         public void ApplyServerState(int hp, bool downed)
         {
+            if (downed && !Downed) m_DownedSince = Time.time;
             Hp = hp;
             Downed = downed;
         }
@@ -240,8 +246,9 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             if (layout == null) return;
             bool outside = !layout.IsInside(transform.position);
-            float target = outside ? 0.22f : 0.03f;
-            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 0.25f);
+            // Outside the gas is a wall: 1.5 m away nothing is seen — lose sight of the house and you are lost.
+            float target = outside ? LightMath.GasFogDensity : 0.03f;
+            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 3f);
             RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, outside ? LightMath.GasFog : LightMath.NightFog, Time.deltaTime * 2f);
             Camera.backgroundColor = RenderSettings.fogColor;
         }
@@ -327,6 +334,12 @@ namespace Stealth.Player
 
         void UpdateInteractions(Keyboard kb)
         {
+            // Knocked down with HP left: Space gets you up — when the robot that hit you has gone.
+            if (Downed && !GameMenu.IsOpen && CanGetUp && kb.spaceKey.wasPressedThisFrame)
+            {
+                if (m_Link != null) m_Link.SendGetUp();
+                else OnGetUpRequest();
+            }
             if (GameMenu.IsOpen) { ReviveProgress = 0; ReviveTarget = null; return; }
             // A failed run is restarted by any player — usually everybody is down by then.
             var game = GameManager.Instance;
@@ -415,8 +428,15 @@ namespace Stealth.Player
 
         void PublishHealth()
         {
+            if (m_Health.Downed && !Downed) m_DownedSince = Time.time;
             Hp = m_Health.Hp;
             Downed = m_Health.Downed;
+        }
+
+        /// <summary>Server: the owner wants to get up (lying with HP left).</summary>
+        public void OnGetUpRequest()
+        {
+            if (m_Health.GetUp(Time.time)) PublishHealth();
         }
 
         // ------------------------------------------------------------------ messages (delivered by the network twin)
@@ -453,7 +473,7 @@ namespace Stealth.Player
         public void OnGasKnockoutRequest()
         {
             if (Downed) return;
-            m_Health.Knockout();
+            m_Health.Knockout(Time.time);
             PublishHealth();
         }
 

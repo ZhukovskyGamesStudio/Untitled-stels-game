@@ -72,6 +72,8 @@ namespace Stealth.Tests
         public void SendNoise(Vector3 position, float radius) => Noises.Add(radius);
         public void SendGasKnockout() => GasKnockouts++;
         public void SendRevive(PlayerController target) => Revives.Add(target);
+        public int GetUps;
+        public void SendGetUp() => GetUps++;
         public void SendHack(Detector target) => Hacks.Add(target);
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedback.Add(awayFromSource);
     }

@@ -59,6 +59,17 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ACameraBeepsFasterAsItNoticesYou()
+        {
+            Assert.IsTrue(float.IsInfinity(AudioRules.CameraBeepInterval(0f)), "silent while it notices nobody");
+            Assert.Greater(AudioRules.CameraBeepInterval(0.2f), AudioRules.CameraBeepInterval(0.6f));
+            Assert.Greater(AudioRules.CameraBeepInterval(0.6f), AudioRules.CameraBeepInterval(0.95f));
+            Assert.Less(AudioRules.CameraBeepInterval(0.95f), 0.15f, "a trill just before the alarm");
+            Assert.IsTrue(float.IsInfinity(AudioRules.CameraBeepInterval(1f)), "the siren takes over");
+            Assert.Greater(AudioRules.CameraBeepPitch(0.9f), AudioRules.CameraBeepPitch(0.1f));
+        }
+
+        [Test]
         public void RobotsWarnThenAnnounceTheChaseAndTheLoss()
         {
             Assert.AreEqual(RobotVoice.Spotted, AudioRules.Voice(RobotState.Suspicious, RobotState.Alerted));
@@ -66,7 +77,7 @@ namespace Stealth.Tests
             Assert.AreEqual(RobotVoice.Chase, AudioRules.Voice(RobotState.Alerted, RobotState.Chase));
             Assert.AreEqual(RobotVoice.Lost, AudioRules.Voice(RobotState.Chase, RobotState.Investigate));
             Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Patrol, RobotState.Investigate), "checking a noise is silent");
-            Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Chase, RobotState.Patrol), "target downed");
+            Assert.AreEqual(RobotVoice.Eliminated, AudioRules.Voice(RobotState.Chase, RobotState.Patrol), "target knocked down");
             Assert.AreEqual(RobotVoice.None, AudioRules.Voice(RobotState.Alerted, RobotState.Alerted));
         }
     }

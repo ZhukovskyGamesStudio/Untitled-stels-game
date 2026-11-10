@@ -396,9 +396,9 @@ namespace Stealth.Level
                 case 1: // bookcases along the wall
                     Prop(l, PropKind.Bookshelf, q.P(1.8f, 4.65f), q.InV);
                     Prop(l, PropKind.Bookshelf, q.P(2.85f, 4.65f), q.InV);
-                    Prop(l, PropKind.Cabinet, q.P(4.0f, 4.55f), q.InV);
+                    Prop(l, PropKind.Safe, q.P(4.0f, 4.4f), q.InV);
                     Prop(l, PropKind.Plant, q.P(4.4f, 2.0f), 0f);
-                    Item(l, q.P(4.0f, 4.55f, 1.4f));
+                    Item(l, q.P(4.0f, 4.4f, 1.02f)); // on the safe
                     break;
                 case 2: // guest corner
                     Prop(l, PropKind.Armchair, q.P(2.2f, 3.8f), q.InV);
@@ -537,17 +537,17 @@ namespace Stealth.Level
                     Prop(l, PropKind.Armchair, q.P(3.4f, 2.6f), q.OutV);
                     Prop(l, PropKind.Plant, q.P(4.4f, 4.4f), 0f);
                     break;
-                case 2:
-                    Prop(l, PropKind.Bookshelf, q.P(2.0f, 4.65f), q.InV);
-                    Prop(l, PropKind.Bookshelf, q.P(3.05f, 4.65f), q.InV);
-                    Prop(l, PropKind.Armchair, q.P(2.6f, 2.8f), q.OutV);
-                    Prop(l, PropKind.Plant, q.P(4.4f, 2.0f), 0f);
+                case 2: // games corner: table tennis (you can stand on it) and a bean bag
+                    Prop(l, PropKind.PingPongTable, q.P(3.0f, 3.3f), 0f);
+                    Prop(l, PropKind.BeanBag, q.P(1.7f, 1.7f), 0f);
+                    Item(l, q.P(3.6f, 3.3f, 0.78f));
                     break;
                 default:
                     Prop(l, PropKind.VendingMachine, q.P(4.4f, 3.0f), q.InU);
                     Prop(l, PropKind.WaterCooler, q.P(4.6f, 4.4f), q.InU);
                     Prop(l, PropKind.RoundTable, q.P(2.5f, 2.6f), 0f);
                     Prop(l, PropKind.Chair, q.P(2.5f, 3.5f), q.InV);
+                    Prop(l, PropKind.ArcadeMachine, q.P(2.2f, 4.35f), q.InV);
                     Item(l, q.P(2.5f, 2.6f, 0.76f));
                     break;
             }
@@ -600,6 +600,8 @@ namespace Stealth.Level
                     }
 
             int robots = s.Robots + level * s.RobotsPerHouse + (l.Floors - 1) * s.RobotsPerExtraFloor;
+            var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
+            var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
             {
                 // Make sure every floor gets at least one robot, then spread randomly.
@@ -612,6 +614,7 @@ namespace Stealth.Level
                 else cell = candidates[rng.Next(candidates.Count)];
                 var pos = l.CellCenter(cell.z, cell.x, cell.y) + new Vector3(Range(rng, -1f, 1f), 0, Range(rng, -1f, 1f));
                 var kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                if (i < freshRobots.Count) kind = freshRobots[i]; // the house that introduces a kind shows it
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
 
@@ -621,6 +624,7 @@ namespace Stealth.Level
             for (int i = 0; i < devices; i++)
             {
                 var kind = RobotRoster.PickDevice(level, rng, s.Roster);
+                if (i < freshDevices.Count) kind = freshDevices[i];
                 Vector3Int cell;
                 Vector3 pos;
                 Quaternion rot;

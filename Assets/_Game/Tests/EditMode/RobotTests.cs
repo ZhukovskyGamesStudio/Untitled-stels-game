@@ -31,7 +31,8 @@ namespace Stealth.Tests
                 Assert.IsNotNull(rig, $"{go.name} has a sensor rig");
                 Assert.AreSame(rc, rig.Robot);
                 var (eyes, ears, ground, nose) = SensorRig.Mounts(rc.Senses);
-                Assert.IsTrue(eyes || ears || ground || nose, $"{go.name} shows at least one sensor");
+                bool lidar = rc.Senses.LidarRange > 0f && rc.Lidar != null && rc.Lidar.Head != null; // the spinning puck shows itself
+                Assert.IsTrue(eyes || ears || ground || nose || lidar, $"{go.name} shows at least one sensor");
                 foreach (var r in rig.Eyes[0].GetComponentsInChildren<Renderer>())
                     if (r.name.StartsWith("Eye")) CollectionAssert.Contains(rc.Status.Renderers, r, $"{go.name}: the eye lens glows in the status colour");
             }
@@ -176,14 +177,54 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void SeismicFeelsWalkersButNotSneakers()
+        public void ASeismicWaveFeelsWhoeverMovesWhenItPasses()
         {
-            var sensor = new Vector3(0, 0, 0);
-            Assert.IsTrue(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 3.6f, false, 10f), "walking");
-            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 1.8f, true, 10f), "crouching");
-            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(6, 0, 0), 0.2f, false, 10f), "standing still");
-            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(12, 0, 0), 6f, false, 10f), "too far");
-            Assert.IsFalse(SeismicSense.Feels(sensor, new Vector3(2, 3.5f, 0), 6f, false, 10f), "other floor");
+            Assert.AreEqual(4.5f, SeismicSense.WaveRadius(0.5f, 9f), 1e-4f);
+            Assert.IsTrue(SeismicSense.WaveTouches(4.6f, 4.5f, 9f, 0.016f), "the front is at the player");
+            Assert.IsFalse(SeismicSense.WaveTouches(8f, 4.5f, 9f, 0.016f), "not there yet");
+            float walk = SeismicSense.WaveSuspicion(0.45f, 3.6f, false, 5f, 10f);
+            Assert.Greater(walk, 0.1f, "walking: felt");
+            Assert.AreEqual(0f, SeismicSense.WaveSuspicion(0.45f, 0f, false, 5f, 10f), "standing still: the wave passes by");
+            Assert.Less(SeismicSense.WaveSuspicion(0.45f, 1.8f, true, 5f, 10f), walk * 0.3f, "crouching: barely");
+            Assert.Greater(SeismicSense.WaveSuspicion(0.45f, 6.5f, false, 5f, 10f), walk, "running: more");
+            Assert.Greater(walk, SeismicSense.WaveSuspicion(0.45f, 3.6f, false, 9.5f, 10f), "weaker far out");
+            Assert.AreEqual(0f, SeismicSense.WaveSuspicion(0.45f, 3.6f, false, 11f, 10f), "out of range");
+        }
+
+        [Test]
+        public void TheFloorLidarSeesFeetOnTheFloorNotOnAChair()
+        {
+            var robot = Vector3.zero;
+            var dir = Vector3.forward;
+            var start = robot + Vector3.up * 0.22f;
+            Assert.IsTrue(ScanLine.Crosses(start, dir, 6f, false, new Vector3(0.1f, 0f, 3f)) && !ScanLine.Above(0f, start.y), "standing on the floor in the line");
+            Assert.IsTrue(ScanLine.Above(0.48f, start.y), "on a chair: above the line");
+            Assert.IsTrue(ScanLine.Above(0.77f, start.y), "on a desk: above the line");
+            Assert.IsFalse(ScanLine.Crosses(start, dir, 2.5f, false, new Vector3(0f, 0f, 3f)), "the line stops at the desk in between");
+        }
+
+        [Test]
+        public void NewKindsAppearInTheHouseThatIntroducesThem()
+        {
+            var roster = new RosterSettings();
+            Assert.IsEmpty(RobotRoster.Newcomers(roster.Robots, 0), "the first house has no showcase");
+            var second = RobotRoster.Newcomers(roster.Robots, 1);
+            CollectionAssert.Contains(second, RobotKind.Spider);
+            CollectionAssert.Contains(second, RobotKind.Sweeper);
+            for (int seed = 1; seed <= 20; seed++)
+            {
+                var l = LevelGenerator.Generate(seed, 1);
+                foreach (var kind in second)
+                    Assert.IsTrue(l.RobotSpawns.Exists(r => r.Kind == kind), $"seed {seed}: no {kind} in the house that introduces it");
+            }
+        }
+
+        [Test]
+        public void CargoPacksShapeAndColour()
+        {
+            for (byte shape = 0; shape < 8; shape++)
+                for (byte color = 0; color < 6; color++)
+                    Assert.AreEqual((shape, color), Detector.DecodeCargo(Detector.EncodeCargo(shape, color)));
         }
     }
 }

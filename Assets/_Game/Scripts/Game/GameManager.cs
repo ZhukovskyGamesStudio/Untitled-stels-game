@@ -199,7 +199,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
             foreach (var p in PlayerController.All)
-                if (!p.Downed) return;
+                if (!p.KnockedOut) return; // lying with HP left is not out: they get up
             if (m_Run.Wipe()) Banner($"Забег окончен: Вся команда выведена из строя. Итог забега: {RunTotal} очк.");
         }
 
@@ -249,7 +249,7 @@ namespace Stealth.Game
             var sender = PlayerController.Find(senderClientId);
             if (sender == null || !Hatch.IsNear(sender.transform.position)) return;
             int down = 0;
-            foreach (var p in PlayerController.All) if (p.Downed) down++;
+            foreach (var p in PlayerController.All) if (p.KnockedOut) down++;
             int collected = Collected, quota = Quota;
             switch (m_Run.Leave(down))
             {

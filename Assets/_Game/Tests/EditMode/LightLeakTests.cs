@@ -43,6 +43,51 @@ namespace Stealth.Tests
                 }
         }
 
+        [Test]
+        public void RobotAndDeviceLightsCastShadows()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs/Robots", "Assets/_Game/Prefabs/Sensors" }))
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+                foreach (var light in prefab.GetComponentsInChildren<Light>(true))
+                    Assert.AreNotEqual(LightShadows.None, light.shadows, $"{prefab.name}/{light.name} would glow through floors and walls");
+            }
+        }
+
+        /// <summary>
+        /// Every material reacts to light. One that glows must glow for real (HDR emission above the bloom threshold) —
+        /// a dim emission just looks like a material that ignores the lamps. Unlit only for effects and the gas behind windows.
+        /// </summary>
+        [Test]
+        public void MaterialsEitherTakeLightOrReallyGlow()
+        {
+            var unlitAllowed = new HashSet<string> { "Laser", "Radio", "Stomp", "Window" };
+            foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/_Game/Art/Materials" }))
+            {
+                var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+                if (mat.shader.name.Contains("Unlit"))
+                {
+                    Assert.IsTrue(unlitAllowed.Contains(mat.name), $"{mat.name} is unlit: it ignores the lamps");
+                    continue;
+                }
+                if (!mat.IsKeywordEnabled("_EMISSION")) continue;
+                var e = mat.GetColor("_EmissionColor");
+                Assert.GreaterOrEqual(Mathf.Max(e.r, Mathf.Max(e.g, e.b)), 1f, $"{mat.name} glows dimly: make it bloom or not glow");
+            }
+        }
+
+        [Test]
+        public void OnlyTheNearestLampsThatFitTheShadowAtlasAreDrawn()
+        {
+            Assert.AreEqual(1.5f, LightBudget.Cost(LightType.Point, 9.5f), 1e-4f, "a room lamp: six medium maps");
+            Assert.Less(LightBudget.Cost(LightType.Spot, 3f), LightBudget.Cost(LightType.Spot, 14f), "a small lamp is cheap");
+            var costs = new List<float> { 1.5f, 1.5f, 1.5f, 1.5f, 0.0625f, 1.5f };
+            var on = new bool[costs.Count];
+            LightBudget.Choose(costs, 5f, on);
+            CollectionAssert.AreEqual(new[] { true, true, true, false, true, false }, on, "nearest first; a small one still fits");
+            Assert.AreEqual(LightBudget.Budget, 13f, 1e-4f);
+        }
+
         readonly List<GameObject> m_Objects = new();
         List<LightSource> m_Disabled;
 

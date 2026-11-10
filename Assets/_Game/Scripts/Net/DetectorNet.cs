@@ -16,6 +16,7 @@ namespace Stealth.Net
         readonly NetworkVariable<byte> m_Mode = new();
         readonly NetworkVariable<sbyte> m_Variant = new(-1);
         readonly NetworkVariable<ulong> m_Target = new(Detector.Nobody);
+        readonly NetworkVariable<short> m_Cargo = new(-1);
         Detector m_Detector;
 
         void Awake() => m_Detector = GetComponent<Detector>();
@@ -31,6 +32,7 @@ namespace Stealth.Net
             m_Mode.OnValueChanged += (_, _) => Pull();
             m_Variant.OnValueChanged += (_, _) => Pull();
             m_Target.OnValueChanged += (_, _) => Pull();
+            m_Cargo.OnValueChanged += (_, _) => Pull();
         }
 
         public override void OnNetworkDespawn() => m_Detector.Despawned();
@@ -49,6 +51,7 @@ namespace Stealth.Net
             NetSync.Set(m_Mode, s.Mode);
             NetSync.Set(m_Variant, s.Variant);
             NetSync.Set(m_Target, s.Target);
+            NetSync.Set(m_Cargo, s.Cargo);
         }
 
         void Pull() => m_Detector.ApplyReplicated(new DetectorSnapshot
@@ -59,6 +62,7 @@ namespace Stealth.Net
             Mode = m_Mode.Value,
             Variant = m_Variant.Value,
             Target = m_Target.Value,
+            Cargo = m_Cargo.Value,
         });
 
         public void BroadcastPulse(byte effect) => PulseRpc(effect);

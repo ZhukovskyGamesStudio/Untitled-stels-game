@@ -150,9 +150,6 @@ namespace Stealth.Tests
         [Test]
         public void SeismicAndMotionSensorsFeelFastMovementStronger()
         {
-            Assert.Greater(SensorMath.SeismicRate(1.1f, 1f, 10f, 4f), SensorMath.SeismicRate(1.1f, 9f, 10f, 4f), "closer");
-            Assert.Greater(SensorMath.SeismicRate(1.1f, 5f, 10f, 6.5f), SensorMath.SeismicRate(1.1f, 5f, 10f, 2f), "running");
-            Assert.AreEqual(1.1f * 0.5f, SensorMath.SeismicRate(1.1f, 10f, 10f, 4f), 1e-4f);
             Assert.Greater(SensorMath.MotionRate(3f, 6f, 4f, 9f, 1f), SensorMath.MotionRate(3f, 3f, 4f, 9f, 1f), "faster");
             Assert.Greater(SensorMath.MotionRate(3f, 4f, 2f, 9f, 1f), SensorMath.MotionRate(3f, 4f, 8f, 9f, 1f), "closer");
             Assert.Greater(SensorMath.MotionRate(3f, 4f, 4f, 9f, 1f), SensorMath.MotionRate(3f, 4f, 4f, 9f, 0.4f), "more of the body in view");

@@ -31,6 +31,12 @@ namespace Stealth.UI
     {
         static readonly List<Prompt> s_Prompts = new();
 
+        /// <summary>What a player lying on the floor reads.</summary>
+        public static string DownedText(int hp, bool canGetUp) =>
+            hp <= 0 ? "Без сознания. Союзник может поднять тебя (E рядом)"
+            : canGetUp ? "Ты на полу. Лежачих роботы не трогают — дождись, пока уйдут. Пробел — встать"
+            : "Сбит с ног!";
+
         public static Prompt Choose(in PromptContext c)
         {
             s_Prompts.Clear();

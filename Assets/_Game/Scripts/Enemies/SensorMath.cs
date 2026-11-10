@@ -103,10 +103,6 @@ namespace Stealth.Enemies
             return Mathf.Clamp(playerSpeed / Mathf.Max(s.ReferenceSpeed, 0.01f), s.MinSpeedFactor, s.MaxSpeedFactor);
         }
 
-        /// <summary>Floor vibrations: stronger close by and when running. Call only when <see cref="SeismicSense.Feels"/> is true.</summary>
-        public static float SeismicRate(float seismicSpeed, float horizontalDistance, float range, float playerSpeed, VibrationSettings s = null) =>
-            seismicSpeed * Mathf.Lerp(0.5f, 2f, 1f - Mathf.Clamp01(horizontalDistance / range)) * SpeedFactor(playerSpeed, s);
-
         /// <summary>Motion sensor: faster movement, closer and more of the body in view — faster alarm.</summary>
         public static float MotionRate(float detectionRate, float playerSpeed, float distance, float range, float exposure,
             VibrationSettings s = null, VisionSettings v = null) =>

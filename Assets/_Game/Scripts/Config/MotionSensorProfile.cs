@@ -9,7 +9,7 @@ namespace Stealth.Enemies
         public float Range = 9f;
         public float ViewAngle = 100f;
         [Tooltip("Moving faster than this is noticed (crouch-walk 1.8, walk 3.6 m/s).")]
-        public float SpeedThreshold = 2.2f;
+        public float SpeedThreshold = 0.35f;
         public float DetectionRate = 3f;
     }
 }

@@ -343,6 +343,22 @@ def turret_shot():
     return fade(mix(at(zap * 0.7, 0, d), at(crack, 0, d), boom))
 
 
+def seismic_thump():
+    """Seismic robot stomps the floor: a deep thud and a rumble running away."""
+    d = 1.2
+    thud = sine(48, 0.5) * env(int(0.5 * SR), 0.003, 0.4, curve=3)
+    knock = lowpass(noise(0.12), 400) * env(int(0.12 * SR), 0.001, 0.08)
+    rumble = lowpass(brown(d), 120) * env(int(d * SR), 0.05, 1.0, curve=2) * 0.8
+    return fade(mix(thud, at(knock, 0, d), rumble))
+
+
+def camera_beep():
+    """Short electronic beep of a camera that is noticing someone (repeats faster and faster)."""
+    d = 0.07
+    b = sine(2100, d) * 0.7 + sine(4200, d) * 0.15
+    return fade(b * env(int(d * SR), 0.002, 0.06, sustain=0.7), 0.002, 0.015)
+
+
 def robot_step():
     """Metal foot on the floor."""
     d = 0.2
@@ -578,6 +594,10 @@ def main():
     write(P("Music", "music_menu"), music_menu(), 0.8)
     write(P("Music", "music_explore"), music_explore(), 0.8)
     write(P("Music", "music_chase"), music_chase(), 0.8)
+
+    # Added later: keep them last so the seeded noise of everything above stays the same.
+    write(P("Robots", "seismic_thump"), seismic_thump(), 0.9)
+    write(P("Robots", "camera_beep"), camera_beep(), 0.6)
 
 
 if __name__ == "__main__":

@@ -73,7 +73,9 @@ namespace Stealth.Level
         public static readonly Color NightAmbient = Color.black;
         /// <summary>Fog indoors (dark, only takes the distance away) and the gas outside.</summary>
         public static readonly Color NightFog = new(0.012f, 0.014f, 0.02f);
-        public static readonly Color GasFog = new(0.55f, 0.6f, 0.5f);
+        public static readonly Color GasFog = new(0.33f, 0.37f, 0.3f);
+        /// <summary>Exponential-squared density of the gas outside: ~95% fog at 1.5 m.</summary>
+        public const float GasFogDensity = 1.15f;
 
         /// <summary>Intensity of a normal ceiling lamp (the panel glows fully at it).</summary>
         public const float RoomIntensity = 3.6f;

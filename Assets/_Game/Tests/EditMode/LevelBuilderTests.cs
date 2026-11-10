@@ -79,7 +79,7 @@ namespace Stealth.Tests
             var root = ActiveLevel.Load(layout, art);
             Assert.AreSame(layout, ActiveLevel.Layout);
             Assert.AreEqual(layout.Stairs.Count, CountNamed(root, "Stairs_"), "one staircase prefab per stair");
-            Assert.AreEqual(layout.AutoDoors.Count, root.GetComponentsInChildren<AutoDoor>().Length);
+            Assert.AreEqual(layout.AutoDoors.Count + layout.ExteriorDoors.Count, root.GetComponentsInChildren<AutoDoor>().Length, "inner sliding doors + a door in every exit");
             Assert.AreEqual(layout.Floors * layout.Width * layout.Height, root.GetComponentsInChildren<RoomLight>().Length, "ceiling lights in every room");
             Assert.Greater(root.GetComponentsInChildren<LightSource>().Length, layout.Floors * layout.Width * layout.Height, "plus exit signs and lamps");
             Assert.IsNotNull(root.GetComponent<Unity.AI.Navigation.NavMeshSurface>(), "the root carries the navmesh surface");

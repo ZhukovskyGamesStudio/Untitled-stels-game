@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Stealth.Level
@@ -20,6 +21,7 @@ namespace Stealth.Level
         MotionSensor,   // wall PIR: notices fast movement
         PressurePlate,  // floor tile: stepping on it raises an alarm
         Camera,         // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
+        Sweeper,        // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk
     }
 
     /// <summary>One line of the security roster: from which house a kind appears and how often.</summary>
@@ -55,6 +57,7 @@ namespace Stealth.Level
             new(RobotKind.Listener, 0, 3f),
             new(RobotKind.Worker, 0, 2f),
             new(RobotKind.Vacuum, 0, 1.5f),
+            new(RobotKind.Sweeper, 1, 2f),
             new(RobotKind.Drone, 1, 2f),
             new(RobotKind.Spider, 1, 2f),
             new(RobotKind.Thumper, 2, 2f),
@@ -66,7 +69,7 @@ namespace Stealth.Level
         public static RosterEntry[] DefaultDevices() => new RosterEntry[]
         {
             new(RobotKind.PressurePlate, 0, 2f),
-            new(RobotKind.MotionSensor, 1, 2f),
+            new(RobotKind.MotionSensor, 0, 2f),
             new(RobotKind.Lidar, 1, 1.5f),
         };
 
@@ -77,6 +80,14 @@ namespace Stealth.Level
             k == RobotKind.Guard || k == RobotKind.Drone || k == RobotKind.Hound || k == RobotKind.Hunter || k == RobotKind.Sorter;
 
         public static RobotKind PickRobot(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Robots, level, rng);
+
+        /// <summary>Kinds that first appear on this house: each of them is placed at least once there, so players meet it.</summary>
+        public static List<RobotKind> Newcomers(RosterEntry[] table, int level)
+        {
+            var list = new List<RobotKind>();
+            foreach (var e in table) if (e.MinLevel == level && level > 0 && e.Weight > 0f) list.Add(e.Kind);
+            return list;
+        }
         public static RobotKind PickDevice(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Devices, level, rng);
 
         public static bool IsUnlocked(RobotKind k, int level, RosterSettings roster = null)

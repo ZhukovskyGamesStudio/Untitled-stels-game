@@ -23,6 +23,7 @@ LINES = {
     "voice_spotted": "Обнаружен нарушитель.",
     "voice_chase": "Веду преследование.",
     "voice_lost": "Нарушитель потерян.",
+    "voice_eliminated": "Нарушитель устранён.",
 }
 
 SPEAK = r"""
@@ -101,7 +102,7 @@ def main():
         for name, text in LINES.items():
             voice = robotize(trim(speak(text, os.path.join(tmp, name + ".wav"))))
             # Radio chirp in front (up for alarms, down for "lost"), then the line.
-            up = name != "voice_lost"
+            up = name not in ("voice_lost", "voice_eliminated")
             pre = np.concatenate([chirp(900, 1500, 0.07) if up else chirp(1500, 900, 0.07), np.zeros(int(0.05 * SR))])
             x = np.concatenate([pre * 0.6, voice / max(np.max(np.abs(voice)), 1e-9), np.zeros(int(0.05 * SR))])
             write(os.path.join(out, "Robots", name + ".wav"), x)

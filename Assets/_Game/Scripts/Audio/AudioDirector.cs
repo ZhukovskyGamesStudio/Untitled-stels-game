@@ -48,7 +48,7 @@ namespace Stealth.Audio
         class Watched
         {
             public int Level; public bool Hacked; public float Cooldown; public Vector3 Pos; public float NextStep;
-            public RobotState Robot; public float VoiceFree; public AudioClip Queued;
+            public RobotState Robot; public float VoiceFree; public AudioClip Queued; public float NextBeep;
         }
 
         readonly Dictionary<PlayerController, Walker> m_Players = new();
@@ -280,6 +280,7 @@ namespace Stealth.Audio
                 if (cue != AlertCue.None) w.Level = level;
                 if (robot != null && cue == AlertCue.Alert) cue = AlertCue.None; // robots say it instead
                 if (robot != null) UpdateVoice(robot, w);
+                if (d is SecurityCamera) UpdateCameraBeep(d, w);
                 if (cue != AlertCue.None && Time.time >= w.Cooldown)
                 {
                     Sfx.At(cue == AlertCue.Alert ? Bank.Alert : cue == AlertCue.Suspicious ? Bank.Suspicious : Bank.Lost, d.Position);
@@ -304,10 +305,29 @@ namespace Stealth.Audio
             Prune(m_Detectors, Detector.All);
         }
 
+        /// <summary>A camera that is noticing someone beeps faster and faster until it raises the alarm.</summary>
+        void UpdateCameraBeep(Detector camera, Watched w)
+        {
+            float a = camera.IsHacked ? 0f : camera.Awareness;
+            float interval = AudioRules.CameraBeepInterval(a);
+            if (float.IsInfinity(interval)) { w.NextBeep = 0f; return; }
+            if (Time.time < w.NextBeep) return;
+            if (w.NextBeep > 0f || a > 0.05f)
+                Sfx.At(Bank.CameraBeep, camera.Position, 0.8f, Sfx.Group.Robots, AudioRules.CameraBeepPitch(a));
+            w.NextBeep = Time.time + interval;
+        }
+
         /// <summary>A robot's voice lines; one line at a time per robot (the next one waits for the current to finish).</summary>
         void UpdateVoice(RobotController robot, Watched w)
         {
-            var state = robot.IsHacked ? RobotState.Patrol : robot.State;
+            if (robot.IsHacked)
+            {
+                // Hacked mid-chase: silence, not «устранён».
+                w.Robot = RobotState.Patrol;
+                w.Queued = null;
+                return;
+            }
+            var state = robot.State;
             var voice = AudioRules.Voice(w.Robot, state);
             w.Robot = state;
             var clip = voice switch
@@ -315,6 +335,7 @@ namespace Stealth.Audio
                 RobotVoice.Spotted => Bank.VoiceSpotted,
                 RobotVoice.Chase => Bank.VoiceChase,
                 RobotVoice.Lost => Bank.VoiceLost,
+                RobotVoice.Eliminated => Bank.VoiceEliminated,
                 _ => null,
             };
             if (voice == RobotVoice.Spotted) w.Queued = null; // a new warning replaces anything still waiting

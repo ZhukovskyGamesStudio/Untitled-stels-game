@@ -494,6 +494,52 @@ def model_items():
         export("item_" + name)
 
 
+def model_robot_sweeper():
+    """Floor cleaner on three wheels, ~0.55 m high. Its lidar puck sits under the body at ankle height (spins in game)."""
+    merge("Body", [cylinder(0.38, 0.22, (0, 0, 0.44), segments=24), sphere(0.2, (0, 0.05, 0.56), segments=14)])
+    for i, (x, y) in enumerate([(-0.28, 0.18), (0.28, 0.18), (0.0, -0.3)]):
+        merge(f"AccentWheel{i}", [cylinder(0.08, 0.06, (x, y, 0.08), axis="X", segments=12)])
+    merge("Accent", [cylinder(0.05, 0.16, (0, 0, 0.28), segments=10),                      # stem to the lidar
+                     cylinder(0.14, 0.012, (-0.3, -0.25, 0.012), segments=12),             # side brushes
+                     cylinder(0.14, 0.012, (0.3, -0.25, 0.012), segments=12)])
+    merge("AccentLidar", [cylinder(0.12, 0.07, (0, 0, 0.22), segments=16), box((0.06, 0.05, 0.035), (0, -0.12, 0.22))])
+    merge("Eye", [box((0.24, 0.03, 0.05), (0, -0.37, 0.5)), sphere(0.03, (0, -0.15, 0.22), segments=8)])
+    export("robot_sweeper")
+
+
+# --------------------------------------------------------------------------- more furniture
+
+def model_ping_pong_table():
+    """Table tennis table 2.74 x 1.525, 0.76 high, net across the middle (long side along X)."""
+    merge("Body", [box((2.74, 1.525, 0.03), (0, 0, 0.745))])
+    merge("Accent", [box((0.02, 1.7, 0.15), (0, 0, 0.835)), box((2.74, 0.02, 0.005), (0, 0, 0.762))]
+          + [box((0.06, 0.06, 0.73), (x, y, 0.365)) for x in (-1.2, 1.2) for y in (-0.6, 0.6)])
+    merge("Eye", [box((0.02, 0.02, 0.15), (0, 0.86, 0.835))])                     # net post (no glow: same material as accent)
+    export("ping_pong_table")
+
+
+def model_bean_bag():
+    """Squashed bean bag ~0.9 m across."""
+    merge("Body", [cylinder(0.45, 0.32, (0, 0, 0.16), segments=16, radius2=0.36), sphere(0.33, (0, 0.08, 0.36), segments=14)])
+    export("bean_bag")
+
+
+def model_arcade_machine():
+    """Arcade cabinet 0.7 x 0.8 x 1.75 facing -Y; a glowing screen and a control panel."""
+    merge("Body", [box((0.7, 0.7, 1.75), (0, 0.05, 0.875))])
+    merge("Accent", [box((0.7, 0.3, 0.08), (0, -0.4, 1.0)), box((0.72, 0.1, 0.25), (0, -0.25, 1.68))])
+    merge("Eye", [box((0.56, 0.03, 0.42), (0, -0.31, 1.33))])
+    export("arcade_machine")
+
+
+def model_safe():
+    """Office safe 0.8 x 0.7 x 1.0 with a handle wheel and a keypad on the door (-Y)."""
+    merge("Body", [box((0.8, 0.7, 1.0), (0, 0, 0.5))])
+    merge("Accent", [box((0.7, 0.03, 0.9), (0, -0.36, 0.5)), cylinder(0.1, 0.04, (0.12, -0.39, 0.55), axis="Y", segments=12)])
+    merge("Eye", [box((0.12, 0.02, 0.16), (-0.22, -0.385, 0.65))])
+    export("safe")
+
+
 # --------------------------------------------------------------------------- light fixtures
 
 def model_ceiling_lamp():
@@ -577,5 +623,10 @@ if __name__ == "__main__":
     model_desk_lamp()
     model_floor_lamp()
     model_exit_sign()
+    model_robot_sweeper()
+    model_ping_pong_table()
+    model_bean_bag()
+    model_arcade_machine()
+    model_safe()
     model_items()
     print("DONE")

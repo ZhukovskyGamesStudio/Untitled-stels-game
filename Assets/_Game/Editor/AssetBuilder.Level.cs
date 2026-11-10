@@ -74,6 +74,10 @@ namespace Stealth.EditorTools
                 glow.innerSpotAngle = 60f;
                 return go;
             });
+            var pPingPong = Prefab(p + "PingPongTable.prefab", () => PropObject("PingPongTable", "ping_pong_table", "PingPong", "Ceiling", "Ceiling"));
+            var pBeanBag = Prefab(p + "BeanBag.prefab", () => PropObject("BeanBag", "bean_bag", "BeanBag", "BeanBag", "BeanBag"));
+            var pArcade = Prefab(p + "ArcadeMachine.prefab", () => PropObject("ArcadeMachine", "arcade_machine", "Arcade", "PropAccent", "PropScreen"));
+            var pSafe = Prefab(p + "Safe.prefab", () => PropObject("Safe", "safe", "SafeMetal", "Metal", "Keypad"));
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
             {
                 var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
@@ -111,6 +115,10 @@ namespace Stealth.EditorTools
                 art.Window = window;
                 art.ExitSign = exitSign;
                 art.DeskLamp = pDeskLamp;
+                art.PingPongTable = pPingPong;
+                art.BeanBag = pBeanBag;
+                art.ArcadeMachine = pArcade;
+                art.Safe = pSafe;
                 art.FloorLamp = pFloorLamp;
                 art.Hatch = hatch;
                 art.Desk = desk;
@@ -150,6 +158,7 @@ namespace Stealth.EditorTools
         static GameObject BuildLevelRoot()
         {
             var root = new GameObject("LevelRoot");
+            root.AddComponent<LightBudget>(); // only the lamps that fit the shadow atlas are drawn
             var surface = root.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.Children;
             surface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.PhysicsColliders;
@@ -255,23 +264,28 @@ namespace Stealth.EditorTools
             light.color = color;
             light.intensity = intensity;
             light.range = range;
-            light.shadows = shadows;
-            light.shadowNearPlane = 0.1f;
+            light.shadows = LightShadows.None;
             if (shadows != LightShadows.None)
-            {
-                // Full-strength shadows with a small bias: 20 cm walls must not let light creep under them at the floor.
-                light.shadowStrength = 1f;
-                light.shadowBias = 0.03f;
-                light.shadowNormalBias = 0.2f;
-                // The property setters are play-mode only; the serialized fields are what the asset keeps anyway.
-                var data = new SerializedObject(light.GetUniversalAdditionalLightData());
-                data.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue =
-                    shadowTier >= 0 ? shadowTier : UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium;
-                data.FindProperty("m_UsePipelineSettings").boolValue = false;
-                data.ApplyModifiedPropertiesWithoutUndo();
-            }
+                ShadowedLight(light, shadowTier >= 0 ? shadowTier : UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium);
             go.AddComponent<LightSource>();
             return light;
+        }
+
+        /// <summary>
+        /// Full-strength soft shadows with a small bias: 20 cm walls and slabs must not let any light through or under them.
+        /// </summary>
+        static void ShadowedLight(Light light, int tier)
+        {
+            light.shadows = LightShadows.Soft;
+            light.shadowStrength = 1f;
+            light.shadowBias = 0.03f;
+            light.shadowNormalBias = 0.2f;
+            light.shadowNearPlane = 0.1f;
+            // The property setters are play-mode only; the serialized fields are what the asset keeps anyway.
+            var data = new SerializedObject(light.GetUniversalAdditionalLightData());
+            data.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue = tier;
+            data.FindProperty("m_UsePipelineSettings").boolValue = false;
+            data.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>The model's renderers do not shadow the lamp inside them.</summary>
@@ -288,21 +302,24 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("RoomLight");
             var panels = new List<Renderer>();
-            foreach (float x in new[] { -RoomLighting.LampOffset, RoomLighting.LampOffset })
+            // A square fixture of two panels in the middle of the ceiling; the light comes out of it.
+            foreach (float z in new[] { -0.32f, 0.32f })
             {
                 var model = Model("ceiling_lamp");
-                model.name = x < 0 ? "PanelA" : "PanelB";
+                model.name = z < 0 ? "PanelA" : "PanelB";
                 model.transform.SetParent(root.transform, false);
-                model.transform.localPosition = new Vector3(x, 0f, 0f);
+                model.transform.localPosition = new Vector3(0f, 0f, z);
                 Paint(model, "LampHousing", "LampHousing", "LampPanel");
                 NoShadows(model);
                 panels.AddRange(Parts(model, "Eye"));
             }
-            // One point light under the ceiling between the panels: lights the whole room, the ceiling too, and casts
-            // shadows in every direction — walls and slabs keep it inside its room.
-            var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.45f, 0f), Quaternion.identity, LightType.Point,
+            // A point light just under the fixture: precise shadows in every direction keep it inside the room.
+            // An invisible shade between it and the ceiling (casts a shadow, is not drawn) keeps the ceiling around the
+            // fixture from lighting up as if by nothing — a recessed panel shines down, not up.
+            var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.3f, 0f), Quaternion.identity, LightType.Point,
                 Color.white, LightMath.RoomIntensity, 9.5f, LightShadows.Soft);
-            light.shadowStrength = 1f;
+            var shade = Cube(root.transform, "CeilingShade", new Vector3(0f, -0.12f, 0f), new Vector3(2.6f, 0.02f, 2.6f), M("LampHousing"), false);
+            shade.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
             var rl = root.AddComponent<RoomLight>();
             rl.Lamp = light;
             rl.Panels = panels.ToArray();

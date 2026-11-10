@@ -27,7 +27,7 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -92,9 +92,16 @@ LaserGate — отдельная ловушка (не детектор)
 кормит индикатор заметности в HUD. Новый источник света, важный для стелса, — `Light` + компонент `LightSource` в префабе;
 **свет не должен проходить сквозь стены**: эмбиента нет (`LightMath.NightAmbient` = чёрный, туман внутри тёмный), стены/плиты/крыша отбрасывают тени
 с двух сторон, у ламп полные тени (сила 1, малое смещение), а лампы без теней — только маленькие споты, не достающие до соседей (`LightLeakTests`);
-сценарий `darkbox` строит закрытую коробку в освещённом лобби и проверяет, что кадр внутри чёрный; слух — громкость шага у робота с затуханием через стены/двери/перекрытия (`Perception.SoundTransmission`,
+сценарий `darkbox` строит закрытую коробку в освещённом лобби и проверяет, что кадр внутри чёрный; у роботов и устройств статусный свет — спот с тенями;
+**бюджет теней** — `LightBudget` на LevelRoot рисует только ближайшие к камере лампы, что влезают в атлас теней (иначе URP ужимает карты, и
+плеер падал); геймплей от этого не зависит. Материалы: либо освещаются, либо светятся по-настоящему (HDR ≥ 1, bloom) — проверяет `LightLeakTests`; слух — громкость шага у робота с затуханием через стены/двери/перекрытия (`Perception.SoundTransmission`,
 компонент `SoundBlocker` на префабах стен, плит и дверей). Полная шкала → `RobotState.Alerted` («Обнаружен нарушитель», `Traits.WarningTime`)
 → `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
+Удар сбивает с ног (`HealthState.TryHit` → `Downed`): лежачих роботы не видят (`IIntruder.IsDown`), робот говорит «Нарушитель устранён»
+и возвращается к работе; с HP > 0 игрок встаёт сам (`CanGetUp`, Пробел → `IPlayerLink.SendGetUp`), с 0 — только союзник; провал забега — когда все `KnockedOut`.
+Сейсмик — волны (`SeismicSense.Wave*`, `PulseStomp` → кольцо `StompRipple` и звук), подметальщик — лидар у пола (`RobotLidar`),
+рабочие везут лут (`DetectorSnapshot.Cargo`, при взломе падает на пол). `RobotRoster.Newcomers` — новый вид гарантированно есть в доме, где он появляется.
+`RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
 Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
 

@@ -12,19 +12,26 @@ namespace Stealth.Player
         public float ReviveGrace = 2f;
         [Tooltip("Invulnerability when a house starts.")]
         public float LevelStartGrace = 3f;
+        [Tooltip("Knocked down with HP left: seconds on the floor before you can get up yourself.")]
+        public float GetUpDelay = 1.2f;
+        [Tooltip("Invulnerability after getting up.")]
+        public float GetUpGrace = 1f;
     }
 
     /// <summary>
-    /// Server-side health rules (pure, unit tested): 2 HP, the second hit downs you, a short invulnerability
-    /// after every hit so that one robot cannot finish you in the same second.
+    /// Server-side health rules (pure, unit tested): 2 HP. Every hit knocks you down — robots leave a lying player alone.
+    /// With HP left you get up yourself (after <see cref="HealthSettings.GetUpDelay"/>); at 0 HP a teammate must lift you.
+    /// A short invulnerability after every hit so that one robot cannot finish you in the same second.
     /// </summary>
     public struct HealthState
     {
         public const int MaxHp = 2;
 
         public int Hp;
+        /// <summary>Lying on the floor (after any hit).</summary>
         public bool Downed;
         public float InvulnerableUntil;
+        public float DownedAt;
         HealthSettings m_S;
 
         HealthSettings S => m_S ??= new HealthSettings();
@@ -36,21 +43,37 @@ namespace Stealth.Player
             return h;
         }
 
-        /// <summary>Apply one hit. Returns false if it was ignored (downed or invulnerable).</summary>
+        /// <summary>Knocked out: lying with no HP, only a teammate can help.</summary>
+        public bool KnockedOut => Downed && Hp == 0;
+
+        /// <summary>Apply one hit: lose a point and fall. Returns false if it was ignored (already down or invulnerable).</summary>
         public bool TryHit(float now)
         {
             if (Downed || now < InvulnerableUntil) return false;
             InvulnerableUntil = now + S.HitGrace;
             Hp = Mathf.Max(0, Hp - 1);
-            if (Hp == 0) Downed = true;
+            Downed = true;
+            DownedAt = now;
+            return true;
+        }
+
+        /// <summary>Can get up by yourself: down, with HP left, after a moment on the floor.</summary>
+        public bool CanGetUp(float now) => Downed && Hp > 0 && now >= DownedAt + S.GetUpDelay;
+
+        public bool GetUp(float now)
+        {
+            if (!CanGetUp(now)) return false;
+            Downed = false;
+            InvulnerableUntil = now + S.GetUpGrace;
             return true;
         }
 
         /// <summary>Knocked out at once (laughing gas).</summary>
-        public void Knockout()
+        public void Knockout(float now = 0f)
         {
             Hp = 0;
             Downed = true;
+            DownedAt = now;
         }
 
         public void Revive(float now)

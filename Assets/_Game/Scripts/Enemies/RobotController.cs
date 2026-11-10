@@ -30,6 +30,14 @@ namespace Stealth.Enemies
         public Transform Eye;
         [Tooltip("Expanding ring shown on every peer when the robot radios for backup.")]
         public RadioRipple RadioRipplePrefab;
+        [Tooltip("Ring running along the floor when a seismic robot stomps.")]
+        public RadioRipple StompRipplePrefab;
+        [Tooltip("Spinning floor lidar (robots with Senses.LidarRange > 0).")]
+        public RobotLidar Lidar;
+        [Tooltip("Where carried loot shows (workers): a mesh slot on the robot; looks from ItemVisuals.")]
+        public MeshFilter CargoMesh;
+        public MeshRenderer CargoRenderer;
+        public ItemVisuals CargoVisuals;
 
         public RobotState State => (RobotState)Mode;
         /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
@@ -62,6 +70,12 @@ namespace Stealth.Enemies
             m_Agent.Warp(transform.position);
             m_Agent.speed = Traits.PatrolSpeed;
             if (Senses.ColorSorter) SetVariant((sbyte)Random.Range(0, ItemCatalog.Colors.Length));
+            if (Traits.CargoChance > 0f && Random.value < Traits.CargoChance)
+            {
+                var rng = new System.Random((int)NetId * 31 + 7);
+                SetCargo(EncodeCargo((byte)rng.Next(ItemCatalog.Shapes.Length), (byte)ItemCatalog.RandomColor(rng, 0)));
+            }
+            m_NextStomp = Time.time + Random.Range(0.5f, Senses.SeismicPeriod);
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random((int)NetId * 7919 + 17));
             m_Brain.StateChanged += s => SetMode((byte)s);
@@ -82,6 +96,31 @@ namespace Stealth.Enemies
         {
             m_Brain?.Reset(Time.time);
             if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
+            DropCargoServer();
+        }
+
+        /// <summary>Server: a hacked worker drops what it carried in front of itself — take it.</summary>
+        void DropCargoServer()
+        {
+            if (Cargo < 0 || GameManager.Instance == null) return;
+            var (shape, color) = DecodeCargo(Cargo);
+            SetCargo(-1);
+            var at = transform.position + transform.forward * 0.8f;
+            if (NavMesh.SamplePosition(at, out var hit, 1.5f, NavMesh.AllAreas)) at = hit.position;
+            GameManager.Instance.SpawnItemServer(shape, color, at + Vector3.up * 0.02f, transform.eulerAngles.y);
+        }
+
+        protected override void OnStatusChanged() => ShowCargo();
+
+        void ShowCargo()
+        {
+            if (CargoRenderer == null) return;
+            bool has = Cargo >= 0 && CargoVisuals != null;
+            CargoRenderer.enabled = has;
+            if (!has) return;
+            var (shape, color) = DecodeCargo(Cargo);
+            CargoMesh.sharedMesh = CargoVisuals.Meshes[Mathf.Clamp(shape, 0, CargoVisuals.Meshes.Length - 1)];
+            CargoRenderer.sharedMaterial = CargoVisuals.ColorMaterials[Mathf.Clamp(color, 0, CargoVisuals.ColorMaterials.Length - 1)];
         }
 
         /// <summary>Server: go and check a spot (alarm, radio).</summary>
@@ -98,7 +137,11 @@ namespace Stealth.Enemies
                 return;
             }
             float now = Time.time, dt = Time.deltaTime;
-            if (GameManager.SensorsAllowed) m_Brain.OnSensed(Sense(), now, dt);
+            if (GameManager.SensorsAllowed)
+            {
+                m_Brain.OnSensed(Sense(), now, dt);
+                if (Senses.SeismicRange > 0f) Stomp(now, dt);
+            }
             m_Brain.Tick(now, dt);
             if (DevFlags.HoldRobots) m_Agent.isStopped = true;
             ReportAwarenessServer(m_Brain.Awareness, m_Brain.AwarenessFocus);
@@ -122,17 +165,48 @@ namespace Stealth.Enemies
                 bool visibleToFilter = ColorFilter < 0 || target.Carries(ColorFilter);
                 if (Senses.HasEyes && visibleToFilter && Look(target, perception.Vision, out var glimpse))
                     rate = Mathf.Max(rate, Senses.DetectionSpeed * SensorMath.VisionFactor(glimpse, -1f, perception.Vision));
-                if (Senses.SeismicRange > 0f && SeismicSense.Feels(transform.position, target.Position, target.GroundSpeed, target.IsCrouching, Senses.SeismicRange))
-                {
-                    var flat = target.Position - transform.position;
-                    flat.y = 0;
-                    rate = Mathf.Max(rate, SensorMath.SeismicRate(Senses.SeismicSpeed, flat.magnitude, Senses.SeismicRange, target.GroundSpeed, perception.Vibration));
-                }
+                if (Lidar != null && Senses.LidarRange > 0f && Lidar.Touches(target.Position))
+                    rate = Mathf.Max(rate, Senses.LidarRate);
                 if (Senses.SmellRange > 0f)
                     rate = Mathf.Max(rate, ScentTrail.Smell(target.ClientId, transform.position, Senses.SmellRange, Time.time) * Senses.SmellSpeed);
                 if (rate > best.Rate) best = new Sighting { Target = target, Rate = rate, ChasePoint = ChasePointFor(target) };
             }
             return best;
+        }
+
+        // ------------------------------------------------------------------ seismic stomps
+
+        float m_NextStomp = float.MaxValue, m_StompAt = float.NegativeInfinity;
+        readonly HashSet<ulong> m_Felt = new();
+
+        /// <summary>
+        /// Server: every <see cref="RobotSenses.SeismicPeriod"/> the robot stomps and a wave runs along its floor (through walls);
+        /// whoever is moving when the front passes adds suspicion — standing still, you are not felt.
+        /// </summary>
+        void Stomp(float now, float dt)
+        {
+            if (now >= m_NextStomp)
+            {
+                m_NextStomp = now + Senses.SeismicPeriod;
+                m_StompAt = now;
+                m_Felt.Clear();
+                Pulse(PulseStomp);
+            }
+            float radius = SeismicSense.WaveRadius(now - m_StompAt, Senses.SeismicWaveSpeed);
+            if (radius > Senses.SeismicRange + 1f) return;
+            var vibration = Tuning.Perception.Vibration;
+            foreach (var p in PlayerController.All)
+            {
+                IIntruder target = p;
+                if (target.IsDown || m_Felt.Contains(target.ClientId) || !Perception.SameFloor(transform.position, target.Position)) continue;
+                var flat = target.Position - transform.position;
+                flat.y = 0f;
+                float d = flat.magnitude;
+                if (!SeismicSense.WaveTouches(d, radius, Senses.SeismicWaveSpeed, dt)) continue;
+                m_Felt.Add(target.ClientId);
+                float s = SeismicSense.WaveSuspicion(Senses.SeismicSpeed, target.GroundSpeed, target.IsCrouching, d, Senses.SeismicRange, vibration);
+                m_Brain.OnFelt(target.Position, s, target, now);
+            }
         }
 
         /// <summary>A hound that only smells its target walks along the trail; anything else goes straight for it.</summary>
@@ -253,6 +327,20 @@ namespace Stealth.Enemies
 
         protected override void OnPulse(byte effect)
         {
+            if (effect == PulseStomp)
+            {
+                // The wave on every peer: a ring along the floor, a thump, the body dips.
+                if (StompRipplePrefab != null)
+                {
+                    var ring = Instantiate(StompRipplePrefab, transform.position, Quaternion.identity);
+                    ring.EndRadius = Senses.SeismicRange;
+                    ring.Duration = Senses.SeismicRange / Mathf.Max(Senses.SeismicWaveSpeed, 0.1f);
+                }
+                Audio.Sfx.At(Audio.Sfx.Bank?.SeismicThump, transform.position, 1f, Audio.Sfx.Group.Robots, Random.Range(0.92f, 1.05f));
+                var anim = GetComponent<RobotAnimator>();
+                if (anim != null) anim.Stomp();
+                return;
+            }
             if (effect != PulseRadio) return;
             if (RadioRipplePrefab != null) Instantiate(RadioRipplePrefab, transform.position, Quaternion.identity);
             Audio.Sfx.At(Audio.Sfx.Bank?.Radio, Position);

@@ -95,6 +95,8 @@ namespace Stealth.Game
         void SendNoise(Vector3 position, float radius);
         void SendGasKnockout();
         void SendRevive(PlayerController target);
+        /// <summary>Owner → server: get up after being knocked down (HP left).</summary>
+        void SendGetUp();
         void SendHack(Detector target);
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>
         void SendHitFeedback(Vector3 awayFromSource);

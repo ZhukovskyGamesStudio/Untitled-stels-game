@@ -35,9 +35,26 @@ namespace Stealth.Enemies
         [Header("Other")]
         [Tooltip("Bumping into the robot this close starts a chase.")]
         public float ContactDistance = 1.3f;
-        [Tooltip("Seismic: feels walking players on the same floor within this range (0 = no seismic sensor).")]
+        [Tooltip("Seismic: stomps the floor and a wave runs out to this range along its floor, through walls (0 = no seismic sensor). " +
+                 "A player moving when the wave passes is felt; one standing still is not.")]
         public float SeismicRange;
-        public float SeismicSpeed = 1.2f;
+        [Tooltip("Suspicion one wave adds for a player walking at the reference speed close by (faster — more, crouching or far — less).")]
+        public float SeismicSpeed = 0.8f;
+        [Tooltip("Seconds between stomps.")]
+        public float SeismicPeriod = 2.6f;
+        [Tooltip("How fast the wave runs, m/s.")]
+        public float SeismicWaveSpeed = 9f;
+
+        [Header("Floor lidar")]
+        [Tooltip("A laser line spinning around the robot at ankle height, this long (0 = none). Feet on the floor that cross it " +
+                 "are noticed; standing on a chair or a desk, or jumping over it, is not.")]
+        public float LidarRange;
+        [Tooltip("Height of the line above the floor, m.")]
+        public float LidarHeight = 0.22f;
+        [Tooltip("Turn speed of the line, degrees per second.")]
+        public float LidarTurnSpeed = 140f;
+        [Tooltip("Suspicion per second while the line touches someone's feet: a tripwire, one pass of the line is enough.")]
+        public float LidarRate = 15f;
         [Tooltip("Smell: follows scent trails found within this radius (0 = no nose).")]
         public float SmellRange;
         public float SmellSpeed = 1.5f;
@@ -62,6 +79,8 @@ namespace Stealth.Enemies
         [Header("Reaction")]
         [Tooltip("Can this robot hit players? If not, it snitches: raises an alarm and goes back to work.")]
         public bool CanAttack = true;
+        [Tooltip("Chance to carry a piece of loot (hack it to make it drop the cargo).")]
+        [Range(0f, 1f)] public float CargoChance;
         [Tooltip("Raise a building-wide alarm when it starts chasing.")]
         public bool AlarmOnDetect;
         [Tooltip("Radius of its alarms (alarm robots, snitches).")]
@@ -185,7 +204,16 @@ namespace Stealth.Enemies
         /// </summary>
         public void OnNoise(Vector3 position, float suspicion, IIntruder source, float now)
         {
-            if (suspicion <= 0f || m_Senses.HearingMultiplier <= 0f) return;
+            if (m_Senses.HearingMultiplier <= 0f) return;
+            OnStimulus(position, suspicion, source, now);
+        }
+
+        /// <summary>A floor wave caught a moving player (seismic): like a noise, but felt through walls.</summary>
+        public void OnFelt(Vector3 position, float suspicion, IIntruder source, float now) => OnStimulus(position, suspicion, source, now);
+
+        void OnStimulus(Vector3 position, float suspicion, IIntruder source, float now)
+        {
+            if (suspicion <= 0f) return;
             if (State == RobotState.Chase)
             {
                 if (source != null && source == Target)

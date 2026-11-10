@@ -22,6 +22,7 @@ namespace Stealth.Enemies
             RobotKind.MotionSensor => "Датчик движения",
             RobotKind.PressurePlate => "Нажимная плита",
             RobotKind.Camera => "Камера",
+            RobotKind.Sweeper => "Подметальщик",
             _ => "Робот",
         };
 
@@ -33,15 +34,16 @@ namespace Stealth.Enemies
             RobotKind.Spider => "глаза · прыгает со стены · не покидает комнату",
             RobotKind.Vacuum => "линия сканера на полу · тревога · перепрыгни",
             RobotKind.Turret => "глаза · стреляет после прицеливания",
-            RobotKind.Thumper => "чувствует шаги через пол · присядь или замри",
+            RobotKind.Thumper => "бьёт в пол — волна идёт сквозь стены · замри, пока проходит",
             RobotKind.Hound => "идёт по запаху · ходит по лестницам",
             RobotKind.Sorter => "видит только лут своего цвета",
-            RobotKind.Worker => "не дерётся · доносит (тревога)",
+            RobotKind.Worker => "не дерётся · доносит (тревога) · может везти лут — взломай",
             RobotKind.Hunter => "все датчики · быстрый",
             RobotKind.Lidar => "луч у пола · перепрыгни",
-            RobotKind.MotionSensor => "замечает быстрое движение · крадись",
+            RobotKind.MotionSensor => "видит любое движение · замри",
             RobotKind.PressurePlate => "не наступай · перепрыгни",
             RobotKind.Camera => "обзор · поднимает тревогу",
+            RobotKind.Sweeper => "лидар у самого пола · встань на стул или стол",
             _ => "",
         };
     }

@@ -268,7 +268,9 @@ namespace Stealth.UI
             }
 
             Ui.Show(DownedTint, down);
-            Ui.Show(DownedText, down && gm.Phase == RunPhase.Playing);
+            bool showDown = down && gm.Phase == RunPhase.Playing;
+            Ui.Show(DownedText, showDown);
+            if (showDown) DownedText.text = PromptRules.DownedText(me.Hp, me.CanGetUp);
 
             // Alarm: thin pulsing frame + a small label with the time left: clear, but does not cover the view.
             bool alarm = gm.AlarmActive;

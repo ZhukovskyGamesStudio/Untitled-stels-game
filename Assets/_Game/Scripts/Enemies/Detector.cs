@@ -23,11 +23,14 @@ namespace Stealth.Enemies
         public sbyte Variant;
         /// <summary>Kind-specific target client: turret aim (<see cref="Detector.Nobody"/> if none).</summary>
         public ulong Target;
+        /// <summary>Loot a worker carries: shape * 16 + colour, -1 none (<see cref="Detector.EncodeCargo"/>).</summary>
+        public short Cargo;
 
-        public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody };
+        public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody, Cargo = -1 };
 
         public bool Equals(DetectorSnapshot o) =>
-            Awareness == o.Awareness && Focus == o.Focus && Hacked == o.Hacked && Mode == o.Mode && Variant == o.Variant && Target == o.Target;
+            Awareness == o.Awareness && Focus == o.Focus && Hacked == o.Hacked && Mode == o.Mode && Variant == o.Variant && Target == o.Target
+            && Cargo == o.Cargo;
     }
 
     /// <summary>
@@ -48,7 +51,7 @@ namespace Stealth.Enemies
         public static readonly List<Detector> All = new();
 
         /// <summary>One-shot effects shown on every peer (see <see cref="Pulse"/>).</summary>
-        protected const byte PulseRadio = 1, PulseShot = 2;
+        protected const byte PulseRadio = 1, PulseShot = 2, PulseStomp = 3;
 
         [Header("Detector")]
         public RobotKind Kind;
@@ -153,6 +156,19 @@ namespace Stealth.Enemies
         }
 
         protected void SetTarget(ulong target) => m_State.Target = target;
+
+        /// <summary>Carried loot (-1 none), see <see cref="EncodeCargo"/>.</summary>
+        public short Cargo => m_State.Cargo;
+
+        public static short EncodeCargo(byte shape, byte color) => (short)(shape * 16 + color);
+        public static (byte shape, byte color) DecodeCargo(short cargo) => ((byte)(cargo / 16), (byte)(cargo % 16));
+
+        protected void SetCargo(short cargo)
+        {
+            if (m_State.Cargo == cargo) return;
+            m_State.Cargo = cargo;
+            RefreshStatus();
+        }
 
         // ------------------------------------------------------------------ hacking
 

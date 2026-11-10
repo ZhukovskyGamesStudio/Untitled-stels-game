@@ -64,6 +64,10 @@ namespace Stealth.Level
         public GameObject WashBasin;
         public GameObject VendingMachine;
         public GameObject DeskLamp;
+        public GameObject PingPongTable;
+        public GameObject BeanBag;
+        public GameObject ArcadeMachine;
+        public GameObject Safe;
         public GameObject FloorLamp;
 
         public GameObject Prop(PropKind kind) => kind switch
@@ -100,6 +104,10 @@ namespace Stealth.Level
             PropKind.VendingMachine => VendingMachine,
             PropKind.DeskLamp => DeskLamp,
             PropKind.FloorLamp => FloorLamp,
+            PropKind.PingPongTable => PingPongTable,
+            PropKind.BeanBag => BeanBag,
+            PropKind.ArcadeMachine => ArcadeMachine,
+            PropKind.Safe => Safe,
             _ => null,
         };
     }

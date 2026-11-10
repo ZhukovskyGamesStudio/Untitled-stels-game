@@ -81,6 +81,10 @@ namespace Stealth.Net
         public void SendNoise(Vector3 position, float radius) => NoiseRpc(position, radius);
         public void SendGasKnockout() => GasKnockoutRpc();
         public void SendRevive(PlayerController target) => ReviveRpc(target.GetComponent<NetworkObject>());
+        public void SendGetUp() => GetUpRpc();
+
+        [Rpc(SendTo.Server)]
+        void GetUpRpc() => m_Player.OnGetUpRequest();
         public void SendHack(Detector target) => HackRpc(target.GetComponent<NetworkObject>());
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedbackRpc(awayFromSource);
 

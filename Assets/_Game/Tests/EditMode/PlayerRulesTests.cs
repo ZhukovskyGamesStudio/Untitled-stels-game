@@ -7,16 +7,22 @@ namespace Stealth.Tests
     public class PlayerRulesTests
     {
         [Test]
-        public void TwoHitsDownAPlayerWithABreatherBetween()
+        public void EveryHitKnocksYouDownWithHpLeftYouGetUpYourself()
         {
             var h = HealthState.Full(0f);
             Assert.IsFalse(h.TryHit(1f), "invulnerable right after the level starts");
             Assert.IsTrue(h.TryHit(4f));
             Assert.AreEqual(1, h.Hp);
-            Assert.IsFalse(h.TryHit(4.5f), "a moment to run after the first hit");
-            Assert.IsTrue(h.TryHit(6f));
-            Assert.IsTrue(h.Downed);
-            Assert.IsFalse(h.TryHit(10f), "no hits while downed");
+            Assert.IsTrue(h.Downed, "every hit knocks you down");
+            Assert.IsFalse(h.KnockedOut, "but with HP left you are not out");
+            Assert.IsFalse(h.TryHit(4.5f), "no hits while lying");
+            Assert.IsFalse(h.CanGetUp(4.5f), "a moment on the floor first");
+            Assert.IsTrue(h.GetUp(6f));
+            Assert.IsFalse(h.Downed);
+            Assert.IsFalse(h.TryHit(6.5f), "a moment to run after getting up");
+            Assert.IsTrue(h.TryHit(8f));
+            Assert.IsTrue(h.KnockedOut, "the second hit: out, a teammate must lift you");
+            Assert.IsFalse(h.GetUp(20f), "no getting up on your own at 0 HP");
         }
 
         [Test]
