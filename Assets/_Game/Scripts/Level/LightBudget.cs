@@ -13,8 +13,8 @@ namespace Stealth.Level
     /// </summary>
     public class LightBudget : MonoBehaviour
     {
-        /// <summary>Shadow atlas (4096²) in units of one 1024² map; a bit is kept spare.</summary>
-        public const float Budget = 13f;
+        /// <summary>Shadow atlas (4096²) in units of one 1024² map; a good share is kept spare (packing is not perfect).</summary>
+        public const float Budget = 11f;
 
         struct Entry
         {
@@ -30,7 +30,7 @@ namespace Stealth.Level
 
         /// <summary>
         /// Shadow atlas cost of a light (pure): a point light renders six maps; room-sized lights use medium maps (512²),
-        /// small lamps and status lights low ones (256²).
+        /// small lamps and status lights (range under 4 m) low ones (256²) — the asset builder sets the tiers to match.
         /// </summary>
         public static float Cost(LightType type, float range)
         {

@@ -79,13 +79,17 @@ namespace Stealth.Tests
         [Test]
         public void OnlyTheNearestLampsThatFitTheShadowAtlasAreDrawn()
         {
+            // Small lamps must really use low maps, or the budget underestimates them and the atlas overflows.
+            var desk = Art.DeskLamp.GetComponentInChildren<Light>();
+            var data = new SerializedObject(desk.GetComponent("UniversalAdditionalLightData"));
+            Assert.AreEqual(0, data.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue, "desk lamp: low shadow tier");
             Assert.AreEqual(1.5f, LightBudget.Cost(LightType.Point, 9.5f), 1e-4f, "a room lamp: six medium maps");
             Assert.Less(LightBudget.Cost(LightType.Spot, 3f), LightBudget.Cost(LightType.Spot, 14f), "a small lamp is cheap");
             var costs = new List<float> { 1.5f, 1.5f, 1.5f, 1.5f, 0.0625f, 1.5f };
             var on = new bool[costs.Count];
             LightBudget.Choose(costs, 5f, on);
             CollectionAssert.AreEqual(new[] { true, true, true, false, true, false }, on, "nearest first; a small one still fits");
-            Assert.AreEqual(LightBudget.Budget, 13f, 1e-4f);
+            Assert.Less(LightBudget.Budget, 16f, "spare room in the 4096² atlas (16 maps of 1024²)");
         }
 
         readonly List<GameObject> m_Objects = new();

@@ -82,7 +82,7 @@ namespace Stealth.EditorTools
             {
                 var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
                 var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.27f, 0.16f), Quaternion.Euler(65f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.8f, 3.2f,
-                    LightShadows.Soft);
+                    LightShadows.Soft, UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow); // small: low maps (LightBudget.Cost)
                 lamp.spotAngle = 120f;
                 lamp.innerSpotAngle = 50f;
                 return go;
@@ -318,7 +318,7 @@ namespace Stealth.EditorTools
             // fixture from lighting up as if by nothing — a recessed panel shines down, not up.
             var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.3f, 0f), Quaternion.identity, LightType.Point,
                 Color.white, LightMath.RoomIntensity, 9.5f, LightShadows.Soft);
-            var shade = Cube(root.transform, "CeilingShade", new Vector3(0f, -0.12f, 0f), new Vector3(2.6f, 0.02f, 2.6f), M("LampHousing"), false);
+            var shade = Cube(root.transform, "CeilingShade", new Vector3(0f, -0.12f, 0f), new Vector3(4.4f, 0.02f, 4.4f), M("LampHousing"), false);
             shade.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
             var rl = root.AddComponent<RoomLight>();
             rl.Lamp = light;

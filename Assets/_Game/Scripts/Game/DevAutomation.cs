@@ -15,7 +15,7 @@ namespace Stealth.Game
     /// Command line helpers for quick testing of builds:
     ///   -host-local / -join-local 127.0.0.1     start a local (UDP) host / client
     ///   -autotest &lt;scenario&gt; -shotdir dir      run a scripted scenario, log [AUTOTEST] lines, save screenshots
-    ///   -autotest-linger                        keep running 20 s after the scenario (host waiting for clients)
+    ///   -autotest-linger                        keep running 45 s after the scenario (host waiting for clients)
     ///   -autotest-sound / -autotest-front       autotests are muted and stay behind other windows unless asked
     /// </summary>
     public partial class DevAutomation : MonoBehaviour
@@ -93,7 +93,7 @@ namespace Stealth.Game
 
             DevFlags.Autopilot = null;
             Log("DONE");
-            yield return new WaitForSeconds(Arg("-autotest-linger") != null ? 20f : 1f);
+            yield return new WaitForSeconds(Arg("-autotest-linger") != null ? 45f : 1f);
             Quit();
         }
 
