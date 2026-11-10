@@ -262,8 +262,42 @@ namespace Stealth.Player
             Camera.backgroundColor = RenderSettings.fogColor;
         }
 
+        GameObject m_RigPrefab;
+        HumanRig m_Rig;
+
+        /// <summary>
+        /// The style's rigged human (VisualStyles.PlayerRig) in place of the player model: swapped in and out when the style
+        /// changes, painted for the slot, a shadow only for the owner (like the model), posed every frame. Purely visual.
+        /// </summary>
+        void UpdateRig()
+        {
+            var prefab = VisualStyles.PlayerRig;
+            if (prefab != m_RigPrefab)
+            {
+                if (m_Rig != null) Destroy(m_Rig.gameObject);
+                m_Rig = null;
+                m_RigPrefab = prefab;
+                if (Model != null)
+                    foreach (var r in Model.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = prefab != null;
+                if (prefab != null && Model != null)
+                {
+                    var go = Instantiate(prefab, Model.parent);
+                    go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
+                    m_Rig = go.GetComponent<HumanRig>();
+                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId));
+                    if (IsOwner)
+                        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                }
+            }
+            if (m_Rig == null) return;
+            float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch);
+        }
+
         void UpdateModelPose()
         {
+            UpdateRig();
             if (Model == null) return;
             if (Model.gameObject.activeSelf == InHatch) Model.gameObject.SetActive(!InHatch); // down in the hatch
             float y = Downed ? 0.35f : (Crouching ? 0.65f : 1f);

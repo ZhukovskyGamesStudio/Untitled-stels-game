@@ -1,6 +1,6 @@
 """The players — IT people of four departments — modelled for every visual style.
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/players.py -- Assets/_Game/Art/Models
+Run:  blender.exe -b --factory-startup --python Tools/Blender/players.py -- Assets/_Game/Art/Models [S11_Derelict ...]
 
 Writes Art/Models/Styles/Players/player__<StyleAsset>__<department>.fbx (11 styles × 4 departments). Every model keeps
 the parts of the original player so the game swaps them in by name and the colours fall into place (PlayerLooks):
@@ -185,6 +185,9 @@ PLANS = {
     "S08_Footage": ("toy", Plan(torso=(0.5, 0.34), leg_r=0.1, arm_r=0.085, hand_r=0.08, seg=20, helmet="diver", foot=(0.15, 0.3, 0.12))),
     "S09_WhiteRoom": ("crystal", Plan(square=True, head="ico", seg=6)),
     "S10_Grid": ("clean", Plan(torso=(0.42, 0.24), leg_r=0.065, arm_r=0.05, seg=20, taper=1.1)),
+    # real adult proportions (1.75 m, head 1/7.5 of the height); the stand-in until the rigged human replaces it
+    "S11_Derelict": ("realistic", Plan(hip=0.92, leg_r=0.068, torso=(0.4, 0.23), top=1.44, shoulder_x=0.23, arm_r=0.048, arm_len=0.64,
+                                       head_r=0.108, head_z=1.63, hand_r=0.045, foot=(0.1, 0.27, 0.07), seg=24, taper=1.12)),
 }
 
 
@@ -211,7 +214,10 @@ def build(style, finish, p, dept):
 
 if __name__ == "__main__":
     G.g.clear_scene()
+    only = argv[1:]  # optional: style asset names to build (default: all)
     for style, (finish, plan) in PLANS.items():
+        if only and style not in only:
+            continue
         for dept in range(4):
             build(style, finish, plan, dept)
         print("players", style)

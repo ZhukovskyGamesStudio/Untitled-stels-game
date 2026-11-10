@@ -28,6 +28,55 @@ namespace Stealth.Tests
         };
 
         [Test]
+        public void DecayAndPostersAreSeededStayOnTheirSurfacesAndSkipTheWindows()
+        {
+            var shell = Shell(6, 3, out var layout);
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            var g = new StyleGeometry
+            {
+                FloorDecay = new[] { Lit(), Lit() }, WallDecay = new[] { Lit() }, Posters = new[] { Lit(), Lit(), Lit() },
+                DecayDensity = 0.1f, PosterChance = 0.6f,
+            };
+            var a = ArchitecturePlanner.Plan(shell, layout, g);
+            var b = ArchitecturePlanner.Plan(shell, layout, g);
+            Assert.AreEqual(a.Count, b.Count, "the same house gets the same decay");
+            for (int i = 0; i < a.Count; i++) Assert.AreEqual(a[i].Position, b[i].Position);
+            var floors = a.Where(p => p.Kind == DecorKind.FloorDecal).ToList();
+            var walls = a.Where(p => p.Kind == DecorKind.WallDecal).ToList();
+            var posters = a.Where(p => p.Kind == DecorKind.Poster).ToList();
+            Assert.IsNotEmpty(floors);
+            Assert.IsNotEmpty(walls);
+            Assert.IsNotEmpty(posters);
+            Assert.IsTrue(a.Where(p => p.Kind is DecorKind.FloorDecal or DecorKind.WallDecal).All(p => p.Variant >= 0 && p.Variant < 2));
+            Assert.IsTrue(posters.All(p => p.Variant >= 0 && p.Variant < 3));
+            foreach (var p in floors)
+            {
+                // the whole decal lies on one floor rectangle (never pokes into a wall or a stair hole)
+                float r = p.Scale.x / 2f;
+                Assert.IsTrue(shell.Floors.Any(f => Mathf.Abs(p.Position.y - f.Y) < 0.05f &&
+                                                    p.Position.x - r >= f.Min.x - 0.01f && p.Position.x + r <= f.Max.x + 0.01f &&
+                                                    p.Position.z - r >= f.Min.y - 0.01f && p.Position.z + r <= f.Max.y + 0.01f),
+                    $"a floor decal at {p.Position} hangs off its floor");
+            }
+            foreach (var p in posters)
+            {
+                float y = p.Position.y - LevelLayout.FloorOf(p.Position.y) * LevelMetrics.FloorHeight;
+                Assert.That(y, Is.InRange(1.3f, 1.8f), "posters hang at eye height");
+            }
+            foreach (var (pos, _) in shell.Windows)
+                foreach (var p in walls.Concat(posters))
+                {
+                    var local = p.Position - pos;
+                    if (Mathf.Abs(Vector3.Dot(local, p.Rotation * Vector3.forward)) > 0.2f) continue; // another wall
+                    bool overlapX = Mathf.Abs(Vector3.Dot(local, p.Rotation * Vector3.right)) < p.Scale.x / 2f + LevelMetrics.WindowWidth / 2f - 0.01f;
+                    bool overlapY = Mathf.Abs(local.y) < p.Scale.y / 2f + LevelMetrics.WindowHeight / 2f - 0.01f;
+                    Assert.IsFalse(overlapX && overlapY, $"a {p.Kind} covers the window at {pos}");
+                }
+            Assert.IsFalse(ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { FloorDecay = g.FloorDecay })
+                .Any(p => p.Kind == DecorKind.FloorDecal), "no density, no decay");
+        }
+
+        [Test]
         public void TheShellRecordsWallsFloorsOpeningsAndWindows()
         {
             var shell = Shell(3, 2, out var layout);
@@ -108,7 +157,8 @@ namespace Stealth.Tests
                 Assert.AreEqual(f, kit.Family, $"{f} falls back to the kit of another family");
                 foreach (DecorKind kind in System.Enum.GetValues(typeof(DecorKind)))
                 {
-                    if (kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish) continue;
+                    if (kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish or
+                        DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster) continue; // quads, not kit pieces
                     Assert.IsNotNull(kit.Pieces[(int)kind], $"{f}: no prefab for {kind}");
                     foreach (var c in kit.Pieces[(int)kind].GetComponentsInChildren<Collider>(true)) Assert.Fail($"{f}/{kind} has a collider");
                 }

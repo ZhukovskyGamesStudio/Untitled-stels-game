@@ -29,9 +29,10 @@ namespace Stealth.Configs
 
     /// <summary>
     /// The modelling language of a style (Tools/Blender/style_families.py rebuilds every model per family; the realistic
-    /// family also swaps furniture for CC0 scanned models and uses PBR materials). Append only.
+    /// family also swaps furniture for CC0 scanned models and uses PBR materials; the derelict family is the abandoned
+    /// sci-fi facility: dented, panelled, self-made grimy PBR surfaces and its own furniture). Append only.
     /// </summary>
-    public enum ModelFamily { None, Lowpoly, Toy, Lofi, Clean, Realistic }
+    public enum ModelFamily { None, Lowpoly, Toy, Lofi, Clean, Realistic, Derelict }
 
     /// <summary>What frames the doorways.</summary>
     public enum DoorTrim { None, Casing, Pilasters, Arch }
@@ -61,6 +62,18 @@ namespace Stealth.Configs
         [Header("Ceiling")]
         public CeilingKind Ceiling;
 
+        [Header("Decay (decals scattered over the house from its seed)")]
+        [Tooltip("Big chunks on the floors: rust, oil, scorch marks, rubble")] public Material[] FloorDecay = new Material[0];
+        [Tooltip("On the walls: leaks, mold, peeled paint, soot (a texture taller than wide hangs from the ceiling)")]
+        public Material[] WallDecay = new Material[0];
+        [Tooltip("Floor decals per square metre (walls: per metre of wall × 0.6); 0 = none")] public float DecayDensity;
+        [Tooltip("Posters on the walls")] public Material[] Posters = new Material[0];
+        [Range(0, 1), Tooltip("Chance of a poster on 4 m of wall")] public float PosterChance;
+
+        [Header("Players")]
+        [Tooltip("A rigged human (Player/HumanRig) shown instead of the player model; null = the style's player models")]
+        public GameObject PlayerRig;
+
         [Header("Materials (null = keep the house as it is)")]
         public Material Floor;
         [Tooltip("Metres covered by one repeat of the floor texture")] public float FloorTile = 1f;
@@ -76,7 +89,8 @@ namespace Stealth.Configs
         public float CeilingTile = 1.2f;
 
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
-                                       Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null;
+                                       Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null ||
+                                       (DecayDensity > 0f && (FloorDecay.Length > 0 || WallDecay.Length > 0)) || (PosterChance > 0f && Posters.Length > 0);
     }
 
     /// <summary>Colour grading on the URP post-processing volume.</summary>
@@ -167,6 +181,10 @@ namespace Stealth.Configs
         public Color IndoorFog = new(0.012f, 0.014f, 0.02f);
         public float IndoorFogDensity = 0.03f;
         public Color GasFog = new(0.33f, 0.37f, 0.3f);
+        [Tooltip("How bright lamps look (1 = as they are). Visual only: robots still see the real light")]
+        public float LightScale = 1f;
+        [Tooltip("How bright the glowing lamp diffusers look (1 = as they are), apart from the light they cast. Visual only")]
+        public float LampGlow = 1f;
     }
 
     /// <summary>How the colours of the world change, by kind of material.</summary>

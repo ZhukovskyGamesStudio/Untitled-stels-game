@@ -16,6 +16,8 @@ Families:
              meant for tiny pixel textures
   clean      Blue Prince / Obra Dinn: crisp 1 cm chamfers that catch the ink lines, smooth round parts
   realistic  PAYDAY / Hitman: small soft bevels, 32-sided round parts, smooth by angle — for PBR materials
+  derelict   Dead Space / Alien: Isolation (abandoned station): panelled casings with deep seams, every part a little
+             askew, dented and sagging, chipped corners — for the self-made grimy PBR surfaces (derelict_textures.py)
 """
 import math
 import os
@@ -31,7 +33,7 @@ import robots as r  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ROOT = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
-FAMILIES = argv[1:] or ["lowpoly", "toy", "lofi", "clean", "realistic"]
+FAMILIES = argv[1:] or ["lowpoly", "toy", "lofi", "clean", "realistic", "derelict"]
 
 orig_box, orig_cyl, orig_sphere, orig_merge = g.box, g.cylinder, g.sphere, g.merge
 family = None
@@ -80,6 +82,18 @@ def box(size, loc, rot_z=0.0):
             res = bmesh.ops.inset_individual(bm, faces=big, thickness=min(0.025, 0.12 * m), depth=0.0)
             bmesh.ops.inset_individual(bm, faces=big, thickness=0.006, depth=-0.005)
         bevel(bm, min(0.006, 0.2 * m), 2)
+    elif family == "derelict":
+        # industrial casing: a deep seam around every big face, a recessed panel, hard bevels
+        big = [f for f in bm.faces if f.calc_area() > 0.02]
+        if big:
+            bmesh.ops.inset_individual(bm, faces=big, thickness=min(0.03, 0.15 * m), depth=0.0)
+            bmesh.ops.inset_individual(bm, faces=big, thickness=0.008, depth=-0.008)
+        bevel(bm, min(0.008, 0.2 * m), 1)
+        # neglect: every part sits a little askew (deterministic by its position)
+        h = math.sin(loc[0] * 12.9898 + loc[1] * 78.233 + loc[2] * 37.719) * 43758.5453
+        h -= math.floor(h)
+        tilt = (h - 0.5) * math.radians(2.4) if max(size) < 1.2 else 0.0
+        bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(tilt, 3, "X" if h > 0.5 else "Y"), verts=bm.verts)
     if rot_z:
         bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(rot_z, 3, "Z"), verts=bm.verts)
     bmesh.ops.translate(bm, vec=Vector(loc), verts=bm.verts)
@@ -87,7 +101,7 @@ def box(size, loc, rot_z=0.0):
 
 
 def cylinder(radius, depth, loc, axis="Z", segments=16, radius2=None):
-    seg = {"lowpoly": 6, "lofi": 6, "toy": 24, "clean": 32, "realistic": 32}.get(family, segments)
+    seg = {"lowpoly": 6, "lofi": 6, "toy": 24, "clean": 32, "realistic": 32, "derelict": 20}.get(family, segments)
     if family in ("lowpoly", "toy"):
         k = 1.9 if family == "lowpoly" else 1.7
         radius = min(0.065, radius * k) if radius < 0.04 else radius
@@ -96,7 +110,7 @@ def cylinder(radius, depth, loc, axis="Z", segments=16, radius2=None):
     bm = orig_cyl(radius, depth, (0, 0, 0), axis, seg, radius2)
     if family == "toy":
         bevel(bm, min(0.05, 0.3 * min(radius, depth)), 3)
-    elif family == "realistic":
+    elif family in ("realistic", "derelict"):
         bevel(bm, min(0.005, 0.2 * min(radius, depth)), 2)
     bmesh.ops.translate(bm, vec=Vector(loc), verts=bm.verts)
     return bm
@@ -108,7 +122,7 @@ def sphere(radius, loc, segments=16):
         bmesh.ops.create_icosphere(bm, subdivisions=1, radius=radius)
         bmesh.ops.translate(bm, vec=Vector(loc), verts=bm.verts)
         return bm
-    seg = {"lofi": 6, "toy": 24, "clean": 24, "realistic": 28}.get(family, segments)
+    seg = {"lofi": 6, "toy": 24, "clean": 24, "realistic": 28, "derelict": 20}.get(family, segments)
     return orig_sphere(radius, loc, seg)
 
 
@@ -126,6 +140,17 @@ def merge(name, parts):
             v.co += v.normal * 0.004
         bm.to_mesh(me)
         bm.free()
+    if family == "derelict":
+        # dents and sag: low-frequency noise pushes surfaces in (never out: nothing grows through walls)
+        from mathutils import noise as mnoise
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bm.normal_update()
+        for v in bm.verts:
+            n = mnoise.noise(v.co * 6.0)
+            v.co -= v.normal * max(0.0, n) * 0.012
+        bm.to_mesh(me)
+        bm.free()
     # box-projected UVs in metres: textured materials tile the same on every part
     bpy.context.view_layer.objects.active = obj
     for o in bpy.context.scene.objects:
@@ -138,7 +163,7 @@ def merge(name, parts):
 
 
 def export(filename):
-    smooth = family in ("toy", "clean", "realistic")
+    smooth = family in ("toy", "clean", "realistic", "derelict")
     bpy.ops.object.select_all(action="SELECT")
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:

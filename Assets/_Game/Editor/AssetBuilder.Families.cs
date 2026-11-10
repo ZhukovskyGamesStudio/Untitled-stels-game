@@ -19,6 +19,12 @@ namespace Stealth.EditorTools
         const string ExternalModels = ExternalDir + "/Models";
         const string PixelTextures = ExternalDir + "/Pixel";
         const string FamilyMaterialsDir = StylesDir + "/Families";
+        /// <summary>Self-made surfaces of the derelict family (Tools/Blender/derelict_textures.py), same layout as the scans.</summary>
+        const string DerelictTextures = Root + "/Art/Textures/Derelict";
+        /// <summary>Decay decals and posters of the derelict style (Tools/Blender/derelict_decals.py): RGBA, colour + coverage.</summary>
+        const string DerelictDecals = DerelictTextures + "/Decals";
+        /// <summary>Self-made furniture of the derelict family (Tools/Blender/derelict_props.py): Art/Models/StyleProps/Derelict/&lt;our model&gt;.fbx.</summary>
+        const string DerelictPropsDir = ModelsDir + "/StyleProps/Derelict";
 
         /// <summary>Scanned CC0 model → our model it replaces in the realistic family (see Tools/Art/fetch_cc0.py).</summary>
         static readonly Dictionary<string, string> RealisticProps = new()
@@ -35,8 +41,9 @@ namespace Stealth.EditorTools
         /// <summary>Import settings of the downloaded textures: normal maps, linear masks, point-filtered pixel art.</summary>
         static void ConfigureExternalTextures()
         {
-            if (!AssetDatabase.IsValidFolder(ExternalDir)) return;
-            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { ExternalDir }))
+            var roots = new[] { ExternalDir, DerelictTextures }.Where(AssetDatabase.IsValidFolder).ToArray();
+            if (roots.Length == 0) return;
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", roots))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 var imp = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -45,12 +52,15 @@ namespace Stealth.EditorTools
                 var type = file == "normal" ? TextureImporterType.NormalMap : TextureImporterType.Default;
                 bool srgb = file != "mask" && file != "normal";
                 var filter = pixel ? FilterMode.Point : FilterMode.Trilinear;
-                if (imp.textureType == type && imp.sRGBTexture == srgb && imp.filterMode == filter && imp.wrapMode == TextureWrapMode.Repeat &&
-                    imp.mipmapEnabled == !pixel && imp.maxTextureSize == 1024) continue;
+                bool decal = path.StartsWith(DerelictDecals);            // single images with edges: never repeat
+                var wrap = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+                if (imp.textureType == type && imp.sRGBTexture == srgb && imp.filterMode == filter && imp.wrapMode == wrap &&
+                    imp.mipmapEnabled == !pixel && imp.maxTextureSize == 1024 && imp.alphaIsTransparency == decal) continue;
                 imp.textureType = type;
                 imp.sRGBTexture = srgb;
                 imp.filterMode = filter;
-                imp.wrapMode = TextureWrapMode.Repeat;
+                imp.wrapMode = wrap;
+                imp.alphaIsTransparency = decal;
                 imp.mipmapEnabled = !pixel;
                 imp.anisoLevel = pixel ? 0 : 4;
                 imp.maxTextureSize = 1024;
@@ -78,6 +88,49 @@ namespace Stealth.EditorTools
             m.SetFloat("_Metallic", 0f);
             if (mask != null) { m.EnableKeyword("_METALLICSPECGLOSSMAP"); m.EnableKeyword("_OCCLUSIONMAP"); }
             else { m.DisableKeyword("_METALLICSPECGLOSSMAP"); m.DisableKeyword("_OCCLUSIONMAP"); }
+        }
+
+        /// <summary>
+        /// A decal: URP Lit with the decal's colour and coverage. Stains blend softly (transparent, no depth write); posters
+        /// are cut out where the paper is torn (alpha clip) so they stay opaque and sorted like the wall.
+        /// </summary>
+        static Material DecalMaterial(string name, string texture, float smoothness, bool clip)
+        {
+            var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+            m.SetColor("_BaseColor", Color.white);
+            m.SetTexture("_BaseMap", Tex(texture));
+            m.SetFloat("_Smoothness", smoothness);
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_ReceiveShadows", 1f);
+            if (clip)
+            {
+                m.SetFloat("_Surface", 0f);
+                m.SetFloat("_AlphaClip", 1f);
+                m.SetFloat("_Cutoff", 0.5f);
+                m.EnableKeyword("_ALPHATEST_ON");
+                m.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                m.SetOverrideTag("RenderType", "TransparentCutout");
+                m.renderQueue = (int)RenderQueue.AlphaTest;
+                m.SetFloat("_ZWrite", 1f);
+            }
+            else
+            {
+                m.SetFloat("_Surface", 1f);
+                m.SetFloat("_Blend", 0f);
+                m.SetFloat("_AlphaClip", 0f);
+                m.DisableKeyword("_ALPHATEST_ON");
+                m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                m.SetOverrideTag("RenderType", "Transparent");
+                m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+                m.SetFloat("_DstBlendAlpha", (float)BlendMode.OneMinusSrcAlpha);
+                m.SetFloat("_ZWrite", 0f);
+                m.renderQueue = (int)RenderQueue.Transparent;
+            }
+            m.SetShaderPassEnabled("ShadowCaster", false);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         static void SetPixel(Material m, string id, Color tint, float smoothness = 0.08f)
@@ -144,6 +197,64 @@ namespace Stealth.EditorTools
             Pbr("Real_HangarConcrete", "hangar_concrete_floor", Color.white);
             Pbr("Real_ConcreteWall", "concrete_wall_006", Color.white);
             Pbr("Real_ConcreteClean", "concrete_floor_01", new Color(0.98f, 0.99f, 1f));
+            // bare grimy plate of the derelict props (Steel parts)
+            Pbr("Real_GrimePlate", "metal_plate", new Color(0.45f, 0.5f, 0.5f), 0.85f);
+            // the derelict family's own surfaces (self-made, Tools/Blender/derelict_textures.py)
+            void Dr(string name, string id, Color tint, float smooth = 1f)
+            {
+                var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+                SetPbr(m, $"{DerelictTextures}/{id}", tint, smooth);
+                EditorUtility.SetDirty(m);
+                s_Kit[name] = m;
+            }
+            Dr("Dr_SteelPanels", "dr_steel_panels", Color.white);
+            Dr("Dr_FloorPlate", "dr_floor_plate", Color.white);
+            Dr("Dr_CeilingVents", "dr_ceiling_vents", Color.white);
+            Dr("Dr_PaintedMetal", "dr_painted_metal", Color.white);
+            Dr("Dr_Rust", "dr_rust", Color.white);
+            Dr("Dr_Composite", "dr_composite", Color.white);
+            Dr("Dr_Vinyl", "dr_vinyl", Color.white);
+            var screen = LitAsset($"{KitMaterialsDir}/Dr_Screen.mat");          // dead terminals: a faint sick-green glow
+            screen.SetColor("_BaseColor", new Color(0.02f, 0.04f, 0.035f));
+            screen.SetFloat("_Smoothness", 0.85f);
+            screen.EnableKeyword("_EMISSION");
+            screen.SetColor("_EmissionColor", new Color(0.25f, 1f, 0.75f) * 1.2f);
+            screen.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+            EditorUtility.SetDirty(screen);
+            s_Kit["Dr_Screen"] = screen;
+            // decay decals (soft transparent stains) and posters (torn paper: alpha clipped)
+            foreach (var id in new[] { "floor_rust", "floor_oil", "floor_scorch", "floor_rubble", "wall_leak", "wall_mold", "wall_peel", "wall_scorch" })
+                s_Kit[$"Dc_{id}"] = DecalMaterial($"Dc_{id}", $"{DerelictDecals}/{id}.png", id == "floor_oil" ? 0.85f : 0.2f, clip: false);
+            for (int i = 0; i < 6; i++)
+                s_Kit[$"Dc_poster_{i}"] = DecalMaterial($"Dc_poster_{i}", $"{DerelictDecals}/poster_{i}.png", 0.15f, clip: true);
+            // computer screens: the terminal's last report and CCTV snow, glowing through their image; dead dark glass
+            Material ScreenImage(string name, string image, float glow)
+            {
+                var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+                m.SetColor("_BaseColor", new Color(0.03f, 0.03f, 0.03f));
+                m.SetTexture("_BaseMap", Tex($"{DerelictDecals}/{image}.png"));
+                m.SetFloat("_Smoothness", 0.9f);
+                m.SetFloat("_Metallic", 0f);
+                m.EnableKeyword("_EMISSION");
+                m.SetTexture("_EmissionMap", Tex($"{DerelictDecals}/{image}.png"));
+                m.SetColor("_EmissionColor", Color.white * glow);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+                EditorUtility.SetDirty(m);
+                s_Kit[name] = m;
+                return m;
+            }
+            ScreenImage("Dr_ScreenText", "screen_terminal", 1.5f);
+            ScreenImage("Dr_ScreenStatic", "screen_static", 1.1f);
+            var glass = LitAsset($"{KitMaterialsDir}/Dr_Glass.mat");
+            glass.SetColor("_BaseColor", new Color(0.015f, 0.018f, 0.02f));
+            glass.SetFloat("_Smoothness", 0.92f);
+            EditorUtility.SetDirty(glass);
+            s_Kit["Dr_Glass"] = glass;
+            var rubber = LitAsset($"{KitMaterialsDir}/Dr_Rubber.mat");          // cables, hoses, rubber feet
+            rubber.SetColor("_BaseColor", new Color(0.035f, 0.035f, 0.035f));
+            rubber.SetFloat("_Smoothness", 0.25f);
+            EditorUtility.SetDirty(rubber);
+            s_Kit["Dr_Rubber"] = rubber;
             // PS1 / Lethal Company: tiny pixel textures, tinted
             Px("Px_Plate", "metal_plate", new Color(0.75f, 0.72f, 0.65f));
             Px("Px_Corrugated", "corrugated_iron_02", new Color(0.62f, 0.7f, 0.64f));
@@ -238,6 +349,17 @@ namespace Stealth.EditorTools
                     else if (metal) SetPbr(m, $"{ExternalTextures}/metal_plate", c * 1.6f);
                     else if (painted) SetPbr(m, $"{ExternalTextures}/painted_metal_shutter", c * 1.5f);
                     break;
+                case ModelFamily.Derelict:
+                    // everything is industrial now: wood becomes painted steel, fabric cracked vinyl, plastic yellowed composite
+                    if (structure) break;
+                    if (player) { m.SetFloat("_Smoothness", 0.3f); break; }
+                    if (fabric) SetPbr(m, $"{DerelictTextures}/dr_vinyl", Saturate(c, 0.4f, 1.6f), 1f, 2f);
+                    else if (pot) SetPbr(m, $"{DerelictTextures}/dr_composite", Color.white, 1f, 2f);
+                    else if (metal) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Saturate(c, 0.3f, 1.8f), 1f, 1.5f);
+                    else if (wood) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Color.white, 1f, 1.5f);
+                    else if (painted) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Saturate(c, 0.35f, 1.7f), 1f, 0.6f); // doors: one patch pattern, not a grid
+                    else SetPbr(m, $"{DerelictTextures}/dr_composite", Saturate(c, 0.3f, 1.5f), 1f, 2f);
+                    break;
             }
         }
 
@@ -250,6 +372,7 @@ namespace Stealth.EditorTools
         static PropReplacement[] BuildPropReplacements()
         {
             var list = new List<PropReplacement>();
+            list.AddRange(BuildDerelictProps());
             if (!AssetDatabase.IsValidFolder(ExternalModels)) return list.ToArray();
             EnsureFolder($"{KitPrefabsDir}/Scanned");
             foreach (var (id, ours) in RealisticProps)
@@ -295,6 +418,67 @@ namespace Stealth.EditorTools
             }
             AssetDatabase.SaveAssets();
             return list.ToArray();
+        }
+
+        /// <summary>
+        /// The derelict family's furniture (self-made, Tools/Blender/derelict_props.py): one FBX per our model, its parts named
+        /// by surface (Paint, Composite, Rust, Vinyl, Rubber, Screen, Steel). Fitted into our model's bounds like the scans.
+        /// </summary>
+        static List<PropReplacement> BuildDerelictProps()
+        {
+            var list = new List<PropReplacement>();
+            if (!AssetDatabase.IsValidFolder(DerelictPropsDir)) return list;
+            EnsureFolder($"{KitPrefabsDir}/Derelict/Props");
+            foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { DerelictPropsDir }))
+            {
+                var fbx = AssetDatabase.GUIDToAssetPath(guid);
+                var ours = Path.GetFileNameWithoutExtension(fbx);
+                var imp = AssetImporter.GetAtPath(fbx) as ModelImporter;
+                if (imp == null) continue;
+                if (imp.materialImportMode != ModelImporterMaterialImportMode.None) { imp.materialImportMode = ModelImporterMaterialImportMode.None; imp.SaveAndReimport(); }
+                var prefab = Prefab($"{KitPrefabsDir}/Derelict/Props/{ours}.prefab", () =>
+                {
+                    var go = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(fbx));
+                    go.name = $"{ours}_derelict";
+                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        r.sharedMaterial = DerelictSurface(r.gameObject.name);
+                        r.shadowCastingMode = ShadowCastingMode.On;
+                    }
+                    foreach (var c in go.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+                    return go;
+                });
+                string ourPath;
+                try { ourPath = ModelPath(ours); }
+                catch (FileNotFoundException) { continue; }
+                var ourMeshes = AssetDatabase.LoadAllAssetsAtPath(ourPath).OfType<Mesh>().ToArray();
+                var key = ourMeshes.FirstOrDefault(m => m.name == "Body") ?? ourMeshes.FirstOrDefault();
+                if (key == null) continue;
+                var ob = BoundsOf(AssetDatabase.LoadAssetAtPath<GameObject>(ourPath), skipGlow: true);
+                var nb = BoundsOf(prefab);
+                // modelled to our model's size: only a small correction, never noticeably larger than the original
+                var s = new Vector3(Mathf.Min(1.05f, ob.size.x / nb.size.x), Mathf.Min(1.05f, ob.size.y / nb.size.y), Mathf.Min(1.05f, ob.size.z / nb.size.z));
+                var pos = new Vector3(ob.center.x - nb.center.x * s.x, ob.min.y - nb.min.y * s.y, ob.center.z - nb.center.z * s.z);
+                bool ownScreens = prefab.GetComponentsInChildren<MeshRenderer>(true).Any(r => r.name.StartsWith("Screen") || r.name.StartsWith("Glass"));
+                list.Add(new PropReplacement { Family = ModelFamily.Derelict, Key = key, Prefab = prefab, Position = pos, Scale = s, HideGlow = ownScreens });
+            }
+            AssetDatabase.SaveAssets();
+            return list;
+        }
+
+        /// <summary>The material of a derelict prop part by its name prefix.</summary>
+        static Material DerelictSurface(string part)
+        {
+            if (part.StartsWith("ScreenText")) return K("Dr_ScreenText");
+            if (part.StartsWith("ScreenStatic")) return K("Dr_ScreenStatic");
+            if (part.StartsWith("Glass")) return K("Dr_Glass");
+            if (part.StartsWith("Screen")) return K("Dr_Screen");
+            if (part.StartsWith("Composite")) return K("Dr_Composite");
+            if (part.StartsWith("Rust")) return K("Dr_Rust");
+            if (part.StartsWith("Vinyl")) return K("Dr_Vinyl");
+            if (part.StartsWith("Rubber")) return K("Dr_Rubber");
+            if (part.StartsWith("Steel")) return K("Real_GrimePlate");
+            return K("Dr_PaintedMetal");
         }
 
         /// <summary>Bounds of all renderers of a model asset in its own space (without the glowing Eye parts if asked).</summary>

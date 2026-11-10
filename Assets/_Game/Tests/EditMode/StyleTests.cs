@@ -29,7 +29,9 @@ namespace Stealth.Tests
             var root = Resources.Load<GameConfig>(GameConfig.ResourcePath);
             Assert.IsNotNull(root.Styles, "GameConfig has no styles");
             var styles = root.Styles.Styles;
-            Assert.GreaterOrEqual(styles.Length, 11, "the base look and ten styles");
+            // only the base look and the abandoned facility are in the game (the other style assets stay on disk)
+            CollectionAssert.AreEqual(new[] { "S00_Base", "S11_Derelict" }, styles.Select(s => s.name).ToArray(), "the styles in the game");
+            Assert.AreEqual("S11_Derelict", root.Styles.Default.name, "the game's look");
             Assert.IsTrue(styles.All(s => s != null));
             Assert.AreEqual(styles.Length, styles.Select(s => s.Title).Distinct().Count(), "titles are unique");
             Assert.AreEqual(0f, styles[0].Screen.OutlineStrength, "the first style is the base look");
