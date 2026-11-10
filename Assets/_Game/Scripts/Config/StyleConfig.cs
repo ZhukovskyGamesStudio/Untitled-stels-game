@@ -19,7 +19,17 @@ namespace Stealth.Configs
         public Material[] Loot = new Material[0];
 
         [Header("Geometry (filled by the asset builder)")]
-        public StyleKit Kit;
+        [Tooltip("Architecture kits by family (index = ModelFamily; None = the plain kit)")]
+        public StyleKit[] Kits = new StyleKit[0];
         public MeshVariants[] Meshes = new MeshVariants[0];
+        public MaterialVariants[] Materials = new MaterialVariants[0];
+        public PropReplacement[] Props = new PropReplacement[0];
+
+        public StyleKit KitFor(ModelFamily family)
+        {
+            int i = (int)family;
+            if (Kits != null && i < Kits.Length && Kits[i] != null) return Kits[i];
+            return Kits != null && Kits.Length > 0 ? Kits[0] : null;
+        }
     }
 }

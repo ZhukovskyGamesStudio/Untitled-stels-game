@@ -27,8 +27,11 @@ namespace Stealth.Configs
 
     public enum StyleTonemap { Neutral, Aces, None }
 
-    /// <summary>How the models are reshaped (Tools/Blender/style_models.py makes a variant of every model per treatment).</summary>
-    public enum ModelTreatment { None, Faceted, Toy, Wonky }
+    /// <summary>
+    /// The modelling language of a style (Tools/Blender/style_families.py rebuilds every model per family; the realistic
+    /// family also swaps furniture for CC0 scanned models and uses PBR materials). Append only.
+    /// </summary>
+    public enum ModelFamily { None, Lowpoly, Toy, Lofi, Clean, Realistic }
 
     /// <summary>What frames the doorways.</summary>
     public enum DoorTrim { None, Casing, Pilasters, Arch }
@@ -44,7 +47,7 @@ namespace Stealth.Configs
     [Serializable]
     public class StyleGeometry
     {
-        public ModelTreatment Treatment;
+        [Tooltip("Models, their materials and the shape of the architecture kit")] public ModelFamily Family;
 
         [Header("Walls")]
         public bool Baseboard;
@@ -69,8 +72,10 @@ namespace Stealth.Configs
         public Material Beam;
         public Material Pipe;
         public Material Glow;
+        [Tooltip("Under the ceilings (tiles, boards…)")] public Material CeilingFinish;
+        public float CeilingTile = 1.2f;
 
-        public bool HasArchitecture => Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
+        public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
                                        Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null;
     }
 

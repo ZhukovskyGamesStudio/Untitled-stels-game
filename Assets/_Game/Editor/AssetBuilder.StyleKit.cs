@@ -115,10 +115,24 @@ namespace Stealth.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        /// <summary>Prefabs of the architecture pieces: the kit models, no colliders, no shadows (they must not change the light).</summary>
-        static StyleKit BuildStyleKit()
+        /// <summary>Architecture kits of every family (index = ModelFamily; None = the plain kit).</summary>
+        static StyleKit[] BuildStyleKits()
         {
-            EnsureFolder(KitPrefabsDir);
+            var families = (ModelFamily[])System.Enum.GetValues(typeof(ModelFamily));
+            var kits = new StyleKit[families.Length];
+            foreach (var f in families) kits[(int)f] = BuildStyleKit(f);
+            return kits;
+        }
+
+        /// <summary>Prefabs of the architecture pieces: the kit models, no colliders, no shadows (they must not change the light).</summary>
+        static StyleKit BuildStyleKit(ModelFamily family)
+        {
+            bool plain = family == ModelFamily.None;
+            string models = plain ? KitModelsDir : $"{KitModelsDir}/{family}";
+            string prefabs = plain ? KitPrefabsDir : $"{KitPrefabsDir}/{family}";
+            string asset = plain ? $"{StylesDir}/StyleKit.asset" : $"{StylesDir}/StyleKit_{family}.asset";
+            if (!plain && !AssetDatabase.IsValidFolder(models)) return null;
+            EnsureFolder(prefabs);
             var files = new Dictionary<DecorKind, string>
             {
                 [DecorKind.Baseboard] = "kit_baseboard", [DecorKind.Crown] = "kit_crown", [DecorKind.Rail] = "kit_rail",
@@ -127,19 +141,20 @@ namespace Stealth.EditorTools
                 [DecorKind.Arch] = "kit_arch", [DecorKind.Beam] = "kit_beam", [DecorKind.IBeam] = "kit_ibeam",
                 [DecorKind.Coffer] = "kit_coffer", [DecorKind.Tray] = "kit_tray", [DecorKind.TrayHanger] = "kit_tray_hanger",
             };
-            var kit = AssetDatabase.LoadAssetAtPath<StyleKit>($"{StylesDir}/StyleKit.asset");
+            var kit = AssetDatabase.LoadAssetAtPath<StyleKit>(asset);
             if (kit == null)
             {
                 kit = ScriptableObject.CreateInstance<StyleKit>();
-                AssetDatabase.CreateAsset(kit, $"{StylesDir}/StyleKit.asset");
+                AssetDatabase.CreateAsset(kit, asset);
             }
+            kit.Family = family;
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)
             {
-                var path = $"{KitModelsDir}/{file}.fbx";
+                var path = $"{models}/{file}.fbx";
                 if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) { Debug.LogWarning($"[Builder] {path} missing: run Tools/Blender/style_kit.py"); continue; }
-                kit.Pieces[(int)kind] = Prefab($"{KitPrefabsDir}/{kind}.prefab", () =>
+                kit.Pieces[(int)kind] = Prefab($"{prefabs}/{kind}.prefab", () =>
                 {
                     var go = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
                     go.name = kind.ToString();
@@ -164,14 +179,14 @@ namespace Stealth.EditorTools
             return kit;
         }
 
-        /// <summary>Every model mesh and its variant per treatment (Art/Models/Styles/&lt;Treatment&gt;/…/&lt;name&gt;__&lt;treatment&gt;.fbx), matched by mesh name.</summary>
+        /// <summary>Every model mesh and its variant per family (Art/Models/Styles/&lt;Family&gt;/…/&lt;name&gt;__&lt;family&gt;.fbx), matched by mesh name.</summary>
         static MeshVariants[] BuildMeshVariants()
         {
             var sets = new List<MeshVariants>();
-            foreach (ModelTreatment t in System.Enum.GetValues(typeof(ModelTreatment)))
+            foreach (ModelFamily f in System.Enum.GetValues(typeof(ModelFamily)))
             {
-                if (t == ModelTreatment.None) continue;
-                var dir = $"{StyleModelsDir}/{t}";
+                if (f == ModelFamily.None) continue;
+                var dir = $"{StyleModelsDir}/{f}";
                 if (!AssetDatabase.IsValidFolder(dir)) continue;
                 var from = new List<Mesh>();
                 var to = new List<Mesh>();
@@ -192,7 +207,7 @@ namespace Stealth.EditorTools
                             to.Add(variant);
                         }
                 }
-                sets.Add(new MeshVariants { Treatment = t, From = from.ToArray(), To = to.ToArray() });
+                sets.Add(new MeshVariants { Family = f, From = from.ToArray(), To = to.ToArray() });
             }
             return sets.ToArray();
         }

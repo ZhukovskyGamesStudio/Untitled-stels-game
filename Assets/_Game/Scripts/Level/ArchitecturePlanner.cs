@@ -8,7 +8,7 @@ namespace Stealth.Level
     public enum DecorKind
     {
         Baseboard, Crown, Rail, Wainscot, Pipes, PipeClamp, Strip, Pilaster, Casing, Arch, Beam, IBeam, Coffer, Tray, TrayHanger,
-        FloorFinish, WallFinish,
+        FloorFinish, WallFinish, CeilingFinish,
     }
 
     /// <summary>One piece to place: a kit prefab (or a finish quad) and its transform; finishes carry their size in metres.</summary>
@@ -45,6 +45,7 @@ namespace Stealth.Level
             foreach (var face in shell.Walls) PlanFace(list, face, shell, g);
             foreach (var o in shell.Openings) PlanOpening(list, o, g);
             if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling);
+            if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (g.Floor != null)
                 foreach (var r in shell.Floors)
                 {
@@ -236,6 +237,30 @@ namespace Stealth.Level
                                 break;
                         }
                     }
+        }
+
+        /// <summary>
+        /// Ceiling finish: the underside of every slab above a floor (so the stair holes stay open) and, on the top floor,
+        /// the whole roof.
+        /// </summary>
+        static void PlanCeilingFinish(List<DecorPiece> list, LevelShell shell, LevelLayout l)
+        {
+            void Quad(Vector2 min, Vector2 max, float y)
+            {
+                var size = max - min;
+                list.Add(new DecorPiece
+                {
+                    Kind = DecorKind.CeilingFinish,
+                    Position = new Vector3((min.x + max.x) / 2f, y - 0.008f, (min.y + max.y) / 2f),
+                    Rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward),
+                    Scale = new Vector3(size.x, size.y, 1f),
+                    Surface = new Vector4(size.x, size.y, min.x, min.y),
+                });
+            }
+            foreach (var r in shell.Floors)
+                if (r.Floor >= 1) Quad(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness);
+            Quad(Vector2.zero, new Vector2(l.Width * LevelMetrics.Cell, l.Height * LevelMetrics.Cell),
+                 LevelLayout.FloorY(l.Floors - 1) + LevelMetrics.WallHeight);
         }
 
         /// <summary>The ceiling of this cell has the opening of a staircase going up.</summary>

@@ -94,8 +94,9 @@ namespace Stealth.Level
         /// <summary>Back to the base look; the materials get their own colours back (they are assets in the editor).</summary>
         public static void Restore()
         {
-            s_Treatment = ModelTreatment.None;
-            foreach (var mf in Object.FindObjectsByType<MeshFilter>()) Dress(mf);
+            UndoReplacements();
+            s_Family = ModelFamily.None;
+            foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
             StyleDecor.Clear();
             foreach (var (mat, orig) in s_Originals)
             {
@@ -121,50 +122,128 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ geometry
 
-        static ModelTreatment s_Treatment;
-        static Dictionary<Mesh, Mesh>[] s_Variants;
-        static readonly Dictionary<Mesh, Mesh> s_OriginalOf = new();
+        static ModelFamily s_Family;
+        static bool s_Loaded;
+        static readonly Dictionary<Mesh, Mesh>[] s_MeshVariants = NewMaps<Mesh>();
+        static readonly Dictionary<Mesh, Mesh> s_MeshOriginal = new();
+        static readonly Dictionary<Material, Material>[] s_MatVariants = NewMaps<Material>();
+        static readonly Dictionary<Material, Material> s_MatOriginal = new();
+        static readonly Dictionary<Mesh, PropReplacement>[] s_Props = NewMaps2();
+        /// <summary>Models replaced as a whole: their root, the replacement and the renderers hidden for it.</summary>
+        static readonly List<(Transform root, GameObject replacement, List<Renderer> hidden)> s_Replaced = new();
+
+        static Dictionary<T, T>[] NewMaps<T>()
+        {
+            var a = new Dictionary<T, T>[System.Enum.GetValues(typeof(ModelFamily)).Length];
+            for (int i = 0; i < a.Length; i++) a[i] = new Dictionary<T, T>();
+            return a;
+        }
+
+        static Dictionary<Mesh, PropReplacement>[] NewMaps2()
+        {
+            var a = new Dictionary<Mesh, PropReplacement>[System.Enum.GetValues(typeof(ModelFamily)).Length];
+            for (int i = 0; i < a.Length; i++) a[i] = new Dictionary<Mesh, PropReplacement>();
+            return a;
+        }
+
+        /// <summary>The family of models on screen now.</summary>
+        public static ModelFamily Family => s_Family;
 
         static void ApplyGeometry(StyleGeometry g)
         {
-            s_Treatment = g != null ? g.Treatment : ModelTreatment.None;
-            foreach (var mf in Object.FindObjectsByType<MeshFilter>()) Dress(mf);
-            if (Application.isPlaying) StyleDecor.Rebuild(g, Config != null ? Config.Kit : null);
+            var family = g != null ? g.Family : ModelFamily.None;
+            if (family != s_Family) UndoReplacements();
+            s_Family = family;
+            foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
+            if (Application.isPlaying) StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null);
         }
 
-        static void LoadVariants()
+        static void Load()
         {
-            if (s_Variants != null) return;
-            s_Variants = new Dictionary<Mesh, Mesh>[System.Enum.GetValues(typeof(ModelTreatment)).Length];
-            for (int i = 0; i < s_Variants.Length; i++) s_Variants[i] = new Dictionary<Mesh, Mesh>();
-            if (Config == null || Config.Meshes == null) return;
-            foreach (var set in Config.Meshes)
+            if (s_Loaded) return;
+            s_Loaded = true;
+            var c = Config;
+            if (c == null) return;
+            foreach (var set in c.Meshes ?? new MeshVariants[0])
                 for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
-                {
-                    if (set.From[i] == null || set.To[i] == null) continue;
-                    s_Variants[(int)set.Treatment][set.From[i]] = set.To[i];
-                    s_OriginalOf[set.To[i]] = set.From[i];
-                }
+                    if (set.From[i] != null && set.To[i] != null)
+                    {
+                        s_MeshVariants[(int)set.Family][set.From[i]] = set.To[i];
+                        s_MeshOriginal[set.To[i]] = set.From[i];
+                    }
+            foreach (var set in c.Materials ?? new MaterialVariants[0])
+                for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
+                    if (set.From[i] != null && set.To[i] != null)
+                    {
+                        s_MatVariants[(int)set.Family][set.From[i]] = set.To[i];
+                        s_MatOriginal[set.To[i]] = set.From[i];
+                    }
+            foreach (var p in c.Props ?? new PropReplacement[0])
+                if (p.Key != null && p.Prefab != null) s_Props[(int)p.Family][p.Key] = p;
         }
 
         /// <summary>
-        /// Gives a freshly spawned object (robot, item, player) the models of the current style. Cheap and safe to call
-        /// for anything: meshes without a variant stay as they are.
+        /// Gives a freshly spawned object (robot, item, player) the models and materials of the current style. Cheap and
+        /// safe to call for anything: what has no variant stays as it is.
         /// </summary>
         public static void Dress(GameObject go)
         {
             if (!s_Active || go == null) return;
-            foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true)) Dress(mf);
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true)) DressRenderer(r);
         }
 
-        static void Dress(MeshFilter mf)
+        static void DressRenderer(Renderer r)
         {
-            var mesh = mf.sharedMesh;
-            if (mesh == null) return;
-            LoadVariants();
-            var original = s_OriginalOf.TryGetValue(mesh, out var o) ? o : mesh;
-            var target = s_Treatment != ModelTreatment.None && s_Variants[(int)s_Treatment].TryGetValue(original, out var v) ? v : original;
-            if (target != mesh) mf.sharedMesh = target;
+            if (r == null) return;
+            Load();
+            int f = (int)s_Family;
+            if (r.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null)
+            {
+                var mesh = mf.sharedMesh;
+                var original = s_MeshOriginal.TryGetValue(mesh, out var o) ? o : mesh;
+                var target = s_MeshVariants[f].TryGetValue(original, out var v) ? v : original;
+                if (target != mesh) mf.sharedMesh = target;
+                if (s_Props[f].TryGetValue(original, out var prop)) Replace(mf.transform.parent, prop);
+            }
+            var mats = r.sharedMaterials;
+            bool changed = false;
+            for (int i = 0; i < mats.Length; i++)
+            {
+                var m = mats[i];
+                if (m == null) continue;
+                var original = s_MatOriginal.TryGetValue(m, out var o) ? o : m;
+                var target = s_MatVariants[f].TryGetValue(original, out var v) ? v : original;
+                if (target != m) { mats[i] = target; changed = true; }
+            }
+            if (changed) r.sharedMaterials = mats;
+        }
+
+        /// <summary>
+        /// Hides our model under <paramref name="root"/> and puts the replacement in its place (colliders stay). Glowing
+        /// parts (Eye*: monitors, bulbs) stay: a scanned desk still carries our monitor.
+        /// </summary>
+        static void Replace(Transform root, PropReplacement prop)
+        {
+            if (root == null || !Application.isPlaying) return;
+            foreach (var (r0, _, _) in s_Replaced) if (r0 == root) return;
+            var hidden = new List<Renderer>();
+            foreach (var r in root.GetComponentsInChildren<Renderer>())
+                if (r.enabled && !r.gameObject.name.StartsWith("Eye")) { r.enabled = false; hidden.Add(r); }
+            var go = Object.Instantiate(prop.Prefab, root);
+            go.transform.localPosition = prop.Position;
+            go.transform.localRotation = Quaternion.identity;
+            go.transform.localScale = prop.Scale;
+            s_Replaced.Add((root, go, hidden));
+        }
+
+        static void UndoReplacements()
+        {
+            foreach (var (_, go, hidden) in s_Replaced)
+            {
+                if (go != null) Object.Destroy(go);
+                foreach (var r in hidden) if (r != null) r.enabled = true;
+            }
+            s_Replaced.Clear();
         }
 
         // ------------------------------------------------------------------ post-processing

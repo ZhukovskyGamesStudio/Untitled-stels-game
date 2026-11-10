@@ -32,7 +32,7 @@ namespace Stealth.Level
             s_Block ??= new MaterialPropertyBlock();
             foreach (var p in ArchitecturePlanner.Plan(ActiveLevel.Shell, ActiveLevel.Layout, g))
             {
-                bool finish = p.Kind is DecorKind.FloorFinish or DecorKind.WallFinish;
+                bool finish = p.Kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish;
                 var prefab = finish ? kit.Finish : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
                 if (prefab == null) continue;
                 var go = Object.Instantiate(prefab, p.Position, p.Rotation, root);
@@ -41,9 +41,14 @@ namespace Stealth.Level
                 if (finish)
                 {
                     var r = go.GetComponentInChildren<MeshRenderer>();
-                    bool floor = p.Kind == DecorKind.FloorFinish;
-                    float tile = Mathf.Max(0.05f, floor ? g.FloorTile : g.WallTile);
-                    r.sharedMaterial = floor ? g.Floor : g.Wall;
+                    var (mat, tileSize) = p.Kind switch
+                    {
+                        DecorKind.FloorFinish => (g.Floor, g.FloorTile),
+                        DecorKind.CeilingFinish => (g.CeilingFinish, g.CeilingTile),
+                        _ => (g.Wall, g.WallTile),
+                    };
+                    float tile = Mathf.Max(0.05f, tileSize);
+                    r.sharedMaterial = mat;
                     s_Block.Clear();
                     s_Block.SetVector(BaseMapSt, new Vector4(p.Surface.x / tile, p.Surface.y / tile, p.Surface.z / tile, p.Surface.w / tile));
                     r.SetPropertyBlock(s_Block);

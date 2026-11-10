@@ -98,21 +98,36 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void EveryKitPieceHasAPrefabAndEveryTreatmentHasVariants()
+        public void EveryKitPieceHasAPrefabAndEveryFamilyHasVariants()
         {
             var config = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
-            Assert.IsNotNull(config.Kit, "no style kit");
-            foreach (DecorKind kind in System.Enum.GetValues(typeof(DecorKind)))
+            foreach (ModelFamily f in System.Enum.GetValues(typeof(ModelFamily)))
             {
-                if (kind is DecorKind.FloorFinish or DecorKind.WallFinish) continue;
-                Assert.IsNotNull(config.Kit.Pieces[(int)kind], $"no prefab for {kind}");
-                foreach (var c in config.Kit.Pieces[(int)kind].GetComponentsInChildren<Collider>(true)) Assert.Fail($"{kind} has a collider");
+                var kit = config.KitFor(f);
+                Assert.IsNotNull(kit, $"no style kit for {f}");
+                Assert.AreEqual(f, kit.Family, $"{f} falls back to the kit of another family");
+                foreach (DecorKind kind in System.Enum.GetValues(typeof(DecorKind)))
+                {
+                    if (kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish) continue;
+                    Assert.IsNotNull(kit.Pieces[(int)kind], $"{f}: no prefab for {kind}");
+                    foreach (var c in kit.Pieces[(int)kind].GetComponentsInChildren<Collider>(true)) Assert.Fail($"{f}/{kind} has a collider");
+                }
+                Assert.IsNotNull(kit.Finish);
             }
-            Assert.IsNotNull(config.Kit.Finish);
-            foreach (ModelTreatment t in System.Enum.GetValues(typeof(ModelTreatment)))
+            Assert.GreaterOrEqual(config.Props.Count(p => p.Family == ModelFamily.Realistic && p.Prefab != null && p.Key != null), 12,
+                "the realistic family swaps the furniture for scanned models");
+            foreach (var p in config.Props)
             {
-                if (t == ModelTreatment.None) continue;
-                var set = config.Meshes.FirstOrDefault(m => m.Treatment == t);
+                Assert.Greater(p.Scale.x, 0.05f); Assert.Greater(p.Scale.y, 0.05f); Assert.Greater(p.Scale.z, 0.05f);
+                foreach (var c in p.Prefab.GetComponentsInChildren<Collider>(true)) Assert.Fail($"{p.Prefab.name} has a collider");
+            }
+            foreach (ModelFamily t in System.Enum.GetValues(typeof(ModelFamily)))
+            {
+                if (t == ModelFamily.None) continue;
+                var mats = config.Materials.FirstOrDefault(m => m.Family == t);
+                Assert.IsNotNull(mats, $"no {t} materials");
+                Assert.Greater(mats.To.Length, 40, $"{t}: too few materials have a version");
+                var set = config.Meshes.FirstOrDefault(m => m.Family == t);
                 Assert.IsNotNull(set, $"no {t} meshes");
                 Assert.Greater(set.From.Length, 150, $"{t}: too few meshes have a variant");
                 for (int i = 0; i < set.From.Length; i++)

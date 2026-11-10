@@ -16,15 +16,15 @@ MonoBehaviour:
   References: PAYDAY 2, Hitman
   Pitch: "\u0411\u0430\u043D\u043A \u043D\u043E\u0447\u044C\u044E: \u043C\u0440\u0430\u043C\u043E\u0440\u043D\u044B\u0439 \u043F\u043E\u043B, \u0441\u0432\u0435\u0442\u043B\u0430\u044F \u0448\u0442\u0443\u043A\u0430\u0442\u0443\u0440\u043A\u0430, \u043F\u0438\u043B\u044F\u0441\u0442\u0440\u044B \u0443 \u0434\u0432\u0435\u0440\u0435\u0439, \u043A\u0435\u0441\u0441\u043E\u043D\u043D\u044B\u0439 \u043F\u043E\u0442\u043E\u043B\u043E\u043A, \u043A\u0430\u0440\u043D\u0438\u0437\u044B \u0438 \u043F\u043B\u0438\u043D\u0442\u0443\u0441\u044B. \u0425\u043E\u043B\u043E\u0434\u043D\u044B\u0435 \u0431\u0438\u0440\u044E\u0437\u043E\u0432\u044B\u0435 \u0442\u0435\u043D\u0438, \u0442\u0451\u043F\u043B\u044B\u0435 \u043B\u0430\u043C\u043F\u044B, \u0433\u043B\u044F\u043D\u0435\u0446. \u0421\u0435\u0440\u044C\u0451\u0437\u043D\u043E \u0438 \u0434\u043E\u0440\u043E\u0433\u043E."
   Grade:
-    Exposure: 0.8
-    Contrast: 22
+    Exposure: 1.1
+    Contrast: 18
     Saturation: 5
     ColorFilter: {r: 1, g: 1, b: 1, a: 1}
     HueShift: 0
     SplitShadows: {r: 0.3, g: 0.45, b: 0.55, a: 1}
     SplitHighlights: {r: 0.62, g: 0.52, b: 0.4, a: 1}
     SplitBalance: 0
-    Temperature: -18
+    Temperature: -12
     Tint: 0
     Tonemap: 1
     BloomIntensity: 1.6
@@ -76,7 +76,7 @@ MonoBehaviour:
     NeonNear: {r: 0, g: 1, b: 1, a: 1}
     NeonFarColor: {r: 1, g: 0, b: 1, a: 1}
   World:
-    Ambient: {r: 0.1, g: 0.12, b: 0.16, a: 1}
+    Ambient: {r: 0.24, g: 0.26, b: 0.3, a: 1}
     IndoorFog: {r: 0.02, g: 0.03, b: 0.045, a: 1}
     IndoorFogDensity: 0.035
     GasFog: {r: 0.33, g: 0.37, b: 0.3, a: 1}
@@ -112,7 +112,7 @@ MonoBehaviour:
       Brightness: 1
       Smoothness: -1
   Geometry:
-    Treatment: 0
+    Family: 5
     Baseboard: 1
     Crown: 1
     WainscotHeight: 0
@@ -120,14 +120,16 @@ MonoBehaviour:
     Pipes: 0
     StripSpacing: 0
     Doors: 2
-    Ceiling: 3
-    Floor: {fileID: 2100000, guid: 0903263d6668a9b46a6f093ca340e35a, type: 2}
+    Ceiling: 0
+    Floor: {fileID: 2100000, guid: 749c82b564578224297b382e5fd17c11, type: 2}
     FloorTile: 2
-    Wall: {fileID: 2100000, guid: e13af629449780848a011642ca50b838, type: 2}
-    WallTile: 2
-    Trim: {fileID: 2100000, guid: fefeffa1b19730240ba873900bf6e3e0, type: 2}
+    Wall: {fileID: 2100000, guid: 34c61250de36aa0408627e2eae60c646, type: 2}
+    WallTile: 2.5
+    Trim: {fileID: 2100000, guid: 1cfb7f990153b4049a1f4b93d9d62928, type: 2}
     Panel: {fileID: 0}
-    Column: {fileID: 2100000, guid: 726a805a869d38a4cb01f5af30e421cb, type: 2}
-    Beam: {fileID: 2100000, guid: fe5ca12aa19bd3a429580e116aa2e322, type: 2}
+    Column: {fileID: 2100000, guid: 749c82b564578224297b382e5fd17c11, type: 2}
+    Beam: {fileID: 0}
     Pipe: {fileID: 0}
     Glow: {fileID: 0}
+    CeilingFinish: {fileID: 2100000, guid: f40a093ebcbdec64880889cb543e1523, type: 2}
+    CeilingTile: 1.2

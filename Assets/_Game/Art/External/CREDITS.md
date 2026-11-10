@@ -1,0 +1,50 @@
+# External assets
+
+All from [Poly Haven](https://polyhaven.com), licence [CC0](https://polyhaven.com/license) (public domain, no attribution required — listed for reference).
+
+| Kind | Asset | Page |
+| --- | --- | --- |
+| texture | marble_01 | https://polyhaven.com/a/marble_01 |
+| texture | laminate_floor_02 | https://polyhaven.com/a/laminate_floor_02 |
+| texture | plastered_wall_04 | https://polyhaven.com/a/plastered_wall_04 |
+| texture | beige_wall_001 | https://polyhaven.com/a/beige_wall_001 |
+| texture | ceiling_interior | https://polyhaven.com/a/ceiling_interior |
+| texture | dark_wood | https://polyhaven.com/a/dark_wood |
+| texture | brown_leather | https://polyhaven.com/a/brown_leather |
+| texture | metal_plate | https://polyhaven.com/a/metal_plate |
+| texture | painted_metal_shutter | https://polyhaven.com/a/painted_metal_shutter |
+| texture | green_metal_rust | https://polyhaven.com/a/green_metal_rust |
+| texture | corrugated_iron_02 | https://polyhaven.com/a/corrugated_iron_02 |
+| texture | concrete_floor_worn_001 | https://polyhaven.com/a/concrete_floor_worn_001 |
+| texture | old_wooden_floor_01 | https://polyhaven.com/a/old_wooden_floor_01 |
+| texture | peeling_painted_wall | https://polyhaven.com/a/peeling_painted_wall |
+| texture | large_red_bricks | https://polyhaven.com/a/large_red_bricks |
+| texture | dark_planks | https://polyhaven.com/a/dark_planks |
+| texture | decrepit_wallpaper | https://polyhaven.com/a/decrepit_wallpaper |
+| texture | dark_paneled_wood | https://polyhaven.com/a/dark_paneled_wood |
+| texture | checkered_pavement_tiles | https://polyhaven.com/a/checkered_pavement_tiles |
+| texture | herringbone_parquet | https://polyhaven.com/a/herringbone_parquet |
+| texture | concrete_wall_006 | https://polyhaven.com/a/concrete_wall_006 |
+| texture | hangar_concrete_floor | https://polyhaven.com/a/hangar_concrete_floor |
+| texture | concrete_floor_01 | https://polyhaven.com/a/concrete_floor_01 |
+| texture | plank_flooring | https://polyhaven.com/a/plank_flooring |
+| texture | raw_plank_wall | https://polyhaven.com/a/raw_plank_wall |
+| texture | dirty_carpet | https://polyhaven.com/a/dirty_carpet |
+| texture | blue_metal_plate | https://polyhaven.com/a/blue_metal_plate |
+| texture | kitchen_wood | https://polyhaven.com/a/kitchen_wood |
+| texture | plastered_wall | https://polyhaven.com/a/plastered_wall |
+| model | metal_office_desk | https://polyhaven.com/a/metal_office_desk |
+| model | modern_arm_chair_01 | https://polyhaven.com/a/modern_arm_chair_01 |
+| model | drawer_cabinet | https://polyhaven.com/a/drawer_cabinet |
+| model | potted_plant_02 | https://polyhaven.com/a/potted_plant_02 |
+| model | wooden_bookshelf_worn | https://polyhaven.com/a/wooden_bookshelf_worn |
+| model | steel_frame_shelves_01 | https://polyhaven.com/a/steel_frame_shelves_01 |
+| model | cardboard_box_01 | https://polyhaven.com/a/cardboard_box_01 |
+| model | sofa_02 | https://polyhaven.com/a/sofa_02 |
+| model | ArmChair_01 | https://polyhaven.com/a/ArmChair_01 |
+| model | modern_coffee_table_01 | https://polyhaven.com/a/modern_coffee_table_01 |
+| model | round_wooden_table_01 | https://polyhaven.com/a/round_wooden_table_01 |
+| model | dining_table | https://polyhaven.com/a/dining_table |
+| model | metal_trash_can | https://polyhaven.com/a/metal_trash_can |
+| model | desk_lamp_arm_01 | https://polyhaven.com/a/desk_lamp_arm_01 |
+| model | mounted_fluorescent_lights | https://polyhaven.com/a/mounted_fluorescent_lights |

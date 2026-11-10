@@ -14,8 +14,12 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
-argv = sys.argv
-out_dir = argv[argv.index("--") + 1] if "--" in argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleKit")
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+base_dir = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleKit")
+# no family: the plain kit in StyleKit/; with families: StyleKit/<Family>/ reshaped like the family's models
+FAMILIES = argv[1:] or [None]
+family = None
+out_dir = base_dir
 
 # Blender: -Y is the room side (Unity +Z). A depth d out of the wall is y = -d.
 
@@ -63,7 +67,54 @@ def merge(name, parts):
     return obj
 
 
+def finish(obj):
+    """Reshape a finished piece like the models of the family (see style_families.py)."""
+    if family is None:
+        return False
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    def bevel(offset, segments):
+        edges = [e for e in bm.edges if e.is_manifold and e.calc_face_angle(0) > math.radians(30)]
+        if edges:
+            bmesh.ops.bevel(bm, geom=edges, offset=offset, offset_type="OFFSET", segments=segments, profile=0.5,
+                            affect="EDGES", clamp_overlap=True)
+    smooth = False
+    if family == "lowpoly":
+        for v in bm.verts:
+            v.co.y *= 1.6  # chunkier: everything sticks out further from the wall
+        bevel(0.025, 1)
+    elif family == "toy":
+        for v in bm.verts:
+            v.co.y *= 1.4
+        bevel(0.03, 4)
+        smooth = True
+    elif family == "lofi":
+        for v in bm.verts:
+            v.co = Vector(round(c / 0.02) * 0.02 for c in v.co)
+    elif family == "clean":
+        bevel(0.006, 1)
+    elif family == "realistic":
+        bevel(0.004, 2)
+        smooth = True
+    bm.to_mesh(obj.data)
+    bm.free()
+    if True:
+        # box-projected UVs for textured trims (1 unit = 1 m)
+        bpy.context.view_layer.objects.active = obj
+        for o in bpy.context.scene.objects:
+            o.select_set(o == obj)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.cube_project(cube_size=1.0, correct_aspect=False, scale_to_bounds=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    return smooth
+
+
 def export(name, smooth=False):
+    bpy.ops.object.select_all(action="SELECT")
+    for obj in list(bpy.context.scene.objects):
+        if obj.type == "MESH":
+            smooth = finish(obj) or smooth
     bpy.ops.object.select_all(action="SELECT")
     for obj in bpy.context.selected_objects:
         for p in obj.data.polygons:
@@ -204,7 +255,9 @@ def tray():
 
 
 if __name__ == "__main__":
-    clear()
-    for fn in (baseboard, crown, rail, wainscot, pipes, strip, pilaster, casing, arch, beam, ibeam, coffer, tray):
-        fn()
+    for family in FAMILIES:
+        out_dir = base_dir if family is None else os.path.join(base_dir, family.capitalize())
+        clear()
+        for fn in (baseboard, crown, rail, wainscot, pipes, strip, pilaster, casing, arch, beam, ibeam, coffer, tray):
+            fn()
     print("DONE")

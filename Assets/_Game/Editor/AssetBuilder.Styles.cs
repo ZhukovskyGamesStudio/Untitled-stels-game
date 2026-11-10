@@ -34,6 +34,7 @@ namespace Stealth.EditorTools
             AddStyleFeature(mat);
 
             BuildKitMaterials();
+            BuildExternalKitMaterials();
             bool rebuild = Environment.GetEnvironmentVariable("REBUILD_STYLES") == "1";
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
@@ -57,8 +58,17 @@ namespace Stealth.EditorTools
             config.Robots = MaterialsIn("Robots");
             config.Players = MaterialsIn("Player");
             config.Loot = MaterialsIn("Items");
-            config.Kit = BuildStyleKit();
+            config.Kits = BuildStyleKits();
             config.Meshes = BuildMeshVariants();
+            config.Materials = BuildMaterialVariants();
+            config.Props = BuildPropReplacements();
+            // the palette of a style recolours the family versions of a material too
+            Material[] WithVariants(Material[] a) => a.Concat(config.Materials.SelectMany(set =>
+                set.From.Select((m, i) => (m, i)).Where(x => a.Contains(x.m)).Select(x => set.To[x.i]))).ToArray();
+            config.Building = WithVariants(config.Building);
+            config.Furniture = WithVariants(config.Furniture);
+            config.Robots = WithVariants(config.Robots);
+            config.Players = WithVariants(config.Players);
             EditorUtility.SetDirty(config);
 
             var root = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
@@ -143,10 +153,11 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.36f, 0.33f, 0.22f);
                     s.Palette.Building.Saturation = 0.7f;
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Wonky;
+                    geo.Family = ModelFamily.Lofi;
                     geo.Pipes = true; geo.Ceiling = CeilingKind.IBeams; geo.Baseboard = true;
-                    geo.Floor = K("Floor_Diamond"); geo.FloorTile = 1f; geo.Wall = K("Wall_Corrugated"); geo.WallTile = 1.5f;
-                    geo.Trim = K("Trim_Rust"); geo.Beam = K("Trim_Rust"); geo.Pipe = K("Pipe_Green");
+                    geo.Floor = K("Px_Plate"); geo.FloorTile = 1.5f; geo.Wall = K("Px_Corrugated"); geo.WallTile = 2f;
+                    geo.CeilingFinish = K("Px_Concrete"); geo.CeilingTile = 2f;
+                    geo.Trim = K("Px_Rust"); geo.Beam = K("Px_Rust"); geo.Pipe = K("Px_Pipe");
                 });
 
             yield return Style("S02_Scrapyard", "Барахольщики", "R.E.P.O., PEAK",
@@ -165,10 +176,11 @@ namespace Stealth.EditorTools
                     s.Palette.Furniture.Saturation = 1.3f;
                     s.Palette.Robots.Saturation = 1.45f; s.Palette.Robots.Smoothness = 0.75f;
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Toy;
+                    geo.Family = ModelFamily.Toy;
                     geo.WainscotHeight = 1.05f; geo.Crown = true; geo.Doors = DoorTrim.Casing;
-                    geo.Floor = K("Floor_Checker"); geo.FloorTile = 1.4f; geo.Wall = K("Wall_Damask"); geo.WallTile = 1.1f;
-                    geo.Trim = K("Trim_WoodDark"); geo.Panel = K("Panel_WoodDark");
+                    geo.Floor = K("Real_CheckerTiles"); geo.FloorTile = 1.6f; geo.Wall = K("Real_Wallpaper"); geo.WallTile = 1.5f;
+                    geo.CeilingFinish = K("Real_Plaster2"); geo.CeilingTile = 2f;
+                    geo.Trim = K("Trim_WoodDark"); geo.Panel = K("Real_PaneledWood");
                 });
 
             yield return Style("S03_Heist", "Ограбление", "PAYDAY 2, Hitman",
@@ -177,17 +189,19 @@ namespace Stealth.EditorTools
                 s =>
                 {
                     var g = s.Grade;
-                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 0.8f; g.Contrast = 22f; g.Saturation = 5f; g.Temperature = -18f;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.1f; g.Contrast = 18f; g.Saturation = 5f; g.Temperature = -12f;
                     g.SplitShadows = C(0.3f, 0.45f, 0.55f); g.SplitHighlights = C(0.62f, 0.52f, 0.4f);
                     g.BloomIntensity = 1.6f; g.BloomThreshold = 0.9f; g.BloomScatter = 0.75f;
                     g.Vignette = 0.3f; g.ChromaticAberration = 0.1f; g.FilmGrain = 0.15f;
-                    s.World.Ambient = C(0.1f, 0.12f, 0.16f);
+                    s.World.Ambient = C(0.24f, 0.26f, 0.3f);
                     s.World.IndoorFog = C(0.02f, 0.03f, 0.045f); s.World.IndoorFogDensity = 0.035f;
                     s.Palette.Furniture.Smoothness = 0.4f;
                     var geo = s.Geometry;
-                    geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Pilasters; geo.Ceiling = CeilingKind.Coffers;
-                    geo.Floor = K("Floor_Marble"); geo.FloorTile = 2f; geo.Wall = K("Wall_PlasterWarm"); geo.WallTile = 2f;
-                    geo.Trim = K("Trim_WoodDark"); geo.Column = K("Trim_Stone"); geo.Beam = K("Trim_White");
+                    geo.Family = ModelFamily.Realistic;
+                    geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Pilasters;
+                    geo.Floor = K("Real_Marble"); geo.FloorTile = 2f; geo.Wall = K("Real_Plaster"); geo.WallTile = 2.5f;
+                    geo.CeilingFinish = K("Real_CeilingTiles"); geo.CeilingTile = 1.2f;
+                    geo.Trim = K("Real_DarkWood"); geo.Column = K("Real_Marble");
                 });
 
             yield return Style("S04_Hunted", "Туман и твид", "Sir, You Are Being Hunted, Pathologic",
@@ -196,7 +210,7 @@ namespace Stealth.EditorTools
                 s =>
                 {
                     var g = s.Grade;
-                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 0.8f; g.Contrast = 5f; g.Saturation = -30f;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.05f; g.Contrast = 5f; g.Saturation = -25f;
                     g.ColorFilter = C(1f, 0.95f, 0.72f); g.SplitShadows = C(0.42f, 0.48f, 0.38f); g.SplitHighlights = C(0.65f, 0.6f, 0.42f);
                     g.BloomIntensity = 1.1f; g.BloomThreshold = 0.75f; g.BloomScatter = 0.9f; g.Vignette = 0.32f;
                     s.Screen.PaintRadius = 4f; s.Screen.PaperGrain = 0.06f;
@@ -204,10 +218,11 @@ namespace Stealth.EditorTools
                     s.World.IndoorFog = C(0.36f, 0.35f, 0.2f); s.World.IndoorFogDensity = 0.09f;
                     s.World.GasFog = C(0.62f, 0.58f, 0.32f);
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Wonky;
+                    geo.Family = ModelFamily.Realistic;
                     geo.Baseboard = true; geo.RailHeight = 0.95f; geo.Ceiling = CeilingKind.Beams; geo.Doors = DoorTrim.Casing;
-                    geo.Floor = K("Floor_Planks"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_PlasterOld"); geo.WallTile = 2f;
-                    geo.Trim = K("Trim_WoodDark"); geo.Beam = K("Trim_WoodDark");
+                    geo.Floor = K("Real_OldFloor"); geo.FloorTile = 1.5f; geo.Wall = K("Real_Peeling"); geo.WallTile = 2.5f;
+                    geo.CeilingFinish = K("Real_Plaster2"); geo.CeilingTile = 2f;
+                    geo.Trim = K("Real_DarkPlanks"); geo.Beam = K("Real_DarkPlanks");
                 });
 
             yield return Style("S05_Toon", "Мультяшный рейд", "Risk of Rain 2, Deep Rock Galactic, PEAK",
@@ -227,7 +242,7 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.8f, 0.55f, 0.45f);
                     foreach (var t in new[] { s.Palette.Building, s.Palette.Furniture, s.Palette.Robots, s.Palette.Players }) t.Saturation = 1.5f;
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Faceted;
+                    geo.Family = ModelFamily.Lowpoly;
                     geo.Baseboard = true;
                     geo.Floor = K("Floor_ToonTiles"); geo.FloorTile = 2.5f; geo.Wall = K("Wall_PlasterToon"); geo.WallTile = 3f;
                     geo.Trim = K("Trim_Toon");
@@ -250,8 +265,9 @@ namespace Stealth.EditorTools
                     s.World.IndoorFog = C(0.16f, 0.18f, 0.22f); s.World.IndoorFogDensity = 0.03f;
                     s.World.GasFog = C(0.6f, 0.64f, 0.68f);
                     var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
                     geo.WainscotHeight = 1f; geo.Crown = true; geo.Doors = DoorTrim.Arch; geo.Ceiling = CeilingKind.Coffers;
-                    geo.Floor = K("Floor_Parquet"); geo.FloorTile = 1f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
+                    geo.Floor = K("Real_Herringbone"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
                     geo.Trim = K("Trim_White"); geo.Panel = K("Panel_PaleBlue"); geo.Column = K("Trim_PaleBlue"); geo.Beam = K("Trim_White");
                 });
 
@@ -270,8 +286,10 @@ namespace Stealth.EditorTools
                     s.World.IndoorFog = C(0.03f, 0.03f, 0.03f);
                     s.World.GasFog = C(0.5f, 0.5f, 0.5f);
                     var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
                     geo.Baseboard = true; geo.Ceiling = CeilingKind.Beams; geo.Doors = DoorTrim.Casing;
-                    geo.Floor = K("Floor_PlanksPale"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_Boards"); geo.WallTile = 1f;
+                    geo.Floor = K("Real_PlankFloor"); geo.FloorTile = 1.5f; geo.Wall = K("Real_RawPlanks"); geo.WallTile = 1.5f;
+                    geo.CeilingFinish = K("Real_RawPlanks"); geo.CeilingTile = 1.5f;
                     geo.Trim = K("Trim_WoodMid"); geo.Beam = K("Trim_WoodMid");
                 });
 
@@ -289,9 +307,10 @@ namespace Stealth.EditorTools
                     sc.RecDot = true; sc.Viewfinder = true; sc.ColorOnlyLights = 1f;
                     s.World.Ambient = C(0.06f, 0.06f, 0.06f);
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Toy;
+                    geo.Family = ModelFamily.Toy;
                     geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true;
-                    geo.Floor = K("Floor_Concrete"); geo.FloorTile = 2f; geo.Wall = K("Wall_Hatch"); geo.WallTile = 1.2f;
+                    geo.Floor = K("Real_HangarConcrete"); geo.FloorTile = 2f; geo.Wall = K("Real_ConcreteWall"); geo.WallTile = 2f;
+                    geo.CeilingFinish = K("Real_ConcreteWall"); geo.CeilingTile = 2f;
                     geo.Trim = K("Trim_Metal"); geo.Pipe = K("Trim_Metal");
                 });
 
@@ -313,7 +332,7 @@ namespace Stealth.EditorTools
                     p.Players.Tint = C(0.12f, 0.12f, 0.12f); p.Players.Amount = 1f;
                     p.Loot.Saturation = 1.2f;
                     var geo = s.Geometry;
-                    geo.Treatment = ModelTreatment.Faceted;
+                    geo.Family = ModelFamily.Lowpoly;
                     geo.StripSpacing = 2.4f;
                     geo.Floor = K("Floor_ConcreteWhite"); geo.FloorTile = 2f; geo.Wall = K("Wall_Panels"); geo.WallTile = 2f;
                     geo.Trim = K("Trim_White"); geo.Glow = K("Glow_White");
@@ -335,6 +354,7 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.06f, 0f, 0.12f);
                     s.Palette.Building.Brightness = 0.5f;
                     var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
                     geo.Pipes = true; geo.Ceiling = CeilingKind.Trays;
                     geo.Floor = K("Floor_Grid"); geo.FloorTile = 1f; geo.Wall = K("Wall_Circuit"); geo.WallTile = 1f;
                     geo.Trim = K("Trim_Black"); geo.Pipe = K("Trim_Black"); geo.Glow = K("Glow_Cyan");
