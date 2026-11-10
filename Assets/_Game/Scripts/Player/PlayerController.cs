@@ -234,7 +234,7 @@ namespace Stealth.Player
             UpdateFog();
         }
 
-        /// <summary>Light haze indoors, an impenetrable gas fog outside.</summary>
+        /// <summary>Dark haze indoors (it only takes the distance away, it does not light anything), the gas fog outside.</summary>
         void UpdateFog()
         {
             var layout = ActiveLevel.Layout;
@@ -242,6 +242,7 @@ namespace Stealth.Player
             bool outside = !layout.IsInside(transform.position);
             float target = outside ? 0.22f : 0.03f;
             RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 0.25f);
+            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, outside ? LightMath.GasFog : LightMath.NightFog, Time.deltaTime * 2f);
             Camera.backgroundColor = RenderSettings.fogColor;
         }
 

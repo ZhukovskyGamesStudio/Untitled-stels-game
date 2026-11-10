@@ -1,4 +1,8 @@
+using UnityEditor;
+using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using Stealth.Level;
 using Unity.AI.Navigation;
 using UnityEngine;
@@ -64,13 +68,17 @@ namespace Stealth.EditorTools
             var pVendingMachine = Prefab(p + "VendingMachine.prefab", () =>
             {
                 var go = PropObject("VendingMachine", "vending_machine", "Vending", "PropAccent", "VendingGlass");
-                Lamp(go.transform, "Glow", new Vector3(0f, 1.2f, 0.75f), Quaternion.identity, LightType.Point, new Color(0.7f, 0.85f, 1f), 0.6f, 3f);
+                // Shines forward and a bit down, away from the wall it stands at: nothing reaches the next room or floor.
+                var glow = Lamp(go.transform, "Glow", new Vector3(0f, 1.2f, 0.5f), Quaternion.Euler(25f, 0f, 0f), LightType.Spot, new Color(0.7f, 0.85f, 1f), 0.8f, 2.6f);
+                glow.spotAngle = 120f;
+                glow.innerSpotAngle = 60f;
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
             {
                 var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
-                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.27f, 0.16f), Quaternion.Euler(65f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.8f, 3.2f);
+                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.27f, 0.16f), Quaternion.Euler(65f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.8f, 3.2f,
+                    LightShadows.Soft);
                 lamp.spotAngle = 120f;
                 lamp.innerSpotAngle = 50f;
                 return go;
@@ -78,7 +86,10 @@ namespace Stealth.EditorTools
             var pFloorLamp = Prefab(p + "FloorLamp.prefab", () =>
             {
                 var go = PropObject("FloorLamp", "floor_lamp", "Metal", "LampShade", "LampBulb");
-                Lamp(go.transform, "Light", new Vector3(0f, 1.42f, 0f), Quaternion.identity, LightType.Point, new Color(1f, 0.8f, 0.55f), 1.3f, 4.5f);
+                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 1.4f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(1f, 0.8f, 0.55f), 1.4f, 4f,
+                    LightShadows.Soft);
+                lamp.spotAngle = 160f;
+                lamp.innerSpotAngle = 90f;
                 return go;
             });
 
@@ -147,10 +158,15 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>A unit cube with a material: scaled to size by the level builder.</summary>
+        /// <summary>
+        /// Structure block (wall, slab, roof). Casts shadows from both faces: walls and slabs are what keeps the moon and
+        /// the lamps of other rooms out — without them light shines straight through the building.
+        /// </summary>
         static GameObject Block(string name, Material mat, bool collider = true, int layer = 0)
         {
             var go = Cube(null, name, Vector3.zero, Vector3.one, mat, collider);
             go.layer = layer;
+            go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.TwoSided;
             return go;
         }
 
@@ -230,7 +246,7 @@ namespace Stealth.EditorTools
         /// A light that robots take into account (<see cref="LightSource"/>): robots see a player standing in it better.
         /// </summary>
         static Light Lamp(Transform parent, string name, Vector3 position, Quaternion rotation, LightType type, Color color, float intensity, float range,
-            LightShadows shadows = LightShadows.None)
+            LightShadows shadows = LightShadows.None, int shadowTier = -1)
         {
             var go = Child(parent, name, position);
             go.transform.localRotation = rotation;
@@ -240,6 +256,20 @@ namespace Stealth.EditorTools
             light.intensity = intensity;
             light.range = range;
             light.shadows = shadows;
+            light.shadowNearPlane = 0.1f;
+            if (shadows != LightShadows.None)
+            {
+                // Full-strength shadows with a small bias: 20 cm walls must not let light creep under them at the floor.
+                light.shadowStrength = 1f;
+                light.shadowBias = 0.03f;
+                light.shadowNormalBias = 0.2f;
+                // The property setters are play-mode only; the serialized fields are what the asset keeps anyway.
+                var data = new SerializedObject(light.GetUniversalAdditionalLightData());
+                data.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue =
+                    shadowTier >= 0 ? shadowTier : UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium;
+                data.FindProperty("m_UsePipelineSettings").boolValue = false;
+                data.ApplyModifiedPropertiesWithoutUndo();
+            }
             go.AddComponent<LightSource>();
             return light;
         }
@@ -247,7 +277,7 @@ namespace Stealth.EditorTools
         /// <summary>The model's renderers do not shadow the lamp inside them.</summary>
         static void NoShadows(GameObject model)
         {
-            foreach (var r in model.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            foreach (var r in model.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = ShadowCastingMode.Off;
         }
 
         /// <summary>
@@ -257,19 +287,25 @@ namespace Stealth.EditorTools
         static GameObject BuildRoomLight()
         {
             var root = new GameObject("RoomLight");
-            var model = Model("ceiling_lamp");
-            model.transform.SetParent(root.transform, false);
-            Paint(model, "LampHousing", "LampHousing", "LampPanel");
-            NoShadows(model);
-            var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.1f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot,
-                Color.white, LightMath.RoomIntensity, 9f, LightShadows.Soft);
-            light.spotAngle = 135f;
-            light.innerSpotAngle = 80f;
-            light.shadowStrength = 0.55f; // many lamps, diffusers: soft, faint office shadows
-            light.shadowNearPlane = 0.2f;
+            var panels = new List<Renderer>();
+            foreach (float x in new[] { -RoomLighting.LampOffset, RoomLighting.LampOffset })
+            {
+                var model = Model("ceiling_lamp");
+                model.name = x < 0 ? "PanelA" : "PanelB";
+                model.transform.SetParent(root.transform, false);
+                model.transform.localPosition = new Vector3(x, 0f, 0f);
+                Paint(model, "LampHousing", "LampHousing", "LampPanel");
+                NoShadows(model);
+                panels.AddRange(Parts(model, "Eye"));
+            }
+            // One point light under the ceiling between the panels: lights the whole room, the ceiling too, and casts
+            // shadows in every direction — walls and slabs keep it inside its room.
+            var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.45f, 0f), Quaternion.identity, LightType.Point,
+                Color.white, LightMath.RoomIntensity, 9.5f, LightShadows.Soft);
+            light.shadowStrength = 1f;
             var rl = root.AddComponent<RoomLight>();
             rl.Lamp = light;
-            rl.Panel = Parts(model, "Eye").FirstOrDefault();
+            rl.Panels = panels.ToArray();
             return root;
         }
 
@@ -277,7 +313,7 @@ namespace Stealth.EditorTools
         static GameObject BuildWindow()
         {
             var go = PropObject("Window", "window", "Blinds", "WindowFrame", "Window", collider: false);
-            foreach (var r in Parts(go, "Eye")) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            foreach (var r in Parts(go, "Eye")) r.shadowCastingMode = ShadowCastingMode.Off;
             return go;
         }
 
@@ -289,7 +325,10 @@ namespace Stealth.EditorTools
             model.transform.SetParent(root.transform, false);
             Paint(model, "PropAccent", "ExitSignMark", "ExitSign");
             NoShadows(model);
-            Lamp(root.transform, "Glow", new Vector3(0f, -0.2f, 0f), Quaternion.identity, LightType.Point, new Color(0.35f, 1f, 0.5f), 0.7f, 3.5f);
+            // Shines down into the doorway (both rooms): nothing goes up to the floor above.
+            var glow = Lamp(root.transform, "Glow", new Vector3(0f, -0.12f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(0.35f, 1f, 0.5f), 0.35f, 2.6f);
+            glow.spotAngle = 170f;
+            glow.innerSpotAngle = 100f;
             return root;
         }
 
@@ -298,14 +337,11 @@ namespace Stealth.EditorTools
             var root = new GameObject("StreetLamp");
             var pole = Cube(root.transform, "Pole", new Vector3(0, 2f, 0), new Vector3(0.15f, 4f, 0.15f), M("DoorFrame"));
             pole.layer = LevelMetrics.CeilingLayer;
-            var lightGo = Child(root.transform, "Light", new Vector3(0, 4.1f, 0));
-            var light = lightGo.AddComponent<Light>();
-            light.type = LightType.Point;
-            light.range = 9f;
-            light.intensity = 2.5f;
-            light.color = new Color(1f, 0.85f, 0.55f);
-            light.shadows = LightShadows.None;
-            lightGo.AddComponent<LightSource>();
+            // Shines down with shadows: the facade keeps it out of the ground-floor rooms.
+            var light = Lamp(root.transform, "Light", new Vector3(0, 4.1f, 0), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(1f, 0.85f, 0.55f), 2.5f, 9f,
+                LightShadows.Soft, UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+            light.spotAngle = 150f;
+            light.innerSpotAngle = 80f;
             return root;
         }
 

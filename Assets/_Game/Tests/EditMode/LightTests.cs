@@ -100,12 +100,12 @@ namespace Stealth.Tests
         {
             var s = new Stealth.Enemies.IlluminationSettings();
             float dark = Stealth.Enemies.SensorMath.LightFactor(0f, s);
-            float dim = Stealth.Enemies.SensorMath.LightFactor(0.15f, s);
+            float dim = Stealth.Enemies.SensorMath.LightFactor(0.05f, s);
             float lit = Stealth.Enemies.SensorMath.LightFactor(1f, s);
             Assert.AreEqual(s.DarkFactor, dark, 1e-4f);
             Assert.AreEqual(1f, lit, 1e-4f);
             Assert.That(dim, Is.InRange(dark + 0.05f, lit - 0.05f), "half-light is in between, not on / off");
-            Assert.Less(Stealth.Enemies.SensorMath.LightFactor(0.1f, s), dim);
+            Assert.Less(Stealth.Enemies.SensorMath.LightFactor(0.03f, s), dim);
             Assert.AreEqual(0f, Stealth.Enemies.SensorMath.Visibility(dark, s), 1e-4f);
             Assert.AreEqual(1f, Stealth.Enemies.SensorMath.Visibility(lit, s), 1e-4f);
         }

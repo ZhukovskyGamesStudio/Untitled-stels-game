@@ -245,13 +245,9 @@ namespace Stealth.Level
                 for (int y = 0; y < l.Height; y++)
                 {
                     var (color, intensity) = RoomLighting.For(l.Rooms[f, x, y], l.Dark[f, x, y]);
-                    // Two ceiling panels per room, clear of the stair hole (stairs fill a 4 m corner square).
-                    for (int i = 0; i < 2; i++)
-                    {
-                        var at = l.CellCenter(f, x, y) + new Vector3(i == 0 ? -RoomLighting.LampOffset : RoomLighting.LampOffset, LevelMetrics.WallHeight, 0f);
-                        var go = Place(m_Art.RoomLight, $"Light_{f}_{x}_{y}_{i}", at, Quaternion.identity);
-                        go.GetComponent<RoomLight>().Init(color, intensity, l.Flicker[f, x, y], f * 13.1f + x * 3.7f + y * 1.9f + i * 0.31f, castShadows: i == 0);
-                    }
+                    // Panels ±2.5 m along x: clear of the stair hole (stairs fill a 4 m corner square).
+                    var go = Place(m_Art.RoomLight, $"Light_{f}_{x}_{y}", l.CellCenter(f, x, y) + Vector3.up * LevelMetrics.WallHeight, Quaternion.identity);
+                    go.GetComponent<RoomLight>().Init(color, intensity, l.Flicker[f, x, y], f * 13.1f + x * 3.7f + y * 1.9f);
                 }
         }
 

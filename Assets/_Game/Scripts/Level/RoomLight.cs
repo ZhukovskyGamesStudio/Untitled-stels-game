@@ -4,18 +4,19 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// Ceiling lamp of a room: a spot light shining down with soft shadows and a glowing panel. In a dark room it is off
+    /// Ceiling lights of a room: two glowing panels and one point light between them with soft shadows (walls and slabs
+    /// keep the light inside the room). In a dark room it is off
     /// (the panel too); a broken one flickers; during an alarm every lamp pulses red, even in dark rooms. Purely visual,
     /// runs on every peer; robots read the result through its <see cref="LightSource"/>.
     /// </summary>
     public class RoomLight : MonoBehaviour
     {
-        [Tooltip("The spot light shining down (a child: lights point along their local +Z).")]
+        [Tooltip("The light of the room (a child under the ceiling).")]
         public Light Lamp;
         public bool Flicker;
         public float Seed;
-        [Tooltip("The glowing diffuser of the fixture: its emission follows the light.")]
-        public Renderer Panel;
+        [Tooltip("The glowing diffusers of the panels: their emission follows the light.")]
+        public Renderer[] Panels;
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly Color AlarmColor = new(1f, 0.15f, 0.1f);
@@ -27,11 +28,9 @@ namespace Stealth.Level
         float m_LastGlow = -1f;
         Color m_LastColor;
 
-        /// <param name="castShadows">Only one lamp of a room casts shadows: enough for the look, half the cost.</param>
-        public void Init(Color color, float intensity, bool flicker, float seed, bool castShadows = true)
+        public void Init(Color color, float intensity, bool flicker, float seed)
         {
             m_Light = Lamp != null ? Lamp : GetComponentInChildren<Light>();
-            if (!castShadows) m_Light.shadows = LightShadows.None;
             m_BaseColor = color;
             m_BaseIntensity = intensity;
             Flicker = flicker;
@@ -55,7 +54,7 @@ namespace Stealth.Level
             m_Light.color = color;
             m_Light.intensity = intensity;
             m_Light.enabled = intensity > 0.001f;
-            if (Panel == null) return;
+            if (Panels == null || Panels.Length == 0) return;
             // The panel glows with the lamp (property block: the shared material stays untouched).
             float glow = Mathf.Clamp01(intensity / LightMath.RoomIntensity);
             if (Mathf.Abs(glow - m_LastGlow) < 0.02f && color == m_LastColor) return;
@@ -63,15 +62,21 @@ namespace Stealth.Level
             m_LastColor = color;
             m_Block ??= new MaterialPropertyBlock();
             m_Block.SetColor(EmissionId, color * (LightMath.PanelGlow * glow));
-            Panel.SetPropertyBlock(m_Block);
+            foreach (var p in Panels) if (p != null) p.SetPropertyBlock(m_Block);
         }
     }
 
     /// <summary>Light rules (pure, unit tested): flicker, URP-like falloff, how visible a lit / dark player is.</summary>
     public static class LightMath
     {
+        /// <summary>Night: no light comes from nowhere. A closed room without lamps is pitch black.</summary>
+        public static readonly Color NightAmbient = Color.black;
+        /// <summary>Fog indoors (dark, only takes the distance away) and the gas outside.</summary>
+        public static readonly Color NightFog = new(0.012f, 0.014f, 0.02f);
+        public static readonly Color GasFog = new(0.55f, 0.6f, 0.5f);
+
         /// <summary>Intensity of a normal ceiling lamp (the panel glows fully at it).</summary>
-        public const float RoomIntensity = 2.6f;
+        public const float RoomIntensity = 3.6f;
         /// <summary>Every lamp gets at least this during an alarm.</summary>
         public const float AlarmIntensity = 1.4f;
         /// <summary>Emission of a lit panel (HDR, catches the bloom).</summary>

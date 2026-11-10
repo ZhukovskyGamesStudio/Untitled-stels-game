@@ -180,6 +180,7 @@ namespace Stealth.Game
                         LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
                         yield return new WaitForSeconds(0.5f);
                         yield return Shot($"room_{type}");
+                        Log($"light in {type}: {Enemies.Perception.Describe(Me.transform.position + Vector3.up * 1.26f)}");
                     }
             Log($"room types: {string.Join(", ", seen)}");
 

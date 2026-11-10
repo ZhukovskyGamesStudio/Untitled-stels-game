@@ -91,6 +91,38 @@ namespace Stealth.Enemies
             return sum;
         }
 
+        /// <summary>Debug: the lights that reach a point (and the ones shaded, with what shades them).</summary>
+        public static string Describe(Vector3 point)
+        {
+            var sb = new System.Text.StringBuilder();
+            float total = 0f;
+            foreach (var src in LightSource.All)
+            {
+                float b = src.Brightness;
+                if (b <= 0f) continue;
+                var light = src.Light;
+                if (light.type == LightType.Directional) continue;
+                var from = light.transform.position;
+                var to = point - from;
+                float d = to.magnitude;
+                if (d >= light.range) continue;
+                float k = LightMath.Attenuation(d, light.range);
+                if (light.type == LightType.Spot) k *= LightMath.SpotFactor(Vector3.Angle(light.transform.forward, to), light.innerSpotAngle, light.spotAngle);
+                if (k * b < 0.002f) continue;
+                string blocker = null;
+                int n = Physics.RaycastNonAlloc(from, to / d, s_ShadowHits, d - 0.1f, ShadowMask, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < n && blocker == null; i++)
+                {
+                    var c = s_ShadowHits[i].collider;
+                    if (c.GetComponentInParent<IIntruder>() == null && c.GetComponentInParent<Detector>() == null && c.GetComponentInParent<Items.WorldItem>() == null)
+                        blocker = $"{c.transform.root.name}/{c.name}@{s_ShadowHits[i].distance:0.0}";
+                }
+                if (blocker == null) total += k * b;
+                sb.Append($"{src.transform.parent?.name ?? src.name} {k * b:0.000}{(blocker != null ? " shaded by " + blocker : "")}; ");
+            }
+            return $"total {total:0.000}: {sb}";
+        }
+
         /// <summary>Something solid on the way (players, robots and loot do not cast stealth shadows).</summary>
         static bool Shaded(Vector3 from, Vector3 dir, float distance)
         {
@@ -106,13 +138,16 @@ namespace Stealth.Enemies
             return false;
         }
 
-        /// <summary>Light on a player: the average of the chest and the knees (crouching behind a desk keeps the legs dark).</summary>
+        /// <summary>
+        /// Light on a player: the brighter of the chest and the knees — eyes notice the best-lit part (legs in a lamp's pool
+        /// under a desk give you away too; a lit chest above dark legs as well).
+        /// </summary>
         public static float IlluminationOf(IIntruder p)
         {
             int frame = Time.frameCount;
             if (s_LightCache.TryGetValue(p, out var c) && c.frame == frame) return c.light;
             var s = Tuning.Perception.Illumination;
-            float light = 0.5f * (Illumination(p.Position + Vector3.up * (p.Height * 0.7f), s) + Illumination(p.Position + Vector3.up * (p.Height * 0.25f), s));
+            float light = Mathf.Max(Illumination(p.Position + Vector3.up * (p.Height * 0.7f), s), Illumination(p.Position + Vector3.up * (p.Height * 0.25f), s));
             if (s_LightCache.Count > 32) s_LightCache.Clear();
             s_LightCache[p] = (frame, light);
             return light;

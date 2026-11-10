@@ -108,10 +108,12 @@ namespace Stealth.Game
         {
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.55f, 0.6f, 0.5f);
+            RenderSettings.fogColor = Stealth.Level.LightMath.GasFog;
             RenderSettings.fogDensity = 0.045f;
+            // Night: no fill light from nowhere, no sky reflections — only the lamps and the moon light anything up.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.2f, 0.21f, 0.22f);
+            RenderSettings.ambientLight = Stealth.Level.LightMath.NightAmbient;
+            RenderSettings.reflectionIntensity = 0f;
         }
 
         void StartLevel(int index)

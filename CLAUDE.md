@@ -27,7 +27,7 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -89,7 +89,10 @@ LaserGate — отдельная ловушка (не детектор)
 Восприятие плавное: зрение — доля видимого тела (`Perception.Exposure`, 7 лучей), дистанция, место в конусе, присед, неподвижность, свет
 (`SensorMath.VisionFactor`); свет на игроке — `Perception.IlluminationOf`: сумма всех `LightSource` (потолочные лампы `RoomLight`, настольные/напольные
 лампы, таблички «Выход», автоматы, фонари, луна) по формуле затухания URP, с конусом и тенью-лучом, плюс эмбиент → `SensorMath.LightFactor`; тот же расчёт
-кормит индикатор заметности в HUD. Новый источник света, важный для стелса, — `Light` + компонент `LightSource` в префабе; слух — громкость шага у робота с затуханием через стены/двери/перекрытия (`Perception.SoundTransmission`,
+кормит индикатор заметности в HUD. Новый источник света, важный для стелса, — `Light` + компонент `LightSource` в префабе;
+**свет не должен проходить сквозь стены**: эмбиента нет (`LightMath.NightAmbient` = чёрный, туман внутри тёмный), стены/плиты/крыша отбрасывают тени
+с двух сторон, у ламп полные тени (сила 1, малое смещение), а лампы без теней — только маленькие споты, не достающие до соседей (`LightLeakTests`);
+сценарий `darkbox` строит закрытую коробку в освещённом лобби и проверяет, что кадр внутри чёрный; слух — громкость шага у робота с затуханием через стены/двери/перекрытия (`Perception.SoundTransmission`,
 компонент `SoundBlocker` на префабах стен, плит и дверей). Полная шкала → `RobotState.Alerted` («Обнаружен нарушитель», `Traits.WarningTime`)
 → `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).

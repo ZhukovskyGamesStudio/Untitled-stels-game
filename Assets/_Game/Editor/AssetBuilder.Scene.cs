@@ -77,7 +77,7 @@ namespace Stealth.EditorTools
             dl.intensity = 0.32f;
             dl.color = new Color(0.62f, 0.72f, 1f);
             dl.shadows = LightShadows.Soft;
-            dl.shadowStrength = 0.95f;
+            dl.shadowStrength = 1f; // anything less lets a share of the moon through every wall and roof
             // Walls are only 20 cm thick: a small bias keeps the moon from leaking through them.
             var moonData = dl.GetUniversalAdditionalLightData();
             moonData.usePipelineSettings = false;
@@ -123,9 +123,11 @@ namespace Stealth.EditorTools
             foreach (var prefab in ui.Screens) if (prefab != null) PrefabUtility.InstantiatePrefab(prefab);
             if (s_AudioDirector != null) PrefabUtility.InstantiatePrefab(s_AudioDirector);
 
-            // Night: a dim blue ambient, so unlit rooms are really dark; the lamps, the moon and glowing things do the rest.
+            // Night: no ambient at all — a closed room without lamps is pitch black; the lamps, the moon and glowing things do the rest.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.075f, 0.08f, 0.1f);
+            RenderSettings.ambientLight = LightMath.NightAmbient;
+            RenderSettings.skybox = null;
+            RenderSettings.reflectionIntensity = 0f;
 
             // Post-processing: bloom on lamps and screens, neutral tone mapping, a soft vignette.
             var volume = new GameObject("PostProcess").AddComponent<Volume>();

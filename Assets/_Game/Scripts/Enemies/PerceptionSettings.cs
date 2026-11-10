@@ -45,9 +45,9 @@ namespace Stealth.Enemies
     public class IlluminationSettings
     {
         [Tooltip("Light at the player at or below which they are in full darkness.")]
-        public float DarkLevel = 0.04f;
+        public float DarkLevel = 0.005f;
         [Tooltip("Light at the player at or above which they are fully lit.")]
-        public float LitLevel = 0.4f;
+        public float LitLevel = 0.12f;
         [Tooltip("Vision rate multiplier in full darkness (1 = darkness does not help).")]
         public float DarkFactor = 0.15f;
         [Tooltip("How much the scene's ambient light counts.")]
