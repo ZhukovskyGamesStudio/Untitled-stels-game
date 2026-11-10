@@ -33,6 +33,8 @@ namespace Stealth.Tests
             Assert.IsTrue(styles.All(s => s != null));
             Assert.AreEqual(styles.Length, styles.Select(s => s.Title).Distinct().Count(), "titles are unique");
             Assert.AreEqual(0f, styles[0].Screen.OutlineStrength, "the first style is the base look");
+            Assert.IsNotNull(root.Styles.Default, "the game has a look");
+            CollectionAssert.Contains(styles, root.Styles.Default);
             Assert.IsNotEmpty(root.Styles.Building);
             Assert.IsNotEmpty(root.Styles.Robots);
 

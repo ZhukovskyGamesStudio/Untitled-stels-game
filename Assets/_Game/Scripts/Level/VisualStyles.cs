@@ -44,6 +44,14 @@ namespace Stealth.Level
 
         public static IReadOnlyList<VisualStyle> All => Config != null ? Config.Styles : System.Array.Empty<VisualStyle>();
 
+        /// <summary>The game's own look (StyleConfig.Default) is on from the first frame of the scene.</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void ApplyDefault()
+        {
+            var style = Config != null ? Config.Default : null;
+            if (style != null) Apply(style);
+        }
+
         /// <summary>Finds a style by asset name or title (case-insensitive); null if there is none.</summary>
         public static VisualStyle Find(string name)
         {

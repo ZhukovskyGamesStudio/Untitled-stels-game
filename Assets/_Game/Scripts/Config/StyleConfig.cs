@@ -10,6 +10,8 @@ namespace Stealth.Configs
     {
         [Tooltip("The styles, in the order F8 cycles through them; the first is the default look")]
         public VisualStyle[] Styles = new VisualStyle[0];
+        [Tooltip("The look of the game: applied when the game starts (none = the plain look). F8 and -style still switch it")]
+        public VisualStyle Default;
 
         [Header("Materials by kind (filled by the asset builder)")]
         public Material[] Building = new Material[0];

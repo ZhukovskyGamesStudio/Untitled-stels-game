@@ -53,6 +53,8 @@ namespace Stealth.EditorTools
                 AssetDatabase.CreateAsset(config, StyleConfigPath);
             }
             config.Styles = styles.ToArray();
+            // the game's look (chosen by hand later; first time: the storybook style)
+            if (config.Default == null) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
             config.Building = MaterialsIn("Environment");
             config.Furniture = MaterialsIn("Props");
             config.Robots = MaterialsIn("Robots");
