@@ -17,5 +17,9 @@ namespace Stealth.Configs
         public Material[] Robots = new Material[0];
         public Material[] Players = new Material[0];
         public Material[] Loot = new Material[0];
+
+        [Header("Geometry (filled by the asset builder)")]
+        public StyleKit Kit;
+        public MeshVariants[] Meshes = new MeshVariants[0];
     }
 }

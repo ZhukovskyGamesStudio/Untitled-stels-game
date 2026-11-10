@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.VisualStyle
   Title: "\u0411\u0430\u0440\u0430\u0445\u043E\u043B\u044C\u0449\u0438\u043A\u0438"
   References: R.E.P.O., PEAK
-  Pitch: "\u0422\u0451\u043F\u043B\u044B\u0439 \u0438\u0433\u0440\u0443\u0448\u0435\u0447\u043D\u044B\u0439 \u043C\u0438\u0440: \u043D\u0430\u0441\u044B\u0449\u0435\u043D\u043D\u044B\u0435 \u0446\u0432\u0435\u0442\u0430, \u0431\u043B\u0435\u0441\u0442\u044F\u0449\u0438\u0435 \u0440\u043E\u0431\u043E\u0442\u044B-\u0438\u0433\u0440\u0443\u0448\u043A\u0438, \u0441\u0438\u043B\u044C\u043D\u043E\u0435 \u0441\u0432\u0435\u0447\u0435\u043D\u0438\u0435 \u0438 \u043B\u0451\u0433\u043A\u043E\u0435 \xAB\u0440\u044B\u0431\u044C\u0435 \u043E\u043A\u043E\xBB. \u0421\u043C\u0435\u0448\u043D\u043E, \u043A\u043E\u0433\u0434\u0430 \u0441\u0442\u0440\u0430\u0448\u043D\u043E."
+  Pitch: "\u0421\u0442\u0430\u0440\u044B\u0439 \u043E\u0441\u043E\u0431\u043D\u044F\u043A, \u043A\u0443\u0434\u0430 \u043F\u0440\u0438\u0435\u0445\u0430\u043B\u0438 \u0437\u0430 \u0445\u043B\u0430\u043C\u043E\u043C: \u0448\u0430\u0445\u043C\u0430\u0442\u043D\u044B\u0439 \u043F\u043E\u043B, \u0442\u0451\u043C\u043D\u044B\u0435 \u043E\u0431\u043E\u0438 \u0441 \u0443\u0437\u043E\u0440\u043E\u043C, \u0434\u0435\u0440\u0435\u0432\u044F\u043D\u043D\u044B\u0435 \u043F\u0430\u043D\u0435\u043B\u0438, \u043A\u0430\u0440\u043D\u0438\u0437\u044B. \u041C\u0435\u0431\u0435\u043B\u044C \u0438 \u0440\u043E\u0431\u043E\u0442\u044B \u2014 \u043F\u0443\u0445\u043B\u044B\u0435 \u043F\u043B\u0430\u0441\u0442\u0438\u043A\u043E\u0432\u044B\u0435 \u0438\u0433\u0440\u0443\u0448\u043A\u0438. \u0422\u0435\u043F\u043B\u043E, \u0441\u043E\u0447\u043D\u043E, \u0441\u0432\u0435\u0442\u0438\u0442\u0441\u044F."
   Grade:
     Exposure: 0.45
     Contrast: 15
@@ -50,6 +50,7 @@ MonoBehaviour:
     OutlineNormal: 2
     OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     OutlineSurfaceTint: 0
+    OutlineInvert: 0
     HatchStrength: 0
     HatchSpacing: 5
     HatchStart: 0.4
@@ -66,6 +67,9 @@ MonoBehaviour:
     Noise: 0
     Wobble: 0
     RecDot: 0
+    Viewfinder: 0
+    ColorOnlyLights: 0
+    Visor: 0
     NeonStrength: 0
     NeonKeep: 1
     NeonFar: 20
@@ -78,8 +82,8 @@ MonoBehaviour:
     GasFog: {r: 0.42, g: 0.36, b: 0.22, a: 1}
   Palette:
     Building:
-      Tint: {r: 0.85, g: 0.74, b: 0.58, a: 1}
-      Amount: 0.25
+      Tint: {r: 1, g: 1, b: 1, a: 1}
+      Amount: 0
       Saturation: 1
       Brightness: 1
       Smoothness: -1
@@ -107,3 +111,23 @@ MonoBehaviour:
       Saturation: 1
       Brightness: 1
       Smoothness: -1
+  Geometry:
+    Treatment: 2
+    Baseboard: 0
+    Crown: 1
+    WainscotHeight: 1.05
+    RailHeight: 0
+    Pipes: 0
+    StripSpacing: 0
+    Doors: 1
+    Ceiling: 0
+    Floor: {fileID: 2100000, guid: bec5941f42c57b94dbb882e1e18ad707, type: 2}
+    FloorTile: 1.4
+    Wall: {fileID: 2100000, guid: 641c9c0fbc68aa84da89edecff93a1a7, type: 2}
+    WallTile: 1.1
+    Trim: {fileID: 2100000, guid: fefeffa1b19730240ba873900bf6e3e0, type: 2}
+    Panel: {fileID: 2100000, guid: 5f5816f5b05d4f24f981b9ae9671dc71, type: 2}
+    Column: {fileID: 0}
+    Beam: {fileID: 0}
+    Pipe: {fileID: 0}
+    Glow: {fileID: 0}

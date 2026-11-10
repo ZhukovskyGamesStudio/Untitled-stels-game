@@ -39,6 +39,7 @@ Shader "Stealth/StyleScreen"
             float4 _StyGlow;         // x neon edge strength, y how much of the image remains, z far distance of the gradient
             float4 _StyGlowA;        // neon colour near
             float4 _StyGlowB;        // neon colour far
+            float4 _StyExtra;        // x inverted lines, y grey world but the lights, z helmet visor, w viewfinder brackets
 
             float Luma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
 
@@ -136,6 +137,13 @@ Shader "Stealth/StyleScreen"
 
                 float3 g = LinearToSRGB(saturate(c));
 
+                // Grey world: only bright things (lamps, lasers, screens) keep their colour.
+                if (_StyExtra.y > 0)
+                {
+                    float keep = smoothstep(0.55, 0.9, max(g.r, max(g.g, g.b)));
+                    g = lerp(g, lerp(Luma(g).xxx, g, keep), _StyExtra.y);
+                }
+
                 // Cel bands: light in a few flat steps, the colour kept.
                 if (_StyCel.x > 0)
                 {
@@ -176,11 +184,14 @@ Shader "Stealth/StyleScreen"
                         float halo = Edge(suv, step * 3) * 0.45;
                         float far = saturate(EyeDepth(suv) / max(_StyGlow.z, 0.1));
                         float3 neon = lerp(_StyGlowA.rgb, _StyGlowB.rgb, far);
-                        g = g * _StyGlow.y + neon * saturate(e + halo) * _StyGlow.x;
+                        // glowing things (lasers, screens, lamps) stay on screen under the neon
+                        float keepK = lerp(_StyGlow.y, 1, smoothstep(0.5, 0.85, max(g.r, max(g.g, g.b))));
+                        g = g * keepK + neon * saturate(e + halo) * _StyGlow.x;
                     }
                     else
                     {
                         float3 ink = lerp(_StyOutlineColor.rgb, g * 0.25, _StyOutlineColor.a);
+                        if (_StyExtra.x > 0.5) ink = Luma(g) < 0.35 ? float3(1, 1, 1) : float3(0, 0, 0);
                         g = lerp(g, ink, e * _StyOutline.x);
                     }
                 }
@@ -190,7 +201,10 @@ Shader "Stealth/StyleScreen"
                 {
                     uint2 dp = (uint2)floor(uv * res / max(1, _StyDither.y * scale));
                     float l = saturate(Luma(g) + _StyDither.z);
-                    g = l > Bayer(dp) ? _StyLight.rgb : _StyInk.rgb;
+                    float hi = max(g.r, max(g.g, g.b)), sat = hi - min(g.r, min(g.g, g.b));
+                    float3 bit = l > Bayer(dp) ? _StyLight.rgb : _StyInk.rgb;
+                    // danger and loot stay in colour: strongly saturated bright things (lasers, items, alarm lights)
+                    g = sat > 0.45 && hi > 0.55 ? g : bit;
                 }
 
                 // Paper: a tint and a grain that stays in place.
@@ -218,6 +232,27 @@ Shader "Stealth/StyleScreen"
                     float2 d = (uv - dotPos) * float2(res.x / res.y, 1);
                     float on = step(0.5, frac(_Time.y * 0.5));
                     g = lerp(g, float3(0.95, 0.08, 0.06), smoothstep(0.016, 0.013, length(d)) * on);
+                }
+
+                // Helmet visor: dark rims curving over the top and the bottom corners.
+                if (_StyExtra.z > 0)
+                {
+                    float cx = (uv.x - 0.5) * res.x / res.y;
+                    float top = smoothstep(-0.008, 0.008, uv.y - (0.955 - 0.09 * cx * cx));
+                    float bottom = smoothstep(0.008, -0.008, uv.y - (0.0 + 0.16 * cx * cx - 0.02));
+                    g = lerp(g, float3(0.02, 0.02, 0.025), saturate(top + bottom) * _StyExtra.z);
+                }
+                // Viewfinder: four corner brackets.
+                if (_StyExtra.w > 0)
+                {
+                    float2 q = abs(uv - 0.5);
+                    float2 pxq = (0.5 - q) * res / scale;      // pixels (at 720p) from the edges
+                    float2 inset = float2(56, 44);
+                    float2 d = pxq - inset;
+                    bool corner = d.x > -1.5 && d.y > -1.5 && d.x < 70 && d.y < 70;
+                    bool lineH = abs(d.y) < 1.5 && d.x < 70 && d.x > -1.5;
+                    bool lineV = abs(d.x) < 1.5 && d.y < 70 && d.y > -1.5;
+                    if (corner && (lineH || lineV)) g = lerp(g, float3(0.95, 0.95, 0.92), 0.9 * _StyExtra.w);
                 }
 
                 return half4(SRGBToLinear(saturate(g)), 1);

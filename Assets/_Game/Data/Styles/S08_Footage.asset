@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: S08_Footage
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.VisualStyle
   Title: "\u041D\u0430\u0439\u0434\u0435\u043D\u043D\u0430\u044F \u043F\u043B\u0451\u043D\u043A\u0430"
-  References: Content Warning, Paranormal VHS, [REC], Splinter Cell
-  Pitch: "\u0412\u044B\u043B\u0430\u0437\u043A\u0430 \u0447\u0435\u0440\u0435\u0437 \u0434\u0435\u0448\u0451\u0432\u0443\u044E \u043A\u0430\u043C\u0435\u0440\u0443 \u0432 \u043D\u043E\u0447\u043D\u043E\u043C \u0440\u0435\u0436\u0438\u043C\u0435: \u0437\u0435\u043B\u0451\u043D\u0430\u044F \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0430 \u0441 \u0443\u0441\u0438\u043B\u0435\u043D\u0438\u0435\u043C, \u0441\u0442\u0440\u043E\u043A\u0438 \u0440\u0430\u0437\u0432\u0451\u0440\u0442\u043A\u0438, \u0448\u0443\u043C, \u043F\u0435\u0440\u0435\u0441\u0432\u0435\u0447\u0435\u043D\u043D\u044B\u0435 \u043B\u0430\u043C\u043F\u044B \u0438 REC. \u041F\u0440\u044F\u043C\u043E \u043F\u0440\u043E\u0441\u0438\u0442\u0441\u044F \u0437\u0430\u043F\u0438\u0441\u044C \u0437\u0430\u0431\u0435\u0433\u0430 \u0438 \u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0441 \u0434\u0440\u0443\u0437\u044C\u044F\u043C\u0438."
+  References: 'Content Warning, Paranormal VHS, [REC]'
+  Pitch: "\u0412\u044B\u043B\u0430\u0437\u043A\u0443 \u0441\u043D\u0438\u043C\u0430\u0435\u0442 \u043A\u0430\u043C\u0435\u0440\u0430: \u0441\u0435\u0440\u044B\u0439 \u043C\u0438\u0440 \u0441 \u043A\u0430\u0440\u0430\u043D\u0434\u0430\u0448\u043D\u043E\u0439 \u0448\u0442\u0440\u0438\u0445\u043E\u0432\u043A\u043E\u0439 \u043D\u0430 \u0441\u0442\u0435\u043D\u0430\u0445, \u0431\u0435\u0442\u043E\u043D, \u0442\u0440\u0443\u0431\u044B \u0438 \u043A\u0430\u0431\u0435\u043B\u044C\u043D\u044B\u0435 \u043B\u043E\u0442\u043A\u0438. \u0426\u0432\u0435\u0442 \u043E\u0441\u0442\u0430\u0451\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u0443 \u0441\u0432\u0435\u0442\u0430 \u2014 \u043B\u0430\u043C\u043F, \u044D\u043A\u0440\u0430\u043D\u043E\u0432, \u043B\u0430\u0437\u0435\u0440\u043E\u0432. \u0412\u0438\u0434\u043E\u0438\u0441\u043A\u0430\u0442\u0435\u043B\u044C, REC, \u0441\u0442\u0440\u043E\u043A\u0438 \u0440\u0430\u0437\u0432\u0451\u0440\u0442\u043A\u0438."
   Grade:
-    Exposure: 1.5
-    Contrast: 25
-    Saturation: -100
-    ColorFilter: {r: 0.55, g: 1, b: 0.6, a: 1}
+    Exposure: 0.85
+    Contrast: 18
+    Saturation: 10
+    ColorFilter: {r: 1, g: 1, b: 1, a: 1}
     HueShift: 0
     SplitShadows: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     SplitHighlights: {r: 0.5, g: 0.5, b: 0.5, a: 1}
@@ -31,13 +31,13 @@ MonoBehaviour:
     BloomThreshold: 0.6
     BloomScatter: 0.9
     BloomTint: {r: 1, g: 1, b: 1, a: 1}
-    Vignette: 0.45
+    Vignette: 0.4
     VignetteColor: {r: 0, g: 0, b: 0, a: 1}
-    ChromaticAberration: 0.5
-    FilmGrain: 0.35
-    LensDistortion: 0.25
+    ChromaticAberration: 0.4
+    FilmGrain: 0.3
+    LensDistortion: 0.2
   Screen:
-    PixelSize: 1.6
+    PixelSize: 1.4
     CelBands: 0
     CelSoftness: 0.05
     CelMix: 1
@@ -50,29 +50,33 @@ MonoBehaviour:
     OutlineNormal: 2
     OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     OutlineSurfaceTint: 0
+    OutlineInvert: 0
     HatchStrength: 0
     HatchSpacing: 5
     HatchStart: 0.4
     PaperGrain: 0
-    PaperTint: 1
-    PaperColor: {r: 0.45, g: 1, b: 0.5, a: 1}
+    PaperTint: 0
+    PaperColor: {r: 1, g: 1, b: 1, a: 1}
     OneBit: 0
     Ink: {r: 0, g: 0, b: 0, a: 1}
     Light: {r: 1, g: 1, b: 1, a: 1}
     DotSize: 1
     DitherBias: 0
-    Scanlines: 0.25
-    ChromaShift: 2
-    Noise: 0.12
-    Wobble: 1
+    Scanlines: 0.15
+    ChromaShift: 1.5
+    Noise: 0.08
+    Wobble: 0.8
     RecDot: 1
+    Viewfinder: 1
+    ColorOnlyLights: 1
+    Visor: 0
     NeonStrength: 0
     NeonKeep: 1
     NeonFar: 20
     NeonNear: {r: 0, g: 1, b: 1, a: 1}
     NeonFarColor: {r: 1, g: 0, b: 1, a: 1}
   World:
-    Ambient: {r: 0.05, g: 0.05, b: 0.05, a: 1}
+    Ambient: {r: 0.06, g: 0.06, b: 0.06, a: 1}
     IndoorFog: {r: 0.012, g: 0.014, b: 0.02, a: 1}
     IndoorFogDensity: 0.03
     GasFog: {r: 0.33, g: 0.37, b: 0.3, a: 1}
@@ -107,3 +111,23 @@ MonoBehaviour:
       Saturation: 1
       Brightness: 1
       Smoothness: -1
+  Geometry:
+    Treatment: 2
+    Baseboard: 1
+    Crown: 0
+    WainscotHeight: 0
+    RailHeight: 0
+    Pipes: 1
+    StripSpacing: 0
+    Doors: 0
+    Ceiling: 4
+    Floor: {fileID: 2100000, guid: 383c8fa76b3b0ae4f854beae8839d3c5, type: 2}
+    FloorTile: 2
+    Wall: {fileID: 2100000, guid: edc1d39e8a886124985baf9991966405, type: 2}
+    WallTile: 1.2
+    Trim: {fileID: 2100000, guid: 7cf11b547c85dcc439d6448d65c3c66b, type: 2}
+    Panel: {fileID: 0}
+    Column: {fileID: 0}
+    Beam: {fileID: 0}
+    Pipe: {fileID: 2100000, guid: 7cf11b547c85dcc439d6448d65c3c66b, type: 2}
+    Glow: {fileID: 0}

@@ -8,13 +8,17 @@ namespace Stealth.Level
     {
         public static LevelLayout Layout { get; private set; }
         public static GameObject Root { get; private set; }
+        /// <summary>Surfaces of the house (walls, floors, openings) that visual styles dress.</summary>
+        public static LevelShell Shell { get; private set; }
 
         /// <summary>Builds <paramref name="layout"/> from the prefabs in <paramref name="art"/>, replacing the previous level.</summary>
         public static GameObject Load(LevelLayout layout, LevelArt art)
         {
             Clear();
             Layout = layout;
-            Root = new LevelBuilder(art, layout).Build();
+            var builder = new LevelBuilder(art, layout);
+            Root = builder.Build();
+            Shell = builder.Shell;
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             return Root;
         }
@@ -28,6 +32,7 @@ namespace Stealth.Level
             }
             Root = null;
             Layout = null;
+            Shell = null;
         }
     }
 
@@ -60,6 +65,10 @@ namespace Stealth.Level
         readonly LevelArt m_Art;
         readonly LevelLayout m_Layout;
         Transform m_Root;
+        int m_Floor;
+
+        /// <summary>Surfaces recorded while building.</summary>
+        public LevelShell Shell { get; } = new();
 
         public LevelBuilder(LevelArt art, LevelLayout layout)
         {
@@ -79,6 +88,7 @@ namespace Stealth.Level
 
             // Ground, slabs between floors (with stair holes), roof, the yard and its invisible fence.
             Block(m_Art.FloorSlab, "Floor", new Vector3(W / 2, -0.1f, H / 2), new Vector3(W, 0.2f, H));
+            Shell.Floors.Add(new FloorRect { Min = Vector2.zero, Max = new Vector2(W, H), Y = 0f, Floor = 0 });
             for (int f = 1; f < l.Floors; f++) BuildSlab(f);
             Block(m_Art.Roof, "Roof", new Vector3(W / 2, top - LevelMetrics.SlabThickness / 2f, H / 2), new Vector3(W + 0.4f, LevelMetrics.SlabThickness, H + 0.4f));
             Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, -0.07f, H / 2), new Vector3(W + 60f, 0.1f, H + 60f));
@@ -89,6 +99,7 @@ namespace Stealth.Level
 
             for (int f = 0; f < l.Floors; f++)
             {
+                m_Floor = f;
                 BuildWalls(f);
                 BuildLights(f);
             }
@@ -139,6 +150,7 @@ namespace Stealth.Level
                     if (hole == null)
                     {
                         Block(m_Art.FloorSlab, "Slab", new Vector3(x0 + cell / 2f, y, z0 + cell / 2f), new Vector3(cell, LevelMetrics.SlabThickness, cell));
+                        RecordFloor(x0, x0 + cell, z0, z0 + cell, y);
                         continue;
                     }
                     var h = hole.Value;
@@ -157,6 +169,13 @@ namespace Stealth.Level
         {
             if (x1 - x0 < 0.01f || z1 - z0 < 0.01f) return;
             Block(m_Art.FloorSlab, "Slab", new Vector3((x0 + x1) / 2f, y, (z0 + z1) / 2f), new Vector3(x1 - x0, LevelMetrics.SlabThickness, z1 - z0));
+            RecordFloor(x0, x1, z0, z1, y);
+        }
+
+        void RecordFloor(float x0, float x1, float z0, float z1, float slabCentreY)
+        {
+            float top = slabCentreY + LevelMetrics.SlabThickness / 2f;
+            Shell.Floors.Add(new FloorRect { Min = new Vector2(x0, z0), Max = new Vector2(x1, z1), Y = top, Floor = LevelLayout.FloorOf(top) });
         }
 
         /// <summary>
@@ -210,6 +229,7 @@ namespace Stealth.Level
             if (type == EdgeType.Wall)
             {
                 WallPiece(m_Art.WallBlock, a1, b1, 0, LevelMetrics.WallHeight);
+                RecordFaces(a1, b1, 0, LevelMetrics.WallHeight, outside, true, true);
                 return;
             }
             var mid = (a + b) / 2f;
@@ -221,11 +241,31 @@ namespace Stealth.Level
             WallPiece(m_Art.WallBlock, a1, d0, 0, LevelMetrics.WallHeight);
             WallPiece(m_Art.WallBlock, d1, b1, 0, LevelMetrics.WallHeight);
             WallPiece(m_Art.TrimBlock, d0, d1, vent ? LevelMetrics.VentHeight : LevelMetrics.DoorHeight, LevelMetrics.WallHeight);
+            float openH = vent ? LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
+            RecordFaces(a1, d0, 0, LevelMetrics.WallHeight, outside, true, false);
+            RecordFaces(d1, b1, 0, LevelMetrics.WallHeight, outside, false, true);
+            RecordFaces(d0, d1, openH, LevelMetrics.WallHeight, outside, false, false);
+            Shell.Openings.Add(new WallOpening { Center = mid, Along = dir, Width = clear, Height = openH, Vent = vent, Exterior = outside, Floor = m_Floor });
             // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
             var along = Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x));
             if (vent) Place(m_Art.VentFrame, "VentFrame", mid, along);
             else if (outside) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
             else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
+        }
+
+        /// <summary>The faces of a wall piece the rooms see: both sides inside, only the inner side of an outer wall.</summary>
+        void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, bool cornerA, bool cornerB)
+        {
+            if ((b - a).magnitude < 0.05f) return;
+            var dir = (b - a).normalized;
+            var n = new Vector3(-dir.z, 0f, dir.x);
+            var centre = new Vector3(m_Layout.Width * LevelMetrics.Cell / 2f, 0f, m_Layout.Height * LevelMetrics.Cell / 2f);
+            var mid = (a + b) / 2f;
+            foreach (var side in new[] { n, -n })
+            {
+                if (outside && Vector3.Dot(side, new Vector3(centre.x - mid.x, 0f, centre.z - mid.z)) < 0f) continue;
+                Shell.Walls.Add(new WallFace { A = a, B = b, Y0 = y0, Y1 = y1, Normal = side, Floor = m_Floor, Exterior = outside, CornerA = cornerA, CornerB = cornerB });
+            }
         }
 
         static Vector3 Snap(Vector3 p) => new(Mathf.Round(p.x * 100f) / 100f, Mathf.Round(p.y * 100f) / 100f, Mathf.Round(p.z * 100f) / 100f);
@@ -267,8 +307,12 @@ namespace Stealth.Level
             void Window(Vector3 p, float yaw) => Place(m_Art.Window, "Window", p, Quaternion.Euler(0f, yaw, 0f));
             for (int f = 0; f < l.Floors; f++)
             {
-                float y = LevelLayout.FloorY(f) + 1.7f;
-                foreach (var (p, yaw) in WindowSpots(l.Width, l.Height, y)) Window(p, yaw);
+                float y = LevelLayout.FloorY(f) + LevelMetrics.WindowCenterY;
+                foreach (var (p, yaw) in WindowSpots(l.Width, l.Height, y))
+                {
+                    Window(p, yaw);
+                    Shell.Windows.Add((p, yaw));
+                }
             }
         }
 

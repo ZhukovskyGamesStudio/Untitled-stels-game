@@ -80,6 +80,7 @@ namespace Stealth.Level
             ApplyScreen(style != null ? style.Screen : null);
             ApplyWorld(World);
             ApplyPalette(style != null ? style.Palette : null);
+            ApplyGeometry(style != null ? style.Geometry : null);
         }
 
         /// <summary>A level was (re)built: the game's atmosphere was reset, put the style back on.</summary>
@@ -93,6 +94,9 @@ namespace Stealth.Level
         /// <summary>Back to the base look; the materials get their own colours back (they are assets in the editor).</summary>
         public static void Restore()
         {
+            s_Treatment = ModelTreatment.None;
+            foreach (var mf in Object.FindObjectsByType<MeshFilter>()) Dress(mf);
+            StyleDecor.Clear();
             foreach (var (mat, orig) in s_Originals)
             {
                 if (mat == null) continue;
@@ -113,6 +117,54 @@ namespace Stealth.Level
             var w = World;
             RenderSettings.fogColor = outside ? w.GasFog : w.IndoorFog;
             RenderSettings.fogDensity = outside ? LightMath.GasFogDensity : w.IndoorFogDensity;
+        }
+
+        // ------------------------------------------------------------------ geometry
+
+        static ModelTreatment s_Treatment;
+        static Dictionary<Mesh, Mesh>[] s_Variants;
+        static readonly Dictionary<Mesh, Mesh> s_OriginalOf = new();
+
+        static void ApplyGeometry(StyleGeometry g)
+        {
+            s_Treatment = g != null ? g.Treatment : ModelTreatment.None;
+            foreach (var mf in Object.FindObjectsByType<MeshFilter>()) Dress(mf);
+            if (Application.isPlaying) StyleDecor.Rebuild(g, Config != null ? Config.Kit : null);
+        }
+
+        static void LoadVariants()
+        {
+            if (s_Variants != null) return;
+            s_Variants = new Dictionary<Mesh, Mesh>[System.Enum.GetValues(typeof(ModelTreatment)).Length];
+            for (int i = 0; i < s_Variants.Length; i++) s_Variants[i] = new Dictionary<Mesh, Mesh>();
+            if (Config == null || Config.Meshes == null) return;
+            foreach (var set in Config.Meshes)
+                for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
+                {
+                    if (set.From[i] == null || set.To[i] == null) continue;
+                    s_Variants[(int)set.Treatment][set.From[i]] = set.To[i];
+                    s_OriginalOf[set.To[i]] = set.From[i];
+                }
+        }
+
+        /// <summary>
+        /// Gives a freshly spawned object (robot, item, player) the models of the current style. Cheap and safe to call
+        /// for anything: meshes without a variant stay as they are.
+        /// </summary>
+        public static void Dress(GameObject go)
+        {
+            if (!s_Active || go == null) return;
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true)) Dress(mf);
+        }
+
+        static void Dress(MeshFilter mf)
+        {
+            var mesh = mf.sharedMesh;
+            if (mesh == null) return;
+            LoadVariants();
+            var original = s_OriginalOf.TryGetValue(mesh, out var o) ? o : mesh;
+            var target = s_Treatment != ModelTreatment.None && s_Variants[(int)s_Treatment].TryGetValue(original, out var v) ? v : original;
+            if (target != mesh) mf.sharedMesh = target;
         }
 
         // ------------------------------------------------------------------ post-processing
@@ -207,6 +259,7 @@ namespace Stealth.Level
             Shader.SetGlobalVector("_StyGlow", new Vector4(s.NeonStrength, s.NeonKeep, s.NeonFar, 0));
             Shader.SetGlobalColor("_StyGlowA", s.NeonNear);
             Shader.SetGlobalColor("_StyGlowB", s.NeonFarColor);
+            Shader.SetGlobalVector("_StyExtra", new Vector4(s.OutlineInvert ? 1 : 0, s.ColorOnlyLights, s.Visor, s.Viewfinder ? 1 : 0));
         }
 
         // ------------------------------------------------------------------ air

@@ -153,6 +153,7 @@ namespace Stealth.Player
             All.Add(this);
             ApplyColor();
             name = $"Player_{clientId}";
+            VisualStyles.Dress(gameObject);
             if (IsOwner)
             {
                 Local = this;

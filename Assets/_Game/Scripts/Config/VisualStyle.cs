@@ -22,9 +22,57 @@ namespace Stealth.Configs
         public StyleScreen Screen = new();
         public StyleWorld World = new();
         public StylePalette Palette = new();
+        public StyleGeometry Geometry = new();
     }
 
     public enum StyleTonemap { Neutral, Aces, None }
+
+    /// <summary>How the models are reshaped (Tools/Blender/style_models.py makes a variant of every model per treatment).</summary>
+    public enum ModelTreatment { None, Faceted, Toy, Wonky }
+
+    /// <summary>What frames the doorways.</summary>
+    public enum DoorTrim { None, Casing, Pilasters, Arch }
+
+    /// <summary>What hangs under the ceiling.</summary>
+    public enum CeilingKind { None, Beams, IBeams, Coffers, Trays }
+
+    /// <summary>
+    /// The shape of the world in a style: reshaped models and the architecture added to the house — trims, panels,
+    /// columns, beams, pipes, light strips, floor and wall finishes. Decoration only: no colliders, no shadows, robots and
+    /// players move and see exactly as without it.
+    /// </summary>
+    [Serializable]
+    public class StyleGeometry
+    {
+        public ModelTreatment Treatment;
+
+        [Header("Walls")]
+        public bool Baseboard;
+        public bool Crown;
+        [Tooltip("Height of the wall panels (0 = none)")] public float WainscotHeight;
+        [Tooltip("Height of a chair rail (0 = none)")] public float RailHeight;
+        [Tooltip("Pipes along the walls under the ceiling")] public bool Pipes;
+        [Tooltip("Glowing slits in the walls every this many metres (0 = none)")] public float StripSpacing;
+        public DoorTrim Doors;
+
+        [Header("Ceiling")]
+        public CeilingKind Ceiling;
+
+        [Header("Materials (null = keep the house as it is)")]
+        public Material Floor;
+        [Tooltip("Metres covered by one repeat of the floor texture")] public float FloorTile = 1f;
+        public Material Wall;
+        [Tooltip("Metres covered by one repeat of the wall texture")] public float WallTile = 1f;
+        [Tooltip("Baseboards, cornices, rails, casings")] public Material Trim;
+        [Tooltip("The boards of the wall panels")] public Material Panel;
+        public Material Column;
+        public Material Beam;
+        public Material Pipe;
+        public Material Glow;
+
+        public bool HasArchitecture => Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
+                                       Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null;
+    }
 
     /// <summary>Colour grading on the URP post-processing volume.</summary>
     [Serializable]
@@ -71,6 +119,7 @@ namespace Stealth.Configs
         public float OutlineNormal = 2f;
         public Color OutlineColor = Color.black;
         [Range(0, 1), Tooltip("0 = ink colour, 1 = a darker shade of the surface")] public float OutlineSurfaceTint;
+        [Tooltip("Lines are light on dark surfaces and dark on light ones (Obra Dinn)")] public bool OutlineInvert;
 
         [Header("Hatching and paper")]
         [Range(0, 1)] public float HatchStrength;
@@ -93,6 +142,9 @@ namespace Stealth.Configs
         [Range(0, 1)] public float Noise;
         public float Wobble;
         public bool RecDot;
+        [Tooltip("Viewfinder corner brackets")] public bool Viewfinder;
+        [Range(0, 1), Tooltip("Grey world: only bright, glowing things keep their colour (lamps, lasers, screens)")] public float ColorOnlyLights;
+        [Range(0, 1), Tooltip("A helmet visor: dark curved rims at the top and bottom of the view")] public float Visor;
 
         [Header("Neon edges")]
         public float NeonStrength;

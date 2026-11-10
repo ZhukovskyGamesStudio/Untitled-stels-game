@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.VisualStyle
   Title: "\u041E\u0433\u0440\u0430\u0431\u043B\u0435\u043D\u0438\u0435"
   References: PAYDAY 2, Hitman
-  Pitch: "\u041A\u0438\u043D\u043E \u043F\u0440\u043E \u043E\u0433\u0440\u0430\u0431\u043B\u0435\u043D\u0438\u0435: \u0445\u043E\u043B\u043E\u0434\u043D\u044B\u0439 \u043D\u043E\u0447\u043D\u043E\u0439 \u043E\u0444\u0438\u0441, \u0431\u0438\u0440\u044E\u0437\u043E\u0432\u044B\u0435 \u0442\u0435\u043D\u0438 \u0438 \u043E\u0440\u0430\u043D\u0436\u0435\u0432\u044B\u0435 \u043B\u0430\u043C\u043F\u044B, \u0433\u043B\u044F\u043D\u0446\u0435\u0432\u044B\u0435 \u043F\u043E\u043B\u044B \u0438 \u0447\u0438\u0441\u0442\u0430\u044F \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0430. \u0421\u0435\u0440\u044C\u0451\u0437\u043D\u043E \u0438 \u0434\u043E\u0440\u043E\u0433\u043E."
+  Pitch: "\u0411\u0430\u043D\u043A \u043D\u043E\u0447\u044C\u044E: \u043C\u0440\u0430\u043C\u043E\u0440\u043D\u044B\u0439 \u043F\u043E\u043B, \u0441\u0432\u0435\u0442\u043B\u0430\u044F \u0448\u0442\u0443\u043A\u0430\u0442\u0443\u0440\u043A\u0430, \u043F\u0438\u043B\u044F\u0441\u0442\u0440\u044B \u0443 \u0434\u0432\u0435\u0440\u0435\u0439, \u043A\u0435\u0441\u0441\u043E\u043D\u043D\u044B\u0439 \u043F\u043E\u0442\u043E\u043B\u043E\u043A, \u043A\u0430\u0440\u043D\u0438\u0437\u044B \u0438 \u043F\u043B\u0438\u043D\u0442\u0443\u0441\u044B. \u0425\u043E\u043B\u043E\u0434\u043D\u044B\u0435 \u0431\u0438\u0440\u044E\u0437\u043E\u0432\u044B\u0435 \u0442\u0435\u043D\u0438, \u0442\u0451\u043F\u043B\u044B\u0435 \u043B\u0430\u043C\u043F\u044B, \u0433\u043B\u044F\u043D\u0435\u0446. \u0421\u0435\u0440\u044C\u0451\u0437\u043D\u043E \u0438 \u0434\u043E\u0440\u043E\u0433\u043E."
   Grade:
     Exposure: 0.8
     Contrast: 22
@@ -50,6 +50,7 @@ MonoBehaviour:
     OutlineNormal: 2
     OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     OutlineSurfaceTint: 0
+    OutlineInvert: 0
     HatchStrength: 0
     HatchSpacing: 5
     HatchStart: 0.4
@@ -66,13 +67,16 @@ MonoBehaviour:
     Noise: 0
     Wobble: 0
     RecDot: 0
+    Viewfinder: 0
+    ColorOnlyLights: 0
+    Visor: 0
     NeonStrength: 0
     NeonKeep: 1
     NeonFar: 20
     NeonNear: {r: 0, g: 1, b: 1, a: 1}
     NeonFarColor: {r: 1, g: 0, b: 1, a: 1}
   World:
-    Ambient: {r: 0.04, g: 0.06, b: 0.1, a: 1}
+    Ambient: {r: 0.1, g: 0.12, b: 0.16, a: 1}
     IndoorFog: {r: 0.02, g: 0.03, b: 0.045, a: 1}
     IndoorFogDensity: 0.035
     GasFog: {r: 0.33, g: 0.37, b: 0.3, a: 1}
@@ -81,8 +85,8 @@ MonoBehaviour:
       Tint: {r: 1, g: 1, b: 1, a: 1}
       Amount: 0
       Saturation: 1
-      Brightness: 1.1
-      Smoothness: 0.5
+      Brightness: 1
+      Smoothness: -1
     Furniture:
       Tint: {r: 1, g: 1, b: 1, a: 1}
       Amount: 0
@@ -107,3 +111,23 @@ MonoBehaviour:
       Saturation: 1
       Brightness: 1
       Smoothness: -1
+  Geometry:
+    Treatment: 0
+    Baseboard: 1
+    Crown: 1
+    WainscotHeight: 0
+    RailHeight: 0
+    Pipes: 0
+    StripSpacing: 0
+    Doors: 2
+    Ceiling: 3
+    Floor: {fileID: 2100000, guid: 0903263d6668a9b46a6f093ca340e35a, type: 2}
+    FloorTile: 2
+    Wall: {fileID: 2100000, guid: e13af629449780848a011642ca50b838, type: 2}
+    WallTile: 2
+    Trim: {fileID: 2100000, guid: fefeffa1b19730240ba873900bf6e3e0, type: 2}
+    Panel: {fileID: 0}
+    Column: {fileID: 2100000, guid: 726a805a869d38a4cb01f5af30e421cb, type: 2}
+    Beam: {fileID: 2100000, guid: fe5ca12aa19bd3a429580e116aa2e322, type: 2}
+    Pipe: {fileID: 0}
+    Glow: {fileID: 0}

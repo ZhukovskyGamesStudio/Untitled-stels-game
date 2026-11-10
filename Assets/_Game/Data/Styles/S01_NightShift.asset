@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.VisualStyle
   Title: "\u041D\u043E\u0447\u043D\u0430\u044F \u0441\u043C\u0435\u043D\u0430"
   References: Lethal Company, Content Warning
-  Pitch: "\u041D\u0438\u0437\u043A\u043E\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u0435, \u0441\u0442\u0443\u043F\u0435\u043D\u0447\u0430\u0442\u044B\u0439 \u0441\u0432\u0435\u0442 \u0438 \u0442\u043E\u043D\u043A\u0438\u0435 \u043A\u043E\u043D\u0442\u0443\u0440\u044B, \u0442\u044F\u0436\u0451\u043B\u0430\u044F \u0434\u044B\u043C\u043A\u0430, \u0442\u0451\u043F\u043B\u044B\u0435 \u043B\u0430\u043C\u043F\u044B \u043D\u0430 \u0444\u043E\u043D\u0435 \u0433\u0440\u044F\u0437\u043D\u043E\u0439 \u0442\u0435\u043C\u043D\u043E\u0442\u044B. \u0414\u0451\u0448\u0435\u0432\u043E, \u0447\u0438\u0442\u0430\u0435\u043C\u043E \u0438 \u0441\u0440\u0430\u0437\u0443 \xAB\u0434\u0440\u0443\u0437\u044C\u044F \u043F\u0440\u043E\u0442\u0438\u0432 \u0442\u0435\u043C\u043D\u043E\u0442\u044B\xBB."
+  Pitch: "\u041F\u0440\u043E\u043C\u0437\u043E\u043D\u0430 \u043D\u0430 \u043D\u043E\u0447\u043D\u043E\u0439 \u0441\u043C\u0435\u043D\u0435: \u0440\u0438\u0444\u043B\u0451\u043D\u044B\u0439 \u043F\u043E\u043B, \u0433\u043E\u0444\u0440\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0435 \u0441\u0442\u0435\u043D\u044B, \u0442\u0440\u0443\u0431\u044B \u0438 \u0434\u0432\u0443\u0442\u0430\u0432\u0440\u044B \u043F\u043E\u0434 \u043F\u043E\u0442\u043E\u043B\u043A\u043E\u043C, \u043A\u0440\u0438\u0432\u043E\u0432\u0430\u0442\u044B\u0435 \u043C\u043E\u0434\u0435\u043B\u0438. \u041D\u0438\u0437\u043A\u043E\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u0435, \u0441\u0442\u0443\u043F\u0435\u043D\u0438 \u0441\u0432\u0435\u0442\u0430, \u0434\u044B\u043C\u043A\u0430 \u0438 \u043A\u0440\u0430\u0439 \u0448\u043B\u0435\u043C\u0430 \u043F\u043E \u0440\u0430\u043C\u043A\u0435 \u043A\u0430\u0434\u0440\u0430."
   Grade:
-    Exposure: 0.55
+    Exposure: 0.8
     Contrast: 22
     Saturation: -22
     ColorFilter: {r: 1, g: 0.94, b: 0.84, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
     BloomThreshold: 0.8
     BloomScatter: 0.7
     BloomTint: {r: 1, g: 1, b: 1, a: 1}
-    Vignette: 0.38
+    Vignette: 0.3
     VignetteColor: {r: 0, g: 0, b: 0, a: 1}
     ChromaticAberration: 0
     FilmGrain: 0.45
@@ -50,6 +50,7 @@ MonoBehaviour:
     OutlineNormal: 2
     OutlineColor: {r: 0, g: 0, b: 0, a: 1}
     OutlineSurfaceTint: 0.6
+    OutlineInvert: 0
     HatchStrength: 0
     HatchSpacing: 5
     HatchStart: 0.4
@@ -66,13 +67,16 @@ MonoBehaviour:
     Noise: 0
     Wobble: 0
     RecDot: 0
+    Viewfinder: 0
+    ColorOnlyLights: 0
+    Visor: 1
     NeonStrength: 0
     NeonKeep: 1
     NeonFar: 20
     NeonNear: {r: 0, g: 1, b: 1, a: 1}
     NeonFarColor: {r: 1, g: 0, b: 1, a: 1}
   World:
-    Ambient: {r: 0.025, g: 0.025, b: 0.03, a: 1}
+    Ambient: {r: 0.05, g: 0.05, b: 0.055, a: 1}
     IndoorFog: {r: 0.05, g: 0.045, b: 0.035, a: 1}
     IndoorFogDensity: 0.06
     GasFog: {r: 0.36, g: 0.33, b: 0.22, a: 1}
@@ -107,3 +111,23 @@ MonoBehaviour:
       Saturation: 1
       Brightness: 1
       Smoothness: -1
+  Geometry:
+    Treatment: 3
+    Baseboard: 1
+    Crown: 0
+    WainscotHeight: 0
+    RailHeight: 0
+    Pipes: 1
+    StripSpacing: 0
+    Doors: 0
+    Ceiling: 2
+    Floor: {fileID: 2100000, guid: 3a991b0b680ff7d4ba7d0f5222185116, type: 2}
+    FloorTile: 1
+    Wall: {fileID: 2100000, guid: 70a99615661ec354ba8365e0d0a68ceb, type: 2}
+    WallTile: 1.5
+    Trim: {fileID: 2100000, guid: 9f9bd4eb864482f439686b8eab14043e, type: 2}
+    Panel: {fileID: 0}
+    Column: {fileID: 0}
+    Beam: {fileID: 2100000, guid: 9f9bd4eb864482f439686b8eab14043e, type: 2}
+    Pipe: {fileID: 2100000, guid: e54306f2d8af320438fd272b3c3f6407, type: 2}
+    Glow: {fileID: 0}

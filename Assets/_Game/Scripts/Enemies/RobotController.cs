@@ -120,6 +120,7 @@ namespace Stealth.Enemies
             var (shape, color) = DecodeCargo(Cargo);
             CargoMesh.sharedMesh = CargoVisuals.Meshes[Mathf.Clamp(shape, 0, CargoVisuals.Meshes.Length - 1)];
             CargoRenderer.sharedMaterial = CargoVisuals.ColorMaterials[Mathf.Clamp(color, 0, CargoVisuals.ColorMaterials.Length - 1)];
+            VisualStyles.Dress(CargoMesh.gameObject);
         }
 
         /// <summary>Server: go and check a spot (alarm, radio).</summary>

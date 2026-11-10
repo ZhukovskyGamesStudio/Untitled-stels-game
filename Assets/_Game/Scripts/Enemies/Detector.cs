@@ -107,6 +107,7 @@ namespace Stealth.Enemies
             All.Add(this);
             OnSpawned();
             RefreshStatus();
+            VisualStyles.Dress(gameObject);
         }
 
         public void Despawned()

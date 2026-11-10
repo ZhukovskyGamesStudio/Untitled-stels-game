@@ -80,6 +80,7 @@ namespace Stealth.Items
                 Collider.center = b.center;
                 Collider.size = b.size + Vector3.one * 0.12f; // a bit larger: easier to grab with the mouse
             }
+            Level.VisualStyles.Dress(gameObject); // the item's model in the current visual style
         }
     }
 }

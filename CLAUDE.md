@@ -36,10 +36,14 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 Art/Materials/<Environment|Props|Robots|Player|Items|FX>   материалы (создаёт AssetBuilder)
 Art/Audio/<Player|Items|UI|Robots|Environment|Music>       WAV из Tools/Audio/generate_sounds.py
 Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Tools/Blender/*.py)
+Art/Models/Styles/<Faceted|Toy|Wonky>/…/<имя>__<обработка>.fbx  варианты всех моделей для стилей (Tools/Blender/style_models.py)
+Art/Models/StyleKit/kit_*.fbx                              архитектура стилей: плинтус, карниз, панели, пилястра, арка, балки, трубы… (style_kit.py)
+Art/Textures/Finishes/*.png                                бесшовные текстуры отделки пола и стен (Tools/Art/generate_textures.py)
 Art/Sprites/                                               текстуры UI (виньетка, дуга)
 Data/            LevelArt, ItemVisuals, NetworkPrefabs, SoundBank (ScriptableObject)
 Data/Config/     НАСТРОЙКИ: Player, Run, Level, Items, Audio (правятся руками в инспекторе)
-Data/Styles/     визуальные стили (VisualStyle) + Styles.asset (список и материалы по видам) + материал экранного фильтра
+Data/Styles/     визуальные стили (VisualStyle) + Styles.asset (список, материалы по видам, варианты мешей) + StyleKit + Kit/*.mat + материал экранного фильтра
+Prefabs/StyleKit детали архитектуры стилей (без коллайдеров и теней) + Finish (квад отделки)
 Prefabs/Robots/<Префаб>Config.asset, Prefabs/Sensors/<Префаб>Config.asset — настройки каждого робота, устройства и лазера рядом с его префабом
 Resources/GameConfig.asset            корень настроек (ссылки на Data/Config/*), его находит любой билд
 Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
@@ -182,6 +186,11 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. F8 листает стили, `-style <имя>` включает при запуске,
 сценарий `styles` снимает одни и те же замороженные кадры во всех стилях. Ассеты стилей создаются один раз из `AssetBuilder.Styles`
 и дальше правятся руками; `REBUILD_STYLES=1 Tools/dev.sh assets` пересоздаёт их из кода.
+Стиль меняет и форму мира (`StyleGeometry`): **модели** — `Treatment` (гранёные / игрушечные / кривоватые варианты всех FBX; `VisualStyles` подменяет
+меши по имени, коллайдеры и материалы те же; новые объекты одеваются через `VisualStyles.Dress` при спавне), **архитектура** — `LevelBuilder` записывает
+оболочку дома (`ActiveLevel.Shell`: грани стен, полы, проёмы, окна), чистый `ArchitecturePlanner` раскладывает по ней детали `StyleKit`
+(плинтусы, панели, карнизы, наличники/пилястры/арки у дверей, балки/кессоны/лотки под потолком в обход ламп и лестничных проёмов, трубы, световые щели,
+отделка пола и стен в обход окон), `StyleDecor` ставит их под корень уровня. Декор без коллайдеров и теней — геймплей и свет не меняются (`ArchitectureTests`).
 
 ### Ассеты из кода
 
