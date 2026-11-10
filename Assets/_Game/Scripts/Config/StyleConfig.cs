@@ -24,6 +24,8 @@ namespace Stealth.Configs
         public MeshVariants[] Meshes = new MeshVariants[0];
         public MaterialVariants[] Materials = new MaterialVariants[0];
         public PropReplacement[] Props = new PropReplacement[0];
+        [Tooltip("Models designed for one style (Art/Models/Styles/Guards)")]
+        public StyleMeshes[] StyleModels = new StyleMeshes[0];
 
         public StyleKit KitFor(ModelFamily family)
         {

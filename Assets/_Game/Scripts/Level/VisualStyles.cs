@@ -129,6 +129,9 @@ namespace Stealth.Level
         static readonly Dictionary<Material, Material>[] s_MatVariants = NewMaps<Material>();
         static readonly Dictionary<Material, Material> s_MatOriginal = new();
         static readonly Dictionary<Mesh, PropReplacement>[] s_Props = NewMaps2();
+        /// <summary>Models of the current style itself (its own guard), over the family's.</summary>
+        static readonly Dictionary<Mesh, Mesh> s_StyleMeshes = new();
+        static VisualStyle s_StyleMeshesOf;
         /// <summary>Models replaced as a whole: their root, the replacement and the renderers hidden for it.</summary>
         static readonly List<(Transform root, GameObject replacement, List<Renderer> hidden)> s_Replaced = new();
 
@@ -180,6 +183,21 @@ namespace Stealth.Level
                     }
             foreach (var p in c.Props ?? new PropReplacement[0])
                 if (p.Key != null && p.Prefab != null) s_Props[(int)p.Family][p.Key] = p;
+            foreach (var set in c.StyleModels ?? new StyleMeshes[0])
+                for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
+                    if (set.From[i] != null && set.To[i] != null) s_MeshOriginal[set.To[i]] = set.From[i];
+        }
+
+        static void LoadStyleMeshes()
+        {
+            if (s_StyleMeshesOf == s_Current && s_StyleMeshes.Count > 0) return;
+            s_StyleMeshesOf = s_Current;
+            s_StyleMeshes.Clear();
+            if (Config == null || s_Current == null) return;
+            foreach (var set in Config.StyleModels ?? new StyleMeshes[0])
+                if (set.Style == s_Current)
+                    for (int i = 0; i < set.From.Length && i < set.To.Length; i++)
+                        if (set.From[i] != null && set.To[i] != null) s_StyleMeshes[set.From[i]] = set.To[i];
         }
 
         /// <summary>
@@ -196,12 +214,14 @@ namespace Stealth.Level
         {
             if (r == null) return;
             Load();
+            LoadStyleMeshes();
             int f = (int)s_Family;
             if (r.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null)
             {
                 var mesh = mf.sharedMesh;
                 var original = s_MeshOriginal.TryGetValue(mesh, out var o) ? o : mesh;
-                var target = s_MeshVariants[f].TryGetValue(original, out var v) ? v : original;
+                var target = s_StyleMeshes.TryGetValue(original, out var own) ? own
+                           : s_MeshVariants[f].TryGetValue(original, out var v) ? v : original;
                 if (target != mesh) mf.sharedMesh = target;
                 if (s_Props[f].TryGetValue(original, out var prop)) Replace(mf.transform.parent, prop);
             }

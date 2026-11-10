@@ -78,12 +78,12 @@ namespace Stealth.Game
             var room = LitRoom(layout);
             var (stand, look) = RoomView(layout, room);
             {
-                var guardAt = Vector3.Lerp(stand, look, 0.75f);
+                var guardAt = Vector3.Lerp(stand, look, 0.42f); // close enough to see the style's own guard
                 if (UnityEngine.AI.NavMesh.SamplePosition(guardAt, out var hit, 2f, UnityEngine.AI.NavMesh.AllAreas)) guardAt = hit.position;
                 LookAtFrom(new Pose(stand, Quaternion.LookRotation(Flat(look - stand))), guardAt + Vector3.up * 1.1f);
                 var guard = gm.SpawnRobotServer(RobotKind.Guard, guardAt, Quaternion.LookRotation(Flat(stand - guardAt))).GetComponent<RobotController>();
                 var right = Vector3.Cross(Vector3.up, Flat(look - stand).normalized);
-                PlaceMate(mate, Vector3.Lerp(stand, guardAt, 0.35f) + right * 0.9f, guardAt, 0.65f);
+                PlaceMate(mate, Vector3.Lerp(stand, guardAt, 0.3f) + right * 1.4f, guardAt, 0.65f);
                 yield return new WaitForSeconds(0.6f);
                 DevFlags.FreezeRobots = false;
                 DevFlags.HoldRobots = true;
@@ -132,6 +132,34 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(1.2f);
                 yield return EveryStyle(styles, "4_loot", false);
                 foreach (var w in spawned) if (w != null) Session.Despawn(w.gameObject);
+            }
+
+            // 6 (shot before the lasers). The style's own guard robot up close, standing under a ceiling lamp of the lobby.
+            {
+                mate.SetActive(false);
+                var c = layout.CellCenter(0, layout.StartCell.x, layout.StartCell.y);
+                Vector3 at = default, eye = default;
+                bool found = false;
+                foreach (float lx in new[] { RoomLighting.LampOffset, -RoomLighting.LampOffset })
+                    foreach (float dz in new[] { -3f, 3f })
+                    {
+                        if (found) break;
+                        var spot = c + Vector3.right * lx;
+                        var cam = spot + Vector3.forward * dz;
+                        if (Physics.CheckCapsule(spot + Vector3.up * 0.3f, spot + Vector3.up * 1.8f, 0.45f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        if (Physics.Linecast(cam + Vector3.up * 1.6f, spot + Vector3.up * 1.4f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        at = spot; eye = cam; found = true;
+                    }
+                if (!found) { at = c + Vector3.right * RoomLighting.LampOffset; eye = at + Vector3.back * 3f; }
+                if (UnityEngine.AI.NavMesh.SamplePosition(at, out var hit, 1.5f, UnityEngine.AI.NavMesh.AllAreas)) at = hit.position;
+                DevFlags.FreezeRobots = true;
+                var portrait = gm.SpawnRobotServer(RobotKind.Guard, at, Quaternion.LookRotation(Flat(eye - at)));
+                LookAtFrom(new Pose(eye + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(at - eye))), at + Vector3.up * 1.2f);
+                yield return new WaitForSeconds(0.8f);
+                Log($"portrait: guard under a lamp {(found ? "with a clear view" : "(no clear spot)")}, {Vector3.Distance(eye, at):0.0} m");
+                yield return EveryStyle(styles, "6_guard_portrait", false);
+                Session.Despawn(portrait);
+                mate.SetActive(true);
             }
 
             // 5. Lasers across a doorway, a wall camera watching (or the exterior door when the house has no lasers).

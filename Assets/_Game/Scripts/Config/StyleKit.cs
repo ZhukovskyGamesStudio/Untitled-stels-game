@@ -25,6 +25,15 @@ namespace Stealth.Configs
         public Mesh[] To = new Mesh[0];
     }
 
+    /// <summary>Models made for one style only (its own guard robot): they win over the family's version.</summary>
+    [Serializable]
+    public class StyleMeshes
+    {
+        public VisualStyle Style;
+        public Mesh[] From = new Mesh[0];
+        public Mesh[] To = new Mesh[0];
+    }
+
     /// <summary>Every material of the world and its version in one family (flat, glossy plastic, pixel, PBR…).</summary>
     [Serializable]
     public class MaterialVariants

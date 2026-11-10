@@ -62,6 +62,7 @@ namespace Stealth.EditorTools
             config.Meshes = BuildMeshVariants();
             config.Materials = BuildMaterialVariants();
             config.Props = BuildPropReplacements();
+            config.StyleModels = BuildStyleModels(styles);
             // the palette of a style recolours the family versions of a material too
             Material[] WithVariants(Material[] a) => a.Concat(config.Materials.SelectMany(set =>
                 set.From.Select((m, i) => (m, i)).Where(x => a.Contains(x.m)).Select(x => set.To[x.i]))).ToArray();
@@ -74,6 +75,21 @@ namespace Stealth.EditorTools
             var root = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             if (root != null && root.Styles != config) { root.Styles = config; EditorUtility.SetDirty(root); }
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>The guard robot designed for each style (Tools/Blender/guards.py → Art/Models/Styles/Guards/robot_guard__&lt;style&gt;.fbx).</summary>
+        static StyleMeshes[] BuildStyleModels(List<VisualStyle> styles)
+        {
+            var list = new List<StyleMeshes>();
+            var originals = AssetDatabase.LoadAllAssetsAtPath(ModelPath("robot_guard")).OfType<Mesh>().ToDictionary(m => m.name, m => m);
+            foreach (var style in styles)
+            {
+                var path = $"{ModelsDir}/Styles/Guards/robot_guard__{style.name}.fbx";
+                var meshes = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>().Where(m => originals.ContainsKey(m.name)).ToArray();
+                if (meshes.Length == 0) continue;
+                list.Add(new StyleMeshes { Style = style, From = meshes.Select(m => originals[m.name]).ToArray(), To = meshes });
+            }
+            return list.ToArray();
         }
 
         static Material[] MaterialsIn(string category) =>

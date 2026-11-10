@@ -37,6 +37,7 @@ Art/Materials/<Environment|Props|Robots|Player|Items|FX>   материалы (�
 Art/Audio/<Player|Items|UI|Robots|Environment|Music>       WAV из Tools/Audio/generate_sounds.py
 Art/Models/<Props|Level|Player|Items|Robots|Sensors>       FBX из Blender (Tools/Blender/*.py)
 Art/Models/Styles/<Lowpoly|Toy|Lofi|Clean|Realistic>/…/<имя>__<семейство>.fbx  все модели в пяти семействах стилей (Tools/Blender/style_families.py)
+Art/Models/Styles/Guards/robot_guard__<стиль>.fbx         свой охранник у каждого стиля, смоделирован с нуля (Tools/Blender/guards.py)
 Art/Models/StyleKit[/<Семейство>]/kit_*.fbx                 архитектура стилей: плинтус, карниз, панели, пилястра, арка, балки, трубы… (style_kit.py)
 Art/External/                                              CC0-ассеты Poly Haven (Tools/Art/fetch_cc0.py + Tools/Blender/import_cc0.py): Textures/<id>,
                                                            Models/<id>.fbx + текстуры, Pixel/ (64 px для PS1); список — CREDITS.md
@@ -191,7 +192,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 Стиль меняет и форму мира (`StyleGeometry`): **семейство моделей** `Family` — лоуполи / игрушки / PS1 / чистые / реализм: свой вариант каждой модели
 (меши подменяются по имени, коллайдеры и пивоты прежние), своя версия каждого материала (`MaterialVariants`: плоский, глянцевый пластик, пиксельный,
 PBR из сканов) и свой набор архитектуры (`StyleConfig.KitFor`); реализм вдобавок заменяет мебель CC0-сканами целиком (`PropReplacement`: наша модель
-прячется, кроме светящихся Eye-частей, скан вписан в её габариты). Новые объекты одеваются через `VisualStyles.Dress` при спавне. **Архитектура** — `LevelBuilder` записывает
+прячется, кроме светящихся Eye-частей, скан вписан в её габариты). Модели одного стиля (`StyleConfig.StyleModels`: свой охранник) сильнее семейства;
+их части повторяют оригинал (Body, Accent, AccentLeg0/1 от бедра ≈ 0.9 м, Eye), чтобы работали анимация и статусный свет. Новые объекты одеваются через `VisualStyles.Dress` при спавне. **Архитектура** — `LevelBuilder` записывает
 оболочку дома (`ActiveLevel.Shell`: грани стен, полы, проёмы, окна), чистый `ArchitecturePlanner` раскладывает по ней детали `StyleKit`
 (плинтусы, панели, карнизы, наличники/пилястры/арки у дверей, балки/кессоны/лотки под потолком в обход ламп и лестничных проёмов, трубы, световые щели,
 отделка пола и стен в обход окон), `StyleDecor` ставит их под корень уровня. Декор без коллайдеров и теней — геймплей и свет не меняются (`ArchitectureTests`).

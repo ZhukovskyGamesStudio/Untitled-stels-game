@@ -121,6 +121,8 @@ namespace Stealth.Tests
                 Assert.Greater(p.Scale.x, 0.05f); Assert.Greater(p.Scale.y, 0.05f); Assert.Greater(p.Scale.z, 0.05f);
                 foreach (var c in p.Prefab.GetComponentsInChildren<Collider>(true)) Assert.Fail($"{p.Prefab.name} has a collider");
             }
+            // every style but the base look has its own guard robot, with all five parts of the original
+            Assert.AreEqual(config.Styles.Length - 1, config.StyleModels.Count(m => m.To.Length == 5), "a style without its own guard");
             foreach (ModelFamily t in System.Enum.GetValues(typeof(ModelFamily)))
             {
                 if (t == ModelFamily.None) continue;
