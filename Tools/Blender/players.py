@@ -185,6 +185,13 @@ PLANS = {
     "S08_Footage": ("toy", Plan(torso=(0.5, 0.34), leg_r=0.1, arm_r=0.085, hand_r=0.08, seg=20, helmet="diver", foot=(0.15, 0.3, 0.12))),
     "S09_WhiteRoom": ("crystal", Plan(square=True, head="ico", seg=6)),
     "S10_Grid": ("clean", Plan(torso=(0.42, 0.24), leg_r=0.065, arm_r=0.05, seg=20, taper=1.1)),
+    # blocky noir figures, a sleek lab jumpsuit, chunky comic heroes, a heat suit, ruler-drawn blueprint people
+    "S11_Noir": ("lofi", Plan(torso=(0.46, 0.28), leg_r=0.07, arm_r=0.06, seg=6, square=True, head="box", taper=1.12)),
+    "S12_TestChamber": ("clean", Plan(torso=(0.4, 0.24), leg_r=0.06, arm_r=0.045, seg=24, taper=0.95)),
+    "S13_Comic": ("lowpoly", Plan(torso=(0.5, 0.3), leg_r=0.085, arm_r=0.075, arm_len=0.6, hand_r=0.08, head_r=0.15, seg=8, taper=1.2,
+                                  foot=(0.15, 0.3, 0.1))),
+    "S14_Thermal": ("realistic", Plan(seg=16, helmet="hazmat")),
+    "S15_Blueprint": ("clean", Plan(torso=(0.4, 0.22), leg_r=0.05, arm_r=0.04, seg=8, square=True, head="box")),
 }
 
 

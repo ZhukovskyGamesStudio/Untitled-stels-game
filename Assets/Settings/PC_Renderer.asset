@@ -136,7 +136,8 @@ MonoBehaviour:
   - {fileID: -5083812220690112894}
   - {fileID: -8145012854825875229}
   - {fileID: 2047761070223118219}
-  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c882def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1cl
+  - {fileID: 2337729831753282592}
+  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c882def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1c20f47c6ae5487120l
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -145,10 +146,10 @@ MonoBehaviour:
     m_Bits: 4294967295
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 4294966783
   m_TransparentLayerMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 4294966783
   m_DefaultStencilState:
     overrideStencilState: 0
     stencilReference: 1
@@ -195,6 +196,49 @@ MonoBehaviour:
     overrideDepthState: 1
     depthCompareFunction: 5
     enableWrite: 0
+    stencilSettings:
+      overrideStencilState: 0
+      stencilReference: 0
+      stencilCompareFunction: 8
+      passOperation: 0
+      failOperation: 0
+      zFailOperation: 0
+    cameraSettings:
+      overrideCamera: 0
+      restoreCamera: 1
+      offset: {x: 0, y: 0, z: 0, w: 0}
+      cameraFieldOfView: 60
+    depthInputAttachment: 0
+--- !u!114 &2337729831753282592
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
+  m_Name: WorldText
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.RenderObjects
+  m_Active: 1
+  settings:
+    passTag: WorldText
+    Event: 601
+    filterSettings:
+      RenderQueueType: 1
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 512
+      PassNames: []
+    overrideMaterial: {fileID: 0}
+    overrideMaterialPassIndex: 0
+    overrideShader: {fileID: 0}
+    overrideShaderPassIndex: 0
+    overrideMode: 0
+    overrideDepthState: 0
+    depthCompareFunction: 4
+    enableWrite: 1
     stencilSettings:
       overrideStencilState: 0
       stencilReference: 0

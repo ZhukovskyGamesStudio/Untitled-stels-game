@@ -15,6 +15,15 @@ namespace Stealth.Audio
     /// <summary>Decisions of the sound director (pure, unit tested).</summary>
     public static class AudioRules
     {
+        // Levels measured on the clips (loudest 20 % of 50 ms windows): the "?"/"!" stingers are ~-4 dB, the robot
+        // voices ~-15 dB, steps ~-14 dB. The stingers are played lower so the voice phrase is what you hear.
+        /// <summary>Volume of the "?", "!" and "lost" stingers of devices.</summary>
+        public const float StingerVolume = 0.35f;
+        /// <summary>Volume of the power-down of a hacked robot / device.</summary>
+        public const float HackedVolume = 0.45f;
+        /// <summary>Volume of a camera's beeping while it notices someone.</summary>
+        public const float CameraBeepVolume = 0.5f;
+
         /// <summary>Menu music outside a game; in a game — exploring, or the chase track while in danger and a bit after.</summary>
         public static MusicTrack ChooseMusic(bool inGame, float secondsSinceDanger, float chaseHold) =>
             !inGame ? MusicTrack.Menu : secondsSinceDanger <= chaseHold ? MusicTrack.Chase : MusicTrack.Explore;

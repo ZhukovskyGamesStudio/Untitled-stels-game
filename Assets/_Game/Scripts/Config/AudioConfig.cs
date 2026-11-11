@@ -8,16 +8,16 @@ namespace Stealth.Configs
     public class AudioMix
     {
         [Header("Volumes (0..1)")]
-        public float Music = 0.4f;
+        public float Music = 0.35f;
         [Tooltip("Office hum inside, gas wind outside.")]
-        public float Ambience = 0.35f;
-        public float Alarm = 0.45f;
-        public float Ui = 0.6f;
-        public float Footsteps = 0.55f;
+        public float Ambience = 0.3f;
+        public float Alarm = 0.3f;
+        public float Ui = 0.5f;
+        public float Footsteps = 0.6f;
         [Tooltip("Robot beeps, turret shots, radio.")]
         public float Robots = 0.8f;
         [Tooltip("Pickup, drop, sell.")]
-        public float Items = 0.8f;
+        public float Items = 0.6f;
         [Tooltip("Looping sounds of robots and lasers.")]
         public float Loops = 0.3f;
 

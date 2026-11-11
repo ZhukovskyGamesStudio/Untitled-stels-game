@@ -273,7 +273,7 @@ namespace Stealth.Audio
                     };
                     continue;
                 }
-                if (d.IsHacked && !w.Hacked) Sfx.At(Bank.Hacked, d.Position);
+                if (d.IsHacked && !w.Hacked) Sfx.At(Bank.Hacked, d.Position, AudioRules.HackedVolume);
                 w.Hacked = d.IsHacked;
                 var robot = d as RobotController;
                 var cue = AudioRules.Cue(w.Level, level);
@@ -283,7 +283,7 @@ namespace Stealth.Audio
                 if (d is SecurityCamera) UpdateCameraBeep(d, w);
                 if (cue != AlertCue.None && Time.time >= w.Cooldown)
                 {
-                    Sfx.At(cue == AlertCue.Alert ? Bank.Alert : cue == AlertCue.Suspicious ? Bank.Suspicious : Bank.Lost, d.Position);
+                    Sfx.At(cue == AlertCue.Alert ? Bank.Alert : cue == AlertCue.Suspicious ? Bank.Suspicious : Bank.Lost, d.Position, AudioRules.StingerVolume);
                     w.Cooldown = Time.time + 1.2f;
                 }
 
@@ -313,7 +313,7 @@ namespace Stealth.Audio
             if (float.IsInfinity(interval)) { w.NextBeep = 0f; return; }
             if (Time.time < w.NextBeep) return;
             if (w.NextBeep > 0f || a > 0.05f)
-                Sfx.At(Bank.CameraBeep, camera.Position, 0.8f, Sfx.Group.Robots, AudioRules.CameraBeepPitch(a));
+                Sfx.At(Bank.CameraBeep, camera.Position, AudioRules.CameraBeepVolume, Sfx.Group.Robots, AudioRules.CameraBeepPitch(a));
             w.NextBeep = Time.time + interval;
         }
 

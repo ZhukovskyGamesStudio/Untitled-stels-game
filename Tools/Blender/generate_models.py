@@ -247,6 +247,30 @@ def model_desk():
     export("desk")
 
 
+def model_terminal():
+    """Security terminal: the office desk (same footprint) turned into a console — three screens on the back edge,
+    a keyboard, a computer under the top. The screens glow in the terminal's colour (cameras / hacking)."""
+    merge("Body", [box((1.6, 0.8, 0.05), (0, 0, 0.74))])
+    merge("Accent", [
+        box((0.05, 0.75, 0.72), (-0.76, 0, 0.36)),
+        box((0.05, 0.75, 0.72), (0.76, 0, 0.36)),
+        box((1.5, 0.03, 0.4), (0, 0.36, 0.52)),
+        box((0.22, 0.45, 0.42), (0.45, 0.05, 0.22)),                 # the computer under the top
+    ])
+    # the console on the top is a part of its own: its bounds stay within the screens (desk lamps stand beside them)
+    merge("AccentConsole", [
+        box((0.52, 0.17, 0.025), (0, -0.1, 0.778)),                  # keyboard
+        box((0.06, 0.06, 0.12), (-0.32, 0.2, 0.83)), box((0.06, 0.06, 0.12), (0, 0.22, 0.83)),
+        box((0.06, 0.06, 0.12), (0.32, 0.2, 0.83)),                  # screen stands
+    ])
+    merge("Eye", [
+        box((0.29, 0.03, 0.22), (-0.32, 0.17, 1.0)),
+        box((0.3, 0.03, 0.24), (0, 0.19, 1.01)),
+        box((0.29, 0.03, 0.22), (0.32, 0.17, 1.0)),
+    ])
+    export("terminal")
+
+
 def model_chair():
     merge("Body", [
         box((0.5, 0.5, 0.08), (0, 0, 0.48)),
@@ -615,6 +639,7 @@ if __name__ == "__main__":
     model_laser_emitter()
     model_hatch()
     model_desk()
+    model_terminal()
     model_chair()
     model_server_rack()
     model_cabinet()

@@ -151,6 +151,17 @@ namespace Stealth.Configs
         [Range(0, 1), Tooltip("Grey world: only bright, glowing things keep their colour (lamps, lasers, screens)")] public float ColorOnlyLights;
         [Range(0, 1), Tooltip("A helmet visor: dark curved rims at the top and bottom of the view")] public float Visor;
 
+        [Header("Gradient map")]
+        [Range(0, 1), Tooltip("Brightness picks a colour on a three-stop ramp (thermal camera, blueprint); 0 = off")] public float GradientMap;
+        public Color MapDark = Color.black;
+        public Color MapMid = Color.grey;
+        public Color MapLight = Color.white;
+
+        [Header("Grid paper")]
+        [Range(0, 1), Tooltip("Lines of a drawing sheet over the picture (0 = off)")] public float GridStrength;
+        [Tooltip("Cell size, pixels at 720p")] public float GridSpacing = 16f;
+        public Color GridColor = Color.white;
+
         [Header("Neon edges")]
         public float NeonStrength;
         [Range(0, 1), Tooltip("How much of the normal picture stays under the edges")] public float NeonKeep = 1f;

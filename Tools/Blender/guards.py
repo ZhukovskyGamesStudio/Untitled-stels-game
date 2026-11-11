@@ -335,8 +335,97 @@ def grid():
     export("S10_Grid")
 
 
+def noir():
+    """Noir detective (after Shadows of Doubt): a robot private eye — long coat with turned-up collar, a fedora pulled
+    low, a glowing visor slit under its brim, hands in the coat pockets. Built out of chunky blocks."""
+    merge("Body", [box(0.56, 0.36, 0.7, z=1.3, taper=1.1),                                        # coat, shoulders to hips
+                   box(0.6, 0.38, 0.12, z=0.96),                                                  # coat hem
+                   box(0.16, 0.2, 0.46, x=-0.36, y=-0.02, z=1.2, ry=-0.12), box(0.16, 0.2, 0.46, x=0.36, y=-0.02, z=1.2, ry=0.12)])
+    merge("Accent", [box(0.3, 0.32, 0.3, y=-0.02, z=1.8),                                          # square head
+                     box(0.62, 0.62, 0.03, z=1.97), box(0.34, 0.34, 0.16, z=2.06, taper=0.85),    # hat brim and crown
+                     box(0.2, 0.08, 0.2, x=-0.14, y=-0.16, z=1.62, rz=0.35), box(0.2, 0.08, 0.2, x=0.14, y=-0.16, z=1.62, rz=-0.35),  # collar
+                     box(0.14, 0.06, 0.12, x=-0.22, y=-0.19, z=1.02), box(0.14, 0.06, 0.12, x=0.22, y=-0.19, z=1.02)])  # pocket flaps
+    merge("Eye", [box(0.24, 0.03, 0.04, y=-0.18, z=1.86)])
+    legs(lambda s: [box(0.14, 0.16, 0.86, x=s * 0.14, z=0.5), box(0.16, 0.3, 0.08, x=s * 0.14, y=-0.06, z=0.04)])
+    export("S11_Noir")
+
+
+def test_chamber():
+    """Test chamber (after Portal): a white lab android — smooth shell plates on dark joints, a round head with one
+    big round lens, thin limbs. Clean and quiet."""
+    merge("Body", [capsule(0.24, 0.42, z=1.32, seg=24), box(0.36, 0.26, 0.16, z=0.98),
+                   limb((-0.3, 0, 1.5), (-0.34, -0.04, 1.12), 0.035), limb((0.3, 0, 1.5), (0.34, -0.04, 1.12), 0.035),
+                   limb((-0.34, -0.04, 1.1), (-0.32, -0.12, 0.82), 0.03), limb((0.34, -0.04, 1.1), (0.32, -0.12, 0.82), 0.03)])
+    merge("Accent", [sph(0.2, z=1.84, seg=24), cyl(0.05, 0.12, z=1.64, seg=12),                    # head, neck
+                     sph(0.09, x=-0.3, z=1.5, seg=16), sph(0.09, x=0.3, z=1.5, seg=16),            # shoulder balls
+                     box(0.3, 0.08, 0.36, y=-0.2, z=1.34, taper=0.8),                              # chest plate
+                     sph(0.05, x=-0.32, y=-0.13, z=0.8, seg=12), sph(0.05, x=0.32, y=-0.13, z=0.8, seg=12)])
+    merge("Eye", [cyl(0.085, 0.04, y=-0.19, z=1.86, axis="Y", seg=24)])
+    legs(lambda s: [limb((s * 0.12, 0, 0.92), (s * 0.13, 0, 0.1), 0.045), sph(0.06, x=s * 0.13, z=0.5, seg=12),
+                    box(0.12, 0.24, 0.06, x=s * 0.13, y=-0.05, z=0.03)])
+    export("S12_TestChamber")
+
+
+def comic():
+    """Wasteland comic (after Borderlands): a welded-together bandit bot — a lopsided boiler body with rivets, a gas-mask
+    face with two round eyes and a hose, one arm ending in a big wrench claw, a spiked shoulder plate."""
+    rivets = [sph(0.025, x=0.3 * math.cos(a), y=0.24 * math.sin(a), z=1.45, seg=6) for a in [i * math.pi / 5 for i in range(10)]]
+    merge("Body", [cyl(0.3, 0.62, z=1.28, seg=10, r2=0.34), box(0.5, 0.36, 0.2, z=0.95)] + rivets + [
+                   limb((-0.34, 0, 1.45), (-0.44, -0.02, 1.08), 0.06), limb((0.34, 0, 1.45), (0.42, -0.06, 1.1), 0.07),
+                   limb((-0.44, -0.02, 1.08), (-0.4, -0.12, 0.84), 0.05), limb((0.42, -0.06, 1.1), (0.44, -0.2, 0.9), 0.06)])
+    merge("Accent", [box(0.32, 0.3, 0.3, y=-0.04, z=1.8, rz=0.08, taper=0.9),                      # tilted head
+                     cyl(0.07, 0.1, y=-0.22, z=1.72, axis="Y", seg=8), limb((0, -0.26, 1.7), (0.18, -0.2, 1.5), 0.03),  # mask filter, hose
+                     box(0.26, 0.3, 0.1, x=0.4, z=1.62, ry=0.4), box(0.05, 0.05, 0.18, x=0.46, z=1.74, ry=0.4),  # shoulder plate, spike
+                     box(0.1, 0.1, 0.24, x=0.44, y=-0.24, z=0.84), box(0.18, 0.08, 0.06, x=0.44, y=-0.3, z=0.72),  # wrench claw
+                     sph(0.06, x=-0.4, y=-0.14, z=0.8, seg=8)])
+    merge("Eye", [cyl(0.055, 0.03, x=-0.07, y=-0.2, z=1.85, axis="Y", seg=12), cyl(0.045, 0.03, x=0.08, y=-0.2, z=1.83, axis="Y", seg=12)])
+    legs(lambda s: [limb((s * 0.17, 0, 0.92), (s * 0.19, -0.02, 0.48), 0.07), cyl(0.08, 0.1, x=s * 0.19, y=-0.02, z=0.48, seg=8),
+                    limb((s * 0.19, -0.02, 0.48), (s * 0.2, 0, 0.1), 0.06), box(0.18, 0.3, 0.1, x=s * 0.2, y=-0.06, z=0.05)])
+    export("S13_Comic")
+
+
+def thermal():
+    """Thermal camera (our own): a heavy heat-sink trooper — radiator fins on the back and shoulders that glow hot
+    on the camera, a barrel helmet with a horizontal sensor slit, armoured forearms."""
+    fins = [box(0.03, 0.18, 0.5, x=-0.2 + i * 0.08, y=0.26, z=1.32) for i in range(6)]
+    merge("Body", [box(0.62, 0.4, 0.6, z=1.3, taper=1.05), box(0.48, 0.34, 0.24, z=0.96)] + fins + [
+                   limb((-0.38, 0, 1.5), (-0.44, -0.02, 1.12), 0.075), limb((0.38, 0, 1.5), (0.44, -0.02, 1.12), 0.075)])
+    merge("Accent", [cyl(0.2, 0.36, z=1.84, seg=16), box(0.44, 0.06, 0.08, y=-0.02, z=2.04),          # barrel helmet, crest
+                     box(0.2, 0.26, 0.22, x=-0.42, z=1.56), box(0.2, 0.26, 0.22, x=0.42, z=1.56),  # shoulder blocks
+                     box(0.03, 0.2, 0.18, x=-0.48, z=1.62), box(0.03, 0.2, 0.18, x=0.48, z=1.62),   # shoulder fins
+                     box(0.16, 0.18, 0.32, x=-0.44, y=-0.06, z=0.94), box(0.16, 0.18, 0.32, x=0.44, y=-0.06, z=0.94)])  # forearms
+    merge("Eye", [box(0.3, 0.03, 0.05, y=-0.2, z=1.86)])
+    legs(lambda s: [box(0.18, 0.22, 0.46, x=s * 0.2, z=0.68), box(0.16, 0.2, 0.44, x=s * 0.21, y=-0.02, z=0.24),
+                    box(0.22, 0.34, 0.08, x=s * 0.21, y=-0.06, z=0.04)])
+    export("S14_Thermal")
+
+
+def blueprint():
+    """Blueprint (our own): a drafting automaton drawn with a ruler — an open frame of square beams for a body, a
+    triangular head with a crosshair lens, a set square on its back, thin square limbs."""
+    frame = [limb(a, b, 0.025, square=True) for a, b in [((-0.25, 0, 1.0), (-0.3, 0, 1.58)), ((0.25, 0, 1.0), (0.3, 0, 1.58)),
+                                                        ((-0.3, 0, 1.58), (0.3, 0, 1.58)), ((-0.25, 0, 1.0), (0.25, 0, 1.0)),
+                                                        ((-0.25, 0, 1.0), (0.3, 0, 1.58)), ((0.25, 0, 1.0), (-0.3, 0, 1.58))]]
+    merge("Body", frame + [box(0.3, 0.2, 0.3, z=1.3),
+                   limb((-0.3, 0, 1.56), (-0.36, -0.04, 1.12), 0.03, square=True), limb((0.3, 0, 1.56), (0.36, -0.04, 1.12), 0.03, square=True),
+                   limb((-0.36, -0.04, 1.1), (-0.32, -0.14, 0.84), 0.025, square=True), limb((0.36, -0.04, 1.1), (0.32, -0.14, 0.84), 0.025, square=True)])
+    tri = bmesh.new()
+    v = [tri.verts.new(p) for p in [(-0.2, -0.12, 1.7), (0.2, -0.12, 1.7), (0.0, -0.12, 2.04), (-0.2, 0.12, 1.7), (0.2, 0.12, 1.7), (0.0, 0.12, 2.04)]]
+    for f in [(0, 1, 2), (5, 4, 3), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)]:
+        tri.faces.new([v[i] for i in f])
+    merge("Accent", [tri, cyl(0.04, 0.12, z=1.64, seg=8),                                            # triangular head, neck
+                     box(0.02, 0.36, 0.36, x=0.0, y=0.16, z=1.3, rx=0.785),                          # set square on the back
+                     box(0.08, 0.08, 0.08, x=-0.32, y=-0.14, z=0.8), box(0.08, 0.08, 0.08, x=0.32, y=-0.14, z=0.8)])
+    merge("Eye", [cyl(0.06, 0.03, y=-0.14, z=1.82, axis="Y", seg=16), box(0.2, 0.03, 0.012, y=-0.15, z=1.82),
+                  box(0.012, 0.03, 0.2, y=-0.15, z=1.82)])
+    legs(lambda s: [limb((s * 0.15, 0, 0.98), (s * 0.16, 0, 0.1), 0.035, square=True), box(0.08, 0.08, 0.08, x=s * 0.16, z=0.5),
+                    box(0.12, 0.26, 0.05, x=s * 0.16, y=-0.06, z=0.025)])
+    export("S15_Blueprint")
+
+
 DESIGNS = [("lofi", night_shift), ("toy", scrapyard), ("realistic", heist), ("realistic", hunted), ("lowpoly", toon),
-           ("clean", storybook), ("clean", logbook), ("toy", footage), ("crystal", white_room), ("clean", grid)]
+           ("clean", storybook), ("clean", logbook), ("toy", footage), ("crystal", white_room), ("clean", grid),
+           ("lofi", noir), ("clean", test_chamber), ("lowpoly", comic), ("realistic", thermal), ("clean", blueprint)]
 
 if __name__ == "__main__":
     g.clear_scene()

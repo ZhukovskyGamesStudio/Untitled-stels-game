@@ -33,6 +33,7 @@ namespace Stealth.EditorTools
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
             AddStyleFeature(mat);
             AddXrayFeature();
+            AddWorldTextFeature();
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
@@ -166,6 +167,47 @@ namespace Stealth.EditorTools
                 feature.SetActive(true);
                 EditorUtility.SetDirty(feature);
             }
+            EditorUtility.SetDirty(data);
+        }
+
+        /// <summary>
+        /// World-space text (route panels in the sewer, the stash board) is kept out of the normal passes and drawn by a
+        /// RenderObjects pass after the style filter: pixel blocks, hatching, 1-bit or neon never eat the letters.
+        /// The scene depth still hides it behind walls.
+        /// </summary>
+        static void AddWorldTextFeature()
+        {
+            var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
+            if (data == null) return;
+            int bit = 1 << Stealth.Level.LevelMetrics.WorldTextLayer;
+            data.opaqueLayerMask &= ~bit;
+            data.transparentLayerMask &= ~bit;
+            const string name = "WorldText";
+            var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == name);
+            if (feature == null)
+            {
+                feature = ScriptableObject.CreateInstance<RenderObjects>();
+                feature.name = name;
+                AssetDatabase.AddObjectToAsset(feature, data);
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long id);
+                var so = new SerializedObject(data);
+                var list = so.FindProperty("m_RendererFeatures");
+                var map = so.FindProperty("m_RendererFeatureMap");
+                list.arraySize++;
+                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = feature;
+                map.arraySize++;
+                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = id;
+                so.ApplyModifiedProperties();
+            }
+            var s = feature.settings;
+            s.passTag = name;
+            s.Event = RenderPassEvent.AfterRenderingPostProcessing + 1; // after the StyleScreen pass
+            s.filterSettings.RenderQueueType = RenderQueueType.Transparent;
+            s.filterSettings.LayerMask = bit;
+            s.overrideMode = RenderObjects.RenderObjectsSettings.OverrideMaterialMode.None;
+            s.overrideDepthState = false;
+            feature.SetActive(true);
+            EditorUtility.SetDirty(feature);
             EditorUtility.SetDirty(data);
         }
 
@@ -446,6 +488,127 @@ namespace Stealth.EditorTools
                     geo.Pipes = true; geo.Ceiling = CeilingKind.Trays;
                     geo.Floor = K("Floor_Grid"); geo.FloorTile = 1f; geo.Wall = K("Wall_Circuit"); geo.WallTile = 1f;
                     geo.Trim = K("Trim_Black"); geo.Pipe = K("Trim_Black"); geo.Glow = K("Glow_Cyan");
+                });
+
+            // ---- by players' requests: three in the spirit of games they named, two of our own (nothing copied: our models,
+            // our textures, only the mood — light, colour and the screen filter)
+
+            yield return Style("S11_Noir", "Нуар-детектив", "по мотивам Shadows of Doubt, Blade Runner",
+                "Ночной город за окном и контора детектива: ковролин, обои с узором, тёмные деревянные панели. Мир собран из " +
+                "крупных «кубиков»: грубые модели, крупный пиксель и мало цветов. Синие тени, янтарные лампы, дождливая дымка.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 2f; g.Contrast = 18f; g.Saturation = -15f;
+                    g.SplitShadows = C(0.25f, 0.4f, 0.6f); g.SplitHighlights = C(0.75f, 0.55f, 0.3f); g.SplitBalance = -15f;
+                    g.BloomIntensity = 1.8f; g.BloomThreshold = 0.65f; g.BloomScatter = 0.8f; g.BloomTint = C(1f, 0.8f, 0.55f);
+                    g.Vignette = 0.4f; g.FilmGrain = 0.25f;
+                    var sc = s.Screen;
+                    sc.PixelSize = 2f; sc.ColorLevels = 20f; sc.OrderedDither = true;
+                    sc.OutlineStrength = 0.35f; sc.OutlineSurfaceTint = 0.8f;
+                    s.World.Ambient = C(0.14f, 0.15f, 0.24f);
+                    s.World.IndoorFog = C(0.06f, 0.07f, 0.12f); s.World.IndoorFogDensity = 0.035f;
+                    s.World.GasFog = C(0.18f, 0.22f, 0.32f);
+                    s.Palette.Building.Saturation = 0.6f; s.Palette.Building.Brightness = 0.85f;
+                    var geo = s.Geometry;
+                    geo.Family = ModelFamily.Lofi;
+                    geo.WainscotHeight = 1.1f; geo.Crown = true; geo.Doors = DoorTrim.Casing;
+                    geo.Floor = K("Real_Carpet"); geo.FloorTile = 2f; geo.Wall = K("Wall_Damask"); geo.WallTile = 1.5f;
+                    geo.CeilingFinish = K("Real_Plaster2"); geo.CeilingTile = 2f;
+                    geo.Trim = K("Trim_WoodDark"); geo.Panel = K("Panel_WoodDark");
+                });
+
+            yield return Style("S12_TestChamber", "Испытательный комплекс", "по мотивам Portal",
+                "Стерильная лаборатория: светлые панели стен, тёмный бетонный пол, голубые световые щели, металлические плинтусы. " +
+                "Ровный холодный свет, чистые глянцевые роботы. Тихо, как перед тестом.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Exposure = 0.5f; g.Contrast = 14f; g.Saturation = -10f; g.ColorFilter = C(0.95f, 0.98f, 1f); g.Temperature = -8f;
+                    g.BloomIntensity = 1.2f; g.BloomThreshold = 0.9f; g.Vignette = 0.15f;
+                    s.World.Ambient = C(0.33f, 0.35f, 0.38f);
+                    s.World.IndoorFog = C(0.5f, 0.55f, 0.6f); s.World.IndoorFogDensity = 0.015f;
+                    s.World.GasFog = C(0.7f, 0.75f, 0.8f);
+                    var p = s.Palette;
+                    p.Building.Tint = C(0.85f, 0.87f, 0.88f); p.Building.Amount = 0.7f;
+                    p.Furniture.Tint = C(0.75f, 0.77f, 0.8f); p.Furniture.Amount = 0.5f; p.Furniture.Saturation = 0.6f;
+                    p.Robots.Smoothness = 0.8f;
+                    var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
+                    geo.Baseboard = true; geo.StripSpacing = 3.2f; geo.Doors = DoorTrim.Casing;
+                    geo.Floor = K("Real_ConcreteClean"); geo.FloorTile = 2.5f; geo.Wall = K("Wall_Panels"); geo.WallTile = 1.2f;
+                    geo.CeilingFinish = K("Real_CeilingTiles"); geo.CeilingTile = 1.2f;
+                    geo.Trim = K("Trim_Metal"); geo.Glow = K("Glow_Cyan");
+                });
+
+            yield return Style("S13_Comic", "Комикс-пустошь", "по мотивам Borderlands",
+                "Нарисованный от руки мир на краю пустыни: жирный чёрный контур, три ступени света, штриховка в тенях. " +
+                "Ребристое железо, рифлёный пол, ржавые балки и трубы. Сочно, тепло и пыльно.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Exposure = 1.7f; g.Contrast = 15f; g.Saturation = 35f; g.ColorFilter = C(1f, 0.95f, 0.85f); g.Temperature = 15f;
+                    g.BloomIntensity = 1f; g.Vignette = 0.2f;
+                    var sc = s.Screen;
+                    sc.CelBands = 3f; sc.CelSoftness = 0.05f; sc.CelMix = 0.85f;
+                    sc.OutlineStrength = 1f; sc.OutlineWidth = 2f; sc.OutlineDepth = 10f; sc.OutlineNormal = 3f;
+                    sc.OutlineColor = C(0.05f, 0.04f, 0.03f); sc.OutlineSurfaceTint = 0f;
+                    sc.HatchStrength = 0.55f; sc.HatchSpacing = 5f; sc.HatchStart = 0.42f;
+                    s.World.Ambient = C(0.32f, 0.24f, 0.15f);
+                    s.World.IndoorFog = C(0.4f, 0.28f, 0.15f); s.World.IndoorFogDensity = 0.02f;
+                    s.World.GasFog = C(0.85f, 0.6f, 0.35f);
+                    foreach (var t in new[] { s.Palette.Building, s.Palette.Furniture, s.Palette.Robots, s.Palette.Players }) t.Saturation = 1.3f;
+                    var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
+                    geo.Pipes = true; geo.Ceiling = CeilingKind.IBeams; geo.Baseboard = true;
+                    geo.Floor = K("Floor_Diamond"); geo.FloorTile = 1.5f; geo.Wall = K("Wall_Corrugated"); geo.WallTile = 2f;
+                    geo.Trim = K("Trim_Rust"); geo.Beam = K("Trim_Rust"); geo.Pipe = K("Pipe_Green");
+                });
+
+            yield return Style("S14_Thermal", "Тепловизор", "своё: тепловизионная камера",
+                "Дом глазами тепловизора: холодные стены и мебель тонут в индиго, лампы и тёплые тела светятся пурпуром и жёлтым. " +
+                "Роботы и люди — самые горячие пятна в кадре. Чуть шума матрицы.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Exposure = 0.6f; g.Contrast = 25f; g.Saturation = 0f; g.BloomIntensity = 1.2f; g.Vignette = 0.3f;
+                    var sc = s.Screen;
+                    sc.PixelSize = 1.5f; sc.GradientMap = 1f;
+                    sc.MapDark = C(0.02f, 0f, 0.12f); sc.MapMid = C(0.85f, 0.1f, 0.45f); sc.MapLight = C(1f, 0.95f, 0.55f);
+                    sc.Noise = 0.05f; sc.Scanlines = 0.08f;
+                    s.World.Ambient = C(0.08f, 0.08f, 0.08f);
+                    s.World.IndoorFog = C(0f, 0f, 0f); s.World.IndoorFogDensity = 0.03f;
+                    s.World.GasFog = C(0.25f, 0.25f, 0.25f);
+                    var p = s.Palette;
+                    p.Building.Saturation = 0f; p.Building.Brightness = 0.35f;
+                    p.Furniture.Saturation = 0f; p.Furniture.Brightness = 0.5f;
+                    p.Robots.Tint = Color.white; p.Robots.Amount = 0.6f; p.Robots.Brightness = 2.2f;
+                    p.Players.Tint = Color.white; p.Players.Amount = 0.6f; p.Players.Brightness = 2f;
+                    p.Loot.Brightness = 1.6f;
+                    s.Geometry.Family = ModelFamily.Lowpoly;
+                });
+
+            yield return Style("S15_Blueprint", "Синька", "своё: архитектурные чертежи",
+                "Вылазка по чертежу: мир в оттенках синьки, все рёбра — белые линии, по экрану — сетка кальки. " +
+                "Карнизы, наличники и кессоны читаются как на плане здания.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Exposure = 0.7f; g.Contrast = 8f; g.Saturation = 0f; g.BloomIntensity = 0.6f; g.Vignette = 0.25f;
+                    var sc = s.Screen;
+                    sc.GradientMap = 1f;
+                    sc.MapDark = C(0.03f, 0.12f, 0.35f); sc.MapMid = C(0.12f, 0.32f, 0.65f); sc.MapLight = C(0.75f, 0.88f, 1f);
+                    sc.OutlineStrength = 1f; sc.OutlineWidth = 1.2f; sc.OutlineColor = C(0.92f, 0.96f, 1f); sc.OutlineSurfaceTint = 0f;
+                    sc.GridStrength = 0.35f; sc.GridSpacing = 18f; sc.GridColor = C(0.55f, 0.72f, 0.95f);
+                    sc.PaperGrain = 0.05f;
+                    s.World.Ambient = C(0.15f, 0.15f, 0.17f);
+                    s.World.IndoorFog = C(0.03f, 0.1f, 0.25f); s.World.IndoorFogDensity = 0.03f;
+                    s.World.GasFog = C(0.2f, 0.35f, 0.6f);
+                    var geo = s.Geometry;
+                    geo.Family = ModelFamily.Clean;
+                    geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Casing; geo.Ceiling = CeilingKind.Coffers;
+                    geo.Floor = K("Floor_Concrete"); geo.FloorTile = 2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
+                    geo.Trim = K("Trim_White"); geo.Beam = K("Trim_White");
                 });
         }
     }

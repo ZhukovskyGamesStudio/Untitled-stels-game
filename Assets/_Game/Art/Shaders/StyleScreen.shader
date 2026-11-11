@@ -40,6 +40,12 @@ Shader "Stealth/StyleScreen"
             float4 _StyGlowA;        // neon colour near
             float4 _StyGlowB;        // neon colour far
             float4 _StyExtra;        // x inverted lines, y grey world but the lights, z helmet visor, w viewfinder brackets
+            float4 _StyMap;          // x gradient map strength (brightness → three colours: thermal camera, blueprint)
+            float4 _StyMapA;         // gradient map: dark
+            float4 _StyMapB;         // gradient map: middle
+            float4 _StyMapC;         // gradient map: light
+            float4 _StyGrid;         // x grid paper strength, y cell size px at 720p
+            float4 _StyGridColor;
 
             float Luma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
 
@@ -144,6 +150,14 @@ Shader "Stealth/StyleScreen"
                     g = lerp(g, lerp(Luma(g).xxx, g, keep), _StyExtra.y);
                 }
 
+                // Gradient map: the brightness picks a colour on a three-stop ramp (cold → warm → hot, ink → paper).
+                if (_StyMap.x > 0)
+                {
+                    float l = Luma(g);
+                    float3 m = l < 0.5 ? lerp(_StyMapA.rgb, _StyMapB.rgb, l * 2) : lerp(_StyMapB.rgb, _StyMapC.rgb, l * 2 - 1);
+                    g = lerp(g, m, _StyMap.x);
+                }
+
                 // Cel bands: light in a few flat steps, the colour kept.
                 if (_StyCel.x > 0)
                 {
@@ -214,6 +228,18 @@ Shader "Stealth/StyleScreen"
                     float grain = Hash(floor(p)) * 0.6 + Hash(floor(p / 4)) * 0.4;
                     g = lerp(g, g * _StyPaperColor.rgb, _StyPaper.y);
                     g *= 1 - _StyPaper.x * (grain - 0.5);
+                }
+
+                // Grid paper: thin lines every cell, a heavier one every fifth (fixed on the screen, like a drawing sheet).
+                if (_StyGrid.x > 0)
+                {
+                    float2 p = uv * res / max(1, scale);
+                    float cellSize = max(2, _StyGrid.y);
+                    float2 f = abs(frac(p / cellSize + 0.5) - 0.5) * cellSize;
+                    float2 F = abs(frac(p / (cellSize * 5) + 0.5) - 0.5) * cellSize * 5;
+                    float minor = 1 - smoothstep(0.35, 0.9, min(f.x, f.y));
+                    float major = 1 - smoothstep(0.6, 1.3, min(F.x, F.y));
+                    g = lerp(g, _StyGridColor.rgb, saturate(minor * 0.45 + major) * _StyGrid.x);
                 }
 
                 // Camcorder: scanlines, noise, a tracking band, REC.

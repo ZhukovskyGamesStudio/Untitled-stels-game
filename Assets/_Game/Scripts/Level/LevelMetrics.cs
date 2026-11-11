@@ -15,9 +15,12 @@ namespace Stealth.Level
         public const float DoorHeight = 2.3f;
         public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
         public const float VentHeight = 1.4f; // crouched capsule 1.1 m + PhysX step-up probe (stepOffset 0.35); standing 1.8 m does not fit
+        public const float SqueezeWidth = 1.1f; // nominal; the clear slot is 0.9 m: a player (0.78 m with skin) fits, a robot does not (navmesh volume)
         public const float WindowWidth = 2.4f;   // the window model's opening
         public const float WindowHeight = 1.2f;
         public const float WindowCenterY = 1.7f; // above the floor
+        /// <summary>World-space text (route panels, the stash board): drawn after the style filter, so every style keeps it readable.</summary>
+        public const int WorldTextLayer = 9;
         public const int CeilingLayer = 2;    // "Ignore Raycast": kept out of the navmesh and vision checks
         public const int StairsArea = 3;      // NavMesh area "Stairs": robots without legs exclude it
 
