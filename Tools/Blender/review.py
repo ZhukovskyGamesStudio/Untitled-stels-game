@@ -2,6 +2,10 @@
 
 Run:  blender.exe -b --factory-startup --python Tools/Blender/review.py -- <sheet.png> <model.fbx> [<model2.fbx> ...]
       options (anywhere after --):  --tile 400  --no-check  --json <report.json>
+                                    --focus x,y,z,r   adds a row of 4 close-ups around that point (model coordinates)
+                                    --shading         adds a row per model: clay matcap | normal-check matcap |
+                                                      back faces culled on magenta (as Unity draws: magenta = hole) |
+                                                      clay from below
 
 Sheet layout — one block of 4 x 2 tiles per model, models stacked top to bottom in the order given (before / after):
   row 1:  front (ortho)  |  3/4 front-left  |  right side (ortho)  |  back (ortho)
@@ -15,6 +19,9 @@ The check (printed, and saved with --json) per model:
   * islands: loose pieces of mesh; touching / intersecting islands are grouped — every group after the first is a
     DETACHED piece floating in the air (3DCodeBench: the most common defect of generated models that render fine)
   * open edges (holes) and degenerate faces
+  * GATE — scenario-labs bx_audit.deliverable(profile="game") (vendor/scenario): floating and hidden parts, z-fighting
+    between parts, inside-out parts, faces pointing inward, unapplied scale, duplicate faces, no UVs. Errors must be
+    fixed before a model goes into the game; warnings need a reason.
 Use it from another script as well:  import review; review.sheet([[objs...], [objs...]], path); review.check(objs)
 """
 import json
@@ -27,6 +34,9 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "scenario"))
+import bx_audit  # noqa: E402  (scenario-labs, MIT)
 
 ROLE_COLORS = {
     "Body": (0.60, 0.62, 0.66),
@@ -135,8 +145,11 @@ VIEWS = [
 ]
 
 
-def frame(cam, objs, direction, ortho):
+def frame(cam, objs, direction, ortho, focus=None):
     lo, hi = bounds(objs)
+    if focus is not None:  # close-up: a sphere (x, y, z, r) around the detail
+        c, r = Vector(focus[:3]) + FOCUS_SHIFT, focus[3]
+        lo, hi = c - Vector((r, r, r)), c + Vector((r, r, r))
     centre = (lo + hi) / 2
     size = hi - lo
     radius = max(size.length / 2, 0.05)
@@ -202,8 +215,46 @@ def load_pixels(path, tile):
     return px
 
 
-def sheet(groups, path, tile=400, tmp=None):
-    """groups: list of object lists (one per model, all already in the scene). Writes the contact sheet PNG."""
+SHADING = [  # (name, direction, ortho, studio light / mode)
+    ("clay", Vector((-0.75, -1, 0.45)), False, "clay_studio.exr"),
+    ("normals", Vector((-0.75, -1, 0.45)), False, "check_normal+y.exr"),
+    ("culled", Vector((0.75, -1, 0.35)), False, "culling"),
+    ("low", Vector((0.8, -1, -0.45)), False, "clay_studio.exr"),
+]
+
+
+def shading_mode(mode):
+    """Workbench set-up of one shading tile; None restores the role-colour look."""
+    scene = bpy.context.scene
+    sh = scene.display.shading
+    if mode is None:
+        setup_render(scene.render.resolution_x)
+        sh.show_backface_culling = False
+        return
+    sh.show_object_outline = False
+    sh.show_cavity = False
+    if mode == "culling":
+        sh.light, sh.color_type = "STUDIO", "SINGLE"
+        sh.single_color = (0.8, 0.8, 0.8)
+        sh.show_backface_culling = True
+        scene.world.color = (1.0, 0.0, 1.0)  # a face pointing inward shows as a magenta hole
+    else:
+        sh.light, sh.color_type = "MATCAP", "SINGLE"
+        sh.studio_light = mode
+        sh.single_color = (0.8, 0.8, 0.8)
+        sh.show_backface_culling = False
+        scene.world.color = (0.18, 0.18, 0.18)
+
+
+FOCUS_SHIFT = Vector((0, 0, 0))
+CLOSE_UPS = [("front", Vector((0, -1, 0)), False), ("q34", Vector((-0.75, -1, 0.45)), False),
+             ("side", Vector((1, 0, 0)), False), ("q34_rear", Vector((0.8, 1, 0.9)), False)]
+
+
+def sheet(groups, path, tile=400, tmp=None, focus=None, offsets=None, shading=False):
+    """groups: list of object lists (one per model, all already in the scene). Writes the contact sheet PNG.
+    focus (x, y, z, r) adds a row of close-ups around that point of every model (offsets: where each model was moved)."""
+    global FOCUS_SHIFT
     tmp = tmp or os.path.join(os.path.dirname(os.path.abspath(path)), "_review_tiles")
     os.makedirs(tmp, exist_ok=True)
     cam = setup_render(tile)
@@ -224,6 +275,26 @@ def sheet(groups, path, tile=400, tmp=None):
             tiles.append(load_pixels(p, tile))
         rows.append(np.concatenate(tiles[:4], axis=1))
         rows.append(np.concatenate(tiles[4:], axis=1))
+        if shading:
+            shaded = []
+            for name, direction, ortho, mode in SHADING:
+                shading_mode(mode)
+                frame(cam, objs, direction, ortho)
+                p = os.path.join(tmp, f"m{gi}_shade_{name}.png")
+                render_tile(p, tile)
+                shaded.append(load_pixels(p, tile))
+            shading_mode(None)
+            rows.append(np.concatenate(shaded, axis=1))
+        if focus is not None:
+            FOCUS_SHIFT = Vector(offsets[gi]) if offsets else Vector((0, 0, 0))
+            close = []
+            for name, direction, ortho in CLOSE_UPS:
+                colour(objs, False)
+                frame(cam, objs, direction, ortho, focus)
+                p = os.path.join(tmp, f"m{gi}_close_{name}.png")
+                render_tile(p, tile)
+                close.append(load_pixels(p, tile))
+            rows.append(np.concatenate(close, axis=1))
         sep = np.ones((6, tile * 4, 4), dtype=np.float32)
         sep[..., :3] = 0.9
         rows.append(sep)
@@ -354,6 +425,13 @@ def check(objs, name="model"):
         print(f"   {pname:<16} {p['tris']:>6} tris  {p['islands']:>3} islands  {'  '.join(flags)}")
     for d in detached:
         print(f"   DETACHED {d['parts']} at {d['centre']} size {d['size']}")
+    gate = bx_audit.deliverable(objs, profile="game")
+    report["gate"] = {k: gate[k] for k in ("pass", "errors", "warnings")}
+    print(f"   GATE {'PASS' if gate['pass'] else 'FAIL'}: {len(gate['errors'])} errors, {len(gate['warnings'])} warnings")
+    for e in gate["errors"]:
+        print("   GATE ERROR", e)
+    for w in gate["warnings"][:12]:
+        print("   GATE WARN ", w)
     return report
 
 
@@ -363,13 +441,19 @@ def main():
     if "--" not in sys.argv:
         return
     args = sys.argv[sys.argv.index("--") + 1:]
-    tile, do_check, json_path = 400, True, None
+    tile, do_check, json_path, focus, shading = 400, True, None, None, False
     rest = []
     i = 0
     while i < len(args):
         if args[i] == "--tile":
             tile = int(args[i + 1])
             i += 2
+        elif args[i] == "--focus":
+            focus = [float(c) for c in args[i + 1].split(",")]
+            i += 2
+        elif args[i] == "--shading":
+            shading = True
+            i += 1
         elif args[i] == "--no-check":
             do_check = False
             i += 1
@@ -381,7 +465,7 @@ def main():
             i += 1
     out, models = rest[0], rest[1:]
     clear()
-    groups, reports = [], []
+    groups, reports, offsets = [], [], []
     for k, path in enumerate(models):
         objs = import_model(path)
         # keep each model at its own spot so the views never see a neighbour
@@ -389,10 +473,11 @@ def main():
             if o.parent is None:
                 o.location.x += k * 50
         bpy.context.view_layer.update()
+        offsets.append((k * 50, 0, 0))
         groups.append(objs)
         if do_check:
             reports.append(check(objs, os.path.basename(path)))
-    sheet(groups, out, tile)
+    sheet(groups, out, tile, focus=focus, offsets=offsets, shading=shading)
     if json_path:
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(reports, f, indent=1)

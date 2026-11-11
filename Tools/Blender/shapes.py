@@ -296,15 +296,16 @@ def bolts(points, radius=0.012, depth=0.008, axis="-Y", seg=10):
 
 def grille(center, width, height, n=5, bar=0.012, proud=0.01, axis="-Y", frame=0.014):
     """A vent: a frame and n horizontal slats standing proud of a surface whose outside faces `axis`."""
+    # pieces overlap by volume, never face to face (a shared plane z-fights in the engine: the gate flags it)
     parts = []
     gap = height / (n + 1)
     for k in range(n):
         z = -height / 2 + gap * (k + 1)
-        parts.append(rbox((width - 2 * frame, proud, bar), (0, 0, z), r=bar * 0.3, seg=1, rot=(math.radians(-25), 0, 0)))
+        parts.append(rbox((width - frame, proud, bar), (0, 0, z), r=bar * 0.3, seg=1, rot=(math.radians(-25), 0, 0)))
     for x in (-width / 2 + frame / 2, width / 2 - frame / 2):
         parts.append(rbox((frame, proud * 1.4, height), (x, 0, 0), r=frame * 0.3, seg=1))
     for z in (-height / 2 + frame / 2, height / 2 - frame / 2):
-        parts.append(rbox((width, proud * 1.4, frame), (0, 0, z), r=frame * 0.3, seg=1))
+        parts.append(rbox((width - frame, proud * 1.25, frame), (0, 0, z), r=frame * 0.3, seg=1))
     rot = {"-Y": (0, 0, 0), "Y": (0, 0, math.pi), "X": (0, 0, math.pi / 2), "-X": (0, 0, -math.pi / 2)}[axis]
     for p in parts:
         place(p, Vector(center), rot)
@@ -327,6 +328,7 @@ def _evaluated(obj):
     me = bpy.data.meshes.new_from_object(obj.evaluated_get(dg))
     bm = bmesh.new()
     bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)  # curve caps come unwelded
     bpy.data.meshes.remove(me)
     data = obj.data
     bpy.data.objects.remove(obj, do_unlink=True)
@@ -452,6 +454,7 @@ def split_at(obj, z, names=("Upper", "Lower")):
     """Cut an object at height z into <name>Upper (above) and <name>Lower (below), both cuts closed — for the legs
     the game bends at the knee (ProceduralLegs)."""
     out = []
+    z += 0.0007  # never cut exactly through a ring of vertices (round parts centred on the knee have them)
     for suffix, keep_above in zip(names, (True, False)):
         bm = bmesh.new()
         bm.from_mesh(obj.data)
@@ -460,7 +463,16 @@ def split_at(obj, z, names=("Upper", "Lower")):
                                      clear_inner=keep_above, clear_outer=not keep_above)
         cut = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
         if cut:
-            bmesh.ops.holes_fill(bm, edges=cut, sides=0)
+            caps = bmesh.ops.holes_fill(bm, edges=cut, sides=0)["faces"]
+            # overlapping pieces (a joint inside a knee pad) get caps in one plane: they z-fight. Step each cap a
+            # fraction of a millimetre into its own piece so no two share the plane.
+            moved = set()
+            for k, f in enumerate(caps):
+                dz = 0.0004 * (k % 8 + 1) * (1 if keep_above else -1)
+                for v in f.verts:
+                    if v.index not in moved:
+                        v.co.z += dz
+                moved.update(v.index for v in f.verts)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         me = bpy.data.meshes.new(obj.name + suffix)
         bm.to_mesh(me)
