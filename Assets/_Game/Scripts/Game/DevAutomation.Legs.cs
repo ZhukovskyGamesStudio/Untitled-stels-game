@@ -8,6 +8,31 @@ namespace Stealth.Game
 {
     public partial class DevAutomation
     {
+        /// <summary>A pressure plate in its doorway, seen as a player walking up to it (<c>LEVEL=4 Tools/dev.sh run plate</c>).</summary>
+        IEnumerator PlateScenario()
+        {
+            if (!Me.IsServer) yield break;
+            DevFlags.Peaceful = true;
+            var plates = Detector.All.OfType<PressurePlate>().ToList();
+            Log($"plates: {plates.Count}");
+            int n = 0;
+            foreach (var plate in plates.Take(3))
+            {
+                var p = plate.transform.position;
+                var across = plate.transform.right; // the door's wall runs along local X: walk up to it across
+                var dir = Vector3.Cross(Vector3.up, across).normalized;
+                var from = p + dir * 3.2f + Vector3.up * 0.05f;
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(p - from))), p);
+                yield return new WaitForSeconds(0.6f);
+                yield return Shot($"plate_{n}_walking_up");
+                // Up close, looking down at the floor in front of the feet: the seams and the dot are there to be found.
+                var near = p + dir * 1.6f + Vector3.up * 0.05f;
+                LookAtFrom(new Pose(near, Quaternion.LookRotation(Flat(p - near))), p);
+                yield return new WaitForSeconds(0.8f);
+                yield return Shot($"plate_{n++}_looking_down");
+            }
+        }
+
         /// <summary>
         /// Walking legs (<c>Tools/dev.sh run legs</c>): a guard and a hound walk past the camera (feet planted, knees bent),
         /// the spider crawls on its wall. A few frames of each, side on.

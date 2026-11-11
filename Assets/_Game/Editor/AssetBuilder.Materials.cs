@@ -70,6 +70,7 @@ namespace Stealth.EditorTools
             Mat(env, "Blinds", new Color(0.82f, 0.8f, 0.72f), smoothness: 0.3f);
             Mat(env, "Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
             Mat(env, "HatchRing", new Color(1f, 0.8f, 0.1f), new Color(2.4f, 1.8f, 0.15f));
+            Mat(env, "PlateSeam", new Color(0.05f, 0.05f, 0.055f), smoothness: 0.1f); // the joints of a pressure plate in the floor
             Mat(env, "LockLamp", new Color(1f, 0.15f, 0.1f), new Color(2.4f, 0.3f, 0.2f));
 
             Mat(env, "LampHousing", new Color(0.82f, 0.83f, 0.85f), smoothness: 0.5f);

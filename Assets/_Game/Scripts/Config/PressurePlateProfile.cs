@@ -7,6 +7,6 @@ namespace Stealth.Enemies
     public class PressurePlateProfile : DeviceProfile
     {
         [Tooltip("Half the side of the plate, meters.")]
-        public float HalfSize = 0.45f;
+        public float HalfSize = 0.55f;
     }
 }

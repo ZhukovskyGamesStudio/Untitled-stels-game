@@ -617,6 +617,24 @@ namespace Stealth.Level
             return (cell, pos, rot);
         }
 
+        /// <summary>A random doorway for a pressure plate (not next to the hatch); it is removed from the list. False if none.</summary>
+        static bool TakeDoorway(List<LaserSpot> doors, System.Random rng, Vector3 hatch, out LaserSpot spot)
+        {
+            spot = default;
+            var free = new List<int>();
+            for (int i = 0; i < doors.Count; i++)
+            {
+                var p = doors[i].Position;
+                if (LevelLayout.FloorOf(p.y) == 0 && Vector3.Distance(p, hatch) < MinDeviceDistanceToHatch) continue;
+                free.Add(i);
+            }
+            if (free.Count == 0) return false;
+            int k = free[rng.Next(free.Count)];
+            spot = doors[k];
+            doors.RemoveAt(k);
+            return true;
+        }
+
         static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s)
         {
             int level = l.LevelIndex;
@@ -651,7 +669,21 @@ namespace Stealth.Level
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = cell.z, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
 
-            // Fixed security devices: pressure plates in the room's walkways, motion sensors on walls, lidar poles.
+            // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
+            var doors = new List<LaserSpot>();
+            for (int f = 0; f < l.Floors; f++)
+            {
+                float fy = LevelLayout.FloorY(f);
+                for (int x = 0; x < l.Width - 1; x++)
+                    for (int y = 0; y < l.Height; y++)
+                        if (l.EdgesX[f, x, y] == EdgeType.Door)
+                            doors.Add(new LaserSpot { Position = new Vector3((x + 1) * Cell, fy, (y + 0.5f) * Cell), Rotation = Quaternion.Euler(0, 90, 0), Width = ClearWidth(DoorWidth) });
+                for (int x = 0; x < l.Width; x++)
+                    for (int y = 0; y < l.Height - 1; y++)
+                        if (l.EdgesZ[f, x, y] == EdgeType.Door)
+                            doors.Add(new LaserSpot { Position = new Vector3((x + 0.5f) * Cell, fy, (y + 1) * Cell), Rotation = Quaternion.identity, Width = ClearWidth(DoorWidth) });
+            }
+            // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.CellCenter(0, l.StartCell.x, l.StartCell.y);
             for (int i = 0; i < devices; i++)
@@ -661,6 +693,13 @@ namespace Stealth.Level
                 Vector3Int cell;
                 Vector3 pos;
                 Quaternion rot;
+                // A pressure plate lies across a doorway (the passage is narrower than a jump is long, but not by much):
+                // whoever goes through either jumps over it, hacks it, or trips it. It takes the doorway from the lasers.
+                if (kind == RobotKind.PressurePlate && TakeDoorway(doors, rng, hatch, out var doorway))
+                {
+                    l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = LevelLayout.FloorOf(doorway.Position.y), Position = doorway.Position, Rotation = doorway.Rotation });
+                    continue;
+                }
                 int tries = 0;
                 // A device in the corner of a room diagonal to the lobby could end up right next to the hatch: try again.
                 do (cell, pos, rot) = DeviceSpot(l, candidates, kind, rng);
@@ -680,19 +719,6 @@ namespace Stealth.Level
                 l.CameraSpots.Add(new Pose(pos, Quaternion.LookRotation(-corner.normalized)));
             }
 
-            var doors = new List<LaserSpot>();
-            for (int f = 0; f < l.Floors; f++)
-            {
-                float fy = LevelLayout.FloorY(f);
-                for (int x = 0; x < l.Width - 1; x++)
-                    for (int y = 0; y < l.Height; y++)
-                        if (l.EdgesX[f, x, y] == EdgeType.Door)
-                            doors.Add(new LaserSpot { Position = new Vector3((x + 1) * Cell, fy, (y + 0.5f) * Cell), Rotation = Quaternion.Euler(0, 90, 0), Width = ClearWidth(DoorWidth) });
-                for (int x = 0; x < l.Width; x++)
-                    for (int y = 0; y < l.Height - 1; y++)
-                        if (l.EdgesZ[f, x, y] == EdgeType.Door)
-                            doors.Add(new LaserSpot { Position = new Vector3((x + 0.5f) * Cell, fy, (y + 1) * Cell), Rotation = Quaternion.identity, Width = ClearWidth(DoorWidth) });
-            }
             int lasers = s.Lasers + level * s.LasersPerHouse;
             while (l.LaserSpots.Count < lasers && doors.Count > 0)
             {

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using Stealth.Enemies;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.Level;
@@ -183,6 +184,28 @@ namespace Stealth.Tests
             CollectionAssert.AreEqual(a.Rooms, b.Rooms);
             Assert.AreEqual(a.AutoDoors.Count, b.AutoDoors.Count);
             Assert.AreEqual(a.RobotSpawns.Count, b.RobotSpawns.Count);
+        }
+
+        [Test]
+        public void PressurePlatesLieInDoorways()
+        {
+            int plates = 0;
+            for (int seed = 1; seed <= 30; seed++)
+            {
+                var l = LevelGenerator.Generate(seed, 4);
+                foreach (var r in l.RobotSpawns.Where(r => r.Kind == RobotKind.PressurePlate))
+                {
+                    plates++;
+                    int f = LevelLayout.FloorOf(r.Position.y);
+                    float gx = r.Position.x / LevelMetrics.Cell, gz = r.Position.z / LevelMetrics.Cell;
+                    bool onX = Mathf.Abs(gx - Mathf.Round(gx)) < 1e-3f, onZ = Mathf.Abs(gz - Mathf.Round(gz)) < 1e-3f;
+                    Assert.IsTrue(onX || onZ, $"seed {seed}: a plate on a wall line, not somewhere by a wall");
+                    var edge = onX ? l.EdgesX[f, Mathf.RoundToInt(gx) - 1, Mathf.FloorToInt(gz)] : l.EdgesZ[f, Mathf.FloorToInt(gx), Mathf.RoundToInt(gz) - 1];
+                    Assert.AreEqual(EdgeType.Door, edge, $"seed {seed}: the plate's doorway");
+                    Assert.IsFalse(l.LaserSpots.Any(s => (s.Position - r.Position).sqrMagnitude < 0.01f), "never together with a laser");
+                }
+            }
+            Assert.Greater(plates, 5);
         }
 
         [Test]

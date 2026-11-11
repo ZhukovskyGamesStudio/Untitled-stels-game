@@ -161,12 +161,14 @@ namespace Stealth.EditorTools
                 m.Profile = Profile<MotionSensorProfile>("SensorMotion");
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // on the wall, nothing to bump into
             }));
-            Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "Floor", false, false, (root, p) =>
+            Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "PlateSeam", false, false, (root, p) =>
             {
-                p.Profile = Profile<PressurePlateProfile>("SensorPlate", c => c.ForgetRate = 0.4f);
+                p.Profile = Profile<PressurePlateProfile>("SensorPlate", c => { c.ForgetRate = 0.4f; c.HalfSize = 0.55f; });
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // flush with the floor
-                p.Status.Light.range = 1.2f;
-                p.Status.Light.intensity = 0.6f;
+                // Only a faint dot: the indicator barely glows, nothing lights the floor around it.
+                p.Status.Light.enabled = false; // no light pooling on the floor around it
+                p.Status.Emission = 0.45f; // below 1: no bloom halo, just a dim dot
+                foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }));
             Robot(RobotKind.Camera, SensorPrefabs + "/SecurityCamera.prefab", BuildSecurityCamera);
             return a;

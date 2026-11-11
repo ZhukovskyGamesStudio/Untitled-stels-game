@@ -115,10 +115,12 @@ def pir():
 
 
 def plate():
-    """Pressure plate: a barely visible square in the floor with a thin glowing border."""
-    merge("Body", [box((0.9, 0.9, 0.02), (0, 0, 0.01))])
-    merge("Eye", [box((0.9, 0.04, 0.025), (0, 0.43, 0.012)), box((0.9, 0.04, 0.025), (0, -0.43, 0.012)),
-                  box((0.04, 0.9, 0.025), (0.43, 0, 0.012)), box((0.04, 0.9, 0.025), (-0.43, 0, 0.012))])
+    """Pressure plate in a doorway: no visible slab — only a square of thin dark seams in the floor, like a floor joint,
+    and a tiny dim indicator in one corner. Spotted only by someone who looks down."""
+    s, w, h = 1.1, 0.02, 0.004
+    merge("Body", [box((s, w, h), (0, s / 2, h / 2)), box((s, w, h), (0, -s / 2, h / 2)),
+                   box((w, s, h), (s / 2, 0, h / 2)), box((w, s, h), (-s / 2, 0, h / 2))])
+    merge("Eye", [box((0.025, 0.025, 0.005), (s / 2 - 0.05, s / 2 - 0.05, 0.0025))])
     export("sensor_plate")
 
 

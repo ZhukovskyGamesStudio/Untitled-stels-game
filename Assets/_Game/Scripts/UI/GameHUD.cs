@@ -367,10 +367,15 @@ namespace Stealth.UI
             // 1) The crosshair ray hits the robot's body.
             if (Physics.Raycast(origin, cam.transform.forward, out var direct, LookRange, Perception.SightMask, QueryTriggerInteraction.Ignore))
                 best = direct.collider.GetComponentInParent<Detector>();
-            // 2) Small devices without a body (PIR, plates): close enough to the centre of the view.
+            // 2) Small devices without a body (PIR): close enough to the centre of the view. A pressure plate hides in the
+            //    floor: it is named only when the crosshair lands on it, from up close (you have to look down at it).
             float bestAngle = best != null ? -1f : 6f;
+            if (best == null && direct.collider != null)
+                foreach (var d in Detector.All)
+                    if (d is PressurePlate plate && plate.Covers(direct.point) && direct.distance < 5f) best = d;
             foreach (var d in Detector.All)
             {
+                if (d is PressurePlate) continue;
                 var to = d.Position - origin;
                 if (to.magnitude > LookRange) continue;
                 float angle = Vector3.Angle(cam.transform.forward, to);
