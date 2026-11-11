@@ -1,6 +1,6 @@
 """The guard robot designed anew for every visual style (it is the robot of the comparison shots).
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/guards.py -- Assets/_Game/Art/Models
+Run:  blender.exe -b --factory-startup --python Tools/Blender/guards.py -- Assets/_Game/Art/Models [S16_Derelict ...]
 
 Writes Art/Models/Styles/Guards/robot_guard__<StyleAsset>.fbx. Every design keeps the parts of the original guard so
 the game swaps them in by name and its animation keeps working:
@@ -423,13 +423,39 @@ def blueprint():
     export("S15_Blueprint")
 
 
+def derelict():
+    """Dead Space / Alien: Isolation: a decommissioned station security synth — scuffed armour shell over a bare
+    mechanical frame, a cracked faceplate with one eye still lit, torn cables hanging from the shoulder and the spine."""
+    vents = [box(0.05, 0.03, 0.16, x=-0.12 + i * 0.08, y=-0.19, z=1.08) for i in range(4)]
+    merge("Body", [box(0.54, 0.34, 0.5, z=1.4, taper=1.1),                                         # chest shell
+                   cyl(0.12, 0.3, z=1.06, seg=16), box(0.4, 0.26, 0.16, z=0.92)] + vents + [   # exposed waist actuator, hips
+                   box(0.12, 0.1, 0.6, y=0.2, z=1.25),                                             # spine housing
+                   limb((-0.34, 0, 1.55), (-0.4, -0.04, 1.15), 0.055), limb((0.34, 0, 1.55), (0.4, -0.04, 1.15), 0.055),
+                   limb((-0.4, -0.04, 1.13), (-0.38, -0.14, 0.82), 0.045), limb((0.4, -0.04, 1.13), (0.38, -0.14, 0.82), 0.045)])
+    merge("Accent", [box(0.3, 0.32, 0.34, y=-0.02, z=1.86, taper=0.88),                            # skull casing
+                     box(0.26, 0.05, 0.22, y=-0.19, z=1.85, rz=0.05),                              # faceplate, askew
+                     cyl(0.065, 0.12, z=1.68, seg=12),                                              # neck
+                     box(0.22, 0.28, 0.12, x=-0.36, z=1.62, ry=-0.35),                              # one surviving pauldron
+                     limb((0.3, 0.05, 1.62), (0.36, 0.1, 1.2), 0.012), limb((0.3, 0.08, 1.6), (0.26, 0.16, 1.28), 0.01),  # torn cables
+                     limb((0.0, 0.25, 1.5), (0.06, 0.3, 1.0), 0.012),
+                     box(0.1, 0.12, 0.16, x=-0.38, y=-0.15, z=0.76), box(0.1, 0.12, 0.16, x=0.38, y=-0.15, z=0.76)])  # hands
+    merge("Eye", [sph(0.03, x=-0.07, y=-0.22, z=1.88, seg=10)])                                     # the one live eye
+    legs(lambda s: [limb((s * 0.2, 0, 0.9), (s * 0.21, -0.04, 0.5), 0.07), cyl(0.06, 0.12, x=s * 0.21, y=-0.04, z=0.5, axis="X", seg=12),
+                    limb((s * 0.21, -0.04, 0.5), (s * 0.22, 0.02, 0.12), 0.055), box(0.15, 0.3, 0.1, x=s * 0.22, y=-0.06, z=0.05)])
+    export("S16_Derelict")
+
+
 DESIGNS = [("lofi", night_shift), ("toy", scrapyard), ("realistic", heist), ("realistic", hunted), ("lowpoly", toon),
            ("clean", storybook), ("clean", logbook), ("toy", footage), ("crystal", white_room), ("clean", grid),
-           ("lofi", noir), ("clean", test_chamber), ("lowpoly", comic), ("realistic", thermal), ("clean", blueprint)]
+           ("lofi", noir), ("clean", test_chamber), ("lowpoly", comic), ("realistic", thermal), ("clean", blueprint),
+           ("realistic", derelict)]
 
 if __name__ == "__main__":
     g.clear_scene()
+    only = argv[1:]  # optional: style asset names to build (default: all)
     for FINISH, make in DESIGNS:
+        if only and not any(make.__name__ in n.lower() for n in only):
+            continue
         make()
         print("guard", make.__name__)
     print("DONE")

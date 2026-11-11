@@ -112,6 +112,7 @@ namespace Stealth.EditorTools
             Mat("Panel_PaleBlue", new Color(0.66f, 0.74f, 0.84f), null, 0.3f);
             Mat("Glow_White", Color.white, null, 0.5f, 0f, null, new Color(2.4f, 2.6f, 2.8f));
             Mat("Glow_Cyan", new Color(0.2f, 1f, 1f), null, 0.5f, 0f, null, new Color(0.3f, 2.6f, 3f));
+            Mat("Glow_DimCyan", new Color(0.1f, 0.5f, 0.5f), null, 0.5f, 0f, null, new Color(0.1f, 0.9f, 1.05f)); // dying electronics (S16_Derelict)
             AssetDatabase.SaveAssets();
         }
 

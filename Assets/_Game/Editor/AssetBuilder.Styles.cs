@@ -37,6 +37,7 @@ namespace Stealth.EditorTools
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
+            s_HumanRig = BuildHumanRig();
             bool rebuild = Environment.GetEnvironmentVariable("REBUILD_STYLES") == "1";
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
@@ -45,6 +46,7 @@ namespace Stealth.EditorTools
                 var asset = AssetDatabase.LoadAssetAtPath<VisualStyle>(path);
                 if (asset != null && rebuild) { EditorUtility.CopySerialized(def, asset); asset.name = def.name; EditorUtility.SetDirty(asset); }
                 if (asset == null) { AssetDatabase.CreateAsset(def, path); asset = def; }
+                FillGenerated(asset, def);
                 styles.Add(asset);
             }
 
@@ -56,7 +58,7 @@ namespace Stealth.EditorTools
             }
             config.Styles = styles.ToArray();
             // the game's look (chosen by hand later; first time: the storybook style)
-            if (config.Default == null) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
+            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
             config.Building = MaterialsIn("Environment");
             config.Furniture = MaterialsIn("Props");
             config.Robots = MaterialsIn("Robots");
@@ -244,6 +246,25 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ the styles
 
+
+        /// <summary>
+        /// Generated lists a hand-tuned style asset lacks (it was made before they existed): decay decals and posters.
+        /// Only fills what is empty, so hand edits stay.
+        /// </summary>
+        static void FillGenerated(VisualStyle asset, VisualStyle def)
+        {
+            var a = asset.Geometry;
+            var d = def.Geometry;
+            bool dirty = false;
+            if ((a.FloorDecay == null || a.FloorDecay.Length == 0) && d.FloorDecay.Length > 0) { a.FloorDecay = d.FloorDecay; dirty = true; }
+            if ((a.WallDecay == null || a.WallDecay.Length == 0) && d.WallDecay.Length > 0) { a.WallDecay = d.WallDecay; dirty = true; }
+            if ((a.Posters == null || a.Posters.Length == 0) && d.Posters.Length > 0) { a.Posters = d.Posters; dirty = true; }
+            if (a.DecayDensity <= 0f && d.DecayDensity > 0f) { a.DecayDensity = d.DecayDensity; dirty = true; }
+            if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
+            if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
+            if (dirty) EditorUtility.SetDirty(asset);
+        }
+
         static VisualStyle Style(string asset, string title, string refs, string pitch, Action<VisualStyle> setup)
         {
             var s = ScriptableObject.CreateInstance<VisualStyle>();
@@ -319,7 +340,7 @@ namespace Stealth.EditorTools
                 s =>
                 {
                     var g = s.Grade;
-                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.1f; g.Contrast = 18f; g.Saturation = 5f; g.Temperature = -12f;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.5f; g.Contrast = 18f; g.Saturation = 5f; g.Temperature = -12f;
                     g.SplitShadows = C(0.3f, 0.45f, 0.55f); g.SplitHighlights = C(0.62f, 0.52f, 0.4f);
                     g.BloomIntensity = 1.6f; g.BloomThreshold = 0.9f; g.BloomScatter = 0.75f;
                     g.Vignette = 0.3f; g.ChromaticAberration = 0.1f; g.FilmGrain = 0.15f;
@@ -609,6 +630,42 @@ namespace Stealth.EditorTools
                     geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Casing; geo.Ceiling = CeilingKind.Coffers;
                     geo.Floor = K("Floor_Concrete"); geo.FloorTile = 2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
                     geo.Trim = K("Trim_White"); geo.Beam = K("Trim_White");
+                });
+
+            // Sasha's style (merged from feature_visual_style_11_prototype): its own model family, kit, props, decay and a rigged human
+            yield return Style("S16_Derelict", "Заброшенный комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis",
+                "Брошенная научная станция: грязный бетон, ржавые трубы и кабельные лотки, стальные плиты. Почти темно — " +
+                "светят только умирающие лампы и редкие холодные щели электроники. Бирюзово-болезненная гамма, зерно, плотный сырой воздух. " +
+                "Модели реалистичные, люди похожи на людей.",
+                s =>
+                {
+                    var g = s.Grade;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.8f; g.Contrast = 18f; g.Saturation = -35f;
+                    g.ColorFilter = C(0.86f, 0.97f, 0.94f); g.Temperature = -18f; g.Tint = -8f;
+                    g.SplitShadows = C(0.3f, 0.45f, 0.45f); g.SplitHighlights = C(0.55f, 0.6f, 0.5f); g.SplitBalance = -20f;
+                    g.BloomIntensity = 1.2f; g.BloomThreshold = 1.1f; g.BloomScatter = 0.8f; g.BloomTint = C(0.8f, 1f, 0.95f);
+                    g.Vignette = 0.32f; g.VignetteColor = C(0f, 0.01f, 0.01f);
+                    g.ChromaticAberration = 0.25f; g.FilmGrain = 0.4f; g.LensDistortion = 0.06f;
+                    s.World.Ambient = C(0.13f, 0.15f, 0.15f);
+                    s.World.IndoorFog = C(0.012f, 0.02f, 0.02f); s.World.IndoorFogDensity = 0.035f;
+                    s.World.GasFog = C(0.22f, 0.3f, 0.2f); s.World.LightScale = 1.3f; s.World.LampGlow = 0.15f; // rooms lit, diffusers not glaring
+                    var p = s.Palette;
+                    p.Building.Saturation = 0.45f; p.Building.Brightness = 1.15f;
+                    p.Furniture.Saturation = 0.5f; p.Furniture.Brightness = 1.15f; p.Furniture.Smoothness = 0.25f;
+                    p.Robots.Saturation = 0.6f;
+                    p.Players.Saturation = 0.8f;
+                    var geo = s.Geometry;
+                    geo.Family = ModelFamily.Derelict;
+                    geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true; geo.StripSpacing = 7f;
+                    geo.Floor = K("Dr_FloorPlate"); geo.FloorTile = 2f; geo.Wall = K("Dr_SteelPanels"); geo.WallTile = 2.4f;
+                    geo.CeilingFinish = K("Dr_CeilingVents"); geo.CeilingTile = 2.4f;
+                    geo.Trim = K("Dr_Rust"); geo.Pipe = K("Dr_Rust"); geo.Beam = K("Dr_PaintedMetal"); geo.Glow = K("Glow_DimCyan");
+                    geo.PlayerRig = s_HumanRig;
+                    geo.FloorDecay = new[] { K("Dc_floor_rust"), K("Dc_floor_oil"), K("Dc_floor_scorch"), K("Dc_floor_rubble") };
+                    geo.WallDecay = new[] { K("Dc_wall_leak"), K("Dc_wall_mold"), K("Dc_wall_peel"), K("Dc_wall_scorch") };
+                    geo.Posters = Enumerable.Range(0, 6).Select(i => K($"Dc_poster_{i}")).ToArray();
+                    geo.DecayDensity = 0.14f;
+                    geo.PosterChance = 0.7f;
                 });
         }
     }

@@ -30,6 +30,9 @@ namespace Stealth.Level
         public static StyleWorld World => s_Current != null ? s_Current.World : s_DefaultWorld;
         static readonly StyleWorld s_DefaultWorld = new();
 
+        /// <summary>The rigged human the current style shows instead of the player model (null = the player models).</summary>
+        public static GameObject PlayerRig => s_Active && s_Current != null ? s_Current.Geometry.PlayerRig : null;
+
         /// <summary>The ambient light robots reckon with: the game's own, whatever a style shows.</summary>
         public static Color GameplayAmbient => s_Active ? s_BaseAmbient : RenderSettings.ambientLight;
 
@@ -126,6 +129,8 @@ namespace Stealth.Level
             if (s_Volume != null && s_BaseProfile != null) s_Volume.sharedProfile = s_BaseProfile;
             Shader.SetGlobalFloat("_StyOn", 0f);
             if (s_Active) RenderSettings.ambientLight = s_BaseAmbient;
+            LightSource.VisualScale = 1f;
+            LightSource.GlowScale = 1f;
             s_Current = s_Default;
             s_Active = false;
         }
@@ -301,7 +306,7 @@ namespace Stealth.Level
             foreach (var (r0, _, _) in s_Replaced) if (r0 == root) return;
             var hidden = new List<Renderer>();
             foreach (var r in root.GetComponentsInChildren<Renderer>())
-                if (r.enabled && !r.gameObject.name.StartsWith("Eye")) { r.enabled = false; hidden.Add(r); }
+                if (r.enabled && (prop.HideGlow || !r.gameObject.name.StartsWith("Eye"))) { r.enabled = false; hidden.Add(r); }
             var go = Object.Instantiate(prop.Prefab, root);
             go.transform.localPosition = prop.Position;
             go.transform.localRotation = Quaternion.identity;
@@ -426,6 +431,8 @@ namespace Stealth.Level
         {
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = s_Current != null ? w.Ambient : s_BaseAmbient;
+            LightSource.VisualScale = s_Current != null && w.LightScale > 0f ? w.LightScale : 1f;
+            LightSource.GlowScale = s_Current != null && w.LampGlow >= 0f ? w.LampGlow : 1f;
         }
 
         // ------------------------------------------------------------------ palette

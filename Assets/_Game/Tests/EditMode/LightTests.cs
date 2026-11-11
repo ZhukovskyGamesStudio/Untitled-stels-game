@@ -109,5 +109,33 @@ namespace Stealth.Tests
             Assert.AreEqual(0f, Stealth.Enemies.SensorMath.Visibility(dark, s), 1e-4f);
             Assert.AreEqual(1f, Stealth.Enemies.SensorMath.Visibility(lit, s), 1e-4f);
         }
+
+        [Test]
+        public void StyleLightScaleIsVisualOnly()
+        {
+            // first frame: whatever the game set is raw
+            Assert.AreEqual(3f, Stealth.Level.LightMath.RawIntensity(3f, -1f, -1f), 1e-5f);
+            // the light still holds what the style showed (3 × 0.4): raw stays 3
+            Assert.AreEqual(3f, Stealth.Level.LightMath.RawIntensity(1.2f, 3f, 1.2f), 1e-5f);
+            // the lamp logic wrote a new value (flicker, alarm): that is the new raw
+            Assert.AreEqual(0.15f, Stealth.Level.LightMath.RawIntensity(0.15f, 3f, 1.2f), 1e-5f);
+
+            var go = new UnityEngine.GameObject("lamp");
+            try
+            {
+                var light = go.AddComponent<UnityEngine.Light>();
+                light.intensity = 2f;
+                light.color = UnityEngine.Color.white;
+                var src = go.AddComponent<Stealth.Level.LightSource>();
+                float before = src.Brightness;
+                Stealth.Level.LightSource.VisualScale = 0.3f;
+                Assert.AreEqual(before, src.Brightness, 1e-5f, "robots must see the same light in every style");
+            }
+            finally
+            {
+                Stealth.Level.LightSource.VisualScale = 1f;
+                UnityEngine.Object.DestroyImmediate(go);
+            }
+        }
     }
 }

@@ -229,6 +229,7 @@ namespace Stealth.Game
             {
                 VisualStyles.Apply(style);
                 VisualStyles.SnapFog(outside);
+                DressMannequins();
                 yield return null;
                 yield return null;
                 yield return Shot($"{pose}__{style.name}");
@@ -244,7 +245,34 @@ namespace Stealth.Game
             foreach (var r in m.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             VisualStyles.SetVariant(m, slot);
             PlayerLooks.Paint(m.transform, slot);
+            s_Mannequins.Add((m, slot));
+            DressMannequins();
             return m;
+        }
+
+        static readonly List<(GameObject model, int slot)> s_Mannequins = new();
+
+        /// <summary>
+        /// Mannequins are bare copies of the player model (no PlayerController), so they show the style's rigged human
+        /// (VisualStyles.PlayerRig) here, the way a player does: model hidden, the rig painted for the slot, standing idle
+        /// (evaluated once: the shots are taken with the time stopped).
+        /// </summary>
+        static void DressMannequins()
+        {
+            s_Mannequins.RemoveAll(x => x.model == null);
+            var prefab = VisualStyles.PlayerRig;
+            foreach (var (m, slot) in s_Mannequins)
+            {
+                var old = m.transform.Find("StyleRig");
+                if (old != null) DestroyImmediate(old.gameObject);
+                foreach (var r in m.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = prefab != null;
+                if (prefab == null) continue;
+                var rig = Instantiate(prefab, m.transform);
+                rig.name = "StyleRig";
+                rig.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                PlayerLooks.Paint(rig.transform, slot);
+                if (rig.TryGetComponent<HumanRig>(out var h) && h.Animator != null) h.Animator.Update(0f);
+            }
         }
 
         static void PlaceMate(GameObject mate, Vector3 at, Vector3 lookAt, float height)

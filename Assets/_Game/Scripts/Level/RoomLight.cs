@@ -56,7 +56,7 @@ namespace Stealth.Level
             m_Light.enabled = intensity > 0.001f;
             if (Panels == null || Panels.Length == 0) return;
             // The panel glows with the lamp (property block: the shared material stays untouched).
-            float glow = Mathf.Clamp01(intensity / LightMath.RoomIntensity);
+            float glow = Mathf.Clamp01(intensity / LightMath.RoomIntensity) * LightSource.GlowScale; // the style's look of the diffusers
             if (Mathf.Abs(glow - m_LastGlow) < 0.02f && color == m_LastColor) return;
             m_LastGlow = glow;
             m_LastColor = color;
@@ -86,6 +86,13 @@ namespace Stealth.Level
 
         /// <summary>Ceiling lamp cookie (pure): full light below the horizon, none straight up (dir.y = direction's height).</summary>
         public static float CookieUpFade(float dirY) => 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.02f, 0.2f, dirY));
+
+        /// <summary>
+        /// The intensity the game set (pure): if the light still holds what the style scale last wrote, the raw value is the
+        /// remembered one; if anything else wrote to it since (lamp logic, flicker, alarm, a prefab), that new value is raw.
+        /// </summary>
+        public static float RawIntensity(float current, float lastRaw, float lastShown) =>
+            lastRaw >= 0f && Mathf.Abs(current - lastShown) < 1e-4f ? lastRaw : current;
 
         /// <summary>Broken fluorescent tube: mostly on, with short irregular drop-outs. Returns 0..1.</summary>
         public static float Flicker(float t)

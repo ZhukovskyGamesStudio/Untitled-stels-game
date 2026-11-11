@@ -181,6 +181,7 @@ namespace Stealth.EditorTools
             foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { ModelsDir }))
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.StartsWith(ModelsDir + "/Humans/")) continue; // rigged and animated: AssetBuilder.Humans sets them up
                 var importer = (ModelImporter)AssetImporter.GetAtPath(path);
                 bool dirty = false;
                 if (importer.materialImportMode != ModelImporterMaterialImportMode.None) { importer.materialImportMode = ModelImporterMaterialImportMode.None; dirty = true; }

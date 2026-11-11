@@ -41,7 +41,7 @@ namespace Stealth.Level
             var batcher = new MeshBatcher(root.worldToLocalMatrix);
             foreach (var p in ArchitecturePlanner.Plan(ActiveLevel.Shell, ActiveLevel.Layout, g))
             {
-                bool finish = p.Kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish;
+                bool finish = p.IsQuad;
                 var prefab = finish ? kit.Finish : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
                 if (prefab == null) continue;
                 Count++;
@@ -51,6 +51,12 @@ namespace Stealth.Level
                 var chunk = MeshBatcher.ChunkOf(p.Position);
                 foreach (var part in PartsOf(prefab))
                 {
+                    if (IsDecal(p.Kind))
+                    {
+                        // decay and posters: the whole image on the quad, the material picked from the style's list
+                        batcher.Add(chunk, part.look, DecalOf(p, g), part.mesh, 0, at * part.local, new Vector4(1f, 1f, 0f, 0f));
+                        continue;
+                    }
                     if (finish)
                     {
                         var mat = FinishOf(p, g, out var tiling);
@@ -96,12 +102,22 @@ namespace Stealth.Level
                     if (m != null) r.sharedMaterial = m;
                     continue;
                 }
+                if (IsDecal(p.Kind)) { r.sharedMaterial = DecalOf(p, g); r.SetPropertyBlock(null); continue; }
                 r.sharedMaterial = FinishOf(p, g, out var tiling);
                 s_Block ??= new MaterialPropertyBlock();
                 s_Block.Clear();
                 s_Block.SetVector(BaseMapSt, tiling);
                 r.SetPropertyBlock(s_Block);
             }
+        }
+
+        static bool IsDecal(DecorKind k) => k is DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster;
+
+        /// <summary>The material of a decal: its variant in the style's decay or poster list.</summary>
+        static Material DecalOf(DecorPiece p, StyleGeometry g)
+        {
+            var list = p.Kind switch { DecorKind.FloorDecal => g.FloorDecay, DecorKind.WallDecal => g.WallDecay, _ => g.Posters };
+            return list != null && p.Variant >= 0 && p.Variant < list.Length ? list[p.Variant] : null;
         }
 
         /// <summary>The material of a finish quad and its texture tiling (as a _BaseMap_ST: the texture follows the world).</summary>

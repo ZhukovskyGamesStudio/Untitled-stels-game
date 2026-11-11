@@ -54,5 +54,6 @@ namespace Stealth.Configs
         public GameObject Prefab;
         public Vector3 Position;
         public Vector3 Scale = Vector3.one;
+        [Tooltip("The replacement brings its own screens: hide our glowing Eye parts too")] public bool HideGlow;
     }
 }

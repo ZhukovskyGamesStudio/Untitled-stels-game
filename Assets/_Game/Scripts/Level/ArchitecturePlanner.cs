@@ -9,6 +9,8 @@ namespace Stealth.Level
     {
         Baseboard, Crown, Rail, Wainscot, Pipes, PipeClamp, Strip, Pilaster, Casing, Arch, Beam, IBeam, Coffer, Tray, TrayHanger,
         FloorFinish, WallFinish, CeilingFinish,
+        /// <summary>Decals: a quad with one of the style's decay / poster materials (<see cref="DecorPiece.Variant"/>).</summary>
+        FloorDecal, WallDecal, Poster,
     }
 
     /// <summary>One piece to place: a kit prefab (or a finish quad) and its transform; finishes carry their size in metres.</summary>
@@ -20,6 +22,11 @@ namespace Stealth.Level
         public Vector3 Scale;
         /// <summary>Finish quads: size (x, y) and the world offset of their corner (z, w) in metres, for texture tiling.</summary>
         public Vector4 Surface;
+        /// <summary>Decals: which material of the style's list.</summary>
+        public int Variant;
+
+        public bool IsQuad => Kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish or
+                              DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster;
     }
 
     /// <summary>
@@ -59,7 +66,95 @@ namespace Stealth.Level
                         Surface = new Vector4(size.x, size.y, r.Min.x, r.Min.y),
                     });
                 }
+            if (layout != null) PlanDecay(list, shell, layout, g);
             return list;
+        }
+
+        // ------------------------------------------------------------------ decay and posters
+
+        /// <summary>
+        /// Big decals over the finishes so the tiled surfaces never read as a pattern: chunks on the floors, stains and
+        /// leaks on the walls, posters at eye height; all from the house seed (every peer sees the same), never over windows.
+        /// </summary>
+        static void PlanDecay(List<DecorPiece> list, LevelShell shell, LevelLayout layout, StyleGeometry g)
+        {
+            int nf = g.FloorDecay?.Length ?? 0, nw = g.WallDecay?.Length ?? 0, np = g.Posters?.Length ?? 0;
+            if ((g.DecayDensity <= 0f || nf + nw == 0) && (g.PosterChance <= 0f || np == 0)) return;
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, 0x0DECA7, 0));
+            int layer = 0;
+            float Lift() => 0.002f * (layer++ % 6);              // overlapping decals never fight for the same depth
+
+            if (nf > 0 && g.DecayDensity > 0f)
+                foreach (var r in shell.Floors)
+                {
+                    var size = r.Max - r.Min;
+                    int n = Count(rng, size.x * size.y * g.DecayDensity);
+                    for (int i = 0; i < n; i++)
+                    {
+                        float s = Mathf.Min(rng.Range(1.6f, 4f), Mathf.Min(size.x, size.y) * 0.9f);
+                        if (s < 0.5f) continue;
+                        float x = rng.Range(r.Min.x + s * 0.5f, r.Max.x - s * 0.5f), z = rng.Range(r.Min.y + s * 0.5f, r.Max.y - s * 0.5f);
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.FloorDecal, Variant = rng.Next(nf),
+                            Position = new Vector3(x, r.Y + 0.014f + Lift(), z),
+                            Rotation = Quaternion.AngleAxis(rng.Range(0f, 360f), Vector3.up) * Quaternion.LookRotation(Vector3.down, Vector3.forward),
+                            Scale = new Vector3(s, s, 1f),
+                        });
+                    }
+                }
+
+            foreach (var f in shell.Walls)
+            {
+                if (f.Y0 > 0.001f || f.Length < 1.2f) continue;                // full-height faces only
+                var holes = WindowHoles(f, shell);
+                var rot = Quaternion.LookRotation(-f.Normal);
+                if (nw > 0 && g.DecayDensity > 0f)
+                {
+                    int n = Count(rng, f.Length * g.DecayDensity * 0.6f);
+                    for (int i = 0; i < n; i++)
+                    {
+                        int v = rng.Next(nw);
+                        float aspect = Aspect(g.WallDecay[v]);
+                        float s = Mathf.Min(rng.Range(0.9f, 2.2f), f.Length - 0.3f);
+                        float h = Mathf.Min(s * aspect, LevelMetrics.WallHeight - 0.1f);
+                        float u = rng.Range(s / 2f + 0.1f, f.Length - s / 2f - 0.1f);
+                        if (Inside(holes, u, s / 2f)) continue;
+                        // tall decals (leaks) run down from the ceiling, the rest sit low where dirt gathers
+                        float yc = aspect > 1.4f ? LevelMetrics.WallHeight - 0.05f - h / 2f : rng.Range(h / 2f, Mathf.Max(h / 2f, 1.6f));
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.WallDecal, Variant = v, Rotation = rot,
+                            Position = f.At(u) + f.Normal * (0.014f + Lift()) + Vector3.up * yc, Scale = new Vector3(s, h, 1f),
+                        });
+                    }
+                }
+                if (np > 0 && g.PosterChance > 0f && rng.Value() < g.PosterChance * Mathf.Min(1.5f, f.Length / 4f) && f.Length > 1.2f)
+                {
+                    float u = rng.Range(0.6f, f.Length - 0.6f);
+                    if (Inside(holes, u, 0.4f)) continue;
+                    list.Add(new DecorPiece
+                    {
+                        Kind = DecorKind.Poster, Variant = rng.Next(np),
+                        Rotation = rot * Quaternion.Euler(0f, 0f, rng.Range(-4f, 4f)),
+                        Position = f.At(u) + f.Normal * 0.03f + Vector3.up * rng.Range(1.5f, 1.65f), Scale = new Vector3(0.75f, 1.06f, 1f),
+                    });
+                }
+            }
+        }
+
+        /// <summary>Whole decals for an expected count (the fraction is a chance of one more).</summary>
+        static int Count(System.Random rng, float expected)
+        {
+            int n = Mathf.FloorToInt(expected);
+            return n + (rng.Value() < expected - n ? 1 : 0);
+        }
+
+        /// <summary>Height / width of a decal's texture (1 without one).</summary>
+        static float Aspect(Material m)
+        {
+            var t = m != null ? m.mainTexture : null;
+            return t != null && t.width > 0 ? (float)t.height / t.width : 1f;
         }
 
         // ------------------------------------------------------------------ walls

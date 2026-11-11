@@ -96,6 +96,13 @@ def finish(obj):
     elif family == "realistic":
         bevel(0.004, 2)
         smooth = True
+    elif family == "derelict":
+        # heavy industrial trims: deeper off the wall, hard bevel, slightly sagging along their length
+        for v in bm.verts:
+            v.co.y *= 1.25
+            v.co.z -= 0.004 * math.sin(v.co.x * 3.1) ** 2
+        bevel(0.006, 1)
+        smooth = True
     bm.to_mesh(obj.data)
     bm.free()
     if True:
