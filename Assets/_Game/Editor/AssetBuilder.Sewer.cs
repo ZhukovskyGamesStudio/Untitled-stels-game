@@ -86,7 +86,11 @@ namespace Stealth.EditorTools
             return SewerMat("SewerMetal");
         }
 
-        /// <summary>A sewer model under <paramref name="parent"/>: materials by part, solid parts get mesh colliders.</summary>
+        /// <summary>
+        /// A sewer model under <paramref name="parent"/>: materials by part, solid parts get mesh colliders. Stone ribs,
+        /// arch frames, curbs and sign plates stand only a few centimetres off the walls and floors: they get no collider,
+        /// so a player sliding along a wall does not catch on every rib (the wall behind still stops them).
+        /// </summary>
         static GameObject SewerModel(string file, Transform parent, Vector3 pos, float yaw = 0f, bool solid = true, string name = null)
         {
             var m = Model(file);
@@ -100,7 +104,8 @@ namespace Stealth.EditorTools
                 r.sharedMaterial = SewerPart(n);
                 bool water = n.StartsWith("Water"), glow = n.StartsWith("Glow");
                 r.shadowCastingMode = water || glow ? ShadowCastingMode.Off : ShadowCastingMode.TwoSided;
-                if (solid && !water && !glow) r.gameObject.AddComponent<MeshCollider>().sharedMesh = r.GetComponent<MeshFilter>().sharedMesh;
+                bool trim = n.StartsWith("Stone") || n.StartsWith("Curbs") || n.StartsWith("Frames") || n.StartsWith("Plates");
+                if (solid && !water && !glow && !trim) r.gameObject.AddComponent<MeshCollider>().sharedMesh = r.GetComponent<MeshFilter>().sharedMesh;
             }
             return m;
         }
@@ -144,7 +149,7 @@ namespace Stealth.EditorTools
             var cart = SewerModel("sewer_cart", t, new Vector3(-4.6f, 0f, -2.35f), 0f, false);
             var cartBox = cart.AddComponent<BoxCollider>();
             cartBox.center = new Vector3(0f, 0.55f, 0f);
-            cartBox.size = new Vector3(2.0f, 1.1f, 1.3f);
+            cartBox.size = new Vector3(2.0f, 1.1f, 1.0f); // the bed and the wheels, not the air around them: the walkway stays passable
             var bed = Child(cart.transform, "Bed", new Vector3(0.88f, 0.62f, 0.44f));
             bed.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             var stash = root.AddComponent<StashCart>();
@@ -203,7 +208,7 @@ namespace Stealth.EditorTools
                 mouth.localRotation = Quaternion.Euler(0f, 180f + BranchYaw[i], 0f); // +X leads into the tunnel
                 var tunnelRoot = Child(t, $"BranchTunnel{i}", new Vector3(-HallEnd, 0f, BranchZ[i])).transform;
                 tunnelRoot.localRotation = Quaternion.Euler(0f, BranchYaw[i], 0f);
-                SewerModel("sewer_branch", tunnelRoot, Vector3.zero);
+                SewerModel($"sewer_branch_{i}", t, Vector3.zero); // modelled turned to its opening and cut off at the hall's wall
                 var grate = SewerModel("sewer_grate", tunnelRoot, new Vector3(-0.15f, 0f, 0f), 0f, false, "Grate");
                 var bars = grate.AddComponent<BoxCollider>();
                 bars.center = new Vector3(0f, 1.45f, 0f);

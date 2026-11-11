@@ -30,6 +30,14 @@ namespace Stealth.Game
             Log($"start: phase {gm.Phase}, in the sewer {sewer != null}, ways {string.Join(",", gm.RouteOptions)}, players {PlayerController.All.Count}");
             if (gm.Phase != RunPhase.Sewer || sewer == null) { Log("FAIL: the run does not start in the sewer"); yield break; }
 
+            // F8 on a client switches the style of the whole team (the host sees it too).
+            int styleBefore = VisualStyles.CurrentIndex;
+            if (!Me.IsServer) gm.RequestStyle((Mathf.Max(0, styleBefore) + 3) % Mathf.Max(1, VisualStyles.All.Count));
+            yield return new WaitForSeconds(1.5f);
+            Log($"style: {styleBefore} -> {VisualStyles.CurrentIndex} ({VisualStyles.Current?.name}), team index {gm.StyleIndex}");
+            if (!Me.IsServer && styleBefore >= 0) gm.RequestStyle(styleBefore); // back to the usual look for the screenshots
+            yield return new WaitForSeconds(0.5f);
+
             if (Me.IsServer)
             {
                 yield return Shot("01_sewer_start");
@@ -52,6 +60,52 @@ namespace Stealth.Game
                 LookAtFrom(new Pose(new Vector3(-17.5f, 0.05f, 0.3f), Quaternion.LookRotation(Vector3.left)), mid);
                 yield return new WaitForSeconds(1f);
                 yield return Shot("04_sign");
+
+                // The whole stash full of turned and mirrored pieces: the cart shows every cell taken.
+                var rng = new System.Random(5);
+                for (int tries = 0; tries < 400; tries++)
+                {
+                    byte shape = (byte)rng.Next(ItemCatalog.Shapes.Length), rot = (byte)rng.Next(8);
+                    byte x = (byte)rng.Next(TeamStash.Width), y = (byte)rng.Next(TeamStash.Height);
+                    if (gm.Stash.CanPlace(shape, rot, x, y)) gm.Stash.Add(shape, (byte)rng.Next(5), x, y, rot);
+                }
+                for (byte y = 0; y < TeamStash.Height; y++)
+                    for (byte x = 0; x < TeamStash.Width; x++)
+                        if (gm.Stash.CanPlace(0, 0, x, y)) gm.Stash.Add(0, 4, x, y, 0);
+                int cells = 0;
+                foreach (var e in gm.Stash.Items) cells += ItemCatalog.Shapes[e.Shape].Cells.Length;
+                Log($"cart: {gm.Stash.Items.Count} items, {cells} of {TeamStash.Width * TeamStash.Height} cells");
+                yield return new WaitForSeconds(0.5f);
+                var above = cart + new Vector3(0.9f, 0.05f, 1.3f);
+                LookAtFrom(new Pose(above, Quaternion.LookRotation(Flat(cart - above))), cart + Vector3.up * 0.6f);
+                Me.Motor.SetPitch(50f);
+                yield return new WaitForSeconds(0.4f);
+                yield return Shot("04b_cart_full");
+
+                // Where the turned side tunnels meet the hall: no gaps around the openings, nothing sticking into the hall.
+                for (int b = 0; b < 3; b += 2)
+                {
+                    var mouth = sewer.Branches[b].Mouth;
+                    var inside = mouth.position + mouth.right * 2.5f + Vector3.up * 0.05f;
+                    LookAtFrom(new Pose(inside, Quaternion.LookRotation(-mouth.right)), mouth.position + Vector3.up * 1.2f - mouth.right * 2f);
+                    yield return new WaitForSeconds(0.3f);
+                    yield return Shot($"04c_tunnel{b}_looking_back");
+                    var hall = mouth.position - mouth.right * 3f + mouth.forward * 2f + Vector3.up * 0.05f;
+                    LookAtFrom(new Pose(hall, Quaternion.LookRotation(Flat(mouth.position - hall))), mouth.position + Vector3.up * 1.2f);
+                    yield return new WaitForSeconds(0.3f);
+                    yield return Shot($"04d_tunnel{b}_from_hall");
+                }
+                // Down in the channel and the cistern: their walls go down to the bed, nothing to see under the floor.
+                LookAtFrom(new Pose(new Vector3(-6f, -0.55f, 0.3f), Quaternion.LookRotation(Vector3.forward)), new Vector3(-7f, -0.4f, 1.6f));
+                yield return new WaitForSeconds(0.3f);
+                yield return Shot("04e_channel_side");
+                LookAtFrom(new Pose(new Vector3(-16.6f, -0.65f, 0f), Quaternion.LookRotation(Vector3.right)), new Vector3(-14.8f, -0.4f, 0f));
+                yield return new WaitForSeconds(0.3f);
+                yield return Shot("04f_cistern_wall");
+                // Sliding along the tunnel wall past the ribs and along the walkway past the cart: nothing to catch on.
+                yield return Slide(new Vector3(-4.2f, 0.05f, 2.9f), 290f, 1.5f, "wall_slide"); // along -X past a rib, pressing into the +Z wall (clear of the crates)
+                yield return Slide(new Vector3(-2.2f, 0.05f, -1.45f), 270f, 3f, "walkway_past_cart");
+                Me.TeleportOwner(sewer.SpawnFor(slot), sewer.SpawnRotation(slot));
             }
             else yield return new WaitForSeconds(4f);
 
@@ -138,6 +192,20 @@ namespace Stealth.Game
             if (gm.Phase != RunPhase.Failed) Log("FAIL: the run did not end");
             if (Me.IsServer) yield return Shot("12_flooded");
             yield return new WaitForSeconds(2f);
+        }
+
+        /// <summary>Walk forward for a while from a spot (yaw in degrees) and log how far the player got.</summary>
+        IEnumerator Slide(Vector3 from, float yaw, float seconds, string label)
+        {
+            Me.TeleportOwner(from, Quaternion.Euler(0f, yaw, 0f));
+            yield return new WaitForSeconds(0.2f);
+            var start = Me.transform.position;
+            DevFlags.Autopilot = new PlayerInputState { Move = Vector2.up };
+            yield return new WaitForSeconds(seconds);
+            DevFlags.Autopilot = null;
+            var moved = Me.transform.position - start;
+            moved.y = 0;
+            Log($"{label}: moved {moved.magnitude:0.0} m in {seconds:0} s ({moved.magnitude / seconds:0.0} m/s, walk speed {Configs.Tuning.Player.Movement.WalkSpeed:0.0})");
         }
 
         /// <summary>Walk into the tunnel of a way (index in the options), a little apart from teammates.</summary>

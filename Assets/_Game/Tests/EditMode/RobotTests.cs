@@ -174,6 +174,20 @@ namespace Stealth.Tests
             Assert.IsFalse(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(0, 0, -3f), false), "too far");
             Assert.IsTrue(Hacking.CanHackDevice(new Vector3(0, 2.2f, 0), new Vector3(1f, 0, 0)), "wall device from below");
             Assert.IsFalse(Hacking.CanHackDevice(new Vector3(0, 0, 0), new Vector3(3f, 0, 0)));
+            Assert.IsTrue(Hacking.CanHackRobot(robot, Vector3.forward, new Vector3(-1.2f, 0, -0.2f), false), "from the side, a little behind");
+        }
+
+        [Test]
+        public void HackProgressIsKeptWhenYouWalkAway()
+        {
+            var held = new HoldProgress<string>();
+            string camera = "camera", guard = "guard";
+            Assert.IsFalse(held.Hold(camera, 1f, 1.75f));
+            Assert.IsFalse(held.Hold(guard, 0.5f, 1.75f), "another target has its own progress");
+            Assert.AreEqual(1f, held.Of(camera), 1e-5f, "walking off to the guard kept the camera's progress");
+            Assert.IsTrue(held.Hold(camera, 0.8f, 1.75f), "coming back finishes it");
+            Assert.AreEqual(0f, held.Of(camera), "a finished target starts from zero next time");
+            Assert.AreEqual(0.5f, held.Of(guard), 1e-5f);
         }
 
         [Test]

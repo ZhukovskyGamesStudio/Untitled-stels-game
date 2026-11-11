@@ -75,6 +75,8 @@ namespace Stealth.Tests
         public int GetUps;
         public void SendGetUp() => GetUps++;
         public void SendHack(Detector target) => Hacks.Add(target);
+        public readonly List<(Detector target, int terminal)> RemoteHacks = new();
+        public void SendRemoteHack(Detector target, int terminal) => RemoteHacks.Add((target, terminal));
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedback.Add(awayFromSource);
         public readonly List<Vector3> Pings = new();
         public readonly List<Detector> Marks = new();

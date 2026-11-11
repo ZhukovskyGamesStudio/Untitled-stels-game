@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Stealth.Enemies
 {
-    /// <summary>Pressure plate in the floor: stepping on it raises an alarm. A thin glowing border gives it away.</summary>
+    /// <summary>Pressure plate in a doorway: stepping on it raises an alarm. A steel slab with a glowing border — jump over it or hack it.</summary>
     public class PressurePlate : SecurityDevice
     {
         [Tooltip("Tuning (PressurePlateProfile) — a separate asset next to the prefab.")]

@@ -10,6 +10,24 @@ namespace Stealth.Tests
         static readonly int[] Seeds = { 1, 7, 42, 1337, 99991, 123456789 };
 
         [Test]
+        public void SomeDesksBecomeSecurityTerminals()
+        {
+            foreach (var seed in Seeds)
+            {
+                var l = LevelGenerator.Generate(seed, 2);
+                var again = LevelGenerator.Generate(seed, 2);
+                CollectionAssert.AreEqual(l.Terminals, again.Terminals, "the same on every peer");
+                Assert.IsTrue(l.Terminals.Exists(t => t.kind == TerminalKind.Hacking), $"seed {seed}: a hacking terminal");
+                if (l.CameraSpots.Count > 0) Assert.IsTrue(l.Terminals.Exists(t => t.kind == TerminalKind.Cameras), $"seed {seed}: a camera terminal");
+                foreach (var (prop, _) in l.Terminals)
+                {
+                    Assert.AreEqual(PropKind.Terminal, l.Props[prop].Kind);
+                    Assert.Greater((l.Props[prop].Position - l.HatchPosition).magnitude, LevelMetrics.Cell * 0.75f, "not in the lobby");
+                }
+            }
+        }
+
+        [Test]
         public void SameSeedGivesSameLayout()
         {
             foreach (var seed in Seeds)

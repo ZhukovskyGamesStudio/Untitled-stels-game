@@ -79,6 +79,10 @@ namespace Stealth.UI
         public RectTransform GainRect;
         public Text GainLabel;
         public Text QuotaHint;
+        [Tooltip("When the hunter comes (or that it is in the house), under the quota bar.")]
+        public Text HunterLabel;
+        [Tooltip("Sitting at a security terminal: what is on the screen and how to use it.")]
+        public Text TerminalLabel;
         public Image[] HpPips;
         public RectTransform TeamList;
         public Text TeamRowPrefab;
@@ -143,6 +147,14 @@ namespace Stealth.UI
         public void FlashHit(Vector3 awayFromSource) => m_Hit.Hit(awayFromSource, Time.time);
 
         public void ShowBanner(string text) => m_Banners.Push(text);
+
+        /// <summary>Seconds the "Стиль: …" banner stays (a new F8 replaces it at once).</summary>
+        const float StyleBannerTime = 1.6f;
+
+        void ShowStyleBanner(string text) => m_Banners.Push(text, "style", Time.time, StyleBannerTime);
+
+        void OnEnable() => GameManager.StyleAnnounced += ShowStyleBanner;
+        void OnDisable() => GameManager.StyleAnnounced -= ShowStyleBanner;
 
         // ------------------------------------------------------------------ frame
 
@@ -349,6 +361,8 @@ namespace Stealth.UI
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
                 Cracking = me.Cracking != null,
+                AtTerminal = me.UsingTerminal != null,
+                Terminal = me.TerminalTarget != null && me.UsingTerminal == null ? TerminalRules.Prompt(me.TerminalTarget.Kind, me.TerminalTarget.Charges) : null,
                 CarriedItems = me.GetComponent<PlayerInventory>().Items.Count,
                 Collected = gm.Collected,
                 Quota = gm.Quota,
@@ -430,7 +444,7 @@ namespace Stealth.UI
             Ui.Show(DownedTint, down);
             bool showDown = down && gm.Phase == RunPhase.Playing;
             Ui.Show(DownedText, showDown);
-            if (showDown) DownedText.text = PromptRules.DownedText(me.Hp, me.CanGetUp);
+            if (showDown) DownedText.text = PromptRules.DownedText(me.Hp, me.CanGetUp, me.Watching != null ? me.Watching.Nick : null);
 
             // Alarm: thin pulsing frame + a small label with the time left: clear, but does not cover the view.
             bool alarm = gm.AlarmActive;
@@ -573,6 +587,37 @@ namespace Stealth.UI
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
             Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing && !me.InHatch);
+            ShowHunter(gm);
+            ShowTerminal(me);
+        }
+
+        void ShowTerminal(PlayerController me)
+        {
+            if (TerminalLabel == null) return;
+            var t = me.UsingTerminal;
+            Ui.Show(TerminalLabel, t != null);
+            if (t == null) return;
+            var shown = me.TerminalView;
+            string text = TerminalRules.Status(t.Kind, shown != null ? shown.DisplayName : "", me.TerminalViewNumber, me.TerminalViewCount,
+                t.Charges, shown != null && shown.IsHacked, me.TerminalHackShare);
+            if (TerminalLabel.text != text) TerminalLabel.text = text;
+        }
+
+        static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };
+
+        void ShowHunter(GameManager gm)
+        {
+            if (HunterLabel == null) return;
+            int inside = 0;
+            foreach (var d in Detector.All)
+                if (d.Kind == RobotKind.Hunter && !d.IsHacked) inside++;
+            float seconds = gm.HunterAt > 0 ? (float)(gm.HunterAt - Session.ServerTime) : -1f;
+            var (text, urgency) = gm.Phase == RunPhase.Playing ? HunterRules.Line(seconds, gm.HunterAlarmsLeft, inside) : (null, HunterRules.Urgency.Calm);
+            Ui.Show(HunterLabel, text != null);
+            if (text == null) return;
+            var color = HunterColors[(int)urgency];
+            if (urgency != HunterRules.Urgency.Calm) color.a = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f); // blinks when it matters
+            Ui.Set(HunterLabel, text, color);
         }
 
         /// <summary>Once the quota is met: a small diamond over the hatch (clamped to the screen edge) with distance.</summary>

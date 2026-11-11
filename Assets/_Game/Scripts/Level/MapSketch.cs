@@ -118,7 +118,7 @@ namespace Stealth.Level
                 var edge = Edge(l, floor, k, c, alongZ);
                 if (edge == EdgeType.Open) continue;
                 float mid = (c + 0.5f) * Cell;
-                float half = edge == EdgeType.Wall ? 0f : ClearWidth(edge == EdgeType.Vent ? VentWidth : LevelMetrics.DoorWidth) / 2f;
+                float half = edge == EdgeType.Wall ? 0f : ClearWidth(edge == EdgeType.Vent ? VentWidth : edge == EdgeType.Squeeze ? SqueezeWidth : LevelMetrics.DoorWidth) / 2f;
                 bool gapSeen = false;
                 for (int s = 0; s < n; s++)
                 {
@@ -136,7 +136,7 @@ namespace Stealth.Level
                 }
                 if (gapSeen)
                 {
-                    var part = edge == EdgeType.Vent ? MapPart.Vent : MapPart.Door;
+                    var part = edge == EdgeType.Vent || edge == EdgeType.Squeeze ? MapPart.Vent : MapPart.Door;
                     output.Add(new MapRect(part, Strip(line, mid - half, mid + half, GapWidth, alongZ)));
                 }
             }

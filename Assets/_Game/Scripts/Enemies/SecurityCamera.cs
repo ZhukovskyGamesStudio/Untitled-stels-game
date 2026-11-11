@@ -36,10 +36,23 @@ namespace Stealth.Enemies
         /// <summary>Yaw of the sweep at a moment of the shared clock (pure).</summary>
         public static float SweepYaw(float time, float sweepAngle, float period) => Mathf.Sin(time * Mathf.PI * 2f / period) * sweepAngle / 2f;
 
+        float m_Yaw, m_Droop;
+        bool m_Posed;
+
+        /// <summary>Degrees a second the head may turn to catch up with the sweep (faster than the sweep itself).</summary>
+        const float CatchUpSpeed = 90f;
+        /// <summary>A hacked camera hangs its head by this much, degrees.</summary>
+        const float HackedDroop = 28f;
+
         protected override void TickLocal()
         {
             float t = Session.ServerTimeF + m_Phase;
-            Pivot.localRotation = Quaternion.Euler(Profile.Tilt, SweepYaw(t, Profile.SweepAngle, Profile.SweepPeriod), 0f);
+            float sweep = SweepYaw(t, Profile.SweepAngle, Profile.SweepPeriod);
+            // Hacked: the head stops where it was and hangs; back on, it eases into the sweep again.
+            if (!m_Posed) { m_Yaw = sweep; m_Posed = true; }
+            else if (!IsHacked) m_Yaw = Mathf.MoveTowards(m_Yaw, sweep, CatchUpSpeed * Time.deltaTime);
+            m_Droop = Mathf.MoveTowards(m_Droop, IsHacked ? HackedDroop : 0f, 60f * Time.deltaTime);
+            Pivot.localRotation = Quaternion.Euler(Profile.Tilt + m_Droop, m_Yaw, 0f);
         }
 
         protected override void OnStatusChanged()

@@ -89,6 +89,13 @@ namespace Stealth.Net
         [Rpc(SendTo.Server)]
         void GetUpRpc() => m_Player.OnGetUpRequest();
         public void SendHack(Detector target) => HackRpc(target.GetComponent<NetworkObject>());
+        public void SendRemoteHack(Detector target, int terminal) => RemoteHackRpc(target.GetComponent<NetworkObject>(), terminal);
+
+        [Rpc(SendTo.Server)]
+        void RemoteHackRpc(NetworkObjectReference target, int terminal)
+        {
+            if (target.TryGet(out var obj)) GameManager.Instance?.RemoteHackServer(m_Player, terminal, obj.GetComponent<Detector>());
+        }
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedbackRpc(awayFromSource);
         public void SendPing(Vector3 position) => PingRpc(position);
         public void SendHatch(bool hide) => HatchRpc(hide);

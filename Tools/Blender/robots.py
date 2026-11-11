@@ -9,6 +9,9 @@ import math
 import os
 import sys
 
+import bmesh
+from mathutils import Vector
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (re-uses helpers; generate_models runs its own export on import)
 
@@ -24,16 +27,34 @@ def drone():
     export("robot_drone")
 
 
+def beam(p0, p1, t):
+    """A square rod of thickness t from p0 to p1 in any direction (built from the current box, so families restyle it)."""
+    a, b = Vector(p0), Vector(p1)
+    d = b - a
+    bm = box((d.length, t, t), (0, 0, 0))
+    bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Vector((1, 0, 0)).rotation_difference(d.normalized()).to_matrix(),
+                     verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(a + b) / 2, verts=bm.verts)
+    return bm
+
+
 def spider():
-    """Wall crawler: low round body, eight legs, cluster of eyes. Local up = away from the surface."""
-    merge("Body", [sphere(0.28, (0, 0.05, 0.2), segments=12), sphere(0.18, (0, -0.28, 0.18), segments=10)])
+    """Wall crawler: a flat two-part body hugging the surface, eight legs fanned out around it with the knees raised
+    and the feet on the surface, a cluster of eyes in front. Local up = away from the surface, forward = -Y.
+    Every leg is a thigh (AccentLeg{n}Upper) and a shin (AccentLeg{n}Lower): ProceduralLegs plants the feet."""
+    merge("Body", [sphere(0.14, (0, -0.15, 0.15), segments=12), sphere(0.2, (0, 0.17, 0.17), segments=12)])
+    angles = (52, 18, -14, -46)  # degrees ahead of straight sideways, front to back
     for i in range(8):
         side = 1 if i < 4 else -1
-        k = i % 4
-        y = 0.25 - k * 0.17
-        # femur out from the body, shin down to the surface: the knee is the corner (ProceduralLegs bends it)
-        g.leg(f"AccentLeg{i}", [box((0.55, 0.05, 0.05), (side * 0.38, y, 0.25)), box((0.05, 0.05, 0.3), (side * 0.65, y, 0.1))], 0.15)
-    merge("Eye", [sphere(0.05, (dx, -0.43, 0.22 + dz), segments=8) for dx, dz in [(-0.06, 0.03), (0.06, 0.03), (-0.1, -0.03), (0.1, -0.03)]])
+        a = math.radians(angles[i % 4])
+        d = Vector((side * math.cos(a), -math.sin(a), 0))
+        centre = Vector((0, -0.02, 0))
+        hip = centre + d * 0.1 + Vector((0, 0, 0.16))
+        knee = centre + d * 0.36 + Vector((0, 0, 0.34))
+        foot = centre + d * 0.62
+        merge(f"AccentLeg{i}Upper", [beam(hip, knee, 0.045)])
+        merge(f"AccentLeg{i}Lower", [beam(knee, foot + Vector((0, 0, 0.02)), 0.038), sphere(0.028, foot + Vector((0, 0, 0.02)), segments=8)])
+    merge("Eye", [sphere(0.045, (dx, -0.29, 0.18 + dz), segments=8) for dx, dz in [(-0.05, 0.03), (0.05, 0.03), (-0.09, -0.02), (0.09, -0.02)]])
     export("robot_spider")
 
 
@@ -115,12 +136,15 @@ def pir():
 
 
 def plate():
-    """Pressure plate in a doorway: no visible slab — only a square of thin dark seams in the floor, like a floor joint,
-    and a tiny dim indicator in one corner. Spotted only by someone who looks down."""
-    s, w, h = 1.1, 0.02, 0.004
-    merge("Body", [box((s, w, h), (0, s / 2, h / 2)), box((s, w, h), (0, -s / 2, h / 2)),
-                   box((w, s, h), (s / 2, 0, h / 2)), box((w, s, h), (-s / 2, 0, h / 2))])
-    merge("Eye", [box((0.025, 0.025, 0.005), (s / 2 - 0.05, s / 2 - 0.05, 0.0025))])
+    """Pressure plate in a doorway: a steel slab flush with the floor, a glowing border in the status colour and four
+    corner studs. Visible to anyone who watches where they walk: jump over it or hack it."""
+    s, h = 1.1, 0.012
+    merge("Body", [box((s - 0.07, s - 0.07, h), (0, 0, h / 2))])
+    k = s / 2 - 0.06
+    merge("Accent", [box((0.07, 0.07, h + 0.006), (x * k, y * k, (h + 0.006) / 2)) for x in (-1, 1) for y in (-1, 1)])
+    b, e = 0.035, h + 0.004
+    merge("Eye", [box((s, b, e), (0, s / 2 - b / 2, e / 2)), box((s, b, e), (0, -s / 2 + b / 2, e / 2)),
+                  box((b, s - 2 * b, e), (s / 2 - b / 2, 0, e / 2)), box((b, s - 2 * b, e), (-s / 2 + b / 2, 0, e / 2))])
     export("sensor_plate")
 
 

@@ -65,7 +65,21 @@ namespace Stealth.Items
         public static int Value(int shape, int color) =>
             Shapes[shape].Cells.Length * Colors[color].Multiplier * PointsPerCell;
 
-        /// <summary>Cells of a shape rotated clockwise <paramref name="rot"/> times, normalized to start at (0,0).</summary>
+        /// <summary>Bit of an item's rotation byte: the piece is mirrored (left-right) before it is turned.</summary>
+        public const int MirrorBit = 4;
+
+        public static bool IsMirrored(int rot) => (rot & MirrorBit) != 0;
+
+        /// <summary>The next quarter turn, keeping the mirror.</summary>
+        public static int Turned(int rot) => (rot & MirrorBit) | ((rot + 1) & 3);
+
+        /// <summary>The same piece flipped left-right (its turn kept).</summary>
+        public static int Mirrored(int rot) => rot ^ MirrorBit;
+
+        /// <summary>
+        /// Cells of a shape — mirrored if <see cref="MirrorBit"/> is set, then rotated clockwise (<paramref name="rot"/> &amp; 3)
+        /// times — normalized to start at (0,0).
+        /// </summary>
         public static Vector2Int[] RotatedCells(int shape, int rot)
         {
             var src = Shapes[shape].Cells;
@@ -73,6 +87,7 @@ namespace Stealth.Items
             for (int i = 0; i < src.Length; i++)
             {
                 var c = src[i];
+                if (IsMirrored(rot)) c.x = -c.x;
                 for (int r = 0; r < (rot & 3); r++) c = new Vector2Int(-c.y, c.x);
                 cells[i] = c;
             }

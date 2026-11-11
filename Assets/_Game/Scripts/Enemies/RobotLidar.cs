@@ -56,7 +56,7 @@ namespace Stealth.Enemies
             if (Robot == null || Robot.Profile == null || Senses.LidarRange <= 0f) return;
             var (start, dir, length) = Beam();
             bool on = !Robot.IsHacked;
-            if (Head != null) Head.rotation = Quaternion.LookRotation(dir, Vector3.up);
+            if (Head != null && on) Head.rotation = Quaternion.LookRotation(dir, Vector3.up); // hacked: the puck stops
             if (Line == null) return;
             Line.enabled = on;
             if (!on) return;

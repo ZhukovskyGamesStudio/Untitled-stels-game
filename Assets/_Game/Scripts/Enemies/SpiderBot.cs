@@ -24,6 +24,11 @@ namespace Stealth.Enemies
         Vector3 m_From, m_To;
         IIntruder m_Prey;
 
+        /// <summary>Gap between the wall face and the spider's underside, metres.</summary>
+        const float WallGap = 0.05f;
+        /// <summary>How fast the spider turns on its wall (at corners, when it turns back), degrees a second.</summary>
+        const float TurnRate = 300f;
+
         public float Perimeter => 2f * ((m_Max.x - m_Min.x) + (m_Max.z - m_Min.z));
 
         protected override Color IdleColor => new(0.6f, 1f, 0.3f);
@@ -33,7 +38,8 @@ namespace Stealth.Enemies
             if (!IsServer) return;
             var layout = ActiveLevel.Layout;
             var c = layout != null ? layout.RoomCenterAt(transform.position) : transform.position;
-            float half = LevelMetrics.Cell / 2f - 0.35f;
+            // Hugging the wall: the body a few centimetres off its face, the feet planted on it (ProceduralLegs).
+            float half = LevelMetrics.Cell / 2f - LevelMetrics.WallThickness / 2f - WallGap;
             m_FloorY = c.y;
             m_Min = new Vector3(c.x - half, 0, c.z - half);
             m_Max = new Vector3(c.x + half, 0, c.z + half);
@@ -70,7 +76,7 @@ namespace Stealth.Enemies
                         if (m_Rng.Value() < 0.002f) { m_Dir = -m_Dir; m_PauseUntil = Time.time + m_Rng.Range(0.5f, 2f); }
                     }
                     var (p, rot) = OnWall(m_T, m_Dir);
-                    transform.SetPositionAndRotation(p, rot);
+                    transform.SetPositionAndRotation(p, Quaternion.RotateTowards(transform.rotation, rot, TurnRate * Time.deltaTime));
                     Look();
                     break;
 

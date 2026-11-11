@@ -98,6 +98,8 @@ namespace Stealth.Game
         /// <summary>Owner → server: get up after being knocked down (HP left).</summary>
         void SendGetUp();
         void SendHack(Detector target);
+        /// <summary>Owner → server: hack this robot / device from the hacking terminal (index in the layout's props).</summary>
+        void SendRemoteHack(Detector target, int terminal);
         /// <summary>Owner → server: "here!" at a point the owner looks at.</summary>
         void SendPing(Vector3 position);
         /// <summary>Owner → server: mark this robot / device for the team.</summary>
@@ -132,6 +134,8 @@ namespace Stealth.Game
     public interface IGameLink
     {
         void RequestRestart();
+        /// <summary>Any player → server: the whole team switches to this visual style (index in VisualStyles.All).</summary>
+        void RequestStyle(int index);
         void BroadcastBanner(string text);
         /// <summary>Server → everyone: a teammate's ping or mark.</summary>
         void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target);

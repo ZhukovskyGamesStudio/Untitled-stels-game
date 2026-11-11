@@ -105,12 +105,26 @@ namespace Stealth.Game
         /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
         public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
         {
+            var (seconds, alarmsLeft) = HunterForecast(alarms, elapsed, levelIndex, huntersSoFar, s);
+            return alarmsLeft == 0 || seconds == 0f;
+        }
+
+        /// <summary>
+        /// When the next hunter comes: seconds left until it comes anyway and alarms left that would bring it sooner
+        /// (both -1 when no more hunters come to this house). Shown to the players, so it is never a surprise.
+        /// </summary>
+        public static (float seconds, int alarms) HunterForecast(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
+        {
             s ??= new RunSettings();
-            if (huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return false;
+            if (huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return (-1f, -1);
             int alarmLimit = (levelIndex == 0 ? s.HunterAlarmsFirstHouse : s.HunterAlarmsLater) * (huntersSoFar + 1);
             float timeLimit = Mathf.Max(s.HunterMinTime, s.HunterTime - levelIndex * s.HunterTimeStepPerHouse) * (huntersSoFar + 1);
-            return alarms >= alarmLimit || elapsed >= timeLimit;
+            return (Mathf.Max(0f, timeLimit - elapsed), Mathf.Max(0, alarmLimit - alarms));
         }
+
+        /// <summary>This house's forecast of the next hunter (see <see cref="HunterForecast(int,float,int,int,RunSettings)"/>).</summary>
+        public (float seconds, int alarms) HunterForecast(float elapsed) =>
+            Phase == RunPhase.Playing ? HunterForecast(Alarms, elapsed, LevelIndex, Hunters, m_S) : (-1f, -1);
 
         /// <summary>A new run begins in the sewer, before the first house: nothing to pay yet.</summary>
         public void BeginRun()

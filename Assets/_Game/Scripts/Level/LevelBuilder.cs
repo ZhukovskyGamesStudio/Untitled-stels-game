@@ -128,6 +128,9 @@ namespace Stealth.Level
                 var go = Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
                 RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
+                if (go.TryGetComponent<SecurityTerminal>(out var terminal))
+                    foreach (var t in l.Terminals)
+                        if (t.prop == i) terminal.Configure(i, t.kind);
                 Props.Add(go);
             }
             return root;
@@ -265,9 +268,9 @@ namespace Stealth.Level
                 return;
             }
             var mid = (a + b) / 2f;
-            bool vent = type == EdgeType.Vent;
-            // Vents sit in the middle of the wall like doors: the centre cross of a room is always kept free of furniture.
-            float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : LevelMetrics.DoorWidth);
+            bool vent = type == EdgeType.Vent, squeeze = type == EdgeType.Squeeze;
+            // Vents and slots sit in the middle of the wall like doors: the centre cross of a room is always kept free of furniture.
+            float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth : LevelMetrics.DoorWidth);
             var d0 = mid - dir * (clear / 2f);
             var d1 = mid + dir * (clear / 2f);
             WallPiece(m_Art.WallBlock, a1, d0, 0, LevelMetrics.WallHeight);
@@ -282,6 +285,7 @@ namespace Stealth.Level
             var along = Quaternion.LookRotation(new Vector3(-dir.z, 0, dir.x));
             if (vent) Place(m_Art.VentFrame, "VentFrame", mid, along);
             else if (outside) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
+            else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
             else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
         }
 

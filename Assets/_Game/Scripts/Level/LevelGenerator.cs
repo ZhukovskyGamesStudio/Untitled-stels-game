@@ -50,7 +50,9 @@ namespace Stealth.Level
         [Tooltip("Chance of an extra door in a remaining wall (loops).")]
         public float ExtraDoorChance = 0.2f;
         [Tooltip("Chance of a crawl vent in a remaining wall.")]
-        public float VentChance = 0.35f;
+        public float VentChance = 0.45f;
+        [Tooltip("Chance of a narrow slot (players squeeze through, robots do not) in a wall still left.")]
+        public float SqueezeChance = 0.3f;
         [Tooltip("Chance of a sliding door in a doorway without a laser.")]
         public float AutoDoorChance = 0.45f;
         [Tooltip("Chance that a sliding door is locked: players must hack it (robots have the key).")]
@@ -117,6 +119,12 @@ namespace Stealth.Level
         public int TeamRoomsPerExtraDevice = 15;
         [Tooltip("House (0-based) from which lasers can move up and down.")]
         public int MovingLasersFromHouse = 2;
+
+        [Header("Terminals")]
+        [Tooltip("Desks turned into a terminal that shows the house's cameras (only in houses with cameras).")]
+        public int CameraTerminals = 1;
+        [Tooltip("Desks turned into a terminal that hacks robots and devices from afar.")]
+        public int HackTerminals = 1;
 
         [Header("Who")]
         public RosterSettings Roster = new();
@@ -204,6 +212,7 @@ namespace Stealth.Level
                         FurnishRoom(l, f, x, y, rng);
 
             PlaceSecurity(l, rng, building, security);
+            PlaceTerminals(l, security);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(w * Cell / 2f, height / 2f, h * Cell / 2f), new Vector3(w * Cell, height, h * Cell));
@@ -246,6 +255,14 @@ namespace Stealth.Level
             for (int x = 0; x < w; x++)
                 for (int y = 0; y < h - 1; y++)
                     if (l.EdgesZ[f, x, y] == EdgeType.Wall && rng.NextDouble() < b.VentChance) l.EdgesZ[f, x, y] = EdgeType.Vent;
+            // Narrow slots in some of the walls still left (own stream: the rest of the house does not shift).
+            var slots = new System.Random(LevelRandom.Mix(l.Seed, 0x5A0E, f));
+            for (int x = 0; x < w - 1; x++)
+                for (int y = 0; y < h; y++)
+                    if (l.EdgesX[f, x, y] == EdgeType.Wall && slots.NextDouble() < b.SqueezeChance) l.EdgesX[f, x, y] = EdgeType.Squeeze;
+            for (int x = 0; x < w; x++)
+                for (int y = 0; y < h - 1; y++)
+                    if (l.EdgesZ[f, x, y] == EdgeType.Wall && slots.NextDouble() < b.SqueezeChance) l.EdgesZ[f, x, y] = EdgeType.Squeeze;
         }
 
         /// <summary>One staircase per pair of floors, each in a different cell (never the lobby).</summary>
@@ -633,6 +650,42 @@ namespace Stealth.Level
             spot = doors[k];
             doors.RemoveAt(k);
             return true;
+        }
+
+        /// <summary>
+        /// Some office desks become security terminals (own stream: the rest of the house does not shift). Not in the lobby,
+        /// and as far from each other as the desks allow, so the two kinds are not side by side.
+        /// </summary>
+        static void PlaceTerminals(LevelLayout l, SecuritySettings s)
+        {
+            var desks = new List<int>();
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > Cell * 0.75f) desks.Add(i);
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
+            var want = new List<TerminalKind>();
+            for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
+            for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
+            foreach (var kind in want)
+            {
+                if (desks.Count == 0) return;
+                int pick = desks[rng.Next(desks.Count)];
+                if (l.Terminals.Count > 0)
+                {
+                    // the desk furthest from the terminals placed so far
+                    float best = -1f;
+                    foreach (var d in desks)
+                    {
+                        float near = float.MaxValue;
+                        foreach (var t in l.Terminals) near = Mathf.Min(near, (l.Props[d].Position - l.Props[t.prop].Position).sqrMagnitude);
+                        if (near > best) { best = near; pick = d; }
+                    }
+                }
+                desks.Remove(pick);
+                var p = l.Props[pick];
+                p.Kind = PropKind.Terminal;
+                l.Props[pick] = p;
+                l.Terminals.Add((pick, kind));
+            }
         }
 
         static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s)

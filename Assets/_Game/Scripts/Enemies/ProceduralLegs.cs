@@ -157,10 +157,34 @@ namespace Stealth.Enemies
                 var ur = upper.GetComponent<Renderer>();
                 var lr = lower != null ? lower.GetComponent<Renderer>() : null;
                 if (ur == null || lr == null) continue;
-                var lb = lr.bounds;
-                var knee = new Vector3(lb.center.x, lb.max.y, lb.center.z);
-                var foot = new Vector3(lb.center.x, lb.min.y, lb.center.z);
-                var hip = FarEnd(ur.bounds, knee);
+                // Knee = top of the shin, foot = its bottom, hip = the end of the thigh away from the knee — from the
+                // vertices, so slanted shins (the spider's) work as well as upright ones.
+                var lv = WorldVertices(lower);
+                var uv = WorldVertices(upper);
+                // Which way the knee bends: from the bounds (the foot pushes a straight shin's middle forward — a biped's
+                // knees bend forwards; a spider's raised knee is above its foot, away from the hip).
+                var lbb = lr.bounds;
+                var boundsKnee = new Vector3(lbb.center.x, lbb.max.y, lbb.center.z);
+                var boundsFoot = new Vector3(lbb.center.x, lbb.min.y, lbb.center.z);
+                var bend = boundsKnee - (FarEnd(ur.bounds, boundsKnee) + boundsFoot) / 2f;
+                Vector3 knee, foot, hip;
+                if (lv != null && uv != null)
+                {
+                    knee = Extreme(lv, Vector3.up);
+                    foot = Extreme(lv, Vector3.down);
+                    var centre = Vector3.zero;
+                    foreach (var v in uv) centre += v;
+                    centre /= uv.Length;
+                    var away = centre - knee;
+                    hip = away.sqrMagnitude > 1e-6f ? Extreme(uv, away.normalized) : FarEnd(ur.bounds, knee);
+                }
+                else
+                {
+                    var lb = lr.bounds;
+                    knee = new Vector3(lb.center.x, lb.max.y, lb.center.z);
+                    foot = new Vector3(lb.center.x, lb.min.y, lb.center.z);
+                    hip = FarEnd(ur.bounds, knee);
+                }
 
                 var hipPivot = new GameObject(upper.name + RobotAnimator.PivotSuffix).transform;
                 hipPivot.SetParent(upper.parent, false);
@@ -173,7 +197,6 @@ namespace Stealth.Enemies
                 upper.SetParent(hipPivot, true);
                 lower.SetParent(kneePivot, true);
 
-                var bend = knee - (hip + foot) / 2f;
                 list.Add(new Leg
                 {
                     Hip = hipPivot,
@@ -192,6 +215,32 @@ namespace Stealth.Enemies
                 leg.Group = leg.RestFoot.x < 0f ? left++ % 2 : (right++ + 1) % 2;
             legs.Legs = list.ToArray();
             return list.Count > 0;
+        }
+
+        static Vector3[] WorldVertices(Transform part)
+        {
+            var mf = part.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null || !mf.sharedMesh.isReadable) return null;
+            var verts = mf.sharedMesh.vertices;
+            if (verts.Length == 0) return null;
+            for (int i = 0; i < verts.Length; i++) verts[i] = part.TransformPoint(verts[i]);
+            return verts;
+        }
+
+        /// <summary>The middle of the vertices furthest along <paramref name="dir"/> (within 2 cm of the furthest one).</summary>
+        public static Vector3 Extreme(Vector3[] verts, Vector3 dir)
+        {
+            float max = float.MinValue;
+            foreach (var v in verts) max = Mathf.Max(max, Vector3.Dot(v, dir));
+            var sum = Vector3.zero;
+            int n = 0;
+            foreach (var v in verts)
+            {
+                if (Vector3.Dot(v, dir) < max - 0.02f) continue;
+                sum += v;
+                n++;
+            }
+            return sum / n;
         }
 
         /// <summary>The middle of the face of <paramref name="b"/> along its longest side that is further from <paramref name="from"/>.</summary>

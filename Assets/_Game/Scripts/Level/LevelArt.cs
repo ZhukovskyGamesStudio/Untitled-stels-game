@@ -24,6 +24,8 @@ namespace Stealth.Level
         public GameObject Stairs;
         public GameObject StairsMirrored;
         public GameObject VentFrame;
+        [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
+        public GameObject SqueezeFrame;
         public GameObject AutoDoor;
         public GameObject RoomLight;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
@@ -69,6 +71,7 @@ namespace Stealth.Level
         public GameObject BeanBag;
         public GameObject ArcadeMachine;
         public GameObject Safe;
+        public GameObject Terminal;
         public GameObject FloorLamp;
 
         public GameObject Prop(PropKind kind) => kind switch
@@ -109,6 +112,7 @@ namespace Stealth.Level
             PropKind.BeanBag => BeanBag,
             PropKind.ArcadeMachine => ArcadeMachine,
             PropKind.Safe => Safe,
+            PropKind.Terminal => Terminal,
             _ => null,
         };
     }

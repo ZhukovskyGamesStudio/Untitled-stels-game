@@ -57,38 +57,38 @@ namespace Stealth.EditorTools
             {
                 anim.Bob = 0.06f;
                 s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
-                t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4.4f;
+                t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
             }));
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ContactDistance = 1.4f;
                 t.CanUseStairs = false; // wheels
-                t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 5f; t.LoseTargetAfter = 3f;
+                t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 4.5f; t.LoseTargetAfter = 3f;
             }));
             Robot(RobotKind.Drone, RobotPrefabs + "/RobotDrone.prefab", () => MobileRobot("RobotDrone", "robot_drone", "DroneBody", 0.45f, new Vector3(0, -0.1f, 0.25f), ripple, (s, t, anim) =>
             {
                 anim.Lean = 14f;
                 s.ViewDistance = 11f; s.ViewAngle = 120f; s.EyePitch = 35f; s.HearingMultiplier = 0.5f; // looks down-forward
                 t.HoverHeight = 2.1f; t.AlarmOnDetect = true;
-                t.PatrolSpeed = 2.6f; t.InvestigateSpeed = 3.6f; t.ChaseSpeed = 5.2f; t.AttackRange = 1.4f;
+                t.PatrolSpeed = 2.6f; t.InvestigateSpeed = 3.6f; t.ChaseSpeed = 4.7f; t.AttackRange = 1.4f;
             }));
             Robot(RobotKind.Thumper, RobotPrefabs + "/RobotThumper.prefab", () => MobileRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 0f; // deaf; it listens with its feet
                 s.SeismicRange = 10f; s.SeismicSpeed = 0.8f; s.ContactDistance = 1.6f;
                 t.CanUseStairs = false; // tracks
-                t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.3f; t.AttackRange = 1.9f;
+                t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3f; t.AttackRange = 1.9f;
                 t.SuspicionDecay = 0.12f; // waves come seconds apart: it keeps what it felt between them
             }));
             Robot(RobotKind.Hound, RobotPrefabs + "/RobotHound.prefab", () => MobileRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 1.6f;
-                t.PatrolSpeed = 2.2f; t.InvestigateSpeed = 3.4f; t.ChaseSpeed = 5.4f; t.LoseTargetAfter = 6f;
+                t.PatrolSpeed = 2.2f; t.InvestigateSpeed = 3.4f; t.ChaseSpeed = 4.9f; t.LoseTargetAfter = 6f;
             }));
             Robot(RobotKind.Sorter, RobotPrefabs + "/RobotSorter.prefab", () => MobileRobot("RobotSorter", "robot_sorter", "SorterBody", 0.35f, new Vector3(0, 1.25f, 0.3f), ripple, (s, t, anim) =>
             {
                 s.ColorSorter = true; s.ViewDistance = 16f; s.ViewAngle = 160f; s.DetectionSpeed = 0.9f; s.HearingMultiplier = 0.3f;
-                t.PatrolSpeed = 1.7f; t.InvestigateSpeed = 2.6f; t.ChaseSpeed = 4.6f;
+                t.PatrolSpeed = 1.7f; t.InvestigateSpeed = 2.6f; t.ChaseSpeed = 4.2f;
             }));
             Robot(RobotKind.Worker, RobotPrefabs + "/RobotWorker.prefab", () =>
             {
@@ -117,7 +117,7 @@ namespace Stealth.EditorTools
                     s.HasEyes = false; s.HearingMultiplier = 0f; s.ContactDistance = 0.9f; // blind and deaf: only the floor lidar
                     s.LidarRange = 6f; s.LidarHeight = 0.22f; s.LidarTurnSpeed = 140f; s.LidarRate = 15f;
                     t.CanUseStairs = false; // wheels
-                    t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.4f; t.AttackRange = 1.3f;
+                    t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.1f; t.AttackRange = 1.3f;
                 });
                 var rc = go.GetComponent<RobotController>();
                 var lidar = go.AddComponent<RobotLidar>();
@@ -129,9 +129,9 @@ namespace Stealth.EditorTools
             });
             Robot(RobotKind.Hunter, RobotPrefabs + "/RobotHunter.prefab", () => MobileRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), ripple, (s, t, anim) =>
             {
-                s.ViewDistance = 16f; s.ViewAngle = 120f; s.DetectionSpeed = 1f; // everything at once
-                s.HearingMultiplier = 1.2f; s.SeismicRange = 6f; s.SmellRange = 3f;
-                t.PatrolSpeed = 2.8f; t.InvestigateSpeed = 4.5f; t.ChaseSpeed = 5.8f; t.LoseTargetAfter = 7f; t.AttackCooldown = 1.3f; t.WarningTime = 0.9f;
+                s.ViewDistance = 14f; s.ViewAngle = 120f; s.DetectionSpeed = 0.75f; // every sense, but beatable
+                s.HearingMultiplier = 1.2f; s.SeismicRange = 4f; s.SmellRange = 3f;
+                t.PatrolSpeed = 2.8f; t.InvestigateSpeed = 3.8f; t.ChaseSpeed = 4.9f; t.LoseTargetAfter = 5f; t.AttackCooldown = 1.7f; t.WarningTime = 1.2f;
             }));
 
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
@@ -161,13 +161,14 @@ namespace Stealth.EditorTools
                 m.Profile = Profile<MotionSensorProfile>("SensorMotion");
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // on the wall, nothing to bump into
             }));
-            Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "PlateSeam", false, false, (root, p) =>
+            Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "RobotBody", false, false, (root, p) =>
             {
                 p.Profile = Profile<PressurePlateProfile>("SensorPlate", c => { c.ForgetRate = 0.4f; c.HalfSize = 0.55f; });
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // flush with the floor
-                // Only a faint dot: the indicator barely glows, nothing lights the floor around it.
-                p.Status.Light.enabled = false; // no light pooling on the floor around it
-                p.Status.Emission = 0.45f; // below 1: no bloom halo, just a dim dot
+                // A steel slab with a glowing border in the status colour and a small pool of light: seen by anyone who
+                // watches where they walk (it lies in a doorway — jump over it or hack it).
+                p.Status.Light.range = 1.4f;
+                p.Status.Light.intensity = 0.8f;
                 foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }));
             Robot(RobotKind.Camera, SensorPrefabs + "/SecurityCamera.prefab", BuildSecurityCamera);

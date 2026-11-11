@@ -42,6 +42,9 @@ namespace Stealth.Net
         readonly NetworkVariable<double> m_LeaveAt = new();
         readonly NetworkVariable<double> m_GoAt = new();
         readonly NetworkVariable<sbyte> m_Chosen = new(-1);
+        readonly NetworkVariable<double> m_HunterAt = new();
+        readonly NetworkVariable<sbyte> m_Style = new(-1);
+        readonly NetworkVariable<sbyte> m_HunterAlarms = new(-1);
         NetworkList<int> m_Opened;
         NetworkList<NetVote> m_Votes;
         int m_PushedOpened = -1, m_PushedVotes = -1;
@@ -78,6 +81,11 @@ namespace Stealth.Net
             m_LeaveAt.OnValueChanged += (_, _) => Pull();
             m_GoAt.OnValueChanged += (_, _) => Pull();
             m_Chosen.OnValueChanged += (_, _) => Pull();
+            m_HunterAt.OnValueChanged += (_, _) => PullHunter();
+            m_HunterAlarms.OnValueChanged += (_, _) => PullHunter();
+            PullHunter();
+            m_Style.OnValueChanged += (_, v) => m_Game.ApplyStyle(v);
+            m_Game.ApplyStyle(m_Style.Value); // a late joiner sees what the team sees
             PullOpened();
             m_Opened.OnListChanged += _ => PullOpened();
             PullVotes();
@@ -109,6 +117,10 @@ namespace Stealth.Net
             NetSync.Set(m_LeaveAt, m_Game.LeaveAt);
             NetSync.Set(m_GoAt, m_Game.GoAt);
             NetSync.Set(m_Chosen, (sbyte)Mathf.Clamp(m_Game.ChosenLane, -1, 127));
+            // Whole seconds are enough for a countdown (and keep the variable from changing every frame).
+            NetSync.Set(m_HunterAt, m_Game.HunterAt <= 0 ? 0 : System.Math.Round(m_Game.HunterAt));
+            NetSync.Set(m_Style, (sbyte)Mathf.Clamp(m_Game.StyleIndex, -1, 127));
+            NetSync.Set(m_HunterAlarms, (sbyte)Mathf.Clamp(m_Game.HunterAlarmsLeft, -1, 127));
             if (m_PushedOpened != m_Game.OpenedVersion)
             {
                 m_PushedOpened = m_Game.OpenedVersion;
@@ -156,6 +168,8 @@ namespace Stealth.Net
             for (int i = 0; i < map.ChunkCount; i++) map.Merge(i, m_Explored[i + 1]);
         }
 
+        void PullHunter() => m_Game.ApplyHunter(m_HunterAt.Value, m_HunterAlarms.Value);
+
         void PullOpened()
         {
             var keys = new List<int>();
@@ -189,6 +203,10 @@ namespace Stealth.Net
 
 
         public void RequestRestart() => RestartRpc();
+        public void RequestStyle(int index) => StyleRpc(index);
+
+        [Rpc(SendTo.Server)]
+        void StyleRpc(int index) => m_Game.SetStyleServer(index);
         public void BroadcastBanner(string text) => BannerRpc(text);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => PingRpc(owner, kind, position, target);
 

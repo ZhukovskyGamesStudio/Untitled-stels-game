@@ -72,6 +72,16 @@ namespace Stealth.Game
 
         public static int DoorKey(int door) => door;
         public static int SafeKey(int safe) => 1_000_000 + safe;
+        /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
+        public static int TerminalKey(int terminal, int use) => 2_000_000 + terminal * 16 + use;
+
+        /// <summary>Hacks already made from this terminal in this house (kept with the opened doors and safes, so replicated).</summary>
+        public int TerminalUses(int terminal)
+        {
+            int n = 0;
+            while (n < 16 && m_Opened.Contains(TerminalKey(terminal, n))) n++;
+            return n;
+        }
         public bool IsOpened(int key) => m_Opened.Contains(key);
 
         /// <summary>The ways on from the house just left (rows of the next column).</summary>
@@ -94,7 +104,18 @@ namespace Stealth.Game
         public int RunTotal => m_Run.RunTotal;
         public RunPhase Phase => m_Run.Phase;
         public double AlarmUntil => m_Run.AlarmUntil;
+        /// <summary>Server time the next hunter comes anyway (0 = no more hunters in this house).</summary>
+        public double HunterAt { get; private set; }
+        /// <summary>Alarms that would bring the next hunter sooner (-1 = no more hunters in this house).</summary>
+        public int HunterAlarmsLeft { get; private set; } = -1;
+        bool m_HunterWarned;
         public bool AlarmActive => m_Run.AlarmActive(Session.ServerTime);
+
+        /// <summary>The visual style the team looks at (index in <see cref="VisualStyles.All"/>, -1 = each its own default).</summary>
+        public int StyleIndex { get; private set; } = -1;
+        int m_AppliedStyle = -1;
+        /// <summary>Every peer: the team's style changed — "Стиль: …" (the HUD shows it, replacing the previous one).</summary>
+        public static event Action<string> StyleAnnounced;
 
         public event Action<string> OnBanner;
         /// <summary>Any banner on this peer (the sound director listens).</summary>
@@ -110,6 +131,7 @@ namespace Stealth.Game
             m_Run = new RunState(Tuning.Run.Rules);
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
+            SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
             if (!isServer) return;
             // A run starts in the sewer, at the first fork (tests and -level start right in a house).
             if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0) StartLevel(DevFlags.ForcedLevel, 0);
@@ -140,6 +162,13 @@ namespace Stealth.Game
                 BuildLocal();
             }
             SyncLocation();
+        }
+
+        /// <summary>Client: the server's forecast of the next hunter.</summary>
+        public void ApplyHunter(double at, int alarmsLeft)
+        {
+            HunterAt = at;
+            HunterAlarmsLeft = alarmsLeft;
         }
 
         /// <summary>Client: the server's hacked doors and cracked safes.</summary>
@@ -329,6 +358,7 @@ namespace Stealth.Game
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
             if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
             if (m_Run.Wipe()) Banner($"Забег окончен: Вся команда выведена из строя. Итог забега: {RunTotal} очк.");
@@ -375,6 +405,21 @@ namespace Stealth.Game
             Audio.Sfx.Ui(kind == PingKind.Enemy ? bank?.Mark : bank?.Ping, 0.8f);
         }
 
+        /// <summary>Server: publish when the next hunter comes, and warn the team a minute before.</summary>
+        void UpdateHunterForecast()
+        {
+            var (seconds, alarms) = m_Run.HunterForecast(Time.time - LevelStartTime);
+            HunterAt = seconds < 0f ? 0 : Session.ServerTime + seconds;
+            HunterAlarmsLeft = alarms;
+            if (seconds < 0f || seconds > HunterWarning) { m_HunterWarned = false; return; }
+            if (m_HunterWarned) return;
+            m_HunterWarned = true;
+            Banner("Охотник придёт через минуту — заканчивайте и к люку");
+        }
+
+        /// <summary>Seconds before the hunter comes that the team is warned.</summary>
+        const float HunterWarning = 60f;
+
         /// <summary>The hunter enters through the furthest room of the ground floor from the players.</summary>
         void SpawnHunter()
         {
@@ -404,6 +449,34 @@ namespace Stealth.Game
         // ------------------------------------------------------------------ requests
 
 
+
+        /// <summary>Any player: switch the whole team to this visual style (F8).</summary>
+        public void RequestStyle(int index)
+        {
+            if (m_Link != null) m_Link.RequestStyle(index);
+            else SetStyleServer(index);
+        }
+
+        /// <summary>Server: the team's style (replicated by the twin, applied on the host at once).</summary>
+        public void SetStyleServer(int index)
+        {
+            if (VisualStyles.At(index) == null) return;
+            StyleIndex = index;
+            ApplyStyle(index);
+        }
+
+        /// <summary>Every peer: put the team's style on (the twin calls it when the replicated index changes).</summary>
+        public void ApplyStyle(int index)
+        {
+            var style = VisualStyles.At(index);
+            if (style == null || index == m_AppliedStyle) return;
+            m_AppliedStyle = index;
+            VisualStyles.Apply(style);
+            var me = PlayerController.Local;
+            VisualStyles.SnapFog(me != null && ActiveLevel.Layout != null && !ActiveLevel.Layout.IsInside(me.transform.position));
+            Debug.Log($"[Game] Team style: {style.name}");
+            StyleAnnounced?.Invoke($"Стиль: {style.Title} ({style.References})");
+        }
 
         public void RequestRestart()
         {
@@ -544,6 +617,22 @@ namespace Stealth.Game
             var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock);
             if (d == null || Vector3.Distance(d.transform.position, player.transform.position) > AutoDoor.HackReach + 1.5f) return;
             if (m_Opened.Add(DoorKey(door))) OpenedVersion++;
+        }
+
+        /// <summary>Server: a player at a hacking terminal hacks a robot / device anywhere in the house (a charge is spent).</summary>
+        public void RemoteHackServer(PlayerController player, int terminal, Detector target)
+        {
+            if (Phase != RunPhase.Playing || player == null || player.Downed || target == null || target.IsHacked) return;
+            var t = SecurityTerminal.Find(terminal);
+            if (t == null || t.Kind != TerminalKind.Hacking) return;
+            var to = player.transform.position - t.transform.position;
+            to.y = 0;
+            if (to.magnitude > SecurityTerminal.Reach + 1.5f) return;
+            int uses = TerminalUses(terminal);
+            if (uses >= Tuning.Player.Interaction.TerminalHacks) return;
+            m_Opened.Add(TerminalKey(terminal, uses));
+            OpenedVersion++;
+            target.HackServer(Tuning.Player.Interaction.HackDuration);
         }
 
         /// <summary>Server: a player cracked a safe — it opens and gives valuable loot.</summary>

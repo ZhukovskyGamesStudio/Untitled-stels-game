@@ -29,7 +29,7 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -186,6 +186,15 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки
 `ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `IPlayerLink.SendOpenSafe` → лут на сервере. Открытые двери и сейфы дома —
 `GameManager.Opened` (ключи `DoorKey`/`SafeKey`), реплицирует `GameManagerNet`.
+
+**Терминалы охраны** — `LevelLayout.Terminals`: часть столов (`PropKind.Desk`) становится `PropKind.Terminal` (свой поток рандома). `SecurityTerminal` на префабе
+Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или взлом издалека — `IPlayerLink.SendRemoteHack` → `GameManager.RemoteHackServer`,
+заряды (`InteractionSettings.TerminalHacks`) хранятся ключами `GameManager.TerminalKey` в `Opened`. Игрок за терминалом — `PlayerController.UsingTerminal`.
+**Узкие щели** — `EdgeType.Squeeze` (`LevelMetrics.SqueezeWidth`, свой поток рандома): игрок протискивается, роботов не пускает `NavMeshModifierVolume`
+в префабе `Level/SqueezeFrame`. **«Я застрял»** — `Unstuck` (кольца свободных точек вокруг игрока, потом точки патруля/спавны канализации; двигает себя
+владелец, у клиента нет навмеша). **Стиль (F8)** — общий для команды: `GameManager.RequestStyle` → `StyleIndex` реплицирует `GameManagerNet`.
+**World-space текст** (панели туннелей, доска склада) — на слое `WorldText` (9): обычные проходы его не рисуют, его рисует RenderObjects `WorldText` после
+фильтра `StyleScreen` — буквы читаются в любом стиле. Выбывший игрок смотрит глазами союзника (`PlayerController.Watching`).
 
 **Ноги роботов** — `ProceduralLegs`: ноги, разрезанные в Blender по колену (`AccentLeg{n}Upper` / `Lower`, `generate_models.split_leg`),
 сборщик превращает в пары шарниров бедро/колено (`ProceduralLegs.Bake`); в игре ступни стоят на поверхности под ними (пол, у паука —

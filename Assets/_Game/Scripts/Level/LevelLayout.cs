@@ -4,12 +4,18 @@ using UnityEngine;
 namespace Stealth.Level
 {
     public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge }
-    /// <summary>Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not.</summary>
-    public enum EdgeType { Wall, Door, Open, Vent }
+    /// <summary>
+    /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
+    /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
+    /// </summary>
+    public enum EdgeType { Wall, Door, Open, Vent, Squeeze }
     public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall,
         Partition, Bookshelf, Printer, Fridge, CoffeeMachine, RoundTable, Armchair, CoffeeTable, TvStand, ReceptionDesk,
         TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine, DeskLamp, FloorLamp,
-        PingPongTable, BeanBag, ArcadeMachine, Safe }
+        PingPongTable, BeanBag, ArcadeMachine, Safe, Terminal }
+
+    /// <summary>What a security terminal does: show the house's cameras, or hack robots and devices from afar.</summary>
+    public enum TerminalKind : byte { Cameras, Hacking }
 
     public struct PropPlacement
     {
@@ -71,6 +77,8 @@ namespace Stealth.Level
         public readonly List<Pose> AutoDoors = new(); // sliding doors in doorways (local X along the wall)
         /// <summary>Indices into <see cref="AutoDoors"/> that are locked: players hack them open, robots pass.</summary>
         public readonly HashSet<int> LockedDoors = new();
+        /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
+        public readonly List<(int prop, TerminalKind kind)> Terminals = new();
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;

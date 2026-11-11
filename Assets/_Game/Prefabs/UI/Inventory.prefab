@@ -911,7 +911,7 @@ GameObject:
   - component: {fileID: 5851541231342449916}
   - component: {fileID: 8892664805132523986}
   - component: {fileID: 1658465259803446101}
-  - component: {fileID: 6453628207424725507}
+  - component: {fileID: 4828303856777398299}
   m_Layer: 0
   m_Name: Tooltip
   m_TagString: Untagged
@@ -980,7 +980,7 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "\u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0430"
---- !u!114 &6453628207424725507
+--- !u!114 &4828303856777398299
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -989,10 +989,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 3243309301459331472}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
-  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.8}
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.85}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!1 &3308885716519695485
@@ -1445,7 +1445,7 @@ GameObject:
   - component: {fileID: 5077255800293394871}
   - component: {fileID: 3264977735321157355}
   - component: {fileID: 6316760313364845946}
-  - component: {fileID: 4667111003231703407}
+  - component: {fileID: 4241064703535174028}
   m_Layer: 0
   m_Name: Value
   m_TagString: Untagged
@@ -1514,7 +1514,7 @@ MonoBehaviour:
     m_VerticalOverflow: 0
     m_LineSpacing: 1
   m_Text: "0 \u043E\u0447\u043A."
---- !u!114 &4667111003231703407
+--- !u!114 &4241064703535174028
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1523,10 +1523,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 4444312048298901374}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
-  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.8}
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.85}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!1 &4468420106078285917
@@ -2342,7 +2342,7 @@ GameObject:
   - component: {fileID: 2519497666143279839}
   - component: {fileID: 2533556125435337177}
   - component: {fileID: 8148480989417879318}
-  - component: {fileID: 8463518133787030464}
+  - component: {fileID: 8756417779222273281}
   m_Layer: 0
   m_Name: RotateHint
   m_TagString: Untagged
@@ -2367,7 +2367,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
   m_AnchoredPosition: {x: -5, y: 0}
-  m_SizeDelta: {x: 120, y: 20}
+  m_SizeDelta: {x: 150, y: 20}
   m_Pivot: {x: 1, y: 0.5}
 --- !u!222 &2533556125435337177
 CanvasRenderer:
@@ -2410,8 +2410,8 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "R \u2014 \u043F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u044C"
---- !u!114 &8463518133787030464
+  m_Text: "R \u043F\u043E\u0432\u043E\u0440\u043E\u0442 \xB7 T \u0437\u0435\u0440\u043A\u0430\u043B\u043E"
+--- !u!114 &8756417779222273281
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -2420,9 +2420,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 8674540724425964775}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cfabb0440166ab443bba8876756fdfa9, type: 3}
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
-  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.8}
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 0.85}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1

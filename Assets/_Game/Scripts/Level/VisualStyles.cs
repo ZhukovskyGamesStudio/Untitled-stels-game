@@ -62,17 +62,22 @@ namespace Stealth.Level
             return null;
         }
 
-        /// <summary>The next style in the list (wraps around).</summary>
-        public static VisualStyle Next()
+        /// <summary>Index of the style in use in <see cref="All"/> (-1 = none of them).</summary>
+        public static int CurrentIndex
         {
-            var all = All;
-            if (all.Count == 0) return null;
-            int i = 0;
-            for (int k = 0; k < all.Count; k++) if (all[k] == s_Current) i = k + 1;
-            var next = all[i % all.Count];
-            Apply(next);
-            return next;
+            get
+            {
+                var all = All;
+                for (int k = 0; k < all.Count; k++) if (all[k] == s_Current) return k;
+                return -1;
+            }
         }
+
+        /// <summary>Index of the next style in the list (wraps around), -1 if there are none.</summary>
+        public static int NextIndex() => All.Count == 0 ? -1 : (CurrentIndex + 1) % All.Count;
+
+        /// <summary>The style at an index of <see cref="All"/>, or null.</summary>
+        public static VisualStyle At(int index) => index >= 0 && index < All.Count ? All[index] : null;
 
         /// <summary>Applies a style (null = the base look). Safe to call again after a level is built.</summary>
         public static void Apply(VisualStyle style)
@@ -407,6 +412,12 @@ namespace Stealth.Level
             Shader.SetGlobalColor("_StyGlowA", s.NeonNear);
             Shader.SetGlobalColor("_StyGlowB", s.NeonFarColor);
             Shader.SetGlobalVector("_StyExtra", new Vector4(s.OutlineInvert ? 1 : 0, s.ColorOnlyLights, s.Visor, s.Viewfinder ? 1 : 0));
+            Shader.SetGlobalVector("_StyMap", new Vector4(s.GradientMap, 0, 0, 0));
+            Shader.SetGlobalColor("_StyMapA", s.MapDark);
+            Shader.SetGlobalColor("_StyMapB", s.MapMid);
+            Shader.SetGlobalColor("_StyMapC", s.MapLight);
+            Shader.SetGlobalVector("_StyGrid", new Vector4(s.GridStrength, s.GridSpacing, 0, 0));
+            Shader.SetGlobalColor("_StyGridColor", s.GridColor);
         }
 
         // ------------------------------------------------------------------ air

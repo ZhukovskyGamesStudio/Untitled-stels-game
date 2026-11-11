@@ -31,6 +31,7 @@ namespace Stealth.Game
             m_Scenarios["sewer"] = SewerScenario;
             m_Scenarios["legs"] = LegsScenario;
             m_Scenarios["plate"] = PlateScenario;
+            m_Scenarios["terminals"] = TerminalsScenario;
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

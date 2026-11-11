@@ -69,7 +69,8 @@ namespace Stealth.Tests
                 for (int x = 0; x < m_Layout.Width - 1; x++)
                     for (int y = 0; y < m_Layout.Height; y++)
                     {
-                        if (m_Layout.EdgesX[f, x, y] != EdgeType.Vent) continue;
+                        var edge = m_Layout.EdgesX[f, x, y];
+                        if (edge != EdgeType.Vent && edge != EdgeType.Squeeze) continue; // crawl vents and narrow slots are for players only
                         // Points right on both sides of the vent opening (middle of the edge, see EdgeWall).
                         float vz = y * LevelMetrics.Cell + LevelMetrics.Cell * 0.5f, wx = (x + 1) * LevelMetrics.Cell;
                         var a = new Vector3(wx - 0.8f, LevelLayout.FloorY(f), vz);
@@ -79,7 +80,7 @@ namespace Stealth.Tests
                         NavMesh.CalculatePath(ha.position, hb.position, NavMesh.AllAreas, path);
                         float len = 0f;
                         for (int i = 1; i < path.corners.Length; i++) len += Vector3.Distance(path.corners[i - 1], path.corners[i]);
-                        Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots squeeze through the vent at {wx},{vz} floor {f}");
+                        Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots get through the {edge} at {wx},{vz} floor {f}");
                         checkedVents++;
                     }
             Assert.Greater(checkedVents, 0, "the level has vents");

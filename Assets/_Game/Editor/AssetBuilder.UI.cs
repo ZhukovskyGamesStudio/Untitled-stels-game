@@ -126,8 +126,9 @@ namespace Stealth.EditorTools
             t.raycastTarget = false;
             if (shadow)
             {
-                var s = rt.gameObject.AddComponent<Shadow>();
-                s.effectColor = new Color(0, 0, 0, 0.8f);
+                // A dark rim all round (not a drop shadow): the text stays readable over the brightest styles.
+                var s = rt.gameObject.AddComponent<Outline>();
+                s.effectColor = new Color(0, 0, 0, 0.85f);
                 s.effectDistance = new Vector2(1, -1);
             }
             return t;
@@ -417,6 +418,7 @@ namespace Stealth.EditorTools
                 view.Body.resizeTextMinSize = 11;
                 view.Body.resizeTextMaxSize = 15;
                 view.Votes = Txt(R(go.transform, "Votes", BottomLeft, BottomLeft, new Vector2(12, 6), new Vector2(w - 24, 26)), "Зайди в туннель", 16, TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.6f), true);
+                SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
                 return go;
             }).GetComponent<RouteSignView>();
 
@@ -524,14 +526,16 @@ namespace Stealth.EditorTools
             hud.NoiseLabel = Txt(R(noise, "Label", BottomLeft, BottomLeft, new Vector2(32, -2), new Vector2(120, 18)), "слышно", 12, TextAnchor.MiddleLeft, Color.white);
 
             // Quota panel, top left.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(232, 50));
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(232, 62));
             Img(quota, PanelColor);
             hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(150, 22)), "Дом 1 · этаж 1", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
             hud.QuotaLabel = Txt(R(quota, "Count", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(212, 22)), "0 / 100", 14, TextAnchor.MiddleRight, Color.white, true);
             hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(10, -28), new Vector2(212, 10), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
             hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(240, -23), new Vector2(120, 26));
             hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
-            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -52), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
+            hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 200), new Vector2(900, 52)), "Камера · 1 / 3", 16, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
+            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -40), new Vector2(260, 20)), "Охотник через 6:00 или после 3 тревог", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
+            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -64), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
 
             // Health, top right, and the team list under it.
             var hp = R(content, "Health", TopRight, TopRight, new Vector2(-16, -16), new Vector2(180, 40));
@@ -746,8 +750,8 @@ namespace Stealth.EditorTools
             ui.Header = header.gameObject;
             ui.HeaderBackground = Img(header, new Color(0, 0, 0, 0.6f));
             ui.ValueLabel = Txt(R(header, "Value", Left, Left, new Vector2(5, 0), new Vector2(120, 20)), "0 очк.", 13, TextAnchor.MiddleLeft, Color.white);
-            ui.RotateHint = Txt(R(header, "RotateHint", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-5, 0), new Vector2(120, 20)),
-                "R — повернуть", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f)).gameObject;
+            ui.RotateHint = Txt(R(header, "RotateHint", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-5, 0), new Vector2(150, 20)),
+                "R поворот · T зеркало", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f)).gameObject;
 
             ui.Grid = R(ui.Panel, "Grid", BottomCenter, TopCenter, new Vector2(0, 5 + gh), new Vector2(gw, gh));
             ui.Grid.pivot = TopLeft;
@@ -806,6 +810,7 @@ namespace Stealth.EditorTools
             board.SellZone = R(go.transform, "Sell", TopLeft, TopLeft, new Vector2(pad + gw + gap, -(header + pad)), new Vector2(sellW, gh));
             board.SellBackground = Img(board.SellZone, new Color(1f, 0.75f, 0.1f, 0.45f));
             Txt(Stretch(board.SellZone, "Label", 4f), "ПРОДАТЬ\nна квоту", 16, TextAnchor.MiddleCenter, Color.white, bold: true);
+            SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
             return go;
         }
 
@@ -878,6 +883,7 @@ namespace Stealth.EditorTools
             menu.Role = ColumnText(pc, "Role", "Ты хост", 15, Color.white, 26, anchor: TextAnchor.MiddleCenter);
             menu.Invite = ButtonIn(e, pc, "Invite", "Пригласить друзей (Steam)", 36);
             menu.Resume = ButtonIn(e, pc, "Resume", "Продолжить", 36);
+            menu.Unstuck = ButtonIn(e, pc, "Unstuck", "Я застрял", 36);
             menu.PauseSettings = ButtonIn(e, pc, "Settings", "Настройки", 36);
             menu.Leave = ButtonIn(e, pc, "Leave", "Покинуть игру", 36);
             BuildControlsPanel(e, menu, root.transform);

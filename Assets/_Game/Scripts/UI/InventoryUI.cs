@@ -164,7 +164,7 @@ namespace Stealth.UI
         void HandleInput(PlayerController me, PlayerInventory inv)
         {
             var mouse = Mouse.current;
-            if (me.Downed || GameMenu.IsOpen) { CancelDrag(); m_Hover = null; return; }
+            if (me.Downed || GameMenu.IsOpen || me.UsingTerminal != null) { CancelDrag(); m_Hover = null; return; } // at a terminal the camera is far away
 
             if (!me.CursorMode && !PlayerController.HoldCursor)
             {
@@ -195,7 +195,12 @@ namespace Stealth.UI
             m_DragTravel += mouse.delta.ReadValue().magnitude;
             if (Controls.Pressed(GameAction.Rotate))
             {
-                m_DragRot = (m_DragRot + 1) % 4;
+                m_DragRot = ItemCatalog.Turned(m_DragRot);
+                m_GrabCell = Vector2Int.zero;
+            }
+            if (Controls.Pressed(GameAction.Mirror))
+            {
+                m_DragRot = ItemCatalog.Mirrored(m_DragRot);
                 m_GrabCell = Vector2Int.zero;
             }
             if (!mouse.leftButton.isPressed) // released (or the press was lost)
@@ -397,7 +402,7 @@ namespace Stealth.UI
             Ui.Show(RotateHint, m_Expand > 0.5f);
             if (m_Expand > 0.5f && RotateHint.TryGetComponent<Text>(out var rotate))
             {
-                string rotateText = $"{Controls.Label(GameAction.Rotate)} — повернуть";
+                string rotateText = $"{Controls.Label(GameAction.Rotate)} поворот · {Controls.Label(GameAction.Mirror)} зеркало";
                 if (rotate.text != rotateText) rotate.text = rotateText;
             }
             float cellAlpha = Mathf.Lerp(0.04f, 0.07f, m_Expand);

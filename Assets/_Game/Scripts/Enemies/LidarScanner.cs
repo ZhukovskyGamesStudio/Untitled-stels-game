@@ -17,6 +17,12 @@ namespace Stealth.Enemies
 
         protected override void TickLocal()
         {
+            // Hacked: the head stops and the beam goes out.
+            if (IsHacked)
+            {
+                if (Line != null) Line.enabled = false;
+                return;
+            }
             var d = Dir;
             if (Head != null) Head.localRotation = Quaternion.LookRotation(-d); // emitter on the model's -Y side → Unity +Z
             if (Line == null) return;

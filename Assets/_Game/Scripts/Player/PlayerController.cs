@@ -76,6 +76,8 @@ namespace Stealth.Player
         /// <summary>Robot or device that can be hacked right now (hold E).</summary>
         public Detector HackTarget { get; private set; }
         public float HackProgress { get; private set; }
+        readonly HoldProgress<Detector> m_HackHeld = new();
+        readonly HoldProgress<AutoDoor> m_DoorHeld = new();
         /// <summary>0..1 of holding E over a downed teammate.</summary>
         public float ReviveShare => ReviveProgress / m_Interaction.ReviveTime;
         /// <summary>0..1 of holding E at a robot / device.</summary>
@@ -229,7 +231,7 @@ namespace Stealth.Player
             bool menu = GameMenu.IsOpen;
             if (Keyboard.current == null) return;
 
-            bool cracking = Cracking != null;
+            bool cracking = Cracking != null || UsingTerminal != null; // busy at a dial or a terminal: no walking
             CursorMode = !menu && !Downed && !InHatch && !cracking && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
@@ -352,6 +354,43 @@ namespace Stealth.Player
             Gas.Reset();
         }
 
+        float m_UnstuckAt = -100f;
+
+        /// <summary>Owner: "I'm stuck" — move to the nearest spot where you stand free (a cooldown keeps it from being an escape).</summary>
+        public void RequestUnstuck()
+        {
+            if (!IsOwner || !IsSpawned) return;
+            var gm = GameManager.Instance;
+            if (Downed || InHatch) return;
+            float wait = m_UnstuckAt + m_Interaction.UnstuckCooldown - Time.time;
+            if (wait > 0f)
+            {
+                gm?.ShowBanner($"«Я застрял» можно снова через {Mathf.CeilToInt(wait)} с");
+                return;
+            }
+            var fallback = new List<Vector3>();
+            var sewer = SewerLocation.Active;
+            if (sewer != null)
+                foreach (var s in sewer.Spawns) fallback.Add(s.position);
+            else if (ActiveLevel.Layout is { } layout)
+            {
+                int floor = LevelLayout.FloorOf(transform.position.y);
+                foreach (var p in layout.PatrolPoints)
+                    if (LevelLayout.FloorOf(p.y) == floor) fallback.Add(p);
+                fallback.AddRange(layout.PlayerSpawns);
+            }
+            if (!Unstuck.FindSpot(transform.position, m_Controller.radius, m_Controller.height, fallback, transform, out var spot))
+            {
+                gm?.ShowBanner("Свободного места рядом не нашлось");
+                return;
+            }
+            m_UnstuckAt = Time.time;
+            Cracking = null;
+            CrackingSafe = null;
+            TeleportOwner(spot, transform.rotation);
+            Debug.Log($"[Player] Unstuck: moved to {spot}");
+        }
+
         public void TeleportOwner(Vector3 position, Quaternion rotation)
         {
             m_Controller.enabled = false;
@@ -393,11 +432,14 @@ namespace Stealth.Player
                 else OnGetUpRequest();
             }
             if (GameMenu.IsOpen) { ReviveProgress = 0; ReviveTarget = null; return; }
+            if (Controls.Pressed(GameAction.Unstuck) && !CursorMode) RequestUnstuck();
             // A failed run is restarted by any player — usually everybody is down by then.
             var game = GameManager.Instance;
             if (game != null && Controls.Pressed(GameAction.Restart) && game.Phase == RunPhase.Failed && !CursorMode)
                 game.RequestRestart();
-            if (Downed) { ReviveProgress = 0; ReviveTarget = null; return; }
+            if (Downed) { ReviveProgress = 0; ReviveTarget = null; StopTerminal(); return; }
+            bool holdE = Controls.Held(GameAction.Interact) || DevFlags.AutoInteract;
+            if (UsingTerminal != null) { UpdateTerminal(holdE); return; }
 
             // Revive: hold E next to a downed teammate.
             ReviveTarget = null;
@@ -406,7 +448,6 @@ namespace Stealth.Player
                 if (p == this || !p.Downed) continue;
                 if ((p.transform.position - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
             }
-            bool holdE = Controls.Held(GameAction.Interact) || DevFlags.AutoInteract;
             if (ReviveTarget != null && holdE)
             {
                 ReviveProgress += Time.deltaTime;
@@ -420,34 +461,26 @@ namespace Stealth.Player
             else ReviveProgress = 0;
 
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
+            // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && holdE)
+            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, Time.deltaTime, m_Interaction.HackHoldTime))
             {
-                HackProgress += Time.deltaTime;
-                if (HackProgress >= m_Interaction.HackHoldTime)
-                {
-                    if (m_Link != null) m_Link.SendHack(HackTarget);
-                    else OnHackRequest(HackTarget);
-                    HackProgress = 0;
-                }
+                if (m_Link != null) m_Link.SendHack(HackTarget);
+                else OnHackRequest(HackTarget);
             }
-            else HackProgress = 0;
+            HackProgress = m_HackHeld.Of(HackTarget);
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
             DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position) : null;
-            if (DoorTarget != null && holdE)
+            if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
             {
-                DoorProgress += Time.deltaTime;
-                if (DoorProgress >= m_Interaction.DoorHackTime)
-                {
-                    if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
-                    else GameManager.Instance?.UnlockDoorServer(this, DoorTarget.Index);
-                    DoorProgress = 0;
-                }
+                if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
+                else GameManager.Instance?.UnlockDoorServer(this, DoorTarget.Index);
             }
-            else DoorProgress = 0;
+            DoorProgress = m_DoorHeld.Of(DoorTarget);
 
             UpdateSafe();
+            UpdateTerminal(holdE);
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
@@ -561,7 +594,9 @@ namespace Stealth.Player
         /// </summary>
         void UpdateCallouts()
         {
-            if (GameMenu.IsOpen || Downed || CursorMode || Camera == null || GameManager.Instance == null) return;
+            // Knocked out: still a teammate — pings and marks from the eyes of the one being watched.
+            bool canCall = !Downed || Watching != null;
+            if (GameMenu.IsOpen || !canCall || CursorMode || Camera == null || GameManager.Instance == null) return;
             bool ping = Controls.Pressed(GameAction.Ping), mark = Controls.Pressed(GameAction.Mark);
             if (ping || mark) Callout(mark);
         }
@@ -628,10 +663,193 @@ namespace Stealth.Player
         public void LeaveHatchServer() => InHatch = false;
 
         /// <summary>Server: the owner pinged a spot.</summary>
+        // ------------------------------------------------------------------ watching a teammate while knocked out
+
+        /// <summary>Owner, knocked out: the teammate whose eyes the camera looks through (null = our own, lying on the floor).</summary>
+        public PlayerController Watching { get; private set; }
+        int m_WatchIndex;
+        Quaternion m_WatchRotation;
+        static readonly List<PlayerController> s_Mates = new();
+
+        void LateUpdate()
+        {
+            if (!IsOwner || Camera == null) return;
+            if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
+            if (UsingTerminal != null) ShowTerminalView();
+            else UpdateWatching();
+        }
+
+        // ------------------------------------------------------------------ security terminals
+
+        /// <summary>Owner: the terminal being used (null = none) and the robot / camera on its screen.</summary>
+        public SecurityTerminal UsingTerminal { get; private set; }
+        public Detector TerminalView { get; private set; }
+        public int TerminalViewNumber => m_TerminalIndex + 1;
+        public int TerminalViewCount => m_TerminalTargets.Count;
+        /// <summary>Owner: a terminal in reach (press E to use it), null if none.</summary>
+        public SecurityTerminal TerminalTarget { get; private set; }
+        /// <summary>0..1 of holding E at a hacking terminal.</summary>
+        public float TerminalHackShare => m_TerminalHold / Mathf.Max(0.05f, m_Interaction.TerminalHackTime);
+
+        readonly List<Detector> m_TerminalTargets = new();
+        int m_TerminalIndex;
+        float m_TerminalHold;
+        bool m_TerminalWaitRelease;
+
+        /// <summary>
+        /// Owner: E at a terminal sits down at it. A/D (or the mouse buttons) flip through what it shows, Space or S stands up.
+        /// At a hacking terminal holding E hacks the robot on the screen (a charge of the terminal is spent on the server).
+        /// </summary>
+        void UpdateTerminal(bool holdE)
+        {
+            if (UsingTerminal == null)
+            {
+                TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null
+                    ? SecurityTerminal.Near(transform.position, Hands) : null;
+                if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
+                StartTerminal(TerminalTarget);
+                return;
+            }
+            var t = UsingTerminal;
+            var to = t != null ? transform.position - t.transform.position : Vector3.positiveInfinity;
+            to.y = 0;
+            if (t == null || to.magnitude > SecurityTerminal.Reach + 0.6f || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
+            {
+                StopTerminal();
+                return;
+            }
+            SecurityTerminal.Targets(t.Kind, t.transform.position, m_TerminalTargets);
+            if (m_TerminalTargets.Count == 0) { TerminalView = null; return; }
+            var mouse = Mouse.current;
+            if (Controls.Pressed(GameAction.Right) || (mouse != null && mouse.leftButton.wasPressedThisFrame)) m_TerminalIndex++;
+            if (Controls.Pressed(GameAction.Left) || (mouse != null && mouse.rightButton.wasPressedThisFrame)) m_TerminalIndex--;
+            int n = m_TerminalTargets.Count;
+            m_TerminalIndex = (m_TerminalIndex % n + n) % n;
+            var view = m_TerminalTargets[m_TerminalIndex];
+            if (view != TerminalView) m_TerminalHold = 0f;
+            TerminalView = view;
+            if (!holdE) m_TerminalWaitRelease = false;
+            bool hacking = t.Kind == TerminalKind.Hacking && t.Charges > 0 && holdE && !m_TerminalWaitRelease && !view.IsHacked;
+            if (!hacking) { m_TerminalHold = 0f; return; }
+            m_TerminalHold += Time.deltaTime;
+            if (m_TerminalHold < m_Interaction.TerminalHackTime) return;
+            m_TerminalHold = 0f;
+            m_TerminalWaitRelease = true;
+            if (m_Link != null) m_Link.SendRemoteHack(view, t.Index);
+            else GameManager.Instance?.RemoteHackServer(this, t.Index, view);
+        }
+
+        /// <summary>Owner: sit down at a terminal (also a test hook: <paramref name="waitRelease"/> false = E already counts).</summary>
+        public void StartTerminal(SecurityTerminal terminal, bool waitRelease = true)
+        {
+            UsingTerminal = terminal;
+            TerminalView = null;
+            m_TerminalIndex = 0;
+            m_TerminalHold = 0f;
+            m_TerminalWaitRelease = waitRelease; // the E that sat us down is not a hack
+        }
+
+        /// <summary>Test hook: the next thing on the terminal's screen (as if D was pressed).</summary>
+        public void NextTerminalViewForTest() => m_TerminalIndex++;
+
+        /// <summary>Owner: stand up from the terminal; the camera is ours again.</summary>
+        public void StopTerminal()
+        {
+            if (ReferenceEquals(UsingTerminal, null)) return;
+            UsingTerminal = null;
+            TerminalView = null;
+            m_TerminalHold = 0f;
+            if (Camera == null) return;
+            Camera.transform.localPosition = Vector3.zero;
+            Camera.transform.localRotation = Quaternion.identity;
+        }
+
+        /// <summary>Owner at a terminal: the camera looks through the security camera on the screen, or at the robot from a clear side.</summary>
+        void ShowTerminalView()
+        {
+            var d = TerminalView;
+            if (d == null) return;
+            if (d is SecurityCamera cam && cam.Pivot != null)
+            {
+                // just in front of the lens: the camera's own housing and glow stay behind the view
+                Camera.transform.SetPositionAndRotation(d.Position + cam.Pivot.forward * 0.4f, cam.Pivot.rotation);
+                return;
+            }
+            // A robot: from behind (or the first side with no wall in between), a little above it and under the ceiling.
+            var target = d.Position;
+            float ceiling = LevelLayout.FloorY(LevelLayout.FloorOf(d.transform.position.y)) + LevelMetrics.WallHeight - 0.35f;
+            var forward = Vector3.ProjectOnPlane(d.transform.forward, Vector3.up).normalized;
+            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+            var right = Vector3.Cross(Vector3.up, forward);
+            Vector3 At(Vector3 dir)
+            {
+                var at = target + dir.normalized * 2.2f + Vector3.up * 0.6f;
+                at.y = Mathf.Min(at.y, ceiling);
+                return at;
+            }
+            Vector3 best = At(-forward);
+            foreach (var dir in new[] { -forward, -forward + right, -forward - right, right, -right, forward })
+            {
+                var at = At(dir);
+                if (Physics.Linecast(target + Vector3.up * 0.1f, at, Perception.SightMask, QueryTriggerInteraction.Ignore)) continue;
+                best = at;
+                break;
+            }
+            Camera.transform.SetPositionAndRotation(best, Quaternion.LookRotation(target - best));
+        }
+
+        /// <summary>
+        /// Knocked out with a teammate still standing: the camera rides with them (their position, yaw and the synced head
+        /// pitch); the mouse buttons switch between teammates. Back on your feet, the camera is yours again.
+        /// </summary>
+        void UpdateWatching()
+        {
+            s_Mates.Clear();
+            var gm = GameManager.Instance;
+            if (KnockedOut && gm != null && gm.Phase == RunPhase.Playing)
+                foreach (var p in All)
+                    if (p != this && p.IsSpawned && !p.KnockedOut) s_Mates.Add(p);
+            if (s_Mates.Count == 0)
+            {
+                if (Watching == null) return;
+                Watching = null;
+                Camera.transform.localPosition = Vector3.zero;
+                Camera.transform.localRotation = Quaternion.identity;
+                return;
+            }
+            var mouse = Mouse.current;
+            if (mouse != null && !GameMenu.IsOpen)
+            {
+                if (mouse.leftButton.wasPressedThisFrame) m_WatchIndex++;
+                if (mouse.rightButton.wasPressedThisFrame) m_WatchIndex--;
+            }
+            var mate = s_Mates[(m_WatchIndex % s_Mates.Count + s_Mates.Count) % s_Mates.Count];
+            float eye = mate.InHatch ? 0.25f : mate.Downed ? 0.35f : mate.Crouching ? 0.95f : 1.6f;
+            var look = mate.transform.rotation * Quaternion.Euler(mate.LookPitch, 0f, 0f);
+            m_WatchRotation = Watching == mate ? Quaternion.Slerp(m_WatchRotation, look, 1f - Mathf.Exp(-12f * Time.deltaTime)) : look;
+            Watching = mate;
+            // A little in front of their face: the camera does not look out from inside their head.
+            var pos = mate.transform.position + Vector3.up * eye + m_WatchRotation * Vector3.forward * 0.18f;
+            Camera.transform.SetPositionAndRotation(pos, m_WatchRotation);
+        }
+
+        /// <summary>
+        /// Server: a callout is in range of this player — or, while knocked out, of a teammate still standing (it is
+        /// made through their eyes).
+        /// </summary>
+        bool WithinCallRange(Vector3 position, float range)
+        {
+            if ((position - transform.position).magnitude <= range) return true;
+            if (!KnockedOut) return false;
+            foreach (var p in All)
+                if (p != this && !p.KnockedOut && (position - p.transform.position).magnitude <= range) return true;
+            return false;
+        }
+
         public void OnPingRequest(Vector3 position)
         {
             var gm = GameManager.Instance;
-            if (gm == null || (position - transform.position).magnitude > Team.PingRange + 5f) return;
+            if (gm == null || !WithinCallRange(position, Team.PingRange + 5f)) return;
             gm.CalloutServer(ClientId, PingKind.Here, position, null);
         }
 
@@ -640,7 +858,7 @@ namespace Stealth.Player
         {
             var gm = GameManager.Instance;
             if (gm == null || target == null || target.IsHacked) return;
-            if ((target.Position - transform.position).magnitude > Team.MarkRange + 5f) return;
+            if (!WithinCallRange(target.Position, Team.MarkRange + 5f)) return;
             gm.CalloutServer(ClientId, PingKind.Enemy, target.Position, target);
         }
 

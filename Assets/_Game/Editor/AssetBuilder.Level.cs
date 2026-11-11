@@ -29,6 +29,7 @@ namespace Stealth.EditorTools
             var stairs = Prefab($"{LevelPrefabs}/Stairs.prefab", () => BuildStairs("Stairs", false));
             var stairsMirrored = Prefab($"{LevelPrefabs}/StairsMirrored.prefab", () => BuildStairs("StairsMirrored", true));
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", BuildVentFrame);
+            var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
             var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
@@ -84,6 +85,14 @@ namespace Stealth.EditorTools
                 box.Keypad = go.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
                 return go;
             });
+            var pTerminal = Prefab(p + "Terminal.prefab", () =>
+            {
+                var go = PropObject("Terminal", "terminal", "PropBody", "PropAccent", "Keypad");
+                // The screens glow in the terminal's colour (SecurityTerminal keeps them out of the merged furniture).
+                var terminal = go.AddComponent<Stealth.Level.SecurityTerminal>();
+                terminal.Screens = go.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                return go;
+            });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
             {
                 var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
@@ -115,6 +124,7 @@ namespace Stealth.EditorTools
                 art.Stairs = stairs;
                 art.StairsMirrored = stairsMirrored;
                 art.VentFrame = vent;
+                art.SqueezeFrame = squeeze;
                 art.AutoDoor = door;
                 art.RoomLight = light;
                 art.Window = window;
@@ -124,6 +134,7 @@ namespace Stealth.EditorTools
                 art.BeanBag = pBeanBag;
                 art.ArcadeMachine = pArcade;
                 art.Safe = pSafe;
+                art.Terminal = pTerminal;
                 art.FloorLamp = pFloorLamp;
                 art.Hatch = hatch;
                 art.Desk = desk;
@@ -233,6 +244,27 @@ namespace Stealth.EditorTools
                 Cube(root.transform, "Left", new Vector3(-w / 2f, h / 2f, z), new Vector3(0.08f, h, 0.04f), M("DoorFrame"), false);
                 Cube(root.transform, "Right", new Vector3(w / 2f, h / 2f, z), new Vector3(0.08f, h, 0.04f), M("DoorFrame"), false);
             }
+            return root;
+        }
+
+        /// <summary>
+        /// Frame of a narrow slot (both faces of the wall, along local X, no collider) and a navmesh volume that keeps
+        /// robots out of it: a player squeezes through, a robot does not.
+        /// </summary>
+        static GameObject BuildSqueezeFrame()
+        {
+            var root = new GameObject("SqueezeFrame");
+            float w = LevelMetrics.ClearWidth(LevelMetrics.SqueezeWidth), h = LevelMetrics.DoorHeight;
+            foreach (float z in new[] { LevelMetrics.WallThickness / 2f + 0.02f, -(LevelMetrics.WallThickness / 2f + 0.02f) })
+            {
+                Cube(root.transform, "Top", new Vector3(0, h, z), new Vector3(w + 0.12f, 0.06f, 0.04f), M("DoorFrame"), false);
+                Cube(root.transform, "Left", new Vector3(-w / 2f - 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
+                Cube(root.transform, "Right", new Vector3(w / 2f + 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
+            }
+            var block = root.AddComponent<NavMeshModifierVolume>();
+            block.center = new Vector3(0f, 1.2f, 0f);
+            block.size = new Vector3(w + 0.6f, 2.4f, 1.6f);
+            block.area = 1; // Not Walkable
             return root;
         }
 

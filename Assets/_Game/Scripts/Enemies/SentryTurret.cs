@@ -34,6 +34,12 @@ namespace Stealth.Enemies
 
         protected override void TickLocal()
         {
+            // Hacked: the head stops where it was, no sight beam.
+            if (IsHacked)
+            {
+                if (Sight != null) Sight.enabled = false;
+                return;
+            }
             // Head: aim at the target if locked, otherwise sweep (shared server time keeps peers in sync).
             var target = AimTarget != Nobody ? PlayerController.Find(AimTarget) : null;
             float yaw;

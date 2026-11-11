@@ -30,10 +30,12 @@ namespace Stealth.Game
                 }
             }
             if (UI.ControlsPanel.Rebinding || !Controls.Pressed(GameAction.Style)) return;
-            var next = VisualStyles.Next();
-            if (next == null) return;
-            VisualStyles.SnapFog(PlayerController.Local != null && ActiveLevel.Layout != null && !ActiveLevel.Layout.IsInside(PlayerController.Local.transform.position));
-            GameManager.Instance?.ShowBanner($"Стиль: {next.Title} ({next.References})");
+            int next = VisualStyles.NextIndex();
+            if (next < 0) return;
+            // In a session the whole team switches (GameManager replicates the choice); in the menu only this window.
+            var gm = GameManager.Instance;
+            if (gm != null) gm.RequestStyle(next);
+            else VisualStyles.Apply(VisualStyles.At(next));
         }
 
         /// <summary>

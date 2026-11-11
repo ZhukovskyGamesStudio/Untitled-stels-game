@@ -28,6 +28,8 @@ BRANCH = dict(half=1.3, wall=1.8, rise=1.1)
 SEG = 20
 HALL_X0, HALL_X1 = 12.0, 22.0
 BRANCH_Y = (-4.2, 0.0, 4.2)
+BRANCH_YAW = 18.0  # degrees the side tunnels bend away from the middle one
+SLAB = 0.8         # floors reach this deep: the channel, the trench and the cistern have walls down to their beds
 
 
 # --------------------------------------------------------------------------- helpers
@@ -173,6 +175,28 @@ def part(name, build):
     return obj_from(bm, name)
 
 
+def branch_yaw(y):
+    return math.radians(math.copysign(BRANCH_YAW, y)) if abs(y) > 1e-6 else 0.0
+
+
+def place_branch(o, y):
+    """A part built along +x from a tunnel's mouth, turned and moved to its opening at y in the hall's end wall."""
+    from mathutils import Matrix
+    o.data.transform(Matrix.Translation((HALL_X1, y, 0.0)) @ Matrix.Rotation(branch_yaw(y), 4, "Z"))
+    return o
+
+
+def clip_to_hall(o):
+    """Cut a branch part off at the inner face of the hall's end wall: it starts inside the wall, never in the hall."""
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(HALL_X1 - 0.38, 0.0, 0.0), plane_no=(1.0, 0.0, 0.0), clear_inner=True)
+    bm.to_mesh(o.data)
+    bm.free()
+    return o
+
+
 def finish_and_export(filename):
     os.makedirs(OUT, exist_ok=True)
     for o in bpy.context.scene.objects:
@@ -210,8 +234,8 @@ def tunnel():
     part("Stone", ribs)
 
     def floor(bm):
-        box(bm, -0.4, HALL_X0 + 0.2, -p["half"], -1.25, -0.3, 0.0)     # walkways
-        box(bm, -0.4, HALL_X0 + 0.2, 1.25, p["half"], -0.3, 0.0)
+        box(bm, -0.4, HALL_X0 + 0.2, -p["half"], -1.25, -SLAB, 0.0)    # walkways, walled down to the channel bed
+        box(bm, -0.4, HALL_X0 + 0.2, 1.25, p["half"], -SLAB, 0.0)
         box(bm, -0.4, HALL_X0 + 0.2, -1.25, 1.25, -0.75, -0.6)         # channel bed
     part("Concrete", floor)
 
@@ -241,19 +265,21 @@ def hall():
     # end wall with three arched openings, and stone frames around them
     back = prism("BrickBack", prof, HALL_X1 - 0.4, HALL_X1)
     for y in BRANCH_Y:
-        subtract(back, prism("cut", profile(**BRANCH), HALL_X1 - 0.6, HALL_X1 + 0.2, y))
+        # cut along the tunnel's own direction: the opening fits the turned tunnel exactly
+        subtract(back, place_branch(prism("cut", profile(**BRANCH), -1.2, 0.6), y))
 
     def frames(bm):
         outer = dict(half=BRANCH["half"] + 0.22, wall=BRANCH["wall"], rise=BRANCH["rise"] + 0.22)
         for y in BRANCH_Y:
-            o = [(yy + y, z) for yy, z in profile(**outer)]
-            i = [(yy + y, z) for yy, z in profile(**BRANCH)]
+            yc = y - 0.4 * math.tan(branch_yaw(y))  # where the turned opening meets the hall's face of the wall
+            o = [(yy + yc, z) for yy, z in profile(**outer)]
+            i = [(yy + yc, z) for yy, z in profile(**BRANCH)]
             band(bm, o, i, HALL_X1 - 0.55, HALL_X1 - 0.38)
     part("Stone", frames).name = "Frames"
 
     # floor with the cistern basin and the trench bringing the channel in
-    floor = part("Concrete", lambda bm: box(bm, HALL_X0, HALL_X1, -p["half"], p["half"], -0.3, 0.0))
-    basin = part("cut", lambda bm: cyl(bm, 2.0, 1.0, (16.6, 0.0, 0.0), seg=32))
+    floor = part("Concrete", lambda bm: box(bm, HALL_X0, HALL_X1, -p["half"], p["half"], -SLAB, 0.0))
+    basin = part("cut", lambda bm: cyl(bm, 2.0, 1.2, (16.6, 0.0, -0.1), seg=32))  # down to the basin's bed at -0.7
     subtract(floor, basin)
     subtract(floor, part("cut", lambda bm: box(bm, HALL_X0 - 0.1, 16.0, -1.25, 1.25, -0.6, 0.2)))
     part("Concrete", lambda bm: cyl(bm, 2.05, 0.1, (16.6, 0.0, -0.75), seg=32)).name = "BasinBed"
@@ -272,18 +298,26 @@ def hall():
 # --------------------------------------------------------------------------- a branch tunnel to a house (local x 0..12)
 
 def branch():
+    """The three tunnels to the next houses, each turned to its opening and cut off at the hall's end wall (no gap
+    between the wall and the tunnel, nothing sticking into the hall). sewer_branch_0 is Unity's left one (z = -4.2)."""
     p = BRANCH
     prof = profile(**p)
-    part("Brick", lambda bm: shell(bm, prof, -0.3, 12.0, (0.0, p["wall"])))
 
     def ribs(bm):
         for x in (2.0, 5.0, 8.0, 11.0):
             band(bm, prof, profile(**inset(p, 0.1)), x - 0.15, x + 0.15)
-    part("Stone", ribs)
-    part("Concrete", lambda bm: box(bm, -0.3, 12.0, -p["half"], p["half"], -0.3, 0.0))
-    part("Dark", lambda bm: box(bm, -0.3, 12.0, -0.12, 0.12, -0.01, 0.005)).name = "Gutter"
-    part("Dark", lambda bm: box(bm, 11.6, 12.0, -p["half"], p["half"], 0.0, p["wall"] + p["rise"])).name = "DarkEnd"
-    finish_and_export("sewer_branch")
+
+    for index, y in enumerate(sorted(BRANCH_Y, reverse=True)):  # Unity z = -y
+        parts = [part("Brick", lambda bm: shell(bm, prof, -1.0, 12.0, (0.0, p["wall"]))),
+                 part("Stone", ribs),
+                 part("Concrete", lambda bm: box(bm, -1.0, 12.0, -p["half"], p["half"], -0.3, 0.0))]
+        gutter = part("Dark", lambda bm: box(bm, -1.0, 12.0, -0.12, 0.12, -0.01, 0.005))
+        gutter.name = "Gutter"
+        end = part("Dark", lambda bm: box(bm, 11.6, 12.0, -p["half"], p["half"], 0.0, p["wall"] + p["rise"]))
+        end.name = "DarkEnd"
+        for o in parts + [gutter, end]:
+            clip_to_hall(place_branch(o, y))
+        finish_and_export(f"sewer_branch_{index}")
 
 
 def grate():

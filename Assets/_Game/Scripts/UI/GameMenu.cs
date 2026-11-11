@@ -59,6 +59,8 @@ namespace Stealth.UI
         public Text Role;
         public Button Invite;
         public Button Resume;
+        [Tooltip("\"I'm stuck\": moves the local player to the nearest free spot.")]
+        public Button Unstuck;
         public Button PauseSettings;
         public Button Leave;
 
@@ -100,6 +102,12 @@ namespace Stealth.UI
 
             Invite.onClick.AddListener(() => Session.Launcher.InviteFriends());
             Resume.onClick.AddListener(() => IsOpen = false);
+            if (Unstuck != null)
+                Unstuck.onClick.AddListener(() =>
+                {
+                    IsOpen = false;
+                    PlayerController.Local?.RequestUnstuck();
+                });
             PauseSettings.onClick.AddListener(OpenSettings);
             Leave.onClick.AddListener(() =>
             {

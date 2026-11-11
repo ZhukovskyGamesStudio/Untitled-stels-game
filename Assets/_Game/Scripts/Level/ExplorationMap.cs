@@ -127,6 +127,7 @@ namespace Stealth.Level
             EdgeType.Open => true,
             EdgeType.Door => Mathf.Abs(offset) <= ClearWidth(DoorWidth) / 2f,
             EdgeType.Vent => Mathf.Abs(offset) <= ClearWidth(VentWidth) / 2f,
+            EdgeType.Squeeze => Mathf.Abs(offset) <= ClearWidth(SqueezeWidth) / 2f,
             _ => false,
         };
 
