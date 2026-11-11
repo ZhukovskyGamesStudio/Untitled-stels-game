@@ -24,6 +24,7 @@ def drone():
     merge("Body", [box((0.5, 0.5, 0.18), (0, 0, 0))] + [beam((0, 0, 0.02), (x, y, 0.02), 0.05) for x, y in rotors])
     for i, (x, y) in enumerate(rotors):
         merge(f"AccentRotor{i}", [box((0.36, 0.05, 0.015), (x, y, 0.1)), box((0.05, 0.36, 0.015), (x, y, 0.1)), cylinder(0.03, 0.08, (x, y, 0.06))])
+    merge("Accent", [box((0.3, 0.3, 0.04), (0, 0, 0.1))])                            # top plate (accent colour)
     merge("Eye", [sphere(0.1, (0, -0.24, -0.08), segments=12)])
     export("robot_drone")
 
@@ -44,6 +45,7 @@ def spider():
     and the feet on the surface, a cluster of eyes in front. Local up = away from the surface, forward = -Y.
     Every leg is a thigh (AccentLeg{n}Upper) and a shin (AccentLeg{n}Lower): ProceduralLegs plants the feet."""
     merge("Body", [sphere(0.14, (0, -0.15, 0.15), segments=12), sphere(0.2, (0, 0.17, 0.17), segments=12)])
+    merge("Accent", [box((0.16, 0.24, 0.06), (0, 0.17, 0.36))])                      # back plate (accent colour)
     angles = (52, 18, -14, -46)  # degrees ahead of straight sideways, front to back
     for i in range(8):
         side = 1 if i < 4 else -1
@@ -90,6 +92,7 @@ def hound():
     merge("Body", [box((0.4, 1.0, 0.35), (0, 0, 0.75)), box((0.3, 0.35, 0.3), (0, -0.6, 0.95))])
     for i, (x, y) in enumerate([(0.15, -0.35), (-0.15, -0.35), (0.15, 0.35), (-0.15, 0.35)]):
         g.leg(f"AccentLeg{i}", [box((0.09, 0.09, 0.6), (x, y, 0.3))], 0.3)
+    merge("Accent", [box((0.32, 0.12, 0.08), (0, -0.48, 0.93))])                      # collar (accent colour)
     merge("Eye", [cylinder(0.08, 0.4, (0, -0.95, 0.9), axis="Y", radius2=0.03)])
     export("robot_hound")
 

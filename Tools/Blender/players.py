@@ -18,8 +18,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import guards as G  # noqa: E402  (primitives and the per-family finishing)
-from guards import box, cyl, sph, capsule, limb, merge  # noqa: E402
+import figure as G  # noqa: E402  (primitives and the per-family finishing)
+from figure import box, cyl, sph, capsule, limb, merge  # noqa: E402
 
 import bpy  # noqa: E402
 

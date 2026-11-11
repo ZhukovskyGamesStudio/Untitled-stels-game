@@ -130,6 +130,8 @@ def attach(pieces, floor=False, snap=SNAP, report=print, name=""):
     if len(pieces) < 2:
         return 0
     floor_z = min(p.lo.z for p in pieces)
+    if floor and -0.02 < floor_z < 0.0:
+        floor_z = 0.0  # a plinth or a leg sunk a few mm into the floor must not lift the floor for everything else
     moved = 0
     for _ in range(12):
         parent = list(range(len(pieces) + 1))  # the last node is the floor
@@ -161,14 +163,17 @@ def attach(pieces, floor=False, snap=SNAP, report=print, name=""):
         if not others:
             return moved
         changed = False
-        main_on_floor = any(p.lo.z <= floor_z + TOUCH for p in main)
+        def stuck(p):  # stands on the floor, or must not move (a wheel or rotor spins about its own centre)
+            return p.lo.z <= floor_z + TOUCH or getattr(p, "pinned", False)
+
+        main_on_floor = any(stuck(p) for p in main)
         for group in others:  # every group within reach moves this round; the next round may carry the rest
             d, src, dst = _distance(group, main)
             if src is None or d > snap:
                 continue
             direction = (dst - src)
             shift = direction.normalized() * (d + 0.002) if d > 1e-6 else Vector((0, 0, 0))
-            if any(p.lo.z <= floor_z + TOUCH for p in group):
+            if any(stuck(p) for p in group):
                 # a foot or a wheel on the floor stays put (lifted, the model would walk on air): the body comes down
                 if main_on_floor or floor:
                     continue
@@ -285,8 +290,9 @@ def turn_outward(bm):
 
 # --------------------------------------------------------------------------- whole model
 
-def fix_objects(objs, floor=False, snap=SNAP, gap=GAP, report=print, name=""):
-    """Attach floating pieces and separate coplanar faces across all mesh objects of one model (world space)."""
+def fix_objects(objs, floor=False, snap=SNAP, gap=GAP, report=print, name="", pinned=None):
+    """Attach floating pieces and separate coplanar faces across all mesh objects of one model (world space).
+    pinned(object name) -> True keeps that object's pieces where they are (the model moves to them instead)."""
     objs = [o for o in objs if o.type == "MESH" and o.data.polygons]
     bms = []
     dropped = flipped = 0
@@ -297,7 +303,11 @@ def fix_objects(objs, floor=False, snap=SNAP, gap=GAP, report=print, name=""):
         dropped += drop_double_faces(bm) + drop_debris(bm)
         flipped += turn_outward(bm)
         bms.append(bm)
-    pieces = [p for bm in bms for p in _pieces(bm)]
+    pieces = []
+    for o, bm in zip(objs, bms):
+        for p in _pieces(bm):
+            p.pinned = bool(pinned and pinned(o.name))
+            pieces.append(p)
     moved = attach(pieces, floor, snap, report, name) if snap else 0
     grown = _separate(pieces, gap)
     for o, bm in zip(objs, bms):

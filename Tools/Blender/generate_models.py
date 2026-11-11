@@ -198,6 +198,7 @@ def model_robot_listener():
         cylinder(0.08, 0.6, (0, 0.1, 0.9), segments=8),             # mast
         cylinder(0.03, 0.5, (0, 0.1, 1.2), axis="X", segments=8),   # cross bar holding the ear dishes
     ])
+    merge("Accent", [box((0.6, 0.7, 0.05), (0, 0, 0.645))])                       # deck (accent colour)
     for i, (x, y) in enumerate([(-0.43, -0.3), (0.43, -0.3), (-0.43, 0.3), (0.43, 0.3)]):
         merge(f"AccentWheel{i}", [cylinder(0.22, 0.12, (x, y, 0.22), axis="X")])   # wheels roll in game, hubs in the chassis
     merge("Eye", [

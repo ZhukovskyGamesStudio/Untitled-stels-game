@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Stealth.Configs;
 using UnityEditor;
@@ -84,17 +85,33 @@ namespace Stealth.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        /// <summary>The guard robot designed for each style (Tools/Blender/guards.py → Art/Models/Styles/Guards/robot_guard__&lt;style&gt;.fbx).</summary>
+        /// <summary>
+        /// Models designed for one style: every robot, device and sensor module (Tools/Blender/build_bestiary.py →
+        /// Art/Models/Styles/PerStyle/&lt;style&gt;/&lt;model&gt;__&lt;style&gt;.fbx), matched to the original model by mesh name.
+        /// </summary>
         static StyleMeshes[] BuildStyleModels(List<VisualStyle> styles)
         {
             var list = new List<StyleMeshes>();
-            var originals = AssetDatabase.LoadAllAssetsAtPath(ModelPath("robot_guard")).OfType<Mesh>().ToDictionary(m => m.name, m => m);
             foreach (var style in styles)
             {
-                var path = $"{ModelsDir}/Styles/Guards/robot_guard__{style.name}.fbx";
-                var meshes = AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>().Where(m => originals.ContainsKey(m.name)).ToArray();
-                if (meshes.Length == 0) continue;
-                list.Add(new StyleMeshes { Style = style, From = meshes.Select(m => originals[m.name]).ToArray(), To = meshes });
+                var dir = $"{ModelsDir}/Styles/PerStyle/{style.name}";
+                if (!AssetDatabase.IsValidFolder(dir)) continue;
+                var from = new List<Mesh>();
+                var to = new List<Mesh>();
+                foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { dir }))
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    var file = Path.GetFileNameWithoutExtension(path);
+                    int cut = file.LastIndexOf("__", System.StringComparison.Ordinal);
+                    if (cut < 0) continue;
+                    string original;
+                    try { original = ModelPath(file.Substring(0, cut)); }
+                    catch (FileNotFoundException) { continue; }
+                    var originals = AssetDatabase.LoadAllAssetsAtPath(original).OfType<Mesh>().ToDictionary(m => m.name, m => m);
+                    foreach (var mesh in AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>())
+                        if (originals.TryGetValue(mesh.name, out var o)) { from.Add(o); to.Add(mesh); }
+                }
+                if (from.Count > 0) list.Add(new StyleMeshes { Style = style, From = from.ToArray(), To = to.ToArray() });
             }
             // the players by department (Tools/Blender/players.py → Styles/Players/player__<style>__<department>.fbx)
             var player = AssetDatabase.LoadAllAssetsAtPath(ModelPath("player")).OfType<Mesh>().ToDictionary(m => m.name, m => m);
