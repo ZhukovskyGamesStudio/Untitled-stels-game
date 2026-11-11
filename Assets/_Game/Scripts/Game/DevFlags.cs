@@ -12,6 +12,8 @@ namespace Stealth.Game
         public static int ForcedSeed;
         /// <summary>Start the run at this level index. Consumed once.</summary>
         public static int ForcedLevel;
+        /// <summary>Start the run right in the first house instead of the sewer (autopilot scenarios).</summary>
+        public static bool StartInHouse;
         /// <summary>Robots and sensors ignore players (UI screenshots).</summary>
         public static bool Peaceful;
         /// <summary>Robots stand still (gallery screenshots).</summary>

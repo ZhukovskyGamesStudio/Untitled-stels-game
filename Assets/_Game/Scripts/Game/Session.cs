@@ -131,8 +131,6 @@ namespace Stealth.Game
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>
     public interface IGameLink
     {
-        /// <summary>Player → server: my vote for a house of the next column (in the sewer).</summary>
-        void RequestVote(int lane);
         void RequestRestart();
         void BroadcastBanner(string text);
         /// <summary>Server → everyone: a teammate's ping or mark.</summary>

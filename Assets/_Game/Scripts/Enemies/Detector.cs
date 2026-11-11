@@ -212,6 +212,8 @@ namespace Stealth.Enemies
 
         public virtual bool CanBeHackedFrom(Vector3 player, float reach) => !IsHacked && Hacking.CanHackDevice(transform.position, player, reach);
 
+        public bool ReachableFrom(Vector3 hands) => Perception.ReachClear(hands, Position, transform);
+
         public void HackServer(float seconds)
         {
             if (!IsServer) return;

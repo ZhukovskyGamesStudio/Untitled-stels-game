@@ -231,13 +231,16 @@ namespace Stealth.Player
 
             bool cracking = Cracking != null;
             CursorMode = !menu && !Downed && !InHatch && !cracking && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
-            bool freeCursor = menu || CursorMode || ScreenWantsCursor;
+            bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
-            // Hiding in the hatch or turning a safe's dial: the player stays put (the mouse turns the dial).
+            // Turning a safe's dial: the player stays put (the mouse turns the dial). In the hatch: look around, no walking.
             var input = DevFlags.Autopilot ?? PlayerInputState.FromDevices(!freeCursor && !cracking);
-            Motor.Tick(input, !menu && !Downed && !InHatch && !cracking, Downed, Head, Camera, Time.deltaTime);
+            if (InHatch) input = new PlayerInputState { Look = input.Look };
+            EnterHatchIfNeeded();
+            Motor.InHatch = InHatch;
+            Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
 
@@ -252,7 +255,16 @@ namespace Stealth.Player
         void UpdateFog()
         {
             var layout = ActiveLevel.Layout;
-            if (layout == null) return;
+            if (layout == null)
+            {
+                // The sewer: a damp indoor haze, the background is the haze too (never the default sky colour).
+                if (SewerLocation.Active == null) return;
+                var a = VisualStyles.World;
+                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, a.IndoorFogDensity * 1.4f, Time.deltaTime * 3f);
+                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog, Time.deltaTime * 4f);
+                Camera.backgroundColor = RenderSettings.fogColor;
+                return;
+            }
             bool outside = !layout.IsInside(transform.position);
             // Outside the gas is a wall: 1.5 m away nothing is seen — lose sight of the house and you are lost.
             var air = VisualStyles.World; // the gas density is gameplay; a style changes only the colours and the indoor haze
@@ -262,10 +274,27 @@ namespace Stealth.Player
             Camera.backgroundColor = RenderSettings.fogColor;
         }
 
+        bool m_PlacedInHatch;
+
+        /// <summary>Owner: the server let us into the hatch — stand in its middle (and leave it where we are when climbing out).</summary>
+        void EnterHatchIfNeeded()
+        {
+            if (InHatch == m_PlacedInHatch) return;
+            m_PlacedInHatch = InHatch;
+            var layout = ActiveLevel.Layout;
+            if (!InHatch || layout == null) return;
+            TeleportOwner(layout.HatchPosition + Vector3.up * 0.05f, transform.rotation);
+        }
+
+        /// <summary>How deep the model sits while hiding: only the head looks out of the hatch.</summary>
+        public const float HatchDepth = 1.5f;
+        float m_ModelSink;
+
         void UpdateModelPose()
         {
             if (Model == null) return;
-            if (Model.gameObject.activeSelf == InHatch) Model.gameObject.SetActive(!InHatch); // down in the hatch
+            m_ModelSink = Mathf.MoveTowards(m_ModelSink, InHatch ? HatchDepth : 0f, Time.deltaTime * 4f);
+            if (IsOwner) Model.localPosition = Vector3.down * m_ModelSink;
             float y = Downed ? 0.35f : (Crouching ? 0.65f : 1f);
             Model.localScale = new Vector3(1f, Mathf.MoveTowards(Model.localScale.y, y, Time.deltaTime * 4f), 1f);
             if (IsOwner || Time.deltaTime <= 0f) return;
@@ -283,7 +312,7 @@ namespace Stealth.Player
             m_RemoteSpeed = Mathf.Lerp(m_RemoteSpeed, speed, 1f - Mathf.Exp(-10f * Time.deltaTime));
             float walk = Mathf.Clamp01(m_RemoteSpeed / 3.6f);
             m_RemoteBobPhase += m_RemoteSpeed * 0.75f * Mathf.PI * Time.deltaTime;
-            Model.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(m_RemoteBobPhase)) * 0.05f * walk, 0);
+            Model.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(m_RemoteBobPhase)) * 0.05f * walk - m_ModelSink, 0);
             Model.localRotation = Quaternion.Euler(Mathf.Clamp(m_RemoteSpeed * 1.2f, 0f, 8f), 0, Mathf.Sin(m_RemoteBobPhase) * 2f * walk);
         }
 
@@ -296,8 +325,6 @@ namespace Stealth.Player
             if (Mathf.Abs(pitch - LookPitch) >= 2) LookPitch = pitch;
         }
 
-        /// <summary>Set by a screen that needs the mouse (the route map in the sewer).</summary>
-        public static bool ScreenWantsCursor { get; set; }
 
         SewerLocation m_PlacedSewer;
 
@@ -307,7 +334,8 @@ namespace Stealth.Player
             if (sewer != null && sewer != m_PlacedSewer)
             {
                 m_PlacedSewer = sewer;
-                TeleportOwner(sewer.SpawnFor(PlayerLooks.SlotOf(ClientId)), sewer.transform.rotation);
+                int slot = PlayerLooks.SlotOf(ClientId);
+                TeleportOwner(sewer.SpawnFor(slot), sewer.SpawnRotation(slot));
                 Motor.SetPitch(0f);
                 Cracking = null;
                 return;
@@ -455,6 +483,7 @@ namespace Stealth.Player
         /// <summary>Test hook: start cracking this safe as if E was pressed next to it.</summary>
         public void StartCrackForTest(Items.SafeBox safe)
         {
+            if (safe == null) { Cracking = null; CrackingSafe = null; return; }
             Cracking = new Items.SafeLock(safe.Seed, Tuning.Items.Safes);
             CrackingSafe = safe;
             m_CrackStartFrame = Time.frameCount;
@@ -462,7 +491,7 @@ namespace Stealth.Player
 
         void UpdateSafe()
         {
-            SafeTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null ? Items.SafeBox.ClosedNear(transform.position) : null;
+            SafeTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null ? Items.SafeBox.ClosedNear(transform.position, Hands) : null;
             if (Cracking == null)
             {
                 if (SafeTarget == null || !Controls.Pressed(GameAction.Interact) || CursorMode) return;
@@ -615,6 +644,9 @@ namespace Stealth.Player
             gm.CalloutServer(ClientId, PingKind.Enemy, target.Position, target);
         }
 
+        /// <summary>Where the player reaches from (chest height): hacking and cracking need a clear line from here.</summary>
+        public Vector3 Hands => transform.position + Vector3.up * (Height * 0.7f);
+
         /// <summary>The nearest robot / device that can be hacked from where we stand.</summary>
         Detector FindHackTarget()
         {
@@ -622,7 +654,7 @@ namespace Stealth.Player
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)
             {
-                if (!d.CanBeHackedFrom(transform.position, HackReach)) continue;
+                if (!d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
                 float dist = (d.transform.position - transform.position).sqrMagnitude;
                 if (dist < bestDist) { best = d; bestDist = dist; }
             }
@@ -717,7 +749,7 @@ namespace Stealth.Player
         /// <summary>Server: the owner finished holding E at a robot / device.</summary>
         public void OnHackRequest(IHackable target)
         {
-            if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f)) return;
+            if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
             target.HackServer(m_Interaction.HackDuration);
         }
     }

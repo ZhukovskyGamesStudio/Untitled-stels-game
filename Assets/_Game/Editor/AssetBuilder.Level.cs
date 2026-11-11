@@ -34,7 +34,6 @@ namespace Stealth.EditorTools
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
             var exitSign = Prefab($"{LevelPrefabs}/ExitSign.prefab", BuildExitSign);
-            var sewer = Prefab($"{LevelPrefabs}/Sewer.prefab", BuildSewer);
 
             string p = PropPrefabs + "/";
             var desk = Prefab(p + "Desk.prefab", () => PropObject("Desk", "desk", "PropBody", "PropAccent", "PropScreen"));
@@ -120,7 +119,6 @@ namespace Stealth.EditorTools
                 art.RoomLight = light;
                 art.Window = window;
                 art.ExitSign = exitSign;
-                art.Sewer = sewer;
                 art.DeskLamp = pDeskLamp;
                 art.PingPongTable = pPingPong;
                 art.BeanBag = pBeanBag;
@@ -158,12 +156,6 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            // Pieces added after the art asset was created (it is never overwritten without FORCE).
-            if (levelArt.Sewer == null)
-            {
-                levelArt.Sewer = sewer;
-                EditorUtility.SetDirty(levelArt);
-            }
             return levelArt;
         }
 
@@ -248,77 +240,6 @@ namespace Stealth.EditorTools
         /// Sliding door: two panels and a blocker collider (enabled only while closed). Ignored by the navmesh:
         /// robots plan through doorways and the door opens when they arrive.
         /// </summary>
-        /// <summary>
-        /// The sewer between houses: a brick tunnel 24 m long with walkways on both sides of a water channel, a ladder up to
-        /// the hatch at one end, the tunnels to the next houses at the other, pipes and three dim lamps. The stash board
-        /// hangs at the trade spot. Built locally on every peer when the team comes down (<see cref="SewerLocation"/>).
-        /// </summary>
-        static GameObject BuildSewer()
-        {
-            var root = new GameObject("Sewer");
-            var loc = root.AddComponent<SewerLocation>();
-            var t = root.transform;
-            const float len = 24f, half = 3.6f, h = 3.6f;
-            Cube(t, "WalkA", new Vector3(len / 2f, -0.1f, -2.375f), new Vector3(len, 0.2f, 2.25f), M("SewerWalk"));
-            Cube(t, "WalkB", new Vector3(len / 2f, -0.1f, 2.375f), new Vector3(len, 0.2f, 2.25f), M("SewerWalk"));
-            Cube(t, "Channel", new Vector3(len / 2f, -0.35f, 0f), new Vector3(len, 0.2f, 2.5f), M("SewerWall"));
-            loc.Water = Cube(t, "Water", new Vector3(len / 2f, -0.18f, 0f), new Vector3(len, 0.04f, 2.5f), M("SewerWater"), false).transform;
-            loc.Water.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            foreach (var (name, pos, size) in new[]
-                     {
-                         ("WallA", new Vector3(len / 2f, h / 2f - 0.2f, -half), new Vector3(len + 0.4f, h + 0.4f, 0.2f)),
-                         ("WallB", new Vector3(len / 2f, h / 2f - 0.2f, half), new Vector3(len + 0.4f, h + 0.4f, 0.2f)),
-                         ("EndHatch", new Vector3(-0.1f, h / 2f - 0.2f, 0f), new Vector3(0.2f, h + 0.4f, half * 2f)),
-                         ("EndTunnels", new Vector3(len + 0.1f, h / 2f - 0.2f, 0f), new Vector3(0.2f, h + 0.4f, half * 2f)),
-                         ("Ceiling", new Vector3(len / 2f, h + 0.1f, 0f), new Vector3(len + 0.4f, 0.2f, half * 2f + 0.2f)),
-                     })
-                Cube(t, name, pos, size, M("SewerWall")).GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.TwoSided;
-
-            // The way down: a ladder from the hatch in the ceiling.
-            Cube(t, "Hatch", new Vector3(0.9f, h - 0.02f, -2.4f), new Vector3(1.1f, 0.06f, 1.1f), M("Hatch"), false);
-            Cube(t, "HatchRing", new Vector3(0.9f, h - 0.06f, -2.4f), new Vector3(1.2f, 0.03f, 1.2f), M("HatchRing"), false);
-            for (int side = -1; side <= 1; side += 2)
-                Cube(t, "LadderRail", new Vector3(0.12f, h / 2f, -2.4f + side * 0.28f), new Vector3(0.06f, h, 0.06f), M("SewerPipe"), false);
-            for (float y = 0.3f; y < h; y += 0.35f)
-                Cube(t, "LadderRung", new Vector3(0.12f, y, -2.4f), new Vector3(0.05f, 0.04f, 0.6f), M("SewerPipe"), false);
-
-            // Where the next houses are: three dark tunnel mouths in the far wall.
-            loc.Tunnels = new Transform[3];
-            for (int i = 0; i < 3; i++)
-            {
-                float z = (i - 1) * 2.4f;
-                loc.Tunnels[i] = Cube(t, $"Tunnel{i}", new Vector3(len - 0.02f, 1.2f, z), new Vector3(0.06f, 2.2f, 1.6f), M("SewerDark"), false).transform;
-            }
-
-            // Pipes along the walls and three dim lamps.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Cube(t, "Pipe", new Vector3(len / 2f, 2.9f, side * (half - 0.3f)), new Vector3(len, 0.25f, 0.25f), M("SewerPipe"), false);
-                Cube(t, "PipeLow", new Vector3(len / 2f, 0.45f, side * (half - 0.2f)), new Vector3(len, 0.15f, 0.15f), M("SewerPipe"), false);
-            }
-            foreach (float x in new[] { 4f, 12f, 20f })
-            {
-                Cube(t, "LampHousing", new Vector3(x, h - 0.08f, 0f), new Vector3(0.5f, 0.12f, 0.3f), M("SewerLamp"), false)
-                    .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-                var lamp = Lamp(t, "Lamp", new Vector3(x, h - 0.2f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(1f, 0.85f, 0.55f), 3.2f, 8f,
-                    LightShadows.Soft);
-                lamp.spotAngle = 150f;
-                lamp.innerSpotAngle = 70f;
-            }
-
-            // Players come down by the ladder; the board to sell and stash is next to it.
-            loc.Spawns = new[]
-            {
-                Child(t, "Spawn0", new Vector3(2.4f, 0.05f, -2.4f)).transform,
-                Child(t, "Spawn1", new Vector3(2.4f, 0.05f, 2.4f)).transform,
-                Child(t, "Spawn2", new Vector3(3.6f, 0.05f, -2.0f)).transform,
-                Child(t, "Spawn3", new Vector3(3.6f, 0.05f, 2.0f)).transform,
-            };
-            foreach (var s in loc.Spawns) s.localRotation = Quaternion.Euler(0f, 90f, 0f);
-            loc.TradeSpot = Child(t, "TradeSpot", new Vector3(6.5f, 0f, -2.4f)).transform;
-            return root;
-        }
-
         static GameObject BuildAutoDoor()
         {
             var root = new GameObject("AutoDoor");
@@ -485,7 +406,11 @@ namespace Stealth.EditorTools
         static GameObject BuildHatch()
         {
             var hatch = PropObject("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing", collider: false);
-            hatch.AddComponent<Hatch>();
+            // The lid (disc and bars) on a hinge at its edge: it swings up while someone hides in the hatch.
+            var hinge = Child(hatch.transform, "LidHinge", new Vector3(0.75f, 0.03f, 0f));
+            foreach (var part in hatch.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
+                if (part.name.StartsWith("Body") || part.name.StartsWith("Accent")) part.SetParent(hinge.transform, true);
+            hatch.AddComponent<Hatch>().Lid = hinge.transform;
             var b = LocalBounds(hatch);
             var box = hatch.AddComponent<BoxCollider>();
             box.size = new Vector3(b.size.x, 0.3f, b.size.z); // easy target for dropping items

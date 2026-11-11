@@ -112,6 +112,20 @@ namespace Stealth.Game
             return alarms >= alarmLimit || elapsed >= timeLimit;
         }
 
+        /// <summary>A new run begins in the sewer, before the first house: nothing to pay yet.</summary>
+        public void BeginRun()
+        {
+            LevelIndex = RunMap.StartDepth;
+            LootValue = 0;
+            Quota = 0;
+            Collected = 0;
+            Penalties = 0;
+            Phase = RunPhase.Sewer;
+            AlarmUntil = 0;
+            Alarms = 0;
+            Hunters = 0;
+        }
+
         /// <summary>A new house begins with this much loot in it.</summary>
         public void BeginLevel(int index, int lootValue, int players = 1)
         {

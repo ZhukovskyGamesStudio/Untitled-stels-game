@@ -133,6 +133,10 @@ namespace Stealth.Player
 
         public void AddTrauma(float amount) => m_Trauma = Mathf.Clamp01(m_Trauma + amount);
 
+        /// <summary>Down in the hatch: the eyes sink to just above the floor (peeking out), the body stays put.</summary>
+        public bool InHatch { get; set; }
+        public const float HatchEyeHeight = 0.24f;
+
         public void ResetMotion()
         {
             m_Impulse = Vector3.zero;
@@ -224,7 +228,7 @@ namespace Stealth.Player
             float targetHeight = crouch ? PlayerController.CrouchHeight : PlayerController.StandHeight;
             m_Controller.height = Mathf.MoveTowards(m_Controller.height, targetHeight, dt * 5f);
             m_Controller.center = new Vector3(0, m_Controller.height / 2f, 0);
-            float targetHead = downed ? 0.35f : (crouch ? 0.95f : 1.6f);
+            float targetHead = InHatch ? HatchEyeHeight : downed ? 0.35f : (crouch ? 0.95f : 1.6f);
             m_HeadHeight = Mathf.SmoothDamp(m_HeadHeight, targetHead, ref m_HeadVelocity, 0.09f, Mathf.Infinity, dt);
 
             // Head bob follows the distance travelled, so it matches the footsteps at any speed.

@@ -56,6 +56,8 @@ namespace Stealth.Game
             DevFlags.Peaceful = Arg("-peaceful") != null;
             if (int.TryParse(Arg("-level"), out var level)) DevFlags.ForcedLevel = level;
             m_Name = Arg("-autotest");
+            // Scenarios start right in a house; the sewer scenario starts a run the normal way, in the sewer.
+            DevFlags.StartInHouse = m_Name != null && m_Name != "sewer";
             if (m_Name != null)
             {
                 m_ShotDir = Arg("-shotdir") ?? Path.Combine(Application.persistentDataPath, "shots");
@@ -83,7 +85,7 @@ namespace Stealth.Game
             if (m_Name == null) yield break;
 
             float timeout = Time.time + 30f;
-            while ((PlayerController.Local == null || ActiveLevel.Layout == null || GameManager.Instance == null) && Time.time < timeout)
+            while ((PlayerController.Local == null || (ActiveLevel.Layout == null && SewerLocation.Active == null) || GameManager.Instance == null) && Time.time < timeout)
                 yield return null;
             if (PlayerController.Local == null) { Log("FAIL: no local player"); Quit(); yield break; }
             yield return new WaitForSeconds(2f);

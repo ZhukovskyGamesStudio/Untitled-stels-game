@@ -51,7 +51,7 @@ namespace Stealth.Enemies
 
         protected override void TickServer()
         {
-            var eye = Pivot.position + Pivot.forward * 0.3f;
+            var eye = Point != null ? Point.position : Pivot.position + Pivot.forward * 0.5f; // the lens
             var vision = Tuning.Perception.Vision;
             IIntruder seen = null;
             float best = 0f;

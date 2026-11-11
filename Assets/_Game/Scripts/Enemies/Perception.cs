@@ -10,6 +10,28 @@ namespace Stealth.Enemies
     {
         public const int SightMask = ~(1 << LevelMetrics.CeilingLayer);
 
+        static readonly RaycastHit[] s_ReachHits = new RaycastHit[16];
+
+        /// <summary>
+        /// Nothing solid between a player's hands and a thing they reach for (a device, a robot, a safe): walls, slabs and
+        /// closed doors block, the thing's own colliders do not. Hacking and cracking need it — never through a wall.
+        /// </summary>
+        public static bool ReachClear(Vector3 from, Vector3 to, Transform target)
+        {
+            var d = to - from;
+            float dist = d.magnitude;
+            if (dist < 1e-3f) return true;
+            int n = Physics.RaycastNonAlloc(from, d / dist, s_ReachHits, dist, SightMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var t = s_ReachHits[i].collider.transform;
+                if (target != null && t.IsChildOf(target)) continue;
+                if (t.GetComponentInParent<Stealth.Player.PlayerController>() != null) continue; // the player's own body, teammates
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>Is <paramref name="target"/> inside a cone (full <paramref name="angle"/> in degrees) and range?</summary>
         public static bool InCone(Vector3 origin, Vector3 forward, Vector3 target, float range, float angle)
         {

@@ -162,16 +162,24 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 `MapSketch` превращает видимое в прямоугольники (пол, стены с проёмами, лестницы, мебель из `LevelShell.Props`, люк), `MapView` рисует
 мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
 → `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
-`PC_Renderer` рисует их сквозь стены (`Art/Shaders/MarkedXray.shader`). Настройки — `PlayerConfig.Team`.
+`PC_Renderer` рисуют их сквозь стены одним силуэтом (`Art/Shaders/MarkedXray.shader`: маска в стенсил → контур снаружи маски → заливка
+ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
+между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`).
 
 **Между домами — канализация.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. Уйти из дома — спрятаться
 в люк (`PlayerController.InHatch`, сервер; `IPlayerLink.SendHatch`); когда `RunState.TeamInHatch` — отсчёт `GameManager.LeaveAt`
 (`RunSettings.HatchCountdown`), потом `GoToSewerServer`: контент дома деспавнится, `RunState.EnterSewer(упавшие)`. Канализацию каждый пир
-строит сам из префаба `LevelArt.Sewer` (`SewerLocation`: спавны, точка доски, вода), дом при этом убирается (`GameManager.SyncLocation`).
-Торговать можно у `GameManager.TradePosition` (люк в доме, доска в канализации; `CanTradeAt`). Маршрут — `RunMap` из `LevelInfo.RunSeed`
-(столбцы 2–4 дома, из дома 1–3 пути, ряд 0 = классический сид дома), голоса — `RouteVotes` (`IGameLink.RequestVote`, ничья — жребий по сиду);
-`RouteScreen` (внутри префаба Menu — нужна мышь). Решили → `RunState.Advance()`: квота выплачена — `StartLevel(глубина + 1, ряд)`, нет — `Failed`
-и вода поднимается (`SewerLocation.Flood`). Номер ряда и сид забега — часть `LevelInfo`.
+строит сам из префаба `LevelArt.Sewer` (модели `Tools/Blender/sewer.py`, сборка `AssetBuilder.Sewer` — после UI; материалы `Art/Materials/Sewer`
+не перекрашиваются стилями), дом при этом убирается (`GameManager.SyncLocation`). **Забег начинается в канализации** (`RunState.BeginRun`,
+глубина `RunMap.StartDepth` = −1, первые 2–3 дома; автопилот стартует сразу в доме — `DevFlags.StartInHouse`, кроме сценария `sewer`).
+Канализация: кирпичный свод от лестницы под люком, тележка команды (`StashCart` выкладывает склад в кузов по сетке), зал с колодцем и
+**три туннеля** (`SewerLocation.Branches`: левый/средний/правый; `SewerBranches.Slots` — какой туннель ведёт к какому пути, лишние —
+за решёткой). Голос — встать в туннель (`SewerLocation.BranchAt`, сервер в `GameManager.UpdateVote`, ничья — жребий по сиду), над туннелем —
+панель в мире (`RouteSignView`, `SewerRoute`: тип дома, этажи, охрана, камеры, тьма, запертые двери, кто стоит, отсчёт, нехватка квоты).
+Торговать можно у `GameManager.TradePosition` (люк в доме, тележка в канализации; `CanTradeAt`). Маршрут — `RunMap` из `LevelInfo.RunSeed`
+(столбцы 2–4 дома, из дома 1–3 пути, ряд 0 = классический сид дома). Решили → `RunState.Advance()`: квота выплачена — `StartLevel(глубина + 1, ряд)`,
+нет — `Failed` и вода поднимается (`SewerLocation.Flood`). В люке игрок правда сидит в люке: камера у пола (`PlayerMotor.InHatch`), модель
+опущена, крышка люка открывается (`Hatch.Lid`).
 
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
 не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.

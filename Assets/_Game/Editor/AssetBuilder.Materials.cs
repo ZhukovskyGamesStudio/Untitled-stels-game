@@ -71,13 +71,6 @@ namespace Stealth.EditorTools
             Mat(env, "Hatch", new Color(0.32f, 0.32f, 0.33f), smoothness: 0.6f);
             Mat(env, "HatchRing", new Color(1f, 0.8f, 0.1f), new Color(2.4f, 1.8f, 0.15f));
             Mat(env, "LockLamp", new Color(1f, 0.15f, 0.1f), new Color(2.4f, 0.3f, 0.2f));
-            // The sewer between houses: wet brick, concrete walkways, murky water, rusty pipes, dim lamps.
-            Mat(env, "SewerWall", new Color(0.36f, 0.3f, 0.26f), smoothness: 0.35f);
-            Mat(env, "SewerWalk", new Color(0.33f, 0.33f, 0.31f), smoothness: 0.3f);
-            Mat(env, "SewerWater", new Color(0.12f, 0.2f, 0.14f), smoothness: 0.92f);
-            Mat(env, "SewerPipe", new Color(0.4f, 0.27f, 0.18f), smoothness: 0.5f);
-            Mat(env, "SewerDark", new Color(0.02f, 0.02f, 0.02f));
-            Mat(env, "SewerLamp", new Color(1f, 0.85f, 0.5f), new Color(2.6f, 2.1f, 1.1f));
 
             Mat(env, "LampHousing", new Color(0.82f, 0.83f, 0.85f), smoothness: 0.5f);
             Mat(env, "LampPanel", new Color(1f, 0.97f, 0.9f), new Color(2.2f, 2.1f, 1.9f));
@@ -179,6 +172,35 @@ namespace Stealth.EditorTools
                 float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
                 return Mathf.Clamp01((1f - d) * 8f);
             });
+            // A rounded panel for 9-slicing (corner radius 14 of 64 px).
+            Sprite("RoundPanel", 64, 64, (u, v) =>
+            {
+                float x = Mathf.Abs(u - 0.5f) * 64f, y = Mathf.Abs(v - 0.5f) * 64f;
+                float dx = Mathf.Max(0f, x - 18f), dy = Mathf.Max(0f, y - 18f);
+                return Mathf.Clamp01((14f - new Vector2(dx, dy).magnitude) * 1.5f);
+            }, new Vector4(20, 20, 20, 20));
+            // The face of a combination dial: dark at the rim, a soft sheen in the middle.
+            Sprite("DialFace", 256, 256, (u, v) =>
+            {
+                float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
+                if (d > 1f) return 0f;
+                return Mathf.Clamp01((1f - d) * 60f) * Mathf.Lerp(0.95f, 0.72f, d * d);
+            });
+            // The metal bezel: a ring lit from the top left (white × alpha, tinted by the image colour).
+            Sprite("DialBezel", 256, 256, (u, v) =>
+            {
+                var p = new Vector2(u - 0.5f, v - 0.5f) * 2f;
+                float d = p.magnitude;
+                float ring = Mathf.Clamp01((d - 0.84f) * 60f) * Mathf.Clamp01((1f - d) * 60f);
+                float light = 0.55f + 0.45f * Vector2.Dot(p.normalized, new Vector2(-0.7f, 0.7f));
+                float knurl = 0.85f + 0.15f * Mathf.Sign(Mathf.Sin(Mathf.Atan2(p.y, p.x) * 72f));
+                return ring * light * knurl;
+            });
+            Sprite("SoftGlow", 64, 64, (u, v) =>
+            {
+                float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
+                return Mathf.Clamp01(1f - d) * Mathf.Clamp01(1f - d);
+            });
             Sprite("Ring", 64, 64, (u, v) =>
             {
                 float d = new Vector2(u - 0.5f, v - 0.5f).magnitude * 2f;
@@ -196,7 +218,7 @@ namespace Stealth.EditorTools
             });
         }
 
-        static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha)
+        static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha, Vector4 border = default)
         {
             var path = $"{SpritesDir}/{name}.png";
             if (s_Force || !File.Exists(path))
@@ -212,8 +234,10 @@ namespace Stealth.EditorTools
                 AssetDatabase.ImportAsset(path);
             }
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-            if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled || importer.wrapMode != TextureWrapMode.Clamp)
+            if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled || importer.wrapMode != TextureWrapMode.Clamp
+                || importer.spriteBorder != border)
             {
+                importer.spriteBorder = border;
                 importer.textureType = TextureImporterType.Sprite;
                 importer.spriteImportMode = SpriteImportMode.Single;
                 importer.mipmapEnabled = false;

@@ -187,7 +187,7 @@ namespace Stealth.Net
 
         // ------------------------------------------------------------------ IGameLink
 
-        public void RequestVote(int lane) => VoteRpc((byte)Mathf.Clamp(lane, 0, 255));
+
         public void RequestRestart() => RestartRpc();
         public void BroadcastBanner(string text) => BannerRpc(text);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => PingRpc(owner, kind, position, target);
@@ -195,8 +195,7 @@ namespace Stealth.Net
         [Rpc(SendTo.Everyone)]
         void PingRpc(ulong owner, PingKind kind, Vector3 position, ulong target) => m_Game.ReceivePing(owner, kind, position, target);
 
-        [Rpc(SendTo.Server)]
-        void VoteRpc(byte lane, RpcParams rpcParams = default) => m_Game.VoteServer(rpcParams.Receive.SenderClientId, lane);
+
 
         [Rpc(SendTo.Server)]
         void RestartRpc() => m_Game.RestartRunServer();

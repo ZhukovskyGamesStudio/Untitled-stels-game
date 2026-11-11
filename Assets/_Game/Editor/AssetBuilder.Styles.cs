@@ -132,35 +132,40 @@ namespace Stealth.EditorTools
             }
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
 
-            var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == "MarkedXray");
-            if (feature == null)
+            // Three passes of the same material, in this order: mask (stencil), outline outside it, fill inside it.
+            string[] names = { "MarkedXray", "MarkedXrayOutline", "MarkedXrayFill" };
+            for (int pass = 0; pass < names.Length; pass++)
             {
-                feature = ScriptableObject.CreateInstance<RenderObjects>();
-                feature.name = "MarkedXray";
-                AssetDatabase.AddObjectToAsset(feature, data);
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long id);
-                var so = new SerializedObject(data);
-                var list = so.FindProperty("m_RendererFeatures");
-                var map = so.FindProperty("m_RendererFeatureMap");
-                list.arraySize++;
-                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = feature;
-                map.arraySize++;
-                map.GetArrayElementAtIndex(map.arraySize - 1).longValue = id;
-                so.ApplyModifiedProperties();
+                var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == names[pass]);
+                if (feature == null)
+                {
+                    feature = ScriptableObject.CreateInstance<RenderObjects>();
+                    feature.name = names[pass];
+                    AssetDatabase.AddObjectToAsset(feature, data);
+                    AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long id);
+                    var so = new SerializedObject(data);
+                    var list = so.FindProperty("m_RendererFeatures");
+                    var map = so.FindProperty("m_RendererFeatureMap");
+                    list.arraySize++;
+                    list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = feature;
+                    map.arraySize++;
+                    map.GetArrayElementAtIndex(map.arraySize - 1).longValue = id;
+                    so.ApplyModifiedProperties();
+                }
+                var s = feature.settings;
+                s.passTag = names[pass];
+                s.Event = RenderPassEvent.AfterRenderingTransparents;
+                s.filterSettings.RenderQueueType = RenderQueueType.Opaque;
+                s.filterSettings.LayerMask = 1 << Stealth.Enemies.Detector.XrayLayer;
+                s.overrideMode = RenderObjects.RenderObjectsSettings.OverrideMaterialMode.Material;
+                s.overrideMaterial = mat;
+                s.overrideMaterialPassIndex = pass;
+                s.overrideDepthState = true;
+                s.depthCompareFunction = UnityEngine.Rendering.CompareFunction.Greater;
+                s.enableWrite = false;
+                feature.SetActive(true);
+                EditorUtility.SetDirty(feature);
             }
-            var s = feature.settings;
-            s.passTag = "MarkedXray";
-            s.Event = RenderPassEvent.AfterRenderingTransparents;
-            s.filterSettings.RenderQueueType = RenderQueueType.Opaque;
-            s.filterSettings.LayerMask = 1 << Stealth.Enemies.Detector.XrayLayer;
-            s.overrideMode = RenderObjects.RenderObjectsSettings.OverrideMaterialMode.Material;
-            s.overrideMaterial = mat;
-            s.overrideMaterialPassIndex = 0;
-            s.overrideDepthState = true;
-            s.depthCompareFunction = UnityEngine.Rendering.CompareFunction.Greater;
-            s.enableWrite = false;
-            feature.SetActive(true);
-            EditorUtility.SetDirty(feature);
             EditorUtility.SetDirty(data);
         }
 

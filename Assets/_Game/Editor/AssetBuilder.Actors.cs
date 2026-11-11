@@ -401,12 +401,15 @@ namespace Stealth.EditorTools
         static GameObject BuildSecurityCamera()
         {
             var root = NetworkedRoot("SecurityCamera", false, false);
-            var pivot = Child(root.transform, "Pivot");
             var model = Model("security_camera");
-            model.transform.SetParent(pivot.transform, false);
+            model.transform.SetParent(root.transform, false);
             Paint(model, "RobotAccent", "RobotBody", "SensorGlow");
+            // Only the head turns: the wall plate stays, the arm and housing swivel at the bracket.
+            var pivot = Child(root.transform, "Pivot", new Vector3(0f, 0f, -0.24f));
+            foreach (var part in model.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
+                if (part.name.StartsWith("Accent") || part.name.StartsWith("Eye")) part.SetParent(pivot.transform, true);
 
-            var spotGo = Child(pivot.transform, "Spot", new Vector3(0, -0.02f, 0.25f));
+            var spotGo = Child(pivot.transform, "Spot", new Vector3(0, -0.02f, 0.49f));
             var spot = spotGo.AddComponent<Light>();
             spot.type = LightType.Spot;
             ShadowedLight(spot, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierMedium);

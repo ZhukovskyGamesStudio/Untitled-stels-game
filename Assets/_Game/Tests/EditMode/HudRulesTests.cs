@@ -61,7 +61,7 @@ namespace Stealth.Tests
             c.Cracking = true;
             Assert.IsFalse(PromptRules.Choose(c).IsValid, "the dial has its own screen");
             var s = new PromptContext { InSewer = true, Quota = 100 };
-            StringAssert.Contains("маршрут", PromptRules.Choose(s).Text);
+            StringAssert.Contains("туннел", PromptRules.Choose(s).Text);
         }
 
         [Test]

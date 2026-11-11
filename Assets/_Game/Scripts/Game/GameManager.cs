@@ -111,7 +111,9 @@ namespace Stealth.Game
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
             if (!isServer) return;
-            StartLevel(DevFlags.ForcedLevel, 0);
+            // A run starts in the sewer, at the first fork (tests and -level start right in a house).
+            if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0) StartLevel(DevFlags.ForcedLevel, 0);
+            else StartRunServer();
             DevFlags.ForcedLevel = 0;
         }
 
@@ -401,12 +403,7 @@ namespace Stealth.Game
 
         // ------------------------------------------------------------------ requests
 
-        /// <summary>This player votes for a house of the next column (in the sewer).</summary>
-        public void RequestVote(int lane)
-        {
-            if (m_Link != null) m_Link.RequestVote(lane);
-            else VoteServer(Session.LocalClientId, lane);
-        }
+
 
         public void RequestRestart()
         {
@@ -445,34 +442,78 @@ namespace Stealth.Game
             SyncLocation();
             string left = down > 0 ? $" Оставили лежать: {down} — квота следующего дома выше на {Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)}%." : "";
             Banner(QuotaMet
-                ? $"Канализация. Квота выплачена — голосуйте за следующий дом ({Controls.Label(GameAction.Map)}).{left}"
+                ? $"Канализация. Квота выплачена — выберите путь: зайдите в один из туннелей.{left}"
                 : $"Канализация. Квота {Collected} / {Quota}: допродайте добычу у доски, без квоты дальше не пустят.{left}");
         }
 
         public bool QuotaMet => m_Run.QuotaMet;
 
-        /// <summary>Server: a player votes for a house of the next column.</summary>
-        public void VoteServer(ulong clientId, int lane)
-        {
-            if (Phase != RunPhase.Sewer || GoAt > 0 || !RouteOptions.Contains(lane)) return;
-            Votes.Cast(clientId, lane);
-        }
+        int m_DecidedVotes = -1;
 
-        /// <summary>Server: everyone has voted — the winner is shown for a moment, then the team goes (or the run ends here).</summary>
+        /// <summary>
+        /// Server: a player votes by standing in a tunnel of the sewer. Once everyone stands in one, the winner (most
+        /// players; a tie by lot) is announced and the team goes after a short countdown — or the run ends here without
+        /// the quota. Stepping out (or into another tunnel) starts the choice again.
+        /// </summary>
         void UpdateVote()
         {
-            if (GoAt > 0)
+            var sewer = SewerLocation.Active;
+            var options = RouteOptions;
+            if (sewer == null || options.Count == 0) return;
+            foreach (var p in PlayerController.All)
             {
-                if (Session.ServerTime >= GoAt) AdvanceServer();
+                int way = SewerBranches.WayOf(sewer.BranchAt(p.transform.position), options.Count);
+                if (way >= 0 && !p.Downed) Votes.Cast(p.ClientId, options[way]);
+                else Votes.Remove(p.ClientId);
+            }
+            if (!Votes.Everyone(PlayerController.All.Select(p => p.ClientId), options))
+            {
+                GoAt = 0;
+                ChosenLane = -1;
+                m_DecidedVotes = -1;
                 return;
             }
-            var options = RouteOptions;
-            if (options.Count == 0 || !Votes.Everyone(PlayerController.All.Select(p => p.ClientId), options)) return;
-            int top = options.Max(o => Votes.Count(o));
-            bool tie = options.Count(o => Votes.Count(o) == top) > 1;
-            ChosenLane = Votes.Winner(options, new System.Random(LevelRandom.Mix(m_RunSeed, 0x707E, Level.Index)));
-            GoAt = Session.ServerTime + m_Run.Settings.VoteDelay;
-            if (tie) Banner("Голоса разделились — дом выбран жребием");
+            if (GoAt <= 0 || m_DecidedVotes != Votes.Version)
+            {
+                m_DecidedVotes = Votes.Version;
+                int top = options.Max(o => Votes.Count(o));
+                bool tie = options.Count(o => Votes.Count(o) == top) > 1;
+                ChosenLane = Votes.Winner(options, new System.Random(LevelRandom.Mix(m_RunSeed, 0x707E, Level.Index)));
+                GoAt = Session.ServerTime + m_Run.Settings.VoteDelay;
+                if (tie) Banner("Голоса разделились — путь выбран жребием");
+                return;
+            }
+            if (Session.ServerTime >= GoAt) AdvanceServer();
+        }
+
+        /// <summary>
+        /// Server: a new run — fresh seed, empty stash and backpacks, the team in the sewer before the first fork.
+        /// </summary>
+        void StartRunServer()
+        {
+            foreach (var obj in m_Spawned) Session.Despawn(obj);
+            m_Spawned.Clear();
+            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
+            ScentTrail.Clear();
+            m_RunSeed = DevFlags.ForcedSeed != 0 ? DevFlags.ForcedSeed : new System.Random().Next(1, int.MaxValue);
+            DevFlags.ForcedSeed = 0;
+            EnsureRoute(m_RunSeed);
+            m_Run.BeginRun();
+            m_Opened.Clear();
+            OpenedVersion++;
+            LeaveAt = 0;
+            GoAt = 0;
+            ChosenLane = -1;
+            m_DecidedVotes = -1;
+            Votes.Clear();
+            Level = new LevelInfo { Seed = 0, Index = RunMap.StartDepth, Players = TeamSize, Lane = 0, RunSeed = m_RunSeed };
+            foreach (var p in PlayerController.All)
+            {
+                p.LeaveHatchServer();
+                p.ResetForLevelServer();
+            }
+            SyncLocation();
+            Debug.Log($"[Game] Run started in the sewer (run seed {m_RunSeed}): {RouteOptions.Count} ways");
         }
 
         void AdvanceServer()
@@ -511,6 +552,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || player == null || player.Downed || IsOpened(SafeKey(safe))) return;
             var box = Items.SafeBox.All.FirstOrDefault(s => s.Index == safe);
             if (box == null || Vector3.Distance(box.transform.position, player.transform.position) > Items.SafeBox.Reach + 1.5f) return;
+            if (!Perception.ReachClear(player.Hands, box.transform.position + Vector3.up * 0.5f, box.transform)) return; // not through a wall
             m_Opened.Add(SafeKey(safe));
             OpenedVersion++;
             var s = Tuning.Items.Safes;
@@ -531,8 +573,8 @@ namespace Stealth.Game
             if (!m_Run.Restart()) return;
             foreach (var p in PlayerController.All) p.GetComponent<PlayerInventory>().ClearServer();
             Stash.Clear();
-            StartLevel(0, 0);
-            Banner("Новый забег");
+            StartRunServer();
+            Banner("Новый забег: выберите путь — зайдите в один из туннелей");
         }
 
         // ------------------------------------------------------------------ banners

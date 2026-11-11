@@ -344,7 +344,7 @@ namespace Stealth.UI
                 NearHatch = gm.Phase == RunPhase.Playing && Hatch.IsNear(me.transform.position),
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
-                InSewer = gm.Phase == RunPhase.Sewer && !RouteScreen.IsOpen,
+                InSewer = gm.Phase == RunPhase.Sewer && SewerLocation.Active != null && SewerLocation.Active.BranchAt(me.transform.position) < 0,
                 LockedDoor = me.DoorTarget != null,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,

@@ -23,6 +23,7 @@ namespace Stealth.EditorTools
         struct UiPrefabs
         {
             public GameObject[] Screens;
+            public RouteSignView RouteSign;
         }
 
         struct UiElements
@@ -40,9 +41,9 @@ namespace Stealth.EditorTools
             public Image MapRect;
             public MapIconView MapIcon;
             public CalloutMarkerView Callout;
-            public RouteNodeView RouteNode;
-            public Image RouteLine;
+            public RouteSignView RouteSign;
             public Text DialNumber;
+            public Image DialTick;
         }
 
         static Font s_Font;
@@ -63,6 +64,7 @@ namespace Stealth.EditorTools
                 var e = BuildUiElements();
                 return new UiPrefabs
                 {
+                    RouteSign = e.RouteSign,
                     Screens = new[]
                     {
                         Prefab(UiPrefabsDir + "/HUD.prefab", () => BuildHud(e)),
@@ -391,28 +393,38 @@ namespace Stealth.EditorTools
                 return root.gameObject;
             }).GetComponent<CalloutMarkerView>();
 
-            e.RouteNode = Prefab(ElementsDir + "/RouteNode.prefab", () =>
-            {
-                var root = R(null, "RouteNode", BottomLeft, Center, Vector2.zero, new Vector2(46, 46));
-                var view = root.gameObject.AddComponent<RouteNodeView>();
-                view.Rect = root;
-                view.Ring = Img(root, Color.white, S("Disc"));
-                view.Ring.raycastTarget = true;
-                view.Fill = Img(R(root, "Fill", Center, Center, Vector2.zero, new Vector2(34, 34)), new Color(0, 0, 0, 0.9f), S("Disc"));
-                view.Button = root.gameObject.AddComponent<Button>();
-                view.Button.targetGraphic = view.Ring;
-                root.gameObject.AddComponent<UiSound>().Control = view.Button;
-                view.Label = Txt(R(root, "Label", Center, TopCenter, new Vector2(0, -26), new Vector2(190, 64)), "Офис", 12, TextAnchor.UpperCenter, Color.white, true);
-                view.Votes = Txt(R(root, "Votes", Center, Center, Vector2.zero, new Vector2(60, 30)), "●●", 18, TextAnchor.MiddleCenter, Color.white, true);
-                return root.gameObject;
-            }).GetComponent<RouteNodeView>();
 
-            e.RouteLine = Prefab(ElementsDir + "/RouteLine.prefab", () =>
-                Img(R(null, "RouteLine", BottomLeft, Left, Vector2.zero, new Vector2(10, 3)), Color.white).gameObject).GetComponent<Image>();
+            e.RouteSign = Prefab(ElementsDir + "/RouteSign.prefab", () =>
+            {
+                // A world-space panel over a sewer tunnel, 1.7 x 0.62 m: where it leads, who stands in it.
+                const float w = 380f, h = 140f;
+                var go = new GameObject("RouteSign", typeof(RectTransform));
+                var canvas = go.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.WorldSpace;
+                go.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 4f;
+                var rt = (RectTransform)go.transform;
+                rt.sizeDelta = new Vector2(w, h);
+                rt.localScale = Vector3.one * 0.0068f; // ~2.6 x 0.95 m: readable from the middle of the hall
+                var view = go.AddComponent<RouteSignView>();
+                view.Group = go.AddComponent<CanvasGroup>();
+                view.Frame = Img(Stretch(go.transform, "Frame"), new Color(1f, 1f, 1f, 0.35f));
+                Img(Stretch(view.Frame.rectTransform, "Back", 2f), new Color(0.02f, 0.025f, 0.03f, 0.88f));
+                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(12, -6), new Vector2(w - 24, 30)), "Офис · дом 1", 26, TextAnchor.MiddleLeft, Color.white, true);
+                view.Title.rectTransform.sizeDelta = new Vector2(w - 24, 36);
+                Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(12, -44), new Vector2(w - 24, 2)), new Color(1f, 1f, 1f, 0.3f));
+                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(12, -50), new Vector2(w - 24, 60)), "3 этажа", 15, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
+                view.Body.resizeTextForBestFit = true;
+                view.Body.resizeTextMinSize = 11;
+                view.Body.resizeTextMaxSize = 15;
+                view.Votes = Txt(R(go.transform, "Votes", BottomLeft, BottomLeft, new Vector2(12, 6), new Vector2(w - 24, 26)), "Зайди в туннель", 16, TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.6f), true);
+                return go;
+            }).GetComponent<RouteSignView>();
 
             e.DialNumber = Prefab(ElementsDir + "/DialNumber.prefab", () =>
-                Txt(R(null, "DialNumber", Center, Center, Vector2.zero, new Vector2(40, 22)), "0", 15, TextAnchor.MiddleCenter, Color.white, true).gameObject)
+                Txt(R(null, "DialNumber", Center, Center, Vector2.zero, new Vector2(40, 22)), "0", 16, TextAnchor.MiddleCenter, new Color(0.95f, 0.93f, 0.86f), true).gameObject)
                 .GetComponent<Text>();
+            e.DialTick = Prefab(ElementsDir + "/DialTick.prefab", () =>
+                Img(R(null, "DialTick", Center, Center, Vector2.zero, new Vector2(2, 10)), Color.white).gameObject).GetComponent<Image>();
 
             e.ControlGroup = Prefab(ElementsDir + "/ControlGroup.prefab", () =>
             {
@@ -445,11 +457,10 @@ namespace Stealth.EditorTools
             hud.DownedTint = Img(Stretch(overlays, "DownedTint"), new Color(0.25f, 0f, 0f, 0.55f));
             hud.DownedText = Txt(R(overlays, "Downed", TopCenter, TopCenter, new Vector2(0, -240), new Vector2(900, 100)),
                 "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
-            // In the hatch: almost dark, a ring of light from the opening above.
-            hud.HatchTint = Img(Stretch(overlays, "HatchTint"), new Color(0f, 0f, 0f, 0.82f));
-            Img(Stretch(hud.HatchTint.rectTransform, "Edge"), new Color(0f, 0f, 0f, 1f), S("Vignette"));
-            hud.HatchText = Txt(R(overlays, "HatchText", Center, Center, new Vector2(0, 40), new Vector2(900, 100)),
-                "Ты в люке", 22, TextAnchor.MiddleCenter, Color.white, true);
+            // In the hatch: peeking out at floor level, the rim of the hatch dark around the view.
+            hud.HatchTint = Img(Stretch(overlays, "HatchTint"), new Color(0f, 0f, 0f, 1f), S("Vignette"));
+            hud.HatchText = Txt(R(overlays, "HatchText", TopCenter, TopCenter, new Vector2(0, -150), new Vector2(900, 60)),
+                "Ты в люке", 18, TextAnchor.MiddleCenter, Color.white, true);
             hud.HatchStatus = Txt(R(overlays, "HatchStatus", TopCenter, TopCenter, new Vector2(0, -160), new Vector2(900, 24)),
                 "В люке ждут", 15, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.65f), true);
             var alarm = Stretch(overlays, "Alarm");
@@ -563,52 +574,74 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        /// <summary>The safe minigame: a dial with numbers, a fixed pointer, the stethoscope bar, the digits found.</summary>
+        /// <summary>
+        /// The safe minigame: a rounded panel, a metal dial (bezel, face, ticks and numbers added by the view, a hub with
+        /// a grip), a fixed gold pointer, three code windows, a stethoscope of bars, key hints.
+        /// </summary>
         static void BuildSafeCrack(UiElements e, Transform content)
         {
             // The view stays active and shows / hides its panel (a component that hides its own object stops updating).
             var holder = R(content, "SafeCrack", Center, Center, Vector2.zero, Vector2.zero);
             var view = holder.gameObject.AddComponent<SafeCrackView>();
-            var root = R(holder, "Panel", Center, Center, new Vector2(0, 10), new Vector2(420, 420));
+            var root = R(holder, "Panel", Center, Center, new Vector2(0, 6), new Vector2(440, 520));
             view.Root = root.gameObject;
-            Img(root, new Color(0.02f, 0.03f, 0.04f, 0.78f));
-            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -8), new Vector2(400, 30)), "Сейф", 20, TextAnchor.MiddleCenter, Color.white, true);
-            var face = R(root, "Face", Center, Center, new Vector2(0, 22), new Vector2(250, 250));
-            Img(face, new Color(0.16f, 0.17f, 0.19f, 1f), S("Disc"));
-            Img(R(face, "Rim", Center, Center, Vector2.zero, new Vector2(250, 250)), new Color(0.7f, 0.72f, 0.75f, 0.9f), S("Ring"));
-            view.Dial = R(face, "Dial", Center, Center, Vector2.zero, Vector2.zero);
-            view.NumberPrefab = e.DialNumber;
-            view.NumberRadius = 98f;
-            var pointer = R(face, "Pointer", Center, Center, new Vector2(0, 136), new Vector2(18, 18));
-            pointer.localEulerAngles = new Vector3(0, 0, 180);
-            Img(pointer, new Color(1f, 0.8f, 0.25f), S("MapArrow"));
-            view.Current = Txt(R(face, "Current", Center, Center, Vector2.zero, new Vector2(90, 50)), "00", 34, TextAnchor.MiddleCenter, Color.white, true);
-            view.Flash = Img(Stretch(root, "Flash"), new Color(1f, 0.2f, 0.15f, 0.3f));
-            view.Listen = Bar(root, "Listen", BottomCenter, BottomCenter, new Vector2(-40, 92), new Vector2(220, 12), new Color(0, 0, 0, 0.6f), Color.white, 2f);
-            view.ListenLabel = Txt(R(root, "ListenLabel", BottomCenter, BottomLeft, new Vector2(78, 84), new Vector2(140, 26)), "тихо", 14, TextAnchor.MiddleLeft, Color.white, true);
-            view.Digits = Txt(R(root, "Digits", BottomCenter, BottomCenter, new Vector2(0, 58), new Vector2(400, 26)), "Код: ○ ○ ○", 17, TextAnchor.MiddleCenter, Color.white, true);
-            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 8), new Vector2(410, 44)), "Мышь — крутить диск", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.75f));
-            root.gameObject.SetActive(false);
-        }
+            view.Panel = root;
+            var gold = new Color(1f, 0.78f, 0.32f);
+            // a thin gold edge (the panel's own image) around a dark face
+            var edge = Img(root, new Color(gold.r, gold.g, gold.b, 0.45f), S("RoundPanel"));
+            edge.type = Image.Type.Sliced;
+            var back = Img(Stretch(root, "Back", 1.5f), new Color(0.035f, 0.04f, 0.05f, 0.96f), S("RoundPanel"));
+            back.type = Image.Type.Sliced;
 
-        /// <summary>
-        /// The route map in the sewer (inside the menu canvas: it needs the mouse). Columns of houses, lines between
-        /// them, the houses the team can vote for.
-        /// </summary>
-        static void BuildRoute(UiElements e, Transform root)
-        {
-            var screen = R(root, "Route", Center, Center, Vector2.zero, Vector2.zero).gameObject.AddComponent<RouteScreen>();
-            var panel = R(screen.transform, "Panel", Center, Center, new Vector2(0, 10), new Vector2(1040, 600));
-            Img(panel, new Color(0.03f, 0.04f, 0.04f, 0.93f)).raycastTarget = true;
-            screen.Panel = panel.gameObject;
-            screen.Title = Txt(R(panel, "Title", TopLeft, TopLeft, new Vector2(20, -8), new Vector2(1000, 36)), "Канализация", 22, TextAnchor.MiddleLeft, Color.white, true);
-            screen.Status = Txt(R(panel, "Status", TopLeft, TopLeft, new Vector2(20, -46), new Vector2(1000, 44)), "Квота", 14, TextAnchor.UpperLeft, Color.white);
-            screen.Graph = R(panel, "Graph", BottomLeft, BottomLeft, new Vector2(20, 44), new Vector2(1000, 450));
-            screen.LineLayer = R(screen.Graph, "Lines", BottomLeft, BottomLeft, Vector2.zero, Vector2.zero);
-            screen.NodePrefab = e.RouteNode;
-            screen.LinePrefab = e.RouteLine;
-            screen.Hint = Txt(R(panel, "Hint", BottomLeft, BottomLeft, new Vector2(20, 10), new Vector2(1000, 26)), "Клик по дому — голос", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
-            panel.gameObject.SetActive(false);
+            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(400, 26)), "С Е Й Ф", 17, TextAnchor.MiddleCenter, gold, true);
+            Txt(R(root, "Subtitle", TopCenter, TopCenter, new Vector2(0, -38), new Vector2(400, 20)), "подбери код на слух", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.5f));
+
+            // Code windows.
+            view.Slots = new Image[3];
+            view.SlotTexts = new Text[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var slot = R(root, $"Slot{i}", TopCenter, TopCenter, new Vector2((i - 1) * 62f, -66), new Vector2(54, 34));
+                view.Slots[i] = Img(slot, new Color(0.08f, 0.09f, 0.1f, 0.9f), S("RoundPanel"));
+                view.Slots[i].type = Image.Type.Sliced;
+                view.SlotTexts[i] = Txt(Stretch(slot, "Digit"), "", 20, TextAnchor.MiddleCenter, gold, true, shadow: false);
+            }
+
+            // The dial.
+            var face = R(root, "Dial", Center, Center, new Vector2(0, 10), new Vector2(276, 276));
+            Img(R(face, "Shadow", Center, Center, new Vector2(0, -6), new Vector2(300, 300)), new Color(0, 0, 0, 0.6f), S("SoftGlow"));
+            view.Ring = Img(R(face, "Ring", Center, Center, Vector2.zero, new Vector2(300, 300)), new Color(0.35f, 1f, 0.5f, 0.8f), S("Ring"));
+            Img(R(face, "Bezel", Center, Center, Vector2.zero, new Vector2(276, 276)), new Color(0.82f, 0.82f, 0.86f, 1f), S("DialBezel"));
+            Img(R(face, "Face", Center, Center, Vector2.zero, new Vector2(236, 236)), new Color(0.13f, 0.14f, 0.16f, 1f), S("DialFace"));
+            view.Dial = R(face, "Turning", Center, Center, Vector2.zero, Vector2.zero);
+            view.TickPrefab = e.DialTick;
+            view.NumberPrefab = e.DialNumber;
+            view.TickRadius = 116f;
+            view.NumberRadius = 90f;
+            // the hub turns with the dial: a grip bar shows it turning
+            Img(R(view.Dial, "Hub", Center, Center, Vector2.zero, new Vector2(84, 84)), new Color(0.3f, 0.31f, 0.34f, 1f), S("Disc"));
+            Img(R(view.Dial, "HubSheen", Center, Center, new Vector2(-8, 8), new Vector2(60, 60)), new Color(1f, 1f, 1f, 0.1f), S("SoftGlow"));
+            view.Readout = Txt(R(face, "Readout", Center, Center, new Vector2(0, -2), new Vector2(80, 40)), "00", 26, TextAnchor.MiddleCenter, new Color(0.95f, 0.93f, 0.86f), true);
+            view.Flash = Img(R(face, "Flash", Center, Center, Vector2.zero, new Vector2(236, 236)), new Color(1f, 0.25f, 0.18f, 0.4f), S("Disc"));
+            var pointer = R(face, "Pointer", Center, Center, new Vector2(0, 146), new Vector2(22, 22));
+            pointer.localEulerAngles = new Vector3(0, 0, 180);
+            Img(pointer, gold, S("MapArrow"));
+            Img(R(face, "PointerLine", Center, Center, new Vector2(0, 128), new Vector2(2, 18)), gold);
+
+            // Stethoscope: bars rising towards the right number.
+            Txt(R(root, "ListenCaption", BottomCenter, BottomCenter, new Vector2(0, 98), new Vector2(400, 18)), "стетоскоп", 11, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.45f));
+            view.Bars = new Image[16];
+            for (int i = 0; i < 16; i++)
+            {
+                float hgt = 6f + i * 1.6f;
+                view.Bars[i] = Img(R(root, $"Bar{i}", BottomCenter, BottomCenter, new Vector2(-120f + i * 16f, 64), new Vector2(10, hgt)), Color.white);
+                view.Bars[i].rectTransform.pivot = new Vector2(0.5f, 0f);
+            }
+
+            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 30), new Vector2(420, 22)), "Мышь — крутить", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
+            Txt(R(root, "Warning", BottomCenter, BottomCenter, new Vector2(0, 10), new Vector2(420, 18)), "неверное число громко лязгает — роботы услышат", 11,
+                TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.45f, 0.75f));
+            root.gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -883,9 +916,6 @@ namespace Stealth.EditorTools
 
             pause.gameObject.SetActive(false);
             settings.gameObject.SetActive(false);
-            // Under the pause and settings pages: the menu covers the route map when it opens.
-            BuildRoute(e, root.transform);
-            root.transform.Find("Route").SetSiblingIndex(0);
             return root;
         }
 

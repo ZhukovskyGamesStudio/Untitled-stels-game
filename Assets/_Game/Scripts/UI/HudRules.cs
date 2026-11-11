@@ -66,7 +66,7 @@ namespace Stealth.UI
                 s_Prompts.Add(new Prompt(55, hatch, c.Collected >= c.Quota
                     ? "Спрятаться в люк — уйти в канализацию"
                     : $"Спрятаться в люк ({c.Collected}/{c.Quota}: квоту можно доплатить внизу)"));
-            if (c.InSewer) s_Prompts.Add(new Prompt(30, Controls.Label(GameAction.Map), "Карта маршрута: голосовать за следующий дом"));
+            if (c.InSewer) s_Prompts.Add(new Prompt(30, "", "Выбери путь: зайди в один из туннелей"));
             if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
             if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));
             return UiMath.Choose(s_Prompts);

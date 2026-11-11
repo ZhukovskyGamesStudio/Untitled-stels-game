@@ -10,6 +10,20 @@ namespace Stealth.Level
     {
         public const float UseDistance = 3.2f;
 
+        [Tooltip("The lid on its hinge: it swings open while someone hides inside.")]
+        public Transform Lid;
+
+        float m_Open;
+
+        void Update()
+        {
+            if (Lid == null) return;
+            bool someone = false;
+            foreach (var p in Stealth.Player.PlayerController.All) someone |= p.InHatch;
+            m_Open = Mathf.MoveTowards(m_Open, someone ? 1f : 0f, Time.deltaTime * 2.5f);
+            Lid.localRotation = Quaternion.Euler(0f, 0f, -Mathf.SmoothStep(0f, 105f, m_Open));
+        }
+
         /// <summary>Feet this far above or below the hatch are on another floor (a floor is 3.5 m).</summary>
         public const float SameFloor = 1.5f;
 

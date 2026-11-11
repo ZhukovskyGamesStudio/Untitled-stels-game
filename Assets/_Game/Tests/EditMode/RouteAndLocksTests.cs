@@ -12,10 +12,12 @@ namespace Stealth.Tests
     public class RouteAndLocksTests
     {
         [Test]
-        public void TheRouteStartsAtOneHouseAndAlwaysBranches()
+        public void TheRouteStartsInTheSewerAndAlwaysBranches()
         {
             var map = new RunMap(12345);
-            Assert.AreEqual(1, map.LanesAt(0));
+            Assert.AreEqual(1, map.LanesAt(RunMap.StartDepth), "one sewer at the start");
+            Assert.That(map.LanesAt(0), Is.InRange(2, 3), "2–3 first houses: the sewer has three tunnels");
+            CollectionAssert.AreEqual(Enumerable.Range(0, map.LanesAt(0)), map.Next(RunMap.StartDepth, 0), "every first house is open");
             bool sawOne = false, sawThree = false;
             for (int d = 0; d < 30; d++)
             {
@@ -51,6 +53,46 @@ namespace Stealth.Tests
             Assert.AreEqual(LevelRandom.LevelSeed(77, 3), a.Node(3, 0).Seed, "row 0 keeps the classic house seed");
             Assert.AreNotEqual(a.Node(3, 0).Seed, a.Node(3, 1).Seed, "houses of a column differ");
             Assert.AreNotEqual(new RunMap(78).Node(2, 1).Seed, a.Node(2, 1).Seed);
+        }
+
+        [Test]
+        public void TunnelsLeadToTheWaysInOrder()
+        {
+            CollectionAssert.AreEqual(new[] { 1 }, SewerBranches.Slots(1), "one way: the middle tunnel");
+            CollectionAssert.AreEqual(new[] { 0, 2 }, SewerBranches.Slots(2), "two: the side ones");
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, SewerBranches.Slots(3));
+            Assert.AreEqual(-1, SewerBranches.WayOf(1, 2), "the middle is barred with two ways");
+            Assert.AreEqual(1, SewerBranches.WayOf(2, 2));
+            Assert.AreEqual(-1, SewerBranches.WayOf(-1, 3), "not in any tunnel");
+            for (int ways = 1; ways <= 3; ways++)
+                Assert.That(new RunMap(ways).Next(0, 0).Count, Is.LessThanOrEqualTo(SewerBranches.Count), "never more ways than tunnels");
+        }
+
+        [Test]
+        public void SteppingOutOfATunnelTakesTheVoteBack()
+        {
+            var votes = new RouteVotes();
+            var options = new List<int> { 0, 1 };
+            votes.Cast(1, 0);
+            votes.Cast(2, 1);
+            Assert.IsTrue(votes.Everyone(new ulong[] { 1, 2 }, options));
+            int v = votes.Version;
+            votes.Remove(2);
+            Assert.Greater(votes.Version, v);
+            Assert.IsFalse(votes.Everyone(new ulong[] { 1, 2 }, options));
+            votes.Remove(2);
+            Assert.AreEqual(v + 1, votes.Version, "removing twice changes nothing");
+        }
+
+        [Test]
+        public void ARunStartsInTheSewerWithNothingToPay()
+        {
+            var run = new RunState();
+            run.BeginRun();
+            Assert.AreEqual(RunPhase.Sewer, run.Phase);
+            Assert.AreEqual(RunMap.StartDepth, run.LevelIndex);
+            Assert.IsTrue(run.QuotaMet, "no quota before the first house");
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
         }
 
         [Test]

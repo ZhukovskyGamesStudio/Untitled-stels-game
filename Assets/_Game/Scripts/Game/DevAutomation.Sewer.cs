@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Linq;
+using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Level;
 using Stealth.Player;
-using Stealth.UI;
 using UnityEngine;
 
 namespace Stealth.Game
@@ -11,9 +11,10 @@ namespace Stealth.Game
     public partial class DevAutomation
     {
         /// <summary>
-        /// Between houses (<c>LEVEL=3 Tools/dev.sh run sewer 1</c>): hack a locked door, crack a safe, hide in the hatch
-        /// (everyone), go down into the sewer, pay the quota, vote, go on to the next house; then leave again without the
-        /// quota and see the run end. A client does the hiding and voting too.
+        /// A run from the start (<c>Tools/dev.sh run sewer 1</c>): it starts in the sewer — the cart with the stash, the
+        /// tunnels with their panels; everyone walks into a tunnel and the house starts. In the house: the safe dial, a
+        /// marked robot through a wall, a camera turning on its bracket, everyone hides in the hatch (peeking out), back
+        /// in the sewer; then into a tunnel again without the quota — the water rises and the run ends.
         /// </summary>
         IEnumerator SewerScenario()
         {
@@ -23,118 +24,133 @@ namespace Stealth.Game
             float t0 = Time.time;
             bool expectClients = Me.IsServer && Arg("-autotest-linger") != null;
             while (expectClients && PlayerController.All.Count < 2 && Time.time - t0 < 25f) yield return null;
-            yield return new WaitForSeconds(1f);
-            var layout = ActiveLevel.Layout;
-            Log($"house {gm.Level.Index} lane {gm.Level.Lane}: locked doors {layout.LockedDoors.Count}, safes {SafeBox.All.Count}, players {PlayerController.All.Count}");
+            yield return new WaitForSeconds(1.5f);
+            int slot = PlayerLooks.SlotOf(Me.ClientId);
+            var sewer = SewerLocation.Active;
+            Log($"start: phase {gm.Phase}, in the sewer {sewer != null}, ways {string.Join(",", gm.RouteOptions)}, players {PlayerController.All.Count}");
+            if (gm.Phase != RunPhase.Sewer || sewer == null) { Log("FAIL: the run does not start in the sewer"); yield break; }
 
             if (Me.IsServer)
             {
-                // A locked door: hold E next to it.
-                var door = AutoDoor.All.FirstOrDefault(d => d.Locked && LevelLayout.FloorOf(d.transform.position.y) == 0) ?? AutoDoor.All.FirstOrDefault(d => d.Locked);
-                if (door != null)
-                {
-                    var side = door.transform.forward * 1.2f;
-                    LookAtFrom(new Pose(door.transform.position + side + Vector3.up * 0.05f, Quaternion.LookRotation(-side)), door.transform.position + Vector3.up * 2.2f);
-                    yield return new WaitForSeconds(0.4f);
-                    yield return Shot("1_locked_door");
-                    DevFlags.AutoInteract = true;
-                    yield return new WaitForSeconds(1.2f);
-                    yield return Shot("2_hacking_door");
-                    yield return new WaitForSeconds(2.3f);
-                    DevFlags.AutoInteract = false;
-                    yield return new WaitForSeconds(0.5f);
-                    Log($"door {door.Index}: locked={door.Locked} (should be false)");
-                    if (door.Locked) Log("FAIL: the door is still locked");
-                    yield return Shot("3_door_unlocked");
-                }
-                else Log("no locked door in this house");
+                yield return Shot("01_sewer_start");
+                // Some loot in the team stash: it lies in the cart.
+                gm.Stash.Add(4, 4, 0, 0, 0);
+                gm.Stash.Add(2, 3, 4, 0, 1);
+                gm.Stash.Add(1, 2, 0, 2, 0);
+                gm.Stash.Add(5, 1, 3, 2, 0);
+                yield return new WaitForSeconds(0.5f);
+                var cart = sewer.TradeSpot.position;
+                var from = cart + new Vector3(1.4f, 0.05f, 1.6f);
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(cart - from))), cart + Vector3.up * 0.7f);
+                yield return new WaitForSeconds(0.4f);
+                yield return Shot("02_cart");
+                // The hall and the panels over the tunnels.
+                LookAtFrom(new Pose(new Vector3(-13.5f, 0.05f, 1.2f), Quaternion.LookRotation(Vector3.left)), new Vector3(-21.5f, 2.6f, 0f));
+                yield return new WaitForSeconds(1f);
+                yield return Shot("03_hall_tunnels");
+                var mid = sewer.Branches[1].Sign.transform.position;
+                LookAtFrom(new Pose(new Vector3(-17.5f, 0.05f, 0.3f), Quaternion.LookRotation(Vector3.left)), mid);
+                yield return new WaitForSeconds(1f);
+                yield return Shot("04_sign");
+            }
+            else yield return new WaitForSeconds(4f);
 
-                // A safe: the dial minigame, then the loot.
+            // Everyone walks into the tunnel of the first way: the house starts after the countdown.
+            yield return IntoTunnel(gm, 0, slot);
+            if (Me.IsServer) yield return Shot("05_in_tunnel");
+            float tw = Time.time;
+            while (gm.Phase == RunPhase.Sewer && Time.time - tw < 15f) yield return null;
+            yield return new WaitForSeconds(2f);
+            Log($"house: phase {gm.Phase}, house {gm.Level.Index} lane {gm.Level.Lane}, layout {ActiveLevel.Layout != null}");
+            if (gm.Phase != RunPhase.Playing || ActiveLevel.Layout == null) { Log("FAIL: the house did not start"); yield break; }
+
+            if (Me.IsServer)
+            {
+                // The safe dial.
                 var safe = SafeBox.All.FirstOrDefault(s => !s.Opened);
                 if (safe != null)
                 {
-                    var view = ViewPoint(safe.transform.position, 1.3f);
-                    LookAtFrom(view, safe.transform.position + Vector3.up * 0.5f);
+                    LookAtFrom(ViewPoint(safe.transform.position, 1.3f), safe.transform.position + Vector3.up * 0.5f);
                     yield return new WaitForSeconds(0.3f);
                     Me.StartCrackForTest(safe);
                     var dial = Me.Cracking;
-                    dial.SetDial(dial.CodeAt(0) + 3);
-                    yield return new WaitForSeconds(0.4f);
-                    yield return Shot("4_safe_dial_near");
-                    Me.TryDial(); // wrong: clank
-                    yield return new WaitForSeconds(0.1f);
-                    yield return Shot("5_safe_wrong");
-                    int items = WorldItem.All.Count;
-                    for (int i = 0; i < dial.Digits; i++)
-                    {
-                        dial.SetDial(dial.CodeAt(i));
-                        yield return new WaitForSeconds(0.3f);
-                        if (i == 1) yield return Shot("6_safe_digit");
-                        Me.TryDial();
-                    }
-                    yield return new WaitForSeconds(0.6f);
-                    Log($"safe {safe.Index}: opened={safe.Opened}, items {items} -> {WorldItem.All.Count}");
-                    if (!safe.Opened) Log("FAIL: the safe did not open");
-                    yield return Shot("7_safe_open");
+                    dial.SetDial(dial.CodeAt(0));
+                    Me.TryDial();
+                    dial.SetDial(dial.CodeAt(1) + 2);
+                    yield return new WaitForSeconds(0.25f);
+                    yield return Shot("06_safe_dial");
+                    Me.TryDial();
+                    yield return new WaitForSeconds(0.08f);
+                    yield return Shot("07_safe_wrong");
+                    Me.StartCrackForTest(null);
                 }
-                else Log("no safe in this house");
+                // A marked robot behind a wall: one shape with one outline.
+                var robot = Detector.All.OfType<RobotController>().FirstOrDefault(r => LevelLayout.FloorOf(r.transform.position.y) == 0);
+                if (robot != null)
+                {
+                    robot.MarkServer(Session.ServerTimeF + 30f);
+                    var layout = ActiveLevel.Layout;
+                    var cell = new Vector2Int(Mathf.FloorToInt(robot.transform.position.x / LevelMetrics.Cell), Mathf.FloorToInt(robot.transform.position.z / LevelMetrics.Cell));
+                    foreach (var d in new[] { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down })
+                    {
+                        var n = cell + d;
+                        if (n.x < 0 || n.y < 0 || n.x >= layout.Width || n.y >= layout.Height) continue;
+                        var spot = layout.CellCenter(0, n.x, n.y) + new Vector3(d.x, 0, d.y) * 2f;
+                        if (!Physics.Linecast(spot + Vector3.up * 1.6f, robot.Position, Perception.SightMask, QueryTriggerInteraction.Ignore)) continue;
+                        LookAtFrom(new Pose(spot + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(robot.Position - spot))), robot.Position);
+                        yield return new WaitForSeconds(0.5f);
+                        yield return Shot("08_marked_through_wall");
+                        break;
+                    }
+                }
+                // A camera: only its head turns.
+                var cam = Detector.All.OfType<SecurityCamera>().FirstOrDefault(c => LevelLayout.FloorOf(c.transform.position.y) == 0);
+                if (cam != null)
+                {
+                    LookAtFrom(ViewPoint(cam.transform.position, 2.2f), cam.transform.position);
+                    yield return new WaitForSeconds(0.3f);
+                    yield return Shot("09_camera_a");
+                    yield return new WaitForSeconds(2.5f);
+                    yield return Shot("09_camera_b");
+                }
             }
 
-            // Everyone hides in the hatch.
-            yield return HideInHatch(gm, "8");
-            if (gm.Phase != RunPhase.Sewer) { Log($"FAIL: not in the sewer (phase {gm.Phase})"); yield break; }
-            yield return new WaitForSeconds(1f);
-            Log($"in the sewer: quota {gm.Collected}/{gm.Quota}, options {string.Join(",", gm.RouteOptions)}, route open {RouteScreen.IsOpen}");
-            yield return Shot("10_route_map");
-            RouteScreen.CloseForTest();
-            Me.TeleportOwner(SewerLocation.Active.SpawnFor(PlayerLooks.SlotOf(Me.ClientId)) + new Vector3(-1.2f, 0f, 0f), Quaternion.LookRotation(Vector3.right));
-            Me.Motor.SetPitch(5f);
-            yield return new WaitForSeconds(0.6f);
-            yield return Shot("10b_sewer_tunnel");
-            Me.TeleportOwner(SewerLocation.Active.TradeSpot.position + new Vector3(-2.5f, 0.05f, PlayerLooks.SlotOf(Me.ClientId) * 0.8f), Quaternion.LookRotation(Vector3.right));
-            yield return new WaitForSeconds(0.6f);
-            yield return Shot("10c_sewer_board");
-
-            if (Me.IsServer) gm.AddCollectedServer(Mathf.Max(0, gm.Quota - gm.Collected)); // the team sells enough
-            yield return new WaitForSeconds(0.8f);
-            int before = gm.Level.Index;
-            gm.RequestVote(gm.RouteOptions[gm.RouteOptions.Count - 1]);
+            // Everyone hides in the hatch: peeking out at floor level.
+            var hatch = ActiveLevel.Layout.HatchPosition;
+            Me.TeleportOwner(hatch + new Vector3(1.0f + slot * 0.4f, 0.05f, 0.5f), Quaternion.LookRotation(Vector3.forward));
+            yield return new WaitForSeconds(0.4f);
+            Me.SetHatch(true);
             yield return new WaitForSeconds(1.2f);
-            yield return Shot("11_voted");
-            float tv = Time.time;
-            while (gm.Level.Index == before && Time.time - tv < 15f) yield return null;
-            yield return new WaitForSeconds(1.5f);
-            Log($"next house: {before} -> {gm.Level.Index} lane {gm.Level.Lane}, phase {gm.Phase}");
-            if (gm.Level.Index != before + 1 || gm.Phase != RunPhase.Playing) Log("FAIL: did not go on to the next house");
-            yield return Shot("12_next_house");
+            Log($"in the hatch: {Me.InHatch}, eyes {Me.Camera.transform.position.y - hatch.y:0.00} m above the floor");
+            yield return Shot("10_peeking");
+            float th = Time.time;
+            while (gm.Phase == RunPhase.Playing && Time.time - th < 20f) yield return null;
+            yield return new WaitForSeconds(2f);
+            Log($"back in the sewer: phase {gm.Phase}, quota {gm.Collected}/{gm.Quota}, ways {string.Join(",", gm.RouteOptions)}");
+            if (Me.IsServer) yield return Shot("11_sewer_again");
 
-            // Leave again without the quota: the run ends in the sewer.
-            yield return HideInHatch(gm, "13");
-            yield return new WaitForSeconds(1f);
-            gm.RequestVote(gm.RouteOptions[0]);
+            // On without the quota: the water rises, the run is over.
+            yield return IntoTunnel(gm, gm.RouteOptions.Count - 1, slot);
             float tf = Time.time;
             while (gm.Phase == RunPhase.Sewer && Time.time - tf < 15f) yield return null;
-            yield return new WaitForSeconds(4f);
+            yield return new WaitForSeconds(4.5f);
             Log($"without the quota: phase {gm.Phase}");
             if (gm.Phase != RunPhase.Failed) Log("FAIL: the run did not end");
-            yield return Shot("14_flooded");
-            yield return new WaitForSeconds(3f);
+            if (Me.IsServer) yield return Shot("12_flooded");
+            yield return new WaitForSeconds(2f);
         }
 
-        IEnumerator HideInHatch(GameManager gm, string shot)
+        /// <summary>Walk into the tunnel of a way (index in the options), a little apart from teammates.</summary>
+        IEnumerator IntoTunnel(GameManager gm, int way, int slot)
         {
-            var hatch = ActiveLevel.Layout.HatchPosition;
-            int slot = PlayerLooks.SlotOf(Me.ClientId);
-            Me.TeleportOwner(hatch + new Vector3(1.2f + slot * 0.5f, 0.05f, 0.6f), Quaternion.LookRotation(Vector3.left));
-            yield return new WaitForSeconds(0.5f);
-            Me.SetHatch(true);
+            var sewer = SewerLocation.Active;
+            int tunnel = SewerBranches.Slots(gm.RouteOptions.Count)[way];
+            var mouth = sewer.Branches[tunnel].Mouth;
+            var spot = mouth.position + mouth.right * (2.5f + slot * 0.9f) + Vector3.up * 0.05f;
+            Me.TeleportOwner(spot, Quaternion.LookRotation(-mouth.right));
+            Me.Motor.SetPitch(-8f);
             yield return new WaitForSeconds(0.8f);
-            Log($"in the hatch: {Me.InHatch}, team {PlayerController.All.Count(p => p.InHatch)}/{PlayerController.All.Count}, leaving at {gm.LeaveAt:0.0}");
-            yield return Shot($"{shot}_in_hatch");
-            float t = Time.time;
-            while (gm.Phase == RunPhase.Playing && Time.time - t < 20f) yield return null;
-            yield return new WaitForSeconds(1.5f);
-            yield return Shot($"{shot}_sewer");
+            Log($"in tunnel {tunnel} (way {way}): votes {gm.Votes.All.Count}, going at {gm.GoAt:0.0}");
         }
     }
 }

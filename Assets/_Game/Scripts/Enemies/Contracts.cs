@@ -29,6 +29,8 @@ namespace Stealth.Enemies
         bool IsHacked { get; }
         /// <summary>Can a player standing at <paramref name="player"/> (reach <paramref name="reach"/> m) hack it right now?</summary>
         bool CanBeHackedFrom(Vector3 player, float reach);
+        /// <summary>The player's hands (chest height) reach it without a wall in between.</summary>
+        bool ReachableFrom(Vector3 hands);
         /// <summary>Server: disable for <paramref name="seconds"/>.</summary>
         void HackServer(float seconds);
     }
