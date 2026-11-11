@@ -14,6 +14,9 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshfix  # noqa: E402
+
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 base_dir = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleKit")
 # no family: the plain kit in StyleKit/; with families: StyleKit/<Family>/ reshaped like the family's models
@@ -59,6 +62,7 @@ def merge(name, parts):
         result.from_mesh(tmp)
         bpy.data.meshes.remove(tmp)
     bmesh.ops.recalc_face_normals(result, faces=result.faces)
+    meshfix.separate_coplanar(result)
     mesh = bpy.data.meshes.new(name)
     result.to_mesh(mesh)
     result.free()
@@ -103,6 +107,7 @@ def finish(obj):
             v.co.z -= 0.004 * math.sin(v.co.x * 3.1) ** 2
         bevel(0.006, 1)
         smooth = True
+    meshfix.separate_coplanar(bm)
     bm.to_mesh(obj.data)
     bm.free()
     if True:
@@ -122,6 +127,8 @@ def export(name, smooth=False):
     for obj in list(bpy.context.scene.objects):
         if obj.type == "MESH":
             smooth = finish(obj) or smooth
+    # kit pieces may be separate on purpose (a hanger beside its tray): only part faces that share a plane
+    meshfix.fix_objects([o for o in bpy.context.scene.objects if o.type == "MESH"], snap=None, name=name)
     bpy.ops.object.select_all(action="SELECT")
     for obj in bpy.context.selected_objects:
         for p in obj.data.polygons:

@@ -19,6 +19,9 @@ import bpy
 import bmesh
 from mathutils import Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshfix  # noqa: E402  (no two parts z-fighting in one plane)
+
 argv = sys.argv
 out_dir = argv[argv.index("--") + 1] if "--" in argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
 
@@ -120,11 +123,14 @@ def merge(name, parts):
         result.from_mesh(tmp)
         bpy.data.meshes.remove(tmp)
     bmesh.ops.recalc_face_normals(result, faces=result.faces)
+    meshfix.separate_coplanar(result)
     return _new_object(name, result)
 
 
 def export(filename):
     bpy.ops.object.select_all(action="SELECT")
+    meshfix.fix_objects(list(bpy.context.selected_objects), floor=category(filename) in ("Props", "Items", "Level"),
+                        name=filename)
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:
             poly.use_smooth = False
@@ -154,29 +160,29 @@ def model_player():
         cylinder(0.28, 1.0, (0, 0, 0.75), segments=12),          # torso
         box((0.22, 0.22, 0.7), (-0.14, 0, 0.35)),                  # legs
         box((0.22, 0.22, 0.7), (0.14, 0, 0.35)),
-        box((0.12, 0.12, 0.6), (-0.38, 0, 0.95)),                  # arms
-        box((0.12, 0.12, 0.6), (0.38, 0, 0.95)),
+        box((0.12, 0.12, 0.6), (-0.33, 0, 0.95)),                  # arms
+        box((0.12, 0.12, 0.6), (0.33, 0, 0.95)),
     ])
     merge("Accent", [
         box((0.44, 0.16, 0.5), (0, 0.3, 0.95)),                     # backpack (behind, +Y)
     ])
     # Head parts are separate objects so the game can tilt them (look direction of teammates).
-    merge("AccentHead", [box((0.36, 0.34, 0.34), (0, 0, 1.47))])
-    merge("EyeGlasses", [box((0.3, 0.04, 0.09), (0, -0.18, 1.52))])  # glasses strip, front
+    merge("AccentHead", [box((0.36, 0.34, 0.34), (0, 0, 1.42))])
+    merge("EyeGlasses", [box((0.3, 0.04, 0.09), (0, -0.18, 1.47))])  # glasses strip, front
     export("player")
 
 
 def model_robot_guard():
     """Bipedal guard robot with a big camera eye. Height ~2.0m."""
     merge("Body", [
-        box((0.7, 0.45, 0.75), (0, 0, 1.25)),                       # torso
-        box((0.14, 0.14, 0.75), (-0.45, 0, 1.15)),                  # arms
-        box((0.14, 0.14, 0.75), (0.45, 0, 1.15)),
+        box((0.7, 0.45, 0.8), (0, 0, 1.27)),                        # torso (up into the head)
+        box((0.14, 0.14, 0.75), (-0.41, 0, 1.15)),                  # arms (into the torso sides)
+        box((0.14, 0.14, 0.75), (0.41, 0, 1.15)),
     ])
     merge("Accent", [
         box((0.45, 0.4, 0.32), (0, 0, 1.82)),                       # head
-        box((0.2, 0.2, 0.2), (-0.45, 0, 0.7)),                      # fists
-        box((0.2, 0.2, 0.2), (0.45, 0, 0.7)),
+        box((0.2, 0.2, 0.2), (-0.41, 0, 0.7)),                      # fists
+        box((0.2, 0.2, 0.2), (0.41, 0, 0.7)),
     ])
     # Legs (with feet) in two parts: the game plants the feet and bends the knees.
     leg("AccentLeg0", [box((0.18, 0.18, 0.9), (-0.22, 0, 0.45)), box((0.26, 0.32, 0.08), (-0.22, -0.06, 0.04))], 0.45)
@@ -190,9 +196,10 @@ def model_robot_listener():
     merge("Body", [
         box((0.8, 1.0, 0.4), (0, 0, 0.42)),                         # chassis
         cylinder(0.08, 0.6, (0, 0.1, 0.9), segments=8),             # mast
+        cylinder(0.03, 0.5, (0, 0.1, 1.2), axis="X", segments=8),   # cross bar holding the ear dishes
     ])
-    for i, (x, y) in enumerate([(-0.46, -0.3), (0.46, -0.3), (-0.46, 0.3), (0.46, 0.3)]):
-        merge(f"AccentWheel{i}", [cylinder(0.22, 0.12, (x, y, 0.22), axis="X")])   # wheels roll in game
+    for i, (x, y) in enumerate([(-0.43, -0.3), (0.43, -0.3), (-0.43, 0.3), (0.43, 0.3)]):
+        merge(f"AccentWheel{i}", [cylinder(0.22, 0.12, (x, y, 0.22), axis="X")])   # wheels roll in game, hubs in the chassis
     merge("Eye", [
         cylinder(0.25, 0.12, (-0.25, 0.1, 1.2), axis="X", radius2=0.05),  # ear dishes
         cylinder(0.25, 0.12, (0.25, 0.1, 1.2), axis="X", radius2=0.05),
@@ -242,7 +249,7 @@ def model_desk():
     ])
     merge("Eye", [
         box((0.55, 0.04, 0.34), (0, 0.15, 0.98)),                   # monitor
-        box((0.06, 0.06, 0.2), (0, 0.2, 0.84)),
+        box((0.06, 0.06, 0.2), (0, 0.19, 0.84)),                    # its stand, 1 cm into the monitor
     ])
     export("desk")
 
@@ -255,13 +262,13 @@ def model_terminal():
         box((0.05, 0.75, 0.72), (-0.76, 0, 0.36)),
         box((0.05, 0.75, 0.72), (0.76, 0, 0.36)),
         box((1.5, 0.03, 0.4), (0, 0.36, 0.52)),
-        box((0.22, 0.45, 0.42), (0.45, 0.05, 0.22)),                 # the computer under the top
+        box((0.22, 0.45, 0.42), (0.45, 0.05, 0.21)),                 # the computer under the top
     ])
     # the console on the top is a part of its own: its bounds stay within the screens (desk lamps stand beside them)
     merge("AccentConsole", [
         box((0.52, 0.17, 0.025), (0, -0.1, 0.778)),                  # keyboard
-        box((0.06, 0.06, 0.12), (-0.32, 0.2, 0.83)), box((0.06, 0.06, 0.12), (0, 0.22, 0.83)),
-        box((0.06, 0.06, 0.12), (0.32, 0.2, 0.83)),                  # screen stands
+        box((0.06, 0.06, 0.14), (-0.32, 0.2, 0.83)), box((0.06, 0.06, 0.14), (0, 0.22, 0.83)),
+        box((0.06, 0.06, 0.14), (0.32, 0.2, 0.83)),                  # screen stands (into the top and the screens)
     ])
     merge("Eye", [
         box((0.29, 0.03, 0.22), (-0.32, 0.17, 1.0)),
@@ -341,7 +348,7 @@ def model_boxes():
 
 def model_water_cooler():
     merge("Body", [box((0.35, 0.35, 1.0), (0, 0, 0.5))])
-    merge("Eye", [cylinder(0.15, 0.45, (0, 0, 1.25), segments=12)])
+    merge("Eye", [cylinder(0.15, 0.45, (0, 0, 1.22), segments=12)])
     export("water_cooler")
 
 
@@ -361,7 +368,7 @@ def model_toilet_stall():
     """1.0 wide, 1.5 deep cubicle walls (2.0 high, raised), door side open towards -Y."""
     merge("Body", [
         box((0.05, 1.5, 1.9), (-0.5, 0, 1.05)), box((0.05, 1.5, 1.9), (0.5, 0, 1.05)), box((1.0, 0.05, 1.9), (0, 0.75, 1.05)),
-    ])
+    ] + [box((0.05, 0.05, 0.12), (x, y, 0.06)) for x in (-0.5, 0.5) for y in (-0.7, 0.0)])   # the raised walls stand on feet
     merge("Accent", [cylinder(0.2, 0.42, (0, 0.4, 0.21), segments=12)])
     export("toilet_stall")
 
@@ -481,10 +488,11 @@ def model_pallet():
 
 def model_wash_basin():
     """Restroom counter 1.6 x 0.5 with two sinks and a mirror on the wall behind (+Y)."""
-    merge("Body", [box((1.6, 0.5, 0.06), (0, 0, 0.85)), box((1.6, 0.45, 0.8), (0, 0.02, 0.4))])
+    merge("Body", [box((1.6, 0.5, 0.06), (0, 0, 0.85)), box((1.6, 0.45, 0.8), (0, 0.02, 0.4)),
+                   box((1.6, 0.03, 0.4), (0, 0.24, 1.06))])                # backsplash up to the mirror
     merge("Accent", [cylinder(0.17, 0.08, (x, -0.02, 0.86), segments=14) for x in (-0.4, 0.4)]
           + [box((0.04, 0.12, 0.15), (x, 0.17, 0.95)) for x in (-0.4, 0.4)])
-    merge("Eye", [box((1.5, 0.02, 0.8), (0, 0.24, 1.55))])
+    merge("Eye", [box((1.5, 0.02, 0.8), (0, 0.235, 1.55))])
     export("wash_basin")
 
 
@@ -538,7 +546,16 @@ def model_items():
         cx = (min(x for x, _ in cells) + max(x for x, _ in cells)) / 2.0
         cy = (min(y for _, y in cells) + max(y for _, y in cells)) / 2.0
         # Shape lies flat on the ground: grid X -> Blender X, grid Y -> Blender -Y (Unity +Z).
-        parts = [box((c * 0.96, c * 0.96, c * 0.96), ((x - cx) * c, -(y - cy) * c, c / 2)) for x, y in cells]
+        pos = lambda x, y: ((x - cx) * c, -(y - cy) * c)  # noqa: E731
+        parts = [box((c * 0.96, c * 0.96, c * 0.96), (*pos(x, y), c / 2)) for x, y in cells]
+        # neighbouring cells are joined inside by a bridge (the shape is one piece, the cell gaps stay; the bridge
+        # stays within the two cells, so the cart still shows the item on its own cells only)
+        for x, y in cells:
+            for nx, ny in ((x + 1, y), (x, y + 1)):
+                if (nx, ny) in cells:
+                    (ax, ay), (bx, by) = pos(x, y), pos(nx, ny)
+                    size = (abs(bx - ax) + c * 0.5, abs(by - ay) + c * 0.5, c * 0.5)
+                    parts.append(box(size, ((ax + bx) / 2, (ay + by) / 2, c / 2)))
         merge("Body", parts)
         export("item_" + name)
 
@@ -546,11 +563,15 @@ def model_items():
 def model_robot_sweeper():
     """Floor cleaner on three wheels, ~0.55 m high. Its lidar puck sits under the body at ankle height (spins in game)."""
     merge("Body", [cylinder(0.38, 0.22, (0, 0, 0.44), segments=24), sphere(0.2, (0, 0.05, 0.56), segments=14)])
-    for i, (x, y) in enumerate([(-0.28, 0.18), (0.28, 0.18), (0.0, -0.3)]):
+    wheels = [(-0.28, 0.18), (0.28, 0.18), (0.0, -0.3)]
+    for i, (x, y) in enumerate(wheels):
         merge(f"AccentWheel{i}", [cylinder(0.08, 0.06, (x, y, 0.08), axis="X", segments=12)])
     merge("Accent", [cylinder(0.05, 0.16, (0, 0, 0.28), segments=10),                      # stem to the lidar
-                     cylinder(0.14, 0.012, (-0.3, -0.25, 0.012), segments=12),             # side brushes
-                     cylinder(0.14, 0.012, (0.3, -0.25, 0.012), segments=12)])
+                     cylinder(0.14, 0.012, (-0.27, -0.24, 0.012), segments=12),            # side brushes
+                     cylinder(0.14, 0.012, (0.27, -0.24, 0.012), segments=12),
+                     cylinder(0.015, 0.33, (-0.27, -0.24, 0.175), segments=8),             # their stems up to the body
+                     cylinder(0.015, 0.33, (0.27, -0.24, 0.175), segments=8)]
+          + [box((0.025, 0.05, 0.27), (x + s * 0.04, y, 0.2)) for x, y in wheels for s in (-1, 1)])  # wheel forks
     merge("AccentLidar", [cylinder(0.12, 0.07, (0, 0, 0.22), segments=16), box((0.06, 0.05, 0.035), (0, -0.12, 0.22))])
     merge("Eye", [box((0.24, 0.03, 0.05), (0, -0.37, 0.5)), sphere(0.03, (0, -0.15, 0.22), segments=8)])
     export("robot_sweeper")

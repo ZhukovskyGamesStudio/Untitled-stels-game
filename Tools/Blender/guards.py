@@ -24,6 +24,7 @@ from mathutils import Matrix, Vector, noise
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402
+import meshfix  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ROOT = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
@@ -136,6 +137,7 @@ def finish(obj):
             bmesh.ops.inset_individual(bm, faces=big, thickness=0.005, depth=-0.004)
         bevel(0.005, 2)
         smooth = True
+    meshfix.separate_coplanar(bm)  # the finish (grid snap, noise) can bring faces back into one plane
     bm.to_mesh(obj.data)
     bm.free()
     for p in obj.data.polygons:
@@ -166,6 +168,7 @@ def merge(name, parts):
 def export(style):
     os.makedirs(OUT, exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
+    meshfix.fix_objects(list(bpy.context.selected_objects), name=f"robot_guard__{style}")
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"robot_guard__{style}.fbx"), use_selection=True,
                              apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=True,
                              object_types={"MESH"}, use_mesh_modifiers=True, mesh_smooth_type="FACE", add_leaf_bones=False)
@@ -194,7 +197,7 @@ def night_shift():
     merge("Accent", [box(0.42, 0.42, 0.3, y=-0.05, z=1.8, taper=0.85),                           # squat head
                      cyl(0.16, 0.08, y=-0.27, z=1.82, axis="Y", seg=8),                          # lamp rim
                      box(0.24, 0.24, 0.2, x=-0.53, y=-0.15, z=0.6), box(0.24, 0.24, 0.2, x=0.53, y=-0.15, z=0.6),  # claws
-                     box(0.06, 0.06, 0.3, x=0.18, y=0.05, z=2.0), cyl(0.04, 0.12, x=-0.5, y=0.36, z=1.62, seg=6)])  # antenna, exhaust
+                     box(0.06, 0.06, 0.3, x=0.18, y=0.05, z=2.0), cyl(0.04, 0.12, x=-0.18, y=0.36, z=1.6, seg=6)])  # antenna, exhaust on the battery
     merge("Eye", [cyl(0.12, 0.06, y=-0.31, z=1.82, axis="Y", seg=8)])
     legs(lambda s: [box(0.2, 0.22, 0.45, x=s * 0.22, z=0.66), box(0.14, 0.16, 0.45, x=s * 0.22, y=0.04, z=0.25),
                     box(0.3, 0.36, 0.08, x=s * 0.22, y=-0.06, z=0.04)])
@@ -209,7 +212,7 @@ def scrapyard():
                      sph(0.12, x=-0.46, y=-0.04, z=0.98, seg=16), sph(0.12, x=0.46, y=-0.04, z=0.98, seg=16),  # mitts
                      cyl(0.03, 0.25, x=0.15, z=1.95, seg=8), sph(0.06, x=0.15, z=2.08, seg=12)])     # antenna bobble
     merge("Eye", [sph(0.14, x=-0.15, y=-0.31, z=1.84, seg=20, sy=0.6), sph(0.14, x=0.15, y=-0.31, z=1.84, seg=20, sy=0.6)])
-    legs(lambda s: capsule(0.11, 0.6, x=s * 0.2, z=0.55) + [sph(0.16, x=s * 0.2, y=-0.06, z=0.1, seg=16, sy=1.4, sz=0.6)])
+    legs(lambda s: capsule(0.11, 0.72, x=s * 0.2, z=0.5) + [sph(0.16, x=s * 0.2, y=-0.06, z=0.1, seg=16, sy=1.4, sz=0.6)])
     export("S02_Scrapyard")
 
 
@@ -262,19 +265,28 @@ def toon():
 
 
 def storybook():
-    """Blue Prince: an art-deco doorman automaton — fluted column body, round face plate with a monocle, bell-hop cap."""
+    """Blue Prince: an art-deco doorman automaton — fluted column body, round face plate with a monocle, bell-hop cap,
+    stepped brass epaulettes and a big wind-up key on the back (the automaton reads from above and behind)."""
     flutes = [cyl(0.03, 0.62, x=0.27 * math.cos(a), y=0.2 * math.sin(a), z=1.3, seg=8) for a in
               [math.pi * (0.55 + 0.1 * i) for i in range(10)]]
-    merge("Body", [cyl(0.28, 0.66, z=1.3, seg=24, r2=0.24), cyl(0.3, 0.06, z=0.98, seg=24), cyl(0.27, 0.06, z=1.63, seg=24)] + flutes + [
-                   limb((-0.3, 0, 1.55), (-0.36, -0.05, 1.1), 0.04), limb((0.3, 0, 1.55), (0.36, -0.05, 1.1), 0.04),
-                   limb((-0.36, -0.05, 1.1), (-0.3, -0.16, 0.86), 0.035), limb((0.36, -0.05, 1.1), (0.3, -0.16, 0.86), 0.035)])
-    merge("Accent", [cyl(0.19, 0.3, z=1.84, seg=24), cyl(0.2, 0.04, y=-0.15, z=1.84, axis="Y", seg=24),   # head and face plate
-                     cyl(0.2, 0.12, z=2.03, seg=24), cyl(0.22, 0.02, y=-0.02, z=1.97, seg=24),             # cap and its band
-                     cyl(0.07, 0.06, z=1.68, seg=16),
-                     sph(0.05, x=-0.3, y=-0.17, z=0.84, seg=12), sph(0.05, x=0.3, y=-0.17, z=0.84, seg=12)])
-    merge("Eye", [cyl(0.07, 0.03, x=0.07, y=-0.19, z=1.86, axis="Y", seg=20)])
-    legs(lambda s: [limb((s * 0.12, 0, 0.96), (s * 0.13, 0, 0.12), 0.05), box(0.12, 0.28, 0.08, x=s * 0.13, y=-0.06, z=0.04),
-                    cyl(0.065, 0.1, x=s * 0.13, z=0.16, seg=16)])
+    merge("Body", [cyl(0.28, 0.66, z=1.3, seg=24, r2=0.24), cyl(0.33, 0.08, z=0.98, seg=24), cyl(0.27, 0.06, z=1.63, seg=24),
+                   cyl(0.34, 0.22, z=1.02, seg=24, r2=0.29)] + flutes + [                          # coat tails flare at the hips
+                   limb((-0.3, 0, 1.55), (-0.37, -0.04, 1.12), 0.065), limb((0.3, 0, 1.55), (0.37, -0.04, 1.12), 0.065),
+                   limb((-0.37, -0.04, 1.12), (-0.32, -0.15, 0.86), 0.06), limb((0.37, -0.04, 1.12), (0.32, -0.15, 0.86), 0.06)])
+    epaulettes = []
+    for s in (-1, 1):  # three stepped brass discs on each shoulder
+        epaulettes += [cyl(0.12 - 0.03 * k, 0.035, x=s * 0.27, z=1.6 + 0.035 * k, seg=20) for k in range(3)]
+    key = [cyl(0.035, 0.2, y=0.3, z=1.36, axis="Y", seg=12),                                         # wind-up key: shaft
+           cyl(0.11, 0.035, x=-0.11, y=0.42, z=1.36, axis="Y", seg=20), cyl(0.11, 0.035, x=0.11, y=0.42, z=1.36, axis="Y", seg=20),
+           box(0.12, 0.04, 0.06, y=0.42, z=1.36)]
+    merge("Accent", [cyl(0.21, 0.32, z=1.84, seg=24), cyl(0.22, 0.04, y=-0.17, z=1.84, axis="Y", seg=24),   # head and face plate
+                     cyl(0.22, 0.14, z=2.05, seg=24), cyl(0.24, 0.025, y=-0.02, z=1.98, seg=24),           # cap and its band
+                     cyl(0.08, 0.08, z=1.68, seg=16),
+                     sph(0.08, x=-0.32, y=-0.16, z=0.84, seg=12), sph(0.08, x=0.32, y=-0.16, z=0.84, seg=12)] + epaulettes + key)
+    merge("Eye", [cyl(0.095, 0.03, x=0.07, y=-0.2, z=1.86, axis="Y", seg=20),                       # monocle, bigger
+                  cyl(0.045, 0.03, y=-0.235, z=2.05, axis="Y", seg=16)])                            # cap badge
+    legs(lambda s: [limb((s * 0.13, 0, 0.96), (s * 0.13, 0, 0.1), 0.075), box(0.15, 0.3, 0.09, x=s * 0.13, y=-0.06, z=0.045),
+                    cyl(0.085, 0.12, x=s * 0.13, z=0.16, seg=16)])
     export("S06_Storybook")
 
 
@@ -296,14 +308,14 @@ def logbook():
 def footage():
     """Content Warning: a camera-man robot — a big camcorder for a head, rounded body, a tripod-like stance."""
     merge("Body", [box(0.56, 0.38, 0.6, z=1.25), box(0.46, 0.32, 0.22, z=0.94)] +
-          capsule(0.075, 0.5, x=-0.38, z=1.22) + capsule(0.075, 0.5, x=0.38, z=1.22))
+          capsule(0.075, 0.5, x=-0.34, z=1.22) + capsule(0.075, 0.5, x=0.34, z=1.22))
     merge("Accent", [box(0.3, 0.52, 0.3, y=0.02, z=1.83),                                          # camcorder body
                      cyl(0.13, 0.22, y=-0.3, z=1.83, axis="Y", seg=20, r2=0.15),                    # lens barrel
                      box(0.06, 0.18, 0.12, x=0.18, y=0.05, z=1.86),                                 # side screen
-                     cyl(0.05, 0.1, z=1.65, seg=12), box(0.1, 0.12, 0.08, y=0.1, z=2.02),           # neck, top handle
+                     cyl(0.05, 0.17, z=1.6, seg=12), box(0.1, 0.12, 0.08, y=0.1, z=2.02),           # neck, top handle
                      sph(0.09, x=-0.4, y=-0.04, z=0.92, seg=12), sph(0.09, x=0.4, y=-0.04, z=0.92, seg=12)])
     merge("Eye", [cyl(0.11, 0.03, y=-0.42, z=1.83, axis="Y", seg=20), sph(0.025, x=-0.1, y=-0.12, z=1.99, seg=8)])
-    legs(lambda s: capsule(0.085, 0.8, x=s * 0.2, z=0.5) + [box(0.16, 0.3, 0.07, x=s * 0.2, y=-0.06, z=0.035)])
+    legs(lambda s: capsule(0.085, 0.88, x=s * 0.2, z=0.46) + [box(0.16, 0.3, 0.07, x=s * 0.2, y=-0.06, z=0.035)])
     export("S08_Footage")
 
 
@@ -321,17 +333,22 @@ def white_room():
 
 
 def grid():
-    """TRON: a sleek suit with glowing seams — smooth helmet, a visor line, light strips down the chest, arms and legs."""
-    merge("Body", [box(0.5, 0.3, 0.6, z=1.3, taper=1.12), box(0.38, 0.26, 0.24, z=0.95),
-                   limb((-0.32, 0, 1.52), (-0.36, -0.02, 1.1), 0.055), limb((0.32, 0, 1.52), (0.36, -0.02, 1.1), 0.055),
-                   limb((-0.36, -0.02, 1.1), (-0.34, -0.1, 0.8), 0.05), limb((0.36, -0.02, 1.1), (0.34, -0.1, 0.8), 0.05)])
-    merge("Accent", [sph(0.18, z=1.84, seg=24, sy=1.1, sz=1.2), cyl(0.07, 0.1, z=1.66, seg=16),
-                     box(0.54, 0.32, 0.06, z=1.6), sph(0.06, x=-0.34, y=-0.1, z=0.78, seg=12), sph(0.06, x=0.34, y=-0.1, z=0.78, seg=12)])
-    seams = [box(0.02, 0.02, 0.56, x=x, y=-0.16, z=1.3) for x in (-0.12, 0.12)] + [box(0.4, 0.02, 0.02, y=-0.155, z=1.05)]
-    seams += [box(0.015, 0.015, 0.4, x=s * 0.37, y=-0.07, z=1.3, ry=s * 0.09) for s in (-1, 1)]
-    merge("Eye", [box(0.26, 0.03, 0.045, y=-0.19, z=1.86)] + seams)
-    legs(lambda s: [limb((s * 0.15, 0, 0.92), (s * 0.16, 0, 0.1), 0.065), box(0.13, 0.28, 0.08, x=s * 0.16, y=-0.06, z=0.04),
-                    box(0.015, 0.015, 0.7, x=s * 0.16, y=-0.07, z=0.5)])
+    """TRON: a sleek suit with glowing seams — smooth helmet with a wrap-around visor, broad shoulder plates, bold light
+    strips down the chest, arms and legs, and the identity disc on the back (a glowing ring, reads from above)."""
+    merge("Body", [box(0.56, 0.32, 0.6, z=1.3, taper=1.22), box(0.4, 0.28, 0.24, z=0.95),
+                   limb((-0.34, 0, 1.52), (-0.39, -0.02, 1.12), 0.075), limb((0.34, 0, 1.52), (0.39, -0.02, 1.12), 0.075),
+                   limb((-0.39, -0.02, 1.12), (-0.36, -0.1, 0.8), 0.07), limb((0.39, -0.02, 1.12), (0.36, -0.1, 0.8), 0.07)])
+    merge("Accent", [sph(0.2, z=1.86, seg=24, sy=1.12, sz=1.2), cyl(0.08, 0.12, z=1.66, seg=16),
+                     box(0.6, 0.34, 0.07, z=1.6, taper=0.9),                                          # shoulder yoke
+                     box(0.2, 0.3, 0.08, x=-0.36, z=1.57, ry=0.35), box(0.2, 0.3, 0.08, x=0.36, z=1.57, ry=-0.35),  # shoulder plates
+                     sph(0.08, x=-0.36, y=-0.1, z=0.77, seg=12), sph(0.08, x=0.36, y=-0.1, z=0.77, seg=12),
+                     cyl(0.2, 0.04, y=0.2, z=1.36, axis="Y", seg=32)])                                # identity disc
+    seams = [box(0.04, 0.025, 0.56, x=x, y=-0.17, z=1.3) for x in (-0.13, 0.13)] + [box(0.44, 0.025, 0.04, y=-0.165, z=1.05)]
+    seams += [box(0.03, 0.03, 0.42, x=s * 0.4, y=-0.07, z=1.3, ry=s * 0.12) for s in (-1, 1)]
+    seams += [cyl(0.16, 0.05, y=0.205, z=1.36, axis="Y", seg=32)]                                    # the disc's glowing ring
+    merge("Eye", [box(0.36, 0.05, 0.08, y=-0.2, z=1.88), box(0.42, 0.3, 0.06, y=-0.06, z=1.88)] + seams)  # wrap-around visor
+    legs(lambda s: [limb((s * 0.15, 0, 0.92), (s * 0.16, 0, 0.08), 0.085), box(0.16, 0.3, 0.1, x=s * 0.16, y=-0.06, z=0.05),
+                    box(0.03, 0.03, 0.72, x=s * 0.16, y=-0.085, z=0.5)])
     export("S10_Grid")
 
 
@@ -361,42 +378,52 @@ def test_chamber():
                      box(0.3, 0.08, 0.36, y=-0.2, z=1.34, taper=0.8),                              # chest plate
                      sph(0.05, x=-0.32, y=-0.13, z=0.8, seg=12), sph(0.05, x=0.32, y=-0.13, z=0.8, seg=12)])
     merge("Eye", [cyl(0.085, 0.04, y=-0.19, z=1.86, axis="Y", seg=24)])
-    legs(lambda s: [limb((s * 0.12, 0, 0.92), (s * 0.13, 0, 0.1), 0.045), sph(0.06, x=s * 0.13, z=0.5, seg=12),
+    legs(lambda s: [limb((s * 0.12, 0, 0.92), (s * 0.13, 0, 0.04), 0.045), sph(0.06, x=s * 0.13, z=0.5, seg=12),
                     box(0.12, 0.24, 0.06, x=s * 0.13, y=-0.05, z=0.03)])
     export("S12_TestChamber")
 
 
 def comic():
     """Wasteland comic (after Borderlands): a welded-together bandit bot — a lopsided boiler body with rivets, a gas-mask
-    face with two round eyes and a hose, one arm ending in a big wrench claw, a spiked shoulder plate."""
-    rivets = [sph(0.025, x=0.3 * math.cos(a), y=0.24 * math.sin(a), z=1.45, seg=6) for a in [i * math.pi / 5 for i in range(10)]]
-    merge("Body", [cyl(0.3, 0.62, z=1.28, seg=10, r2=0.34), box(0.5, 0.36, 0.2, z=0.95)] + rivets + [
-                   limb((-0.34, 0, 1.45), (-0.44, -0.02, 1.08), 0.06), limb((0.34, 0, 1.45), (0.42, -0.06, 1.1), 0.07),
-                   limb((-0.44, -0.02, 1.08), (-0.4, -0.12, 0.84), 0.05), limb((0.42, -0.06, 1.1), (0.44, -0.2, 0.9), 0.06)])
-    merge("Accent", [box(0.32, 0.3, 0.3, y=-0.04, z=1.8, rz=0.08, taper=0.9),                      # tilted head
-                     cyl(0.07, 0.1, y=-0.22, z=1.72, axis="Y", seg=8), limb((0, -0.26, 1.7), (0.18, -0.2, 1.5), 0.03),  # mask filter, hose
-                     box(0.26, 0.3, 0.1, x=0.4, z=1.62, ry=0.4), box(0.05, 0.05, 0.18, x=0.46, z=1.74, ry=0.4),  # shoulder plate, spike
-                     box(0.1, 0.1, 0.24, x=0.44, y=-0.24, z=0.84), box(0.18, 0.08, 0.06, x=0.44, y=-0.3, z=0.72),  # wrench claw
-                     sph(0.06, x=-0.4, y=-0.14, z=0.8, seg=8)])
-    merge("Eye", [cyl(0.055, 0.03, x=-0.07, y=-0.2, z=1.85, axis="Y", seg=12), cyl(0.045, 0.03, x=0.08, y=-0.2, z=1.83, axis="Y", seg=12)])
-    legs(lambda s: [limb((s * 0.17, 0, 0.92), (s * 0.19, -0.02, 0.48), 0.07), cyl(0.08, 0.1, x=s * 0.19, y=-0.02, z=0.48, seg=8),
-                    limb((s * 0.19, -0.02, 0.48), (s * 0.2, 0, 0.1), 0.06), box(0.18, 0.3, 0.1, x=s * 0.2, y=-0.06, z=0.05)])
+    face with two round eyes and a hose, one arm ending in a big wrench claw, a spiked shoulder plate. Pushed proportions:
+    a big boiler chest over short legs, thick limbs, a heavy jaw."""
+    rivets = [sph(0.03, x=0.36 * math.cos(a), y=0.29 * math.sin(a), z=1.48, seg=6) for a in [i * math.pi / 5 for i in range(10)]]
+    merge("Body", [cyl(0.36, 0.66, z=1.32, seg=10, r2=0.42), box(0.5, 0.36, 0.22, z=0.95)] + rivets + [
+                   limb((-0.4, 0, 1.5), (-0.52, -0.02, 1.12), 0.09), limb((0.4, 0, 1.5), (0.5, -0.06, 1.14), 0.1),
+                   limb((-0.52, -0.02, 1.12), (-0.48, -0.12, 0.86), 0.08), limb((0.5, -0.06, 1.14), (0.52, -0.2, 0.92), 0.09)])
+    merge("Accent", [box(0.36, 0.34, 0.32, y=-0.04, z=1.86, rz=0.08, taper=0.9),                     # tilted head
+                     box(0.32, 0.22, 0.14, y=-0.12, z=1.7, taper=0.8),                                # heavy jaw
+                     cyl(0.08, 0.12, y=-0.26, z=1.74, axis="Y", seg=8), limb((0, -0.3, 1.72), (0.22, -0.24, 1.5), 0.035),  # filter, hose
+                     box(0.36, 0.4, 0.14, x=0.48, z=1.66, ry=0.45), box(0.06, 0.06, 0.26, x=0.56, z=1.82, ry=0.45),  # shoulder plate, spike
+                     box(0.06, 0.06, 0.2, x=0.42, y=0.12, z=1.8, ry=0.2),
+                     box(0.18, 0.18, 0.3, x=0.52, y=-0.26, z=0.84),                                   # wrench handle
+                     box(0.3, 0.14, 0.1, x=0.52, y=-0.3, z=0.66), box(0.08, 0.14, 0.14, x=0.4, y=-0.3, z=0.6),
+                     box(0.08, 0.14, 0.14, x=0.64, y=-0.3, z=0.6),                                    # open jaws
+                     sph(0.09, x=-0.48, y=-0.14, z=0.8, seg=8)])
+    merge("Eye", [cyl(0.08, 0.03, x=-0.08, y=-0.22, z=1.9, axis="Y", seg=12), cyl(0.065, 0.03, x=0.09, y=-0.22, z=1.88, axis="Y", seg=12)])
+    legs(lambda s: [limb((s * 0.18, 0, 0.92), (s * 0.2, -0.02, 0.48), 0.09), cyl(0.1, 0.12, x=s * 0.2, y=-0.02, z=0.48, seg=8),
+                    limb((s * 0.2, -0.02, 0.48), (s * 0.21, 0, 0.08), 0.08), box(0.22, 0.34, 0.12, x=s * 0.21, y=-0.06, z=0.06)])
     export("S13_Comic")
 
 
 def thermal():
     """Thermal camera (our own): a heavy heat-sink trooper — radiator fins on the back and shoulders that glow hot
-    on the camera, a barrel helmet with a horizontal sensor slit, armoured forearms."""
-    fins = [box(0.03, 0.18, 0.5, x=-0.2 + i * 0.08, y=0.26, z=1.32) for i in range(6)]
-    merge("Body", [box(0.62, 0.4, 0.6, z=1.3, taper=1.05), box(0.48, 0.34, 0.24, z=0.96)] + fins + [
-                   limb((-0.38, 0, 1.5), (-0.44, -0.02, 1.12), 0.075), limb((0.38, 0, 1.5), (0.44, -0.02, 1.12), 0.075)])
-    merge("Accent", [cyl(0.2, 0.36, z=1.84, seg=16), box(0.44, 0.06, 0.08, y=-0.02, z=2.04),          # barrel helmet, crest
-                     box(0.2, 0.26, 0.22, x=-0.42, z=1.56), box(0.2, 0.26, 0.22, x=0.42, z=1.56),  # shoulder blocks
-                     box(0.03, 0.2, 0.18, x=-0.48, z=1.62), box(0.03, 0.2, 0.18, x=0.48, z=1.62),   # shoulder fins
-                     box(0.16, 0.18, 0.32, x=-0.44, y=-0.06, z=0.94), box(0.16, 0.18, 0.32, x=0.44, y=-0.06, z=0.94)])  # forearms
-    merge("Eye", [box(0.3, 0.03, 0.05, y=-0.2, z=1.86)])
-    legs(lambda s: [box(0.18, 0.22, 0.46, x=s * 0.2, z=0.68), box(0.16, 0.2, 0.44, x=s * 0.21, y=-0.02, z=0.24),
-                    box(0.22, 0.34, 0.08, x=s * 0.21, y=-0.06, z=0.04)])
+    on the camera, a barrel helmet with a wide sensor slit, armoured forearms, coolant tanks and hoses on the back."""
+    fins = [box(0.035, 0.22, 0.56, x=-0.24 + i * 0.08, y=0.28, z=1.32) for i in range(7)]
+    merge("Body", [box(0.68, 0.42, 0.62, z=1.3, taper=1.08), box(0.5, 0.36, 0.26, z=0.96)] + fins + [
+                   limb((-0.42, 0, 1.5), (-0.47, -0.02, 1.12), 0.09), limb((0.42, 0, 1.5), (0.47, -0.02, 1.12), 0.09)])
+    tanks = []
+    for s in (-1, 1):
+        tanks += [cyl(0.085, 0.5, x=s * 0.27, y=0.3, z=1.3, seg=16), sph(0.085, x=s * 0.27, y=0.3, z=1.55, seg=16),
+                  limb((s * 0.27, 0.3, 1.6), (s * 0.24, 0.1, 1.72), 0.03), limb((s * 0.24, 0.1, 1.72), (s * 0.18, -0.1, 1.55), 0.03)]
+    merge("Accent", [cyl(0.22, 0.38, z=1.86, seg=16), box(0.48, 0.07, 0.09, y=-0.02, z=2.07),          # barrel helmet, crest
+                     box(0.24, 0.3, 0.24, x=-0.45, z=1.56), box(0.24, 0.3, 0.24, x=0.45, z=1.56),     # shoulder blocks
+                     box(0.035, 0.24, 0.2, x=-0.53, z=1.64), box(0.035, 0.24, 0.2, x=0.53, z=1.64),   # shoulder fins
+                     box(0.035, 0.24, 0.2, x=-0.47, z=1.66), box(0.035, 0.24, 0.2, x=0.47, z=1.66),
+                     box(0.2, 0.22, 0.36, x=-0.47, y=-0.06, z=0.94), box(0.2, 0.22, 0.36, x=0.47, y=-0.06, z=0.94)] + tanks)
+    merge("Eye", [box(0.4, 0.04, 0.08, y=-0.215, z=1.88), box(0.42, 0.14, 0.03, y=-0.13, z=2.03)])   # sensor slit, crest light
+    legs(lambda s: [box(0.2, 0.24, 0.48, x=s * 0.2, z=0.68), box(0.18, 0.22, 0.46, x=s * 0.21, y=-0.02, z=0.24),
+                    box(0.24, 0.36, 0.1, x=s * 0.21, y=-0.06, z=0.05)])
     export("S14_Thermal")
 
 
@@ -418,7 +445,7 @@ def blueprint():
                      box(0.08, 0.08, 0.08, x=-0.32, y=-0.14, z=0.8), box(0.08, 0.08, 0.08, x=0.32, y=-0.14, z=0.8)])
     merge("Eye", [cyl(0.06, 0.03, y=-0.14, z=1.82, axis="Y", seg=16), box(0.2, 0.03, 0.012, y=-0.15, z=1.82),
                   box(0.012, 0.03, 0.2, y=-0.15, z=1.82)])
-    legs(lambda s: [limb((s * 0.15, 0, 0.98), (s * 0.16, 0, 0.1), 0.035, square=True), box(0.08, 0.08, 0.08, x=s * 0.16, z=0.5),
+    legs(lambda s: [limb((s * 0.15, 0, 0.98), (s * 0.16, 0, 0.035), 0.035, square=True), box(0.08, 0.08, 0.08, x=s * 0.16, z=0.5),
                     box(0.12, 0.26, 0.05, x=s * 0.16, y=-0.06, z=0.025)])
     export("S15_Blueprint")
 

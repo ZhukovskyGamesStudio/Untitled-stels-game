@@ -20,8 +20,9 @@ box, cylinder, sphere, merge, export, clear_scene = g.box, g.cylinder, g.sphere,
 
 def drone():
     """Quadcopter, ~0.9 m across. Hovers ~2 m high, looks down-forward with a camera eye."""
-    merge("Body", [box((0.5, 0.5, 0.18), (0, 0, 0)), box((0.9, 0.06, 0.04), (0, 0, 0.02)), box((0.06, 0.9, 0.04), (0, 0, 0.02))])
-    for i, (x, y) in enumerate([(0.42, 0.42), (-0.42, 0.42), (0.42, -0.42), (-0.42, -0.42)]):
+    rotors = [(0.42, 0.42), (-0.42, 0.42), (0.42, -0.42), (-0.42, -0.42)]
+    merge("Body", [box((0.5, 0.5, 0.18), (0, 0, 0))] + [beam((0, 0, 0.02), (x, y, 0.02), 0.05) for x, y in rotors])
+    for i, (x, y) in enumerate(rotors):
         merge(f"AccentRotor{i}", [box((0.36, 0.05, 0.015), (x, y, 0.1)), box((0.05, 0.36, 0.015), (x, y, 0.1)), cylinder(0.03, 0.08, (x, y, 0.06))])
     merge("Eye", [sphere(0.1, (0, -0.24, -0.08), segments=12)])
     export("robot_drone")
@@ -68,8 +69,8 @@ def vacuum():
 
 def turret():
     """Sentry turret on a tripod; the head (with barrel and eye) turns."""
-    merge("Body", [box((0.06, 0.06, 1.1), (0.25 * math.cos(a), 0.25 * math.sin(a), 0.5)) for a in (0.5, 2.6, 4.7)] +
-          [cylinder(0.14, 0.2, (0, 0, 1.05), segments=12)])
+    merge("Body", [beam((0.3 * math.cos(a), 0.3 * math.sin(a), 0.0), (0.07 * math.cos(a), 0.07 * math.sin(a), 1.0), 0.06)
+                   for a in (0.5, 2.6, 4.7)] + [cylinder(0.14, 0.24, (0, 0, 1.06), segments=12)])
     merge("AccentHead", [box((0.36, 0.42, 0.26), (0, 0, 1.3)), box((0.08, 0.45, 0.08), (0.1, -0.35, 1.3)), box((0.08, 0.45, 0.08), (-0.1, -0.35, 1.3))])
     merge("Eye", [cylinder(0.06, 0.04, (0, -0.22, 1.38), axis="Y")])
     export("robot_turret")
@@ -78,9 +79,9 @@ def turret():
 def thumper():
     """Heavy tracked robot with seismic sensor plates touching the floor in front."""
     merge("Body", [box((1.0, 1.2, 0.6), (0, 0, 0.75)), box((0.6, 0.6, 0.3), (0, 0.15, 1.2))])
-    merge("Accent", [box((0.25, 1.4, 0.45), (-0.62, 0, 0.23)), box((0.25, 1.4, 0.45), (0.62, 0, 0.23))])
+    merge("Accent", [box((0.25, 1.4, 0.56), (-0.56, 0, 0.28)), box((0.25, 1.4, 0.56), (0.56, 0, 0.28))])  # tracks reach under the body
     merge("Eye", [cylinder(0.18, 0.04, (-0.3, -0.85, 0.02), segments=12), cylinder(0.18, 0.04, (0.3, -0.85, 0.02), segments=12),
-                  box((0.05, 0.25, 0.05), (-0.3, -0.72, 0.15)), box((0.05, 0.25, 0.05), (0.3, -0.72, 0.15))])
+                  beam((-0.3, -0.5, 0.5), (-0.3, -0.85, 0.03), 0.05), beam((0.3, -0.5, 0.5), (0.3, -0.85, 0.03), 0.05)])
     export("robot_thumper")
 
 
@@ -105,8 +106,8 @@ def worker():
     """Small wheeled worker carrying a crate — it snitches but cannot fight."""
     merge("Body", [box((0.6, 0.7, 0.35), (0, 0, 0.35)), box((0.08, 0.08, 0.5), (-0.25, -0.2, 0.75)), box((0.08, 0.08, 0.5), (0.25, -0.2, 0.75))])
     merge("Accent", [box((0.55, 0.45, 0.4), (0, -0.15, 1.15))])
-    for i, (x, y) in enumerate([(0.32, 0.25), (-0.32, 0.25), (0.32, -0.25), (-0.32, -0.25)]):
-        merge(f"AccentWheel{i}", [cylinder(0.12, 0.06, (x, y, 0.12), axis="X")])
+    for i, (x, y) in enumerate([(0.31, 0.25), (-0.31, 0.25), (0.31, -0.25), (-0.31, -0.25)]):
+        merge(f"AccentWheel{i}", [cylinder(0.12, 0.1, (x, y, 0.12), axis="X")])   # hubs 4 cm into the body
     merge("Eye", [box((0.3, 0.04, 0.08), (0, -0.36, 0.45))])
     export("robot_worker")
 
@@ -114,8 +115,8 @@ def worker():
 def hunter():
     """Tall angular hunter (2.3 m), shows up after alarms."""
     merge("Body", [box((0.55, 0.4, 0.9), (0, 0, 1.55)), box((0.16, 0.16, 1.1), (-0.2, 0.05, 0.55)), box((0.16, 0.16, 1.1), (0.2, 0.05, 0.55))])
-    merge("Accent", [box((0.12, 0.6, 0.12), (-0.45, -0.2, 1.6)), box((0.12, 0.6, 0.12), (0.45, -0.2, 1.6)),
-                     box((0.7, 0.08, 0.08), (0, 0.1, 2.05)), box((0.08, 0.08, 0.35), (0, 0.15, 2.2))])
+    merge("Accent", [box((0.12, 0.6, 0.12), (-0.33, -0.2, 1.6)), box((0.12, 0.6, 0.12), (0.33, -0.2, 1.6)),
+                     box((0.7, 0.08, 0.08), (0, 0.1, 2.03)), box((0.08, 0.08, 0.35), (0, 0.15, 2.2))])
     merge("Eye", [box((0.38, 0.05, 0.08), (0, -0.21, 1.85)), sphere(0.06, (0, -0.2, 2.0), segments=8)])
     export("robot_hunter")
 
@@ -169,7 +170,7 @@ def attach_mic():
 
 def attach_seismic():
     """Ground probe: a plate with a spike down to the floor (origin at floor level)."""
-    merge("Accent", [cylinder(0.08, 0.03, (0, 0, 0.3), segments=12), cylinder(0.02, 0.2, (0, 0, 0.18), segments=8)])
+    merge("Accent", [cylinder(0.08, 0.03, (0, 0, 0.3), segments=12), cylinder(0.02, 0.22, (0, 0, 0.19), segments=8)])
     merge("Eye", [cylinder(0.04, 0.1, (0, 0, 0.05), segments=10, radius2=0.002)])
     export("attach_seismic")
 

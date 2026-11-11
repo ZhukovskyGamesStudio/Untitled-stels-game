@@ -29,6 +29,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402
+import meshfix  # noqa: E402
 import robots as r  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -58,6 +59,8 @@ def box(size, loc, rot_z=0.0):
         size = thicken(size, 1.9, below=0.08, cap=0.13)
     elif family == "toy":
         size = thicken(size, 1.8, below=0.08, cap=0.12)
+    elif family == "lofi":
+        size = tuple(max(s, 0.021) for s in size)  # never thinner than one 2 cm grid cell: snapping would squash it
     bm = orig_box(size, (0, 0, 0), 0.0)
     m = min(size)
     if family == "lowpoly":
@@ -107,6 +110,9 @@ def cylinder(radius, depth, loc, axis="Z", segments=16, radius2=None):
         radius = min(0.065, radius * k) if radius < 0.04 else radius
         if radius2 is not None and radius2 < 0.04:
             radius2 = min(0.065, radius2 * k)
+    if family == "lofi":
+        radius, depth = max(radius, 0.0105), max(depth, 0.021)
+        radius2 = None if radius2 is None else max(radius2, 0.0105)
     bm = orig_cyl(radius, depth, (0, 0, 0), axis, seg, radius2)
     if family == "toy":
         bevel(bm, min(0.05, 0.3 * min(radius, depth)), 3)
@@ -146,9 +152,11 @@ def merge(name, parts):
         bm = bmesh.new()
         bm.from_mesh(me)
         bm.normal_update()
-        for v in bm.verts:
-            n = mnoise.noise(v.co * 6.0)
-            v.co -= v.normal * max(0.0, n) * 0.012
+        for piece in meshfix._pieces(bm):
+            depth = min(0.012, 0.15 * min(piece.hi[k] - piece.lo[k] for k in range(3)))
+            dents = [(v, v.normal.copy() * max(0.0, mnoise.noise(v.co * 6.0)) * depth) for v in piece.verts]
+            for v, d in dents:
+                v.co -= d
         bm.to_mesh(me)
         bm.free()
     # box-projected UVs in metres: textured materials tile the same on every part
@@ -165,6 +173,8 @@ def merge(name, parts):
 def export(filename):
     smooth = family in ("toy", "clean", "realistic", "derelict")
     bpy.ops.object.select_all(action="SELECT")
+    meshfix.fix_objects(list(bpy.context.selected_objects), floor=g.category(filename) in ("Props", "Items", "Level"),
+                        name=f"{filename}__{family}")
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:
             poly.use_smooth = smooth

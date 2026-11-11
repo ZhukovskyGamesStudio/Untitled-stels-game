@@ -274,7 +274,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 Туман задаётся в рантайме (газ снаружи, дымка внутри), поэтому вырезание вариантов тумана — ручное (`GraphicsSettings`: Exp2 оставлен) и туман включён
 в самой сцене: иначе билд выбрасывает шейдеры с туманом и газа не видно. Материалы со свечением — `globalIlluminationFlags = BakedEmissive`
 (с `None` URP при импорте выключает `_EMISSION`). GPU Resident Drawer выключен: с ним плеер падал на старте уровня.
-Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`),
+Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`;
+перед экспортом каждая модель проходит `meshfix.fix_objects`, проверка — `review.py` / `audit_models.py`, как моделировать — скилл [`blender-modeling`](.claude/skills/blender-modeling/SKILL.md)),
 звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом), голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).
 
 ## Правила кода (коротко; подробно — скилл [`stealth-code`](.claude/skills/stealth-code/SKILL.md))

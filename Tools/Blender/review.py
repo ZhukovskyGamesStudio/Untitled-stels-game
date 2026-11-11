@@ -3,6 +3,9 @@
 Run:  blender.exe -b --factory-startup --python Tools/Blender/review.py -- <sheet.png> <model.fbx> [<model2.fbx> ...]
       options (anywhere after --):  --tile 400  --no-check  --json <report.json>
                                     --focus x,y,z,r   adds a row of 4 close-ups around that point (model coordinates)
+                                    --floor           the model stands on the floor (props): resting pieces are supported
+                                    --lineup N        many models on one sheet instead: front + 3/4 each, N per row
+                                                      (order in <sheet>_legend.txt)
                                     --shading         adds a row per model: clay matcap | normal-check matcap |
                                                       back faces culled on magenta (as Unity draws: magenta = hole) |
                                                       clay from below
@@ -313,6 +316,58 @@ def sheet(groups, path, tile=400, tmp=None, focus=None, offsets=None, shading=Fa
     return path
 
 
+def lineup(groups, path, cols=4, tile=256, names=None, tmp=None):
+    """Many models on one sheet to compare them: each model gets a front and a 3/4 tile (role colours), models in
+    rows of `cols`, in the order given. The order is printed and written next to the sheet (<sheet>_legend.txt)."""
+    tmp = tmp or os.path.join(os.path.dirname(os.path.abspath(path)), "_review_tiles")
+    os.makedirs(tmp, exist_ok=True)
+    cam = setup_render(tile)
+    all_objs = [o for g in groups for o in g]
+    views = [VIEWS[0], VIEWS[1]]
+    cells = []
+    for gi, objs in enumerate(groups):
+        for o in all_objs:
+            o.hide_render = o not in objs
+        pair = []
+        for name, direction, ortho in views:
+            colour(objs, False)
+            frame(cam, objs, direction, ortho)
+            p = os.path.join(tmp, f"lineup_{gi}_{name}.png")
+            render_tile(p, tile)
+            pair.append(load_pixels(p, tile))
+        cell = np.concatenate(pair, axis=1)
+        cell[:, :2, :3] = 0.9  # a thin light line between models
+        cells.append(cell)
+    for o in all_objs:
+        o.hide_render = False
+    blank = np.zeros_like(cells[0])
+    blank[..., 3] = 1.0
+    blank[..., :3] = BACKGROUND
+    rows = []
+    for r in range(0, len(cells), cols):
+        row = cells[r:r + cols] + [blank] * (cols - len(cells[r:r + cols]))
+        rows.append(np.concatenate(row, axis=1))
+        sep = np.ones((3, rows[-1].shape[1], 4), dtype=np.float32)
+        sep[..., :3] = 0.9
+        rows.append(sep)
+    full = np.ascontiguousarray(np.concatenate(rows[:-1][::-1], axis=0))
+    h, w = full.shape[:2]
+    out = bpy.data.images.new("lineup_sheet", w, h, alpha=True)
+    out.pixels.foreach_set(full.ravel())
+    out.filepath_raw = path
+    out.file_format = "PNG"
+    out.save()
+    bpy.data.images.remove(out)
+    names = names or [str(k) for k in range(len(groups))]
+    legend = [f"row {k // cols + 1}, col {k % cols + 1}: {n}" for k, n in enumerate(names)]
+    with open(os.path.splitext(path)[0] + "_legend.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(legend))
+    print("LINEUP", path, f"{w}x{h}", "models:", len(groups))
+    for line in legend:
+        print("  ", line)
+    return path
+
+
 # --------------------------------------------------------------------------- structural check
 
 def _islands(obj):
@@ -353,7 +408,10 @@ def _islands(obj):
     return result, open_edges, degenerate
 
 
-def check(objs, name="model"):
+def check(objs, name="model", verbose=True, floor=False):
+    """floor: the model stands on the floor (furniture, props): pieces resting on it count as supported, so a chair
+    beside a desk is not 'detached'. Leave it off for robots and characters — a wheel touching the floor but not the
+    body is a defect there."""
     lo, hi = bounds(objs)
     parts = {}
     pieces = []  # (part name, verts, bvh)
@@ -366,8 +424,8 @@ def check(objs, name="model"):
         for verts, t in islands:
             if t:
                 pieces.append((o.name, verts, BVHTree.FromPolygons(verts, t)))
-    # union-find over touching pieces
-    parent = list(range(len(pieces)))
+    # union-find over touching pieces; with floor, node len(pieces) is the floor
+    parent = list(range(len(pieces) + (1 if floor else 0)))
 
     def find(i):
         while parent[i] != i:
@@ -381,20 +439,27 @@ def check(objs, name="model"):
                 continue
             a, b = pieces[i], pieces[j]
             touching = bool(a[2].overlap(b[2]))
-            if not touching:
-                small, big = (a, b) if len(a[1]) < len(b[1]) else (b, a)
-                step = max(1, len(small[1]) // 400)
-                for v in small[1][::step]:
-                    hit = big[2].find_nearest(v, TOUCH)
-                    if hit[0] is not None:
+            if not touching:  # both ways: the corners of a big slab can be far from a small part lying on it
+                for src, dst in ((a, b), (b, a)):
+                    step = max(1, len(src[1]) // 400)
+                    if any(dst[2].find_nearest(v, TOUCH)[0] is not None for v in src[1][::step]):
                         touching = True
                         break
             if touching:
                 parent[find(i)] = find(j)
+    ground = len(pieces)
+    if floor:
+        for i, piece in enumerate(pieces):
+            if min(v.z for v in piece[1]) <= lo.z + TOUCH:
+                parent[find(i)] = find(ground)
     groups = {}
     for i in range(len(pieces)):
         groups.setdefault(find(i), []).append(i)
-    ordered = sorted(groups.values(), key=lambda g: -sum(len(pieces[i][1]) for i in g))
+    if floor:
+        main = groups.get(find(ground), [])
+        ordered = [main] + [g for g in groups.values() if g is not main]
+    else:
+        ordered = sorted(groups.values(), key=lambda g: -sum(len(pieces[i][1]) for i in g))
     detached = []
     for g in ordered[1:]:
         pts = [v for i in g for v in pieces[i][1]]
@@ -414,6 +479,14 @@ def check(objs, name="model"):
         "pieces": len(pieces),
         "detached": detached,
     }
+    gate = bx_audit.deliverable(objs, profile="game")
+    if floor:  # the gate knows no floor: its floating verdicts are replaced by DETACHED above
+        gate["errors"] = [e for e in gate["errors"] if "floating" not in e and "fragment" not in e]
+        gate["warnings"] = [w for w in gate["warnings"] if "not touching" not in w and "detached fragment" not in w]
+        gate["pass"] = not gate["errors"]
+    report["gate"] = {k: gate[k] for k in ("pass", "errors", "warnings")}
+    if not verbose:
+        return report
     print(f"CHECK {name}: size {report['size_m']} m, floor z {report['min_z']}, {total_tris} tris, "
           f"{len(pieces)} pieces, {len(detached)} detached")
     for pname, p in parts.items():
@@ -425,8 +498,6 @@ def check(objs, name="model"):
         print(f"   {pname:<16} {p['tris']:>6} tris  {p['islands']:>3} islands  {'  '.join(flags)}")
     for d in detached:
         print(f"   DETACHED {d['parts']} at {d['centre']} size {d['size']}")
-    gate = bx_audit.deliverable(objs, profile="game")
-    report["gate"] = {k: gate[k] for k in ("pass", "errors", "warnings")}
     print(f"   GATE {'PASS' if gate['pass'] else 'FAIL'}: {len(gate['errors'])} errors, {len(gate['warnings'])} warnings")
     for e in gate["errors"]:
         print("   GATE ERROR", e)
@@ -441,7 +512,7 @@ def main():
     if "--" not in sys.argv:
         return
     args = sys.argv[sys.argv.index("--") + 1:]
-    tile, do_check, json_path, focus, shading = 400, True, None, None, False
+    tile, do_check, json_path, focus, shading, cols, floor = 400, True, None, None, False, 0, False
     rest = []
     i = 0
     while i < len(args):
@@ -451,8 +522,14 @@ def main():
         elif args[i] == "--focus":
             focus = [float(c) for c in args[i + 1].split(",")]
             i += 2
+        elif args[i] == "--lineup":
+            cols = int(args[i + 1])
+            i += 2
         elif args[i] == "--shading":
             shading = True
+            i += 1
+        elif args[i] == "--floor":
+            floor = True
             i += 1
         elif args[i] == "--no-check":
             do_check = False
@@ -476,8 +553,11 @@ def main():
         offsets.append((k * 50, 0, 0))
         groups.append(objs)
         if do_check:
-            reports.append(check(objs, os.path.basename(path)))
-    sheet(groups, out, tile, focus=focus, offsets=offsets, shading=shading)
+            reports.append(check(objs, os.path.basename(path), floor=floor))
+    if cols:
+        lineup(groups, out, cols, tile if tile != 400 else 256, [os.path.basename(m) for m in models])
+    else:
+        sheet(groups, out, tile, focus=focus, offsets=offsets, shading=shading)
     if json_path:
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(reports, f, indent=1)
