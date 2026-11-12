@@ -1,5 +1,6 @@
 using System;
 using Stealth.Configs;
+using Stealth.Level;
 using UnityEngine;
 
 namespace Stealth.Enemies
@@ -111,7 +112,8 @@ namespace Stealth.Enemies
         /// <summary>The surface under the foot's rest spot along the robot's −up (its own colliders ignored), or the spot itself.</summary>
         Vector3 Ground(Vector3 rest, Vector3 up, float length)
         {
-            int n = Physics.RaycastNonAlloc(rest + up * length, -up, s_Hits, length * 2f, Perception.SightMask, QueryTriggerInteraction.Ignore);
+            // every layer: a spider on the top floor's ceiling plants its feet on the roof (kept out of vision checks)
+            int n = Physics.RaycastNonAlloc(rest + up * length, -up, s_Hits, length * 2f, Perception.SightMask | (1 << LevelMetrics.CeilingLayer), QueryTriggerInteraction.Ignore);
             float best = float.MaxValue;
             var point = rest;
             for (int i = 0; i < n; i++)

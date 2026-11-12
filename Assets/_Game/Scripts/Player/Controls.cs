@@ -8,7 +8,7 @@ namespace Stealth.Player
     public enum GameAction
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
-        Interact, Hands, Rotate, Mirror, Hatch, Ping, Mark, Map, Help, Style, Unstuck, Restart,
+        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart,
     }
 
     /// <summary>
@@ -75,10 +75,10 @@ namespace Stealth.Player
             new(GameAction.Rotate, "Действия", "Повернуть предмет", KeyBinding.Of(Key.R)),
             new(GameAction.Mirror, "Действия", "Отзеркалить предмет", KeyBinding.Of(Key.T)),
             new(GameAction.Hatch, "Действия", "У люка — следующий дом", KeyBinding.Of(Key.F)),
+            new(GameAction.StashAll, "Действия", "У люка — сложить всё из рюкзака на склад", KeyBinding.Of(Key.G)),
             new(GameAction.Ping, "Команда", "Пинг «сюда» для команды", KeyBinding.MouseButton(2)),
             new(GameAction.Mark, "Команда", "Пометить робота для команды", KeyBinding.Of(Key.Q)),
             new(GameAction.Map, "Команда", "Большая карта", KeyBinding.Of(Key.M)),
-            new(GameAction.Help, "Прочее", "Подсказка на экране", KeyBinding.Of(Key.H)),
             new(GameAction.Style, "Прочее", "Сменить визуальный стиль", KeyBinding.Of(Key.F8)),
             new(GameAction.Unstuck, "Прочее", "Я застрял — на свободное место", KeyBinding.Of(Key.K)),
             new(GameAction.Restart, "Прочее", "Новый забег (после провала)", KeyBinding.Of(Key.R)),

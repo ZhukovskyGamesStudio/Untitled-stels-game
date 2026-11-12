@@ -51,7 +51,7 @@ namespace Stealth.UI
         public Text Tooltip;
 
         enum DragSource { None, Inventory, World, Stash }
-        enum Target { None, Backpack, Stash, Sell }
+        enum Target { None, Backpack, Stash, Sell, StashAll }
 
         DragSource m_Source;
         int m_DragIndex = -1;
@@ -115,6 +115,9 @@ namespace Stealth.UI
             if (CellIn(Board.Grid, me.Camera, MouseScreen, out cell)) return Target.Stash;
             if (RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
                 Board.SellZone.rect.Contains(local)) return Target.Sell;
+            if (Board.StashAllZone != null &&
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.StashAllZone, MouseScreen, me.Camera, out var all) &&
+                Board.StashAllZone.rect.Contains(all)) return Target.StashAll;
             return Target.None;
         }
 
@@ -153,7 +156,11 @@ namespace Stealth.UI
             Board.Show(on);
             if (!on) return;
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
-            if ((!me.CursorMode || !was) && GameManager.Instance.TradePosition is Vector3 at) Board.Place(at, me.Camera.transform.position);
+            if (!me.CursorMode || !was)
+            {
+                if (me.InHatch) Board.PlaceInFront(me.Camera.transform);
+                else if (GameManager.Instance.TradePosition is Vector3 at) Board.Place(at, me.Camera.transform.position);
+            }
             if (m_StashItems == null)
             {
                 m_StashItems = new UiPool<InventoryBlockView>(BlockPrefab, Board.ItemLayer);
@@ -165,6 +172,7 @@ namespace Stealth.UI
         {
             var mouse = Mouse.current;
             if (me.Downed || GameMenu.IsOpen || me.UsingTerminal != null) { CancelDrag(); m_Hover = null; return; } // at a terminal the camera is far away
+            if (Controls.Pressed(GameAction.StashAll)) StashAll(me, inv);
 
             if (!me.CursorMode && !PlayerController.HoldCursor)
             {
@@ -239,6 +247,11 @@ namespace Stealth.UI
             {
                 m_Tooltip = "Перетащи сюда — продать на квоту";
             }
+            else if (over == Target.StashAll)
+            {
+                m_Tooltip = inv.Items.Count > 0 ? "Сложить всё из рюкзака на склад команды" : "Рюкзак пуст";
+                if (press) StashAll(PlayerController.Local, inv);
+            }
             else if (m_Hover != null)
             {
                 m_Tooltip = ItemCatalog.Describe(m_Hover.Shape, m_Hover.Color);
@@ -297,6 +310,14 @@ namespace Stealth.UI
                 if (inv.FindSpot(m_DragShape, out var fx, out var fy, out var fr)) Take(inv, fx, fy, fr);
                 else m_FullUntil = Time.time + 1.5f;
             }
+        }
+
+        /// <summary>The whole backpack onto the team stash (the server puts in what fits).</summary>
+        void StashAll(PlayerController me, PlayerInventory inv)
+        {
+            if (inv.Items.Count == 0 || !StashActive(me)) return;
+            inv.RequestStashAll();
+            Sfx.At(Sfx.Bank?.Stash, Board.Root.position, 0.9f, Sfx.Group.Items);
         }
 
         /// <summary>Pick the dragged world item up into the backpack; it vanishes at once (the server confirms).</summary>
@@ -461,6 +482,14 @@ namespace Stealth.UI
             {
                 m_StashHighlights.End();
                 Board.SellBackground.color = overSell ? new Color(1f, 0.75f, 0.1f, 0.85f) : new Color(1f, 0.75f, 0.1f, 0.45f);
+                if (Board.StashAllZone != null)
+                {
+                    bool overAll = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.StashAll;
+                    bool any = inv.Items.Count > 0;
+                    Board.StashAllBackground.color = !any ? new Color(0.3f, 0.75f, 1f, 0.15f) : overAll ? new Color(0.3f, 0.75f, 1f, 0.85f) : new Color(0.3f, 0.75f, 1f, 0.45f);
+                    string label = $"СЛОЖИТЬ ВСЁ НА СКЛАД  [{Controls.Label(GameAction.StashAll)}]";
+                    if (Board.StashAllLabel.text != label) Board.StashAllLabel.text = label;
+                }
             }
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);

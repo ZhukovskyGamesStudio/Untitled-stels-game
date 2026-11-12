@@ -69,6 +69,7 @@ namespace Stealth.EditorTools
             Plain("SewerMetal", new Color(0.22f, 0.23f, 0.24f), 0.62f, 0.7f);
             Plain("SewerDark", new Color(0.01f, 0.01f, 0.012f), 0f, 0f);
             Mat("Sewer", "SewerGlow", new Color(1f, 0.82f, 0.55f), new Color(3.2f, 2.4f, 1.3f));
+            Mat("Sewer", "SewerZone", new Color(0.35f, 1f, 0.55f), new Color(0.5f, 2.2f, 0.9f));
             AssetDatabase.SaveAssets();
         }
 
@@ -120,6 +121,33 @@ namespace Stealth.EditorTools
             light.spotAngle = 150f;
             light.innerSpotAngle = 80f;
             return light;
+        }
+
+        /// <summary>
+        /// The frame on the floor of a tunnel where the team stands to vote (from <see cref="SewerLocation.VoteFrom"/> to
+        /// <see cref="SewerLocation.VoteTo"/>), with chevrons pointing in. Glowing strips a few millimetres off the floor.
+        /// </summary>
+        static void VoteZone(Transform parent)
+        {
+            var mat = SewerMat("SewerZone");
+            float x0 = -SewerLocation.VoteFrom - 0.1f, x1 = -SewerLocation.VoteTo + 0.1f, hw = 1.05f, y = 0.012f, line = 0.07f;
+            float cx = (x0 + x1) / 2f, len = Mathf.Abs(x1 - x0);
+            void Strip(string name, Vector3 c, Vector3 size, float yaw = 0f)
+            {
+                var go = Cube(parent, name, c, size, mat, false);
+                go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            }
+            Strip("ZoneNear", new Vector3(x0, y, 0f), new Vector3(line, 0.01f, hw * 2f));
+            Strip("ZoneFar", new Vector3(x1, y, 0f), new Vector3(line, 0.01f, hw * 2f));
+            Strip("ZoneLeft", new Vector3(cx, y, -hw), new Vector3(len, 0.01f, line));
+            Strip("ZoneRight", new Vector3(cx, y, hw), new Vector3(len, 0.01f, line));
+            for (int k = 0; k < 2; k++)
+            {
+                float x = cx + 0.35f - k * 0.6f;
+                Strip($"Chevron{k}L", new Vector3(x, y, -0.22f), new Vector3(0.6f, 0.01f, line * 1.4f), 40f); // the tip points into the tunnel
+                Strip($"Chevron{k}R", new Vector3(x, y, 0.22f), new Vector3(0.6f, 0.01f, line * 1.4f), -40f);
+            }
         }
 
         static GameObject BuildSewer(RouteSignView signPrefab, MeshRenderer itemDisplay)
@@ -200,7 +228,9 @@ namespace Stealth.EditorTools
                 .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             Cube(t, "HallLampCable", new Vector3(-16.6f, 4.75f, 0f), new Vector3(0.02f, 0.9f, 0.02f), SewerMat("SewerMetal"), false);
 
-            // The three ways on: a tunnel each (side ones bending away), a grate when it leads nowhere, a panel over it.
+            // The three ways on: a tunnel each (side ones bending away and fading into the haze far away), a grate when it
+            // leads nowhere, a panel over it. A player stops 2.7 m in (an invisible wall): there a glowing frame on the floor
+            // marks where to stand to vote for the way.
             loc.Branches = new SewerLocation.Branch[3];
             for (int i = 0; i < 3; i++)
             {
@@ -213,13 +243,21 @@ namespace Stealth.EditorTools
                 var bars = grate.AddComponent<BoxCollider>();
                 bars.center = new Vector3(0f, 1.45f, 0f);
                 bars.size = new Vector3(0.1f, 2.9f, 2.6f);
-                var lamp = Lamp(tunnelRoot, "TunnelLight", new Vector3(-5f, 2.5f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot,
-                    new Color(0.65f, 0.85f, 1f), 3.5f, 8f);
-                lamp.spotAngle = 150f;
+                var open = Child(tunnelRoot, "WhenOpen", Vector3.zero).transform; // lights and the zone: only while the way is open
+                foreach (var (x, power) in new[] { (-4.5f, 3.5f), (-16f, 2.6f), (-29f, 2f) })
+                {
+                    var lamp = Lamp(open, "TunnelLight", new Vector3(x, 2.5f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot,
+                        new Color(0.65f, 0.85f, 1f), power, 8f);
+                    lamp.spotAngle = 150f;
+                }
+                VoteZone(open);
+                var stop = Child(tunnelRoot, "StopWall", new Vector3(-SewerLocation.StopAt, 1.5f, 0f));
+                var wall = stop.AddComponent<BoxCollider>(); // invisible: the tunnel goes on as far as the eye sees
+                wall.size = new Vector3(0.3f, 3f, 3f);
                 var s = Instance<RouteSignView>(signPrefab.gameObject, t, $"Sign{i}");
                 s.transform.localPosition = new Vector3(-HallEnd + 0.7f, 3.55f, BranchZ[i]);
                 s.transform.localRotation = Quaternion.Euler(-15f, -90f, 0f); // read from the hall, leaning towards the reader
-                loc.Branches[i] = new SewerLocation.Branch { Mouth = mouth, Grate = grate, Sign = s, Lamp = lamp.gameObject };
+                loc.Branches[i] = new SewerLocation.Branch { Mouth = mouth, Grate = grate, Sign = s, Lamp = open.gameObject };
             }
 
             // The flood that ends a run without the quota: under the floors, rises over everything.

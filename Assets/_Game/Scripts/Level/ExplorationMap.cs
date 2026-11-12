@@ -1,22 +1,25 @@
+using System.Collections.Generic;
 using UnityEngine;
-using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
     /// <summary>
-    /// What the team has seen of a house (pure, unit tested): every floor is a grid of 2.5 m tiles (4 x 4 per room).
-    /// A tile is revealed when a player sees its centre: close enough and not behind a wall — doors and vents let the
-    /// view through their opening, open passages along the whole wall. The server reveals around every player and
+    /// What the team has seen of a house (pure, unit tested): every floor is a grid of 0.5 m tiles (the cells of the
+    /// plan). The view is a fan of rays from the eyes that stop at solid walls — doors and vents let it through their
+    /// opening, open passages and railings along their whole length (<see cref="HousePlan.SightShare"/>) — so walking past
+    /// a door reveals the wedge of the room seen through it, not whole squares. The server reveals around every player and
     /// replicates the bits (<see cref="Chunk"/> / <see cref="Merge"/>); the minimap draws revealed tiles, walls and furniture.
     /// </summary>
     public sealed class ExplorationMap
     {
-        public const int TilesPerCell = 4;
-        public const float Tile = Cell / TilesPerCell;
+        public const float Tile = HousePlan.Res;
+        /// <summary>Gap between neighbouring rays at the edge of the view (smaller than a tile: no tile slips between them).</summary>
+        const float RaySpacing = Tile * 0.7f;
 
         readonly LevelLayout m_Layout;
         readonly ulong[] m_Bits;
         readonly int[] m_RevealedPerFloor;
+        readonly List<int> m_Walls = new();
 
         /// <summary>Tiles along X and Z of one floor, and floors.</summary>
         public readonly int Width, Height, Floors;
@@ -31,8 +34,8 @@ namespace Stealth.Level
         public ExplorationMap(LevelLayout layout)
         {
             m_Layout = layout;
-            Width = layout.Width * TilesPerCell;
-            Height = layout.Height * TilesPerCell;
+            Width = Mathf.CeilToInt(layout.SizeX / Tile);
+            Height = Mathf.CeilToInt(layout.SizeZ / Tile);
             Floors = layout.Floors;
             m_Bits = new ulong[(Width * Height * Floors + 63) / 64];
             m_RevealedPerFloor = new int[Floors];
@@ -67,69 +70,40 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// Reveals what is seen from <paramref name="eye"/> (its floor only) within <paramref name="radius"/> metres.
-        /// Returns how many tiles were new.
+        /// Reveals what is seen from <paramref name="eye"/> (its floor only) within <paramref name="radius"/> metres:
+        /// a fan of rays, each one marching until a solid wall or the outside. Returns how many tiles were new.
         /// </summary>
         public int RevealAround(Vector3 eye, float radius)
         {
-            if (!m_Layout.IsInside(eye)) return 0;
+            var plan = m_Layout.Plan;
+            if (plan == null || !m_Layout.IsInside(eye)) return 0;
             int floor = Mathf.Clamp(LevelLayout.FloorOf(eye.y), 0, Floors - 1);
             var from = new Vector2(eye.x, eye.z);
-            int r = Mathf.CeilToInt(radius / Tile);
-            var c = TileOf(eye);
+            if (!plan.IsInside(floor, from)) return 0;
+            plan.WallsNear(floor, from, radius, m_Walls);
+            int rays = Mathf.Max(64, Mathf.CeilToInt(2f * Mathf.PI * radius / RaySpacing));
             int added = 0;
-            for (int ty = c.y - r; ty <= c.y + r; ty++)
-                for (int tx = c.x - r; tx <= c.x + r; tx++)
+            var c = TileOf(eye);
+            if (InRange(floor, c.x, c.y) && Set(floor, c.x, c.y)) added++;
+            for (int k = 0; k < rays; k++)
+            {
+                float a = k * (2f * Mathf.PI / rays);
+                var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float reach = radius * plan.SightShare(floor, from, from + dir * radius, m_Walls);
+                for (float s = Tile * 0.5f; s <= reach; s += Tile * 0.5f)
                 {
-                    if (!InRange(floor, tx, ty) || IsRevealed(floor, tx, ty)) continue;
-                    var to = TileCenter(tx, ty);
-                    if ((to - from).sqrMagnitude > radius * radius) continue;
-                    if (!CanSee(m_Layout, floor, from, to)) continue;
-                    if (Set(floor, tx, ty)) added++;
+                    var p = from + dir * s;
+                    if (!plan.IsInside(floor, p)) break;
+                    var t = TileOf(new Vector3(p.x, 0f, p.y));
+                    if (InRange(floor, t.x, t.y) && Set(floor, t.x, t.y)) added++;
                 }
+            }
             if (added > 0) Version++;
             return added;
         }
 
-        /// <summary>
-        /// The straight line between two points of a floor crosses no wall: at every room boundary it passes through an
-        /// open passage or the opening of a door / vent. Leaving the building blocks the view.
-        /// </summary>
-        public static bool CanSee(LevelLayout l, int floor, Vector2 from, Vector2 to)
-        {
-            var d = to - from;
-            // Boundaries between rooms along X (walls at x = k * Cell).
-            int x0 = Mathf.FloorToInt(from.x / Cell), x1 = Mathf.FloorToInt(to.x / Cell);
-            for (int k = Mathf.Min(x0, x1) + 1; k <= Mathf.Max(x0, x1); k++)
-            {
-                float t = (k * Cell - from.x) / d.x;
-                float z = from.y + d.y * t;
-                int row = Mathf.FloorToInt(z / Cell);
-                if (k <= 0 || k >= l.Width || row < 0 || row >= l.Height) return false;
-                if (!Passes(l.EdgesX[floor, k - 1, row], z - (row + 0.5f) * Cell)) return false;
-            }
-            // Boundaries along Z (walls at z = k * Cell).
-            int y0 = Mathf.FloorToInt(from.y / Cell), y1 = Mathf.FloorToInt(to.y / Cell);
-            for (int k = Mathf.Min(y0, y1) + 1; k <= Mathf.Max(y0, y1); k++)
-            {
-                float t = (k * Cell - from.y) / d.y;
-                float x = from.x + d.x * t;
-                int col = Mathf.FloorToInt(x / Cell);
-                if (k <= 0 || k >= l.Height || col < 0 || col >= l.Width) return false;
-                if (!Passes(l.EdgesZ[floor, col, k - 1], x - (col + 0.5f) * Cell)) return false;
-            }
-            return true;
-        }
-
-        /// <summary>Does a line cross this wall <paramref name="offset"/> metres from its middle?</summary>
-        static bool Passes(EdgeType edge, float offset) => edge switch
-        {
-            EdgeType.Open => true,
-            EdgeType.Door => Mathf.Abs(offset) <= ClearWidth(DoorWidth) / 2f,
-            EdgeType.Vent => Mathf.Abs(offset) <= ClearWidth(VentWidth) / 2f,
-            EdgeType.Squeeze => Mathf.Abs(offset) <= ClearWidth(SqueezeWidth) / 2f,
-            _ => false,
-        };
+        /// <summary>The straight line between two points of a floor crosses no solid wall and stays inside the building.</summary>
+        public static bool CanSee(LevelLayout l, int floor, Vector2 from, Vector2 to) => l.Plan != null && l.Plan.CanSee(floor, from, to);
 
         // ------------------------------------------------------------------ replication
 

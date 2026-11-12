@@ -42,7 +42,7 @@ namespace Stealth.Game
         [Tooltip("Seconds from the moment the whole team is hiding in the hatch to the sewer (anyone can climb back out).")]
         public float HatchCountdown = 5f;
         [Tooltip("Seconds the result of the vote for the next house is shown before the team goes.")]
-        public float VoteDelay = 3f;
+        public float VoteDelay = 5f;
 
         [Header("Alarms")]
         [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]

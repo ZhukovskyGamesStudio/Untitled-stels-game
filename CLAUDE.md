@@ -23,6 +23,8 @@ Tools/dev.sh assets             # дособрать недостающие ас
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
 REBUILD_UI=1 Tools/dev.sh assets  # пересобрать только UI-префабы (HUD, меню, инвентарь, элементы)
 REBUILD=RobotGuard,Safe Tools/dev.sh assets  # пересобрать только эти префабы (по имени файла), GUID сохраняются
+FILTER=HousePlanTests Tools/dev.sh tests  # только эти тесты
+PLANS="7:3,42:5" Tools/dev.sh plans       # картинки планов домов (сид:дом) в Logs/plans/
 Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
@@ -70,9 +72,9 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
-   `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
+   `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `HousePlan`, `PlanGenerator`, `Furnisher`, `HouseKinds`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
    `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`,
-   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`.
+   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`, `StairStyles`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
    показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
@@ -111,6 +113,9 @@ LaserGate — отдельная ловушка (не детектор)
 → `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
 Удар сбивает с ног (`HealthState.TryHit` → `Downed`): лежачих роботы не видят (`IIntruder.IsDown`), робот говорит «Нарушитель устранён»
 и возвращается к работе; с HP > 0 игрок встаёт сам (`CanGetUp`, Пробел → `IPlayerLink.SendGetUp`), с 0 — только союзник; провал забега — когда все `KnockedOut`.
+Потолочный пылесос — вертикальный лазерный веер от робота до пола (`ScanLine.CutsFan`, меш `Art/Models/FX/LaserHalfFan`, две половины
+обрезаются стенами): касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
+противоположную стену (`SpiderProfile.CeilingEvery`; ступни ног находят и крышу верхнего этажа).
 Сейсмик — волны (`SeismicSense.Wave*`, `PulseStomp` → кольцо `StompRipple` и звук), подметальщик — лидар у пола (`RobotLidar`),
 рабочие везут лут (`DetectorSnapshot.Cargo`, при взломе падает на пол). `RobotRoster.Newcomers` — новый вид гарантированно есть в доме, где он появляется.
 `RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
@@ -122,9 +127,18 @@ LaserGate — отдельная ловушка (не детектор)
 `LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`). `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
 **только из префабов `LevelArt`**: блоки-кубы масштабируются под размер, лестницы/двери/лазы/лампы/мебель ставятся как есть.
 Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
-Размеры здания — `LevelMetrics`. Мебель — `LevelGenerator.FurnishRoom`: четыре квадранта комнаты в координатах «от центра к стенам»
-(крест посередине свободен под двери), раскладки по типам комнат. Пристенная мебель держит ≥ 20 см от оси стены (жалюзи и подоконники окон).
-Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
+**План дома** (дизайн — [Docs/HouseGenerator.md](Docs/HouseGenerator.md)) — `HousePlan`: растр клеток 0,5 м на этаж (`CellKind`: комната,
+карман за наклонной/дуговой стеной, пустота атриума), стены выводятся из границ растра плюс наклонные и дуговые сегменты (`PlanWall`),
+проёмы (`PlanOpening`: дверь, открытый проход, лаз, щель) лежат на стенах, перила — края галерей над атриумом. `PlanGenerator`: масса здания
+(бар/Г/Т/П/двор/Н + пристройка) → лобби у фасада → лестничные холлы → коридоры → BSP на комнаты любого размера, Г/Т-слияния → типы по площади
+и пропорциям → атриумы в 2–3 этажа → формы (ротонда, восьмиугольник, срез и скругление углов) → связность (Краскал, петли, лазы, щели).
+`HouseKinds` — характер дома из сида (офис, бизнес-центр, дата-центр, склад, штаб-квартира): клон `BuildingSettings` с другой программой комнат
+и формами. `LevelGenerator` — «сгенерируй и проверь»: до 16 вариантов плана (`LevelLayout.PlanAttempt`), берётся первый, где до каждой комнаты
+можно дойти. `LevelLayout` — адаптеры для остального кода (`Rooms`, `Doorways`, `Stairs`, `RoomAt`, `OpenBetweenFloors`…).
+Мебель — `Furnisher`: острова с проходами 1,25 м, пристенные группы с дорожкой перед ними, коридоры пустые, вокруг проёмов, лестниц, люка и
+точек патруля — свободно; `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
+без запуска игры — `PLANS="seed:дом,…" Tools/dev.sh plans` → `Logs/plans/`. Размеры — `LevelMetrics`. Пристенная мебель держит ≥ 20 см
+от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
 со стенами, лестницами и друг с другом, `LevelNavMeshTests` — что до лута можно дойти.
 
 ### Сеть
@@ -150,14 +164,16 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
   Без запущенной сессии этот пир — сам себе сервер, время — локальное, спавн — обычный `Instantiate`.
 - Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
 - Правила забега (квота, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
-- Склад команды у люка — `TeamStash` в `GameManager.Stash` (сервер), реплицирует `GameManagerNet`; запросы — `PlayerInventory.Request{Stash,Unstash,StashMove,SellStashed,StashWorld,SellWorld}`.
+- Склад команды у люка — `TeamStash` в `GameManager.Stash` (сервер), реплицирует `GameManagerNet`; запросы — `PlayerInventory.Request{Stash,Unstash,StashMove,SellStashed,StashWorld,SellWorld,StashAll}`.
+  Сидя в люке, руки (Tab) тоже работают: доска склада висит перед глазами (`StashBoard.PlaceInFront`). «Сложить всё» — клавиша `GameAction.StashAll` (G) или кнопка на доске (`TeamStash.AddAll`).
   Записи склада адресуются по значению (`InventoryEntry`), не по индексу: список мог измениться, пока запрос летел. Склад живёт весь забег, `RestartRunServer` его чистит.
 
 **Управление** — `Controls` (`Scripts/Player`): действия `GameAction` с клавишами по умолчанию, переназначение (PlayerPrefs), чтение устройств.
 Игровой код спрашивает `Controls.Held/Pressed(GameAction.X)`, а не `Keyboard.current`; тексты для игрока называют клавиши через `Controls.Label`.
 Новое действие — в `GameAction` и `Controls.All` (название, группа, клавиша), оно само появится в списке на паузе (`ControlsPanel`).
 
-**Карта, пинги, метки.** `ExplorationMap` — что команда видела (плитки 2,5 м, вид не проходит сквозь стены, проходит в проём двери);
+**Карта, пинги, метки.** `ExplorationMap` — что команда видела (клетки плана 0,5 м, открываются веером лучей от глаз: луч останавливается на стене,
+проходит в проём двери — мимо двери открывается клин комнаты, который видно сквозь неё; `HousePlan.SightShare`);
 сервер открывает вокруг всех игроков, `GameManagerNet` реплицирует биты (`NetworkList<ulong>`, [0] = сид дома), клиент ещё и сам вокруг себя.
 `MapSketch` превращает видимое в прямоугольники (пол, стены с проёмами, лестницы, мебель из `LevelShell.Props`, люк), `MapView` рисует
 мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
@@ -174,7 +190,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 глубина `RunMap.StartDepth` = −1, первые 2–3 дома; автопилот стартует сразу в доме — `DevFlags.StartInHouse`, кроме сценария `sewer`).
 Канализация: кирпичный свод от лестницы под люком, тележка команды (`StashCart` выкладывает склад в кузов по сетке), зал с колодцем и
 **три туннеля** (`SewerLocation.Branches`: левый/средний/правый; `SewerBranches.Slots` — какой туннель ведёт к какому пути, лишние —
-за решёткой). Голос — встать в туннель (`SewerLocation.BranchAt`, сервер в `GameManager.UpdateVote`, ничья — жребий по сиду), над туннелем —
+за решёткой; туннели уходят на 40 м в темноту, но через `SewerLocation.StopAt` = 2,85 м — невидимая стена, на полу — светящаяся рамка зоны голоса).
+Голос — встать в рамку (`SewerLocation.BranchAt`, сервер в `GameManager.UpdateVote`, ничья — жребий по сиду; отсчёт `RunSettings.VoteDelay` крупно на HUD), над туннелем —
 панель в мире (`RouteSignView`, `SewerRoute`: тип дома, этажи, охрана, камеры, тьма, запертые двери, кто стоит, отсчёт, нехватка квоты).
 Торговать можно у `GameManager.TradePosition` (люк в доме, тележка в канализации; `CanTradeAt`). Маршрут — `RunMap` из `LevelInfo.RunSeed`
 (столбцы 2–4 дома, из дома 1–3 пути, ряд 0 = классический сид дома). Решили → `RunState.Advance()`: квота выплачена — `StartLevel(глубина + 1, ряд)`,
@@ -260,6 +277,13 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 **Рендер большого дома** — `MeshBatcher` склеивает статичную геометрию в один меш на клетку комнаты и этаж (сабмеш на материал, тайлинг отделки — в UV):
 декор стиля (`StyleDecor`, отдельных объектов у деталей нет) и мебель (`PropBatches`: объекты мебели с коллайдерами и светом остаются, их рендереры —
 `forceRenderingOff`, перед сменой стиля склейка снимается и собирается заново). Стены, плиты, лестницы и окна — static batching (`LevelBuilder.CombineStatic`).
+**Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
+дерево с балясинами, открытая сталь с сеткой, белый камень со стеклом), меши генерирует `AssetBuilder.Stairs` (`Art/Models/Stairs`); выбор — `StairStyles.Pick`
+по семейству стиля и сиду дома, `StairLook` переключает при F8. Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью.
+**Лазы** — короб вентиляции: порог `LevelMetrics.VentSill` (кусок стены), над ним `VentHeight`, облицовка, фланцы и снятая решётка у стены (префаб `Level/VentFrame`).
+Часть лазов — под потолком (`PlanOpening.High`, `Doorway.High`; `LevelGenerator.RaiseVents`, свой поток рандома, `BuildingSettings.HighVentChance`): порог `HighVentSill`, с обеих
+сторон штабель из двух ящиков с коллайдерами (`CrateLow`/`CrateHigh`, префаб `Level/HighVentFrame`) — запрыгнуть, пригнуться, шагнуть в короб; ставится, только где ящики
+влезают в комнату и не задевают лестницы (`LevelGenerator.CratesFit`), мебель держится в стороне (зона проёма в `Furnisher`). Проверка — сценарий `vent`.
 Держатель склеенного меша — `StyleConfig.Batch`.
 **Стиль Саши `S16_Derelict`** «Заброшенный комплекс» (влит из `feature_visual_style_11_prototype`): семейство моделей `Derelict`, свои PBR-поверхности,
 мебель и деградация (`Tools/Blender/derelict_*.py`, пятна и плакаты раскладывает `ArchitecturePlanner`), человек со скелетом вместо модели игрока
@@ -272,6 +296,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 **Rebuild All Assets** (или `FORCE=1`) перезаписывает всё. Пути не меняются, поэтому GUID и сетевые хэши стабильны.
 Если меняешь структуру префаба в коде — пересобери с `FORCE=1` и закоммить изменённые префабы вместе с кодом.
 Сцена в режиме «только недостающее» не пересобирается: новый экран или объект сцены появится после `FORCE=1`.
+Сглаживание: SMAA камеры работает внутри постобработки, до стилевого фильтра, поэтому после `StyleScreen` идёт свой FXAA-проход
+(`Art/Shaders/ScreenFxaa.shader`, фича `ScreenFxaa` на `PC_Renderer`; стили из пикселей и 1 бит он пропускает).
 Рендер: URP Forward+, луна (направленный свет с тенями) и тёмный эмбиент задаются в `AssetBuilder.Scene`, постобработка — `Data/PostProcess.asset`
 (bloom, тонмаппинг, виньетка; пересоздаётся только с `FORCE=1`), атласы теней — `Assets/Settings/PC_RPAsset.asset`.
 Туман задаётся в рантайме (газ снаружи, дымка внутри), поэтому вырезание вариантов тумана — ручное (`GraphicsSettings`: Exp2 оставлен) и туман включён

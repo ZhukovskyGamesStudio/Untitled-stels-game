@@ -15,6 +15,8 @@ namespace Stealth.EditorTools
         const string StyleConfigPath = StylesDir + "/Styles.asset";
         const string StyleMaterialPath = StylesDir + "/StyleScreen.mat";
         const string StyleShaderPath = Root + "/Art/Shaders/StyleScreen.shader";
+        const string FxaaMaterialPath = StylesDir + "/ScreenFxaa.mat";
+        const string FxaaShaderPath = Root + "/Art/Shaders/ScreenFxaa.shader";
         const string PcRendererPath = "Assets/Settings/PC_Renderer.asset";
 
         /// <summary>
@@ -33,6 +35,7 @@ namespace Stealth.EditorTools
             }
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
             AddStyleFeature(mat);
+            AddFxaaFeature();
             AddXrayFeature();
             AddWorldTextFeature();
 
@@ -231,15 +234,36 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>A full-screen pass after post-processing that reads depth and normals (for outlines).</summary>
-        static void AddStyleFeature(Material mat)
+        static void AddStyleFeature(Material mat) =>
+            AddFullScreenFeature("StyleScreen", mat, ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal);
+
+        /// <summary>
+        /// FXAA after the style filter (same injection point, later in the list): the filter's outlines are drawn after
+        /// the camera's SMAA and would stay jagged.
+        /// </summary>
+        static void AddFxaaFeature()
+        {
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(FxaaShaderPath);
+            if (shader == null) { Debug.LogWarning("[Builder] FXAA shader not found"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(FxaaMaterialPath);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = "ScreenFxaa" };
+                AssetDatabase.CreateAsset(mat, FxaaMaterialPath);
+            }
+            else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
+            AddFullScreenFeature("ScreenFxaa", mat, ScriptableRenderPassInput.None);
+        }
+
+        static void AddFullScreenFeature(string name, Material mat, ScriptableRenderPassInput requirements)
         {
             var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
-            if (data == null) { Debug.LogWarning("[Builder] PC renderer not found: no style filter"); return; }
-            var feature = data.rendererFeatures.OfType<FullScreenPassRendererFeature>().FirstOrDefault(f => f.name == "StyleScreen");
+            if (data == null) { Debug.LogWarning($"[Builder] PC renderer not found: no {name} pass"); return; }
+            var feature = data.rendererFeatures.OfType<FullScreenPassRendererFeature>().FirstOrDefault(f => f.name == name);
             if (feature == null)
             {
                 feature = ScriptableObject.CreateInstance<FullScreenPassRendererFeature>();
-                feature.name = "StyleScreen";
+                feature.name = name;
                 AssetDatabase.AddObjectToAsset(feature, data);
                 AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long id);
                 var so = new SerializedObject(data);
@@ -253,7 +277,7 @@ namespace Stealth.EditorTools
             }
             feature.injectionPoint = FullScreenPassRendererFeature.InjectionPoint.AfterRenderingPostProcessing;
             feature.fetchColorBuffer = true;
-            feature.requirements = ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal;
+            feature.requirements = requirements;
             feature.passMaterial = mat;
             feature.passIndex = 0;
             feature.SetActive(true);

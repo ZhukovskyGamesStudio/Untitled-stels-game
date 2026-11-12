@@ -43,6 +43,26 @@ MonoBehaviour:
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
     depthInputAttachment: 0
+--- !u!114 &-6490560498486638581
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b00045f12942b46c698459096c89274e, type: 3}
+  m_Name: ScreenFxaa
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FullScreenPassRendererFeature
+  m_Active: 1
+  injectionPoint: 600
+  fetchColorBuffer: 1
+  requirements: 0
+  passMaterial: {fileID: 2100000, guid: f2d830d3aa8f290419979c6a91d4299e, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1
 --- !u!114 &-5083812220690112894
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -137,7 +157,8 @@ MonoBehaviour:
   - {fileID: -8145012854825875229}
   - {fileID: 2047761070223118219}
   - {fileID: 2337729831753282592}
-  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c882def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1c20f47c6ae5487120l
+  - {fileID: -6490560498486638581}
+  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c882def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1c20f47c6ae54871200b8885769de5eca5l
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3

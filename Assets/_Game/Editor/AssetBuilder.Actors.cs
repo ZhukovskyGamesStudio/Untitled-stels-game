@@ -149,6 +149,10 @@ namespace Stealth.EditorTools
             {
                 v.Profile = Profile<VacuumProfile>("RobotVacuum", p => p.ForgetRate = 0.6f);
                 v.Line = Beam(root, "ScanLine", 0.03f);
+                v.FanARenderer = LaserFan(root, "LaserFanA");
+                v.FanBRenderer = LaserFan(root, "LaserFanB");
+                v.FanA = v.FanARenderer.transform;
+                v.FanB = v.FanBRenderer.transform;
             }));
             Robot(RobotKind.Lidar, SensorPrefabs + "/SensorLidar.prefab", () => Device<LidarScanner>("SensorLidar", "sensor_lidar", "TurretBody", false, false, (root, l) =>
             {
@@ -324,7 +328,7 @@ namespace Stealth.EditorTools
             rc.StompRipplePrefab = s_StompRipple;
             // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
-            BuildSensorRig(root, model, rc, eyePos, radius);
+            BuildSensorRig(root, model, rc, bodyMat, eyePos, radius);
             AddLoop(root, rc.Profile.Traits.HoverHeight > 0f ? s_Bank.DroneRotor : s_Bank.RobotMotor);
             rc.Status.Renderers = Parts(model, "Eye"); // the sensor lenses glow in the status colour too
             return root;
@@ -334,11 +338,13 @@ namespace Stealth.EditorTools
         /// Every kind of sensor mount on the model (camera eye, two microphones, two ground probes, a snout);
         /// <see cref="SensorRig"/> keeps only those the robot's senses use.
         /// </summary>
-        static void BuildSensorRig(GameObject root, GameObject model, RobotController rc, Vector3 eye, float radius)
+        static void BuildSensorRig(GameObject root, GameObject model, RobotController rc, string bodyMat, Vector3 eye, float radius)
         {
             var rig = root.AddComponent<SensorRig>();
             rig.Robot = rc;
-            float scale = Mathf.Clamp(radius / 0.45f, 0.85f, 1.4f), side = Mathf.Max(0.2f, radius * 0.75f);
+            // Mounted where each robot's design expects them (the bestiary contracts) at their modelled size, painted like
+            // the robot itself: its body colour, its accent, its lenses.
+            float side = Mathf.Max(0.2f, radius * 0.75f);
             GameObject Mount(string file, string name, Vector3 position, Quaternion rotation)
             {
                 var go = Model(file);
@@ -346,8 +352,8 @@ namespace Stealth.EditorTools
                 go.transform.SetParent(model.transform, false);
                 go.transform.localPosition = position;
                 go.transform.localRotation = rotation;
-                go.transform.localScale = Vector3.one * scale;
-                Paint(go, "RobotAccent", "RobotAccent", "SensorGlow");
+                go.transform.localScale = Vector3.one;
+                Paint(go, bodyMat, "RobotAccent", "SensorGlow");
                 return go;
             }
             rig.Eyes = new[] { Mount("attach_eye", "SensorEye", eye + new Vector3(0, 0, 0.08f), Quaternion.Euler(rc.Profile.Senses.EyePitch, 0, 0)) };
@@ -387,6 +393,35 @@ namespace Stealth.EditorTools
             device.Status.Light = StatusLight(root.transform, b.center + Vector3.up * (b.extents.y + 0.1f), 3f, 2f, 90f);
             config(root, device);
             return root;
+        }
+
+        const string LaserFanMeshPath = Root + "/Art/Models/FX/LaserHalfFan.asset";
+
+        /// <summary>
+        /// Half of a laser fan: a right triangle with the apex at the origin, straight down 1 m and out 1 m along +X on the
+        /// floor (scaled to the room each frame), drawn double-sided with the additive laser sheet material.
+        /// </summary>
+        static MeshRenderer LaserFan(GameObject root, string name)
+        {
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(LaserFanMeshPath);
+            if (mesh == null)
+            {
+                EnsureFolder(Root + "/Art/Models/FX");
+                mesh = new Mesh { name = "LaserHalfFan" };
+                mesh.vertices = new[] { Vector3.zero, new Vector3(0f, -1f, 0f), new Vector3(1f, -1f, 0f) };
+                mesh.uv = new[] { new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(1f, 0f) };
+                mesh.triangles = new[] { 0, 2, 1 };
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                AssetDatabase.CreateAsset(mesh, LaserFanMeshPath);
+            }
+            var go = Child(root.transform, name);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = M("LaserSheet");
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            return r;
         }
 
         static LineRenderer Beam(GameObject root, string name, float width)

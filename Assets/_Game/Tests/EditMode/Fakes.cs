@@ -104,6 +104,7 @@ namespace Stealth.Tests
         public void RequestSellStashed(InventoryEntry from) => Requests.Add($"sell-stashed {from.X},{from.Y}");
         public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => Requests.Add($"stash-world {x},{y},{rot}");
         public void RequestSellWorld(WorldItem item) => Requests.Add("sell-world");
+        public void RequestStashAll() => Requests.Add("stash-all");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

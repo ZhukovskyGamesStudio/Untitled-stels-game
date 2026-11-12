@@ -4,53 +4,87 @@ using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
-    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch }
+    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void }
 
-    /// <summary>One rectangle of the map, x/y = world x/z in metres.</summary>
+    /// <summary>
+    /// One rectangle of the map, x/y = world x/z in metres. <see cref="Angle"/> turns it (degrees, counter-clockwise)
+    /// about its min corner: diagonal and curved walls.
+    /// </summary>
     public struct MapRect
     {
         public MapPart Part;
         public Rect Area;
+        public float Angle;
 
-        public MapRect(MapPart part, Rect area)
+        public MapRect(MapPart part, Rect area, float angle = 0f)
         {
             Part = part;
             Area = area;
+            Angle = angle;
         }
     }
 
     /// <summary>
     /// What the map draws of one floor (pure, unit tested): only what the team has seen (<see cref="ExplorationMap"/>).
-    /// Revealed tiles merged into runs, the walls next to them with the gaps of doors and vents, stairs, furniture and the
-    /// hatch. Few rectangles, so the HUD needs few images.
+    /// Revealed tiles merged into runs, the walls next to them (straight, diagonal, arcs) with the gaps of doors and
+    /// vents, railings of galleries, voids of atriums, stairs, furniture and the hatch. Few rectangles, so the HUD needs
+    /// few images.
     /// </summary>
     public static class MapSketch
     {
         public const float WallWidth = 0.35f;
         public const float GapWidth = 0.14f;
+        const float Step = 0.5f;
 
-        static readonly List<(float a, float b)> s_Line = new();
+        static readonly List<(float a, float b)> s_Run = new();
+        static readonly List<(int x0, int x1)> s_Rows = new();
+        static readonly List<(int x0, int x1, int y0)> s_Open = new();
 
         public static void Build(ExplorationMap map, int floor, IReadOnlyList<MapProp> props, List<MapRect> output)
         {
             output.Clear();
             if (map == null || floor < 0 || floor >= map.Floors) return;
             var l = map.Layout;
+            var plan = l.Plan;
             const float t = ExplorationMap.Tile;
 
-            // Floor: revealed tiles merged along X.
-            for (int ty = 0; ty < map.Height; ty++)
+            // Floor: revealed tiles merged into runs along X, and runs that repeat on the next rows into one rectangle
+            // (voids of atriums drawn dark on top).
+            s_Open.Clear();
+            for (int ty = 0; ty <= map.Height; ty++)
             {
-                int start = -1;
-                for (int tx = 0; tx <= map.Width; tx++)
+                s_Rows.Clear();
+                if (ty < map.Height)
                 {
-                    bool on = tx < map.Width && map.IsRevealed(floor, tx, ty);
-                    if (on && start < 0) start = tx;
-                    if (on || start < 0) continue;
-                    output.Add(new MapRect(MapPart.Floor, new Rect(start * t, ty * t, (tx - start) * t, t)));
-                    start = -1;
+                    int start = -1;
+                    for (int tx = 0; tx <= map.Width; tx++)
+                    {
+                        bool on = tx < map.Width && map.IsRevealed(floor, tx, ty);
+                        if (on && start < 0) start = tx;
+                        if (on || start < 0) continue;
+                        s_Rows.Add((start, tx));
+                        start = -1;
+                    }
                 }
+                // close the rectangles whose run does not go on in this row
+                for (int i = s_Open.Count - 1; i >= 0; i--)
+                {
+                    var (x0, x1, y0) = s_Open[i];
+                    if (s_Rows.Remove((x0, x1))) continue;
+                    output.Add(new MapRect(MapPart.Floor, new Rect(x0 * t, y0 * t, (x1 - x0) * t, (ty - y0) * t)));
+                    s_Open.RemoveAt(i);
+                }
+                foreach (var (x0, x1) in s_Rows) s_Open.Add((x0, x1, ty));
             }
+            if (plan != null && floor > 0)
+                for (int ty = 0; ty < map.Height; ty++)
+                    for (int tx = 0; tx < map.Width; tx++)
+                    {
+                        if (!map.IsRevealed(floor, tx, ty)) continue;
+                        var c = ExplorationMap.TileCenter(tx, ty);
+                        var cell = HousePlan.CellOf(c);
+                        if (plan.KindAt(floor, cell.x, cell.y) == CellKind.Void) output.Add(new MapRect(MapPart.Void, new Rect(tx * t, ty * t, t, t)));
+                    }
 
             // Stairs: drawn where they are seen, going up from this floor or arriving from below.
             foreach (var s in l.Stairs)
@@ -60,9 +94,9 @@ namespace Stealth.Level
                 if (AnyRevealed(map, floor, area)) output.Add(new MapRect(MapPart.Stairs, area));
             }
 
-            // Walls along X (at x = k * Cell) and along Z (at z = k * Cell).
-            for (int k = 0; k <= l.Width; k++) WallLine(map, floor, k, true, output);
-            for (int k = 0; k <= l.Height; k++) WallLine(map, floor, k, false, output);
+            if (plan != null)
+                for (int i = 0; i < plan.Walls.Count; i++)
+                    if (plan.Walls[i].Floor == floor) Wall(map, plan, i, output);
 
             // Furniture: once the tile under its centre is seen, clipped to its room (models may reach past a wall).
             if (props != null)
@@ -71,9 +105,10 @@ namespace Stealth.Level
                     if (p.Floor != floor) continue;
                     var c = p.Area.center;
                     if (!map.IsRevealed(floor, Mathf.FloorToInt(c.x / t), Mathf.FloorToInt(c.y / t))) continue;
-                    var room = new Rect(Mathf.Floor(c.x / Cell) * Cell, Mathf.Floor(c.y / Cell) * Cell, Cell, Cell);
-                    var clipped = Rect.MinMaxRect(Mathf.Max(p.Area.xMin, room.xMin), Mathf.Max(p.Area.yMin, room.yMin),
-                        Mathf.Min(p.Area.xMax, room.xMax), Mathf.Min(p.Area.yMax, room.yMax));
+                    var room = plan?.RoomAt(new Vector3(c.x, LevelLayout.FloorY(floor), c.y));
+                    var box = room != null ? room.Bounds : p.Area;
+                    var clipped = Rect.MinMaxRect(Mathf.Max(p.Area.xMin, box.xMin), Mathf.Max(p.Area.yMin, box.yMin),
+                        Mathf.Min(p.Area.xMax, box.xMax), Mathf.Min(p.Area.yMax, box.yMax));
                     if (clipped.width > 0.01f && clipped.height > 0.01f) output.Add(new MapRect(MapPart.Prop, clipped));
                 }
 
@@ -86,12 +121,7 @@ namespace Stealth.Level
         }
 
         /// <summary>The square of a staircase and its hole in the corner of its room.</summary>
-        public static Rect StairArea(Stair s)
-        {
-            float x = s.Corner.x > 0 ? (s.Cell.x + 1) * Cell - StairSize : s.Cell.x * Cell;
-            float z = s.Corner.y > 0 ? (s.Cell.y + 1) * Cell - StairSize : s.Cell.y * Cell;
-            return new Rect(x, z, StairSize, StairSize);
-        }
+        public static Rect StairArea(Stair s) => PlanGenerator.StairArea(s, 0f);
 
         static bool AnyRevealed(ExplorationMap map, int floor, Rect area)
         {
@@ -104,78 +134,74 @@ namespace Stealth.Level
             return false;
         }
 
-        /// <summary>The wall between rooms on one grid line, cut into pieces next to revealed tiles; door / vent gaps drawn thin.</summary>
-        static void WallLine(ExplorationMap map, int floor, int k, bool alongZ, List<MapRect> output)
+        static bool SeenAt(ExplorationMap map, int floor, Vector2 p, Vector2 n)
         {
-            var l = map.Layout;
-            const float t = ExplorationMap.Tile;
-            const int n = ExplorationMap.TilesPerCell;
-            int cells = alongZ ? l.Height : l.Width;
-            float line = k * Cell;
-            s_Line.Clear();
-            for (int c = 0; c < cells; c++)
+            foreach (var q in new[] { p + n * 0.4f, p - n * 0.4f })
             {
-                var edge = Edge(l, floor, k, c, alongZ);
-                if (edge == EdgeType.Open) continue;
-                float mid = (c + 0.5f) * Cell;
-                float half = edge == EdgeType.Wall ? 0f : ClearWidth(edge == EdgeType.Vent ? VentWidth : edge == EdgeType.Squeeze ? SqueezeWidth : LevelMetrics.DoorWidth) / 2f;
-                bool gapSeen = false;
-                for (int s = 0; s < n; s++)
-                {
-                    int along = c * n + s;
-                    int before = k * n - 1, after = k * n;
-                    bool seen = alongZ
-                        ? map.IsRevealed(floor, before, along) || map.IsRevealed(floor, after, along)
-                        : map.IsRevealed(floor, along, before) || map.IsRevealed(floor, along, after);
-                    if (!seen) continue;
-                    float a = along * t, b = a + t;
-                    if (half <= 0f) { Add(a, b); continue; }
-                    if (a < mid - half) Add(a, Mathf.Min(b, mid - half));
-                    if (b > mid + half) Add(Mathf.Max(a, mid + half), b);
-                    if (b > mid - half && a < mid + half) gapSeen = true;
-                }
-                if (gapSeen)
-                {
-                    var part = edge == EdgeType.Vent || edge == EdgeType.Squeeze ? MapPart.Vent : MapPart.Door;
-                    output.Add(new MapRect(part, Strip(line, mid - half, mid + half, GapWidth, alongZ)));
-                }
+                var tile = ExplorationMap.TileOf(new Vector3(q.x, 0f, q.y));
+                if (map.IsRevealed(floor, tile.x, tile.y)) return true;
             }
-            // Merge touching pieces so a long wall is one rectangle.
-            s_Line.Sort((p, q) => p.a.CompareTo(q.a));
-            for (int i = 0; i < s_Line.Count; i++)
+            return false;
+        }
+
+        /// <summary>One wall, cut into the pieces next to revealed tiles; door / vent gaps and railings drawn thin.</summary>
+        static void Wall(ExplorationMap map, HousePlan plan, int index, List<MapRect> output)
+        {
+            var w = plan.Walls[index];
+            float len = w.Length;
+            if (len < 0.01f) return;
+            var dir = w.Dir;
+            var n = new Vector2(-dir.y, dir.x);
+            var openings = plan.OpeningsOf(index);
+            foreach (var o in openings) if (o.Kind == EdgeType.Open) return;
+
+            // revealed runs along the wall
+            s_Run.Clear();
+            for (float a = 0f; a < len; a += Step)
             {
-                var (a, b) = s_Line[i];
-                while (i + 1 < s_Line.Count && s_Line[i + 1].a <= b + 0.001f) b = Mathf.Max(b, s_Line[++i].b);
-                output.Add(new MapRect(MapPart.Wall, Strip(line, a, b, WallWidth, alongZ)));
+                float b = Mathf.Min(len, a + Step);
+                if (!SeenAt(map, w.Floor, w.At((a + b) / 2f), n)) continue;
+                if (s_Run.Count > 0 && Mathf.Abs(s_Run[^1].b - a) < 0.001f) s_Run[^1] = (s_Run[^1].a, b);
+                else s_Run.Add((a, b));
+            }
+            if (s_Run.Count == 0) return;
+            var part = w.Railing ? MapPart.Railing : MapPart.Wall;
+            float width = w.Railing ? GapWidth : WallWidth;
+            foreach (var (a, b) in s_Run)
+            {
+                // minus the openings
+                float from = a;
+                foreach (var o in openings)
+                {
+                    float half = ClearWidth(o.Width) / 2f;
+                    float o0 = o.At - half, o1 = o.At + half;
+                    if (o1 <= from || o0 >= b) continue;
+                    Strip(output, part, w, from, Mathf.Max(from, o0), width);
+                    Strip(output, o.Kind is EdgeType.Vent or EdgeType.Squeeze ? MapPart.Vent : MapPart.Door, w, Mathf.Max(a, o0), Mathf.Min(b, o1), GapWidth);
+                    from = Mathf.Min(b, o1);
+                }
+                Strip(output, part, w, from, b, width);
             }
         }
 
-        static void Add(float a, float b)
+        static void Strip(List<MapRect> output, MapPart part, PlanWall w, float a, float b, float width)
         {
-            if (b - a > 0.01f) s_Line.Add((a, b));
-        }
-
-        static Rect Strip(float line, float a, float b, float width, bool alongZ) =>
-            alongZ ? new Rect(line - width / 2f, a, width, b - a) : new Rect(a, line - width / 2f, b - a, width);
-
-        /// <summary>The wall at grid line <paramref name="k"/>, cell <paramref name="c"/> along it; outer walls have the exterior doors.</summary>
-        public static EdgeType Edge(LevelLayout l, int floor, int k, int c, bool alongZ)
-        {
-            int max = alongZ ? l.Width : l.Height;
-            if (k > 0 && k < max) return alongZ ? l.EdgesX[floor, k - 1, c] : l.EdgesZ[floor, c, k - 1];
-            if (floor != 0) return EdgeType.Wall;
-            Vector2Int cell, dir;
-            if (alongZ)
+            if (b - a < 0.01f) return;
+            var dir = w.Dir;
+            var n = new Vector2(-dir.y, dir.x);
+            var start = w.At(a);
+            float len = b - a;
+            // axis-aligned walls stay plain rectangles; others turn about their min corner
+            if (Mathf.Abs(dir.x) > 0.999f || Mathf.Abs(dir.y) > 0.999f)
             {
-                cell = new Vector2Int(k == 0 ? 0 : l.Width - 1, c);
-                dir = k == 0 ? Vector2Int.left : Vector2Int.right;
+                var end = w.At(b);
+                var min = Vector2.Min(start, end) - new Vector2(Mathf.Abs(n.x), Mathf.Abs(n.y)) * (width / 2f);
+                var size = new Vector2(Mathf.Abs(end.x - start.x), Mathf.Abs(end.y - start.y)) + new Vector2(Mathf.Abs(n.x), Mathf.Abs(n.y)) * width;
+                output.Add(new MapRect(part, new Rect(min, size)));
+                return;
             }
-            else
-            {
-                cell = new Vector2Int(c, k == 0 ? 0 : l.Height - 1);
-                dir = k == 0 ? Vector2Int.down : Vector2Int.up;
-            }
-            return l.ExteriorDoors.Exists(e => e.cell == cell && e.dir == dir) ? EdgeType.Door : EdgeType.Wall;
+            var corner = start - n * (width / 2f);
+            output.Add(new MapRect(part, new Rect(corner, new Vector2(len, width)), Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg));
         }
     }
 }

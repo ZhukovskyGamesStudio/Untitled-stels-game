@@ -44,7 +44,7 @@ namespace Stealth.Tests
             var small = LevelGenerator.Generate(7, 1, players: 1);
             var big = LevelGenerator.Generate(7, 1, players: 4);
             Assert.AreEqual(4, big.Players);
-            Assert.Greater(big.Width * big.Height, small.Width * small.Height);
+            Assert.Greater(big.RoomUnits, small.RoomUnits);
             Assert.Greater(big.RobotSpawns.Count, small.RobotSpawns.Count, "more rooms, more guards");
         }
 
@@ -90,8 +90,8 @@ namespace Stealth.Tests
             var l = LevelGenerator.Generate(3, 1);
             var map = new ExplorationMap(l);
             Assert.AreEqual(0f, map.RevealedShare(0));
-            Assert.AreEqual(l.Width * 4, map.Width);
-            var eye = l.CellCenter(0, l.StartCell.x, l.StartCell.y) + Vector3.up * 1.6f;
+            Assert.AreEqual(Mathf.CeilToInt(l.SizeX / ExplorationMap.Tile), map.Width);
+            var eye = l.Lobby.Center + Vector3.up * 1.6f;
             Assert.Greater(map.RevealAround(eye, 8f), 0);
             var tile = ExplorationMap.TileOf(eye);
             Assert.IsTrue(map.IsRevealed(0, tile.x, tile.y), "where you stand");
@@ -106,21 +106,88 @@ namespace Stealth.Tests
         {
             var l = LevelGenerator.Generate(11, 2);
             int checkedWalls = 0, checkedDoors = 0;
-            for (int x = 0; x < l.Width - 1; x++)
-                for (int y = 0; y < l.Height; y++)
+            var plan = l.Plan;
+            for (int i = 0; i < plan.Walls.Count; i++)
+            {
+                var w = plan.Walls[i];
+                if (w.Floor != 0 || w.RoomA < 0 || w.RoomB < 0 || w.Railing || w.Shaped || w.Length < 3f) continue;
+                var mid = w.At(w.Length / 2f);
+                var n = new Vector2(-w.Dir.y, w.Dir.x);
+                var openings = plan.OpeningsOf(i);
+                // straight through the middle of the wall: an opening there lets the view through, a wall does not
+                bool through = ExplorationMap.CanSee(l, 0, mid - n * 0.6f, mid + n * 0.6f);
+                bool open = openings.Any(o => o.Kind == EdgeType.Open || Mathf.Abs(o.At - w.Length / 2f) < LevelMetrics.ClearWidth(o.Width) / 2f - 0.05f);
+                bool solid = !openings.Any(o => o.Kind == EdgeType.Open || Mathf.Abs(o.At - w.Length / 2f) < o.Width / 2f + 0.1f);
+                if (open) { Assert.IsTrue(through, $"through the opening at {mid}"); checkedDoors++; }
+                else if (solid) { Assert.IsFalse(through, $"through the wall at {mid}"); checkedWalls++; }
+            }
+            Assert.Greater(checkedWalls, 3);
+            Assert.Greater(checkedDoors, 0);
+            var lobby = l.Lobby.Center;
+            Assert.IsFalse(ExplorationMap.CanSee(l, 0, new Vector2(lobby.x, lobby.z), new Vector2(-3f, -3f)), "nothing outside the house");
+        }
+
+        [Test]
+        public void PassingADoorRevealsWhatIsSeenThroughIt()
+        {
+            int checkedDoors = 0;
+            foreach (int seed in new[] { 11, 12, 13, 14 })
+            {
+                var l = LevelGenerator.Generate(seed, 2);
+                var plan = l.Plan;
+                foreach (var o in plan.Openings)
                 {
-                    var edge = l.EdgesX[0, x, y];
-                    float midZ = (y + 0.5f) * LevelMetrics.Cell, wallX = (x + 1) * LevelMetrics.Cell;
-                    // Straight through the middle of the wall: a door or an opening lets the view through, a wall does not.
-                    bool through = ExplorationMap.CanSee(l, 0, new Vector2(wallX - 3f, midZ), new Vector2(wallX + 3f, midZ));
-                    if (edge == EdgeType.Wall) { Assert.IsFalse(through); checkedWalls++; }
-                    if (edge == EdgeType.Door || edge == EdgeType.Open) { Assert.IsTrue(through); checkedDoors++; }
-                    // Off to the side of a door: the wall next to the doorway blocks.
-                    if (edge == EdgeType.Door)
-                        Assert.IsFalse(ExplorationMap.CanSee(l, 0, new Vector2(wallX - 3f, midZ + 3.5f), new Vector2(wallX + 3f, midZ + 3.5f)));
+                    if (o.Kind != EdgeType.Door) continue;
+                    var w = plan.Walls[o.Wall];
+                    if (w.Floor != 0 || w.Railing || w.Shaped || w.RoomA < 0 || w.RoomB < 0) continue;
+                    var n = new Vector2(-w.Dir.y, w.Dir.x);
+                    var door = w.At(o.At);
+                    var eye = door - n * 1.2f;                                  // a step in front of the door
+                    var through = door + n * 2.0f;                              // straight through it
+                    var beside = w.At(o.At > w.Length / 2f ? o.At - 2.6f : o.At + 2.6f) + n * 0.4f; // behind the wall next to it
+                    if (!plan.IsInside(0, eye) || !plan.IsInside(0, through) || !plan.IsInside(0, beside)) continue;
+                    if (!plan.CanSee(0, eye, through) || plan.CanSee(0, eye, beside)) continue;
+                    var map = new ExplorationMap(l);
+                    map.RevealAround(new Vector3(eye.x, 1.6f, eye.y), 14f);
+                    var t = ExplorationMap.TileOf(new Vector3(through.x, 0f, through.y));
+                    var b = ExplorationMap.TileOf(new Vector3(beside.x, 0f, beside.y));
+                    Assert.IsTrue(map.IsRevealed(0, t.x, t.y), $"seed {seed}: the room through the door at {through}");
+                    Assert.IsFalse(map.IsRevealed(0, b.x, b.y), $"seed {seed}: behind the wall at {beside}");
+                    if (++checkedDoors >= 12) return;
                 }
-            Assert.Greater(checkedWalls + checkedDoors, 3);
-            Assert.IsFalse(ExplorationMap.CanSee(l, 0, new Vector2(1f, 5f), new Vector2(-3f, 5f)), "nothing outside the house");
+            }
+            Assert.Greater(checkedDoors, 2);
+        }
+
+        [Test]
+        public void TheHouseHasAMadeUpCompanyName()
+        {
+            string a = HouseKinds.Title(7, HouseKind.Office);
+            Assert.AreEqual(a, HouseKinds.Title(7, HouseKind.Office), "the same house, the same name");
+            StringAssert.StartsWith("Офис ", a);
+            StringAssert.Contains("«", a);
+            var names = new HashSet<string>();
+            for (int s = 0; s < 40; s++) names.Add(HouseKinds.Title(s, HouseKind.DataCenter));
+            Assert.Greater(names.Count, 20, "houses get different companies");
+        }
+
+        [Test]
+        public void StairLooksSuitTheFamily()
+        {
+            foreach (Stealth.Configs.ModelFamily f in System.Enum.GetValues(typeof(Stealth.Configs.ModelFamily)))
+            {
+                var options = StairStyles.For(f);
+                var seen = new HashSet<StairStyle>();
+                for (int s = 0; s < 200; s++)
+                {
+                    var pick = StairStyles.Pick(f, s);
+                    CollectionAssert.Contains(options, pick, $"{f}");
+                    seen.Add(pick);
+                }
+                Assert.AreEqual(options.Length, seen.Count, $"{f}: every suitable look turns up");
+                Assert.AreEqual(StairStyles.Pick(f, 42), StairStyles.Pick(f, 42));
+            }
+            Assert.AreEqual(StairStyles.Count, System.Enum.GetValues(typeof(StairStyle)).Length);
         }
 
         [Test]
@@ -129,8 +196,9 @@ namespace Stealth.Tests
             var l = LevelGenerator.Generate(4, 0);
             var server = new ExplorationMap(l);
             var client = new ExplorationMap(l);
-            server.RevealAround(l.CellCenter(0, 0, 0) + Vector3.up, 8f);
-            client.RevealAround(l.CellCenter(0, l.Width - 1, l.Height - 1) + Vector3.up, 8f);
+            var ground = l.Rooms.Where(r => r.Floor == 0).OrderBy(r => r.Center.x + r.Center.z).ToList();
+            server.RevealAround(ground[0].Center + Vector3.up, 8f);
+            client.RevealAround(ground[ground.Count - 1].Center + Vector3.up, 8f);
             float before = client.RevealedShare(0);
             for (int i = 0; i < server.ChunkCount; i++) client.Merge(i, server.Chunk(i));
             Assert.Greater(client.RevealedShare(0), before);
@@ -147,7 +215,7 @@ namespace Stealth.Tests
             MapSketch.Build(map, 0, null, rects);
             Assert.IsEmpty(rects, "nothing seen, nothing drawn");
 
-            var room = l.CellCenter(0, l.StartCell.x, l.StartCell.y);
+            var room = l.Lobby.Center;
             map.RevealAround(room + Vector3.up * 1.6f, 8f);
             var props = new List<MapProp>
             {
@@ -163,7 +231,7 @@ namespace Stealth.Tests
             int tiles = Mathf.RoundToInt(map.RevealedShare(0) * map.Width * map.Height);
             Assert.Less(rects.Count(r => r.Part == MapPart.Floor), tiles);
             foreach (var r in rects.Where(r => r.Part == MapPart.Wall))
-                Assert.IsTrue(Mathf.Approximately(r.Area.width, MapSketch.WallWidth) || Mathf.Approximately(r.Area.height, MapSketch.WallWidth));
+                Assert.IsTrue(Mathf.Approximately(r.Area.width, MapSketch.WallWidth) || Mathf.Approximately(r.Area.height, MapSketch.WallWidth) || r.Angle != 0f);
         }
 
         // ------------------------------------------------------------------ pings

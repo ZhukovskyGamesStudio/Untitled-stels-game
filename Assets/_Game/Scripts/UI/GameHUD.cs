@@ -20,10 +20,11 @@ namespace Stealth.UI
     {
         public static GameHUD Instance { get; private set; }
 
-        public const float HelpDuration = 30f;
         public const float IconRange = 25f;
         public const float LookRange = 18f;
         public const float LookDwell = 0.4f;
+        /// <summary>Where the "+N" of a sale starts, next to the quota bar.</summary>
+        public const float GainX = 310f, GainY = -48f;
 
         [Header("Root")]
         public RectTransform Canvas;
@@ -43,6 +44,8 @@ namespace Stealth.UI
         public Text HatchText;
         [Tooltip("For the ones still upstairs: who is waiting in the hatch.")]
         public Text HatchStatus;
+        [Tooltip("In the sewer, once the whole team stands in tunnels: the countdown to the next house.")]
+        public Text RouteCountdown;
         public GameObject AlarmFrame;
         public Image[] AlarmEdges;
         public Text AlarmLabel;
@@ -92,8 +95,6 @@ namespace Stealth.UI
         public GameObject RunOver;
         public Text RunOverTotal;
         public Text RunOverRestart;
-        public GameObject Help;
-        public Text HelpLabel;
 
         [Header("Map and callouts")]
         public MapView Minimap;
@@ -103,7 +104,7 @@ namespace Stealth.UI
         public RectTransform CalloutLayer;
         public CalloutMarkerView CalloutPrefab;
 
-        static readonly string[] NoiseNames = { "", "тихо", "слышно", "громко" };
+        static readonly string[] NoiseNames = { "бесшумно", "тихо", "слышно", "громко" };
         static readonly Color[] NoiseColors = { Color.white, new(0.6f, 0.9f, 1f), new(1f, 0.85f, 0.35f), new(1f, 0.35f, 0.25f) };
         static readonly Color QuotaGreen = new(0.45f, 1f, 0.5f);
 
@@ -118,8 +119,6 @@ namespace Stealth.UI
         bool m_BigMapOpen;
         int m_KeysVersion = -1;
         GameManager m_Subscribed;
-        bool m_ShowHelp = true;
-        float m_HelpUntil = -1f;
         Detector m_LookCandidate;
         float m_LookSince;
 
@@ -176,11 +175,11 @@ namespace Stealth.UI
             m_Hit.Update(Time.deltaTime);
             m_Banners.Update(now);
             m_Gain.Observe(gm.Collected, now);
-            UpdateHelp(me);
             CurrentPrompt = PromptRules.Choose(BuildContext(gm, me));
 
             ShowOverlays(gm, me, now);
             ShowHatch(gm, me);
+            ShowRouteCountdown(gm);
             ShowDetection(me, now);
             ShowRobotIcons(me);
             ShowCrosshair(me);
@@ -197,7 +196,6 @@ namespace Stealth.UI
             ShowBannerLine(now);
             Ui.Show(RunOver, gm.Phase == RunPhase.Failed);
             if (gm.Phase == RunPhase.Failed) RunOverTotal.text = $"Сдано за забег: {gm.RunTotal} очк.";
-            Ui.Show(Help, m_ShowHelp && !m_BigMapOpen);
             NameTheKeys(gm);
         }
 
@@ -207,8 +205,6 @@ namespace Stealth.UI
             if (m_KeysVersion == Controls.Version) return;
             m_KeysVersion = Controls.Version;
             string K(GameAction a) => Controls.Label(a);
-            // All the controls are on the pause page; the corner only says where to find them.
-            HelpLabel.text = $"Esc — меню и всё управление · {K(GameAction.Help)} — скрыть";
             RunOverRestart.text = $"{K(GameAction.Restart)} — начать новый забег";
             QuotaHint.text = $"Квота набрана — к люку, {K(GameAction.Hatch)}: спрятаться и уйти";
         }
@@ -236,10 +232,27 @@ namespace Stealth.UI
                 HatchText.text = left >= 0f
                     ? $"Вся команда в люке\nУходим в канализацию через {Mathf.CeilToInt(left)}…"
                     : $"Ты в люке — роботы тебя не видят\nЖдём: {missing}";
+                HatchText.text += $"\n{Controls.Label(GameAction.Hands)} — склад и продажа · {Controls.Label(GameAction.StashAll)} — всё на склад";
             }
             bool status = playing && !me.InHatch && hidden > 0;
             Ui.Show(HatchStatus, status);
             if (status) Ui.Set(HatchStatus, $"В люке ждут: {waiting} — когда спрячутся все, команда уйдёт в канализацию", new Color(0.6f, 1f, 0.65f));
+        }
+
+        /// <summary>The way is chosen: a big countdown in the middle of the screen until the team goes.</summary>
+        void ShowRouteCountdown(GameManager gm)
+        {
+            if (RouteCountdown == null) return;
+            bool on = gm.Phase == RunPhase.Sewer && gm.GoAt > 0;
+            Ui.Show(RouteCountdown, on);
+            if (!on) return;
+            float left = Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime));
+            int n = Mathf.CeilToInt(left);
+            string text = n > 0 ? $"Путь выбран — выходим через\n<size=64>{n}</size>" : "Выходим!";
+            if (RouteCountdown.text != text) RouteCountdown.text = text;
+            // each second starts big and settles
+            float f = left - Mathf.Floor(left);
+            RouteCountdown.rectTransform.localScale = Vector3.one * (1f + 0.12f * f);
         }
 
         // ------------------------------------------------------------------ map and callouts
@@ -324,17 +337,6 @@ namespace Stealth.UI
                 m.Ring.color = new Color(color.r, color.g, color.b, color.a * (1f - age / 0.6f));
             }
             Ui.Set(m.Label, label, new Color(color.r, color.g, color.b, color.a * (clamped ? 0.8f : 1f)));
-        }
-
-        void UpdateHelp(PlayerController me)
-        {
-            if (!GameMenu.IsOpen && Controls.Pressed(GameAction.Help))
-            {
-                m_ShowHelp = !m_ShowHelp;
-                m_HelpUntil = float.MaxValue;
-            }
-            if (m_HelpUntil < 0f) m_HelpUntil = Time.time + HelpDuration;
-            if (Time.time > m_HelpUntil) m_ShowHelp = false;
         }
 
         PromptContext BuildContext(GameManager gm, PlayerController me)
@@ -556,15 +558,16 @@ namespace Stealth.UI
             Ui.Set(LightLabel, UiMath.LightNames[level], color);
         }
 
-        /// <summary>How loud you are right now: three short bars above the inventory, fading out when silent.</summary>
+        /// <summary>How loud you are right now: three short bars above the health, dim and "бесшумно" when silent.</summary>
         void ShowNoise(PlayerController me, float now)
         {
             float age = now - me.LastNoiseTime;
-            bool visible = age <= 0.9f && !me.Downed;
+            bool visible = !me.Downed;
             Ui.Show(NoiseGroup, visible);
             if (!visible) return;
-            int bars = UiMath.NoiseBars(me.LastNoiseRadius);
-            NoiseGroup.alpha = Mathf.Clamp01(1f - age / 0.9f);
+            bool fresh = age <= 0.9f;
+            int bars = fresh ? UiMath.NoiseBars(me.LastNoiseRadius) : 0;
+            NoiseGroup.alpha = fresh ? Mathf.Lerp(0.55f, 1f, Mathf.Clamp01(1f - age / 0.9f)) : 0.55f;
             for (int i = 0; i < NoiseBars.Length; i++)
                 NoiseBars[i].color = i < bars ? NoiseColors[bars] : new Color(1, 1, 1, 0.25f);
             Ui.Set(NoiseLabel, NoiseNames[bars], NoiseColors[bars]);
@@ -574,8 +577,9 @@ namespace Stealth.UI
         {
             int collected = gm.Collected, quota = gm.Quota;
             bool met = collected >= quota;
-            HouseLabel.text = SewerLocation.Active != null ? "Канализация"
-                : $"Дом {gm.Level.Index + 1} · этаж {LevelLayout.FloorOf(me.transform.position.y) + 1}";
+            var layout = ActiveLevel.Layout;
+            string house = SewerLocation.Active != null || layout == null ? "Канализация" : HouseKinds.Title(gm.Level.Seed, layout.Kind);
+            if (HouseLabel.text != house) HouseLabel.text = house;
             Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
             QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
             bool gain = m_Gain.Visible(now);
@@ -583,7 +587,7 @@ namespace Stealth.UI
             if (gain)
             {
                 float age = now - m_Gain.Time;
-                GainRect.anchoredPosition = new Vector2(240f, -23f + age * 8f);
+                GainRect.anchoredPosition = new Vector2(GainX, GainY + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
             Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing && !me.InHatch);

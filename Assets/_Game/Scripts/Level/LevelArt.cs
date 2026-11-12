@@ -24,6 +24,8 @@ namespace Stealth.Level
         public GameObject Stairs;
         public GameObject StairsMirrored;
         public GameObject VentFrame;
+        [Tooltip("A vent under the ceiling with the crate stacks under it on both sides.")]
+        public GameObject HighVentFrame;
         [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
         public GameObject SqueezeFrame;
         public GameObject AutoDoor;

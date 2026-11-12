@@ -167,6 +167,12 @@ namespace Stealth.Player
             else SellWorldServer(item);
         }
 
+        public void RequestStashAll()
+        {
+            if (m_Link != null) m_Link.RequestStashAll();
+            else StashAllServer();
+        }
+
         // ------------------------------------------------------------------ server
 
         bool CanAct => m_Player == null || !m_Player.Downed;
@@ -232,6 +238,16 @@ namespace Stealth.Player
             var e = m_Items[index];
             if (!gm.Stash.Add(e.Shape, e.Color, x, y, rot)) return;
             m_Items.RemoveAt(index);
+            Changed();
+        }
+
+        /// <summary>Every carried item into the first free spot of the stash, biggest first; what does not fit stays in the backpack.</summary>
+        public void StashAllServer()
+        {
+            if (!AtHatch(out var gm) || m_Items.Count == 0) return;
+            if (gm.Stash.AddAll(m_Items, out var left) == 0) return;
+            m_Items.Clear();
+            m_Items.AddRange(left);
             Changed();
         }
 

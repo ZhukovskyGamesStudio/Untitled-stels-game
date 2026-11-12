@@ -107,6 +107,23 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheCeilingFanCannotBeJumped()
+        {
+            var apex = new Vector3(0f, 2.9f, 0f);
+            var dir = Vector3.forward;
+            // standing in the sheet, 2 m out: caught; jumping there: still caught (the body is in the light)
+            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.1f, 0f, 2f), 1.8f));
+            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.1f, 0.8f, 2f), 1.8f), "in the air");
+            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 0f, -2.5f), 1.1f), "both halves");
+            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.6f, 0f, 2f), 1.8f), "beside the sheet");
+            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 0f, 3.6f), 1.8f), "beyond its foot");
+            // a wall cut this half short
+            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 1f, 3f, new Vector3(0f, 0f, 2f), 1.8f), "behind the wall");
+            // the fan narrows upwards: high up (on a shelf) the edge is closer
+            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 2f, 2.5f), 0.8f), "above its slope");
+        }
+
+        [Test]
         public void ScanLineCrossing()
         {
             var c = Vector3.zero;

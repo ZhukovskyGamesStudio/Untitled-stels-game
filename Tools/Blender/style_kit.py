@@ -212,27 +212,46 @@ def casing():
     export("kit_casing")
 
 
+def band(inner, outer, d0, d1):
+    """A solid strip between two polylines of (x, z) points (same count), from depth d0 to d1 out of the wall."""
+    bm = bmesh.new()
+    n = len(inner)
+    fi = [bm.verts.new((x, -d1, z)) for x, z in inner]
+    fo = [bm.verts.new((x, -d1, z)) for x, z in outer]
+    bi = [bm.verts.new((x, -d0, z)) for x, z in inner]
+    bo = [bm.verts.new((x, -d0, z)) for x, z in outer]
+    for i in range(n - 1):
+        bm.faces.new((fi[i], fi[i + 1], fo[i + 1], fo[i]))   # front
+        bm.faces.new((bo[i], bo[i + 1], bi[i + 1], bi[i]))   # back (on the wall)
+        bm.faces.new((bi[i], bi[i + 1], fi[i + 1], fi[i]))   # inner edge
+        bm.faces.new((fo[i], fo[i + 1], bo[i + 1], bo[i]))   # outer edge
+    for i in (0, n - 1):
+        bm.faces.new((fi[i], fo[i], bo[i], bi[i]))           # end caps
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
 def arch():
-    """A flattened arch inside a 1.6 x 2.3 m opening (spandrels fill its top corners) with a moulding: Blue Prince doorways."""
-    w, top = 1.6, 3.0
-    r = w / 2
-    parts = []
-    seg = 14
-    for i in range(seg):
-        a0, a1 = math.pi * i / seg, math.pi * (i + 1) / seg
-        x0, x1 = -r * math.cos(a0), -r * math.cos(a1)
-        z0, z1 = 2.3 - 0.55 + r * math.sin(a0) * 0.7, 2.3 - 0.55 + r * math.sin(a1) * 0.7
-        lo = min(x0, x1)
-        hi = max(x0, x1)
-        parts.append(box(lo, hi, 0, 0.03, min(z0, z1), 2.3))  # the arch soffit seen from the room
-    merge("Accent", [box(-r - 0.12, -r, 0, 0.03, 0, 2.3), box(r, r + 0.12, 0, 0.03, 0, 2.3)])
-    # keystone and the moulding following the arch
-    ring = []
-    for i in range(seg):
-        a = math.pi * (i + 0.5) / seg
-        x, z = -r * math.cos(a), 2.3 - 0.55 + r * math.sin(a) * 0.7
-        ring.append(box(x - 0.1, x + 0.1, 0.03, 0.06, z - 0.03, z + 0.07))
-    merge("Body", ring + parts)  # no keystone: the exit sign hangs right above the doorway
+    """
+    A flattened (elliptic) arch inside a 1.6 x 2.3 m opening: two smooth spandrels fill its top corners, a moulding
+    follows the curve and runs down the jambs. One continuous curve, no stepped blocks.
+    """
+    w, top, spring = 1.6, 2.3, 1.75
+    r, rz = w / 2, 0.47          # half width, rise of the arch (crown at 2.22 m: under the head of the opening)
+    seg = 40
+    curve, normal = [], []
+    for i in range(seg + 1):
+        a = math.pi * i / seg
+        curve.append((-r * math.cos(a), spring + rz * math.sin(a)))
+        nx, nz = -rz * math.cos(a), r * math.sin(a)       # outward normal of the ellipse
+        ln = math.hypot(nx, nz)
+        normal.append((nx / ln, nz / ln))
+    spandrels = band(curve, [(x, top) for x, _ in curve], 0, 0.03)
+    mould = 0.1
+    ring = band(curve, [(x + nx * mould, z + nz * mould) for (x, z), (nx, nz) in zip(curve, normal)], 0.03, 0.06)
+    legs = [box(-r - mould, -r, 0.03, 0.06, 0, spring), box(r, r + mould, 0.03, 0.06, 0, spring)]
+    merge("Accent", [box(-r - 0.12, -r, 0, 0.03, 0, top), box(r, r + 0.12, 0, 0.03, 0, top)])
+    merge("Body", [spandrels, ring] + legs)  # no keystone: the exit sign hangs right above the doorway
     export("kit_arch")
 
 

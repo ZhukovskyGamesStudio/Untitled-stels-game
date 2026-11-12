@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Stealth.Level;
 using UnityEditor;
@@ -17,7 +18,7 @@ namespace Stealth.Tests
         [Test]
         public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner)
         {
-            var stair = new Stair { Floor = 1, Cell = new Vector2Int(2, 1), Corner = corner };
+            var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner };
             var (mirrored, yaw) = StairGeometry.Placement(corner);
             var rotation = Quaternion.Euler(0f, yaw, 0f);
             foreach (var box in StairGeometry.Boxes())
@@ -67,13 +68,14 @@ namespace Stealth.Tests
             var root = ActiveLevel.Load(layout, art);
             Assert.AreSame(layout, ActiveLevel.Layout);
             Assert.AreEqual(layout.Stairs.Count, CountNamed(root, "Stairs_"), "one staircase prefab per stair");
-            Assert.AreEqual(layout.AutoDoors.Count + layout.ExteriorDoors.Count, root.GetComponentsInChildren<AutoDoor>().Length, "inner sliding doors + a door in every exit");
-            Assert.AreEqual(layout.Floors * layout.Width * layout.Height, root.GetComponentsInChildren<RoomLight>().Length, "ceiling lights in every room");
-            Assert.Greater(root.GetComponentsInChildren<LightSource>().Length, layout.Floors * layout.Width * layout.Height, "plus exit signs and lamps");
+            int exits = layout.Doorways.Count(d => d.Exterior && d.Kind == EdgeType.Door);
+            Assert.AreEqual(layout.AutoDoors.Count + exits, root.GetComponentsInChildren<AutoDoor>().Length, "inner sliding doors + a door in every exit");
+            int lamps = layout.Rooms.Sum(r => LevelBuilder.LightSpots(layout, r).Count);
+            Assert.GreaterOrEqual(lamps, layout.Rooms.Count, "ceiling lights in every room");
+            Assert.AreEqual(lamps, root.GetComponentsInChildren<RoomLight>().Length);
+            Assert.Greater(root.GetComponentsInChildren<LightSource>().Length, lamps, "plus exit signs and lamps");
             Assert.IsNotNull(root.GetComponent<Unity.AI.Navigation.NavMeshSurface>(), "the root carries the navmesh surface");
-            int vents = 0;
-            foreach (var e in layout.EdgesX) if (e == EdgeType.Vent) vents++;
-            foreach (var e in layout.EdgesZ) if (e == EdgeType.Vent) vents++;
+            int vents = layout.Doorways.Count(d => d.Kind == EdgeType.Vent);
             Assert.AreEqual(vents, CountNamed(root, "VentFrame"));
             ActiveLevel.Clear();
             Assert.IsNull(ActiveLevel.Layout);
@@ -151,16 +153,19 @@ namespace Stealth.Tests
         [Test]
         public void WindowsFaceIntoTheBuilding()
         {
-            var spots = LevelBuilder.WindowSpots(3, 4, 1.7f);
-            var centre = new Vector3(15f, 1.7f, 20f);
-            Assert.AreEqual(2 * 2 * (3 + 4), spots.Count);
-            foreach (var (pos, yaw) in spots)
+            foreach (var seed in new[] { 3, 21, 77 })
             {
-                var inward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
-                var toCentre = (centre - pos);
-                Assert.Greater(Vector3.Dot(inward, toCentre), 0f, $"window at {pos}");
-                bool onWall = Mathf.Approximately(pos.x, 0f) || Mathf.Approximately(pos.x, 30f) || Mathf.Approximately(pos.z, 0f) || Mathf.Approximately(pos.z, 40f);
-                Assert.IsTrue(onWall, $"window at {pos} is on an outer wall");
+                var layout = LevelGenerator.Generate(seed, 3);
+                var spots = LevelBuilder.WindowSpots(layout);
+                Assert.Greater(spots.Count, 10, "windows along the facades");
+                foreach (var (pos, yaw) in spots)
+                {
+                    var inward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+                    int f = LevelLayout.FloorOf(pos.y - 1.7f);
+                    Assert.GreaterOrEqual(layout.Plan.SpaceAt(f, new Vector2(pos.x + inward.x * 0.5f, pos.z + inward.z * 0.5f)), 0, $"seed {seed}: window at {pos} faces a room");
+                    var o = HousePlan.CellOf(new Vector2(pos.x - inward.x * 0.5f, pos.z - inward.z * 0.5f));
+                    Assert.AreEqual(CellKind.Outside, layout.Plan.KindAt(f, o.x, o.y), $"seed {seed}: window at {pos} is in an outer wall");
+                }
             }
         }
 

@@ -62,12 +62,10 @@ namespace Stealth.Game
             if (board != null)
             {
                 var b = board.transform.position;
-                var lobby = new Vector2Int(Mathf.FloorToInt(b.x / LevelMetrics.Cell), Mathf.FloorToInt(b.z / LevelMetrics.Cell));
-                foreach (var d in new[] { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down })
+                var lay = ActiveLevel.Layout;
+                foreach (var other in lay.Rooms.Where(r => r.Floor == 0 && r != lay.RoomAt(b)).OrderBy(r => Vector3.Distance(r.Center, b)).Take(6))
                 {
-                    var n = lobby + d;
-                    if (n.x < 0 || n.y < 0 || n.x >= ActiveLevel.Layout.Width || n.y >= ActiveLevel.Layout.Height) continue;
-                    var spot = ActiveLevel.Layout.CellCenter(0, n.x, n.y) + new Vector3(d.x, 0, d.y) * 1.5f;
+                    var spot = other.Center;
                     if (!Physics.Linecast(spot + Vector3.up * 1.6f, b, Perception.SightMask, QueryTriggerInteraction.Ignore)) continue;
                     LookAtFrom(new Pose(spot + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(b - spot))), b);
                     yield return new WaitForSeconds(0.4f);
@@ -79,7 +77,11 @@ namespace Stealth.Game
 
             // "I'm stuck": inside a wall between two rooms, away from its middle (where a doorway could be).
             var layout = ActiveLevel.Layout;
-            var wall = new Vector3(LevelMetrics.Cell, LevelLayout.FloorY(0) + 0.05f, LevelMetrics.Cell * 0.5f + 2.6f);
+            // a wall between two rooms of the ground floor, away from its openings
+            var inner = layout.Plan.Walls.Where(w => w.Floor == 0 && w.RoomA >= 0 && w.RoomB >= 0 && !w.Railing && w.Length > 4f)
+                .OrderByDescending(w => w.Length).First();
+            var mid = inner.At(inner.Length * 0.25f);
+            var wall = new Vector3(mid.x, LevelLayout.FloorY(0) + 0.05f, mid.y);
             Me.TeleportOwner(wall, Quaternion.identity);
             yield return new WaitForSeconds(0.3f);
             var stuckAt = Me.transform.position;

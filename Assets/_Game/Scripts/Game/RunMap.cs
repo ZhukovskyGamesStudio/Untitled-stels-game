@@ -4,9 +4,6 @@ using UnityEngine;
 
 namespace Stealth.Game
 {
-    /// <summary>What kind of building a stop on the route is. Only offices so far.</summary>
-    public enum HouseKind : byte { Office }
-
     /// <summary>A house on the route: its column (how deep into the run) and row, and the seed it is built from.</summary>
     public readonly struct RouteNode
     {
@@ -21,10 +18,7 @@ namespace Stealth.Game
             Kind = kind;
         }
 
-        public static string KindName(HouseKind kind) => kind switch
-        {
-            _ => "Офис",
-        };
+        public static string KindName(HouseKind kind) => HouseKinds.Name(kind);
     }
 
     /// <summary>
@@ -65,7 +59,7 @@ namespace Stealth.Game
         {
             int seed = LevelRandom.LevelSeed(m_RunSeed, depth);
             if (lane > 0) seed = (LevelRandom.Mix(seed, RouteSalt, lane) & int.MaxValue) | 1;
-            return new RouteNode(depth, lane, seed, HouseKind.Office);
+            return new RouteNode(depth, lane, seed, HouseKinds.Of(seed, depth));
         }
 
         /// <summary>Rows of the next column this house leads to (1–3, sorted).</summary>

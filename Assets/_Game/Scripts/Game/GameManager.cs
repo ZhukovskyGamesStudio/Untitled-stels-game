@@ -237,7 +237,7 @@ namespace Stealth.Game
             Pings.Clear();
             ApplyAtmosphere();
             VisualStyles.Reapply();
-            Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {layout.Width}x{layout.Height} rooms x {layout.Floors} floors for {layout.Players} players");
+            Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {HouseKinds.Name(layout.Kind)} ({layout.Mass}) {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms, {layout.Floors} floors for {layout.Players} players");
         }
 
         static void ApplyAtmosphere()

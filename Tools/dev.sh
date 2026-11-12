@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Dev loop helpers (Git Bash on Windows). Usage:
-#   Tools/dev.sh tests            compile + EditMode tests
+#   Tools/dev.sh tests            compile + EditMode tests (FILTER=<name> runs only those)
+#   Tools/dev.sh plans            pictures of floor plans: Logs/plans/plan_<seed>_<house>.png
 #   Tools/dev.sh assets           build missing assets (FORCE=1: regenerate everything from code)
 #   Tools/dev.sh player           build Windows player
 #   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario>
@@ -15,10 +16,10 @@ case "${1:-}" in
   tests)
     rm -f "$LOGS/tests.xml"
     "$UNITY" -batchmode -nographics -projectPath "$P" -runTests -testPlatform EditMode \
-      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log"
+      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log" ${FILTER:+-testFilter "$FILTER"}
     code=$?
     grep -E "error CS" "$LOGS/tests.log" | sort -u | head -30
-    python - "$LOGS/tests.xml" <<'EOF'
+    PYTHONIOENCODING=utf-8 python - "$LOGS/tests.xml" <<'EOF'
 import sys, xml.etree.ElementTree as ET
 try:
     r = ET.parse(sys.argv[1]).getroot()
@@ -31,6 +32,11 @@ for tc in r.iter("test-case"):
         print("FAILED", tc.get("fullname"), "-", (msg.text or "").strip()[:400] if msg is not None else "")
 EOF
     exit $code ;;
+  plans)
+    rm -rf "$LOGS/plans"
+    FILTER="Stealth.Tests.PlanPictures" "$0" tests
+    ls "$LOGS/plans" 2>/dev/null
+    exit 0 ;;
   assets)
     "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.AssetBuilder.BuildAllBatch ${FORCE:+-force} -logFile "$P/Logs/build_assets.log"
     code=$?

@@ -38,7 +38,7 @@ namespace Stealth.Items
         public static int ItemCount(LevelLayout l, LootSettings s = null)
         {
             s ??= new LootSettings();
-            return s.BaseItems + l.LevelIndex * s.ItemsPerHouse + l.Width * l.Height * l.Floors / Mathf.Max(1, s.RoomsPerExtraItem);
+            return s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
         }
 
         /// <summary>

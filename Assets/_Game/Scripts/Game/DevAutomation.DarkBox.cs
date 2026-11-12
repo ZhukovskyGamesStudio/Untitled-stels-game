@@ -115,7 +115,7 @@ namespace Stealth.Game
             DevFlags.Peaceful = true;
             var layout = ActiveLevel.Layout;
             // The middle of the south facade (z = 0), looking at it from outside.
-            var facade = new Vector3(layout.Width * LevelMetrics.Cell / 2f, 0f, 0f);
+            var facade = new Vector3(layout.SizeX / 2f, 0f, 0f);
             foreach (float d in new[] { 1f, 2f, 4f, 8f })
             {
                 var at = facade + new Vector3(0.7f, 0.05f, -d);

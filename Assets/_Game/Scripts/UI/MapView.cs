@@ -39,6 +39,8 @@ namespace Stealth.UI
             new(0.95f, 0.78f, 0.3f, 0.55f),  // Stairs
             new(0.72f, 0.78f, 0.85f, 0.42f), // Prop
             new(0.45f, 1f, 0.5f, 0.95f),     // Hatch
+            new(0.7f, 0.85f, 0.95f, 0.6f),   // Railing (the edge of a gallery)
+            new(0.05f, 0.07f, 0.1f, 0.55f),  // Void (an atrium seen from above)
         };
         static readonly Color Marked = new(1f, 0.22f, 0.15f);
 
@@ -70,7 +72,7 @@ namespace Stealth.UI
             if (!FollowPlayer)
             {
                 // The whole floor fits the view.
-                var extent = new Vector2(layout.Width * LevelMetrics.Cell, layout.Height * LevelMetrics.Cell);
+                var extent = new Vector2(layout.SizeX, layout.SizeZ);
                 scale = Mathf.Min(size.x / extent.x, size.y / extent.y) * 0.92f;
             }
             if (!Mathf.Approximately(scale, m_Fit)) { m_Fit = scale; m_DrawnVersion = -1; }
@@ -90,7 +92,7 @@ namespace Stealth.UI
             float yaw = me.transform.eulerAngles.y;
             float turn = FollowPlayer ? yaw : 0f;
             Pivot.localRotation = Quaternion.Euler(0f, 0f, turn);
-            var centre = FollowPlayer ? me2 : new Vector2(layout.Width, layout.Height) * (LevelMetrics.Cell / 2f);
+            var centre = FollowPlayer ? me2 : new Vector2(layout.SizeX, layout.SizeZ) / 2f;
             Content.anchoredPosition = -centre * scale;
 
             m_Icons.Begin();
@@ -143,8 +145,10 @@ namespace Stealth.UI
                 rt.anchoredPosition = r.Area.min * scale;
                 // Thin parts stay visible on a small map.
                 var s = r.Area.size * scale;
-                if (r.Part == MapPart.Wall || r.Part == MapPart.Door || r.Part == MapPart.Vent) s = Vector2.Max(s, Vector2.one * 1.5f);
+                if (r.Part is MapPart.Wall or MapPart.Door or MapPart.Vent or MapPart.Railing) s = Vector2.Max(s, Vector2.one * 1.5f);
                 rt.sizeDelta = s;
+                // diagonal and curved walls: turned about the rect's min corner (its pivot)
+                rt.localRotation = Quaternion.Euler(0f, 0f, r.Angle);
                 img.color = PartColors[(int)r.Part];
             }
             m_Images.End();

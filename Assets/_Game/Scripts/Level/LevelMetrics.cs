@@ -6,6 +6,7 @@ namespace Stealth.Level
     /// <summary>Sizes of the office building shared by the generator, the builder, the prefabs and the sensors.</summary>
     public static class LevelMetrics
     {
+        /// <summary>Size of a chunk of the house that merged meshes are cut into (and the old room grid). Rooms are free now (HousePlan).</summary>
         public const float Cell = 10f;
         public const float WallHeight = 3f;
         public const float FloorHeight = 3.5f; // floor-to-floor: walls + slab
@@ -14,7 +15,15 @@ namespace Stealth.Level
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
         public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
-        public const float VentHeight = 1.4f; // crouched capsule 1.1 m + PhysX step-up probe (stepOffset 0.35); standing 1.8 m does not fit
+        // A vent is a duct through the wall: its floor is a sill above the room's floor (a step for a player, a wall for a robot),
+        // the clear height above the sill fits the crouched capsule (1.1 m) + the step-up probe (0.35); standing 1.8 m does not fit.
+        public const float VentSill = 0.25f;
+        public const float VentHeight = 1.5f;
+        // A high vent: its sill is a short step up from a stack of two crates (each a jump up: JumpHeight 0.9), its top stays under the ceiling.
+        public const float HighVentSill = 1.2f;
+        public const float CrateLow = 0.45f, CrateHigh = 0.9f;
+        /// <summary>How far the crate stack reaches into the room from the wall's face.</summary>
+        public const float CrateReach = 1.15f;
         public const float SqueezeWidth = 1.1f; // nominal; the clear slot is 0.9 m: a player (0.78 m with skin) fits, a robot does not (navmesh volume)
         public const float WindowWidth = 2.4f;   // the window model's opening
         public const float WindowHeight = 1.2f;
@@ -99,10 +108,7 @@ namespace Stealth.Level
         }
 
         /// <summary>World position of the corner frame origin for a stair (floor level of its start).</summary>
-        public static Vector3 Origin(Stair s) => new(
-            (s.Cell.x + (s.Corner.x > 0 ? 1 : 0)) * LevelMetrics.Cell,
-            LevelLayout.FloorY(s.Floor),
-            (s.Cell.y + (s.Corner.y > 0 ? 1 : 0)) * LevelMetrics.Cell);
+        public static Vector3 Origin(Stair s) => new(s.Origin.x, LevelLayout.FloorY(s.Floor), s.Origin.y);
 
         /// <summary>World point of a corner-frame point (u, y, v) for a stair (the same mapping the prefab placement gives).</summary>
         public static Vector3 ToWorld(Stair s, Vector3 local) =>

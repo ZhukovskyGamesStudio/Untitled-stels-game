@@ -10,6 +10,8 @@ namespace Stealth.Game
     {
         /// <summary>Seed for the next level (0 = random). Consumed once.</summary>
         public static int ForcedSeed;
+        /// <summary>Every staircase shows this look (StairStyle index), −1 = the one its family and seed pick (autopilot "floors").</summary>
+        public static int ForcedStairStyle = -1;
         /// <summary>Start the run at this level index. Consumed once.</summary>
         public static int ForcedLevel;
         /// <summary>Start the run right in the first house instead of the sewer (autopilot scenarios).</summary>

@@ -10,6 +10,8 @@ namespace Stealth.Enemies
         [Tooltip("Height on the wall, meters.")]
         public float CrawlHeight = 2.6f;
         public float CrawlSpeed = 1.3f;
+        [Tooltip("About how often it crosses the ceiling to the opposite wall, seconds (0 = it keeps to the walls).")]
+        public float CeilingEvery = 14f;
 
         [Header("Eyes")]
         public float Range = 9f;

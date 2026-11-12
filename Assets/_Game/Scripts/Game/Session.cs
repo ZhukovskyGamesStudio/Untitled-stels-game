@@ -128,6 +128,8 @@ namespace Stealth.Game
         void RequestSellStashed(InventoryEntry from);
         void RequestStashWorld(WorldItem item, byte x, byte y, byte rot);
         void RequestSellWorld(WorldItem item);
+        /// <summary>Everything in the backpack into the first free spots of the stash (what does not fit stays).</summary>
+        void RequestStashAll();
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

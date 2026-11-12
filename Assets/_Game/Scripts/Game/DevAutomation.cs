@@ -199,7 +199,7 @@ namespace Stealth.Game
         {
             var gm = GameManager.Instance;
             var layout = ActiveLevel.Layout;
-            Log($"connected: players={PlayerController.All.Count} level={gm.Level.Index} seed={gm.Level.Seed} rooms={layout.Width}x{layout.Height}x{layout.Floors} " +
+            Log($"connected: players={PlayerController.All.Count} level={gm.Level.Index} seed={gm.Level.Seed} house={layout.Mass} {layout.SizeX:0}x{layout.SizeZ:0}m rooms={layout.Rooms.Count} floors={layout.Floors} " +
                 $"items={WorldItem.All.Count} robots={RobotController.Robots.Count} cameras={FindObjectsByType<SecurityCamera>().Length} " +
                 $"lasers={FindObjectsByType<LaserGate>().Length} quota={gm.Quota}");
             var kinds = new System.Collections.Generic.Dictionary<string, int>();

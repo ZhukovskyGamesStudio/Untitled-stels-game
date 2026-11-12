@@ -55,6 +55,40 @@ namespace Stealth.EditorTools
             return mat;
         }
 
+        /// <summary>A see-through glow (laser sheets): transparent, additive, both sides, no depth write.</summary>
+        static void Additive(Material mat)
+        {
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 2f); // additive
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetFloat("_Cull", 0f);
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+        }
+
+        /// <summary>Lit glass you see through (balustrades): transparent, alpha-blended, both sides, no depth write.</summary>
+        static void Translucent(Material mat)
+        {
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f); // alpha
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetFloat("_Cull", 0f);
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+        }
+
         static void BuildMaterials()
         {
             const string env = "Environment", props = "Props", robots = "Robots", player = "Player", fx = "FX";
@@ -127,6 +161,8 @@ namespace Stealth.EditorTools
             Mat(player, "PlayerGlasses", new Color(0.05f, 0.05f, 0.06f), smoothness: 0.9f);
 
             Mat(fx, "Laser", new Color(1f, 0.1f, 0.05f), unlit: true);
+            Additive(Mat(fx, "LaserSheet", new Color(1f, 0.12f, 0.06f, 0.28f), unlit: true));
+            Translucent(Mat(props, "StairGlass", new Color(0.72f, 0.86f, 0.95f, 0.22f), smoothness: 0.92f));
             Mat(fx, "Radio", new Color(1f, 0.6f, 0.2f), unlit: true);
             Mat(fx, "Stomp", new Color(1f, 0.75f, 0.25f), unlit: true);
 

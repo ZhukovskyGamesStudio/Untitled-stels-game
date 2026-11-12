@@ -16,7 +16,7 @@ namespace Stealth.Tests
             for (int level = 0; level < 8; level++)
             {
                 var l = LevelGenerator.Generate(1, level);
-                int rooms = l.Width * l.Height * l.Floors;
+                int rooms = Mathf.RoundToInt(l.RoomUnits);
                 Assert.GreaterOrEqual(rooms, prevRooms, $"level {level}");
                 Assert.GreaterOrEqual(l.RobotSpawns.Count, prevRobots, $"level {level}");
                 prevRooms = rooms;

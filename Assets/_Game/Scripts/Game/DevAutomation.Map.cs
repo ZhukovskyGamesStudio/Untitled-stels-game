@@ -21,7 +21,7 @@ namespace Stealth.Game
             DevFlags.FreezeRobots = true;
             var gm = GameManager.Instance;
             var layout = ActiveLevel.Layout;
-            Log($"house {layout.Width}x{layout.Height} x {layout.Floors} floors for {layout.Players} players, quota {gm.Quota}");
+            Log($"house {layout.Mass} {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms x {layout.Floors} floors for {layout.Players} players, quota {gm.Quota}");
             float t0 = Time.time;
             bool expectClients = Me.IsServer && Arg("-autotest-linger") != null;
             while (expectClients && PlayerController.All.Count < 2 && Time.time - t0 < 25f) yield return null;
@@ -47,23 +47,23 @@ namespace Stealth.Game
             float start = gm.Exploration.RevealedShare(0);
 
             // Walk through the nearest rooms of the ground floor (breadth first from the lobby).
-            var rooms = new List<Vector3Int>();
-            var seen = new HashSet<Vector3Int>();
-            var queue = new Queue<Vector3Int>();
-            var first = new Vector3Int(layout.StartCell.x, layout.StartCell.y, 0);
+            var rooms = new List<int>();
+            var seen = new HashSet<int>();
+            var queue = new Queue<int>();
+            int first = layout.LobbyRoom;
             queue.Enqueue(first);
             seen.Add(first);
             while (queue.Count > 0 && rooms.Count < 6)
             {
-                var c = queue.Dequeue();
+                int c = queue.Dequeue();
                 rooms.Add(c);
-                foreach (var n in layout.Neighbours(c.z, new Vector2Int(c.x, c.y)))
-                    if (n.z == 0 && seen.Add(n)) queue.Enqueue(n);
+                foreach (int n in layout.Neighbours(c))
+                    if (layout.Rooms[n].Floor == 0 && seen.Add(n)) queue.Enqueue(n);
             }
-            Vector3 prev = layout.CellCenter(0, first.x, first.y);
-            foreach (var c in rooms)
+            Vector3 prev = layout.Lobby.Center;
+            foreach (int c in rooms)
             {
-                var centre = layout.CellCenter(0, c.x, c.y);
+                var centre = layout.Rooms[c].Center;
                 var dir = Flat(centre - prev);
                 Me.TeleportOwner(centre + Vector3.up * 0.05f, Quaternion.LookRotation(dir.sqrMagnitude > 0.01f ? dir : Vector3.forward));
                 prev = centre;
@@ -88,12 +88,12 @@ namespace Stealth.Game
                 if (!robot.IsMarked) Log("FAIL: the robot is not marked");
                 yield return Shot("3_marked_in_view");
                 // Into the next room, facing the robot: the wall is in between.
-                var cell = new Vector2Int(Mathf.FloorToInt(robot.transform.position.x / LevelMetrics.Cell), Mathf.FloorToInt(robot.transform.position.z / LevelMetrics.Cell));
-                foreach (var d in new[] { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down })
+                // the room next door
+                foreach (var other in layout.Rooms.Where(r => r.Floor == 0 && r != layout.RoomAt(robot.transform.position))
+                                 .OrderBy(r => Vector3.Distance(r.Center, robot.transform.position)).Take(6))
                 {
-                    var n = cell + d;
-                    if (n.x < 0 || n.y < 0 || n.x >= layout.Width || n.y >= layout.Height) continue;
-                    var spot = layout.CellCenter(0, n.x, n.y) + new Vector3(d.x, 0, d.y) * 2f;
+                        var spot = other.Center + Flat(robot.transform.position - other.Center).normalized * Mathf.Min(2f, Vector3.Distance(other.Center, robot.transform.position) * 0.3f);
+                        if (layout.RoomAt(spot) != other) spot = other.Center;
                     if (!Physics.Linecast(spot + Vector3.up * 1.6f, robot.Position, Perception.SightMask, QueryTriggerInteraction.Ignore)) continue;
                     LookAtFrom(new Pose(spot + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(robot.Position - spot))), robot.Position);
                     yield return new WaitForSeconds(0.5f);
@@ -104,7 +104,7 @@ namespace Stealth.Game
             else Log("no robot on the ground floor to mark");
 
             // Ping a spot in the lobby.
-            var lobby = layout.CellCenter(0, first.x, first.y);
+            var lobby = layout.Lobby.Center;
             LookAtFrom(new Pose(lobby + new Vector3(-3f, 0.05f, -3f), Quaternion.LookRotation(new Vector3(1f, 0f, 1f))), lobby + new Vector3(2f, 0f, 2f));
             yield return new WaitForSeconds(0.6f); // the callout cooldown
             Me.Callout(false);

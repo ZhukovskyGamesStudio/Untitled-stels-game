@@ -9,7 +9,7 @@ namespace Stealth.Enemies
         [Tooltip("Speed along the ceiling, m/s.")]
         public float Speed = 1.1f;
         [Tooltip("Rotation of the scan line, degrees per second.")]
-        public float ScanSpeed = 75f;
+        public float ScanSpeed = 45f;
         [Tooltip("Half the length of the scan line on the floor, meters.")]
         public float HalfLength = 3f;
     }

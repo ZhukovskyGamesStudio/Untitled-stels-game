@@ -72,9 +72,10 @@ namespace Stealth.UI
             var level = Tuning.Level;
             var l = LevelGenerator.Generate(node.Seed, node.Depth, level.Building, level.Security, Mathf.Max(1, PlayerController.All.Count));
             int dark = 0;
-            foreach (bool b in l.Dark) if (b) dark++;
-            int rooms = l.Width * l.Height * l.Floors;
-            text = $"{l.Floors} {Floors(l.Floors)} · {l.Width}×{l.Height} комнат на этаже\n" +
+            foreach (var r in l.Rooms) if (r.Dark) dark++;
+            int rooms = l.Rooms.Count, atriums = 0;
+            foreach (var r in l.Rooms) if (r.Levels > 1) atriums++;
+            text = $"{l.Floors} {Floors(l.Floors)} · {rooms} комнат" + (atriums > 0 ? $" · атриумов: {atriums}" : "") + $"\n" +
                    $"Охрана: {l.RobotSpawns.Count} · камер: {l.CameraSpots.Count} · лазеров: {l.LaserSpots.Count}\n" +
                    $"Темно в {dark} из {rooms} комнат · запертых дверей: {l.LockedDoors.Count}";
             m_Previews[node.Seed] = text;

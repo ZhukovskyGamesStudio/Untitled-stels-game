@@ -82,11 +82,16 @@ namespace Stealth.Tests
             var shell = Shell(3, 2, out var layout);
             Assert.IsNotEmpty(shell.Walls);
             Assert.IsNotEmpty(shell.Openings);
-            Assert.AreEqual(LevelBuilder.WindowSpots(layout.Width, layout.Height, 0f).Count * layout.Floors, shell.Windows.Count);
-            Assert.IsTrue(shell.Walls.Where(w => w.Exterior).All(w =>
-                Vector3.Dot(w.Normal, new Vector3(layout.Width * 5f, 0, layout.Height * 5f) - (w.A + w.B) / 2f) > 0f), "outer walls only face inwards");
+            Assert.AreEqual(LevelBuilder.WindowSpots(layout).Count, shell.Windows.Count);
+            foreach (var w in shell.Walls.Where(w => w.Exterior))
+            {
+                // an outer wall's face looks into the building, never out into the gas
+                var p = (w.A + w.B) / 2f + w.Normal * 0.4f;
+                Assert.GreaterOrEqual(layout.Plan.SpaceAt(w.Floor, new Vector2(p.x, p.z)), 0, $"outer wall face at {p} looks outside");
+            }
             float area = shell.Floors.Where(f => f.Floor == 0).Sum(f => (f.Max.x - f.Min.x) * (f.Max.y - f.Min.y));
-            Assert.AreEqual(layout.Width * layout.Height * LevelMetrics.Cell * LevelMetrics.Cell, area, 1f, "the ground floor is covered");
+            float rooms = layout.Rooms.Where(r => r.Floor == 0).Sum(r => r.Area);
+            Assert.GreaterOrEqual(area, rooms - 0.5f, "the ground floor is covered");
         }
 
         [Test]
@@ -103,7 +108,7 @@ namespace Stealth.Tests
                     float along = Mathf.Abs(Vector3.Dot(d, o.Along));
                     float half = Mathf.Abs(Vector3.Dot(p.Rotation * Vector3.right, o.Along)) * p.Scale.x / 2f;
                     bool sameWall = Mathf.Abs(Vector3.Dot(d, Vector3.Cross(Vector3.up, o.Along))) < 0.2f && Mathf.Abs(d.y) < 0.5f;
-                    if (sameWall) Assert.Greater(along + 0.001f, o.Width / 2f + half - 0.0001f, $"{p.Kind} runs across the doorway at {o.Center}");
+                    if (sameWall) Assert.Greater(along + 0.001f, o.Width / 2f + half - 0.0001f, $"{p.Kind} at {p.Position} (facing {p.Rotation * Vector3.forward}, {p.Scale.x:0.00} long) runs across the doorway at {o.Center} along {o.Along}");
                 }
             }
             foreach (var (pos, _) in shell.Windows)
@@ -129,15 +134,18 @@ namespace Stealth.Tests
                 foreach (var p in pieces)
                 {
                     int f = LevelLayout.FloorOf(p.Position.y - LevelMetrics.WallHeight);
-                    int x = Mathf.FloorToInt(p.Position.x / LevelMetrics.Cell), y = Mathf.FloorToInt(p.Position.z / LevelMetrics.Cell);
-                    Assert.IsFalse(ArchitecturePlanner.HasStairHole(layout, f, x, y), $"{p.Kind} over the stair hole of {x},{y} floor {f}");
+                    var flat = new Vector2(p.Position.x, p.Position.z);
+                    foreach (var s in layout.Stairs)
+                        if (s.Floor == f) Assert.IsFalse(PlanGenerator.StairArea(s, 0f).Contains(flat), $"{p.Kind} over a stair hole at {flat} floor {f}");
                     if (p.Kind is DecorKind.TrayHanger) continue;
-                    // the two ceiling lamps of a cell hang at ±2.5 m (x) from its centre, 1.2 x 0.6 m
-                    var c = layout.CellCenter(f, x, y);
+                    // the ceiling lamps of the room (1.24 x 1.3 m fixtures)
+                    var room = layout.RoomAt(new Vector3(p.Position.x, LevelLayout.FloorY(f), p.Position.z));
+                    if (room == null) continue;
                     var dir = p.Rotation * Vector3.right;
-                    foreach (float s in new[] { -RoomLighting.LampOffset, RoomLighting.LampOffset })
+                    foreach (var spot in LevelBuilder.LightSpots(layout, room))
                     {
-                        var lamp = c + Vector3.right * s;
+                        var lamp = new Vector3(spot.x, p.Position.y, spot.y);
+                        if (Mathf.Abs(Vector3.Dot(lamp - p.Position, dir)) > p.Scale.x / 2f + 0.7f) continue; // beyond its ends
                         var d = new Vector3(lamp.x - p.Position.x, 0f, lamp.z - p.Position.z);
                         float across = (d - dir * Vector3.Dot(d, dir)).magnitude;
                         Assert.Greater(across, 0.35f, $"{p.Kind} runs into a ceiling lamp");

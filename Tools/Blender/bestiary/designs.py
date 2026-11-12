@@ -436,17 +436,22 @@ def attach_eye(L):
 
 
 def attach_mic(L):
+    """A microphone on a stalk: a grille head banded like the robot's body, only a small status diode glows (the head
+    itself no longer lights up like a bulb: it read as a foreign object on every style)."""
     P = Parts()
     P.add("Accent", L.cyl(.045, .02, (0, 0, .01)) + L.rod((0, 0, .01), (0, 0, .27), .014))
-    P.add("Eye", L.ball(.06, (0, 0, .32)))
+    P.add("Accent", L.ball(.06, (0, 0, .32)))
     P.add("Body", sum([L.cyl(.066, .012, (0, 0, .32 + d)) for d in (-.03, 0, .03)], []))
+    P.add("Eye", L.ball(.016, (0, -.062, .32)))
     return P
 
 
 def attach_seismic(L):
+    """A ground probe: a metal spike pressed to the floor, a thin glowing ring where it meets the rod."""
     P = Parts()
     P.add("Accent", L.cyl(.08, .03, (0, 0, .3)) + L.rod((0, 0, .3), (0, 0, .09), .02))
-    P.add("Eye", L.lathe([(0, 0), (.035, .03), (.04, .1), (0, .1)]))
+    P.add("Body", L.lathe([(0, 0), (.035, .03), (.04, .1), (0, .1)]))
+    P.add("Eye", L.cyl(.046, .014, (0, 0, .1)))
     return P
 
 

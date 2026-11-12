@@ -77,13 +77,13 @@ namespace Stealth.Tests
             var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentChance = 0f, AutoDoorChance = 0f };
             var l = LevelGenerator.Generate(5, 0, b);
             Assert.AreEqual(4, l.Floors);
-            Assert.AreEqual(2, l.Width);
-            Assert.IsFalse(l.EdgesX.Cast<EdgeType>().Concat(l.EdgesZ.Cast<EdgeType>()).Contains(EdgeType.Vent), "no vents");
+            Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
+            Assert.IsFalse(l.Doorways.Any(d => d.Kind == EdgeType.Vent), "no vents");
             Assert.AreEqual(0, l.AutoDoors.Count);
 
             var onlyServers = new BuildingSettings { RoomWeights = new[] { new RoomWeight(RoomType.Server, 1) } };
             var s = LevelGenerator.Generate(5, 1, onlyServers);
-            foreach (var room in s.Rooms) Assert.IsTrue(room == RoomType.Server || room == RoomType.Lobby);
+            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall, room.Type.ToString());
         }
 
         [Test]
@@ -93,7 +93,7 @@ namespace Stealth.Tests
             var a = LevelGenerator.Generate(77, 3);
             var b = LevelGenerator.Generate(77, 3, new BuildingSettings(), new SecuritySettings());
             Assert.AreEqual(a.Floors, b.Floors);
-            CollectionAssert.AreEqual(a.Rooms, b.Rooms);
+            CollectionAssert.AreEqual(a.Rooms.Select(r => (r.Type, r.Area)), b.Rooms.Select(r => (r.Type, r.Area)));
             Assert.AreEqual(a.RobotSpawns.Count, b.RobotSpawns.Count);
         }
 

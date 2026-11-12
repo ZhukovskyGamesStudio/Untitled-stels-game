@@ -94,7 +94,7 @@ namespace Stealth.Game
             {
                 var lamp = layout.Props.Where(p => p.Kind == PropKind.DeskLamp).OrderByDescending(p => layout.IsDarkAt(p.Position) ? 1 : 0)
                     .ThenBy(p => LevelLayout.FloorOf(p.Position.y)).Select(p => (Vector3?)p.Position).FirstOrDefault();
-                var target = lamp ?? layout.CellCenter(0, room.x, room.y);
+                var target = lamp ?? room.Center;
                 var pose = ViewPoint(target, 3.2f);
                 LookAtFrom(pose, target + Vector3.up * 0.5f);
                 var sweeperAt = Vector3.Lerp(pose.position, target, 0.55f) + Vector3.Cross(Vector3.up, pose.forward) * 1.2f;
@@ -109,7 +109,7 @@ namespace Stealth.Game
 
             // 4. A pile of loot in the lit room, a teammate crouching at it.
             {
-                var c = layout.CellCenter(0, room.x, room.y);
+                var c = room.Center;
                 var pile = c + (stand - c) * 0.15f;
                 if (UnityEngine.AI.NavMesh.SamplePosition(pile, out var hit, 3f, UnityEngine.AI.NavMesh.AllAreas)) pile = hit.position;
                 var spawned = new List<WorldItem>();
@@ -132,14 +132,15 @@ namespace Stealth.Game
             {
                 mate.SetActive(false);
                 // a ceiling lamp between the camera and the team lights their faces
-                var c = layout.CellCenter(0, layout.StartCell.x, layout.StartCell.y);
-                Vector3 lamp = c + Vector3.right * RoomLighting.LampOffset, dir = Vector3.forward;
+                var c = layout.Lobby.Center;
+                var lamps = LevelBuilder.LightSpots(layout, layout.Lobby).Select(p => new Vector3(p.x, c.y, p.y)).ToList();
+                Vector3 lamp = lamps[0], dir = Vector3.forward;
                 bool clear = false;
-                foreach (float lx in new[] { RoomLighting.LampOffset, -RoomLighting.LampOffset })
-                    foreach (var d in new[] { Vector3.forward, Vector3.back })
+                foreach (var lampAt in lamps)
+                    foreach (var d in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
                     {
                         if (clear) break;
-                        var l = c + Vector3.right * lx;
+                        var l = lampAt;
                         var teamAt = l + d * 0.9f;
                         var cam = l - d * 3.4f;
                         if (Physics.Linecast(cam + Vector3.up * 1.6f, teamAt + Vector3.up * 1.2f, ~0, QueryTriggerInteraction.Ignore)) continue;
@@ -167,20 +168,21 @@ namespace Stealth.Game
             // 6 (shot before the lasers). The style's own guard robot up close, standing under a ceiling lamp of the lobby.
             {
                 mate.SetActive(false);
-                var c = layout.CellCenter(0, layout.StartCell.x, layout.StartCell.y);
+                var c = layout.Lobby.Center;
+                var lamps = LevelBuilder.LightSpots(layout, layout.Lobby).Select(p => new Vector3(p.x, c.y, p.y)).ToList();
                 Vector3 at = default, eye = default;
                 bool found = false;
-                foreach (float lx in new[] { RoomLighting.LampOffset, -RoomLighting.LampOffset })
-                    foreach (float dz in new[] { -3f, 3f })
+                foreach (var lampAt in lamps)
+                    foreach (var dz in new[] { Vector3.back * 3f, Vector3.forward * 3f, Vector3.left * 3f, Vector3.right * 3f })
                     {
                         if (found) break;
-                        var spot = c + Vector3.right * lx;
-                        var cam = spot + Vector3.forward * dz;
+                        var spot = lampAt;
+                        var cam = spot + dz;
                         if (Physics.CheckCapsule(spot + Vector3.up * 0.3f, spot + Vector3.up * 1.8f, 0.45f, ~0, QueryTriggerInteraction.Ignore)) continue;
                         if (Physics.Linecast(cam + Vector3.up * 1.6f, spot + Vector3.up * 1.4f, ~0, QueryTriggerInteraction.Ignore)) continue;
                         at = spot; eye = cam; found = true;
                     }
-                if (!found) { at = c + Vector3.right * RoomLighting.LampOffset; eye = at + Vector3.back * 3f; }
+                if (!found) { at = lamps[0]; eye = at + Vector3.back * 3f; }
                 if (UnityEngine.AI.NavMesh.SamplePosition(at, out var hit, 1.5f, UnityEngine.AI.NavMesh.AllAreas)) at = hit.position;
                 DevFlags.FreezeRobots = true;
                 var portrait = gm.SpawnRobotServer(RobotKind.Guard, at, Quaternion.LookRotation(Flat(eye - at)));
@@ -207,9 +209,10 @@ namespace Stealth.Game
             }
             else
             {
-                var (cell, dir) = layout.ExteriorDoors.Count > 0 ? layout.ExteriorDoors[0] : (layout.StartCell, Vector2Int.down);
-                var door = layout.CellCenter(0, cell.x, cell.y) + new Vector3(dir.x, 0, dir.y) * (LevelMetrics.Cell / 2f);
-                var outward = new Vector3(dir.x, 0, dir.y);
+                var exit = layout.Doorways.Where(d => d.Exterior).Select(d => (Doorway?)d).FirstOrDefault();
+                var door = exit?.Position ?? layout.Lobby.Center;
+                var outward = exit.HasValue ? exit.Value.Rotation * Vector3.forward : Vector3.back;
+                if (exit.HasValue && layout.IsInside(door + outward * 1.5f)) outward = -outward;
                 var at = door - outward * 1.7f + Vector3.Cross(Vector3.up, outward) * 0.5f;
                 LookAtFrom(new Pose(at + Vector3.up * 0.05f, Quaternion.LookRotation(outward)), door + outward * 2f + Vector3.up * 1.2f);
                 PlaceMate(mate, door + outward * 0.9f - Vector3.Cross(Vector3.up, outward) * 0.3f, at, 1f);
@@ -285,33 +288,33 @@ namespace Stealth.Game
         }
 
         /// <summary>A lit, furnished room near the start (offices first).</summary>
-        static Vector2Int LitRoom(LevelLayout l)
+        static PlanRoom LitRoom(LevelLayout l)
         {
-            Vector2Int best = l.StartCell;
+            PlanRoom best = l.Lobby;
             float bestScore = float.MinValue;
-            for (int x = 0; x < l.Width; x++)
-                for (int y = 0; y < l.Height; y++)
-                {
-                    if (l.Dark[0, x, y] || l.Flicker[0, x, y] || new Vector2Int(x, y) == l.StartCell) continue;
-                    var type = l.Rooms[0, x, y];
-                    if (type is RoomType.Lobby or RoomType.Restroom or RoomType.Storage) continue;
-                    var c = l.CellCenter(0, x, y);
-                    int props = l.Props.Count(p => Flat(p.Position - c).magnitude < LevelMetrics.Cell * 0.5f && LevelLayout.FloorOf(p.Position.y) == 0);
-                    float score = props * 2f - Vector2Int.Distance(new Vector2Int(x, y), l.StartCell) + (type is RoomType.Office or RoomType.OpenSpace ? 4f : 0f);
-                    if (score > bestScore) { bestScore = score; best = new Vector2Int(x, y); }
-                }
+            foreach (var r in l.Rooms)
+            {
+                if (r.Floor != 0 || r.Dark || r.Flicker || r.Id == l.LobbyRoom) continue;
+                if (r.Type is RoomType.Lobby or RoomType.Restroom or RoomType.Storage or RoomType.Corridor) continue;
+                int props = l.Props.Count(p => l.RoomAt(p.Position) == r);
+                float score = props * 2f - Vector3.Distance(r.Center, l.Lobby.Center) / 10f + (r.Type is RoomType.Office or RoomType.OpenSpace ? 4f : 0f);
+                if (score > bestScore) { bestScore = score; best = r; }
+            }
             return best;
         }
 
         /// <summary>A corner of the room with a clear view across it.</summary>
-        static (Vector3 stand, Vector3 look) RoomView(LevelLayout l, Vector2Int room)
+        static (Vector3 stand, Vector3 look) RoomView(LevelLayout l, PlanRoom room)
         {
-            var c = l.CellCenter(0, room.x, room.y);
-            float r = LevelMetrics.Cell * 0.36f;
-            var corners = new[] { new Vector3(-r, 0, -r), new Vector3(r, 0, -r), new Vector3(-r, 0, r), new Vector3(r, 0, r) };
+            var c = room.Center;
+            var b = room.Bounds;
+            var corners = new[] { new Vector3(b.xMin - c.x, 0, b.yMin - c.z), new Vector3(b.xMax - c.x, 0, b.yMin - c.z),
+                                  new Vector3(b.xMin - c.x, 0, b.yMax - c.z), new Vector3(b.xMax - c.x, 0, b.yMax - c.z) };
+            for (int i = 0; i < corners.Length; i++) corners[i] *= 0.72f;
             foreach (var k in corners)
             {
                 var stand = c + k + Vector3.up * 0.05f;
+                if (l.RoomAt(stand) != room) continue;
                 var head = stand + Vector3.up * 1.6f;
                 var look = c - k;
                 if (Physics.CheckSphere(head, 0.35f, ~0, QueryTriggerInteraction.Ignore)) continue;

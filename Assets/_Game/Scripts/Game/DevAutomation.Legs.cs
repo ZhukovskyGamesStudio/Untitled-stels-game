@@ -46,7 +46,7 @@ namespace Stealth.Game
             foreach (var gate in FindObjectsByType<LaserGate>()) Session.Despawn(gate.gameObject);
             yield return new WaitForSeconds(0.5f);
             var layout = ActiveLevel.Layout;
-            var room = layout.CellCenter(0, layout.StartCell.x, layout.StartCell.y);
+            var room = layout.Lobby.Center;
 
             foreach (var kind in new[] { RobotKind.Guard, RobotKind.Hound })
             {

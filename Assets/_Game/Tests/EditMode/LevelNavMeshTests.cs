@@ -41,13 +41,8 @@ namespace Stealth.Tests
         public void EveryFloorIsReachableFromTheHatchByStairs([Values(1, 42, 1337)] int seed)
         {
             Build(seed, 3);
-            for (int f = 0; f < m_Layout.Floors; f++)
-                for (int x = 0; x < m_Layout.Width; x++)
-                    for (int y = 0; y < m_Layout.Height; y++)
-                    {
-                        var target = m_Layout.CellCenter(f, x, y);
-                        Assert.IsTrue(Reach(m_Layout.HatchPosition, target, NavMesh.AllAreas), $"seed {seed}: room {x},{y} on floor {f}");
-                    }
+            foreach (var r in m_Layout.Rooms)
+                Assert.IsTrue(Reach(m_Layout.HatchPosition, r.Center, NavMesh.AllAreas), $"seed {seed}: {r.Type} ({r.Shape}, {r.Area:0} m²) on floor {r.Floor} at {r.Center}");
         }
 
         [Test]
@@ -55,7 +50,7 @@ namespace Stealth.Tests
         {
             Build(seed, 2);
             int noStairs = NavMesh.AllAreas & ~(1 << LevelMetrics.StairsArea);
-            var upstairs = m_Layout.CellCenter(1, m_Layout.Width / 2, m_Layout.Height / 2);
+            var upstairs = LevelLayout.StairEnds(m_Layout.Stairs[0]).top;
             Assert.IsTrue(Reach(m_Layout.HatchPosition, upstairs, NavMesh.AllAreas));
             Assert.IsFalse(Reach(m_Layout.HatchPosition, upstairs, noStairs), "wheels cannot climb stairs");
         }
@@ -65,22 +60,22 @@ namespace Stealth.Tests
         {
             Build(seed, 4);
             int checkedVents = 0;
-            for (int f = 0; f < m_Layout.Floors; f++)
-                for (int x = 0; x < m_Layout.Width - 1; x++)
-                    for (int y = 0; y < m_Layout.Height; y++)
+            foreach (var d in m_Layout.Doorways)
                     {
-                        var edge = m_Layout.EdgesX[f, x, y];
+                        var edge = d.Kind;
                         if (edge != EdgeType.Vent && edge != EdgeType.Squeeze) continue; // crawl vents and narrow slots are for players only
-                        // Points right on both sides of the vent opening (middle of the edge, see EdgeWall).
-                        float vz = y * LevelMetrics.Cell + LevelMetrics.Cell * 0.5f, wx = (x + 1) * LevelMetrics.Cell;
-                        var a = new Vector3(wx - 0.8f, LevelLayout.FloorY(f), vz);
-                        var b = new Vector3(wx + 0.8f, LevelLayout.FloorY(f), vz);
+                        // Points right on both sides of the opening.
+                        var across = d.Rotation * Vector3.forward;
+                        var a = d.Position - across * 0.8f;
+                        var b = d.Position + across * 0.8f;
+                        var at = d.Position;
+                        int f = d.Floor;
                         if (!NavMesh.SamplePosition(a, out var ha, 0.6f, NavMesh.AllAreas) || !NavMesh.SamplePosition(b, out var hb, 0.6f, NavMesh.AllAreas)) continue;
                         var path = new NavMeshPath();
                         NavMesh.CalculatePath(ha.position, hb.position, NavMesh.AllAreas, path);
                         float len = 0f;
                         for (int i = 1; i < path.corners.Length; i++) len += Vector3.Distance(path.corners[i - 1], path.corners[i]);
-                        Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots get through the {edge} at {wx},{vz} floor {f}");
+                        Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots get through the {edge} at {at} floor {f}");
                         checkedVents++;
                     }
             Assert.Greater(checkedVents, 0, "the level has vents");

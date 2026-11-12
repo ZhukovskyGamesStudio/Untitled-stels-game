@@ -29,20 +29,36 @@ namespace Stealth.Game
         IEnumerator FloorsScenario()
         {
             var l = ActiveLevel.Layout;
-            Log($"building: {l.Width}x{l.Height} rooms, {l.Floors} floors, stairs={l.Stairs.Count}");
+            Log($"building: {l.Mass} {l.SizeX:0}x{l.SizeZ:0} m, {l.Rooms.Count} rooms, {l.Floors} floors, stairs={l.Stairs.Count}");
             var s = l.Stairs[0];
-            float cx = (s.Cell.x + (s.Corner.x > 0 ? 1 : 0)) * LevelMetrics.Cell, cz = (s.Cell.y + (s.Corner.y > 0 ? 1 : 0)) * LevelMetrics.Cell;
-            var corner = new Vector3(cx, LevelLayout.FloorY(s.Floor), cz);
-            var room = l.CellCenter(s.Floor, s.Cell.x, s.Cell.y);
+            var corner = StairGeometry.Origin(s);
+            var (bottom, upstairs) = LevelLayout.StairEnds(s);
+            var room = bottom + (bottom - corner).normalized * 1.0f;
 
             // View of the staircase from the room.
             var view = room + (room - corner).normalized * 1.5f + Vector3.up * 0.05f;
             LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(corner - view))), corner + Vector3.up * 1.5f);
             yield return new WaitForSeconds(0.6f);
             yield return Shot("stairs_from_room");
+            // Every look of the staircase from a step further back and higher.
+            // from beyond the open corner of the staircase (its own frame: u = x, v = z; the holder flips u when mirrored)
+            var looks = Object.FindObjectsByType<StairLook>(FindObjectsSortMode.None).OrderBy(l => (l.transform.position - corner).sqrMagnitude).FirstOrDefault();
+            var frame = looks != null ? looks.transform.Find("Looks") : null;
+            var wide = frame != null ? frame.TransformPoint(new Vector3(6.2f, 0.05f, 6.2f)) : view + Vector3.up;
+            var middle = frame != null ? frame.TransformPoint(new Vector3(2f, 1.6f, 2f)) : corner + Vector3.up * 1.3f;
+            LookAtFrom(new Pose(wide, Quaternion.LookRotation(Flat(middle - wide))), middle);
+            for (int i = 0; i < StairStyles.Count; i++)
+            {
+                DevFlags.ForcedStairStyle = i;
+                yield return new WaitForSeconds(0.3f);
+                yield return Shot($"stairs_look_{(StairStyle)i}");
+            }
+            DevFlags.ForcedStairStyle = -1;
+            LookAtFrom(new Pose(view, Quaternion.LookRotation(Flat(corner - view))), corner + Vector3.up * 1.5f);
+            yield return new WaitForSeconds(0.3f);
 
             // Walk up with the real controller along the navmesh path.
-            var target = l.CellCenter(s.Floor + 1, s.Cell.x, s.Cell.y);
+            var target = upstairs + (upstairs - new Vector3(corner.x, upstairs.y, corner.z)).normalized * 1.0f;
             var path = new NavMeshPath();
             NavMesh.SamplePosition(view, out var a, 2f, NavMesh.AllAreas);
             NavMesh.SamplePosition(target, out var b, 2f, NavMesh.AllAreas);
@@ -70,7 +86,8 @@ namespace Stealth.Game
             Log($"descend: y now {Me.transform.position.y:0.00}, floor {LevelLayout.FloorOf(Me.transform.position.y)}");
 
             // Upper floor overview.
-            var top = l.CellCenter(l.Floors - 1, 0, 0) + new Vector3(-3.5f, 0.05f, -3.5f);
+            var topRoom = l.Rooms.Where(r => r.Floor == l.Floors - 1).OrderByDescending(r => r.Area).First();
+            var top = topRoom.Center + new Vector3(-2f, 0.05f, -2f);
             LookAtFrom(new Pose(top, Quaternion.LookRotation(new Vector3(1, 0, 1))), top + new Vector3(10, 1.2f, 10));
             yield return new WaitForSeconds(0.5f);
             yield return Shot("top_floor");
@@ -125,8 +142,9 @@ namespace Stealth.Game
             var views = new[]
             {
                 new Pose(l.HatchPosition + new Vector3(-3, 0.05f, -3), Quaternion.LookRotation(new Vector3(1, 0, 1))),
-                new Pose(new Vector3(-9f, 0.05f, l.Height * 5f), Quaternion.LookRotation(Vector3.right)),
-                new Pose(l.CellCenter(l.Floors - 1, l.Width / 2, l.Height / 2) + Vector3.up * 0.05f, Quaternion.LookRotation(Vector3.forward)),
+                new Pose(new Vector3(-9f, 0.05f, l.SizeZ / 2f), Quaternion.LookRotation(Vector3.right)),
+                new Pose(l.Rooms.Where(r => r.Floor == l.Floors - 1).OrderBy(r => (r.Center - new Vector3(l.SizeX / 2f, r.Center.y, l.SizeZ / 2f)).sqrMagnitude).First().Center + Vector3.up * 0.05f,
+                    Quaternion.LookRotation(Vector3.forward)),
             };
             float sum = 0, worst = float.MaxValue;
             for (int i = 0; i < views.Length; i++)
@@ -142,78 +160,152 @@ namespace Stealth.Game
                 worst = Mathf.Min(worst, fps);
                 Log($"perf view {i}: {fps:0} fps");
             }
-            Log($"perf: building {l.Width}x{l.Height}x{l.Floors}, {renderers} renderers drawn, avg {sum / views.Length:0} fps, worst {worst:0} fps");
+            Log($"perf: building {l.Mass} {l.SizeX:0}x{l.SizeZ:0} m x {l.Floors} floors, {l.Rooms.Count} rooms, {renderers} renderers drawn, avg {sum / views.Length:0} fps, worst {worst:0} fps");
             Application.targetFrameRate = 144;
+        }
+
+        /// <summary>
+        /// A vent under the ceiling: from the floor, jump onto the low crate and the high one (holding jump and forward),
+        /// then crouch and walk on — into the duct, through the wall and down the crates on the other side.
+        /// </summary>
+        IEnumerator HighVentClimb(LevelLayout l)
+        {
+            foreach (var d in l.Doorways)
+            {
+                if (!d.High) continue;
+                var across = d.Rotation * Vector3.forward;
+                var from = d.Position - across * 2.3f + Vector3.up * 0.05f;
+                if (l.RoomAt(from) == null) { across = -across; from = d.Position - across * 2.3f + Vector3.up * 0.05f; }
+                LookAtFrom(new Pose(from - across * 1.2f, Quaternion.LookRotation(across)), d.Position + Vector3.up * 1.4f);
+                yield return new WaitForSeconds(0.6f);
+                yield return Shot("high_vent");
+                Me.TeleportOwner(from, Quaternion.LookRotation(across));
+                Me.Motor.SetPitch(10f);
+                yield return new WaitForSeconds(0.3f);
+                float t0 = Time.time, top = 0f;
+                while (Time.time - t0 < 2.2f)
+                {
+                    DevFlags.Autopilot = new PlayerInputState { Move = Vector2.up * 0.6f, Jump = true };
+                    top = Mathf.Max(top, Me.transform.position.y - d.Position.y);
+                    yield return null;
+                }
+                float onCrates = Me.transform.position.y - d.Position.y;
+                yield return Shot("high_vent_on_crates");
+                Drive(Vector2.up * 0.7f, crouch: true);
+                yield return new WaitForSeconds(0.6f);
+                yield return Shot("high_vent_in_duct");
+                yield return new WaitForSeconds(3.4f);
+                Release();
+                float beyond = Vector3.Dot(Me.transform.position - d.Position, across);
+                Log($"high vent at {d.Position}: on the crates y={onCrates:0.00} (highest {top:0.00}), through={beyond > 0.3f} ({beyond:0.0} m past the wall), " +
+                    $"y now {Me.transform.position.y - d.Position.y:0.00}");
+                // looking back at the hole under the ceiling and the crates under it
+                LookAtFrom(new Pose(d.Position + across * 3.2f + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + Vector3.up * 1.2f);
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("high_vent_from_the_other_side");
+                yield break;
+            }
+            Log("no high vent in this house");
         }
 
         /// <summary>Standing players are blocked by a vent, crouching players crawl through.</summary>
         IEnumerator VentScenario()
         {
             var l = ActiveLevel.Layout;
-            for (int x = 0; x < l.Width - 1; x++)
-                for (int y = 0; y < l.Height; y++)
-                {
-                    if (l.EdgesX[0, x, y] != EdgeType.Vent) continue;
-                    float wx = (x + 1) * LevelMetrics.Cell, vz = y * LevelMetrics.Cell + LevelMetrics.Cell * 0.5f;
-                    var from = new Vector3(wx - 2.2f, 0.05f, vz);
-                    LookAtFrom(new Pose(from, Quaternion.LookRotation(Vector3.right)), new Vector3(wx, 0.6f, vz));
-                    yield return new WaitForSeconds(0.5f);
-                    yield return Shot("vent");
+            yield return HighVentClimb(l);
+            foreach (var d in l.Doorways)
+            {
+                if (d.Kind != EdgeType.Vent || d.High || d.Floor != 0) continue;
+                var across = d.Rotation * Vector3.forward;
+                var from = d.Position - across * 2.2f + Vector3.up * 0.05f;
+                if (l.RoomAt(from) == null) { across = -across; from = d.Position - across * 2.2f + Vector3.up * 0.05f; }
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(across)), d.Position + Vector3.up * 0.6f);
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("vent");
 
-                    Drive(Vector2.up);
-                    yield return new WaitForSeconds(1.6f);
-                    Release();
-                    bool standingPassed = Me.transform.position.x > wx + 0.3f;
-                    Me.TeleportOwner(from, Quaternion.LookRotation(Vector3.right));
-                    Drive(Vector2.up, crouch: true);
-                    yield return new WaitForSeconds(0.5f);
-                    yield return Shot("crawling");
-                    yield return new WaitForSeconds(2.5f);
-                    Release();
-                    bool crouchPassed = Me.transform.position.x > wx + 0.3f;
-                    var cc = Me.GetComponent<CharacterController>();
-                    Log($"vent at x={wx} z={vz}: standing passed={standingPassed}, crouching passed={crouchPassed} pos={Me.transform.position} crouch={Me.Motor.IsCrouching} h={cc.height:0.00} r={cc.radius}");
-                    yield break;
-                }
+                Drive(Vector2.up);
+                yield return new WaitForSeconds(1.6f);
+                Release();
+                bool standingPassed = Vector3.Dot(Me.transform.position - d.Position, across) > 0.3f;
+                Me.TeleportOwner(from, Quaternion.LookRotation(across));
+                Drive(Vector2.up, crouch: true);
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("crawling");
+                yield return new WaitForSeconds(2.5f);
+                Release();
+                bool crouchPassed = Vector3.Dot(Me.transform.position - d.Position, across) > 0.3f;
+                var cc = Me.GetComponent<CharacterController>();
+                Log($"vent at {d.Position}: standing passed={standingPassed}, crouching passed={crouchPassed} pos={Me.transform.position} crouch={Me.Motor.IsCrouching} h={cc.height:0.00} r={cc.radius}");
+                yield break;
+            }
             Log("no vent on the ground floor");
         }
 
-        /// <summary>One screenshot of every room type present in the building.</summary>
+        /// <summary>A view across a room: from near one of its corners towards the opposite side.</summary>
+        static (Vector3 from, Vector3 to) ViewAcross(LevelLayout l, PlanRoom r)
+        {
+            var c = r.Center;
+            var b = r.Bounds;
+            foreach (var k in new[] { new Vector2(b.xMin, b.yMin), new Vector2(b.xMax, b.yMax), new Vector2(b.xMin, b.yMax), new Vector2(b.xMax, b.yMin) })
+            {
+                var corner = new Vector3(k.x, c.y, k.y);
+                var from = Vector3.Lerp(c, corner, 0.7f) + Vector3.up * 0.05f;
+                if (l.RoomAt(from) != r || l.NearStair(r.Floor, from, 0.5f)) continue;
+                return (from, c - (from - c) + Vector3.up * 0.6f);
+            }
+            return (c + Vector3.up * 0.05f, c + Vector3.forward * 4f + Vector3.up * 0.6f);
+        }
+
+        /// <summary>One screenshot of every room type and every room shape present in the building; atriums from below and above.</summary>
         IEnumerator RoomsScenario()
         {
             var l = ActiveLevel.Layout;
-            var seen = new System.Collections.Generic.HashSet<RoomType>();
-            for (int f = 0; f < l.Floors; f++)
-                for (int x = 0; x < l.Width; x++)
-                    for (int y = 0; y < l.Height; y++)
+            var seen = new System.Collections.Generic.HashSet<string>();
+            foreach (var r in l.Rooms)
+            {
+                string key = r.Shape is RoomShape.Rotunda or RoomShape.Octagon or RoomShape.L or RoomShape.U ? $"{r.Type}_{r.Shape}" : r.Type.ToString();
+                bool atrium = r.Levels > 1;
+                if (!seen.Add(key) && !atrium) continue;
+                var (from, to) = ViewAcross(l, r);
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to + (atrium ? Vector3.up * 3f : Vector3.zero));
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot($"room_{key}{(atrium ? $"_x{r.Levels}" : "")}");
+                Log($"light in {key}: {Enemies.Perception.Describe(Me.transform.position + Vector3.up * 1.26f)}");
+                if (!atrium) continue;
+                // the atrium from a gallery above: look down into it
+                foreach (var g in l.Rooms)
+                {
+                    if (g.Floor != r.Floor + 1) continue;
+                    var dir = Flat(r.Center - g.Center);
+                    if (dir.sqrMagnitude < 0.01f) continue;
+                    // walk from the gallery room's middle towards the atrium while still on its floor
+                    var gp = g.Center;
+                    for (float k = 0f; k < 30f; k += 0.5f)
                     {
-                        var type = l.Rooms[f, x, y];
-                        if (!seen.Add(type)) continue;
-                        var c = l.CellCenter(f, x, y);
-                        // Stand near one corner and look across the room towards the opposite one.
-                        int q = l.StairQuadrant(f, new Vector2Int(x, y));
-                        var from = c + LevelMetrics.Quadrants[q == 3 ? 0 : 3] * 1.45f + Vector3.up * 0.05f;
-                        var to = c - (from - c) + Vector3.up * 0.6f;
-                        LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
-                        yield return new WaitForSeconds(0.5f);
-                        yield return Shot($"room_{type}");
-                        Log($"light in {type}: {Enemies.Perception.Describe(Me.transform.position + Vector3.up * 1.26f)}");
+                        var next = g.Center + dir.normalized * k;
+                        if (l.RoomAt(next) != g) break;
+                        gp = next;
                     }
-            Log($"room types: {string.Join(", ", seen)}");
+                    if ((Flat(gp - r.Center)).magnitude > Mathf.Max(r.Bounds.width, r.Bounds.height)) continue;
+                    gp -= dir.normalized * 0.8f;
+                    LookAtFrom(new Pose(gp + Vector3.up * 0.05f, Quaternion.LookRotation(dir)), r.Center + Vector3.up * 0.5f);
+                    yield return new WaitForSeconds(0.5f);
+                    yield return Shot($"atrium_from_above_{r.Type}");
+                    break;
+                }
+            }
+            Log($"rooms: {string.Join(", ", seen)}");
 
             // A dark room, then the lobby during an alarm.
-            for (int f = 0; f < l.Floors; f++)
-                for (int x = 0; x < l.Width; x++)
-                    for (int y = 0; y < l.Height; y++)
-                    {
-                        if (!l.Dark[f, x, y]) continue;
-                        var c = l.CellCenter(f, x, y);
-                        var from = c + new Vector3(-1.5f, 0.05f, -1.5f);
-                        LookAtFrom(new Pose(from, Quaternion.LookRotation(new Vector3(1, 0, 1))), c + new Vector3(4, 0.5f, 4));
-                        yield return new WaitForSeconds(0.5f);
-                        yield return Shot("dark_room");
-                        f = l.Floors; x = l.Width; break;
-                    }
+            foreach (var r in l.Rooms)
+            {
+                if (!r.Dark) continue;
+                var (from, to) = ViewAcross(l, r);
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("dark_room");
+                break;
+            }
             var hatch = l.HatchPosition;
             LookAtFrom(new Pose(hatch + new Vector3(-3f, 0.05f, -3f), Quaternion.LookRotation(new Vector3(1, 0, 1))), hatch + new Vector3(3, 1, 3));
             if (Me.IsServer) GameManager.Instance.RaiseAlarmServer(hatch + Vector3.forward * 80f, 1f);
@@ -237,7 +329,7 @@ namespace Stealth.Game
             }
 
             // The building from the street.
-            var outside = new Vector3(-9f, 0.05f, l.Height * LevelMetrics.Cell * 0.5f);
+            var outside = new Vector3(-9f, 0.05f, l.SizeZ * 0.5f);
             LookAtFrom(new Pose(outside, Quaternion.LookRotation(Vector3.right)), new Vector3(0, l.Floors * 1.5f, outside.z));
             yield return new WaitForSeconds(2f);
             yield return Shot("facade");

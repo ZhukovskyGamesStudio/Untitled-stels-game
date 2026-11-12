@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Stealth.Configs;
 using Stealth.Level;
 using Stealth.Player;
@@ -6,8 +7,9 @@ using UnityEngine;
 namespace Stealth.Enemies
 {
     /// <summary>
-    /// Wall crawler: runs around its room along the walls (above the doors), watching the floor below.
-    /// On detection it leaps onto the player, hits on landing and crawls back up. Never leaves its room.
+    /// Wall crawler: runs around its room along the walls (above the doors), watching the floor below, and now and then
+    /// climbs onto the ceiling and crosses it to the opposite wall (watching straight down meanwhile). On detection it
+    /// leaps onto the player, hits on landing and crawls back up. Never leaves its room.
     /// </summary>
     public class SpiderBot : SecurityDevice
     {
@@ -15,7 +17,7 @@ namespace Stealth.Enemies
         public SpiderProfile Profile;
         protected override DeviceProfile Device => Profile;
 
-        enum Mode { Crawl, Leap, Return }
+        enum Mode { Crawl, Leap, Return, Cross }
 
         Mode m_Mode;
         Vector3 m_Min, m_Max;
@@ -23,11 +25,19 @@ namespace Stealth.Enemies
         System.Random m_Rng = new(1);
         Vector3 m_From, m_To;
         IIntruder m_Prey;
+        float m_NextCross;
+        readonly List<(Vector3 pos, Quaternion rot)> m_Path = new();
+        int m_Step;
 
         /// <summary>Gap between the wall face and the spider's underside, metres.</summary>
         const float WallGap = 0.05f;
         /// <summary>How fast the spider turns on its wall (at corners, when it turns back), degrees a second.</summary>
         const float TurnRate = 300f;
+        /// <summary>Where a wall meets the ceiling the body passes this far below the corner, and this far out from the wall.</summary>
+        const float CornerDrop = 0.3f, CornerOut = 0.3f;
+
+        /// <summary>Height of the spider's feet plane on the ceiling.</summary>
+        float CeilingY => m_FloorY + LevelMetrics.WallHeight - WallGap;
 
         public float Perimeter => 2f * ((m_Max.x - m_Min.x) + (m_Max.z - m_Min.z));
 
@@ -37,14 +47,15 @@ namespace Stealth.Enemies
         {
             if (!IsServer) return;
             var layout = ActiveLevel.Layout;
-            var c = layout != null ? layout.RoomCenterAt(transform.position) : transform.position;
+            var rect = layout != null ? layout.RoomRectAt(transform.position) : new Rect(transform.position.x - 5f, transform.position.z - 5f, 10f, 10f);
             // Hugging the wall: the body a few centimetres off its face, the feet planted on it (ProceduralLegs).
-            float half = LevelMetrics.Cell / 2f - LevelMetrics.WallThickness / 2f - WallGap;
-            m_FloorY = c.y;
-            m_Min = new Vector3(c.x - half, 0, c.z - half);
-            m_Max = new Vector3(c.x + half, 0, c.z + half);
+            float inset = LevelMetrics.WallThickness / 2f + WallGap;
+            m_FloorY = layout != null ? LevelLayout.FloorY(LevelLayout.FloorOf(transform.position.y)) : transform.position.y;
+            m_Min = new Vector3(rect.xMin + inset, 0, rect.yMin + inset);
+            m_Max = new Vector3(rect.xMax - inset, 0, rect.yMax - inset);
             m_Rng = LevelRandom.Next(RandomChannel.Devices);
             m_T = m_Rng.Value() * Perimeter;
+            m_NextCross = Time.time + Profile.CeilingEvery * m_Rng.Range(0.3f, 1f);
             var (p, rot) = OnWall(m_T, m_Dir);
             transform.SetPositionAndRotation(p, rot);
         }
@@ -63,13 +74,53 @@ namespace Stealth.Enemies
             return (p, Quaternion.LookRotation(tangent * dir, inward));
         }
 
-        Vector3 LookDirection => Quaternion.AngleAxis(35f, Vector3.Cross(transform.up, Vector3.up).normalized) * transform.up;
+        /// <summary>On a wall: 35 degrees down from its belly; on the ceiling: straight down.</summary>
+        Vector3 LookDirection
+        {
+            get
+            {
+                var axis = Vector3.Cross(transform.up, Vector3.up);
+                return axis.sqrMagnitude < 0.01f ? transform.up : Quaternion.AngleAxis(35f, axis.normalized) * transform.up;
+            }
+        }
+
+        /// <summary>
+        /// The way over the ceiling to the opposite wall: up its wall to under the corner, onto the ceiling, straight across,
+        /// down the far wall to its crawl height (a polyline with the body's orientation at every point).
+        /// </summary>
+        void StartCrossing()
+        {
+            float t1 = m_T + Perimeter * (0.5f + m_Rng.Range(-0.12f, 0.12f));
+            var (a, rotA) = OnWall(m_T, m_Dir);
+            var (b, rotB) = OnWall(t1, m_Dir);
+            Vector3 inA = rotA * Vector3.up, inB = rotB * Vector3.up; // legs to the wall: up = into the room
+            var across = b + inB * CornerOut - (a + inA * CornerOut);
+            across.y = 0f;
+            if (across.sqrMagnitude < 1f) return; // a tiny room: nothing to cross
+            var overhead = Quaternion.LookRotation(across.normalized, Vector3.down);
+            float under = CeilingY - CornerDrop;
+            m_Path.Clear();
+            m_Path.Add((new Vector3(a.x, under, a.z), Quaternion.LookRotation(Vector3.up, inA)));
+            m_Path.Add((new Vector3(a.x, CeilingY, a.z) + inA * CornerOut, overhead));
+            m_Path.Add((new Vector3(b.x, CeilingY, b.z) + inB * CornerOut, overhead));
+            m_Path.Add((new Vector3(b.x, under, b.z), Quaternion.LookRotation(Vector3.down, inB)));
+            m_Path.Add((b, rotB));
+            m_Step = 0;
+            m_T = t1; // a leap from up there returns to the far wall
+            m_Mode = Mode.Cross;
+        }
 
         protected override void TickServer()
         {
             switch (m_Mode)
             {
                 case Mode.Crawl:
+                    if (Profile.CeilingEvery > 0f && Time.time > m_NextCross && Time.time > m_PauseUntil)
+                    {
+                        m_NextCross = Time.time + Profile.CeilingEvery * m_Rng.Range(0.6f, 1.4f);
+                        StartCrossing();
+                        if (m_Mode == Mode.Cross) break;
+                    }
                     if (Time.time > m_PauseUntil)
                     {
                         m_T += Profile.CrawlSpeed * m_Dir * Time.deltaTime;
@@ -98,6 +149,16 @@ namespace Stealth.Enemies
                         m_ModeStart = Time.time;
                         m_From = transform.position;
                     }
+                    break;
+                }
+
+                case Mode.Cross:
+                {
+                    var (target, facing) = m_Path[m_Step];
+                    var pos = Vector3.MoveTowards(transform.position, target, Profile.CrawlSpeed * Time.deltaTime);
+                    transform.SetPositionAndRotation(pos, Quaternion.RotateTowards(transform.rotation, facing, TurnRate * Time.deltaTime));
+                    if ((pos - target).sqrMagnitude < 0.0004f && ++m_Step >= m_Path.Count) m_Mode = Mode.Crawl;
+                    Look();
                     break;
                 }
 

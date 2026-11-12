@@ -13,28 +13,24 @@ namespace Stealth.Tests
             foreach (var seed in new[] { 1, 2, 3, 4, 5, 6, 7, 8 })
             {
                 var l = LevelGenerator.Generate(seed, 3);
-                for (int f = 0; f < l.Floors; f++)
-                    for (int x = 0; x < l.Width; x++)
-                        for (int y = 0; y < l.Height; y++)
-                        {
-                            total++;
-                            if (l.Dark[f, x, y]) dark++;
-                            if (l.Rooms[f, x, y] == RoomType.Lobby) Assert.IsFalse(l.Dark[f, x, y]);
-                            Assert.IsFalse(l.Dark[f, x, y] && l.Flicker[f, x, y]);
-                        }
+                foreach (var r in l.Rooms)
+                {
+                    total++;
+                    if (r.Dark) dark++;
+                    if (r.Type == RoomType.Lobby) Assert.IsFalse(r.Dark);
+                    Assert.IsFalse(r.Dark && r.Flicker);
+                }
             }
             float share = dark / (float)total;
             Assert.That(share, Is.InRange(0.1f, 0.4f), $"dark share {share:0.00}");
         }
 
         [Test]
-        public void IsDarkAtMatchesCells()
+        public void IsDarkAtMatchesRooms()
         {
             var l = LevelGenerator.Generate(9, 4);
-            for (int f = 0; f < l.Floors; f++)
-                for (int x = 0; x < l.Width; x++)
-                    for (int y = 0; y < l.Height; y++)
-                        Assert.AreEqual(l.Dark[f, x, y], l.IsDarkAt(l.CellCenter(f, x, y) + Vector3.up));
+            foreach (var r in l.Rooms)
+                Assert.AreEqual(r.Dark, l.IsDarkAt(r.Center + Vector3.up));
             Assert.IsFalse(l.IsDarkAt(new Vector3(-5, 0, -5)), "outside is not a dark room");
         }
 

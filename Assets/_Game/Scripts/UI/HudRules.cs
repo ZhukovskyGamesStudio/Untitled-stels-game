@@ -67,12 +67,12 @@ namespace Stealth.UI
             if (c.Terminal != null) s_Prompts.Add(new Prompt(64, use, c.Terminal));
             // With the cursor out the board speaks for itself.
             if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)
-                s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), "Разложить добычу: на склад или в «Продать»"));
+                s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), $"Разложить добычу: склад или «Продать» · {Controls.Label(GameAction.StashAll)} — всё на склад"));
             if (c.Playing && c.NearHatch)
                 s_Prompts.Add(new Prompt(55, hatch, c.Collected >= c.Quota
                     ? "Спрятаться в люк — уйти в канализацию"
                     : $"Спрятаться в люк ({c.Collected}/{c.Quota}: квоту можно доплатить внизу)"));
-            if (c.InSewer) s_Prompts.Add(new Prompt(30, "", "Выбери путь: зайди в один из туннелей"));
+            if (c.InSewer) s_Prompts.Add(new Prompt(30, "", "Выбери путь: встань в светящуюся рамку в туннеле"));
             if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
             if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));
             return UiMath.Choose(s_Prompts);

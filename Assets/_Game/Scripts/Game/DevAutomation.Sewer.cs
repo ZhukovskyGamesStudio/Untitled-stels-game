@@ -110,8 +110,26 @@ namespace Stealth.Game
             else yield return new WaitForSeconds(4f);
 
             // Everyone walks into the tunnel of the first way: the house starts after the countdown.
+            if (Me.IsServer)
+            {
+                // The far end: walk deeper into the tunnel — the invisible wall stops you; the zone glows on the floor.
+                var mouth = sewer.Branches[SewerBranches.Slots(gm.RouteOptions.Count)[0]].Mouth;
+                Me.Motor.SetPitch(-20f);
+                yield return Slide(mouth.position + mouth.right * 0.3f + Vector3.up * 0.05f, Quaternion.LookRotation(mouth.right).eulerAngles.y, 2f, "tunnel_end");
+                Log($"tunnel: stopped {mouth.InverseTransformPoint(Me.transform.position).x:0.00} m in (wall at {SewerLocation.StopAt})");
+                yield return Shot("04g_tunnel_end");
+                // turned round, looking down: the glowing frame where the team stands to vote
+                Me.TeleportOwner(mouth.position + mouth.right * 3.2f + Vector3.up * 0.05f, Quaternion.LookRotation(-mouth.right));
+                yield return new WaitForSeconds(0.2f);
+                Me.TeleportOwner(mouth.position + mouth.right * 2.3f + Vector3.up * 0.05f, Quaternion.LookRotation(-mouth.right));
+                Me.Motor.SetPitch(55f);
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot("04h_vote_zone");
+            }
             yield return IntoTunnel(gm, 0, slot);
             if (Me.IsServer) yield return Shot("05_in_tunnel");
+            yield return new WaitForSeconds(1.5f);
+            if (Me.IsServer) yield return Shot("05b_countdown");
             float tw = Time.time;
             while (gm.Phase == RunPhase.Sewer && Time.time - tw < 15f) yield return null;
             yield return new WaitForSeconds(2f);
@@ -144,12 +162,12 @@ namespace Stealth.Game
                 {
                     robot.MarkServer(Session.ServerTimeF + 30f);
                     var layout = ActiveLevel.Layout;
-                    var cell = new Vector2Int(Mathf.FloorToInt(robot.transform.position.x / LevelMetrics.Cell), Mathf.FloorToInt(robot.transform.position.z / LevelMetrics.Cell));
-                    foreach (var d in new[] { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down })
+                    // the room next door
+                    foreach (var other in layout.Rooms.Where(r => r.Floor == 0 && r != layout.RoomAt(robot.transform.position))
+                                 .OrderBy(r => Vector3.Distance(r.Center, robot.transform.position)).Take(6))
                     {
-                        var n = cell + d;
-                        if (n.x < 0 || n.y < 0 || n.x >= layout.Width || n.y >= layout.Height) continue;
-                        var spot = layout.CellCenter(0, n.x, n.y) + new Vector3(d.x, 0, d.y) * 2f;
+                        var spot = other.Center + Flat(robot.transform.position - other.Center).normalized * Mathf.Min(2f, Vector3.Distance(other.Center, robot.transform.position) * 0.3f);
+                        if (layout.RoomAt(spot) != other) spot = other.Center;
                         if (!Physics.Linecast(spot + Vector3.up * 1.6f, robot.Position, Perception.SightMask, QueryTriggerInteraction.Ignore)) continue;
                         LookAtFrom(new Pose(spot + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(robot.Position - spot))), robot.Position);
                         yield return new WaitForSeconds(0.5f);
@@ -177,6 +195,18 @@ namespace Stealth.Game
             yield return new WaitForSeconds(1.2f);
             Log($"in the hatch: {Me.InHatch}, eyes {Me.Camera.transform.position.y - hatch.y:0.00} m above the floor");
             yield return Shot("10_peeking");
+            // From inside the hatch: hands out, the stash board in front of the eyes, everything onto the stash.
+            var inv = Me.GetComponent<PlayerInventory>();
+            if (Me.IsServer) { inv.GiveServer(1, 2); inv.GiveServer(0, 1); }
+            DevFlags.ForceHandsMode = true;
+            yield return new WaitForSeconds(0.5f);
+            int carried = inv.Items.Count, stashed = gm.Stash.Items.Count;
+            inv.RequestStashAll();
+            yield return new WaitForSeconds(0.4f);
+            Log($"stash from the hatch: board visible={UI.StashBoard.Instance != null && UI.StashBoard.Instance.Visible}, " +
+                $"backpack {carried} -> {inv.Items.Count}, stash {stashed} -> {gm.Stash.Items.Count}");
+            yield return Shot("10b_hatch_hands");
+            DevFlags.ForceHandsMode = false;
             float th = Time.time;
             while (gm.Phase == RunPhase.Playing && Time.time - th < 20f) yield return null;
             yield return new WaitForSeconds(2f);
@@ -214,7 +244,8 @@ namespace Stealth.Game
             var sewer = SewerLocation.Active;
             int tunnel = SewerBranches.Slots(gm.RouteOptions.Count)[way];
             var mouth = sewer.Branches[tunnel].Mouth;
-            var spot = mouth.position + mouth.right * (2.5f + slot * 0.9f) + Vector3.up * 0.05f;
+            // inside the glowing frame on the floor (before the invisible wall), side by side across the tunnel
+            var spot = mouth.position + mouth.right * 1.5f + mouth.forward * ((slot % 4) - 1.5f) * 0.55f + Vector3.up * 0.05f;
             Me.TeleportOwner(spot, Quaternion.LookRotation(-mouth.right));
             Me.Motor.SetPitch(-8f);
             yield return new WaitForSeconds(0.8f);

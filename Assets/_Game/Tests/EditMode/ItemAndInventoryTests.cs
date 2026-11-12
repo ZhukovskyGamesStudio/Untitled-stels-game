@@ -154,6 +154,25 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void StashAllPutsWhatFitsAndKeepsTheRest()
+        {
+            var stash = new TeamStash();
+            var items = new List<InventoryEntry>();
+            // More single cells than the stash holds: the extra ones stay in the backpack.
+            for (int i = 0; i < TeamStash.Width * TeamStash.Height + 3; i++) items.Add(new InventoryEntry { Shape = 0, Color = 1, X = (byte)(i % 8), Y = (byte)(i / 8) });
+            int added = stash.AddAll(items, out var left);
+            Assert.AreEqual(TeamStash.Width * TeamStash.Height, added);
+            Assert.AreEqual(3, left.Count);
+            Assert.IsFalse(stash.FindSpot(0, out _, out _, out _), "the stash is full");
+
+            // A big piece goes in before the small ones fill the gaps.
+            var fresh = new TeamStash();
+            var mixed = new List<InventoryEntry> { new() { Shape = 0 }, new() { Shape = 3 }, new() { Shape = 0 } };
+            Assert.AreEqual(3, fresh.AddAll(mixed, out var rest));
+            Assert.AreEqual(0, rest.Count);
+        }
+
+        [Test]
         public void RandomColorFavoursRareColorsDeeper()
         {
             int Gold(int bonus)

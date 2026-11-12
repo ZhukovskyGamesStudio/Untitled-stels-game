@@ -82,6 +82,39 @@ namespace Stealth.Game
             return true;
         }
 
+        /// <summary>First free position for a shape, trying every rotation (row by row from the top left).</summary>
+        public bool FindSpot(int shape, out byte x, out byte y, out byte rot)
+        {
+            for (int r = 0; r < 4; r++)
+                for (int yy = 0; yy < Height; yy++)
+                    for (int xx = 0; xx < Width; xx++)
+                        if (CanPlace(shape, r, xx, yy))
+                        {
+                            x = (byte)xx; y = (byte)yy; rot = (byte)r;
+                            return true;
+                        }
+            x = y = rot = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// Puts the items into the first free spots, the biggest first (they are the hardest to fit). Returns how many went in;
+        /// <paramref name="left"/> — the ones that did not fit, unchanged.
+        /// </summary>
+        public int AddAll(IReadOnlyList<InventoryEntry> items, out List<InventoryEntry> left)
+        {
+            left = new List<InventoryEntry>();
+            var order = new List<InventoryEntry>(items);
+            order.Sort((a, b) => b.Cells.Length.CompareTo(a.Cells.Length));
+            int added = 0;
+            foreach (var e in order)
+            {
+                if (FindSpot(e.Shape, out var x, out var y, out var r) && Add(e.Shape, e.Color, x, y, r)) added++;
+                else left.Add(e);
+            }
+            return added;
+        }
+
         public bool Move(InventoryEntry entry, byte x, byte y, byte rot)
         {
             int i = IndexOf(entry);

@@ -25,6 +25,10 @@ namespace Stealth.UI
         public RectTransform SellZone;
         public Image SellBackground;
         public Text ValueLabel;
+        [Tooltip("The \"put everything in\" button under the grid (clicked with the cursor out, or its key).")]
+        public RectTransform StashAllZone;
+        public Image StashAllBackground;
+        public Text StashAllLabel;
 
         public bool Visible => Canvas.enabled;
 
@@ -51,6 +55,24 @@ namespace Stealth.UI
             var dir = pos - viewer;
             dir.y = 0f;
             Root.SetPositionAndRotation(pos, Quaternion.LookRotation(dir.sqrMagnitude > 0.01f ? dir : Vector3.forward));
+        }
+
+        /// <summary>Metres in front of the eyes while sitting in the hatch.</summary>
+        public const float HatchDistance = 1.9f;
+
+        /// <summary>
+        /// From inside the hatch the eyes are at the floor and the board above the hatch is right overhead: it floats
+        /// in front of the view instead, a little above the floor, tilted to face the eyes.
+        /// </summary>
+        public void PlaceInFront(Transform eyes)
+        {
+            var flat = eyes.forward;
+            flat.y = 0f;
+            if (flat.sqrMagnitude < 0.01f) flat = eyes.up;
+            flat.y = 0f;
+            flat.Normalize();
+            var pos = eyes.position + flat * HatchDistance + Vector3.up * 0.75f; // above the backpack at the bottom of the screen
+            Root.SetPositionAndRotation(pos, Quaternion.LookRotation(pos - eyes.position));
         }
     }
 }

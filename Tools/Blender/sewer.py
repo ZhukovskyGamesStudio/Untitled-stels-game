@@ -295,7 +295,9 @@ def hall():
     finish_and_export("sewer_hall")
 
 
-# --------------------------------------------------------------------------- a branch tunnel to a house (local x 0..12)
+# --------------------------------------------------------------------------- a branch tunnel to a house (local x 0..40)
+
+BRANCH_LENGTH = 40.0  # it looks endless (the haze swallows the far end); the game stops players 2.7 m in
 
 def branch():
     """The three tunnels to the next houses, each turned to its opening and cut off at the hall's end wall (no gap
@@ -304,16 +306,19 @@ def branch():
     prof = profile(**p)
 
     def ribs(bm):
-        for x in (2.0, 5.0, 8.0, 11.0):
+        x = 2.0
+        while x < BRANCH_LENGTH - 0.5:
             band(bm, prof, profile(**inset(p, 0.1)), x - 0.15, x + 0.15)
+            x += 3.0
 
     for index, y in enumerate(sorted(BRANCH_Y, reverse=True)):  # Unity z = -y
-        parts = [part("Brick", lambda bm: shell(bm, prof, -1.0, 12.0, (0.0, p["wall"]))),
+        n = BRANCH_LENGTH
+        parts = [part("Brick", lambda bm: shell(bm, prof, -1.0, n, (0.0, p["wall"]))),
                  part("Stone", ribs),
-                 part("Concrete", lambda bm: box(bm, -1.0, 12.0, -p["half"], p["half"], -0.3, 0.0))]
-        gutter = part("Dark", lambda bm: box(bm, -1.0, 12.0, -0.12, 0.12, -0.01, 0.005))
+                 part("Concrete", lambda bm: box(bm, -1.0, n, -p["half"], p["half"], -0.3, 0.0))]
+        gutter = part("Dark", lambda bm: box(bm, -1.0, n, -0.12, 0.12, -0.01, 0.005))
         gutter.name = "Gutter"
-        end = part("Dark", lambda bm: box(bm, 11.6, 12.0, -p["half"], p["half"], 0.0, p["wall"] + p["rise"]))
+        end = part("Dark", lambda bm: box(bm, n - 0.4, n, -p["half"], p["half"], 0.0, p["wall"] + p["rise"]))
         end.name = "DarkEnd"
         for o in parts + [gutter, end]:
             clip_to_hall(place_branch(o, y))

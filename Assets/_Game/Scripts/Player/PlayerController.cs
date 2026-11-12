@@ -232,7 +232,8 @@ namespace Stealth.Player
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null; // busy at a dial or a terminal: no walking
-            CursorMode = !menu && !Downed && !InHatch && !cracking && (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
+            CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
+                          (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;

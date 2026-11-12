@@ -42,8 +42,6 @@ namespace Stealth.Level
         const float WindowBottom = LevelMetrics.WindowCenterY - LevelMetrics.WindowHeight / 2f - 0.08f;
         const float WindowTop = LevelMetrics.WindowCenterY + LevelMetrics.WindowHeight / 2f + 0.08f;
         /// <summary>Ceiling lamps hang at ±2.5 m along x of a cell centre (see <see cref="RoomLighting.LampOffset"/>).</summary>
-        static readonly float[] BeamsAlongZ = { -3.75f, 0f, 3.75f };
-        static readonly float[] BeamsAlongX = { -2.5f, 2.5f };
 
         public static List<DecorPiece> Plan(LevelShell shell, LevelLayout layout, StyleGeometry g)
         {
@@ -201,7 +199,8 @@ namespace Stealth.Level
                 for (int i = 0; i <= n; i++)
                 {
                     float u = (u0 + u1) / 2f + (i - n / 2f) * g.StripSpacing;
-                    if (u < u0 + 0.4f || u > u1 - 0.4f || Inside(holes, u, 0.1f)) continue;
+                    // clear of the face ends; an end at a doorway keeps the strip (half a metre each way) off the opening
+                    if (u < u0 + (f.CornerA ? 0.4f : 0.6f) || u > u1 - (f.CornerB ? 0.4f : 0.6f) || Inside(holes, u, 0.1f)) continue;
                     list.Add(new DecorPiece
                     {
                         Kind = DecorKind.Strip, Position = At(u, 0.1f), Rotation = rot,
@@ -300,38 +299,96 @@ namespace Stealth.Level
 
         static void PlanCeilings(List<DecorPiece> list, LevelLayout l, CeilingKind kind)
         {
-            const float cell = LevelMetrics.Cell;
-            float span = cell - T;
-            for (int f = 0; f < l.Floors; f++)
-                for (int x = 0; x < l.Width; x++)
-                    for (int y = 0; y < l.Height; y++)
+            var alongZ = Quaternion.LookRotation(Vector3.right);   // local X → world Z
+            var alongX = Quaternion.LookRotation(Vector3.forward); // local X → world X
+            foreach (var room in l.Rooms)
+            {
+                var lamps = LevelBuilder.LightSpots(l, room);
+                // a beam along z at x (or along x at z) keeps clear of the lamps it passes; shifted aside or left out
+                float? Dodge(float at, bool alongZ, Rect r)
+                {
+                    foreach (float shift in new[] { 0f, 1.25f, -1.25f })
                     {
-                        if (HasStairHole(l, f, x, y)) continue; // nothing may cross the opening to the floor above
-                        var c = l.CellCenter(f, x, y) + Vector3.up * LevelMetrics.WallHeight;
-                        var alongZ = Quaternion.LookRotation(Vector3.right);   // local X → world Z
-                        var alongX = Quaternion.LookRotation(Vector3.forward); // local X → world X
-                        switch (kind)
+                        float v = at + shift;
+                        bool hit = false;
+                        foreach (var p in lamps)
                         {
-                            case CeilingKind.Beams:
-                            case CeilingKind.IBeams:
-                                var k = kind == CeilingKind.Beams ? DecorKind.Beam : DecorKind.IBeam;
-                                foreach (float dx in BeamsAlongZ)
-                                    list.Add(new DecorPiece { Kind = k, Position = c + Vector3.right * dx, Rotation = alongZ, Scale = new Vector3(span, 1f, 1f) });
-                                break;
-                            case CeilingKind.Coffers:
-                                foreach (float dx in BeamsAlongZ)
-                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = c + Vector3.right * dx, Rotation = alongZ, Scale = new Vector3(span, 1f, 1f) });
-                                foreach (float dz in BeamsAlongX)
-                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = c + Vector3.forward * dz, Rotation = alongX, Scale = new Vector3(span, 1f, 1f) });
-                                break;
-                            case CeilingKind.Trays:
-                                var at = c + Vector3.forward * 1.6f;
-                                list.Add(new DecorPiece { Kind = DecorKind.Tray, Position = at, Rotation = alongX, Scale = new Vector3(cell, 1f, 1f) });
-                                for (float u = -cell / 2f + 1f; u < cell / 2f; u += 2f)
-                                    list.Add(new DecorPiece { Kind = DecorKind.TrayHanger, Position = at + Vector3.right * u, Rotation = alongX, Scale = Vector3.one });
-                                break;
+                            float across = alongZ ? p.x : p.y, along = alongZ ? p.y : p.x;
+                            float lo = alongZ ? r.yMin : r.xMin, hi = alongZ ? r.yMax : r.xMax;
+                            if (Mathf.Abs(across - v) < 1.0f && along > lo - 0.7f && along < hi + 0.7f) hit = true;
                         }
+                        if (!hit && v > (alongZ ? r.xMin : r.yMin) + 0.5f && v < (alongZ ? r.xMax : r.yMax) - 0.5f) return v;
                     }
+                    return null;
+                }
+                foreach (var r in CeilingRects(l, room))
+                {
+                    float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight;
+                    var c = new Vector3(r.center.x, y, r.center.y);
+                    float spanZ = r.height - T, spanX = r.width - T;
+                    switch (kind)
+                    {
+                        case CeilingKind.Beams:
+                        case CeilingKind.IBeams:
+                            var k = kind == CeilingKind.Beams ? DecorKind.Beam : DecorKind.IBeam;
+                            foreach (float dx in Spread(r.width, 3.75f))
+                                if (Dodge(c.x + dx, true, r) is float bx)
+                                    list.Add(new DecorPiece { Kind = k, Position = new Vector3(bx, y, c.z), Rotation = alongZ, Scale = new Vector3(spanZ, 1f, 1f) });
+                            break;
+                        case CeilingKind.Coffers:
+                            foreach (float dx in Spread(r.width, 3.75f))
+                                if (Dodge(c.x + dx, true, r) is float bx)
+                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = new Vector3(bx, y, c.z), Rotation = alongZ, Scale = new Vector3(spanZ, 1f, 1f) });
+                            foreach (float dz in Spread(r.height, 5f))
+                                if (Dodge(c.z + dz, false, r) is float bz)
+                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = new Vector3(c.x, y, bz), Rotation = alongX, Scale = new Vector3(spanX, 1f, 1f) });
+                            break;
+                        case CeilingKind.Trays:
+                            if (r.height < 4f || Dodge(c.z + Mathf.Min(1.6f, r.height / 2f - 0.6f), false, r) is not float tz) break;
+                            var at = new Vector3(c.x, y, tz);
+                            list.Add(new DecorPiece { Kind = DecorKind.Tray, Position = at, Rotation = alongX, Scale = new Vector3(spanX, 1f, 1f) });
+                            for (float u = -spanX / 2f + 1f; u < spanX / 2f; u += 2f)
+                                list.Add(new DecorPiece { Kind = DecorKind.TrayHanger, Position = at + Vector3.right * u, Rotation = alongX, Scale = Vector3.one });
+                            break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>Offsets from a span's middle for parts every ~<paramref name="step"/> metres, none closer than 1 m to its ends.</summary>
+        static IEnumerable<float> Spread(float span, float step)
+        {
+            int n = Mathf.FloorToInt((span - 2f) / step);
+            for (int i = 0; i <= n; i++) yield return (i - n / 2f) * step;
+        }
+
+        /// <summary>
+        /// The ceiling of a room as rectangles (pure): its floor's cells minus pockets and the holes of stairs on any of its
+        /// storeys, merged; only rectangles big enough to carry beams (3 × 3 m).
+        /// </summary>
+        public static List<Rect> CeilingRects(LevelLayout l, PlanRoom room)
+        {
+            var plan = l.Plan;
+            var list = new List<Rect>();
+            int x0 = Mathf.FloorToInt(room.Bounds.xMin / HousePlan.Res), z0 = Mathf.FloorToInt(room.Bounds.yMin / HousePlan.Res);
+            int nx = Mathf.RoundToInt(room.Bounds.width / HousePlan.Res), nz = Mathf.RoundToInt(room.Bounds.height / HousePlan.Res);
+            bool Solid(int x, int z)
+            {
+                int cx = x0 + x, cz = z0 + z;
+                if (plan.KindAt(room.Floor, cx, cz) != CellKind.Room || plan.IdAt(room.Floor, cx, cz) != room.Id) return false;
+                var p = HousePlan.CellCenter(cx, cz);
+                var p3 = new Vector3(p.x, 0f, p.y);
+                for (int f = room.Floor; f < room.Floor + room.Levels; f++)
+                    foreach (var s in l.Stairs)
+                        if (s.Floor == f && PlanGenerator.StairArea(s, 0.3f).Contains(p)) return false;
+                return true;
+            }
+            foreach (var r in LevelBuilder.Rectangles(nx, nz, Solid))
+            {
+                var rect = new Rect((x0 + r.x) * HousePlan.Res, (z0 + r.y) * HousePlan.Res, r.width * HousePlan.Res, r.height * HousePlan.Res);
+                if (rect.width >= 3f && rect.height >= 3f) list.Add(rect);
+            }
+            return list;
         }
 
         /// <summary>
@@ -354,15 +411,11 @@ namespace Stealth.Level
             }
             foreach (var r in shell.Floors)
                 if (r.Floor >= 1) Quad(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness);
-            Quad(Vector2.zero, new Vector2(l.Width * LevelMetrics.Cell, l.Height * LevelMetrics.Cell),
-                 LevelLayout.FloorY(l.Floors - 1) + LevelMetrics.WallHeight);
-        }
-
-        /// <summary>The ceiling of this cell has the opening of a staircase going up.</summary>
-        public static bool HasStairHole(LevelLayout l, int floor, int x, int y)
-        {
-            foreach (var s in l.Stairs) if (s.Floor == floor && s.Cell == new Vector2Int(x, y)) return true;
-            return false;
+            // under the roof: the top floor's rooms, pockets and atrium tops
+            var plan = l.Plan;
+            int top = l.Floors - 1;
+            foreach (var r in LevelBuilder.Rectangles(plan.NX, plan.NZ, (x, z) => plan.KindAt(top, x, z) != CellKind.Outside))
+                Quad(new Vector2(r.xMin, r.yMin) * HousePlan.Res, new Vector2(r.xMax, r.yMax) * HousePlan.Res, LevelLayout.FloorY(top) + LevelMetrics.WallHeight);
         }
     }
 }

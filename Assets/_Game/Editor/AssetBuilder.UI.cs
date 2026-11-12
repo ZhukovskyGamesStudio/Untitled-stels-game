@@ -439,6 +439,8 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ HUD
 
+        const float MinimapSize = 210f;
+
         static GameObject BuildHud(UiElements e)
         {
             var root = CanvasRoot("HUD", 0, false);
@@ -461,10 +463,13 @@ namespace Stealth.EditorTools
                 "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
             // In the hatch: peeking out at floor level, the rim of the hatch dark around the view.
             hud.HatchTint = Img(Stretch(overlays, "HatchTint"), new Color(0f, 0f, 0f, 1f), S("Vignette"));
-            hud.HatchText = Txt(R(overlays, "HatchText", TopCenter, TopCenter, new Vector2(0, -150), new Vector2(900, 60)),
+            hud.HatchText = Txt(R(overlays, "HatchText", TopCenter, TopCenter, new Vector2(0, -150), new Vector2(900, 84)),
                 "Ты в люке", 18, TextAnchor.MiddleCenter, Color.white, true);
             hud.HatchStatus = Txt(R(overlays, "HatchStatus", TopCenter, TopCenter, new Vector2(0, -160), new Vector2(900, 24)),
                 "В люке ждут", 15, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.65f), true);
+            hud.RouteCountdown = Txt(R(overlays, "RouteCountdown", Center, Center, new Vector2(0, 120), new Vector2(700, 130)),
+                "Путь выбран — выходим через\n5", 22, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.7f), true);
+            hud.RouteCountdown.supportRichText = true;
             var alarm = Stretch(overlays, "Alarm");
             hud.AlarmFrame = alarm.gameObject;
             var red = new Color(1f, 0.15f, 0.1f, 0.5f);
@@ -512,13 +517,12 @@ namespace Stealth.EditorTools
             hud.HatchDiamond = Img(diamond, new Color(0.45f, 1f, 0.5f, 0.8f));
             hud.HatchLabel = Txt(R(hud.HatchMarker, "Label", Center, Center, new Vector2(0, -19), new Vector2(120, 18)), "люк · 12 м", 12, TextAnchor.MiddleCenter, new Color(0.45f, 1f, 0.5f));
 
-            // How visible you are (light on you), above the noise meter.
-            var lightRow = R(content, "Visibility", BottomCenter, BottomLeft, new Vector2(-30, 156), new Vector2(200, 18));
+            // Bottom left: health, and above it how lit (= how visible) and how loud you are.
+            var lightRow = R(content, "Visibility", BottomLeft, BottomLeft, new Vector2(18, 86), new Vector2(200, 18));
             hud.LightBar = Bar(lightRow, "Bar", BottomLeft, BottomLeft, new Vector2(0, 5), new Vector2(46, 7), new Color(0, 0, 0, 0.55f), Color.white, 1f);
             hud.LightLabel = Txt(R(lightRow, "Label", BottomLeft, BottomLeft, new Vector2(54, -1), new Vector2(150, 18)), "в тени", 12, TextAnchor.MiddleLeft, Color.white, true);
 
-            // Noise meter above the inventory.
-            var noise = R(content, "Noise", BottomCenter, BottomLeft, new Vector2(-30, 134), new Vector2(160, 18));
+            var noise = R(content, "Noise", BottomLeft, BottomLeft, new Vector2(18, 64), new Vector2(160, 18));
             hud.NoiseGroup = noise.gameObject.AddComponent<CanvasGroup>();
             hud.NoiseGroup.blocksRaycasts = false;
             hud.NoiseBars = Enumerable.Range(0, 3)
@@ -526,24 +530,27 @@ namespace Stealth.EditorTools
             hud.NoiseLabel = Txt(R(noise, "Label", BottomLeft, BottomLeft, new Vector2(32, -2), new Vector2(120, 18)), "слышно", 12, TextAnchor.MiddleLeft, Color.white);
 
             // Quota panel, top left.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(232, 62));
+            // The house's name on its own line (the floor is under the minimap), the quota under it.
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 80));
             Img(quota, PanelColor);
-            hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(150, 22)), "Дом 1 · этаж 1", 14, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f), true);
-            hud.QuotaLabel = Txt(R(quota, "Count", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(212, 22)), "0 / 100", 14, TextAnchor.MiddleRight, Color.white, true);
-            hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(10, -28), new Vector2(212, 10), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
-            hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(240, -23), new Vector2(120, 26));
+            hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(280, 22)), "Офис ООО «Рога и Копыта»", 14, TextAnchor.MiddleLeft, Color.white, true);
+            hud.HouseLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            Txt(R(quota, "QuotaCaption", TopLeft, TopLeft, new Vector2(10, -22), new Vector2(140, 20)), "квота", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.6f));
+            hud.QuotaLabel = Txt(R(quota, "Count", TopLeft, TopLeft, new Vector2(10, -22), new Vector2(280, 20)), "0 / 100", 14, TextAnchor.MiddleRight, Color.white, true);
+            hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 10), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
+            hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(GameHUD.GainX, GameHUD.GainY), new Vector2(120, 26));
             hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
             hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 200), new Vector2(900, 52)), "Камера · 1 / 3", 16, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
-            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -40), new Vector2(260, 20)), "Охотник через 6:00 или после 3 тревог", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
-            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -64), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
+            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -56), new Vector2(280, 20)), "Охотник через 6:00 или после 3 тревог", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
+            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -84), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
 
-            // Health, top right, and the team list under it.
-            var hp = R(content, "Health", TopRight, TopRight, new Vector2(-16, -16), new Vector2(180, 40));
+            // Health, bottom left (light and noise above it); the team list top right under the minimap.
+            var hp = R(content, "Health", BottomLeft, BottomLeft, new Vector2(16, 16), new Vector2(180, 40));
             Img(hp, new Color(0, 0, 0, 0.55f));
             Txt(R(hp, "Caption", TopLeft, TopLeft, new Vector2(12, 0), new Vector2(60, 40)), "ХП", 15, TextAnchor.MiddleLeft, Color.white, true);
             hud.HpPips = Enumerable.Range(0, Stealth.Player.HealthState.MaxHp)
                 .Select(i => Img(R(hp, $"Pip{i}", TopLeft, TopLeft, new Vector2(56 + i * 54, -10), new Vector2(46, 20)), new Color(0.9f, 0.2f, 0.2f))).ToArray();
-            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -62), new Vector2(244, 0));
+            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -16 - MinimapSize - 8), new Vector2(244, 0));
             var team = hud.TeamList.gameObject.AddComponent<VerticalLayoutGroup>();
             team.childControlHeight = true;
             team.childControlWidth = true;
@@ -565,13 +572,8 @@ namespace Stealth.EditorTools
             hud.RunOverRestart = Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R — начать новый забег", 15, TextAnchor.MiddleCenter, Color.white);
             hud.RunOver = over.gameObject;
 
-            // The help text names the current keys (GameHUD rebuilds it after a rebind).
-            hud.HelpLabel = Txt(R(content, "Help", BottomLeft, BottomLeft, new Vector2(16, 12), new Vector2(420, 18)),
-                "Esc — меню и всё управление · H — скрыть", 12, TextAnchor.LowerLeft, new Color(1, 1, 1, 0.6f));
-            hud.Help = hud.HelpLabel.gameObject;
-
-            // The minimap (bottom right, turns with the view) and the big map (M, the whole floor, north-up).
-            hud.Minimap = BuildMap(e, content, "Minimap", true, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-16, 16), new Vector2(210, 210), 4.5f);
+            // The minimap (top right, turns with the view) and the big map (M, the whole floor, north-up).
+            hud.Minimap = BuildMap(e, content, "Minimap", true, TopRight, TopRight, new Vector2(-16, -16), new Vector2(MinimapSize, MinimapSize), 4.5f);
             hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
             hud.BigMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
@@ -780,14 +782,14 @@ namespace Stealth.EditorTools
         /// </summary>
         static GameObject BuildStashBoard(UiElements e)
         {
-            const float c = InventoryUI.Cell, pad = 8f, gap = 12f, header = 26f, sellW = 96f;
+            const float c = InventoryUI.Cell, pad = 8f, gap = 12f, header = 26f, sellW = 96f, buttonH = 30f;
             float gw = TeamStash.Width * c, gh = TeamStash.Height * c;
             var go = new GameObject("StashBoard", typeof(RectTransform));
             var canvas = go.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             go.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 3f;
             var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(pad + gw + gap + sellW + pad, header + gh + pad * 2f);
+            rt.sizeDelta = new Vector2(pad + gw + gap + sellW + pad, header + gh + pad * 3f + buttonH);
             rt.localScale = Vector3.one * 0.0065f; // ~2.5 m wide
             var board = go.AddComponent<StashBoard>();
             board.Canvas = canvas;
@@ -810,6 +812,9 @@ namespace Stealth.EditorTools
             board.SellZone = R(go.transform, "Sell", TopLeft, TopLeft, new Vector2(pad + gw + gap, -(header + pad)), new Vector2(sellW, gh));
             board.SellBackground = Img(board.SellZone, new Color(1f, 0.75f, 0.1f, 0.45f));
             Txt(Stretch(board.SellZone, "Label", 4f), "ПРОДАТЬ\nна квоту", 16, TextAnchor.MiddleCenter, Color.white, bold: true);
+            board.StashAllZone = R(go.transform, "StashAll", TopLeft, TopLeft, new Vector2(pad, -(header + gh + pad * 2f)), new Vector2(gw + gap + sellW, buttonH));
+            board.StashAllBackground = Img(board.StashAllZone, new Color(0.3f, 0.75f, 1f, 0.45f));
+            board.StashAllLabel = Txt(Stretch(board.StashAllZone, "Label", 2f), "СЛОЖИТЬ ВСЁ НА СКЛАД  [G]", 15, TextAnchor.MiddleCenter, Color.white, bold: true);
             SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
             return go;
         }

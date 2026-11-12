@@ -24,7 +24,7 @@ namespace Stealth.Level
             public GameObject Grate;
             [Tooltip("The panel over the mouth: where it leads.")]
             public Stealth.UI.RouteSignView Sign;
-            [Tooltip("A lamp inside, lit only when the tunnel is open.")]
+            [Tooltip("Lamps inside and the vote zone on the floor: shown only when the tunnel is open.")]
             public GameObject Lamp;
         }
 
@@ -38,7 +38,9 @@ namespace Stealth.Level
         public Branch[] Branches = new Branch[SewerBranches.Count];
 
         /// <summary>A player inside a tunnel this far past its mouth (and up to this deep) votes for it.</summary>
-        public const float VoteFrom = 0.6f, VoteTo = 11.5f, VoteHalfWidth = 1.4f;
+        public const float VoteFrom = 0.4f, VoteTo = 2.6f, VoteHalfWidth = 1.4f;
+        /// <summary>The invisible wall in every tunnel, metres past its mouth (the tunnel itself goes on into the dark).</summary>
+        public const float StopAt = 2.85f;
 
         float m_WaterBase;
         float m_FloodStart = -1f;

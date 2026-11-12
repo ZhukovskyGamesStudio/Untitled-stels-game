@@ -645,6 +645,25 @@ def zig(L, w, d, h, loc, n=3, k=.04):
     return out
 
 
+def half_disc(r, depth, base, seg=20):
+    """An upright half disc (flat side down on base = the middle of its bottom edge), depth along Y."""
+    bm = bmesh.new()
+    x0, y0, z0 = base
+    front, back = [], []
+    for i in range(seg + 1):
+        a = math.pi * i / seg
+        x, z = x0 + r * math.cos(a), z0 + r * math.sin(a)
+        front.append(bm.verts.new((x, y0 - depth / 2, z)))
+        back.append(bm.verts.new((x, y0 + depth / 2, z)))
+    bm.faces.new(front)
+    bm.faces.new(list(reversed(back)))
+    for i in range(seg):
+        bm.faces.new((front[i], back[i], back[i + 1], front[i + 1]))
+    bm.faces.new((front[seg], back[seg], back[0], front[0]))  # the flat bottom
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
 def fan(L, c, r, n=7, width=.08, depth=.03, a0=0.0, a1=math.pi):
     """A shell fan: a half disc of tapered rays round a hub (a chair back, a crest)."""
     return L.sunburst(c, r * .15, r, n, a0=a0, a1=a1, width=width, depth=depth) + [s.rcyl(r * .2, depth * 1.2, c, axis="Y", seg=12, r=.004)]
@@ -844,8 +863,9 @@ def p_bookshelf(L):
         P.add("Body", L.fluted(.045, .0, 1.6, loc=(x, 0), n=4) + L.finial((x, 0, 1.58), h=.1, r=.035))
     for h in (.03, .52, 1.04, 1.52):
         P.add("Body", L.slab((.98, .34, .04), (0, 0, h)))
-    P.add("Body", L.slab((.92, .02, 1.5), (0, .16, .78)) + [s.rcyl(.45, .3, (0, .01, 1.55), axis="Y", seg=20, r=.01)])
-    P.add("Accent", L.sunburst((0, -.15, 1.55), .05, .4, 9, a0=0, a1=math.pi, width=.05, depth=.02))
+    # the crest: a half disc standing on the top, its sunburst fanning upwards — above the books, not over them
+    P.add("Body", L.slab((.92, .02, 1.5), (0, .16, .78)) + [half_disc(.42, .26, (0, .02, 1.54))])
+    P.add("Accent", L.sunburst((0, -.12, 1.56), .05, .37, 9, a0=0, a1=math.pi, width=.05, depth=.02))
     for i, h in enumerate((.05, .54, 1.06)):
         x = -.42
         for k in range(6 + i % 2):
@@ -863,7 +883,8 @@ def p_fridge(L):
     P.add("Body", [s.rbox((.7, .7, 1.75), (0, 0, .925), r=.12, seg=3)])
     P.add("Body", L.door((.64, .44), (0, -.355, 1.45)) + L.door((.64, 1.0), (0, -.355, .68)))
     P.add("Accent", [s.rbox((.06, .05, .3), (.24, -.39, 1.0), r=.02, seg=1), s.rbox((.05, .05, .16), (.24, -.39, 1.45), r=.02, seg=1)])
-    P.add("Accent", L.sunburst((0, -.37, 1.25), .03, .1, 9, a0=0, a1=math.tau, width=.025, depth=.015))
+    # the badge sits on the upper door, clear of the seam and of the lever
+    P.add("Accent", L.sunburst((-.05, -.381, 1.45), .025, .085, 9, a0=0, a1=math.tau, width=.022, depth=.012))
     return P
 
 
