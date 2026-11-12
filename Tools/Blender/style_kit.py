@@ -246,7 +246,9 @@ def arch():
         nx, nz = -rz * math.cos(a), r * math.sin(a)       # outward normal of the ellipse
         ln = math.hypot(nx, nz)
         normal.append((nx / ln, nz / ln))
-    spandrels = band(curve, [(x, top) for x, _ in curve], 0, 0.03)
+    # the spandrels reach half the wall's thickness in (Unity puts a piece on each face): the two meet inside the opening,
+    # so under the curve there is no flat head and no square corners to see
+    spandrels = band(curve, [(x, top) for x, _ in curve], -0.1, 0.03)
     mould = 0.1
     ring = band(curve, [(x + nx * mould, z + nz * mould) for (x, z), (nx, nz) in zip(curve, normal)], 0.03, 0.06)
     legs = [box(-r - mould, -r, 0.03, 0.06, 0, spring), box(r, r + mould, 0.03, 0.06, 0, spring)]

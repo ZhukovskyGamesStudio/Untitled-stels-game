@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(HERE, "bestiary"))
 import bpy  # noqa: E402
 
 import meshfix  # noqa: E402
+import voxel  # noqa: E402
 import shapes as s  # noqa: E402
 import designs  # noqa: E402
 import props  # noqa: E402
@@ -160,6 +161,8 @@ def build(name, L, design):
         o.data.name = o.name
     meshfix.fix_objects(objs, floor=category(name) in ("Props", "Level"), name=f"{name}__{L.name}",
                         pinned=lambda n: n.startswith(MOVING))
+    if getattr(L, "voxel", 0.0) > 0.0:
+        voxel.voxelize(objs, L.voxel)  # a voxel style: every part rebuilt from cubes
     objs += fillers(name, objs)
     return objs
 

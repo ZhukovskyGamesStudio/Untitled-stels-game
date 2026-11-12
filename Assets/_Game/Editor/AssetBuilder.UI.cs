@@ -577,7 +577,29 @@ namespace Stealth.EditorTools
             hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
             hud.BigMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
+            BuildCheatPanel(e, content);
             return root;
+        }
+
+        /// <summary>The F4 cheat panel: its own canvas with a raycaster (the HUD takes no clicks), hidden until opened.</summary>
+        static void BuildCheatPanel(UiElements e, Transform content)
+        {
+            var holder = R(content, "Cheats", Center, Center, Vector2.zero, Vector2.zero);
+            holder.gameObject.AddComponent<Canvas>();
+            holder.gameObject.AddComponent<GraphicRaycaster>();
+            var panel = holder.gameObject.AddComponent<CheatPanel>();
+            var root = R(holder, "Panel", Center, Center, new Vector2(0, 0), new Vector2(420, 360));
+            Img(root, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
+            panel.Root = root.gameObject;
+            var col = Column(root, "Column", new Vector2(0, -14), 380, 8f);
+            ColumnText(col, "Title", "ЧИТЫ (F4)", 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
+            panel.KillRobots = ButtonIn(e, col, "KillRobots", "Выключить всех роботов", 36);
+            panel.Invulnerable = ButtonIn(e, col, "Invulnerable", "Неуязвимость: выкл", 36);
+            panel.Invisible = ButtonIn(e, col, "Invisible", "Невидимость для роботов: выкл", 36);
+            panel.Quota = ButtonIn(e, col, "Quota", "Выполнить квоту дома", 36);
+            panel.ToHatch = ButtonIn(e, col, "ToHatch", "Телепорт к люку", 36);
+            panel.RevealMap = ButtonIn(e, col, "RevealMap", "Открыть всю карту", 36);
+            root.gameObject.SetActive(false);
         }
 
         /// <summary>

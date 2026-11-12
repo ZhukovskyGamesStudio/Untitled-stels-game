@@ -152,11 +152,10 @@ namespace Stealth.Tests
         [Test]
         public void HighVentsCanBeClimbedTo()
         {
-            // the climb in numbers: floor → low crate → high crate are jumps, the sill a step, the duct fits a crouched player
+            // the climb in numbers: floor → desk is a jump, desk → sill a crouched step, the duct fits a crouched player
             const float jump = 0.9f, step = 0.35f, crouched = Stealth.Player.PlayerController.CrouchHeight;
-            Assert.LessOrEqual(LevelMetrics.CrateLow, jump - 0.1f);
-            Assert.LessOrEqual(LevelMetrics.CrateHigh - LevelMetrics.CrateLow, jump - 0.1f);
-            Assert.LessOrEqual(LevelMetrics.HighVentSill - LevelMetrics.CrateHigh, step - 0.03f, "a step up from the crate into the duct");
+            Assert.LessOrEqual(LevelMetrics.DeskTop, jump - 0.1f);
+            Assert.LessOrEqual(LevelMetrics.HighVentSill - LevelMetrics.DeskTop, step - 0.03f, "a step up from the desk into the duct");
             Assert.GreaterOrEqual(LevelMetrics.VentHeight, crouched + step, "room to step in crouched");
             Assert.LessOrEqual(LevelMetrics.HighVentSill + LevelMetrics.VentHeight, LevelMetrics.WallHeight - 0.2f, "under the ceiling");
 
@@ -168,7 +167,13 @@ namespace Stealth.Tests
                 {
                     if (!o.High) { if (o.Kind == EdgeType.Vent) low++; continue; }
                     Assert.AreEqual(EdgeType.Vent, o.Kind, "only vents go up");
-                    Assert.IsTrue(LevelGenerator.CratesFit(l, o), $"seed {seed}: the crates under the vent fit");
+                    Assert.IsTrue(LevelGenerator.DesksFit(l, o), $"seed {seed}: the desks under the vent fit");
+                    // a desk on each side, back to the wall under the hole
+                    var w = l.Plan.Walls[o.Wall];
+                    var mid = w.At(o.At);
+                    int desks = l.Props.Count(p => p.Kind is PropKind.Desk or PropKind.Terminal &&
+                        (new Vector2(p.Position.x, p.Position.z) - mid).magnitude < 0.75f && LevelLayout.FloorOf(p.Position.y) == w.Floor);
+                    Assert.AreEqual(2, desks, $"seed {seed}: desks under the high vent at {mid}");
                     high++;
                 }
                 Assert.AreEqual(l.Plan.Openings.Count(o => o.High), l.Doorways.Count(d => d.High), "doorways carry it");

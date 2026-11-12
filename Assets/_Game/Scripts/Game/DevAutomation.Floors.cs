@@ -165,7 +165,7 @@ namespace Stealth.Game
         }
 
         /// <summary>
-        /// A vent under the ceiling: from the floor, jump onto the low crate and the high one (holding jump and forward),
+        /// A vent under the ceiling: from the floor, jump onto the desk under it (holding jump and forward),
         /// then crouch and walk on — into the duct, through the wall and down the crates on the other side.
         /// </summary>
         IEnumerator HighVentClimb(LevelLayout l)
@@ -189,17 +189,17 @@ namespace Stealth.Game
                     top = Mathf.Max(top, Me.transform.position.y - d.Position.y);
                     yield return null;
                 }
-                float onCrates = Me.transform.position.y - d.Position.y;
-                yield return Shot("high_vent_on_crates");
+                float onDesk = Me.transform.position.y - d.Position.y;
+                yield return Shot("high_vent_on_desk");
                 Drive(Vector2.up * 0.7f, crouch: true);
                 yield return new WaitForSeconds(0.6f);
                 yield return Shot("high_vent_in_duct");
                 yield return new WaitForSeconds(3.4f);
                 Release();
                 float beyond = Vector3.Dot(Me.transform.position - d.Position, across);
-                Log($"high vent at {d.Position}: on the crates y={onCrates:0.00} (highest {top:0.00}), through={beyond > 0.3f} ({beyond:0.0} m past the wall), " +
+                Log($"high vent at {d.Position}: on the desk y={onDesk:0.00} (highest {top:0.00}), through={beyond > 0.3f} ({beyond:0.0} m past the wall), " +
                     $"y now {Me.transform.position.y - d.Position.y:0.00}");
-                // looking back at the hole under the ceiling and the crates under it
+                // looking back at the hole under the ceiling and the desk under it
                 LookAtFrom(new Pose(d.Position + across * 3.2f + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + Vector3.up * 1.2f);
                 yield return new WaitForSeconds(0.5f);
                 yield return Shot("high_vent_from_the_other_side");

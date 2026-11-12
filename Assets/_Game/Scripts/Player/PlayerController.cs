@@ -106,7 +106,30 @@ namespace Stealth.Player
 
         public Vector3 Position => transform.position;
         public bool IsCrouching => Crouching;
-        public bool IsDown => !IsSpawned || Downed || InHatch;
+        public bool IsDown => !IsSpawned || Downed || InHatch || Invisible;
+
+        /// <summary>Server: cheats of the F4 panel — nothing hurts this player / robots do not perceive them.</summary>
+        public bool Invulnerable { get; private set; }
+        public bool Invisible { get; private set; }
+
+        /// <summary>Owner: a cheat from the F4 panel (the server carries it out).</summary>
+        public void RequestCheat(Cheat cheat, bool on)
+        {
+            if (m_Link != null) m_Link.SendCheat(cheat, on);
+            else CheatServer(cheat, on);
+        }
+
+        public void CheatServer(Cheat cheat, bool on)
+        {
+            var gm = GameManager.Instance;
+            switch (cheat)
+            {
+                case Cheat.Invulnerable: Invulnerable = on; break;
+                case Cheat.Invisible: Invisible = on; break;
+                case Cheat.KillRobots: gm?.KillAllRobotsServer(); break;
+                case Cheat.FillQuota: gm?.FillQuotaServer(); break;
+            }
+        }
         /// <summary>Lying with no HP: only a teammate can lift you (lying with HP left you get up yourself).</summary>
         public bool KnockedOut => Downed && Hp == 0;
         /// <summary>Owner: lying with HP left long enough to get up (Space).</summary>
@@ -228,7 +251,7 @@ namespace Stealth.Player
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
-            bool menu = GameMenu.IsOpen;
+            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null; // busy at a dial or a terminal: no walking
@@ -918,7 +941,7 @@ namespace Stealth.Player
 
         public void HitServer(Vector3 source)
         {
-            if (!IsServer || !m_Health.TryHit(Time.time)) return;
+            if (!IsServer || Invulnerable || !m_Health.TryHit(Time.time)) return;
             PublishHealth();
             var away = transform.position - source;
             away.y = 0;

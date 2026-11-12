@@ -72,7 +72,9 @@ def arch(w, z0, z1, n=8):
 
 
 class Style(Lang):
+    """Noir detective, built from voxels (in the spirit of Shadows of Doubt): the shapes below, rebuilt from 4 cm cubes."""
     name = "S11_Noir"
+    voxel = 0.04
     seg = SEG
     soft = 0.0
     edge = 0.012

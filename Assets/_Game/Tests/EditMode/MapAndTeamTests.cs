@@ -90,7 +90,7 @@ namespace Stealth.Tests
             var l = LevelGenerator.Generate(3, 1);
             var map = new ExplorationMap(l);
             Assert.AreEqual(0f, map.RevealedShare(0));
-            Assert.AreEqual(Mathf.CeilToInt(l.SizeX / ExplorationMap.Tile), map.Width);
+            Assert.AreEqual(Mathf.CeilToInt((l.SizeX + 2f * ExplorationMap.Margin) / ExplorationMap.Tile), map.Width);
             var eye = l.Lobby.Center + Vector3.up * 1.6f;
             Assert.Greater(map.RevealAround(eye, 8f), 0);
             var tile = ExplorationMap.TileOf(eye);
@@ -157,6 +157,22 @@ namespace Stealth.Tests
                 }
             }
             Assert.Greater(checkedDoors, 2);
+        }
+
+        [Test]
+        public void OutsideTheMapOpensOnlyCloseBy()
+        {
+            var l = LevelGenerator.Generate(5, 1);
+            var map = new ExplorationMap(l);
+            var eye = new Vector3(-3f, 1.6f, l.SizeZ / 2f); // in the yard, 3 m off the building's side
+            Assert.Greater(map.RevealAround(eye, 14f, 4f), 0, "the yard round the player opens");
+            var here = ExplorationMap.TileOf(eye);
+            Assert.IsTrue(map.IsRevealed(0, here.x, here.y));
+            var far = ExplorationMap.TileOf(eye + new Vector3(0f, 0f, 6f));
+            Assert.IsFalse(map.IsRevealed(0, far.x, far.y), "not far in the gas");
+            var rects = new List<MapRect>();
+            MapSketch.Build(map, 0, null, rects);
+            Assert.IsTrue(rects.Any(r => r.Part == MapPart.Ground), "the yard is drawn as ground");
         }
 
         [Test]

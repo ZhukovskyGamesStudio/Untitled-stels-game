@@ -239,6 +239,31 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ walls
 
         readonly Dictionary<Vector3, float> m_Posts = new();
+        /// <summary>Walls of the floor by their end points (cm keys): to find bent walls whose pieces meet at a shallow angle.</summary>
+        readonly Dictionary<Vector3, List<int>> m_Ends = new();
+
+        static Vector3 EndKey(Vector2 p) => new(Mathf.Round(p.x * 100f) / 100f, 0f, Mathf.Round(p.y * 100f) / 100f);
+
+        /// <summary>
+        /// The two walls meeting at <paramref name="p"/> continue each other at a shallow angle (the pieces of a chamfer or an
+        /// arc, not a corner): their joint gets a post turned between them and decoration that meets at the joint.
+        /// </summary>
+        bool SmoothJoint(Vector2 p, out float yaw)
+        {
+            yaw = 0f;
+            if (!m_Ends.TryGetValue(EndKey(p), out var walls) || walls.Count != 2) return false;
+            var a = m_Plan.Walls[walls[0]];
+            var b = m_Plan.Walls[walls[1]];
+            if (a.Railing || b.Railing) return false;
+            // directions pointing away from the joint
+            var da = (EndKey(a.A) == EndKey(p) ? a.Dir : -a.Dir);
+            var db = (EndKey(b.A) == EndKey(p) ? b.Dir : -b.Dir);
+            float turn = 180f - Vector2.Angle(da, db); // 0 = straight on
+            if (turn > 60f || turn < 1f) return false;
+            var mean = (da - db).normalized; // along the wall through the joint
+            yaw = Mathf.Atan2(mean.x, mean.y) * Mathf.Rad2Deg;
+            return true;
+        }
 
         /// <summary>
         /// Walls of a floor without overlapping geometry (overlaps z-fight and look like clipping): every piece stops half a
@@ -248,12 +273,28 @@ namespace Stealth.Level
         void BuildWalls(int f)
         {
             m_Posts.Clear();
+            m_Ends.Clear();
+            for (int i = 0; i < m_Plan.Walls.Count; i++)
+            {
+                var w = m_Plan.Walls[i];
+                if (w.Floor != f || w.Railing) continue;
+                foreach (var e in new[] { EndKey(w.A), EndKey(w.B) })
+                {
+                    if (!m_Ends.TryGetValue(e, out var l)) m_Ends[e] = l = new List<int>();
+                    l.Add(i);
+                }
+            }
             for (int i = 0; i < m_Plan.Walls.Count; i++)
                 if (m_Plan.Walls[i].Floor == f) Wall(i);
             const float t = LevelMetrics.WallThickness;
             float y = LevelLayout.FloorY(f);
             foreach (var kv in m_Posts)
-                Block(m_Art.WallBlock, "WallPost", kv.Key + Vector3.up * (y + kv.Value / 2f), new Vector3(t, kv.Value, t));
+            {
+                // a post between two pieces of a bent wall turns with them: its faces run on with the wall's, no cube sticks out
+                var at = new Vector2(kv.Key.x, kv.Key.z);
+                var rot = SmoothJoint(at, out float yaw) ? Quaternion.Euler(0f, yaw, 0f) : (Quaternion?)null;
+                Block(m_Art.WallBlock, "WallPost", kv.Key + Vector3.up * (y + kv.Value / 2f), new Vector3(t, kv.Value, t), rot);
+            }
         }
 
         void Post(Vector2 p, float height)
@@ -284,7 +325,8 @@ namespace Stealth.Level
             float len = w.Length;
             var inner = InnerNormals(w);
             float from = t / 2f;
-            bool cornerA = true;
+            bool jointA = SmoothJoint(w.A, out _), jointB = SmoothJoint(w.B, out _);
+            bool cornerA = !jointA;
             foreach (var o in openings)
             {
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
@@ -293,7 +335,7 @@ namespace Stealth.Level
                 float sill = o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
                 float openH = vent ? sill + LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
                 WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * o0, 0f, height);
-                RecordFaces(a3 + d3 * from, a3 + d3 * o0, 0f, height, w.Exterior, inner, cornerA, false);
+                RecordFaces(a3 + d3 * from, a3 + d3 * o0, 0f, height, w.Exterior, inner, cornerA, false, jointA && cornerA == false && from <= t / 2f + 0.001f);
                 if (vent)
                 {
                     // the duct's floor: a sill of wall under the hole
@@ -314,10 +356,15 @@ namespace Stealth.Level
                 cornerA = false;
             }
             WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height);
-            RecordFaces(a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height, w.Exterior, inner, cornerA, true);
+            RecordFaces(a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height, w.Exterior, inner, cornerA, !jointB,
+                jointA && from <= t / 2f + 0.001f, jointB);
         }
 
-        /// <summary>The sides of a wall a room sees: both for a wall between rooms, only the room's side otherwise.</summary>
+        /// <summary>
+        /// The sides of a wall a room sees: both for a wall between rooms, only the room's side otherwise. A bent wall (a
+        /// chamfer, an arc) has the sealed pocket on one side, and the room's cells next to it are pocket too (a margin):
+        /// look a little further out before deciding.
+        /// </summary>
         List<Vector3> InnerNormals(PlanWall w)
         {
             var list = new List<Vector3>();
@@ -326,18 +373,27 @@ namespace Stealth.Level
             var mid = w.At(w.Length / 2f);
             foreach (var side in new[] { n, -n })
             {
-                var c = HousePlan.CellOf(mid + side * (HousePlan.Res * 0.5f));
-                var k = m_Plan.KindAt(w.Floor, c.x, c.y);
+                var k = CellKind.Pocket;
+                for (float s = HousePlan.Res * 0.5f; s <= 0.8f && k == CellKind.Pocket; s += HousePlan.Res * 0.5f)
+                {
+                    var c = HousePlan.CellOf(mid + side * s);
+                    k = m_Plan.KindAt(w.Floor, c.x, c.y);
+                }
                 if (k == CellKind.Room || k == CellKind.Void) list.Add(new Vector3(side.x, 0f, side.y));
             }
             return list;
         }
 
-        void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, List<Vector3> sides, bool cornerA, bool cornerB)
+        void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, List<Vector3> sides, bool cornerA, bool cornerB,
+            bool jointA = false, bool jointB = false)
         {
             if ((b - a).magnitude < 0.05f) return;
             foreach (var side in sides)
-                Shell.Walls.Add(new WallFace { A = a, B = b, Y0 = y0, Y1 = y1, Normal = side, Floor = m_Floor, Exterior = outside, CornerA = cornerA, CornerB = cornerB });
+                Shell.Walls.Add(new WallFace
+                {
+                    A = a, B = b, Y0 = y0, Y1 = y1, Normal = side, Floor = m_Floor, Exterior = outside,
+                    CornerA = cornerA, CornerB = cornerB, JointA = jointA, JointB = jointB,
+                });
         }
 
         /// <summary>A wall block exactly from <paramref name="a"/> to <paramref name="b"/> (no overlap with neighbours), any direction.</summary>
@@ -353,7 +409,10 @@ namespace Stealth.Level
             else Block(prefab, "Wall", centre, new Vector3(t, y1 - y0, len), Quaternion.LookRotation(d));
         }
 
-        /// <summary>A railing on the edge of a gallery: a waist-high bar the view and the light pass over.</summary>
+        /// <summary>
+        /// A railing on the edge of a gallery: an invisible waist-high collider the view and the light pass over, and bays of
+        /// the house's railing look strung along it (posts and balusters, tubes, glass or a parapet — <see cref="StairLook"/>).
+        /// </summary>
         void RailingPiece(Vector3 a, Vector3 b)
         {
             var len = (b - a).magnitude;
@@ -361,7 +420,21 @@ namespace Stealth.Level
             var d = (b - a) / len;
             var centre = (a + b) / 2f + Vector3.up * (RailingHeight / 2f);
             var rot = Mathf.Abs(d.x) > 0.999f ? Quaternion.LookRotation(Vector3.right) : Mathf.Abs(d.z) > 0.999f ? Quaternion.identity : Quaternion.LookRotation(d);
-            Block(m_Art.TrimBlock, "Railing", centre, new Vector3(RailingThickness, RailingHeight, len), rot);
+            if (m_Art.RailingBay == null || m_Art.RailingBlock == null)
+            {
+                Block(m_Art.TrimBlock, "Railing", centre, new Vector3(RailingThickness, RailingHeight, len), rot);
+                return;
+            }
+            Block(m_Art.RailingBlock, "Railing", centre, new Vector3(RailingThickness, RailingHeight, len), rot);
+            int bays = Mathf.Max(1, Mathf.CeilToInt(len / 1.25f));
+            var bayRot = Quaternion.LookRotation(Vector3.Cross(d, Vector3.up)); // local X along the railing
+            int seed = LevelRandom.Mix(m_Layout.Seed, 0x57A1, 7); // one look for every railing of the house
+            for (int i = 0; i < bays; i++)
+            {
+                var go = Place(m_Art.RailingBay, "RailingBay", a + d * (len * (i + 0.5f) / bays), bayRot);
+                go.transform.localScale = new Vector3(len / bays, 1f, 1f);
+                if (go.TryGetComponent<StairLook>(out var look)) look.Configure(seed);
+            }
         }
 
         // ------------------------------------------------------------------ light, stairs, facade

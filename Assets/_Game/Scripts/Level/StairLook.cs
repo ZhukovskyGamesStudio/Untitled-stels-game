@@ -3,7 +3,8 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// The look of a staircase (prefabs Level/Stairs and StairsMirrored): the prefab carries every built look
+    /// The look of a staircase (prefabs Level/Stairs and StairsMirrored) or of a bay of a gallery railing (Level/RailingBay,
+    /// where there are no collider boxes to hide): the prefab carries every built look
     /// (<see cref="StairStyle"/> order) over the plain collider boxes; the one that suits the current model family and the
     /// house seed is shown (<see cref="StairStyles"/>), the boxes are hidden. Purely visual: the colliders, the navmesh
     /// and the step heights never change. Follows the style when F8 changes it.

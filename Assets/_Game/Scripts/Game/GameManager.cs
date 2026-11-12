@@ -333,6 +333,19 @@ namespace Stealth.Game
 
         public void AddCollectedServer(int value) => m_Run.Deposit(value);
 
+        /// <summary>Server, cheat: every robot and device switched off for good (hacked for a day).</summary>
+        public void KillAllRobotsServer()
+        {
+            foreach (var d in Detector.All.ToArray()) d.HackServer(86400f);
+            Banner("Читы: все роботы выключены");
+        }
+
+        /// <summary>Server, cheat: the quota of this house is met.</summary>
+        public void FillQuotaServer()
+        {
+            if (Collected < Quota) AddCollectedServer(Quota - Collected);
+        }
+
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
             m_Run.RaiseAlarm(Session.ServerTime);
@@ -378,7 +391,7 @@ namespace Stealth.Game
             {
                 if (!m_IsServer && p != PlayerController.Local) continue;
                 var eye = p.Camera != null && p.IsOwner ? p.Camera.transform.position : p.transform.position + Vector3.up * p.Height * 0.9f;
-                map.RevealAround(eye, radius);
+                map.RevealAround(eye, radius, Tuning.Player.Team.OutsideRevealRadius);
             }
         }
 

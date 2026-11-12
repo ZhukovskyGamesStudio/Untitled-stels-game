@@ -28,6 +28,10 @@ namespace Stealth.Level
         public GameObject HighVentFrame;
         [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
         public GameObject SqueezeFrame;
+        [Tooltip("One bay of a gallery railing in every staircase look (StairLook picks one).")]
+        public GameObject RailingBay;
+        [Tooltip("An invisible box collider, stretched along a railing.")]
+        public GameObject RailingBlock;
         public GameObject AutoDoor;
         public GameObject RoomLight;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]

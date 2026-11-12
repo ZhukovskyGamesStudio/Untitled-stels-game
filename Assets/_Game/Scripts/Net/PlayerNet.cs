@@ -101,6 +101,10 @@ namespace Stealth.Net
         public void SendHatch(bool hide) => HatchRpc(hide);
         public void SendUnlockDoor(int door) => UnlockDoorRpc(door);
         public void SendOpenSafe(int safe) => OpenSafeRpc(safe);
+        public void SendCheat(Cheat cheat, bool on) => CheatRpc((byte)cheat, on);
+
+        [Rpc(SendTo.Server)]
+        void CheatRpc(byte cheat, bool on) => m_Player.CheatServer((Cheat)cheat, on);
 
         [Rpc(SendTo.Server)]
         void HatchRpc(bool hide) => m_Player.OnHatchRequest(hide);

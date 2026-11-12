@@ -8,7 +8,7 @@ namespace Stealth.Player
     public enum GameAction
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
-        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart,
+        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats,
     }
 
     /// <summary>
@@ -82,6 +82,7 @@ namespace Stealth.Player
             new(GameAction.Style, "Прочее", "Сменить визуальный стиль", KeyBinding.Of(Key.F8)),
             new(GameAction.Unstuck, "Прочее", "Я застрял — на свободное место", KeyBinding.Of(Key.K)),
             new(GameAction.Restart, "Прочее", "Новый забег (после провала)", KeyBinding.Of(Key.R)),
+            new(GameAction.Cheats, "Прочее", "Чит-панель (для тестов)", KeyBinding.Of(Key.F4)),
         };
 
         const string Prefix = "stealth.key.";

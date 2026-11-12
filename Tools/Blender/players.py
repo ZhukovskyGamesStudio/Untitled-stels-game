@@ -22,6 +22,7 @@ import figure as G  # noqa: E402  (primitives and the per-family finishing)
 from figure import box, cyl, sph, capsule, limb, merge  # noqa: E402
 
 import bpy  # noqa: E402
+import voxel  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ROOT = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
@@ -263,6 +264,10 @@ PLANS = {
 }
 
 
+# voxel styles: the figure rebuilt from cubes of this size (the same grid as the style's robots and furniture)
+VOXEL = {"S11_Noir": 0.04}
+
+
 def build(style, finish, p, dept):
     G.FINISH = finish
     acc, dark, extra = department(p, dept)
@@ -287,6 +292,8 @@ def build(style, finish, p, dept):
     os.makedirs(OUT, exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
     G.meshfix.fix_objects(list(bpy.context.selected_objects), name=f"player__{style}__{DEPARTMENTS[dept]}")
+    if style in VOXEL:
+        voxel.voxelize(list(bpy.context.selected_objects), VOXEL[style])
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"player__{style}__{DEPARTMENTS[dept]}.fbx"), use_selection=True,
                              apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=True,
                              object_types={"MESH"}, use_mesh_modifiers=True, mesh_smooth_type="FACE", add_leaf_bones=False)

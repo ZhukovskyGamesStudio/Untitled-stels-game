@@ -19,11 +19,13 @@ namespace Stealth.Level
         // the clear height above the sill fits the crouched capsule (1.1 m) + the step-up probe (0.35); standing 1.8 m does not fit.
         public const float VentSill = 0.25f;
         public const float VentHeight = 1.5f;
-        // A high vent: its sill is a short step up from a stack of two crates (each a jump up: JumpHeight 0.9), its top stays under the ceiling.
-        public const float HighVentSill = 1.2f;
-        public const float CrateLow = 0.45f, CrateHigh = 0.9f;
-        /// <summary>How far the crate stack reaches into the room from the wall's face.</summary>
-        public const float CrateReach = 1.15f;
+        // A high vent: up under the ceiling, over a desk standing against the wall on both sides (the furniture the players
+        // climb: a jump onto the desk, JumpHeight 0.9; from its top a short crouched step into the duct).
+        public const float HighVentSill = 1.05f;
+        /// <summary>Top of a desk (the climbing furniture under a high vent), metres.</summary>
+        public const float DeskTop = 0.765f;
+        /// <summary>How far the desk under a high vent and the room to climb onto it reach into the room from the wall's face.</summary>
+        public const float VentDeskReach = 0.9f, VentDeskAisle = 1.0f;
         public const float SqueezeWidth = 1.1f; // nominal; the clear slot is 0.9 m: a player (0.78 m with skin) fits, a robot does not (navmesh volume)
         public const float WindowWidth = 2.4f;   // the window model's opening
         public const float WindowHeight = 1.2f;

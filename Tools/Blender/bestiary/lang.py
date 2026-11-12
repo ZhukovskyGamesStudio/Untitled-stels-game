@@ -45,6 +45,7 @@ class Lang(Furniture):
     flat = False        # flat shading (faceted styles)
     sharp = 35.0        # smooth-by-angle limit
     grid = 0.0          # snap every vertex to this grid (PS1 wobble); 0 = off
+    voxel = 0.0         # rebuild every finished part from cubes of this size (a voxel style); 0 = off
     hull_kind = "rounded"   # rounded | soft | facet | block | barrel | frame | plated | shard
     limb_kind = "tube"      # tube | square | piston | stilt
     eye_kind = "lens"       # lens | visor | bulb | porthole | slit

@@ -41,6 +41,7 @@ namespace Stealth.UI
             new(0.45f, 1f, 0.5f, 0.95f),     // Hatch
             new(0.7f, 0.85f, 0.95f, 0.6f),   // Railing (the edge of a gallery)
             new(0.05f, 0.07f, 0.1f, 0.55f),  // Void (an atrium seen from above)
+            new(0.22f, 0.3f, 0.22f, 0.45f),  // Ground (the yard outside, seen up close in the gas)
         };
         static readonly Color Marked = new(1f, 0.22f, 0.15f);
 

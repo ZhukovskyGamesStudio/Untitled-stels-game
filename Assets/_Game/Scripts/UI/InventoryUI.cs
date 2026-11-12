@@ -104,7 +104,7 @@ namespace Stealth.UI
         bool StashActive(PlayerController me)
         {
             var gm = GameManager.Instance;
-            return Board != null && gm != null && gm.CanTradeAt(me.transform.position);
+            return Board != null && gm != null && !DevFlags.HideStashBoard && gm.CanTradeAt(me.transform.position);
         }
 
         /// <summary>What the cursor is over: the backpack grid, the stash grid, the sell area or nothing.</summary>

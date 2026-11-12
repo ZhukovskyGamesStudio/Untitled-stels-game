@@ -86,8 +86,11 @@ namespace Stealth.Tests
             foreach (var w in shell.Walls.Where(w => w.Exterior))
             {
                 // an outer wall's face looks into the building, never out into the gas
+                // (a bent wall has a margin of pocket cells on its room side: look a little further too)
                 var p = (w.A + w.B) / 2f + w.Normal * 0.4f;
-                Assert.GreaterOrEqual(layout.Plan.SpaceAt(w.Floor, new Vector2(p.x, p.z)), 0, $"outer wall face at {p} looks outside");
+                var q = (w.A + w.B) / 2f + w.Normal * 0.8f;
+                bool inside = layout.Plan.SpaceAt(w.Floor, new Vector2(p.x, p.z)) >= 0 || layout.Plan.SpaceAt(w.Floor, new Vector2(q.x, q.z)) >= 0;
+                Assert.IsTrue(inside, $"outer wall face at {p} looks outside");
             }
             float area = shell.Floors.Where(f => f.Floor == 0).Sum(f => (f.Max.x - f.Min.x) * (f.Max.y - f.Min.y));
             float rooms = layout.Rooms.Where(r => r.Floor == 0).Sum(r => r.Area);

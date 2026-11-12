@@ -217,6 +217,32 @@ namespace Stealth.Level
         readonly List<int> m_GroupOf = new();    // per prop of the layout: the group it came with (−1: not removable)
         readonly List<int> m_ItemGroup = new();  // per loot spot
 
+        /// <summary>
+        /// Under every high vent, on both sides: an ordinary desk against the wall (the players climb it to reach the duct —
+        /// furniture that happens to stand there, not a staircase someone built). Never removed by the walkability check;
+        /// the space in front of it stays free so nothing blocks the climb.
+        /// </summary>
+        public void PlaceVentDesks()
+        {
+            float face = LevelMetrics.WallThickness / 2f;
+            float half = Foot[PropKind.Desk].height / 2f;
+            foreach (var d in m_L.Doorways)
+            {
+                if (!d.High) continue;
+                var across = d.Rotation * Vector3.forward;
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var n = across * side;
+                    var pos = d.Position + n * (face + WallGap + half);
+                    var room = m_P.RoomAt(pos + Vector3.up * 0.1f);
+                    if (room == null) continue;
+                    float yaw = Mathf.Atan2(n.x, n.z) * Mathf.Rad2Deg; // its front (+Z) to the room, its back to the wall
+                    Put(room, PropKind.Desk, pos, yaw);
+                    Keep(d.Floor, pos + n * half - d.Rotation * Vector3.right * 0.9f, pos + n * (half + LevelMetrics.VentDeskAisle) + d.Rotation * Vector3.right * 0.9f);
+                }
+            }
+        }
+
         public void Put(PlanRoom room, PropKind k, Vector3 p, float yaw)
         {
             m_L.Props.Add(new PropPlacement { Kind = k, Position = p, RotationY = yaw });

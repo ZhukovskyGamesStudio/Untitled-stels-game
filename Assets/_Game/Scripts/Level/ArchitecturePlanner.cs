@@ -49,6 +49,8 @@ namespace Stealth.Level
             if (shell == null || g == null) return list;
             foreach (var face in shell.Walls) PlanFace(list, face, shell, g);
             foreach (var o in shell.Openings) PlanOpening(list, o, g);
+            if (g.Wall != null)
+                foreach (var o in shell.Openings) PlanReveals(list, o);
             if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling);
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (g.Floor != null)
@@ -159,13 +161,15 @@ namespace Stealth.Level
 
         static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g)
         {
-            // Reach into the room's corners: past the corner post on that side.
-            float u0 = f.CornerA ? -T : 0f, u1 = f.Length + (f.CornerB ? T : 0f);
+            // Reach into the room's corners: past the corner post on that side; at the joint of a bent wall exactly to the joint.
+            float u0 = f.CornerA ? -T : f.JointA ? -T / 2f : 0f, u1 = f.Length + (f.CornerB ? T : f.JointB ? T / 2f : 0f);
             float len = u1 - u0;
             if (len < 0.05f) return;
             var rot = Quaternion.LookRotation(f.Normal);
             Vector3 At(float u, float y) => f.At(u) + Vector3.up * y;
             bool fullHeight = f.Y0 <= 0.001f;
+            // the piece under a vent is only knee-high: what does not fit under the hole stays off it
+            bool toTop = f.Y1 >= LevelMetrics.WallHeight - 0.05f;
             var holes = fullHeight ? WindowHoles(f, shell) : new List<(float, float)>();
 
             void Run(DecorKind kind, float y)
@@ -173,10 +177,11 @@ namespace Stealth.Level
                 list.Add(new DecorPiece { Kind = kind, Position = At((u0 + u1) / 2f, y), Rotation = rot, Scale = new Vector3(len, 1f, 1f) });
             }
 
-            if (fullHeight && g.Baseboard && g.WainscotHeight <= 0f) Run(DecorKind.Baseboard, 0f);
-            if (g.Crown) Run(DecorKind.Crown, LevelMetrics.WallHeight);
-            if (fullHeight && g.RailHeight > 0f) Run(DecorKind.Rail, g.RailHeight);
-            if (fullHeight && g.WainscotHeight > 0f)
+            bool wainscot = fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + 0.02f;
+            if (fullHeight && g.Baseboard && !wainscot && f.Y1 >= 0.2f) Run(DecorKind.Baseboard, 0f);
+            if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight);
+            if (fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) Run(DecorKind.Rail, g.RailHeight);
+            if (wainscot)
             {
                 int n = Mathf.Max(1, Mathf.RoundToInt(len / 1.1f));
                 float w = len / n;
@@ -187,13 +192,13 @@ namespace Stealth.Level
                         Scale = new Vector3(w, g.WainscotHeight, 1f),
                     });
             }
-            if (g.Pipes && f.Y0 < 2.5f)
+            if (g.Pipes && f.Y0 < 2.5f && toTop)
             {
                 Run(DecorKind.Pipes, 0f);
                 for (float u = u0 + 0.6f; u < u1 - 0.4f; u += 1.5f)
                     list.Add(new DecorPiece { Kind = DecorKind.PipeClamp, Position = At(u, 0f), Rotation = rot, Scale = Vector3.one });
             }
-            if (fullHeight && g.StripSpacing > 0f)
+            if (fullHeight && toTop && g.StripSpacing > 0f)
             {
                 int n = Mathf.FloorToInt((len - 0.8f) / g.StripSpacing);
                 for (int i = 0; i <= n; i++)
@@ -295,6 +300,32 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// The wall's finish carried into a doorway: both reveals and the head, across the wall's thickness, so the opening
+        /// reads as cut into the same wall instead of a bare block between two papered faces. Vents have their lining.
+        /// </summary>
+        static void PlanReveals(List<DecorPiece> list, WallOpening o)
+        {
+            if (o.Vent || o.Exterior) return;
+            float w = o.Width, h = o.Height;
+            const float lift = 0.006f;
+            foreach (float s in new[] { -1f, 1f })
+            {
+                // the reveal at the +s end faces back into the opening (−s along the wall)
+                var c = o.Center + o.Along * (s * (w / 2f - lift)) + Vector3.up * (h / 2f);
+                list.Add(new DecorPiece
+                {
+                    Kind = DecorKind.WallFinish, Position = c, Rotation = Quaternion.LookRotation(o.Along * s),
+                    Scale = new Vector3(T, h, 1f), Surface = new Vector4(T, h, 0f, 0f),
+                });
+            }
+            list.Add(new DecorPiece
+            {
+                Kind = DecorKind.WallFinish, Position = o.Center + Vector3.up * (h - lift),
+                Rotation = Quaternion.LookRotation(Vector3.up, o.Along), Scale = new Vector3(T, w, 1f), Surface = new Vector4(T, w, 0f, h),
+            });
+        }
+
         // ------------------------------------------------------------------ ceilings
 
         static void PlanCeilings(List<DecorPiece> list, LevelLayout l, CeilingKind kind)
@@ -321,28 +352,24 @@ namespace Stealth.Level
                     }
                     return null;
                 }
+                float ceilingY = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight;
+                if (kind is CeilingKind.Beams or CeilingKind.IBeams or CeilingKind.Coffers)
+                {
+                    // One system for the whole room: beams across its short side, each from wall to wall (broken only
+                    // over a stair hole), so they never end in the middle of the ceiling or cross each other at odd heights.
+                    var k = kind == CeilingKind.Beams ? DecorKind.Beam : kind == CeilingKind.IBeams ? DecorKind.IBeam : DecorKind.Coffer;
+                    bool zBeams = room.Bounds.height <= room.Bounds.width;
+                    BeamLines(list, l, room, lamps, k, zBeams, 3.75f, ceilingY);
+                    if (kind == CeilingKind.Coffers) BeamLines(list, l, room, lamps, k, !zBeams, 5f, ceilingY);
+                    continue;
+                }
                 foreach (var r in CeilingRects(l, room))
                 {
-                    float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight;
+                    float y = ceilingY;
                     var c = new Vector3(r.center.x, y, r.center.y);
-                    float spanZ = r.height - T, spanX = r.width - T;
+                    float spanX = r.width - T;
                     switch (kind)
                     {
-                        case CeilingKind.Beams:
-                        case CeilingKind.IBeams:
-                            var k = kind == CeilingKind.Beams ? DecorKind.Beam : DecorKind.IBeam;
-                            foreach (float dx in Spread(r.width, 3.75f))
-                                if (Dodge(c.x + dx, true, r) is float bx)
-                                    list.Add(new DecorPiece { Kind = k, Position = new Vector3(bx, y, c.z), Rotation = alongZ, Scale = new Vector3(spanZ, 1f, 1f) });
-                            break;
-                        case CeilingKind.Coffers:
-                            foreach (float dx in Spread(r.width, 3.75f))
-                                if (Dodge(c.x + dx, true, r) is float bx)
-                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = new Vector3(bx, y, c.z), Rotation = alongZ, Scale = new Vector3(spanZ, 1f, 1f) });
-                            foreach (float dz in Spread(r.height, 5f))
-                                if (Dodge(c.z + dz, false, r) is float bz)
-                                    list.Add(new DecorPiece { Kind = DecorKind.Coffer, Position = new Vector3(c.x, y, bz), Rotation = alongX, Scale = new Vector3(spanX, 1f, 1f) });
-                            break;
                         case CeilingKind.Trays:
                             if (r.height < 4f || Dodge(c.z + Mathf.Min(1.6f, r.height / 2f - 0.6f), false, r) is not float tz) break;
                             var at = new Vector3(c.x, y, tz);
@@ -353,6 +380,82 @@ namespace Stealth.Level
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Beams of one direction under a room's ceiling: lines every ~<paramref name="step"/> m across the room, each cut into
+        /// the runs where the ceiling is the room's own (walls, pockets and stair holes end a run) and pulled back to the wall
+        /// faces; a line that would hit a lamp moves aside, a run that still does is left out.
+        /// </summary>
+        static void BeamLines(List<DecorPiece> list, LevelLayout l, PlanRoom room, List<Vector2> lamps, DecorKind kind, bool alongZ, float step, float y)
+        {
+            var b = room.Bounds;
+            float acrossMin = alongZ ? b.xMin : b.yMin, acrossMax = alongZ ? b.xMax : b.yMax;
+            float lineMin = alongZ ? b.yMin : b.xMin, lineMax = alongZ ? b.yMax : b.xMax;
+            var rot = alongZ ? Quaternion.LookRotation(Vector3.right) : Quaternion.LookRotation(Vector3.forward);
+            const float res = HousePlan.Res;
+            foreach (float offset in Spread(acrossMax - acrossMin, step))
+            {
+                float centre = (acrossMin + acrossMax) / 2f + offset;
+                List<(float a, float b)> best = null;
+                float bestV = centre;
+                foreach (float shift in new[] { 0f, 1.25f, -1.25f, 0.6f, -0.6f })
+                {
+                    float v = centre + shift;
+                    if (v < acrossMin + 0.5f || v > acrossMax - 0.5f) continue;
+                    var runs = new List<(float a, float b)>();
+                    float start = float.NaN;
+                    for (float s = lineMin + res / 2f; s < lineMax + res; s += res)
+                    {
+                        var p = alongZ ? new Vector2(v, s) : new Vector2(s, v);
+                        var cell = HousePlan.CellOf(p);
+                        bool on = s < lineMax && CeilingCell(l, room, cell.x, cell.y);
+                        if (on && float.IsNaN(start)) start = s - res / 2f;
+                        if (on || float.IsNaN(start)) continue;
+                        float a = start + T / 2f, e = s - res / 2f - T / 2f;
+                        if (e - a >= 1.5f && !HitsLamp(lamps, v, a, e, alongZ)) runs.Add((a, e));
+                        start = float.NaN;
+                    }
+                    if (best == null || Length(runs) > Length(best) + 0.01f) { best = runs; bestV = v; }
+                    if (best.Count > 0 && shift == 0f && Length(best) >= (lineMax - lineMin) * 0.8f) break; // straight through: keep it centred
+                }
+                if (best == null) continue;
+                foreach (var (a, e) in best)
+                {
+                    float mid = (a + e) / 2f;
+                    var pos = alongZ ? new Vector3(bestV, y, mid) : new Vector3(mid, y, bestV);
+                    list.Add(new DecorPiece { Kind = kind, Position = pos, Rotation = rot, Scale = new Vector3(e - a, 1f, 1f) });
+                }
+            }
+        }
+
+        static bool HitsLamp(List<Vector2> lamps, float v, float a, float e, bool alongZ)
+        {
+            foreach (var p in lamps)
+            {
+                float across = alongZ ? p.x : p.y, along = alongZ ? p.y : p.x;
+                if (Mathf.Abs(across - v) < 1.0f && along > a - 0.7f && along < e + 0.7f) return true;
+            }
+            return false;
+        }
+
+        static float Length(List<(float a, float b)> runs)
+        {
+            float s = 0f;
+            foreach (var (a, b) in runs) s += b - a;
+            return s;
+        }
+
+        /// <summary>A cell of the room's floor whose ceiling is the room's own: not a pocket, not under a stair hole on any of its storeys.</summary>
+        static bool CeilingCell(LevelLayout l, PlanRoom room, int cx, int cz)
+        {
+            var plan = l.Plan;
+            if (plan.KindAt(room.Floor, cx, cz) != CellKind.Room || plan.IdAt(room.Floor, cx, cz) != room.Id) return false;
+            var p = HousePlan.CellCenter(cx, cz);
+            for (int f = room.Floor; f < room.Floor + room.Levels; f++)
+                foreach (var s in l.Stairs)
+                    if (s.Floor == f && PlanGenerator.StairArea(s, 0.3f).Contains(p)) return false;
+            return true;
         }
 
         /// <summary>Offsets from a span's middle for parts every ~<paramref name="step"/> metres, none closer than 1 m to its ends.</summary>

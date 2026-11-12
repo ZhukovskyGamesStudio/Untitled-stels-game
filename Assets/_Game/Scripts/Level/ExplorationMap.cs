@@ -13,6 +13,8 @@ namespace Stealth.Level
     public sealed class ExplorationMap
     {
         public const float Tile = HousePlan.Res;
+        /// <summary>The map reaches this far round the building: the yard a player runs through outside.</summary>
+        public const float Margin = 8f;
         /// <summary>Gap between neighbouring rays at the edge of the view (smaller than a tile: no tile slips between them).</summary>
         const float RaySpacing = Tile * 0.7f;
 
@@ -34,8 +36,8 @@ namespace Stealth.Level
         public ExplorationMap(LevelLayout layout)
         {
             m_Layout = layout;
-            Width = Mathf.CeilToInt(layout.SizeX / Tile);
-            Height = Mathf.CeilToInt(layout.SizeZ / Tile);
+            Width = Mathf.CeilToInt((layout.SizeX + 2f * Margin) / Tile);
+            Height = Mathf.CeilToInt((layout.SizeZ + 2f * Margin) / Tile);
             Floors = layout.Floors;
             m_Bits = new ulong[(Width * Height * Floors + 63) / 64];
             m_RevealedPerFloor = new int[Floors];
@@ -55,9 +57,12 @@ namespace Stealth.Level
         /// <summary>Share of a floor the team has seen (0..1).</summary>
         public float RevealedShare(int floor) => floor >= 0 && floor < Floors ? m_RevealedPerFloor[floor] / (float)(Width * Height) : 0f;
 
-        public static Vector2Int TileOf(Vector3 p) => new(Mathf.FloorToInt(p.x / Tile), Mathf.FloorToInt(p.z / Tile));
+        public static Vector2Int TileOf(Vector3 p) => new(Mathf.FloorToInt((p.x + Margin) / Tile), Mathf.FloorToInt((p.z + Margin) / Tile));
 
-        public static Vector2 TileCenter(int tx, int ty) => new((tx + 0.5f) * Tile, (ty + 0.5f) * Tile);
+        public static Vector2 TileCenter(int tx, int ty) => new((tx + 0.5f) * Tile - Margin, (ty + 0.5f) * Tile - Margin);
+
+        /// <summary>The corner of a tile with the smallest x and z, world metres.</summary>
+        public static Vector2 TileMin(int tx, int ty) => new(tx * Tile - Margin, ty * Tile - Margin);
 
         bool Set(int floor, int tx, int ty)
         {
@@ -71,15 +76,23 @@ namespace Stealth.Level
 
         /// <summary>
         /// Reveals what is seen from <paramref name="eye"/> (its floor only) within <paramref name="radius"/> metres:
-        /// a fan of rays, each one marching until a solid wall or the outside. Returns how many tiles were new.
+        /// a fan of rays, each one marching until a solid wall or the outside. Outside, in the gas, the eyes reach only
+        /// <paramref name="outsideRadius"/>: the yard and the outer walls close by. Returns how many tiles were new.
         /// </summary>
-        public int RevealAround(Vector3 eye, float radius)
+        public int RevealAround(Vector3 eye, float radius, float outsideRadius = 4f)
         {
             var plan = m_Layout.Plan;
-            if (plan == null || !m_Layout.IsInside(eye)) return 0;
+            if (plan == null) return 0;
             int floor = Mathf.Clamp(LevelLayout.FloorOf(eye.y), 0, Floors - 1);
             var from = new Vector2(eye.x, eye.z);
-            if (!plan.IsInside(floor, from)) return 0;
+            var at = TileOf(eye);
+            if (!InRange(floor, at.x, at.y)) return 0;
+            bool outside = !plan.IsInside(floor, from);
+            if (outside)
+            {
+                if (floor != 0) return 0;
+                radius = outsideRadius;
+            }
             plan.WallsNear(floor, from, radius, m_Walls);
             int rays = Mathf.Max(64, Mathf.CeilToInt(2f * Mathf.PI * radius / RaySpacing));
             int added = 0;
@@ -93,7 +106,7 @@ namespace Stealth.Level
                 for (float s = Tile * 0.5f; s <= reach; s += Tile * 0.5f)
                 {
                     var p = from + dir * s;
-                    if (!plan.IsInside(floor, p)) break;
+                    if (!outside && !plan.IsInside(floor, p)) break; // from inside, the view stops at the building's edge
                     var t = TileOf(new Vector3(p.x, 0f, p.y));
                     if (InRange(floor, t.x, t.y) && Set(floor, t.x, t.y)) added++;
                 }
@@ -104,6 +117,18 @@ namespace Stealth.Level
 
         /// <summary>The straight line between two points of a floor crosses no solid wall and stays inside the building.</summary>
         public static bool CanSee(LevelLayout l, int floor, Vector2 from, Vector2 to) => l.Plan != null && l.Plan.CanSee(floor, from, to);
+
+        /// <summary>Cheat: every tile of the building on every floor is seen.</summary>
+        public void RevealAll()
+        {
+            var plan = m_Layout.Plan;
+            int added = 0;
+            for (int f = 0; f < Floors; f++)
+                for (int ty = 0; ty < Height; ty++)
+                    for (int tx = 0; tx < Width; tx++)
+                        if ((plan == null || plan.IsInside(f, TileCenter(tx, ty))) && Set(f, tx, ty)) added++;
+            if (added > 0) Version++;
+        }
 
         // ------------------------------------------------------------------ replication
 

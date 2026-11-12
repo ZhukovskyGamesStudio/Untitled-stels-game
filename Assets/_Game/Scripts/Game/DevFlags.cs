@@ -12,6 +12,8 @@ namespace Stealth.Game
         public static int ForcedSeed;
         /// <summary>Every staircase shows this look (StairStyle index), −1 = the one its family and seed pick (autopilot "floors").</summary>
         public static int ForcedStairStyle = -1;
+        /// <summary>The stash board over the hatch stays hidden (autopilot "gallery": robots are shown right behind it).</summary>
+        public static bool HideStashBoard;
         /// <summary>Start the run at this level index. Consumed once.</summary>
         public static int ForcedLevel;
         /// <summary>Start the run right in the first house instead of the sewer (autopilot scenarios).</summary>

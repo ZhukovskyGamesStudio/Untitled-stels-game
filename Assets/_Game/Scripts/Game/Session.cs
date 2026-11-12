@@ -88,8 +88,13 @@ namespace Stealth.Game
     // The game component talks to the twin only through these interfaces.
 
     /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
+    /// <summary>The test cheats of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server.</summary>
+    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota }
+
     public interface IPlayerLink
     {
+        /// <summary>Owner → server: a cheat from the F4 panel.</summary>
+        void SendCheat(Cheat cheat, bool on);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>
         void Teleport(Vector3 position, Quaternion rotation);
         void SendNoise(Vector3 position, float radius);

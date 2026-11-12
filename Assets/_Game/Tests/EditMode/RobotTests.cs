@@ -107,6 +107,19 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void SensorMountsFindTheSurfaceOfTheBody()
+        {
+            // a unit cube's top face (two triangles at y = 0.5)
+            var v = new[] { new Vector3(-0.5f, 0.5f, -0.5f), new Vector3(0.5f, 0.5f, -0.5f), new Vector3(0.5f, 0.5f, 0.5f), new Vector3(-0.5f, 0.5f, 0.5f) };
+            var t = new[] { 0, 1, 2, 0, 2, 3 };
+            Assert.IsTrue(MeshRay.Cast(new Vector3(0.2f, 3f, 0.1f), Vector3.down, v, t, out float h));
+            Assert.AreEqual(2.5f, h, 1e-4f, "from 3 m above down to the top");
+            Assert.IsFalse(MeshRay.Cast(new Vector3(0.8f, 3f, 0f), Vector3.down, v, t, out _), "beside the body");
+            Assert.IsFalse(MeshRay.Cast(new Vector3(0f, 0f, 0f), Vector3.down, v, t, out _), "below it, looking away");
+            Assert.IsTrue(MeshRay.Cast(new Vector3(0f, 0f, 0f), Vector3.up, v, t, out h) && Mathf.Abs(h - 0.5f) < 1e-4f, "from inside: either side counts");
+        }
+
+        [Test]
         public void TheCeilingFanCannotBeJumped()
         {
             var apex = new Vector3(0f, 2.9f, 0f);

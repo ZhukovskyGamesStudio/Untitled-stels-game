@@ -25,6 +25,8 @@ namespace Stealth.Game
     {
         [Tooltip("How far a player reveals the map around them (not through walls), metres.")]
         public float RevealRadius = 14f;
+        [Tooltip("How far a player outside the building reveals the map (the gas hides everything further), metres.")]
+        public float OutsideRevealRadius = 4f;
         [Tooltip("Seconds a ping stays on screen and on the map.")]
         public float PingDuration = 8f;
         [Tooltip("How far a ping reaches along the view, metres.")]

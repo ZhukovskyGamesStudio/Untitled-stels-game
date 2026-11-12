@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using Stealth.Enemies;
 using Stealth.Items;
 using Stealth.Level;
 using Stealth.Player;
@@ -32,6 +33,39 @@ namespace Stealth.Game
             m_Scenarios["legs"] = LegsScenario;
             m_Scenarios["plate"] = PlateScenario;
             m_Scenarios["terminals"] = TerminalsScenario;
+            m_Scenarios["cheats"] = CheatsScenario;
+        }
+
+        /// <summary>The F4 cheat panel (robots off, invulnerable) and the map outside the building.</summary>
+        IEnumerator CheatsScenario()
+        {
+            var gm = GameManager.Instance;
+            var panel = UI.CheatPanel.Instance;
+            if (panel != null) panel.SetOpen(true);
+            yield return new WaitForSeconds(0.5f);
+            yield return Shot("panel");
+            Me.RequestCheat(Cheat.KillRobots, true);
+            Me.RequestCheat(Cheat.Invulnerable, true);
+            yield return new WaitForSeconds(0.4f);
+            int hp = Me.Hp;
+            if (Me.IsServer) Me.HitServer(Me.transform.position + Me.transform.right);
+            yield return new WaitForSeconds(0.3f);
+            Log($"cheats: robots off {Detector.All.Count(d => d.IsHacked)}/{Detector.All.Count}, invulnerable hp {hp} -> {Me.Hp}, panel open {UI.CheatPanel.IsOpen}");
+            if (panel != null) panel.SetOpen(false);
+
+            // outside: the yard round the player opens on the map, not further
+            var l = ActiveLevel.Layout;
+            Me.TeleportOwner(new Vector3(-3f, 0.05f, l.SizeZ / 2f), Quaternion.LookRotation(Vector3.right));
+            yield return new WaitForSeconds(1.5f);
+            var map = gm.Exploration;
+            var here = ExplorationMap.TileOf(Me.transform.position);
+            Log($"outside: tile under the player seen {map.IsRevealed(0, here.x, here.y)}, floor 0 seen {map.RevealedShare(0) * 100f:0.0}%");
+            yield return Shot("outside_minimap");
+            map.RevealAll();
+            UI.GameHUD.Instance.SetBigMap(true);
+            yield return new WaitForSeconds(0.6f);
+            yield return Shot("whole_map");
+            UI.GameHUD.Instance.SetBigMap(false);
         }
 
         /// <summary>Screenshots of the HUD in typical situations.</summary>

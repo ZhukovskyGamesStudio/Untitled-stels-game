@@ -31,6 +31,8 @@ namespace Stealth.EditorTools
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", () => BuildVentFrame(false));
             var highVent = Prefab($"{LevelPrefabs}/HighVentFrame.prefab", () => BuildVentFrame(true));
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
+            var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
+            var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
             var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
@@ -169,9 +171,12 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            if (levelArt.HighVentFrame != highVent)
+            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock)
             {
-                levelArt.HighVentFrame = highVent; // a field newer than the asset: filled without overwriting the rest
+                // fields newer than the asset: filled without overwriting the rest
+                levelArt.HighVentFrame = highVent;
+                levelArt.RailingBay = railingBay;
+                levelArt.RailingBlock = railingBlock;
                 EditorUtility.SetDirty(levelArt);
             }
             return levelArt;
@@ -261,13 +266,12 @@ namespace Stealth.EditorTools
             foreach (float z in new[] { t / 2f + 0.015f, -(t / 2f + 0.015f) })
             {
                 string side = z > 0 ? "A" : "B";
-                Cube(root.transform, "FlangeTop" + side, new Vector3(0, y0 + h + flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), M("DoorFrame"), false);
-                Cube(root.transform, "FlangeBottom" + side, new Vector3(0, y0 - flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), M("DoorFrame"), false);
+                Cube(root.transform, "FlangeTop" + side, new Vector3(0, y0 + h + flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
+                Cube(root.transform, "FlangeBottom" + side, new Vector3(0, y0 - flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
                 foreach (float s in new[] { -1f, 1f })
                     Cube(root.transform, (s < 0 ? "FlangeLeft" : "FlangeRight") + side, new Vector3(s * (w / 2f + flange / 2f), y0 + h / 2f, z),
-                        new Vector3(flange, h, 0.03f), M("DoorFrame"), false);
+                        new Vector3(flange, h, 0.03f), metal, false);
             }
-            if (high) Crates(root.transform, w);
             // the removed grille: a frame with slats, leaning on the wall beside the hole on side A (beside the crates)
             var grille = new GameObject("Grille").transform;
             grille.SetParent(root.transform, false);
@@ -284,35 +288,6 @@ namespace Stealth.EditorTools
                 slat.transform.localRotation = Quaternion.Euler(35f, 0f, 0f); // louvres
             }
             return root;
-        }
-
-        /// <summary>
-        /// Two crates on each side of a high vent: the high one against the wall under the hole, the low one in front of it
-        /// (box colliders: players climb them, robots cannot), wooden slats and corner battens for the look.
-        /// </summary>
-        static void Crates(Transform root, float holeWidth)
-        {
-            float face = LevelMetrics.WallThickness / 2f + 0.03f;
-            float deepHigh = 0.55f, deepLow = LevelMetrics.CrateReach - 0.03f - deepHigh;
-            foreach (float s in new[] { 1f, -1f })
-            {
-                string side = s > 0 ? "A" : "B";
-                void Crate(string name, float x, float width, float depth0, float depth, float height)
-                {
-                    float zc = s * (face + depth0 + depth / 2f);
-                    var box = Cube(root, name + side, new Vector3(x, height / 2f, zc), new Vector3(width, height, depth), M("Wood"));
-                    box.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-                    // dark battens on the edges and a slat across every face: it reads as a crate, not a block
-                    foreach (float ex in new[] { -1f, 1f })
-                        foreach (float ez in new[] { -1f, 1f })
-                            Cube(root, $"{name}{side}Batten", new Vector3(x + ex * (width / 2f - 0.025f), height / 2f, zc + ez * (depth / 2f - 0.025f)),
-                                new Vector3(0.06f, height + 0.01f, 0.06f), M("DoorFrame"), false);
-                    Cube(root, $"{name}{side}Band", new Vector3(x, height * 0.5f, zc), new Vector3(width + 0.012f, 0.07f, depth + 0.012f), M("DoorFrame"), false);
-                    Cube(root, $"{name}{side}Lid", new Vector3(x, height - 0.015f, zc), new Vector3(width + 0.012f, 0.03f, depth + 0.012f), M("DoorFrame"), false);
-                }
-                Crate("CrateHigh", 0f, Mathf.Min(holeWidth, 1.0f), 0f, deepHigh, LevelMetrics.CrateHigh);
-                Crate("CrateLow", 0.05f * s, 0.85f, deepHigh, deepLow, LevelMetrics.CrateLow);
-            }
         }
 
         /// <summary>

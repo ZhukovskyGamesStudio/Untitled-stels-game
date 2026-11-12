@@ -556,8 +556,8 @@ namespace Stealth.EditorTools
             // our textures, only the mood — light, colour and the screen filter)
 
             yield return Style("S11_Noir", "Нуар-детектив", "по мотивам Shadows of Doubt, Blade Runner",
-                "Ночной город за окном и контора детектива: ковролин, обои с узором, тёмные деревянные панели. Мир собран из " +
-                "крупных «кубиков»: грубые модели, крупный пиксель и мало цветов. Синие тени, янтарные лампы, дождливая дымка.",
+                "Ночной город за окном и контора детектива: ковролин, обои с узором, тёмные деревянные панели. Роботы, мебель " +
+                "и люди собраны из вокселей (4 см), картинка чёткая, мало цветов. Синие тени, янтарные лампы, дождливая дымка.",
                 s =>
                 {
                     var g = s.Grade;
@@ -566,7 +566,7 @@ namespace Stealth.EditorTools
                     g.BloomIntensity = 1.8f; g.BloomThreshold = 0.65f; g.BloomScatter = 0.8f; g.BloomTint = C(1f, 0.8f, 0.55f);
                     g.Vignette = 0.4f; g.FilmGrain = 0.25f;
                     var sc = s.Screen;
-                    sc.PixelSize = 2f; sc.ColorLevels = 20f; sc.OrderedDither = true;
+                    sc.PixelSize = 0f; sc.ColorLevels = 20f; sc.OrderedDither = true; // crisp voxels, no pixel blocks
                     sc.OutlineStrength = 0.35f; sc.OutlineSurfaceTint = 0.8f;
                     s.World.Ambient = C(0.14f, 0.15f, 0.24f);
                     s.World.IndoorFog = C(0.06f, 0.07f, 0.12f); s.World.IndoorFogDensity = 0.035f;

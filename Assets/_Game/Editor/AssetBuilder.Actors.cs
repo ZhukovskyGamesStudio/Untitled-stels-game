@@ -342,6 +342,7 @@ namespace Stealth.EditorTools
         {
             var rig = root.AddComponent<SensorRig>();
             rig.Robot = rc;
+            rig.Model = model.transform; // in the game the mounts seat themselves on the body of the current style
             // Mounted where each robot's design expects them (the bestiary contracts) at their modelled size, painted like
             // the robot itself: its body colour, its accent, its lenses.
             float side = Mathf.Max(0.2f, radius * 0.75f);

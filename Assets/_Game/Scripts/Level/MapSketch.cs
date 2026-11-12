@@ -4,7 +4,7 @@ using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
-    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void }
+    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void, Ground }
 
     /// <summary>
     /// One rectangle of the map, x/y = world x/z in metres. <see cref="Angle"/> turns it (degrees, counter-clockwise)
@@ -37,8 +37,8 @@ namespace Stealth.Level
         const float Step = 0.5f;
 
         static readonly List<(float a, float b)> s_Run = new();
-        static readonly List<(int x0, int x1)> s_Rows = new();
-        static readonly List<(int x0, int x1, int y0)> s_Open = new();
+        static readonly List<(int x0, int x1, bool inside)> s_Rows = new();
+        static readonly List<(int x0, int x1, int y0, bool inside)> s_Open = new();
 
         public static void Build(ExplorationMap map, int floor, IReadOnlyList<MapProp> props, List<MapRect> output)
         {
@@ -57,24 +57,30 @@ namespace Stealth.Level
                 if (ty < map.Height)
                 {
                     int start = -1;
+                    bool startInside = false;
                     for (int tx = 0; tx <= map.Width; tx++)
                     {
                         bool on = tx < map.Width && map.IsRevealed(floor, tx, ty);
-                        if (on && start < 0) start = tx;
-                        if (on || start < 0) continue;
-                        s_Rows.Add((start, tx));
-                        start = -1;
+                        // a run is all floor of the building or all ground outside it
+                        bool inside = on && plan != null && plan.IsInside(floor, ExplorationMap.TileCenter(tx, ty));
+                        if (start >= 0 && (!on || inside != startInside))
+                        {
+                            s_Rows.Add((start, tx, startInside));
+                            start = -1;
+                        }
+                        if (on && start < 0) { start = tx; startInside = inside; }
                     }
                 }
                 // close the rectangles whose run does not go on in this row
                 for (int i = s_Open.Count - 1; i >= 0; i--)
                 {
-                    var (x0, x1, y0) = s_Open[i];
-                    if (s_Rows.Remove((x0, x1))) continue;
-                    output.Add(new MapRect(MapPart.Floor, new Rect(x0 * t, y0 * t, (x1 - x0) * t, (ty - y0) * t)));
+                    var (x0, x1, y0, ins) = s_Open[i];
+                    if (s_Rows.Remove((x0, x1, ins))) continue;
+                    var min = ExplorationMap.TileMin(x0, y0);
+                    output.Add(new MapRect(ins ? MapPart.Floor : MapPart.Ground, new Rect(min.x, min.y, (x1 - x0) * t, (ty - y0) * t)));
                     s_Open.RemoveAt(i);
                 }
-                foreach (var (x0, x1) in s_Rows) s_Open.Add((x0, x1, ty));
+                foreach (var (x0, x1, ins) in s_Rows) s_Open.Add((x0, x1, ty, ins));
             }
             if (plan != null && floor > 0)
                 for (int ty = 0; ty < map.Height; ty++)
@@ -83,7 +89,11 @@ namespace Stealth.Level
                         if (!map.IsRevealed(floor, tx, ty)) continue;
                         var c = ExplorationMap.TileCenter(tx, ty);
                         var cell = HousePlan.CellOf(c);
-                        if (plan.KindAt(floor, cell.x, cell.y) == CellKind.Void) output.Add(new MapRect(MapPart.Void, new Rect(tx * t, ty * t, t, t)));
+                        if (plan.KindAt(floor, cell.x, cell.y) == CellKind.Void)
+                        {
+                            var min = ExplorationMap.TileMin(tx, ty);
+                            output.Add(new MapRect(MapPart.Void, new Rect(min.x, min.y, t, t)));
+                        }
                     }
 
             // Stairs: drawn where they are seen, going up from this floor or arriving from below.
@@ -104,7 +114,8 @@ namespace Stealth.Level
                 {
                     if (p.Floor != floor) continue;
                     var c = p.Area.center;
-                    if (!map.IsRevealed(floor, Mathf.FloorToInt(c.x / t), Mathf.FloorToInt(c.y / t))) continue;
+                    var tile = ExplorationMap.TileOf(new Vector3(c.x, 0f, c.y));
+                    if (!map.IsRevealed(floor, tile.x, tile.y)) continue;
                     var room = plan?.RoomAt(new Vector3(c.x, LevelLayout.FloorY(floor), c.y));
                     var box = room != null ? room.Bounds : p.Area;
                     var clipped = Rect.MinMaxRect(Mathf.Max(p.Area.xMin, box.xMin), Mathf.Max(p.Area.yMin, box.yMin),
@@ -125,9 +136,9 @@ namespace Stealth.Level
 
         static bool AnyRevealed(ExplorationMap map, int floor, Rect area)
         {
-            const float t = ExplorationMap.Tile;
-            int x0 = Mathf.FloorToInt(area.xMin / t), x1 = Mathf.FloorToInt((area.xMax - 0.01f) / t);
-            int y0 = Mathf.FloorToInt(area.yMin / t), y1 = Mathf.FloorToInt((area.yMax - 0.01f) / t);
+            var lo = ExplorationMap.TileOf(new Vector3(area.xMin, 0f, area.yMin));
+            var hi = ExplorationMap.TileOf(new Vector3(area.xMax - 0.01f, 0f, area.yMax - 0.01f));
+            int x0 = lo.x, x1 = hi.x, y0 = lo.y, y1 = hi.y;
             for (int y = y0; y <= y1; y++)
                 for (int x = x0; x <= x1; x++)
                     if (map.IsRevealed(floor, x, y)) return true;

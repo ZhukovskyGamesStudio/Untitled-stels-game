@@ -348,6 +348,64 @@ namespace Stealth.EditorTools
             (StairGlass(), new[] { M("Ceiling"), M("StairGlass"), M("Metal") }),
         };
 
+        // ------------------------------------------------------------------ railings of galleries
+
+        /// <summary>
+        /// One bay of a gallery railing, 1 m along local X (centred), standing on y = 0, in each staircase look: a concrete
+        /// parapet with a cap, a wooden post with balusters and a handrail, a steel post with tube rails and a kick plate,
+        /// a glass pane under a steel cap. The level builder strings bays along a railing (each stretched a little to fit).
+        /// </summary>
+        static GameObject BuildRailingBay()
+        {
+            var root = new GameObject("RailingBay");
+            var looks = new (string name, MeshKit kit, Material[] mats)[]
+            {
+                ("Concrete", new MeshKit(2), new[] { M("Wall"), M("DoorFrame") }),
+                ("Wood", new MeshKit(2), new[] { M("Wood"), M("DoorFrame") }),
+                ("Steel", new MeshKit(2), new[] { M("Metal"), M("PropBody") }),
+                ("Glass", new MeshKit(2), new[] { M("StairGlass"), M("Metal") }),
+            };
+            const float h = 1.0f;
+            var concrete = looks[0].kit;
+            concrete.Span(0, -0.5f, 0.5f, 0f, h, -0.06f, 0.06f);
+            concrete.Span(1, -0.5f, 0.5f, h, h + 0.05f, -0.09f, 0.09f);
+            var wood = looks[1].kit;
+            wood.Span(1, -0.54f, -0.46f, 0f, h + 0.08f, -0.04f, 0.04f);                   // the post
+            wood.Span(1, -0.5f, 0.5f, h - 0.02f, h + 0.04f, -0.045f, 0.045f);             // the handrail
+            wood.Span(0, -0.5f, 0.5f, 0.08f, 0.12f, -0.025f, 0.025f);                     // the bottom rail
+            for (int k = 1; k < 8; k++) { float x = -0.5f + k * 0.125f; wood.Span(0, x - 0.017f, x + 0.017f, 0.12f, h - 0.02f, -0.017f, 0.017f); }
+            var steel = looks[2].kit;
+            steel.Tube(0, new Vector3(-0.5f, 0f, 0f), new Vector3(-0.5f, h + 0.02f, 0f), 0.024f);
+            steel.Tube(0, new Vector3(-0.5f, h, 0f), new Vector3(0.5f, h, 0f), 0.022f);
+            foreach (float y in new[] { 0.62f, 0.32f }) steel.Tube(0, new Vector3(-0.5f, y, 0f), new Vector3(0.5f, y, 0f), 0.013f);
+            steel.Span(1, -0.5f, 0.5f, 0.02f, 0.13f, -0.006f, 0.006f);                    // the kick plate
+            var glass = looks[3].kit;
+            glass.Span(0, -0.49f, 0.49f, 0.06f, h - 0.02f, -0.01f, 0.01f);
+            glass.Span(1, -0.5f, 0.5f, h - 0.02f, h + 0.02f, -0.03f, 0.03f);
+            glass.Span(1, -0.5f, -0.46f, 0f, 0.1f, -0.03f, 0.03f);                        // a shoe that holds the pane
+            var look = root.AddComponent<StairLook>();
+            look.Blocks = new Renderer[0];
+            look.Variants = new GameObject[looks.Length];
+            for (int i = 0; i < looks.Length; i++)
+            {
+                var go = new GameObject(looks[i].name);
+                go.transform.SetParent(root.transform, false);
+                go.AddComponent<MeshFilter>().sharedMesh = StairMesh("railing_" + looks[i].name.ToLowerInvariant(), looks[i].kit);
+                go.AddComponent<MeshRenderer>().sharedMaterials = looks[i].mats;
+                go.SetActive(false);
+                look.Variants[i] = go;
+            }
+            return root;
+        }
+
+        /// <summary>An invisible box: the railing's collider (players and robots cannot pass, the view goes over it).</summary>
+        static GameObject BuildRailingBlock()
+        {
+            var go = new GameObject("RailingBlock");
+            go.AddComponent<BoxCollider>();
+            return go;
+        }
+
         /// <summary>Every look under the staircase (inactive), and the component that shows the one that fits.</summary>
         static void AddStairLooks(GameObject root, bool mirrored)
         {

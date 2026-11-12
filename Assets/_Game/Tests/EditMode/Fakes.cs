@@ -87,6 +87,8 @@ namespace Stealth.Tests
         public void SendHatch(bool hide) => Hatch.Add(hide);
         public void SendUnlockDoor(int door) => Doors.Add(door);
         public void SendOpenSafe(int safe) => Safes.Add(safe);
+        public readonly List<(Cheat cheat, bool on)> Cheats = new();
+        public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
     }
 
     /// <summary>Stands in for the inventory's network twin.</summary>

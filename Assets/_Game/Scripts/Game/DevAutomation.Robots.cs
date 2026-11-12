@@ -19,6 +19,7 @@ namespace Stealth.Game
             var only = Arg("-kinds");
             DevFlags.FreezeRobots = true;
             DevFlags.SkipGracePeriod = true; // sensors on immediately
+            DevFlags.HideStashBoard = true;  // the stage is right behind the hatch
             var hatch = ActiveLevel.Layout.HatchPosition;
             // Clear the stage: the level's own guards (robots, turrets, sensors, lasers) would photobomb the gallery
             // and hit the player during the reaction checks (a knockback looks like running to a motion sensor).

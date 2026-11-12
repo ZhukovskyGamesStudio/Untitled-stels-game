@@ -218,6 +218,7 @@ namespace Stealth.Level
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
             furnisher.Put(lobby, PropKind.Hatch, l.HatchPosition, 0f);
+            furnisher.PlaceVentDesks();
             for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
@@ -249,31 +250,47 @@ namespace Stealth.Level
             {
                 var o = plan.Openings[i];
                 bool roll = rng.NextDouble() < b.HighVentChance; // one roll per opening, used or not
-                if (o.Kind != EdgeType.Vent || !roll || !CratesFit(l, o)) continue;
+                if (o.Kind != EdgeType.Vent || !roll || !DesksFit(l, o)) continue;
                 o.High = true;
                 plan.Openings[i] = o;
             }
         }
 
-        /// <summary>The crate stacks under a high vent fit: each side stays inside one room and clear of stairs.</summary>
-        public static bool CratesFit(LevelLayout l, PlanOpening o)
+        /// <summary>
+        /// A desk can stand under a high vent on both sides, with room in front of it to climb on: inside one room that is
+        /// not a corridor (they stay bare), clear of stairs and of every other opening's doorway space.
+        /// </summary>
+        public static bool DesksFit(LevelLayout l, PlanOpening o)
         {
             var plan = l.Plan;
             var w = plan.Walls[o.Wall];
-            if (w.Exterior || w.Railing) return false;
+            if (w.Exterior || w.Railing || w.Shaped) return false;
             var mid = w.At(o.At);
             var n = new Vector2(-w.Dir.y, w.Dir.x);
+            float face = LevelMetrics.WallThickness / 2f, reach = LevelMetrics.VentDeskReach + LevelMetrics.VentDeskAisle;
             foreach (float side in new[] { -1f, 1f })
             {
                 PlanRoom room = null;
-                foreach (float depth in new[] { 0.2f, 0.7f, LevelMetrics.CrateReach })
-                    foreach (float along in new[] { -0.5f, 0f, 0.5f })
+                for (float depth = 0.1f; depth <= reach + 0.01f; depth += 0.25f)
+                    foreach (float along in new[] { -0.85f, -0.4f, 0f, 0.4f, 0.85f })
                     {
-                        var p = mid + n * (side * (LevelMetrics.WallThickness / 2f + depth)) + w.Dir * along;
+                        var p = mid + n * (side * (face + depth)) + w.Dir * along;
                         var p3 = new Vector3(p.x, LevelLayout.FloorY(w.Floor) + 0.1f, p.y);
                         var here = plan.RoomAt(p3);
-                        if (here == null || (room != null && here != room) || l.NearStair(w.Floor, p3, 0.3f)) return false;
+                        if (here == null || here.Type == RoomType.Corridor || (room != null && here != room) || l.NearStair(w.Floor, p3, 0.3f)) return false;
                         room = here;
+                        // the space a doorway keeps free (Furnisher): a desk there would block the door
+                        foreach (var other in plan.Openings)
+                        {
+                            if (other.Wall == o.Wall && Mathf.Abs(other.At - o.At) < 0.01f) continue;
+                            var ow = plan.Walls[other.Wall];
+                            if (ow.Floor != w.Floor) continue;
+                            var oc = ow.At(other.At);
+                            var od = p - oc;
+                            float oAlong = Mathf.Abs(Vector2.Dot(od, ow.Dir)), oAcross = Mathf.Abs(Vector2.Dot(od, new Vector2(-ow.Dir.y, ow.Dir.x)));
+                            float half = (other.Kind == EdgeType.Open ? ow.Length : other.Width) / 2f + 0.35f;
+                            if (oAlong < half && oAcross < 1.35f) return false;
+                        }
                     }
             }
             return true;

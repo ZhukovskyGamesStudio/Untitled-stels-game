@@ -16,6 +16,11 @@ namespace Stealth.Level
         public bool Exterior;
         /// <summary>The end meets a corner post (decoration reaches into the room's corner), not an opening.</summary>
         public bool CornerA, CornerB;
+        /// <summary>
+        /// The end meets the next piece of a bent wall (a chamfer, an arc) at a shallow angle: decoration runs exactly to the
+        /// joint, so the pieces of both meet instead of crossing.
+        /// </summary>
+        public bool JointA, JointB;
 
         public Vector3 Along => (B - A).normalized;
         public float Length => (B - A).magnitude;
