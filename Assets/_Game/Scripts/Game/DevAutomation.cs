@@ -89,6 +89,12 @@ namespace Stealth.Game
                 yield return null;
             if (PlayerController.Local == null) { Log("FAIL: no local player"); Quit(); yield break; }
             yield return new WaitForSeconds(2f);
+            // a house starts with the team in its entry hatch: the checks start standing next to it (the car scenario climbs out itself)
+            if (PlayerController.Local.InHatch && m_Name != "sewer" && m_Name != "features")
+            {
+                PlayerController.Local.SetHatch(false);
+                yield return new WaitForSeconds(0.4f);
+            }
 
             if (m_Scenarios.TryGetValue(m_Name, out var scenario)) yield return scenario();
             else Log($"FAIL: unknown scenario '{m_Name}'");

@@ -70,6 +70,7 @@ namespace Stealth.Tests
                 Requires<PlayerInventory, InventoryNet>();
                 Requires<Detector, DetectorNet>();
                 Requires<WorldItem, WorldItemNet>();
+                Requires<Stealth.Vehicles.Car, CarNet>();
                 Requires<LaserGate, LaserGateNet>();
                 Requires<GameManager, GameManagerNet>();
             }

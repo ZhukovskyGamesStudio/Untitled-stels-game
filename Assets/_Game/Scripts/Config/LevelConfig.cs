@@ -15,5 +15,6 @@ namespace Stealth.Configs
         public BuildingSettings Building = new();
         public SecuritySettings Security = new();
         public LootSettings Loot = new();
+        public FeatureSettings Features = new();
     }
 }

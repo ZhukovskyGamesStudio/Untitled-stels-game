@@ -63,14 +63,14 @@ namespace Stealth.Net
         public void HostLobby()
         {
             if (!SteamManager.Initialized) return;
-            GameNetwork.Instance.SetStatus("Создаём лобби Steam…");
+            GameNetwork.Instance.SetStatus(Loc.T("net.lobby_creating"));
             m_Created.Set(SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly, MaxPlayers));
         }
 
         public void JoinLobby(ulong lobby)
         {
             if (!SteamManager.Initialized) return;
-            GameNetwork.Instance.SetStatus("Входим в лобби…");
+            GameNetwork.Instance.SetStatus(Loc.T("net.lobby_joining"));
             SteamMatchmaking.JoinLobby(new CSteamID(lobby));
         }
 
@@ -124,7 +124,7 @@ namespace Stealth.Net
         {
             if (ioFailure || result.m_eResult != EResult.k_EResultOK)
             {
-                GameNetwork.Instance.SetStatus($"Не удалось создать лобби: {result.m_eResult}");
+                GameNetwork.Instance.SetStatus(Loc.F("net.lobby_create_failed", result.m_eResult));
                 return;
             }
             LobbyId = result.m_ulSteamIDLobby;
@@ -143,7 +143,7 @@ namespace Stealth.Net
         void AdvertiseLobby()
         {
             SteamFriends.SetRichPresence("connect", $"+connect_lobby {LobbyId}");
-            SteamFriends.SetRichPresence("status", "Вылазка в офис");
+            SteamFriends.SetRichPresence("status", Loc.T("net.presence"));
         }
 
         void OnJoinRequested(GameLobbyJoinRequested_t request)
@@ -161,14 +161,14 @@ namespace Stealth.Net
             if (owner == SteamUser.GetSteamID()) return; // we are the host
             if ((EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse != EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess)
             {
-                GameNetwork.Instance.SetStatus($"Не удалось войти в лобби: {(EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse}");
+                GameNetwork.Instance.SetStatus(Loc.F("net.lobby_join_failed", (EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse));
                 LobbyId = 0;
                 return;
             }
             string build = SteamMatchmaking.GetLobbyData(lobby, "build");
             if (!string.IsNullOrEmpty(build) && !string.IsNullOrEmpty(BuildId) && build != BuildId)
             {
-                GameNetwork.Instance.SetStatus("У друга другая версия игры — обновитесь до одного билда");
+                GameNetwork.Instance.SetStatus(Loc.T("net.other_version"));
                 Leave();
                 return;
             }

@@ -201,10 +201,10 @@ namespace Stealth.Tests
                 foreach (var mesh in originals)
                     Assert.IsTrue(own.Contains(mesh), $"{style.name}: no own version of {mesh.name} ({AssetDatabase.GetAssetPath(mesh)})");
             }
-            // every style has the four departments of players, each with the four parts of the player model
+            // every style has the four departments of players, each with the six parts of the player model
             foreach (var style in config.Styles)
                 for (int d = 0; d < 4; d++)
-                    Assert.AreEqual(1, config.StyleModels.Count(m => m.Style == style && m.Variant == d && m.To.Length == 4),
+                    Assert.AreEqual(1, config.StyleModels.Count(m => m.Style == style && m.Variant == d && m.To.Length == 6), // body, two legs, accent, face, glasses
                         $"{style.name}: no player of department {d}");
             foreach (ModelFamily t in System.Enum.GetValues(typeof(ModelFamily)))
             {

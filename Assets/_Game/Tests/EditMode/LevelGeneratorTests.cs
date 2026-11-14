@@ -52,7 +52,10 @@ namespace Stealth.Tests
                 {
                     var l = LevelGenerator.Generate(seed, level);
                     var reached = Reachable(l);
-                    var lost = l.Rooms.Where(r => !reached.Contains(r.Id)).Select(r => $"{r.Type} {r.Area:0} m² floor {r.Floor}").ToList();
+                    // the hidden room: only players get in (through its illusion walls)
+                    if (l.HiddenRoom >= 0)
+                        Assert.IsTrue(HouseFeatures.Reach(l.Plan, l.Stairs, l.LobbyRoom, true).Contains(l.HiddenRoom), $"seed {seed} level {level}: the hidden room is reached by players");
+                    var lost = l.Rooms.Where(r => r.Id != l.HiddenRoom && !reached.Contains(r.Id)).Select(r => $"{r.Type} {r.Area:0} m² floor {r.Floor}").ToList();
                     Assert.IsEmpty(lost, $"seed {seed} level {level}: rooms out of reach");
                 }
         }

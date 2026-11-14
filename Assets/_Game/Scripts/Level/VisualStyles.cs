@@ -65,6 +65,13 @@ namespace Stealth.Level
             return null;
         }
 
+        /// <summary>The table key of a style's name for the player: <c>style.&lt;asset name&gt;</c> ("style.s01_nightshift").</summary>
+        public static string TitleKey(VisualStyle style) => "style." + style.name.ToLowerInvariant();
+
+        /// <summary>The style's name for the player (the asset's own title if the table has none).</summary>
+        public static string TitleOf(VisualStyle style) =>
+            style == null ? "" : Loc.Has(TitleKey(style)) ? Loc.T(TitleKey(style)) : style.Title;
+
         /// <summary>Index of the style in use in <see cref="All"/> (-1 = none of them).</summary>
         public static int CurrentIndex
         {

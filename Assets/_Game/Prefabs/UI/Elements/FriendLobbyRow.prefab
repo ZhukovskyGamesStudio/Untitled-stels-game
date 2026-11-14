@@ -79,7 +79,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u0414\u0440\u0443\u0433 \xB7 1/4"
+  m_Text: "\u2014 \xB7 1/4"
 --- !u!114 &7733503541732378607
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -309,7 +309,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7270219775432253452, guid: 175241a686b59f044b020994f1daac97, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 388293261557636737}
   m_SourcePrefab: {fileID: 100100000, guid: 175241a686b59f044b020994f1daac97, type: 3}
 --- !u!114 &3020661369099656383 stripped
 MonoBehaviour:
@@ -327,3 +330,21 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 4177661209353202266, guid: 175241a686b59f044b020994f1daac97, type: 3}
   m_PrefabInstance: {fileID: 1625064408437214021}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &8243945933263285065 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7270219775432253452, guid: 175241a686b59f044b020994f1daac97, type: 3}
+  m_PrefabInstance: {fileID: 1625064408437214021}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &388293261557636737
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8243945933263285065}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8230e30e5ef7d74392a0d857d40d21c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.UI.LocText
+  Key: friends.join

@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using Stealth.Level;
 using Unity.AI.Navigation;
@@ -42,7 +43,13 @@ namespace Stealth.Tests
         {
             Build(seed, 3);
             foreach (var r in m_Layout.Rooms)
-                Assert.IsTrue(Reach(m_Layout.HatchPosition, r.Center, NavMesh.AllAreas), $"seed {seed}: {r.Type} ({r.Shape}, {r.Area:0} m²) on floor {r.Floor} at {r.Center}");
+                if (r.Id != m_Layout.HiddenRoom) // robots never get into the hidden room
+                {
+                    // the exit hatch stands in the middle of its room: walk up to it
+                    var target = (r.Center - m_Layout.ExitHatchPosition).sqrMagnitude < 0.1f ? r.Center + new Vector3(1.6f, 0f, 0f) : r.Center;
+                    Assert.IsTrue(Reach(m_Layout.HatchPosition, target, NavMesh.AllAreas), $"seed {seed}: {r.Type} ({r.Shape}, {r.Area:0} m²) on floor {r.Floor} at {r.Center}" +
+                        $" (exit hatch {(r.Center - m_Layout.ExitHatchPosition).magnitude:0.0} m away, hidden {m_Layout.HiddenRoom}, key rooms {string.Join(",", m_Layout.KeyDoors.SelectMany(k => k.Rooms))}, room {r.Id}, POI {m_Layout.PointOfInterest})");
+                }
         }
 
         [Test]

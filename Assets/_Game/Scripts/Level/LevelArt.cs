@@ -40,6 +40,8 @@ namespace Stealth.Level
         public GameObject ExitSign;
         [Tooltip("The sewer between houses: the team sells, pays the quota and votes for the next house there.")]
         public GameObject Sewer;
+        [Tooltip("The drive to the next house: the car in a tunnel seen from the side, while the house is built.")]
+        public GameObject DriveScene;
 
         [Header("Props")]
         public GameObject Desk;
@@ -79,6 +81,12 @@ namespace Stealth.Level
         public GameObject Safe;
         public GameObject Terminal;
         public GameObject FloorLamp;
+        [Tooltip("A crate to search (SearchCrate).")]
+        public GameObject Crate;
+        [Tooltip("Points of interest: the med table (hospital), the workbench (garage), the robot programming console (office).")]
+        public GameObject MedTable, Workbench, Programmer;
+        [Tooltip("The entrance of a hidden room: looks like a wall block, players walk through it, robots are kept out.")]
+        public GameObject IllusionBlock;
 
         public GameObject Prop(PropKind kind) => kind switch
         {
@@ -119,6 +127,10 @@ namespace Stealth.Level
             PropKind.ArcadeMachine => ArcadeMachine,
             PropKind.Safe => Safe,
             PropKind.Terminal => Terminal,
+            PropKind.Crate => Crate,
+            PropKind.MedTable => MedTable,
+            PropKind.Workbench => Workbench,
+            PropKind.Programmer => Programmer,
             _ => null,
         };
     }

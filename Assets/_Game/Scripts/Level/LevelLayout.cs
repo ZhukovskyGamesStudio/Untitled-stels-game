@@ -8,11 +8,14 @@ namespace Stealth.Level
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
     /// </summary>
-    public enum EdgeType { Wall, Door, Open, Vent, Squeeze }
+    /// Illusion = the entrance of a hidden room: looks like a wall, players walk through, robots and the map do not.
+    public enum EdgeType { Wall, Door, Open, Vent, Squeeze, Illusion }
     public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall,
         Partition, Bookshelf, Printer, Fridge, CoffeeMachine, RoundTable, Armchair, CoffeeTable, TvStand, ReceptionDesk,
         TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine, DeskLamp, FloorLamp,
-        PingPongTable, BeanBag, ArcadeMachine, Safe, Terminal }
+        PingPongTable, BeanBag, ArcadeMachine, Safe, Terminal,
+        // searchable crate, and the points of interest of the three locations (HouseFeatures)
+        Crate, MedTable, Workbench, Programmer }
 
     /// <summary>What a security terminal does: show the house's cameras, or hack robots and devices from afar.</summary>
     public enum TerminalKind : byte { Cameras, Hacking }
@@ -22,6 +25,8 @@ namespace Stealth.Level
         public PropKind Kind;
         public Vector3 Position;
         public float RotationY;
+        /// <summary>Uniform scale of the model (0 = 1): a point of interest shrinks to the table it stands in for.</summary>
+        public float Scale;
     }
 
     public struct RobotSpawn
@@ -90,7 +95,10 @@ namespace Stealth.Level
         public readonly List<Stair> Stairs = new();
         /// <summary>Every opening of the plan as a pose (doors between rooms, exterior doors, vents, slots, open passages).</summary>
         public readonly List<Doorway> Doorways = new();
+        /// <summary>The entry hatch (in the lobby): the team comes up here from the car.</summary>
         public Vector3 HatchPosition;
+        /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
+        public Vector3 ExitHatchPosition;
         public readonly List<Vector3> PlayerSpawns = new();
         public readonly List<Vector3> ItemSpots = new();
         public readonly List<Vector3> PatrolPoints = new();
@@ -101,6 +109,19 @@ namespace Stealth.Level
         public readonly HashSet<int> LockedDoors = new();
         /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
         public readonly List<(int prop, TerminalKind kind)> Terminals = new();
+        /// <summary>The hidden room (plan id; its entrances are <see cref="EdgeType.Illusion"/>), -1 if none.</summary>
+        public int HiddenRoom = -1;
+        /// <summary>Doors locked with a key block, and where each key lies (<see cref="HouseFeatures.KeyDoors"/>).</summary>
+        public readonly List<KeyDoor> KeyDoors = new();
+        /// <summary>Searchable crates: indices in <see cref="Props"/>.</summary>
+        public readonly List<int> Crates = new();
+        /// <summary>Wardens' posts (their robots are in <see cref="RobotSpawns"/> too).</summary>
+        public readonly List<WardenPost> Wardens = new();
+        /// <summary>Where lure speakers lie when the house starts.</summary>
+        public readonly List<Vector3> LureSpots = new();
+        /// <summary>The location's point of interest: index in <see cref="Props"/>, -1 if none.</summary>
+        public int PointOfInterest = -1;
+        public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;

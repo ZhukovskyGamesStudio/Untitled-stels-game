@@ -82,6 +82,8 @@ namespace Stealth.UI
         public Slider Volume;
         public Text MusicLabel;
         public Slider Music;
+        [Tooltip("Cycles the languages of the texts (Loc.All); its label names the current one.")]
+        public Button Language;
         public Button Defaults;
         public Button Done;
 
@@ -128,6 +130,14 @@ namespace Stealth.UI
                 SyncSettingsControls();
             });
             Done.onClick.AddListener(CloseSettings);
+            if (Language != null) Language.onClick.AddListener(NextLanguage);
+        }
+
+        /// <summary>The next language of <see cref="Loc.All"/> (saved at once; every label follows it).</summary>
+        static void NextLanguage()
+        {
+            int i = System.Array.IndexOf(Loc.All, Loc.Language);
+            Loc.Use(Loc.All[(i + 1) % Loc.All.Length]);
         }
 
         static void OpenSettings()
@@ -187,7 +197,7 @@ namespace Stealth.UI
         {
             SteamStatus.text = $"Steam: {net.SteamStatus}";
             HostSteam.interactable = net.SteamAvailable;
-            LocalCaption.text = $"Локальная сеть / тест на одном ПК (UDP, порт {net.LocalPort}):";
+            LocalCaption.text = Loc.F("menu.local", net.LocalPort);
             Ui.Show(NetStatus, !string.IsNullOrEmpty(net.Status));
             NetStatus.text = net.Status;
             UpdateFriends(net);
@@ -207,15 +217,15 @@ namespace Stealth.UI
             foreach (var lobby in lobbies) m_FriendRows.Next().Set(lobby, id => net.JoinFriendLobby(id));
             m_FriendRows.End();
             string status = lobbies.Count > 0 ? null
-                : !net.SteamAvailable && DevFlags.FriendLobbiesOverride == null ? "Нужен запущенный Steam"
-                : "Никого из друзей нет в игре. Друг создаёт игру через Steam — она появится здесь.";
+                : !net.SteamAvailable && DevFlags.FriendLobbiesOverride == null ? Loc.T("friends.no_steam")
+                : Loc.T("friends.none");
             Ui.Show(FriendsStatus, status != null);
             if (status != null) FriendsStatus.text = status;
         }
 
         void UpdatePause(ISessionLauncher net)
         {
-            Role.text = net.IsHost ? "Ты хост" : "Ты подключён к хосту";
+            Role.text = Loc.T(net.IsHost ? "menu.role_host" : "menu.role_client");
             Ui.Show(Invite, net.CanInviteFriends);
         }
 
@@ -232,10 +242,16 @@ namespace Stealth.UI
 
         void UpdateSettingsLabels()
         {
-            SensitivityLabel.text = $"Чувствительность мыши: {GameSettings.Sensitivity * 10f:0.0}";
-            FovLabel.text = $"Поле зрения: {GameSettings.Fov:0}°";
-            VolumeLabel.text = $"Громкость: {GameSettings.MasterVolume * 100f:0}%";
-            MusicLabel.text = $"Музыка: {GameSettings.MusicVolume * 100f:0}%";
+            SensitivityLabel.text = Loc.F("menu.sensitivity", GameSettings.Sensitivity * 10f);
+            FovLabel.text = Loc.F("menu.fov", GameSettings.Fov);
+            VolumeLabel.text = Loc.F("menu.volume", GameSettings.MasterVolume * 100f);
+            MusicLabel.text = Loc.F("menu.music", GameSettings.MusicVolume * 100f);
+            if (Language != null)
+            {
+                var label = Language.GetComponentInChildren<Text>();
+                string text = Loc.F("menu.language", Loc.NameOf(Loc.Language));
+                if (label != null && label.text != text) label.text = text;
+            }
         }
     }
 }

@@ -41,8 +41,12 @@ namespace Stealth.Game
         [Header("Leaving a house")]
         [Tooltip("Seconds from the moment the whole team is hiding in the hatch to the sewer (anyone can climb back out).")]
         public float HatchCountdown = 5f;
-        [Tooltip("Seconds the result of the vote for the next house is shown before the team goes.")]
-        public float VoteDelay = 5f;
+        [Tooltip("Seconds the car must stand in a tunnel before the team goes (the countdown on the HUD).")]
+        public float VoteDelay = 3f;
+        [Tooltip("Seconds of the drive to the next house (the side view of the car in the tunnel) before the house appears.")]
+        public float DriveTime = 3.5f;
+        [Tooltip("Seconds of warning before the run ends when the team cannot get the fuel for any way on.")]
+        public float StrandedGrace = 12f;
 
         [Header("Alarms")]
         [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]
@@ -68,8 +72,10 @@ namespace Stealth.Game
     }
 
     /// <summary>
-    /// Rules of a run (pure, unit tested): quota per house, deposits, death penalties, alarms and hunters,
-    /// how a level ends. <see cref="GameManager"/> owns one on the server and replicates the public state.
+    /// Rules of a run (pure, unit tested): the fuel of the car, what the drive on costs (the "quota" of a house), death
+    /// penalties, alarms and hunters, how a level ends. The tank (<see cref="Collected"/>) keeps its fuel for the whole
+    /// run: loot is fed into the engine, every drive to the next house burns <see cref="Quota"/> of it.
+    /// <see cref="GameManager"/> owns one on the server and replicates the public state.
     /// </summary>
     public sealed class RunState
     {
@@ -80,7 +86,9 @@ namespace Stealth.Game
         public RunSettings Settings => m_S;
 
         public int LevelIndex { get; private set; }
+        /// <summary>Fuel the drive from this house to the next one burns (the house's quota).</summary>
         public int Quota { get; private set; }
+        /// <summary>Fuel in the car's tank (kept between houses).</summary>
         public int Collected { get; private set; }
         public int RunTotal { get; private set; }
         public RunPhase Phase { get; private set; }
@@ -126,7 +134,7 @@ namespace Stealth.Game
         public (float seconds, int alarms) HunterForecast(float elapsed) =>
             Phase == RunPhase.Playing ? HunterForecast(Alarms, elapsed, LevelIndex, Hunters, m_S) : (-1f, -1);
 
-        /// <summary>A new run begins in the sewer, before the first house: nothing to pay yet.</summary>
+        /// <summary>A new run begins in the sewer, before the first house: an empty tank, the first drive is free.</summary>
         public void BeginRun()
         {
             LevelIndex = RunMap.StartDepth;
@@ -147,8 +155,7 @@ namespace Stealth.Game
             LootValue = lootValue;
             Players = Mathf.Max(1, players);
             Quota = QuotaFor(lootValue, index, Penalties, m_S, Players);
-            Collected = 0;
-            Phase = RunPhase.Playing;
+            Phase = RunPhase.Playing; // the tank keeps what is in it
             AlarmUntil = 0;
             Alarms = 0;
             Hunters = 0;
@@ -213,14 +220,24 @@ namespace Stealth.Game
             return true;
         }
 
-        /// <summary>The team goes on to the house it voted for: only with the quota paid, otherwise the run ends here.</summary>
+        /// <summary>The team drives on to the next house: the drive burns <see cref="Quota"/> of the fuel (not enough — it does not go).</summary>
         public Exit Advance()
         {
-            if (Phase != RunPhase.Sewer) return Exit.Ignored;
-            if (QuotaMet) return Exit.NextLevel;
-            Phase = RunPhase.Failed;
-            return Exit.Failed;
+            if (Phase != RunPhase.Sewer || !QuotaMet) return Exit.Ignored;
+            Collected -= Quota;
+            return Exit.NextLevel;
         }
+
+        /// <summary>Not enough fuel for any way on and nothing left to feed the engine: the run ends in the sewer.</summary>
+        public bool Strand()
+        {
+            if (Phase != RunPhase.Sewer) return false;
+            Phase = RunPhase.Failed;
+            return true;
+        }
+
+        /// <summary>Can the team still get the fuel: what is in the tank plus everything it could still feed into the engine.</summary>
+        public static bool CanStillGo(int fuel, int cost, int burnable) => fuel + burnable >= cost;
 
         /// <summary>Can the team trade (sell, use the stash) now: in a house at the hatch, or in the sewer.</summary>
         public bool CanTrade => Phase == RunPhase.Playing || Phase == RunPhase.Sewer;
@@ -254,6 +271,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Failed) return false;
             Penalties = 0;
             RunTotal = 0;
+            Collected = 0;
             return true;
         }
 

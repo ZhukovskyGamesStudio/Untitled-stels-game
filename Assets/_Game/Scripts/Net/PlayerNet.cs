@@ -18,6 +18,7 @@ namespace Stealth.Net
         readonly NetworkVariable<int> m_Hp = new(HealthState.MaxHp);
         readonly NetworkVariable<bool> m_Downed = new();
         readonly NetworkVariable<bool> m_InHatch = new();
+        readonly NetworkVariable<byte> m_Hatch = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -38,6 +39,7 @@ namespace Stealth.Net
             m_Hp.OnValueChanged += (_, _) => Pull();
             m_Downed.OnValueChanged += (_, _) => Pull();
             m_InHatch.OnValueChanged += (_, _) => Pull();
+            m_Hatch.OnValueChanged += (_, _) => Pull();
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
@@ -59,6 +61,7 @@ namespace Stealth.Net
                 NetSync.Set(m_Hp, m_Player.Hp);
                 NetSync.Set(m_Downed, m_Player.Downed);
                 NetSync.Set(m_InHatch, m_Player.InHatch);
+                NetSync.Set(m_Hatch, (byte)m_Player.HatchIndex);
             }
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
@@ -70,7 +73,7 @@ namespace Stealth.Net
 
         void Pull()
         {
-            if (!IsServer) m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value);
+            if (!IsServer) m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value, m_Hatch.Value);
             if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString());
         }
 
@@ -102,6 +105,20 @@ namespace Stealth.Net
         public void SendUnlockDoor(int door) => UnlockDoorRpc(door);
         public void SendOpenSafe(int safe) => OpenSafeRpc(safe);
         public void SendCheat(Cheat cheat, bool on) => CheatRpc((byte)cheat, on);
+        public void SendUse(Stealth.Level.UseKind kind, int index) => UseRpc((byte)kind, index);
+        public void SendGadget() => GadgetRpc();
+
+        [Rpc(SendTo.Server)]
+        void UseRpc(byte kind, int index) => GameManager.Instance?.UseServer(m_Player, (Stealth.Level.UseKind)kind, index);
+
+        [Rpc(SendTo.Server)]
+        void GadgetRpc() => GameManager.Instance?.GadgetServer(m_Player);
+        public void SendTerminal(int terminal, Detector steered, float yaw) =>
+            TerminalRpc(terminal, steered != null ? steered.GetComponent<NetworkObject>() : default, steered != null, yaw);
+
+        [Rpc(SendTo.Server)]
+        void TerminalRpc(int terminal, NetworkObjectReference steered, bool hasSteered, float yaw) =>
+            m_Player.TerminalServer(terminal, hasSteered && steered.TryGet(out var obj) ? obj.GetComponent<Detector>() : null, yaw);
 
         [Rpc(SendTo.Server)]
         void CheatRpc(byte cheat, bool on) => m_Player.CheatServer((Cheat)cheat, on);

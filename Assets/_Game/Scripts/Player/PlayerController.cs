@@ -58,7 +58,7 @@ namespace Stealth.Player
         public sbyte LookPitch { get; private set; }
         /// <summary>Owner-owned: Steam name or empty.</summary>
         public string DisplayName { get; private set; } = "";
-        public string Nick => DisplayName.Length > 0 ? DisplayName : $"Игрок {ClientId + 1}";
+        public string Nick => DisplayName.Length > 0 ? DisplayName : Loc.F("player.nick", ClientId + 1);
 
         public ulong ClientId { get; private set; }
         /// <summary>This peer controls the player (input, camera).</summary>
@@ -100,7 +100,7 @@ namespace Stealth.Player
         float m_PitchSyncTimer;
         Vector3 m_LastModelPos;
         float m_RemoteSpeed;
-        float m_RemoteBobPhase;
+
 
         // ------------------------------------------------------------------ IIntruder
 
@@ -115,6 +115,9 @@ namespace Stealth.Player
         /// <summary>Owner: a cheat from the F4 panel (the server carries it out).</summary>
         public void RequestCheat(Cheat cheat, bool on)
         {
+            // the owner runs its own gas and footsteps: it keeps the flags too (the server's copy is what robots use)
+            if (cheat == Cheat.Invulnerable) Invulnerable = on;
+            if (cheat == Cheat.Invisible) Invisible = on;
             if (m_Link != null) m_Link.SendCheat(cheat, on);
             else CheatServer(cheat, on);
         }
@@ -210,13 +213,17 @@ namespace Stealth.Player
         }
 
         /// <summary>Client: health as decided by the server.</summary>
-        public void ApplyServerState(int hp, bool downed, bool inHatch)
+        public void ApplyServerState(int hp, bool downed, bool inHatch, int hatch = 0)
         {
             if (downed && !Downed) m_DownedSince = Time.time;
             Hp = hp;
             Downed = downed;
             InHatch = inHatch;
+            HatchIndex = hatch;
         }
+
+        /// <summary>Which hatch of the house the player sits in: 0 the entry (where the team comes up), 1 the exit (the way down).</summary>
+        public int HatchIndex { get; private set; }
 
         /// <summary>Other peers: what the owner reports.</summary>
         public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName)
@@ -266,7 +273,9 @@ namespace Stealth.Player
             if (InHatch) input = new PlayerInputState { Look = input.Look };
             EnterHatchIfNeeded();
             Motor.InHatch = InHatch;
+            Motor.Seated = SeatIndex >= 0;
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
+            UpdateSeat(menu);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
 
@@ -309,7 +318,7 @@ namespace Stealth.Player
             m_PlacedInHatch = InHatch;
             var layout = ActiveLevel.Layout;
             if (!InHatch || layout == null) return;
-            TeleportOwner(layout.HatchPosition + Vector3.up * 0.05f, transform.rotation);
+            TeleportOwner(Hatch.PositionOf(HatchIndex) + Vector3.up * 0.05f, transform.rotation);
         }
 
         /// <summary>How deep the model sits while hiding: only the head looks out of the hatch.</summary>
@@ -349,6 +358,44 @@ namespace Stealth.Player
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch);
         }
 
+        Transform m_LegL, m_LegR;
+        Quaternion m_LegRestL, m_LegRestR;
+        float m_StridePhase, m_LegSwing;
+
+        /// <summary>
+        /// The legs (parts BodyLegL / BodyLegR hanging from the hip) swing in step with the walk: one step per
+        /// <see cref="StepLength"/> metres, wider when running, still when standing, crouched lower, none in the hatch or lying.
+        /// </summary>
+        void SwingLegs(float speed)
+        {
+            if (m_LegL == null && Model != null)
+                foreach (var t in Model.GetComponentsInChildren<Transform>(true))
+                {
+                    if (t.name == "BodyLegL") { m_LegL = t; m_LegRestL = t.localRotation; }
+                    else if (t.name == "BodyLegR") { m_LegR = t; m_LegRestR = t.localRotation; }
+                }
+            if (m_LegL == null || m_LegR == null) return;
+            if (SeatIndex >= 0)
+            {
+                // sitting: thighs forward
+                m_LegL.localRotation = Quaternion.Slerp(m_LegL.localRotation, m_LegRestL * Quaternion.Euler(-80f, 0f, 0f), 1f - Mathf.Exp(-10f * Time.deltaTime));
+                m_LegR.localRotation = Quaternion.Slerp(m_LegR.localRotation, m_LegRestR * Quaternion.Euler(-80f, 0f, 0f), 1f - Mathf.Exp(-10f * Time.deltaTime));
+                m_LegSwing = 0f;
+                return;
+            }
+            bool still = Downed || InHatch || speed < 0.3f;
+            float amplitude = still ? 0f : PlayerRules.LegSwing(speed, Crouching);
+            m_LegSwing = Mathf.MoveTowards(m_LegSwing, amplitude, Time.deltaTime * 160f);
+            if (!still) m_StridePhase += speed / StepLength * Mathf.PI * Time.deltaTime;
+            else if (m_LegSwing <= 0.01f) m_StridePhase = 0f; // the next walk starts from the rest pose
+            float angle = Mathf.Sin(m_StridePhase) * m_LegSwing;
+            m_LegL.localRotation = m_LegRestL * Quaternion.Euler(angle, 0f, 0f);
+            m_LegR.localRotation = m_LegRestR * Quaternion.Euler(-angle, 0f, 0f);
+        }
+
+        /// <summary>Metres per step of the walking animation (the footstep sounds use the same length).</summary>
+        const float StepLength = 1.25f;
+
         void UpdateModelPose()
         {
             UpdateRig();
@@ -357,7 +404,8 @@ namespace Stealth.Player
             if (IsOwner) Model.localPosition = Vector3.down * m_ModelSink;
             float y = Downed ? 0.35f : (Crouching ? 0.65f : 1f);
             Model.localScale = new Vector3(1f, Mathf.MoveTowards(Model.localScale.y, y, Time.deltaTime * 4f), 1f);
-            if (IsOwner || Time.deltaTime <= 0f) return;
+            if (IsOwner) SwingLegs(Motor.HorizontalSpeed);
+            if (IsOwner || Time.deltaTime <= 0f) { FollowRig(); return; }
 
             // Remote players: tilt the head to the synced pitch and bob a little while walking.
             if (HeadPivot != null)
@@ -371,9 +419,25 @@ namespace Stealth.Player
             if (speed > 20f) speed = 0f; // teleport
             m_RemoteSpeed = Mathf.Lerp(m_RemoteSpeed, speed, 1f - Mathf.Exp(-10f * Time.deltaTime));
             float walk = Mathf.Clamp01(m_RemoteSpeed / 3.6f);
-            m_RemoteBobPhase += m_RemoteSpeed * 0.75f * Mathf.PI * Time.deltaTime;
-            Model.localPosition = new Vector3(0, Mathf.Abs(Mathf.Sin(m_RemoteBobPhase)) * 0.05f * walk - m_ModelSink, 0);
-            Model.localRotation = Quaternion.Euler(Mathf.Clamp(m_RemoteSpeed * 1.2f, 0f, 8f), 0, Mathf.Sin(m_RemoteBobPhase) * 2f * walk);
+            // the bob follows the steps: up at mid-stride, down when a foot lands (two per leg cycle)
+            Model.localPosition = new Vector3(0, Mathf.Abs(Mathf.Cos(m_StridePhase)) * 0.035f * walk - m_ModelSink, 0);
+            Model.localRotation = Quaternion.Euler(Mathf.Clamp(m_RemoteSpeed * 0.6f, 0f, 4f), 0, Mathf.Sin(m_StridePhase) * 1.5f * walk);
+            SwingLegs(m_RemoteSpeed);
+            FollowRig();
+        }
+
+        /// <summary>The style's rigged human sinks into the hatch with the model (it is a sibling of the model, not its child).</summary>
+        void FollowRig()
+        {
+            // in the car every peer puts the model right on its seat (the synced position lags behind the moving car)
+            var car = Vehicles.Car.Active;
+            int seat = SeatIndex;
+            if (seat >= 0 && car.Seats[seat] != null && Model != null)
+            {
+                Model.SetPositionAndRotation(car.Seats[seat].position - Vector3.up * 0.42f, car.transform.rotation);
+                Model.localScale = Vector3.one;
+            }
+            if (m_Rig != null && Model != null) m_Rig.transform.localPosition = Model.localPosition;
         }
 
         void SyncLookPitch()
@@ -406,7 +470,8 @@ namespace Stealth.Player
             var spawn = layout.PlayerSpawns[(int)(ClientId % (ulong)layout.PlayerSpawns.Count)];
             var toHatch = layout.HatchPosition - spawn;
             toHatch.y = 0;
-            TeleportOwner(spawn + Vector3.up * 0.1f, Quaternion.LookRotation(toHatch.sqrMagnitude > 0.01f ? toHatch : Vector3.forward));
+            TeleportOwner(spawn + Vector3.up * 0.1f, Quaternion.LookRotation(toHatch.sqrMagnitude > 0.01f ? -toHatch : Vector3.forward));
+            m_PlacedInHatch = false; // the team starts in the entry hatch: sit down into it again
             Motor.SetPitch(15f);
             Motor.Stamina.Refill();
             Gas.Reset();
@@ -423,7 +488,7 @@ namespace Stealth.Player
             float wait = m_UnstuckAt + m_Interaction.UnstuckCooldown - Time.time;
             if (wait > 0f)
             {
-                gm?.ShowBanner($"«Я застрял» можно снова через {Mathf.CeilToInt(wait)} с");
+                gm?.ShowBanner(Loc.F("unstuck.wait", Mathf.CeilToInt(wait)));
                 return;
             }
             var fallback = new List<Vector3>();
@@ -439,7 +504,7 @@ namespace Stealth.Player
             }
             if (!Unstuck.FindSpot(transform.position, m_Controller.radius, m_Controller.height, fallback, transform, out var spot))
             {
-                gm?.ShowBanner("Свободного места рядом не нашлось");
+                gm?.ShowBanner(Loc.T("unstuck.none"));
                 return;
             }
             m_UnstuckAt = Time.time;
@@ -471,8 +536,9 @@ namespace Stealth.Player
         {
             var layout = ActiveLevel.Layout;
             bool outside = layout != null && !layout.IsInside(transform.position);
+            // Lying, watching a teammate or in god mode, the gas has nothing to do with you (no overlay, no knockout).
+            if (Downed || Invulnerable) { Gas.Reset(); return; }
             var effect = Gas.Tick(outside, Time.deltaTime);
-            if (Downed) return;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
             else if (effect == GasExposure.Effect.Knockout)
             {
@@ -539,12 +605,100 @@ namespace Stealth.Player
 
             UpdateSafe();
             UpdateTerminal(holdE);
+            UpdateUse(holdE);
+            if (Controls.Pressed(GameAction.Gadget) && !CursorMode && HasItem(Items.ItemCatalog.Stun))
+            {
+                if (m_Link != null) m_Link.SendGadget();
+                else GameManager.Instance?.GadgetServer(this);
+            }
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
             // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
             if (InHatch) SetHatch(false);
             else if (Hatch.IsNear(transform.position)) SetHatch(true);
+        }
+
+        // ------------------------------------------------------------------ in the car
+
+        /// <summary>The seat of the car this player sits on (0 the driver's … 3), −1 = on foot (from the car's replicated seats).</summary>
+        public int SeatIndex => Vehicles.Car.Active != null ? Vehicles.Car.Active.SeatOf(ClientId) : -1;
+        public bool Driving => SeatIndex == 0;
+
+        /// <summary>Feet this far under the seat's cushion: a sitting player's eyes are ~0.8 m above it.</summary>
+        const float SeatDrop = 0.72f;
+        bool m_WasSeated;
+        int m_LastSeat;
+
+        /// <summary>
+        /// Owner: sitting in the car the player is carried by it (looking around freely, turning with it); E gets out on the
+        /// car's side. The server decides the seats (<see cref="Vehicles.Car.SitServer"/>).
+        /// </summary>
+        void UpdateSeat(bool menu)
+        {
+            var car = Vehicles.Car.Active;
+            int seat = SeatIndex;
+            bool seated = seat >= 0 && car.Seats[seat] != null;
+            if (seated != m_WasSeated)
+            {
+                m_WasSeated = seated;
+                if (!seated && car != null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
+                if (seated) { transform.rotation = car.transform.rotation; Motor.SetPitch(6f); } // sitting down: eyes on the road
+                m_Controller.enabled = !seated;
+                Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);
+            }
+            if (!seated) return;
+            m_LastSeat = seat;
+            transform.position = car.Seats[seat].position - Vector3.up * SeatDrop;
+            transform.Rotate(0f, car.YawDelta, 0f);
+            if (!menu && !CursorMode && Controls.Pressed(GameAction.Interact))
+            {
+                if (m_Link != null) m_Link.SendUse(UseKind.CarSeat, seat);
+                else GameManager.Instance?.UseServer(this, UseKind.CarSeat, seat);
+            }
+        }
+
+        /// <summary>Something in reach to use with E (a crate, the med table, a seat of the car…), or null.</summary>
+        public Interactable UseTarget { get; private set; }
+        /// <summary>The hint for <see cref="UseTarget"/>, whether E does something now, and the hold progress (0..1).</summary>
+        public string UsePrompt { get; private set; }
+        public bool UseAvailable { get; private set; }
+        public float UseProgress { get; private set; }
+        readonly HoldProgress<Interactable> m_UseHeld = new();
+        bool m_UseWaitRelease;
+
+        bool HasItem(byte shape)
+        {
+            if (m_Inventory == null) return false;
+            foreach (var e in m_Inventory.Items) if (e.Shape == shape) return true;
+            return false;
+        }
+
+        /// <summary>Owner: press (or hold) E at a crate, the med table, the workbench, a key lock, a lever, the car.</summary>
+        void UpdateUse(bool holdE)
+        {
+            bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null
+                        || Cracking != null || CursorMode || SeatIndex >= 0;
+            UseTarget = busy ? null : Interactable.Near(this, Hands);
+            bool available = false;
+            UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;
+            UseAvailable = UseTarget != null && available;
+            if (!holdE) m_UseWaitRelease = false;
+            if (UseTarget == null || !UseAvailable || m_UseWaitRelease) { UseProgress = 0f; return; }
+            float hold = UseTarget.HoldTime;
+            bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, Time.deltaTime, hold);
+            UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) : 0f;
+            if (!done) return;
+            m_UseWaitRelease = true; // one use per press
+            if (m_Link != null) m_Link.SendUse(UseTarget.Kind, UseTarget.Index);
+            else GameManager.Instance?.UseServer(this, UseTarget.Kind, UseTarget.Index);
+        }
+
+        /// <summary>Server: the med table raised this player's health.</summary>
+        public void HealServer(int hp)
+        {
+            m_Health.Heal(hp);
+            PublishHealth();
         }
 
         /// <summary>Owner: hide in the hatch or climb out (also a test hook).</summary>
@@ -663,10 +817,17 @@ namespace Stealth.Player
         public void Callout(bool mark)
         {
             if (Camera == null) return;
-            var view = Camera.transform;
+            var eye = Camera.transform.position;
+            var forward = Camera.transform.forward;
+            if (UsingTerminal != null && TerminalViewPose(out var at, out var rotation))
+            {
+                eye = at;
+                forward = rotation * Vector3.forward;
+            }
+            var view = (position: eye, forward: forward);
             if (mark)
             {
-                var target = MarkTarget(view.position, view.forward, Team.MarkRange);
+                var target = MarkTarget(view.position, view.forward, Team.MarkRange, UsingTerminal != null ? TerminalView : null);
                 if (target != null)
                 {
                     if (m_Link != null) m_Link.SendMark(target);
@@ -684,12 +845,12 @@ namespace Stealth.Player
         /// The robot / device the player aims at: the crosshair ray hits its body, or it is within a few degrees of the
         /// view and in plain sight (small devices are hard to hit exactly).
         /// </summary>
-        public static Detector MarkTarget(Vector3 eye, Vector3 forward, float range)
+        public static Detector MarkTarget(Vector3 eye, Vector3 forward, float range, Detector except = null)
         {
             if (Physics.Raycast(eye, forward, out var direct, range, Perception.SightMask, QueryTriggerInteraction.Ignore))
             {
                 var hit = direct.collider.GetComponentInParent<Detector>();
-                if (hit != null && !hit.IsHacked) return hit;
+                if (hit != null && !hit.IsHacked && hit != except) return hit;
             }
             Detector best = null;
             float bestAngle = 5f;
@@ -697,7 +858,7 @@ namespace Stealth.Player
             {
                 var to = d.Position - eye;
                 float dist = to.magnitude;
-                if (dist > range || dist < 0.01f || d.IsHacked) continue;
+                if (dist > range || dist < 0.01f || d.IsHacked || d == except) continue;
                 float angle = Vector3.Angle(forward, to);
                 if (angle >= bestAngle) continue;
                 if (Physics.Raycast(eye, to / dist, out var block, dist - 0.6f, Perception.SightMask, QueryTriggerInteraction.Ignore)
@@ -713,12 +874,22 @@ namespace Stealth.Player
         {
             var gm = GameManager.Instance;
             if (!hide) { InHatch = false; return; }
-            if (Downed || gm == null || gm.Phase != RunPhase.Playing || !Hatch.IsNear(transform.position)) return;
+            if (Downed || gm == null || gm.Phase != RunPhase.Playing) return;
+            int hatch = Hatch.IndexNear(transform.position);
+            if (hatch < 0) return;
             InHatch = true;
+            HatchIndex = hatch;
         }
 
         /// <summary>Server: the team left the house (or a new one starts).</summary>
         public void LeaveHatchServer() => InHatch = false;
+
+        /// <summary>Server: a house starts with the team sitting in its entry hatch.</summary>
+        public void EnterHatchServer(int hatch)
+        {
+            InHatch = true;
+            HatchIndex = hatch;
+        }
 
         /// <summary>Server: the owner pinged a spot.</summary>
         // ------------------------------------------------------------------ watching a teammate while knocked out
@@ -741,6 +912,50 @@ namespace Stealth.Player
 
         /// <summary>Owner: the terminal being used (null = none) and the robot / camera on its screen.</summary>
         public SecurityTerminal UsingTerminal { get; private set; }
+
+        /// <summary>Server: the terminal this player sits at (-1 none): cameras do not notice them, marks come from the screen.</summary>
+        public int AtTerminal { get; private set; } = -1;
+        SecurityCamera m_Steered;
+
+        public void TerminalServer(int terminal, Detector steered, float yaw)
+        {
+            AtTerminal = terminal;
+            var camera = terminal >= 0 ? steered as SecurityCamera : null;
+            if (m_Steered != null && m_Steered != camera) m_Steered.ReleaseServer(this);
+            m_Steered = camera;
+            if (camera != null) camera.SteerServer(this, yaw);
+        }
+
+        SecurityCamera m_SteerCamera;
+        float m_SteerYaw, m_TerminalSent;
+
+        /// <summary>Owner at a camera terminal: the mouse and A/D turn the camera on the screen; its yaw goes to the server.</summary>
+        void SteerTerminalCamera(Detector view)
+        {
+            var camera = view as SecurityCamera;
+            if (camera != m_SteerCamera)
+            {
+                m_SteerCamera = camera;
+                m_SteerYaw = camera != null ? camera.CurrentYaw : 0f;
+            }
+            if (camera != null)
+            {
+                float keys = (Controls.Held(GameAction.Right) ? 1f : 0f) - (Controls.Held(GameAction.Left) ? 1f : 0f);
+                var mouse = Mouse.current;
+                float mouseX = mouse != null ? mouse.delta.ReadValue().x * GameSettings.Sensitivity : 0f;
+                m_SteerYaw = Mathf.Clamp(m_SteerYaw + keys * 70f * Time.deltaTime + mouseX, -SecurityCamera.SteerLimit, SecurityCamera.SteerLimit);
+                camera.PreviewAim(m_SteerYaw);
+            }
+            SendTerminalState(UsingTerminal != null ? UsingTerminal.Index : -1, camera, m_SteerYaw, false);
+        }
+
+        void SendTerminalState(int terminal, Detector steered, float yaw, bool now)
+        {
+            if (!now && Time.time < m_TerminalSent) return;
+            m_TerminalSent = Time.time + 0.1f;
+            if (m_Link != null) m_Link.SendTerminal(terminal, steered, yaw);
+            else TerminalServer(terminal, steered, yaw);
+        }
         public Detector TerminalView { get; private set; }
         public int TerminalViewNumber => m_TerminalIndex + 1;
         public int TerminalViewCount => m_TerminalTargets.Count;
@@ -777,15 +992,19 @@ namespace Stealth.Player
                 return;
             }
             SecurityTerminal.Targets(t.Kind, t.transform.position, m_TerminalTargets);
-            if (m_TerminalTargets.Count == 0) { TerminalView = null; return; }
+            if (m_TerminalTargets.Count == 0) { TerminalView = null; SteerTerminalCamera(null); return; }
             var mouse = Mouse.current;
-            if (Controls.Pressed(GameAction.Right) || (mouse != null && mouse.leftButton.wasPressedThisFrame)) m_TerminalIndex++;
-            if (Controls.Pressed(GameAction.Left) || (mouse != null && mouse.rightButton.wasPressedThisFrame)) m_TerminalIndex--;
+            // cameras: A/D and the mouse turn the camera, the mouse buttons and the wheel switch it; robots: A/D switch too
+            bool steer = t.Kind == TerminalKind.Cameras;
+            float wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+            if ((!steer && Controls.Pressed(GameAction.Right)) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || wheel < 0f) m_TerminalIndex++;
+            if ((!steer && Controls.Pressed(GameAction.Left)) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || wheel > 0f) m_TerminalIndex--;
             int n = m_TerminalTargets.Count;
             m_TerminalIndex = (m_TerminalIndex % n + n) % n;
             var view = m_TerminalTargets[m_TerminalIndex];
             if (view != TerminalView) m_TerminalHold = 0f;
             TerminalView = view;
+            SteerTerminalCamera(steer ? view : null);
             if (!holdE) m_TerminalWaitRelease = false;
             bool hacking = t.Kind == TerminalKind.Hacking && t.Charges > 0 && holdE && !m_TerminalWaitRelease && !view.IsHacked;
             if (!hacking) { m_TerminalHold = 0f; return; }
@@ -801,6 +1020,8 @@ namespace Stealth.Player
         public void StartTerminal(SecurityTerminal terminal, bool waitRelease = true)
         {
             UsingTerminal = terminal;
+            m_SteerCamera = null;
+            SendTerminalState(terminal.Index, null, 0f, true);
             TerminalView = null;
             m_TerminalIndex = 0;
             m_TerminalHold = 0f;
@@ -816,6 +1037,8 @@ namespace Stealth.Player
             if (ReferenceEquals(UsingTerminal, null)) return;
             UsingTerminal = null;
             TerminalView = null;
+            m_SteerCamera = null;
+            SendTerminalState(-1, null, 0f, true);
             m_TerminalHold = 0f;
             if (Camera == null) return;
             Camera.transform.localPosition = Vector3.zero;
@@ -825,13 +1048,22 @@ namespace Stealth.Player
         /// <summary>Owner at a terminal: the camera looks through the security camera on the screen, or at the robot from a clear side.</summary>
         void ShowTerminalView()
         {
+            if (TerminalViewPose(out var at, out var rotation)) Camera.transform.SetPositionAndRotation(at, rotation);
+        }
+
+        /// <summary>Where the terminal's picture is seen from (also where pings and marks come from while sitting at it).</summary>
+        bool TerminalViewPose(out Vector3 position, out Quaternion rotation)
+        {
+            position = default;
+            rotation = Quaternion.identity;
             var d = TerminalView;
-            if (d == null) return;
+            if (d == null) return false;
             if (d is SecurityCamera cam && cam.Pivot != null)
             {
                 // just in front of the lens: the camera's own housing and glow stay behind the view
-                Camera.transform.SetPositionAndRotation(d.Position + cam.Pivot.forward * 0.4f, cam.Pivot.rotation);
-                return;
+                position = d.Position + cam.Pivot.forward * 0.4f;
+                rotation = cam.Pivot.rotation;
+                return true;
             }
             // A robot: from behind (or the first side with no wall in between), a little above it and under the ceiling.
             var target = d.Position;
@@ -853,7 +1085,9 @@ namespace Stealth.Player
                 best = at;
                 break;
             }
-            Camera.transform.SetPositionAndRotation(best, Quaternion.LookRotation(target - best));
+            position = best;
+            rotation = Quaternion.LookRotation(target - best);
+            return true;
         }
 
         /// <summary>
@@ -907,7 +1141,7 @@ namespace Stealth.Player
         public void OnPingRequest(Vector3 position)
         {
             var gm = GameManager.Instance;
-            if (gm == null || !WithinCallRange(position, Team.PingRange + 5f)) return;
+            if (gm == null || (AtTerminal < 0 && !WithinCallRange(position, Team.PingRange + 5f))) return;
             gm.CalloutServer(ClientId, PingKind.Here, position, null);
         }
 
@@ -916,7 +1150,8 @@ namespace Stealth.Player
         {
             var gm = GameManager.Instance;
             if (gm == null || target == null || target.IsHacked) return;
-            if (!WithinCallRange(target.Position, Team.MarkRange + 5f)) return;
+            // at a terminal the player looks through the house's cameras: the mark comes from there, not from their eyes
+            if (AtTerminal < 0 && !WithinCallRange(target.Position, Team.MarkRange + 5f)) return;
             gm.CalloutServer(ClientId, PingKind.Enemy, target.Position, target);
         }
 
@@ -1002,14 +1237,14 @@ namespace Stealth.Player
         /// <summary>Server: the owner made a noise.</summary>
         public void OnNoiseRequest(Vector3 position, float radius)
         {
-            if (Downed) return;
+            if (Downed || Invisible) return; // the invisibility cheat: robots ignore this player completely
             NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), ClientId);
         }
 
         /// <summary>Server: the owner passed out from the gas.</summary>
         public void OnGasKnockoutRequest()
         {
-            if (Downed) return;
+            if (Downed || Invulnerable) return;
             m_Health.Knockout(Time.time);
             PublishHealth();
         }

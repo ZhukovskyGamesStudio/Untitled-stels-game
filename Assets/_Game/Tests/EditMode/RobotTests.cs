@@ -32,6 +32,7 @@ namespace Stealth.Tests
                 Assert.AreSame(rc, rig.Robot);
                 var (eyes, ears, ground, nose) = SensorRig.Mounts(rc.Senses);
                 bool lidar = rc.Senses.LidarRange > 0f && rc.Lidar != null && rc.Lidar.Head != null; // the spinning puck shows itself
+                if (rc.Senses.FollowsSightings) { Assert.IsFalse(eyes || ears || ground || nose, $"{go.name} has no sensors of its own and shows none"); continue; }
                 Assert.IsTrue(eyes || ears || ground || nose || lidar, $"{go.name} shows at least one sensor");
                 foreach (var r in rig.Eyes[0].GetComponentsInChildren<Renderer>())
                     if (r.name.StartsWith("Eye")) CollectionAssert.Contains(rc.Status.Renderers, r, $"{go.name}: the eye lens glows in the status colour");
@@ -54,7 +55,7 @@ namespace Stealth.Tests
             Assert.IsFalse(first.Contains(RobotKind.Hound), "hounds come later");
             Assert.Greater(deep.Count, first.Count);
             foreach (RobotKind k in System.Enum.GetValues(typeof(RobotKind)))
-                if (k != RobotKind.Hunter && k != RobotKind.Camera) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
+                if (k != RobotKind.Hunter && k != RobotKind.Camera && k != RobotKind.Warden) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
             Assert.IsFalse(deep.Contains(RobotKind.Hunter), "hunters are never placed, they arrive");
         }
 
@@ -76,6 +77,7 @@ namespace Stealth.Tests
             int devices = 0, robots = 0;
             foreach (var r in l.RobotSpawns)
             {
+                if (r.Kind == RobotKind.Warden) continue; // placed at loot rooms by HouseFeatures, not by the roster
                 Assert.IsTrue(RobotRoster.IsUnlocked(r.Kind, 5));
                 if (RobotRoster.IsDevice(r.Kind)) devices++; else robots++;
             }

@@ -27,6 +27,20 @@ namespace Stealth.Audio
         public AudioClip SeismicThump;
         [Tooltip("A camera that is noticing someone beeps, faster and faster.")]
         public AudioClip CameraBeep;
+        [Tooltip("A hound's paw / a spider's foot (the guard's foot is RobotStep).")]
+        public AudioClip StepLight, SpiderStep;
+        [Tooltip("Motor loops of the other robots: joints of legged ones, tracks, the sweeper's brush, the hunter's turbine.")]
+        public AudioClip MotorServo, MotorTracks, MotorBrush, MotorTurbine;
+
+        [Header("Items and places")]
+        [Tooltip("The lure speaker's music (loop).")]
+        public AudioClip SpeakerMusic;
+        public AudioClip FuelGulp, Heal, Craft, StunBlast, CrateSearch, Unlock, GateOpen;
+
+        [Header("Car")]
+        [Tooltip("Engine loop at idle: pitched up with the revs.")]
+        public AudioClip CarEngine;
+        public AudioClip CarStart, CarStop, CarHorn, CarBump;
 
         [Header("Robot voice (Tools/Audio/generate_voices.py)")]
         [Tooltip("«Обнаружен нарушитель» — a robot has noticed someone; the chase starts after its warning time.")]

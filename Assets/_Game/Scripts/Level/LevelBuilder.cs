@@ -116,7 +116,12 @@ namespace Stealth.Level
             {
                 var d = l.AutoDoors[i];
                 var door = Place(m_Art.AutoDoor, "AutoDoor", d.position, d.rotation).GetComponent<AutoDoor>();
-                if (door != null) door.Configure(i, l.LockedDoors.Contains(i));
+                if (door != null)
+                {
+                    bool keyed = false;
+                    foreach (var k in l.KeyDoors) keyed |= k.Door == i;
+                    door.Configure(i, l.LockedDoors.Contains(i), keyed);
+                }
             }
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
@@ -127,8 +132,10 @@ namespace Stealth.Level
                 var prefab = m_Art.Prop(p.Kind);
                 if (prefab == null) continue;
                 var go = Place(prefab, p.Kind.ToString(), p.Position, Quaternion.Euler(0, p.RotationY, 0));
+                if (p.Scale > 0f) go.transform.localScale = Vector3.one * p.Scale;
                 RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
+                if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind);
@@ -329,6 +336,18 @@ namespace Stealth.Level
             bool cornerA = !jointA;
             foreach (var o in openings)
             {
+                if (o.Kind == EdgeType.Illusion)
+                {
+                    // the entrance of a hidden room: a wall to look at (with all its decor), nothing to bump into
+                    float h0 = o.At - LevelMetrics.ClearWidth(o.Width) / 2f, h1 = o.At + LevelMetrics.ClearWidth(o.Width) / 2f;
+                    WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * h0, 0f, height);
+                    RecordFaces(a3 + d3 * from, a3 + d3 * h0, 0f, height, w.Exterior, inner, cornerA, false, jointA && cornerA == false && from <= t / 2f + 0.001f);
+                    WallPiece(m_Art.IllusionBlock != null ? m_Art.IllusionBlock : m_Art.WallBlock, a3 + d3 * h0, a3 + d3 * h1, 0f, height);
+                    RecordFaces(a3 + d3 * h0, a3 + d3 * h1, 0f, height, w.Exterior, inner, false, false);
+                    from = h1;
+                    cornerA = false;
+                    continue;
+                }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
                 float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth : LevelMetrics.DoorWidth);
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;

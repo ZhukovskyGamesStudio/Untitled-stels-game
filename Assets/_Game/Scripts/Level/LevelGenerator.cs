@@ -159,10 +159,12 @@ namespace Stealth.Level
         public static class Timing { public static long Plan, Check, Furnish, Walk, Grid, Flood, Reach, Barrier, Rounds; public static void Reset() => Plan = Check = Furnish = Walk = Grid = Flood = Reach = Barrier = Rounds = 0; }
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
-        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1)
+        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
+            FeatureSettings features = null)
         {
             building ??= new BuildingSettings();
             security ??= new SecuritySettings();
+            features ??= new FeatureSettings();
             var kind = HouseKinds.Of(seed, levelIndex);
             building = HouseKinds.Apply(kind, building);
             var rng = new System.Random(seed);
@@ -201,6 +203,15 @@ namespace Stealth.Level
                 if (ok) break;
             }
 
+            // Sometimes a room hides behind illusion walls (it changes the openings: the doorways are listed again).
+            l.HiddenRoom = HouseFeatures.HideRoom(l, features);
+            if (l.HiddenRoom >= 0)
+            {
+                l.Doorways.Clear();
+                Doorways(l);
+                checker = null; // its walk grid knew the old doors
+            }
+
             // Light: some rooms are dark (robots see worse there), some lamps flicker. Never the lobby.
             foreach (var r in l.Rooms)
             {
@@ -218,6 +229,10 @@ namespace Stealth.Level
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
             furnisher.Put(lobby, PropKind.Hatch, l.HatchPosition, 0f);
+            var exit = ExitRoom(l);
+            l.ExitHatchPosition = exit.Center;
+            furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
+            furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
             for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
 
@@ -232,6 +247,10 @@ namespace Stealth.Level
             Timing.Walk += watch.ElapsedMilliseconds;
             PlaceSecurity(l, rng, building, security);
             PlaceTerminals(l, security);
+            HouseFeatures.KeyDoors(l, features);
+            HouseFeatures.Crates(l, features);
+            HouseFeatures.PointOfInterest(l);
+            HouseFeatures.Wardens(l, features);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));
@@ -319,6 +338,24 @@ namespace Stealth.Level
                     High = op.High,
                 });
             }
+        }
+
+        /// <summary>
+        /// The room of the exit hatch: on the ground floor, not the lobby, not the hidden room, not a corridor, as far from the
+        /// entry as possible (the team has to cross the house).
+        /// </summary>
+        static PlanRoom ExitRoom(LevelLayout l)
+        {
+            PlanRoom best = null;
+            float far = -1f;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type == RoomType.Corridor || r.Area < 10f) continue;
+                if (l.NearStair(0, r.Center, 1.4f)) continue;
+                float d = (r.Center - l.HatchPosition).magnitude;
+                if (d > far) { far = d; best = r; }
+            }
+            return best ?? l.Lobby;
         }
 
         /// <summary>Patrol points: the middle of every room, and in big rooms the middles of the parts they were made of.</summary>

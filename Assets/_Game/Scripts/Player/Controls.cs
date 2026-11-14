@@ -8,7 +8,7 @@ namespace Stealth.Player
     public enum GameAction
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
-        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats,
+        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats, Gadget, Horn,
     }
 
     /// <summary>
@@ -46,43 +46,53 @@ namespace Stealth.Player
         public readonly struct Info
         {
             public readonly GameAction Action;
-            public readonly string Title;
+            /// <summary>The group's id ("move", "actions", "team", "car", "other"): the table key is <c>controls.group.&lt;id&gt;</c>.</summary>
             public readonly string Group;
             public readonly KeyBinding Default;
 
-            public Info(GameAction action, string group, string title, KeyBinding binding)
+            public Info(GameAction action, string group, KeyBinding binding)
             {
                 Action = action;
                 Group = group;
-                Title = title;
                 Default = binding;
             }
+
+            /// <summary>The action's name for the controls page (table key <c>action.&lt;action&gt;</c>).</summary>
+            public string Title => Loc.T(TitleKey(Action));
+            public string GroupTitle => Loc.T(GroupKey(Group));
         }
+
+        public static string TitleKey(GameAction a) => "action." + a.ToString().ToLowerInvariant();
+
+        /// <summary>The table key of a group of <see cref="Info.Group"/>: "controls.group.move".</summary>
+        public static string GroupKey(string group) => "controls.group." + group;
 
         /// <summary>Every action in the order the controls page lists them (index = (int)GameAction).</summary>
         public static readonly Info[] All =
         {
-            new(GameAction.Forward, "Движение", "Вперёд", KeyBinding.Of(Key.W)),
-            new(GameAction.Back, "Движение", "Назад", KeyBinding.Of(Key.S)),
-            new(GameAction.Left, "Движение", "Влево", KeyBinding.Of(Key.A)),
-            new(GameAction.Right, "Движение", "Вправо", KeyBinding.Of(Key.D)),
-            new(GameAction.Sprint, "Движение", "Бег (удерживать)", KeyBinding.Of(Key.LeftShift)),
-            new(GameAction.Jump, "Движение", "Прыжок / встать, если сбили", KeyBinding.Of(Key.Space)),
-            new(GameAction.CrouchHold, "Движение", "Присесть (удерживать)", KeyBinding.Of(Key.LeftCtrl)),
-            new(GameAction.CrouchToggle, "Движение", "Присесть / встать", KeyBinding.Of(Key.C)),
-            new(GameAction.Interact, "Действия", "Поднять союзника, взломать (держать)", KeyBinding.Of(Key.E)),
-            new(GameAction.Hands, "Действия", "Руки: тащить добычу мышью (держать)", KeyBinding.Of(Key.Tab)),
-            new(GameAction.Rotate, "Действия", "Повернуть предмет", KeyBinding.Of(Key.R)),
-            new(GameAction.Mirror, "Действия", "Отзеркалить предмет", KeyBinding.Of(Key.T)),
-            new(GameAction.Hatch, "Действия", "У люка — следующий дом", KeyBinding.Of(Key.F)),
-            new(GameAction.StashAll, "Действия", "У люка — сложить всё из рюкзака на склад", KeyBinding.Of(Key.G)),
-            new(GameAction.Ping, "Команда", "Пинг «сюда» для команды", KeyBinding.MouseButton(2)),
-            new(GameAction.Mark, "Команда", "Пометить робота для команды", KeyBinding.Of(Key.Q)),
-            new(GameAction.Map, "Команда", "Большая карта", KeyBinding.Of(Key.M)),
-            new(GameAction.Style, "Прочее", "Сменить визуальный стиль", KeyBinding.Of(Key.F8)),
-            new(GameAction.Unstuck, "Прочее", "Я застрял — на свободное место", KeyBinding.Of(Key.K)),
-            new(GameAction.Restart, "Прочее", "Новый забег (после провала)", KeyBinding.Of(Key.R)),
-            new(GameAction.Cheats, "Прочее", "Чит-панель (для тестов)", KeyBinding.Of(Key.F4)),
+            new(GameAction.Forward, "move", KeyBinding.Of(Key.W)),
+            new(GameAction.Back, "move", KeyBinding.Of(Key.S)),
+            new(GameAction.Left, "move", KeyBinding.Of(Key.A)),
+            new(GameAction.Right, "move", KeyBinding.Of(Key.D)),
+            new(GameAction.Sprint, "move", KeyBinding.Of(Key.LeftShift)),
+            new(GameAction.Jump, "move", KeyBinding.Of(Key.Space)),
+            new(GameAction.CrouchHold, "move", KeyBinding.Of(Key.LeftCtrl)),
+            new(GameAction.CrouchToggle, "move", KeyBinding.Of(Key.C)),
+            new(GameAction.Interact, "actions", KeyBinding.Of(Key.E)),
+            new(GameAction.Hands, "actions", KeyBinding.Of(Key.Tab)),
+            new(GameAction.Rotate, "actions", KeyBinding.Of(Key.R)),
+            new(GameAction.Mirror, "actions", KeyBinding.Of(Key.T)),
+            new(GameAction.Hatch, "actions", KeyBinding.Of(Key.F)),
+            new(GameAction.StashAll, "actions", KeyBinding.Of(Key.G)),
+            new(GameAction.Ping, "team", KeyBinding.MouseButton(2)),
+            new(GameAction.Mark, "team", KeyBinding.Of(Key.Q)),
+            new(GameAction.Map, "team", KeyBinding.Of(Key.M)),
+            new(GameAction.Style, "other", KeyBinding.Of(Key.F8)),
+            new(GameAction.Unstuck, "other", KeyBinding.Of(Key.K)),
+            new(GameAction.Restart, "other", KeyBinding.Of(Key.R)),
+            new(GameAction.Cheats, "other", KeyBinding.Of(Key.F4)),
+            new(GameAction.Gadget, "actions", KeyBinding.Of(Key.X)),
+            new(GameAction.Horn, "car", KeyBinding.Of(Key.H)),
         };
 
         const string Prefix = "stealth.key.";
@@ -224,7 +234,7 @@ namespace Stealth.Player
 
         // ------------------------------------------------------------------ names
 
-        /// <summary>Short name of the action's key for prompts: "E", "Пробел", "СКМ".</summary>
+        /// <summary>Short name of the action's key for prompts: "E", "Space", "MMB" (in the player's language).</summary>
         public static string Label(GameAction a) => Name(Get(a));
 
         public static string Name(KeyBinding b)
@@ -233,23 +243,23 @@ namespace Stealth.Player
             if (b.IsMouse)
                 return b.MouseIndex switch
                 {
-                    0 => "ЛКМ",
-                    1 => "ПКМ",
-                    2 => "СКМ",
-                    3 => "Мышь 4",
-                    4 => "Мышь 5",
-                    _ => "Мышь",
+                    0 => Loc.T("key.lmb"),
+                    1 => Loc.T("key.rmb"),
+                    2 => Loc.T("key.mmb"),
+                    3 => Loc.T("key.mouse4"),
+                    4 => Loc.T("key.mouse5"),
+                    _ => Loc.T("key.mouse"),
                 };
             var k = b.Key;
             switch (k)
             {
-                case Key.Space: return "Пробел";
+                case Key.Space: return Loc.T("key.space");
                 case Key.LeftShift: return "Shift";
-                case Key.RightShift: return "Правый Shift";
+                case Key.RightShift: return Loc.T("key.rshift");
                 case Key.LeftCtrl: return "Ctrl";
-                case Key.RightCtrl: return "Правый Ctrl";
+                case Key.RightCtrl: return Loc.T("key.rctrl");
                 case Key.LeftAlt: return "Alt";
-                case Key.RightAlt: return "Правый Alt";
+                case Key.RightAlt: return Loc.T("key.ralt");
                 case Key.Enter: return "Enter";
                 case Key.Backspace: return "Backspace";
                 case Key.Backquote: return "`";

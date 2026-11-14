@@ -6,6 +6,7 @@
 - Unity **6000.6.0f1**, URP, новый Input System (только `Keyboard.current` / `Mouse.current`).
 - Сеть: Netcode for GameObjects 2.13 (`NetworkVariable`, `[Rpc(SendTo.*)]`). Транспорт Steam (Steamworks.NET, AppID 480) или UnityTransport UDP 7777.
 - Интерфейс: uGUI (legacy `Text`, шрифт `LegacyRuntime.ttf`). IMGUI больше не используется.
+- Тексты: **все** строки для игрока — в таблицах `Resources/Strings/*.csv` (`key,ru,en`), в коде только ключи (`Loc.T/F/Plural`, см. «Тексты и языки»).
 - Навмеш: com.unity.ai.navigation, запекание в рантайме; зона 3 `Stairs` — по ней ходят только роботы с ногами.
 
 ## Ветки
@@ -31,7 +32,7 @@ Tools/dev.sh run full 1         # хост + 1 клиент по сети (бе�
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`, `cheats`, `features`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -57,10 +58,11 @@ Resources/GameConfig.asset            корень настроек (ссылк�
 Prefabs/Level    куски здания: LevelRoot (NavMeshSurface), блоки стен/перекрытий, Stairs/StairsMirrored, AutoDoor, VentFrame, RoomLight, StreetLamp, Hatch
 Prefabs/Props    мебель
 Prefabs/Robots   роботы + их конфиги · Prefabs/Sensors — датчики, камера, лазер + их конфиги
+Prefabs/Vehicles машина (Car, сетевой), её модель для сцены поездки, кусок груза в кузове · Prefabs/Level/Sewer — набор канализации
 Prefabs/Player, Items, Network (Session), FX (RadioRipple), Audio (AudioDirector)
 Prefabs/UI       экраны HUD, Inventory, Menu, StashBoard + UI/Elements (кнопка, слайдер, дуга, маркеры…)
 Scenes/Game.unity                      единственная сцена: сеть, камера меню, экземпляры UI-префабов и AudioDirector, EventSystem
-Scripts/<Audio|Config|Enemies|Game|Items|Level|Player|UI>   код игры (asmdef Stealth.Game — без Netcode и Steam)
+Scripts/<Audio|Config|Enemies|Game|Items|Level|Player|UI|Vehicles>   код игры (asmdef Stealth.Game — без Netcode и Steam)
 Scripts/Net/                          сетевой слой (asmdef Stealth.Net): NGO, Steam, сетевые двойники компонентов
 Editor/AssetBuilder*.cs               генератор ассетов (asmdef Stealth.Editor)
 Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
@@ -73,8 +75,8 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
 1. **Чистые правила** — обычные C#-классы и статические функции без `MonoBehaviour`, сети и физики. Здесь живут решения, и здесь же — тесты.
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
    `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `HousePlan`, `PlanGenerator`, `Furnisher`, `HouseKinds`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
-   `PromptRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`,
-   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`, `StairStyles`.
+   `ReticleRules`, `HintRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`,
+   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`, `StairStyles`, `HouseFeatures`, `Crafting`, `Cargo`, `CarPhysics`, `SewerPlan`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
    показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
@@ -122,6 +124,13 @@ LaserGate — отдельная ловушка (не детектор)
 `RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
 Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
+**Охотник** без своих датчиков (`RobotSenses.FollowsSightings`): бежит к игроку, которого сейчас замечает любой другой детектор
+(`RobotController.Relayed`), быстрый. **Сторож** (`RobotKind.Warden`) не в ростере — его ставит `HouseFeatures.Wardens`.
+**Звук роботов**: у каждого вида свой мотор (`AssetBuilder.MotorFor`) и высота голоса (`AudioRules.VoicePitch`); шаги шагающих — по
+касанию ступни (`ProceduralLegs.FootDown` → `AudioDirector.OnFootDown`: охранник, ищейка, паук — свои клипы); всё, что звучит через
+перекрытия, глохнет (`AudioDirector.Muffle` → `AudioRules.FloorFactor`, `AudioMix.ThroughFloor`; петли `LoopSound` тоже).
+Громкость из настроек применяется сразу (вес кроссфейда отдельно от громкости), фон исследования тихий (`AudioMix.ExploreMusic`),
+двери — `AudioMix.Doors`.
 
 ### Уровень
 
@@ -142,6 +151,21 @@ LaserGate — отдельная ловушка (не детектор)
 от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
 со стенами, лестницами и друг с другом, `LevelNavMeshTests` — что до лута можно дойти.
 
+### Тексты, языки и HUD
+
+**Тексты — только по ключу.** `Loc` (`Scripts/Game/Loc.cs`, namespace `Stealth`) читает все `Resources/Strings/*.csv` (UTF-8, `key,ru,en`, кавычки по RFC 4180,
+`\n` — перенос, строки с `#` — заголовки разделов; ключ живёт ровно в одном файле). `Loc.T(key)`, `Loc.F(key, args)`, `Loc.Plural(key, n)` (`key.one/few/many`);
+нет перевода — русский, нет ключа — сам ключ. Язык — настройка игрока (пауза → Настройки, PlayerPrefs `stealth.lang`), по умолчанию — язык системы;
+`Loc.Version`/`Loc.Changed` — для кэшей. Подписи в префабах — `L("key")` в сборщике → компонент `LocText`. Текст, который летит по сети (баннеры),
+летит ключом: `Loc.Pack(key, args)` (аргумент `@key` — тоже ключ), каждый пир делает `Loc.Unpack` на своём языке. `LocalizationTests`: все строки с ru и en,
+одинаковые `{n}`, ключи из кода есть в таблицах, в коде не осталось кириллицы (кроме `[Tooltip]`, комментариев, `DevAutomation*`, строк с `// loc-ok`).
+
+**HUD почти без текста** (`GameHUD`, решения — `HudRules.cs`): прицел — точка или иконка того, что сделает E (`ReticleRules`: поднять, взломать, замок,
+сейф, ящик, медстол, верстак, ключ, рычаг, сиденье, бак, терминал, взять), тусклая — если сейчас нельзя, кольцо — удержание. Клавиши момента — стопка
+справа снизу (`HintRules` → `HintView`/`KeyCapView`: нарисованная клавиша или мышь + одно слово, полупрозрачно; самое важное — внизу; очевидного
+вроде WASD нет). Слева снизу — глаз (освещённость, 8 кадров от закрытого до открытого), динамик (шум: 0–3 волны) и сердечки (третье — золотое
+от медстола). Иконки рисует `python Tools/Art/generate_icons.py` → `Art/Sprites/Icons` (белые с тёмным контуром, красит `Image.color`).
+
 ### Сеть
 
 Игровая сборка `Stealth.Game` **не ссылается** на Netcode/Steam (проверяет `NetworkBoundaryTests`). Всё сетевое — в `Stealth.Net`:
@@ -152,6 +176,7 @@ PlayerController + PlayerInventory   ⇄  PlayerNet + InventoryNet
 GameManager (+ RunState)              ⇄  GameManagerNet
 Detector (все роботы и датчики)        ⇄  DetectorNet
 WorldItem                             ⇄  WorldItemNet
+Car (машина в канализации)            ⇄  CarNet
 LaserGate                             ⇄  LaserGateNet
 Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork (ISessionLauncher), Steam*
 ```
@@ -164,7 +189,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 - `Session` — фасад сессии: `IsServer`, `ServerTime`, `Spawn`/`Despawn` (сетевые префабы), `Launcher` (меню: хост, подключение, Steam).
   Без запущенной сессии этот пир — сам себе сервер, время — локальное, спавн — обычный `Instantiate`.
 - Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
-- Правила забега (квота, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
+- Правила забега (топливо и цена поездки, штрафы, тревоги, охотник, конец уровня) — чистый класс `RunState`.
 - Склад команды у люка — `TeamStash` в `GameManager.Stash` (сервер), реплицирует `GameManagerNet`; запросы — `PlayerInventory.Request{Stash,Unstash,StashMove,SellStashed,StashWorld,SellWorld,StashAll}`.
   Сидя в люке, руки (Tab) тоже работают: доска склада висит перед глазами (`StashBoard.PlaceInFront`). «Сложить всё» — клавиша `GameAction.StashAll` (G) или кнопка на доске (`TeamStash.AddAll`).
   Записи склада адресуются по значению (`InventoryEntry`), не по индексу: список мог измениться, пока запрос летел. Склад живёт весь забег, `RestartRunServer` его чистит.
@@ -173,7 +198,12 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 Игровой код спрашивает `Controls.Held/Pressed(GameAction.X)`, а не `Keyboard.current`; тексты для игрока называют клавиши через `Controls.Label`.
 Новое действие — в `GameAction` и `Controls.All` (название, группа, клавиша), оно само появится в списке на паузе (`ControlsPanel`).
 
-**Чит-панель (F4)** — `CheatPanel` в HUD: выключить всех роботов, неуязвимость, невидимость для роботов (`PlayerController.Invisible` входит в `IsDown`),
+**Терминал камер**: камеру на экране игрок поворачивает сам (`SecurityCamera.SteerServer`, угол — `DetectorSnapshot.Aim`;
+`IPlayerLink.SendTerminal` раз в 0,1 с); управляемая камера никого не замечает, сидящего за терминалом (`PlayerController.AtTerminal`) камеры
+не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта у всех повёрнута одинаково (север вверху, `MapView`).
+Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
+качаются в шаг (`PlayerController.SwingLegs`, `PlayerRules.LegSwing`), сидя в машине — согнуты. Оставленный лежать в доме возвращается с пустым рюкзаком.
+**Чит-панель (F4)** — `CheatPanel` в HUD: выключить всех роботов, неуязвимость (и газ не берёт), невидимость для роботов (`PlayerController.Invisible` входит в `IsDown`; ни шума, ни следа),
 квота, телепорт к люку, вся карта; выполняет сервер (`IPlayerLink.SendCheat` → `PlayerController.CheatServer`). Сценарий `cheats`.
 **Карта, пинги, метки.** `ExplorationMap` — что команда видела (клетки плана 0,5 м, открываются веером лучей от глаз: луч останавливается на стене,
 проходит в проём двери — мимо двери открывается клин комнаты, который видно сквозь неё; `HousePlan.SightShare`; сетка выходит на `Margin` = 8 м за дом —
@@ -186,21 +216,45 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
 между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`).
 
-**Между домами — канализация.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. Уйти из дома — спрятаться
-в люк (`PlayerController.InHatch`, сервер; `IPlayerLink.SendHatch`); когда `RunState.TeamInHatch` — отсчёт `GameManager.LeaveAt`
-(`RunSettings.HatchCountdown`), потом `GoToSewerServer`: контент дома деспавнится, `RunState.EnterSewer(упавшие)`. Канализацию каждый пир
-строит сам из префаба `LevelArt.Sewer` (модели `Tools/Blender/sewer.py`, сборка `AssetBuilder.Sewer` — после UI; материалы `Art/Materials/Sewer`
-не перекрашиваются стилями), дом при этом убирается (`GameManager.SyncLocation`). **Забег начинается в канализации** (`RunState.BeginRun`,
-глубина `RunMap.StartDepth` = −1, первые 2–3 дома; автопилот стартует сразу в доме — `DevFlags.StartInHouse`, кроме сценария `sewer`).
-Канализация: кирпичный свод от лестницы под люком, тележка команды (`StashCart` выкладывает склад в кузов по сетке), зал с колодцем и
-**три туннеля** (`SewerLocation.Branches`: левый/средний/правый; `SewerBranches.Slots` — какой туннель ведёт к какому пути, лишние —
-за решёткой; туннели уходят на 40 м в темноту, но через `SewerLocation.StopAt` = 2,85 м — невидимая стена, на полу — светящаяся рамка зоны голоса).
-Голос — встать в рамку (`SewerLocation.BranchAt`, сервер в `GameManager.UpdateVote`, ничья — жребий по сиду; отсчёт `RunSettings.VoteDelay` крупно на HUD), над туннелем —
-панель в мире (`RouteSignView`, `SewerRoute`: тип дома, этажи, охрана, камеры, тьма, запертые двери, кто стоит, отсчёт, нехватка квоты).
-Торговать можно у `GameManager.TradePosition` (люк в доме, тележка в канализации; `CanTradeAt`). Маршрут — `RunMap` из `LevelInfo.RunSeed`
-(столбцы 2–4 дома, из дома 1–3 пути, ряд 0 = классический сид дома). Решили → `RunState.Advance()`: квота выплачена — `StartLevel(глубина + 1, ряд)`,
-нет — `Failed` и вода поднимается (`SewerLocation.Flood`). В люке игрок правда сидит в люке: камера у пола (`PlayerMotor.InHatch`), модель
-опущена, крышка люка открывается (`Hatch.Lid`).
+**Между домами — канализация и машина.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. В доме **два люка**:
+вход (`LevelLayout.HatchPosition`, лобби — команда начинает дом сидя в нём, `PlayerController.EnterHatchServer(0)`) и выход
+(`ExitHatchPosition`, комната первого этажа дальше всех от входа, `LevelGenerator.ExitRoom`); `PlayerController.HatchIndex` (0/1, реплицирует
+`PlayerNet`). Уйти — вся команда в люке **выхода** (`RunState.TeamInHatch`) → отсчёт `LeaveAt` → `GoToSewerServer`. У каждого люка свой склад:
+`GameManager.Stash` (вход: при старте дома туда выгружается кузов машины, `UnloadCarServer`) и `ExitStash` (выход: уезжает в кузов,
+`LoadCarServer`; склад входа пропадает) — `GameManager.StashAt(позиция)`. Продажи нет: добыча — **топливо**. `RunState.Collected` — бак
+(живёт весь забег), `Quota` — сколько сожжёт поездка из этого дома (первая бесплатна); `RunState.Advance` списывает её, `Strand` — забег
+окончен, если топлива не хватит даже со всей добычей (`CanStillGo`, предупреждение `RunSettings.StrandedGrace`).
+Канализацию каждый пир собирает сам: `SewerPlan.Make(RunSeed, глубина)` (чистый: заглушка, участок машины под люком входа, ворота, участок
+спуска из люка выхода, зал с тремя туннелями; число и варианты сегментов, лампы, их цвет, мусор — от сида) → `SewerLocation.Build` из кусков
+набора `Tools/Blender/sewer.py` (`-- … kit`: `sewer_seg_0..3` + `_cut`, `sewer_hub`, `sewer_branch`, `sewer_gate_*`, `sewer_lever`, `sewer_cap`;
+префабы `Prefabs/Level/Sewer/*`, `AssetBuilder.Sewer`). Дорога — решётка (`SewerGrate`, alpha-clip, `Art/Textures/Sewer/grate.png`) над водой.
+Ворота (`SewerGate`, рычаг `GateLever` на стороне спуска) — `GameManager.GateKey` в `Opened`; в начале забега открыты.
+**Машина** — `Vehicles/Car` (сетевой префаб; двойник `CarNet` отдаёт владение водителю: owner-authoritative `NetworkTransform`):
+4 места (`CarSeat`, `Car.SitServer`, игрок в машине — `PlayerController.SeatIndex`, `PlayerMotor.Seated`), езда — чистый `CarPhysics`
+(велосипедная модель, `RunConfig.Car` → `CarSettings`), упор в стены `BoxCast`, подвеска/руль/колёса/дробилка анимирует `Car`, звук мотора
+по оборотам, старт/стоп, гудок (`GameAction.Horn`, `ICarLink`). Бак-приёмник на капоте `CarHopper` (E: лут рюкзака, с пустым — весь кузов →
+`FeedServer`). Кузов без ячеек — `Cargo` (куча: `Heights`, упаковка `CargoItem.Pack` в `NetworkList<ulong>`), брошенное над кузовом
+ложится туда (`GameManager.DropOnCarServer`), взять — E по `CargoPiece`. Выбор пути — машина в зоне открытого туннеля
+(`SewerLocation.BranchAt(машина)`, `GameManager.UpdateSewer`, отсчёт `RunSettings.VoteDelay`) → `DepartServer` → `DriveUntil`
+(реплицируется): каждый пир показывает `DriveScene` (`LevelArt.DriveScene`: бесконечный туннель из `_cut`-сегментов, пикап в профиль, длинный
+объектив) → `ArriveServer` → `StartLevel`; экран темнеет и проясняется на доме (`GameHUD.ShowLoadingFade`). Панели над туннелями —
+`RouteSignView`/`SewerRoute`. Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
+
+**Особые места дома** — чистый `HouseFeatures` (каждое — свой поток рандома), настройки `LevelConfig.Features` (`FeatureSettings`):
+типы домов `HouseKinds` + `Location` (офис — пять характеров, больница, автомастерская); главное место (`LevelLayout.PointOfInterest`,
+встаёт вместо большого стола/дивана/стеллажа, сжимается до его габаритов `PropPlacement.Scale`): консоль программирования роботов
+(`Programmer`, кубики-оглушители по игроку), медстол (`MedTable`: здоровье до `GadgetSettings.MedTableHp` = 3, раз за дом —
+`GameManager.MedKey`), верстак (`Workbench`: `Crafting.Plan` — вещи одного цвета → `ItemCatalog.Diamond`); офис — больше и ценнее лут
+(`LootSettings.OfficeItems/OfficeBonus`). **Скрытая комната** (`HideRoom`: окружённая комнатами, входы `EdgeType.Illusion` с каждой
+соседней; `LevelArt.IllusionBlock` — стена без коллайдера с NotWalkable-объёмом; карта и `HousePlan.SightShare` не видят сквозь неё;
+проверка проходимости робота её не требует). **Двери с ключом** (`KeyDoors`: дверь — единственный путь в 1–3 комнаты; ключ — предмет
+`ItemCatalog.Key` в другой комнате; `AutoDoor.NeedsKey`, `KeyLock`). **Ящики** (`Crates`: стеллаж/паллета/коробки → `SearchCrate`,
+содержимое `GameManager.CrateContents`, ключ `CrateKey`). **Сторожа** (`Wardens`: `RobotKind.Warden` перед единственным проходом комнаты
+с лутом, `RobotController.SetPost` — ходит A↔B, смотрит наружу; колонки `LureSpots`). Инструменты — особые формы `ItemCatalog`
+(`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`; стоят 0, кроме алмаза): брошенная колонка (`WorldItem.PlayServer`, реплицирует
+`WorldItemNet`) зовёт ближайшего робота (`GameManager.UpdateLures`), он её выключает; оглушитель — `GameAction.Gadget` (X) →
+`GadgetServer` (все детекторы взломаны на `StunDuration`). Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
+→ `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
 
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
 не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.
@@ -325,7 +379,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 - Число, которое будут подкручивать при балансе, — в группу настроек конфига (с `[Tooltip]`), а не константой в коде. Константы — только для геометрии и того, что не тюнится.
 - Сервер решает, клиенты показывают. В игровом коде нет `NetworkVariable`/`Rpc`/`NetworkManager`: состояние — обычные поля, запросы — через link-интерфейсы,
   проверка — в серверном обработчике игрового компонента. Netcode — только в `Scripts/Net`.
-- Приватные поля `m_Name`, статические `s_Name`, константы и публичное — `PascalCase`. Комментарии и идентификаторы — по-английски, тексты для игрока — по-русски.
+- Приватные поля `m_Name`, статические `s_Name`, константы и публичное — `PascalCase`. Комментарии и идентификаторы — по-английски, тексты для игрока — ключами из таблиц строк (русский + английский).
+- Текстов на экране — минимум: игрок уже прошёл обучение. Никаких объяснений по центру; клавиши — в стопке подсказок справа снизу, интерактивность — иконкой прицела.
 - Найденный баг — чинить и, если можно, закрыть тестом.
 
 ## Точки стыковки для коллеги

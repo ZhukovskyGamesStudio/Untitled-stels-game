@@ -49,7 +49,10 @@ namespace Stealth.Net
         NetworkList<NetVote> m_Votes;
         int m_PushedOpened = -1, m_PushedVotes = -1;
         readonly List<KeyValuePair<ulong, int>> m_VoteBuffer = new();
-        NetworkList<NetInventoryEntry> m_Stash;
+        NetworkList<NetInventoryEntry> m_Stash, m_ExitStash;
+        NetworkList<ulong> m_Cargo;
+        readonly NetworkVariable<double> m_DriveUntil = new(), m_StunnedUntil = new();
+        int m_PushedExitStash = -1, m_PushedCargo = -1;
         /// <summary>What the team has seen of the house: [0] = the house seed, then the bits of <see cref="Stealth.Level.ExplorationMap"/>.</summary>
         NetworkList<ulong> m_Explored;
         int m_PushedExplored = -1;
@@ -62,6 +65,8 @@ namespace Stealth.Net
         {
             m_Game = GetComponent<GameManager>();
             m_Stash = new NetworkList<NetInventoryEntry>();
+            m_ExitStash = new NetworkList<NetInventoryEntry>();
+            m_Cargo = new NetworkList<ulong>();
             m_Explored = new NetworkList<ulong>();
             m_Opened = new NetworkList<int>();
             m_Votes = new NetworkList<NetVote>();
@@ -92,6 +97,12 @@ namespace Stealth.Net
             m_Votes.OnListChanged += _ => PullVotes();
             PullStash();
             m_Stash.OnListChanged += _ => PullStash();
+            m_ExitStash.OnListChanged += _ => PullStash();
+            m_Cargo.OnListChanged += _ => PullCargo();
+            PullCargo();
+            m_DriveUntil.OnValueChanged += (_, v) => m_Game.DriveUntil = v;
+            m_Game.DriveUntil = m_DriveUntil.Value;
+            m_StunnedUntil.OnValueChanged += (_, v) => m_Game.ApplyStun(v);
             m_Explored.OnListChanged += _ => PullExplored();
         }
 
@@ -140,6 +151,20 @@ namespace Stealth.Net
                 m_Stash.Clear();
                 foreach (var e in m_Game.Stash.Items) m_Stash.Add(NetInventoryEntry.From(e));
             }
+            if (m_PushedExitStash != m_Game.ExitStash.Version)
+            {
+                m_PushedExitStash = m_Game.ExitStash.Version;
+                m_ExitStash.Clear();
+                foreach (var e in m_Game.ExitStash.Items) m_ExitStash.Add(NetInventoryEntry.From(e));
+            }
+            if (m_PushedCargo != m_Game.Cargo.Version)
+            {
+                m_PushedCargo = m_Game.Cargo.Version;
+                m_Cargo.Clear();
+                foreach (var c in m_Game.Cargo.Items) m_Cargo.Add(c.Pack());
+            }
+            NetSync.Set(m_DriveUntil, m_Game.DriveUntil);
+            NetSync.Set(m_StunnedUntil, m_Game.StunnedUntil);
         }
 
         /// <summary>Sends only the changed chunks, a few times a second; a new house resends the whole list.</summary>
@@ -189,6 +214,18 @@ namespace Stealth.Net
             m_Buffer.Clear();
             foreach (var e in m_Stash) m_Buffer.Add(e.ToEntry());
             m_Game.Stash.ApplyReplicated(m_Buffer);
+            m_Buffer.Clear();
+            foreach (var e in m_ExitStash) m_Buffer.Add(e.ToEntry());
+            m_Game.ExitStash.ApplyReplicated(m_Buffer);
+        }
+
+        readonly List<ulong> m_CargoBuffer = new();
+
+        void PullCargo()
+        {
+            m_CargoBuffer.Clear();
+            foreach (var c in m_Cargo) m_CargoBuffer.Add(c);
+            m_Game.Cargo.ApplyReplicated(m_CargoBuffer);
         }
 
         void Pull()

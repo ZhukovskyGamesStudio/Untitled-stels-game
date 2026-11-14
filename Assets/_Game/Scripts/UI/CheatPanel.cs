@@ -54,8 +54,8 @@ namespace Stealth.UI
             if (!GameMenu.IsOpen && Controls.Pressed(GameAction.Cheats)) Show(!IsOpen);
             if (GameMenu.IsOpen && IsOpen) Show(false);
             if (!IsOpen) return;
-            Label(Invulnerable, m_Invulnerable ? "Неуязвимость: ВКЛ" : "Неуязвимость: выкл");
-            Label(Invisible, m_Invisible ? "Невидимость для роботов: ВКЛ" : "Невидимость для роботов: выкл");
+            Label(Invulnerable, Loc.F("cheats.invulnerable", Loc.T(m_Invulnerable ? "cheats.on" : "cheats.off")));
+            Label(Invisible, Loc.F("cheats.invisible", Loc.T(m_Invisible ? "cheats.on" : "cheats.off")));
         }
 
         void Show(bool on)

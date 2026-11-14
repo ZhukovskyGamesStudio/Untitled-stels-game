@@ -1,4 +1,8 @@
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
+using Stealth.Level;
+using Stealth.Player;
 using Stealth.UI;
 using UnityEngine;
 
@@ -7,7 +11,7 @@ namespace Stealth.Tests
     /// <summary>What the HUD decides to show: the prompt, banners, "+N", hit feedback.</summary>
     public class HudRulesTests
     {
-        static PromptContext Idle => new() { Playing = true, Quota = 100 };
+        static PromptContext Idle => new() { Playing = true };
 
         [Test]
         public void StyleBannersReplaceEachOther()
@@ -37,11 +41,10 @@ namespace Stealth.Tests
         public void TheHunterIsNeverASurprise()
         {
             var (text, urgency) = HunterRules.Line(250.2f, 3, 0);
-            Assert.AreEqual("Охотник через 4:11 или после 3 тревог", text);
+            Assert.AreEqual("Охотник через 4:11 · тревог: 3", text);
             Assert.AreEqual(HunterRules.Urgency.Calm, urgency);
             Assert.AreEqual(HunterRules.Urgency.Soon, HunterRules.Line(59f, 3, 0).urgency, "the last minute");
             Assert.AreEqual(HunterRules.Urgency.Soon, HunterRules.Line(300f, 1, 0).urgency, "one more alarm brings it");
-            Assert.AreEqual("Охотник через 5:00 или после 1 тревоги", HunterRules.Line(300f, 1, 0).text);
             Assert.AreEqual(HunterRules.Urgency.Inside, HunterRules.Line(-1f, -1, 1).urgency);
             Assert.IsNull(HunterRules.Line(-1f, -1, 0).text, "no more hunters in this house: no line");
         }
@@ -59,91 +62,132 @@ namespace Stealth.Tests
             Assert.AreEqual(-1, Stealth.Game.RunState.HunterForecast(0, 0f, 0, 1, s).alarms, "the only hunter of the first house came");
         }
 
+        static List<Hint> Hints(in PromptContext c) => HintRules.Collect(c, new List<Hint>());
+
         [Test]
-        public void NothingToSayNoPrompt()
+        public void NothingToDoADotAndNoHints()
         {
-            Assert.IsFalse(PromptRules.Choose(Idle).IsValid);
+            var r = ReticleRules.Choose(Idle);
+            Assert.IsTrue(r.Visible);
+            Assert.AreEqual(ReticleIcon.Dot, r.Icon);
+            CollectionAssert.IsEmpty(Hints(Idle), "no text on the screen when there is nothing to do");
         }
 
         [Test]
-        public void ReviveBeatsEverything()
+        public void ReviveBeatsEverythingAndShowsTheHold()
         {
             var c = Idle;
             c.CanRevive = true;
-            c.HackTarget = "Турель";
-            c.NearHatch = true;
-            c.HoverItem = "Красный";
-            var p = PromptRules.Choose(c);
-            Assert.AreEqual("E", p.Key);
-            StringAssert.Contains("поднять", p.Text);
-            Assert.GreaterOrEqual(p.Progress, 0f, "hold actions show a bar");
+            c.ReviveProgress = 0.3f;
+            c.CanHack = true;
+            c.HoverItem = true;
+            var r = ReticleRules.Choose(c);
+            Assert.AreEqual(ReticleIcon.Revive, r.Icon);
+            Assert.AreEqual(0.3f, r.Progress, 1e-4f, "a ring fills while E is held");
+            var last = Hints(c)[^1];
+            Assert.AreEqual(Controls.Get(GameAction.Interact), last.Key, "the key is drawn, not written");
+            Assert.AreEqual("поднять", last.Text, "one short word");
         }
 
         [Test]
-        public void HatchPromptDependsOnCargoAndQuota()
+        public void ThingsToUseShowTheirGlyphAndDimWhenNotPossible()
+        {
+            var c = Idle;
+            c.HasUse = true;
+            c.UseKind = UseKind.KeyDoor;
+            c.UseText = "нужен ключ";
+            c.UseAvailable = false;
+            var r = ReticleRules.Choose(c);
+            Assert.AreEqual(ReticleIcon.Key, r.Icon);
+            Assert.IsFalse(r.Available, "dimmed: no key");
+            Assert.IsTrue(Hints(c)[^1].Dim);
+            c.UseKind = UseKind.CarHopper;
+            c.UseAvailable = true;
+            Assert.AreEqual(ReticleIcon.Fuel, ReticleRules.Choose(c).Icon);
+            foreach (UseKind k in System.Enum.GetValues(typeof(UseKind)))
+                Assert.AreNotEqual(ReticleIcon.Dot, ReticleRules.IconOf(k), $"{k} has a glyph");
+        }
+
+        [Test]
+        public void TheHatchAndTheStashHintTheirKeys()
         {
             var c = Idle;
             c.NearHatch = true;
             c.NearTrade = true;
             c.CarriedItems = 2;
-            StringAssert.Contains("Разложить", PromptRules.Choose(c).Text);
-            c.CarriedItems = 0;
-            c.Collected = 40;
-            StringAssert.Contains("доплатить", PromptRules.Choose(c).Text, "leaving without the quota is allowed: it is paid below");
-            c.Collected = 100;
-            StringAssert.Contains("канализацию", PromptRules.Choose(c).Text);
+            var keys = Hints(c).Select(h => h.Key).ToList();
+            CollectionAssert.Contains(keys, Controls.Get(GameAction.Hands));
+            CollectionAssert.Contains(keys, Controls.Get(GameAction.StashAll));
+            Assert.AreEqual(Controls.Get(GameAction.Hatch), Hints(c)[^1].Key, "into the hatch: the nearest thing to do");
             c.InHatch = true;
-            Assert.AreEqual("Вылезти из люка", PromptRules.Choose(c).Text);
+            Assert.IsFalse(ReticleRules.Choose(c).Visible, "no reticle while hiding");
+            Assert.AreEqual("вылезти", Hints(c)[^1].Text);
+            c.CarriedItems = 0;
+            CollectionAssert.DoesNotContain(Hints(c).Select(h => h.Key), Controls.Get(GameAction.StashAll), "nothing to stash");
         }
 
         [Test]
-        public void DoorsSafesAndTheSewer()
+        public void DrivingHintsOnlyWhatIsNotObvious()
+        {
+            var c = Idle;
+            c.Driving = true;
+            var hints = Hints(c);
+            CollectionAssert.AreEquivalent(new[] { Controls.Get(GameAction.Horn), Controls.Get(GameAction.Interact) }, hints.Select(h => h.Key));
+            CollectionAssert.DoesNotContain(hints.Select(h => h.Key), Controls.Get(GameAction.Forward), "no WASD — that is obvious");
+            c.Driving = false;
+            c.Passenger = true;
+            Assert.AreEqual(1, Hints(c).Count, "a passenger only gets out");
+        }
+
+        [Test]
+        public void DoorsSafesAndTerminals()
         {
             var c = Idle;
             c.LockedDoor = true;
             c.DoorProgress = 0.4f;
-            var p = PromptRules.Choose(c);
-            StringAssert.Contains("замок", p.Text);
-            Assert.AreEqual(0.4f, p.Progress, 1e-4f);
+            var r = ReticleRules.Choose(c);
+            Assert.AreEqual(ReticleIcon.Lock, r.Icon);
+            Assert.AreEqual(0.4f, r.Progress, 1e-4f);
             c.LockedDoor = false;
             c.SafeNear = true;
-            StringAssert.Contains("сейф", PromptRules.Choose(c).Text);
+            Assert.AreEqual(ReticleIcon.Safe, ReticleRules.Choose(c).Icon);
             c.Cracking = true;
-            Assert.IsFalse(PromptRules.Choose(c).IsValid, "the dial has its own screen");
-            var s = new PromptContext { InSewer = true, Quota = 100 };
-            StringAssert.Contains("туннел", PromptRules.Choose(s).Text);
+            Assert.IsFalse(ReticleRules.Choose(c).Visible, "the dial has its own screen");
+            CollectionAssert.IsEmpty(Hints(c));
+            var t = new PromptContext { AtTerminal = true, SittingKind = TerminalKind.Cameras };
+            var keys = Hints(t).Select(h => h.Key).ToList();
+            CollectionAssert.Contains(keys, Controls.Get(GameAction.Mark), "cameras: mark a robot");
+            CollectionAssert.Contains(keys, Controls.Get(GameAction.Jump), "and stand up");
         }
 
         [Test]
-        public void ItemPromptOnlyOutsideHandsMode()
+        public void ItemsAreTakenOnlyOutsideHandsMode()
         {
             var c = Idle;
-            c.HoverItem = "Синий";
-            Assert.AreEqual("ЛКМ", PromptRules.Choose(c).Key);
+            c.HoverItem = true;
+            Assert.AreEqual(ReticleIcon.Hand, ReticleRules.Choose(c).Icon);
+            Assert.IsTrue(Hints(c)[^1].Key.IsMouse);
             c.CursorMode = true;
-            Assert.IsFalse(PromptRules.Choose(c).IsValid);
+            Assert.IsFalse(ReticleRules.Choose(c).Visible);
+            CollectionAssert.Contains(Hints(c).Select(h => h.Key), Controls.Get(GameAction.Rotate), "hands out: rotate and mirror");
         }
 
         [Test]
-        public void RobotInfoYieldsToActions()
+        public void LyingDown()
         {
-            var c = Idle;
-            c.LookedAt = "Охранник: глаза";
-            Assert.AreEqual("Охранник: глаза", PromptRules.Choose(c).Text);
-            c.HoverItem = "Синий";
-            StringAssert.Contains("Взять", PromptRules.Choose(c).Text);
-        }
-
-        [Test]
-        public void NoPromptsWhenDownedOrInTheMenu()
-        {
-            var c = Idle;
-            c.CanRevive = true;
-            c.Downed = true;
-            Assert.IsFalse(PromptRules.Choose(c).IsValid);
-            c.Downed = false;
-            c.MenuOpen = true;
-            Assert.IsFalse(PromptRules.Choose(c).IsValid);
+            var c = new PromptContext { Downed = true, Hp = 1, CanGetUp = true };
+            Assert.IsFalse(ReticleRules.Choose(c).Visible);
+            Assert.AreEqual(Controls.Get(GameAction.Jump), Hints(c).Single().Key);
+            c.Hp = 0;
+            c.CanGetUp = false;
+            CollectionAssert.IsEmpty(Hints(c), "out cold: nothing to press");
+            c.Watching = true;
+            Assert.IsTrue(Hints(c).Single().Key.IsMouse, "switch whose eyes");
+            var menu = Idle;
+            menu.MenuOpen = true;
+            menu.CanRevive = true;
+            Assert.IsFalse(ReticleRules.Choose(menu).Visible);
+            CollectionAssert.IsEmpty(Hints(menu));
         }
 
         [Test]

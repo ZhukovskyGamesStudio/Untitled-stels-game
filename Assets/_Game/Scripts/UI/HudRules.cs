@@ -4,106 +4,208 @@ using UnityEngine;
 
 namespace Stealth.UI
 {
-    /// <summary>Everything the prompt under the crosshair depends on, gathered by the HUD each frame.</summary>
+    /// <summary>Everything the reticle and the hint stack depend on, gathered by the HUD each frame.</summary>
     public struct PromptContext
     {
-        public bool Downed, MenuOpen, CursorMode;
+        public bool Downed, MenuOpen, CursorMode, Cracking;
+        public int Hp;
+        public bool CanGetUp;
+        /// <summary>Knocked out and looking through a teammate's eyes.</summary>
+        public bool Watching;
         public bool CanRevive;
         public float ReviveProgress;
-        /// <summary>Name of the robot / device that can be hacked, null if none.</summary>
-        public string HackTarget;
+        /// <summary>A robot / device in reach to hack.</summary>
+        public bool CanHack;
         public float HackProgress;
-        /// <summary>How long a hack lasts (shown in the prompt).</summary>
-        public float HackSeconds;
-        public bool BlockedByCeiling;
         public bool Playing, NearHatch;
-        /// <summary>At the stash board (the hatch of a house or the board in the sewer).</summary>
+        /// <summary>The hatch in reach is the exit (the way down), not the entry.</summary>
+        public bool NearExit;
+        /// <summary>At a stash (a hatch of the house) or at the car.</summary>
         public bool NearTrade;
-        public bool InHatch, InSewer;
+        public bool InHatch;
         /// <summary>A locked door in reach and how far its hack is (0..1).</summary>
         public bool LockedDoor;
         public float DoorProgress;
-        /// <summary>A closed safe in reach / turning a safe's dial now.</summary>
-        public bool SafeNear, Cracking;
-        /// <summary>A terminal in reach: what pressing E does there (null if none); sitting at one hides the prompt.</summary>
-        public string Terminal;
+        /// <summary>A closed safe in reach.</summary>
+        public bool SafeNear;
+        /// <summary>A terminal in reach (and whether it can do anything).</summary>
+        public bool NearTerminal, TerminalUsable;
+        /// <summary>Sitting at a terminal: which kind, and whether E hacks the robot on its screen now.</summary>
         public bool AtTerminal;
-        public int CarriedItems, Collected, Quota;
-        /// <summary>Robot / device in the crosshair: "name: senses", null if none.</summary>
-        public string LookedAt;
-        /// <summary>World item under the crosshair, null if none.</summary>
-        public string HoverItem;
+        public Level.TerminalKind SittingKind;
+        public bool SittingCanHack;
+        public int CarriedItems;
+        /// <summary>Something to use with E (crate, med table, workbench, key lock, lever, car): its kind and short label.</summary>
+        public bool HasUse;
+        public Level.UseKind UseKind;
+        public string UseText;
+        public bool UseAvailable;
+        public float UseProgress;
+        /// <summary>Sitting in the car: at the wheel / as a passenger.</summary>
+        public bool Driving, Passenger;
+        public bool HasStun;
+        /// <summary>A world item under the crosshair (it can be taken).</summary>
+        public bool HoverItem;
+        public bool BigMap;
+    }
+
+    /// <summary>The glyph in the middle of the screen: a dot, or what the thing in front of you is for.</summary>
+    public enum ReticleIcon { Dot, Hand, Lock, Key, Hack, Revive, Heal, Search, Seat, Fuel, Terminal, Craft, Lever, Safe, Crate, Door }
+
+    /// <summary>The reticle this frame: hidden (hands out, lying, in a menu), its glyph, dimmed when it can't be used now, the hold progress.</summary>
+    public readonly struct Reticle
+    {
+        public readonly bool Visible;
+        public readonly ReticleIcon Icon;
+        public readonly bool Available;
+        /// <summary>0..1 while holding E, negative — no ring.</summary>
+        public readonly float Progress;
+
+        public Reticle(ReticleIcon icon, bool available = true, float progress = -1f)
+        {
+            Visible = true;
+            Icon = icon;
+            Available = available;
+            Progress = progress;
+        }
+
+        public static readonly Reticle Hidden = default;
+    }
+
+    /// <summary>One line of the hint stack (bottom right): one or two keys drawn as key caps and a short word.</summary>
+    public readonly struct Hint
+    {
+        public readonly KeyBinding Key, Key2;
+        public readonly string Text;
+        /// <summary>Can't be done now (no key for the door): the line is dimmer.</summary>
+        public readonly bool Dim;
+
+        public Hint(KeyBinding key, string text, bool dim = false) : this(key, default, text, dim) { }
+
+        public Hint(KeyBinding key, KeyBinding key2, string text, bool dim = false)
+        {
+            Key = key;
+            Key2 = key2;
+            Text = text;
+            Dim = dim;
+        }
+
+        public override string ToString() => (Key.IsNone ? "" : $"[{Key}]") + (Key2.IsNone ? "" : $"[{Key2}]") + " " + Text;
     }
 
     /// <summary>
-    /// Which single hint to show under the crosshair (pure, unit tested). Higher priority wins:
-    /// out of the hatch 90 · revive 100 · cannot stand 80 · hack 70 · door 68 · safe 66 · deposit 60 · hatch 55 · take item 50 ·
-    /// robot info 45 · route map in the sewer 30.
+    /// What the reticle shows (pure, unit tested). The thing in front of you that E would act on, by priority:
+    /// revive · hack · locked door · safe · something to use · terminal · an item to take; otherwise a dot.
+    /// No text: the glyph says what it is, the hint stack names the key.
     /// </summary>
-    public static class PromptRules
+    public static class ReticleRules
     {
-        static readonly List<Prompt> s_Prompts = new();
-
-        /// <summary>What a player lying on the floor reads; <paramref name="watching"/> — whose eyes a knocked-out player looks through.</summary>
-        public static string DownedText(int hp, bool canGetUp, string watching = null) =>
-            hp <= 0 && watching != null
-                ? $"Без сознания · смотришь глазами: {watching}\nЛКМ / ПКМ — другой союзник · {Controls.Label(GameAction.Ping)} — пинг, {Controls.Label(GameAction.Mark)} — метка"
-            : hp <= 0 ?$"Без сознания\nСоюзник может поднять тебя ({Controls.Label(GameAction.Interact)} рядом)"
-            : canGetUp ? $"Ты на полу\nЛежачих роботы не трогают — дождись, пока уйдут\n{Controls.Label(GameAction.Jump)} — встать"
-            : "Сбит с ног!";
-
-        public static Prompt Choose(in PromptContext c)
+        public static Reticle Choose(in PromptContext c)
         {
-            s_Prompts.Clear();
-            if (c.Downed || c.MenuOpen || c.Cracking || c.AtTerminal) return default;
-            string hatch = Controls.Label(GameAction.Hatch);
-            if (c.InHatch) return new Prompt(90, hatch, "Вылезти из люка");
-            string use = Controls.Label(GameAction.Interact);
-            if (c.CanRevive) s_Prompts.Add(new Prompt(100, use, "Удерживай — поднять союзника", c.ReviveProgress));
-            if (c.HackTarget != null) s_Prompts.Add(new Prompt(70, use, $"Удерживай — взломать: {c.HackTarget} ({c.HackSeconds:0} с)", c.HackProgress));
-            if (c.BlockedByCeiling) s_Prompts.Add(new Prompt(80, "", "Не встать: над головой препятствие"));
-            if (c.LockedDoor) s_Prompts.Add(new Prompt(68, use, "Удерживай — взломать замок двери", c.DoorProgress));
-            if (c.SafeNear) s_Prompts.Add(new Prompt(66, use, "Вскрыть сейф: подобрать код на слух"));
-            if (c.Terminal != null) s_Prompts.Add(new Prompt(64, use, c.Terminal));
-            // With the cursor out the board speaks for itself.
+            if (c.MenuOpen || c.CursorMode || c.Downed || c.Cracking || c.AtTerminal || c.InHatch) return Reticle.Hidden;
+            if (c.Driving || c.Passenger) return new Reticle(ReticleIcon.Dot);
+            if (c.CanRevive) return new Reticle(ReticleIcon.Revive, true, c.ReviveProgress);
+            if (c.CanHack) return new Reticle(ReticleIcon.Hack, true, c.HackProgress);
+            if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
+            if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
+            if (c.HasUse) return new Reticle(IconOf(c.UseKind), c.UseAvailable, c.UseAvailable && c.UseProgress > 0f ? c.UseProgress : -1f);
+            if (c.NearTerminal) return new Reticle(ReticleIcon.Terminal, c.TerminalUsable);
+            if (c.HoverItem) return new Reticle(ReticleIcon.Hand);
+            return new Reticle(ReticleIcon.Dot);
+        }
+
+        public static ReticleIcon IconOf(Level.UseKind kind) => kind switch
+        {
+            Level.UseKind.Crate => ReticleIcon.Crate,
+            Level.UseKind.MedTable => ReticleIcon.Heal,
+            Level.UseKind.Workbench => ReticleIcon.Craft,
+            Level.UseKind.KeyDoor => ReticleIcon.Key,
+            Level.UseKind.GateLever => ReticleIcon.Lever,
+            Level.UseKind.CarSeat => ReticleIcon.Seat,
+            Level.UseKind.CarHopper => ReticleIcon.Fuel,
+            Level.UseKind.CarCargo => ReticleIcon.Hand,
+            _ => ReticleIcon.Dot,
+        };
+    }
+
+    /// <summary>
+    /// The hint stack in the bottom right corner (pure, unit tested): only the keys that are specific to this game and to
+    /// this moment, one short word each — never the obvious ones (WASD to drive, the mouse to look). The last line is the
+    /// most important (it sits at the bottom, next to the corner).
+    /// </summary>
+    public static class HintRules
+    {
+        static KeyBinding K(GameAction a) => Controls.Get(a);
+        static readonly KeyBinding Lmb = KeyBinding.MouseButton(0), Rmb = KeyBinding.MouseButton(1), Wheel = new(KeyCapView.WheelCode);
+
+        public static List<Hint> Collect(in PromptContext c, List<Hint> into)
+        {
+            into.Clear();
+            if (c.MenuOpen) return into;
+            if (c.Downed)
+            {
+                if (c.Watching) into.Add(new Hint(Lmb, Rmb, Loc.T("hint.watch_next")));
+                else if (c.Hp > 0 && c.CanGetUp) into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.get_up")));
+                return into;
+            }
+            if (c.Cracking) return into; // the safe's own screen
+            if (c.AtTerminal)
+            {
+                bool cams = c.SittingKind == Level.TerminalKind.Cameras;
+                into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.leave")));
+                into.Add(new Hint(Lmb, Rmb, Loc.T(cams ? "hint.terminal.next_camera" : "hint.terminal.next_target")));
+                if (cams) into.Add(new Hint(K(GameAction.Mark), Loc.T("hint.mark")));
+                else if (c.SittingCanHack) into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.hack")));
+                return into;
+            }
+            if (c.Driving || c.Passenger)
+            {
+                if (c.Driving) into.Add(new Hint(K(GameAction.Horn), Loc.T("hint.horn")));
+                into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.car.exit")));
+                return into;
+            }
+            if (c.BigMap) into.Add(new Hint(Wheel, Loc.T("hint.map.floor")));
+            if (c.CursorMode)
+            {
+                into.Add(new Hint(K(GameAction.Rotate), Loc.T("hint.rotate")));
+                into.Add(new Hint(K(GameAction.Mirror), Loc.T("hint.mirror")));
+            }
+            if (c.HasStun && !c.CursorMode) into.Add(new Hint(K(GameAction.Gadget), Loc.T("hint.stun")));
+            if (c.InHatch)
+            {
+                into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
+                if (c.CarriedItems > 0) into.Add(new Hint(K(GameAction.StashAll), Loc.T("hint.stash_all")));
+                into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.out")));
+                return into;
+            }
             if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)
-                s_Prompts.Add(new Prompt(60, Controls.Label(GameAction.Hands), $"Разложить добычу: склад или «Продать» · {Controls.Label(GameAction.StashAll)} — всё на склад"));
-            if (c.Playing && c.NearHatch)
-                s_Prompts.Add(new Prompt(55, hatch, c.Collected >= c.Quota
-                    ? "Спрятаться в люк — уйти в канализацию"
-                    : $"Спрятаться в люк ({c.Collected}/{c.Quota}: квоту можно доплатить внизу)"));
-            if (c.InSewer) s_Prompts.Add(new Prompt(30, "", "Выбери путь: встань в светящуюся рамку в туннеле"));
-            if (c.LookedAt != null) s_Prompts.Add(new Prompt(45, "", c.LookedAt));
-            if (c.HoverItem != null && !c.CursorMode) s_Prompts.Add(new Prompt(50, "ЛКМ", $"Взять: {c.HoverItem} (зажми и тащи в рюкзак)"));
-            return UiMath.Choose(s_Prompts);
+            {
+                into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
+                into.Add(new Hint(K(GameAction.StashAll), Loc.T("hint.stash_all")));
+            }
+            if (c.Playing && c.NearHatch) into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.in")));
+            var target = Target(c);
+            if (target.Text != null) into.Add(target);
+            return into;
         }
-    }
 
-    /// <summary>What a security terminal says (pure, unit tested): the prompt next to it and the line while sitting at it.</summary>
-    public static class TerminalRules
-    {
-        public static string Prompt(Level.TerminalKind kind, int charges) =>
-            kind == Level.TerminalKind.Cameras ? "Терминал охраны: смотреть камеры"
-            : charges > 0 ? $"Терминал взлома: взламывать роботов издалека (зарядов: {charges})"
-            : "Терминал взлома: заряды кончились";
-
-        /// <summary>The line under the screen: what is shown, how to switch and leave, and the hack (with its progress, 0..1).</summary>
-        public static string Status(Level.TerminalKind kind, string shown, int number, int count, int charges, bool shownHacked, float hack)
+        /// <summary>The key line of what the reticle points at (the same priority as <see cref="ReticleRules"/>).</summary>
+        static Hint Target(in PromptContext c)
         {
-            string flip = $"{Controls.Label(GameAction.Left)}/{Controls.Label(GameAction.Right)} или ЛКМ/ПКМ — другой";
-            string leave = $"{Controls.Label(GameAction.Jump)} — встать";
-            if (count == 0) return kind == Level.TerminalKind.Cameras ? $"Камер в доме нет · {leave}" : $"Взламывать некого · {leave}";
-            string head = $"{shown} · {number} / {count}";
-            if (kind == Level.TerminalKind.Cameras) return $"{head}\n{flip} · {leave}";
-            string action = shownHacked ? "уже взломан"
-                : charges <= 0 ? "заряды кончились"
-                : hack > 0f ? $"взлом… {Mathf.RoundToInt(hack * 100f)}%"
-                : $"держи {Controls.Label(GameAction.Interact)} — взломать (зарядов: {charges})";
-            return $"{head} · {action}\n{flip} · {leave}";
+            var e = K(GameAction.Interact);
+            if (c.CursorMode) return default;
+            if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
+            if (c.CanHack) return new Hint(e, Loc.T("hint.hack"));
+            if (c.LockedDoor) return new Hint(e, Loc.T("hint.pick_lock"));
+            if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
+            if (c.HasUse && !string.IsNullOrEmpty(c.UseText)) return new Hint(e, c.UseText, !c.UseAvailable);
+            if (c.NearTerminal) return new Hint(e, Loc.T("hint.terminal"), !c.TerminalUsable);
+            if (c.HoverItem) return new Hint(Lmb, Loc.T("hint.take"));
+            return default;
         }
     }
 
-    /// <summary>The hunter line under the quota (pure, unit tested): when it comes, or that it is in the house.</summary>
+    /// <summary>The hunter line under the fuel bar (pure, unit tested): when it comes, or that it is in the house.</summary>
     public static class HunterRules
     {
         public enum Urgency { Calm, Soon, Inside }
@@ -114,13 +216,11 @@ namespace Stealth.UI
         /// </summary>
         public static (string text, Urgency urgency) Line(float secondsLeft, int alarmsLeft, int inside)
         {
-            if (inside > 0) return (inside > 1 ? $"Охотники в доме: {inside}" : "Охотник в доме!", Urgency.Inside);
+            if (inside > 0) return (Loc.T("hud.hunter.inside"), Urgency.Inside);
             if (secondsLeft < 0f || alarmsLeft < 0) return (null, Urgency.Calm);
             int s = Mathf.CeilToInt(secondsLeft);
-            string time = $"{s / 60}:{s % 60:00}";
-            string alarms = alarmsLeft == 1 ? "1 тревоги" : $"{alarmsLeft} тревог";
             bool soon = secondsLeft <= 60f || alarmsLeft <= 1;
-            return ($"Охотник через {time} или после {alarms}", soon ? Urgency.Soon : Urgency.Calm);
+            return (Loc.F("hud.hunter.in", $"{s / 60}:{s % 60:00}", alarmsLeft), soon ? Urgency.Soon : Urgency.Calm);
         }
     }
 

@@ -27,12 +27,14 @@ namespace Stealth.Enemies
         public short Cargo;
         /// <summary>Marked for the team until this server time (shown through walls), 0 = never.</summary>
         public float MarkedUntil;
+        /// <summary>A camera steered from a terminal: its yaw in tenths of a degree; <see cref="Detector.NotSteered"/> = sweeping by itself.</summary>
+        public short Aim;
 
-        public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody, Cargo = -1 };
+        public static DetectorSnapshot Initial => new() { Focus = Detector.Nobody, Variant = -1, Target = Detector.Nobody, Cargo = -1, Aim = Detector.NotSteered };
 
         public bool Equals(DetectorSnapshot o) =>
             Awareness == o.Awareness && Focus == o.Focus && Hacked == o.Hacked && Mode == o.Mode && Variant == o.Variant && Target == o.Target
-            && Cargo == o.Cargo && MarkedUntil.Equals(o.MarkedUntil);
+            && Cargo == o.Cargo && MarkedUntil.Equals(o.MarkedUntil) && Aim == o.Aim;
     }
 
     /// <summary>
@@ -197,6 +199,16 @@ namespace Stealth.Enemies
 
         /// <summary>Carried loot (-1 none), see <see cref="EncodeCargo"/>.</summary>
         public short Cargo => m_State.Cargo;
+
+        public const short NotSteered = short.MinValue;
+        /// <summary>A player at a terminal turns this camera by hand (<see cref="AimDegrees"/>), it does not sweep.</summary>
+        public bool IsSteered => m_State.Aim != NotSteered;
+        public float AimDegrees => m_State.Aim / 10f;
+
+        protected void SetAim(short aim)
+        {
+            if (m_State.Aim != aim) m_State.Aim = aim;
+        }
 
         public static short EncodeCargo(byte shape, byte color) => (short)(shape * 16 + color);
         public static (byte shape, byte color) DecodeCargo(short cargo) => ((byte)(cargo / 16), (byte)(cargo % 16));

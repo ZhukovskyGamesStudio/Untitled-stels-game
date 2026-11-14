@@ -79,10 +79,12 @@ namespace Stealth.Tests
             Assert.AreEqual(4, l.Floors);
             Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
             Assert.IsFalse(l.Doorways.Any(d => d.Kind == EdgeType.Vent), "no vents");
-            Assert.AreEqual(0, l.AutoDoors.Count);
+            Assert.AreEqual(l.KeyDoors.Count, l.AutoDoors.Count, "only the key doors");
 
             var onlyServers = new BuildingSettings { RoomWeights = new[] { new RoomWeight(RoomType.Server, 1) } };
-            var s = LevelGenerator.Generate(5, 1, onlyServers);
+            // an office (a hospital and a garage have programs of their own)
+            int officeSeed = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 1) == HouseKind.Office);
+            var s = LevelGenerator.Generate(officeSeed, 1, onlyServers);
             foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall, room.Type.ToString());
         }
 
@@ -102,13 +104,13 @@ namespace Stealth.Tests
         {
             var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0 };
             var l = LevelGenerator.Generate(9, 4, null, calm);
-            Assert.AreEqual(0, l.RobotSpawns.Count);
+            Assert.AreEqual(0, l.RobotSpawns.Count(r => r.Kind != RobotKind.Warden), "only wardens (HouseFeatures)");
             Assert.AreEqual(0, l.CameraSpots.Count);
             Assert.AreEqual(0, l.LaserSpots.Count);
 
             var drones = new SecuritySettings { Roster = new RosterSettings { Robots = new[] { new RosterEntry(RobotKind.Drone, 0, 1f) } } };
             var d = LevelGenerator.Generate(9, 0, null, drones);
-            foreach (var spawn in d.RobotSpawns.Where(s => !RobotRoster.IsDevice(s.Kind))) Assert.AreEqual(RobotKind.Drone, spawn.Kind);
+            foreach (var spawn in d.RobotSpawns.Where(s => !RobotRoster.IsDevice(s.Kind) && s.Kind != RobotKind.Warden)) Assert.AreEqual(RobotKind.Drone, spawn.Kind);
         }
 
         [Test]
@@ -134,7 +136,7 @@ namespace Stealth.Tests
         [Test]
         public void PlayerRulesFollowTheSettings()
         {
-            var stamina = new Stamina(new StaminaSettings { SprintDuration = 1f });
+            var stamina = new Stamina(new StaminaSettings { Enabled = true, SprintDuration = 1f });
             for (int i = 0; i < 11; i++) stamina.Tick(true, 0.1f);
             Assert.IsTrue(stamina.Exhausted, "a short sprint bar empties in a second");
 

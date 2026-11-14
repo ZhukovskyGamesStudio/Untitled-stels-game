@@ -360,7 +360,7 @@ namespace Stealth.Level
         {
             foreach (var o in Openings)
             {
-                if (o.Wall != wall) continue;
+                if (o.Wall != wall || o.Kind == EdgeType.Illusion) continue; // an illusion looks like a wall: nothing is seen through it
                 if (o.Kind == EdgeType.Open) return true;
                 if (Mathf.Abs(t - o.At) <= ClearWidth(o.Width) / 2f) return true;
             }

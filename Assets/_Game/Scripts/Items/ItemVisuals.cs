@@ -8,5 +8,7 @@ namespace Stealth.Items
     {
         public Mesh[] Meshes;
         public Material[] ColorMaterials;
+        [Tooltip("Tools with a model of their own (lure speaker): shown instead of the tinted mesh; null = the mesh.")]
+        public GameObject[] Models;
     }
 }

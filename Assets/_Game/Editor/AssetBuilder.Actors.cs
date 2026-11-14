@@ -37,6 +37,7 @@ namespace Stealth.EditorTools
             // One material per configured colour (ItemsConfig can grow).
             visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
             EditorUtility.SetDirty(visuals);
+            FillToolVisuals(visuals);
 
             var a = new Actors
             {
@@ -129,11 +130,12 @@ namespace Stealth.EditorTools
             });
             Robot(RobotKind.Hunter, RobotPrefabs + "/RobotHunter.prefab", () => MobileRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), ripple, (s, t, anim) =>
             {
-                s.ViewDistance = 14f; s.ViewAngle = 120f; s.DetectionSpeed = 0.75f; // every sense, but beatable
-                s.HearingMultiplier = 1.2f; s.SeismicRange = 4f; s.SmellRange = 3f;
-                t.PatrolSpeed = 2.8f; t.InvestigateSpeed = 3.8f; t.ChaseSpeed = 4.9f; t.LoseTargetAfter = 5f; t.AttackCooldown = 1.7f; t.WarningTime = 1.2f;
+                // no sensors at all: it runs to whoever the other robots and cameras are seeing (RobotSenses.FollowsSightings)
+                s.HasEyes = false; s.FollowsSightings = true; s.HearingMultiplier = 0f; s.SeismicRange = 0f; s.SmellRange = 0f;
+                t.PatrolSpeed = 3.2f; t.InvestigateSpeed = 5.2f; t.ChaseSpeed = 6.2f; t.LoseTargetAfter = 3f; t.AttackCooldown = 1.5f; t.WarningTime = 0.3f;
             }));
 
+            Robot(RobotKind.Warden, RobotPrefabs + "/RobotWarden.prefab", () => BuildWarden(ripple));
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
             {
                 t.Profile = Profile<TurretProfile>("RobotTurret", p => p.ForgetRate = 0.6f);
@@ -194,6 +196,16 @@ namespace Stealth.EditorTools
             var item = root.AddComponent<WorldItem>();
             root.AddComponent<WorldItemNet>();
             item.Visuals = visuals;
+            // the lure speaker's music (WorldItem plays it while the speaker is on)
+            var music = Child(root.transform, "Music").AddComponent<AudioSource>();
+            music.playOnAwake = false;
+            music.loop = true;
+            music.spatialBlend = 1f;
+            music.rolloffMode = AudioRolloffMode.Linear;
+            music.minDistance = 2f;
+            music.maxDistance = 28f;
+            music.dopplerLevel = 0f;
+            item.Music = music;
             item.MeshFilter = mf;
             item.Renderer = mr;
             item.Collider = col;
@@ -329,10 +341,20 @@ namespace Stealth.EditorTools
             // All the numbers live in a profile next to the prefab (tuned by hand, never overwritten).
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
             BuildSensorRig(root, model, rc, bodyMat, eyePos, radius);
-            AddLoop(root, rc.Profile.Traits.HoverHeight > 0f ? s_Bank.DroneRotor : s_Bank.RobotMotor);
+            AddLoop(root, MotorFor(name, rc.Profile.Traits.HoverHeight > 0f), name == "RobotWorker" ? 1.3f : name == "RobotSorter" ? 1.2f : 1f);
             rc.Status.Renderers = Parts(model, "Eye"); // the sensor lenses glow in the status colour too
             return root;
         }
+
+        /// <summary>Every kind of robot hums in its own way: joints of the legged ones, tracks, brush, turbine, rotor, wheels.</summary>
+        static AudioClip MotorFor(string name, bool hover) => hover ? s_Bank.DroneRotor : name switch
+        {
+            "RobotGuard" or "RobotHound" => s_Bank.MotorServo,
+            "RobotThumper" or "RobotWorker" => s_Bank.MotorTracks,
+            "RobotSweeper" => s_Bank.MotorBrush,
+            "RobotHunter" => s_Bank.MotorTurbine,
+            _ => s_Bank.RobotMotor,
+        };
 
         /// <summary>
         /// Every kind of sensor mount on the model (camera eye, two microphones, two ground probes, a snout);

@@ -135,6 +135,8 @@ namespace Stealth.Player
 
         /// <summary>Down in the hatch: the eyes sink to just above the floor (peeking out), the body stays put.</summary>
         public bool InHatch { get; set; }
+        /// <summary>Sitting in the car: no walking, falling or crouching (the car carries the player).</summary>
+        public bool Seated { get; set; }
         public const float HatchEyeHeight = 0.24f;
 
         public void ResetMotion()
@@ -149,6 +151,7 @@ namespace Stealth.Player
         public void Tick(PlayerInputState input, bool canAct, bool downed, Transform head, Camera cam, float dt)
         {
             if (!canAct) input = default;
+            if (Seated) input = new PlayerInputState { Look = input.Look }; // in the car: look around, the car moves us
 
             // Raw mouse delta, no smoothing: the camera reacts on the same frame.
             float sens = GameSettings.Sensitivity;
@@ -199,7 +202,8 @@ namespace Stealth.Player
             // While grounded push down by at least a few centimeters per frame: at high frame rates a tiny push
             // stays inside the skin width and isGrounded starts flickering.
             if (grounded && !jumpedNow && m_Velocity.y <= 0f) step.y = Mathf.Min(step.y, -0.03f);
-            var flags = m_Controller.Move(step);
+            if (Seated) { m_Velocity = Vector3.zero; step = Vector3.zero; }
+            var flags = Seated || !m_Controller.enabled ? CollisionFlags.None : m_Controller.Move(step);
             if ((flags & CollisionFlags.Above) != 0 && m_Velocity.y > 0f) m_Velocity.y = 0f;
 
             bool nowGrounded = m_Controller.isGrounded;

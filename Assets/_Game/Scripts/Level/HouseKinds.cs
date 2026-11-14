@@ -3,7 +3,11 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>What kind of building a house is: it changes the program of rooms and the shapes, not the rules.</summary>
-    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters }
+    /// <summary>
+    /// Office, Business, DataCenter, Warehouse and Headquarters are offices of different character (location
+    /// <see cref="Location.Office"/>); Hospital and Garage are locations of their own (<see cref="HouseFeatures.LocationOf"/>).
+    /// </summary>
+    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage }
 
     /// <summary>
     /// House kinds (pure): which one a house is (from its seed: every peer and the route panel agree without sending
@@ -17,43 +21,35 @@ namespace Stealth.Level
             if (house <= 0) return HouseKind.Office;
             var rng = new System.Random(LevelRandom.Mix(seed, 0x4B1D, 0));
             int roll = rng.Next(100);
-            return roll < 34 ? HouseKind.Office : roll < 52 ? HouseKind.Business : roll < 68 ? HouseKind.DataCenter
-                 : roll < 84 ? HouseKind.Warehouse : HouseKind.Headquarters;
+            // a third each: an office (of some character), a hospital, a garage
+            if (roll >= 67) return HouseKind.Garage;
+            if (roll >= 34) return HouseKind.Hospital;
+            int office = rng.Next(100);
+            return office < 34 ? HouseKind.Office : office < 52 ? HouseKind.Business : office < 68 ? HouseKind.DataCenter
+                 : office < 84 ? HouseKind.Warehouse : HouseKind.Headquarters;
         }
 
-        public static string Name(HouseKind kind) => kind switch
-        {
-            HouseKind.Business => "Бизнес-центр",
-            HouseKind.DataCenter => "Дата-центр",
-            HouseKind.Warehouse => "Склад",
-            HouseKind.Headquarters => "Штаб-квартира",
-            _ => "Офис",
-        };
+        /// <summary>The kind's name for the player (table <c>house.kind.&lt;kind&gt;</c>).</summary>
+        public static string Name(HouseKind kind) => Loc.T(NameKey(kind));
 
-        static readonly string[] LegalForms = { "ООО", "ОАО", "АО", "ЗАО", "ПАО", "ГК" };
-        static readonly string[] NameStarts =
-        {
-            "Рога", "Вектор", "Гипер", "Мега", "Техно", "Кибер", "Альфа", "Нео", "Инфо", "Сигма", "Байт", "Пиксель", "Квант", "Облако",
-            "Север", "Протон", "Стек", "Бит", "Терра", "Спектр",
-        };
-        static readonly string[] NameEnds =
-        {
-            "Софт", "Системс", "Лаб", "Групп", "Плюс", "Интеграция", "Консалтинг", "Логистик", "Девелопмент", "Холдинг",
-            "Решения", "Сервис", "Технологии", "Трейд", "Капитал", "Инвест", "Дата", "Сеть", "Нова",
-        };
+        public static string NameKey(HouseKind kind) => "house.kind." + kind.ToString().ToLowerInvariant();
+
+        /// <summary>A list from the table: "a;b;c" (the lists have the same length in every language — the same company for everyone).</summary>
+        static string[] List(string key) => Loc.T(key).Split(';');
 
         /// <summary>
         /// The name on the HUD: the kind and a made-up company from the house's seed, e.g. «Офис ООО «Рога и Копыта»»
-        /// (every peer and every visit to the same house agree).
+        /// (every peer and every visit to the same house agree). The first name start is the joke one (table <c>house.horns</c>).
         /// </summary>
         public static string Title(int seed, HouseKind kind)
         {
             var rng = new System.Random(LevelRandom.Mix(seed, 0x4E41, 1));
-            string form = LegalForms[rng.Next(LegalForms.Length)];
-            string start = NameStarts[rng.Next(NameStarts.Length)];
-            string end = NameEnds[rng.Next(NameEnds.Length)];
-            string company = start == "Рога" ? "Рога и Копыта" : $"{start}-{end}";
-            return $"{Name(kind)} {form} «{company}»";
+            string[] forms = List("house.forms"), starts = List("house.name_starts"), ends = List("house.name_ends");
+            string form = forms[rng.Next(forms.Length)];
+            int start = rng.Next(starts.Length);
+            string end = ends[rng.Next(ends.Length)];
+            string company = start == 0 ? Loc.T("house.horns") : Loc.F("house.company", starts[start], end);
+            return Loc.F("house.title", Name(kind), form, company);
         }
 
         /// <summary>A copy of the settings with this kind's character (the office keeps them as they are).</summary>
@@ -67,6 +63,10 @@ namespace Stealth.Level
                 HouseKind.DataCenter => t switch { RoomType.Server => 4f, RoomType.Storage => 1.5f, RoomType.OpenSpace => 0.5f, RoomType.Lounge => 0.3f, RoomType.Kitchen => 0.6f, _ => 1f },
                 HouseKind.Warehouse => t switch { RoomType.Storage => 5f, RoomType.OpenSpace => 0.6f, RoomType.Meeting => 0.4f, RoomType.Lounge => 0.5f, _ => 1f },
                 HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f, _ => 1f },
+                // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
+                HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f, _ => 1f },
+                // big repair bays and parts stores, a small office and a break room
+                HouseKind.Garage => t switch { RoomType.Storage => 5f, RoomType.Kitchen => 0.8f, RoomType.OpenSpace => 0.4f, RoomType.Meeting => 0.5f, RoomType.Server => 0.2f, _ => 1f },
                 _ => 1f,
             };
             var weights = new RoomWeight[b.RoomWeights.Length];
@@ -99,6 +99,20 @@ namespace Stealth.Level
                     s.RotundaChance = b.RotundaChance * 3f;
                     s.CornerCutChance = Mathf.Min(1f, b.CornerCutChance * 1.6f);
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;
+                    break;
+                case HouseKind.Hospital:
+                    s.CorridorChance = 1f;
+                    s.AtriumChance = b.AtriumChance * 0.5f;
+                    s.RotundaChance = b.RotundaChance * 0.4f;
+                    s.RoomSizeScale = b.RoomSizeScale * 0.9f;
+                    break;
+                case HouseKind.Garage:
+                    s.CorridorChance = b.CorridorChance * 0.3f;
+                    s.AtriumChance = b.AtriumChance * 0.4f;
+                    s.RotundaChance = 0f;
+                    s.CornerCutChance = b.CornerCutChance * 0.2f;
+                    s.RoomSizeScale = b.RoomSizeScale * 1.8f;
+                    s.DarkChance = b.DarkChance + 0.08f;
                     break;
             }
             return s;

@@ -19,6 +19,7 @@ namespace Stealth.Items
         [System.Serializable]
         public struct ItemColor
         {
+            [Tooltip("Name in the inspector; the player sees the table's item.color.<index>")]
             public string Name;
             public Color Color;
             [Tooltip("Value per cell = PointsPerCell × Multiplier.")]
@@ -49,21 +50,40 @@ namespace Stealth.Items
             new Shape { Id = "tet_t",  Cells = new[] { V(0, 0), V(1, 0), V(2, 0), V(1, 1) } },
             new Shape { Id = "tet_l",  Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(1, 0) } },
             new Shape { Id = "tet_s",  Cells = new[] { V(0, 0), V(1, 0), V(1, 1), V(2, 1) } },
+            // not loot that lies around: made at a workbench / tools (Diamond … Speaker)
+            new Shape { Id = "diamond", Cells = new[] { V(0, 0) } },
+            new Shape { Id = "key",     Cells = new[] { V(0, 0) } },
+            new Shape { Id = "stun",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "speaker", Cells = new[] { V(0, 0), V(1, 0) } },
         };
+
+        /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
+        public const int LootShapes = 8;
+        public const byte Diamond = 8, Key = 9, Stun = 10, Speaker = 11;
+
+        /// <summary>A diamond (workbench) is worth this many cells of its colour.</summary>
+        public static int DiamondValueCells { get; set; } = 10;
+
+        /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
+        public static bool IsLoot(int shape) => shape < LootShapes;
+        /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
+        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker;
+        public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
         {
-            new ItemColor { Name = "Серый",      Color = new Color(0.62f, 0.64f, 0.66f), Multiplier = 1, SpawnWeight = 40 },
-            new ItemColor { Name = "Зелёный",    Color = new Color(0.30f, 0.80f, 0.35f), Multiplier = 2, SpawnWeight = 28 },
-            new ItemColor { Name = "Синий",      Color = new Color(0.25f, 0.50f, 0.95f), Multiplier = 3, SpawnWeight = 18 },
-            new ItemColor { Name = "Фиолетовый", Color = new Color(0.70f, 0.35f, 0.90f), Multiplier = 5, SpawnWeight = 10 },
-            new ItemColor { Name = "Золотой",    Color = new Color(1.00f, 0.80f, 0.15f), Multiplier = 8, SpawnWeight = 4 },
+            new ItemColor { Name = "Grey",       Color = new Color(0.62f, 0.64f, 0.66f), Multiplier = 1, SpawnWeight = 40 },
+            new ItemColor { Name = "Green",      Color = new Color(0.30f, 0.80f, 0.35f), Multiplier = 2, SpawnWeight = 28 },
+            new ItemColor { Name = "Blue",       Color = new Color(0.25f, 0.50f, 0.95f), Multiplier = 3, SpawnWeight = 18 },
+            new ItemColor { Name = "Purple",     Color = new Color(0.70f, 0.35f, 0.90f), Multiplier = 5, SpawnWeight = 10 },
+            new ItemColor { Name = "Gold",       Color = new Color(1.00f, 0.80f, 0.15f), Multiplier = 8, SpawnWeight = 4 },
         };
 
         static Vector2Int V(int x, int y) => new Vector2Int(x, y);
 
         public static int Value(int shape, int color) =>
-            Shapes[shape].Cells.Length * Colors[color].Multiplier * PointsPerCell;
+            IsTool(shape) ? 0
+            : (shape == Diamond ? DiamondValueCells : Shapes[shape].Cells.Length) * Colors[color].Multiplier * PointsPerCell;
 
         /// <summary>Bit of an item's rotation byte: the piece is mirrored (left-right) before it is turned.</summary>
         public const int MirrorBit = 4;
@@ -120,8 +140,20 @@ namespace Stealth.Items
         // Deeper levels shift the distribution towards valuable colors.
         static int Weight(int color, int bonus) => Colors[color].SpawnWeight + color * bonus;
 
-        public static string Describe(int shape, int color) =>
-            $"{Colors[color].Name} ({Shapes[shape].Cells.Length} кл.) — {Value(shape, color)} очк.";
+        /// <summary>The colour's name for the player (table <c>item.color.&lt;index&gt;</c>, the config's name if the table has none).</summary>
+        public static string ColorName(int color) => Loc.Has(ColorKey(color)) ? Loc.T(ColorKey(color)) : Colors[color].Name;
+
+        public static string ColorKey(int color) => "item.color." + color;
+
+        /// <summary>The item's short name for the player: "Синий · 30 очк.", "Ключ".</summary>
+        public static string Describe(int shape, int color) => shape switch
+        {
+            Key => Loc.T("item.key"),
+            Stun => Loc.T("item.stun"),
+            Speaker => Loc.T("item.speaker"),
+            Diamond => Loc.F("item.diamond", ColorName(color), Value(shape, color)),
+            _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
+        };
     }
 
     /// <summary>Grid inventory layout. '#' = usable cell, '.' = hole.</summary>

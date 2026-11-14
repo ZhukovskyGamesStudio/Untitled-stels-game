@@ -93,6 +93,18 @@ namespace Stealth.Game
 
     public interface IPlayerLink
     {
+        /// <summary>
+        /// Owner → server, while at a terminal (refreshed a few times a second): which terminal (-1 = stood up) and the
+        /// camera being turned by hand (null if none) with its yaw.
+        /// </summary>
+        void SendTerminal(int terminal, Detector steered, float yaw);
+
+        /// <summary>Owner → server: used something with E (<see cref="Stealth.Level.Interactable"/>: a crate, the med table…).</summary>
+        void SendUse(Stealth.Level.UseKind kind, int index);
+
+        /// <summary>Owner → server: set off the stun cube from the backpack.</summary>
+        void SendGadget();
+
         /// <summary>Owner → server: a cheat from the F4 panel.</summary>
         void SendCheat(Cheat cheat, bool on);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>

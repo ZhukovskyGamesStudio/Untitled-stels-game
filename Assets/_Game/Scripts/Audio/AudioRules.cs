@@ -61,6 +61,31 @@ namespace Stealth.Audio
         /// <summary>The beep rises in pitch as it speeds up.</summary>
         public static float CameraBeepPitch(float awareness) => Mathf.Lerp(0.9f, 1.35f, Mathf.Clamp01(awareness));
 
+        /// <summary>
+        /// The share of a sound that gets through the floors between the source and the listener: 1 on the same floor,
+        /// <paramref name="throughFloor"/> per slab in between (heights measured from the floor of the house).
+        /// </summary>
+        public static float FloorFactor(float listenerY, float sourceY, float throughFloor)
+        {
+            int a = Mathf.FloorToInt((listenerY + 0.2f) / Stealth.Level.LevelMetrics.FloorHeight);
+            int b = Mathf.FloorToInt((sourceY + 0.2f) / Stealth.Level.LevelMetrics.FloorHeight);
+            return Mathf.Pow(Mathf.Clamp01(throughFloor), Mathf.Abs(a - b));
+        }
+
+        /// <summary>Every kind of robot speaks in its own voice: the same phrases, pitched to its size.</summary>
+        public static float VoicePitch(Stealth.Level.RobotKind kind) => kind switch
+        {
+            Stealth.Level.RobotKind.Hunter => 0.78f,
+            Stealth.Level.RobotKind.Thumper => 0.84f,
+            Stealth.Level.RobotKind.Listener => 0.92f,
+            Stealth.Level.RobotKind.Sorter => 1.08f,
+            Stealth.Level.RobotKind.Hound => 1.14f,
+            Stealth.Level.RobotKind.Worker => 1.2f,
+            Stealth.Level.RobotKind.Sweeper => 1.26f,
+            Stealth.Level.RobotKind.Drone => 1.32f,
+            _ => 1f,
+        };
+
         public static AlertCue Cue(int from, int to) =>
             to > from ? (to == 2 ? AlertCue.Alert : AlertCue.Suspicious) : to == 0 && from > 0 ? AlertCue.Lost : AlertCue.None;
     }

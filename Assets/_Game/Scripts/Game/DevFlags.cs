@@ -36,6 +36,8 @@ namespace Stealth.Game
         public static bool SkipGracePeriod;
         /// <summary>Show these friends' sessions in the main menu instead of asking Steam (menu screenshots).</summary>
         public static System.Collections.Generic.IReadOnlyList<FriendLobby> FriendLobbiesOverride;
+        /// <summary>Replaces the driver's pedals and wheel (autopilot drives the car).</summary>
+        public static Stealth.Vehicles.CarInput? CarInput;
 
         public static void Reset()
         {
@@ -50,6 +52,7 @@ namespace Stealth.Game
             ForceHandsMode = false;
             SkipGracePeriod = false;
             FriendLobbiesOverride = null;
+            CarInput = null;
         }
     }
 }

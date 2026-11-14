@@ -22,6 +22,14 @@ namespace Stealth.Items
         public int BonusPerFloor = 4;
         [Tooltip("Dark rooms are riskier and richer.")]
         public int DarkRoomBonus = 6;
+
+        [Header("Locations")]
+        [Tooltip("An office has more things lying around (× this) and rarer ones (+ this colour bonus).")]
+        public float OfficeItems = 1.5f;
+        public int OfficeBonus = 6;
+        [Tooltip("The hidden room: this many items in it first, and richer ones.")]
+        public int HiddenRoomItems = 3;
+        public int HiddenRoomBonus = 14;
     }
 
     /// <summary>Server-side loot placement rules (pure, unit tested).</summary>
@@ -38,7 +46,8 @@ namespace Stealth.Items
         public static int ItemCount(LevelLayout l, LootSettings s = null)
         {
             s ??= new LootSettings();
-            return s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
+            int count = s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
+            return l.Location == Location.Office ? Mathf.RoundToInt(count * s.OfficeItems) : count;
         }
 
         /// <summary>
@@ -55,6 +64,22 @@ namespace Stealth.Items
 
             int want = ItemCount(l, s);
             var result = new List<Loot>();
+            int Bonus(Vector3 p) => l.LevelIndex * s.BonusPerHouse + LevelLayout.FloorOf(p.y) * s.BonusPerFloor
+                + (l.IsDarkAt(p + Vector3.up * 0.5f) ? s.DarkRoomBonus : 0)
+                + (l.Location == Location.Office ? s.OfficeBonus : 0)
+                + (InHidden(p) ? s.HiddenRoomBonus : 0);
+            bool InHidden(Vector3 p) => l.HiddenRoom >= 0 && l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Id == l.HiddenRoom;
+            // the hidden room is worth finding: a few things there first
+            if (l.HiddenRoom >= 0)
+                foreach (var spots in byFloor)
+                    for (int i = spots.Count - 1; i >= 0 && result.Count < s.HiddenRoomItems; i--)
+                    {
+                        if (!InHidden(spots[i])) continue;
+                        var p = spots[i];
+                        spots.RemoveAt(i);
+                        if (result.Exists(r => (r.Position - p).sqrMagnitude < spacing * spacing)) continue;
+                        result.Add(new Loot { Position = p, Shape = rng.Next(ItemCatalog.LootShapes), Color = ItemCatalog.RandomColor(rng, Bonus(p)) });
+                    }
             int floor = 0, misses = 0;
             while (result.Count < want && misses < l.Floors)
             {
@@ -67,8 +92,7 @@ namespace Stealth.Items
                     var p = spots[i];
                     spots.RemoveAt(i);
                     if (result.Exists(r => (r.Position - p).sqrMagnitude < spacing * spacing)) continue;
-                    int bonus = l.LevelIndex * s.BonusPerHouse + LevelLayout.FloorOf(p.y) * s.BonusPerFloor + (l.IsDarkAt(p + Vector3.up * 0.5f) ? s.DarkRoomBonus : 0);
-                    result.Add(new Loot { Position = p, Shape = rng.Next(ItemCatalog.Shapes.Length), Color = ItemCatalog.RandomColor(rng, bonus) });
+                    result.Add(new Loot { Position = p, Shape = rng.Next(ItemCatalog.LootShapes), Color = ItemCatalog.RandomColor(rng, Bonus(p)) });
                     placed = true;
                 }
                 misses = placed ? 0 : misses + 1;

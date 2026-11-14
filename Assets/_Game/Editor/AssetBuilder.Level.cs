@@ -179,6 +179,7 @@ namespace Stealth.EditorTools
                 levelArt.RailingBlock = railingBlock;
                 EditorUtility.SetDirty(levelArt);
             }
+            BuildFeatureArt(levelArt);
             return levelArt;
         }
 
@@ -335,6 +336,19 @@ namespace Stealth.EditorTools
                 Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
             };
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
+            // a key door: the lock panels beside the frame on both sides (shown only on doors of LevelLayout.KeyDoors)
+            var keyLock = root.AddComponent<KeyLock>();
+            keyLock.Door = door;
+            keyLock.Panels = new[] { 1f, -1f }.Select(side =>
+            {
+                var panel = Model("key_lock");
+                panel.name = side > 0 ? "KeyLockA" : "KeyLockB";
+                panel.transform.SetParent(root.transform, false);
+                panel.transform.localPosition = new Vector3(w / 2f + 0.22f, 1.15f, side * (LevelMetrics.WallThickness / 2f + 0.005f));
+                panel.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                Paint(panel, "Metal", "Metal", "LockLamp");
+                return panel;
+            }).ToArray();
             Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
             return root;
         }

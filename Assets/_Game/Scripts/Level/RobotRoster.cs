@@ -16,12 +16,13 @@ namespace Stealth.Level
         Hound,          // legs, follows the scent trail
         Sorter,         // sees only players carrying loot of its colour
         Worker,         // harmless, but snitches (alarm)
-        Hunter,         // arrives after alarms, all sensors
+        Hunter,         // arrives after alarms, no sensors: runs to whoever the others have spotted
         Lidar,          // floor pole, spinning laser line at knee height
         MotionSensor,   // wall PIR: notices fast movement
         PressurePlate,  // floor tile: stepping on it raises an alarm
         Camera,         // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
         Sweeper,        // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk
+        Warden,         // guards the doorway of a loot room (placed by HouseFeatures, not the roster); sharp eyes, raises the alarm — distract it
     }
 
     /// <summary>One line of the security roster: from which house a kind appears and how often.</summary>

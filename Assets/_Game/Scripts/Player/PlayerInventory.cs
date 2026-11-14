@@ -208,35 +208,50 @@ namespace Stealth.Player
             m_Items.RemoveAt(index);
             Changed();
             var gm = GameManager.Instance;
-            if (gm != null) gm.SpawnItemServer(e.Shape, e.Color, position, yaw);
+            if (gm == null) return;
+            if (gm.DropOnCarServer(e.Shape, e.Color, position, yaw)) return; // onto the car's bed: a heap, no cells
+            var item = gm.SpawnItemServer(e.Shape, e.Color, position, yaw);
+            // a lure speaker dropped on the floor starts playing after a moment (time to walk away)
+            if (e.Shape == ItemCatalog.Speaker && item != null)
+            {
+                var g = Configs.Tuning.Items.Gadgets;
+                item.PlayServer(Session.ServerTime + g.LureDelay, g.LureDuration);
+            }
         }
 
-        public void DepositServer(int index)
-        {
-            if (index < 0 || index >= m_Items.Count) return;
-            var gm = GameManager.Instance;
-            if (gm == null || !gm.CanTradeAt(transform.position)) return;
-            var e = m_Items[index];
-            m_Items.RemoveAt(index);
-            Changed();
-            gm.AddCollectedServer(e.Value);
-        }
+        /// <summary>Nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (<see cref="Vehicles.CarHopper"/>).</summary>
+        public void DepositServer(int index) { }
 
         // Team stash: at the hatch of a house, or at the board in the sewer.
 
-        bool AtHatch(out GameManager gm)
+        bool AtHatch(out TeamStash stash)
         {
-            gm = GameManager.Instance;
-            return CanAct && gm != null && gm.CanTradeAt(transform.position);
+            var gm = GameManager.Instance;
+            stash = CanAct && gm != null ? gm.StashAt(transform.position) : null;
+            return stash != null;
+        }
+
+        /// <summary>Server, the car's hopper: every piece of loot in the backpack becomes fuel (tools stay). Returns the fuel.</summary>
+        public int BurnServer()
+        {
+            int fuel = 0;
+            for (int i = m_Items.Count - 1; i >= 0; i--)
+            {
+                if (ItemCatalog.IsTool(m_Items[i].Shape)) continue;
+                fuel += m_Items[i].Value;
+                m_Items.RemoveAt(i);
+            }
+            if (fuel > 0) Changed();
+            return fuel;
         }
 
         bool InReach(WorldItem item) => item != null && (item.transform.position - transform.position).magnitude <= ReachDistance + 1.5f;
 
         public void StashServer(int index, byte x, byte y, byte rot)
         {
-            if (index < 0 || index >= m_Items.Count || !AtHatch(out var gm)) return;
+            if (index < 0 || index >= m_Items.Count || !AtHatch(out var stash)) return;
             var e = m_Items[index];
-            if (!gm.Stash.Add(e.Shape, e.Color, x, y, rot)) return;
+            if (!stash.Add(e.Shape, e.Color, x, y, rot)) return;
             m_Items.RemoveAt(index);
             Changed();
         }
@@ -244,8 +259,22 @@ namespace Stealth.Player
         /// <summary>Every carried item into the first free spot of the stash, biggest first; what does not fit stays in the backpack.</summary>
         public void StashAllServer()
         {
-            if (!AtHatch(out var gm) || m_Items.Count == 0) return;
-            if (gm.Stash.AddAll(m_Items, out var left) == 0) return;
+            var game = GameManager.Instance;
+            if (game != null && game.Phase == RunPhase.Sewer && Vehicles.Car.Active != null && CanAct &&
+                (Vehicles.Car.Active.transform.position - transform.position).magnitude < 5f)
+            {
+                // at the car: everything from the backpack onto its bed
+                var rng = new System.Random(m_Items.Count * 7919 + (int)(Time.time * 10f));
+                foreach (var e in m_Items)
+                {
+                    var spot = game.Cargo.FreeSpot(rng);
+                    game.Cargo.Add(e.Shape, e.Color, spot.x, spot.y, rng.Next(360));
+                }
+                if (m_Items.Count > 0) { m_Items.Clear(); Changed(); }
+                return;
+            }
+            if (!AtHatch(out var stash) || m_Items.Count == 0) return;
+            if (stash.AddAll(m_Items, out var left) == 0) return;
             m_Items.Clear();
             m_Items.AddRange(left);
             Changed();
@@ -253,33 +282,31 @@ namespace Stealth.Player
 
         public void UnstashServer(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (!AtHatch(out var gm) || gm.Stash.IndexOf(from) < 0 || !CanPlace(from.Shape, rot, x, y)) return;
-            gm.Stash.Take(from);
+            if (!AtHatch(out var stash) || stash.IndexOf(from) < 0 || !CanPlace(from.Shape, rot, x, y)) return;
+            stash.Take(from);
             m_Items.Add(new InventoryEntry { Shape = from.Shape, Color = from.Color, X = x, Y = y, Rot = rot });
             Changed();
         }
 
         public void StashMoveServer(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (AtHatch(out var gm)) gm.Stash.Move(from, x, y, rot);
+            if (AtHatch(out var stash)) stash.Move(from, x, y, rot);
         }
 
         public void SellStashedServer(InventoryEntry from)
         {
-            if (AtHatch(out var gm) && gm.Stash.Take(from)) gm.AddCollectedServer(from.Value);
+            // nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (CarHopper)
         }
 
         public void StashWorldServer(WorldItem item, byte x, byte y, byte rot)
         {
-            if (!InReach(item) || !AtHatch(out var gm) || !gm.Stash.Add(item.Shape, item.Color, x, y, rot)) return;
+            if (!InReach(item) || !AtHatch(out var stash) || !stash.Add(item.Shape, item.Color, x, y, rot)) return;
             Session.Despawn(item.gameObject);
         }
 
         public void SellWorldServer(WorldItem item)
         {
-            if (!InReach(item) || !AtHatch(out var gm)) return;
-            gm.AddCollectedServer(item.Value);
-            Session.Despawn(item.gameObject);
+            // nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (CarHopper)
         }
 
         /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>
@@ -289,6 +316,38 @@ namespace Stealth.Player
             m_Items.Add(new InventoryEntry { Shape = shape, Color = color, X = x, Y = y, Rot = rot });
             Changed();
             return true;
+        }
+
+        /// <summary>Server: use up one item of this shape (a key, a stun cube). False if there is none.</summary>
+        public bool TakeServer(byte shape)
+        {
+            int i = m_Items.FindIndex(e => e.Shape == shape);
+            if (i < 0) return false;
+            m_Items.RemoveAt(i);
+            Changed();
+            return true;
+        }
+
+        /// <summary>Server: the workbench turns groups of one colour into diamonds (<see cref="Crafting"/>). Returns how many were made.</summary>
+        public int CraftServer(GadgetSettings settings)
+        {
+            var recipes = Crafting.Plan(m_Items, settings);
+            if (recipes.Count == 0) return 0;
+            var used = new HashSet<int>();
+            foreach (var r in recipes) used.UnionWith(r.Items);
+            var kept = new List<InventoryEntry>();
+            for (int i = 0; i < m_Items.Count; i++) if (!used.Contains(i)) kept.Add(m_Items[i]);
+            m_Items.Clear();
+            m_Items.AddRange(kept);
+            int made = 0;
+            foreach (var r in recipes)
+            {
+                if (!FindSpot(ItemCatalog.Diamond, out var x, out var y, out var rot)) break; // one cell: it fits where its parts were
+                m_Items.Add(new InventoryEntry { Shape = ItemCatalog.Diamond, Color = (byte)r.Color, X = x, Y = y, Rot = rot });
+                made++;
+            }
+            Changed();
+            return made;
         }
 
         public void ClearServer()

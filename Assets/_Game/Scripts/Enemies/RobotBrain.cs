@@ -26,6 +26,9 @@ namespace Stealth.Enemies
         public float EyePitch;
         [Tooltip("Colour sorter: on spawn picks an item colour and only sees players carrying that colour.")]
         public bool ColorSorter;
+        [Tooltip("No sensors of its own (the hunter): runs to any player another robot or a camera has spotted, and keeps " +
+                 "after them for as long as someone is seeing them.")]
+        public bool FollowsSightings;
 
         [Header("Hearing")]
         [Tooltip("Hears a noise this many times its radius away (0 = deaf). Each heard noise adds suspicion by its loudness " +

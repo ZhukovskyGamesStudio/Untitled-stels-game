@@ -325,12 +325,12 @@ namespace Stealth.EditorTools
         /// </summary>
         static IEnumerable<VisualStyle> StyleDefinitions()
         {
-            yield return Style("S00_Base", "Как сейчас", "—",
-                "Текущий вид игры: чистый URP, ночь, свет только от ламп, голые стены.", s => { });
+            yield return Style("S00_Base", "Как сейчас", "—", // loc-ok: authoring data of the style asset (the player sees style.<name>)
+                "Текущий вид игры: чистый URP, ночь, свет только от ламп, голые стены.", s => { }); // loc-ok
 
-            yield return Style("S01_NightShift", "Ночная смена", "Lethal Company, Content Warning",
-                "Промзона на ночной смене: рифлёный пол, гофрированные стены, трубы и двутавры под потолком, кривоватые модели. " +
-                "Низкое разрешение, ступени света, дымка и край шлема по рамке кадра.",
+            yield return Style("S01_NightShift", "Ночная смена", "Lethal Company, Content Warning", // loc-ok
+                "Промзона на ночной смене: рифлёный пол, гофрированные стены, трубы и двутавры под потолком, кривоватые модели. " + // loc-ok
+                "Низкое разрешение, ступени света, дымка и край шлема по рамке кадра.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -352,9 +352,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Px_Rust"); geo.Beam = K("Px_Rust"); geo.Pipe = K("Px_Pipe");
                 });
 
-            yield return Style("S02_Scrapyard", "Барахольщики", "R.E.P.O., PEAK",
-                "Старый особняк, куда приехали за хламом: шахматный пол, тёмные обои с узором, деревянные панели, карнизы. " +
-                "Мебель и роботы — пухлые пластиковые игрушки. Тепло, сочно, светится.",
+            yield return Style("S02_Scrapyard", "Барахольщики", "R.E.P.O., PEAK", // loc-ok
+                "Старый особняк, куда приехали за хламом: шахматный пол, тёмные обои с узором, деревянные панели, карнизы. " + // loc-ok
+                "Мебель и роботы — пухлые пластиковые игрушки. Тепло, сочно, светится.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -375,9 +375,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_WoodDark"); geo.Panel = K("Real_PaneledWood");
                 });
 
-            yield return Style("S03_Heist", "Ограбление", "PAYDAY 2, Hitman",
-                "Банк ночью: мраморный пол, светлая штукатурка, пилястры у дверей, кессонный потолок, карнизы и плинтусы. " +
-                "Холодные бирюзовые тени, тёплые лампы, глянец. Серьёзно и дорого.",
+            yield return Style("S03_Heist", "Ограбление", "PAYDAY 2, Hitman", // loc-ok
+                "Банк ночью: мраморный пол, светлая штукатурка, пилястры у дверей, кессонный потолок, карнизы и плинтусы. " + // loc-ok
+                "Холодные бирюзовые тени, тёплые лампы, глянец. Серьёзно и дорого.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -396,9 +396,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Real_DarkWood"); geo.Column = K("Real_Marble");
                 });
 
-            yield return Style("S04_Hunted", "Туман и твид", "Sir, You Are Being Hunted, Pathologic",
-                "Старый английский дом: кирпич, облезлая штукатурка, доски на полу и тёмные балки, всё чуть кривое, как сделанное руками. " +
-                "Жёлто-оливковая дымка, картинка как масло.",
+            yield return Style("S04_Hunted", "Туман и твид", "Sir, You Are Being Hunted, Pathologic", // loc-ok
+                "Старый английский дом: кирпич, облезлая штукатурка, доски на полу и тёмные балки, всё чуть кривое, как сделанное руками. " + // loc-ok
+                "Жёлто-оливковая дымка, картинка как масло.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -417,9 +417,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Real_DarkPlanks"); geo.Beam = K("Real_DarkPlanks");
                 });
 
-            yield return Style("S05_Toon", "Мультяшный рейд", "Risk of Rain 2, Deep Rock Galactic, PEAK",
-                "Гранёные модели с плоскими гранями, сочные тёплые стены, крупная плитка, мягкие ступени света и цветная дымка в глубине. " +
-                "Без чёрных контуров: силуэты держит цвет.",
+            yield return Style("S05_Toon", "Мультяшный рейд", "Risk of Rain 2, Deep Rock Galactic, PEAK", // loc-ok
+                "Гранёные модели с плоскими гранями, сочные тёплые стены, крупная плитка, мягкие ступени света и цветная дымка в глубине. " + // loc-ok
+                "Без чёрных контуров: силуэты держит цвет.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -440,9 +440,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_Toon");
                 });
 
-            yield return Style("S06_Storybook", "Книжка-чертёж", "Blue Prince, Disco Elysium, The Wolf Among Us",
-                "Дом как иллюстрация из графического романа: арки и пилястры у дверей, кессонный потолок, панели, карнизы, паркет. " +
-                "Тонкий чернильный контур, серо-голубые стены и тёплые лампы.",
+            yield return Style("S06_Storybook", "Книжка-чертёж", "Blue Prince, Disco Elysium, The Wolf Among Us", // loc-ok
+                "Дом как иллюстрация из графического романа: арки и пилястры у дверей, кессонный потолок, панели, карнизы, паркет. " + // loc-ok
+                "Тонкий чернильный контур, серо-голубые стены и тёплые лампы.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -463,9 +463,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_White"); geo.Panel = K("Panel_PaleBlue"); geo.Column = K("Trim_PaleBlue"); geo.Beam = K("Trim_White");
                 });
 
-            yield return Style("S07_Logbook", "Бортовой журнал", "Return of the Obra Dinn, ранний Macintosh",
-                "Один бит, две краски: оливковые чернила и мятная бумага. Дом обшит досками, как корабль, под потолком балки. " +
-                "Контур светлый на тёмном и тёмный на светлом.",
+            yield return Style("S07_Logbook", "Бортовой журнал", "Return of the Obra Dinn, ранний Macintosh", // loc-ok
+                "Один бит, две краски: оливковые чернила и мятная бумага. Дом обшит досками, как корабль, под потолком балки. " + // loc-ok
+                "Контур светлый на тёмном и тёмный на светлом.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -485,9 +485,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_WoodMid"); geo.Beam = K("Trim_WoodMid");
                 });
 
-            yield return Style("S08_Footage", "Найденная плёнка", "Content Warning, Paranormal VHS, [REC]",
-                "Вылазку снимает камера: серый мир с карандашной штриховкой на стенах, бетон, трубы и кабельные лотки. " +
-                "Цвет остаётся только у света — ламп, экранов, лазеров. Видоискатель, REC, строки развёртки.",
+            yield return Style("S08_Footage", "Найденная плёнка", "Content Warning, Paranormal VHS, [REC]", // loc-ok
+                "Вылазку снимает камера: серый мир с карандашной штриховкой на стенах, бетон, трубы и кабельные лотки. " + // loc-ok
+                "Цвет остаётся только у света — ламп, экранов, лазеров. Видоискатель, REC, строки развёртки.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -506,9 +506,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_Metal"); geo.Pipe = K("Trim_Metal");
                 });
 
-            yield return Style("S09_WhiteRoom", "Белая комната", "SUPERHOT, Mirror's Edge",
-                "Белые панели, светящиеся щели в стенах, бетонный пол. Роботы — гранёные красные кристаллы, лут — единственные краски. " +
-                "Только силуэты и угрозы.",
+            yield return Style("S09_WhiteRoom", "Белая комната", "SUPERHOT, Mirror's Edge", // loc-ok
+                "Белые панели, светящиеся щели в стенах, бетонный пол. Роботы — гранёные красные кристаллы, лут — единственные краски. " + // loc-ok
+                "Только силуэты и угрозы.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -530,9 +530,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_White"); geo.Glow = K("Glow_White");
                 });
 
-            yield return Style("S10_Grid", "Сеть", "TRON, Rez, RUINER",
-                "Мир глазами системы охраны: всё тёмное, рёбра светятся бирюзой вблизи и пурпуром вдали, по стенам бегут дорожки плат, " +
-                "пол расчерчен светящейся сеткой, под потолком кабельные лотки. Лазеры и экраны видны поверх неона.",
+            yield return Style("S10_Grid", "Сеть", "TRON, Rez, RUINER", // loc-ok
+                "Мир глазами системы охраны: всё тёмное, рёбра светятся бирюзой вблизи и пурпуром вдали, по стенам бегут дорожки плат, " + // loc-ok
+                "пол расчерчен светящейся сеткой, под потолком кабельные лотки. Лазеры и экраны видны поверх неона.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -555,9 +555,9 @@ namespace Stealth.EditorTools
             // ---- by players' requests: three in the spirit of games they named, two of our own (nothing copied: our models,
             // our textures, only the mood — light, colour and the screen filter)
 
-            yield return Style("S11_Noir", "Нуар-детектив", "по мотивам Shadows of Doubt, Blade Runner",
-                "Ночной город за окном и контора детектива: ковролин, обои с узором, тёмные деревянные панели. Роботы, мебель " +
-                "и люди собраны из вокселей (4 см), картинка чёткая, мало цветов. Синие тени, янтарные лампы, дождливая дымка.",
+            yield return Style("S11_Noir", "Нуар-детектив", "по мотивам Shadows of Doubt, Blade Runner", // loc-ok
+                "Ночной город за окном и контора детектива: ковролин, обои с узором, тёмные деревянные панели. Роботы, мебель " + // loc-ok
+                "и люди собраны из вокселей (4 см), картинка чёткая, мало цветов. Синие тени, янтарные лампы, дождливая дымка.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -580,9 +580,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_WoodDark"); geo.Panel = K("Panel_WoodDark");
                 });
 
-            yield return Style("S12_TestChamber", "Испытательный комплекс", "по мотивам Portal",
-                "Стерильная лаборатория: светлые панели стен, тёмный бетонный пол, голубые световые щели, металлические плинтусы. " +
-                "Ровный холодный свет, чистые глянцевые роботы. Тихо, как перед тестом.",
+            yield return Style("S12_TestChamber", "Испытательный комплекс", "по мотивам Portal", // loc-ok
+                "Стерильная лаборатория: светлые панели стен, тёмный бетонный пол, голубые световые щели, металлические плинтусы. " + // loc-ok
+                "Ровный холодный свет, чистые глянцевые роботы. Тихо, как перед тестом.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -603,9 +603,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_Metal"); geo.Glow = K("Glow_Cyan");
                 });
 
-            yield return Style("S13_Comic", "Комикс-пустошь", "по мотивам Borderlands",
-                "Нарисованный от руки мир на краю пустыни: жирный чёрный контур, три ступени света, штриховка в тенях. " +
-                "Ребристое железо, рифлёный пол, ржавые балки и трубы. Сочно, тепло и пыльно.",
+            yield return Style("S13_Comic", "Комикс-пустошь", "по мотивам Borderlands", // loc-ok
+                "Нарисованный от руки мир на краю пустыни: жирный чёрный контур, три ступени света, штриховка в тенях. " + // loc-ok
+                "Ребристое железо, рифлёный пол, ржавые балки и трубы. Сочно, тепло и пыльно.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -627,9 +627,9 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_Rust"); geo.Beam = K("Trim_Rust"); geo.Pipe = K("Pipe_Green");
                 });
 
-            yield return Style("S14_Thermal", "Тепловизор", "своё: тепловизионная камера",
-                "Дом глазами тепловизора: холодные стены и мебель тонут в индиго, лампы и тёплые тела светятся пурпуром и жёлтым. " +
-                "Роботы и люди — самые горячие пятна в кадре. Чуть шума матрицы.",
+            yield return Style("S14_Thermal", "Тепловизор", "своё: тепловизионная камера", // loc-ok
+                "Дом глазами тепловизора: холодные стены и мебель тонут в индиго, лампы и тёплые тела светятся пурпуром и жёлтым. " + // loc-ok
+                "Роботы и люди — самые горячие пятна в кадре. Чуть шума матрицы.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -650,9 +650,9 @@ namespace Stealth.EditorTools
                     s.Geometry.Family = ModelFamily.Lowpoly;
                 });
 
-            yield return Style("S15_Blueprint", "Синька", "своё: архитектурные чертежи",
-                "Вылазка по чертежу: мир в оттенках синьки, все рёбра — белые линии, по экрану — сетка кальки. " +
-                "Карнизы, наличники и кессоны читаются как на плане здания.",
+            yield return Style("S15_Blueprint", "Синька", "своё: архитектурные чертежи", // loc-ok
+                "Вылазка по чертежу: мир в оттенках синьки, все рёбра — белые линии, по экрану — сетка кальки. " + // loc-ok
+                "Карнизы, наличники и кессоны читаются как на плане здания.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;
@@ -674,10 +674,10 @@ namespace Stealth.EditorTools
                 });
 
             // Sasha's style (merged from feature_visual_style_11_prototype): its own model family, kit, props, decay and a rigged human
-            yield return Style("S16_Derelict", "Заброшенный комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis",
-                "Брошенная научная станция: грязный бетон, ржавые трубы и кабельные лотки, стальные плиты. Почти темно — " +
-                "светят только умирающие лампы и редкие холодные щели электроники. Бирюзово-болезненная гамма, зерно, плотный сырой воздух. " +
-                "Модели реалистичные, люди похожи на людей.",
+            yield return Style("S16_Derelict", "Заброшенный комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis", // loc-ok
+                "Брошенная научная станция: грязный бетон, ржавые трубы и кабельные лотки, стальные плиты. Почти темно — " + // loc-ok
+                "светят только умирающие лампы и редкие холодные щели электроники. Бирюзово-болезненная гамма, зерно, плотный сырой воздух. " + // loc-ok
+                "Модели реалистичные, люди похожи на людей.", // loc-ok
                 s =>
                 {
                     var g = s.Grade;

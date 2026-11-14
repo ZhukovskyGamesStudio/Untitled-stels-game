@@ -155,17 +155,31 @@ def export(filename):
 
 # --------------------------------------------------------------------------- characters
 
+# Where a player's leg hangs from (x to the side, z up): the same in every style, so a style's leg mesh swings around
+# the same hip as the original's (the game swaps meshes by name and keeps the pivots).
+LEG_PIVOT = (0.11, 0.92)
+
+
+def set_pivot(obj, point):
+    """Moves the object's origin to `point` (world), leaving the geometry where it is."""
+    import mathutils
+    obj.data.transform(mathutils.Matrix.Translation((-point[0], -point[1], -point[2])))
+    obj.location = point
+    return obj
+
+
 def model_player():
     merge("Body", [
         cylinder(0.28, 1.0, (0, 0, 0.75), segments=12),          # torso
-        box((0.22, 0.22, 0.7), (-0.14, 0, 0.35)),                  # legs
-        box((0.22, 0.22, 0.7), (0.14, 0, 0.35)),
         box((0.12, 0.12, 0.6), (-0.33, 0, 0.95)),                  # arms
         box((0.12, 0.12, 0.6), (0.33, 0, 0.95)),
     ])
     merge("Accent", [
         box((0.44, 0.16, 0.5), (0, 0.3, 0.95)),                     # backpack (behind, +Y)
     ])
+    # Legs are separate parts hanging from the hip: the game swings them while walking (PlayerController).
+    for name, x in (("BodyLegL", -LEG_PIVOT[0]), ("BodyLegR", LEG_PIVOT[0])):
+        set_pivot(merge(name, [box((0.2, 0.22, 0.86), (x, 0, 0.43))]), (x, 0, LEG_PIVOT[1]))
     # Head parts are separate objects so the game can tilt them (look direction of teammates).
     merge("AccentHead", [box((0.36, 0.34, 0.34), (0, 0, 1.42))])
     merge("EyeGlasses", [box((0.3, 0.04, 0.09), (0, -0.18, 1.47))])  # glasses strip, front

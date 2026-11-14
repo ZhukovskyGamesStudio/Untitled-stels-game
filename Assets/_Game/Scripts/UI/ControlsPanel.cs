@@ -27,15 +27,17 @@ namespace Stealth.UI
         static ControlsPanel s_Waiting;
 
         readonly List<(GameAction action, ControlRowView row)> m_Rows = new();
+        readonly List<(Text text, string key)> m_Labels = new();
         GameAction m_Target;
         bool m_Built;
+        int m_LocVersion = -1;
 
-        /// <summary>Not rebindable, listed so that the page holds every control of the game.</summary>
+        /// <summary>Not rebindable, listed so that the page holds every control of the game (table keys of the title and the key).</summary>
         static readonly (string title, string key)[] Fixed =
         {
-            ("Осмотреться", "Мышь"),
-            ("В руках: тащить предмет", "ЛКМ"),
-            ("Меню, пауза", "Esc"),
+            ("controls.look", "key.mouse"),
+            ("controls.drag", "key.lmb"),
+            ("controls.menu", "key.esc"),
         };
 
         void Awake()
@@ -57,25 +59,25 @@ namespace Stealth.UI
             string group = null;
             foreach (var info in Controls.All)
             {
-                var column = Columns[info.Group == "Движение" || info.Group == "Действия" ? 0 : Columns.Length - 1];
+                var column = Columns[info.Group == "move" || info.Group == "actions" ? 0 : Columns.Length - 1];
                 if (info.Group != group)
                 {
                     group = info.Group;
-                    Instantiate(GroupPrefab, column, false).text = group;
+                    m_Labels.Add((Instantiate(GroupPrefab, column, false), Controls.GroupKey(group)));
                 }
                 var row = Instantiate(RowPrefab, column, false);
-                row.Title.text = info.Title;
+                m_Labels.Add((row.Title, Controls.TitleKey(info.Action)));
                 var action = info.Action;
                 row.Key.onClick.AddListener(() => Begin(action));
                 m_Rows.Add((action, row));
             }
             var last = Columns[Columns.Length - 1];
-            Instantiate(GroupPrefab, last, false).text = "Всегда";
+            m_Labels.Add((Instantiate(GroupPrefab, last, false), "controls.group.fixed"));
             foreach (var (title, key) in Fixed)
             {
                 var row = Instantiate(RowPrefab, last, false);
-                row.Title.text = title;
-                row.KeyLabel.text = key;
+                m_Labels.Add((row.Title, title));
+                m_Labels.Add((row.KeyLabel, key));
                 row.Key.interactable = false;
                 row.KeyBackground.color = new Color(0.12f, 0.13f, 0.15f, 0.9f);
                 row.KeyLabel.color = new Color(1f, 1f, 1f, 0.8f);
@@ -98,6 +100,11 @@ namespace Stealth.UI
 
         void Update()
         {
+            if (m_LocVersion != Loc.Version)
+            {
+                m_LocVersion = Loc.Version;
+                foreach (var (text, key) in m_Labels) text.text = Loc.T(key);
+            }
             if (s_Waiting == this && Controls.CapturePress(out var binding))
             {
                 Controls.Set(m_Target, binding);
@@ -110,15 +117,15 @@ namespace Stealth.UI
             {
                 bool waiting = s_Waiting == this && m_Target == action;
                 bool clash = Controls.Conflicts(action, out var other);
-                if (clash && conflict == null) conflict = $"«{Controls.Label(action)}» занята дважды: {Controls.All[(int)action].Title} и {Controls.All[(int)other].Title}";
-                string label = waiting ? "нажми клавишу…" : Controls.Label(action);
+                if (clash && conflict == null) conflict = Loc.F("controls.conflict", Controls.Label(action), Controls.All[(int)action].Title, Controls.All[(int)other].Title);
+                string label = waiting ? Loc.T("controls.waiting") : Controls.Label(action);
                 if (row.KeyLabel.text != label) row.KeyLabel.text = label;
                 row.KeyBackground.color = waiting ? KeyWaiting : clash ? KeyConflict : KeyNormal;
                 row.KeyLabel.color = waiting ? Color.black : Color.white;
             }
             string hint = s_Waiting == this
-                ? $"Нажми новую клавишу или кнопку мыши для «{Controls.All[(int)m_Target].Title}» · Esc — отмена"
-                : conflict ?? "Нажми на клавишу, чтобы переназначить. Сохраняется сразу.";
+                ? Loc.F("controls.rebinding", Controls.All[(int)m_Target].Title)
+                : conflict ?? Loc.T("controls.hint");
             if (Hint.text != hint) Hint.text = hint;
             Hint.color = s_Waiting != this && conflict != null ? new Color(1f, 0.55f, 0.45f) : new Color(1, 1, 1, 0.65f);
         }

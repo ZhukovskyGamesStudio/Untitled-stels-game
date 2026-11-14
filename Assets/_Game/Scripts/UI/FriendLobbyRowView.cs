@@ -24,11 +24,11 @@ namespace Stealth.UI
             Ui.Show(Join, lobby.CanJoin); // the label says why not
         }
 
-        /// <summary>"Саша · 2/4", with the reason when joining is impossible (pure).</summary>
+        /// <summary>"Sasha · 2/4", with the reason when joining is impossible (pure).</summary>
         public static string Describe(FriendLobby l)
         {
             string count = l.MaxPlayers > 0 ? $" · {l.Players}/{l.MaxPlayers}" : "";
-            string why = !l.Compatible ? " · другая версия игры" : l.IsFull ? " · мест нет" : "";
+            string why = !l.Compatible ? " · " + Loc.T("friends.other_version") : l.IsFull ? " · " + Loc.T("friends.full") : "";
             return $"{l.FriendName}{count}{why}";
         }
     }

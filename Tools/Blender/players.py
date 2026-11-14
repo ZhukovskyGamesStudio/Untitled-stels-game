@@ -71,12 +71,13 @@ def body(p):
     return parts
 
 
-def legs(p):
-    """Thigh, knee, shin, shoe with a toe cap: the knee forward a little, so the leg is not a post."""
+def legs(p, s):
+    """One leg (s = -1 left, +1 right): thigh, knee, shin, shoe with a toe cap; the knee forward a little, so the leg is
+    not a post. A part of its own (BodyLegL / BodyLegR) hanging from the hip: the game swings it while walking."""
     out = []
     ankle_z = p.foot[2] * 0.8
     knee_z = (p.hip + ankle_z) / 2
-    for s in (-1, 1):
+    for s in (s,):
         x = s * 0.11
         knee = (x, -0.025, knee_z)
         out += [limb((x, 0, p.hip + 0.03), knee, p.leg_r * 1.12, seg=p.seg, square=p.square),
@@ -285,7 +286,9 @@ def build(style, finish, p, dept):
         shell, visor = helmet(p)
         b += shell
         dark = visor + [x for x in dark]
-    merge("Body", b + legs(p))
+    merge("Body", b)
+    for name, side in (("BodyLegL", -1), ("BodyLegR", 1)):
+        G.g.set_pivot(merge(name, legs(p, side)), (side * G.g.LEG_PIVOT[0], 0, G.g.LEG_PIVOT[1]))
     merge("Accent", acc)
     merge("AccentHead", head)
     merge("EyeGlasses", dark)

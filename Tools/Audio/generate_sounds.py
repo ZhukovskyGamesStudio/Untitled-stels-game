@@ -416,11 +416,198 @@ def laser_hum(length):
 
 
 def door_slide():
+    """A soft pneumatic slide: a short hush of air and a muted stop (doors open all the time: keep it gentle)."""
+    d = 0.55
+    hiss = bandpass(noise(d), 600, 2500) * env(int(d * SR), 0.06, 0.35, curve=2) * 0.35
+    motor = lowpass(saw(60, d), 250) * env(int(d * SR), 0.08, 0.4, sustain=0.2, release=0.12) * 0.25
+    stop = at(lowpass(noise(0.06), 400) * env(int(0.06 * SR), 0.002, 0.03) * 0.5, 0.46, d)
+    return fade(mix(hiss, motor, stop), 0.01, 0.05)
+
+
+def motor_servo(length):
+    """Loop: a legged robot's joints: a thin servo whir that breathes with its gait."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        whir = np.sin(2 * np.pi * (620 + 40 * np.sin(2 * np.pi * 1.7 * t)) * t) * 0.15
+        gear = bandpass(noise(d), 1500, 3500) * (0.5 + 0.5 * np.sin(2 * np.pi * 3.4 * t)) * 0.12
+        body = lowpass(signal.sawtooth(2 * np.pi * 70 * t), 300) * 0.2
+        return whir + gear + body
+    return loop(render, length)
+
+
+def motor_tracks(length):
+    """Loop: heavy tracks: a low growl with the clatter of the links."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        growl = lowpass(signal.sawtooth(2 * np.pi * 38 * t) + 0.5 * signal.square(2 * np.pi * 19 * t), 260) * 0.5
+        clatter = bandpass(noise(d), 700, 2000) * (np.sin(2 * np.pi * 11 * t) > 0.6) * 0.35
+        return growl + lowpass(clatter, 2200)
+    return loop(render, length)
+
+
+def motor_brush(length):
+    """Loop: the sweeper: a fast brush on the floor and a little vacuum fan."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        brush = bandpass(noise(d), 2500, 7000) * (0.6 + 0.4 * np.sin(2 * np.pi * 14 * t)) * 0.3
+        fan = np.sin(2 * np.pi * 410 * t) * 0.08 + lowpass(noise(d), 500) * 0.2
+        return brush + fan
+    return loop(render, length)
+
+
+def motor_turbine(length):
+    """Loop: the hunter: a high turbine whine over a deep hum (heard from afar, it should feel dangerous)."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        whine = np.sin(2 * np.pi * (2100 + 30 * np.sin(2 * np.pi * 0.7 * t)) * t) * 0.07
+        hum = np.sin(2 * np.pi * 55 * t) * 0.4 + lowpass(signal.sawtooth(2 * np.pi * 110 * t), 600) * 0.2
+        air = bandpass(noise(d), 400, 1400) * 0.15
+        return whine + hum + air
+    return loop(render, length)
+
+
+def step_light():
+    """A hound's paw: a light metal tick."""
+    d = 0.12
+    tick = (sine(820, d) + 0.5 * sine(1730, d)) * env(int(d * SR), 0.0005, 0.03, curve=6) * 0.5
+    soft = lowpass(noise(d), 500) * env(int(d * SR), 0.001, 0.02) * 0.6
+    return fade(mix(tick, soft))
+
+
+def spider_step():
+    """A spider's foot: a dry, tiny click."""
+    d = 0.06
+    click = highpass(noise(d), 2500) * env(int(d * SR), 0.0003, 0.008, curve=6)
+    tone = sine(2600, d) * env(int(d * SR), 0.0003, 0.01, curve=6) * 0.3
+    return fade(mix(click, tone), 0.0005, 0.01)
+
+
+def speaker_music(length):
+    """Loop: the lure speaker: loud, tinny, cheerful music through a cheap cone (made to be noticed)."""
+    bpm = 128
+    beat = 60 / bpm
+    roots = [60, 65, 67, 65]
+    def render(L):
+        out = silence(L + 1)
+        for b in range(int(L / (4 * beat)) + 1):
+            r = roots[b % 4]
+            start = b * 4 * beat
+            for k in range(4):
+                out = mix(out, at(kick() * 0.6, start + k * beat, L + 1))
+            for k in range(8):
+                n = [r, r + 4, r + 7, r + 12][k % 4] + 12
+                out = mix(out, at(pluck(n, 0.2, 4000) * 0.4, start + k * beat / 2, L + 1))
+        return bandpass(out, 400, 4500) * 1.4
+    return loop(render, length)
+
+
+def car_engine(length):
+    """Loop: the pickup's engine at idle (pitched up in game with the revs): a four-cylinder burble."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        f = 28.0
+        firing = (np.sin(2 * np.pi * f * t) > 0.3).astype(float)
+        burble = lowpass(firing * (0.7 + 0.3 * rng.uniform(0, 1, len(t))), 180) * 0.8
+        body = lowpass(signal.sawtooth(2 * np.pi * f * 2 * t), 420) * 0.3
+        valves = bandpass(noise(d), 1200, 3000) * 0.04
+        return burble + body + valves
+    return loop(render, length)
+
+
+def car_start():
+    """Starter motor cranking, then the engine catches."""
+    d = 1.4
+    crank = lowpass(saw(14, 0.8) * (0.6 + 0.4 * sine(7, 0.8)), 600) * env(int(0.8 * SR), 0.02, 0.8, sustain=0.9, release=0.05) * 0.7
+    catch = at(lowpass(noise(0.6), 200) * env(int(0.6 * SR), 0.005, 0.5, curve=3), 0.75, d)
+    rev = at(lowpass(sweep(40, 90, 0.6, "lin"), 400) * env(int(0.6 * SR), 0.01, 0.6, curve=2) * 0.5, 0.8, d)
+    return fade(mix(at(crank, 0, d), catch, rev))
+
+
+def car_stop():
+    """The engine shuts off: a last cough and a settling body."""
+    d = 0.9
+    cough = lowpass(sweep(70, 25, 0.5, "lin"), 300) * env(int(0.5 * SR), 0.005, 0.45, curve=2) * 0.6
+    creak = at(bandpass(noise(0.3), 300, 900) * env(int(0.3 * SR), 0.05, 0.25, curve=2) * 0.25, 0.5, d)
+    return fade(mix(at(cough, 0, d), creak))
+
+
+def car_horn():
+    d = 0.6
+    t = t_axis(d)
+    h = (signal.square(2 * np.pi * 415 * t, 0.5) + signal.square(2 * np.pi * 523 * t, 0.5)) * 0.3
+    return fade(lowpass(h, 2500) * env(len(t), 0.01, d, sustain=1, release=0.08, curve=1))
+
+
+def car_bump():
+    """A wheel hitting a bump / the bed rattling."""
+    d = 0.25
+    thud = lowpass(noise(d), 180) * env(int(d * SR), 0.001, 0.08)
+    rattle = bandpass(noise(d), 1500, 4000) * env(int(d * SR), 0.002, 0.12, curve=3) * 0.3
+    return fade(mix(thud, rattle))
+
+
+def gate_open():
+    """A heavy steel gate grinding up its rails and clanging at the top."""
+    d = 2.2
+    g = 1.9
+    tg = t_axis(g)
+    grind = bandpass(noise(g), 150, 900) * (0.6 + 0.4 * np.sin(2 * np.pi * 6 * tg)) * env(len(tg), 0.1, g, sustain=0.9, release=0.2) * 0.6
+    chain = bandpass(noise(g), 2000, 5000) * (np.sin(2 * np.pi * 9 * tg) > 0.7) * 0.15
+    clang = at((sine(180, 0.4) + 0.5 * sine(410, 0.4)) * env(int(0.4 * SR), 0.001, 0.3, curve=4) * 0.6, 1.85, d)
+    return fade(mix(at(grind + chain, 0, d), clang))
+
+
+def fuel_gulp():
+    """Something goes into the engine's hopper: a crunch and a happy gurgle."""
     d = 0.7
-    hiss = bandpass(noise(d), 1200, 6000) * env(int(d * SR), 0.03, 0.4, curve=2) * 0.5
-    motor = lowpass(saw(70, d), 400) * env(int(d * SR), 0.05, 0.5, sustain=0.3, release=0.15) * 0.5
-    stop = at(lowpass(noise(0.08), 700) * env(int(0.08 * SR), 0.001, 0.03), 0.58, d)
-    return fade(mix(hiss, motor, stop))
+    crunch = bandpass(noise(0.2), 800, 4000) * env(int(0.2 * SR), 0.001, 0.15, curve=3) * 0.6
+    gurgle = at(lowpass(sweep(180, 90, 0.45), 600) * (0.6 + 0.4 * sine(18, 0.45)) * env(int(0.45 * SR), 0.01, 0.4) * 0.5, 0.18, d)
+    return fade(mix(at(crunch, 0, d), gurgle))
+
+
+def heal():
+    """The med table: a soft rising chime."""
+    d = 0.9
+    notes = [at(pluck(n, 0.6, 2500) * 0.4, 0.12 * i, d) for i, n in enumerate([72, 76, 79, 84])]
+    return fade(mix(*notes))
+
+
+def craft():
+    """The workbench: two hammer taps and a ratchet."""
+    d = 0.8
+    tap = (sine(1250, 0.15) + 0.5 * sine(2900, 0.15)) * env(int(0.15 * SR), 0.0005, 0.05, curve=5) * 0.5
+    ratchet = bandpass(noise(0.3), 2500, 6000) * (np.sin(2 * np.pi * 40 * t_axis(0.3)) > 0.5) * 0.3
+    return fade(mix(at(tap, 0, d), at(tap, 0.18, d), at(ratchet, 0.42, d)))
+
+
+def stun_blast():
+    """The robot programmer's pulse: a deep thump with a falling electric zap."""
+    d = 1.2
+    thump = sweep(120, 30, 0.6) * env(int(0.6 * SR), 0.001, 0.5, curve=3) * 0.8
+    zap = highpass(sweep(5000, 300, 0.9) * signal.square(2 * np.pi * 70 * t_axis(0.9)), 300) * env(int(0.9 * SR), 0.002, 0.8, curve=2) * 0.25
+    return fade(mix(at(thump, 0, d), at(zap, 0.02, d)))
+
+
+def crate_search():
+    """Rummaging through a crate: cardboard and a lid."""
+    d = 0.8
+    rustle = bandpass(noise(0.6), 900, 5000) * (0.5 + 0.5 * np.sin(2 * np.pi * 7 * t_axis(0.6))) * env(int(0.6 * SR), 0.05, 0.5, curve=1) * 0.4
+    lid = at(lowpass(noise(0.1), 500) * env(int(0.1 * SR), 0.001, 0.05), 0.65, d)
+    return fade(mix(at(rustle, 0, d), lid))
+
+
+def unlock():
+    """A key turning a heavy lock."""
+    d = 0.5
+    def click():
+        return highpass(noise(0.04), 2000) * env(int(0.04 * SR), 0.0005, 0.01, curve=6)
+    clunk = at(lowpass(noise(0.15), 400) * env(int(0.15 * SR), 0.001, 0.08), 0.3, d)
+    return fade(mix(at(click(), 0.0, d), at(click(), 0.12, d), clunk))
 
 
 # --------------------------------------------------------------------------- environment
@@ -523,22 +710,23 @@ def music_menu():
 
 
 def music_explore():
-    """Tense ambient loop while sneaking: Dm drone, slow pulse, sparse high pings (80 BPM, 8 bars)."""
-    bpm, bars = 80, 8
-    beat = 60 / bpm
-    L = bars * 4 * beat
-    chords = [[50, 53, 57], [50, 53, 58], [50, 53, 57], [48, 52, 55]] * 2
-    pings = [74, 77, 72, 81, 76, 74, 79, 69]
+    """Unobtrusive bed while sneaking: dark pads that drift into each other, no rhythm, no melody (~34 s).
+
+    It must sit under the footsteps and the robots: everything above 500 Hz is filtered away, chords change every
+    8.5 s with long swells, and the only movement is a slow breathing of the filter."""
+    seg = 8.5
+    chords = [[38, 45, 50, 53], [38, 45, 50, 52], [36, 43, 48, 52], [38, 45, 50, 53]]
+    L = seg * len(chords)
     def render(L):
-        out = silence(L + 3)
+        total = L + 6
+        out = silence(total)
         for b, ch in enumerate(chords):
-            start = b * 4 * beat
-            out = mix(out, at(pad(ch, 4 * beat + 1.0, 700, 0.004) * 0.55, start, L + 3))
-            for k in range(4):
-                out = mix(out, at(bass(38, beat * 0.6) * (0.3 if k % 2 == 0 else 0.18), start + k * beat, L + 3))
-            p = pluck(pings[b], 1.6, 2200) * 0.12
-            out = mix(out, at(p, start + 2.5 * beat, L + 3))
-        return out
+            p = pad(ch, seg + 5.0, 420, 0.003, attack=3.5, release=4.0) * 0.5
+            out = mix(out, at(p, b * seg, total))
+        t = np.arange(len(out)) / SR
+        breath = 0.8 + 0.2 * np.sin(2 * np.pi * t / L)
+        air = lowpass(brown(len(out) / SR), 160)[:len(out)] * 0.12
+        return lowpass(out, 500) * breath + air
     return loop(render, L)
 
 
@@ -603,18 +791,37 @@ def main():
     write(P("Robots", "drone_rotor"), drone_rotor(2.0), 0.7)
 
     write(P("Environment", "laser_hum"), laser_hum(2.0), 0.6)
-    write(P("Environment", "door_slide"), door_slide())
+    write(P("Environment", "door_slide"), door_slide(), 0.6)
     write(P("Environment", "alarm"), alarm(2.4), 0.8)
     write(P("Environment", "office_hum"), office_hum(12.0), 0.6)
     write(P("Environment", "gas_wind"), gas_wind(12.0), 0.7)
 
     write(P("Music", "music_menu"), music_menu(), 0.8)
-    write(P("Music", "music_explore"), music_explore(), 0.8)
+    write(P("Music", "music_explore"), music_explore(), 0.5)
     write(P("Music", "music_chase"), music_chase(), 0.8)
 
     # Added later: keep them last so the seeded noise of everything above stays the same.
     write(P("Robots", "seismic_thump"), seismic_thump(), 0.9)
     write(P("Robots", "camera_beep"), camera_beep(), 0.6)
+    write(P("Robots", "motor_servo"), motor_servo(2.0), 0.6)
+    write(P("Robots", "motor_tracks"), motor_tracks(2.0), 0.7)
+    write(P("Robots", "motor_brush"), motor_brush(2.0), 0.6)
+    write(P("Robots", "motor_turbine"), motor_turbine(2.0), 0.7)
+    write(P("Robots", "step_light"), step_light(), 0.7)
+    write(P("Robots", "spider_step"), spider_step(), 0.6)
+    write(P("Items", "speaker_music"), speaker_music(7.5), 0.9)
+    write(P("Items", "fuel_gulp"), fuel_gulp(), 0.8)
+    write(P("Items", "heal"), heal(), 0.7)
+    write(P("Items", "craft"), craft(), 0.8)
+    write(P("Items", "stun_blast"), stun_blast(), 0.9)
+    write(P("Items", "crate_search"), crate_search(), 0.7)
+    write(P("Items", "unlock"), unlock(), 0.8)
+    write(P("Car", "car_engine"), car_engine(2.0), 0.8)
+    write(P("Car", "car_start"), car_start(), 0.8)
+    write(P("Car", "car_stop"), car_stop(), 0.7)
+    write(P("Car", "car_horn"), car_horn(), 0.7)
+    write(P("Car", "car_bump"), car_bump(), 0.7)
+    write(P("Environment", "gate_open"), gate_open(), 0.8)
 
 
 if __name__ == "__main__":

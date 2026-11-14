@@ -1,15 +1,18 @@
 using System;
+using System.Collections.Generic;
 using Stealth.Game;
 using UnityEngine;
 
 namespace Stealth.Level
 {
     /// <summary>
-    /// The sewer between two houses (prefab Level/Sewer): a vaulted brick tunnel from the ladder under the hatch, the team's
-    /// cart with the stash, a hall with a cistern and three tunnels branching off to the next houses (<see cref="Branches"/>,
-    /// left, middle, right). The ways on are chosen by walking into a tunnel; tunnels that lead nowhere this time are
-    /// barred. Every peer builds it locally; nothing in it is networked. If the team goes on without the quota, the water
-    /// rises (<see cref="Flood"/>).
+    /// The sewer between two houses (prefab Level/Sewer), assembled on every peer from the kit pieces by a
+    /// <see cref="SewerPlan"/> (the same on every peer: the run's seed and the depth): a closed end, the stretch where
+    /// the team's car waits under the hatch it came in through, a gate (opened with a lever on the far side), the stretch
+    /// the house's exit drops into, and the hall where three tunnels lead on to the next houses (<see cref="Branches"/>:
+    /// left, middle, right). The team drives the car into a tunnel to choose it; tunnels that lead nowhere are barred.
+    /// The road is a steel grate over the water. Nothing in it is networked except the car. If the run ends here, the
+    /// water rises (<see cref="Flood"/>).
     /// </summary>
     public class SewerLocation : MonoBehaviour
     {
@@ -24,46 +27,156 @@ namespace Stealth.Level
             public GameObject Grate;
             [Tooltip("The panel over the mouth: where it leads.")]
             public Stealth.UI.RouteSignView Sign;
-            [Tooltip("Lamps inside and the vote zone on the floor: shown only when the tunnel is open.")]
+            [Tooltip("Lamps inside and the zone on the floor: shown only when the tunnel is open.")]
             public GameObject Lamp;
         }
 
-        [Tooltip("Where the players stand when they come down (one per slot).")]
-        public Transform[] Spawns;
-        [Tooltip("The cart: the stash board hangs over it, its bed shows the stash.")]
-        public Transform TradeSpot;
-        [Tooltip("The flood water: it rises when the run ends here.")]
-        public Transform Water;
-        [Tooltip("Left, middle, right.")]
-        public Branch[] Branches = new Branch[SewerBranches.Count];
+        [Header("Kit (Tools/Blender/sewer.py)")]
+        [Tooltip("Straight 6 m segments, one per variant.")]
+        public GameObject[] Segments;
+        public GameObject Cap, Hub, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
+        [Tooltip("The gate across the tunnel: frame, shutter, lever (SewerGate).")]
+        public SewerGate GatePrefab;
+        [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
+        public SewerBranch BranchPrefab;
+        public Stealth.UI.RouteSignView SignPrefab;
 
-        /// <summary>A player inside a tunnel this far past its mouth (and up to this deep) votes for it.</summary>
-        public const float VoteFrom = 0.4f, VoteTo = 2.6f, VoteHalfWidth = 1.4f;
+        // built at run time by Build (not in the prefab)
+        [NonSerialized] public Transform Water;
+        [NonSerialized] public Branch[] Branches = Array.Empty<Branch>();
+        [NonSerialized] public SewerGate Gate;
+        /// <summary>Where the team stands when it comes down, and where the car waits (world).</summary>
+        public Pose[] Spawns = Array.Empty<Pose>();
+        public Pose CarSpot;
+
+        /// <summary>The car inside a tunnel this far past its mouth (and up to this deep) chooses it.</summary>
+        public const float VoteFrom = 3.0f, VoteTo = 11.5f, VoteHalfWidth = 2.2f;
         /// <summary>The invisible wall in every tunnel, metres past its mouth (the tunnel itself goes on into the dark).</summary>
-        public const float StopAt = 2.85f;
+        public const float StopAt = 12.5f;
+
+        public SewerPlan Plan { get; private set; }
 
         float m_WaterBase;
         float m_FloodStart = -1f;
         int m_Ways = -1;
 
-        void Awake()
-        {
-            Active = this;
-            if (Water != null) m_WaterBase = Water.localPosition.y;
-        }
+        void Awake() => Active = this;
 
         void OnDestroy()
         {
             if (Active == this) Active = null;
         }
 
+        // ------------------------------------------------------------------ building
+
+        GameObject Put(GameObject prefab, string name, Vector3 at, float yaw = 0f, Transform parent = null)
+        {
+            if (prefab == null) return null;
+            var go = Instantiate(prefab, parent != null ? parent : transform);
+            go.name = name;
+            go.transform.SetLocalPositionAndRotation(at, Quaternion.Euler(0f, yaw, 0f));
+            return go;
+        }
+
+        /// <summary>Assembles the sewer of this plan (every peer, the same plan → the same sewer).</summary>
+        public void Build(SewerPlan plan)
+        {
+            Plan = plan;
+            Put(Cap, "Cap", Vector3.zero);
+            for (int i = 0; i < plan.Segments.Count; i++)
+            {
+                var s = plan.Segments[i];
+                if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
+                if (s.LampSide != 0)
+                {
+                    var lamp = Put(Lamp, $"Lamp{i}", new Vector3(s.X + SewerPlan.SegmentLength / 2f, 2.3f, s.LampSide * 3.55f), s.LampSide > 0 ? 90f : -90f);
+                    if (lamp != null)
+                        foreach (var l in lamp.GetComponentsInChildren<Light>())
+                        {
+                            l.color = plan.LampColor;
+                            l.intensity = plan.LampIntensity * (s.LampBroken ? 0.35f : 1f);
+                            l.range = 13f;
+                        }
+                }
+                foreach (var (x, side, barrel) in s.Junk)
+                    Put(barrel ? Barrel : Crate, "Junk", new Vector3(x, 0.15f, side * (SewerPlan.WalkwayZ + 0.1f)), x * 47f);
+            }
+
+            // the car's stretch: the ladder up to the hatch the team came in through
+            if (plan.EntryLadderX >= 0f)
+            {
+                Put(Ladder, "EntryLadder", new Vector3(plan.EntryLadderX, 0.15f, -3.45f), 180f);
+                Put(Manhole, "EntryManhole", new Vector3(plan.EntryLadderX, 4.15f, -3.2f));
+            }
+            CarSpot = new Pose(transform.TransformPoint(new Vector3(plan.CarX, 0.05f, -0.4f)), transform.rotation * Quaternion.Euler(0f, 90f, 0f)); // facing +X
+
+            if (plan.GateX >= 0f && GatePrefab != null)
+            {
+                Gate = Instantiate(GatePrefab, transform);
+                Gate.name = "Gate";
+                Gate.transform.localPosition = new Vector3(plan.GateX, 0f, 0f);
+                foreach (var use in Gate.GetComponentsInChildren<Interactable>()) use.Configure(0);
+            }
+
+            // where the team stands when it comes down: at the exit's ladder (after a house) or around the car (the start)
+            var spawns = new List<Pose>();
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 at = plan.ExitLadderX >= 0f
+                    ? new Vector3(plan.ExitLadderX + 0.8f + i * 0.7f, 0.2f, SewerPlan.WalkwayZ - 0.1f - (i % 2) * 0.5f)
+                    : new Vector3(plan.CarX - 3.5f + i * 1.6f, 0.1f, 2.4f);
+                float yaw = plan.ExitLadderX >= 0f ? -90f : 180f; // towards the gate / the car
+                spawns.Add(new Pose(transform.TransformPoint(at), transform.rotation * Quaternion.Euler(0f, yaw, 0f)));
+            }
+            Spawns = spawns.ToArray();
+            if (plan.ExitLadderX >= 0f)
+            {
+                Put(Ladder, "ExitLadder", new Vector3(plan.ExitLadderX, 0.15f, 3.45f));
+                Put(Manhole, "ExitManhole", new Vector3(plan.ExitLadderX, 4.15f, 3.2f));
+            }
+
+            // the hall and the three tunnels; lamps on its long walls
+            Put(Hub, "Hub", new Vector3(plan.HubX, 0f, 0f));
+            foreach (var (x, side) in new[] { (6f, 1), (6f, -1), (11.5f, 1), (11.5f, -1) })
+            {
+                var lamp = Put(Lamp, "HubLamp", new Vector3(plan.HubX + x, 3.1f, side * 7.9f), side > 0 ? 90f : -90f);
+                if (lamp != null) foreach (var l in lamp.GetComponentsInChildren<Light>()) { l.color = plan.LampColor; l.intensity = plan.LampIntensity; l.range = 14f; }
+            }
+            Branches = new Branch[SewerBranches.Count];
+            for (int i = 0; i < SewerBranches.Count; i++)
+            {
+                var at = new Vector3(plan.End, 0f, SewerPlan.BranchZ[i]);
+                if (BranchPrefab == null) continue;
+                var b = Instantiate(BranchPrefab, transform);
+                b.name = $"Branch{i}";
+                b.transform.localPosition = at; // +X leads into it
+                Stealth.UI.RouteSignView sign = null;
+                if (SignPrefab != null)
+                {
+                    sign = Instantiate(SignPrefab, transform);
+                    sign.name = $"Sign{i}";
+                    sign.transform.SetLocalPositionAndRotation(at + new Vector3(-0.4f, 4.4f, 0f), Quaternion.Euler(-12f, -90f, 0f));
+                }
+                Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen };
+            }
+            var water = Put(Flooding, "FloodWater", new Vector3(plan.End / 2f, -0.6f, 0f));
+            if (water != null)
+            {
+                water.transform.localScale = new Vector3(plan.End + 40f, 1f, 20f);
+                Water = water.transform;
+                m_WaterBase = Water.localPosition.y;
+            }
+        }
+
+        // ------------------------------------------------------------------ queries
+
         public Vector3 SpawnFor(int slot) =>
-            Spawns != null && Spawns.Length > 0 ? Spawns[Mathf.Abs(slot) % Spawns.Length].position : transform.position + Vector3.up;
+            Spawns.Length > 0 ? Spawns[Mathf.Abs(slot) % Spawns.Length].position : transform.position + Vector3.up;
 
         public Quaternion SpawnRotation(int slot) =>
-            Spawns != null && Spawns.Length > 0 ? Spawns[Mathf.Abs(slot) % Spawns.Length].rotation : transform.rotation;
+            Spawns.Length > 0 ? Spawns[Mathf.Abs(slot) % Spawns.Length].rotation : transform.rotation;
 
-        /// <summary>The tunnel (0 left, 1 middle, 2 right) a point is in, or −1.</summary>
+        /// <summary>The tunnel (0 left, 1 middle, 2 right) a point (the car) is in, or −1.</summary>
         public int BranchAt(Vector3 p)
         {
             for (int i = 0; i < Branches.Length; i++)
@@ -102,7 +215,7 @@ namespace Stealth.Level
             if (Water == null || m_FloodStart < 0f) return;
             float t = Mathf.Clamp01((Time.time - m_FloodStart) / 6f);
             var p = Water.localPosition;
-            Water.localPosition = new Vector3(p.x, m_WaterBase + Mathf.SmoothStep(0f, 2.4f, t), p.z);
+            Water.localPosition = new Vector3(p.x, m_WaterBase + Mathf.SmoothStep(0f, 2.6f, t), p.z);
         }
     }
 }

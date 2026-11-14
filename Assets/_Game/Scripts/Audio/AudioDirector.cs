@@ -36,6 +36,10 @@ namespace Stealth.Audio
         AudioMix m_Mix;
         int m_NextVoice;
         AudioSource m_Music; // the one fading in
+        // Crossfade weights (0..1): the settings' volume multiplies them, so a slider acts at once.
+        float m_WeightA, m_WeightB, m_Inside, m_Outside, m_Siren;
+        Vector3 m_Listener;
+        bool m_InHouse;
         MusicTrack m_Track;
         float m_LastDanger = float.NegativeInfinity;
 
@@ -49,6 +53,7 @@ namespace Stealth.Audio
         {
             public int Level; public bool Hacked; public float Cooldown; public Vector3 Pos; public float NextStep;
             public RobotState Robot; public float VoiceFree; public AudioClip Queued; public float NextBeep;
+            public bool Legs; public int FootFrame = -1;
         }
 
         readonly Dictionary<PlayerController, Walker> m_Players = new();
@@ -79,11 +84,13 @@ namespace Stealth.Audio
             Loop(AmbienceOutside, Bank.GasWind);
             Loop(AlarmSource, Bank.Alarm);
             GameManager.BannerShown += OnBanner;
+            ProceduralLegs.FootDown += OnFootDown;
         }
 
         void OnDestroy()
         {
             GameManager.BannerShown -= OnBanner;
+            ProceduralLegs.FootDown -= OnFootDown;
             if (Instance == this) Instance = null;
         }
 
@@ -111,7 +118,7 @@ namespace Stealth.Audio
             voice.transform.position = position;
             voice.pitch = pitch;
             voice.clip = clip;
-            voice.volume = Mathf.Clamp01(volume * GroupVolume(group));
+            voice.volume = Mathf.Clamp01(volume * GroupVolume(group) * Muffle(position));
             voice.Play();
             Played++;
         }
@@ -121,6 +128,13 @@ namespace Stealth.Audio
             Flat.PlayOneShot(clip, Mathf.Clamp01(volume * GroupVolume(group)));
             Played++;
         }
+
+        /// <summary>
+        /// How much of a sound at <paramref name="position"/> reaches the listener through the floors of the house
+        /// (1 on the same floor; slabs between them swallow most of it). Robots above or below you are muffled, not loud.
+        /// </summary>
+        public float Muffle(Vector3 position) =>
+            m_InHouse ? AudioRules.FloorFactor(m_Listener.y, position.y, m_Mix.ThroughFloor) : 1f;
 
         float GroupVolume(Sfx.Group g) => g switch
         {
@@ -138,8 +152,10 @@ namespace Stealth.Audio
             var me = PlayerController.Local;
             var gm = GameManager.Instance;
             bool inGame = me != null && gm != null && ActiveLevel.Layout != null;
+            m_InHouse = inGame && gm.Phase == RunPhase.Playing;
+            m_Listener = ListenerPosition(me);
 
-            UpdateMusic(me, gm, inGame);
+            UpdateMusic(me, gm, me != null && gm != null); // the sewer is part of the game too (not the menu track)
             UpdateAmbience(me, gm, inGame);
             if (!inGame)
             {
@@ -167,13 +183,23 @@ namespace Stealth.Audio
                 if (next.clip != null) { next.time = 0f; next.Play(); }
                 m_Music = next;
             }
-            float target = m_Mix.Music * GameSettings.MusicVolume;
+            // Only the change of track fades; the volume from the settings applies immediately.
+            float target = m_Mix.Music * GameSettings.MusicVolume * (track == MusicTrack.Explore ? m_Mix.ExploreMusic : 1f);
             float step = Time.unscaledDeltaTime / Mathf.Max(0.05f, m_Mix.Crossfade);
-            foreach (var s in new[] { MusicA, MusicB })
-            {
-                s.volume = Mathf.MoveTowards(s.volume, s == m_Music ? target : 0f, step * Mathf.Max(target, 0.01f));
-                if (s != m_Music && s.volume <= 0f && s.isPlaying) s.Stop();
-            }
+            m_WeightA = Mathf.MoveTowards(m_WeightA, m_Music == MusicA ? 1f : 0f, step);
+            m_WeightB = Mathf.MoveTowards(m_WeightB, m_Music == MusicB ? 1f : 0f, step);
+            MusicA.volume = m_WeightA * target;
+            MusicB.volume = m_WeightB * target;
+            if (m_Music != MusicA && m_WeightA <= 0f && MusicA.isPlaying) MusicA.Stop();
+            if (m_Music != MusicB && m_WeightB <= 0f && MusicB.isPlaying) MusicB.Stop();
+        }
+
+        /// <summary>Where the ears are: the local player's head (or the teammate they watch), else the menu camera.</summary>
+        static Vector3 ListenerPosition(PlayerController me)
+        {
+            if (me != null && me.Listener != null && me.Listener.isActiveAndEnabled) return me.Listener.transform.position;
+            var cam = Camera.main;
+            return cam != null ? cam.transform.position : Vector3.zero;
         }
 
         static bool InDanger(PlayerController me)
@@ -185,11 +211,15 @@ namespace Stealth.Audio
 
         void UpdateAmbience(PlayerController me, GameManager gm, bool inGame)
         {
-            bool inside = inGame && ActiveLevel.Layout.IsInside(me.transform.position);
+            bool house = inGame && gm.Phase == RunPhase.Playing;
+            bool inside = house && ActiveLevel.Layout.IsInside(me.transform.position);
             float step = Time.deltaTime * 0.5f;
-            AmbienceInside.volume = Mathf.MoveTowards(AmbienceInside.volume, inGame && inside ? m_Mix.Ambience : 0f, step);
-            AmbienceOutside.volume = Mathf.MoveTowards(AmbienceOutside.volume, inGame && !inside ? m_Mix.Ambience : 0f, step);
-            AlarmSource.volume = Mathf.MoveTowards(AlarmSource.volume, inGame && gm.AlarmActive ? m_Mix.Alarm : 0f, Time.deltaTime * 2f);
+            m_Inside = Mathf.MoveTowards(m_Inside, inside ? 1f : 0f, step);
+            m_Outside = Mathf.MoveTowards(m_Outside, house && !inside ? 1f : 0f, step);
+            m_Siren = Mathf.MoveTowards(m_Siren, house && gm.AlarmActive ? 1f : 0f, Time.deltaTime * 2f);
+            AmbienceInside.volume = m_Inside * m_Mix.Ambience;
+            AmbienceOutside.volume = m_Outside * m_Mix.Ambience;
+            AlarmSource.volume = m_Siren * m_Mix.Alarm;
         }
 
         void UpdateRun(GameManager gm)
@@ -270,6 +300,7 @@ namespace Stealth.Audio
                     {
                         Level = level, Hacked = d.IsHacked, Pos = d.transform.position,
                         Robot = d is RobotController rc ? rc.State : RobotState.Patrol,
+                        Legs = d.GetComponent<ProceduralLegs>() != null,
                     };
                     continue;
                 }
@@ -287,7 +318,8 @@ namespace Stealth.Audio
                     w.Cooldown = Time.time + 1.2f;
                 }
 
-                if (d is RobotController r && r.Profile != null && r.Traits.CanUseStairs && r.Traits.HoverHeight <= 0f)
+                // Robots with walking legs sound each foot as it lands (OnFootDown); the rest step on a timer.
+                if (!w.Legs && d is RobotController r && r.Profile != null && r.Traits.CanUseStairs && r.Traits.HoverHeight <= 0f)
                 {
                     var pos = r.transform.position;
                     var delta = pos - w.Pos;
@@ -303,6 +335,22 @@ namespace Stealth.Audio
                 }
             }
             Prune(m_Detectors, Detector.All);
+        }
+
+        /// <summary>A foot of a walking robot touched the surface: one step sound per robot per frame (a group lands together).</summary>
+        void OnFootDown(ProceduralLegs legs, Vector3 foot)
+        {
+            var d = legs.Detector;
+            if (d == null || !m_InHouse || !m_Detectors.TryGetValue(d, out var w)) return;
+            if (w.FootFrame == Time.frameCount) return;
+            w.FootFrame = Time.frameCount;
+            var (clip, volume) = d.Kind switch
+            {
+                RobotKind.Spider => (Bank.SpiderStep, 0.35f),
+                RobotKind.Hound => (Bank.StepLight, 0.45f),
+                _ => (Bank.RobotStep, 0.6f),
+            };
+            Sfx.At(clip != null ? clip : Bank.RobotStep, foot, volume, Sfx.Group.Robots, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
         }
 
         /// <summary>A camera that is noticing someone beeps faster and faster until it raises the alarm.</summary>
@@ -341,7 +389,7 @@ namespace Stealth.Audio
             if (voice == RobotVoice.Spotted) w.Queued = null; // a new warning replaces anything still waiting
             if (clip != null) w.Queued = clip;
             if (w.Queued == null || Time.time < w.VoiceFree) return;
-            Sfx.At(w.Queued, robot.Position, 1f, Sfx.Group.Robots);
+            Sfx.At(w.Queued, robot.Position, 1f, Sfx.Group.Robots, AudioRules.VoicePitch(robot.Kind));
             VoiceLines++;
             w.VoiceFree = Time.time + w.Queued.length - 0.1f;
             w.Queued = null;

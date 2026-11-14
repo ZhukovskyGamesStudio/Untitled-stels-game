@@ -18,7 +18,7 @@ namespace Stealth.Game
     /// <see cref="RunState"/>; the network twin (GameManagerNet) replicates <see cref="Level"/> and the run state and
     /// carries requests and banners (<see cref="IGameLink"/>).
     /// </summary>
-    public class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour
     {
         public static GameManager Instance { get; private set; }
 
@@ -88,15 +88,13 @@ namespace Stealth.Game
         public IReadOnlyList<int> RouteOptions => Route != null ? Route.Next(Level.Index, Level.Lane) : System.Array.Empty<int>();
 
         /// <summary>Where the team trades now: the hatch in a house, the stash board in the sewer.</summary>
-        public Vector3? TradePosition =>
-            Phase == RunPhase.Playing && ActiveLevel.Layout != null ? ActiveLevel.Layout.HatchPosition
-            : Phase == RunPhase.Sewer && SewerLocation.Active != null && SewerLocation.Active.TradeSpot != null ? SewerLocation.Active.TradeSpot.position
-            : null;
+        /// <summary>Where the stash board hangs for the local player (the hatch of the house they are at), null outside a house.</summary>
+        public Vector3? TradePosition => PlayerController.Local != null ? TradePositionFor(PlayerController.Local.transform.position) : TradePositionFor(Vector3.zero);
 
-        /// <summary>A player standing here can sell and use the team stash.</summary>
-        public bool CanTradeAt(Vector3 position) => TradePosition is Vector3 at && Hatch.IsNear(position, at);
+        /// <summary>A player standing here can use the stash of a hatch (the entry or the exit of the house).</summary>
+        public bool CanTradeAt(Vector3 position) => StashAt(position) != null;
         float m_NextReveal;
-        /// <summary>The team's shared stash at the hatch: kept for the whole run, emptied by a new run.</summary>
+        /// <summary>The stash in the house's entry hatch: what came up from the car (it stays in the house unless carried to the exit).</summary>
         public TeamStash Stash { get; } = new();
         public RunState Run => m_Run;
         public int Quota => m_Run.Quota;
@@ -114,7 +112,7 @@ namespace Stealth.Game
         /// <summary>The visual style the team looks at (index in <see cref="VisualStyles.All"/>, -1 = each its own default).</summary>
         public int StyleIndex { get; private set; } = -1;
         int m_AppliedStyle = -1;
-        /// <summary>Every peer: the team's style changed — "Стиль: …" (the HUD shows it, replacing the previous one).</summary>
+        /// <summary>Every peer: the team's style changed — "Style: …" (the HUD shows it, replacing the previous one).</summary>
         public static event Action<string> StyleAnnounced;
 
         public event Action<string> OnBanner;
@@ -132,6 +130,7 @@ namespace Stealth.Game
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
             SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
+            HookFeatures();
             if (!isServer) return;
             // A run starts in the sewer, at the first fork (tests and -level start right in a house).
             if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0) StartLevel(DevFlags.ForcedLevel, 0);
@@ -208,6 +207,7 @@ namespace Stealth.Game
             Pings.Clear();
             if (Art.Sewer == null) { Debug.LogError("[Game] LevelArt has no sewer"); return; }
             m_Sewer = Instantiate(Art.Sewer).GetComponent<SewerLocation>();
+            m_Sewer.Build(SewerPlan.Make(Level.RunSeed, Level.Index));
             ApplyAtmosphere();
             VisualStyles.Dress(m_Sewer.gameObject);
             Debug.Log("[Game] In the sewer");
@@ -217,6 +217,26 @@ namespace Stealth.Game
         {
             if (m_Sewer != null) Destroy(m_Sewer.gameObject);
             m_Sewer = null;
+        }
+
+        GameObject m_DriveScene;
+        float m_DriveEndAt = -1f;
+
+        /// <summary>Every peer: the drive scene from the departure until the next house stands (under the black of the fade).</summary>
+        void UpdateDriveScene()
+        {
+            if (DriveUntil > 0 && m_DriveScene == null && Art != null && Art.DriveScene != null)
+            {
+                m_DriveScene = Instantiate(Art.DriveScene, new Vector3(0f, -400f, 0f), Quaternion.identity);
+                m_DriveEndAt = -1f;
+            }
+            if (m_DriveScene == null || DriveUntil > 0 || Phase != RunPhase.Playing || ActiveLevel.Layout == null) return;
+            if (m_DriveEndAt < 0f) m_DriveEndAt = Time.time + 0.5f; // the house is there: a moment of black, then fade in on it
+            else if (Time.time >= m_DriveEndAt)
+            {
+                Destroy(m_DriveScene);
+                m_DriveScene = null;
+            }
         }
 
         // ------------------------------------------------------------------ level lifecycle
@@ -231,7 +251,7 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players));
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
             ActiveLevel.Load(layout, Art);
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
@@ -284,7 +304,13 @@ namespace Stealth.Game
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
-            foreach (var p in PlayerController.All) p.ResetForLevelServer();
+            DespawnCarServer();
+            UnloadCarServer();
+            foreach (var p in PlayerController.All)
+            {
+                p.ResetForLevelServer();
+                p.EnterHatchServer(0); // the team comes up into the entry hatch
+            }
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
@@ -298,14 +324,18 @@ namespace Stealth.Game
                 var item = SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f);
                 total += item.Value;
             }
+            total += SpawnFeatures(layout);
 
+            var wardens = new List<GameObject>();
             foreach (var spawn in layout.RobotSpawns)
             {
                 var pos = spawn.Position;
                 bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
-                SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
+                var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
+                if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
             }
+            PostWardens(layout, wardens);
 
             foreach (var pose in layout.CameraSpots) SpawnRobotServer(RobotKind.Camera, pose.position, pose.rotation);
 
@@ -337,7 +367,7 @@ namespace Stealth.Game
         public void KillAllRobotsServer()
         {
             foreach (var d in Detector.All.ToArray()) d.HackServer(86400f);
-            Banner("Читы: все роботы выключены");
+            Banner(Loc.Pack("banner.cheat_robots_off"));
         }
 
         /// <summary>Server, cheat: the quota of this house is met.</summary>
@@ -361,20 +391,22 @@ namespace Stealth.Game
         {
             Pings.Expire(Time.time);
             RevealMap();
+            UpdateDriveScene();
             if (!m_IsServer) return;
             if (m_Run.SetPlayers(TeamSize))
-                Banner($"В команде {m_Run.Players} {Plural(m_Run.Players, "игрок", "игрока", "игроков")} — квота этого дома: {Quota}");
+                Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
             foreach (var p in PlayerController.All)
-                if (!p.Downed) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
-            if (Phase == RunPhase.Sewer) { UpdateVote(); return; }
+                if (!p.Downed && !p.Invisible) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
+            if (Phase == RunPhase.Sewer) { UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
+            UpdateLures();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
             if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
             UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
-            if (m_Run.Wipe()) Banner($"Забег окончен: Вся команда выведена из строя. Итог забега: {RunTotal} очк.");
+            if (m_Run.Wipe()) Banner(Loc.Pack("banner.run_over", RunTotal));
         }
 
         /// <summary>
@@ -427,7 +459,7 @@ namespace Stealth.Game
             if (seconds < 0f || seconds > HunterWarning) { m_HunterWarned = false; return; }
             if (m_HunterWarned) return;
             m_HunterWarned = true;
-            Banner("Охотник придёт через минуту — заканчивайте и к люку");
+            Banner(Loc.Pack("banner.hunter_soon"));
         }
 
         /// <summary>Seconds before the hunter comes that the team is warned.</summary>
@@ -455,7 +487,7 @@ namespace Stealth.Game
             foreach (var pl in PlayerController.All)
                 if (target == null || Vector3.Distance(pl.transform.position, best) < Vector3.Distance(target.transform.position, best)) target = pl;
             if (target != null) obj.GetComponent<RobotController>().InvestigateServer(target.transform.position, true);
-            Banner("В здание вошёл Охотник");
+            Banner(Loc.Pack("banner.hunter_in"));
             Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_Run.Alarms})");
         }
 
@@ -488,7 +520,7 @@ namespace Stealth.Game
             var me = PlayerController.Local;
             VisualStyles.SnapFog(me != null && ActiveLevel.Layout != null && !ActiveLevel.Layout.IsInside(me.transform.position));
             Debug.Log($"[Game] Team style: {style.name}");
-            StyleAnnounced?.Invoke($"Стиль: {style.Title} ({style.References})");
+            StyleAnnounced?.Invoke(Loc.F("banner.style", VisualStyles.TitleOf(style)));
         }
 
         public void RequestRestart()
@@ -503,7 +535,8 @@ namespace Stealth.Game
         /// </summary>
         void UpdateHatch()
         {
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch, p.KnockedOut)));
+            // only the exit hatch takes the team down
+            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
             if (!hidden) { LeaveAt = 0; return; }
             if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
             else if (Session.ServerTime >= LeaveAt) GoToSewerServer();
@@ -520,57 +553,25 @@ namespace Stealth.Game
             Votes.Clear();
             GoAt = 0;
             ChosenLane = -1;
+            DriveUntil = 0;
+            int lost = LoadCarServer();
+            m_Opened.Clear(); // the house is gone; the gate is shut
+            OpenedVersion++;
             foreach (var p in PlayerController.All)
             {
+                // left lying in the house: back with the team, but whatever they carried stayed there
+                if (p.KnockedOut) p.GetComponent<PlayerInventory>()?.ClearServer();
                 p.LeaveHatchServer();
                 p.ResetForLevelServer();
             }
             SyncLocation();
-            string left = down > 0 ? $" Оставили лежать: {down} — квота следующего дома выше на {Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)}%." : "";
-            Banner(QuotaMet
-                ? $"Канализация. Квота выплачена — выберите путь: зайдите в один из туннелей.{left}"
-                : $"Канализация. Квота {Collected} / {Quota}: допродайте добычу у доски, без квоты дальше не пустят.{left}");
+            SpawnCarServer();
+            // only what the team lost: the sewer, the gate and the fuel are on the screen anyway
+            if (down > 0) Banner(Loc.Pack("banner.left_behind", down, Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)));
+            if (lost > 0) Banner(Loc.Pack("banner.hatch_lost", lost));
         }
 
         public bool QuotaMet => m_Run.QuotaMet;
-
-        int m_DecidedVotes = -1;
-
-        /// <summary>
-        /// Server: a player votes by standing in a tunnel of the sewer. Once everyone stands in one, the winner (most
-        /// players; a tie by lot) is announced and the team goes after a short countdown — or the run ends here without
-        /// the quota. Stepping out (or into another tunnel) starts the choice again.
-        /// </summary>
-        void UpdateVote()
-        {
-            var sewer = SewerLocation.Active;
-            var options = RouteOptions;
-            if (sewer == null || options.Count == 0) return;
-            foreach (var p in PlayerController.All)
-            {
-                int way = SewerBranches.WayOf(sewer.BranchAt(p.transform.position), options.Count);
-                if (way >= 0 && !p.Downed) Votes.Cast(p.ClientId, options[way]);
-                else Votes.Remove(p.ClientId);
-            }
-            if (!Votes.Everyone(PlayerController.All.Select(p => p.ClientId), options))
-            {
-                GoAt = 0;
-                ChosenLane = -1;
-                m_DecidedVotes = -1;
-                return;
-            }
-            if (GoAt <= 0 || m_DecidedVotes != Votes.Version)
-            {
-                m_DecidedVotes = Votes.Version;
-                int top = options.Max(o => Votes.Count(o));
-                bool tie = options.Count(o => Votes.Count(o) == top) > 1;
-                ChosenLane = Votes.Winner(options, new System.Random(LevelRandom.Mix(m_RunSeed, 0x707E, Level.Index)));
-                GoAt = Session.ServerTime + m_Run.Settings.VoteDelay;
-                if (tie) Banner("Голоса разделились — путь выбран жребием");
-                return;
-            }
-            if (Session.ServerTime >= GoAt) AdvanceServer();
-        }
 
         /// <summary>
         /// Server: a new run — fresh seed, empty stash and backpacks, the team in the sewer before the first fork.
@@ -590,35 +591,24 @@ namespace Stealth.Game
             LeaveAt = 0;
             GoAt = 0;
             ChosenLane = -1;
-            m_DecidedVotes = -1;
             Votes.Clear();
             Level = new LevelInfo { Seed = 0, Index = RunMap.StartDepth, Players = TeamSize, Lane = 0, RunSeed = m_RunSeed };
+            Cargo.Clear();
+            Stash.Clear();
+            ExitStash.Clear();
+            DriveUntil = 0;
+            m_Opened.Add(GateKey); // the start of the run: no gate to open
+            OpenedVersion++;
             foreach (var p in PlayerController.All)
             {
+                // left lying in the house: back with the team, but whatever they carried stayed there
+                if (p.KnockedOut) p.GetComponent<PlayerInventory>()?.ClearServer();
                 p.LeaveHatchServer();
                 p.ResetForLevelServer();
             }
             SyncLocation();
+            SpawnCarServer();
             Debug.Log($"[Game] Run started in the sewer (run seed {m_RunSeed}): {RouteOptions.Count} ways");
-        }
-
-        void AdvanceServer()
-        {
-            GoAt = 0;
-            int collected = Collected, quota = Quota;
-            switch (m_Run.Advance())
-            {
-                case RunState.Exit.Failed:
-                    ChosenLane = -1;
-                    SyncLocation();
-                    Banner($"Квота не выплачена ({collected} / {quota}). Коллекторы затопили канализацию. Забег окончен, итог: {RunTotal} очк.");
-                    break;
-                case RunState.Exit.NextLevel:
-                    int next = Level.Index + 1, lane = ChosenLane;
-                    StartLevel(next, lane);
-                    Banner($"Дом №{next + 1}");
-                    break;
-            }
         }
 
         // ------------------------------------------------------------------ locked doors and safes
@@ -627,7 +617,7 @@ namespace Stealth.Game
         public void UnlockDoorServer(PlayerController player, int door)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
-            var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock);
+            var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock && !a.NeedsKey); // a key door needs its key
             if (d == null || Vector3.Distance(d.transform.position, player.transform.position) > AutoDoor.HackReach + 1.5f) return;
             if (m_Opened.Add(DoorKey(door))) OpenedVersion++;
         }
@@ -663,10 +653,10 @@ namespace Stealth.Game
             for (int i = 0; i < s.LootItems; i++)
             {
                 byte color = (byte)Mathf.Clamp(s.LootColors[rng.Next(s.LootColors.Length)], 0, ItemCatalog.Colors.Length - 1);
-                byte shape = (byte)rng.Next(ItemCatalog.Shapes.Length);
+                byte shape = (byte)rng.Next(ItemCatalog.LootShapes);
                 value += SpawnItemServer(shape, color, box.LootSpot(i), rng.Next(360)).Value;
             }
-            Banner($"{player.Nick} вскрыл сейф: добыча на {value} очк.");
+            Banner(Loc.Pack("banner.safe", player.Nick, value));
         }
 
         /// <summary>Server: a player pressed R after a failed run.</summary>
@@ -676,18 +666,11 @@ namespace Stealth.Game
             foreach (var p in PlayerController.All) p.GetComponent<PlayerInventory>().ClearServer();
             Stash.Clear();
             StartRunServer();
-            Banner("Новый забег: выберите путь — зайдите в один из туннелей");
         }
 
         // ------------------------------------------------------------------ banners
 
-        static string Plural(int n, string one, string few, string many)
-        {
-            int d = n % 10, h = n % 100;
-            if (d == 1 && h != 11) return one;
-            return d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many;
-        }
-
+        /// <summary>Server: a banner for everyone — a <see cref="Loc.Pack"/>ed text, each peer reads it in its own language.</summary>
         void Banner(string text)
         {
             if (m_Link != null) m_Link.BroadcastBanner(text);
@@ -697,6 +680,7 @@ namespace Stealth.Game
         /// <summary>Every peer: show a banner (delivered by the network twin).</summary>
         public void ShowBanner(string text)
         {
+            text = Loc.Unpack(text);
             Debug.Log("[Game] " + text);
             OnBanner?.Invoke(text);
             BannerShown?.Invoke(text);

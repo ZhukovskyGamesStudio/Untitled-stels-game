@@ -133,7 +133,8 @@ namespace Stealth.Tests
             int checkedDoors = 0;
             foreach (int seed in new[] { 11, 12, 13, 14 })
             {
-                var l = LevelGenerator.Generate(seed, 2);
+                // plain doors only (a hidden room changes the walls these cases were picked from)
+                var l = LevelGenerator.Generate(seed, 2, null, null, 1, new FeatureSettings { HiddenRoomChance = 0f });
                 var plan = l.Plan;
                 foreach (var o in plan.Openings)
                 {
@@ -147,6 +148,10 @@ namespace Stealth.Tests
                     var beside = w.At(o.At > w.Length / 2f ? o.At - 2.6f : o.At + 2.6f) + n * 0.4f; // behind the wall next to it
                     if (!plan.IsInside(0, eye) || !plan.IsInside(0, through) || !plan.IsInside(0, beside)) continue;
                     if (!plan.CanSee(0, eye, through) || plan.CanSee(0, eye, beside)) continue;
+                    // another doorway in the same wall near the spot behind it would show it (dense hospital corridors)
+                    float along = o.At > w.Length / 2f ? o.At - 2.6f : o.At + 2.6f;
+                    if (along < 0.3f || along > w.Length - 0.3f) continue; // past the wall's end: round the corner, not behind it
+                    if (plan.Openings.Any(x => x.Wall == o.Wall && !x.Equals(o) && Mathf.Abs(x.At - along) < 2.2f)) continue;
                     var map = new ExplorationMap(l);
                     map.RevealAround(new Vector3(eye.x, 1.6f, eye.y), 14f);
                     var t = ExplorationMap.TileOf(new Vector3(through.x, 0f, through.y));
@@ -311,7 +316,7 @@ namespace Stealth.Tests
                 Assert.AreEqual("E", Controls.Label(GameAction.Interact));
                 Controls.Set(GameAction.Interact, KeyBinding.Of(Key.G));
                 Assert.AreEqual("G", Controls.Label(GameAction.Interact));
-                Assert.IsTrue(Stealth.UI.PromptRules.DownedText(0, false).Contains("G"));
+                Assert.AreEqual(KeyBinding.Of(Key.G), Stealth.UI.HintRules.Collect(new Stealth.UI.PromptContext { Playing = true, CanRevive = true }, new System.Collections.Generic.List<Stealth.UI.Hint>())[^1].Key);
                 Controls.Set(GameAction.Ping, KeyBinding.MouseButton(4));
                 Assert.AreEqual("Мышь 5", Controls.Label(GameAction.Ping));
                 Controls.Set(GameAction.Mark, KeyBinding.Of(Key.G));

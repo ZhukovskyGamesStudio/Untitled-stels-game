@@ -69,7 +69,11 @@ namespace Stealth.Configs
         static void OnGameStart() => Apply();
 
         /// <summary>Applies the global parts of the tuning (item colours and values). Called before the scene loads.</summary>
-        public static void Apply() => ItemCatalog.Configure(Items.Colors, Items.PointsPerCell);
+        public static void Apply()
+        {
+            ItemCatalog.Configure(Items.Colors, Items.PointsPerCell);
+            ItemCatalog.DiamondValueCells = Items.Gadgets.DiamondValueCells;
+        }
 
         /// <summary>Use another root (tests, A/B balance); null returns to Resources/GameConfig.</summary>
         public static void Use(GameConfig root)

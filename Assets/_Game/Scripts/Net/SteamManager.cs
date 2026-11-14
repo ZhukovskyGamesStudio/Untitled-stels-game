@@ -23,14 +23,14 @@ namespace Stealth.Net
 #if !DISABLESTEAMWORKS
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-nosteam") >= 0)
             {
-                Error = "отключён флагом -nosteam";
+                Error = "disabled by -nosteam";
                 return;
             }
             try
             {
                 if (!Packsize.Test() || !DllCheck.Test())
                 {
-                    Error = "неверная сборка steam_api";
+                    Error = "wrong steam_api build";
                     return;
                 }
                 var result = SteamAPI.InitEx(out var message);
@@ -41,11 +41,11 @@ namespace Stealth.Net
             }
             catch (System.DllNotFoundException e)
             {
-                Error = "steam_api64.dll не найдена";
+                Error = "steam_api64.dll not found";
                 Debug.LogWarning("[Steam] " + e.Message);
             }
 #else
-            Error = "Steamworks отключён для этой платформы";
+            Error = "Steamworks is off on this platform";
 #endif
         }
 

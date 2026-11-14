@@ -52,7 +52,14 @@ namespace Stealth.Level
             [PropKind.ArcadeMachine] = Rect.MinMaxRect(-0.36f, -0.4f, 0.36f, 0.55f),
             [PropKind.Safe] = Rect.MinMaxRect(-0.4f, -0.35f, 0.4f, 0.41f),
             [PropKind.Hatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
+            [PropKind.Crate] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
+            [PropKind.MedTable] = Rect.MinMaxRect(-0.97f, -0.53f, 0.97f, 0.53f),
+            [PropKind.Workbench] = Rect.MinMaxRect(-1.0f, -0.43f, 1.0f, 0.55f),
+            [PropKind.Programmer] = Rect.MinMaxRect(-0.99f, -0.5f, 0.99f, 0.42f),
         };
+
+        /// <summary>A model's footprint in its own frame (x = local X, y = local Z), metres.</summary>
+        public static Rect FootprintOf(PropKind kind) => Foot.TryGetValue(kind, out var r) ? r : new Rect(-0.5f, -0.5f, 1f, 1f);
 
         const float DeskTop = 0.765f;
         const float WallGap = 0.06f;    // between a back and the wall's face
@@ -269,7 +276,7 @@ namespace Stealth.Level
             var grid = new Walk(m_L, this);
             var reached = grid.Flood();
             var list = new List<PlanRoom>();
-            foreach (var r in m_L.Rooms) if (!grid.Reached(reached, r.Center)) list.Add(r);
+            foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r.Center)) list.Add(r);
             return list;
         }
 
@@ -294,7 +301,8 @@ namespace Stealth.Level
                 var reached = grid.Flood();
                 long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var lostRooms = new List<PlanRoom>();
-                foreach (var r in m_L.Rooms) if (!grid.Reached(reached, r.Center)) lostRooms.Add(r);
+                // the walker is a robot: it never gets into the hidden room (players do, through its illusion walls)
+                foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r.Center)) lostRooms.Add(r);
                 long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var cut = lostRooms.Count > 0 ? grid.Barrier(reached, lostRooms) : new HashSet<int>();
                 long t4 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -313,7 +321,8 @@ namespace Stealth.Level
                     {
                         var p = m_L.ItemSpots[i];
                         var floor = new Vector3(p.x, LevelLayout.FloorY(LevelLayout.FloorOf(p.y)), p.z);
-                        if (!grid.Reached(reached, floor)) { m_L.ItemSpots.RemoveAt(i); m_ItemGroup.RemoveAt(i); LastDroppedItems++; }
+                        bool hidden = m_L.HiddenRoom >= 0 && m_L.Plan.RoomAt(floor + Vector3.up * 0.3f)?.Id == m_L.HiddenRoom;
+                        if (!hidden && !grid.Reached(reached, floor)) { m_L.ItemSpots.RemoveAt(i); m_ItemGroup.RemoveAt(i); LastDroppedItems++; }
                     }
                     return;
                 }

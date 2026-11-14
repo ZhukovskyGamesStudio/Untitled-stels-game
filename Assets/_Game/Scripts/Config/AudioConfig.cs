@@ -28,6 +28,10 @@ namespace Stealth.Configs
         public float MaxDistance = 24f;
         [Tooltip("Silent further than this (robot motors, laser hum).")]
         public float LoopMaxDistance = 11f;
+        [Tooltip("Share of a sound that gets through one floor slab (robots upstairs / downstairs are muffled, not loud).")]
+        public float ThroughFloor = 0.12f;
+        [Tooltip("Automatic doors opening and closing (they do it all the time: keep it low).")]
+        public float Doors = 0.18f;
 
         [Header("Footsteps")]
         [Tooltip("Metres per step: the faster you go, the quicker the steps.")]
@@ -40,6 +44,8 @@ namespace Stealth.Configs
         [Header("Music")]
         [Tooltip("Seconds to crossfade between tracks.")]
         public float Crossfade = 1.5f;
+        [Tooltip("The exploring track is a quiet bed under the footsteps: its share of the music volume.")]
+        public float ExploreMusic = 0.45f;
         [Tooltip("The chase music keeps playing this long after the last chase / alarm.")]
         public float ChaseHold = 5f;
     }

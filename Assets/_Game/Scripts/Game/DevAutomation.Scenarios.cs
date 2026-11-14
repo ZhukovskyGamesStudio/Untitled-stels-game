@@ -34,6 +34,7 @@ namespace Stealth.Game
             m_Scenarios["plate"] = PlateScenario;
             m_Scenarios["terminals"] = TerminalsScenario;
             m_Scenarios["cheats"] = CheatsScenario;
+            m_Scenarios["features"] = FeaturesScenario;
         }
 
         /// <summary>The F4 cheat panel (robots off, invulnerable) and the map outside the building.</summary>

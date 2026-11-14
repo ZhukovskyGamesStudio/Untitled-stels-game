@@ -91,7 +91,7 @@ namespace Stealth.UI
             // Place the content: around the player (turning with the view) or the floor centred.
             var me2 = Flat(me.transform.position);
             float yaw = me.transform.eulerAngles.y;
-            float turn = FollowPlayer ? yaw : 0f;
+            float turn = 0f; // north up on every peer: the team reads the same map (the minimap follows the player, it does not turn)
             Pivot.localRotation = Quaternion.Euler(0f, 0f, turn);
             var centre = FollowPlayer ? me2 : new Vector2(layout.SizeX, layout.SizeZ) / 2f;
             Content.anchoredPosition = -centre * scale;
@@ -126,9 +126,8 @@ namespace Stealth.UI
             if (Caption != null)
             {
                 string text = FollowPlayer
-                    ? $"этаж {floor + 1}"
-                    : $"Этаж {floor + 1} из {map.Floors} · исследовано {map.RevealedShare(floor) * 100f:0}%" +
-                      (map.Floors > 1 ? " · колесо мыши — другой этаж" : "") + $" · {Controls.Label(GameAction.Map)} — закрыть";
+                    ? Loc.F("map.floor_short", floor + 1)
+                    : Loc.F("map.floor", floor + 1, map.Floors, Mathf.RoundToInt(map.RevealedShare(floor) * 100f));
                 if (Caption.text != text) Caption.text = text;
             }
         }

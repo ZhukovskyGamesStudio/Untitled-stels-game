@@ -15,7 +15,7 @@ namespace Stealth.Tests
         [Test]
         public void SprintLastsAboutSixSeconds()
         {
-            var s = new Stamina();
+            var s = new Stamina(new StaminaSettings { Enabled = true });
             Run(s, true, 5.5f);
             Assert.IsTrue(s.CanSprint);
             Run(s, true, 0.6f);
@@ -26,7 +26,7 @@ namespace Stealth.Tests
         [Test]
         public void ExhaustionLastsUntilThreshold()
         {
-            var s = new Stamina();
+            var s = new Stamina(new StaminaSettings { Enabled = true });
             Run(s, true, 6.05f);
             Run(s, false, 1.5f); // delay + a bit
             Assert.IsTrue(s.Exhausted, "still exhausted right after the delay");
@@ -38,7 +38,7 @@ namespace Stealth.Tests
         [Test]
         public void RegeneratesOnlyAfterDelay()
         {
-            var s = new Stamina();
+            var s = new Stamina(new StaminaSettings { Enabled = true });
             Run(s, true, 2f);
             float v = s.Value;
             Run(s, false, 1f);
@@ -48,9 +48,19 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void SwitchedOffItNeverRunsOut()
+        {
+            var s = new Stamina(new StaminaSettings { Enabled = false });
+            Run(s, true, 60f);
+            s.SpendJump();
+            Assert.IsTrue(s.CanSprint);
+            Assert.AreEqual(1f, s.Value);
+        }
+
+        [Test]
         public void JumpCostsStamina()
         {
-            var s = new Stamina();
+            var s = new Stamina(new StaminaSettings { Enabled = true });
             s.SpendJump();
             Assert.Less(s.Value, 1f);
         }

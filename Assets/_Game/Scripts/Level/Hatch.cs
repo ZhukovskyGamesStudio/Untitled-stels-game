@@ -3,8 +3,9 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// The sewer hatch the team climbed in through. Items dragged onto it are handed in for the quota;
-    /// standing next to it a player can finish the level.
+    /// A hatch of the house (two of them): the entry the team comes up through from the car (its stash holds what came up
+    /// with them) and the exit the team leaves by (its stash goes down with them). Hiding in the exit's hatch (everyone)
+    /// takes the team down into the sewer.
     /// </summary>
     public class Hatch : MonoBehaviour
     {
@@ -19,7 +20,9 @@ namespace Stealth.Level
         {
             if (Lid == null) return;
             bool someone = false;
-            foreach (var p in Stealth.Player.PlayerController.All) someone |= p.InHatch;
+            var layout = ActiveLevel.Layout;
+            int mine = layout != null && (transform.position - layout.ExitHatchPosition).sqrMagnitude < 1f ? 1 : 0;
+            foreach (var p in Stealth.Player.PlayerController.All) someone |= p.InHatch && p.HatchIndex == mine;
             m_Open = Mathf.MoveTowards(m_Open, someone ? 1f : 0f, Time.deltaTime * 2.5f);
             Lid.localRotation = Quaternion.Euler(0f, 0f, -Mathf.SmoothStep(0f, 105f, m_Open));
         }
@@ -27,10 +30,21 @@ namespace Stealth.Level
         /// <summary>Feet this far above or below the hatch are on another floor (a floor is 3.5 m).</summary>
         public const float SameFloor = 1.5f;
 
-        public static bool IsNear(Vector3 position)
+        public static bool IsNear(Vector3 position) => IndexNear(position) >= 0;
+
+        /// <summary>0 near the entry hatch, 1 near the exit, −1 near neither.</summary>
+        public static int IndexNear(Vector3 position)
         {
             var layout = ActiveLevel.Layout;
-            return layout != null && IsNear(position, layout.HatchPosition);
+            if (layout == null) return -1;
+            if (IsNear(position, layout.ExitHatchPosition)) return 1;
+            return IsNear(position, layout.HatchPosition) ? 0 : -1;
+        }
+
+        public static Vector3 PositionOf(int hatch)
+        {
+            var layout = ActiveLevel.Layout;
+            return layout == null ? Vector3.zero : hatch == 1 ? layout.ExitHatchPosition : layout.HatchPosition;
         }
 
         /// <summary>Close to the hatch and on its floor — not right above it on the floor upstairs (pure).</summary>

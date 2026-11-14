@@ -92,7 +92,21 @@ namespace Stealth.UI
         }
 
         /// <summary>Words for how lit the player is (HUD), from <see cref="LightLevel"/>.</summary>
-        public static readonly string[] LightNames = { "в тени", "полумрак", "заметно", "на свету" };
+        public static string[] LightNames
+        {
+            get
+            {
+                if (s_LightNamesVersion != Loc.Version || s_LightNames == null)
+                {
+                    s_LightNamesVersion = Loc.Version;
+                    s_LightNames = new[] { Loc.T("light.0"), Loc.T("light.1"), Loc.T("light.2"), Loc.T("light.3") };
+                }
+                return s_LightNames;
+            }
+        }
+
+        static string[] s_LightNames;
+        static int s_LightNamesVersion = -1;
 
         /// <summary>0 in the shadows, 1 half-light, 2 noticeable, 3 in the light — from visibility 0..1.</summary>
         public static int LightLevel(float visibility) => visibility < 0.2f ? 0 : visibility < 0.5f ? 1 : visibility < 0.8f ? 2 : 3;

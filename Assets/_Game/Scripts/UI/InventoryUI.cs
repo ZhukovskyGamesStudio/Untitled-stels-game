@@ -37,7 +37,6 @@ namespace Stealth.UI
         public GameObject Header;
         public Image HeaderBackground;
         public Text ValueLabel;
-        public GameObject RotateHint;
         public RectTransform Grid;
         [Tooltip("Pre-built cell backgrounds, one per InventoryLayout cell.")]
         public Image[] Cells;
@@ -72,7 +71,9 @@ namespace Stealth.UI
 
         static PlayerController Me => PlayerController.Local;
         static StashBoard Board => StashBoard.Instance;
-        static TeamStash Stash => GameManager.Instance != null ? GameManager.Instance.Stash : null;
+        /// <summary>The stash of the hatch the local player is at (the entry's or the exit's), null elsewhere.</summary>
+        static TeamStash Stash => GameManager.Instance != null && PlayerController.Local != null
+            ? GameManager.Instance.StashAt(PlayerController.Local.transform.position) : null;
 
         void Awake()
         {
@@ -113,7 +114,7 @@ namespace Stealth.UI
             if (MouseCell(out cell)) return Target.Backpack;
             if (!StashActive(me) || !Board.Visible) return Target.None;
             if (CellIn(Board.Grid, me.Camera, MouseScreen, out cell)) return Target.Stash;
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
+            if (Board.SellZone.gameObject.activeInHierarchy && RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
                 Board.SellZone.rect.Contains(local)) return Target.Sell;
             if (Board.StashAllZone != null &&
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.StashAllZone, MouseScreen, me.Camera, out var all) &&
@@ -155,6 +156,8 @@ namespace Stealth.UI
             bool on = StashActive(me), was = Board.Visible;
             Board.Show(on);
             if (!on) return;
+            // nothing is sold at a hatch: loot is fuel, fed into the car's engine in the sewer
+            if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf) Board.SellZone.gameObject.SetActive(false);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
             {
@@ -237,7 +240,7 @@ namespace Stealth.UI
                 int idx = Stash.IndexAt(cell);
                 if (idx < 0) return;
                 var e = Stash.Items[idx];
-                m_Tooltip = ItemCatalog.Describe(e.Shape, e.Color) + " · на складе команды";
+                m_Tooltip = ItemCatalog.Describe(e.Shape, e.Color);
                 if (!press) return;
                 m_Source = DragSource.Stash;
                 m_DragStashed = e;
@@ -245,11 +248,11 @@ namespace Stealth.UI
             }
             else if (over == Target.Sell)
             {
-                m_Tooltip = "Перетащи сюда — продать на квоту";
+                m_Tooltip = null;
             }
             else if (over == Target.StashAll)
             {
-                m_Tooltip = inv.Items.Count > 0 ? "Сложить всё из рюкзака на склад команды" : "Рюкзак пуст";
+                m_Tooltip = null;
                 if (press) StashAll(PlayerController.Local, inv);
             }
             else if (m_Hover != null)
@@ -419,13 +422,7 @@ namespace Stealth.UI
             Ui.Alpha(HeaderBackground, alpha);
             bool header = m_Expand > 0.5f || inv.Items.Count > 0;
             Ui.Show(Header, header);
-            if (header) ValueLabel.text = $"{inv.TotalValue} очк.";
-            Ui.Show(RotateHint, m_Expand > 0.5f);
-            if (m_Expand > 0.5f && RotateHint.TryGetComponent<Text>(out var rotate))
-            {
-                string rotateText = $"{Controls.Label(GameAction.Rotate)} поворот · {Controls.Label(GameAction.Mirror)} зеркало";
-                if (rotate.text != rotateText) rotate.text = rotateText;
-            }
+            if (header) SetIfChanged(ValueLabel, Loc.F("common.points", inv.TotalValue));
             float cellAlpha = Mathf.Lerp(0.04f, 0.07f, m_Expand);
             foreach (var c in Cells) Ui.Alpha(c, cellAlpha);
 
@@ -462,17 +459,12 @@ namespace Stealth.UI
                 {
                     int ignore = m_Source == DragSource.Stash ? Stash.IndexOf(m_DragStashed) : -1;
                     Highlight(m_StashHighlights, target, Stash.CanPlace(m_DragShape, m_DragRot, target.x, target.y, ignore));
-                    hint = m_Source == DragSource.Stash ? null : "Отпусти — оставить на складе команды";
                 }
                 else if (over == Target.Sell)
                 {
                     overSell = true;
-                    hint = $"Отпусти — продать за {ItemCatalog.Value(m_DragShape, m_DragColor)} очк. на квоту";
+                    hint = Loc.F("inventory.sell_value", ItemCatalog.Value(m_DragShape, m_DragColor));
                 }
-                else if (m_Source == DragSource.Inventory)
-                    hint = "Отпусти — положить";
-                else if (m_Source == DragSource.World)
-                    hint = m_DragTravel < ClickTravel ? null : "Отпусти — в рюкзак · или тащи на нужное место в сетке";
                 Ghost.anchoredPosition = MouseCanvas - new Vector2(m_GrabCell.x * Cell + Cell / 2f, -(m_GrabCell.y * Cell + Cell / 2f));
                 AddShape(m_GhostBlocks, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
             }
@@ -487,14 +479,13 @@ namespace Stealth.UI
                     bool overAll = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.StashAll;
                     bool any = inv.Items.Count > 0;
                     Board.StashAllBackground.color = !any ? new Color(0.3f, 0.75f, 1f, 0.15f) : overAll ? new Color(0.3f, 0.75f, 1f, 0.85f) : new Color(0.3f, 0.75f, 1f, 0.45f);
-                    string label = $"СЛОЖИТЬ ВСЁ НА СКЛАД  [{Controls.Label(GameAction.StashAll)}]";
-                    if (Board.StashAllLabel.text != label) Board.StashAllLabel.text = label;
+                    SetIfChanged(Board.StashAllLabel, Loc.F("stash.all", Controls.Label(GameAction.StashAll)));
                 }
             }
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);
             bool full = Time.time < m_FullUntil;
-            if (full && tip == null) tip = $"Рюкзак полон — освободи место ({Controls.Label(GameAction.Hands)})";
+            if (full && tip == null) tip = Loc.T("inventory.full");
             Ui.Show(Tooltip, tip != null);
             if (tip == null) return;
             Tooltip.text = tip;
@@ -515,7 +506,12 @@ namespace Stealth.UI
                     AddShape(m_StashItems, new Vector2Int(e.X, e.Y), e.Shape, e.Color, e.Rot, 1f);
                 }
             m_StashItems.End();
-            Board.ValueLabel.text = $"Склад команды · {(stash != null ? stash.TotalValue : 0)} очк.";
+            SetIfChanged(Board.ValueLabel, Loc.F("stash.title", stash != null ? stash.TotalValue : 0));
+        }
+
+        static void SetIfChanged(Text t, string text)
+        {
+            if (t.text != text) t.text = text;
         }
 
         /// <summary>Marks the cells the dragged item would take at <paramref name="target"/>: green if it fits.</summary>

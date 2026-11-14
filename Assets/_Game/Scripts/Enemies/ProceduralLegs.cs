@@ -39,6 +39,12 @@ namespace Stealth.Enemies
 
         public Leg[] Legs = Array.Empty<Leg>();
 
+        /// <summary>A foot has landed (the end of its step): the sound director plays the step there.</summary>
+        public static event Action<ProceduralLegs, Vector3> FootDown;
+
+        /// <summary>The robot or device these legs carry.</summary>
+        public Detector Detector { get; private set; }
+
         AnimationSettings m_S = new();
         Vector3 m_LastPos, m_Velocity;
         static readonly RaycastHit[] s_Hits = new RaycastHit[8];
@@ -46,6 +52,7 @@ namespace Stealth.Enemies
         void Awake()
         {
             var detector = GetComponent<Detector>();
+            Detector = detector;
             if (detector != null && detector.ProfileBase != null) m_S = detector.ProfileBase.Animation;
             foreach (var leg in Legs)
             {
@@ -95,6 +102,7 @@ namespace Stealth.Enemies
                     {
                         leg.Stepping = false;
                         leg.Planted = leg.To;
+                        FootDown?.Invoke(this, leg.To);
                     }
                 }
                 else foot = leg.Planted;

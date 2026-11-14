@@ -16,6 +16,33 @@ namespace Stealth.Items
         public MeshFilter MeshFilter;
         public MeshRenderer Renderer;
         public BoxCollider Collider;
+        [Tooltip("The lure speaker's music (plays while it is on).")]
+        public AudioSource Music;
+
+        /// <summary>A lure speaker plays from / until these server times (set by the server, replicated).</summary>
+        public double PlayFrom { get; private set; }
+        public double PlayUntil { get; private set; }
+        public bool IsPlaying => Shape == ItemCatalog.Speaker && Game.Session.ServerTime >= PlayFrom && Game.Session.ServerTime < PlayUntil;
+
+        /// <summary>Server: the speaker starts playing at <paramref name="from"/> for <paramref name="seconds"/>.</summary>
+        public void PlayServer(double from, float seconds)
+        {
+            PlayFrom = from;
+            PlayUntil = from + seconds;
+        }
+
+        /// <summary>Server: a robot switched it off.</summary>
+        public void StopPlayingServer() => PlayUntil = PlayFrom = 0;
+
+        public void ApplyPlaying(double from, double until)
+        {
+            PlayFrom = from;
+            PlayUntil = until;
+        }
+
+        GameObject m_Special;
+        Renderer[] m_Glow;
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         public byte Shape { get; private set; }
         public byte Color { get; private set; }
@@ -51,10 +78,44 @@ namespace Stealth.Items
 
         void Update()
         {
+            UpdateMusic();
             if (m_HiddenUntil < 0f || Time.time < m_HiddenUntil) return;
             m_HiddenUntil = -1f;
             if (Renderer != null) Renderer.enabled = true;
             if (Collider != null) Collider.enabled = true;
+        }
+
+        bool m_Playing;
+
+        /// <summary>The speaker's music and its blinking LED, on every peer from the replicated times.</summary>
+        void UpdateMusic()
+        {
+            bool playing = IsPlaying;
+            if (playing != m_Playing)
+            {
+                m_Playing = playing;
+                if (Music != null)
+                {
+                    if (playing)
+                    {
+                        Music.clip = Audio.Sfx.Bank != null ? Audio.Sfx.Bank.SpeakerMusic : Music.clip;
+                        Music.volume = 0.9f;
+                        if (Music.clip != null) Music.Play();
+                    }
+                    else Music.Stop();
+                }
+            }
+            if (Music != null && playing && Audio.AudioDirector.Instance != null)
+                Music.volume = 0.9f * Audio.AudioDirector.Instance.Muffle(transform.position);
+            if (m_Glow == null) return;
+            m_Block ??= new MaterialPropertyBlock();
+            float pulse = playing ? 1.5f + Mathf.Sin(Time.time * 12f) * 1.2f : 0.15f;
+            foreach (var r in m_Glow)
+            {
+                r.GetPropertyBlock(m_Block);
+                m_Block.SetColor(EmissionId, new UnityEngine.Color(0.3f, 1f, 0.6f) * pulse);
+                r.SetPropertyBlock(m_Block);
+            }
         }
 
         /// <summary>Local-only highlight while the item is under the crosshair / cursor.</summary>
@@ -80,6 +141,18 @@ namespace Stealth.Items
                 Collider.center = b.center;
                 Collider.size = b.size + Vector3.one * 0.12f; // a bit larger: easier to grab with the mouse
             }
+            // a tool with a model of its own: the model instead of the tinted piece
+            var model = Visuals.Models != null && Shape < Visuals.Models.Length ? Visuals.Models[Shape] : null;
+            if (m_Special != null && (model == null || m_Special.name != model.name)) { Destroy(m_Special); m_Special = null; m_Glow = null; }
+            if (model != null && m_Special == null)
+            {
+                m_Special = Instantiate(model, transform);
+                m_Special.name = model.name;
+                var list = new List<Renderer>();
+                foreach (var r in m_Special.GetComponentsInChildren<Renderer>()) if (r.name.StartsWith("Eye")) list.Add(r);
+                m_Glow = list.ToArray();
+            }
+            Renderer.forceRenderingOff = m_Special != null;
             Level.VisualStyles.Dress(gameObject); // the item's model in the current visual style
         }
     }

@@ -19,7 +19,7 @@ namespace Stealth.EditorTools
 {
     public static partial class AssetBuilder
     {
-        static void BuildSceneAndSession(LevelArt art, Actors actors, UiPrefabs ui)
+        static void BuildSceneAndSession(LevelArt art, Actors actors, UiPrefabs ui, GameObject car)
         {
             var session = Prefab(PrefabsDir + "/Network/Session.prefab", () =>
             {
@@ -31,10 +31,20 @@ namespace Stealth.EditorTools
                 gm.ItemPrefab = actors.Item;
                 gm.RobotPrefabs = actors.Robots.ToArray();
                 gm.LaserPrefab = actors.Laser;
+                gm.CarPrefab = car;
                 return root;
             });
+            // fields newer than the prefab: filled without rebuilding it
+            var game = session.GetComponent<GameManager>();
+            if (game.CarPrefab != car || game.RobotPrefabs == null || game.RobotPrefabs.Length != actors.Robots.Length)
+            {
+                game.CarPrefab = car;
+                game.RobotPrefabs = actors.Robots.ToArray();
+                EditorUtility.SetDirty(session);
+                PrefabUtility.SavePrefabAsset(session);
+            }
 
-            var networkPrefabs = new List<GameObject> { actors.Player, actors.Item, actors.Laser, session };
+            var networkPrefabs = new List<GameObject> { actors.Player, actors.Item, actors.Laser, session, car };
             networkPrefabs.AddRange(actors.Robots.Where(r => r != null));
             FixNetworkHashes(networkPrefabs);
             var list = DataAsset<NetworkPrefabsList>(DataDir + "/NetworkPrefabs.asset", l =>

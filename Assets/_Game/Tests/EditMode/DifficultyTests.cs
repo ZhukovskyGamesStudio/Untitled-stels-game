@@ -33,7 +33,11 @@ namespace Stealth.Tests
                 {
                     var l = LevelGenerator.Generate(seed, level);
                     foreach (var r in l.RobotSpawns)
-                        if (r.Floor == 0) Assert.Greater(Vector3.Distance(r.Position, l.HatchPosition), 12f, $"seed {seed} level {level}");
+                        if (r.Floor == 0)
+                        {
+                            Assert.Greater(Vector3.Distance(r.Position, l.HatchPosition), 12f, $"seed {seed} level {level}");
+                            if (r.Kind == RobotKind.Warden) Assert.Greater(Vector3.Distance(r.Position, l.ExitHatchPosition), 8f, $"a warden at the exit, seed {seed} level {level}");
+                        }
                     foreach (var c in l.CameraSpots)
                         if (LevelLayout.FloorOf(c.position.y) == 0)
                             Assert.Greater(Vector3.Distance(c.position, l.HatchPosition), 8f, $"camera too close to the hatch, seed {seed}");

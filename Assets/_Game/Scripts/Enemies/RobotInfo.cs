@@ -2,49 +2,20 @@ using Stealth.Level;
 
 namespace Stealth.Enemies
 {
-    /// <summary>What players learn by looking at a robot: its name and how it senses (shown under the crosshair).</summary>
+    /// <summary>
+    /// What players learn by looking at a robot: its name and how it senses (shown under the crosshair). The texts are the
+    /// table's <c>robot.&lt;kind&gt;.name</c> / <c>.senses</c> (<see cref="Key"/>).
+    /// </summary>
     public static class RobotInfo
     {
-        public static string Name(RobotKind k) => k switch
-        {
-            RobotKind.Guard => "Охранник",
-            RobotKind.Listener => "Слухач",
-            RobotKind.Drone => "Дрон",
-            RobotKind.Spider => "Паук",
-            RobotKind.Vacuum => "Пылесос",
-            RobotKind.Turret => "Турель",
-            RobotKind.Thumper => "Сейсмик",
-            RobotKind.Hound => "Ищейка",
-            RobotKind.Sorter => "Сортировщик",
-            RobotKind.Worker => "Рабочий",
-            RobotKind.Hunter => "Охотник",
-            RobotKind.Lidar => "Лидар",
-            RobotKind.MotionSensor => "Датчик движения",
-            RobotKind.PressurePlate => "Нажимная плита",
-            RobotKind.Camera => "Камера",
-            RobotKind.Sweeper => "Подметальщик",
-            _ => "Робот",
-        };
+        /// <summary>The table key prefix of a kind: "robot.guard"; <c>robot.unknown</c> for a kind without texts.</summary>
+        public static string Key(RobotKind k) => "robot." + k.ToString().ToLowerInvariant();
 
-        public static string Senses(RobotKind k) => k switch
-        {
-            RobotKind.Guard => "глаза · глухой · ходит по лестницам",
-            RobotKind.Listener => "слепой · микрофоны · колёса, свой этаж",
-            RobotKind.Drone => "камера сверху · тревога · летает",
-            RobotKind.Spider => "глаза · ползает по стенам и потолку, прыгает · не покидает комнату",
-            RobotKind.Vacuum => "лазерный веер с потолка до пола · тревога · не попадай под него",
-            RobotKind.Turret => "глаза · стреляет после прицеливания",
-            RobotKind.Thumper => "бьёт в пол — волна идёт сквозь стены · замри, пока проходит",
-            RobotKind.Hound => "идёт по запаху · ходит по лестницам",
-            RobotKind.Sorter => "видит только лут своего цвета",
-            RobotKind.Worker => "не дерётся · доносит (тревога) · может везти лут — взломай",
-            RobotKind.Hunter => "все датчики · быстрый",
-            RobotKind.Lidar => "луч у пола · перепрыгни",
-            RobotKind.MotionSensor => "видит любое движение · замри",
-            RobotKind.PressurePlate => "не наступай · перепрыгни",
-            RobotKind.Camera => "обзор · поднимает тревогу",
-            RobotKind.Sweeper => "лидар у самого пола · встань на стул или стол",
-            _ => "",
-        };
+        /// <summary>The table key of the kind's name (for texts packed with an "@" argument).</summary>
+        public static string NameKey(RobotKind k) => Loc.Has(Key(k) + ".name") ? Key(k) + ".name" : "robot.unknown.name";
+
+        public static string Name(RobotKind k) => Loc.T(NameKey(k));
+
+        public static string Senses(RobotKind k) => Loc.Has(Key(k) + ".senses") ? Loc.T(Key(k) + ".senses") : "";
     }
 }

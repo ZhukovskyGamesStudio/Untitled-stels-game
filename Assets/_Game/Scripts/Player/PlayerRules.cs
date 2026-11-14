@@ -76,6 +76,12 @@ namespace Stealth.Player
             DownedAt = now;
         }
 
+        /// <summary>The med table: up to <paramref name="hp"/> points (more than the usual maximum); not while lying.</summary>
+        public void Heal(int hp)
+        {
+            if (!Downed) Hp = Mathf.Max(Hp, hp);
+        }
+
         public void Revive(float now)
         {
             Downed = false;
@@ -212,5 +218,13 @@ namespace Stealth.Player
         /// <summary>Landing noise: a normal jump (~4 m/s) is audible nearby, falling from a floor above is loud.</summary>
         public static float LandingRadius(float impactSpeed) =>
             impactSpeed < 3.5f ? 0f : Mathf.Lerp(4f, 14f, Mathf.InverseLerp(3.5f, 10f, impactSpeed));
+    }
+
+    /// <summary>Small rules of the player's body (pure, unit tested).</summary>
+    public static class PlayerRules
+    {
+        /// <summary>How far (degrees) a leg swings forward and back at this speed: wider when running, short crouched.</summary>
+        public static float LegSwing(float speed, bool crouching) =>
+            (crouching ? 0.6f : 1f) * Mathf.Lerp(14f, 34f, Mathf.InverseLerp(1.5f, 6f, speed));
     }
 }

@@ -33,7 +33,8 @@ namespace Stealth.Player
 
         public static readonly Color Dark = new(0.06f, 0.06f, 0.07f);
 
-        public static readonly string[] DepartmentNames = { "Бэкенд", "Тестирование", "Сисадмины", "Дизайн" };
+        /// <summary>The departments' names for the player (table <c>department.&lt;n&gt;</c>, by <see cref="Department"/>).</summary>
+        public static string[] DepartmentNames => new[] { Loc.T("department.0"), Loc.T("department.1"), Loc.T("department.2"), Loc.T("department.3") };
 
         public static int SlotOf(ulong clientId) => (int)(clientId % Slots);
 

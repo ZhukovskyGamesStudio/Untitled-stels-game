@@ -63,7 +63,7 @@ namespace Stealth.Net
             UsingSteam = true;
             Manager.NetworkConfig.NetworkTransport = SteamTransport;
             if (Manager.StartHost()) OnHostStarted();
-            else SetStatus("Не удалось запустить хост через Steam");
+            else SetStatus(Loc.T("net.host_steam_failed"));
         }
 
         public void StartClientSteam(ulong hostSteamId)
@@ -71,8 +71,8 @@ namespace Stealth.Net
             UsingSteam = true;
             SteamTransport.ConnectToSteamId = hostSteamId;
             Manager.NetworkConfig.NetworkTransport = SteamTransport;
-            SetStatus("Подключаемся к хосту через Steam…");
-            if (!Manager.StartClient()) SetStatus("Не удалось подключиться через Steam");
+            SetStatus(Loc.T("net.connecting_steam"));
+            if (!Manager.StartClient()) SetStatus(Loc.T("net.connect_failed"));
         }
 
         public void StartHostLocal()
@@ -81,7 +81,7 @@ namespace Stealth.Net
             LocalTransport.SetConnectionData("127.0.0.1", LocalPort, "0.0.0.0");
             Manager.NetworkConfig.NetworkTransport = LocalTransport;
             if (Manager.StartHost()) OnHostStarted();
-            else SetStatus($"Не удалось открыть порт {LocalPort}");
+            else SetStatus(Loc.F("net.port_failed", LocalPort));
         }
 
         public void StartClientLocal(string address)
@@ -89,8 +89,8 @@ namespace Stealth.Net
             UsingSteam = false;
             LocalTransport.SetConnectionData(string.IsNullOrWhiteSpace(address) ? "127.0.0.1" : address.Trim(), LocalPort);
             Manager.NetworkConfig.NetworkTransport = LocalTransport;
-            SetStatus($"Подключаемся к {address}:{LocalPort}…");
-            if (!Manager.StartClient()) SetStatus("Не удалось подключиться");
+            SetStatus(Loc.F("net.connecting", address, LocalPort));
+            if (!Manager.StartClient()) SetStatus(Loc.T("net.connect_failed"));
         }
 
         void OnHostStarted()
@@ -114,7 +114,7 @@ namespace Stealth.Net
         {
             if (Manager.IsServer || clientId != Manager.LocalClientId) return;
             // We were disconnected from the host.
-            SetStatus(string.IsNullOrEmpty(Manager.DisconnectReason) ? "Соединение с хостом потеряно" : Manager.DisconnectReason);
+            SetStatus(string.IsNullOrEmpty(Manager.DisconnectReason) ? Loc.T("net.lost") : Manager.DisconnectReason);
             Leave();
         }
 
@@ -133,7 +133,7 @@ namespace Stealth.Net
         ushort ISessionLauncher.LocalPort => LocalPort;
         bool ISessionLauncher.IsHost => Manager.IsHost;
         bool ISessionLauncher.SteamAvailable => SteamManager.Initialized;
-        string ISessionLauncher.SteamStatus => SteamManager.Initialized ? "подключён как " + SteamManager.PersonaName : "недоступен — " + SteamManager.Error;
+        string ISessionLauncher.SteamStatus => SteamManager.Initialized ? Loc.F("net.steam_on", SteamManager.PersonaName) : Loc.F("net.steam_off", SteamManager.Error);
         string ISessionLauncher.LocalPlayerName => SteamManager.Initialized ? SteamManager.PersonaName : null;
         bool ISessionLauncher.CanInviteFriends => UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby;
 

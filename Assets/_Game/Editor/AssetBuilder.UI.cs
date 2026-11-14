@@ -117,7 +117,7 @@ namespace Stealth.EditorTools
         {
             var t = rt.gameObject.AddComponent<Text>();
             t.font = UiFont;
-            t.text = text;
+            SetText(t, text);
             t.fontSize = size;
             t.alignment = anchor;
             t.color = color;
@@ -132,6 +132,24 @@ namespace Stealth.EditorTools
                 s.effectDistance = new Vector2(1, -1);
             }
             return t;
+        }
+
+        const char KeyMark = '\u0001';
+
+        /// <summary>A fixed label from the string table: pass <c>L(key)</c> wherever a helper takes a text (it gets a <see cref="LocText"/>).</summary>
+        static string L(string key) => KeyMark + key;
+
+        /// <summary>Set a prefab label: a plain text as it is, an <see cref="L"/> key as its Russian text plus a <see cref="LocText"/> that follows the language.</summary>
+        static void SetText(Text t, string text)
+        {
+            if (!string.IsNullOrEmpty(text) && text[0] == KeyMark)
+            {
+                string key = text.Substring(1);
+                t.text = Loc.T(key, Language.Ru);
+                var lt = t.GetComponent<LocText>() ?? t.gameObject.AddComponent<LocText>();
+                lt.Key = key;
+            }
+            else t.text = text;
         }
 
         static GameObject CanvasRoot(string name, int order, bool raycasts)
@@ -182,7 +200,7 @@ namespace Stealth.EditorTools
         static Button ButtonIn(UiElements e, Transform parent, string name, string label, float height)
         {
             var b = Instance<Button>(e.Button, parent, name);
-            b.GetComponentInChildren<Text>().text = label;
+            SetText(b.GetComponentInChildren<Text>(), label);
             Fixed(b, height);
             return b;
         }
@@ -281,9 +299,9 @@ namespace Stealth.EditorTools
                 Img(root, new Color(1, 1, 1, 0.06f));
                 Fixed(root.GetComponent<Image>(), 34);
                 var view = root.gameObject.AddComponent<FriendLobbyRowView>();
-                view.Label = Txt(R(root, "Label", Left, Left, new Vector2(10, 0), new Vector2(200, 30)), "Друг · 1/4", 14, TextAnchor.MiddleLeft, Color.white);
+                view.Label = Txt(R(root, "Label", Left, Left, new Vector2(10, 0), new Vector2(200, 30)), "— · 1/4", 14, TextAnchor.MiddleLeft, Color.white);
                 view.Join = Instance<Button>(e.Button, root, "Join");
-                view.Join.GetComponentInChildren<Text>().text = "Войти";
+                SetText(view.Join.GetComponentInChildren<Text>(), L("friends.join"));
                 var jrt = (RectTransform)view.Join.transform;
                 jrt.anchorMin = jrt.anchorMax = jrt.pivot = new Vector2(1, 0.5f);
                 jrt.anchoredPosition = new Vector2(-4, 0);
@@ -293,7 +311,7 @@ namespace Stealth.EditorTools
 
             e.TeamRow = Prefab(ElementsDir + "/TeamRow.prefab", () =>
             {
-                var t = Txt(R(null, "TeamRow", TopRight, TopRight, Vector2.zero, new Vector2(244, 18)), "Игрок  ■■", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.8f));
+                var t = Txt(R(null, "TeamRow", TopRight, TopRight, Vector2.zero, new Vector2(244, 18)), "P1  ■■", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.8f));
                 Fixed(t, 18);
                 return t.gameObject;
             }).GetComponent<Text>();
@@ -310,7 +328,7 @@ namespace Stealth.EditorTools
                     Img(R(cross, "Vertical", Center, Center, Vector2.zero, new Vector2(6, 20)), Color.red),
                     Img(R(cross, "Horizontal", Center, Center, Vector2.zero, new Vector2(20, 6)), Color.red),
                 };
-                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -21), new Vector2(160, 18)), "Игрок", 12, TextAnchor.MiddleCenter, Color.white);
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -21), new Vector2(160, 18)), "P1", 12, TextAnchor.MiddleCenter, Color.white);
                 return root.gameObject;
             }).GetComponent<TeamMarkerView>();
 
@@ -333,7 +351,7 @@ namespace Stealth.EditorTools
                 var root = R(null, "ControlRow", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 24));
                 Fixed(root, 24);
                 var view = root.gameObject.AddComponent<ControlRowView>();
-                view.Title = Txt(R(root, "Title", Left, Left, new Vector2(2, 0), new Vector2(220, 24)), "Действие", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.9f));
+                view.Title = Txt(R(root, "Title", Left, Left, new Vector2(2, 0), new Vector2(220, 24)), "—", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.9f));
                 view.Title.horizontalOverflow = HorizontalWrapMode.Wrap;
                 view.Title.resizeTextForBestFit = true;
                 view.Title.resizeTextMinSize = 10;
@@ -376,7 +394,7 @@ namespace Stealth.EditorTools
                 var diamond = R(root, "Diamond", Center, Center, Vector2.zero, new Vector2(9, 9));
                 diamond.localEulerAngles = new Vector3(0, 0, 45);
                 view.Diamond = Img(diamond, Color.white);
-                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -14), new Vector2(160, 16)), "Игрок", 11, TextAnchor.MiddleCenter, Color.white);
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -14), new Vector2(160, 16)), "P1", 11, TextAnchor.MiddleCenter, Color.white);
                 return root.gameObject;
             }).GetComponent<MapIconView>();
 
@@ -390,7 +408,7 @@ namespace Stealth.EditorTools
                 view.Diamond = Img(diamond, Color.white);
                 Img(R(diamond, "Hole", Center, Center, Vector2.zero, new Vector2(5, 5)), new Color(0, 0, 0, 0.55f));
                 view.Ring = Img(R(root, "Ring", Center, Center, Vector2.zero, new Vector2(30, 30)), Color.white, S("Ring"));
-                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, 17), new Vector2(220, 18)), "12 м", 12, TextAnchor.MiddleCenter, Color.white, true);
+                view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, 17), new Vector2(220, 18)), "12", 12, TextAnchor.MiddleCenter, Color.white, true);
                 return root.gameObject;
             }).GetComponent<CalloutMarkerView>();
 
@@ -410,14 +428,14 @@ namespace Stealth.EditorTools
                 view.Group = go.AddComponent<CanvasGroup>();
                 view.Frame = Img(Stretch(go.transform, "Frame"), new Color(1f, 1f, 1f, 0.35f));
                 Img(Stretch(view.Frame.rectTransform, "Back", 2f), new Color(0.02f, 0.025f, 0.03f, 0.88f));
-                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(12, -6), new Vector2(w - 24, 30)), "Офис · дом 1", 26, TextAnchor.MiddleLeft, Color.white, true);
+                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(12, -6), new Vector2(w - 24, 30)), "—", 26, TextAnchor.MiddleLeft, Color.white, true);
                 view.Title.rectTransform.sizeDelta = new Vector2(w - 24, 36);
                 Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(12, -44), new Vector2(w - 24, 2)), new Color(1f, 1f, 1f, 0.3f));
-                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(12, -50), new Vector2(w - 24, 60)), "3 этажа", 15, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
+                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(12, -50), new Vector2(w - 24, 60)), "—", 15, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
                 view.Body.resizeTextForBestFit = true;
                 view.Body.resizeTextMinSize = 11;
                 view.Body.resizeTextMaxSize = 15;
-                view.Votes = Txt(R(go.transform, "Votes", BottomLeft, BottomLeft, new Vector2(12, 6), new Vector2(w - 24, 26)), "Зайди в туннель", 16, TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.6f), true);
+                view.Votes = Txt(R(go.transform, "Votes", BottomLeft, BottomLeft, new Vector2(12, 6), new Vector2(w - 24, 26)), "", 16, TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.6f), true);
                 SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
                 return go;
             }).GetComponent<RouteSignView>();
@@ -430,155 +448,11 @@ namespace Stealth.EditorTools
 
             e.ControlGroup = Prefab(ElementsDir + "/ControlGroup.prefab", () =>
             {
-                var t = Txt(R(null, "ControlGroup", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 26)), "Группа", 15, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.45f), true);
+                var t = Txt(R(null, "ControlGroup", TopLeft, TopLeft, Vector2.zero, new Vector2(330, 26)), "—", 15, TextAnchor.LowerLeft, new Color(1f, 0.85f, 0.45f), true);
                 Fixed(t, 28);
                 return t.gameObject;
             }).GetComponent<Text>();
             return e;
-        }
-
-        // ------------------------------------------------------------------ HUD
-
-        const float MinimapSize = 210f;
-
-        static GameObject BuildHud(UiElements e)
-        {
-            var root = CanvasRoot("HUD", 0, false);
-            var hud = root.AddComponent<GameHUD>();
-            hud.Canvas = (RectTransform)root.transform;
-            var content = Stretch(root.transform, "Content");
-            hud.Content = content.gameObject;
-            var white = new Color(1, 1, 1, 0.8f);
-
-            // Overlays (full screen, hidden until needed).
-            var overlays = Stretch(content, "Overlays");
-            hud.LowHpVignette = Img(Stretch(overlays, "LowHpVignette"), new Color(0.8f, 0, 0, 0.35f), S("Vignette"));
-            hud.HitFlash = Img(Stretch(overlays, "HitFlash"), new Color(1, 0, 0, 0.2f));
-            hud.GasVignette = Img(Stretch(overlays, "GasVignette"), new Color(0.4f, 0.95f, 0.3f, 0.5f), S("Vignette"));
-            hud.GasTint = Img(Stretch(overlays, "GasTint"), new Color(0.5f, 0.9f, 0.3f, 0.1f));
-            hud.LaughText = Txt(R(overlays, "Laugh", TopCenter, TopCenter, new Vector2(0, -216), new Vector2(400, 50)), "ХА-ХА-ХА-ХА", 30, TextAnchor.MiddleCenter, new Color(0.8f, 1f, 0.6f, 0.9f), true);
-            hud.GasText = Txt(R(overlays, "GasTimer", TopCenter, TopCenter, new Vector2(0, -260), new Vector2(400, 24)), "Весёлый газ", 15, TextAnchor.MiddleCenter, Color.white);
-            hud.DownedTint = Img(Stretch(overlays, "DownedTint"), new Color(0.25f, 0f, 0f, 0.55f));
-            hud.DownedText = Txt(R(overlays, "Downed", TopCenter, TopCenter, new Vector2(0, -240), new Vector2(900, 100)),
-                "Ты выведен из строя\nСоюзник может поднять тебя (удерживать E рядом)", 22, TextAnchor.MiddleCenter, Color.white, true);
-            // In the hatch: peeking out at floor level, the rim of the hatch dark around the view.
-            hud.HatchTint = Img(Stretch(overlays, "HatchTint"), new Color(0f, 0f, 0f, 1f), S("Vignette"));
-            hud.HatchText = Txt(R(overlays, "HatchText", TopCenter, TopCenter, new Vector2(0, -150), new Vector2(900, 84)),
-                "Ты в люке", 18, TextAnchor.MiddleCenter, Color.white, true);
-            hud.HatchStatus = Txt(R(overlays, "HatchStatus", TopCenter, TopCenter, new Vector2(0, -160), new Vector2(900, 24)),
-                "В люке ждут", 15, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.65f), true);
-            hud.RouteCountdown = Txt(R(overlays, "RouteCountdown", Center, Center, new Vector2(0, 120), new Vector2(700, 130)),
-                "Путь выбран — выходим через\n5", 22, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.7f), true);
-            hud.RouteCountdown.supportRichText = true;
-            var alarm = Stretch(overlays, "Alarm");
-            hud.AlarmFrame = alarm.gameObject;
-            var red = new Color(1f, 0.15f, 0.1f, 0.5f);
-            hud.AlarmEdges = new[]
-            {
-                Img(R(alarm, "Top", TopCenter, TopCenter, Vector2.zero, new Vector2(4000, 4)), red),
-                Img(R(alarm, "Bottom", BottomCenter, BottomCenter, Vector2.zero, new Vector2(4000, 4)), red),
-                Img(R(alarm, "Left", Left, Left, Vector2.zero, new Vector2(4, 4000)), red),
-                Img(R(alarm, "Right", new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(4, 4000)), red),
-            };
-            var tag = R(alarm, "Tag", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(140, 24));
-            Img(tag, new Color(0.5f, 0f, 0f, 0.6f));
-            hud.AlarmLabel = Txt(Stretch(tag, "Label"), "ТРЕВОГА · 6 c", 14, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.8f), true);
-
-            // Around the crosshair.
-            hud.ArcLayer = R(content, "Arcs", Center, Center, Vector2.zero, Vector2.zero);
-            hud.ArcPrefab = e.Arc;
-            hud.HitArc = Instance<ArcView>(e.Arc.gameObject, hud.ArcLayer, "HitArc");
-            var dot = R(content, "CrosshairDot", Center, Center, Vector2.zero, new Vector2(4, 4));
-            Img(dot, white);
-            hud.CrosshairDot = dot.gameObject;
-            var brackets = R(content, "CrosshairBrackets", Center, Center, Vector2.zero, new Vector2(22, 22));
-            hud.CrosshairBrackets = brackets.gameObject;
-            const float r = 11f, l = 6f, t = 2f;
-            foreach (var (sx, sy) in new[] { (-1, 1), (1, 1), (-1, -1), (1, -1) })
-            {
-                var corner = new Vector2(sx * r, sy * r);
-                var piv = new Vector2(sx < 0 ? 0 : 1, sy > 0 ? 1 : 0);
-                Img(R(brackets, "H", Center, piv, corner, new Vector2(l, t)), new Color(1, 1, 1, 0.95f));
-                Img(R(brackets, "V", Center, piv, corner, new Vector2(t, l)), new Color(1, 1, 1, 0.95f));
-            }
-            hud.Stamina = Bar(content, "Stamina", Center, TopCenter, new Vector2(0, -34), new Vector2(120, 6), new Color(0, 0, 0, 0.45f), white, 0f);
-            hud.Prompt = BuildPrompt(content);
-
-            // World markers.
-            hud.IconLayer = Stretch(content, "RobotIcons");
-            hud.SuspicionPrefab = e.SuspicionMarker;
-            hud.MarkerLayer = Stretch(content, "TeamMarkers");
-            hud.TeamMarkerPrefab = e.TeamMarker;
-            hud.CalloutLayer = Stretch(content, "Callouts");
-            hud.CalloutPrefab = e.Callout;
-            hud.HatchMarker = R(content, "HatchMarker", BottomLeft, Center, new Vector2(640, 360), Vector2.zero);
-            var diamond = R(hud.HatchMarker, "Diamond", Center, Center, Vector2.zero, new Vector2(14, 14));
-            diamond.localEulerAngles = new Vector3(0, 0, 45);
-            hud.HatchDiamond = Img(diamond, new Color(0.45f, 1f, 0.5f, 0.8f));
-            hud.HatchLabel = Txt(R(hud.HatchMarker, "Label", Center, Center, new Vector2(0, -19), new Vector2(120, 18)), "люк · 12 м", 12, TextAnchor.MiddleCenter, new Color(0.45f, 1f, 0.5f));
-
-            // Bottom left: health, and above it how lit (= how visible) and how loud you are.
-            var lightRow = R(content, "Visibility", BottomLeft, BottomLeft, new Vector2(18, 86), new Vector2(200, 18));
-            hud.LightBar = Bar(lightRow, "Bar", BottomLeft, BottomLeft, new Vector2(0, 5), new Vector2(46, 7), new Color(0, 0, 0, 0.55f), Color.white, 1f);
-            hud.LightLabel = Txt(R(lightRow, "Label", BottomLeft, BottomLeft, new Vector2(54, -1), new Vector2(150, 18)), "в тени", 12, TextAnchor.MiddleLeft, Color.white, true);
-
-            var noise = R(content, "Noise", BottomLeft, BottomLeft, new Vector2(18, 64), new Vector2(160, 18));
-            hud.NoiseGroup = noise.gameObject.AddComponent<CanvasGroup>();
-            hud.NoiseGroup.blocksRaycasts = false;
-            hud.NoiseBars = Enumerable.Range(0, 3)
-                .Select(i => Img(R(noise, $"Bar{i}", BottomLeft, BottomLeft, new Vector2(i * 9f, 0), new Vector2(6, 6 + i * 5)), Color.white)).ToArray();
-            hud.NoiseLabel = Txt(R(noise, "Label", BottomLeft, BottomLeft, new Vector2(32, -2), new Vector2(120, 18)), "слышно", 12, TextAnchor.MiddleLeft, Color.white);
-
-            // Quota panel, top left.
-            // The house's name on its own line (the floor is under the minimap), the quota under it.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 80));
-            Img(quota, PanelColor);
-            hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(280, 22)), "Офис ООО «Рога и Копыта»", 14, TextAnchor.MiddleLeft, Color.white, true);
-            hud.HouseLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
-            Txt(R(quota, "QuotaCaption", TopLeft, TopLeft, new Vector2(10, -22), new Vector2(140, 20)), "квота", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.6f));
-            hud.QuotaLabel = Txt(R(quota, "Count", TopLeft, TopLeft, new Vector2(10, -22), new Vector2(280, 20)), "0 / 100", 14, TextAnchor.MiddleRight, Color.white, true);
-            hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 10), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
-            hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(GameHUD.GainX, GameHUD.GainY), new Vector2(120, 26));
-            hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
-            hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 200), new Vector2(900, 52)), "Камера · 1 / 3", 16, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
-            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -56), new Vector2(280, 20)), "Охотник через 6:00 или после 3 тревог", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
-            hud.QuotaHint = Txt(R(quota, "Hint", TopLeft, TopLeft, new Vector2(10, -84), new Vector2(400, 20)), "Квота набрана — к люку, F: следующий дом", 12, TextAnchor.MiddleLeft, new Color(0.6f, 1f, 0.65f, 0.9f));
-
-            // Health, bottom left (light and noise above it); the team list top right under the minimap.
-            var hp = R(content, "Health", BottomLeft, BottomLeft, new Vector2(16, 16), new Vector2(180, 40));
-            Img(hp, new Color(0, 0, 0, 0.55f));
-            Txt(R(hp, "Caption", TopLeft, TopLeft, new Vector2(12, 0), new Vector2(60, 40)), "ХП", 15, TextAnchor.MiddleLeft, Color.white, true);
-            hud.HpPips = Enumerable.Range(0, Stealth.Player.HealthState.MaxHp)
-                .Select(i => Img(R(hp, $"Pip{i}", TopLeft, TopLeft, new Vector2(56 + i * 54, -10), new Vector2(46, 20)), new Color(0.9f, 0.2f, 0.2f))).ToArray();
-            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -16 - MinimapSize - 8), new Vector2(244, 0));
-            var team = hud.TeamList.gameObject.AddComponent<VerticalLayoutGroup>();
-            team.childControlHeight = true;
-            team.childControlWidth = true;
-            team.childForceExpandHeight = false;
-            team.childAlignment = TextAnchor.UpperRight;
-            hud.TeamRowPrefab = e.TeamRow;
-
-            // Banner, run over, help.
-            hud.BannerRect = R(content, "Banner", TopCenter, TopCenter, new Vector2(0, -115), new Vector2(640, 40));
-            hud.Banner = hud.BannerRect.gameObject.AddComponent<CanvasGroup>();
-            hud.Banner.blocksRaycasts = false;
-            Img(hud.BannerRect, new Color(0, 0, 0, 0.5f));
-            hud.BannerLabel = Txt(Stretch(hud.BannerRect, "Label"), "Сообщение", 16, TextAnchor.MiddleCenter, Color.white, true);
-
-            var over = R(content, "RunOver", TopCenter, TopCenter, new Vector2(0, -274), new Vector2(520, 120));
-            Img(over, new Color(0, 0, 0, 0.8f));
-            Txt(R(over, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(520, 40)), "Забег окончен", 26, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.35f), true);
-            hud.RunOverTotal = Txt(R(over, "Total", TopCenter, TopCenter, new Vector2(0, -56), new Vector2(520, 24)), "Сдано за забег: 0 очк.", 16, TextAnchor.MiddleCenter, Color.white);
-            hud.RunOverRestart = Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R — начать новый забег", 15, TextAnchor.MiddleCenter, Color.white);
-            hud.RunOver = over.gameObject;
-
-            // The minimap (top right, turns with the view) and the big map (M, the whole floor, north-up).
-            hud.Minimap = BuildMap(e, content, "Minimap", true, TopRight, TopRight, new Vector2(-16, -16), new Vector2(MinimapSize, MinimapSize), 4.5f);
-            hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
-            hud.BigMap.gameObject.SetActive(false);
-            BuildSafeCrack(e, content);
-            BuildCheatPanel(e, content);
-            return root;
         }
 
         /// <summary>The F4 cheat panel: its own canvas with a raycaster (the HUD takes no clicks), hidden until opened.</summary>
@@ -592,13 +466,13 @@ namespace Stealth.EditorTools
             Img(root, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
             panel.Root = root.gameObject;
             var col = Column(root, "Column", new Vector2(0, -14), 380, 8f);
-            ColumnText(col, "Title", "ЧИТЫ (F4)", 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
-            panel.KillRobots = ButtonIn(e, col, "KillRobots", "Выключить всех роботов", 36);
-            panel.Invulnerable = ButtonIn(e, col, "Invulnerable", "Неуязвимость: выкл", 36);
-            panel.Invisible = ButtonIn(e, col, "Invisible", "Невидимость для роботов: выкл", 36);
-            panel.Quota = ButtonIn(e, col, "Quota", "Выполнить квоту дома", 36);
-            panel.ToHatch = ButtonIn(e, col, "ToHatch", "Телепорт к люку", 36);
-            panel.RevealMap = ButtonIn(e, col, "RevealMap", "Открыть всю карту", 36);
+            ColumnText(col, "Title", L("cheats.title"), 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
+            panel.KillRobots = ButtonIn(e, col, "KillRobots", L("cheats.kill_robots"), 36);
+            panel.Invulnerable = ButtonIn(e, col, "Invulnerable", "", 36);
+            panel.Invisible = ButtonIn(e, col, "Invisible", "", 36);
+            panel.Quota = ButtonIn(e, col, "Quota", L("cheats.quota"), 36);
+            panel.ToHatch = ButtonIn(e, col, "ToHatch", L("cheats.to_hatch"), 36);
+            panel.RevealMap = ButtonIn(e, col, "RevealMap", L("cheats.reveal_map"), 36);
             root.gameObject.SetActive(false);
         }
 
@@ -621,8 +495,7 @@ namespace Stealth.EditorTools
             var back = Img(Stretch(root, "Back", 1.5f), new Color(0.035f, 0.04f, 0.05f, 0.96f), S("RoundPanel"));
             back.type = Image.Type.Sliced;
 
-            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(400, 26)), "С Е Й Ф", 17, TextAnchor.MiddleCenter, gold, true);
-            Txt(R(root, "Subtitle", TopCenter, TopCenter, new Vector2(0, -38), new Vector2(400, 20)), "подбери код на слух", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.5f));
+            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(400, 26)), L("safe.title"), 17, TextAnchor.MiddleCenter, gold, true);
 
             // Code windows.
             view.Slots = new Image[3];
@@ -657,7 +530,6 @@ namespace Stealth.EditorTools
             Img(R(face, "PointerLine", Center, Center, new Vector2(0, 128), new Vector2(2, 18)), gold);
 
             // Stethoscope: bars rising towards the right number.
-            Txt(R(root, "ListenCaption", BottomCenter, BottomCenter, new Vector2(0, 98), new Vector2(400, 18)), "стетоскоп", 11, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.45f));
             view.Bars = new Image[16];
             for (int i = 0; i < 16; i++)
             {
@@ -666,9 +538,7 @@ namespace Stealth.EditorTools
                 view.Bars[i].rectTransform.pivot = new Vector2(0.5f, 0f);
             }
 
-            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 30), new Vector2(420, 22)), "Мышь — крутить", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
-            Txt(R(root, "Warning", BottomCenter, BottomCenter, new Vector2(0, 10), new Vector2(420, 18)), "неверное число громко лязгает — роботы услышат", 11,
-                TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.45f, 0.75f));
+            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 20), new Vector2(420, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
             root.gameObject.SetActive(false);
         }
 
@@ -696,8 +566,8 @@ namespace Stealth.EditorTools
             view.RectPrefab = e.MapRect;
             view.IconPrefab = e.MapIcon;
             view.Caption = follow
-                ? Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(6, -2), new Vector2(120, 18)), "этаж 1", 11, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f))
-                : Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(12, -2), new Vector2(size.x - 24, 30)), "Этаж 1", 15, TextAnchor.MiddleLeft, Color.white, true);
+                ? Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(6, -2), new Vector2(120, 18)), "1", 11, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f))
+                : Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(12, -2), new Vector2(size.x - 24, 30)), "1", 15, TextAnchor.MiddleLeft, Color.white, true);
             return view;
         }
 
@@ -712,49 +582,6 @@ namespace Stealth.EditorTools
             var view = rt.gameObject.AddComponent<BarView>();
             view.Fill = f;
             view.FillImage = Img(f, fill);
-            return view;
-        }
-
-        /// <summary>The pill under the crosshair: auto-sized by layout groups to the key and the text.</summary>
-        static PromptView BuildPrompt(Transform parent)
-        {
-            var pill = R(parent, "Prompt", Center, TopCenter, new Vector2(0, -52), new Vector2(200, 30));
-            Img(pill, new Color(0, 0, 0, 0.5f));
-            var h = pill.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.padding = new RectOffset(8, 8, 4, 4);
-            h.spacing = 8;
-            h.childAlignment = TextAnchor.MiddleCenter;
-            h.childControlWidth = h.childControlHeight = true;
-            h.childForceExpandWidth = h.childForceExpandHeight = false;
-            var fit = pill.gameObject.AddComponent<ContentSizeFitter>();
-            fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var keyBox = R(pill, "Key", Center, Center, Vector2.zero, new Vector2(26, 22));
-            Img(keyBox, new Color(1, 1, 1, 0.9f));
-            var kh = keyBox.gameObject.AddComponent<HorizontalLayoutGroup>();
-            kh.padding = new RectOffset(7, 7, 2, 2);
-            kh.childAlignment = TextAnchor.MiddleCenter;
-            kh.childControlWidth = kh.childControlHeight = true;
-            var kle = keyBox.gameObject.AddComponent<LayoutElement>();
-            kle.minWidth = 26;
-            kle.minHeight = kle.preferredHeight = 22;
-            var key = Txt(R(keyBox, "Label", Center, Center, Vector2.zero, Vector2.zero), "E", 13, TextAnchor.MiddleCenter, new Color(0.08f, 0.08f, 0.1f), true, shadow: false);
-
-            var label = Txt(R(pill, "Text", Center, Center, Vector2.zero, Vector2.zero), "Подсказка", 15, TextAnchor.MiddleLeft, Color.white);
-            label.horizontalOverflow = HorizontalWrapMode.Overflow;
-
-            var progress = Bar(pill, "Progress", BottomCenter, TopCenter, new Vector2(0, -2), new Vector2(0, 6), new Color(0, 0, 0, 0.5f), Color.white, 2f);
-            var prt = (RectTransform)progress.transform;
-            prt.anchorMin = new Vector2(0, 0);
-            prt.anchorMax = new Vector2(1, 0);
-            prt.sizeDelta = new Vector2(0, 6);
-            progress.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-
-            var view = pill.gameObject.AddComponent<PromptView>();
-            view.KeyBox = keyBox.gameObject;
-            view.Key = key;
-            view.Label = label;
-            view.Progress = progress;
             return view;
         }
 
@@ -773,9 +600,7 @@ namespace Stealth.EditorTools
             var header = R(ui.Panel, "Header", BottomCenter, BottomCenter, new Vector2(0, gh + 9), new Vector2(gw + 10, 22));
             ui.Header = header.gameObject;
             ui.HeaderBackground = Img(header, new Color(0, 0, 0, 0.6f));
-            ui.ValueLabel = Txt(R(header, "Value", Left, Left, new Vector2(5, 0), new Vector2(120, 20)), "0 очк.", 13, TextAnchor.MiddleLeft, Color.white);
-            ui.RotateHint = Txt(R(header, "RotateHint", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-5, 0), new Vector2(150, 20)),
-                "R поворот · T зеркало", 12, TextAnchor.MiddleRight, new Color(1, 1, 1, 0.6f)).gameObject;
+            ui.ValueLabel = Txt(R(header, "Value", Left, Left, new Vector2(5, 0), new Vector2(120, 20)), "0", 13, TextAnchor.MiddleLeft, Color.white);
 
             ui.Grid = R(ui.Panel, "Grid", BottomCenter, TopCenter, new Vector2(0, 5 + gh), new Vector2(gw, gh));
             ui.Grid.pivot = TopLeft;
@@ -794,7 +619,7 @@ namespace Stealth.EditorTools
             ui.Ghost = R(root.transform, "DragGhost", BottomLeft, TopLeft, Vector2.zero, Vector2.zero);
             ui.BlockPrefab = e.InventoryBlock;
             ui.HighlightPrefab = e.CellHighlight;
-            ui.Tooltip = Txt(R(root.transform, "Tooltip", BottomLeft, TopLeft, Vector2.zero, new Vector2(320, 22)), "Подсказка", 13, TextAnchor.MiddleLeft, Color.white);
+            ui.Tooltip = Txt(R(root.transform, "Tooltip", BottomLeft, TopLeft, Vector2.zero, new Vector2(320, 22)), "", 13, TextAnchor.MiddleLeft, Color.white);
             return root;
         }
 
@@ -819,7 +644,7 @@ namespace Stealth.EditorTools
 
             Img(Stretch(go.transform, "Background"), new Color(0.02f, 0.03f, 0.05f, 0.7f));
             board.ValueLabel = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(pad, -2f), new Vector2(gw, header)),
-                "Склад команды · 0 очк.", 16, TextAnchor.MiddleLeft, Color.white, bold: true);
+                "0", 16, TextAnchor.MiddleLeft, Color.white, bold: true);
             board.Grid = R(go.transform, "Grid", TopLeft, TopLeft, new Vector2(pad, -(header + pad)), new Vector2(gw, gh));
             var cells = new List<Image>();
             for (int y = 0; y < TeamStash.Height; y++)
@@ -833,10 +658,10 @@ namespace Stealth.EditorTools
 
             board.SellZone = R(go.transform, "Sell", TopLeft, TopLeft, new Vector2(pad + gw + gap, -(header + pad)), new Vector2(sellW, gh));
             board.SellBackground = Img(board.SellZone, new Color(1f, 0.75f, 0.1f, 0.45f));
-            Txt(Stretch(board.SellZone, "Label", 4f), "ПРОДАТЬ\nна квоту", 16, TextAnchor.MiddleCenter, Color.white, bold: true);
+            Txt(Stretch(board.SellZone, "Label", 4f), L("stash.sell"), 16, TextAnchor.MiddleCenter, Color.white, bold: true);
             board.StashAllZone = R(go.transform, "StashAll", TopLeft, TopLeft, new Vector2(pad, -(header + gh + pad * 2f)), new Vector2(gw + gap + sellW, buttonH));
             board.StashAllBackground = Img(board.StashAllZone, new Color(0.3f, 0.75f, 1f, 0.45f));
-            board.StashAllLabel = Txt(Stretch(board.StashAllZone, "Label", 2f), "СЛОЖИТЬ ВСЁ НА СКЛАД  [G]", 15, TextAnchor.MiddleCenter, Color.white, bold: true);
+            board.StashAllLabel = Txt(Stretch(board.StashAllZone, "Label", 2f), "G", 15, TextAnchor.MiddleCenter, Color.white, bold: true);
             SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
             return go;
         }
@@ -855,15 +680,13 @@ namespace Stealth.EditorTools
             var bg = Img(main, new Color(0.06f, 0.07f, 0.08f, 1f));
             bg.raycastTarget = true;
             var col = Column(main, "Column", new Vector2(-190, -100), 440); // with the friends panel the pair is centred
-            ColumnText(col, "Title", "АЙТИШНИКИ: ВЫЛАЗКА", 30, Color.white, 50, true, TextAnchor.MiddleCenter);
-            ColumnText(col, "Subtitle", "прототип кор-лупа", 14, dim, 24, anchor: TextAnchor.MiddleCenter);
+            ColumnText(col, "Title", L("menu.game_title"), 30, Color.white, 50, true, TextAnchor.MiddleCenter);
             Spacer(col, 20);
-            menu.SteamStatus = ColumnText(col, "SteamStatus", "Steam: …", 14, Color.white, 22);
-            menu.HostSteam = ButtonIn(e, col, "HostSteam", "Создать игру через Steam", 44);
-            ColumnText(col, "SteamHint", "Друзья заходят через приглашение или «Присоединиться к игре» в Steam.", 13, dim, 36);
+            menu.SteamStatus = ColumnText(col, "SteamStatus", "Steam", 14, Color.white, 22);
+            menu.HostSteam = ButtonIn(e, col, "HostSteam", L("menu.host_steam"), 44);
             Spacer(col, 14);
-            menu.LocalCaption = ColumnText(col, "LocalCaption", "Локальная сеть / тест на одном ПК (UDP, порт 7777):", 14, Color.white, 22);
-            menu.HostLocal = ButtonIn(e, col, "HostLocal", "Создать локальную игру", 36);
+            menu.LocalCaption = ColumnText(col, "LocalCaption", "LAN", 14, Color.white, 22);
+            menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(row, 34);
             var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -874,13 +697,13 @@ namespace Stealth.EditorTools
             menu.Address = Instance<InputField>(e.InputField, row, "Address");
             menu.Address.text = "127.0.0.1";
             menu.Address.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
-            menu.Join = ButtonIn(e, row, "Join", "Подключиться по IP", 34);
+            menu.Join = ButtonIn(e, row, "Join", L("menu.join_ip"), 34);
             menu.Join.GetComponent<LayoutElement>().preferredWidth = 200;
             Spacer(col, 14);
             menu.NetStatus = ColumnText(col, "NetStatus", "", 14, new Color(1f, 0.85f, 0.5f), 22);
-            menu.MainSettings = ButtonIn(e, col, "Settings", "Настройки", 30);
-            menu.MainControls = ButtonIn(e, col, "Controls", "Управление", 30);
-            menu.Quit = ButtonIn(e, col, "Quit", "Выход", 30);
+            menu.MainSettings = ButtonIn(e, col, "Settings", L("menu.settings"), 30);
+            menu.MainControls = ButtonIn(e, col, "Controls", L("controls.title"), 30);
+            menu.Quit = ButtonIn(e, col, "Quit", L("menu.quit"), 30);
 
             // Friends playing right now (Steam): one click to join.
             var friends = R(main, "Friends", TopCenter, TopLeft, new Vector2(60, -196), new Vector2(350, 0));
@@ -890,8 +713,8 @@ namespace Stealth.EditorTools
             fl.childForceExpandWidth = true;
             fl.childForceExpandHeight = false;
             friends.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            ColumnText(friends, "Caption", "Друзья в игре", 16, Color.white, 26, true);
-            menu.FriendsStatus = ColumnText(friends, "Status", "Никого из друзей нет в игре", 13, dim, 40);
+            ColumnText(friends, "Caption", L("friends.caption"), 16, Color.white, 26, true);
+            menu.FriendsStatus = ColumnText(friends, "Status", "", 13, dim, 40);
             menu.FriendList = R(friends, "List", Center, Center, Vector2.zero, Vector2.zero);
             var ll = menu.FriendList.gameObject.AddComponent<VerticalLayoutGroup>();
             ll.spacing = 4;
@@ -899,20 +722,20 @@ namespace Stealth.EditorTools
             ll.childForceExpandWidth = true;
             ll.childForceExpandHeight = false;
             menu.FriendRowPrefab = e.FriendRow;
-            menu.RefreshFriends = ButtonIn(e, friends, "Refresh", "Обновить", 28);
+            menu.RefreshFriends = ButtonIn(e, friends, "Refresh", L("friends.refresh"), 28);
 
             // Pause menu.
             var pause = Stretch(root.transform, "Pause");
             menu.PausePage = pause.gameObject;
             Img(pause, new Color(0, 0, 0, 0.6f)).raycastTarget = true;
             var pc = Column(pause, "Column", new Vector2(-430, -150), 300);
-            ColumnText(pc, "Title", "Пауза", 26, Color.white, 44, true, TextAnchor.MiddleCenter);
-            menu.Role = ColumnText(pc, "Role", "Ты хост", 15, Color.white, 26, anchor: TextAnchor.MiddleCenter);
-            menu.Invite = ButtonIn(e, pc, "Invite", "Пригласить друзей (Steam)", 36);
-            menu.Resume = ButtonIn(e, pc, "Resume", "Продолжить", 36);
-            menu.Unstuck = ButtonIn(e, pc, "Unstuck", "Я застрял", 36);
-            menu.PauseSettings = ButtonIn(e, pc, "Settings", "Настройки", 36);
-            menu.Leave = ButtonIn(e, pc, "Leave", "Покинуть игру", 36);
+            ColumnText(pc, "Title", L("menu.pause"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
+            menu.Role = ColumnText(pc, "Role", "", 15, Color.white, 26, anchor: TextAnchor.MiddleCenter);
+            menu.Invite = ButtonIn(e, pc, "Invite", L("menu.invite"), 36);
+            menu.Resume = ButtonIn(e, pc, "Resume", L("menu.resume"), 36);
+            menu.Unstuck = ButtonIn(e, pc, "Unstuck", L("menu.unstuck"), 36);
+            menu.PauseSettings = ButtonIn(e, pc, "Settings", L("menu.settings"), 36);
+            menu.Leave = ButtonIn(e, pc, "Leave", L("menu.leave"), 36);
             BuildControlsPanel(e, menu, root.transform);
 
             // Settings.
@@ -920,23 +743,25 @@ namespace Stealth.EditorTools
             menu.SettingsPage = settings.gameObject;
             Img(settings, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
             var sc = Column(settings, "Column", new Vector2(0, -84), 460);
-            ColumnText(sc, "Title", "Настройки", 26, Color.white, 44, true, TextAnchor.MiddleCenter);
+            ColumnText(sc, "Title", L("menu.settings"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
             Spacer(sc, 8);
-            menu.SensitivityLabel = ColumnText(sc, "SensitivityLabel", "Чувствительность мыши", 15, Color.white, 22);
+            menu.SensitivityLabel = ColumnText(sc, "SensitivityLabel", "", 15, Color.white, 22);
             menu.Sensitivity = SliderIn(e, sc, "Sensitivity", 0.02f, 0.4f, false);
             Spacer(sc, 8);
-            menu.FovLabel = ColumnText(sc, "FovLabel", "Поле зрения", 15, Color.white, 22);
+            menu.FovLabel = ColumnText(sc, "FovLabel", "", 15, Color.white, 22);
             menu.Fov = SliderIn(e, sc, "Fov", 60f, 100f, true);
             Spacer(sc, 8);
-            menu.VolumeLabel = ColumnText(sc, "VolumeLabel", "Громкость", 15, Color.white, 22);
+            menu.VolumeLabel = ColumnText(sc, "VolumeLabel", "", 15, Color.white, 22);
             menu.Volume = SliderIn(e, sc, "Volume", 0f, 1f, false);
             Spacer(sc, 8);
-            menu.MusicLabel = ColumnText(sc, "MusicLabel", "Музыка", 15, Color.white, 22);
+            menu.MusicLabel = ColumnText(sc, "MusicLabel", "", 15, Color.white, 22);
             menu.Music = SliderIn(e, sc, "Music", 0f, 1f, false);
             Spacer(sc, 10);
-            menu.InvertY = ToggleIn(e, sc, "InvertY", "Инвертировать мышь по вертикали");
-            menu.HeadBob = ToggleIn(e, sc, "HeadBob", "Покачивание камеры при ходьбе");
-            menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", "Присед переключается, а не удерживается");
+            menu.InvertY = ToggleIn(e, sc, "InvertY", L("menu.invert_y"));
+            menu.HeadBob = ToggleIn(e, sc, "HeadBob", L("menu.head_bob"));
+            menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", L("menu.crouch_toggle"));
+            Spacer(sc, 10);
+            menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
             Spacer(sc, 14);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(buttons, 32);
@@ -944,8 +769,8 @@ namespace Stealth.EditorTools
             bh.spacing = 10;
             bh.childControlWidth = bh.childControlHeight = true;
             bh.childForceExpandWidth = bh.childForceExpandHeight = true;
-            menu.Defaults = ButtonIn(e, buttons, "Defaults", "По умолчанию", 32);
-            menu.Done = ButtonIn(e, buttons, "Done", "Готово", 32);
+            menu.Defaults = ButtonIn(e, buttons, "Defaults", L("menu.defaults"), 32);
+            menu.Done = ButtonIn(e, buttons, "Done", L("menu.done"), 32);
 
             pause.gameObject.SetActive(false);
             settings.gameObject.SetActive(false);
@@ -954,7 +779,7 @@ namespace Stealth.EditorTools
 
         /// <summary>
         /// Every control of the game in two columns (rows are added by <see cref="ControlsPanel"/> from Controls.All):
-        /// right of the pause buttons in a game, over a backdrop with "Готово" from the main menu.
+        /// right of the pause buttons in a game, over a backdrop with "Done" from the main menu.
         /// </summary>
         static void BuildControlsPanel(UiElements e, GameMenu menu, Transform root)
         {
@@ -968,7 +793,7 @@ namespace Stealth.EditorTools
             Img(rt, new Color(0.03f, 0.04f, 0.05f, 0.88f)).raycastTarget = true;
             var panel = rt.gameObject.AddComponent<ControlsPanel>();
             menu.KeysPanel = panel;
-            Txt(R(rt, "Title", TopLeft, TopLeft, new Vector2(pad, -8), new Vector2(400, 36)), "Управление", 22, TextAnchor.MiddleLeft, Color.white, true);
+            Txt(R(rt, "Title", TopLeft, TopLeft, new Vector2(pad, -8), new Vector2(400, 36)), L("controls.title"), 22, TextAnchor.MiddleLeft, Color.white, true);
             panel.Columns = new RectTransform[2];
             for (int i = 0; i < 2; i++)
             {
@@ -984,15 +809,15 @@ namespace Stealth.EditorTools
             panel.RowPrefab = e.ControlRow;
             panel.GroupPrefab = e.ControlGroup;
             panel.Hint = Txt(R(rt, "Hint", BottomLeft, BottomLeft, new Vector2(pad, 52), new Vector2(colW * 2 + gap, 22)),
-                "Нажми на клавишу, чтобы переназначить", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.65f));
+                "", 13, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.65f));
             panel.Reset = Instance<Button>(e.Button, rt, "Reset");
-            panel.Reset.GetComponentInChildren<Text>().text = "Сбросить управление";
+            SetText(panel.Reset.GetComponentInChildren<Text>(), L("controls.reset"));
             var rrt = (RectTransform)panel.Reset.transform;
             rrt.anchorMin = rrt.anchorMax = rrt.pivot = BottomLeft;
             rrt.anchoredPosition = new Vector2(pad, 14);
             rrt.sizeDelta = new Vector2(220, 32);
             menu.ControlsDone = Instance<Button>(e.Button, rt, "Done");
-            menu.ControlsDone.GetComponentInChildren<Text>().text = "Готово";
+            SetText(menu.ControlsDone.GetComponentInChildren<Text>(), L("menu.done"));
             var drt = (RectTransform)menu.ControlsDone.transform;
             drt.anchorMin = drt.anchorMax = drt.pivot = new Vector2(1, 0);
             drt.anchoredPosition = new Vector2(-pad, 14);
@@ -1013,7 +838,7 @@ namespace Stealth.EditorTools
         static Toggle ToggleIn(UiElements e, Transform parent, string name, string label)
         {
             var t = Instance<Toggle>(e.Toggle, parent, name);
-            t.GetComponentInChildren<Text>().text = label;
+            SetText(t.GetComponentInChildren<Text>(), label);
             Fixed(t, 24);
             return t;
         }

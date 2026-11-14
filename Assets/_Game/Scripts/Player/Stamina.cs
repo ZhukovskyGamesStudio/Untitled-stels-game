@@ -6,6 +6,8 @@ namespace Stealth.Player
     [System.Serializable]
     public class StaminaSettings
     {
+        [Tooltip("Off: run as long as you like (no bar). On: sprinting drains the bar below.")]
+        public bool Enabled;
         [Tooltip("Seconds of sprinting from full to empty.")]
         public float SprintDuration = 6f;
         [Tooltip("Seconds to refill from empty.")]
@@ -39,6 +41,7 @@ namespace Stealth.Player
 
         public void Tick(bool sprinting, float dt)
         {
+            if (!m_S.Enabled) { Value = 1f; Exhausted = false; return; }
             if (sprinting && CanSprint)
             {
                 Value = Mathf.Max(0f, Value - dt / SprintDuration);
@@ -53,6 +56,7 @@ namespace Stealth.Player
 
         public void SpendJump()
         {
+            if (!m_S.Enabled) return;
             Value = Mathf.Max(0f, Value - JumpCost);
             m_SinceUse = 0f;
         }

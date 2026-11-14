@@ -87,6 +87,7 @@ namespace Stealth.EditorTools
                 b.MenuMusic = Clip("Music/music_menu");
                 b.ExploreMusic = Clip("Music/music_explore");
                 b.ChaseMusic = Clip("Music/music_chase");
+                FillLateClips(b);
             });
             // Clips added after the bank was created (the bank itself is never overwritten without FORCE).
             if (s_Bank.Ping == null || s_Bank.Mark == null)
@@ -95,7 +96,35 @@ namespace Stealth.EditorTools
                 s_Bank.Mark = Clip("UI/mark");
                 EditorUtility.SetDirty(s_Bank);
             }
+            if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null)
+            {
+                FillLateClips(s_Bank);
+                EditorUtility.SetDirty(s_Bank);
+            }
             return s_Bank;
+        }
+
+        static void FillLateClips(SoundBank b)
+        {
+            b.StepLight = Clip("Robots/step_light");
+            b.SpiderStep = Clip("Robots/spider_step");
+            b.MotorServo = Clip("Robots/motor_servo");
+            b.MotorTracks = Clip("Robots/motor_tracks");
+            b.MotorBrush = Clip("Robots/motor_brush");
+            b.MotorTurbine = Clip("Robots/motor_turbine");
+            b.SpeakerMusic = Clip("Items/speaker_music");
+            b.FuelGulp = Clip("Items/fuel_gulp");
+            b.Heal = Clip("Items/heal");
+            b.Craft = Clip("Items/craft");
+            b.StunBlast = Clip("Items/stun_blast");
+            b.CrateSearch = Clip("Items/crate_search");
+            b.Unlock = Clip("Items/unlock");
+            b.GateOpen = Clip("Environment/gate_open");
+            b.CarEngine = Clip("Car/car_engine");
+            b.CarStart = Clip("Car/car_start");
+            b.CarStop = Clip("Car/car_stop");
+            b.CarHorn = Clip("Car/car_horn");
+            b.CarBump = Clip("Car/car_bump");
         }
 
         /// <summary>Music, ambience, alarm, a 2D voice and a pool of 3D voices; placed in the scene.</summary>
@@ -116,10 +145,11 @@ namespace Stealth.EditorTools
         });
 
         /// <summary>A looping 3D sound on a prefab (configured at runtime by <see cref="LoopSound"/>).</summary>
-        static void AddLoop(GameObject root, AudioClip clip)
+        static void AddLoop(GameObject root, AudioClip clip, float pitch = 1f)
         {
             var source = root.AddComponent<AudioSource>();
             source.clip = clip;
+            source.pitch = pitch;
             source.playOnAwake = false;
             source.loop = true;
             source.spatialBlend = 1f;

@@ -75,8 +75,8 @@ namespace Stealth.EditorTools
                 var art = BuildLevelArt();
                 var actors = BuildActors();
                 var ui = BuildUi();
-                BuildSewerPrefab(art, ui.RouteSign);
-                BuildSceneAndSession(art, actors, ui);
+                var car = BuildSewerPrefab(art, ui.RouteSign);
+                BuildSceneAndSession(art, actors, ui, car);
                 AssetDatabase.SaveAssets();
                 Debug.Log($"[Builder] Assets built ({(force ? "overwrite" : "missing only")})");
             }

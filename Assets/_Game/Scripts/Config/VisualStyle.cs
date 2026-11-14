@@ -12,7 +12,7 @@ namespace Stealth.Configs
     public class VisualStyle : ScriptableObject
     {
         [Tooltip("Name shown to the player and in the comparison")]
-        public string Title = "Как сейчас";
+        public string Title = "Как сейчас"; // loc-ok: authoring default (the player sees style.<name>)
         [Tooltip("Games and works that inspired the style")]
         public string References = "";
         [TextArea(2, 5), Tooltip("The idea in two sentences")]

@@ -20,6 +20,7 @@ namespace Stealth.UI
 
         SewerLocation m_Sewer;
         readonly Dictionary<int, string> m_Previews = new();
+        int m_PreviewsLoc = -1;
 
         void Awake() => m_Sewer = GetComponent<SewerLocation>();
 
@@ -39,8 +40,8 @@ namespace Stealth.UI
                 if (way < 0 || sign == null) continue;
                 int lane = options[way];
                 var node = gm.Route.Node(gm.Level.Index + 1, lane);
-                sign.Title.text = $"{RouteNode.KindName(node.Kind)} · дом {gm.Level.Index + 2}";
-                sign.Body.text = Preview(node, gm) + (need > 0 ? $"\n<color=#FF8A70>Квота: не хватает {need} — дальше не пустят</color>" : "");
+                sign.Title.text = Loc.F("route.title", RouteNode.KindName(node.Kind), gm.Level.Index + 2);
+                sign.Body.text = Preview(node, gm) + (need > 0 ? "\n<color=#FF8A70>" + Loc.F("route.need", need) + "</color>" : "");
 
                 string voters = "";
                 foreach (var p in PlayerController.All)
@@ -48,8 +49,8 @@ namespace Stealth.UI
                         voters += (voters.Length > 0 ? ", " : "") +
                                   $"<color=#{ColorUtility.ToHtmlStringRGB(PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId)))}>{p.Nick}</color>";
                 bool going = gm.GoAt > 0 && gm.ChosenLane == lane;
-                string status = going ? $"Идём сюда через {Mathf.CeilToInt(Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime)))}…"
-                    : voters.Length > 0 ? $"Здесь: {voters}" : "Зайди в туннель, чтобы выбрать этот путь";
+                string status = going ? Loc.F("route.going", Mathf.CeilToInt(Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime))))
+                    : voters.Length > 0 ? Loc.F("route.here", voters) : "";
                 sign.Votes.text = status;
                 sign.Frame.color = going ? new Color(1f, 0.8f, 0.25f) : voters.Length > 0 ? new Color(0.45f, 0.85f, 1f) : new Color(1f, 1f, 1f, 0.35f);
 
@@ -68,20 +69,15 @@ namespace Stealth.UI
         /// <summary>What the team would face there (generated from the house's seed, cached).</summary>
         string Preview(RouteNode node, GameManager gm)
         {
+            if (m_PreviewsLoc != Loc.Version) { m_Previews.Clear(); m_PreviewsLoc = Loc.Version; }
             if (m_Previews.TryGetValue(node.Seed, out var text)) return text;
             var level = Tuning.Level;
-            var l = LevelGenerator.Generate(node.Seed, node.Depth, level.Building, level.Security, Mathf.Max(1, PlayerController.All.Count));
+            var l = LevelGenerator.Generate(node.Seed, node.Depth, level.Building, level.Security, Mathf.Max(1, PlayerController.All.Count), level.Features);
             int dark = 0;
             foreach (var r in l.Rooms) if (r.Dark) dark++;
-            int rooms = l.Rooms.Count, atriums = 0;
-            foreach (var r in l.Rooms) if (r.Levels > 1) atriums++;
-            text = $"{l.Floors} {Floors(l.Floors)} · {rooms} комнат" + (atriums > 0 ? $" · атриумов: {atriums}" : "") + $"\n" +
-                   $"Охрана: {l.RobotSpawns.Count} · камер: {l.CameraSpots.Count} · лазеров: {l.LaserSpots.Count}\n" +
-                   $"Темно в {dark} из {rooms} комнат · запертых дверей: {l.LockedDoors.Count}";
+            text = Loc.F("route.preview", l.Floors, l.Rooms.Count, l.RobotSpawns.Count, l.CameraSpots.Count, l.LaserSpots.Count, dark, l.LockedDoors.Count);
             m_Previews[node.Seed] = text;
             return text;
         }
-
-        static string Floors(int n) => n % 10 == 1 && n % 100 != 11 ? "этаж" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "этажа" : "этажей";
     }
 }

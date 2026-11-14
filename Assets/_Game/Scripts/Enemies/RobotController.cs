@@ -73,7 +73,7 @@ namespace Stealth.Enemies
             var rng = LevelRandom.Next(RandomChannel.Robots);
             if (Senses.ColorSorter) SetVariant((sbyte)rng.Next(ItemCatalog.Colors.Length));
             if (Traits.CargoChance > 0f && rng.Value() < Traits.CargoChance)
-                SetCargo(EncodeCargo((byte)rng.Next(ItemCatalog.Shapes.Length), (byte)ItemCatalog.RandomColor(rng, 0)));
+                SetCargo(EncodeCargo((byte)rng.Next(ItemCatalog.LootShapes), (byte)ItemCatalog.RandomColor(rng, 0)));
             m_NextStomp = Time.time + rng.Range(0.5f, Senses.SeismicPeriod);
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
@@ -143,6 +143,12 @@ namespace Stealth.Enemies
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
             m_Brain.Tick(now, dt);
+            if (m_HasPost && State == RobotState.Patrol && Arrived)
+            {
+                // a warden at its post watches the way in
+                var face = Quaternion.LookRotation(m_PostFacing);
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, face, 120f * dt);
+            }
             if (DevFlags.HoldRobots) m_Agent.isStopped = true;
             ReportAwarenessServer(m_Brain.Awareness, m_Brain.AwarenessFocus);
         }
@@ -152,6 +158,7 @@ namespace Stealth.Enemies
         /// <summary>Every sensor channel gives a detection rate per player; the strongest one wins.</summary>
         Sighting Sense()
         {
+            if (Senses.FollowsSightings) return Relayed();
             var best = Sighting.None;
             var perception = Tuning.Perception;
             foreach (var p in PlayerController.All)
@@ -172,6 +179,34 @@ namespace Stealth.Enemies
                 if (rate > best.Rate) best = new Sighting { Target = target, Rate = rate, ChasePoint = ChasePointFor(target) };
             }
             return best;
+        }
+
+        /// <summary>
+        /// The hunter's only "sense": the nearest player whom some other robot or camera is seeing right now (alerted or
+        /// chasing, focused on them) — the hunter knows where they are and runs there; bumping into it still counts.
+        /// </summary>
+        Sighting Relayed()
+        {
+            var best = Sighting.None;
+            float nearest = float.MaxValue;
+            foreach (var p in PlayerController.All)
+            {
+                IIntruder target = p;
+                if (target.IsDown) continue;
+                float d = Vector3.Distance(target.Position, transform.position);
+                if (d <= Senses.ContactDistance) return new Sighting { Target = target, Contact = true, ChasePoint = target.Position };
+                if (d >= nearest || !SpottedByOthers(target.ClientId)) continue;
+                nearest = d;
+                best = new Sighting { Target = target, Rate = 10f, ChasePoint = target.Position };
+            }
+            return best;
+        }
+
+        bool SpottedByOthers(ulong client)
+        {
+            foreach (var d in All)
+                if (d != this && !d.IsHacked && d.FocusClient == client && (d.IsChasing || d.Awareness >= 0.999f)) return true;
+            return false;
         }
 
         // ------------------------------------------------------------------ seismic stomps
@@ -346,8 +381,31 @@ namespace Stealth.Enemies
             Audio.Sfx.At(Audio.Sfx.Bank?.Radio, Position);
         }
 
+        bool m_HasPost, m_PostAtB;
+        Vector3 m_PostA, m_PostB, m_PostFacing;
+
+        /// <summary>
+        /// Server: a warden's post (<see cref="WardenPost"/>): instead of wandering the house it walks between two points in
+        /// front of a doorway and watches <paramref name="facing"/>; after a distraction it comes back here.
+        /// </summary>
+        public void SetPost(Vector3 a, Vector3 b, Vector3 facing)
+        {
+            m_HasPost = true;
+            m_PostA = a;
+            m_PostB = b;
+            m_PostFacing = facing.sqrMagnitude > 0.01f ? new Vector3(facing.x, 0f, facing.z).normalized : transform.forward;
+            PatrolToNextPoint();
+        }
+
         public void PatrolToNextPoint()
         {
+            if (m_HasPost)
+            {
+                m_PostAtB = !m_PostAtB;
+                var goal = m_PostAtB ? m_PostB : m_PostA;
+                if (m_Agent != null && m_Agent.isOnNavMesh && NavMesh.SamplePosition(goal, out var spot, 1.5f, m_Agent.areaMask)) m_Agent.SetDestination(spot.position);
+                return;
+            }
             var layout = ActiveLevel.Layout;
             if (layout == null || layout.PatrolPoints.Count == 0) return;
             int myFloor = LevelLayout.FloorOf(transform.position.y);

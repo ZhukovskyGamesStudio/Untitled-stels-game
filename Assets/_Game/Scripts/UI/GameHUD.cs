@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Stealth.Configs;
 using Stealth.Enemies;
 using Stealth.Game;
@@ -5,26 +7,25 @@ using Stealth.Items;
 using Stealth.Level;
 using Stealth.Player;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Stealth.UI
 {
     /// <summary>
-    /// HUD presenter (prefab UI/HUD). Principle: show only what matters right now — one contextual prompt under the
-    /// crosshair, overlays only while something is happening (damage, gas, alarm), static panels kept small.
+    /// HUD presenter (prefab UI/HUD). Principle: almost no text. The reticle changes its glyph when E would do something
+    /// (<see cref="ReticleRules"/>), the keys of the moment sit quietly in the bottom right corner (<see cref="HintRules"/>),
+    /// noise, light and health are icons in the bottom left; overlays only while something is happening (damage, gas, alarm).
     /// Every element is pre-built in the prefab; this component only shows, hides, moves and recolours them.
-    /// Decisions live in pure classes (<see cref="PromptRules"/>, <see cref="BannerQueue"/>, <see cref="GainTracker"/>, <see cref="UiMath"/>).
     /// </summary>
     public class GameHUD : MonoBehaviour
     {
         public static GameHUD Instance { get; private set; }
 
         public const float IconRange = 25f;
-        public const float LookRange = 18f;
-        public const float LookDwell = 0.4f;
-        /// <summary>Where the "+N" of a sale starts, next to the quota bar.</summary>
-        public const float GainX = 310f, GainY = -48f;
+        /// <summary>Where the "+N" of fuel starts, next to the fuel bar.</summary>
+        public const float GainX = 310f, GainY = -36f;
+        /// <summary>How opaque the hint stack is: there, but not calling for attention.</summary>
+        public const float HintAlpha = 0.6f;
 
         [Header("Root")]
         public RectTransform Canvas;
@@ -36,28 +37,37 @@ namespace Stealth.UI
         public Image GasVignette;
         public Image GasTint;
         public Text LaughText;
+        [Tooltip("Seconds of laughing gas left before passing out.")]
         public Text GasText;
         public Image DownedTint;
+        [Tooltip("Knocked out: whose eyes you look through (or that you are out).")]
         public Text DownedText;
-        [Tooltip("Hiding in the hatch: the view goes dark, who is still missing, the countdown.")]
+        [Tooltip("Hiding in the hatch: the view goes dark.")]
         public Image HatchTint;
+        [Tooltip("In the exit hatch: who is still missing, or the countdown.")]
         public Text HatchText;
-        [Tooltip("For the ones still upstairs: who is waiting in the hatch.")]
-        public Text HatchStatus;
-        [Tooltip("In the sewer, once the whole team stands in tunnels: the countdown to the next house.")]
+        [Tooltip("In the sewer, once the car is in a tunnel: the countdown to the next house.")]
         public Text RouteCountdown;
+        [Tooltip("Black over everything between the drive scene and the next house.")]
+        public Image LoadingFade;
         public GameObject AlarmFrame;
         public Image[] AlarmEdges;
         public Text AlarmLabel;
 
-        [Header("Around the crosshair")]
+        [Header("Reticle")]
         public RectTransform ArcLayer;
         public ArcView ArcPrefab;
         public ArcView HitArc;
-        public GameObject CrosshairDot;
-        public GameObject CrosshairBrackets;
+        public Image ReticleGlyph;
+        [Tooltip("The hold progress around the reticle (a radial fill).")]
+        public Image ReticleRing;
+        [Tooltip("One sprite per ReticleIcon, in its order (Dot first).")]
+        public Sprite[] ReticleSprites;
         public BarView Stamina;
-        public PromptView Prompt;
+
+        [Header("Hints (bottom right)")]
+        public RectTransform HintStack;
+        public HintView HintPrefab;
 
         [Header("World markers")]
         public RectTransform IconLayer;
@@ -69,24 +79,26 @@ namespace Stealth.UI
         public Image HatchDiamond;
         public Text HatchLabel;
 
+        [Header("Status (bottom left)")]
+        [Tooltip("How lit you are = how well eyes see you: a closed eye in the dark, wide open in full light.")]
+        public Image Eye;
+        public Sprite[] EyeSprites;
+        [Tooltip("How loud you are: a speaker with 0–3 waves.")]
+        public Image Speaker;
+        public Sprite[] SpeakerSprites;
+        public Image[] Hearts;
+        public Sprite HeartFull, HeartEmpty;
+
         [Header("Panels")]
-        [Tooltip("How much light is on you = how well robots see you.")]
-        public BarView LightBar;
-        public Text LightLabel;
-        public CanvasGroup NoiseGroup;
-        public Image[] NoiseBars;
-        public Text NoiseLabel;
         public Text HouseLabel;
         public Text QuotaLabel;
         public BarView QuotaBar;
         public RectTransform GainRect;
         public Text GainLabel;
-        public Text QuotaHint;
-        [Tooltip("When the hunter comes (or that it is in the house), under the quota bar.")]
+        [Tooltip("When the hunter comes (or that it is in the house), under the fuel bar.")]
         public Text HunterLabel;
-        [Tooltip("Sitting at a security terminal: what is on the screen and how to use it.")]
+        [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
-        public Image[] HpPips;
         public RectTransform TeamList;
         public Text TeamRowPrefab;
         public CanvasGroup Banner;
@@ -104,25 +116,27 @@ namespace Stealth.UI
         public RectTransform CalloutLayer;
         public CalloutMarkerView CalloutPrefab;
 
-        static readonly string[] NoiseNames = { "бесшумно", "тихо", "слышно", "громко" };
-        static readonly Color[] NoiseColors = { Color.white, new(0.6f, 0.9f, 1f), new(1f, 0.85f, 0.35f), new(1f, 0.35f, 0.25f) };
+        static readonly Color[] NoiseColors = { new(1f, 1f, 1f, 0.45f), new(0.6f, 0.9f, 1f), new(1f, 0.85f, 0.35f), new(1f, 0.35f, 0.25f) };
         static readonly Color QuotaGreen = new(0.45f, 1f, 0.5f);
 
         readonly BannerQueue m_Banners = new();
         readonly GainTracker m_Gain = new();
         readonly HitFeedback m_Hit = new();
+        readonly List<Hint> m_Hints = new();
         UiPool<ArcView> m_Arcs;
         UiPool<SuspicionMarkerView> m_Icons;
         UiPool<TeamMarkerView> m_Markers;
         UiPool<Text> m_TeamRows;
         UiPool<CalloutMarkerView> m_Callouts;
+        UiPool<HintView> m_HintRows;
         bool m_BigMapOpen;
         int m_KeysVersion = -1;
         GameManager m_Subscribed;
-        Detector m_LookCandidate;
-        float m_LookSince;
 
+        /// <summary>The hint lines of this frame, joined (logs of the autopilot).</summary>
         public Prompt CurrentPrompt { get; private set; }
+        public Reticle CurrentReticle { get; private set; }
+        public IReadOnlyList<Hint> CurrentHints => m_Hints;
         public Vector3 LastHitDirection => m_Hit.Direction;
         public float LastHitTime => m_Hit.Time;
 
@@ -136,6 +150,7 @@ namespace Stealth.UI
             m_Markers = new UiPool<TeamMarkerView>(TeamMarkerPrefab, MarkerLayer);
             m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
             m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
+            m_HintRows = new UiPool<HintView>(HintPrefab, HintStack);
         }
 
         void OnDestroy()
@@ -147,7 +162,7 @@ namespace Stealth.UI
 
         public void ShowBanner(string text) => m_Banners.Push(text);
 
-        /// <summary>Seconds the "Стиль: …" banner stays (a new F8 replaces it at once).</summary>
+        /// <summary>Seconds the style banner stays (a new F8 replaces it at once).</summary>
         const float StyleBannerTime = 1.6f;
 
         void ShowStyleBanner(string text) => m_Banners.Push(text, "style", Time.time, StyleBannerTime);
@@ -175,68 +190,80 @@ namespace Stealth.UI
             m_Hit.Update(Time.deltaTime);
             m_Banners.Update(now);
             m_Gain.Observe(gm.Collected, now);
-            CurrentPrompt = PromptRules.Choose(BuildContext(gm, me));
+            bool driveScene = DriveScene.Active != null; // the drive scene speaks for itself
+            var context = BuildContext(gm, me);
+            CurrentReticle = driveScene ? Reticle.Hidden : ReticleRules.Choose(context);
+            HintRules.Collect(context, m_Hints);
+            if (driveScene) m_Hints.Clear();
+            CurrentPrompt = m_Hints.Count > 0 ? new Prompt(1, "", string.Join(" · ", m_Hints)) : default;
 
             ShowOverlays(gm, me, now);
             ShowHatch(gm, me);
             ShowRouteCountdown(gm);
+            ShowLoadingFade(gm);
             ShowDetection(me, now);
             ShowRobotIcons(me);
-            ShowCrosshair(me);
+            ShowReticle();
+            ShowHints();
             ShowStamina(me);
             ShowNoise(me, now);
             ShowVisibility(me, now);
-            ShowQuota(gm, me, now);
+            ShowQuota(gm, now);
             ShowHatchMarker(gm, me);
             ShowHealth(me);
             ShowTeam(me, now);
             ShowCallouts(gm, me, now);
             ShowMaps(gm, me);
-            Prompt.Set(CurrentPrompt);
             ShowBannerLine(now);
             Ui.Show(RunOver, gm.Phase == RunPhase.Failed);
-            if (gm.Phase == RunPhase.Failed) RunOverTotal.text = $"Сдано за забег: {gm.RunTotal} очк.";
-            NameTheKeys(gm);
+            if (gm.Phase == RunPhase.Failed) RunOverTotal.text = Loc.F("hud.run_total", gm.RunTotal);
+            NameTheKeys();
         }
 
-        /// <summary>Texts that name keys follow the rebinds.</summary>
-        void NameTheKeys(GameManager gm)
+        /// <summary>Texts that name keys follow the rebinds and the language.</summary>
+        void NameTheKeys()
         {
-            if (m_KeysVersion == Controls.Version) return;
-            m_KeysVersion = Controls.Version;
-            string K(GameAction a) => Controls.Label(a);
-            RunOverRestart.text = $"{K(GameAction.Restart)} — начать новый забег";
-            QuotaHint.text = $"Квота набрана — к люку, {K(GameAction.Hatch)}: спрятаться и уйти";
+            int version = Controls.Version * 1000 + Loc.Version;
+            if (m_KeysVersion == version) return;
+            m_KeysVersion = version;
+            RunOverRestart.text = Loc.F("hud.restart", Controls.Label(GameAction.Restart));
+        }
+
+        float m_Fade;
+
+        /// <summary>
+        /// The drive to the next house ends in black: it comes up in the last moments of the drive scene, holds while the
+        /// house is built and lifts once it stands (the drive scene is gone).
+        /// </summary>
+        void ShowLoadingFade(GameManager gm)
+        {
+            if (LoadingFade == null) return;
+            bool black = (gm.DriveUntil > 0 && Session.ServerTime > gm.DriveUntil - 0.7) || (gm.DriveUntil <= 0 && DriveScene.Active != null);
+            m_Fade = Mathf.MoveTowards(m_Fade, black ? 1f : 0f, Time.unscaledDeltaTime / (black ? 0.6f : 0.9f));
+            Ui.Show(LoadingFade, m_Fade > 0.001f);
+            if (m_Fade > 0.001f) LoadingFade.color = new Color(0f, 0f, 0f, m_Fade);
         }
 
         /// <summary>
-        /// Leaving a house: in the hatch the view goes dark and says who is still missing or how long until the sewer;
-        /// the ones still upstairs see who waits in the hatch.
+        /// In a hatch the view goes dark. In the exit hatch a short line says who is still missing or counts down to the
+        /// sewer; the entry hatch says nothing (the team list shows who sits where).
         /// </summary>
         void ShowHatch(GameManager gm, PlayerController me)
         {
-            bool playing = gm.Phase == RunPhase.Playing;
-            int hidden = 0;
-            string missing = "", waiting = "";
-            foreach (var p in PlayerController.All)
-            {
-                if (p.InHatch) { hidden++; waiting += (waiting.Length > 0 ? ", " : "") + p.Nick; }
-                else if (!p.KnockedOut) missing += (missing.Length > 0 ? ", " : "") + p.Nick;
-            }
-            float left = gm.LeaveAt > 0 ? Mathf.Max(0f, (float)(gm.LeaveAt - Session.ServerTime)) : -1f;
-            bool inside = playing && me.InHatch;
+            bool inside = gm.Phase == RunPhase.Playing && me.InHatch;
             Ui.Show(HatchTint, inside);
-            Ui.Show(HatchText, inside);
-            if (inside)
+            bool exit = inside && me.HatchIndex == 1;
+            Ui.Show(HatchText, exit);
+            if (!exit) return;
+            float left = gm.LeaveAt > 0 ? Mathf.Max(0f, (float)(gm.LeaveAt - Session.ServerTime)) : -1f;
+            string text;
+            if (left >= 0f) text = Mathf.CeilToInt(left).ToString();
+            else
             {
-                HatchText.text = left >= 0f
-                    ? $"Вся команда в люке\nУходим в канализацию через {Mathf.CeilToInt(left)}…"
-                    : $"Ты в люке — роботы тебя не видят\nЖдём: {missing}";
-                HatchText.text += $"\n{Controls.Label(GameAction.Hands)} — склад и продажа · {Controls.Label(GameAction.StashAll)} — всё на склад";
+                string missing = string.Join(", ", PlayerController.All.Where(p => !(p.InHatch && p.HatchIndex == 1) && !p.KnockedOut).Select(p => p.Nick));
+                text = missing.Length > 0 ? Loc.F("hud.hatch.waiting", missing) : "";
             }
-            bool status = playing && !me.InHatch && hidden > 0;
-            Ui.Show(HatchStatus, status);
-            if (status) Ui.Set(HatchStatus, $"В люке ждут: {waiting} — когда спрячутся все, команда уйдёт в канализацию", new Color(0.6f, 1f, 0.65f));
+            if (HatchText.text != text) HatchText.text = text;
         }
 
         /// <summary>The way is chosen: a big countdown in the middle of the screen until the team goes.</summary>
@@ -247,12 +274,11 @@ namespace Stealth.UI
             Ui.Show(RouteCountdown, on);
             if (!on) return;
             float left = Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime));
-            int n = Mathf.CeilToInt(left);
-            string text = n > 0 ? $"Путь выбран — выходим через\n<size=64>{n}</size>" : "Выходим!";
+            string text = Mathf.Max(1, Mathf.CeilToInt(left)).ToString();
             if (RouteCountdown.text != text) RouteCountdown.text = text;
             // each second starts big and settles
             float f = left - Mathf.Floor(left);
-            RouteCountdown.rectTransform.localScale = Vector3.one * (1f + 0.12f * f);
+            RouteCountdown.rectTransform.localScale = Vector3.one * (1f + 0.15f * f);
         }
 
         // ------------------------------------------------------------------ map and callouts
@@ -289,8 +315,8 @@ namespace Stealth.UI
         }
 
         /// <summary>
-        /// Teammates' pings ("here!") and marked robots: a diamond with a name and the distance, seen through walls,
-        /// kept on the screen edge when out of view. Marked robots are also drawn through walls by the renderer.
+        /// Teammates' pings and marked robots: a diamond with the distance, seen through walls, kept on the screen edge
+        /// when out of view. Marked robots are also drawn through walls by the renderer.
         /// </summary>
         void ShowCallouts(GameManager gm, PlayerController me, float now)
         {
@@ -305,18 +331,15 @@ namespace Stealth.UI
                 var top = d.Position + Vector3.up * 0.7f;
                 float left = d.MarkedUntil - Session.ServerTimeF;
                 var red = new Color(1f, 0.25f, 0.18f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
-                Callout(cam, size, top, red, $"{d.DisplayName} · {Vector3.Distance(me.transform.position, d.Position):0} м", false, 0f);
+                Callout(cam, size, top, red, Loc.F("hud.metres", Vector3.Distance(me.transform.position, d.Position)), false, 0f);
             }
             if (cam != null)
                 foreach (var p in gm.Pings.Active)
                 {
                     if (p.Kind != PingKind.Here) continue;
-                    var owner = PlayerController.Find(p.Owner);
                     var color = PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.Owner));
-                    float fade = Mathf.Clamp01(p.Until - now);
-                    color.a = fade;
-                    string who = owner != null && owner != me ? owner.Nick + " · " : "";
-                    Callout(cam, size, p.Position, color, $"{who}{Vector3.Distance(me.transform.position, p.Position):0} м", true, p.Age(now));
+                    color.a = Mathf.Clamp01(p.Until - now);
+                    Callout(cam, size, p.Position, color, Loc.F("hud.metres", Vector3.Distance(me.transform.position, p.Position)), true, p.Age(now));
                 }
             m_Callouts.End();
         }
@@ -341,66 +364,48 @@ namespace Stealth.UI
 
         PromptContext BuildContext(GameManager gm, PlayerController me)
         {
-            var looked = LookedAtRobot(me);
             var hover = InventoryUI.Instance != null ? InventoryUI.Instance.Hover : null;
+            var inventory = me.GetComponent<PlayerInventory>();
+            var terminal = me.UsingTerminal;
+            var view = me.TerminalView;
             return new PromptContext
             {
                 Downed = me.Downed,
+                Hp = me.Hp,
+                CanGetUp = me.CanGetUp,
+                Watching = me.Watching != null,
                 MenuOpen = GameMenu.IsOpen,
                 CursorMode = me.CursorMode,
                 CanRevive = me.ReviveTarget != null,
                 ReviveProgress = me.ReviveShare,
-                HackTarget = me.HackTarget != null ? me.HackTarget.DisplayName : null,
+                CanHack = me.HackTarget != null,
                 HackProgress = me.HackShare,
-                HackSeconds = Configs.Tuning.Player.Interaction.HackDuration,
-                BlockedByCeiling = me.Motor.BlockedByCeiling,
                 Playing = gm.Phase == RunPhase.Playing,
                 NearHatch = gm.Phase == RunPhase.Playing && Hatch.IsNear(me.transform.position),
+                NearExit = Hatch.IndexNear(me.transform.position) == 1,
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
-                InSewer = gm.Phase == RunPhase.Sewer && SewerLocation.Active != null && SewerLocation.Active.BranchAt(me.transform.position) < 0,
                 LockedDoor = me.DoorTarget != null,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
                 Cracking = me.Cracking != null,
-                AtTerminal = me.UsingTerminal != null,
-                Terminal = me.TerminalTarget != null && me.UsingTerminal == null ? TerminalRules.Prompt(me.TerminalTarget.Kind, me.TerminalTarget.Charges) : null,
-                CarriedItems = me.GetComponent<PlayerInventory>().Items.Count,
-                Collected = gm.Collected,
-                Quota = gm.Quota,
-                LookedAt = looked != null ? $"{looked.DisplayName}: {looked.SensesDescription}" : null,
-                HoverItem = hover != null ? ItemCatalog.Describe(hover.Shape, hover.Color) : null,
+                NearTerminal = me.TerminalTarget != null && terminal == null,
+                TerminalUsable = me.TerminalTarget != null && !me.TerminalTarget.Spent,
+                AtTerminal = terminal != null,
+                SittingKind = terminal != null ? terminal.Kind : default,
+                SittingCanHack = terminal != null && terminal.Charges > 0 && view != null && !view.IsHacked,
+                CarriedItems = inventory.Items.Count,
+                HasUse = me.UsePrompt != null,
+                UseKind = me.UseTarget != null ? me.UseTarget.Kind : default,
+                UseText = me.UsePrompt,
+                UseAvailable = me.UseAvailable,
+                UseProgress = me.UseProgress,
+                Driving = me.SeatIndex == 0,
+                Passenger = me.SeatIndex > 0,
+                HasStun = inventory.Items.Any(i => i.Shape == ItemCatalog.Stun),
+                HoverItem = hover != null,
+                BigMap = m_BigMapOpen,
             };
-        }
-
-        /// <summary>The robot / device in the crosshair for at least <see cref="LookDwell"/> s (within 18 m, in plain sight).</summary>
-        Detector LookedAtRobot(PlayerController me)
-        {
-            var cam = me.Camera;
-            if (cam == null) return null;
-            var origin = cam.transform.position;
-            Detector best = null;
-            // 1) The crosshair ray hits the robot's body.
-            if (Physics.Raycast(origin, cam.transform.forward, out var direct, LookRange, Perception.SightMask, QueryTriggerInteraction.Ignore))
-                best = direct.collider.GetComponentInParent<Detector>();
-            // 2) Small devices without a body (PIR): close enough to the centre of the view. A pressure plate hides in the
-            //    floor: it is named only when the crosshair lands on it, from up close (you have to look down at it).
-            float bestAngle = best != null ? -1f : 6f;
-            if (best == null && direct.collider != null)
-                foreach (var d in Detector.All)
-                    if (d is PressurePlate plate && plate.Covers(direct.point) && direct.distance < 5f) best = d;
-            foreach (var d in Detector.All)
-            {
-                if (d is PressurePlate) continue;
-                var to = d.Position - origin;
-                if (to.magnitude > LookRange) continue;
-                float angle = Vector3.Angle(cam.transform.forward, to);
-                if (angle >= bestAngle || !Visible(origin, d, to, 0.6f)) continue;
-                best = d;
-                bestAngle = angle;
-            }
-            if (best != m_LookCandidate) { m_LookCandidate = best; m_LookSince = Time.time; }
-            return best != null && Time.time - m_LookSince > LookDwell ? best : null;
         }
 
         static bool Visible(Vector3 origin, Detector d, Vector3 to, float slack) =>
@@ -426,9 +431,9 @@ namespace Stealth.UI
                 HitArc.Set(UiMath.ScreenAngle(cam.position, cam.forward, cam.position + m_Hit.Direction), 120f, new Color(1f, 0.15f, 0.1f, arcAlpha));
             }
 
-            // Laughing gas outside.
+            // Laughing gas outside: the green edge says what it is; only the seconds left are written.
             var gas = me.Gas;
-            bool gassed = gas.Time > 0f;
+            bool gassed = gas.Time > 0f && !me.Downed && me.Watching == null;
             Ui.Show(GasVignette, gassed);
             Ui.Show(GasTint, gassed);
             Ui.Show(GasText, gassed);
@@ -438,15 +443,21 @@ namespace Stealth.UI
                 float g = gas.Share;
                 GasVignette.color = new Color(0.4f, 0.95f, 0.3f, Mathf.Clamp01(g * 1.4f));
                 GasTint.color = new Color(0.5f, 0.9f, 0.3f, g * 0.35f);
-                GasText.text = $"Весёлый газ: {gas.SecondsLeft:0} c до отключки";
+                string seconds = Mathf.CeilToInt(gas.SecondsLeft).ToString();
+                if (GasText.text != seconds) GasText.text = seconds;
                 if (gas.Laughing)
+                {
+                    if (LaughText.text != Loc.T("hud.laugh")) LaughText.text = Loc.T("hud.laugh");
                     LaughText.rectTransform.anchoredPosition = new Vector2(0f, -216f) + new Vector2(Mathf.Sin(now * 37f), -Mathf.Cos(now * 29f)) * 6f * g;
+                }
             }
 
             Ui.Show(DownedTint, down);
-            bool showDown = down && gm.Phase == RunPhase.Playing;
-            Ui.Show(DownedText, showDown);
-            if (showDown) DownedText.text = PromptRules.DownedText(me.Hp, me.CanGetUp, me.Watching != null ? me.Watching.Nick : null);
+            // Lying with health left needs no words (the hint names the key to get up); out cold — whose eyes these are.
+            string downed = !down || gm.Phase != RunPhase.Playing || me.Hp > 0 ? null
+                : me.Watching != null ? me.Watching.Nick : Loc.T("hud.out_cold");
+            Ui.Show(DownedText, downed != null);
+            if (downed != null && DownedText.text != downed) DownedText.text = downed;
 
             // Alarm: thin pulsing frame + a small label with the time left: clear, but does not cover the view.
             bool alarm = gm.AlarmActive;
@@ -455,7 +466,7 @@ namespace Stealth.UI
             float left = (float)(gm.AlarmUntil - Session.ServerTime);
             var red = new Color(1f, 0.15f, 0.1f, 0.35f + 0.25f * Mathf.Sin(now * 7f));
             foreach (var e in AlarmEdges) e.color = red;
-            AlarmLabel.text = $"ТРЕВОГА · {Mathf.Max(0, left):0} c";
+            AlarmLabel.text = Loc.F("hud.alarm", Mathf.Max(0, Mathf.CeilToInt(left)));
         }
 
         /// <summary>Arcs around the crosshair towards every sensor that is noticing you.</summary>
@@ -520,12 +531,29 @@ namespace Stealth.UI
             m_Icons.End();
         }
 
-        void ShowCrosshair(PlayerController me)
+        /// <summary>The reticle: a dot, or the glyph of what E would do (dimmed when it can't now), a ring while holding.</summary>
+        void ShowReticle()
         {
-            bool hands = me.CursorMode || me.Downed;
-            bool hover = InventoryUI.Instance != null && InventoryUI.Instance.Hover != null;
-            Ui.Show(CrosshairDot, !hands && !hover);
-            Ui.Show(CrosshairBrackets, !hands && hover); // "this can be taken"
+            var r = CurrentReticle;
+            Ui.Show(ReticleGlyph, r.Visible);
+            Ui.Show(ReticleRing, r.Visible && r.Progress > 0f);
+            if (!r.Visible) return;
+            bool dot = r.Icon == ReticleIcon.Dot;
+            int i = (int)r.Icon;
+            var sprite = i < ReticleSprites.Length ? ReticleSprites[i] : null;
+            if (ReticleGlyph.sprite != sprite) ReticleGlyph.sprite = sprite;
+            float size = dot ? 5f : 30f;
+            if (!Mathf.Approximately(ReticleGlyph.rectTransform.sizeDelta.x, size)) ReticleGlyph.rectTransform.sizeDelta = new Vector2(size, size);
+            var color = dot ? new Color(1f, 1f, 1f, 0.8f) : r.Available ? new Color(1f, 1f, 1f, 0.92f) : new Color(1f, 1f, 1f, 0.38f);
+            if (ReticleGlyph.color != color) ReticleGlyph.color = color;
+            if (r.Progress > 0f) ReticleRing.fillAmount = Mathf.Clamp01(r.Progress);
+        }
+
+        void ShowHints()
+        {
+            m_HintRows.Begin();
+            foreach (var h in m_Hints) m_HintRows.Next().Set(h, HintAlpha);
+            m_HintRows.End();
         }
 
         void ShowStamina(PlayerController me)
@@ -538,12 +566,11 @@ namespace Stealth.UI
 
         float m_NextLight, m_Visibility;
 
-        /// <summary>How lit you are (= how well eyes see you): a bar and a word, like a thief's light gem.</summary>
+        /// <summary>How lit you are (= how well eyes see you): an eye that opens as the light on you grows.</summary>
         void ShowVisibility(PlayerController me, float now)
         {
             bool visible = !me.Downed;
-            Ui.Show(LightBar, visible);
-            Ui.Show(LightLabel, visible);
+            Ui.Show(Eye, visible);
             if (!visible) return;
             if (now >= m_NextLight)
             {
@@ -552,33 +579,33 @@ namespace Stealth.UI
                 float target = SensorMath.Visibility(SensorMath.LightFactor(Perception.IlluminationOf(me), s), s);
                 m_Visibility = Mathf.Lerp(m_Visibility, target, 0.6f);
             }
-            int level = UiMath.LightLevel(m_Visibility);
-            var color = UiMath.LightColor(level);
-            LightBar.Set(Mathf.Max(0.04f, m_Visibility), color);
-            Ui.Set(LightLabel, UiMath.LightNames[level], color);
+            int frame = Mathf.Clamp(Mathf.RoundToInt(m_Visibility * (EyeSprites.Length - 1)), 0, EyeSprites.Length - 1);
+            if (Eye.sprite != EyeSprites[frame]) Eye.sprite = EyeSprites[frame];
+            var color = Color.Lerp(new Color(0.75f, 0.8f, 0.9f, 0.6f), new Color(1f, 0.92f, 0.6f, 1f), m_Visibility);
+            if (Eye.color != color) Eye.color = color;
         }
 
-        /// <summary>How loud you are right now: three short bars above the health, dim and "бесшумно" when silent.</summary>
+        /// <summary>How loud you are right now: a speaker with 0–3 waves, dim when silent.</summary>
         void ShowNoise(PlayerController me, float now)
         {
-            float age = now - me.LastNoiseTime;
             bool visible = !me.Downed;
-            Ui.Show(NoiseGroup, visible);
+            Ui.Show(Speaker, visible);
             if (!visible) return;
+            float age = now - me.LastNoiseTime;
             bool fresh = age <= 0.9f;
-            int bars = fresh ? UiMath.NoiseBars(me.LastNoiseRadius) : 0;
-            NoiseGroup.alpha = fresh ? Mathf.Lerp(0.55f, 1f, Mathf.Clamp01(1f - age / 0.9f)) : 0.55f;
-            for (int i = 0; i < NoiseBars.Length; i++)
-                NoiseBars[i].color = i < bars ? NoiseColors[bars] : new Color(1, 1, 1, 0.25f);
-            Ui.Set(NoiseLabel, NoiseNames[bars], NoiseColors[bars]);
+            int level = fresh ? UiMath.NoiseBars(me.LastNoiseRadius) : 0;
+            if (Speaker.sprite != SpeakerSprites[level]) Speaker.sprite = SpeakerSprites[level];
+            var color = NoiseColors[level];
+            if (level > 0) color.a = Mathf.Lerp(0.6f, 1f, Mathf.Clamp01(1f - age / 0.9f));
+            if (Speaker.color != color) Speaker.color = color;
         }
 
-        void ShowQuota(GameManager gm, PlayerController me, float now)
+        void ShowQuota(GameManager gm, float now)
         {
             int collected = gm.Collected, quota = gm.Quota;
             bool met = collected >= quota;
             var layout = ActiveLevel.Layout;
-            string house = SewerLocation.Active != null || layout == null ? "Канализация" : HouseKinds.Title(gm.Level.Seed, layout.Kind);
+            string house = SewerLocation.Active != null || layout == null ? Loc.T("hud.sewer") : HouseKinds.Title(gm.Level.Seed, layout.Kind);
             if (HouseLabel.text != house) HouseLabel.text = house;
             Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
             QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
@@ -590,11 +617,11 @@ namespace Stealth.UI
                 GainRect.anchoredPosition = new Vector2(GainX, GainY + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
-            Ui.Show(QuotaHint, met && gm.Phase == RunPhase.Playing && !me.InHatch);
             ShowHunter(gm);
-            ShowTerminal(me);
+            ShowTerminal(PlayerController.Local);
         }
 
+        /// <summary>At a terminal: what is on the screen, which of how many, and the charges of a hacking terminal.</summary>
         void ShowTerminal(PlayerController me)
         {
             if (TerminalLabel == null) return;
@@ -602,8 +629,15 @@ namespace Stealth.UI
             Ui.Show(TerminalLabel, t != null);
             if (t == null) return;
             var shown = me.TerminalView;
-            string text = TerminalRules.Status(t.Kind, shown != null ? shown.DisplayName : "", me.TerminalViewNumber, me.TerminalViewCount,
-                t.Charges, shown != null && shown.IsHacked, me.TerminalHackShare);
+            string text = me.TerminalViewCount == 0 ? "—"
+                : $"{(shown != null ? shown.DisplayName : "")} · {me.TerminalViewNumber} / {me.TerminalViewCount}";
+            if (t.Kind == TerminalKind.Hacking)
+            {
+                float hack = me.TerminalHackShare;
+                text += shown != null && shown.IsHacked ? " · " + Loc.T("hud.terminal.hacked")
+                    : hack > 0f ? $" · {Mathf.RoundToInt(hack * 100f)}%"
+                    : " · " + Loc.F("hud.terminal.charges", t.Charges);
+            }
             if (TerminalLabel.text != text) TerminalLabel.text = text;
         }
 
@@ -624,32 +658,43 @@ namespace Stealth.UI
             Ui.Set(HunterLabel, text, color);
         }
 
-        /// <summary>Once the quota is met: a small diamond over the hatch (clamped to the screen edge) with distance.</summary>
+        /// <summary>Once the fuel is enough: a small diamond over the exit hatch (clamped to the screen edge) with the distance.</summary>
         void ShowHatchMarker(GameManager gm, PlayerController me)
         {
             var layout = ActiveLevel.Layout;
             bool visible = layout != null && me.Camera != null && gm.Phase == RunPhase.Playing &&
-                           gm.Collected >= gm.Quota && !Hatch.IsNear(me.transform.position);
+                           gm.Collected >= gm.Quota && !Hatch.IsNear(me.transform.position) && !me.InHatch;
             Ui.Show(HatchMarker, visible);
             if (!visible) return;
             var size = Size;
-            var vp = me.Camera.WorldToViewportPoint(layout.HatchPosition + Vector3.up * 0.4f);
+            var exit = layout.ExitHatchPosition;
+            var vp = me.Camera.WorldToViewportPoint(exit + Vector3.up * 0.4f);
             var gui = UiMath.EdgeMarker(vp, size.x, size.y, 48f, out bool clamped);
             HatchMarker.anchoredPosition = new Vector2(gui.x, size.y - gui.y);
             var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
             HatchDiamond.color = c;
-            Ui.Set(HatchLabel, $"люк · {Vector3.Distance(me.transform.position, layout.HatchPosition):0} м", c);
+            Ui.Set(HatchLabel, Loc.F("hud.metres", Vector3.Distance(me.transform.position, exit)), c);
         }
 
+        /// <summary>Hearts: two as a rule, the third (gold) only while the med table's extra point is there.</summary>
         void ShowHealth(PlayerController me)
         {
-            for (int i = 0; i < HpPips.Length; i++)
-                HpPips[i].color = i < me.Hp ? new Color(0.9f, 0.2f, 0.2f) : new Color(1, 1, 1, 0.15f);
+            for (int i = 0; i < Hearts.Length; i++)
+            {
+                bool shown = i < Mathf.Max(HealthState.MaxHp, me.Hp);
+                Ui.Show(Hearts[i], shown);
+                if (!shown) continue;
+                bool full = i < me.Hp;
+                var sprite = full ? HeartFull : HeartEmpty;
+                if (Hearts[i].sprite != sprite) Hearts[i].sprite = sprite;
+                var color = !full ? new Color(1f, 1f, 1f, 0.35f) : i >= HealthState.MaxHp ? new Color(1f, 0.8f, 0.2f) : new Color(0.95f, 0.25f, 0.25f);
+                if (Hearts[i].color != color) Hearts[i].color = color;
+            }
         }
 
         /// <summary>
-        /// Teammates: a compact list under the health panel; names over heads only when close and visible;
-        /// a downed teammate gets a red marker through walls so the team can come and help.
+        /// Teammates: a compact list under the minimap (health as squares, or a word: down / in the hatch); names over heads
+        /// only when close and visible; a downed teammate gets a red marker through walls so the team can come and help.
         /// </summary>
         void ShowTeam(PlayerController me, float now)
         {
@@ -661,8 +706,8 @@ namespace Stealth.UI
             {
                 if (p == me) continue;
                 bool down = p.Downed;
-                string state = down ? "упал" : new string('■', Mathf.Max(0, p.Hp));
-                Ui.Set(m_TeamRows.Next(), $"{p.Nick}  {state}", down ? new Color(1f, 0.35f, 0.3f) : new Color(1, 1, 1, 0.8f));
+                string state = down ? Loc.T("hud.team.down") : p.InHatch ? Loc.T("hud.team.hatch") : new string('■', Mathf.Max(0, p.Hp));
+                Ui.Set(m_TeamRows.Next(), $"{p.Nick}  {state}", down ? new Color(1f, 0.35f, 0.3f) : p.InHatch ? new Color(0.6f, 1f, 0.65f, 0.85f) : new Color(1, 1, 1, 0.8f));
                 if (cam == null) continue;
 
                 var head = p.transform.position + Vector3.up * (down ? 0.6f : p.Height + 0.25f);
@@ -677,7 +722,7 @@ namespace Stealth.UI
                     var red = new Color(1f, 0.25f, 0.2f, 0.7f + 0.3f * Mathf.Sin(now * 6f));
                     foreach (var bar in m.CrossBars) bar.color = red;
                     m.Label.rectTransform.anchoredPosition = new Vector2(0f, -21f);
-                    Ui.Set(m.Label, $"{p.Nick} · {dist:0} м", new Color(1f, 0.5f, 0.45f));
+                    Ui.Set(m.Label, $"{p.Nick} · {Loc.F("hud.metres", dist)}", new Color(1f, 0.5f, 0.45f));
                 }
                 else if (vp.z > 0f && dist < 14f && !Physics.Linecast(cam.transform.position, head, Perception.SightMask, QueryTriggerInteraction.Ignore))
                 {

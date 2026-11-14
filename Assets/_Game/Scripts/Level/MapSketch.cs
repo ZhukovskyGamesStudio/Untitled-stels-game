@@ -184,6 +184,7 @@ namespace Stealth.Level
                 float from = a;
                 foreach (var o in openings)
                 {
+                    if (o.Kind == EdgeType.Illusion) continue; // drawn as the wall it pretends to be
                     float half = ClearWidth(o.Width) / 2f;
                     float o0 = o.At - half, o1 = o.At + half;
                     if (o1 <= from || o0 >= b) continue;

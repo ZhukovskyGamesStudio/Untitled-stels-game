@@ -27,8 +27,25 @@ namespace Stealth.Tests
             Assert.AreEqual(65, run.Collected);
             Assert.AreEqual(65, run.RunTotal);
             run.BeginLevel(1, 1000);
-            Assert.AreEqual(0, run.Collected, "the quota is per house");
+            Assert.AreEqual(65, run.Collected, "the tank keeps its fuel from house to house");
             Assert.AreEqual(65, run.RunTotal, "the total is per run");
+        }
+
+        [Test]
+        public void TheDriveOnBurnsTheQuotaOfFuel()
+        {
+            var run = new RunState();
+            run.BeginRun();
+            Assert.AreEqual(0, run.Quota, "the first drive is free");
+            Assert.IsTrue(run.QuotaMet);
+            run.BeginLevel(0, 1000);
+            int cost = run.Quota;
+            run.Deposit(cost + 30);
+            Assert.IsTrue(run.EnterSewer(0));
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+            Assert.AreEqual(30, run.Collected, "what is left stays in the tank");
+            Assert.IsTrue(RunState.CanStillGo(10, 50, 40));
+            Assert.IsFalse(RunState.CanStillGo(10, 50, 39));
         }
 
         [Test]
@@ -39,8 +56,10 @@ namespace Stealth.Tests
             run.Deposit(10);
             Assert.IsTrue(run.EnterSewer(0), "leaving a house is always possible");
             Assert.AreEqual(RunPhase.Sewer, run.Phase);
-            Assert.IsTrue(run.CanTrade, "the rest can be sold down there");
-            Assert.AreEqual(RunState.Exit.Failed, run.Advance());
+            Assert.IsTrue(run.CanTrade, "the rest can be fed into the engine down there");
+            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(), "not enough fuel: the car does not go");
+            Assert.AreEqual(RunPhase.Sewer, run.Phase);
+            Assert.IsTrue(run.Strand(), "nothing left to burn: the run ends here");
             Assert.AreEqual(RunPhase.Failed, run.Phase);
             Assert.AreEqual(RunState.Exit.Ignored, run.Advance(), "nothing happens after the end");
             Assert.IsFalse(run.EnterSewer(0));

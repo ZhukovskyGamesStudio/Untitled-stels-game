@@ -89,6 +89,12 @@ namespace Stealth.Tests
         public void SendOpenSafe(int safe) => Safes.Add(safe);
         public readonly List<(Cheat cheat, bool on)> Cheats = new();
         public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
+        public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();
+        public void SendUse(Stealth.Level.UseKind kind, int index) => Uses.Add((kind, index));
+        public int Gadgets;
+        public void SendGadget() => Gadgets++;
+        public readonly List<int> Terminals = new();
+        public void SendTerminal(int terminal, Detector steered, float yaw) => Terminals.Add(terminal);
     }
 
     /// <summary>Stands in for the inventory's network twin.</summary>

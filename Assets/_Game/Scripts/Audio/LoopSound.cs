@@ -13,6 +13,9 @@ namespace Stealth.Audio
     {
         public AudioSource Source;
 
+        bool m_On = true;
+        float m_NextMuffle;
+
         void Start()
         {
             var mix = Tuning.Audio.Mix;
@@ -31,7 +34,18 @@ namespace Stealth.Audio
         /// <summary>Muted while switched off (a hacked robot, a laser that is off).</summary>
         public void SetActive(bool on)
         {
-            float target = on ? Tuning.Audio.Mix.Loops : 0f;
+            if (m_On == on) return;
+            m_On = on;
+            m_NextMuffle = 0f;
+        }
+
+        /// <summary>The floors between it and the listener muffle it (<see cref="AudioDirector.Muffle"/>).</summary>
+        void Update()
+        {
+            if (Time.time < m_NextMuffle) return;
+            m_NextMuffle = Time.time + 0.2f;
+            float muffle = AudioDirector.Instance != null ? AudioDirector.Instance.Muffle(transform.position) : 1f;
+            float target = m_On ? Tuning.Audio.Mix.Loops * muffle : 0f;
             if (!Mathf.Approximately(Source.volume, target)) Source.volume = target;
         }
     }

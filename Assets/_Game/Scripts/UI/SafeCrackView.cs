@@ -37,6 +37,7 @@ namespace Stealth.UI
 
         readonly List<GameObject> m_Marks = new();
         int m_Built = -1, m_LastNumber = -1;
+        int m_HintControls = -1, m_HintLoc = -1;
         float m_Pulse, m_LastTryShown = -10f;
         Vector2 m_PanelHome;
         bool m_Home;
@@ -99,8 +100,12 @@ namespace Stealth.UI
             }
             if (me.LastTryTime != m_LastTryShown) m_LastTryShown = me.LastTryTime;
 
-            Hint.text = $"<b>Мышь</b> — крутить    <b>ЛКМ</b> / <b>{Controls.Label(GameAction.Interact)}</b> — попробовать число    " +
-                        $"<b>{Controls.Label(GameAction.Jump)}</b> — отойти";
+            if (m_HintControls != Controls.Version || m_HintLoc != Loc.Version || Hint.text.Length == 0)
+            {
+                m_HintControls = Controls.Version;
+                m_HintLoc = Loc.Version;
+                Hint.text = Loc.F("safe.hint", Loc.T("key.mouse"), Loc.T("key.lmb"), Controls.Label(GameAction.Interact), Controls.Label(GameAction.Jump));
+            }
         }
 
         /// <summary>A tick for every number, a longer one with the number every fifth (instances of the prefabs).</summary>
