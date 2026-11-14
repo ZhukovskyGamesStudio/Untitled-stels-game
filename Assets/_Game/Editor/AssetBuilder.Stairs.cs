@@ -214,27 +214,27 @@ namespace Stealth.EditorTools
 
         static Mesh StairWood()
         {
-            var k = new MeshKit(3); // 0 painted panels, 1 wood, 2 dark wood (handrail, newels)
+            var k = new MeshKit(4); // 0 painted panels, 1 treads, 2 dark wood (handrail, newels), 3 wood (stringer, balusters, battens)
             SolidSteps(k, 0, 0.04f);
             Treads(k, 1, 0.04f, 0.035f);
             // a closed stringer board along the open edge and panelling battens under the flight
-            InclinedPanel(k, 1, B1 + 0.03f, 0.05f, -0.28f, 0.34f);
-            for (float u = 0.3f; u < SStart; u += 0.6f) k.Span(1, u - 0.02f, u + 0.02f, 0.05f, Mathf.Min(SHalf, LineB(Mathf.Max(u, SLand))) - 0.35f, B1, B1 + 0.02f);
+            InclinedPanel(k, 3, B1 + 0.03f, 0.05f, -0.28f, 0.34f);
+            for (float u = 0.3f; u < SStart; u += 0.6f) k.Span(3, u - 0.02f, u + 0.02f, 0.05f, Mathf.Min(SHalf, LineB(Mathf.Max(u, SLand))) - 0.35f, B1, B1 + 0.02f);
             // balusters two per step, a newel at each end, the handrail
             for (int j = 0; j < SSteps; j++)
             {
                 var (u0, u1) = StepB(j);
                 foreach (float u in new[] { u0 + SRun * 0.25f, u0 + SRun * 0.75f })
-                    k.Span(1, u - 0.018f, u + 0.018f, TreadB(j), LineB(u) + 0.9f, B1 - 0.02f, B1 + 0.016f);
+                    k.Span(3, u - 0.018f, u + 0.018f, TreadB(j), LineB(u) + 0.9f, B1 - 0.02f, B1 + 0.016f);
             }
             k.Span(2, SLand - 0.12f, SLand - 0.02f, 0f, SHalf + 1.1f, B1 - 0.06f, B1 + 0.04f);
             k.Span(2, SStart - 0.04f, SStart + 0.06f, LineB(SStart) - 0.3f, SH + 1.1f, B1 - 0.06f, B1 + 0.04f);
             RailB(k, 2, B1, 0.92f, 0.08f, 0.06f, false);
             // the landing's edge: balusters and a flat rail
-            for (float u = 0.22f; u < SLand - 0.15f; u += 0.14f) k.Span(1, u - 0.018f, u + 0.018f, SHalf, SHalf + 0.92f, B1 - 0.02f, B1 + 0.016f);
+            for (float u = 0.22f; u < SLand - 0.15f; u += 0.14f) k.Span(3, u - 0.018f, u + 0.018f, SHalf, SHalf + 0.92f, B1 - 0.02f, B1 + 0.016f);
             k.Span(2, 0.12f, SLand - 0.02f, SHalf + 0.92f, SHalf + 0.98f, B1 - 0.04f, B1 + 0.04f);
             // the closed space under the top of the flight: a cupboard door in its end
-            k.Span(1, SSize + 0.08f, SSize + 0.11f, 0f, 1.95f, B0 + 0.35f, B0 + 1.25f);
+            k.Span(3, SSize + 0.08f, SSize + 0.11f, 0f, 1.95f, B0 + 0.35f, B0 + 1.25f);
             k.Span(2, SSize + 0.11f, SSize + 0.14f, 0.95f, 1.1f, B0 + 1.1f, B0 + 1.14f);
             // the divider: a panelled wall with a wooden handrail along the lower flight
             k.Span(0, DividerU, SStart, 0f, SH - 0.4f, A1, B0);
@@ -248,7 +248,7 @@ namespace Stealth.EditorTools
                 for (int i = 0; i <= n; i++)
                 {
                     var p = Vector3.Lerp(a, b, i / (float)n);
-                    k.Span(1, p.x - 0.018f, p.x + 0.018f, SH, SH + 0.95f, p.z - 0.018f, p.z + 0.018f);
+                    k.Span(3, p.x - 0.018f, p.x + 0.018f, SH, SH + 0.95f, p.z - 0.018f, p.z + 0.018f);
                 }
                 k.Box(2, (a + b) / 2f + Vector3.up * 0.98f, new Vector3(Mathf.Max(0.08f, Mathf.Abs(d.x)), 0.06f, Mathf.Max(0.08f, Mathf.Abs(d.z))), Quaternion.identity);
             });
@@ -343,7 +343,7 @@ namespace Stealth.EditorTools
         static (Mesh mesh, Material[] mats)[] StairLooks() => new[]
         {
             (StairConcrete(), new[] { M("Wall"), M("Floor"), M("DoorFrame") }),
-            (StairWood(), new[] { M("Ceiling"), M("Wood"), M("DoorFrame") }),
+            (StairWood(), new[] { M("Ceiling"), M("Wood"), M("DoorFrame"), M("Wood") }),
             (StairSteel(), new[] { M("Metal"), M("PropBody"), M("Metal") }),
             (StairGlass(), new[] { M("Ceiling"), M("StairGlass"), M("Metal") }),
         };
@@ -385,6 +385,7 @@ namespace Stealth.EditorTools
             glass.Span(1, -0.5f, -0.46f, 0f, 0.1f, -0.03f, 0.03f);                        // a shoe that holds the pane
             var look = root.AddComponent<StairLook>();
             look.Blocks = new Renderer[0];
+            look.Railing = true;
             look.Variants = new GameObject[looks.Length];
             for (int i = 0; i < looks.Length; i++)
             {

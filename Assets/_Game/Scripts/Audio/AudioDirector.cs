@@ -62,6 +62,7 @@ namespace Stealth.Audio
 
         void Awake()
         {
+            GameSettings.EnsureLoaded(); // the saved volumes from the very first frame of the menu, not after opening the settings
             Instance = this;
             m_Mix = Tuning.Audio.Mix;
             foreach (var v in Voices)

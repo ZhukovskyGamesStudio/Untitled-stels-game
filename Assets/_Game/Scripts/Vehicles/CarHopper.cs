@@ -16,6 +16,7 @@ namespace Stealth.Vehicles
         public override float HoldTime => 0.5f;
         public override float Reach => 2.3f;
         public override Vector3 Point => transform.position;
+        public override Transform ReachRoot => GetComponentInParent<Car>() is Car car ? car.transform : transform; // on the car's own hood
 
         void Awake() => Index = 0;
 

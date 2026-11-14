@@ -126,6 +126,37 @@ namespace Stealth.Tests
                 }
         }
 
+        [TestCase(DoorTrim.Casing)]
+        [TestCase(DoorTrim.Arch)]
+        [TestCase(DoorTrim.Pilasters)]
+        public void LowTrimsStopWhereTheDoorTrimStarts(DoorTrim trim)
+        {
+            var shell = Shell(5, 3, out var layout);
+            var g = new StyleGeometry { Baseboard = true, Crown = true, RailHeight = 0.9f, Doors = trim };
+            var pieces = ArchitecturePlanner.Plan(shell, layout, g);
+            var panels = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { WainscotHeight = 1f, Doors = trim });
+            float reach = ArchitecturePlanner.TrimReach(trim);
+            int checkedRuns = 0;
+            foreach (var o in shell.Openings.Where(o => !o.Vent && !o.Exterior))
+                foreach (var p in pieces.Concat(panels).Where(p => p.Kind is DecorKind.Baseboard or DecorKind.Rail or DecorKind.Wainscot))
+                {
+                    var d = p.Position - o.Center;
+                    bool sameWall = Mathf.Abs(Vector3.Dot(d, Vector3.Cross(Vector3.up, o.Along))) < 0.2f && Mathf.Abs(d.y) < 1.5f;
+                    if (!sameWall) continue;
+                    float along = Mathf.Abs(Vector3.Dot(d, o.Along));
+                    float half = Mathf.Abs(Vector3.Dot(p.Rotation * Vector3.right, o.Along)) * p.Scale.x / 2f;
+                    if (along - half > o.Width / 2f + reach + 1f) continue; // far along the wall
+                    checkedRuns++;
+                    Assert.Greater(along - half + 0.001f, o.Width / 2f + reach,
+                        $"{p.Kind} at {p.Position} pokes into the {trim} of the doorway at {o.Center}");
+                }
+            Assert.Greater(checkedRuns, 0, "runs next to doorways were checked");
+            if (trim == DoorTrim.Casing) return;
+            foreach (var p in pieces.Where(p => p.Kind == DecorKind.Pilaster))
+                Assert.AreEqual(LevelMetrics.WallHeight - ArchitecturePlanner.CrownDrop, p.Scale.y * LevelMetrics.WallHeight, 1e-3f,
+                    "a pilaster stops under the cornice, which runs on over its capital");
+        }
+
         [Test]
         public void CeilingPiecesAvoidStairHolesAndLamps()
         {

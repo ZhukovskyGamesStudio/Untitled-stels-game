@@ -124,8 +124,8 @@ LaserGate — отдельная ловушка (не детектор)
 `RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
 Цвета статусов — `SecurityPalette`. Описание для игрока — `RobotInfo`. Где и когда появляется — `RobotRoster`.
-**Охотник** без своих датчиков (`RobotSenses.FollowsSightings`): бежит к игроку, которого сейчас замечает любой другой детектор
-(`RobotController.Relayed`), быстрый. **Сторож** (`RobotKind.Warden`) не в ростере — его ставит `HouseFeatures.Wardens`.
+**Охотник** без своих датчиков (`RobotSenses.FollowsSightings`): «спит» там, где вошёл (`RobotBrain.Asleep`: не ходит, касание, взлом,
+шум и тревоги его не будят), пока любой другой детектор не заметит игрока (`RobotController.Relayed`) — тогда бежит к нему, быстрый; потерял — засыпает снова. **Сторож** (`RobotKind.Warden`) не в ростере — его ставит `HouseFeatures.Wardens`.
 **Звук роботов**: у каждого вида свой мотор (`AssetBuilder.MotorFor`) и высота голоса (`AudioRules.VoicePitch`); шаги шагающих — по
 касанию ступни (`ProceduralLegs.FootDown` → `AudioDirector.OnFootDown`: охранник, ищейка, паук — свои клипы); всё, что звучит через
 перекрытия, глохнет (`AudioDirector.Muffle` → `AudioRules.FloorFactor`, `AudioMix.ThroughFloor`; петли `LoopSound` тоже).
@@ -230,7 +230,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 префабы `Prefabs/Level/Sewer/*`, `AssetBuilder.Sewer`). Дорога — решётка (`SewerGrate`, alpha-clip, `Art/Textures/Sewer/grate.png`) над водой.
 Ворота (`SewerGate`, рычаг `GateLever` на стороне спуска) — `GameManager.GateKey` в `Opened`; в начале забега открыты.
 **Машина** — `Vehicles/Car` (сетевой префаб; двойник `CarNet` отдаёт владение водителю: owner-authoritative `NetworkTransform`):
-4 места (`CarSeat`, `Car.SitServer`, игрок в машине — `PlayerController.SeatIndex`, `PlayerMotor.Seated`), езда — чистый `CarPhysics`
+4 места (`CarSeat`, `Car.SitServer`, игрок в машине — `PlayerController.SeatIndex`, `PlayerMotor.Seated`; руль слева — `CarSettings.LeftHandDrive`:
+модель из Blender праворульная, левый руль — она же в зеркале, `CarLook.Mirror`, места водителя и пассажира меняются), езда — чистый `CarPhysics`
 (велосипедная модель, `RunConfig.Car` → `CarSettings`), упор в стены `BoxCast`, подвеска/руль/колёса/дробилка анимирует `Car`, звук мотора
 по оборотам, старт/стоп, гудок (`GameAction.Horn`, `ICarLink`). Бак-приёмник на капоте `CarHopper` (E: лут рюкзака, с пустым — весь кузов →
 `FeedServer`). Кузов без ячеек — `Cargo` (куча: `Heights`, упаковка `CargoItem.Pack` в `NetworkList<ulong>`), брошенное над кузовом
@@ -337,13 +338,15 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 `forceRenderingOff`, перед сменой стиля склейка снимается и собирается заново). Стены, плиты, лестницы и окна — static batching (`LevelBuilder.CombineStatic`).
 **Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
 дерево с балясинами, открытая сталь с сеткой, белый камень со стеклом), меши генерирует `AssetBuilder.Stairs` (`Art/Models/Stairs`); выбор — `StairStyles.Pick`
-по семейству стиля и сиду дома, `StairLook` переключает при F8. Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью.
+по семейству стиля и сиду дома или вид, который просит стиль (`StyleGeometry.Stairs`; у стиля по умолчанию — дерево), `StairLook` переключает при F8
+и одевает лестницу в архитектуру стиля: ступени — отделка пола, тело — отделка стен, балясины и поручни — его молдинг (`StairStyles.Parts`: роль каждого слота материала). Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью.
 **Лазы** — короб вентиляции: порог `LevelMetrics.VentSill` (кусок стены), над ним `VentHeight`, облицовка, фланцы и снятая решётка у стены (префаб `Level/VentFrame`).
 Часть лазов — под потолком (`PlanOpening.High`, `Doorway.High`; `LevelGenerator.RaiseVents`, свой поток рандома, `BuildingSettings.HighVentChance`): порог `HighVentSill`,
 под ним с обеих сторон обычный письменный стол у стены (`Furnisher.PlaceVentDesks`, не убирается проверкой проходимости) — запрыгнуть на стол, пригнуться, шагнуть в короб;
 ставится, только где стол и место перед ним влезают в комнату (не коридор), не задевают лестницы и чужие проёмы (`LevelGenerator.DesksFit`). Проверка — сценарий `vent`.
 **Перила галерей** — невидимый коллайдер `Level/RailingBlock` и пролёты `Level/RailingBay` в тех же четырёх исполнениях, что лестницы (`StairLook`).
 **Декор у проёмов и стен**: отделка стены заходит в откосы и на потолок проёма (`ArchitecturePlanner.PlanReveals`), пазухи арки идут до середины толщины стены;
+плинтус, панели и рейка обрываются там, где начинается обрамление двери (`ArchitecturePlanner.TrimReach`/`TrimSpans`), пилястры — до низа карниза, карниз идёт над капителью;
 обшивка, карниз, трубы ставятся только на куски стены нужной высоты (под лазом — нет); стыки скошенных и дуговых стен — повёрнутый столб и декор ровно до стыка
 (`WallFace.JointA/B`), грани таких стен находятся сквозь «карман» (`LevelBuilder.InnerNormals`). Балки — одна система на комнату, от стены до стены (`ArchitecturePlanner.BeamLines`).
 Держатель склеенного меша — `StyleConfig.Batch`.

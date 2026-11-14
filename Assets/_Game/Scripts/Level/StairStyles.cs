@@ -5,6 +5,9 @@ namespace Stealth.Level
     /// <summary>How a staircase is built (its look only: steps, landing and railings keep the same colliders).</summary>
     public enum StairStyle { Concrete, Wood, Steel, Glass }
 
+    /// <summary>What a material slot of a staircase look is: kept as built, or dressed in the style's wall finish, floor finish or trim.</summary>
+    public enum StairPart { Keep, Body, Tread, Trim }
+
     /// <summary>
     /// Which staircase look fits a model family (pure, unit tested): each family has a few that suit it, and the house
     /// seed picks one of them per staircase — every peer agrees, and the same house always looks the same.
@@ -33,5 +36,30 @@ namespace Stealth.Level
             uint h = (uint)seed * 2654435761u;
             return options[(int)((h >> 7) % (uint)options.Length)];
         }
+
+        /// <summary>The look a style asks for, or (Auto) the one its family and the seed pick.</summary>
+        public static StairStyle Pick(StairChoice choice, ModelFamily family, int seed) =>
+            choice != StairChoice.Auto ? (StairStyle)((int)choice - 1) : Pick(family, seed);
+
+        /// <summary>
+        /// What each material slot (submesh) of a look is made of, so the style can dress it in its own architecture:
+        /// the solid body in the wall finish, the treads in the floor finish, balusters and rails in the trim. The
+        /// staircase (<paramref name="railing"/> false) and the gallery railing bay have their own slot layouts
+        /// (<c>AssetBuilder.Stairs</c>).
+        /// </summary>
+        public static StairPart[] Parts(StairStyle look, bool railing) => railing
+            ? look switch
+            {
+                StairStyle.Concrete => new[] { StairPart.Body, StairPart.Trim },
+                StairStyle.Wood => new[] { StairPart.Trim, StairPart.Keep },
+                _ => new[] { StairPart.Keep, StairPart.Keep },
+            }
+            : look switch
+            {
+                StairStyle.Concrete => new[] { StairPart.Body, StairPart.Tread, StairPart.Trim },
+                StairStyle.Wood => new[] { StairPart.Body, StairPart.Tread, StairPart.Keep, StairPart.Trim },
+                StairStyle.Steel => new[] { StairPart.Keep, StairPart.Keep, StairPart.Keep },
+                _ => new[] { StairPart.Tread, StairPart.Keep, StairPart.Keep },
+            };
     }
 }

@@ -247,13 +247,14 @@ def arch():
         ln = math.hypot(nx, nz)
         normal.append((nx / ln, nz / ln))
     # the spandrels reach half the wall's thickness in (Unity puts a piece on each face): the two meet inside the opening,
-    # so under the curve there is no flat head and no square corners to see
-    spandrels = band(curve, [(x, top) for x, _ in curve], -0.1, 0.03)
+    # so under the curve there is no flat head and no square corners to see. Their front is flush with the wall face:
+    # only the moulding stands out, nothing square around the curve
+    spandrels = band(curve, [(x, top) for x, _ in curve], -0.1, 0.0)
     mould = 0.1
-    ring = band(curve, [(x + nx * mould, z + nz * mould) for (x, z), (nx, nz) in zip(curve, normal)], 0.03, 0.06)
-    legs = [box(-r - mould, -r, 0.03, 0.06, 0, spring), box(r, r + mould, 0.03, 0.06, 0, spring)]
-    merge("Accent", [box(-r - 0.12, -r, 0, 0.03, 0, top), box(r, r + 0.12, 0, 0.03, 0, top)])
-    merge("Body", [spandrels, ring] + legs)  # no keystone: the exit sign hangs right above the doorway
+    ring = band(curve, [(x + nx * mould, z + nz * mould) for (x, z), (nx, nz) in zip(curve, normal)], 0.0, 0.04)
+    legs = [box(-r - mould, -r, 0.0, 0.04, 0, spring), box(r, r + mould, 0.0, 0.04, 0, spring)]
+    merge("Body", [spandrels])
+    merge("Accent", [ring] + legs)  # no keystone: the exit sign hangs right above the doorway
     export("kit_arch")
 
 

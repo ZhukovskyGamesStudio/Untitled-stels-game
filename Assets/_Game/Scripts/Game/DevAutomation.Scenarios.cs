@@ -16,6 +16,7 @@ namespace Stealth.Game
             m_Scenarios["menu"] = MenuScenario;
             m_Scenarios["floors"] = FloorsScenario;
             m_Scenarios["rooms"] = RoomsScenario;
+            m_Scenarios["doors"] = DoorsScenario;
             m_Scenarios["vent"] = VentScenario;
             m_Scenarios["perf"] = PerfScenario;
             m_Scenarios["gallery"] = GalleryScenario;

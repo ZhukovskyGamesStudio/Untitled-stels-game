@@ -171,30 +171,33 @@ namespace Stealth.Level
             // the piece under a vent is only knee-high: what does not fit under the hole stays off it
             bool toTop = f.Y1 >= LevelMetrics.WallHeight - 0.05f;
             var holes = fullHeight ? WindowHoles(f, shell) : new List<(float, float)>();
+            // the low runs (baseboard, panels, chair rail) stop where a doorway's trim starts instead of poking through it
+            var low = Around(u0, u1, TrimSpans(f, shell, g));
 
-            void Run(DecorKind kind, float y)
+            void Run(DecorKind kind, float y, float a, float b)
             {
-                list.Add(new DecorPiece { Kind = kind, Position = At((u0 + u1) / 2f, y), Rotation = rot, Scale = new Vector3(len, 1f, 1f) });
+                list.Add(new DecorPiece { Kind = kind, Position = At((a + b) / 2f, y), Rotation = rot, Scale = new Vector3(b - a, 1f, 1f) });
             }
 
             bool wainscot = fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + 0.02f;
-            if (fullHeight && g.Baseboard && !wainscot && f.Y1 >= 0.2f) Run(DecorKind.Baseboard, 0f);
-            if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight);
-            if (fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) Run(DecorKind.Rail, g.RailHeight);
+            if (fullHeight && g.Baseboard && !wainscot && f.Y1 >= 0.2f) foreach (var (a, b) in low) Run(DecorKind.Baseboard, 0f, a, b);
+            if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight, u0, u1);
+            if (fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, g.RailHeight, a, b);
             if (wainscot)
-            {
-                int n = Mathf.Max(1, Mathf.RoundToInt(len / 1.1f));
-                float w = len / n;
-                for (int i = 0; i < n; i++)
-                    list.Add(new DecorPiece
-                    {
-                        Kind = DecorKind.Wainscot, Position = At(u0 + w * (i + 0.5f), 0f), Rotation = rot,
-                        Scale = new Vector3(w, g.WainscotHeight, 1f),
-                    });
-            }
+                foreach (var (a, b) in low)
+                {
+                    int n = Mathf.Max(1, Mathf.RoundToInt((b - a) / 1.1f));
+                    float w = (b - a) / n;
+                    for (int i = 0; i < n; i++)
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.Wainscot, Position = At(a + w * (i + 0.5f), 0f), Rotation = rot,
+                            Scale = new Vector3(w, g.WainscotHeight, 1f),
+                        });
+                }
             if (g.Pipes && f.Y0 < 2.5f && toTop)
             {
-                Run(DecorKind.Pipes, 0f);
+                Run(DecorKind.Pipes, 0f, u0, u1);
                 for (float u = u0 + 0.6f; u < u1 - 0.4f; u += 1.5f)
                     list.Add(new DecorPiece { Kind = DecorKind.PipeClamp, Position = At(u, 0f), Rotation = rot, Scale = Vector3.one });
             }
@@ -214,6 +217,55 @@ namespace Stealth.Level
                 }
             }
             if (g.Wall != null) PlanWallFinish(list, f, u0, u1, holes);
+        }
+
+        /// <summary>How far a doorway's trim reaches onto the wall past the opening's edge (the kit's casing, the pilasters).</summary>
+        public static float TrimReach(DoorTrim t) => t switch
+        {
+            DoorTrim.Casing => 0.17f,                         // jamb 12 cm + the head's cornice
+            DoorTrim.Arch or DoorTrim.Pilasters => PilasterOffset + PilasterHalfWidth + 0.01f,
+            _ => 0f,
+        };
+
+        /// <summary>A pilaster's centre from the opening's edge, and half its base's width (kit_pilaster).</summary>
+        const float PilasterOffset = 0.3f, PilasterHalfWidth = 0.23f;
+        /// <summary>The cornice hangs this far under the ceiling (kit_crown): pilasters stop under it.</summary>
+        public const float CrownDrop = 0.23f;
+
+        /// <summary>Along-wall spans of this face covered by the trim of doorways in the same wall (and its other face).</summary>
+        static List<(float, float)> TrimSpans(WallFace f, LevelShell shell, StyleGeometry g)
+        {
+            var spans = new List<(float, float)>();
+            float reach = TrimReach(g.Doors);
+            if (reach <= 0f) return spans;
+            var dir = f.Along;
+            foreach (var o in shell.Openings)
+            {
+                if (o.Vent || o.Exterior || o.Floor != f.Floor || Mathf.Abs(Vector3.Dot(o.Along, dir)) < 0.99f) continue;
+                var d = new Vector3(o.Center.x - f.A.x, 0f, o.Center.z - f.A.z);
+                if (Mathf.Abs(Vector3.Dot(d, f.Normal)) > 0.05f) continue; // another wall
+                float u = Vector3.Dot(d, dir), half = o.Width / 2f + reach;
+                if (u + half < -T || u - half > f.Length + T) continue;
+                spans.Add((u - half, u + half));
+            }
+            return spans;
+        }
+
+        /// <summary>The parts of [<paramref name="u0"/>, <paramref name="u1"/>] outside <paramref name="spans"/> (pieces under 5 cm dropped).</summary>
+        public static List<(float a, float b)> Around(float u0, float u1, List<(float a, float b)> spans)
+        {
+            var parts = new List<(float, float)>();
+            spans.Sort((x, y) => x.a.CompareTo(y.a));
+            float cur = u0;
+            foreach (var (a, b) in spans)
+            {
+                if (b <= cur) continue;
+                if (a >= u1) break;
+                if (a - cur >= 0.05f) parts.Add((cur, a));
+                cur = Mathf.Max(cur, b);
+            }
+            if (u1 - cur >= 0.05f) parts.Add((cur, u1));
+            return parts;
         }
 
         /// <summary>Along-wall spans of the windows on this face (only outer walls have windows).</summary>
@@ -293,7 +345,9 @@ namespace Stealth.Level
                         foreach (float s in new[] { -1f, 1f })
                             list.Add(new DecorPiece
                             {
-                                Kind = DecorKind.Pilaster, Position = at + o.Along * (s * (o.Width / 2f + 0.3f)), Rotation = rot, Scale = Vector3.one,
+                                // full height, or up to the cornice that then runs over its capital
+                                Kind = DecorKind.Pilaster, Position = at + o.Along * (s * (o.Width / 2f + PilasterOffset)), Rotation = rot,
+                                Scale = new Vector3(1f, g.Crown ? (LevelMetrics.WallHeight - CrownDrop) / LevelMetrics.WallHeight : 1f, 1f),
                             });
                         break;
                 }

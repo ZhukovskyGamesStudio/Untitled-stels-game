@@ -26,8 +26,9 @@ namespace Stealth.Enemies
         public float EyePitch;
         [Tooltip("Colour sorter: on spawn picks an item colour and only sees players carrying that colour.")]
         public bool ColorSorter;
-        [Tooltip("No sensors of its own (the hunter): runs to any player another robot or a camera has spotted, and keeps " +
-                 "after them for as long as someone is seeing them.")]
+        [Tooltip("No sensors of its own (the hunter): sleeps where it stands until another robot or a camera spots a player, " +
+                 "then runs to them and keeps after them for as long as someone is seeing them. Bumping into it, hacking it, " +
+                 "noises and alarms do not wake it.")]
         public bool FollowsSightings;
 
         [Header("Hearing")]
@@ -158,6 +159,12 @@ namespace Stealth.Enemies
             m_Rng = rng;
         }
 
+        /// <summary>The hunter: no patrol, no reaction to anything but a player another detector sees right now.</summary>
+        bool Sleeper => m_Senses.FollowsSightings;
+
+        /// <summary>Asleep: a hunter standing still, waiting for a sighting.</summary>
+        public bool Asleep => Sleeper && State == RobotState.Patrol;
+
         bool Detected => State == RobotState.Alerted || State == RobotState.Chase && Target != null;
 
         /// <summary>Awareness for the HUD: full once it has detected someone, otherwise the suspicion.</summary>
@@ -189,7 +196,7 @@ namespace Stealth.Enemies
             }
             Suspect = s.Target;
             LookPoint = s.Target.Position;
-            if (s.Contact)
+            if (s.Contact && !m_Senses.FollowsSightings)
             {
                 Detect(s.Target, now);
                 return;
@@ -216,7 +223,7 @@ namespace Stealth.Enemies
 
         void OnStimulus(Vector3 position, float suspicion, IIntruder source, float now)
         {
-            if (suspicion <= 0f) return;
+            if (suspicion <= 0f || Sleeper) return;
             if (State == RobotState.Chase)
             {
                 if (source != null && source == Target)
@@ -239,7 +246,7 @@ namespace Stealth.Enemies
         /// <summary>Go and check a spot (radio call, alarm, noise). Ignored once it has detected someone.</summary>
         public void Investigate(Vector3 position, bool alarm, float now)
         {
-            if (State == RobotState.Chase || State == RobotState.Alerted) return;
+            if (State == RobotState.Chase || State == RobotState.Alerted || Sleeper) return;
             BeginInvestigation(position, alarm, now);
         }
 
@@ -304,6 +311,11 @@ namespace Stealth.Enemies
             switch (State)
             {
                 case RobotState.Patrol:
+                    if (Sleeper)
+                    {
+                        m_Body.Stop(); // the hunter "sleeps" until someone else spots a player
+                        break;
+                    }
                     m_Body.Move(m_Traits.PatrolSpeed);
                     if (m_Body.Arrived)
                     {

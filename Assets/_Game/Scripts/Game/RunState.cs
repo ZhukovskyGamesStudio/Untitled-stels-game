@@ -43,8 +43,8 @@ namespace Stealth.Game
         public float HatchCountdown = 5f;
         [Tooltip("Seconds the car must stand in a tunnel before the team goes (the countdown on the HUD).")]
         public float VoteDelay = 3f;
-        [Tooltip("Seconds of the drive to the next house (the side view of the car in the tunnel) before the house appears.")]
-        public float DriveTime = 3.5f;
+        [Tooltip("Seconds of the drive to the next house before the house appears: the camera glides out of the cab to the side view (DriveScene.GlideTime), the car speeds up along the tunnel, the screen fades to black for the last 0.7 s.")]
+        public float DriveTime = 6.5f;
         [Tooltip("Seconds of warning before the run ends when the team cannot get the fuel for any way on.")]
         public float StrandedGrace = 12f;
 

@@ -28,6 +28,8 @@ namespace Stealth.Level
         public virtual float Reach => 1.8f;
         /// <summary>Where the hands go (a clear line from the player's hands to here is needed).</summary>
         public virtual Vector3 Point => transform.position + Vector3.up * 0.8f;
+        /// <summary>Colliders under this do not stand between the hands and <see cref="Point"/> (the thing's own body: a car's cab).</summary>
+        public virtual Transform ReachRoot => transform;
 
         /// <summary>The hint for this player, and whether pressing E does something now.</summary>
         public abstract string Prompt(PlayerController player, out bool available);
@@ -58,7 +60,7 @@ namespace Stealth.Level
                 to.y = 0f;
                 float d = to.magnitude;
                 if (d > i.Reach || d >= bestD) continue;
-                if (!Perception.ReachClear(hands, p, i.transform)) continue;
+                if (!Perception.ReachClear(hands, p, i.ReachRoot)) continue;
                 best = i;
                 bestD = d;
             }

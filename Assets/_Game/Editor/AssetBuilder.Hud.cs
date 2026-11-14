@@ -108,6 +108,9 @@ namespace Stealth.EditorTools
             hud.Canvas = (RectTransform)root.transform;
             var content = Stretch(root.transform, "Content");
             hud.Content = content.gameObject;
+            hud.ContentGroup = content.gameObject.AddComponent<CanvasGroup>(); // fades out for the drive scene
+            hud.ContentGroup.interactable = false;
+            hud.ContentGroup.blocksRaycasts = false;
             var white = new Color(1, 1, 1, 0.8f);
 
             // Overlays (full screen, hidden until needed).
@@ -123,9 +126,6 @@ namespace Stealth.EditorTools
             // In the hatch: peeking out at floor level, the rim of the hatch dark around the view.
             hud.HatchTint = Img(Stretch(overlays, "HatchTint"), new Color(0f, 0f, 0f, 1f), S("Vignette"));
             hud.HatchText = Txt(R(overlays, "HatchText", TopCenter, TopCenter, new Vector2(0, -120), new Vector2(700, 40)), "—", 20, TextAnchor.MiddleCenter, new Color(0.7f, 1f, 0.75f, 0.9f), true);
-            // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade)
-            hud.LoadingFade = Img(Stretch(overlays, "LoadingFade"), Color.black);
-            hud.LoadingFade.raycastTarget = false;
             hud.RouteCountdown = Txt(R(overlays, "RouteCountdown", Center, Center, new Vector2(0, 120), new Vector2(300, 100)), "3", 72, TextAnchor.MiddleCenter, new Color(0.6f, 1f, 0.7f, 0.9f), true);
             var alarm = Stretch(overlays, "Alarm");
             hud.AlarmFrame = alarm.gameObject;
@@ -232,6 +232,10 @@ namespace Stealth.EditorTools
             hud.BigMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
             BuildCheatPanel(e, content);
+            // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade):
+            // over everything, outside Content (which fades out on its own while the drive scene plays)
+            hud.LoadingFade = Img(Stretch(root.transform, "LoadingFade"), Color.black);
+            hud.LoadingFade.raycastTarget = false;
             return root;
         }
     }

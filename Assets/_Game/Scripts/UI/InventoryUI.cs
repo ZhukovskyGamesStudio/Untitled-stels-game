@@ -133,7 +133,7 @@ namespace Stealth.UI
 
         void Update()
         {
-            var me = Me;
+            var me = DriveScene.Active != null ? null : Me; // the drive scene shows the car, not the backpack
             Ui.Show(Panel, me != null);
             m_Tooltip = null;
             if (me == null || Mouse.current == null)

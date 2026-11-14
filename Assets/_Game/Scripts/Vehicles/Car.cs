@@ -32,6 +32,8 @@ namespace Stealth.Vehicles
         [Header("Model")]
         [Tooltip("Everything that bounces, pitches and rolls on the suspension.")]
         public Transform Body;
+        [Tooltip("The painted model under Body (mirrored for a left-hand car, CarLook).")]
+        public Transform Model;
         [Tooltip("Front left, front right, rear left, rear right (each pivoted at its centre).")]
         public Transform[] Wheels = new Transform[4];
         public Transform Steering;
@@ -49,6 +51,8 @@ namespace Stealth.Vehicles
         public Transform CargoRoot;
         [Tooltip("The solid hull: what stops at walls.")]
         public BoxCollider Hull;
+        [Tooltip("The solid chassis: pushed out of walls it ended up in (Physics.ComputePenetration).")]
+        public BoxCollider Chassis;
         public AudioSource Engine;
 
         /// <summary>This peer moves the car (the network twin: it owns it). Without a session — always.</summary>
@@ -69,6 +73,7 @@ namespace Stealth.Vehicles
         int m_CargoShown = -1;
         readonly List<CargoPiece> m_Pieces = new();
         static readonly RaycastHit[] s_Hits = new RaycastHit[16];
+        static readonly Collider[] s_Overlaps = new Collider[16];
 
         public IReadOnlyList<ulong> Occupants => m_Occupants;
         public ulong Driver => m_Occupants[0];
@@ -83,6 +88,7 @@ namespace Stealth.Vehicles
         {
             Active = this;
             m_Physics = new CarPhysics(Tuning.Run.Car);
+            if (CarLook.NeedsMirror(m_Physics.Settings)) MirrorSides();
             m_WheelRest = new Quaternion[Wheels.Length];
             for (int i = 0; i < Wheels.Length; i++) if (Wheels[i] != null) m_WheelRest[i] = Wheels[i].localRotation;
             if (Steering != null) m_SteeringRest = Steering.localRotation;
@@ -91,6 +97,18 @@ namespace Stealth.Vehicles
             m_LastPos = transform.position;
             m_LastYaw = transform.eulerAngles.y;
             if (Engine != null) { Engine.loop = true; Engine.volume = 0f; if (Engine.clip != null) Engine.Play(); }
+        }
+
+        /// <summary>The steering wheel to the other side: the model mirrored, the driver's and the passenger's seats swapped.</summary>
+        void MirrorSides()
+        {
+            CarLook.Mirror(Model);
+            for (int i = 0; i < 2 && i < Seats.Length; i++)
+            {
+                if (Seats[i] == null) continue;
+                var p = Seats[i].localPosition;
+                Seats[i].localPosition = new Vector3(-p.x, p.y, p.z);
+            }
         }
 
         void OnDestroy()
@@ -191,7 +209,8 @@ namespace Stealth.Vehicles
         {
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen;
+            bool away = Level.DriveScene.Active != null; // the drive scene shows the car now: this one waits, silent
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !away;
             m_Input = drive
                 ? new CarInput
                 {
@@ -200,7 +219,7 @@ namespace Stealth.Vehicles
                     Brake = Controls.Held(GameAction.Jump),
                 }
                 : new CarInput { Brake = !EngineOn };
-            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning)) m_Input = forced;
+            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning) && !away) m_Input = forced;
             if (drive && Controls.Pressed(GameAction.Horn)) Horn();
 
 
@@ -237,9 +256,72 @@ namespace Stealth.Vehicles
                 distance = Mathf.Max(0f, free - 0.05f);
             }
             var pos = transform.position + dir * distance;
+            // The cast above sweeps the old heading only: turning beside a wall would swing the hull into it. A pose that
+            // ends inside something keeps the old heading (slides on), or turns on the spot, or stays where it was.
+            if (Overlaps(pos, rot))
+            {
+                if (!Overlaps(pos, transform.rotation)) rot = transform.rotation;
+                else if (!Overlaps(transform.position, rot)) pos = transform.position;
+                else { pos = transform.position; rot = transform.rotation; }
+                m_Physics.Bump();
+            }
+            pos = PushedOut(pos, rot); // already in a wall (spawned so, pushed by the network): out of it, never through
             // on the floor: the grate under the wheels (not the car itself, a player, a thing lying around)
             if (Ground(pos, out float floor)) pos.y = Mathf.MoveTowards(pos.y, floor, 4f * dt);
             transform.SetPositionAndRotation(pos, rot);
+        }
+
+        /// <summary>The hull's box for wall checks at a pose: a little lower than the hull and lifted off the floor.</summary>
+        (Vector3 center, Vector3 half) HullBox(Vector3 pos, Quaternion rot)
+        {
+            var half = Vector3.Scale(Hull.size, Hull.transform.lossyScale) * 0.49f;
+            half.y *= 0.7f; // the floor under the wheels is not a wall
+            var local = transform.InverseTransformPoint(Hull.transform.TransformPoint(Hull.center)) + Vector3.up * half.y * 0.35f;
+            return (pos + rot * local, half);
+        }
+
+        /// <summary>Is this collider something the car cannot drive through (not itself, a player or a thing lying around)?</summary>
+        bool Solid(Collider c) =>
+            c != null && !c.isTrigger && !c.transform.IsChildOf(transform)
+            && c.GetComponentInParent<PlayerController>() == null && c.GetComponentInParent<WorldItem>() == null;
+
+        bool Overlaps(Vector3 pos, Quaternion rot)
+        {
+            if (Hull == null) return false;
+            var (center, half) = HullBox(pos, rot);
+            int n = Physics.OverlapBoxNonAlloc(center, half, s_Overlaps, rot, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++) if (Solid(s_Overlaps[i])) return true;
+            return false;
+        }
+
+        /// <summary>The pose moved out of whatever the chassis sits in, sideways only (a few passes for corners).</summary>
+        Vector3 PushedOut(Vector3 pos, Quaternion rot)
+        {
+            if (Chassis == null) return pos;
+            var t = Chassis.transform;
+            var localPos = transform.InverseTransformPoint(t.position);
+            var localRot = Quaternion.Inverse(transform.rotation) * t.rotation;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                var at = pos + rot * localPos;
+                var turn = rot * localRot;
+                var center = at + turn * Vector3.Scale(Chassis.center, t.lossyScale);
+                var half = Vector3.Scale(Chassis.size, t.lossyScale) * 0.5f;
+                int n = Physics.OverlapBoxNonAlloc(center, half, s_Overlaps, turn, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                bool moved = false;
+                for (int i = 0; i < n; i++)
+                {
+                    var c = s_Overlaps[i];
+                    if (!Solid(c)) continue;
+                    if (!Physics.ComputePenetration(Chassis, at, turn, c, c.transform.position, c.transform.rotation, out var away, out float depth)) continue;
+                    away.y = 0f;
+                    if (away.sqrMagnitude < 1e-6f || depth <= 0f) continue;
+                    pos += away.normalized * (depth + 0.01f);
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            return pos;
         }
 
         bool Ground(Vector3 at, out float y)
@@ -317,7 +399,7 @@ namespace Stealth.Vehicles
             if (Engine == null) return;
             if (Engine.clip == null && Sfx.Bank != null) { Engine.clip = Sfx.Bank.CarEngine; if (Engine.clip != null) Engine.Play(); }
             float revs = Mathf.Clamp01(Mathf.Abs(Speed) / Mathf.Max(1f, m_Physics.Settings.MaxSpeed));
-            float target = EngineOn ? 0.55f + 0.35f * revs : 0f;
+            float target = EngineOn && Level.DriveScene.Active == null ? 0.55f + 0.35f * revs : 0f;
             float muffle = AudioDirector.Instance != null ? AudioDirector.Instance.Muffle(transform.position) : 1f;
             Engine.volume = Mathf.MoveTowards(Engine.volume, target * muffle, Time.deltaTime * 1.5f);
             Engine.pitch = Mathf.Lerp(Engine.pitch, 0.8f + revs * 1.1f + Mathf.Abs(m_Input.Throttle) * 0.15f, 1f - Mathf.Exp(-5f * Time.deltaTime));

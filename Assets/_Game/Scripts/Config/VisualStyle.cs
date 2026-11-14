@@ -37,6 +37,9 @@ namespace Stealth.Configs
     /// <summary>What frames the doorways.</summary>
     public enum DoorTrim { None, Casing, Pilasters, Arch }
 
+    /// <summary>Which staircase look a style uses (<see cref="Stealth.Level.StairStyle"/> + 1); Auto — by the model family and the house seed.</summary>
+    public enum StairChoice { Auto, Concrete, Wood, Steel, Glass }
+
     /// <summary>What hangs under the ceiling.</summary>
     public enum CeilingKind { None, Beams, IBeams, Coffers, Trays }
 
@@ -58,6 +61,9 @@ namespace Stealth.Configs
         [Tooltip("Pipes along the walls under the ceiling")] public bool Pipes;
         [Tooltip("Glowing slits in the walls every this many metres (0 = none)")] public float StripSpacing;
         public DoorTrim Doors;
+        [Tooltip("The look of the staircases and gallery railings (Auto = by the model family and the house seed). Whatever the look, " +
+                 "its treads take the floor finish, its solid body the wall finish and its rails and balusters the trim of the style.")]
+        public StairChoice Stairs;
 
         [Header("Ceiling")]
         public CeilingKind Ceiling;

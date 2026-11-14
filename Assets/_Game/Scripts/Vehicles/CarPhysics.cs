@@ -35,6 +35,10 @@ namespace Stealth.Vehicles
         public float PitchPerAccel = 0.35f;
         [Tooltip("Roll of the body in a turn, degrees at full lock and top speed.")]
         public float Roll = 3.5f;
+
+        [Header("Layout")]
+        [Tooltip("Steering wheel on the left (driver's seat on the left, passenger on the right). Off — a right-hand car.")]
+        public bool LeftHandDrive = true;
     }
 
     /// <summary>What the driver does this frame.</summary>

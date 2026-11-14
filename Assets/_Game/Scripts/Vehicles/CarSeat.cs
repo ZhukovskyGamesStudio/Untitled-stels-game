@@ -14,6 +14,8 @@ namespace Stealth.Vehicles
         public override UseKind Kind => UseKind.CarSeat;
         public override float Reach => 2.1f;
         public override Vector3 Point => transform.position + Vector3.up * 0.4f;
+        // the seat is inside the cab: its walls must not hide it from the hands at the door
+        public override Transform ReachRoot => Car != null ? Car.transform : transform;
 
         void Awake() => Index = Seat;
 

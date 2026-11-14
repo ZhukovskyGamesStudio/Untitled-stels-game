@@ -26,10 +26,10 @@ namespace Stealth.EditorTools
         {
             BuildSewerMaterials();
             BuildCarMaterials();
-            var segments = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}.prefab", () => KitPiece($"sewer_seg_{i}", true))).ToArray();
+            var segments = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}.prefab", () => KitPiece($"sewer_seg_{i}", true, KitYaw))).ToArray();
             var cuts = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}Cut.prefab", () => KitPiece($"sewer_seg_{i}_cut", false))).ToArray();
-            var cap = Prefab($"{SewerKit}/Cap.prefab", () => KitPiece("sewer_cap", true));
-            var hub = Prefab($"{SewerKit}/Hub.prefab", () => KitPiece("sewer_hub", true));
+            var cap = Prefab($"{SewerKit}/Cap.prefab", () => KitPiece("sewer_cap", true, KitYaw));
+            var hub = Prefab($"{SewerKit}/Hub.prefab", () => KitPiece("sewer_hub", true, KitYaw));
             var lamp = Prefab($"{SewerKit}/Lamp.prefab", () =>
             {
                 var root = new GameObject("SewerLamp");
@@ -196,11 +196,18 @@ namespace Stealth.EditorTools
             return m;
         }
 
+        /// <summary>
+        /// The drivable kit is modelled along Blender +X, and the FBX import turns Blender +X into Unity −X (and +Y into −Z).
+        /// Turned half round, a piece runs along Unity +X from its origin — where <see cref="SewerLocation"/> puts the next one
+        /// (Blender +Y becomes Unity +Z). The cut-away segments of the drive scene stay as imported: their open side faces its camera.
+        /// </summary>
+        const float KitYaw = 180f;
+
         /// <summary>A kit piece as a prefab of its own (the model at its origin).</summary>
-        static GameObject KitPiece(string file, bool solid)
+        static GameObject KitPiece(string file, bool solid, float yaw = 0f)
         {
             var root = new GameObject(file);
-            SewerModel(file, root.transform, Vector3.zero, 0f, solid, "Model");
+            SewerModel(file, root.transform, Vector3.zero, yaw, solid, "Model");
             return root;
         }
 
@@ -220,8 +227,8 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("SewerGate");
             var gate = root.AddComponent<SewerGate>();
-            SewerModel("sewer_gate_frame", root.transform, Vector3.zero, 0f, true, "Frame");
-            var door = SewerModel("sewer_gate_door", root.transform, Vector3.zero, 0f, false, "Door");
+            SewerModel("sewer_gate_frame", root.transform, Vector3.zero, KitYaw, true, "Frame");
+            var door = SewerModel("sewer_gate_door", root.transform, Vector3.zero, KitYaw, false, "Door");
             var box = door.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, 1.65f, 0f);
             box.size = new Vector3(0.3f, 3.3f, 5.8f);
@@ -243,7 +250,7 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("SewerBranch");
             var b = root.AddComponent<SewerBranch>();
-            SewerModel("sewer_branch", root.transform, Vector3.zero, 0f, true, "Tunnel");
+            SewerModel("sewer_branch", root.transform, Vector3.zero, KitYaw, true, "Tunnel");
             var bars = new GameObject("Bars");
             bars.transform.SetParent(root.transform, false);
             for (int i = 0; i < 12; i++)
@@ -341,6 +348,7 @@ namespace Stealth.EditorTools
             model.transform.SetParent(body.transform, false);
             PaintCar(model);
             car.Body = body.transform;
+            car.Model = model.transform;
             car.Wheels = new[] { "AccentWheelFL", "AccentWheelFR", "AccentWheelRL", "AccentWheelRR" }.Select(n => Find(model, n)).ToArray();
             car.Steering = Find(model, "AccentSteering");
             car.Grinder = Find(model, "AccentHopperGrinder");
@@ -348,7 +356,7 @@ namespace Stealth.EditorTools
             car.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
             car.CargoPrefab = piece;
 
-            // the driver sits behind the steering wheel (whatever side the import put it on), the passenger beside
+            // the driver sits behind the model's steering wheel, the passenger beside (a left-hand car swaps them at runtime: CarLook)
             float driverX = car.Steering != null ? root.transform.InverseTransformPoint(car.Steering.position).x : -0.42f;
             var seatPoints = new[]
             {
@@ -373,6 +381,7 @@ namespace Stealth.EditorTools
             var chassis = Child(root.transform, "Chassis").AddComponent<BoxCollider>();
             chassis.center = new Vector3(0f, 0.6f, 0f);
             chassis.size = new Vector3(1.95f, 0.75f, 4.85f);
+            car.Chassis = chassis;
             var cab = Child(root.transform, "Cab").AddComponent<BoxCollider>();
             cab.center = new Vector3(0f, 1.45f, 0.7f);
             cab.size = new Vector3(1.8f, 0.95f, 1.9f);

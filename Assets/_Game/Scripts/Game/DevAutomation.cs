@@ -117,6 +117,45 @@ namespace Stealth.Game
 
         static PlayerController Me => PlayerController.Local;
 
+        /// <summary>Holds keys on the real keyboard device for a while (a player driving with W, steering with A/D).</summary>
+        static IEnumerator HoldKeys(float seconds, params UnityEngine.InputSystem.Key[] keys)
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb == null) yield break;
+            var settings = UnityEngine.InputSystem.InputSystem.settings;
+            var was = settings.backgroundBehavior;
+            settings.backgroundBehavior = UnityEngine.InputSystem.InputSettings.BackgroundBehavior.IgnoreFocus;
+            if (!kb.enabled) UnityEngine.InputSystem.InputSystem.EnableDevice(kb);
+            float t0 = Time.time;
+            while (Time.time - t0 < seconds)
+            {
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(keys));
+                yield return null;
+            }
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+            yield return null;
+            settings.backgroundBehavior = was;
+        }
+
+        /// <summary>Presses and releases a key on the real keyboard device (what a player's finger does).</summary>
+        static IEnumerator PressKey(UnityEngine.InputSystem.Key key)
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb == null) yield break;
+            // the autotest window runs in the background, where the keyboard is switched off: only for this press
+            var settings = UnityEngine.InputSystem.InputSystem.settings;
+            var was = settings.backgroundBehavior;
+            settings.backgroundBehavior = UnityEngine.InputSystem.InputSettings.BackgroundBehavior.IgnoreFocus;
+            if (!kb.enabled) UnityEngine.InputSystem.InputSystem.EnableDevice(kb);
+            yield return null;
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState(key));
+            yield return null;
+            yield return null;
+            UnityEngine.InputSystem.InputSystem.QueueStateEvent(kb, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+            yield return null;
+            settings.backgroundBehavior = was;
+        }
+
         static void Drive(Vector2 move, bool sprint = false, bool crouch = false, Vector2 look = default) =>
             DevFlags.Autopilot = new PlayerInputState { Move = move, Sprint = sprint, CrouchHeld = crouch, Look = look };
 
@@ -135,6 +174,10 @@ namespace Stealth.Game
             stand.y = floorY + 0.05f;
             return new Pose(stand, Quaternion.LookRotation(Flat(target - stand)));
         }
+
+        /// <summary>Stands at <paramref name="at"/> (feet) facing <paramref name="target"/> and looks right at it.</summary>
+        void LookFrom(Vector3 at, Vector3 target) =>
+            LookAtFrom(new Pose(at, Quaternion.LookRotation(Flat(target - at).sqrMagnitude > 1e-4f ? Flat(target - at) : Vector3.forward)), target);
 
         /// <summary>Teleports in front of a world point and pitches the camera to look right at it.</summary>
         void LookAtFrom(Pose pose, Vector3 target)

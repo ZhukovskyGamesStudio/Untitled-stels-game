@@ -30,6 +30,8 @@ namespace Stealth.UI
         [Header("Root")]
         public RectTransform Canvas;
         public GameObject Content;
+        [Tooltip("Fades the whole HUD out while the drive scene plays (the drive speaks for itself).")]
+        public CanvasGroup ContentGroup;
 
         [Header("Overlays")]
         public Image LowHpVignette;
@@ -191,6 +193,7 @@ namespace Stealth.UI
             m_Banners.Update(now);
             m_Gain.Observe(gm.Collected, now);
             bool driveScene = DriveScene.Active != null; // the drive scene speaks for itself
+            if (ContentGroup != null) ContentGroup.alpha = Mathf.MoveTowards(ContentGroup.alpha, driveScene ? 0f : 1f, Time.deltaTime * 2.5f);
             var context = BuildContext(gm, me);
             CurrentReticle = driveScene ? Reticle.Hidden : ReticleRules.Choose(context);
             HintRules.Collect(context, m_Hints);
@@ -604,6 +607,18 @@ namespace Stealth.UI
         {
             int collected = gm.Collected, quota = gm.Quota;
             bool met = collected >= quota;
+            if (gm.Level.Index < 0)
+            {
+                // the start of the run: the car comes with a full tank and the first drive costs nothing — no quota yet
+                if (HouseLabel.text != Loc.T("hud.sewer")) HouseLabel.text = Loc.T("hud.sewer");
+                Ui.Show(QuotaLabel, false);
+                QuotaBar.Set(1f, new Color(0.3f, 0.9f, 0.4f));
+                Ui.Show(GainLabel, false);
+                ShowHunter(gm);
+                ShowTerminal(PlayerController.Local);
+                return;
+            }
+            Ui.Show(QuotaLabel, true);
             var layout = ActiveLevel.Layout;
             string house = SewerLocation.Active != null || layout == null ? Loc.T("hud.sewer") : HouseKinds.Title(gm.Level.Seed, layout.Kind);
             if (HouseLabel.text != house) HouseLabel.text = house;

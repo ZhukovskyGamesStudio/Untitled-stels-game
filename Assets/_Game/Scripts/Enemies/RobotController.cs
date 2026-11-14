@@ -183,7 +183,8 @@ namespace Stealth.Enemies
 
         /// <summary>
         /// The hunter's only "sense": the nearest player whom some other robot or camera is seeing right now (alerted or
-        /// chasing, focused on them) — the hunter knows where they are and runs there; bumping into it still counts.
+        /// chasing, focused on them) — the hunter knows where they are and runs there. Nothing else wakes it: standing next
+        /// to it or hacking it does not.
         /// </summary>
         Sighting Relayed()
         {
@@ -194,7 +195,6 @@ namespace Stealth.Enemies
                 IIntruder target = p;
                 if (target.IsDown) continue;
                 float d = Vector3.Distance(target.Position, transform.position);
-                if (d <= Senses.ContactDistance) return new Sighting { Target = target, Contact = true, ChasePoint = target.Position };
                 if (d >= nearest || !SpottedByOthers(target.ClientId)) continue;
                 nearest = d;
                 best = new Sighting { Target = target, Rate = 10f, ChasePoint = target.Position };

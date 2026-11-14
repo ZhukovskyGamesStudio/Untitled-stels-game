@@ -204,6 +204,15 @@ namespace Stealth.Game
             Log($"hunter: present={hunter != null}" + (hunter != null ? $" at {hunter.transform.position}, state {hunter.State}" : ""));
             if (hunter != null)
             {
+                // asleep: it stays where it came in, and standing next to it (others hacked, nobody sees us) does not wake it
+                var came = hunter.transform.position;
+                yield return new WaitForSeconds(3f);
+                Log($"hunter asleep: moved {Vector3.Distance(came, hunter.transform.position):0.00} m in 3 s, state {hunter.State}");
+                foreach (var d in Detector.All) if (d != hunter) d.HackServer(60f);
+                Me.TeleportOwner(came + hunter.transform.forward * 0.9f + Vector3.up * 0.05f, Quaternion.LookRotation(-hunter.transform.forward));
+                yield return new WaitForSeconds(3f);
+                Log($"hunter next to the player: moved {Vector3.Distance(came, hunter.transform.position):0.00} m, state {hunter.State} → " +
+                    (hunter.State == RobotState.Patrol ? "SLEEPS" : "WOKE UP"));
                 DevFlags.FreezeRobots = true;
                 var hp = hunter.transform.position;
                 LookAtFrom(ViewPoint(hp, 3.5f), hp + Vector3.up * 1.4f);

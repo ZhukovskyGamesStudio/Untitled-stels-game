@@ -256,6 +256,48 @@ namespace Stealth.Game
             return (c + Vector3.up * 0.05f, c + Vector3.forward * 4f + Vector3.up * 0.6f);
         }
 
+        /// <summary>
+        /// Close-ups of where doorways meet their walls (doors and open passages): from both sides at an angle, at the joint
+        /// of the trim with the wall finish, and up at the head — the style's decor must not stick out at the joint.
+        /// </summary>
+        IEnumerator DoorsScenario()
+        {
+            var l = ActiveLevel.Layout;
+            DevFlags.FreezeRobots = true;
+            int doors = 0, open = 0;
+            foreach (var d in l.Doorways)
+            {
+                if (d.Exterior || d.High) continue;
+                bool isDoor = d.Kind == EdgeType.Door;
+                if (!isDoor && d.Kind != EdgeType.Open) continue;
+                if (isDoor ? doors >= 3 : open >= 3) continue;
+                if (isDoor) doors++; else open++;
+                string tag = $"{(isDoor ? "door" : "open")}{(isDoor ? doors : open)}";
+                var along = d.Rotation * Vector3.right;
+                var across = d.Rotation * Vector3.forward;
+                var joint = d.Position + along * (d.Width / 2f);
+                foreach (float side in new[] { 1f, -1f })
+                {
+                    // standing in the room, off to one side, looking at the jamb where the trim meets the wall
+                    var stand = joint + across * (side * 1.9f) + along * 1.1f;
+                    LookAtFrom(new Pose(stand + Vector3.up * 0.05f, Quaternion.LookRotation(Flat(joint - stand))), joint + Vector3.up * 1.1f);
+                    yield return new WaitForSeconds(0.4f);
+                    yield return Shot($"{tag}_{(side > 0 ? "a" : "b")}_jamb");
+                }
+                // straight on from 2.6 m, and up at the head of the opening from close by
+                var front = d.Position + across * 2.6f;
+                LookAtFrom(new Pose(front + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + Vector3.up * 1.3f);
+                yield return new WaitForSeconds(0.4f);
+                yield return Shot($"{tag}_front");
+                var near = d.Position + across * 1.1f + along * 0.5f;
+                LookAtFrom(new Pose(near + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + along * (d.Width / 2f) + Vector3.up * 2.4f);
+                yield return new WaitForSeconds(0.4f);
+                yield return Shot($"{tag}_head");
+                if (doors >= 3 && open >= 3) break;
+            }
+            Log($"doors: {doors} doors, {open} open passages shot (style {VisualStyles.Current?.name})");
+        }
+
         /// <summary>One screenshot of every room type and every room shape present in the building; atriums from below and above.</summary>
         IEnumerator RoomsScenario()
         {

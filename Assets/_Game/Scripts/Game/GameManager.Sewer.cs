@@ -224,13 +224,14 @@ namespace Stealth.Game
         {
             GoAt = 0;
             if (m_Run.Advance() != RunState.Exit.NextLevel) return;
-            Car.Active?.ClearSeatsServer();
+            // the team stays in its seats: the drive scene starts from their eyes in the cab (out on arrival)
             DriveUntil = Session.ServerTime + m_Run.Settings.DriveTime;
         }
 
         void ArriveServer()
         {
             DriveUntil = 0;
+            Car.Active?.ClearSeatsServer();
             int next = Level.Index + 1, lane = ChosenLane;
             StartLevel(next, lane);
             Banner(Loc.Pack("banner.house", next + 1));

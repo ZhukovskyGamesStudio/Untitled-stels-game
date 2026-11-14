@@ -229,6 +229,7 @@ namespace Stealth.Game
             {
                 m_DriveScene = Instantiate(Art.DriveScene, new Vector3(0f, -400f, 0f), Quaternion.identity);
                 m_DriveEndAt = -1f;
+                BeginDriveScene(m_DriveScene.GetComponent<DriveScene>());
             }
             if (m_DriveScene == null || DriveUntil > 0 || Phase != RunPhase.Playing || ActiveLevel.Layout == null) return;
             if (m_DriveEndAt < 0f) m_DriveEndAt = Time.time + 0.5f; // the house is there: a moment of black, then fade in on it
@@ -237,6 +238,34 @@ namespace Stealth.Game
                 Destroy(m_DriveScene);
                 m_DriveScene = null;
             }
+        }
+
+        /// <summary>The drive starts from where this player's eyes are in the car (the scene glides out to its side view).</summary>
+        static void BeginDriveScene(DriveScene scene)
+        {
+            if (scene == null) return;
+            var me = PlayerController.Local;
+            var car = Vehicles.Car.Active;
+            if (me == null || me.Camera == null || car == null) { scene.Begin(null, 60f, 0.05f, 0f); return; }
+            var eye = me.Camera.transform;
+            var local = car.transform.InverseTransformPoint(eye.position);
+            // at the car (in a seat or beside it): from the eyes; far from it: straight into the side view
+            Pose? inCar = local.magnitude < 8f ? new Pose(local, Quaternion.Inverse(car.transform.rotation) * eye.rotation) : null;
+            // the team rides along: everyone in a seat, as they look now (the driver at the wheel)
+            var riders = new List<DriveScene.Rider>();
+            var back = Quaternion.Inverse(car.transform.rotation);
+            for (int seat = 0; seat < Vehicles.Car.SeatCount; seat++)
+            {
+                var p = PlayerController.Find(car.OccupantOf(seat));
+                if (p == null || p.Visual == null) continue;
+                riders.Add(new DriveScene.Rider
+                {
+                    Visual = p.Visual,
+                    InCar = new Pose(car.transform.InverseTransformPoint(p.Visual.position), back * p.Visual.rotation),
+                    Mine = p == me,
+                });
+            }
+            scene.Begin(inCar, me.Camera.fieldOfView, me.Camera.nearClipPlane, car.Speed, riders);
         }
 
         // ------------------------------------------------------------------ level lifecycle
@@ -482,11 +511,7 @@ namespace Stealth.Game
             if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
             var obj = SpawnRobotServer(RobotKind.Hunter, best, Quaternion.identity);
             if (obj == null) return;
-            // It knows roughly where you are: starts by investigating the nearest player.
-            PlayerController target = null;
-            foreach (var pl in PlayerController.All)
-                if (target == null || Vector3.Distance(pl.transform.position, best) < Vector3.Distance(target.transform.position, best)) target = pl;
-            if (target != null) obj.GetComponent<RobotController>().InvestigateServer(target.transform.position, true);
+            // it sleeps where it came in until someone else spots a player (RobotSenses.FollowsSightings)
             Banner(Loc.Pack("banner.hunter_in"));
             Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_Run.Alarms})");
         }

@@ -92,6 +92,7 @@ namespace Stealth.UI
 
         void Awake()
         {
+            GameSettings.EnsureLoaded();
             m_FriendRows = new UiPool<FriendLobbyRowView>(FriendRowPrefab, FriendList);
             RefreshFriends.onClick.AddListener(() => m_NextFriendsRefresh = 0f);
             HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());

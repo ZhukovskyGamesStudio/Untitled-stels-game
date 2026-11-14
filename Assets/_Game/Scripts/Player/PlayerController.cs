@@ -328,6 +328,9 @@ namespace Stealth.Player
         GameObject m_RigPrefab;
         HumanRig m_Rig;
 
+        /// <summary>What other players see of this one: the style's rigged human if it has one, otherwise the model.</summary>
+        public Transform Visual => m_Rig != null ? m_Rig.transform : Model;
+
         /// <summary>
         /// The style's rigged human (VisualStyles.PlayerRig) in place of the player model: swapped in and out when the style
         /// changes, painted for the slot, a shadow only for the owner (like the model), posed every frame. Purely visual.
@@ -642,7 +645,8 @@ namespace Stealth.Player
             if (seated != m_WasSeated)
             {
                 m_WasSeated = seated;
-                if (!seated && car != null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
+                // getting out beside the car — but not on arrival (the drive scene is up): the house puts us in its hatch
+                if (!seated && car != null && DriveScene.Active == null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
                 if (seated) { transform.rotation = car.transform.rotation; Motor.SetPitch(6f); } // sitting down: eyes on the road
                 m_Controller.enabled = !seated;
                 Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);
@@ -653,6 +657,9 @@ namespace Stealth.Player
             transform.Rotate(0f, car.YawDelta, 0f);
             if (!menu && !CursorMode && Controls.Pressed(GameAction.Interact))
             {
+                // this press is spent: on the host the seat is freed at once, and the same E must not sit us down again
+                // on the seat we are still standing on (UpdateUse runs later this frame)
+                m_UseWaitRelease = true;
                 if (m_Link != null) m_Link.SendUse(UseKind.CarSeat, seat);
                 else GameManager.Instance?.UseServer(this, UseKind.CarSeat, seat);
             }
