@@ -108,9 +108,8 @@ namespace Stealth.EditorTools
             hud.Canvas = (RectTransform)root.transform;
             var content = Stretch(root.transform, "Content");
             hud.Content = content.gameObject;
-            hud.ContentGroup = content.gameObject.AddComponent<CanvasGroup>(); // fades out for the drive scene
-            hud.ContentGroup.interactable = false;
-            hud.ContentGroup.blocksRaycasts = false;
+            // fades out for the drive scene; it stays interactable: the cheat panel and other buttons live under it
+            hud.ContentGroup = content.gameObject.AddComponent<CanvasGroup>();
             var white = new Color(1, 1, 1, 0.8f);
 
             // Overlays (full screen, hidden until needed).

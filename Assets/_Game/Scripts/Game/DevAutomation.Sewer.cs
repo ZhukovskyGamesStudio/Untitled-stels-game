@@ -46,6 +46,14 @@ namespace Stealth.Game
             LookFrom(hall, sewer.transform.TransformPoint(new Vector3(plan.End, 1.4f, 0f)));
             yield return new WaitForSeconds(0.4f);
             yield return Shot("02b_hall");
+            // the panels over the ways on: in front of the end wall, facing the hall, with their text
+            foreach (var b in sewer.Branches)
+                if (b.Sign != null)
+                    Log($"sign {b.Sign.name}: shown {b.Sign.gameObject.activeInHierarchy}, at {sewer.transform.InverseTransformPoint(b.Sign.transform.position)}, " +
+                        $"faces {sewer.transform.InverseTransformDirection(-b.Sign.transform.forward)}, '{b.Sign.Title.text}' / '{b.Sign.Body.text}'");
+            LookFrom(sewer.transform.TransformPoint(new Vector3(plan.End - 7f, 0.1f, 0f)), sewer.transform.TransformPoint(new Vector3(plan.End, 4.2f, 0f)));
+            yield return new WaitForSeconds(0.6f);
+            yield return Shot("02bb_signs");
             // the closed start of the tunnel behind the car, near and from a few metres, and the tunnel's end from the hall
             var capFace = sewer.transform.TransformPoint(new Vector3(0f, 1.3f, 0f));
             LookFrom(sewer.transform.TransformPoint(new Vector3(2.2f, 0.1f, 1.2f)), capFace);

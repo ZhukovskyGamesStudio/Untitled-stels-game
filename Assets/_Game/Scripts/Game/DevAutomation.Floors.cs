@@ -414,6 +414,49 @@ namespace Stealth.Game
             }
         }
 
+        /// <summary>
+        /// A staircase alone in the open (the yard, no fog, the moon and a lamp), in every look, from every side, from above
+        /// and from under the upper flight: everything that is drawn and should not be (a door to nowhere, a hole, a stray
+        /// panel) shows when nothing stands around it.
+        /// </summary>
+        IEnumerator StairsScenario()
+        {
+            DevFlags.FreezeRobots = true;
+            Me.CheatServer(Cheat.Invulnerable, true); // the gas outside
+            var l = ActiveLevel.Layout;
+            var at = new Vector3(-14f, 0f, l.SizeZ / 2f);
+            var stairs = Instantiate(GameManager.Instance.Art.Stairs, at, Quaternion.identity);
+            stairs.GetComponent<StairLook>().Configure(l.Seed);
+            VisualStyles.Dress(stairs);
+            var lamp = Instantiate(GameManager.Instance.Art.FloorLamp, at + new Vector3(5.5f, 0f, 5.5f), Quaternion.identity);
+            RenderSettings.fog = false;
+            var frame = stairs.transform.Find("Looks");
+            Vector3 P(float u, float y, float v) => frame != null ? frame.TransformPoint(new Vector3(u, y, v)) : at + new Vector3(u, y, v);
+            var mid = P(2f, 1.6f, 2f);
+            var views = new (string name, Vector3 from, Vector3 to)[]
+            {
+                ("front", P(2f, 0.05f, -4.5f), mid), ("back", P(2f, 0.05f, 8.5f), mid),
+                ("left", P(-4.5f, 0.05f, 2f), mid), ("right", P(8.5f, 0.05f, 2f), mid),
+                ("corner", P(7f, 0.05f, -3f), mid), ("under", P(5.6f, 0.05f, 3f), P(3f, 1.2f, 3f)),
+                ("above", P(2f, 3.6f, -2.5f), P(2f, 1.8f, 2f)),
+            };
+            for (int look = 0; look < StairStyles.Count; look++)
+            {
+                DevFlags.ForcedStairStyle = look;
+                foreach (var (name, from, to) in views)
+                {
+                    RenderSettings.fog = false;
+                    LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from).sqrMagnitude > 1e-4f ? Flat(to - from) : Vector3.forward)), to);
+                    yield return new WaitForSeconds(0.35f);
+                    yield return Shot($"{(StairStyle)look}_{name}");
+                }
+            }
+            DevFlags.ForcedStairStyle = -1;
+            Log($"stairs: {StairStyles.Count} looks × {views.Length} views (style {VisualStyles.Current?.name})");
+            Destroy(stairs);
+            Destroy(lamp);
+        }
+
         /// <summary>One screenshot of every room type and every room shape present in the building; atriums from below and above.</summary>
         IEnumerator RoomsScenario()
         {

@@ -124,11 +124,11 @@ namespace Stealth.Level
                 }
 
             if (floor == 0)
-            {
-                var h = l.HatchPosition;
-                var hatch = new Rect(h.x - 0.8f, h.z - 0.8f, 1.6f, 1.6f);
-                if (AnyRevealed(map, 0, hatch)) output.Add(new MapRect(MapPart.Hatch, hatch));
-            }
+                foreach (var h in new[] { l.HatchPosition, l.ExitHatchPosition }) // the way in and the way out
+                {
+                    var hatch = new Rect(h.x - 0.8f, h.z - 0.8f, 1.6f, 1.6f);
+                    if (AnyRevealed(map, 0, hatch)) output.Add(new MapRect(MapPart.Hatch, hatch));
+                }
         }
 
         /// <summary>The square of a staircase and its hole in the corner of its room.</summary>

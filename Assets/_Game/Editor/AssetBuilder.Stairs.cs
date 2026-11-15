@@ -137,7 +137,9 @@ namespace Stealth.EditorTools
             k.Span(sub, 0.12f, SLand, 0f, SHalf - topInset, 0.12f, B1);
             for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(sub, u0, u1, 0f, TreadB(j) - topInset, B0, B1); }
             k.Span(sub, SStart, SSize + 0.08f, SH - 0.25f, SH - topInset, B0, B1);
-            k.Span(sub, SSize - 0.06f, SSize + 0.08f, 0f, SH - 0.25f, B0, B1); // the end panel under the top of the upper flight
+            // the end under the top of the upper flight, solid from its last step on: a panel at the very end left a slit
+            // (the last step ends at FlightStart) that showed as a dark hole beside the staircase
+            k.Span(sub, SStart, SSize + 0.08f, 0f, SH - 0.25f, B0, B1);
         }
 
         /// <summary>Tread caps with a nosing (a thin board on every step, a little proud of its front).</summary>
@@ -233,9 +235,6 @@ namespace Stealth.EditorTools
             // the landing's edge: balusters and a flat rail
             for (float u = 0.22f; u < SLand - 0.15f; u += 0.14f) k.Span(3, u - 0.018f, u + 0.018f, SHalf, SHalf + 0.92f, B1 - 0.02f, B1 + 0.016f);
             k.Span(2, 0.12f, SLand - 0.02f, SHalf + 0.92f, SHalf + 0.98f, B1 - 0.04f, B1 + 0.04f);
-            // the closed space under the top of the flight: a cupboard door in its end
-            k.Span(3, SSize + 0.08f, SSize + 0.11f, 0f, 1.95f, B0 + 0.35f, B0 + 1.25f);
-            k.Span(2, SSize + 0.11f, SSize + 0.14f, 0.95f, 1.1f, B0 + 1.1f, B0 + 1.14f);
             // the divider: a panelled wall with a wooden handrail along the lower flight
             k.Span(0, DividerU, SStart, 0f, SH - 0.4f, A1, B0);
             var a0 = new Vector3(DividerU, LineA(DividerU) + 0.9f, A1 - 0.04f);

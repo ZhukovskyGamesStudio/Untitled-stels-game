@@ -40,6 +40,8 @@ namespace Stealth.Level
         [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
         public SewerBranch BranchPrefab;
         public Stealth.UI.RouteSignView SignPrefab;
+        /// <summary>How far in front of the tunnels' mouths the route panels hang: the end wall of the hall is 0.6 m of brick.</summary>
+        public const float SignOffWall = 0.75f;
 
         // built at run time by Build (not in the prefab)
         [NonSerialized] public Transform Water;
@@ -155,7 +157,9 @@ namespace Stealth.Level
                 {
                     sign = Instantiate(SignPrefab, transform);
                     sign.name = $"Sign{i}";
-                    sign.transform.SetLocalPositionAndRotation(at + new Vector3(-0.4f, 4.4f, 0f), Quaternion.Euler(-12f, -90f, 0f));
+                    // over the mouth, 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth),
+                    // its face to the hall (a world-space canvas reads along its +Z: into the tunnel), tipped down a little
+                    sign.transform.SetLocalPositionAndRotation(at + new Vector3(-SignOffWall, 4.4f, 0f), Quaternion.Euler(-12f, 90f, 0f));
                 }
                 Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen };
             }

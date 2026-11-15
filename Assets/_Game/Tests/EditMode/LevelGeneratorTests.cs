@@ -184,5 +184,25 @@ namespace Stealth.Tests
             Assert.Greater(high, 3, "some vents are up under the ceiling");
             Assert.Greater(low, 3, "and some stay low");
         }
+
+        [Test]
+        public void EveryHouseHasTheExitHatchFarFromTheEntry()
+        {
+            var problems = new List<string>();
+            foreach (int seed in Seeds)
+                for (int level = 0; level < 6; level++)
+                    for (int players = 1; players <= 4; players += 3)
+                    {
+                        var l = LevelGenerator.Generate(seed, level, players: players);
+                        var hatches = l.Props.Where(p => p.Kind == PropKind.Hatch).ToList();
+                        string at = $"seed {seed} house {level} players {players}";
+                        if (hatches.Count != 2) problems.Add($"{at}: {hatches.Count} hatches");
+                        if (!hatches.Any(h => (h.Position - l.ExitHatchPosition).sqrMagnitude < 0.01f)) problems.Add($"{at}: no hatch at the exit");
+                        if ((l.ExitHatchPosition - l.HatchPosition).magnitude < 6f) problems.Add($"{at}: exit {(l.ExitHatchPosition - l.HatchPosition).magnitude:0.0} m from the entry");
+                        var room = l.RoomAt(l.ExitHatchPosition);
+                        if (room == null || room.Floor != 0) problems.Add($"{at}: the exit hatch at {l.ExitHatchPosition} is not in a ground floor room");
+                    }
+            Assert.IsEmpty(problems, string.Join("; ", problems));
+        }
     }
 }

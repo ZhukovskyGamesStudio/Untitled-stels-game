@@ -240,7 +240,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 (`SewerLocation.BranchAt(машина)`, `GameManager.UpdateSewer`, отсчёт `RunSettings.VoteDelay`) → `DepartServer` → `DriveUntil`
 (реплицируется): каждый пир показывает `DriveScene` (`LevelArt.DriveScene`: бесконечный туннель из `_cut`-сегментов, пикап в профиль, длинный
 объектив) → `ArriveServer` → `StartLevel`; экран темнеет и проясняется на доме (`GameHUD.ShowLoadingFade`). Панели над туннелями —
-`RouteSignView`/`SewerRoute`. Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
+`RouteSignView`/`SewerRoute` (коротко: тип дома и номер, этажи и охрана, отсчёт; висят в `SewerLocation.SignOffWall` перед торцевой стеной зала). Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
 
 **Особые места дома** — чистый `HouseFeatures` (каждое — свой поток рандома), настройки `LevelConfig.Features` (`FeatureSettings`):
 типы домов `HouseKinds` + `Location` (офис — пять характеров, больница, автомастерская); главное место (`LevelLayout.PointOfInterest`,
@@ -342,7 +342,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 **Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
 дерево с балясинами, открытая сталь с сеткой, белый камень со стеклом), меши генерирует `AssetBuilder.Stairs` (`Art/Models/Stairs`); выбор — `StairStyles.Pick`
 по семейству стиля и сиду дома или вид, который просит стиль (`StyleGeometry.Stairs`; у стиля по умолчанию — дерево), `StairLook` переключает при F8
-и одевает лестницу в архитектуру стиля: ступени — отделка пола, тело — отделка стен, балясины и поручни — его молдинг (`StairStyles.Parts`: роль каждого слота материала). Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью.
+и одевает лестницу в архитектуру стиля: ступени — отделка пола, тело — отделка стен, балясины и поручни — его молдинг (`StairStyles.Parts`: роль каждого слота материала). Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью (торец под верхом марша — сплошной от последней ступени);
+сценарий `stairs` ставит лестницу одну во дворе и снимает каждый вид со всех сторон.
 **Лазы** — короб вентиляции: порог `LevelMetrics.VentSill` (кусок стены), над ним `VentHeight`, облицовка, фланцы и снятая решётка у стены (префаб `Level/VentFrame`).
 Часть лазов — под потолком (`PlanOpening.High`, `Doorway.High`; `LevelGenerator.RaiseVents`, свой поток рандома, `BuildingSettings.HighVentChance`): порог `HighVentSill`,
 под ним с обеих сторон обычный письменный стол у стены (`Furnisher.PlaceVentDesks`, не убирается проверкой проходимости) — запрыгнуть на стол, пригнуться, шагнуть в короб;

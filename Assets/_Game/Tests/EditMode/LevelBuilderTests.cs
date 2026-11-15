@@ -16,6 +16,18 @@ namespace Stealth.Tests
         static readonly Vector2Int[] Corners = { new(1, 1), new(-1, -1), new(1, -1), new(-1, 1) };
 
         [Test]
+        public void TheBuiltHouseHasBothHatches([Values(7, 42, 1337)] int seed, [Values(0, 3)] int level)
+        {
+            var l = LevelGenerator.Generate(seed, level);
+            ActiveLevel.Load(l, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
+            var hatches = Object.FindObjectsByType<Hatch>(FindObjectsSortMode.None);
+            Assert.AreEqual(2, hatches.Length, "the way in and the way out");
+            Assert.IsTrue(hatches.Any(h => (h.transform.position - l.ExitHatchPosition).magnitude < 0.1f), "one stands at the exit");
+            foreach (var h in hatches)
+                Assert.IsTrue(h.GetComponentsInChildren<Renderer>().Any(r => r.enabled), "and it is drawn");
+        }
+
+        [Test]
         public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner)
         {
             var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner };

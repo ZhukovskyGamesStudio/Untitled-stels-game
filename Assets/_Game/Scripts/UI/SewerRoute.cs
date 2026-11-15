@@ -9,9 +9,8 @@ namespace Stealth.UI
 {
     /// <summary>
     /// The ways on in the sewer (on the prefab Level/Sewer): opens as many tunnels as the route has ways from here and fills
-    /// the panel over each one — the house it leads to (kind, size, floors, guards, cameras, dark rooms), who stands in it,
-    /// the countdown once everyone has chosen, and a warning while the quota is not paid. A panel comes up fully when you
-    /// look at its tunnel. Presenter only: the vote itself is decided by the server from where players stand.
+    /// the panel over each one — short: the house it leads to (kind and number), its floors and guards, the countdown once
+    /// the car stands in that tunnel. A panel comes up fully when you look at its tunnel. Presenter only: the vote itself is decided by the server from where players stand.
     /// </summary>
     public class SewerRoute : MonoBehaviour
     {
@@ -32,7 +31,6 @@ namespace Stealth.UI
             m_Sewer.ShowWays(options.Count);
             var me = PlayerController.Local;
             var cam = me != null && me.Camera != null ? me.Camera.transform : null;
-            int need = Mathf.Max(0, gm.Quota - gm.Collected);
             for (int tunnel = 0; tunnel < m_Sewer.Branches.Length; tunnel++)
             {
                 int way = SewerBranches.WayOf(tunnel, options.Count);
@@ -41,7 +39,7 @@ namespace Stealth.UI
                 int lane = options[way];
                 var node = gm.Route.Node(gm.Level.Index + 1, lane);
                 sign.Title.text = Loc.F("route.title", RouteNode.KindName(node.Kind), gm.Level.Index + 2);
-                sign.Body.text = Preview(node, gm) + (need > 0 ? "\n<color=#FF8A70>" + Loc.F("route.need", need) + "</color>" : "");
+                sign.Body.text = Preview(node, gm); // the fuel the trip costs is the same for every way: not shown
 
                 string voters = "";
                 foreach (var p in PlayerController.All)
@@ -73,9 +71,8 @@ namespace Stealth.UI
             if (m_Previews.TryGetValue(node.Seed, out var text)) return text;
             var level = Tuning.Level;
             var l = LevelGenerator.Generate(node.Seed, node.Depth, level.Building, level.Security, Mathf.Max(1, PlayerController.All.Count), level.Features);
-            int dark = 0;
-            foreach (var r in l.Rooms) if (r.Dark) dark++;
-            text = Loc.F("route.preview", l.Floors, l.Rooms.Count, l.RobotSpawns.Count, l.CameraSpots.Count, l.LaserSpots.Count, dark, l.LockedDoors.Count);
+            // only what tells the ways apart at a glance: how big, how guarded
+            text = Loc.F("route.preview", l.Floors, l.RobotSpawns.Count);
             m_Previews[node.Seed] = text;
             return text;
         }

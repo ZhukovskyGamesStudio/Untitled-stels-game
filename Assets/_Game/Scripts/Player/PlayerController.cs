@@ -738,12 +738,31 @@ namespace Stealth.Player
         public Items.SafeLock.Result LastTry { get; private set; }
         public float LastTryTime { get; private set; } = -10f;
         int m_CrackStartFrame;
+        /// <summary>
+        /// The dials this player has worked on in this house: walking away from a safe keeps the digits already found
+        /// (two found, a walk, the third next time). Safes are new objects in every house, so stale keys just drop out.
+        /// </summary>
+        readonly Dictionary<Items.SafeBox, Items.SafeLock> m_Dials = new();
+
+        /// <summary>The dial of this safe as it was left, or a new one (its code from the safe's seed).</summary>
+        Items.SafeLock DialOf(Items.SafeBox safe)
+        {
+            if (m_Dials.TryGetValue(safe, out var dial)) return dial;
+            var stale = new List<Items.SafeBox>();
+            foreach (var k in m_Dials.Keys) if (k == null) stale.Add(k);
+            foreach (var k in stale) m_Dials.Remove(k);
+            var settings = Tuning.Items.Safes;
+            dial = new Items.SafeLock(safe.Seed, settings);
+            dial.SetDial(new System.Random(safe.Seed ^ Time.frameCount).Next(settings.DialSize));
+            m_Dials[safe] = dial;
+            return dial;
+        }
 
         /// <summary>Test hook: start cracking this safe as if E was pressed next to it.</summary>
         public void StartCrackForTest(Items.SafeBox safe)
         {
             if (safe == null) { Cracking = null; CrackingSafe = null; return; }
-            Cracking = new Items.SafeLock(safe.Seed, Tuning.Items.Safes);
+            Cracking = DialOf(safe);
             CrackingSafe = safe;
             m_CrackStartFrame = Time.frameCount;
         }
@@ -754,9 +773,7 @@ namespace Stealth.Player
             if (Cracking == null)
             {
                 if (SafeTarget == null || !Controls.Pressed(GameAction.Interact) || CursorMode) return;
-                var settings = Tuning.Items.Safes;
-                Cracking = new Items.SafeLock(SafeTarget.Seed, settings);
-                Cracking.SetDial(new System.Random(SafeTarget.Seed ^ Time.frameCount).Next(settings.DialSize));
+                Cracking = DialOf(SafeTarget); // the digits found before are still found
                 CrackingSafe = SafeTarget;
                 m_CrackStartFrame = Time.frameCount;
                 LastTry = Items.SafeLock.Result.Nothing;
