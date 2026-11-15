@@ -283,8 +283,8 @@ def model_desk():
         box((1.5, 0.03, 0.4), (0, 0.36, 0.52)),
     ])
     merge("Eye", [
-        box((0.55, 0.04, 0.34), (0, 0.15, 0.98)),                   # monitor
-        box((0.06, 0.06, 0.2), (0, 0.19, 0.84)),                    # its stand, 1 cm into the monitor
+        box((0.7, 0.05, 0.43), (0, 0.14, 1.19)),                    # monitor (a big one: the player is 1.8 m)
+        box((0.07, 0.07, 0.24), (0, 0.19, 0.885)),                  # its stand, 1.5 cm into the monitor
     ])
     raise_top(DESK_TOP, DESK_TOP_NEW)
     export("desk")
@@ -504,7 +504,8 @@ def model_reception_desk():
     """Front counter 2.4 x 0.8: high front panel towards the visitor (-Y), work top behind."""
     merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.08, 0.8, 1.1), (-1.16, 0, 0.55)), box((0.08, 0.8, 1.1), (1.16, 0, 0.55))])
     merge("Accent", [box((2.5, 0.3, 0.04), (0, -0.33, 1.12)), box((2.3, 0.7, 0.04), (0, 0.02, 0.74))])
-    merge("Eye", [box((0.5, 0.04, 0.32), (0.4, 0.15, 0.96)), box((0.06, 0.06, 0.2), (0.4, 0.2, 0.82))])
+    merge("Eye", [box((0.62, 0.05, 0.4), (0.4, 0.15, 1.0)), box((0.07, 0.07, 0.2), (0.4, 0.2, 0.84))])
+    raise_top(0.76, DESK_TOP_NEW)  # the work top at the office desk's height
     export("reception_desk")
 
 

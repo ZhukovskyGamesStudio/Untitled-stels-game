@@ -6,6 +6,7 @@ Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's 
   shovel      1 x 4 cells (ItemCatalog.Shovel)       Art/Models/Items/item_shovel_model.fbx
   flashlight  1 x 3 cells (ItemCatalog.Flashlight)   Art/Models/Items/item_flashlight_model.fbx
   battery     1 x 1 cell  (ItemCatalog.Battery)      Art/Models/Items/item_battery_model.fbx
+  diamond, key, cagekey, stun (2 x 2), speaker (2 x 1)  the tools and the crafted diamond, seen three-quarter
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
 a dark outline so it reads on any cell colour. The UI turns and mirrors the picture with the item.
@@ -23,7 +24,8 @@ OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "
 MODELS = os.path.abspath(argv[1] if len(argv) > 1 else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models"))
 CELL = 128
 
-# id: (cells wide, cells tall, model file, {part prefix: (colour, metallic, roughness, emission)})
+# id: (cells wide, cells tall, model file (Items/ unless a folder is given), {part prefix: (colour, metallic, roughness,
+# emission)}, view: "top" — lying things seen from above, "front" — standing things seen three-quarter from the front)
 ITEMS = {
     "shovel": (1, 4, "item_shovel_model", {
         "Body": ((0.42, 0.26, 0.12), 0.0, 0.6, 0.0),
@@ -35,6 +37,15 @@ ITEMS = {
     "battery": (1, 1, "item_battery_model", {
         "Body": ((0.1, 0.38, 0.85), 0.0, 0.35, 0.0),
         "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}),
+    # the tools and the crafted diamond: their own models in the world, pictures in the backpack too
+    "diamond": (1, 1, "item_diamond", {"Body": ((0.75, 0.92, 1.0), 0.0, 0.05, 0.25)}, "front"),
+    "key": (1, 1, "item_key", {"Body": ((0.95, 0.72, 0.2), 0.95, 0.25, 0.0)}, "front"),
+    "cagekey": (1, 1, "item_key", {"Body": ((0.55, 0.85, 0.2), 0.9, 0.3, 0.0)}, "front"),
+    "stun": (2, 2, "item_stun", {"Body": ((0.15, 0.75, 0.85), 0.3, 0.3, 0.35)}, "front"),
+    "speaker": (2, 1, "Props/lure_speaker", {
+        "Body": ((0.14, 0.15, 0.16), 0.2, 0.5, 0.0),
+        "EyeLed": ((0.3, 1.0, 0.6), 0.0, 0.3, 2.0),
+        "Accent": ((0.05, 0.05, 0.05), 0.1, 0.6, 0.0)}, "front"),
 }
 
 
@@ -65,10 +76,11 @@ def bounds(objs):
     return lo, hi
 
 
-def render(item_id, wide, tall, model, looks):
+def render(item_id, wide, tall, model, looks, view="top"):
     clear()
     scene = bpy.context.scene
-    bpy.ops.import_scene.fbx(filepath=os.path.join(MODELS, "Items", model + ".fbx"))
+    path = os.path.join(MODELS, model + ".fbx") if "/" in model else os.path.join(MODELS, "Items", model + ".fbx")
+    bpy.ops.import_scene.fbx(filepath=path)
     objs = [o for o in scene.objects if o.type == "MESH"]
     for o in objs:
         role = next((k for k in sorted(looks, key=len, reverse=True) if o.name.startswith(k)), "Body")
@@ -83,25 +95,36 @@ def render(item_id, wide, tall, model, looks):
     for o in [o for o in scene.objects if o.parent is None and o is not holder]:
         o.location -= centre
         o.parent = holder
-    holder.rotation_euler = Euler((0, 0, math.radians(90)))   # +X (the head) → +Y (up in the picture)
+    if view == "top":
+        # a lying thing: its length (X in the file) along the picture's longer side, its head up / to the right
+        holder.rotation_euler = Euler((0, 0, math.radians(90) if tall > wide else 0))
     bpy.context.view_layer.update()
-    lo, hi = bounds(objs)
-    w, h = hi.x - lo.x, hi.y - lo.y
 
     cam_data = bpy.data.cameras.new("cam")
     cam_data.type = "ORTHO"
+    cam = bpy.data.objects.new("cam", cam_data)
+    scene.collection.objects.link(cam)
+    # top: from above with a little tilt (the sides read); front: three-quarter from the front (-Y) and above
+    tilt = math.radians(7 if view == "top" else 58)
+    cam.location = (0, -3.0 * math.sin(tilt), 3.0 * math.cos(tilt))
+    cam.rotation_euler = Euler((tilt, 0, 0))
+    if view == "front":
+        holder.rotation_euler = Euler((0, 0, math.radians(-25)))  # turned a little: two sides show
+    scene.camera = cam
+    bpy.context.view_layer.update()
+    # fit: the model's corners seen from the camera, the frame's aspect from the cells
+    inv = cam.matrix_world.inverted()
+    pts = [inv @ (o.matrix_world @ Vector(c)) for o in objs for c in o.bound_box]
+    w = max(p.x for p in pts) - min(p.x for p in pts)
+    h = max(p.y for p in pts) - min(p.y for p in pts)
+    cx = (max(p.x for p in pts) + min(p.x for p in pts)) / 2
+    cy = (max(p.y for p in pts) + min(p.y for p in pts)) / 2
+    cam.location = cam.matrix_world @ Vector((cx, cy, 0))
     margin = 1.12
-    # Blender's ortho scale covers the longer side of the frame
-    if tall >= wide:
+    if tall >= wide:  # Blender's ortho scale covers the longer side of the frame
         cam_data.ortho_scale = max(h * margin, w * margin * tall / wide)
     else:
         cam_data.ortho_scale = max(w * margin, h * margin * wide / tall)
-    cam = bpy.data.objects.new("cam", cam_data)
-    scene.collection.objects.link(cam)
-    tilt = math.radians(7)                                     # a little tilt: the sides read
-    cam.location = (0, -2.0 * math.sin(tilt), 2.0 * math.cos(tilt))
-    cam.rotation_euler = Euler((tilt, 0, 0))
-    scene.camera = cam
 
     for name, rot, energy, size in (("key", (math.radians(40), math.radians(-30), math.radians(20)), 3.5, 0.4),
                                     ("rim", (math.radians(-55), math.radians(35), 0), 2.0, 0.2)):
@@ -162,5 +185,5 @@ def outline(path, px=4):
     im.save()
 
 
-for item, (wide, tall, model, looks) in ITEMS.items():
-    render(item, wide, tall, model, looks)
+for item, spec in ITEMS.items():
+    render(item, *spec)

@@ -322,12 +322,12 @@ def desk():
         open_ = 0.14 if k == 1 else 0.0
         box("Paint", 0.32, 0.69, -0.37 - open_, -0.34 - open_, z, z + 0.15, panel=True)
         box("Steel", 0.45, 0.56, -0.39 - open_, -0.37 - open_, z + 0.1, z + 0.12)
-    zc = crt(0.02, 0.0, 0.74, w=0.36, h=0.28, depth=0.36, face=-1, kind="ScreenText")
+    zc = crt(0.02, 0.0, 0.74, w=0.46, h=0.36, depth=0.44, face=-1, kind="ScreenText")  # a big CRT: the player is 1.8 m
     box("Composite", -0.12, -0.04, -0.005, -0.004, zc + 0.12, zc + 0.15, bev=0.0)               # a sticky note on the bezel
-    keyboard(0.0, -0.24, 0.74, face=-1, missing={(2, 3), (3, 11), (1, 7)})
+    keyboard(0.0, -0.26, 0.74, face=-1, missing={(2, 3), (3, 11), (1, 7)}, w=0.56, d=0.19)
     box("Rubber", 0.28, 0.48, -0.32, -0.12, 0.74, 0.743, bev=0.0)                              # mouse pad
-    sphere("Composite", 0.37, -0.22, 0.755, 0.03, seg=12, sz=0.55)                             # mouse
-    cable((0.37, -0.19, 0.755), (0.2, 0.3, 0.74), sag=-0.01, r=0.003)
+    sphere("Composite", 0.4, -0.22, 0.757, 0.036, seg=12, sz=0.55)                             # mouse
+    cable((0.4, -0.19, 0.757), (0.2, 0.3, 0.74), sag=-0.01, r=0.003)
     tower(-0.55, -0.02, 0.0, face=-1)
     cable((-0.55, 0.2, 0.3), (0.0, 0.25, 0.85), sag=0.25, r=0.006)
     cable((-0.6, 0.22, 0.15), (-0.7, 0.4, 0.0), sag=0.05, r=0.006)
@@ -374,6 +374,11 @@ def reception_desk():
     mug(0.95, 0.3, 0.7)
     cable((-0.75, 0.3, 0.75), (-1.0, 0.42, 0.0), sag=0.15)
     cable((0.75, 0.3, 0.75), (1.1, 0.42, 0.0), sag=0.12)
+    top, lift = 0.72, DESK_TOP_NEW - 0.76                                                    # the base counter's
+    for bms in parts.values():                                                                 # work top goes from 0.76
+        for bm in bms:                                                                         # to the desks' height
+            for v in bm.verts:
+                v.co.z = v.co.z * (top + lift) / top if v.co.z <= top + 1e-4 else v.co.z + lift
     export("reception_desk")
 
 

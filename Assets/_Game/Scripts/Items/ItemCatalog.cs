@@ -183,10 +183,34 @@ namespace Stealth.Items
         static Vector2Int V(int x, int y) => new Vector2Int(x, y);
 
         /// <summary>
-        /// The flashlight and the batteries burn into fuel like loot (in the car's hopper, into the entry hatch): worth
-        /// their cells at the grey colour's rate, whatever their charge (their colour byte holds the charge).
+        /// The flashlight burns into fuel like loot (in the car's hopper, into the entry hatch), worth its cells at the grey
+        /// colour's rate whatever its charge (its colour byte holds the charge). Batteries have a colour like any loot.
         /// </summary>
-        static bool Plain(int shape) => shape == Flashlight || shape == Battery;
+        static bool Plain(int shape) => shape == Flashlight;
+
+        /// <summary>The value of a loot item in cells of the grey colour, on average (its cells × the mean colour multiplier).</summary>
+        public static float MeanValueCells(int shape)
+        {
+            if (Plain(shape)) return Shapes[shape].Cells.Length * Colors[0].Multiplier;
+            float w = 0f, m = 0f;
+            foreach (var c in Colors) { w += c.SpawnWeight; m += c.SpawnWeight * c.Multiplier; }
+            return Shapes[shape].Cells.Length * (w > 0f ? m / w : 1f);
+        }
+
+        /// <summary>
+        /// How many items of the loot table make up the value the old loot (the tetris pieces, drawn evenly) had: the
+        /// house's loot budget, and so its quota (a share of the loot's value), stays as it was whatever the table is.
+        /// </summary>
+        public static float ItemsPerOldItem()
+        {
+            float old = 0f;
+            for (int i = 0; i < LootShapes; i++) old += MeanValueCells(i);
+            old /= LootShapes;
+            float now = 0f, w = 0f;
+            foreach (var t in LootTable) { now += t.weight * MeanValueCells(t.shape); w += t.weight; }
+            now = w > 0f ? now / w : old;
+            return now > 0f ? old / now : 1f;
+        }
 
         public static int Value(int shape, int color) =>
             IsTool(shape) ? 0
@@ -263,7 +287,7 @@ namespace Stealth.Items
             Diamond => Loc.F("item.diamond", ColorName(color), Value(shape, color)),
             Shovel => Loc.F("item.shovel", ColorName(color), Value(shape, color)),
             Flashlight => Loc.F("item.flashlight", Mathf.Min(color, FullCharge)),
-            Battery => Loc.T("item.battery"),
+            Battery => Loc.F("item.battery", Value(shape, color)),
             _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
         };
     }

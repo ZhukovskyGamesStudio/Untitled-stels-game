@@ -168,7 +168,43 @@ def build(name, L, design):
     if getattr(L, "voxel", 0.0) > 0.0:
         voxel.voxelize(objs, L.voxel)  # a voxel style: every part rebuilt from cubes
     objs += fillers(name, objs)
+    taller(name, objs)
     return objs
+
+
+# The office desks are taller than they were drawn (generate_models.DESK_TOP_NEW): every style's design is raised the
+# same way — what is under the old top stretches, what stands on it lifts — and its screens grow to the original's.
+TALLER = {"desk": 0.765, "terminal": 0.765, "reception_desk": 0.76}
+DESK_TOP_NEW = 0.918
+
+
+def taller(name, objs):
+    if name not in TALLER:
+        return
+    top = TALLER[name]
+    k = DESK_TOP_NEW / top
+    bpy.context.view_layer.update()
+    for o in objs:
+        mw, inv = o.matrix_world, o.matrix_world.inverted()
+        for v in o.data.vertices:
+            w = mw @ v.co
+            w.z = w.z * k if w.z <= top + 1e-4 else w.z + top * (k - 1)
+            v.co = inv @ w
+    want = contract(name).get("Eye")
+    for o in objs:
+        if not o.name.startswith("Eye") or want is None:
+            continue
+        lo, hi = bounds(o)
+        h0, h1 = want[1][2] - want[0][2], hi[2] - lo[2]
+        if h1 <= 1e-4:
+            continue
+        f = max(1.0, min(1.6, h0 / h1))                    # the screens as big as the original's (never smaller)
+        piv = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2])
+        mw, inv = o.matrix_world, o.matrix_world.inverted()
+        for v in o.data.vertices:
+            w = mw @ v.co
+            w.x, w.y, w.z = piv[0] + (w.x - piv[0]) * f, piv[1] + (w.y - piv[1]) * f, piv[2] + (w.z - piv[2]) * f
+            v.co = inv @ w
 
 
 def fillers(name, objs):
@@ -191,8 +227,7 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     root = argv[0] if argv and not argv[0].startswith("--") else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
     opt = {argv[i]: argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else "" for i in range(len(argv)) if argv[i].startswith("--")}
-    # this branch plays only S16 «Заброшенный комплекс»: the other styles are built only when named with --styles
-    styles = opt["--styles"].split(",") if opt.get("--styles") else ["S16_Derelict"]
+    styles = opt["--styles"].split(",") if opt.get("--styles") else list(STYLES)
     if "--base" in opt:
         styles = ["Base"] + styles if "--styles" not in opt else styles
     only = set(opt["--only"].split(",")) if opt.get("--only") else None

@@ -588,6 +588,17 @@ def model_console_desk():
     lights.append(s.rbox((1.9, 0.02, 0.008), loc, r=0.002, seg=1, rot=rot))
     lights.append(s.rbox((0.07, 0.04, 0.006), (0.98, -0.185, 0.826), r=0.002, seg=1))
     s.part("Eye", screens + lights)
+    # the work top at the office desks' height (0.918, generate_models.DESK_TOP_NEW): under it stretches, on it lifts
+    top, new = 0.76, 0.918
+    import bpy
+    bpy.context.view_layer.update()
+    for obj in [o for o in bpy.context.scene.objects if o.type == "MESH"]:
+        mw = obj.matrix_world
+        inv = mw.inverted()
+        for v in obj.data.vertices:
+            w = mw @ v.co
+            w.z = w.z * new / top if w.z <= top + 1e-4 else w.z + (new - top)
+            v.co = inv @ w
     return export("console_desk")
 
 

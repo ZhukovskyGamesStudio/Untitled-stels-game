@@ -54,7 +54,9 @@ namespace Stealth.Items
         {
             s ??= new LootSettings();
             int count = s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
-            return l.Location == Location.Office ? Mathf.RoundToInt(count * s.OfficeItems) : count;
+            if (l.Location == Location.Office) count = Mathf.RoundToInt(count * s.OfficeItems);
+            // the budget is the value the tetris loot had: fewer items when the table's are worth more, more when less
+            return Mathf.RoundToInt(count * ItemCatalog.ItemsPerOldItem());
         }
 
         /// <summary>

@@ -47,7 +47,6 @@ namespace Stealth.EditorTools
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
             {
-                if (!EnabledStyles.Contains(def.name)) continue; // the other styles stay on disk, out of the game
                 var path = $"{StylesDir}/{def.name}.asset";
                 var asset = AssetDatabase.LoadAssetAtPath<VisualStyle>(path);
                 if (asset != null && rebuild) { EditorUtility.CopySerialized(def, asset); asset.name = def.name; EditorUtility.SetDirty(asset); }
@@ -63,8 +62,8 @@ namespace Stealth.EditorTools
                 AssetDatabase.CreateAsset(config, StyleConfigPath);
             }
             config.Styles = styles.ToArray();
-            // the game's look: the abandoned facility (the only style of this branch)
-            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S16_Derelict");
+            // the game's look (chosen by hand later; first time: the storybook style)
+            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
             config.Building = MaterialsIn("Environment");
             config.Furniture = MaterialsIn("Props");
             config.Robots = MaterialsIn("Robots");
@@ -89,13 +88,6 @@ namespace Stealth.EditorTools
             if (root != null && root.Styles != config) { root.Styles = config; EditorUtility.SetDirty(root); }
             AssetDatabase.SaveAssets();
         }
-
-        /// <summary>
-        /// The styles in the game (F8 cycles through them). This branch plays only «Заброшенный комплекс»: the other style
-        /// assets stay on disk but are not built into the game, and the model generators make nothing for them
-        /// (Tools/Blender: style_families, style_kit, build_bestiary, players default to S16 / the derelict family).
-        /// </summary>
-        static readonly string[] EnabledStyles = { "S16_Derelict" };
 
         /// <summary>
         /// Models designed for one style: every robot, device and sensor module (Tools/Blender/build_bestiary.py →
