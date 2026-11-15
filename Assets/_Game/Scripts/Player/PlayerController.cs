@@ -808,7 +808,7 @@ namespace Stealth.Player
             if (UseTarget == null || !UseAvailable || m_UseWaitRelease) { UseProgress = 0f; return; }
             float hold = UseTarget.HoldTime;
             bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, Time.deltaTime, hold);
-            UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) : 0f;
+            UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) / hold : 0f; // the ring is a share of the hold, not seconds
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved

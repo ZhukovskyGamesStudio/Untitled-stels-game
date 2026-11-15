@@ -188,6 +188,8 @@ namespace Stealth.Game
         /// <summary>Every peer: build the sewer when the run is there, take it away when a house starts, flood it when the run ends there.</summary>
         void SyncLocation()
         {
+            // a new run after the water rose (or another run's sewer): built afresh, dry
+            if (Phase == RunPhase.Sewer && m_Sewer != null && (m_Sewer.Flooded || m_SewerFor != (Level.RunSeed, Level.Index))) LeaveSewerLocal();
             if (Phase == RunPhase.Sewer && m_Sewer == null) EnterSewerLocal();
             else if (Phase == RunPhase.Playing)
             {
@@ -208,6 +210,7 @@ namespace Stealth.Game
             if (Art.Sewer == null) { Debug.LogError("[Game] LevelArt has no sewer"); return; }
             m_Sewer = Instantiate(Art.Sewer).GetComponent<SewerLocation>();
             m_Sewer.Build(SewerPlan.Make(Level.RunSeed, Level.Index));
+            m_SewerFor = (Level.RunSeed, Level.Index);
             ApplyAtmosphere();
             VisualStyles.Dress(m_Sewer.gameObject);
             Debug.Log("[Game] In the sewer");
@@ -220,6 +223,7 @@ namespace Stealth.Game
         }
 
         GameObject m_DriveScene;
+        (int seed, int depth) m_SewerFor;
         float m_DriveEndAt = -1f;
 
         /// <summary>Every peer: the drive scene from the departure until the next house stands (under the black of the fade).</summary>
@@ -432,6 +436,8 @@ namespace Stealth.Game
             if (Phase == RunPhase.Sewer) { UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
+            UpdateDryers();
+            UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
             if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
@@ -563,8 +569,8 @@ namespace Stealth.Game
         /// </summary>
         void UpdateHatch()
         {
-            // only the exit hatch takes the team down
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
+            // everyone in a hatch (either one), at least one in the exit's
+            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch, p.HatchIndex == 1, p.KnockedOut)));
             if (!hidden) { LeaveAt = 0; return; }
             if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
             else if (Session.ServerTime >= LeaveAt) GoToSewerServer();

@@ -183,6 +183,9 @@ namespace Stealth.Level
         /// from the tunnel's axis finds the wall at a few heights; the first stretch where it is flat takes the lever, its
         /// back (the model's origin) on the brick.
         /// </summary>
+        /// <summary>How far from the gate's axis the wall the lever hangs on may be, metres.</summary>
+        const float LeverMinWall = 3.0f, LeverMaxWall = 6.5f;
+
         void PlaceLever(SewerGate gate)
         {
             var lever = gate.GetComponentInChildren<GateLever>();
@@ -198,8 +201,13 @@ namespace Stealth.Level
                 var hits = Physics.RaycastAll(from, dir, 8f, ~0, QueryTriggerInteraction.Ignore);
                 float best = float.MaxValue;
                 foreach (var h in hits)
-                    if (!h.collider.transform.IsChildOf(g) && h.distance < best) best = h.distance;
-                return best < float.MaxValue ? best : -1f;
+                {
+                    // the tunnel's own drawn wall only: invisible stops (the car's bounds, a tunnel's bars) are flat too
+                    if (h.collider.transform.IsChildOf(g) || h.collider is not MeshCollider || !h.collider.TryGetComponent<MeshRenderer>(out var r) || !r.enabled) continue;
+                    if (h.distance < best) best = h.distance;
+                }
+                // a wall is beyond the walkway (z ±3.1 from the tunnel's axis): anything nearer stands in the tunnel
+                return best >= LeverMinWall && best < LeverMaxWall ? best : -1f;
             }
             foreach (float x in LeverAlong)
             {
@@ -209,6 +217,12 @@ namespace Stealth.Level
                 float flat = Mathf.Max(Mathf.Abs(a - b), Mathf.Abs(c - b), Mathf.Abs(l - b), Mathf.Abs(r - b));
                 if (flat > 0.03f) continue; // a rib, a niche, a pipe: further along
                 lever.transform.localPosition = new Vector3(x, LeverHeight, side * (b - 0.005f));
+                if (gate.LeverLight != null)
+                {
+                    // 0.6 m out of the wall and 0.9 m up, looking down at the handle
+                    var at = g.TransformPoint(new Vector3(x, LeverHeight + 0.9f, side * (b - 0.6f)));
+                    gate.LeverLight.transform.SetPositionAndRotation(at, Quaternion.LookRotation(lever.transform.position - at));
+                }
                 return;
             }
             Debug.LogWarning("[Sewer] no flat wall for the gate's lever: left where the prefab has it");
@@ -255,6 +269,9 @@ namespace Stealth.Level
         {
             if (m_FloodStart < 0f) m_FloodStart = Time.time;
         }
+
+        /// <summary>The water has risen (the run ended here): a new run builds the sewer afresh.</summary>
+        public bool Flooded => m_FloodStart >= 0f;
 
         void Update()
         {

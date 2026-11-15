@@ -552,6 +552,10 @@ namespace Stealth.Level
                     foreach (var o in openings) if (Mathf.Abs(o.At - at) < o.Width / 2f + clear) free = false;
                     if (!free) continue;
                     var p = w.At(at);
+                    // a window opens into a room (or an atrium), never into a pocket behind a slanted or round wall
+                    var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
+                    var ik = plan.KindAt(w.Floor, inside.x, inside.y);
+                    if (ik != CellKind.Room && ik != CellKind.Void) continue;
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg));
                 }
             }

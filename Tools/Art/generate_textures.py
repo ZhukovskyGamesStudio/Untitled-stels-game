@@ -275,7 +275,27 @@ def hatch():
     save("hatch", 0.78 - s * 0.35 + (noise(29, 4) - 0.5) * 0.08)
 
 
+def smalltiles():
+    """1 m: 10 x 10 white ceramic tiles of 10 cm with dark grout (restrooms, showers, locker rooms)."""
+    y, x = np.mgrid[0:N, 0:N]
+    k = N // 10
+    tone = rng(41).random((10, 10))[y // k % 10, x // k % 10]
+    a = 0.9 + (tone - 0.5) * 0.05 + (noise(42, 8) - 0.5) * 0.03
+    grout = ((x % k) < 3) | ((y % k) < 3)
+    save("smalltiles", a * (1 - 0.32 * grout))
+
+
+def rubber():
+    """1 m: gym rubber flooring in four 50 cm mats, coloured flecks in the black, a thin seam."""
+    f = rng(43).random((N, N))
+    flecks = (f > 0.93) * (0.35 + rng(44).random((N, N)) * 0.4)
+    a = 0.2 + (noise(45, 10) - 0.5) * 0.05 + flecks
+    seams = lines_mask(lambda d: [d.line([(0, k * N // 2), (N, k * N // 2)], fill=255, width=2) for k in range(3)]
+                       + [d.line([(k * N // 2, 0), (k * N // 2, N)], fill=255, width=2) for k in range(3)])
+    save("rubber", a * (1 - 0.5 * seams))
+
+
 if __name__ == "__main__":
     for fn in (planks, parquet, checker, bigtiles, marble, diamondplate, carpet, concrete, gridtiles,
-               damask, boards, brick, corrugated, plaster, panels, circuit, hatch):
+               damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber):
         fn()

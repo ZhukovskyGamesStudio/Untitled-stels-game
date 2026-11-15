@@ -250,23 +250,23 @@ namespace Stealth.UI
         }
 
         /// <summary>
-        /// In a hatch the view goes dark. In the exit hatch a short line says who is still missing or counts down to the
-        /// sewer; the entry hatch says nothing (the team list shows who sits where).
+        /// In a hatch the view goes dark and a short line says who is still missing (everyone must be in a hatch, either
+        /// one), that somebody must sit in the exit's, or counts down to the sewer.
         /// </summary>
         void ShowHatch(GameManager gm, PlayerController me)
         {
             bool inside = gm.Phase == RunPhase.Playing && me.InHatch;
             Ui.Show(HatchTint, inside);
-            bool exit = inside && me.HatchIndex == 1;
-            Ui.Show(HatchText, exit);
-            if (!exit) return;
+            Ui.Show(HatchText, inside);
+            if (!inside) return;
             float left = gm.LeaveAt > 0 ? Mathf.Max(0f, (float)(gm.LeaveAt - Session.ServerTime)) : -1f;
             string text;
             if (left >= 0f) text = Mathf.CeilToInt(left).ToString();
             else
             {
-                string missing = string.Join(", ", PlayerController.All.Where(p => !(p.InHatch && p.HatchIndex == 1) && !p.KnockedOut).Select(p => p.Nick));
-                text = missing.Length > 0 ? Loc.F("hud.hatch.waiting", missing) : "";
+                string missing = string.Join(", ", PlayerController.All.Where(p => !p.InHatch && !p.KnockedOut).Select(p => p.Nick));
+                text = missing.Length > 0 ? Loc.F("hud.hatch.waiting", missing)
+                    : !PlayerController.All.Any(p => p.InHatch && p.HatchIndex == 1) ? Loc.T("hud.hatch.need_exit") : "";
             }
             if (HatchText.text != text) HatchText.text = text;
         }
@@ -488,17 +488,26 @@ namespace Stealth.UI
             AlarmLabel.text = Loc.F("hud.alarm", Mathf.Max(0, Mathf.CeilToInt(left)));
         }
 
-        /// <summary>Arcs around the crosshair towards every sensor that is noticing you.</summary>
+        const float DetectionArcMin = 0.12f, DetectionArcRange = 15f;
+
+        /// <summary>
+        /// Arcs around the crosshair towards a robot or sensor near you that is noticing you (yellow while its meter fills, red
+        /// once it has seen you): only those on your floor and close enough to matter — a seismic sensor two floors down
+        /// feeling a step is no news, and an arc nobody can find reads as a bug.
+        /// </summary>
         void ShowDetection(PlayerController me, float now)
         {
             m_Arcs.Begin();
             if (me.Camera != null && !me.Downed)
             {
                 var cam = me.Camera.transform;
+                var at = me.transform.position;
                 foreach (var d in Detector.All)
                 {
                     float a = d.AwarenessOf(me.ClientId);
-                    if (a < 0.03f) continue;
+                    if (a < DetectionArcMin) continue;
+                    var to = d.Position - at;
+                    if (Mathf.Abs(to.y) > 2.5f || new Vector2(to.x, to.z).magnitude > DetectionArcRange) continue;
                     bool detected = a >= 0.99f;
                     var color = detected
                         ? new Color(1f, 0.12f, 0.08f, 0.75f + 0.25f * Mathf.Sin(now * 12f))
@@ -674,15 +683,31 @@ namespace Stealth.UI
             if (TerminalLabel.text != text) TerminalLabel.text = text;
         }
 
-        /// <summary>The main job's line: what it is and how far along (the vault's locks), gold once done.</summary>
+        /// <summary>
+        /// The task list under the fuel: in a house find the exit, then the main job (gold once done); in the sewer open
+        /// the way, fuel the car, choose a tunnel. Done tasks stay, ticked and dim (<see cref="ObjectiveRules.Tasks"/>).
+        /// </summary>
         void ShowObjective(GameManager gm)
         {
             if (ObjectiveLabel == null) return;
             var l = ActiveLevel.Layout;
-            string text = gm.Phase == RunPhase.Playing && l != null ? ObjectiveRules.Line(l.Objective, gm.VaultSolved, l.VaultConsoles.Count, gm.ObjectiveDone) : null;
-            Ui.Show(ObjectiveLabel, text != null);
-            if (text != null) Ui.Set(ObjectiveLabel, text, gm.ObjectiveDone ? new Color(1f, 0.82f, 0.3f) : new Color(1f, 1f, 1f, 0.8f));
+            bool sewer = gm.Phase == RunPhase.Sewer;
+            if (!sewer && (gm.Phase != RunPhase.Playing || l == null)) { Ui.Show(ObjectiveLabel, false); return; }
+            bool exitSeen = !sewer && gm.Exploration != null && MapSketch.AnyRevealed(gm.Exploration, 0,
+                new Rect(l.ExitHatchPosition.x - 0.8f, l.ExitHatchPosition.z - 0.8f, 1.6f, 1.6f));
+            var tasks = ObjectiveRules.Tasks(sewer, exitSeen, sewer ? default : gm.ObjectiveStage, gm.GateOpen, gm.QuotaMet);
+            m_TaskText.Clear();
+            foreach (var (line, done) in tasks)
+            {
+                if (m_TaskText.Length > 0) m_TaskText.Append('\n');
+                m_TaskText.Append(done ? "<color=#8CE69Acc>✓ " : "<color=#ffffffcc>• ").Append(line).Append("</color>");
+            }
+            Ui.Show(ObjectiveLabel, tasks.Count > 0);
+            string text = m_TaskText.ToString();
+            if (ObjectiveLabel.text != text) ObjectiveLabel.text = text;
         }
+
+        readonly System.Text.StringBuilder m_TaskText = new();
 
         static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };
 

@@ -3,7 +3,9 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
-    public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge, Corridor, Hall }
+    public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge, Corridor, Hall,
+        // themed rooms (append only): each furnished as what it is (Furnisher), some with a floor of their own (StyleGeometry.RoomFloors)
+        Gym, Library, CopyRoom, ControlRoom, Lab, NapRoom, Studio, LockerRoom, Infirmary, GameRoom }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -17,7 +19,15 @@ namespace Stealth.Level
         // searchable crate, and the points of interest of the three locations (HouseFeatures)
         Crate, MedTable, Workbench, Programmer,
         // the house's main job (HouseFeatures.Objective): the hostage's cage
-        Cage }
+        Cage,
+        // the themed rooms' furniture (Tools/Blender/rooms_*.py, AssetBuilder.Rooms): kitchen and restrooms
+        KitchenSink, Stove, Microwave, WallCabinet, Urinal, MirrorSink, HandDryer, Bench, ShowerStall,
+        // gym, infirmary, nap room
+        Treadmill, ExerciseBike, WeightBench, DumbbellRack, PunchingBag, HospitalBed, MedicineCabinet, PrivacyScreen, SleepPod, Hammock,
+        // library, copy room, control room
+        TallBookcase, ReadingTable, Globe, Copier, PaperStack, MailShelf, Shredder, MonitorWall, ConsoleDesk,
+        // studio, game room, lab
+        MixingDesk, MicStand, AcousticPanel, DrumKit, PoolTable, Foosball, DartBoard, BarCounter, BarStool, LabBench, PartsCabinet, RobotArm }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }

@@ -53,7 +53,11 @@ namespace Stealth.Enemies
         void Face(Vector3 point, float dt);
         /// <summary>Turn on the spot by <paramref name="degrees"/> (look around).</summary>
         void Turn(float degrees);
-        /// <summary>Choose the next patrol point and walk there.</summary>
+        /// <summary>Where it faces (flat).</summary>
+        Vector3 Forward { get; }
+        /// <summary>Choose the next patrol point now (it turns to it before walking); <see cref="PatrolToNextPoint"/> goes there.</summary>
+        Vector3 PlanNextPatrolPoint();
+        /// <summary>Walk to the planned patrol point (or choose one and walk there).</summary>
         void PatrolToNextPoint();
         void Attack(IIntruder target);
         void RaiseAlarm(Vector3 at, float radius);

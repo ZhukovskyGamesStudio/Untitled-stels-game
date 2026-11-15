@@ -71,6 +71,23 @@ namespace Stealth.Game
             }
         }
 
+        /// <summary>Whether a thing dropped here burns into fuel: at the car in the sewer (its hopper), at the entry hatch in a house.</summary>
+        public bool CanBurnAt(Vector3 position)
+        {
+            if (Phase == RunPhase.Sewer) return Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+            var l = ActiveLevel.Layout;
+            return Phase == RunPhase.Playing && l != null && Hatch.IsNear(position, l.HatchPosition);
+        }
+
+        /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>
+        public void BurnServer(PlayerController player, int fuel)
+        {
+            if (fuel <= 0) return;
+            m_Run.Deposit(fuel);
+            m_StrandedAt = -1f;
+            Banner(Loc.Pack("banner.fuel_added", player != null ? player.Nick : "", fuel, Collected, Quota));
+        }
+
         /// <summary>Server, the team comes down: the exit hatch's things go into the car; the entry hatch's stay in the house.</summary>
         int LoadCarServer()
         {

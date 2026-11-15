@@ -180,6 +180,7 @@ namespace Stealth.EditorTools
                 EditorUtility.SetDirty(levelArt);
             }
             BuildFeatureArt(levelArt);
+            BuildRoomProps(levelArt);
             return levelArt;
         }
 

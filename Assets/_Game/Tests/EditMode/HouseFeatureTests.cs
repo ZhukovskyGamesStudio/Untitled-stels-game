@@ -188,5 +188,50 @@ namespace Stealth.Tests
             Assert.Less(PlayerRules.LegSwing(3f, true), PlayerRules.LegSwing(3f, false), "crouched: shorter");
             Assert.AreNotEqual(AudioRules.VoicePitch(RobotKind.Hunter), AudioRules.VoicePitch(RobotKind.Drone), "robots speak in their own voices");
         }
+    
+        [Test]
+        public void NoKeyDoorShutsAnAtriumAPlayerCouldDropInto()
+        {
+            int doors = 0;
+            foreach (var l in TestHouses.Sample)
+                foreach (var k in l.KeyDoors)
+                {
+                    doors++;
+                    foreach (int r in k.Rooms)
+                        Assert.AreEqual(1, l.Plan.Rooms[r].Levels, $"seed {l.Seed}: behind the key door is a room {l.Plan.Rooms[r].Levels} storeys high (a gallery above looks into it)");
+                }
+            Assert.Greater(doors, 0);
+        }
+
+        [Test]
+        public void ThemedRoomsAreFurnishedAsWhatTheyAre()
+        {
+            var signature = new Dictionary<RoomType, PropKind[]>
+            {
+                [RoomType.Gym] = new[] { PropKind.Treadmill, PropKind.ExerciseBike, PropKind.WeightBench, PropKind.DumbbellRack, PropKind.PunchingBag },
+                [RoomType.Library] = new[] { PropKind.TallBookcase, PropKind.ReadingTable, PropKind.Globe },
+                [RoomType.CopyRoom] = new[] { PropKind.Copier, PropKind.PaperStack, PropKind.MailShelf, PropKind.Shredder },
+                [RoomType.ControlRoom] = new[] { PropKind.MonitorWall, PropKind.ConsoleDesk },
+                [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.PartsCabinet, PropKind.RobotArm },
+                [RoomType.NapRoom] = new[] { PropKind.SleepPod, PropKind.Hammock, PropKind.BeanBag },
+                [RoomType.Studio] = new[] { PropKind.MixingDesk, PropKind.MicStand, PropKind.AcousticPanel, PropKind.DrumKit },
+                [RoomType.LockerRoom] = new[] { PropKind.Lockers, PropKind.ShowerStall, PropKind.Bench },
+                [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.MedicineCabinet, PropKind.PrivacyScreen },
+                [RoomType.GameRoom] = new[] { PropKind.PoolTable, PropKind.Foosball, PropKind.PingPongTable, PropKind.DartBoard, PropKind.BarCounter, PropKind.ArcadeMachine },
+            };
+            var seen = new HashSet<RoomType>();
+            var bare = new List<string>();
+            foreach (var l in TestHouses.Sample)
+                foreach (var r in l.Rooms)
+                {
+                    if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom) continue;
+                    seen.Add(r.Type);
+                    bool has = l.Props.Any(p => kinds.Contains(p.Kind) && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id);
+                    if (!has) bare.Add($"seed {l.Seed}: {r.Type} {r.Area:0} m²");
+                }
+            Assert.Greater(seen.Count, 4, "the shared houses have themed rooms: " + string.Join(", ", seen));
+            // a small room with doors on every wall may have no wall left for its piece: a few, not many
+            Assert.LessOrEqual(bare.Count, 3, "themed rooms without their furniture: " + string.Join("; ", bare));
+        }
     }
 }

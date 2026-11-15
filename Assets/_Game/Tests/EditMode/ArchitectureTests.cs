@@ -306,5 +306,30 @@ namespace Stealth.Tests
                 }
             }
         }
+    
+        [Test]
+        public void RoomsWithAFloorOfTheirOwnGetItAndNothingElseDoes()
+        {
+            var shell = Shell(out var layout);
+            var tiles = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var g = new StyleGeometry
+            {
+                Floor = new Material(Shader.Find("Universal Render Pipeline/Lit")),
+                RoomFloors = layout.Rooms.Select(r => r.Type).Distinct().Where(t => t != RoomType.Lobby)
+                    .Select(t => new RoomFloor { Room = t, Material = tiles, Tile = 1f }).Take(3).ToArray(),
+            };
+            var floors = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.FloorFinish).ToList();
+            Assert.IsTrue(floors.Any(p => p.Variant == 0), "the style's floor elsewhere");
+            Assert.IsTrue(floors.Any(p => p.Variant > 0), "rooms of their own");
+            foreach (var p in floors)
+            {
+                // the middle of every quad lies in a room of the type its floor belongs to (or, for the style's, not of those types)
+                var at = new Vector3(p.Position.x, p.Position.y + 0.3f, p.Position.z);
+                var room = layout.Plan.RoomAt(at);
+                if (room == null) continue; // a pocket or a landing
+                int expect = g.RoomFloorOf(room.Type) + 1;
+                Assert.AreEqual(expect, p.Variant, $"{room.Type} at {p.Position}");
+            }
+        }
     }
 }

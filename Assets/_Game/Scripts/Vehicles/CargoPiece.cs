@@ -27,7 +27,19 @@ namespace Stealth.Vehicles
             if (visuals == null) return;
             MeshFilter.sharedMesh = visuals.Meshes[Mathf.Clamp(item.Shape, 0, visuals.Meshes.Length - 1)];
             Renderer.sharedMaterial = visuals.ColorMaterials[Mathf.Clamp(item.Color, 0, visuals.ColorMaterials.Length - 1)];
+            // a tool with a model of its own (the lure speaker): that model, as on the floor, not the tinted piece
+            var model = visuals.Models != null && item.Shape < visuals.Models.Length ? visuals.Models[item.Shape] : null;
+            if (m_Special != null && (model == null || m_Special.name != model.name)) { Destroy(m_Special); m_Special = null; }
+            if (model != null && m_Special == null)
+            {
+                m_Special = Instantiate(model, transform);
+                m_Special.name = model.name;
+                Level.VisualStyles.Dress(m_Special);
+            }
+            Renderer.forceRenderingOff = m_Special != null;
         }
+
+        GameObject m_Special;
 
         public override string Prompt(PlayerController player, out bool available)
         {

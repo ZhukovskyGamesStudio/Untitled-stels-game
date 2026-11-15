@@ -273,5 +273,35 @@ namespace Stealth.Tests
                 for (byte color = 0; color < 6; color++)
                     Assert.AreEqual((shape, color), Detector.DecodeCargo(Detector.EncodeCargo(shape, color)));
         }
+    
+        [Test]
+        public void TheSpidersWebIsAMazeOfWiresAwayFromTheDoors()
+        {
+            var room = new Rect(0f, 0f, 10f, 5f);
+            var none = new List<Vector3>();
+            var web = SpiderWebs.Plan(room, 0f, none, new System.Random(3));
+            Assert.Greater(web.Count, 2, "a few wires across the room");
+            Assert.LessOrEqual(web.Count, 6, "not a mess");
+            for (int i = 0; i < web.Count; i++)
+            {
+                var w = web[i];
+                Assert.AreEqual(w.A.x, w.B.x, 1e-4f, "across the shorter side");
+                Assert.That(w.A.y, Is.InRange(0.45f, 1.05f), "between the knee and the chest");
+                // a gap at alternating ends: the way through zig-zags
+                bool gapAtFar = w.B.z < room.yMax - 0.5f;
+                Assert.AreEqual(i % 2 == 0, gapAtFar, $"wire {i}");
+            }
+            // a door in a long wall: no wire runs past it
+            var door = new List<Vector3> { new(web[1].A.x, 0f, 0f) };
+            foreach (var w in SpiderWebs.Plan(room, 0f, door, new System.Random(3)))
+                Assert.Greater(Mathf.Abs(w.A.x - door[0].x), 1f);
+
+            var s = web[0];
+            var onIt = new Vector3(s.A.x, 0f, (s.A.z + s.B.z) / 2f);
+            Assert.IsTrue(SpiderWebs.Touches(s, onIt, 1.8f), "walking into it");
+            Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.right * 0.6f, 1.8f), "beside it");
+            Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.up * (s.A.y + 0.1f), 1.8f), "over it (a jump)");
+            Assert.IsFalse(SpiderWebs.Touches(s, new Vector3(s.A.x, 0f, s.B.z + 0.6f), 1.8f), "through the gap at its end");
+        }
     }
 }

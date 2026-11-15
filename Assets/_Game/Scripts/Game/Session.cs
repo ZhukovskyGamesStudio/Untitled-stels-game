@@ -150,6 +150,8 @@ namespace Stealth.Game
         void RequestSellWorld(WorldItem item);
         /// <summary>Everything in the backpack into the first free spots of the stash (what does not fit stays).</summary>
         void RequestStashAll();
+        /// <summary>A thing from the car's bed into a cell of the backpack (named by value: <see cref="Vehicles.CargoItem.Pack"/>).</summary>
+        void RequestTakeCargo(ulong cargo, byte x, byte y, byte rot);
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

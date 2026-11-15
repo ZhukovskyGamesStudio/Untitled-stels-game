@@ -72,6 +72,11 @@ namespace Stealth.Vehicles
         bool m_WasEngine;
         int m_CargoShown = -1;
         readonly List<CargoPiece> m_Pieces = new();
+        /// <summary>The things shown in the bed (inactive ones are spare).</summary>
+        public IReadOnlyList<CargoPiece> Pieces => m_Pieces;
+        /// <summary>The engine's hopper on the hood (things dragged onto it burn into fuel).</summary>
+        public CarHopper Hopper => m_Hopper != null ? m_Hopper : m_Hopper = GetComponentInChildren<CarHopper>();
+        CarHopper m_Hopper;
         static readonly RaycastHit[] s_Hits = new RaycastHit[16];
         static readonly Collider[] s_Overlaps = new Collider[16];
 

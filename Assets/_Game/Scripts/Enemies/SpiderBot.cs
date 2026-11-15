@@ -7,17 +7,25 @@ using UnityEngine;
 namespace Stealth.Enemies
 {
     /// <summary>
-    /// Wall crawler: runs around its room along the walls (above the doors), watching the floor below, and now and then
-    /// climbs onto the ceiling and crosses it to the opposite wall (watching straight down meanwhile). On detection it
-    /// leaps onto the player, hits on landing and crawls back up. Never leaves its room.
+    /// Wall crawler without eyes: its room is strung with wires like a simple maze (<see cref="SpiderWebs"/>, every peer
+    /// strings the same). It runs around the room along the walls (above the doors), now and then over the ceiling to the
+    /// opposite wall. A player who touches a wire is found: it scurries along the walls towards them, leaps on them, hits
+    /// on landing and crawls back up. Never leaves its room.
     /// </summary>
     public class SpiderBot : SecurityDevice
     {
         [Tooltip("Tuning (SpiderProfile) — a separate asset next to the prefab.")]
         public SpiderProfile Profile;
+        [Tooltip("One wire of its web: a unit length along local Z (scaled to the wire), its pivot at one end.")]
+        public GameObject Strand;
         protected override DeviceProfile Device => Profile;
 
-        enum Mode { Crawl, Leap, Return, Cross }
+        enum Mode { Crawl, Leap, Return, Cross, Rush }
+
+        readonly List<SpiderWebs.Strand> m_Web = new();
+        readonly List<GameObject> m_WebViews = new();
+        /// <summary>The wires strung across its room (the same on every peer).</summary>
+        public IReadOnlyList<SpiderWebs.Strand> Web => m_Web;
 
         Mode m_Mode;
         Vector3 m_Min, m_Max;
@@ -45,9 +53,10 @@ namespace Stealth.Enemies
 
         protected override void OnDeviceSpawned()
         {
-            if (!IsServer) return;
             var layout = ActiveLevel.Layout;
             var rect = layout != null ? layout.RoomRectAt(transform.position) : new Rect(transform.position.x - 5f, transform.position.z - 5f, 10f, 10f);
+            StringWeb(layout, rect);
+            if (!IsServer) return;
             // Hugging the wall: the body a few centimetres off its face, the feet planted on it (ProceduralLegs).
             float inset = LevelMetrics.WallThickness / 2f + WallGap;
             m_FloorY = layout != null ? LevelLayout.FloorY(LevelLayout.FloorOf(transform.position.y)) : transform.position.y;
@@ -58,6 +67,50 @@ namespace Stealth.Enemies
             m_NextCross = Time.time + Profile.CeilingEvery * m_Rng.Range(0.3f, 1f);
             var (p, rot) = OnWall(m_T, m_Dir);
             transform.SetPositionAndRotation(p, rot);
+        }
+
+        /// <summary>Every peer: the wires of its room, from the room and the house (not from the spider's moves), drawn from the prefab.</summary>
+        void StringWeb(LevelLayout layout, Rect rect)
+        {
+            foreach (var v in m_WebViews) if (v != null) Destroy(v);
+            m_WebViews.Clear();
+            m_Web.Clear();
+            if (layout == null) return;
+            float floorY = LevelLayout.FloorY(LevelLayout.FloorOf(transform.position.y));
+            var doors = new List<Vector3>();
+            foreach (var d in layout.Doorways) doors.Add(d.Position);
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, 0x5E8, Mathf.RoundToInt(rect.x * 4f) * 7919 + Mathf.RoundToInt(rect.y * 4f)));
+            m_Web.AddRange(SpiderWebs.Plan(rect, floorY, doors, rng, Profile.StrandSpacing, Profile.StrandGap, Profile.MaxStrands));
+            if (Strand == null) return;
+            var parent = ActiveLevel.Root != null ? ActiveLevel.Root.transform : null;
+            foreach (var w in m_Web)
+            {
+                var view = Instantiate(Strand, w.A, Quaternion.LookRotation(w.B - w.A), parent);
+                view.transform.localScale = new Vector3(1f, 1f, (w.B - w.A).magnitude);
+                m_WebViews.Add(view);
+            }
+        }
+
+        void OnDestroy()
+        {
+            foreach (var v in m_WebViews) if (v != null) Destroy(v);
+        }
+
+        /// <summary>The distance along its wall loop nearest to a point (where it goes to leap at someone).</summary>
+        float NearestT(Vector3 p)
+        {
+            float w = m_Max.x - m_Min.x, d = m_Max.z - m_Min.z;
+            float x = Mathf.Clamp(p.x, m_Min.x, m_Max.x), z = Mathf.Clamp(p.z, m_Min.z, m_Max.z);
+            var options = new[]
+            {
+                (Mathf.Abs(p.z - m_Min.z), x - m_Min.x),
+                (Mathf.Abs(p.x - m_Max.x), w + (z - m_Min.z)),
+                (Mathf.Abs(p.z - m_Max.z), w + d + (m_Max.x - x)),
+                (Mathf.Abs(p.x - m_Min.x), 2f * w + d + (m_Max.z - z)),
+            };
+            float best = float.MaxValue, t = m_T;
+            foreach (var (dist, at) in options) if (dist < best) { best = dist; t = at; }
+            return t;
         }
 
         /// <summary>Point on the room's wall loop at distance <paramref name="t"/>, oriented legs-to-wall.</summary>
@@ -72,16 +125,6 @@ namespace Stealth.Enemies
             else { p = new Vector3(m_Min.x, 0, m_Max.z - (t - 2 * w - d)); tangent = Vector3.back; inward = Vector3.right; }
             p.y = m_FloorY + Profile.CrawlHeight;
             return (p, Quaternion.LookRotation(tangent * dir, inward));
-        }
-
-        /// <summary>On a wall: 35 degrees down from its belly; on the ceiling: straight down.</summary>
-        Vector3 LookDirection
-        {
-            get
-            {
-                var axis = Vector3.Cross(transform.up, Vector3.up);
-                return axis.sqrMagnitude < 0.01f ? transform.up : Quaternion.AngleAxis(35f, axis.normalized) * transform.up;
-            }
         }
 
         /// <summary>
@@ -128,8 +171,22 @@ namespace Stealth.Enemies
                     }
                     var (p, rot) = OnWall(m_T, m_Dir);
                     transform.SetPositionAndRotation(p, Quaternion.RotateTowards(transform.rotation, rot, TurnRate * Time.deltaTime));
-                    Look();
+                    Feel();
                     break;
+
+                case Mode.Rush:
+                {
+                    // scurrying along the walls the short way round to the point nearest to them, then a leap
+                    if (m_Prey == null || m_Prey.IsDown) { m_Mode = Mode.Crawl; break; }
+                    float goal = NearestT(m_Prey.Position), loop = Perimeter;
+                    float delta = Mathf.Repeat(goal - m_T + loop / 2f, loop) - loop / 2f;
+                    m_Dir = delta >= 0f ? 1f : -1f;
+                    m_T += Mathf.Clamp(delta, -Profile.RushSpeed * Time.deltaTime, Profile.RushSpeed * Time.deltaTime);
+                    var (rp, rrot) = OnWall(m_T, m_Dir);
+                    transform.SetPositionAndRotation(rp, Quaternion.RotateTowards(transform.rotation, rrot, TurnRate * 2f * Time.deltaTime));
+                    if (Vector3.Distance(rp, m_Prey.Position) <= Profile.LeapRange || Mathf.Abs(delta) < 0.2f) StartLeap(m_Prey);
+                    break;
+                }
 
                 case Mode.Leap:
                 {
@@ -158,7 +215,7 @@ namespace Stealth.Enemies
                     var pos = Vector3.MoveTowards(transform.position, target, Profile.CrawlSpeed * Time.deltaTime);
                     transform.SetPositionAndRotation(pos, Quaternion.RotateTowards(transform.rotation, facing, TurnRate * Time.deltaTime));
                     if ((pos - target).sqrMagnitude < 0.0004f && ++m_Step >= m_Path.Count) m_Mode = Mode.Crawl;
-                    Look();
+                    Feel();
                     break;
                 }
 
@@ -173,26 +230,29 @@ namespace Stealth.Enemies
             }
         }
 
-        void Look()
+        /// <summary>A player touching a wire of its web: found at once (the device's alarm), it comes for them.</summary>
+        void Feel()
         {
-            var vision = Tuning.Perception.Vision;
-            var eye = transform.position + transform.up * 0.3f;
-            IIntruder seen = null;
-            float best = 0f;
+            if (IsHacked) return;
             foreach (var p in PlayerController.All)
             {
-                if (p.IsDown || !Perception.SameFloor(p.Position, new Vector3(0, m_FloorY, 0))) continue;
-                if (!Perception.Look(eye, LookDirection, p, Profile.Range, Profile.ViewAngle, vision, out var g)) continue;
-                float rate = Profile.DetectionRate * SensorMath.VisionFactor(g, Profile.CrouchFactor, vision);
-                if (rate > best) { seen = p; best = rate; }
+                if (p.IsDown) continue;
+                foreach (var w in m_Web)
+                    if (SpiderWebs.Touches(w, p.Position, p.Height)) { Trip(p); return; }
             }
-            if (seen == null) { Forget(); return; }
-            Notice(seen, best);
         }
 
         protected override void OnDetected(IIntruder p)
         {
-            if (Time.time < m_NextLeap) return;
+            if (Time.time < m_NextLeap || m_Mode is Mode.Leap or Mode.Rush) return;
+            m_Prey = p;
+            // from the ceiling it drops straight on them; on a wall it runs to them first
+            if (m_Mode == Mode.Cross) StartLeap(p);
+            else m_Mode = Mode.Rush;
+        }
+
+        void StartLeap(IIntruder p)
+        {
             m_NextLeap = Time.time + Profile.Cooldown + Profile.LeapTime + Profile.ReturnTime;
             m_Prey = p;
             m_Mode = Mode.Leap;

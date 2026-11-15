@@ -53,7 +53,8 @@ namespace Stealth.Level
                 foreach (var o in shell.Openings) PlanReveals(list, o);
             if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling);
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
-            if (g.Floor != null)
+            if (g.Floor != null && layout != null && g.RoomFloors != null && g.RoomFloors.Length > 0) PlanFloors(list, shell, layout, g);
+            else if (g.Floor != null)
                 foreach (var r in shell.Floors)
                 {
                     var size = r.Max - r.Min;
@@ -68,6 +69,51 @@ namespace Stealth.Level
                 }
             if (layout != null) PlanDecay(list, shell, layout, g);
             return list;
+        }
+
+        /// <summary>
+        /// The floor finish with rooms of their own (<see cref="StyleGeometry.RoomFloors"/>): every cell of the slabs
+        /// takes the floor of the room on it (pockets and stair landings that of the style), merged into rectangles per
+        /// floor material; <see cref="DecorPiece.Variant"/> = 0 the style's floor, k + 1 its k-th room floor.
+        /// </summary>
+        static void PlanFloors(List<DecorPiece> list, LevelShell shell, LevelLayout layout, StyleGeometry g)
+        {
+            var plan = layout.Plan;
+            for (int f = 0; f < layout.Floors; f++)
+            {
+                var slabs = new List<FloorRect>();
+                foreach (var r in shell.Floors) if (r.Floor == f) slabs.Add(r);
+                if (slabs.Count == 0) continue;
+                float y = slabs[0].Y;
+                var kind = new int[plan.NX, plan.NZ];
+                var used = new HashSet<int>();
+                for (int x = 0; x < plan.NX; x++)
+                    for (int z = 0; z < plan.NZ; z++)
+                    {
+                        var c = HousePlan.CellCenter(x, z);
+                        bool slab = false;
+                        foreach (var r in slabs)
+                            if (c.x > r.Min.x && c.x < r.Max.x && c.y > r.Min.y && c.y < r.Max.y) { slab = true; break; }
+                        if (!slab) { kind[x, z] = -1; continue; }
+                        int id = plan.KindAt(f, x, z) == CellKind.Room ? plan.IdAt(f, x, z) : -1;
+                        int k = id >= 0 && id < plan.Rooms.Count ? g.RoomFloorOf(plan.Rooms[id].Type) + 1 : 0;
+                        kind[x, z] = k;
+                        used.Add(k);
+                    }
+                foreach (int k in used)
+                    foreach (var cells in LevelBuilder.Rectangles(plan.NX, plan.NZ, (x, z) => kind[x, z] == k))
+                    {
+                        float x0 = cells.xMin * HousePlan.Res, x1 = cells.xMax * HousePlan.Res, z0 = cells.yMin * HousePlan.Res, z1 = cells.yMax * HousePlan.Res;
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.FloorFinish, Variant = k,
+                            Position = new Vector3((x0 + x1) / 2f, y + 0.008f, (z0 + z1) / 2f),
+                            Rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward),
+                            Scale = new Vector3(x1 - x0, z1 - z0, 1f),
+                            Surface = new Vector4(x1 - x0, z1 - z0, x0, z0),
+                        });
+                    }
+            }
         }
 
         // ------------------------------------------------------------------ decay and posters

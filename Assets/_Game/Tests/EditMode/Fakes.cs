@@ -51,9 +51,14 @@ namespace Stealth.Tests
         }
 
         public void Stop() => Stopped = true;
-        public void Face(Vector3 point, float dt) { }
+        public readonly List<Vector3> Faced = new();
+        public void Face(Vector3 point, float dt) => Faced.Add(point);
         public void Turn(float degrees) => Turned += degrees;
         public void PatrolToNextPoint() => PatrolRequests++;
+        public Vector3 Forward { get; set; } = Vector3.forward;
+        public Vector3 NextPoint = new(5f, 0f, 0f);
+        public int Plans;
+        public Vector3 PlanNextPatrolPoint() { Plans++; return NextPoint; }
         public void Attack(IIntruder target) => Attacks.Add(target);
         public void RaiseAlarm(Vector3 at, float radius) => Alarms.Add((at, radius));
         public void CallForBackup(Vector3 at) => BackupCalls++;
@@ -115,6 +120,7 @@ namespace Stealth.Tests
         public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => Requests.Add($"stash-world {x},{y},{rot}");
         public void RequestSellWorld(WorldItem item) => Requests.Add("sell-world");
         public void RequestStashAll() => Requests.Add("stash-all");
+        public void RequestTakeCargo(ulong cargo, byte x, byte y, byte rot) => Requests.Add($"take-cargo {x},{y},{rot}");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

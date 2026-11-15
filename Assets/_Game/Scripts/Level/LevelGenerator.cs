@@ -33,6 +33,9 @@ namespace Stealth.Level
         {
             new(RoomType.OpenSpace, 28), new(RoomType.Office, 16), new(RoomType.Meeting, 12), new(RoomType.Kitchen, 10),
             new(RoomType.Server, 12), new(RoomType.Storage, 10), new(RoomType.Restroom, 6), new(RoomType.Lounge, 6),
+            // the themed rooms: a few per house, each furnished as what it is
+            new(RoomType.Gym, 4), new(RoomType.Library, 4), new(RoomType.CopyRoom, 4), new(RoomType.ControlRoom, 3), new(RoomType.Lab, 4),
+            new(RoomType.NapRoom, 3), new(RoomType.Studio, 3), new(RoomType.LockerRoom, 3), new(RoomType.Infirmary, 3), new(RoomType.GameRoom, 4),
         };
 
         [Header("Light")]
@@ -211,6 +214,14 @@ namespace Stealth.Level
             l.HiddenRoom = HouseFeatures.HideRoom(l, features);
             if (l.HiddenRoom >= 0)
             {
+                // an illusion wall may now be where a high vent's desks would stand: that vent stays low (no desk in front of the way in)
+                for (int i = 0; i < l.Plan.Openings.Count; i++)
+                {
+                    var o = l.Plan.Openings[i];
+                    if (!o.High || DesksFit(l, o)) continue;
+                    o.High = false;
+                    l.Plan.Openings[i] = o;
+                }
                 l.Doorways.Clear();
                 Doorways(l);
                 checker = null; // its walk grid knew the old doors

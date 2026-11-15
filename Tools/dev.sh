@@ -62,9 +62,11 @@ EOF
       # one quiet window per seed, all at once: shots in Builds/shots/<scenario>_<seed>, logs in Builds/host_<seed>.log
       exe="$ROOT/Builds/Windows/StealthPrototype.exe"
       pids=()
+      port=7790
       for seed in ${SEEDS//,/ }; do
         dir="$ROOT/Builds/shots/${scenario}_$seed"; rm -rf "$dir"; mkdir -p "$dir"
-        python "$ROOT/Tools/launch_quiet.py" "$exe" -nosteam -host-local -autotest "$scenario" -seed "$seed" ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL}           -shotdir "$(cygpath -w "$dir" 2>/dev/null || echo "$dir")" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0           -logFile "$P/Builds/host_$seed.log" &
+        port=$((port + 1))   # each window hosts on its own UDP port
+        python "$ROOT/Tools/launch_quiet.py" "$exe" -nosteam -host-local -port $port -autotest "$scenario" -seed "$seed" ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL}           -shotdir "$(cygpath -w "$dir" 2>/dev/null || echo "$dir")" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0           -logFile "$P/Builds/host_$seed.log" &
         pids+=($!)
       done
       for pid in "${pids[@]}"; do wait "$pid"; done

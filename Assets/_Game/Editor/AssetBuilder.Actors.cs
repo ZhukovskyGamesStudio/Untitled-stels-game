@@ -62,9 +62,11 @@ namespace Stealth.EditorTools
                     s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
                     t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
                 });
-                // what a guard may carry (the hostage's cage key) hangs on its back, where a player sneaking up sees it
+                // what a guard may carry (the hostage's cage key) hangs at its belt behind, off to one side — the lower edge of
+                // the torso (it starts at 1.5 m over the legs), where a player sneaking up sees it
                 var rc = go.GetComponent<RobotController>();
-                var cargo = Child(go.transform, "Cargo", new Vector3(0f, 1.25f, -0.42f));
+                var cargo = Child(go.transform, "Cargo", new Vector3(0.17f, 1.47f, -0.13f));
+                cargo.transform.localRotation = Quaternion.Euler(0f, 0f, 12f);
                 rc.CargoMesh = cargo.AddComponent<MeshFilter>();
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;
@@ -154,9 +156,18 @@ namespace Stealth.EditorTools
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
+            // one wire of the spider's web: a thin glowing fibre a unit long along +Z (scaled to each wire), no collider, no shadow
+            var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
+            {
+                var go = new GameObject("SpiderStrand");
+                var wire = Cube(go.transform, "Wire", new Vector3(0f, 0f, 0.5f), new Vector3(0.014f, 0.014f, 1f), M("Web"), false);
+                wire.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                return go;
+            });
             Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) =>
             {
                 s.Profile = Profile<SpiderProfile>("RobotSpider");
+                s.Strand = strand;
             }));
             Robot(RobotKind.Vacuum, RobotPrefabs + "/RobotVacuum.prefab", () => Device<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
             {

@@ -22,6 +22,12 @@ namespace Stealth.Items
         [Tooltip("Seconds after being dropped before it starts playing (time to walk away).")]
         public float LureDelay = 1.5f;
 
+        [Header("Hand dryer (restrooms)")]
+        [Tooltip("Seconds it roars once switched on.")]
+        public float DryerTime = 4f;
+        [Tooltip("How far robots hear it, metres (through walls and doors as any noise).")]
+        public float DryerNoise = 14f;
+
         [Header("Crates")]
         [Tooltip("Seconds of holding E to search a crate.")]
         public float CrateSearchTime = 1.2f;

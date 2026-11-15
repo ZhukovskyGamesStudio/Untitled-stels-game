@@ -17,6 +17,10 @@ namespace Stealth.Game
     {
         public static int CrateKey(int prop) => 3_000_000 + prop;
         public static int MedKey(ulong client) => 4_000_000 + (int)(client % 1_000_000);
+        public static int DryerKey(int prop) => 8_000_000 + prop;
+
+        /// <summary>Server: the hand dryers running and until when (server time).</summary>
+        readonly Dictionary<int, double> m_Dryers = new();
 
         /// <summary>Server time until which every robot and camera is stunned (the stun cube), 0 = never. Replicated.</summary>
         public double StunnedUntil { get; private set; }
@@ -28,6 +32,7 @@ namespace Stealth.Game
         {
             SearchCrate.IsSearched = i => IsOpened(CrateKey(i));
             MedTable.UsedBy = c => IsOpened(MedKey(c));
+            HandDryer.IsRunning = i => IsOpened(DryerKey(i));
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
         }
@@ -95,7 +100,31 @@ namespace Stealth.Game
                 case UseKind.KeyDoor: UnlockWithKeyServer(player, index); break;
                 case UseKind.VaultConsole: SolveConsoleServer(player, index); break;
                 case UseKind.Cage: FreeHostageServer(player, index); break;
+                case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 default: UseSewerServer(player, kind, index); break;
+            }
+        }
+
+        /// <summary>Server: a hand dryer roars for a few seconds — robots with ears around come to check (a lure on the wall).</summary>
+        void RunDryerServer(PlayerController player, int prop, Vector3 at)
+        {
+            if (Phase != RunPhase.Playing || IsOpened(DryerKey(prop))) return;
+            m_Opened.Add(DryerKey(prop));
+            OpenedVersion++;
+            m_Dryers[prop] = Session.ServerTime + Gadgets.DryerTime;
+            NoiseSystem.EmitServer(at, Gadgets.DryerNoise, NoiseSystem.NoSource); // the dryer's noise, not the player's
+        }
+
+        /// <summary>Server: dryers whose time is up go quiet (and can be switched on again).</summary>
+        void UpdateDryers()
+        {
+            if (m_Dryers.Count == 0) return;
+            foreach (var (prop, until) in m_Dryers.ToArray())
+            {
+                if (Session.ServerTime < until) continue;
+                m_Dryers.Remove(prop);
+                m_Opened.Remove(DryerKey(prop));
+                OpenedVersion++;
             }
         }
 

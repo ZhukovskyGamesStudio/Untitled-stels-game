@@ -31,6 +31,10 @@ namespace Stealth.Net
         void Awake()
         {
             Instance = this;
+            // -port N: another local UDP port (several test windows hosting at once must not share one)
+            var args = System.Environment.GetCommandLineArgs();
+            int i = System.Array.IndexOf(args, "-port");
+            if (i >= 0 && i + 1 < args.Length && ushort.TryParse(args[i + 1], out var port)) LocalPort = port;
             Session.Backend = new NgoSessionBackend(Manager);
             Session.Launcher = this;
             PlayerController.LocalChanged += OnLocalPlayerChanged;

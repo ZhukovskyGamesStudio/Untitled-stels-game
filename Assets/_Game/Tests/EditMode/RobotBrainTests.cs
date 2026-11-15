@@ -27,6 +27,30 @@ namespace Stealth.Tests
             m_Now = 0f;
         }
 
+        [Test]
+        public void APauseReadsFromAfarStopLookAroundThenTurnToGo()
+        {
+            Assert.AreEqual(RobotBrain.PatrolPause.Settle, RobotBrain.PausePhase(0.2f, 4f, 1f), "just stopped");
+            Assert.AreEqual(RobotBrain.PatrolPause.Scan, RobotBrain.PausePhase(1.5f, 4f, 1f), "standing a while: looking around");
+            Assert.AreEqual(RobotBrain.PatrolPause.Ready, RobotBrain.PausePhase(3.3f, 4f, 1f), "about to go: turned to the way");
+            Assert.Less(RobotBrain.PauseScanSide(1.6f), 0f, "first to the left");
+
+            m_Traits.PatrolWaitMin = m_Traits.PatrolWaitMax = 4f;
+            m_Traits.PauseReadyTime = 1f;
+            m_Body.Arrived = true;
+            for (float t = 0f; t < 2.9f; t += 0.1f) m_Brain.Tick(t, 0.1f);
+            Assert.IsTrue(m_Body.Stopped);
+            Assert.AreEqual(0, m_Body.Plans, "still looking around");
+            Assert.AreEqual(0, m_Body.PatrolRequests);
+            Assert.IsTrue(m_Body.Faced.Count > 0, "it turns while it stands");
+            for (float t = 2.9f; t < 4.0f; t += 0.1f) m_Brain.Tick(t, 0.1f);
+            Assert.AreEqual(1, m_Body.Plans, "chose where to go before going");
+            Assert.AreEqual(m_Body.NextPoint, m_Body.Faced[m_Body.Faced.Count - 1], "and turned to it");
+            Assert.AreEqual(0, m_Body.PatrolRequests, "not walking yet");
+            m_Brain.Tick(4.2f, 0.1f);
+            Assert.AreEqual(1, m_Body.PatrolRequests, "then it walks");
+        }
+
         void Sense(float rate, float seconds, IIntruder target = null, bool contact = false)
         {
             target ??= m_Player;

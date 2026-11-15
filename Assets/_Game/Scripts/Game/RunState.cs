@@ -243,18 +243,18 @@ namespace Stealth.Game
         public bool CanTrade => Phase == RunPhase.Playing || Phase == RunPhase.Sewer;
 
         /// <summary>
-        /// The team may leave the house: at least one player hides in the hatch and every other one either hides too or
-        /// is knocked out (lying with no HP — they stay behind). Pure.
+        /// The team may leave the house: everyone hides in a hatch — the entry or the exit, either will do — or is knocked
+        /// out (lying with no HP — they stay behind), and at least one of them is in the exit's hatch. Pure.
         /// </summary>
-        public static bool TeamInHatch(IEnumerable<(bool inHatch, bool knockedOut)> players)
+        public static bool TeamInHatch(IEnumerable<(bool inHatch, bool atExit, bool knockedOut)> players)
         {
-            bool someone = false;
-            foreach (var (inHatch, knockedOut) in players)
+            bool exit = false;
+            foreach (var (inHatch, atExit, knockedOut) in players)
             {
-                if (inHatch) { someone = true; continue; }
+                if (inHatch) { exit |= atExit; continue; }
                 if (!knockedOut) return false;
             }
-            return someone;
+            return exit;
         }
 
         /// <summary>Everybody is down: the run is over.</summary>

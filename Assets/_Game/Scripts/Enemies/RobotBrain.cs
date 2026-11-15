@@ -100,8 +100,12 @@ namespace Stealth.Enemies
         [Tooltip("Suspicion lost per second while it senses nobody.")]
         public float SuspicionDecay = 0.35f;
         [Tooltip("Pause at a patrol point, seconds (random between min and max).")]
-        public float PatrolWaitMin = 1f;
-        public float PatrolWaitMax = 3.5f;
+        public float PatrolWaitMin = 2.5f;
+        public float PatrolWaitMax = 5f;
+        [Tooltip("Pausing it looks around: turns this far to each side of where it came from, degrees.")]
+        public float PauseScanAngle = 55f;
+        [Tooltip("The end of a pause: it turns to where it goes next this many seconds before it walks (a player sees it is about to move).")]
+        public float PauseReadyTime = 1.1f;
         [Tooltip("Seconds it looks around after reaching a spot it went to check.")]
         public float InvestigateLookTime = 3f;
         [Tooltip("Seconds of staring before it walks over to check.")]
@@ -145,6 +149,9 @@ namespace Stealth.Enemies
 
         float m_LastSense;
         float m_WaitUntil = -1f;
+        float m_PauseStart;
+        Vector3 m_PauseForward, m_PauseNext;
+        bool m_PauseReady;
         float m_NextAttack;
         float m_StateTime;
         float m_SnitchUntil = float.NegativeInfinity;
@@ -316,12 +323,32 @@ namespace Stealth.Enemies
                         m_Body.Stop(); // the hunter "sleeps" until someone else spots a player
                         break;
                     }
-                    m_Body.Move(m_Traits.PatrolSpeed);
-                    if (m_Body.Arrived)
+                    if (!m_Body.Arrived) { m_Body.Move(m_Traits.PatrolSpeed); break; }
+                    if (m_WaitUntil < 0f)
                     {
-                        if (m_WaitUntil < 0f) m_WaitUntil = now + Range(m_Traits.PatrolWaitMin, m_Traits.PatrolWaitMax);
-                        else if (now > m_WaitUntil) NextPatrolPoint();
+                        m_WaitUntil = now + Range(m_Traits.PatrolWaitMin, m_Traits.PatrolWaitMax);
+                        m_PauseStart = now;
+                        m_PauseForward = m_Body.Forward;
+                        m_PauseReady = false;
                     }
+                    m_Body.Stop();
+                    switch (PausePhase(now - m_PauseStart, m_WaitUntil - m_PauseStart, m_Traits.PauseReadyTime))
+                    {
+                        case PatrolPause.Scan:
+                        {
+                            // slowly to one side, then the other: a robot that has stood a while
+                            float side = PauseScanSide(now - m_PauseStart);
+                            var look = Quaternion.Euler(0f, side * m_Traits.PauseScanAngle, 0f) * m_PauseForward;
+                            m_Body.Face(m_Body.Position + look, dt * 0.3f);
+                            break;
+                        }
+                        case PatrolPause.Ready:
+                            // about to go: it picks the next point and turns to it first
+                            if (!m_PauseReady) { m_PauseNext = m_Body.PlanNextPatrolPoint(); m_PauseReady = true; }
+                            m_Body.Face(m_PauseNext, dt * 0.6f);
+                            break;
+                    }
+                    if (now > m_WaitUntil) NextPatrolPoint();
                     break;
 
                 case RobotState.Suspicious:
@@ -394,6 +421,19 @@ namespace Stealth.Enemies
             SetState(RobotState.Patrol, now);
             NextPatrolPoint();
         }
+
+        /// <summary>The phases of a pause at a patrol point, readable from afar: it stops, looks around, turns to go.</summary>
+        public enum PatrolPause { Settle, Scan, Ready }
+
+        /// <summary>Which phase a pause is in, <paramref name="t"/> seconds into a pause of <paramref name="length"/> (pure).</summary>
+        public static PatrolPause PausePhase(float t, float length, float ready)
+        {
+            if (t >= length - ready) return PatrolPause.Ready;
+            return t < 0.6f ? PatrolPause.Settle : PatrolPause.Scan;
+        }
+
+        /// <summary>Where the look-around is: −1 (left) … 1 (right), a slow swing starting to the left (pure).</summary>
+        public static float PauseScanSide(float t) => -Mathf.Sin((t - 0.6f) * 1.1f);
 
         void NextPatrolPoint()
         {

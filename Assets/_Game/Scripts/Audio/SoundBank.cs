@@ -54,6 +54,8 @@ namespace Stealth.Audio
 
         [Header("Environment")]
         public AudioClip LaserHum, DoorSlide, Alarm, OfficeHum, GasWind;
+        [Tooltip("A restroom's hand dryer running (4 s, loud: robots come to check).")]
+        public AudioClip HandDryer;
 
         [Header("Music")]
         public AudioClip MenuMusic, ExploreMusic, ChaseMusic;

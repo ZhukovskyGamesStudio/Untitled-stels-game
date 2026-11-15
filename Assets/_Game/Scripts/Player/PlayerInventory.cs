@@ -113,6 +113,27 @@ namespace Stealth.Player
             else PickupServer(item, x, y, rot);
         }
 
+        public void RequestTakeCargo(Vehicles.CargoItem item, byte x, byte y, byte rot)
+        {
+            if (m_Link != null) m_Link.RequestTakeCargo(item.Pack(), x, y, rot);
+            else TakeCargoServer(item, x, y, rot);
+        }
+
+        /// <summary>Server: a thing from the car's bed into this cell (standing at the car in the sewer).</summary>
+        public void TakeCargoServer(Vehicles.CargoItem item, byte x, byte y, byte rot)
+        {
+            var game = GameManager.Instance;
+            var car = Vehicles.Car.Active;
+            if (game == null || car == null || !CanAct || game.Phase != RunPhase.Sewer) return;
+            if ((car.transform.position - transform.position).magnitude > CarReach || !CanPlace(item.Shape, rot, x, y)) return;
+            if (!game.Cargo.Remove(item)) return; // taken by somebody else meanwhile
+            m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
+            Changed();
+        }
+
+        /// <summary>How far from the car's middle its bed and hopper are within reach.</summary>
+        public const float CarReach = 5f;
+
         public void RequestMove(int index, byte x, byte y, byte rot)
         {
             if (m_Link != null) m_Link.RequestMove(index, x, y, rot);
@@ -219,8 +240,20 @@ namespace Stealth.Player
             }
         }
 
-        /// <summary>Nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (<see cref="Vehicles.CarHopper"/>).</summary>
-        public void DepositServer(int index) { }
+        /// <summary>
+        /// Server: one thing dropped into the car's hopper (in the sewer) or into the entry hatch (in a house) burns into fuel
+        /// at once. Tools are not burnt; anywhere else nothing happens.
+        /// </summary>
+        public void DepositServer(int index)
+        {
+            if (index < 0 || index >= m_Items.Count || !CanAct || ItemCatalog.IsTool(m_Items[index].Shape)) return;
+            var game = GameManager.Instance;
+            if (game == null || !game.CanBurnAt(transform.position)) return;
+            var e = m_Items[index];
+            m_Items.RemoveAt(index);
+            Changed();
+            game.BurnServer(GetComponent<PlayerController>(), e.Value);
+        }
 
         // Team stash: at the hatch of a house, or at the board in the sewer.
 
@@ -293,9 +326,12 @@ namespace Stealth.Player
             if (AtHatch(out var stash)) stash.Move(from, x, y, rot);
         }
 
+        /// <summary>Server: a thing from the entry hatch's stash dropped on its burn zone becomes fuel (tools are not burnt).</summary>
         public void SellStashedServer(InventoryEntry from)
         {
-            // nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (CarHopper)
+            var game = GameManager.Instance;
+            if (!AtHatch(out var stash) || game == null || stash != game.Stash || ItemCatalog.IsTool(from.Shape) || !stash.Take(from)) return;
+            game.BurnServer(GetComponent<PlayerController>(), from.Value);
         }
 
         public void StashWorldServer(WorldItem item, byte x, byte y, byte rot)
@@ -304,9 +340,14 @@ namespace Stealth.Player
             Session.Despawn(item.gameObject);
         }
 
+        /// <summary>Server: a thing on the floor dragged onto the entry hatch's burn zone becomes fuel.</summary>
         public void SellWorldServer(WorldItem item)
         {
-            // nothing is sold any more: loot is fuel, fed into the car's engine in the sewer (CarHopper)
+            var game = GameManager.Instance;
+            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.IsTool(item.Shape)) return;
+            int fuel = item.Value;
+            Session.Despawn(item.gameObject);
+            game.BurnServer(GetComponent<PlayerController>(), fuel);
         }
 
         /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>

@@ -59,14 +59,20 @@ namespace Stealth.Level
             var s = (BuildingSettings)b.Clone();
             float Mul(RoomType t) => kind switch
             {
-                HouseKind.Business => t switch { RoomType.OpenSpace => 2f, RoomType.Meeting => 1.6f, RoomType.Lounge => 1.6f, RoomType.Storage => 0.5f, RoomType.Server => 0.6f, _ => 1f },
-                HouseKind.DataCenter => t switch { RoomType.Server => 4f, RoomType.Storage => 1.5f, RoomType.OpenSpace => 0.5f, RoomType.Lounge => 0.3f, RoomType.Kitchen => 0.6f, _ => 1f },
-                HouseKind.Warehouse => t switch { RoomType.Storage => 5f, RoomType.OpenSpace => 0.6f, RoomType.Meeting => 0.4f, RoomType.Lounge => 0.5f, _ => 1f },
-                HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f, _ => 1f },
+                HouseKind.Business => t switch { RoomType.OpenSpace => 2f, RoomType.Meeting => 1.6f, RoomType.Lounge => 1.6f, RoomType.Storage => 0.5f, RoomType.Server => 0.6f,
+                    RoomType.Gym => 1.6f, RoomType.GameRoom => 1.6f, RoomType.NapRoom => 1.4f, _ => 1f },
+                HouseKind.DataCenter => t switch { RoomType.Server => 4f, RoomType.Storage => 1.5f, RoomType.OpenSpace => 0.5f, RoomType.Lounge => 0.3f, RoomType.Kitchen => 0.6f,
+                    RoomType.ControlRoom => 3f, RoomType.Lab => 1.6f, RoomType.Library => 0.3f, RoomType.Studio => 0.3f, _ => 1f },
+                HouseKind.Warehouse => t switch { RoomType.Storage => 5f, RoomType.OpenSpace => 0.6f, RoomType.Meeting => 0.4f, RoomType.Lounge => 0.5f,
+                    RoomType.CopyRoom => 2f, RoomType.LockerRoom => 2f, RoomType.Library => 0.3f, _ => 1f },
+                HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f,
+                    RoomType.Library => 2f, RoomType.ControlRoom => 1.5f, RoomType.Studio => 1.5f, _ => 1f },
                 // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
-                HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f, _ => 1f },
+                HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f,
+                    RoomType.Infirmary => 3f, RoomType.LockerRoom => 1.5f, RoomType.Lab => 1.5f, RoomType.GameRoom => 0.3f, RoomType.Studio => 0.2f, _ => 1f },
                 // big repair bays and parts stores, a small office and a break room
-                HouseKind.Garage => t switch { RoomType.Storage => 5f, RoomType.Kitchen => 0.8f, RoomType.OpenSpace => 0.4f, RoomType.Meeting => 0.5f, RoomType.Server => 0.2f, _ => 1f },
+                HouseKind.Garage => t switch { RoomType.Storage => 5f, RoomType.Kitchen => 0.8f, RoomType.OpenSpace => 0.4f, RoomType.Meeting => 0.5f, RoomType.Server => 0.2f,
+                    RoomType.Lab => 2.5f, RoomType.LockerRoom => 2f, RoomType.Library => 0.2f, RoomType.Studio => 0.2f, _ => 1f },
                 _ => 1f,
             };
             var weights = new RoomWeight[b.RoomWeights.Length];

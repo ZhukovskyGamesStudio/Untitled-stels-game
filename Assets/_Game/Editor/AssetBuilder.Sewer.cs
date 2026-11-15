@@ -91,7 +91,7 @@ namespace Stealth.EditorTools
                 PaintCar(m);
                 return m;
             });
-            var drive = Prefab($"{LevelPrefabs}/DriveScene.prefab", () => BuildDriveScene(cuts, carModel));
+            var drive = Prefab($"{LevelPrefabs}/DriveScene.prefab", () => BuildDriveScene(segments, carModel));
             var piece = Prefab($"{PrefabsDir}/Vehicles/CargoPiece.prefab", () =>
             {
                 var go = new GameObject("CargoPiece");
@@ -237,6 +237,9 @@ namespace Stealth.EditorTools
             var lever = SewerModel("sewer_lever", root.transform, new Vector3(1.2f, 1.25f, 3.72f), 180f, false, "Lever");
             lever.AddComponent<GateLever>();
             gate.Handle = Find(lever, "AccentHandle");
+            // a small spot over the lever (placed with it, SewerLocation.PlaceLever): red while the way is shut, so it is found in the dark
+            gate.LeverLight = Lamp(root.transform, "LeverLight", new Vector3(1.2f, 2.1f, 3.2f), Quaternion.Euler(70f, 0f, 0f), LightType.Spot, new Color(1f, 0.25f, 0.15f), 4f, 3.2f);
+            gate.LeverLight.spotAngle = 70f;
             gate.HazardLights = new[]
             {
                 Lamp(root.transform, "HazardA", new Vector3(-0.7f, 3.6f, 2.6f), Quaternion.Euler(60f, 0f, 0f), LightType.Spot, new Color(1f, 0.55f, 0.1f), 0f, 8f),
@@ -411,21 +414,20 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>The drive scene: the cut-away tunnel, the pickup's model, a side camera with a long lens, the engine.</summary>
-        static GameObject BuildDriveScene(GameObject[] cuts, GameObject carModel)
+        static GameObject BuildDriveScene(GameObject[] segments, GameObject carModel)
         {
             var root = new GameObject("DriveScene");
             var scene = root.AddComponent<DriveScene>();
-            scene.CutSegments = cuts;
+            scene.Segments = segments; // whole segments: the camera stays inside the tunnel (DriveScene.Place)
             scene.CarModel = carModel;
-            // the kit's cut segments have no wall on the +Z side: the camera looks in from there, across at the car
-            var camGo = Child(root.transform, "Camera", new Vector3(-1.5f, 1.9f, 15f));
-            camGo.transform.localRotation = Quaternion.Euler(4f, 180f, 0f);
+            var camGo = Child(root.transform, "Camera", new Vector3(3.1f, 1.45f, 2.35f));
+            camGo.transform.localRotation = Quaternion.Euler(8f, 245f, 0f);
             var cam = camGo.AddComponent<Camera>();
             ConfigureCamera(cam);
-            cam.fieldOfView = 22f; // a long lens: almost flat, like a side-scroller
+            cam.fieldOfView = 52f;
             cam.depth = 50f;
-            cam.nearClipPlane = 1f;
-            cam.farClipPlane = 80f;
+            cam.nearClipPlane = 0.1f;
+            cam.farClipPlane = 60f;
             scene.Camera = cam;
             var engine = root.AddComponent<AudioSource>();
             engine.spatialBlend = 0f;
@@ -438,8 +440,8 @@ namespace Stealth.EditorTools
                 Lamp(root.transform, "Lamp1", new Vector3(6f, 3.4f, -1.2f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(1f, 0.78f, 0.5f), 6f, 12f),
             };
             foreach (var l in scene.Lamps) l.spotAngle = 150f;
-            // a soft key light from the open side: the car reads as a shape, not a silhouette
-            var key = Lamp(root.transform, "KeyLight", new Vector3(-1.5f, 3.2f, 7f), Quaternion.Euler(18f, 180f, 0f), LightType.Spot, new Color(0.85f, 0.9f, 1f), 9f, 18f);
+            // a soft key light from the camera's side, under the vault: the car reads as a shape, not a silhouette
+            var key = Lamp(root.transform, "KeyLight", new Vector3(1.5f, 3.3f, 2.6f), Quaternion.Euler(35f, 235f, 0f), LightType.Spot, new Color(0.85f, 0.9f, 1f), 7f, 12f);
             key.spotAngle = 70f;
             key.innerSpotAngle = 40f;
             return root;

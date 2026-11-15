@@ -36,9 +36,10 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            available = !Freed && HasKey(player);
+            // with the key: free the hostage; without: ask where it is (the hostage points out the guard who carries it)
+            available = !Freed;
             if (Freed) return null;
-            return available ? Loc.T("use.cage") : Loc.T("use.cage.nokey");
+            return HasKey(player) ? Loc.T("use.cage") : Loc.T("use.cage.ask");
         }
 
         void LateUpdate()

@@ -4,7 +4,7 @@ using static Stealth.Level.LevelMetrics;
 
 namespace Stealth.Level
 {
-    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void, Ground }
+    public enum MapPart : byte { Floor, Wall, Door, Vent, Stairs, Prop, Hatch, Railing, Void, Ground, ExitHatch }
 
     /// <summary>
     /// One rectangle of the map, x/y = world x/z in metres. <see cref="Angle"/> turns it (degrees, counter-clockwise)
@@ -124,17 +124,18 @@ namespace Stealth.Level
                 }
 
             if (floor == 0)
-                foreach (var h in new[] { l.HatchPosition, l.ExitHatchPosition }) // the way in and the way out
+                foreach (var (h, part) in new[] { (l.HatchPosition, MapPart.Hatch), (l.ExitHatchPosition, MapPart.ExitHatch) }) // the way in and the way out
                 {
                     var hatch = new Rect(h.x - 0.8f, h.z - 0.8f, 1.6f, 1.6f);
-                    if (AnyRevealed(map, 0, hatch)) output.Add(new MapRect(MapPart.Hatch, hatch));
+                    if (AnyRevealed(map, 0, hatch)) output.Add(new MapRect(part, hatch));
                 }
         }
 
         /// <summary>The square of a staircase and its hole in the corner of its room.</summary>
         public static Rect StairArea(Stair s) => PlanGenerator.StairArea(s, 0f);
 
-        static bool AnyRevealed(ExplorationMap map, int floor, Rect area)
+        /// <summary>Whether anybody has seen any tile of this area of a floor.</summary>
+        public static bool AnyRevealed(ExplorationMap map, int floor, Rect area)
         {
             var lo = ExplorationMap.TileOf(new Vector3(area.xMin, 0f, area.yMin));
             var hi = ExplorationMap.TileOf(new Vector3(area.xMax - 0.01f, 0f, area.yMax - 0.01f));

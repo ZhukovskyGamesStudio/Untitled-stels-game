@@ -143,14 +143,17 @@ namespace Stealth.EditorTools
         /// </summary>
         static void AddXrayFeature()
         {
-            AddXray(XrayMaterialPath, "MarkedXray", new[] { "MarkedXray", "MarkedXrayOutline", "MarkedXrayFill" }, Stealth.Enemies.Detector.XrayLayer,
+            AddXray(XrayMaterialPath, "MarkedXray", new[] { "MarkedXrayVisible", "MarkedXray", "MarkedXrayOutline", "MarkedXrayFill" }, Stealth.Enemies.Detector.XrayLayer,
                 null, null);
             // marked things (loot, crates, panels…): the same three passes on their own layer, in yellow-green
-            AddXray(MaterialsDir + "/FX/MarkedThingXray.mat", "MarkedThingXray", new[] { "MarkedThing", "MarkedThingOutline", "MarkedThingFill" },
+            AddXray(MaterialsDir + "/FX/MarkedThingXray.mat", "MarkedThingXray", new[] { "MarkedThingVisible", "MarkedThing", "MarkedThingOutline", "MarkedThingFill" },
                 Stealth.Level.MarkedThings.XrayLayer, new Color(0.75f, 1f, 0.2f, 0.36f), new Color(0.85f, 1f, 0.35f, 1f));
         }
 
-        /// <summary>Three RenderObjects passes of the x-ray shader (mask, outline, fill) on one layer, with their material (colours: null = the shader's).</summary>
+        /// <summary>
+        /// The RenderObjects passes of the x-ray shader (in view, mask, outline, fill) on one layer, in this order in the
+        /// renderer's list, with their material (colours: null = the shader's).
+        /// </summary>
         static void AddXray(string materialPath, string materialName, string[] names, int layer, Color? fill, Color? edge)
         {
             var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
@@ -167,7 +170,7 @@ namespace Stealth.EditorTools
             }
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
 
-            // Three passes of the same material, in this order: mask (stencil), outline outside it, fill inside it.
+            // The passes of the same material, in this order: where it is in view, mask (stencil), outline outside it, fill inside it.
             for (int pass = 0; pass < names.Length; pass++)
             {
                 var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == names[pass]);
@@ -195,11 +198,31 @@ namespace Stealth.EditorTools
                 s.overrideMaterial = mat;
                 s.overrideMaterialPassIndex = pass;
                 s.overrideDepthState = true;
-                s.depthCompareFunction = UnityEngine.Rendering.CompareFunction.Greater;
+                // the first pass marks where the object is in plain view (its own depth); the others draw behind walls only
+                s.depthCompareFunction = pass == 0 ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Greater;
                 s.enableWrite = false;
                 feature.SetActive(true);
                 EditorUtility.SetDirty(feature);
             }
+            // passes of one event run in the list's order: keep ours together and in order (a pass added later lands at the end)
+            var order = new SerializedObject(data);
+            var features = order.FindProperty("m_RendererFeatures");
+            var ids = order.FindProperty("m_RendererFeatureMap");
+            int Index(string n)
+            {
+                for (int i = 0; i < features.arraySize; i++)
+                    if (features.GetArrayElementAtIndex(i).objectReferenceValue is ScriptableRendererFeature f && f.name == n) return i;
+                return -1;
+            }
+            for (int k = 1; k < names.Length; k++)
+            {
+                int prev = Index(names[k - 1]), at = Index(names[k]);
+                if (prev < 0 || at < 0 || at == prev + 1) continue;
+                int to = at > prev ? prev + 1 : prev;
+                features.MoveArrayElement(at, to);
+                ids.MoveArrayElement(at, to);
+            }
+            order.ApplyModifiedProperties();
             EditorUtility.SetDirty(data);
         }
 
@@ -314,6 +337,7 @@ namespace Stealth.EditorTools
             if (a.DecayDensity <= 0f && d.DecayDensity > 0f) { a.DecayDensity = d.DecayDensity; dirty = true; }
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
+            if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
             if (dirty) EditorUtility.SetDirty(asset);
         }
 
@@ -471,6 +495,7 @@ namespace Stealth.EditorTools
                     geo.Family = ModelFamily.Clean;
                     geo.WainscotHeight = 1f; geo.Crown = true; geo.Doors = DoorTrim.Arch; geo.Ceiling = CeilingKind.Coffers;
                     geo.Floor = K("Real_Herringbone"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
+                    geo.RoomFloors = StorybookRoomFloors();
                     geo.Trim = K("Trim_White"); geo.Panel = K("Panel_PaleBlue"); geo.Column = K("Trim_PaleBlue"); geo.Beam = K("Trim_White");
                 });
 

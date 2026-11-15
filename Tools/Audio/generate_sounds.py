@@ -637,6 +637,17 @@ def office_hum(length):
     return loop(render, length)
 
 
+def hand_dryer():
+    """A hand dryer running for 4 s: a roar of air over a motor whine, spinning up and down (loud on purpose: it draws robots)."""
+    d = 4.0
+    t = t_axis(d)
+    spin = np.clip(t / 0.35, 0, 1) * np.clip((d - t) / 0.5, 0, 1)
+    air = bandpass(noise(d), 300, 4200) * 0.55
+    whine = np.sin(2 * np.pi * (780 + 140 * spin) * t) * 0.05 + np.sin(2 * np.pi * 1560 * t) * 0.02
+    hum = lowpass(signal.sawtooth(2 * np.pi * 95 * t), 400) * 0.18
+    return fade((air + whine + hum) * spin, 0.01, 0.05)
+
+
 def gas_wind(length):
     """Loop: the gas outside — wind with slow gusts and a low drone."""
     def render(L):
@@ -795,6 +806,7 @@ def main():
     write(P("Environment", "alarm"), alarm(2.4), 0.8)
     write(P("Environment", "office_hum"), office_hum(12.0), 0.6)
     write(P("Environment", "gas_wind"), gas_wind(12.0), 0.7)
+    write(P("Environment", "hand_dryer"), hand_dryer(), 0.8)
 
     write(P("Music", "music_menu"), music_menu(), 0.8)
     write(P("Music", "music_explore"), music_explore(), 0.5)

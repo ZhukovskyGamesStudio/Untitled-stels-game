@@ -5,19 +5,21 @@ namespace Stealth.Level
 {
     /// <summary>
     /// The drive to the next house (prefab Level/DriveScene), shown on every peer while the house is chosen and built:
-    /// the pickup drives along an endless sewer tunnel seen from the side — the near wall is cut away (the kit's cut
-    /// segments), the view is long and narrow, almost flat, the car bounces a little on the grate. The tunnel slides past
-    /// under a car that stays in the middle of the picture. Its own camera draws over the player's; the game takes it
-    /// away once the house is there (the screen fades through black, <see cref="Stealth.UI.GameHUD"/>).
+    /// the pickup drives along an endless sewer tunnel — whole segments, walls all round, so whichever way the camera
+    /// looks there is the tunnel and its haze, never the void — and bounces a little on the grate. The tunnel slides past
+    /// under a car that stays put. Its own camera draws over the player's; the game takes it away once the house is
+    /// there (the screen fades through black, <see cref="Stealth.UI.GameHUD"/>).
     /// It does not cut in: its camera starts where the player's eyes are in the car (<see cref="Begin"/> — the same cab,
-    /// the same lens) and glides out to the side view while the car picks up speed, so the drive follows on from the sewer.
+    /// the same lens), leaves through the side window and settles ahead of the car by the walkway, looking back at it as
+    /// the tunnel rushes by, swaying slowly; it never leaves the tunnel.
     /// </summary>
     public class DriveScene : MonoBehaviour
     {
         public static DriveScene Active { get; private set; }
 
-        [Tooltip("Straight tunnel segments without the near wall (6 m each).")]
-        public GameObject[] CutSegments;
+        [Tooltip("Straight tunnel segments, whole (6 m each).")]
+        [UnityEngine.Serialization.FormerlySerializedAs("CutSegments")]
+        public GameObject[] Segments;
         [Tooltip("The pickup's model (visual only).")]
         public GameObject CarModel;
         public Camera Camera;
@@ -30,14 +32,14 @@ namespace Stealth.Level
         [Tooltip("Seconds the car takes to reach full speed from the speed it had in the sewer.")]
         public float SpeedUpTime = 3f;
 
-        const int Count = 12;
+        const int Count = 14;
         readonly List<Transform> m_Segments = new();
         Transform m_Car;
         readonly List<Transform> m_Wheels = new();
         float m_Travel;
 
         static readonly Vector3 CarAt = new(-1.5f, 0.02f, 0.3f);
-        Pose m_EyeInCar, m_SideView;
+        Pose m_EyeInCar;
         float m_FromFov, m_ToFov, m_FromNear, m_ToNear, m_FromSpeed, m_Started = -1f;
         bool m_Glide;
         GameObject m_Mine;
@@ -55,10 +57,11 @@ namespace Stealth.Level
         void Awake()
         {
             Active = this;
-            for (int i = 0; i < Count && CutSegments != null && CutSegments.Length > 0; i++)
+            for (int i = 0; i < Count && Segments != null && Segments.Length > 0; i++)
             {
-                var s = Instantiate(CutSegments[(i * 7 + 3) % CutSegments.Length], transform);
+                var s = Instantiate(Segments[(i * 7 + 3) % Segments.Length], transform);
                 s.transform.localPosition = new Vector3((i - Count / 2) * SewerPlan.SegmentLength, 0f, 0f);
+                foreach (var c in s.GetComponentsInChildren<Collider>()) c.enabled = false; // only a picture: it slides every frame
                 m_Segments.Add(s.transform);
             }
             if (CarModel != null)
@@ -73,9 +76,10 @@ namespace Stealth.Level
             }
             if (Camera != null)
             {
-                m_SideView = new Pose(Camera.transform.localPosition, Camera.transform.localRotation);
-                m_ToFov = m_FromFov = Camera.fieldOfView;
-                m_ToNear = m_FromNear = Camera.nearClipPlane;
+                m_ToFov = m_FromFov = ViewFov;
+                m_ToNear = m_FromNear = 0.1f;
+                Camera.fieldOfView = ViewFov;
+                Camera.nearClipPlane = 0.1f;
             }
             m_FromSpeed = Speed;
             Level.VisualStyles.Dress(gameObject);
@@ -128,32 +132,39 @@ namespace Stealth.Level
         /// <summary>0..1 of the glide (linear in time; the path eases its two legs itself).</summary>
         public float Glide => m_Started < 0f || !m_Glide ? 1f : Mathf.Clamp01((Time.time - m_Started) / GlideTime);
 
-        /// <summary>How far from the car's side the camera stops after leaving the cab (inside the tunnel), metres.</summary>
-        const float CloseSide = 2.3f;
+        /// <summary>Where the camera settles, in the scene's space: ahead of the car, by the right walkway, eye height.</summary>
+        static readonly Vector3 View = new(CarAt.x + 4.6f, 1.45f, 2.35f);
+        /// <summary>What it looks at: the car's middle, a little above the bed (not the bouncing body: the picture stays calm).</summary>
+        static readonly Vector3 Focus = new(CarAt.x - 0.4f, 0.95f, CarAt.z);
+        /// <summary>The settled lens: wide enough for the car and the tunnel running away behind it.</summary>
+        const float ViewFov = 52f;
 
         static float Ease(float x) => Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(x));
 
         /// <summary>
-        /// The camera along its two legs: out of the cab through its window to a close side view of the car (turning to
-        /// it), then back away to the side view while the lens narrows just as fast as the distance grows — the picture
-        /// stays filled by the tunnel, never the void beside the cut-away scene.
+        /// The camera: out of the cab through the side window (a point just outside it), then forward along the car to
+        /// its settled view, turning to the car on the way, the lens widening from the player's to the drive's. Once
+        /// there it sways slowly along the walkway. Inside the tunnel all the way.
         /// </summary>
         void Place(float t)
         {
+            var focus = transform.TransformPoint(Focus);
+            float sway = Mathf.Sin((Time.time - Mathf.Max(0f, m_Started)) * 0.35f);
+            var view = transform.TransformPoint(View + new Vector3(sway * 0.9f, sway * 0.12f, -Mathf.Abs(sway) * 0.25f));
+            if (!m_Glide)
+            {
+                Camera.transform.SetPositionAndRotation(view, Quaternion.LookRotation(focus - view));
+                Camera.fieldOfView = ViewFov;
+                return;
+            }
             var from = new Pose(m_Car.TransformPoint(m_EyeInCar.position), m_Car.rotation * m_EyeInCar.rotation);
-            var to = new Pose(transform.TransformPoint(m_SideView.position), transform.rotation * m_SideView.rotation);
-            var car = m_Car.position;
-            float a = Ease(t / 0.4f), b = Ease((t - 0.35f) / 0.65f);
-            var close = new Vector3(car.x, Mathf.Lerp(from.position.y, to.position.y, 0.5f), car.z + CloseSide);
-            var p = Vector3.Lerp(Vector3.Lerp(from.position, close, a), to.position, b);
-            Camera.transform.SetPositionAndRotation(p, Quaternion.Slerp(from.rotation, to.rotation, a));
-            // the window at the car: from the close view's to the side view's height, whatever the distance on the way
-            float closeHalf = CloseSide * Mathf.Tan(m_FromFov * 0.5f * Mathf.Deg2Rad);
-            float farHalf = Mathf.Max(0.5f, to.position.z - car.z) * Mathf.Tan(m_ToFov * 0.5f * Mathf.Deg2Rad);
-            float half = Mathf.Lerp(closeHalf, farHalf, b);
-            float fov = 2f * Mathf.Atan(half / Mathf.Max(0.3f, p.z - car.z)) * Mathf.Rad2Deg;
-            Camera.fieldOfView = b <= 0f ? m_FromFov : Mathf.Clamp(fov, m_ToFov, m_FromFov);
-            Camera.nearClipPlane = Mathf.Lerp(m_FromNear, m_ToNear, b * b);
+            var window = transform.TransformPoint(new Vector3(CarAt.x + 0.5f, 1.35f, CarAt.z + 1.7f));
+            float a = Ease(t / 0.35f), b = Ease((t - 0.25f) / 0.75f);
+            var p = Vector3.Lerp(Vector3.Lerp(from.position, window, a), view, b);
+            var look = Quaternion.LookRotation(focus - p);
+            Camera.transform.SetPositionAndRotation(p, Quaternion.Slerp(from.rotation, look, Ease(t / 0.45f)));
+            Camera.fieldOfView = Mathf.Lerp(m_FromFov, ViewFov, Ease(t / 0.6f));
+            Camera.nearClipPlane = Mathf.Lerp(m_FromNear, m_ToNear, a);
         }
 
         void OnDestroy()
@@ -191,11 +202,11 @@ namespace Stealth.Level
             m_Car.localPosition = CarAt + new Vector3(drift * 0.4f * k, bounce * k, 0f);
             m_Car.localRotation = Quaternion.Euler(pitch * k, 90f, 0f);
             foreach (var w in m_Wheels) w.Rotate(speed * dt / 0.42f * Mathf.Rad2Deg, 0f, 0f, Space.Self);
-            if (m_Glide) Place(Glide);
+            if (Camera != null) Place(Glide);
             if (m_Mine != null && !m_Mine.activeSelf && Glide >= 0.22f) m_Mine.SetActive(true); // the camera has left the cab
             if (Camera != null)
             {
-                // past the cut-away's edges: the sewer's haze, like the player's own camera (never Unity's default blue)
+                // far down the tunnel: the sewer's haze, like the player's own camera (never Unity's default blue)
                 Camera.clearFlags = CameraClearFlags.SolidColor;
                 Camera.backgroundColor = RenderSettings.fogColor;
             }

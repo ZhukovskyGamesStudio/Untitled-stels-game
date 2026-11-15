@@ -82,6 +82,14 @@ namespace Stealth.EditorTools
             Mat("Floor_ToonTiles", new Color(0.62f, 0.8f, 0.9f), "bigtiles", 0.3f);
             Mat("Floor_Concrete", new Color(0.72f, 0.72f, 0.7f), "concrete", 0.15f);
             Mat("Floor_ConcreteWhite", new Color(0.96f, 0.97f, 0.99f), "concrete", 0.3f);
+            // the themed rooms' floors (StyleGeometry.RoomFloors)
+            Mat("Floor_SmallTiles", new Color(0.9f, 0.93f, 0.95f), "smalltiles", 0.6f);
+            Mat("Floor_Rubber", new Color(0.55f, 0.55f, 0.58f), "rubber", 0.15f);
+            Mat("Floor_CarpetGreen", new Color(0.3f, 0.48f, 0.36f), "carpet", 0.05f);
+            Mat("Floor_CarpetBlue", new Color(0.32f, 0.42f, 0.62f), "carpet", 0.05f);
+            Mat("Floor_CarpetCharcoal", new Color(0.36f, 0.37f, 0.4f), "carpet", 0.05f);
+            Mat("Floor_CarpetRed", new Color(0.62f, 0.24f, 0.22f), "carpet", 0.05f);
+            Mat("Floor_Lino", new Color(0.72f, 0.84f, 0.8f), "bigtiles", 0.45f);
             Mat("Floor_Grid", new Color(0.32f, 0.32f, 0.38f), "gridtiles", 0.6f, 0f, "gridtiles_glow", new Color(0.2f, 1.6f, 1.8f));
             // walls
             Mat("Wall_Corrugated", new Color(0.42f, 0.48f, 0.44f), "corrugated", 0.35f, 0.45f);

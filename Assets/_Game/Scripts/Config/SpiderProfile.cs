@@ -13,11 +13,16 @@ namespace Stealth.Enemies
         [Tooltip("About how often it crosses the ceiling to the opposite wall, seconds (0 = it keeps to the walls).")]
         public float CeilingEvery = 14f;
 
-        [Header("Eyes")]
-        public float Range = 9f;
-        public float ViewAngle = 120f;
-        public float DetectionRate = 1.6f;
-        public float CrouchFactor = 0.6f;
+        [Header("Web (it has no eyes: the wires across its room tell it)")]
+        [Tooltip("Metres between the wires along the room.")]
+        public float StrandSpacing = 1.7f;
+        [Tooltip("The way past a wire at its open end, metres.")]
+        public float StrandGap = 1.0f;
+        public int MaxStrands = 6;
+        [Tooltip("How fast it scurries along the walls towards whoever touched a wire, m/s.")]
+        public float RushSpeed = 6f;
+        [Tooltip("It leaps once this close to them, metres.")]
+        public float LeapRange = 4.5f;
 
         [Header("Leap")]
         public float LeapTime = 0.7f;

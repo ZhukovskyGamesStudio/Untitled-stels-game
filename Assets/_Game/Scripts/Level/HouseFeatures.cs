@@ -251,6 +251,10 @@ namespace Stealth.Level
                 behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
                 if (behind.Count == 0 || behind.Count > s.KeyRegionRooms || behind.Contains(l.LobbyRoom) || behind.Overlaps(taken)) continue;
                 if (i == l.VaultDoorway || (l.VaultRoom >= 0 && behind.Contains(l.VaultRoom))) continue; // the vault has a lock of its own
+                // no room two storeys high behind it: from a gallery above a player drops in past the door — and is shut in
+                bool atrium = false;
+                foreach (int r in behind) atrium |= plan.Rooms[r].Levels > 1;
+                if (atrium) continue;
                 var d = l.Doorways[i];
                 // the key: a room on this side, not the lobby, far from the door; on a table if there is one
                 var keyRooms = new List<PlanRoom>();
@@ -552,7 +556,11 @@ namespace Stealth.Level
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0xC7A7, 0));
             var options = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes) options.Add(i);
+                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack) options.Add(i);
+            // a house without a store room: a cabinet or a locker stands in (every house has something to search)
+            if (options.Count == 0)
+                for (int i = 0; i < l.Props.Count; i++)
+                    if (l.Props[i].Kind is PropKind.Cabinet or PropKind.Lockers) options.Add(i);
             Shuffle(options, rng);
             foreach (int i in options)
             {
@@ -580,7 +588,8 @@ namespace Stealth.Level
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the
             // place — the place shrinks to its footprint
             var need = Furnisher.FootprintOf(kind);
-            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa, PropKind.Shelf })
+            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa, PropKind.Shelf,
+                         PropKind.PoolTable, PropKind.ReadingTable, PropKind.ConsoleDesk, PropKind.LabBench, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball })
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)

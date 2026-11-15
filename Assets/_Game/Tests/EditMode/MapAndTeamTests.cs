@@ -248,11 +248,11 @@ namespace Stealth.Tests
             Assert.IsTrue(rects.Any(r => r.Part == MapPart.Floor));
             Assert.IsTrue(rects.Any(r => r.Part == MapPart.Wall), "the walls of the room");
             Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Prop), "only the furniture that was seen");
-            Assert.IsTrue(rects.Any(r => r.Part == MapPart.Hatch), "the lobby has the hatch");
-            Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Hatch), "the exit hatch is not seen yet");
+            Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Hatch), "the lobby has the way in");
+            Assert.AreEqual(0, rects.Count(r => r.Part == MapPart.ExitHatch), "the exit hatch is not seen yet");
             map.RevealAround(l.ExitHatchPosition + Vector3.up * 1.6f, 6f);
             MapSketch.Build(map, 0, props, rects);
-            Assert.AreEqual(2, rects.Count(r => r.Part == MapPart.Hatch), "once seen, the way out is on the map too");
+            Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.ExitHatch), "once seen, the way out is on the map too, in its own colour");
             // Floor runs are merged: far fewer rectangles than tiles.
             int tiles = Mathf.RoundToInt(map.RevealedShare(0) * map.Width * map.Height);
             Assert.Less(rects.Count(r => r.Part == MapPart.Floor), tiles);

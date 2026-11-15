@@ -744,6 +744,16 @@ namespace Stealth.Level
             RoomType.Storage => aspect > 1.6f ? 1.4f : 0.9f,
             RoomType.OpenSpace => area > 45f ? 2f : area > 28f ? 0.6f : 0f,
             RoomType.Lounge => area > 30f ? 1.3f : 0.3f,
+            RoomType.Gym => area is > 22f and < 80f ? 1.3f : 0.15f,
+            RoomType.Library => area > 22f ? 1.2f : 0.2f,
+            RoomType.CopyRoom => area < 26f ? 1.5f : area < 40f ? 0.4f : 0f,
+            RoomType.ControlRoom => area is > 24f and < 60f ? 1.1f : 0f,
+            RoomType.Lab => area is > 16f and < 70f ? 1.1f : 0.2f,
+            RoomType.NapRoom => area is > 14f and < 36f ? 1.3f : 0f,
+            RoomType.Studio => area is > 16f and < 40f ? 1.2f : 0f,
+            RoomType.LockerRoom => (area is > 16f and < 50f ? 1.1f : 0f) * (aspect > 1.4f ? 1.4f : 1f),
+            RoomType.Infirmary => area is > 18f and < 50f ? 1.1f : 0f,
+            RoomType.GameRoom => area is > 26f and < 100f ? 1.3f : 0.1f,
             _ => 1f,
         };
 
@@ -764,7 +774,8 @@ namespace Stealth.Level
             {
                 var r = regions[i];
                 float area = r.Cells.Count / (float)(M * M);
-                bool kind = r.Type is RoomType.Lobby or RoomType.OpenSpace or RoomType.Lounge or RoomType.Storage or RoomType.Meeting;
+                bool kind = r.Type is RoomType.Lobby or RoomType.OpenSpace or RoomType.Lounge or RoomType.Storage or RoomType.Meeting
+                    or RoomType.Library or RoomType.GameRoom or RoomType.Gym;
                 if (!kind || r.Hall >= 0 || area < 45f || area > 260f || made >= 1 + c.House / 3) continue;
                 if (rng.NextDouble() > c.B.AtriumChance) continue;
                 int levels = f + 2 < c.Floors && rng.NextDouble() < 0.3 ? 3 : 2;

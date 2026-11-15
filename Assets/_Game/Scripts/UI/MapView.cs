@@ -38,10 +38,11 @@ namespace Stealth.UI
             new(0.75f, 0.7f, 0.6f, 0.9f),    // Vent
             new(0.95f, 0.78f, 0.3f, 0.55f),  // Stairs
             new(0.72f, 0.78f, 0.85f, 0.42f), // Prop
-            new(0.45f, 1f, 0.5f, 0.95f),     // Hatch
+            new(0.4f, 0.72f, 1f, 0.95f),     // Hatch (the way in: blue)
             new(0.7f, 0.85f, 0.95f, 0.6f),   // Railing (the edge of a gallery)
             new(0.05f, 0.07f, 0.1f, 0.55f),  // Void (an atrium seen from above)
             new(0.22f, 0.3f, 0.22f, 0.45f),  // Ground (the yard outside, seen up close in the gas)
+            new(0.45f, 1f, 0.5f, 0.95f),     // ExitHatch (the way out: green, like its marker in the HUD)
         };
         static readonly Color Marked = new(1f, 0.22f, 0.15f);
 

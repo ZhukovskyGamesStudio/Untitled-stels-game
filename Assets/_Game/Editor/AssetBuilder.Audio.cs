@@ -84,6 +84,7 @@ namespace Stealth.EditorTools
                 b.Alarm = Clip("Environment/alarm");
                 b.OfficeHum = Clip("Environment/office_hum");
                 b.GasWind = Clip("Environment/gas_wind");
+                b.HandDryer = Clip("Environment/hand_dryer");
                 b.MenuMusic = Clip("Music/music_menu");
                 b.ExploreMusic = Clip("Music/music_explore");
                 b.ChaseMusic = Clip("Music/music_chase");
@@ -99,6 +100,11 @@ namespace Stealth.EditorTools
             if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null)
             {
                 FillLateClips(s_Bank);
+                EditorUtility.SetDirty(s_Bank);
+            }
+            if (s_Bank.HandDryer == null)
+            {
+                s_Bank.HandDryer = Clip("Environment/hand_dryer");
                 EditorUtility.SetDirty(s_Bank);
             }
             return s_Bank;

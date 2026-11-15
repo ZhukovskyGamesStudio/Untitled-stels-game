@@ -18,6 +18,30 @@ namespace Stealth.Game
     {
         public static int ConsoleKey(int console) => 5_000_000 + console;
         public static int CageOpenKey(int prop) => 6_000_000 + prop;
+        /// <summary>Stages of the job (in <see cref="IsOpened"/>, replicated): the vault seen, somebody inside it; the hostage spoken to, its key in hand.</summary>
+        public const int VaultFoundKey = 9_000_001, VaultEnteredKey = 9_000_002, CageFoundKey = 9_000_003, CageKeyHeldKey = 9_000_004;
+
+        /// <summary>How long the hostage's pointing marks the guard with the key, seconds.</summary>
+        const float KeyCarrierMark = 90f;
+
+        /// <summary>Where the job stands, for the task list (every peer: from the replicated keys and the layout).</summary>
+        public UI.ObjectiveState ObjectiveStage
+        {
+            get
+            {
+                var l = ActiveLevel.Layout;
+                if (l == null) return default;
+                return new UI.ObjectiveState
+                {
+                    Kind = l.Objective,
+                    Found = l.Objective == ObjectiveKind.Vault ? IsOpened(VaultFoundKey) || VaultSolved > 0 : IsOpened(CageFoundKey),
+                    Solved = VaultSolved,
+                    Locks = l.VaultConsoles.Count,
+                    KeyHeld = IsOpened(CageKeyHeldKey),
+                    Done = ObjectiveDone,
+                };
+            }
+        }
 
         ObjectiveSettings Objectives => Tuning.Items.Objectives;
 
@@ -43,7 +67,7 @@ namespace Stealth.Game
                 if (l == null) return false;
                 return l.Objective switch
                 {
-                    ObjectiveKind.Vault => l.VaultDoor >= 0 && IsOpened(DoorKey(l.VaultDoor)),
+                    ObjectiveKind.Vault => IsOpened(VaultEnteredKey),
                     ObjectiveKind.Hostage => l.Cage >= 0 && IsOpened(CageOpenKey(l.Cage)),
                     _ => false,
                 };
@@ -99,13 +123,61 @@ namespace Stealth.Game
             Banner(Loc.Pack("banner.vault_open"));
         }
 
-        /// <summary>Server: a player with the cage's key opens the cage; the hostage slips away and leaves the reward.</summary>
+        /// <summary>
+        /// Server, every frame of a house: the stages that are not a player's action — the vault seen (its door revealed on
+        /// the team's map), somebody inside the opened vault, the cage's key in somebody's backpack (dropped again: not).
+        /// </summary>
+        void UpdateObjective()
+        {
+            var l = ActiveLevel.Layout;
+            if (l == null || l.Objective == ObjectiveKind.None) return;
+            if (l.Objective == ObjectiveKind.Vault)
+            {
+                if (!IsOpened(VaultFoundKey) && l.VaultDoorway >= 0 && Exploration != null)
+                {
+                    var d = l.Doorways[l.VaultDoorway].Position;
+                    if (MapSketch.AnyRevealed(Exploration, LevelLayout.FloorOf(d.y), new Rect(d.x - 0.75f, d.z - 0.75f, 1.5f, 1.5f))) SetStage(VaultFoundKey, true);
+                }
+                if (!IsOpened(VaultEnteredKey) && l.VaultDoor >= 0 && IsOpened(DoorKey(l.VaultDoor)))
+                    foreach (var p in PlayerController.All)
+                        if (!p.Downed && l.Plan.RoomAt(p.transform.position + Vector3.up * 0.3f)?.Id == l.VaultRoom)
+                        {
+                            SetStage(VaultEnteredKey, true);
+                            Banner(Loc.Pack("banner.vault_entered", p.Nick));
+                            break;
+                        }
+                return;
+            }
+            bool held = false;
+            foreach (var p in PlayerController.All)
+                if (Cage.HasKey(p)) { held = true; break; }
+            SetStage(CageKeyHeldKey, held && !ObjectiveDone);
+        }
+
+        void SetStage(int key, bool on)
+        {
+            if (on == IsOpened(key)) return;
+            if (on) m_Opened.Add(key); else m_Opened.Remove(key);
+            OpenedVersion++;
+        }
+
+        /// <summary>
+        /// Server: E at the cage. With its key: free the hostage. Without: the hostage points out the guard who carries it —
+        /// marked for the whole team (seen through walls) — or, if it lies about already, where it lies.
+        /// </summary>
         void FreeHostageServer(PlayerController player, int prop)
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Hostage || prop != l.Cage || IsOpened(CageOpenKey(prop))) return;
             var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null || !inventory.TakeServer(ItemCatalog.CageKey)) return;
+            if (inventory == null) return;
+            if (!inventory.TakeServer(ItemCatalog.CageKey))
+            {
+                SetStage(CageFoundKey, true);
+                PointOutKeyServer(player);
+                return;
+            }
+            SetStage(CageFoundKey, true);
             m_Opened.Add(CageOpenKey(prop));
             OpenedVersion++;
             var cage = Interactable.All.FirstOrDefault(i => i.Kind == UseKind.Cage && i.Index == prop);
@@ -113,6 +185,25 @@ namespace Stealth.Game
             byte color = (byte)Mathf.Clamp(Objectives.HostageRewardColor, 0, ItemCatalog.Colors.Length - 1);
             SpawnItemServer(ItemCatalog.Diamond, color, at + Vector3.up * 0.05f, 0f);
             Banner(Loc.Pack("banner.hostage_free", player.Nick));
+        }
+
+        /// <summary>Server: the guard with the cage's key marked for everyone (a long mark), or the key's spot pinged if it lies about.</summary>
+        void PointOutKeyServer(PlayerController player)
+        {
+            var carrier = Detector.All.FirstOrDefault(d => d.Cargo >= 0 && Detector.DecodeCargo(d.Cargo).shape == ItemCatalog.CageKey);
+            if (carrier != null)
+            {
+                carrier.MarkServer(Session.ServerTimeF + KeyCarrierMark);
+                if (m_Link != null) m_Link.BroadcastPing(player.ClientId, PingKind.Enemy, carrier.Position, carrier.NetId);
+                else ReceivePing(player.ClientId, PingKind.Enemy, carrier.Position, carrier.NetId);
+                Banner(Loc.Pack("banner.hostage_points"));
+                return;
+            }
+            var key = WorldItem.All.FirstOrDefault(i => i.Shape == ItemCatalog.CageKey);
+            if (key == null) return;
+            if (m_Link != null) m_Link.BroadcastPing(player.ClientId, PingKind.Thing, key.transform.position, 0);
+            else ReceivePing(player.ClientId, PingKind.Thing, key.transform.position, 0);
+            Banner(Loc.Pack("banner.hostage_points"));
         }
     }
 }

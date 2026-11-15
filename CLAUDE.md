@@ -30,12 +30,12 @@ FILTER=HousePlanTests Tools/dev.sh tests  # только эти тесты
 PLANS="7:3,42:5" Tools/dev.sh plans       # картинки планов домов (сид:дом) в Logs/plans/
 Tools/dev.sh player             # релизный Windows-билд в Builds/Windows/StealthPrototype.exe (cycle собирает development)
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
-SEEDS=7,42,3 Tools/dev.sh run sewer          # несколько сидов сразу, по окну на сид: Builds/shots/<сценарий>_<сид>, Builds/host_<сид>.log
+SEEDS=7,42,3 Tools/dev.sh run sewer          # несколько сидов сразу, по окну на сид (свой UDP-порт, -port): Builds/shots/<сценарий>_<сид>, Builds/host_<сид>.log
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`, `cheats`, `features`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `themed`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`, `cheats`, `features`).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -122,7 +122,9 @@ LaserGate — отдельная ловушка (не детектор)
 Потолочный пылесос — вертикальный лазерный веер от робота до пола (`ScanLine.CutsFan`, меш `Art/Models/FX/LaserHalfFan`, две половины
 обрезаются стенами): касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
 противоположную стену (`SpiderProfile.CeilingEvery`; ступни ног находят и крышу верхнего этажа).
-Сейсмик — волны (`SeismicSense.Wave*`, `PulseStomp` → кольцо `StompRipple` и звук), подметальщик — лидар у пола (`RobotLidar`),
+Паук без глаз: его комната перетянута проводами-паутиной, как простой лабиринт (`SpiderWebs`, каждый пир натягивает те же провода; префаб
+`Robots/SpiderStrand`), коснулся — паук бежит по стенам к тебе и прыгает. Охранник на точке патруля стоит в три фазы, видные издалека
+(`RobotBrain.PausePhase`: замер — оглядывается — разворачивается к следующей точке). Сейсмик — волны (`SeismicSense.Wave*`, `PulseStomp` → кольцо `StompRipple` и звук), подметальщик — лидар у пола (`RobotLidar`),
 рабочие везут лут (`DetectorSnapshot.Cargo`, при взломе падает на пол). `RobotRoster.Newcomers` — новый вид гарантированно есть в доме, где он появляется.
 `RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
 Настройки робота — в префабе: `RobotController.Senses` (`RobotSenses`: глаза, слух, сейсмика, нюх, сортировщик) и `Traits` (`RobotTraits`: скорости, лестницы, атака, тревога).
@@ -149,7 +151,10 @@ LaserGate — отдельная ловушка (не детектор)
 и формами. `LevelGenerator` — «сгенерируй и проверь»: до 16 вариантов плана (`LevelLayout.PlanAttempt`), берётся первый, где до каждой комнаты
 можно дойти. `LevelLayout` — адаптеры для остального кода (`Rooms`, `Doorways`, `Stairs`, `RoomAt`, `OpenBetweenFloors`…).
 Мебель — `Furnisher`: острова с проходами 1,25 м, пристенные группы с дорожкой перед ними, коридоры пустые, вокруг проёмов, лестниц, люка и
-точек патруля — свободно; `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
+точек патруля — свободно; тематические комнаты (`RoomType` от `Gym` до `GameRoom`, плюс кухня и туалет) сначала получают свой узнаваемый
+предмет (`Furnisher.Anchor`: варианты от большого к компактному, у стены или посреди комнаты), потом второй проход по стенам; модели —
+`Tools/Blender/rooms_*.py`, префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors` (пока у
+«Книжки-чертежа»), сушилка для рук — `HandDryer` (E: гудит `GadgetSettings.DryerTime` и шумит для роботов); `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
 без запуска игры — `PLANS="seed:дом,…" Tools/dev.sh plans` → `Logs/plans/`. Размеры — `LevelMetrics`. Пристенная мебель держит ≥ 20 см
 от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
 со стенами, лестницами и друг с другом, `LevelNavMeshTests` — что до лута можно дойти.
@@ -223,9 +228,11 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 **Между домами — канализация и машина.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. В доме **два люка**:
 вход (`LevelLayout.HatchPosition`, лобби — команда начинает дом сидя в нём, `PlayerController.EnterHatchServer(0)`) и выход
 (`ExitHatchPosition`, комната первого этажа дальше всех от входа, `LevelGenerator.ExitRoom`); `PlayerController.HatchIndex` (0/1, реплицирует
-`PlayerNet`). Уйти — вся команда в люке **выхода** (`RunState.TeamInHatch`) → отсчёт `LeaveAt` → `GoToSewerServer`. У каждого люка свой склад:
-`GameManager.Stash` (вход: при старте дома туда выгружается кузов машины, `UnloadCarServer`) и `ExitStash` (выход: уезжает в кузов,
-`LoadCarServer`; склад входа пропадает) — `GameManager.StashAt(позиция)`. Продажи нет: добыча — **топливо**. `RunState.Collected` — бак
+`PlayerNet`). Уйти — все в люках (в любом), и хотя бы один — в люке **выхода** (`RunState.TeamInHatch`) → отсчёт `LeaveAt` → `GoToSewerServer`. У каждого люка свой склад:
+`GameManager.Stash` (вход: склад, куда при старте дома выгружается кузов (`UnloadCarServer`), и горловина бака — на его доске зона «сжечь в топливо»,
+`StashBoard.SellZone` → `PlayerInventory.Sell*Server`/`DepositServer`; инструменты не горят) и `ExitStash` (выход: уезжает в кузов, `LoadCarServer`) — `GameManager.StashAt(позиция)`.
+Вещь, брошенная из рук на шредер машины или во входной люк, — тоже топливо (`PlayerInventory.DepositServer`, `GameManager.CanBurnAt`); вещи из кузова
+тащатся мышью в рюкзак (`IInventoryLink.RequestTakeCargo`). Продажи нет: добыча — **топливо**. `RunState.Collected` — бак
 (живёт весь забег), `Quota` — сколько сожжёт поездка из этого дома (первая бесплатна); `RunState.Advance` списывает её, `Strand` — забег
 окончен, если топлива не хватит даже со всей добычей (`CanStillGo`, предупреждение `RunSettings.StrandedGrace`).
 Канализацию каждый пир собирает сам: `SewerPlan.Make(RunSeed, глубина)` (чистый: заглушка, участок машины под люком входа, ворота, участок
@@ -266,7 +273,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 **большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами),
 три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
 `SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь открыта, внутри сокровища (`VaultTreasure`);
-**заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате, ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
+задание показывается по шагам (`ObjectiveRules.Step`, `GameManager.ObjectiveStage`: найдите сейф → разблокируйте дверь (k/3) → откройте её;
+найдите заложника → заберите ключ у охранника (заложник по E помечает его для всех) → освободите); **заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате, ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
 взломан — роняет), с ключом E → награда (алмаз). Награды не входят в квоту дома. Сервер — `GameManager.Objective.cs`, строка в HUD — `ObjectiveRules`;
 сценарий `objective` проходит оба задания настоящими клавишами.
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`

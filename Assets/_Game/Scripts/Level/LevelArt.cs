@@ -2,6 +2,14 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
+    /// <summary>A furniture prefab of a kind (<see cref="LevelArt.RoomProps"/>).</summary>
+    [System.Serializable]
+    public struct PropPrefab
+    {
+        public PropKind Kind;
+        public GameObject Prefab;
+    }
+
     /// <summary>
     /// Every prefab the level builder instantiates. Created by the asset builder (Stealth / Build Prototype Assets),
     /// then freely editable: swap a prefab here to restyle the whole office.
@@ -89,6 +97,8 @@ namespace Stealth.Level
         public GameObject IllusionBlock;
         [Tooltip("The house's main job: a lock panel of the vault on a wall (VaultConsole), the hostage's cage (Cage), the vault door's lamps (VaultPanel).")]
         public GameObject VaultConsole, Cage, VaultPanel;
+        [Tooltip("The furniture of the themed rooms (gym, library, kitchen run, restrooms…), by kind.")]
+        public PropPrefab[] RoomProps = new PropPrefab[0];
 
         public GameObject Prop(PropKind kind) => kind switch
         {
@@ -134,7 +144,13 @@ namespace Stealth.Level
             PropKind.Workbench => Workbench,
             PropKind.Programmer => Programmer,
             PropKind.Cage => Cage,
-            _ => null,
+            _ => RoomProp(kind),
         };
+
+        GameObject RoomProp(PropKind kind)
+        {
+            if (RoomProps != null) foreach (var p in RoomProps) if (p.Kind == kind) return p.Prefab;
+            return null;
+        }
     }
 }

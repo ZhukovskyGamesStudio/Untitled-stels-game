@@ -78,6 +78,10 @@ namespace Stealth.Net
         public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => StashWorldRpc(item.GetComponent<NetworkObject>(), x, y, rot);
         public void RequestSellWorld(WorldItem item) => SellWorldRpc(item.GetComponent<NetworkObject>());
         public void RequestStashAll() => StashAllRpc();
+        public void RequestTakeCargo(ulong cargo, byte x, byte y, byte rot) => TakeCargoRpc(cargo, x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void TakeCargoRpc(ulong cargo, byte x, byte y, byte rot) => m_Inventory.TakeCargoServer(Vehicles.CargoItem.Unpack(cargo), x, y, rot);
 
         [Rpc(SendTo.Server)]
         void StashAllRpc() => m_Inventory.StashAllServer();

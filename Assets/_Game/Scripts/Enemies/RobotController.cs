@@ -403,17 +403,34 @@ namespace Stealth.Enemies
             PatrolToNextPoint();
         }
 
+        public Vector3 Forward => new Vector3(transform.forward.x, 0f, transform.forward.z).normalized;
+
+        Vector3? m_PlannedPoint;
+
+        public Vector3 PlanNextPatrolPoint()
+        {
+            m_PlannedPoint ??= ChoosePatrolPoint();
+            return m_PlannedPoint.Value;
+        }
+
         public void PatrolToNextPoint()
+        {
+            var goal = m_PlannedPoint ?? ChoosePatrolPoint();
+            m_PlannedPoint = null;
+            if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.SetDestination(goal);
+        }
+
+        /// <summary>The next spot of its round: the other end of a warden's post, or a patrol point near "its" area.</summary>
+        Vector3 ChoosePatrolPoint()
         {
             if (m_HasPost)
             {
                 m_PostAtB = !m_PostAtB;
                 var goal = m_PostAtB ? m_PostB : m_PostA;
-                if (m_Agent != null && m_Agent.isOnNavMesh && NavMesh.SamplePosition(goal, out var spot, 1.5f, m_Agent.areaMask)) m_Agent.SetDestination(spot.position);
-                return;
+                return m_Agent != null && m_Agent.isOnNavMesh && NavMesh.SamplePosition(goal, out var spot, 1.5f, m_Agent.areaMask) ? spot.position : transform.position;
             }
             var layout = ActiveLevel.Layout;
-            if (layout == null || layout.PatrolPoints.Count == 0) return;
+            if (layout == null || layout.PatrolPoints.Count == 0) return transform.position;
             int myFloor = LevelLayout.FloorOf(transform.position.y);
             // Robots without legs patrol only their floor; walkers mostly stay but sometimes change floors.
             var rng = LevelRandom.Shared(RandomChannel.Patrol);
@@ -429,7 +446,7 @@ namespace Stealth.Enemies
                 if (Vector3.Distance(p, here) < Vector3.Distance(best, here) && Vector3.Distance(p, here) > 3f) best = p;
             }
             best += new Vector3(rng.Range(-2.5f, 2.5f), 0, rng.Range(-2.5f, 2.5f));
-            if (NavMesh.SamplePosition(best, out var hit, 3f, m_Agent.areaMask)) m_Agent.SetDestination(hit.position);
+            return NavMesh.SamplePosition(best, out var hit, 3f, m_Agent.areaMask) ? hit.position : transform.position;
         }
     }
 }

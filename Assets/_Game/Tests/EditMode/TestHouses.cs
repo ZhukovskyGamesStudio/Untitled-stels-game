@@ -22,9 +22,9 @@ namespace Stealth.Tests
 
         /// <summary>
         /// The seeds and houses of <see cref="Sample"/>: different masses, kinds and sizes, the first house to a deep one.
-        /// 123456789/2 once lost its whole top floor (a stair's approach walled off by furniture); 3/2 has an octagon.
+        /// 123456789/2 once lost its whole top floor (a stair's approach walled off by furniture); 17/2 has a rotunda.
         /// </summary>
-        public static readonly (int seed, int level)[] SampleKeys = { (1, 0), (7, 1), (42, 2), (1337, 3), (99991, 4), (123456789, 2), (3, 2) };
+        public static readonly (int seed, int level)[] SampleKeys = { (1, 0), (7, 1), (42, 2), (1337, 3), (99991, 4), (123456789, 2), (17, 2) };
 
         /// <summary>Seven different houses (see <see cref="SampleKeys"/>), generated once for the whole run.</summary>
         public static IEnumerable<LevelLayout> Sample

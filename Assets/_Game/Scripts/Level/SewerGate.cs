@@ -16,6 +16,8 @@ namespace Stealth.Level
         [Tooltip("The lever's handle: it flips when the gate opens.")]
         public Transform Handle;
         public Light[] HazardLights;
+        [Tooltip("The spot over the lever: red while the gate is shut, green once it opens.")]
+        public Light LeverLight;
 
         /// <summary>Is the gate of this sewer open (set by the game).</summary>
         public static System.Func<bool> IsOpen = () => false;
@@ -45,6 +47,12 @@ namespace Stealth.Level
             if (Door != null) Door.localPosition = m_Closed + Vector3.up * Lift * Mathf.SmoothStep(0f, 1f, m_Open);
             if (DoorCollider != null) DoorCollider.enabled = m_Open < 0.6f;
             if (Handle != null) Handle.localRotation = m_HandleRest * Quaternion.Euler(open ? 70f : 0f, 0f, 0f);
+            if (LeverLight != null)
+            {
+                // a slow pulse while shut draws the eye; steady green once open
+                LeverLight.color = open ? new Color(0.35f, 1f, 0.45f) : new Color(1f, 0.25f, 0.15f);
+                LeverLight.intensity = open ? 1.5f : 3f + 1.5f * Mathf.Sin(Time.time * 3f);
+            }
             if (HazardLights != null)
                 foreach (var l in HazardLights)
                     if (l != null) l.intensity = m_Open > 0f && m_Open < 1f ? 3f * (Mathf.Sin(Time.time * 10f) > 0f ? 1f : 0.1f) : 0f;

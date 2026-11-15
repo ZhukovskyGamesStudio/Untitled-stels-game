@@ -142,6 +142,8 @@ namespace Stealth.Level
         {
             var (mat, tileSize) = p.Kind switch
             {
+                DecorKind.FloorFinish when p.Variant > 0 && g.RoomFloors != null && p.Variant <= g.RoomFloors.Length
+                    => (g.RoomFloors[p.Variant - 1].Material, g.RoomFloors[p.Variant - 1].Tile),
                 DecorKind.FloorFinish => (g.Floor, g.FloorTile),
                 DecorKind.CeilingFinish => (g.CeilingFinish, g.CeilingTile),
                 _ => (g.Wall, g.WallTile),

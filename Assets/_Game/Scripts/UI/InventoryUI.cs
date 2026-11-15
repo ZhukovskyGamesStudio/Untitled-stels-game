@@ -49,7 +49,7 @@ namespace Stealth.UI
         public Image HighlightPrefab;
         public Text Tooltip;
 
-        enum DragSource { None, Inventory, World, Stash }
+        enum DragSource { None, Inventory, World, Stash, Cargo }
         enum Target { None, Backpack, Stash, Sell, StashAll }
 
         DragSource m_Source;
@@ -60,6 +60,8 @@ namespace Stealth.UI
         float m_DragTravel;
         Vector2Int m_GrabCell;
         WorldItem m_Hover, m_Highlighted;
+        Vehicles.CargoPiece m_HoverCargo;
+        Vehicles.CargoItem m_DragCargo;
         float m_FullUntil = -1f;
         string m_Tooltip;
         float m_Expand; // 0 = compact (just carrying), 1 = hands mode (Tab / dragging)
@@ -139,7 +141,7 @@ namespace Stealth.UI
             if (me == null || Mouse.current == null)
             {
                 CancelDrag();
-                m_Hover = null;
+                m_Hover = null; m_HoverCargo = null;
                 HideDynamic();
                 if (Board != null) Board.Show(false);
                 return;
@@ -156,8 +158,9 @@ namespace Stealth.UI
             bool on = StashActive(me), was = Board.Visible;
             Board.Show(on);
             if (!on) return;
-            // nothing is sold at a hatch: loot is fuel, fed into the car's engine in the sewer
-            if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf) Board.SellZone.gameObject.SetActive(false);
+            // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
+            bool burn = GameManager.Instance.Stash == Stash;
+            if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
             {
@@ -174,17 +177,24 @@ namespace Stealth.UI
         void HandleInput(PlayerController me, PlayerInventory inv)
         {
             var mouse = Mouse.current;
-            if (me.Downed || GameMenu.IsOpen || me.UsingTerminal != null) { CancelDrag(); m_Hover = null; return; } // at a terminal the camera is far away
+            if (me.Downed || GameMenu.IsOpen || me.UsingTerminal != null) { CancelDrag(); m_Hover = null; m_HoverCargo = null; return; } // at a terminal the camera is far away
             if (Controls.Pressed(GameAction.StashAll)) StashAll(me, inv);
 
             if (!me.CursorMode && !PlayerController.HoldCursor)
             {
                 CancelDrag();
-                m_Hover = RaycastWorldItem(me, new Ray(me.Camera.transform.position, me.Camera.transform.forward));
+                var look = new Ray(me.Camera.transform.position, me.Camera.transform.forward);
+                m_Hover = RaycastWorldItem(me, look);
+                m_HoverCargo = m_Hover == null ? RaycastCargo(me, look) : null;
                 // Grab it: the camera freezes and the cursor appears until the button is released.
                 if (m_Hover != null && mouse.leftButton.wasPressedThisFrame)
                 {
                     BeginWorldDrag(m_Hover);
+                    PlayerController.HoldCursor = true;
+                }
+                else if (m_HoverCargo != null && mouse.leftButton.wasPressedThisFrame)
+                {
+                    BeginCargoDrag(m_HoverCargo);
                     PlayerController.HoldCursor = true;
                 }
                 return;
@@ -193,6 +203,7 @@ namespace Stealth.UI
             var mouseRay = me.Camera.ScreenPointToRay(MouseScreen);
             var over = MouseTarget(me, out var cell);
             m_Hover = over != Target.None ? null : RaycastWorldItem(me, mouseRay);
+            m_HoverCargo = over != Target.None || m_Hover != null ? null : RaycastCargo(me, mouseRay);
 
             if (m_Source == DragSource.None)
             {
@@ -202,6 +213,7 @@ namespace Stealth.UI
 
             if (m_Source == DragSource.World && (m_DragWorld == null || !m_DragWorld.isActiveAndEnabled)) { CancelDrag(); return; }
             if (m_Source == DragSource.Stash && (Stash == null || Stash.IndexOf(m_DragStashed) < 0)) { CancelDrag(); return; }
+            if (m_Source == DragSource.Cargo && !InBed(m_DragCargo)) { CancelDrag(); return; }
 
             m_DragTravel += mouse.delta.ReadValue().magnitude;
             if (Controls.Pressed(GameAction.Rotate))
@@ -260,6 +272,11 @@ namespace Stealth.UI
                 m_Tooltip = ItemCatalog.Describe(m_Hover.Shape, m_Hover.Color);
                 if (press) BeginWorldDrag(m_Hover);
             }
+            else if (m_HoverCargo != null)
+            {
+                m_Tooltip = ItemCatalog.Describe(m_HoverCargo.Item.Shape, m_HoverCargo.Item.Color);
+                if (press) BeginCargoDrag(m_HoverCargo);
+            }
         }
 
         void StartShape(InventoryEntry e, Vector2Int cell)
@@ -278,6 +295,52 @@ namespace Stealth.UI
             m_DragTravel = 0f;
         }
 
+        void BeginCargoDrag(Vehicles.CargoPiece piece)
+        {
+            m_Source = DragSource.Cargo;
+            m_DragCargo = piece.Item;
+            m_DragShape = piece.Item.Shape; m_DragColor = piece.Item.Color; m_DragRot = 0;
+            m_GrabCell = Vector2Int.zero;
+            m_DragTravel = 0f;
+        }
+
+        static bool InBed(Vehicles.CargoItem item)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null) return false;
+            foreach (var c in gm.Cargo.Items) if (c.Equals(item)) return true;
+            return false;
+        }
+
+        /// <summary>The thing in the car's bed nearest to the ray (within its aim radius and the hands' reach), or null.</summary>
+        static Vehicles.CargoPiece RaycastCargo(PlayerController me, Ray ray)
+        {
+            var car = Vehicles.Car.Active;
+            if (car == null || (car.transform.position - me.transform.position).magnitude > PlayerInventory.CarReach) return null;
+            Vehicles.CargoPiece best = null;
+            float bestMiss = float.MaxValue;
+            foreach (var piece in car.Pieces)
+            {
+                if (piece == null || !piece.gameObject.activeInHierarchy) continue;
+                var v = piece.Point - ray.origin;
+                float along = Vector3.Dot(v, ray.direction);
+                if (along <= 0f || along > piece.Reach + 0.8f) continue;
+                float miss = (v - ray.direction * along).magnitude;
+                if (miss < piece.AimRadius && miss < bestMiss) { best = piece; bestMiss = miss; }
+            }
+            return best;
+        }
+
+        /// <summary>Whether the ray points at the car's hopper (a thing let go there burns into fuel).</summary>
+        static bool AtHopper(PlayerController me, Ray ray)
+        {
+            var hopper = Vehicles.Car.Active != null ? Vehicles.Car.Active.Hopper : null;
+            if (hopper == null || (hopper.Point - me.transform.position).magnitude > hopper.Reach + 0.8f) return false;
+            var v = hopper.Point - ray.origin;
+            float along = Vector3.Dot(v, ray.direction);
+            return along > 0f && (v - ray.direction * along).magnitude < hopper.AimRadius + 0.25f;
+        }
+
         void Drop(PlayerController me, PlayerInventory inv, Target over, Vector2Int target, Ray mouseRay)
         {
             byte x = (byte)Mathf.Clamp(target.x, 0, 255), y = (byte)Mathf.Clamp(target.y, 0, 255), rot = (byte)m_DragRot;
@@ -290,6 +353,7 @@ namespace Stealth.UI
                     if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) Take(inv, x, y, rot);
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, rot, x, y, m_DragIndex)) { inv.RequestMove(m_DragIndex, x, y, rot); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestUnstash(m_DragStashed, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    else if (m_Source == DragSource.Cargo && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestTakeCargo(m_DragCargo, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Stash:
                     if (!inside || Stash == null) return;
@@ -306,7 +370,19 @@ namespace Stealth.UI
                     else if (m_Source == DragSource.Stash) inv.RequestSellStashed(m_DragStashed);
                     return;
             }
-            if (m_Source == DragSource.Inventory) DropIntoWorld(me, inv, mouseRay);
+            if (m_Source == DragSource.Inventory && AtHopper(me, mouseRay))
+            {
+                // into the shredder: this one thing burns into fuel
+                inv.RequestDeposit(m_DragIndex);
+                Sfx.At(bank?.Stash, Vehicles.Car.Active.Hopper.Point, 0.9f, Sfx.Group.Items);
+            }
+            else if (m_Source == DragSource.Inventory) DropIntoWorld(me, inv, mouseRay);
+            // a thing from the bed let go anywhere but a cell: into the first free spot
+            else if (m_Source == DragSource.Cargo)
+            {
+                if (inv.FindSpot(m_DragShape, out var cx, out var cy, out var cr)) { inv.RequestTakeCargo(m_DragCargo, cx, cy, cr); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                else m_FullUntil = Time.time + 1.5f;
+            }
             // A world item released anywhere but a grid (a click, or a drag that missed): into the first free spot.
             else if (m_Source == DragSource.World)
             {
@@ -465,6 +541,8 @@ namespace Stealth.UI
                     overSell = true;
                     hint = Loc.F("inventory.sell_value", ItemCatalog.Value(m_DragShape, m_DragColor));
                 }
+                else if (m_Source == DragSource.Inventory && AtHopper(me, me.Camera.ScreenPointToRay(MouseScreen)))
+                    hint = ItemCatalog.IsTool(m_DragShape) ? Loc.T("use.hopper.empty") : Loc.F("use.hopper", ItemCatalog.Value(m_DragShape, m_DragColor));
                 Ghost.anchoredPosition = MouseCanvas - new Vector2(m_GrabCell.x * Cell + Cell / 2f, -(m_GrabCell.y * Cell + Cell / 2f));
                 AddShape(m_GhostBlocks, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
             }

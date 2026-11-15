@@ -78,11 +78,14 @@ namespace Stealth.Tests
         [Test]
         public void TheTeamLeavesWhenEveryoneWhoCanIsInTheHatch()
         {
-            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, false), (true, false) }));
-            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, false), (false, false) }), "one is still upstairs");
-            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, false), (false, true) }), "the knocked-out one stays behind");
-            Assert.IsFalse(RunState.TeamInHatch(new[] { (false, true), (false, true) }), "nobody is in the hatch");
-            Assert.IsFalse(RunState.TeamInHatch(new (bool, bool)[0]));
+            // (in a hatch, it is the exit's, knocked out)
+            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (true, true, false) }));
+            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (true, false, false) }), "one in the entry's will do");
+            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, false, false), (true, false, false) }), "nobody in the exit's");
+            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, true, false), (false, false, false) }), "one is still upstairs");
+            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (false, false, true) }), "the knocked-out one stays behind");
+            Assert.IsFalse(RunState.TeamInHatch(new[] { (false, false, true), (false, false, true) }), "nobody is in the hatch");
+            Assert.IsFalse(RunState.TeamInHatch(new (bool, bool, bool)[0]));
         }
 
         [Test]

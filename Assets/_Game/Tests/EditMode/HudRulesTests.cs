@@ -243,5 +243,51 @@ namespace Stealth.Tests
             h.Update(1f);
             Assert.Less(h.Flash, 1f);
         }
+    
+        [Test]
+        public void TheTaskListPutsTheExitFirstAndTheSewersStepsInOrder()
+        {
+            Loc.Reload();
+            var vault = new ObjectiveState { Kind = ObjectiveKind.Vault, Found = true, Solved = 1, Locks = 3 };
+            var house = ObjectiveRules.Tasks(false, false, vault, false, false);
+            Assert.AreEqual(2, house.Count);
+            Assert.AreEqual(Loc.T("hud.task.exit"), house[0].text, "find the exit comes first");
+            Assert.IsFalse(house[0].done);
+            StringAssert.Contains(Loc.F("hud.job.vault_unlock", 1, 3), house[1].text, "then the main job's step");
+            Assert.IsTrue(ObjectiveRules.Tasks(false, true, default, false, false).Single().done, "the exit seen: ticked; no job: one line");
+
+            var shut = ObjectiveRules.Tasks(true, false, default, false, false);
+            CollectionAssert.AreEqual(new[] { Loc.T("hud.task.gate"), Loc.T("hud.task.fuel") }, shut.Select(t => t.text), "open the way, then fuel the car");
+            var ready = ObjectiveRules.Tasks(true, false, default, true, true);
+            Assert.AreEqual(3, ready.Count, "both done: choose a tunnel");
+            Assert.IsTrue(ready[0].done && ready[1].done && !ready[2].done);
+        }
+
+        [Test]
+        public void TheMainJobShowsOneStepAtATime()
+        {
+            Loc.Reload();
+            string Step(ObjectiveState s) => ObjectiveRules.Step(s)?.text;
+            var v = new ObjectiveState { Kind = ObjectiveKind.Vault, Locks = 3 };
+            Assert.AreEqual(Loc.T("hud.job.vault_find"), Step(v));
+            v.Found = true;
+            for (int k = 0; k < 3; k++) { v.Solved = k; Assert.AreEqual(Loc.F("hud.job.vault_unlock", k, 3), Step(v)); }
+            v.Solved = 3;
+            Assert.AreEqual(Loc.T("hud.job.vault_open"), Step(v), "all unlocked: go in");
+            v.Done = true;
+            Assert.IsTrue(ObjectiveRules.Step(v).Value.done);
+
+            var h = new ObjectiveState { Kind = ObjectiveKind.Hostage };
+            Assert.AreEqual(Loc.T("hud.job.hostage_find"), Step(h));
+            h.KeyHeld = true;
+            Assert.AreEqual(Loc.T("hud.job.hostage_find"), Step(h), "the key taken first: still find the hostage");
+            h.KeyHeld = false; h.Found = true;
+            Assert.AreEqual(Loc.T("hud.job.hostage_key"), Step(h), "spoken to: take the key");
+            h.KeyHeld = true;
+            Assert.AreEqual(Loc.T("hud.job.hostage_free"), Step(h));
+            h.Done = true;
+            Assert.IsTrue(ObjectiveRules.Step(h).Value.done);
+            Assert.IsNull(ObjectiveRules.Step(default), "no job, no line");
+        }
     }
 }

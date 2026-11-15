@@ -43,6 +43,15 @@ namespace Stealth.Configs
     /// <summary>What hangs under the ceiling.</summary>
     public enum CeilingKind { None, Beams, IBeams, Coffers, Trays }
 
+    /// <summary>A kind of room with a floor of its own in a style (<see cref="StyleGeometry.RoomFloors"/>).</summary>
+    [Serializable]
+    public struct RoomFloor
+    {
+        public Stealth.Level.RoomType Room;
+        public Material Material;
+        [Tooltip("Metres covered by one repeat of its texture")] public float Tile;
+    }
+
     /// <summary>
     /// The shape of the world in a style: reshaped models and the architecture added to the house — trims, panels,
     /// columns, beams, pipes, light strips, floor and wall finishes. Decoration only: no colliders, no shadows, robots and
@@ -83,6 +92,8 @@ namespace Stealth.Configs
         [Header("Materials (null = keep the house as it is)")]
         public Material Floor;
         [Tooltip("Metres covered by one repeat of the floor texture")] public float FloorTile = 1f;
+        [Tooltip("Floors of their own in some kinds of rooms (tiles in kitchens and restrooms, rubber in the gym, carpet in the library); the rest keep Floor")]
+        public RoomFloor[] RoomFloors = new RoomFloor[0];
         public Material Wall;
         [Tooltip("Metres covered by one repeat of the wall texture")] public float WallTile = 1f;
         [Tooltip("Baseboards, cornices, rails, casings")] public Material Trim;
@@ -93,6 +104,15 @@ namespace Stealth.Configs
         public Material Glow;
         [Tooltip("Under the ceilings (tiles, boards…)")] public Material CeilingFinish;
         public float CeilingTile = 1.2f;
+
+        /// <summary>The index in <see cref="RoomFloors"/> of a room type's own floor, or −1 (the style's <see cref="Floor"/>).</summary>
+        public int RoomFloorOf(Stealth.Level.RoomType room)
+        {
+            if (RoomFloors == null) return -1;
+            for (int i = 0; i < RoomFloors.Length; i++)
+                if (RoomFloors[i].Room == room && RoomFloors[i].Material != null) return i;
+            return -1;
+        }
 
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
                                        Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null ||

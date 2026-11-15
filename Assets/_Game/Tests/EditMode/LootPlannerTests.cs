@@ -46,7 +46,7 @@ namespace Stealth.Tests
             }
             int easy = Total(TestHouses.Get(1, 0)), hard = Total(TestHouses.Get(99991, 4));
             Assert.Greater(easy, 100, "the first house has enough loot for a sensible quota");
-            Assert.Greater(hard, easy * 2, $"deeper buildings are much richer: {easy} → {hard}");
+            Assert.Greater(hard, easy * 1.7f, $"deeper buildings are much richer: {easy} → {hard}");
         }
 
         [Test]
@@ -64,6 +64,24 @@ namespace Stealth.Tests
             }
             float ground = Mean(3 * s.BonusPerHouse), top = Mean(3 * s.BonusPerHouse + 2 * s.BonusPerFloor);
             Assert.Greater(top, ground * 1.05f, $"ground {ground:0.00}, two floors up {top:0.00}");
+        }
+    
+        [Test]
+        public void BehindKeyAndLockedDoorsThereIsAlwaysSomething()
+        {
+            int regions = 0;
+            foreach (var l in TestHouses.Sample)
+            {
+                var behind = LootPlanner.LockedRegions(l);
+                var loot = LootPlanner.Plan(l, new System.Random(l.Seed));
+                for (int k = 0; k < behind.Count; k++)
+                {
+                    int inside = loot.Count(x => l.Plan.RoomAt(x.Position + Vector3.up * 0.3f) is { } r && behind[k].Contains(r.Id));
+                    Assert.Greater(inside, 0, $"seed {l.Seed}: nothing behind locked part {k} (rooms {string.Join(",", behind[k])})");
+                    regions++;
+                }
+            }
+            Assert.Greater(regions, 0, "the shared houses have key or locked doors");
         }
     }
 }

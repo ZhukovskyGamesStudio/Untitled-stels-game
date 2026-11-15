@@ -98,8 +98,43 @@ namespace Stealth.UI
     /// revive · hack · locked door · safe · something to use · terminal · an item to take; otherwise a dot.
     /// No text: the glyph says what it is, the hint stack names the key.
     /// </summary>
+    /// <summary>Where the house's main job stands (<see cref="Game.GameManager.ObjectiveStage"/>).</summary>
+    public struct ObjectiveState
+    {
+        public Level.ObjectiveKind Kind;
+        /// <summary>The vault seen / the hostage spoken to.</summary>
+        public bool Found;
+        public int Solved, Locks;
+        /// <summary>Somebody carries the cage's key.</summary>
+        public bool KeyHeld;
+        public bool Done;
+    }
+
     public static class ObjectiveRules
     {
+        /// <summary>
+        /// The job's line, one step at a time (pure). Vault: find it — unlock its door (k/3) — open its door — done.
+        /// Hostage: find the hostage — take the key from the guard it points out — free the hostage; a key taken before
+        /// the hostage is found keeps "find the hostage" until it is.
+        /// </summary>
+        public static (string text, bool done)? Step(in ObjectiveState s)
+        {
+            switch (s.Kind)
+            {
+                case Level.ObjectiveKind.Vault:
+                    if (s.Done) return (Loc.T("hud.job.vault_done"), true);
+                    if (!s.Found) return (Loc.T("hud.job.vault_find"), false);
+                    if (s.Solved < s.Locks) return (Loc.F("hud.job.vault_unlock", s.Solved, s.Locks), false);
+                    return (Loc.T("hud.job.vault_open"), false);
+                case Level.ObjectiveKind.Hostage:
+                    if (s.Done) return (Loc.T("hud.job.hostage_done"), true);
+                    if (!s.Found) return (Loc.T("hud.job.hostage_find"), false);
+                    if (!s.KeyHeld) return (Loc.T("hud.job.hostage_key"), false);
+                    return (Loc.T("hud.job.hostage_free"), false);
+            }
+            return null;
+        }
+
         /// <summary>The name of a main job (the tunnel's panel, the HUD), or null for none.</summary>
         public static string Name(Level.ObjectiveKind kind) => kind switch
         {
@@ -108,14 +143,25 @@ namespace Stealth.UI
             _ => null,
         };
 
-        /// <summary>The HUD's line for the job: its name, the vault's locks solved, or done (pure).</summary>
-        public static string Line(Level.ObjectiveKind kind, int solved, int locks, bool done)
+        /// <summary>
+        /// The task list in the top left corner, in order (pure): in a house — find the exit first, then the house's main
+        /// job; in the sewer — open the way for the car, fuel it, then choose a tunnel. Each line with whether it is done.
+        /// </summary>
+        public static List<(string text, bool done)> Tasks(bool sewer, bool exitSeen, in ObjectiveState job, bool gateOpen, bool fueled)
         {
-            var name = Name(kind);
-            if (name == null) return null;
-            if (done) return Loc.F("hud.objective.done", name);
-            return kind == Level.ObjectiveKind.Vault ? Loc.F("hud.objective.progress", name, solved, locks) : Loc.F("hud.objective", name);
+            var list = new List<(string, bool)>();
+            if (sewer)
+            {
+                list.Add((Loc.T("hud.task.gate"), gateOpen));
+                list.Add((Loc.T("hud.task.fuel"), fueled));
+                if (gateOpen && fueled) list.Add((Loc.T("hud.task.tunnel"), false));
+                return list;
+            }
+            list.Add((Loc.T("hud.task.exit"), exitSeen));
+            if (Step(job) is { } step) list.Add((Loc.F("hud.objective", step.text), step.done));
+            return list;
         }
+
     }
 
     /// <summary>The centre of the screen: what E does with the thing under the crosshair (pure).</summary>
@@ -147,6 +193,7 @@ namespace Stealth.UI
             Level.UseKind.CarCargo => ReticleIcon.Hand,
             Level.UseKind.VaultConsole => ReticleIcon.Terminal,
             Level.UseKind.Cage => ReticleIcon.Key,
+            Level.UseKind.HandDryer => ReticleIcon.Hand,
             _ => ReticleIcon.Dot,
         };
     }

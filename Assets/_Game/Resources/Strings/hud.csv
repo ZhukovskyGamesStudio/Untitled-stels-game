@@ -40,12 +40,14 @@ use.hopper,заправить +{0},refuel +{0}
 use.hopper.bed,заправить из кузова +{0},refuel from bed +{0}
 use.hopper.empty,нечем заправить,nothing to burn
 use.cargo,взять,take
+use.dryer,включить сушилку,turn the dryer on
 # HUD,,
 hud.hunter.inside,Охотник в доме!,Hunter inside!
 hud.hunter.in,Охотник через {0} · тревог: {1},Hunter in {0} · alarms: {1}
 hud.run_total,Итог забега: {0},Run total: {0}
 hud.restart,{0} — новый забег,{0} — new run
 hud.hatch.waiting,Ждём: {0},Waiting for: {0}
+hud.hatch.need_exit,Кто-то должен ждать в люке выхода,Someone must wait in the exit hatch
 hud.metres,{0:0} м,{0:0} m
 hud.laugh,ХА-ХА-ХА-ХА,HA-HA-HA-HA
 hud.out_cold,Без сознания,Knocked out
@@ -57,11 +59,21 @@ hud.team.down,упал,down
 hud.team.hatch,в люке,in hatch
 hud.run_over,Забег окончен,Run over
 hud.objective,★ {0},★ {0}
-hud.objective.progress,★ {0}: {1}/{2},★ {0}: {1}/{2}
-hud.objective.done,★ {0} — готово,★ {0} — done
+hud.task.exit,Найдите выход,Find the exit
+hud.task.gate,Откройте проезд,Open the way
+hud.task.fuel,Заправьте автомобиль,Fuel the car
+hud.task.tunnel,Выберите туннель,Choose a tunnel
+hud.job.vault_find,Найдите сейф,Find the vault
+hud.job.vault_unlock,Разблокируйте дверь сейфа ({0}/{1}),Unlock the vault door ({0}/{1})
+hud.job.vault_open,Откройте дверь сейфа,Open the vault door
+hud.job.vault_done,Сейф открыт,The vault is open
+hud.job.hostage_find,Найдите заложника,Find the hostage
+hud.job.hostage_key,Заберите ключ у охранника,Take the key from the guard
+hud.job.hostage_free,Освободите заложника,Free the hostage
+hud.job.hostage_done,Заложник свободен,The hostage is free
 use.vault_console,замок,lock
 use.cage,освободить,free
-use.cage.nokey,нужен ключ,need the key
+use.cage.ask,спросить про ключ,ask about the key
 vault.switches.title,Зажги все лампы,Light every lamp
 vault.sequence.title,Повтори вспышки,Repeat the flashes
 vault.hint,{0}–{1} — кнопки · {2} — отойти,{0}–{1} — buttons · {2} — step away
