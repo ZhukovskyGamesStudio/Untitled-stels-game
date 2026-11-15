@@ -67,7 +67,7 @@ namespace Stealth.Items
 
             int want = ItemCount(l, s);
             var result = new List<Loot>();
-            var behind = LockedRegions(l);
+            var behind = KeyRegions(l);
             int RegionOf(Vector3 p)
             {
                 var room = l.Plan.RoomAt(p + Vector3.up * 0.3f);
@@ -107,7 +107,7 @@ namespace Stealth.Items
             if (l.HiddenRoom >= 0) First(InHidden, s.HiddenRoomItems);
             for (int k = 0; k < behind.Count; k++)
             {
-                // behind a key door or a locked one: things there first; a bare room gets them on its floor
+                // behind a key door: things there first; a bare room gets them on its floor
                 int region = k;
                 int spots = 0;
                 foreach (var list in byFloor) foreach (var q in list) if (RegionOf(q) == region) spots++;
@@ -136,28 +136,11 @@ namespace Stealth.Items
             return result;
         }
 
-        /// <summary>
-        /// The parts of the house worth a detour: the rooms behind each key door, then behind each locked (hacked) door
-        /// that is the only way into a few rooms. One set of room ids per door.
-        /// </summary>
-        public static List<HashSet<int>> LockedRegions(LevelLayout l)
+        /// <summary>The parts of the house behind each key door (the key is a detour: things worth it lie there). One set of room ids per door.</summary>
+        public static List<HashSet<int>> KeyRegions(LevelLayout l)
         {
             var list = new List<HashSet<int>>();
             foreach (var k in l.KeyDoors) list.Add(new HashSet<int>(k.Rooms));
-            if (l.LockedDoors.Count == 0) return list;
-            var all = HouseFeatures.Reach(l.Plan, l.Stairs, l.LobbyRoom, true);
-            foreach (int door in l.LockedDoors)
-            {
-                if (door < 0 || door >= l.AutoDoors.Count) continue;
-                var at = l.AutoDoors[door].position;
-                int opening = l.Doorways.FindIndex(d => (d.Position - at).sqrMagnitude < 0.1f);
-                if (opening < 0) continue;
-                var rooms = new HashSet<int>(all);
-                rooms.ExceptWith(HouseFeatures.Reach(l.Plan, l.Stairs, l.LobbyRoom, true, opening));
-                rooms.Remove(l.HiddenRoom);
-                if (rooms.Count == 0 || rooms.Count > 4 || rooms.Contains(l.LobbyRoom) || list.Exists(r => r.Overlaps(rooms))) continue;
-                list.Add(rooms);
-            }
             return list;
         }
 

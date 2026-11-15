@@ -300,6 +300,9 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 **Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
 `RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).
 
+**Сплеш студии** — `StudioSplash` в префабе меню (юнитевский сплеш выключен, `PlayerSettings.SplashScreen.show`): крыло Zhukovsky Games, раз за запуск,
+автопилоту не показывается; на время сплеша музыка меню молчит.
+
 Тестовые хуки собраны в `DevFlags` (сид, уровень, мирный режим, автопилот…) — в обычной игре не используются.
 
 **Рандом — только по сиду.** Один сид забега (`GameManager.RunSeed`, `-seed`) даёт сиды домов (`LevelRandom.LevelSeed`), сид дома — отдельный

@@ -13,20 +13,21 @@ namespace Stealth.Tests
             {
                 var p = new SwitchPuzzle(seed);
                 Assert.IsFalse(p.Solved, $"seed {seed}: handed over open");
-                // a ring of n switches where each flips three: brute force over all subsets finds the way
-                bool found = false;
-                for (int mask = 0; mask < 1 << p.Count && !found; mask++)
+                // a ring of n switches where each flips two: brute force over all subsets finds the way, in no more presses than the scramble
+                int best = int.MaxValue;
+                for (int mask = 0; mask < 1 << p.Count; mask++)
                 {
                     var q = new SwitchPuzzle(seed);
-                    for (int i = 0; i < q.Count; i++) if ((mask & (1 << i)) != 0) q.Press(i);
-                    found = q.Solved;
+                    int presses = 0;
+                    for (int i = 0; i < q.Count; i++) if ((mask & (1 << i)) != 0) { q.Press(i); presses++; }
+                    if (q.Solved) best = System.Math.Min(best, presses);
                 }
-                Assert.IsTrue(found, $"seed {seed}: no way to light them all");
+                Assert.LessOrEqual(best, new ObjectiveSettings().Scramble, $"seed {seed}: no short way to light them all");
             }
         }
 
         [Test]
-        public void ASwitchFlipsItsLampAndBothNeighbours()
+        public void ASwitchFlipsItsLampAndTheNextOne()
         {
             var p = new SwitchPuzzle(3);
             var before = new bool[p.Count];
@@ -34,9 +35,11 @@ namespace Stealth.Tests
             p.Press(0);
             Assert.AreNotEqual(before[0], p.Lit(0));
             Assert.AreNotEqual(before[1], p.Lit(1));
-            Assert.AreNotEqual(before[p.Count - 1], p.Lit(p.Count - 1), "the ring wraps round");
             Assert.AreEqual(before[2], p.Lit(2));
-            Assert.AreEqual(1, p.Presses);
+            Assert.AreEqual(before[p.Count - 1], p.Lit(p.Count - 1), "only the next one");
+            p.Press(p.Count - 1);
+            Assert.AreEqual(before[0], p.Lit(0), "the ring wraps round: the last switch flips the first lamp back");
+            Assert.AreEqual(2, p.Presses);
         }
 
         [Test]

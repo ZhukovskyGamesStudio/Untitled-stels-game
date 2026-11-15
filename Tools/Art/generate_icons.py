@@ -72,6 +72,11 @@ class Glyph:
         self.w = ImageDraw.Draw(self.white)
 
     def save(self, name, rim=0.045, rim_alpha=0.8):
+        os.makedirs(OUT, exist_ok=True)
+        self.render(rim, rim_alpha).save(os.path.join(OUT, name + ".png"))
+
+    def render(self, rim=0.045, rim_alpha=0.8):
+        """The glyph as an RGBA image at its size: white with a dark rim."""
         dark = self.white.filter(ImageFilter.MaxFilter(_odd(self.px(rim) * 2)))
         dark = ImageChops.lighter(dark, self.dark)
         white = ImageChops.subtract(self.white, self.dark)
@@ -87,9 +92,7 @@ class Glyph:
                     continue
                 v = int(255 * a_w / a)
                 out[x, y] = (v, v, v, int(255 * a))
-        rgba = rgba.resize((self.size, self.size), Image.LANCZOS)
-        os.makedirs(OUT, exist_ok=True)
-        rgba.save(os.path.join(OUT, name + ".png"))
+        return rgba.resize((self.size, self.size), Image.LANCZOS)
 
 
 def _odd(v):
@@ -335,6 +338,21 @@ def make(name, draw, size=R, rim=0.045):
     g.save(name, rim=rim)
 
 
+def app_icon(size=512):
+    """The application's icon (for now): the HUD's open eye, white on the studio's navy rounded plate."""
+    g = Glyph(size)
+    eye(1.0)(g)
+    glyph = g.render(rim=0.03, rim_alpha=0.9)
+    plate = Image.new("RGBA", (size * SS, size * SS), (0, 0, 0, 0))
+    ImageDraw.Draw(plate).rounded_rectangle([0, 0, size * SS - 1, size * SS - 1], radius=size * SS * 0.2, fill=(0x2A, 0x32, 0x4B, 255))
+    plate = plate.resize((size, size), Image.LANCZOS)
+    inner = int(size * 0.86)
+    plate.alpha_composite(glyph.resize((inner, inner), Image.LANCZOS), ((size - inner) // 2, (size - inner) // 2))
+    path = os.path.join(OUT, "..", "AppIcon.png")
+    plate.save(path)
+    print("app icon ->", os.path.abspath(path))
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     glyphs = {
@@ -354,6 +372,7 @@ def main():
     keycap()
     for b in ("lmb", "rmb", "mmb", "wheel"):
         make(f"mouse_{b}", mouse(b), rim=0.03)
+    app_icon()
     print("icons ->", os.path.abspath(OUT))
 
 

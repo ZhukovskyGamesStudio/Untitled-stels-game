@@ -809,7 +809,52 @@ namespace Stealth.EditorTools
 
             pause.gameObject.SetActive(false);
             settings.gameObject.SetActive(false);
+            BuildStudioSplash(root.transform);
             return root;
+        }
+
+        /// <summary>
+        /// The studio's splash over everything (its own canvas order): the navy veil, the 1920 x 1080 frame with the name
+        /// behind its clip and the wing with its eye (shapes from code, StudioSplash), the sound.
+        /// </summary>
+        static void BuildStudioSplash(Transform parent)
+        {
+            var root = Stretch(parent, "StudioSplash");
+            var canvas = root.gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 1000;
+            root.gameObject.AddComponent<GraphicRaycaster>();
+            var splash = root.gameObject.AddComponent<StudioSplash>();
+            splash.Veil = Img(root, new Color(0.165f, 0.196f, 0.294f, 1f));
+            splash.Veil.raycastTarget = true; // nothing under it is clicked while it plays
+            splash.Group = root.gameObject.AddComponent<CanvasGroup>();
+            var content = R(root, "Content", Center, Center, Vector2.zero, new Vector2(1920, 1080));
+            splash.Content = content;
+            const float s = 2.4f;
+            var clip = R(content, "Clip", Center, new Vector2(0f, 0.5f), Vector2.zero, new Vector2(0, 240 * s));
+            clip.gameObject.AddComponent<RectMask2D>();
+            splash.Clip = clip;
+            splash.WordGroup = clip.gameObject.AddComponent<CanvasGroup>();
+            var word = R(clip, "Word", new Vector2(0f, 0.5f), new Vector2(0f, 1f), new Vector2(-3.94f * s, (200 - (164 - 3.94f)) * s), new Vector2(900 * 0.394f * s, 212 * 0.394f * s));
+            var image = word.gameObject.AddComponent<RawImage>();
+            image.texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SpritesDir + "/Splash/zg_word.png");
+            image.raycastTarget = false;
+            var wing = R(content, "Wing", Center, Center, new Vector2(700 * s, 0), Vector2.zero);
+            splash.Wing = wing;
+            Blob Shape(RectTransform at)
+            {
+                var b = at.gameObject.AddComponent<Blob>();
+                b.raycastTarget = false;
+                return b;
+            }
+            splash.Body = Shape(wing);
+            splash.Pupil = Shape(R(wing, "Pupil", Center, Center, Vector2.zero, Vector2.zero));
+            splash.Glint = Shape(R(wing, "Glint", Center, Center, Vector2.zero, Vector2.zero));
+            var sound = root.gameObject.AddComponent<AudioSource>();
+            sound.playOnAwake = false;
+            sound.spatialBlend = 0f;
+            sound.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AudioDir + "/UI/zg_splash.wav");
+            splash.Sound = sound;
         }
 
         /// <summary>

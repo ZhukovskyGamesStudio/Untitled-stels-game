@@ -32,6 +32,7 @@ namespace Stealth.Tests
             "RobotController.CargoMesh",     // only workers carry loot
             "RobotController.CargoRenderer",
             "RobotController.CargoVisuals",
+            "Blob.m_Material",               // a UI graphic: empty is Unity's default UI material
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

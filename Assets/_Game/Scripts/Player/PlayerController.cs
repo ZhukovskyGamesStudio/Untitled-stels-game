@@ -720,7 +720,7 @@ namespace Stealth.Player
                 case VaultGame.Dial:
                     if (!m_ConsoleDials.TryGetValue(c, out var dial))
                     {
-                        var safes = Tuning.Items.Safes;
+                        var safes = Tuning.Items.Objectives.VaultDial(Tuning.Items.Safes);
                         dial = new Items.SafeLock(ConsoleSeed(c), safes);
                         dial.SetDial(new System.Random(ConsoleSeed(c) ^ 0x5A).Next(safes.DialSize));
                         m_ConsoleDials[c] = dial;

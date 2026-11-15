@@ -186,6 +186,7 @@ namespace Stealth.Audio
             }
             // Only the change of track fades; the volume from the settings applies immediately.
             float target = m_Mix.Music * GameSettings.MusicVolume * (track == MusicTrack.Explore ? m_Mix.ExploreMusic : 1f);
+            if (UI.StudioSplash.Holding) target = 0f; // the studio's splash has its own sound
             float step = Time.unscaledDeltaTime / Mathf.Max(0.05f, m_Mix.Crossfade);
             m_WeightA = Mathf.MoveTowards(m_WeightA, m_Music == MusicA ? 1f : 0f, step);
             m_WeightB = Mathf.MoveTowards(m_WeightB, m_Music == MusicB ? 1f : 0f, step);

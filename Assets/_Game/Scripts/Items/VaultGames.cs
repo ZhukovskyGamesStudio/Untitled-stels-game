@@ -6,24 +6,39 @@ namespace Stealth.Items
     [System.Serializable]
     public class ObjectiveSettings
     {
+        [Header("Vault: the dial lock (a safe's dial, kinder)")]
+        [Tooltip("Numbers on the vault's dial.")]
+        public int DialSize = 20;
+        [Tooltip("How many numbers its combination has.")]
+        public int DialDigits = 2;
+        [Tooltip("How close (in numbers) to the right one its ticks get louder.")]
+        public int DialHearRange = 5;
+
         [Header("Vault: the switch lock")]
-        [Tooltip("Lamps in the ring of switches: a switch flips its lamp and both neighbours; all lit opens the lock.")]
-        public int Switches = 5;
-        [Tooltip("Random presses the lock is scrambled with (from its seed).")]
-        public int Scramble = 3;
+        [Tooltip("Lamps in the ring of switches: a switch flips its lamp and the next one; all lit opens the lock.")]
+        public int Switches = 4;
+        [Tooltip("Random presses the lock is scrambled with (from its seed): it never takes more presses than this.")]
+        public int Scramble = 2;
 
         [Header("Vault: the sequence lock")]
         [Tooltip("Lamps the sequence plays on.")]
         public int SequenceLamps = 4;
         [Tooltip("How long the sequence is.")]
-        public int SequenceLength = 5;
+        public int SequenceLength = 3;
         [Tooltip("A lamp stays lit this long while the sequence plays, seconds.")]
-        public float FlashTime = 0.45f;
+        public float FlashTime = 0.6f;
         [Tooltip("The dark between two flashes, seconds.")]
-        public float GapTime = 0.18f;
+        public float GapTime = 0.25f;
 
         [Tooltip("How far a wrong press on a lock clanks: robots with ears hear it, metres.")]
         public float WrongNoise = 6f;
+
+        /// <summary>The vault dial's settings: a safe's (turning, noise) with its own size, digits and hearing range.</summary>
+        public SafeSettings VaultDial(SafeSettings safe) => new()
+        {
+            DialSize = Mathf.Max(8, DialSize), Digits = Mathf.Max(1, DialDigits), HearRange = Mathf.Max(1, DialHearRange),
+            TurnSpeed = safe.TurnSpeed, WrongNoise = safe.WrongNoise, LootItems = 0, LootColors = safe.LootColors,
+        };
 
         [Header("Rewards (not part of the house's quota: the job is optional)")]
         [Tooltip("Valuable items lying in the vault.")]
@@ -36,8 +51,8 @@ namespace Stealth.Items
 
     /// <summary>
     /// The vault's switch lock (pure, unit tested): a ring of lamps, one switch under each; a switch flips its own lamp
-    /// and both neighbours. Scrambled from all-lit by a few presses (from the seed), so it can always be solved;
-    /// lighting them all opens it. No penalty for a press: it is a puzzle, not a test of nerve.
+    /// and the next one. Scrambled from all-lit by a couple of presses (from the seed), so it can always be solved in as
+    /// many; lighting them all opens it. No penalty for a press: it is a puzzle, not a test of nerve.
     /// </summary>
     public sealed class SwitchPuzzle
     {
@@ -77,7 +92,8 @@ namespace Stealth.Items
         void Flip(int i)
         {
             int n = m_Lit.Length;
-            for (int d = -1; d <= 1; d++) m_Lit[(i + d + n) % n] ^= true;
+            m_Lit[i] ^= true;
+            m_Lit[(i + 1) % n] ^= true;
         }
     }
 

@@ -215,10 +215,24 @@ namespace Stealth.EditorTools
             BuildPlayerWindows(System.Environment.GetEnvironmentVariable("DEV") == "1" ? BuildOptions.Development : BuildOptions.None);
 
         /// <summary>The Windows player with these options (DevCycle: development, scripts only when only code changed).</summary>
+        /// <summary>The application's icon (for now the HUD's eye on the studio's navy, Tools/Art/generate_icons.py → Art/Sprites/AppIcon.png).</summary>
+        public static void SetAppIcon()
+        {
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(SpritesDir + "/AppIcon.png");
+            if (icon == null) return;
+            var target = UnityEditor.Build.NamedBuildTarget.Unknown; // the default icon, every platform
+            var now = PlayerSettings.GetIcons(target, IconKind.Any);
+            if (now.Length == 1 && now[0] == icon) return;
+            PlayerSettings.SetIcons(target, new[] { icon }, IconKind.Any);
+        }
+
         public static bool BuildPlayerWindows(BuildOptions options)
         {
             // a release build replaces the development one: the next dev cycle must not patch only its scripts
             if ((options & BuildOptions.Development) == 0 && File.Exists("Builds/Windows/dev_build_stamp.txt")) File.Delete("Builds/Windows/dev_build_stamp.txt");
+            // no Unity splash: the game opens with the studio's own (StudioSplash, over the menu)
+            if (PlayerSettings.SplashScreen.show) { PlayerSettings.SplashScreen.show = false; PlayerSettings.SplashScreen.showUnityLogo = false; }
+            SetAppIcon();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },

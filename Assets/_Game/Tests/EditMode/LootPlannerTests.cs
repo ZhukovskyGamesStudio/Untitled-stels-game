@@ -67,21 +67,21 @@ namespace Stealth.Tests
         }
     
         [Test]
-        public void BehindKeyAndLockedDoorsThereIsAlwaysSomething()
+        public void BehindAKeyDoorThereIsAlwaysSomething()
         {
             int regions = 0;
             foreach (var l in TestHouses.Sample)
             {
-                var behind = LootPlanner.LockedRegions(l);
+                var behind = LootPlanner.KeyRegions(l);
                 var loot = LootPlanner.Plan(l, new System.Random(l.Seed));
                 for (int k = 0; k < behind.Count; k++)
                 {
                     int inside = loot.Count(x => l.Plan.RoomAt(x.Position + Vector3.up * 0.3f) is { } r && behind[k].Contains(r.Id));
-                    Assert.Greater(inside, 0, $"seed {l.Seed}: nothing behind locked part {k} (rooms {string.Join(",", behind[k])})");
+                    Assert.Greater(inside, 0, $"seed {l.Seed}: nothing behind key door {k} (rooms {string.Join(",", behind[k])})");
                     regions++;
                 }
             }
-            Assert.Greater(regions, 0, "the shared houses have key or locked doors");
+            Assert.Greater(regions, 0, "the shared houses have key doors");
         }
     }
 }
