@@ -216,7 +216,8 @@ namespace Stealth.EditorTools
                 scenes = new[] { ScenePath },
                 locationPathName = exe,
                 target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.None,
+                // DEV=1: a development player, so the perf scenario can read the profiler's markers (per script, per system)
+                options = System.Environment.GetEnvironmentVariable("DEV") == "1" ? BuildOptions.Development : BuildOptions.None,
             });
             Debug.Log($"[Builder] Player build: {report.summary.result}, {report.summary.totalErrors} errors, {report.summary.totalSize / (1024 * 1024)} MB");
             if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded && File.Exists("steam_appid.txt"))

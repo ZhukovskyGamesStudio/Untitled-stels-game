@@ -56,13 +56,15 @@ namespace Stealth.Level
         }
 
         /// <summary>The door a player can hack from here (locked, close, same floor), or null.</summary>
-        public static AutoDoor LockedNear(Vector3 player, float reach = HackReach)
+        public static AutoDoor LockedNear(Vector3 player, float reach = HackReach, Aim? aim = null)
         {
             AutoDoor best = null;
             float bestD = reach;
             foreach (var d in All)
             {
                 if (!d.Locked || d.NeedsKey || Mathf.Abs(player.y - d.transform.position.y) > 1.6f) continue;
+                var p = d.transform.position;
+                if (aim.HasValue && !aim.Value.At(p + Vector3.up * 0.2f, p + Vector3.up * 2.1f, 0.6f)) continue; // looked at
                 var to = player - d.transform.position;
                 to.y = 0;
                 if (to.magnitude <= bestD) { best = d; bestD = to.magnitude; }

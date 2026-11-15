@@ -184,5 +184,24 @@ namespace Stealth.Tests
             }
             Assert.Greater(Gold(10), Gold(0));
         }
+
+        [Test]
+        public void ToolsHaveColoursNoLootHas()
+        {
+            var tools = new[] { ItemCatalog.Key, ItemCatalog.Stun, ItemCatalog.Speaker };
+            foreach (var t in tools)
+                for (int c = 0; c < ItemCatalog.Colors.Length; c++)
+                {
+                    var tool = ItemCatalog.UiColor(t, c);
+                    Assert.AreEqual(tool, ItemCatalog.UiColor(t, 0), "a tool looks the same whatever colour it was spawned with");
+                    foreach (var loot in ItemCatalog.Colors)
+                        Assert.Greater(Mathf.Abs(tool.r - loot.Color.r) + Mathf.Abs(tool.g - loot.Color.g) + Mathf.Abs(tool.b - loot.Color.b), 0.45f,
+                            $"{ItemCatalog.Shapes[t].Id} is told apart from {loot.Name} loot");
+                }
+            for (int a = 0; a < tools.Length; a++)
+                for (int b = a + 1; b < tools.Length; b++)
+                    Assert.AreNotEqual(ItemCatalog.UiColor(tools[a], 0), ItemCatalog.UiColor(tools[b], 0));
+            Assert.AreEqual(ItemCatalog.Colors[3].Color, ItemCatalog.UiColor(0, 3), "loot keeps the colour of its value");
+        }
     }
 }

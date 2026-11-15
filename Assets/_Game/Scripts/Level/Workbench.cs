@@ -14,6 +14,7 @@ namespace Stealth.Level
         public override UseKind Kind => UseKind.Workbench;
         public override float HoldTime => 1.5f;
         public override float Reach => 2.0f;
+        public override float AimRadius => 0.7f; // a whole bench
 
         public override string Prompt(PlayerController player, out bool available)
         {

@@ -16,6 +16,7 @@ namespace Stealth.Vehicles
         public override UseKind Kind => UseKind.CarCargo;
         public override float Reach => 2.2f;
         public override Vector3 Point => transform.position;
+        public override float AimRadius => 0.3f; // pieces lie close together: the one looked at
         public override Transform ReachRoot => GetComponentInParent<Car>() is Car car ? car.transform : transform; // inside the bed's walls
 
         public void Show(int index, CargoItem item, ItemVisuals visuals)

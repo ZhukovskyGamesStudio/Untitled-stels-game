@@ -61,13 +61,15 @@ namespace Stealth.Items
         }
 
         /// <summary>The closed safe a player can crack from here (same floor), or null.</summary>
-        public static SafeBox ClosedNear(Vector3 player, Vector3 hands, float reach = Reach)
+        public static SafeBox ClosedNear(Vector3 player, Vector3 hands, float reach = Reach, Player.Aim? aim = null)
         {
             SafeBox best = null;
             float bestD = reach;
             foreach (var s in All)
             {
                 if (s.Index < 0 || s.Opened || Mathf.Abs(player.y - s.transform.position.y) > 1.6f) continue;
+                var p = s.transform.position;
+                if (aim.HasValue && !aim.Value.At(p + Vector3.up * 0.15f, p + Vector3.up * 0.9f, 0.45f)) continue; // looked at
                 var to = player - s.transform.position;
                 to.y = 0;
                 if (to.magnitude > bestD || !Enemies.Perception.ReachClear(hands, s.transform.position + Vector3.up * 0.5f, s.transform)) continue;

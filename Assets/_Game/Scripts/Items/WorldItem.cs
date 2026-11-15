@@ -124,7 +124,7 @@ namespace Stealth.Items
             if (Renderer == null || Visuals == null) return;
             if (!on) { Renderer.SetPropertyBlock(null); return; }
             m_Block ??= new MaterialPropertyBlock();
-            var c = ItemCatalog.Colors[Mathf.Clamp(Color, 0, ItemCatalog.Colors.Length - 1)].Color;
+            var c = ItemCatalog.UiColor(Shape, Color);
             m_Block.SetColor("_EmissionColor", c * 1.5f); // brighter, but keeps its colour (= value)
             Renderer.SetPropertyBlock(m_Block);
         }

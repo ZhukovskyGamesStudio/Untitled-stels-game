@@ -65,13 +65,15 @@ namespace Stealth.Level
         public Vector3 Front => transform.position + transform.forward * 0.4f;
 
         /// <summary>The terminal a player can use from here (same floor, nothing in between), or null.</summary>
-        public static SecurityTerminal Near(Vector3 player, Vector3 hands, float reach = Reach)
+        public static SecurityTerminal Near(Vector3 player, Vector3 hands, float reach = Reach, Player.Aim? aim = null)
         {
             SecurityTerminal best = null;
             float bestD = reach;
             foreach (var t in All)
             {
                 if (t.Index < 0 || Mathf.Abs(player.y - t.transform.position.y) > 1.6f) continue;
+                var p = t.transform.position;
+                if (aim.HasValue && !aim.Value.At(p + Vector3.up * 0.6f, p + Vector3.up * 1.3f, 0.55f)) continue; // looked at
                 var to = player - t.transform.position;
                 to.y = 0;
                 if (to.magnitude > bestD || !Perception.ReachClear(hands, t.transform.position + Vector3.up * 0.9f, t.transform)) continue;

@@ -527,7 +527,7 @@ namespace Stealth.UI
 
         static void AddShape(UiPool<InventoryBlockView> pool, Vector2Int origin, int shape, int color, int rot, float alpha)
         {
-            var c = ItemCatalog.Colors[color].Color;
+            var c = ItemCatalog.UiColor(shape, color);
             foreach (var cell in ItemCatalog.RotatedCells(shape, rot))
                 pool.Next().Set(new Vector2((origin.x + cell.x) * Cell + 2, -((origin.y + cell.y) * Cell + 2)), Cell - 4, c, alpha);
         }

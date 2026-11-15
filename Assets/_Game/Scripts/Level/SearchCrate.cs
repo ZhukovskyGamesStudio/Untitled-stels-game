@@ -19,6 +19,7 @@ namespace Stealth.Level
         public override UseKind Kind => UseKind.Crate;
         public override float HoldTime => Tuning.Items.Gadgets.CrateSearchTime;
         public override Vector3 Point => transform.position + Vector3.up * 0.5f;
+        public override float AimRadius => 0.6f; // a shelf or a pallet
 
         Quaternion m_Rest;
         float m_Open;

@@ -147,6 +147,7 @@ namespace Stealth.Game
                     Quaternion.LookRotation(Vector3.forward)),
             };
             float sum = 0, worst = float.MaxValue;
+            var profile = new PerfProfile();
             for (int i = 0; i < views.Length; i++)
             {
                 Me.TeleportOwner(views[i].position, views[i].rotation);
@@ -154,14 +155,86 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(0.5f);
                 int frames = 0;
                 float t0 = Time.realtimeSinceStartup;
-                while (Time.realtimeSinceStartup - t0 < 3f) { frames++; yield return null; }
+                profile.Begin();
+                while (Time.realtimeSinceStartup - t0 < 3f) { frames++; profile.Sample(); yield return null; }
                 float fps = frames / (Time.realtimeSinceStartup - t0);
                 sum += fps;
                 worst = Mathf.Min(worst, fps);
-                Log($"perf view {i}: {fps:0} fps");
+                Log($"perf view {i}: {fps:0} fps; {profile.Summary()}");
             }
+            // playing: walking and turning through the house with the robots about
+            Me.TeleportOwner(views[0].position, views[0].rotation);
+            yield return new WaitForSeconds(0.5f);
+            profile.Begin();
+            float tw = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - tw < 8f)
+            {
+                float k = Time.realtimeSinceStartup - tw;
+                Drive(new Vector2(Mathf.Sin(k * 0.9f) * 0.6f, 1f), look: new Vector2(Mathf.Sign(Mathf.Sin(k * 0.5f)) * 3f, 0f));
+                profile.Sample();
+                yield return null;
+            }
+            Release();
+            Log($"perf walking: {profile.Summary()}");
+            foreach (var line in profile.Top(18)) Log("perf top: " + line);
+            // the first view again with one thing off at a time: what the frame's GPU time goes to
+            Me.TeleportOwner(views[0].position, views[0].rotation);
+            Me.Motor.SetPitch(0);
+            yield return new WaitForSeconds(0.5f);
+            foreach (var (label, off) in PerfToggles())
+            {
+                var undo = off();
+                yield return new WaitForSeconds(0.4f);
+                profile.Begin();
+                float t1 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t1 < 2f) { profile.Sample(); yield return null; }
+                undo?.Invoke();
+                Log($"perf without {label}: {profile.Summary()}");
+            }
+            profile.Dispose();
             Log($"perf: building {l.Mass} {l.SizeX:0}x{l.SizeZ:0} m x {l.Floors} floors, {l.Rooms.Count} rooms, {renderers} renderers drawn, avg {sum / views.Length:0} fps, worst {worst:0} fps");
             Application.targetFrameRate = 144;
+        }
+
+        /// <summary>The things the perf scenario switches off one at a time (each returns how to switch it back on).</summary>
+        static System.Collections.Generic.IEnumerable<(string, System.Func<System.Action>)> PerfToggles()
+        {
+            yield return ("nothing", () => null);
+            var asset = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+            var field = typeof(UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset).GetField("m_RendererDataList",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var data = asset != null && field != null ? field.GetValue(asset) as UnityEngine.Rendering.Universal.ScriptableRendererData[] : null;
+            if (data != null && data.Length > 0)
+                foreach (var f in data[0].rendererFeatures)
+                {
+                    if (f == null || !f.isActive) continue;
+                    var feature = f;
+                    yield return (feature.name, () => { feature.SetActive(false); return () => feature.SetActive(true); });
+                }
+            yield return ("post-processing", () =>
+            {
+                var cam = Camera.main != null ? Camera.main.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>() : null;
+                if (cam == null) return null;
+                cam.renderPostProcessing = false;
+                return () => cam.renderPostProcessing = true;
+            });
+            System.Func<System.Action> Lights(bool directional, LightShadows to) => () =>
+            {
+                var changed = new System.Collections.Generic.List<(Light, LightShadows)>();
+                foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+                    if ((l.type == LightType.Directional) == directional && l.shadows != LightShadows.None && l.shadows != to) { changed.Add((l, l.shadows)); l.shadows = to; }
+                return () => { foreach (var (l, sh) in changed) if (l != null) l.shadows = sh; };
+            };
+            yield return ("soft shadows of lamps (hard)", Lights(false, LightShadows.Hard));
+            yield return ("shadows of lamps", Lights(false, LightShadows.None));
+            yield return ("shadows of the moon", Lights(true, LightShadows.None));
+            yield return ("lamps", () =>
+            {
+                var off = new System.Collections.Generic.List<Light>();
+                foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+                    if (l.enabled && l.type != LightType.Directional) { off.Add(l); l.enabled = false; }
+                return () => { foreach (var l in off) if (l != null) l.enabled = true; };
+            });
         }
 
         /// <summary>

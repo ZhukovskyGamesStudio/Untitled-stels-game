@@ -68,6 +68,20 @@ namespace Stealth.Items
         public static bool IsLoot(int shape) => shape < LootShapes;
         /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
         public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker;
+
+        /// <summary>
+        /// The colour a thing is drawn with in the inventory and the stash: loot by its colour (its value), the tools in
+        /// colours no loot has — magenta key, cyan stun, orange speaker — so they never pass for a cube of loot.
+        /// </summary>
+        public static Color UiColor(int shape, int color) => shape switch
+        {
+            Key => KeyColor,
+            Stun => StunColor,
+            Speaker => SpeakerColor,
+            _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
+        };
+
+        public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]

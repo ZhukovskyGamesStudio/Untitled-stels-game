@@ -437,7 +437,7 @@ namespace Stealth.Player
             int seat = SeatIndex;
             if (seat >= 0 && car.Seats[seat] != null && Model != null)
             {
-                Model.SetPositionAndRotation(car.Seats[seat].position - Vector3.up * 0.42f, car.transform.rotation);
+                Model.SetPositionAndRotation(car.Seats[seat].position - Vector3.up * ModelUnderSeat, car.transform.rotation);
                 Model.localScale = Vector3.one;
             }
             if (m_Rig != null && Model != null) m_Rig.transform.localPosition = Model.localPosition;
@@ -573,7 +573,9 @@ namespace Stealth.Player
             foreach (var p in All)
             {
                 if (p == this || !p.Downed) continue;
-                if ((p.transform.position - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
+                var at = p.transform.position;
+                if (View is { } view && !view.At(at, at + Vector3.up * 0.5f, 0.7f)) continue; // looking at them
+                if ((at - transform.position).magnitude <= m_Interaction.ReviveDistance) { ReviveTarget = p; break; }
             }
             if (ReviveTarget != null && holdE)
             {
@@ -598,7 +600,7 @@ namespace Stealth.Player
             HackProgress = m_HackHeld.Of(HackTarget);
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
-            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position) : null;
+            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) : null;
             if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
             {
                 if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
@@ -630,6 +632,11 @@ namespace Stealth.Player
 
         /// <summary>Feet this far under the seat's cushion: a sitting player's eyes are ~0.8 m above it.</summary>
         const float SeatDrop = 0.72f;
+        /// <summary>
+        /// The model's feet this far under the cushion when sitting: its hips (the legs' pivot, 0.92 m over the feet,
+        /// <c>generate_models.LEG_PIVOT</c>) rest on the seat, so the head stays under the cab's roof (1.85 m).
+        /// </summary>
+        const float ModelUnderSeat = 0.85f;
         bool m_WasSeated;
         int m_LastSeat;
 
@@ -686,7 +693,7 @@ namespace Stealth.Player
         {
             bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null
                         || Cracking != null || CursorMode || SeatIndex >= 0;
-            UseTarget = busy ? null : Interactable.Near(this, Hands);
+            UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
             UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;
             UseAvailable = UseTarget != null && available;
@@ -743,7 +750,7 @@ namespace Stealth.Player
 
         void UpdateSafe()
         {
-            SafeTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null ? Items.SafeBox.ClosedNear(transform.position, Hands) : null;
+            SafeTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null ? Items.SafeBox.ClosedNear(transform.position, Hands, Items.SafeBox.Reach, View) : null;
             if (Cracking == null)
             {
                 if (SafeTarget == null || !Controls.Pressed(GameAction.Interact) || CursorMode) return;
@@ -985,7 +992,7 @@ namespace Stealth.Player
             if (UsingTerminal == null)
             {
                 TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null
-                    ? SecurityTerminal.Near(transform.position, Hands) : null;
+                    ? SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View) : null;
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
                 return;
@@ -1162,6 +1169,13 @@ namespace Stealth.Player
             gm.CalloutServer(ClientId, PingKind.Enemy, target.Position, target);
         }
 
+        /// <summary>
+        /// Where the player looks: E works on what is under the crosshair, not on whatever is nearest (null for the
+        /// autopilot that holds E, <see cref="DevFlags.AutoInteract"/>: it uses whatever is in reach).
+        /// </summary>
+        public Aim? View => DevFlags.AutoInteract ? null
+            : Camera != null ? new Aim(Camera.transform.position, Camera.transform.forward) : new Aim(Hands, transform.forward);
+
         /// <summary>Where the player reaches from (chest height): hacking and cracking need a clear line from here.</summary>
         public Vector3 Hands => transform.position + Vector3.up * (Height * 0.7f);
 
@@ -1172,7 +1186,8 @@ namespace Stealth.Player
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)
             {
-                if (!d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
+                if (!d.CanBeHackedFrom(transform.position, HackReach) || (View.HasValue && !View.Value.At(d.transform.position + Vector3.up * 0.1f, d.Position, 0.45f)) ||
+                    !d.ReachableFrom(Hands)) continue;
                 float dist = (d.transform.position - transform.position).sqrMagnitude;
                 if (dist < bestDist) { best = d; bestDist = dist; }
             }

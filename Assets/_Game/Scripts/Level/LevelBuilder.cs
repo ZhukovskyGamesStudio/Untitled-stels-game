@@ -552,7 +552,12 @@ namespace Stealth.Level
         {
             var list = new List<GameObject>();
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
-                if (r.GetComponentInParent<AutoDoor>() == null) list.Add(r.gameObject);
+            {
+                if (r.GetComponentInParent<AutoDoor>() != null) continue;
+                // the unchanging shell is merged per room cell instead (PropBatches): static batching would keep each renderer
+                if (PropBatches.IsShell(r, root.transform) && MeshBatcher.CanMerge(r, out _)) continue;
+                list.Add(r.gameObject);
+            }
             StaticBatchingUtility.Combine(list.ToArray(), root);
         }
     }
