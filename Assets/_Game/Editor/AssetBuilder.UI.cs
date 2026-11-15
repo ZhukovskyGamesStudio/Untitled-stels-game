@@ -417,7 +417,7 @@ namespace Stealth.EditorTools
             {
                 // A world-space panel over a sewer tunnel, ~2.0 x 0.45 m, just the two lines it holds: where it leads, how big
                 // and guarded that house is (or the countdown while the car stands in that tunnel).
-                const float w = 300f, h = 66f;
+                const float w = 360f, h = 66f;
                 var go = new GameObject("RouteSign", typeof(RectTransform));
                 var canvas = go.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.WorldSpace;
@@ -429,14 +429,24 @@ namespace Stealth.EditorTools
                 view.Group = go.AddComponent<CanvasGroup>();
                 view.Frame = Img(Stretch(go.transform, "Frame"), new Color(1f, 1f, 1f, 0.35f));
                 Img(Stretch(view.Frame.rectTransform, "Back", 2f), new Color(0.02f, 0.025f, 0.03f, 0.88f));
-                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(10, -3), new Vector2(w - 20, 32)), "—", 24, TextAnchor.MiddleLeft, Color.white, true);
-                Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(10, -36), new Vector2(w - 20, 2)), new Color(1f, 1f, 1f, 0.3f));
-                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(10, -39), new Vector2(w - 20, 24)), "—", 16, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.9f));
+                // the house's kind on the left (office, hospital, garage…), its main job (vault / hostage) on the right
+                const float ix = 60f, jw = 42f;
+                view.KindIcon = Img(R(go.transform, "KindIcon", Left, Left, new Vector2(6, 0), new Vector2(50, 50)), Color.white, Icon("house_office"));
+                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage" }
+                    .Select(n => Icon(n)).ToArray();
+                if (view.KindIcons.Length != System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Length)
+                    throw new System.InvalidOperationException("RouteSign: one icon per HouseKind");
+                view.JobIcon = Img(R(go.transform, "JobIcon", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-6, 0), new Vector2(38, 38)), new Color(1f, 0.85f, 0.4f), Icon("job_vault"));
+                view.VaultIcon = Icon("job_vault");
+                view.HostageIcon = Icon("job_hostage");
+                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(ix, -3), new Vector2(w - ix - jw - 6, 32)), "—", 24, TextAnchor.MiddleLeft, Color.white, true);
+                Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(ix, -36), new Vector2(w - ix - jw - 6, 2)), new Color(1f, 1f, 1f, 0.3f));
+                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(ix, -39), new Vector2(w - ix - jw - 6, 24)), "—", 16, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.9f));
                 view.Body.resizeTextForBestFit = true; // the main job, the floors and the guards on one line: shrinks to fit
                 view.Body.resizeTextMinSize = 10;
                 view.Body.resizeTextMaxSize = 16;
                 // the countdown takes the body's line (same place, warm colour) instead of a third, mostly empty one
-                view.Votes = Txt(R(go.transform, "Votes", TopLeft, TopLeft, new Vector2(10, -39), new Vector2(w - 20, 24)), "", 16, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.4f), true);
+                view.Votes = Txt(R(go.transform, "Votes", TopLeft, TopLeft, new Vector2(ix, -39), new Vector2(w - ix - jw - 6, 24)), "", 16, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.4f), true);
                 SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
                 return go;
             }).GetComponent<RouteSignView>();
@@ -906,18 +916,47 @@ namespace Stealth.EditorTools
             var panel = rt.gameObject.AddComponent<ControlsPanel>();
             menu.KeysPanel = panel;
             Txt(R(rt, "Title", TopLeft, TopLeft, new Vector2(pad, -8), new Vector2(400, 36)), L("controls.title"), 22, TextAnchor.MiddleLeft, Color.white, true);
+            // The two columns scroll (mouse wheel or the bar on the right) inside the panel: there are more controls than fit.
+            const float viewH = 600f - 46f - 84f;
+            var view = R(rt, "Scroll", TopLeft, TopLeft, new Vector2(pad, -46), new Vector2(colW * 2 + gap + 6, viewH));
+            Img(view, new Color(0, 0, 0, 0.01f)).raycastTarget = true; // the wheel scrolls anywhere over the list
+            view.gameObject.AddComponent<RectMask2D>();
+            var content = R(view, "Content", TopLeft, TopLeft, Vector2.zero, new Vector2(colW * 2 + gap, 0));
+            var row2 = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+            row2.spacing = gap;
+            row2.childControlWidth = row2.childControlHeight = true;
+            row2.childForceExpandWidth = row2.childForceExpandHeight = false;
+            row2.childAlignment = TextAnchor.UpperLeft;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             panel.Columns = new RectTransform[2];
             for (int i = 0; i < 2; i++)
             {
-                var c = R(rt, $"Column{i}", TopLeft, TopLeft, new Vector2(pad + i * (colW + gap), -46), new Vector2(colW, 0));
+                var c = R(content, $"Column{i}", TopLeft, TopLeft, Vector2.zero, new Vector2(colW, 0));
+                c.gameObject.AddComponent<LayoutElement>().preferredWidth = colW;
                 var v = c.gameObject.AddComponent<VerticalLayoutGroup>();
                 v.spacing = 3;
                 v.childControlWidth = v.childControlHeight = true;
                 v.childForceExpandWidth = true;
                 v.childForceExpandHeight = false;
-                c.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
                 panel.Columns[i] = c;
             }
+            var scroll = view.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = view;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 30f;
+            var barRt = R(rt, "Scrollbar", TopRight, TopRight, new Vector2(-6, -46), new Vector2(8, viewH));
+            Img(barRt, new Color(1, 1, 1, 0.06f)).raycastTarget = true;
+            var bar = barRt.gameObject.AddComponent<Scrollbar>();
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            var handle = Stretch(Stretch(barRt, "Area"), "Handle");
+            bar.handleRect = handle;
+            bar.targetGraphic = Img(handle, new Color(1, 1, 1, 0.35f));
+            bar.targetGraphic.raycastTarget = true;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             panel.RowPrefab = e.ControlRow;
             panel.GroupPrefab = e.ControlGroup;
             panel.Hint = Txt(R(rt, "Hint", BottomLeft, BottomLeft, new Vector2(pad, 52), new Vector2(colW * 2 + gap, 22)),

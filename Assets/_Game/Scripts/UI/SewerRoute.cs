@@ -19,6 +19,7 @@ namespace Stealth.UI
 
         SewerLocation m_Sewer;
         readonly Dictionary<int, string> m_Previews = new();
+        readonly Dictionary<int, ObjectiveKind> m_Jobs = new();
         int m_PreviewsLoc = -1;
 
         void Awake() => m_Sewer = GetComponent<SewerLocation>();
@@ -40,6 +41,7 @@ namespace Stealth.UI
                 var node = gm.Route.Node(gm.Level.Index + 1, lane);
                 sign.Title.text = Loc.F("route.title", RouteNode.KindName(node.Kind), gm.Level.Index + 2);
                 sign.Body.text = Preview(node, gm); // the fuel the trip costs is the same for every way: not shown
+                sign.ShowIcons(node.Kind, m_Jobs.TryGetValue(node.Seed, out var job) ? job : ObjectiveKind.None);
 
                 string voters = "";
                 foreach (var p in PlayerController.All)
@@ -76,6 +78,7 @@ namespace Stealth.UI
             var job = ObjectiveRules.Name(l.Objective);
             text = (job != null ? Loc.F("route.objective", job) + " · " : "") + Loc.F("route.preview", l.Floors, l.RobotSpawns.Count);
             m_Previews[node.Seed] = text;
+            m_Jobs[node.Seed] = l.Objective;
             return text;
         }
     }

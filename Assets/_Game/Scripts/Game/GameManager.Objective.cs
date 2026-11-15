@@ -171,8 +171,9 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Hostage || prop != l.Cage || IsOpened(CageOpenKey(prop))) return;
             var inventory = player.GetComponent<PlayerInventory>();
             if (inventory == null) return;
-            if (!inventory.TakeServer(ItemCatalog.CageKey))
+            if (!inventory.TakeHeldServer(ItemCatalog.CageKey))
             {
+                if (inventory.Has(ItemCatalog.CageKey)) return; // in the backpack: take it in hand first
                 SetStage(CageFoundKey, true);
                 PointOutKeyServer(player);
                 return;

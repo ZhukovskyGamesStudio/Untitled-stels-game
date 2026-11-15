@@ -347,6 +347,20 @@ namespace Stealth.EditorTools
                 Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
             };
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
+            // a locked (hackable) door: a hasp across the seam with a padlock hanging from it, on both faces
+            door.Padlocks = new[] { 1f, -1f }.Select(side =>
+            {
+                var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(0f, 1.2f, side * 0.032f)).transform;
+                holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                var lockModel = Model("padlock");
+                lockModel.transform.SetParent(holder, false);
+                lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
+                Paint(lockModel, "Gold", "Metal", "Metal");
+                NoShadows(lockModel);
+                holder.gameObject.SetActive(false);
+                return holder;
+            }).ToArray();
             // a key door: the lock panels beside the frame on both sides (shown only on doors of LevelLayout.KeyDoors)
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
@@ -515,8 +529,14 @@ namespace Stealth.EditorTools
             var hinge = Child(hatch.transform, "LidHinge", new Vector3(0.75f, 0.03f, 0f));
             foreach (var part in hatch.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
                 if (part.name.StartsWith("Body") || part.name.StartsWith("Accent")) part.SetParent(hinge.transform, true);
-            hatch.AddComponent<Hatch>().Lid = hinge.transform;
+            var h = hatch.AddComponent<Hatch>();
+            h.Lid = hinge.transform;
             var b = LocalBounds(hatch);
+            // a post at the rim with a lamp on top: the hatch's colour (entry blue — the tank's filler, exit green — the way down)
+            Cube(hatch.transform, "MarkPost", new Vector3(0f, 0.65f, -0.85f), new Vector3(0.07f, 1.3f, 0.07f), M("Metal"), false);
+            Cube(hatch.transform, "EyeMarkLamp", new Vector3(0f, 1.36f, -0.85f), new Vector3(0.2f, 0.14f, 0.2f), M("HatchRing"), false);
+            h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
             var box = hatch.AddComponent<BoxCollider>();
             // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
             // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it

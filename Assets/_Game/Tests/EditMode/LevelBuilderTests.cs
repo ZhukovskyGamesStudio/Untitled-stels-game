@@ -36,10 +36,10 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner)
+        public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner, [Values(false, true)] bool flip)
         {
-            var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner };
-            var (mirrored, yaw) = StairGeometry.Placement(corner);
+            var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner, Flip = flip };
+            var (mirrored, yaw) = StairGeometry.Placement(corner, flip);
             var rotation = Quaternion.Euler(0f, yaw, 0f);
             foreach (var box in StairGeometry.Boxes())
             {
@@ -49,7 +49,7 @@ namespace Stealth.Tests
                 var placed = StairGeometry.Origin(stair) + rotation * local;
                 // ... must be where the corner frame says it is.
                 var expected = StairGeometry.ToWorld(stair, box.Center);
-                Assert.That(Vector3.Distance(placed, expected), Is.LessThan(1e-3f), $"{box.Name} for corner {corner}");
+                Assert.That(Vector3.Distance(placed, expected), Is.LessThan(1e-3f), $"{box.Name} for corner {corner}, flip {flip}");
             }
         }
 

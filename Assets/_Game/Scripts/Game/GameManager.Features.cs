@@ -170,17 +170,17 @@ namespace Stealth.Game
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null || IsOpened(DoorKey(door)) || !l.KeyDoors.Any(k => k.Door == door)) return;
             var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null || !inventory.TakeServer(ItemCatalog.Key)) return;
+            if (inventory == null || !inventory.TakeHeldServer(ItemCatalog.Key)) return;
             m_Opened.Add(DoorKey(door));
             OpenedVersion++;
         }
 
-        /// <summary>Server: a player sets off a stun cube from the backpack — every robot and camera of the house freezes.</summary>
+        /// <summary>Server: a player sets off the stun cube in the hand — every robot and camera of the house freezes.</summary>
         public void GadgetServer(PlayerController player)
         {
             if (player == null || player.Downed || Phase != RunPhase.Playing) return;
             var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null || !inventory.TakeServer(ItemCatalog.Stun)) return;
+            if (inventory == null || !inventory.TakeHeldServer(ItemCatalog.Stun)) return;
             float seconds = Gadgets.StunDuration;
             foreach (var d in Detector.All.ToArray()) d.HackServer(seconds);
             StunnedUntil = Session.ServerTime + seconds;

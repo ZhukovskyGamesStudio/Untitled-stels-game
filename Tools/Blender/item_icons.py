@@ -39,8 +39,13 @@ ITEMS = {
         "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}),
     # the tools and the crafted diamond: their own models in the world, pictures in the backpack too
     "diamond": (1, 1, "item_diamond", {"Body": ((0.75, 0.92, 1.0), 0.0, 0.05, 0.25)}, "front"),
-    "key": (1, 1, "item_key", {"Body": ((0.95, 0.72, 0.2), 0.95, 0.25, 0.0)}, "front"),
-    "cagekey": (1, 1, "item_key", {"Body": ((0.55, 0.85, 0.2), 0.9, 0.3, 0.0)}, "front"),
+    "key": (1, 1, "item_key_model", {
+        "Body": ((0.95, 0.72, 0.2), 0.95, 0.25, 0.0),
+        "Accent": ((0.62, 0.64, 0.66), 0.9, 0.3, 0.0),
+        "Trim": ((0.85, 0.16, 0.12), 0.0, 0.4, 0.0)}),
+    "cagekey": (1, 2, "item_cagekey_model", {
+        "Body": ((0.2, 0.19, 0.18), 0.8, 0.5, 0.0),
+        "Accent": ((0.95, 0.72, 0.2), 0.95, 0.25, 0.0)}),
     "stun": (2, 2, "item_stun", {"Body": ((0.15, 0.75, 0.85), 0.3, 0.3, 0.35)}, "front"),
     "speaker": (2, 1, "Props/lure_speaker", {
         "Body": ((0.14, 0.15, 0.16), 0.2, 0.5, 0.0),

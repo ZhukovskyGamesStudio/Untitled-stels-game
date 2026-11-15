@@ -590,12 +590,17 @@ namespace Stealth.Level
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the
             // place — the place shrinks to its footprint
             var need = Furnisher.FootprintOf(kind);
-            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa, PropKind.Shelf,
-                         PropKind.PoolTable, PropKind.ReadingTable, PropKind.ConsoleDesk, PropKind.LabBench, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball })
+            // away from the hatch where the house allows it; a small first house has no "far"
+            foreach (float away in new[] { 6f, 2.5f })
+            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.ConferenceTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa,
+                         PropKind.SectionalSofa, PropKind.StudioCouch, PropKind.Shelf, PropKind.MetalShelving, PropKind.PoolTable, PropKind.AirHockey,
+                         PropKind.PokerTable, PropKind.ReadingTable, PropKind.DiningTable, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.LabBench,
+                         PropKind.RobotTable, PropKind.WorkTable, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball, PropKind.Credenza,
+                         PropKind.AvCredenza, PropKind.HallBench, PropKind.BenchIsland, PropKind.Daybed, PropKind.DoctorDesk })
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)
-                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > 6f) options.Add(i);
+                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away) options.Add(i);
                 if (options.Count == 0) continue;
                 int pick = options[rng.Next(options.Count)];
                 var p = l.Props[pick];

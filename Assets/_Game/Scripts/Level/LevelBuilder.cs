@@ -122,7 +122,11 @@ namespace Stealth.Level
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 var d = l.AutoDoors[i];
-                var door = Place(m_Art.AutoDoor, "AutoDoor", d.position, d.rotation).GetComponent<AutoDoor>();
+                bool vault = i == l.VaultDoor && m_Art.VaultDoor != null;
+                var rot = d.rotation;
+                if (vault && l.VaultRoom >= 0 && Vector3.Dot(l.Plan.Rooms[l.VaultRoom].Center - d.position, d.rotation * Vector3.forward) < 0f)
+                    rot *= Quaternion.Euler(0f, 180f, 0f); // the round door's +Z into the vault
+                var door = Place(vault ? m_Art.VaultDoor : m_Art.AutoDoor, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
                     bool keyed = false;
@@ -134,7 +138,7 @@ namespace Stealth.Level
                     // the vault's plate with its three lamps over the doorway, on both faces of the wall
                     var across = d.rotation * Vector3.forward;
                     foreach (float side in new[] { 1f, -1f })
-                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.36f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
+                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.56f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
                             Quaternion.LookRotation(across * side));
                 }
             }
@@ -410,7 +414,7 @@ namespace Stealth.Level
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
-                else if (w.Exterior) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
+                else if (w.Exterior) Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, along);
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
                 else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
                 from = o1;
@@ -538,7 +542,7 @@ namespace Stealth.Level
 
         void BuildStair(Stair s)
         {
-            var (mirrored, yaw) = StairGeometry.Placement(s.Corner);
+            var (mirrored, yaw) = StairGeometry.Placement(s.Corner, s.Flip);
             var go = Place(mirrored ? m_Art.StairsMirrored : m_Art.Stairs, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))

@@ -166,6 +166,15 @@ namespace Stealth.UI
                 if (Board != null) Board.Show(false);
                 return;
             }
+            if (me.Watching != null && me.Watching.TryGetComponent<PlayerInventory>(out var watched))
+            {
+                // knocked out, watching a teammate: their backpack, to look at only
+                CancelDrag();
+                m_Hover = null; m_HoverCargo = null;
+                if (Board != null) Board.Show(false);
+                Draw(me, watched);
+                return;
+            }
             var inv = me.GetComponent<PlayerInventory>();
             UpdateBoard(me);
             HandleInput(me, inv);
@@ -621,7 +630,7 @@ namespace Stealth.UI
                     hint = Loc.F("inventory.sell_value", ItemCatalog.Value(m_DragShape, m_DragColor));
                 }
                 else if (m_Source == DragSource.Inventory && AtHopper(me, me.Camera.ScreenPointToRay(MouseScreen)))
-                    hint = ItemCatalog.IsTool(m_DragShape) ? Loc.T("use.hopper.empty") : Loc.F("use.hopper", ItemCatalog.Value(m_DragShape, m_DragColor));
+                    hint = Loc.F("use.hopper", ItemCatalog.Value(m_DragShape, m_DragColor));
                 Ghost.anchoredPosition = MouseCanvas - new Vector2(m_GrabCell.x * Cell + Cell / 2f, -(m_GrabCell.y * Cell + Cell / 2f));
                 AddShape(m_GhostBlocks, m_GhostIcons, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
             }

@@ -35,6 +35,11 @@ namespace Stealth.Level
         [Tooltip("Straight 6 m segments, one per variant.")]
         public GameObject[] Segments;
         public GameObject Cap, Hub, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
+        [Tooltip("An invisible wall across the tunnel behind the car: the way back (where the car came from) is seen, not walked.")]
+        public GameObject BackWall;
+
+        /// <summary>How many segments of the way back are seen behind the car (past the invisible wall), then the cap.</summary>
+        public const int BackSegments = 7;
         [Tooltip("The gate across the tunnel: frame, shutter, lever (SewerGate).")]
         public SewerGate GatePrefab;
         [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
@@ -84,7 +89,26 @@ namespace Stealth.Level
         public void Build(SewerPlan plan)
         {
             Plan = plan;
-            Put(Cap, "Cap", Vector3.zero);
+            // the way the car came from: a long tunnel behind it, dimly lit, closed by an invisible wall where the sewer starts
+            Put(BackWall, "BackWall", Vector3.zero);
+            for (int i = 1; i <= BackSegments; i++)
+            {
+                float bx = -i * SewerPlan.SegmentLength;
+                if (Segments != null && Segments.Length > 0) Put(Segments[(i * 3 + plan.Segments.Count) % Segments.Length], $"BackSegment{i}", new Vector3(bx, 0f, 0f));
+                if (i % 2 == 1 && i < BackSegments)
+                {
+                    int side = i % 4 == 1 ? 1 : -1;
+                    var lamp = Put(Lamp, $"BackLamp{i}", new Vector3(bx + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                    if (lamp != null)
+                        foreach (var l in lamp.GetComponentsInChildren<Light>())
+                        {
+                            l.color = plan.LampColor;
+                            l.intensity = plan.LampIntensity * 0.45f; // fading into the distance
+                            l.range = 11f;
+                        }
+                }
+            }
+            Put(Cap, "Cap", new Vector3(-BackSegments * SewerPlan.SegmentLength, 0f, 0f));
             for (int i = 0; i < plan.Segments.Count; i++)
             {
                 var s = plan.Segments[i];

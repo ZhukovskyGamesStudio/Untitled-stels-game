@@ -90,6 +90,8 @@ namespace Stealth.UI
         public Sprite[] SpeakerSprites;
         public Image[] Hearts;
         public Sprite HeartFull, HeartEmpty;
+        [Tooltip("The team's hack slots, bottom left: lit = a robot / device is switched off.")]
+        public Image[] HackSlots;
 
         [Header("Panels")]
         public Text HouseLabel;
@@ -216,6 +218,7 @@ namespace Stealth.UI
             ShowQuota(gm, now);
             ShowHatchMarker(gm, me);
             ShowHealth(me);
+            ShowHackSlots(gm);
             ShowTeam(me, now);
             ShowCallouts(gm, me, now);
             ShowMaps(gm, me);
@@ -436,7 +439,7 @@ namespace Stealth.UI
                 UseProgress = me.UseProgress,
                 Driving = me.SeatIndex == 0,
                 Passenger = me.SeatIndex > 0,
-                HasStun = inventory.Items.Any(i => i.Shape == ItemCatalog.Stun),
+                HasStun = inventory.Holds(ItemCatalog.Stun),
                 HandUse = HandUse(me, inventory),
                 HoverItem = hover != null,
                 BigMap = m_BigMapOpen,
@@ -758,6 +761,22 @@ namespace Stealth.UI
             var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
             HatchDiamond.color = c;
             Ui.Set(HatchLabel, Loc.F("hud.metres", Vector3.Distance(me.transform.position, exit)), c);
+        }
+
+        /// <summary>How many of the team's hack slots are in use (a hack over the limit wakes the first robot).</summary>
+        void ShowHackSlots(GameManager gm)
+        {
+            if (HackSlots == null) return;
+            bool house = gm != null && gm.Phase == RunPhase.Playing;
+            int used = house ? gm.HackedCount : 0, max = house ? gm.MaxHacked : 0;
+            for (int i = 0; i < HackSlots.Length; i++)
+            {
+                bool shown = i < max;
+                Ui.Show(HackSlots[i], shown);
+                if (!shown) continue;
+                var color = i < used ? new Color(0.35f, 0.9f, 1f, 1f) : new Color(1f, 1f, 1f, 0.3f);
+                if (HackSlots[i].color != color) HackSlots[i].color = color;
+            }
         }
 
         /// <summary>Hearts: two as a rule, the third (gold) only while the med table's extra point is there.</summary>

@@ -97,6 +97,8 @@ namespace Stealth.Level
         public GameObject IllusionBlock;
         [Tooltip("The house's main job: a lock panel of the vault on a wall (VaultConsole), the hostage's cage (Cage), the vault door's lamps (VaultPanel).")]
         public GameObject VaultConsole, Cage, VaultPanel;
+        [Tooltip("The vault's round bank door (an AutoDoor that swings), and the heavy doors in the facade.")]
+        public GameObject VaultDoor, ExteriorDoor;
         [Tooltip("The furniture of the themed rooms (gym, library, kitchen run, restrooms…), by kind.")]
         public PropPrefab[] RoomProps = new PropPrefab[0];
 

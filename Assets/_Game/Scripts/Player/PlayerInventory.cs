@@ -280,11 +280,11 @@ namespace Stealth.Player
 
         /// <summary>
         /// Server: one thing dropped into the car's hopper (in the sewer) or into the entry hatch (in a house) burns into fuel
-        /// at once. Tools are not burnt; anywhere else nothing happens.
+        /// at once — tools too (a key, the stun, the speaker burn at the grey rate); anywhere else nothing happens.
         /// </summary>
         public void DepositServer(int index)
         {
-            if (index < 0 || index >= m_Items.Count || !CanAct || ItemCatalog.IsTool(m_Items[index].Shape)) return;
+            if (index < 0 || index >= m_Items.Count || !CanAct) return;
             var game = GameManager.Instance;
             if (game == null || !game.CanBurnAt(transform.position)) return;
             var e = m_Items[index];
@@ -407,11 +407,11 @@ namespace Stealth.Player
             if (AtHatch(out var stash)) stash.Move(from, x, y, rot);
         }
 
-        /// <summary>Server: a thing from the entry hatch's stash dropped on its burn zone becomes fuel (tools are not burnt).</summary>
+        /// <summary>Server: a thing from the entry hatch's stash dropped on its burn zone becomes fuel (tools too).</summary>
         public void SellStashedServer(InventoryEntry from)
         {
             var game = GameManager.Instance;
-            if (!AtHatch(out var stash) || game == null || stash != game.Stash || ItemCatalog.IsTool(from.Shape) || !stash.Take(from)) return;
+            if (!AtHatch(out var stash) || game == null || stash != game.Stash || !stash.Take(from)) return;
             game.BurnServer(GetComponent<PlayerController>(), from.Value);
         }
 
@@ -425,7 +425,7 @@ namespace Stealth.Player
         public void SellWorldServer(WorldItem item)
         {
             var game = GameManager.Instance;
-            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.IsTool(item.Shape)) return;
+            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position)) return;
             int fuel = item.Value;
             Session.Despawn(item.gameObject);
             game.BurnServer(GetComponent<PlayerController>(), fuel);
@@ -441,6 +441,40 @@ namespace Stealth.Player
         }
 
         /// <summary>Server: use up one item of this shape (a key, a stun cube). False if there is none.</summary>
+        /// <summary>Server: a copy of what is carried (a player who leaves keeps it for a reconnect).</summary>
+        public List<InventoryEntry> SnapshotServer() => new(m_Items);
+
+        /// <summary>Server: a player who came back gets their things again (what does not fit is dropped at their feet).</summary>
+        public void RestoreServer(List<InventoryEntry> items)
+        {
+            foreach (var e in items)
+            {
+                if (CanPlace(e.Shape, e.Rot, e.X, e.Y)) m_Items.Add(e);
+                else if (!GiveServer(e.Shape, e.Color)) GameManager.Instance?.SpawnItemServer(e.Shape, e.Color, transform.position + Vector3.up * 0.3f, 0f);
+            }
+            Changed();
+        }
+
+        /// <summary>Whether the hand slot holds an item of this shape (keys and the stun work only from the hand).</summary>
+        public bool Holds(byte shape)
+        {
+            int h = HandIndex();
+            return h >= 0 && m_Items[h].Shape == shape;
+        }
+
+        /// <summary>Whether the backpack or the hand has an item of this shape.</summary>
+        public bool Has(byte shape) => m_Items.Exists(e => e.Shape == shape);
+
+        /// <summary>Server: use up the item in the hand if it is of this shape.</summary>
+        public bool TakeHeldServer(byte shape)
+        {
+            int h = HandIndex();
+            if (h < 0 || m_Items[h].Shape != shape) return false;
+            m_Items.RemoveAt(h);
+            Changed();
+            return true;
+        }
+
         public bool TakeServer(byte shape)
         {
             int i = m_Items.FindIndex(e => e.Shape == shape);

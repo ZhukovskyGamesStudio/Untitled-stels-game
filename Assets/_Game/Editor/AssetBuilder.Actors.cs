@@ -32,7 +32,7 @@ namespace Stealth.EditorTools
             s_StompRipple = Prefab(PrefabsDir + "/FX/StompRipple.prefab", BuildStompRipple).GetComponent<RadioRipple>();
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
-                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath(s.Id == "cagekey" ? "item_key" : s.Id == "speaker" ? "item_domino" : $"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
+                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(s.Id))).OfType<Mesh>().First()).ToArray();
             });
             // One material per configured colour (ItemsConfig can grow).
             visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
@@ -159,9 +159,10 @@ namespace Stealth.EditorTools
             // one wire of the spider's web: a thin glowing fibre a unit long along +Z (scaled to each wire), no collider, no shadow
             var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
             {
+                // one 1 m x 0.5 m piece of cobweb along the wire (Tools/Art/generate_web.py); SpiderBot lays them end to end
                 var go = new GameObject("SpiderStrand");
-                var wire = Cube(go.transform, "Wire", new Vector3(0f, 0f, 0.5f), new Vector3(0.014f, 0.014f, 1f), M("Web"), false);
-                wire.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var web = Cube(go.transform, "Web", new Vector3(0f, 0f, 0.5f), new Vector3(0.003f, 0.5f, 1f), WebMaterial(), false);
+                web.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 return go;
             });
             Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) =>

@@ -117,7 +117,7 @@ namespace Stealth.Tests
             Assert.AreEqual(1, plan[0].Color);
             CollectionAssert.AreEquivalent(new[] { 0, 1 }, plan[0].Items);
             Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1) + ItemCatalog.Value(4, 1) - 1, "worth more than what went in");
-            Assert.AreEqual(0, ItemCatalog.Value(ItemCatalog.Key, 4), "tools are worth nothing");
+            Assert.AreEqual(ItemCatalog.Cells(ItemCatalog.Key) * ItemCatalog.Value(0, 0), ItemCatalog.Value(ItemCatalog.Key, 4), "tools burn at the grey rate, whatever their colour");
             Assert.IsFalse(ItemCatalog.IsLoot(ItemCatalog.Stun));
         }
 
@@ -208,23 +208,33 @@ namespace Stealth.Tests
         {
             var signature = new Dictionary<RoomType, PropKind[]>
             {
-                [RoomType.Gym] = new[] { PropKind.Treadmill, PropKind.ExerciseBike, PropKind.WeightBench, PropKind.DumbbellRack, PropKind.PunchingBag },
-                [RoomType.Library] = new[] { PropKind.TallBookcase, PropKind.ReadingTable, PropKind.Globe },
-                [RoomType.CopyRoom] = new[] { PropKind.Copier, PropKind.PaperStack, PropKind.MailShelf, PropKind.Shredder },
-                [RoomType.ControlRoom] = new[] { PropKind.MonitorWall, PropKind.ConsoleDesk },
-                [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.PartsCabinet, PropKind.RobotArm },
-                [RoomType.NapRoom] = new[] { PropKind.SleepPod, PropKind.Hammock, PropKind.BeanBag },
-                [RoomType.Studio] = new[] { PropKind.MixingDesk, PropKind.MicStand, PropKind.AcousticPanel, PropKind.DrumKit },
-                [RoomType.LockerRoom] = new[] { PropKind.Lockers, PropKind.ShowerStall, PropKind.Bench },
-                [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.MedicineCabinet, PropKind.PrivacyScreen },
-                [RoomType.GameRoom] = new[] { PropKind.PoolTable, PropKind.Foosball, PropKind.PingPongTable, PropKind.DartBoard, PropKind.BarCounter, PropKind.ArcadeMachine },
+                [RoomType.Gym] = new[] { PropKind.Treadmill, PropKind.ExerciseBike, PropKind.WeightBench, PropKind.DumbbellRack, PropKind.PunchingBag,
+                    PropKind.RowingMachine, PropKind.PowerCage, PropKind.KettlebellRack, PropKind.MatRack, PropKind.CableMachine },
+                [RoomType.Library] = new[] { PropKind.TallBookcase, PropKind.ReadingTable, PropKind.Globe,
+                    PropKind.CardCatalog, PropKind.StudyCarrel, PropKind.Lectern, PropKind.WingbackChair, PropKind.BookCart },
+                [RoomType.CopyRoom] = new[] { PropKind.Copier, PropKind.PaperStack, PropKind.MailShelf, PropKind.Shredder,
+                    PropKind.Plotter, PropKind.WorkTable, PropKind.SupplyShelf, PropKind.MailCart, PropKind.PaperBin },
+                [RoomType.ControlRoom] = new[] { PropKind.MonitorWall, PropKind.ConsoleDesk,
+                    PropKind.MapBoard, PropKind.RadioRack, PropKind.OperatorChair, PropKind.SupervisorDesk, PropKind.AlarmPanel },
+                [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.PartsCabinet, PropKind.RobotArm,
+                    PropKind.FumeHood, PropKind.Printer3d, PropKind.ComponentShelf, PropKind.RobotTable, PropKind.ScopeCart },
+                [RoomType.NapRoom] = new[] { PropKind.SleepPod, PropKind.Hammock, PropKind.BeanBag,
+                    PropKind.BunkBed, PropKind.Daybed, PropKind.CurtainDivider, PropKind.FloorCushions, PropKind.NightTable },
+                [RoomType.Studio] = new[] { PropKind.MixingDesk, PropKind.MicStand, PropKind.AcousticPanel, PropKind.DrumKit,
+                    PropKind.GuitarStand, PropKind.SynthStand, PropKind.VocalBooth, PropKind.AmpCabinet, PropKind.StudioCouch },
+                [RoomType.LockerRoom] = new[] { PropKind.Lockers, PropKind.ShowerStall, PropKind.Bench,
+                    PropKind.TowelShelf, PropKind.LaundryCart, PropKind.BenchIsland, PropKind.WeighingScale, PropKind.ShoeRack },
+                [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.MedicineCabinet, PropKind.PrivacyScreen,
+                    PropKind.ExamTable, PropKind.Wheelchair, PropKind.IvStand, PropKind.DoctorDesk, PropKind.DefibCabinet },
+                [RoomType.GameRoom] = new[] { PropKind.PoolTable, PropKind.Foosball, PropKind.PingPongTable, PropKind.DartBoard, PropKind.BarCounter, PropKind.ArcadeMachine,
+                    PropKind.AirHockey, PropKind.PokerTable, PropKind.Jukebox, PropKind.Pinball, PropKind.GamingCorner },
             };
             var seen = new HashSet<RoomType>();
             var bare = new List<string>();
             foreach (var l in TestHouses.Sample)
                 foreach (var r in l.Rooms)
                 {
-                    if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom) continue;
+                    if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom || r.Id == l.VaultRoom) continue; // the vault is a bank vault inside
                     seen.Add(r.Type);
                     bool has = l.Props.Any(p => kinds.Contains(p.Kind) && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id);
                     if (!has) bare.Add($"seed {l.Seed}: {r.Type} {r.Area:0} m²");

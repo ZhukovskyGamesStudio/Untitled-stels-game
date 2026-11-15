@@ -18,6 +18,43 @@ namespace Stealth.EditorTools
             s_Mats.TryGetValue(name, out var m) ? m : throw new KeyNotFoundException($"Material {name} is not registered in BuildMaterials");
 
         /// <summary>Loads or creates Art/Materials/<paramref name="category"/>/<paramref name="name"/>.mat.</summary>
+        /// <summary>
+        /// The spider's web: white threads on transparent (Art/Textures/Web/web_panel.png), faintly glowing so a careful
+        /// player sees it in a dark room, both sides drawn, blended (threads are thinner than a pixel from afar).
+        /// </summary>
+        static Material WebMaterial()
+        {
+            var mat = M("Web");
+            const string texPath = Root + "/Art/Textures/Web/web_panel.png";
+            if (AssetImporter.GetAtPath(texPath) is TextureImporter imp && (imp.wrapMode != TextureWrapMode.Clamp || !imp.alphaIsTransparency))
+            {
+                imp.wrapMode = TextureWrapMode.Clamp;
+                imp.alphaIsTransparency = true;
+                imp.mipmapEnabled = true;
+                imp.SaveAndReimport();
+            }
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            mat.SetTexture("_BaseMap", tex);
+            mat.SetColor("_BaseColor", new Color(0.85f, 0.95f, 1f, 1f));
+            mat.SetTexture("_EmissionMap", tex);
+            mat.SetColor("_EmissionColor", new Color(0.7f, 1.2f, 1.4f));
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+            mat.SetFloat("_Surface", 1f); // transparent
+            mat.SetFloat("_Blend", 0f);   // alpha
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         static Material Mat(string category, string name, Color color, Color? emission = null, bool unlit = false, float smoothness = 0.25f)
         {
             var dir = $"{MaterialsDir}/{category}";
@@ -142,6 +179,7 @@ namespace Stealth.EditorTools
             // the themed rooms' furniture (AssetBuilder.Rooms)
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);
+            Mat(props, "Gold", new Color(1f, 0.76f, 0.22f), smoothness: 0.8f); // the vault's bars, the padlocks
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

@@ -80,7 +80,8 @@ namespace Stealth.Level
             {
                 var (f, hall, corner) = c.Halls[i];
                 var origin = new Vector2((corner.x > 0 ? hall.xMax : hall.xMin) / (float)M, (corner.y > 0 ? hall.yMax : hall.yMin) / (float)M);
-                o.Stairs.Add(new Stair { Floor = f, Origin = origin, Corner = corner, Room = c.StairRooms[2 * i], RoomAbove = c.StairRooms[2 * i + 1] });
+                bool flip = c.Rng(0x57F, i).Next(2) == 1; // its own stream: which wall the flights run along
+                o.Stairs.Add(new Stair { Floor = f, Origin = origin, Corner = corner, Flip = flip, Room = c.StairRooms[2 * i], RoomAbove = c.StairRooms[2 * i + 1] });
             }
             // rooms with a staircase: their centre (patrols, views, spawns) off the stair and its approach
             var avoid = new List<(int floor, Rect area)>();

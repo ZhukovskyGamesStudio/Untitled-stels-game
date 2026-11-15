@@ -122,8 +122,8 @@ LaserGate — отдельная ловушка (не детектор)
 Потолочный пылесос — вертикальный лазерный веер от робота до пола (`ScanLine.CutsFan`, меш `Art/Models/FX/LaserHalfFan`, две половины
 обрезаются стенами): касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
 противоположную стену (`SpiderProfile.CeilingEvery`; ступни ног находят и крышу верхнего этажа).
-Паук без глаз: его комната перетянута проводами-паутиной, как простой лабиринт (`SpiderWebs`, каждый пир натягивает те же провода; префаб
-`Robots/SpiderStrand`), коснулся — паук бежит по стенам к тебе и прыгает. Охранник на точке патруля стоит в три фазы, видные издалека
+Паук без глаз: его комната перетянута паутиной, как простой лабиринт (`SpiderWebs`, каждый пир натягивает те же нити; префаб
+`Robots/SpiderStrand` — кусок паутины 1 × 0,5 м, текстура `Tools/Art/generate_web.py`, куски встык вдоль нити), коснулся — паук бежит по стенам к тебе и прыгает. Охранник на точке патруля стоит в три фазы, видные издалека
 (`RobotBrain.PausePhase`: замер — оглядывается — разворачивается к следующей точке). Сейсмик — волны (`SeismicSense.Wave*`, `PulseStomp` → кольцо `StompRipple` и звук), подметальщик — лидар у пола (`RobotLidar`),
 рабочие везут лут (`DetectorSnapshot.Cargo`, при взломе падает на пол). `RobotRoster.Newcomers` — новый вид гарантированно есть в доме, где он появляется.
 `RobotAnimator`: наклоны в разгоне и повороте, испуг при «Обнаружен», обмякание при взломе, удар сейсмика, глаз-камера следит за замеченным игроком.
@@ -150,10 +150,11 @@ LaserGate — отдельная ловушка (не детектор)
 `HouseKinds` — характер дома из сида (офис, бизнес-центр, дата-центр, склад, штаб-квартира): клон `BuildingSettings` с другой программой комнат
 и формами. `LevelGenerator` — «сгенерируй и проверь»: до 16 вариантов плана (`LevelLayout.PlanAttempt`), берётся первый, где до каждой комнаты
 можно дойти. `LevelLayout` — адаптеры для остального кода (`Rooms`, `Doorways`, `Stairs`, `RoomAt`, `OpenBetweenFloors`…).
-Мебель — `Furnisher`: острова с проходами 1,25 м, пристенные группы с дорожкой перед ними, коридоры пустые, вокруг проёмов, лестниц, люка и
+Мебель — `Furnisher`: острова с проходами 1,25 м (их примерно в полтора раза больше, чем «достаточно»: дом обыскивают), пристенные группы с дорожкой
+перед ними и второй проход по стенам у всех комнат, в коридорах — только тонкое у стен (огнетушитель, доска, урны) далеко друг от друга, вокруг проёмов, лестниц, люка и
 точек патруля — свободно; тематические комнаты (`RoomType` от `Gym` до `GameRoom`, плюс кухня и туалет) сначала получают свой узнаваемый
 предмет (`Furnisher.Anchor`: варианты от большого к компактному, у стены или посреди комнаты), потом второй проход по стенам; модели —
-`Tools/Blender/rooms_*.py`, префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors` (пока у
+`Tools/Blender/rooms_*.py` и `rooms2_*.py` (по пять предметов на каждый тип комнаты, висящие на стене — `Furnisher.Hung`), префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors` (пока у
 «Книжки-чертежа»), сушилка для рук — `HandDryer` (E: гудит `GadgetSettings.DryerTime` и шумит для роботов); `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
 без запуска игры — `PLANS="seed:дом,…" Tools/dev.sh plans` → `Logs/plans/`. Размеры — `LevelMetrics`. Пристенная мебель держит ≥ 20 см
 от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
@@ -223,7 +224,12 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 → `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
 `PC_Renderer` рисуют их сквозь стены одним силуэтом (`Art/Shaders/MarkedXray.shader`: маска в стенсил → контур снаружи маски → заливка
 ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
-между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`).
+между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`). **Взлом навсегда**: робот или устройство, взломанные руками или
+с терминала (`GameManager.TeamHackServer`, `GameManager.Hacks.cs`), выключены, пока команда держит не больше `InteractionSettings.MaxHacked` (2);
+взлом сверх лимита будит первого (`Detector.WakeServer`); занятые слоты — ключи `HackSlotKey` в `Opened`, в HUD — значки слева снизу (`GameHUD.HackSlots`).
+Выключенный робот осел — его капсула идёт за телом до пола (`RobotAnimator.FitCapsule`). **Переподключение** — `GameManager.Reconnect.cs`:
+кто вышел (`PlayerController.Identity` — Steam id или id компьютера, `ISessionLauncher.LocalPlayerId`), вернётся с рюкзаком туда, где стоял (тот же дом),
+иначе — к хосту (`IPlayerLink.PlaceOwner` → `PlayerController.PlaceFromServer`). Выбывший видит рюкзак того, за кем смотрит (`InventoryUI`).
 
 **Между домами — канализация и машина.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. В доме **два люка**:
 вход (`LevelLayout.HatchPosition`, лобби — команда начинает дом сидя в нём, `PlayerController.EnterHatchServer(0)`) и выход
@@ -250,7 +256,8 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 (`SewerLocation.BranchAt(машина)`, `GameManager.UpdateSewer`, отсчёт `RunSettings.VoteDelay`) → `DepartServer` → `DriveUntil`
 (реплицируется): каждый пир показывает `DriveScene` (`LevelArt.DriveScene`: бесконечный туннель из `_cut`-сегментов, пикап в профиль, длинный
 объектив) → `ArriveServer` → `StartLevel`; экран темнеет и проясняется на доме (`GameHUD.ShowLoadingFade`). Панели над туннелями —
-`RouteSignView`/`SewerRoute` (коротко: тип дома и номер, этажи и охрана, отсчёт; висят в `SewerLocation.SignOffWall` перед торцевой стеной зала). Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
+`RouteSignView`/`SewerRoute` (коротко: значок типа дома и значок главного задания — `Tools/Art/generate_icons.py` `house_*`/`job_*`, тип дома и номер, этажи и охрана, отсчёт; висят в `SewerLocation.SignOffWall` перед торцевой стеной зала). Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
+Позади машины — длинный туннель, откуда она приехала (`SewerLocation.BackSegments`), за невидимой стеной `BackWall`; фары и у модели в сцене поездки.
 
 **Особые места дома** — чистый `HouseFeatures` (каждое — свой поток рандома), настройки `LevelConfig.Features` (`FeatureSettings`):
 типы домов `HouseKinds` + `Location` (офис — пять характеров, больница, автомастерская); главное место (`LevelLayout.PointOfInterest`,
@@ -263,14 +270,17 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 `ItemCatalog.Key` в другой комнате; `AutoDoor.NeedsKey`, `KeyLock`). **Ящики** (`Crates`: стеллаж/паллета/коробки → `SearchCrate`,
 содержимое `GameManager.CrateContents`, ключ `CrateKey`). **Сторожа** (`Wardens`: `RobotKind.Warden` перед единственным проходом комнаты
 с лутом, `RobotController.SetPost` — ходит A↔B, смотрит наружу; колонки `LureSpots`). Инструменты — особые формы `ItemCatalog` (в инвентаре — свои цвета, которых нет у лута: `ItemCatalog.UiColor`)
-(`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`; стоят 0, кроме алмаза): брошенная колонка (`WorldItem.PlayServer`, реплицирует
+(`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`, `CageKey`; горят в топливо по цене серого цвета; ключи, ключ клетки (1×2) и оглушитель
+работают только из руки — `PlayerInventory.Holds/TakeHeldServer`; ключи — настоящие модели, как лопата, `ItemCatalog.KeyScale`): брошенная колонка (`WorldItem.PlayServer`, реплицирует
 `WorldItemNet`) зовёт ближайшего робота (`GameManager.UpdateLures`), он её выключает; оглушитель — `GameAction.Gadget` (X) →
 `GadgetServer` (все детекторы взломаны на `StunDuration`). Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
 → `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
 
 **Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
 (`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
-**большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами),
+**большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами;
+дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`, открывается внутрь и остаётся открытой; внутри — ячейки, полки с деньгами,
+золото на поддонах и тележки, `Furnisher.VaultRoom`; запертые двери — с навесным замком `AutoDoor.Padlocks`, двери фасада — тяжёлые `LevelArt.ExteriorDoor`),
 три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
 `SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь открыта, внутри сокровища (`VaultTreasure`);
 задание показывается по шагам (`ObjectiveRules.Step`, `GameManager.ObjectiveStage`: найдите сейф → разблокируйте дверь (k/3) → откройте её;
@@ -361,7 +371,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 а их число съедало кадр на сортировке и отсечении теней; замер — `perf`: `DEV=1 Tools/dev.sh player` даёт разбивку по маркерам профайлера, `PerfProfile`) (сабмеш на материал, тайлинг отделки — в UV):
 декор стиля (`StyleDecor`, отдельных объектов у деталей нет) и мебель (`PropBatches`: объекты мебели с коллайдерами и светом остаются, их рендереры —
 `forceRenderingOff`, перед сменой стиля склейка снимается и собирается заново). Стены, плиты, лестницы и окна — static batching (`LevelBuilder.CombineStatic`).
-**Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
+**Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются; `Stair.Flip` — марши вдоль другой стены угла, зеркальный вариант,
+`StairGeometry.Placement/ToWorld`) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
 дерево с балясинами, открытая сталь с сеткой, белый камень со стеклом), меши генерирует `AssetBuilder.Stairs` (`Art/Models/Stairs`); выбор — `StairStyles.Pick`
 по семейству стиля и сиду дома или вид, который просит стиль (`StyleGeometry.Stairs`; у стиля по умолчанию — дерево), `StairLook` переключает при F8
 и одевает лестницу в архитектуру стиля: ступени — отделка пола, тело — отделка стен, балясины и поручни — его молдинг (`StairStyles.Parts`: роль каждого слота материала). Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью (торец под верхом марша — сплошной от последней ступени);

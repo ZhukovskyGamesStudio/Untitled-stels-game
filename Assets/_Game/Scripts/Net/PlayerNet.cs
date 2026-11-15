@@ -23,10 +23,11 @@ namespace Stealth.Net
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<FixedString64Bytes> m_Identity = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         PlayerController m_Player;
         NetworkTransform m_Transform;
-        string m_PushedName;
+        string m_PushedName, m_PushedIdentity;
 
         void Awake()
         {
@@ -45,7 +46,9 @@ namespace Stealth.Net
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
+            m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
             PushState();
+            if (!IsOwner) m_Player.ApplyIdentity(m_Identity.Value.ToString());
             Pull();
         }
 
@@ -69,6 +72,11 @@ namespace Stealth.Net
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
             NetSync.Set(m_LookPitch, m_Player.LookPitch);
+            if (m_PushedIdentity != m_Player.Identity)
+            {
+                m_PushedIdentity = m_Player.Identity;
+                m_Identity.Value = new FixedString64Bytes(m_PushedIdentity ?? "");
+            }
             if (m_PushedName == m_Player.DisplayName) return;
             m_PushedName = m_Player.DisplayName;
             m_Name.Value = new FixedString32Bytes(m_PushedName);
@@ -86,6 +94,11 @@ namespace Stealth.Net
         {
             if (m_Transform != null && m_Transform.IsSpawned) m_Transform.Teleport(position, rotation, transform.localScale);
         }
+
+        public void PlaceOwner(Vector3 position, float yaw) => PlaceRpc(position, yaw);
+
+        [Rpc(SendTo.Owner)]
+        void PlaceRpc(Vector3 position, float yaw) => m_Player.PlaceFromServer(position, yaw);
 
         public void SendNoise(Vector3 position, float radius) => NoiseRpc(position, radius);
         public void SendGasKnockout() => GasKnockoutRpc();

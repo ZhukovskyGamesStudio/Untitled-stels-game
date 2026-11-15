@@ -74,6 +74,8 @@ namespace Stealth.Enemies
         float m_Seed, m_LastYaw, m_TurnRate;
         float m_Recoil, m_Stomp, m_Slump, m_EyeYaw;
         RobotState m_LastState;
+        CapsuleCollider m_Capsule;
+        float m_CapBottom, m_CapTop, m_CapSlump = -1f;
 
         /// <summary>Seismic stomp (every peer, from the network pulse): the body dips, the floor probes punch.</summary>
         public void Stomp() => m_Stomp = 1f;
@@ -93,6 +95,12 @@ namespace Stealth.Enemies
                 if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
                 else if (t.name.StartsWith("AccentWheel")) m_Wheels.Add(t);
                 else if (t.name.StartsWith("AccentLeg") && !IsJointedLeg(t.name)) m_Legs.Add((t, m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
+            }
+            m_Capsule = GetComponent<CapsuleCollider>();
+            if (m_Capsule != null)
+            {
+                m_CapBottom = m_Capsule.center.y - m_Capsule.height * 0.5f;
+                m_CapTop = m_Capsule.center.y + m_Capsule.height * 0.5f;
             }
             m_LastPos = transform.position;
             m_LastYaw = transform.eulerAngles.y;
@@ -128,6 +136,7 @@ namespace Stealth.Enemies
             m_Stomp = Mathf.MoveTowards(m_Stomp, 0f, dt * 3.5f);
             m_Slump = Mathf.MoveTowards(m_Slump, hacked ? 1f : 0f, dt * (hacked ? 1.5f : 3f));
 
+            FitCapsule();
             float power = 1f - m_Slump; // a hacked robot winds down: rotors, wheels and legs stop
             foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * Mathf.Max(power, 0.05f), 0f, Space.Self);
             foreach (var w in m_Wheels) w.Rotate(m_Speed / 0.12f * Mathf.Rad2Deg * dt, 0f, 0f, Space.Self);
@@ -159,6 +168,21 @@ namespace Stealth.Enemies
             float bob = Bob > 0f ? Mathf.Abs(Mathf.Sin(m_Phase)) * Bob * Mathf.Clamp01(m_Speed / 2f) : 0f;
             float breathe = Mathf.Sin(t * 1.6f) * 0.012f * (1f - Mathf.Clamp01(m_Speed)) * power;
             Model.localPosition = m_ModelBase + Vector3.up * (bob + breathe + m_Recoil * 0.06f - m_Stomp * 0.14f - m_Slump * 0.08f);
+        }
+
+        /// <summary>
+        /// The body stays solid where it is seen: a hacked robot slumps (a flyer drops to the floor), so its collider follows
+        /// the slumped body down to the floor — nobody walks or crouches through a switched-off robot.
+        /// </summary>
+        void FitCapsule()
+        {
+            if (m_Capsule == null || m_Robot == null || Mathf.Approximately(m_Slump, m_CapSlump)) return;
+            m_CapSlump = m_Slump;
+            float top = m_CapTop - m_Slump * (Lean > 0f ? 0.6f : 0.08f);
+            float bottom = Mathf.Lerp(m_CapBottom, 0f, m_Slump);
+            float height = Mathf.Max(top - bottom, m_Capsule.radius * 2f);
+            m_Capsule.height = height;
+            m_Capsule.center = new Vector3(m_Capsule.center.x, bottom + height * 0.5f, m_Capsule.center.z);
         }
 
         /// <summary>

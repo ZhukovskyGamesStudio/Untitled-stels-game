@@ -49,8 +49,12 @@ namespace Stealth.EditorTools
             var console = Prefab(p + "VaultConsole.prefab", BuildVaultConsole);
             var cage = Prefab(p + "Cage.prefab", BuildCage);
             var vaultPanel = Prefab($"{LevelPrefabs}/VaultPanel.prefab", BuildVaultPanel);
+            var vaultDoor = Prefab($"{LevelPrefabs}/VaultDoor.prefab", BuildVaultDoor);
+            var exteriorDoor = Prefab($"{LevelPrefabs}/ExteriorDoor.prefab", BuildExteriorDoor);
             if (art.Crate == crate && art.MedTable == med && art.Workbench == bench && art.Programmer == programmer && art.IllusionBlock == illusion
-                && art.VaultConsole == console && art.Cage == cage && art.VaultPanel == vaultPanel) return;
+                && art.VaultConsole == console && art.Cage == cage && art.VaultPanel == vaultPanel && art.VaultDoor == vaultDoor && art.ExteriorDoor == exteriorDoor) return;
+            art.VaultDoor = vaultDoor;
+            art.ExteriorDoor = exteriorDoor;
             art.Crate = crate;
             art.MedTable = med;
             art.Workbench = bench;
@@ -63,22 +67,142 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
-        /// A lock panel of the vault on a wall (the root on the wall's face, +Z into the room): a steel box at hand height,
-        /// a screen (red, green once solved), a strip of keys under it. No collider: it hangs flat on the wall.
+        /// A lock panel of the vault on a wall (the root on the wall's face, +Z into the room), one look per minigame: a round
+        /// safe dial, a box of toggle switches, a grid of glowing buttons; the lamp over it is red, green once solved.
+        /// No collider: it hangs flat on the wall.
         /// </summary>
         static GameObject BuildVaultConsole()
         {
             var root = new GameObject("VaultConsole");
-            var steel = M("Metal");
-            Cube(root.transform, "Body", new Vector3(0f, 0f, 0.035f), new Vector3(0.46f, 0.56f, 0.07f), steel, false);
-            Cube(root.transform, "Frame", new Vector3(0f, 0.1f, 0.071f), new Vector3(0.36f, 0.24f, 0.004f), M("PropBody"), false);
-            var screen = Cube(root.transform, "EyeScreen", new Vector3(0f, 0.1f, 0.075f), new Vector3(0.32f, 0.2f, 0.006f), M("LockLamp"), false);
-            for (int i = 0; i < 4; i++)
-                Cube(root.transform, $"Key{i}", new Vector3(-0.135f + i * 0.09f, -0.14f, 0.075f), new Vector3(0.07f, 0.06f, 0.012f), M("Keypad"), false);
-            Cube(root.transform, "Stripe", new Vector3(0f, -0.25f, 0.072f), new Vector3(0.46f, 0.04f, 0.004f), M("DoorFrame"), false);
+            // The lamp over the panel: red until solved, then green.
+            Cube(root.transform, "LampBase", new Vector3(0f, 0.36f, 0.02f), new Vector3(0.2f, 0.08f, 0.04f), M("Metal"), false);
+            var screen = Cube(root.transform, "EyeScreen", new Vector3(0f, 0.36f, 0.045f), new Vector3(0.16f, 0.05f, 0.012f), M("LockLamp"), false);
             var console = root.AddComponent<VaultConsole>();
             console.Screen = screen.GetComponent<Renderer>();
+            console.Faces = new GameObject[3];
+            GameObject Face(int i, string name, Material body, Vector3 size)
+            {
+                var f = new GameObject(name);
+                f.transform.SetParent(root.transform, false);
+                f.AddComponent<KeepUnmerged>(); // one of the three shows (by the panel's game)
+                Cube(f.transform, "Body", new Vector3(0f, 0f, size.z / 2f), size, body, false);
+                console.Faces[i] = f;
+                return f;
+            }
+            // The dial: a round steel safe door — a big knob with a pointer and a ring of ticks.
+            var dial = Face(0, "FaceDial", M("Metal"), new Vector3(0.5f, 0.6f, 0.08f));
+            for (int k = 0; k < 2; k++)
+                Cube(dial.transform, "Ring", new Vector3(0f, -0.02f, 0.082f), new Vector3(0.36f, 0.36f, 0.006f), M("PropAccent"), false).transform.localRotation = Quaternion.Euler(0, 0, k * 45f);
+            for (int k = 0; k < 2; k++)
+                Cube(dial.transform, "Knob", new Vector3(0f, -0.02f, 0.1f), new Vector3(0.2f, 0.2f, 0.04f), M("Metal"), false).transform.localRotation = Quaternion.Euler(0, 0, 22.5f + k * 45f);
+            Cube(dial.transform, "Pointer", new Vector3(0f, 0.07f, 0.122f), new Vector3(0.025f, 0.08f, 0.01f), M("Keypad"), false);
+            for (int k = 0; k < 12; k++)
+            {
+                float a = k * 30f * Mathf.Deg2Rad;
+                Cube(dial.transform, "Tick", new Vector3(Mathf.Sin(a) * 0.15f, -0.02f + Mathf.Cos(a) * 0.15f, 0.087f), new Vector3(0.012f, 0.03f, 0.006f), M("Ceiling"), false)
+                    .transform.localRotation = Quaternion.Euler(0, 0, -k * 30f);
+            }
+            Cube(dial.transform, "Handle", new Vector3(0.19f, -0.02f, 0.11f), new Vector3(0.04f, 0.2f, 0.05f), M("PropAccent"), false);
+            // The switches: an orange-striped electrical box, four big toggles with a lamp over each.
+            var sw = Face(1, "FaceSwitches", M("PropAccent"), new Vector3(0.56f, 0.5f, 0.09f));
+            Cube(sw.transform, "Stripe", new Vector3(0f, -0.21f, 0.092f), new Vector3(0.56f, 0.05f, 0.004f), M("BeanBag"), false);
+            for (int k = 0; k < 4; k++)
+            {
+                float x = -0.195f + k * 0.13f;
+                Cube(sw.transform, "Socket", new Vector3(x, -0.03f, 0.1f), new Vector3(0.08f, 0.16f, 0.025f), M("Metal"), false);
+                Cube(sw.transform, "Toggle", new Vector3(x, 0.02f, 0.13f), new Vector3(0.03f, 0.1f, 0.05f), M("Ceiling"), false)
+                    .transform.localRotation = Quaternion.Euler(-25f, 0, 0);
+                Cube(sw.transform, "Lamp", new Vector3(x, 0.13f, 0.095f), new Vector3(0.05f, 0.05f, 0.012f), M("Keypad"), false);
+            }
+            // The sequence: a white panel with a 3 x 3 grid of glowing buttons (the pattern to repeat).
+            var seq = Face(2, "FaceSequence", M("PropBody"), new Vector3(0.46f, 0.56f, 0.07f));
+            Cube(seq.transform, "Bezel", new Vector3(0f, -0.02f, 0.072f), new Vector3(0.36f, 0.36f, 0.006f), M("Rack"), false);
+            string[] lit = { "LockLamp", "Keypad", "LampBulb" };
+            for (int y = 0; y < 3; y++)
+                for (int x = 0; x < 3; x++)
+                    Cube(seq.transform, "Button", new Vector3((x - 1) * 0.11f, -0.02f + (1 - y) * 0.11f, 0.082f), new Vector3(0.08f, 0.08f, 0.02f), M(lit[(x + y) % 3]), false);
             return root;
+        }
+
+        /// <summary>
+        /// The vault's round bank door (+Z into the vault): the steel ring framing the doorway on the outer face, the round
+        /// door on its hinge against the inner face (its wheel and bolts towards the corridor), swinging into the vault once
+        /// the three locks are solved (<see cref="AutoDoor.Swing"/>). Models: Tools/Blender/rooms2_special.py.
+        /// </summary>
+        static GameObject BuildVaultDoor()
+        {
+            var root = new GameObject("VaultDoor");
+            root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
+            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth, wall = LevelMetrics.WallThickness;
+            var door = root.AddComponent<AutoDoor>();
+            door.Width = w;
+            var frame = Model("vault_frame");
+            frame.transform.SetParent(root.transform, false);
+            frame.transform.localPosition = new Vector3(0f, 0f, -wall / 2f - 0.07f);
+            Paint(frame, "Metal", "PropAccent", "PropAccent");
+            // the hinge at the doorway's +X edge, on the vault's side of the wall; the leaf turned to show its front to the corridor
+            var hinge = Child(root.transform, "Hinge", new Vector3(1.1f, 0f, wall / 2f + 0.21f));
+            var leaf = Model("vault_door");
+            leaf.transform.SetParent(hinge.transform, false);
+            leaf.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            Paint(leaf, "Metal", "PropAccent", "PropAccent");
+            PaintTrimParts(leaf, "Metal");
+            door.Swing = hinge.transform;
+            door.SwingAngle = 92f;
+            var blocker = root.AddComponent<BoxCollider>();
+            blocker.center = new Vector3(0, h / 2f, 0);
+            blocker.size = new Vector3(w, h, wall + 0.1f);
+            door.Blocker = blocker;
+            door.LockLamps = new Renderer[0];
+            door.Padlocks = new Transform[0];
+            Muffles(root, SoundMaterial.Door);
+            return root;
+        }
+
+        /// <summary>
+        /// A door of the facade: two heavy leaves (Tools/Blender/rooms2_special.py exterior_door_panel: glass, a push bar)
+        /// sliding apart like the inside doors, in a deep steel frame — the house's real doors look like outside doors.
+        /// </summary>
+        static GameObject BuildExteriorDoor()
+        {
+            var root = new GameObject("ExteriorDoor");
+            root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
+            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth, wall = LevelMetrics.WallThickness;
+            var door = root.AddComponent<AutoDoor>();
+            door.Width = w;
+            Transform Leaf(string name, float x, bool mirror)
+            {
+                var holder = Child(root.transform, name, new Vector3(x, 0f, 0f)).transform;
+                var leaf = Model("exterior_door_panel");
+                leaf.transform.SetParent(holder, false);
+                if (mirror) leaf.transform.localScale = new Vector3(-1f, 1f, 1f);
+                Paint(leaf, "PropAccent", "Metal", "StairGlass");
+                return holder;
+            }
+            door.PanelA = Leaf("PanelA", -w / 4f, false);
+            door.PanelB = Leaf("PanelB", w / 4f, true);
+            // the frame: deep jambs and a head, proud of both faces of the wall
+            var steel = M("Metal");
+            float depth = wall + 0.16f;
+            Cube(root.transform, "JambL", new Vector3(-w / 2f - 0.07f, (h + 0.12f) / 2f, 0f), new Vector3(0.14f, h + 0.12f, depth), steel, false);
+            Cube(root.transform, "JambR", new Vector3(w / 2f + 0.07f, (h + 0.12f) / 2f, 0f), new Vector3(0.14f, h + 0.12f, depth), steel, false);
+            Cube(root.transform, "Head", new Vector3(0f, h + 0.06f, 0f), new Vector3(w + 0.28f, 0.14f, depth), steel, false);
+            Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(w + 0.28f, 0.02f, depth), M("PropAccent"), false);
+            var blocker = root.AddComponent<BoxCollider>();
+            blocker.center = new Vector3(0, h / 2f, 0);
+            blocker.size = new Vector3(w, h, 0.14f);
+            door.Blocker = blocker;
+            door.LockLamps = new Renderer[0];
+            door.Padlocks = new Transform[0];
+            Muffles(root, SoundMaterial.Door);
+            return root;
+        }
+
+        /// <summary>Parts named Trim* take this material (PropObject-style painting leaves them as the body).</summary>
+        static void PaintTrimParts(GameObject go, string trim)
+        {
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                if (r.gameObject.name.StartsWith("Trim")) r.sharedMaterial = M(trim);
         }
 
         /// <summary>The vault door's plate over the doorway (+Z out of the wall): three lamps, one per lock panel.</summary>
@@ -193,6 +317,29 @@ namespace Stealth.EditorTools
                 Paint(m, "BatteryLabel", "BatterySteel", "BatterySteel");
                 return m;
             });
+            // the keys (Tools/Blender/rooms2_special.py): real keys like the shovel, a little larger than life to be found
+            Mat("Items", "KeyBrass", new Color(0.86f, 0.66f, 0.25f), smoothness: 0.75f);
+            Mat("Items", "KeyTag", new Color(0.85f, 0.15f, 0.12f), smoothness: 0.3f);
+            Mat("Items", "CageIron", new Color(0.16f, 0.16f, 0.18f), smoothness: 0.45f);
+            var key = Prefab($"{PrefabsDir}/Items/KeyModel.prefab", () =>
+            {
+                var root = new GameObject("KeyModel");
+                var m = Model("item_key_model");
+                m.transform.SetParent(root.transform, false);
+                m.transform.localScale = Vector3.one * ItemCatalog.KeyScale;
+                Paint(m, "KeyBrass", "ShovelSteel", "ShovelSteel");
+                foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true)) if (r.name.StartsWith("Trim")) r.sharedMaterial = M("KeyTag");
+                return root;
+            });
+            var cageKey = Prefab($"{PrefabsDir}/Items/CageKeyModel.prefab", () =>
+            {
+                var root = new GameObject("CageKeyModel");
+                var m = Model("item_cagekey_model");
+                m.transform.SetParent(root.transform, false);
+                m.transform.localScale = Vector3.one * ItemCatalog.CageKeyScale;
+                Paint(m, "CageIron", "KeyBrass", "KeyBrass");
+                return root;
+            });
             var icons = new Sprite[ItemCatalog.Shapes.Length];
             icons[ItemCatalog.Shovel] = ItemIcon("shovel");
             icons[ItemCatalog.Flashlight] = ItemIcon("flashlight");
@@ -207,12 +354,12 @@ namespace Stealth.EditorTools
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
                 // the cart is item_shovel (its own model shows in the world: Models)
-                string file = s.Id == "speaker" ? "item_domino" : s.Id == "cagekey" ? "item_key" : $"item_{s.Id}";
-                return AssetDatabase.LoadAllAssetsAtPath(ModelPath(file)).OfType<Mesh>().First();
+                return AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(s.Id))).OfType<Mesh>().First();
             }).ToArray();
             if (visuals.Meshes != null && visuals.Meshes.SequenceEqual(meshes) && visuals.Models != null && visuals.Models.Length == ItemCatalog.Shapes.Length
                 && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Shovel] == shovel
                 && visuals.Models[ItemCatalog.Flashlight] == flashlight && visuals.Models[ItemCatalog.Battery] == battery
+                && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey
                 && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
@@ -220,9 +367,23 @@ namespace Stealth.EditorTools
             visuals.Models[ItemCatalog.Shovel] = shovel;
             visuals.Models[ItemCatalog.Flashlight] = flashlight;
             visuals.Models[ItemCatalog.Battery] = battery;
+            visuals.Models[ItemCatalog.Key] = key;
+            visuals.Models[ItemCatalog.CageKey] = cageKey;
             visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
         }
+
+        /// <summary>
+        /// The mesh of a shape's piece (tinted grid pieces, the cargo a robot carries): the speaker's is a domino, the keys'
+        /// are their own models.
+        /// </summary>
+        static string ItemMeshFile(string id) => id switch
+        {
+            "speaker" => "item_domino",
+            "key" => "item_key_model",
+            "cagekey" => "item_cagekey_model",
+            _ => $"item_{id}",
+        };
 
         /// <summary>A backpack picture of a real item (Art/Sprites/Items/&lt;id&gt;.png) as a sprite.</summary>
         static Sprite ItemIcon(string id)

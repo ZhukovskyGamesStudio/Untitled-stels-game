@@ -18,10 +18,17 @@ namespace Stealth.Level
     {
         public const float OpenRadius = 2.3f;
         public const float SlideTime = 0.35f;
+        /// <summary>Seconds the vault's door takes to swing open.</summary>
+        public const float VaultSwingTime = 2.6f;
 
         public static readonly List<AutoDoor> All = new();
 
         public Transform PanelA, PanelB;
+        [Tooltip("A door on a hinge instead of sliding panels (the vault's round door): turns by SwingAngle when open.")]
+        public Transform Swing;
+        public float SwingAngle = 90f;
+        [Tooltip("Padlocks on both faces, hung on the panels' seam: shown while a hackable lock holds the door.")]
+        public Transform[] Padlocks;
         public BoxCollider Blocker;
         public float Width = LevelMetrics.DoorWidth;
         [Tooltip("Lock lamps on both sides above the door (shown only on locked doors).")]
@@ -111,10 +118,22 @@ namespace Stealth.Level
                 m_Opening = open;
                 Audio.Sfx.At(Audio.Sfx.Bank?.DoorSlide, transform.position + Vector3.up * 1.2f, Configs.Tuning.Audio.Mix.Doors, Audio.Sfx.Group.Items, open ? 1f : 0.92f);
             }
+            if (Swing != null)
+            {
+                // the vault door: heavy, slow, and once unlocked it stays open
+                if (Vault && !locked) open = true;
+                m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / VaultSwingTime);
+                Swing.localRotation = Quaternion.Euler(0f, SwingAngle * Mathf.SmoothStep(0f, 1f, m_Open), 0f);
+                Blocker.enabled = m_Open < 0.15f;
+                return;
+            }
             m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / SlideTime);
             float slide = Width / 4f * m_Open;
             PanelA.localPosition = new Vector3(-Width / 4f - slide, PanelA.localPosition.y, 0);
             PanelB.localPosition = new Vector3(Width / 4f + slide, PanelB.localPosition.y, 0);
+            if (Padlocks != null)
+                foreach (var p in Padlocks)
+                    if (p != null) p.localPosition = new Vector3(-slide, p.localPosition.y, p.localPosition.z); // rides on panel A's edge
             // Solid only while (almost) closed: never trap anyone in the panels.
             Blocker.enabled = m_Open < 0.15f;
         }
@@ -122,8 +141,15 @@ namespace Stealth.Level
         void ShowLock(bool locked)
         {
             int state = !HasLock ? 0 : locked ? 1 : 2;
-            if (state == m_ShownLock || LockLamps == null) return;
+            if (state == m_ShownLock) return;
             m_ShownLock = state;
+            if (Padlocks != null)
+            {
+                bool padlock = locked && !NeedsKey; // a key door has its key panels, the vault its lamps
+                foreach (var p in Padlocks)
+                    if (p != null && p.gameObject.activeSelf != padlock) p.gameObject.SetActive(padlock);
+            }
+            if (LockLamps == null) return;
             m_Block ??= new MaterialPropertyBlock();
             var c = locked ? (NeedsKey ? KeyColor : LockedColor) : OpenColor;
             foreach (var r in LockLamps)

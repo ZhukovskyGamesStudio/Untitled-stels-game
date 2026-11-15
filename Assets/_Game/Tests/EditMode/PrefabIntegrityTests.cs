@@ -33,6 +33,9 @@ namespace Stealth.Tests
             "RobotController.CargoRenderer",
             "RobotController.CargoVisuals",
             "Blob.m_Material",               // a UI graphic: empty is Unity's default UI material
+            "AutoDoor.Swing",                // sliding doors have panels, the vault's round door a hinge instead
+            "AutoDoor.PanelA",
+            "AutoDoor.PanelB",
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

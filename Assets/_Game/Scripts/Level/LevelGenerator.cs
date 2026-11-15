@@ -19,8 +19,8 @@ namespace Stealth.Level
     {
         [Header("Size by house (0-based); the last entry repeats")]
         public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        [Tooltip("Rooms per floor in the first house (9 = 3 x 3).")]
-        public float BaseRooms = 9f;
+        [Tooltip("Rooms per floor in the first house (6 = 3 x 2): the first houses are small and easy.")]
+        public float BaseRooms = 6f;
         [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
         public float RoomsPerHouse = 2.5f;
         [Tooltip("Rooms per floor never go above this (36 = 6 x 6).")]
@@ -208,15 +208,15 @@ namespace Stealth.Level
         public bool Enemies = true;
 
         [Header("Counts: base + per house")]
-        public int Robots = 2;
+        public int Robots = 1;
         public int RobotsPerHouse = 1;
         [Tooltip("Extra robots per floor above the ground floor.")]
         public int RobotsPerExtraFloor = 1;
-        public int Devices = 1;
+        public int Devices = 0;
         public int DevicesPerHouse = 1;
-        public int Cameras = 2;
+        public int Cameras = 1;
         public int CamerasPerHouse = 1;
-        public int Lasers = 1;
+        public int Lasers = 0;
         public int LasersPerHouse = 1;
         [Tooltip("A bigger team gets a bigger house: one more robot per this many rooms it adds (all floors).")]
         public int TeamRoomsPerExtraRobot = 10;
