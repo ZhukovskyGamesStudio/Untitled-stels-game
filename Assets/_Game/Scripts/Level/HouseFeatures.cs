@@ -63,6 +63,16 @@ namespace Stealth.Level
         public int ExtraLures = 1;
         [Tooltip("Lures lie this far from the warden's post, metres (min, max).")]
         public Vector2 LureDistance = new(6f, 14f);
+
+        [Header("Main job (optional; shown on the tunnel's panel in the sewer)")]
+        [Tooltip("From which house every house has one (0 = the first).")]
+        public int ObjectivesFromHouse = 0;
+        [Tooltip("Chance the job is the vault (otherwise the hostage); if one does not fit the house, the other.")]
+        public float VaultShare = 0.5f;
+        [Tooltip("The vault room's floor area, m² (min, max).")]
+        public Vector2 VaultArea = new(8f, 45f);
+        [Tooltip("The hostage's room: at least this many m² (the cage stands in its middle).")]
+        public float HostageMinArea = 14f;
     }
 
     /// <summary>
@@ -240,11 +250,12 @@ namespace Stealth.Level
                 var behind = new HashSet<int>(all);
                 behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
                 if (behind.Count == 0 || behind.Count > s.KeyRegionRooms || behind.Contains(l.LobbyRoom) || behind.Overlaps(taken)) continue;
+                if (i == l.VaultDoorway || (l.VaultRoom >= 0 && behind.Contains(l.VaultRoom))) continue; // the vault has a lock of its own
                 var d = l.Doorways[i];
                 // the key: a room on this side, not the lobby, far from the door; on a table if there is one
                 var keyRooms = new List<PlanRoom>();
                 foreach (var r in plan.Rooms)
-                    if (r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && all.Contains(r.Id) && !behind.Contains(r.Id) && !taken.Contains(r.Id)
+                    if (r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != l.VaultRoom && all.Contains(r.Id) && !behind.Contains(r.Id) && !taken.Contains(r.Id)
                         && (r.Center - d.Position).magnitude >= s.KeyMinDistance)
                         keyRooms.Add(r);
                 if (keyRooms.Count == 0) continue;
@@ -269,6 +280,252 @@ namespace Stealth.Level
                 l.LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
                 l.KeyDoors.Add(new KeyDoor { Door = door, Key = key, Rooms = new List<int>(behind) });
                 taken.UnionWith(behind);
+            }
+        }
+
+        // ------------------------------------------------------------------ the main job
+
+        /// <summary>A lock panel stands at hand height on the wall, facing into its room.</summary>
+        public const float ConsoleHeight = 1.3f;
+        /// <summary>The hostage's cage is this wide and deep (Prefabs/Props/Cage).</summary>
+        public const float CageSize = 2.0f;
+
+        /// <summary>
+        /// The house's main job, planned before the furniture (its places are kept free): a vault — a room whose only way in
+        /// is a door, locked until three lock panels on the walls of the nearest rooms outside are solved (one each:
+        /// <see cref="VaultGame"/>), treasure in its middle — or a hostage — a cage in the middle of a big room, its key
+        /// carried by one of the guards (<see cref="FinishObjective"/>). Which one comes from the seed; if it does not fit
+        /// the house, the other. Own random stream.
+        /// </summary>
+        public static void PlanObjective(LevelLayout l, FeatureSettings s, Furnisher furnisher)
+        {
+            if (s == null || l.LevelIndex < s.ObjectivesFromHouse) return;
+            // the house's number in too, and the first draw thrown away: close seeds give close first draws
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, l.LevelIndex + 1));
+            rng.Next();
+            bool vaultFirst = rng.NextDouble() < s.VaultShare;
+            foreach (bool vault in vaultFirst ? new[] { true, false } : new[] { false, true })
+            {
+                if (vault && PlanVault(l, s, rng, furnisher)) { l.Objective = ObjectiveKind.Vault; return; }
+                if (!vault && PlanCage(l, s, rng, furnisher)) { l.Objective = ObjectiveKind.Hostage; return; }
+            }
+        }
+
+        static int ExitRoomId(LevelLayout l) => l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+
+        static bool Plain(LevelLayout l, PlanRoom r) =>
+            r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
+            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && !HasStair(l, r.Id);
+
+        static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
+        {
+            var plan = l.Plan;
+            var all = Reach(plan, l.Stairs, l.LobbyRoom, true);
+            var order = new List<int>();
+            for (int i = 0; i < plan.Openings.Count; i++)
+            {
+                var o = plan.Openings[i];
+                var w = plan.Walls[o.Wall];
+                if (o.Kind == EdgeType.Door && !w.Exterior && w.RoomA >= 0 && w.RoomB >= 0) order.Add(i);
+            }
+            Shuffle(order, rng);
+            foreach (int i in order)
+            {
+                var behind = new HashSet<int>(all);
+                behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
+                if (behind.Count != 1) continue;
+                int v = 0;
+                foreach (int id in behind) v = id;
+                var room = plan.Rooms[v];
+                if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y) continue;
+                var w = plan.Walls[plan.Openings[i].Wall];
+                int outside = w.RoomA == v ? w.RoomB : w.RoomA;
+                var consoles = ConsolePlaces(l, v, outside);
+                if (consoles.Count < 3) continue;
+                l.VaultRoom = v;
+                l.VaultDoorway = i;
+                foreach (var c in consoles)
+                {
+                    l.VaultConsoles.Add(c);
+                    var front = c.position + c.rotation * Vector3.forward * 0.6f;
+                    int floor = LevelLayout.FloorOf(c.position.y);
+                    furnisher.Reserve(floor, new Vector3(front.x, LevelLayout.FloorY(floor), front.z), 0.55f);
+                }
+                // the treasure in a ring in the vault's middle (kept free of furniture)
+                var centre = room.Center;
+                furnisher.Reserve(room.Floor, centre, 1.0f);
+                for (int k = 0; k < 8; k++)
+                {
+                    float a = k * Mathf.PI / 4f;
+                    var p = centre + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (k % 2 == 0 ? 0.45f : 0.75f) + Vector3.up * 0.02f;
+                    if (plan.RoomAt(p + Vector3.up * 0.3f)?.Id == v && plan.IsFloor(room.Floor, new Vector2(p.x, p.z))) l.VaultTreasure.Add(p);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// A place on a wall for a lock panel in each of the three rooms nearest to <paramref name="outside"/> (the room in
+        /// front of the vault door, counted first): interior straight walls, away from openings, corners and stairs.
+        /// </summary>
+        static List<Pose> ConsolePlaces(LevelLayout l, int vault, int outside)
+        {
+            var plan = l.Plan;
+            var result = new List<Pose>();
+            var adjacent = new Dictionary<int, List<int>>();
+            void Link(int a, int b)
+            {
+                if (a < 0 || b < 0) return;
+                if (!adjacent.TryGetValue(a, out var la)) adjacent[a] = la = new List<int>();
+                if (!adjacent.TryGetValue(b, out var lb)) adjacent[b] = lb = new List<int>();
+                la.Add(b);
+                lb.Add(a);
+            }
+            foreach (var o in plan.Openings)
+                if (PlayerPasses(o.Kind)) Link(plan.Walls[o.Wall].RoomA, plan.Walls[o.Wall].RoomB);
+            foreach (var st in l.Stairs) Link(st.Room, st.RoomAbove);
+            // rooms by steps from the one in front of the vault (players' ways, not through the vault)
+            var seen = new HashSet<int> { outside, vault };
+            var queue = new Queue<int>();
+            queue.Enqueue(outside);
+            var byDistance = new List<int>();
+            while (queue.Count > 0)
+            {
+                int r = queue.Dequeue();
+                byDistance.Add(r);
+                if (!adjacent.TryGetValue(r, out var next)) continue;
+                foreach (int n in next)
+                    if (seen.Add(n)) queue.Enqueue(n);
+            }
+            foreach (int r in byDistance)
+            {
+                if (result.Count >= 3) break;
+                var room = plan.Rooms[r];
+                if (r == l.LobbyRoom || r == l.HiddenRoom || r == ExitRoomId(l) || room.Levels > 1) continue;
+                if (WallPlace(l, room, out var pose)) result.Add(pose);
+            }
+            return result;
+        }
+
+        /// <summary>The best spot on the room's walls for a panel: the middle-most free stretch of its longest interior wall.</summary>
+        static bool WallPlace(LevelLayout l, PlanRoom room, out Pose pose)
+        {
+            var plan = l.Plan;
+            pose = default;
+            float best = -1f;
+            float floorY = LevelLayout.FloorY(room.Floor);
+            for (int wi = 0; wi < plan.Walls.Count; wi++)
+            {
+                var w = plan.Walls[wi];
+                if (w.Floor != room.Floor || (w.RoomA != room.Id && w.RoomB != room.Id) || w.Exterior || w.Railing || w.Shaped || w.Length < 1.8f) continue;
+                var d = w.Dir;
+                var n2 = new Vector2(-d.y, d.x);
+                var mid = w.At(w.Length / 2f);
+                if (plan.RoomAt(new Vector3(mid.x + n2.x * 0.4f, floorY + 0.3f, mid.y + n2.y * 0.4f))?.Id != room.Id) n2 = -n2;
+                for (float t = 0.8f; t <= w.Length - 0.8f; t += 0.25f)
+                {
+                    bool clear = true;
+                    foreach (var o in plan.Openings)
+                        if (o.Wall == wi && Mathf.Abs(o.At - t) < o.Width / 2f + 0.6f) { clear = false; break; }
+                    if (!clear) continue;
+                    var at = w.At(t) + n2 * (LevelMetrics.WallThickness / 2f);
+                    var p = new Vector3(at.x, floorY + ConsoleHeight, at.y);
+                    if (l.NearStair(room.Floor, p, 1.0f) || plan.RoomAt(new Vector3(p.x + n2.x * 0.6f, floorY + 0.3f, p.z + n2.y * 0.6f))?.Id != room.Id)
+                        continue;
+                    // the longest wall wins, then the spot nearest to its middle
+                    float score = w.Length * 10f - Mathf.Abs(t - w.Length / 2f);
+                    if (score <= best) continue;
+                    best = score;
+                    pose = new Pose(p, Quaternion.LookRotation(new Vector3(n2.x, 0f, n2.y)));
+                }
+            }
+            return best >= 0f;
+        }
+
+        static bool PlanCage(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
+        {
+            var plan = l.Plan;
+            var options = new List<PlanRoom>();
+            foreach (var r in plan.Rooms)
+            {
+                if (!Plain(l, r) || r.Area < s.HostageMinArea) continue;
+                var c = r.Center;
+                bool fits = plan.RoomAt(c + Vector3.up * 0.3f)?.Id == r.Id;
+                float reach = (CageSize / 2f + 0.6f) * 1.42f;
+                for (int k = 0; k < 8 && fits; k++)
+                {
+                    float a = k * Mathf.PI / 4f;
+                    var p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * reach;
+                    fits = plan.RoomAt(p + Vector3.up * 0.3f)?.Id == r.Id && plan.IsFloor(r.Floor, new Vector2(p.x, p.z));
+                }
+                foreach (var d in l.Doorways)
+                    if ((d.RoomA == r.Id || d.RoomB == r.Id) && (d.Position - c).magnitude < 2.4f) fits = false;
+                if (fits) options.Add(r);
+            }
+            if (options.Count == 0) return false;
+            // far from the way in: one of the three farthest from the entry hatch
+            options.Sort((a, b) => (b.Center - l.HatchPosition).sqrMagnitude.CompareTo((a.Center - l.HatchPosition).sqrMagnitude));
+            var room = options[rng.Next(Mathf.Min(3, options.Count))];
+            var centre = room.Center;
+            // its door towards the room's nearest doorway
+            Vector3 toDoor = Vector3.forward;
+            float near = float.MaxValue;
+            foreach (var d in l.Doorways)
+            {
+                if (d.RoomA != room.Id && d.RoomB != room.Id) continue;
+                float dist = (d.Position - centre).magnitude;
+                if (dist < near) { near = dist; toDoor = d.Position - centre; }
+            }
+            toDoor.y = 0f;
+            float yaw = Mathf.Round(Mathf.Atan2(toDoor.x, toDoor.z) * Mathf.Rad2Deg / 90f) * 90f;
+            furnisher.Reserve(room.Floor, centre, CageSize / 2f + 0.7f);
+            furnisher.Put(room, PropKind.Cage, centre, yaw);
+            return true;
+        }
+
+        /// <summary>
+        /// The main job after the security and the furniture: the vault's door becomes a door of its own (never locked for
+        /// hacking, no laser in it: the panels open it); the cage's index; the guard who carries the cage's key (a guard
+        /// that is there anyway, or one more on the ground floor).
+        /// </summary>
+        public static void FinishObjective(LevelLayout l)
+        {
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, 1));
+            if (l.Objective == ObjectiveKind.Vault)
+            {
+                var d = l.Doorways[l.VaultDoorway];
+                int door = -1;
+                for (int k = 0; k < l.AutoDoors.Count; k++)
+                    if ((l.AutoDoors[k].position - d.Position).sqrMagnitude < 0.1f) { door = k; break; }
+                if (door < 0)
+                {
+                    l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+                    door = l.AutoDoors.Count - 1;
+                }
+                l.LockedDoors.Remove(door);
+                l.LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
+                l.VaultDoor = door;
+            }
+            if (l.Objective != ObjectiveKind.Hostage) return;
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Cage) { l.Cage = i; break; }
+            // a guard carries it; with no guard, any robot that walks or rolls the house
+            var carriers = new List<int>();
+            for (int i = 0; i < l.RobotSpawns.Count; i++)
+                if (l.RobotSpawns[i].Kind == RobotKind.Guard) carriers.Add(i);
+            if (carriers.Count == 0)
+                for (int i = 0; i < l.RobotSpawns.Count; i++)
+                    if (!RobotRoster.IsDevice(l.RobotSpawns[i].Kind) && l.RobotSpawns[i].Kind != RobotKind.Hunter) carriers.Add(i);
+            if (carriers.Count > 0) { l.KeyCarrier = carriers[rng.Next(carriers.Count)]; return; }
+            // no robots at all (a calm house): the key lies in the room farthest from the cage
+            var cage = l.Props[l.Cage].Position;
+            float far = -1f;
+            l.CageKeySpot = l.Lobby.Center;
+            foreach (var p in l.ItemSpots)
+            {
+                float dist = (p - cage).magnitude;
+                if (dist > far) { far = dist; l.CageKeySpot = p; }
             }
         }
 

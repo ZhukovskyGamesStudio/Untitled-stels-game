@@ -98,6 +98,27 @@ namespace Stealth.UI
     /// revive · hack · locked door · safe · something to use · terminal · an item to take; otherwise a dot.
     /// No text: the glyph says what it is, the hint stack names the key.
     /// </summary>
+    public static class ObjectiveRules
+    {
+        /// <summary>The name of a main job (the tunnel's panel, the HUD), or null for none.</summary>
+        public static string Name(Level.ObjectiveKind kind) => kind switch
+        {
+            Level.ObjectiveKind.Vault => Loc.T("objective.vault"),
+            Level.ObjectiveKind.Hostage => Loc.T("objective.hostage"),
+            _ => null,
+        };
+
+        /// <summary>The HUD's line for the job: its name, the vault's locks solved, or done (pure).</summary>
+        public static string Line(Level.ObjectiveKind kind, int solved, int locks, bool done)
+        {
+            var name = Name(kind);
+            if (name == null) return null;
+            if (done) return Loc.F("hud.objective.done", name);
+            return kind == Level.ObjectiveKind.Vault ? Loc.F("hud.objective.progress", name, solved, locks) : Loc.F("hud.objective", name);
+        }
+    }
+
+    /// <summary>The centre of the screen: what E does with the thing under the crosshair (pure).</summary>
     public static class ReticleRules
     {
         public static Reticle Choose(in PromptContext c)
@@ -124,6 +145,8 @@ namespace Stealth.UI
             Level.UseKind.CarSeat => ReticleIcon.Seat,
             Level.UseKind.CarHopper => ReticleIcon.Fuel,
             Level.UseKind.CarCargo => ReticleIcon.Hand,
+            Level.UseKind.VaultConsole => ReticleIcon.Terminal,
+            Level.UseKind.Cage => ReticleIcon.Key,
             _ => ReticleIcon.Dot,
         };
     }

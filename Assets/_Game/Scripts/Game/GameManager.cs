@@ -354,15 +354,18 @@ namespace Stealth.Game
                 total += item.Value;
             }
             total += SpawnFeatures(layout);
+            SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
 
             var wardens = new List<GameObject>();
-            foreach (var spawn in layout.RobotSpawns)
+            for (int si = 0; si < layout.RobotSpawns.Count; si++)
             {
+                var spawn = layout.RobotSpawns[si];
                 var pos = spawn.Position;
                 bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
+                GiveCageKey(layout, si, robot);
             }
             PostWardens(layout, wardens);
 

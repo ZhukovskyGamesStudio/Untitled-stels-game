@@ -87,6 +87,8 @@ namespace Stealth.Level
         public GameObject MedTable, Workbench, Programmer;
         [Tooltip("The entrance of a hidden room: looks like a wall block, players walk through it, robots are kept out.")]
         public GameObject IllusionBlock;
+        [Tooltip("The house's main job: a lock panel of the vault on a wall (VaultConsole), the hostage's cage (Cage), the vault door's lamps (VaultPanel).")]
+        public GameObject VaultConsole, Cage, VaultPanel;
 
         public GameObject Prop(PropKind kind) => kind switch
         {
@@ -131,6 +133,7 @@ namespace Stealth.Level
             PropKind.MedTable => MedTable,
             PropKind.Workbench => Workbench,
             PropKind.Programmer => Programmer,
+            PropKind.Cage => Cage,
             _ => null,
         };
     }

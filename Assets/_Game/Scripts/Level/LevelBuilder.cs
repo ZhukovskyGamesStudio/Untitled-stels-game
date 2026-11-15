@@ -120,9 +120,20 @@ namespace Stealth.Level
                 {
                     bool keyed = false;
                     foreach (var k in l.KeyDoors) keyed |= k.Door == i;
-                    door.Configure(i, l.LockedDoors.Contains(i), keyed);
+                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor);
+                }
+                if (i == l.VaultDoor && m_Art.VaultPanel != null)
+                {
+                    // the vault's plate with its three lamps over the doorway, on both faces of the wall
+                    var across = d.rotation * Vector3.forward;
+                    foreach (float side in new[] { 1f, -1f })
+                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.36f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
+                            Quaternion.LookRotation(across * side));
                 }
             }
+            if (m_Art.VaultConsole != null)
+                for (int i = 0; i < l.VaultConsoles.Count; i++)
+                    Place(m_Art.VaultConsole, $"VaultConsole{i}", l.VaultConsoles[i].position, l.VaultConsoles[i].rotation).GetComponent<VaultConsole>()?.Configure(i);
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
 

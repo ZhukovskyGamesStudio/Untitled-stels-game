@@ -15,7 +15,15 @@ namespace Stealth.Level
         TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine, DeskLamp, FloorLamp,
         PingPongTable, BeanBag, ArcadeMachine, Safe, Terminal,
         // searchable crate, and the points of interest of the three locations (HouseFeatures)
-        Crate, MedTable, Workbench, Programmer }
+        Crate, MedTable, Workbench, Programmer,
+        // the house's main job (HouseFeatures.Objective): the hostage's cage
+        Cage }
+
+    /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
+    public enum ObjectiveKind : byte { None, Vault, Hostage }
+
+    /// <summary>The vault's three locks, one console each (in the order of <see cref="LevelLayout.VaultConsoles"/>).</summary>
+    public enum VaultGame : byte { Dial, Switches, Sequence }
 
     /// <summary>What a security terminal does: show the house's cameras, or hack robots and devices from afar.</summary>
     public enum TerminalKind : byte { Cameras, Hacking }
@@ -121,6 +129,22 @@ namespace Stealth.Level
         public readonly List<Vector3> LureSpots = new();
         /// <summary>The location's point of interest: index in <see cref="Props"/>, -1 if none.</summary>
         public int PointOfInterest = -1;
+        /// <summary>The house's main job (<see cref="HouseFeatures.Objective"/>).</summary>
+        public ObjectiveKind Objective;
+        /// <summary>Vault: its room (plan id), its only door (index in <see cref="AutoDoors"/>), where its treasure lies.</summary>
+        public int VaultRoom = -1, VaultDoor = -1;
+        /// <summary>Vault: its doorway (index in <see cref="Doorways"/> and the plan's openings).</summary>
+        public int VaultDoorway = -1;
+        public readonly List<Vector3> VaultTreasure = new();
+        /// <summary>
+        /// Vault: its lock panels on the walls of the rooms next to it (the face of the wall at hand height, facing into
+        /// the room); the n-th is <see cref="VaultGame"/> n.
+        /// </summary>
+        public readonly List<Pose> VaultConsoles = new();
+        /// <summary>Hostage: the cage (index in <see cref="Props"/>) and the guard carrying its key (index in <see cref="RobotSpawns"/>).</summary>
+        public int Cage = -1, KeyCarrier = -1;
+        /// <summary>Hostage, and no robot to carry the key: where it lies instead.</summary>
+        public Vector3 CageKeySpot;
         public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();

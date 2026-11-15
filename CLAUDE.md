@@ -258,6 +258,14 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 `GadgetServer` (все детекторы взломаны на `StunDuration`). Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
 → `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
 
+**Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
+(`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
+**большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами),
+три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
+`SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь открыта, внутри сокровища (`VaultTreasure`);
+**заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате, ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
+взломан — роняет), с ключом E → награда (алмаз). Награды не входят в квоту дома. Сервер — `GameManager.Objective.cs`, строка в HUD — `ObjectiveRules`;
+сценарий `objective` проходит оба задания настоящими клавишами.
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
 не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.
 Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки

@@ -56,6 +56,7 @@ namespace Stealth.Level
             [PropKind.MedTable] = Rect.MinMaxRect(-0.97f, -0.53f, 0.97f, 0.53f),
             [PropKind.Workbench] = Rect.MinMaxRect(-1.0f, -0.43f, 1.0f, 0.55f),
             [PropKind.Programmer] = Rect.MinMaxRect(-0.99f, -0.5f, 0.99f, 0.42f),
+            [PropKind.Cage] = Rect.MinMaxRect(-1.0f, -1.0f, 1.0f, 1.0f),
         };
 
         /// <summary>A model's footprint in its own frame (x = local X, y = local Z), metres.</summary>

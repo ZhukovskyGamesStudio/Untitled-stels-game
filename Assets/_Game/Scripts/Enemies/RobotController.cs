@@ -123,6 +123,12 @@ namespace Stealth.Enemies
             VisualStyles.Dress(CargoMesh.gameObject);
         }
 
+        /// <summary>Server: the robot carries this thing (the cage's key on a guard's back); hacked, it drops it.</summary>
+        public void CarryServer(byte shape, byte color)
+        {
+            if (IsServer) SetCargo(EncodeCargo(shape, color));
+        }
+
         /// <summary>Server: go and check a spot (alarm, radio).</summary>
         public void InvestigateServer(Vector3 position, bool alarm) => m_Brain?.Investigate(position, alarm, Time.time);
 

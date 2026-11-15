@@ -99,6 +99,8 @@ namespace Stealth.UI
         public Text GainLabel;
         [Tooltip("When the hunter comes (or that it is in the house), under the fuel bar.")]
         public Text HunterLabel;
+        [Tooltip("The house's main job and how far along it is (under the hunter's line).")]
+        public Text ObjectiveLabel;
         [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
         public RectTransform TeamList;
@@ -391,7 +393,7 @@ namespace Stealth.UI
                 LockedDoor = me.DoorTarget != null,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
-                Cracking = me.Cracking != null,
+                Cracking = me.Cracking != null || me.AtConsole != null,
                 NearTerminal = me.TerminalTarget != null && terminal == null,
                 TerminalUsable = me.TerminalTarget != null && !me.TerminalTarget.Spent,
                 AtTerminal = terminal != null,
@@ -615,6 +617,7 @@ namespace Stealth.UI
                 QuotaBar.Set(1f, new Color(0.3f, 0.9f, 0.4f));
                 Ui.Show(GainLabel, false);
                 ShowHunter(gm);
+                ShowObjective(gm);
                 ShowTerminal(PlayerController.Local);
                 return;
             }
@@ -633,6 +636,7 @@ namespace Stealth.UI
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
             ShowHunter(gm);
+            ShowObjective(gm);
             ShowTerminal(PlayerController.Local);
         }
 
@@ -654,6 +658,16 @@ namespace Stealth.UI
                     : " · " + Loc.F("hud.terminal.charges", t.Charges);
             }
             if (TerminalLabel.text != text) TerminalLabel.text = text;
+        }
+
+        /// <summary>The main job's line: what it is and how far along (the vault's locks), gold once done.</summary>
+        void ShowObjective(GameManager gm)
+        {
+            if (ObjectiveLabel == null) return;
+            var l = ActiveLevel.Layout;
+            string text = gm.Phase == RunPhase.Playing && l != null ? ObjectiveRules.Line(l.Objective, gm.VaultSolved, l.VaultConsoles.Count, gm.ObjectiveDone) : null;
+            Ui.Show(ObjectiveLabel, text != null);
+            if (text != null) Ui.Set(ObjectiveLabel, text, gm.ObjectiveDone ? new Color(1f, 0.82f, 0.3f) : new Color(1f, 1f, 1f, 0.8f));
         }
 
         static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };

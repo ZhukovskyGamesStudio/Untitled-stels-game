@@ -50,6 +50,7 @@ namespace Stealth.UI
                 string status = going ? Loc.F("route.going", Mathf.CeilToInt(Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime))))
                     : voters.Length > 0 ? Loc.F("route.here", voters) : "";
                 sign.Votes.text = status;
+                sign.Body.enabled = status.Length == 0; // the countdown takes the body's line
                 sign.Frame.color = going ? new Color(1f, 0.8f, 0.25f) : voters.Length > 0 ? new Color(0.45f, 0.85f, 1f) : new Color(1f, 1f, 1f, 0.35f);
 
                 // Fully visible when looked at, otherwise only a hint of it.
@@ -71,8 +72,9 @@ namespace Stealth.UI
             if (m_Previews.TryGetValue(node.Seed, out var text)) return text;
             var level = Tuning.Level;
             var l = LevelGenerator.Generate(node.Seed, node.Depth, level.Building, level.Security, Mathf.Max(1, PlayerController.All.Count), level.Features);
-            // only what tells the ways apart at a glance: how big, how guarded
-            text = Loc.F("route.preview", l.Floors, l.RobotSpawns.Count);
+            // only what tells the ways apart at a glance: the main job, how big, how guarded
+            var job = ObjectiveRules.Name(l.Objective);
+            text = (job != null ? Loc.F("route.objective", job) + " · " : "") + Loc.F("route.preview", l.Floors, l.RobotSpawns.Count);
             m_Previews[node.Seed] = text;
             return text;
         }

@@ -76,7 +76,7 @@ namespace Stealth.Level
                 if (prop == null) continue;
                 foreach (var r in prop.GetComponentsInChildren<MeshRenderer>())
                 {
-                    if (!MeshBatcher.CanMerge(r, out var mesh)) continue;
+                    if (r.GetComponentInParent<KeepUnmerged>() != null || !MeshBatcher.CanMerge(r, out var mesh)) continue;
                     batcher.Add(r, mesh);
                     merged.Add(r);
                 }

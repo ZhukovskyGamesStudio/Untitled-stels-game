@@ -42,16 +42,19 @@ namespace Stealth.Level
         public bool HasLock { get; private set; }
         /// <summary>Opens only with a key block (not hacked).</summary>
         public bool NeedsKey { get; private set; }
+        /// <summary>The vault's door: opened by its three lock panels (not hacked, no key).</summary>
+        public bool Vault { get; private set; }
         /// <summary>Locked and not hacked yet: players cannot pass.</summary>
         public bool Locked => HasLock && !IsUnlocked(Index);
         MaterialPropertyBlock m_Block;
         int m_ShownLock = -1;
 
-        public void Configure(int index, bool locked, bool keyed = false)
+        public void Configure(int index, bool locked, bool keyed = false, bool vault = false)
         {
             Index = index;
-            HasLock = locked || keyed;
-            NeedsKey = keyed;
+            HasLock = locked || keyed || vault;
+            NeedsKey = keyed || vault; // neither can be hacked
+            Vault = vault;
             m_ShownLock = -1;
         }
 

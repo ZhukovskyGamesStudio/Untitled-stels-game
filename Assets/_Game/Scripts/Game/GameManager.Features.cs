@@ -29,6 +29,7 @@ namespace Stealth.Game
             SearchCrate.IsSearched = i => IsOpened(CrateKey(i));
             MedTable.UsedBy = c => IsOpened(MedKey(c));
             SewerGate.IsOpen = () => GateOpen;
+            HookObjective();
         }
 
         /// <summary>What a crate holds (the same on every call: from the house's seed and the crate).</summary>
@@ -92,6 +93,8 @@ namespace Stealth.Game
                 case UseKind.MedTable: HealServer(player); break;
                 case UseKind.Workbench: CraftServer(player); break;
                 case UseKind.KeyDoor: UnlockWithKeyServer(player, index); break;
+                case UseKind.VaultConsole: SolveConsoleServer(player, index); break;
+                case UseKind.Cage: FreeHostageServer(player, index); break;
                 default: UseSewerServer(player, kind, index); break;
             }
         }

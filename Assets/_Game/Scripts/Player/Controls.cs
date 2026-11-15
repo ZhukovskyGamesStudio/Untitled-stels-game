@@ -170,6 +170,19 @@ namespace Stealth.Player
         /// <summary>The binding went down this frame.</summary>
         public static bool Pressed(GameAction a) => WentDown(Get(a));
 
+        /// <summary>
+        /// A number key went down this frame (1–9, the top row or the keypad): the switches of a lock panel. Fixed keys,
+        /// not an action to rebind — the panel draws the numbers on its lamps.
+        /// </summary>
+        public static bool DigitPressed(int n)
+        {
+            var kb = Keyboard.current;
+            if (kb == null || n < 1 || n > 9) return false;
+            var top = kb[(Key)((int)Key.Digit1 + n - 1)];
+            var pad = kb[(Key)((int)Key.Numpad1 + n - 1)];
+            return (top != null && top.wasPressedThisFrame) || (pad != null && pad.wasPressedThisFrame);
+        }
+
         public static bool IsDown(KeyBinding b)
         {
             var c = Control(b);

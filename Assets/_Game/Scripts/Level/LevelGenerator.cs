@@ -236,6 +236,9 @@ namespace Stealth.Level
             furnisher.PlaceVentDesks();
             for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
 
+            // the house's main job: the vault and its lock panels, or the hostage's cage (their places kept free)
+            HouseFeatures.PlanObjective(l, features, furnisher);
+
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
             foreach (var p in l.PatrolPoints) furnisher.Reserve(LevelLayout.FloorOf(p.y), p, 0.75f);
@@ -251,6 +254,7 @@ namespace Stealth.Level
             HouseFeatures.Crates(l, features);
             HouseFeatures.PointOfInterest(l);
             HouseFeatures.Wardens(l, features);
+            HouseFeatures.FinishObjective(l);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));

@@ -190,7 +190,7 @@ namespace Stealth.EditorTools
                 .Select(i => Img(R(status, $"Heart{i}", BottomLeft, BottomLeft, new Vector2(2 + i * 22, 0), new Vector2(20, 20)), new Color(0.95f, 0.25f, 0.25f), hud.HeartFull)).ToArray();
 
             // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the hunter under it.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 66));
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 84));
             Img(quota, PanelColor);
             hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(280, 22)), "House", 14, TextAnchor.MiddleLeft, Color.white, true);
             hud.HouseLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -200,6 +200,7 @@ namespace Stealth.EditorTools
             hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(GameHUD.GainX, GameHUD.GainY), new Vector2(120, 26));
             hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
             hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 20)), "Hunter", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
+            hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -62), new Vector2(280, 20)), "", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.8f), true);
             hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 150), new Vector2(700, 24)), "1 / 3", 15, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f, 0.9f), true);
 
             // The team list top right under the minimap.
@@ -230,6 +231,7 @@ namespace Stealth.EditorTools
             hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
             hud.BigMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
+            BuildVaultLock(content);
             BuildCheatPanel(e, content);
             // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade):
             // over everything, outside Content (which fades out on its own while the drive scene plays)

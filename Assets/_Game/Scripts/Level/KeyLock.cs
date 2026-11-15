@@ -36,9 +36,9 @@ namespace Stealth.Level
         void LateUpdate()
         {
             // the door's index arrives with the level; open doors need no hint
-            int index = Door != null && Door.NeedsKey && Door.Locked ? Door.Index : -1;
+            int index = Door != null && Door.NeedsKey && !Door.Vault && Door.Locked ? Door.Index : -1;
             if (Index != index) Index = index;
-            bool show = Door != null && Door.NeedsKey;
+            bool show = Door != null && Door.NeedsKey && !Door.Vault; // the vault's door has its panels instead
             if (Panels != null)
                 foreach (var p in Panels)
                     if (p != null && p.activeSelf != show) p.SetActive(show);

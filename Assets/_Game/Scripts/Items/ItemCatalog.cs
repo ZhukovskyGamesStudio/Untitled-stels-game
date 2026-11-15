@@ -55,11 +55,14 @@ namespace Stealth.Items
             new Shape { Id = "key",     Cells = new[] { V(0, 0) } },
             new Shape { Id = "stun",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             new Shape { Id = "speaker", Cells = new[] { V(0, 0), V(1, 0) } },
+            new Shape { Id = "cagekey", Cells = new[] { V(0, 0) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
         public const int LootShapes = 8;
         public const byte Diamond = 8, Key = 9, Stun = 10, Speaker = 11;
+        /// <summary>The key of the hostage's cage (a guard carries it: hack him and he drops it).</summary>
+        public const byte CageKey = 12;
 
         /// <summary>A diamond (workbench) is worth this many cells of its colour.</summary>
         public static int DiamondValueCells { get; set; } = 10;
@@ -67,7 +70,7 @@ namespace Stealth.Items
         /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
         public static bool IsLoot(int shape) => shape < LootShapes;
         /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
-        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker;
+        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey;
 
         /// <summary>
         /// The colour a thing is drawn with in the inventory and the stash: loot by its colour (its value), the tools in
@@ -78,10 +81,12 @@ namespace Stealth.Items
             Key => KeyColor,
             Stun => StunColor,
             Speaker => SpeakerColor,
+            CageKey => CageKeyColor,
             _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
         };
 
-        public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f);
+        public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f),
+            CageKeyColor = new(0.55f, 1.00f, 0.15f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
@@ -165,6 +170,7 @@ namespace Stealth.Items
             Key => Loc.T("item.key"),
             Stun => Loc.T("item.stun"),
             Speaker => Loc.T("item.speaker"),
+            CageKey => Loc.T("item.cagekey"),
             Diamond => Loc.F("item.diamond", ColorName(color), Value(shape, color)),
             _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
         };

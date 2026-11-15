@@ -15,6 +15,8 @@ namespace Stealth.Configs
         public ItemCatalog.ItemColor[] Colors = ItemCatalog.DefaultColors();
         [Tooltip("Safes: the dial minigame and the loot inside.")]
         public SafeSettings Safes = new();
+        [Tooltip("The house's main job: the vault's locks (switches, sequence) and the rewards of the vault and the hostage.")]
+        public Stealth.Items.ObjectiveSettings Objectives = new();
         [Tooltip("Tools and places: stun cube, lure speaker, crates, workbench, med table.")]
         public GadgetSettings Gadgets = new();
     }

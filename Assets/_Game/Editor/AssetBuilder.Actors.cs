@@ -32,7 +32,7 @@ namespace Stealth.EditorTools
             s_StompRipple = Prefab(PrefabsDir + "/FX/StompRipple.prefab", BuildStompRipple).GetComponent<RadioRipple>();
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
-                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath($"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
+                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath(s.Id == "cagekey" ? "item_key" : s.Id == "speaker" ? "item_domino" : $"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
             });
             // One material per configured colour (ItemsConfig can grow).
             visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
@@ -54,12 +54,23 @@ namespace Stealth.EditorTools
                 return go;
             });
 
-            Robot(RobotKind.Guard, RobotPrefabs + "/RobotGuard.prefab", () => MobileRobot("RobotGuard", "robot_guard", "RobotBody", 0.4f, new Vector3(0, 1.84f, 0.3f), ripple, (s, t, anim) =>
+            Robot(RobotKind.Guard, RobotPrefabs + "/RobotGuard.prefab", () =>
             {
-                anim.Bob = 0.06f;
-                s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
-                t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
-            }));
+                var go = MobileRobot("RobotGuard", "robot_guard", "RobotBody", 0.4f, new Vector3(0, 1.84f, 0.3f), ripple, (s, t, anim) =>
+                {
+                    anim.Bob = 0.06f;
+                    s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
+                    t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
+                });
+                // what a guard may carry (the hostage's cage key) hangs on its back, where a player sneaking up sees it
+                var rc = go.GetComponent<RobotController>();
+                var cargo = Child(go.transform, "Cargo", new Vector3(0f, 1.25f, -0.42f));
+                rc.CargoMesh = cargo.AddComponent<MeshFilter>();
+                rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
+                rc.CargoRenderer.enabled = false;
+                rc.CargoVisuals = visuals;
+                return go;
+            });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ContactDistance = 1.4f;

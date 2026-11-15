@@ -261,7 +261,7 @@ namespace Stealth.Player
             bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
             if (Keyboard.current == null) return;
 
-            bool cracking = Cracking != null || UsingTerminal != null; // busy at a dial or a terminal: no walking
+            bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
                           (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
             bool freeCursor = menu || CursorMode;
@@ -465,6 +465,8 @@ namespace Stealth.Player
                 TeleportOwner(sewer.SpawnFor(slot), sewer.SpawnRotation(slot));
                 Motor.SetPitch(0f);
                 Cracking = null;
+                CrackingConsole = null;
+                LeaveConsole();
                 return;
             }
             var layout = ActiveLevel.Layout;
@@ -513,6 +515,8 @@ namespace Stealth.Player
             m_UnstuckAt = Time.time;
             Cracking = null;
             CrackingSafe = null;
+            CrackingConsole = null;
+            LeaveConsole();
             TeleportOwner(spot, transform.rotation);
             Debug.Log($"[Player] Unstuck: moved to {spot}");
         }
@@ -609,6 +613,7 @@ namespace Stealth.Player
             DoorProgress = m_DoorHeld.Of(DoorTarget);
 
             UpdateSafe();
+            UpdateConsole();
             UpdateTerminal(holdE);
             UpdateUse(holdE);
             if (Controls.Pressed(GameAction.Gadget) && !CursorMode && HasItem(Items.ItemCatalog.Stun))
@@ -689,10 +694,112 @@ namespace Stealth.Player
         }
 
         /// <summary>Owner: press (or hold) E at a crate, the med table, the workbench, a key lock, a lever, the car.</summary>
+        // ------------------------------------------------------------------ the vault's lock panels
+
+        /// <summary>The vault's lock panel whose switch or sequence lock is on the screen, or null (the dial: <see cref="CrackingConsole"/>).</summary>
+        public VaultConsole AtConsole { get; private set; }
+        /// <summary>The switch lock on the screen (<see cref="VaultGame.Switches"/>), or null.</summary>
+        public Items.SwitchPuzzle Switches { get; private set; }
+        /// <summary>The sequence lock on the screen (<see cref="VaultGame.Sequence"/>), or null.</summary>
+        public Items.SequenceLock Sequence { get; private set; }
+        /// <summary>When a lock last clanked on a wrong press (the screen flashes red).</summary>
+        public float ConsoleWrongTime { get; private set; } = -10f;
+        /// <summary>Busy at any lock of the vault (no walking, no reticle).</summary>
+        public bool AtVaultLock => AtConsole != null || CrackingConsole != null;
+        readonly Dictionary<VaultConsole, Items.SafeLock> m_ConsoleDials = new();
+        readonly Dictionary<VaultConsole, Items.SwitchPuzzle> m_ConsoleSwitches = new();
+
+        int ConsoleSeed(VaultConsole c) => LevelRandom.Mix(ActiveLevel.Layout != null ? ActiveLevel.Layout.Seed : 0, 0x0C05, c.Index);
+
+        /// <summary>Owner: E at a lock panel puts its minigame on the screen (a dial or the switches keep their state while away).</summary>
+        void StartConsole(VaultConsole c)
+        {
+            if (c == null || c.Solved) return;
+            switch (c.Game)
+            {
+                case VaultGame.Dial:
+                    if (!m_ConsoleDials.TryGetValue(c, out var dial))
+                    {
+                        var safes = Tuning.Items.Safes;
+                        dial = new Items.SafeLock(ConsoleSeed(c), safes);
+                        dial.SetDial(new System.Random(ConsoleSeed(c) ^ 0x5A).Next(safes.DialSize));
+                        m_ConsoleDials[c] = dial;
+                    }
+                    Cracking = dial;
+                    CrackingConsole = c;
+                    m_CrackStartFrame = Time.frameCount;
+                    LastTry = Items.SafeLock.Result.Nothing;
+                    break;
+                case VaultGame.Switches:
+                    if (!m_ConsoleSwitches.TryGetValue(c, out var switches)) m_ConsoleSwitches[c] = switches = new Items.SwitchPuzzle(ConsoleSeed(c), Tuning.Items.Objectives);
+                    Switches = switches;
+                    AtConsole = c;
+                    break;
+                default:
+                    Sequence = new Items.SequenceLock(ConsoleSeed(c), Time.time, Tuning.Items.Objectives); // it plays again from the start
+                    AtConsole = c;
+                    break;
+            }
+        }
+
+        void LeaveConsole()
+        {
+            AtConsole = null;
+            Switches = null;
+            Sequence = null;
+        }
+
+        /// <summary>Owner: the switch or sequence lock on the screen — number keys press its switches, Space / back leaves.</summary>
+        void UpdateConsole()
+        {
+            var c = AtConsole;
+            if (c == null) return;
+            bool away = c.Solved || (c.transform.position - transform.position).magnitude > Items.SafeBox.Reach + 0.8f;
+            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back)) { LeaveConsole(); return; }
+            var at = c.transform.position;
+            int keys = Switches != null ? Switches.Count : Sequence != null ? Sequence.Lamps : 0;
+            for (int i = 0; i < keys; i++)
+            {
+                if (!Controls.DigitPressed(i + 1)) continue;
+                if (Switches != null)
+                {
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, at, 0.7f, Audio.Sfx.Group.Items, 0.9f + 0.05f * i);
+                    if (Switches.Press(i)) { SolveConsole(c); LeaveConsole(); return; }
+                }
+                else if (Sequence != null)
+                {
+                    switch (Sequence.Press(i, Time.time))
+                    {
+                        case Items.SequenceLock.Result.Wrong:
+                            Audio.Sfx.At(Audio.Sfx.Bank?.Drop, at, 1f, Audio.Sfx.Group.Items, 0.6f);
+                            EmitNoise(Tuning.Items.Objectives.WrongNoise);
+                            ConsoleWrongTime = Time.time;
+                            break;
+                        case Items.SequenceLock.Result.Step:
+                            Audio.Sfx.At(Audio.Sfx.Bank?.Click, at, 0.8f, Audio.Sfx.Group.Items, 0.9f + 0.08f * i);
+                            break;
+                        case Items.SequenceLock.Result.Opened:
+                            SolveConsole(c);
+                            LeaveConsole();
+                            return;
+                    }
+                }
+            }
+        }
+
+        /// <summary>Owner: a lock panel is solved — the server marks it (and opens the vault with the third).</summary>
+        void SolveConsole(VaultConsole c)
+        {
+            if (c == null) return;
+            Audio.Sfx.At(Audio.Sfx.Bank?.Stash, c.transform.position, 1f, Audio.Sfx.Group.Items);
+            if (m_Link != null) m_Link.SendUse(UseKind.VaultConsole, c.Index);
+            else GameManager.Instance?.UseServer(this, UseKind.VaultConsole, c.Index);
+        }
+
         void UpdateUse(bool holdE)
         {
             bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null
-                        || Cracking != null || CursorMode || SeatIndex >= 0;
+                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0;
             UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
             UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;
@@ -704,6 +811,7 @@ namespace Stealth.Player
             UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) : 0f;
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
+            if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
             if (m_Link != null) m_Link.SendUse(UseTarget.Kind, UseTarget.Index);
             else GameManager.Instance?.UseServer(this, UseTarget.Kind, UseTarget.Index);
         }
@@ -732,6 +840,8 @@ namespace Stealth.Player
         /// <summary>Owner: the dial being turned (null when not cracking a safe).</summary>
         public Items.SafeLock Cracking { get; private set; }
         public Items.SafeBox CrackingSafe { get; private set; }
+        /// <summary>The vault's lock panel whose dial is being turned (the dial lock is the safe's minigame), or null.</summary>
+        public VaultConsole CrackingConsole { get; private set; }
         /// <summary>Owner: a closed safe in reach (press E to start), null if none.</summary>
         public Items.SafeBox SafeTarget { get; private set; }
         /// <summary>Owner: the last try on the dial and when (for the minigame's feedback).</summary>
@@ -780,11 +890,14 @@ namespace Stealth.Player
                 return;
             }
             var safe = CrackingSafe;
-            bool away = safe == null || safe.Opened || (safe.transform.position - transform.position).magnitude > Items.SafeBox.Reach + 0.6f;
+            var host = safe != null ? safe.transform : CrackingConsole != null ? CrackingConsole.transform : null;
+            bool away = host == null || (safe != null && safe.Opened) || (CrackingConsole != null && CrackingConsole.Solved)
+                        || (host.position - transform.position).magnitude > Items.SafeBox.Reach + 0.6f;
             if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
             {
                 Cracking = null;
                 CrackingSafe = null;
+                CrackingConsole = null;
                 return;
             }
             var mouse = Mouse.current;
@@ -792,7 +905,7 @@ namespace Stealth.Player
             {
                 int ticks = Cracking.Turn(mouse.delta.ReadValue().x);
                 if (ticks > 0)
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, safe.transform.position + Vector3.up, 0.15f + 0.85f * Cracking.Closeness(), Audio.Sfx.Group.Items,
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, host.position + Vector3.up, 0.15f + 0.85f * Cracking.Closeness(), Audio.Sfx.Group.Items,
                         0.8f + 0.5f * Cracking.Closeness());
             }
             bool tryNow = Time.frameCount != m_CrackStartFrame &&
@@ -804,25 +917,31 @@ namespace Stealth.Player
         public void TryDial()
         {
             var safe = CrackingSafe;
-            if (Cracking == null || safe == null) return;
+            var host = safe != null ? safe.transform : CrackingConsole != null ? CrackingConsole.transform : null;
+            if (Cracking == null || host == null) return;
             LastTry = Cracking.Try();
             LastTryTime = Time.time;
             switch (LastTry)
             {
                 case Items.SafeLock.Result.Wrong:
                     // A loud clank: robots with ears may come.
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Drop, safe.transform.position + Vector3.up, 1f, Audio.Sfx.Group.Items, 0.6f);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Drop, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items, 0.6f);
                     EmitNoise(Tuning.Items.Safes.WrongNoise);
                     break;
                 case Items.SafeLock.Result.Digit:
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Pickup, safe.transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items, 1.3f);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Pickup, host.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items, 1.3f);
                     break;
                 case Items.SafeLock.Result.Opened:
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Stash, safe.transform.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
-                    if (m_Link != null) m_Link.SendOpenSafe(safe.Index);
-                    else GameManager.Instance?.OpenSafeServer(this, safe.Index);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Stash, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
+                    if (safe != null)
+                    {
+                        if (m_Link != null) m_Link.SendOpenSafe(safe.Index);
+                        else GameManager.Instance?.OpenSafeServer(this, safe.Index);
+                    }
+                    else SolveConsole(CrackingConsole);
                     Cracking = null;
                     CrackingSafe = null;
+                    CrackingConsole = null;
                     break;
             }
         }

@@ -235,13 +235,19 @@ namespace Stealth.Game
             if (sewer == null || sewer.Gate == null) { Log("FAIL: no gate after a house"); yield break; }
             yield return Shot("09_down_at_exit");
             var lever = sewer.Gate.GetComponentInChildren<GateLever>();
-            Me.TeleportOwner(lever.transform.position + new Vector3(1.2f, -1.2f, -1f), Quaternion.identity);
-            LookFrom(Me.transform.position, sewer.Gate.transform.position + Vector3.up * 1.8f);
-            yield return new WaitForSeconds(0.4f);
+            // on the exit's side, a step from the lever, looking at it: the reticle must offer it and a real held E pulls it
+            var toAxis = lever.Point - lever.transform.position;
+            toAxis.y = 0f;
+            var gateAlong = sewer.Gate.transform.right; // the car's side is −x of the gate: stand on the +x side
+            var standAt = lever.Point + toAxis.normalized * 0.9f + gateAlong * 0.6f;
+            standAt.y = sewer.Gate.transform.position.y + 0.05f;
+            LookFrom(standAt, lever.Point);
+            yield return new WaitForSeconds(0.5f);
+            Log($"at the lever: target {(Me.UseTarget != null ? Me.UseTarget.name : "none")}, prompt '{Me.UsePrompt}'");
             yield return Shot("10_gate_shut");
-            gm.UseServer(Me, UseKind.GateLever, 0);
+            yield return HoldKeys(1.2f, UnityEngine.InputSystem.Key.E);
             yield return new WaitForSeconds(2.6f);
-            Log($"gate: open {gm.GateOpen}");
+            Log($"gate: open {gm.GateOpen} -> {(gm.GateOpen ? "OPENED with E" : "FAIL: E at the lever did nothing")}");
             yield return Shot("11_gate_open");
             Log("DONE");
         }

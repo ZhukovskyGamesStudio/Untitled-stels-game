@@ -415,8 +415,9 @@ namespace Stealth.EditorTools
 
             e.RouteSign = Prefab(ElementsDir + "/RouteSign.prefab", () =>
             {
-                // A world-space panel over a sewer tunnel, 1.7 x 0.62 m: where it leads, who stands in it.
-                const float w = 380f, h = 140f;
+                // A world-space panel over a sewer tunnel, ~2.0 x 0.45 m, just the two lines it holds: where it leads, how big
+                // and guarded that house is (or the countdown while the car stands in that tunnel).
+                const float w = 300f, h = 66f;
                 var go = new GameObject("RouteSign", typeof(RectTransform));
                 var canvas = go.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.WorldSpace;
@@ -428,14 +429,14 @@ namespace Stealth.EditorTools
                 view.Group = go.AddComponent<CanvasGroup>();
                 view.Frame = Img(Stretch(go.transform, "Frame"), new Color(1f, 1f, 1f, 0.35f));
                 Img(Stretch(view.Frame.rectTransform, "Back", 2f), new Color(0.02f, 0.025f, 0.03f, 0.88f));
-                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(12, -6), new Vector2(w - 24, 30)), "—", 26, TextAnchor.MiddleLeft, Color.white, true);
-                view.Title.rectTransform.sizeDelta = new Vector2(w - 24, 36);
-                Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(12, -44), new Vector2(w - 24, 2)), new Color(1f, 1f, 1f, 0.3f));
-                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(12, -50), new Vector2(w - 24, 60)), "—", 15, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.9f));
-                view.Body.resizeTextForBestFit = true;
-                view.Body.resizeTextMinSize = 11;
-                view.Body.resizeTextMaxSize = 15;
-                view.Votes = Txt(R(go.transform, "Votes", BottomLeft, BottomLeft, new Vector2(12, 6), new Vector2(w - 24, 26)), "", 16, TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.6f), true);
+                view.Title = Txt(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(10, -3), new Vector2(w - 20, 32)), "—", 24, TextAnchor.MiddleLeft, Color.white, true);
+                Img(R(go.transform, "Rule", TopLeft, TopLeft, new Vector2(10, -36), new Vector2(w - 20, 2)), new Color(1f, 1f, 1f, 0.3f));
+                view.Body = Txt(R(go.transform, "Body", TopLeft, TopLeft, new Vector2(10, -39), new Vector2(w - 20, 24)), "—", 16, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.9f));
+                view.Body.resizeTextForBestFit = true; // the main job, the floors and the guards on one line: shrinks to fit
+                view.Body.resizeTextMinSize = 10;
+                view.Body.resizeTextMaxSize = 16;
+                // the countdown takes the body's line (same place, warm colour) instead of a third, mostly empty one
+                view.Votes = Txt(R(go.transform, "Votes", TopLeft, TopLeft, new Vector2(10, -39), new Vector2(w - 20, 24)), "", 16, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.4f), true);
                 SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
                 return go;
             }).GetComponent<RouteSignView>();
@@ -539,6 +540,40 @@ namespace Stealth.EditorTools
             }
 
             view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 20), new Vector2(420, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
+            root.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The vault's switch and sequence locks: a rounded panel, a title, a row of round lamps with their number keys under
+        /// them, the sequence's progress dots, a red flash for a wrong press, the keys to use.
+        /// </summary>
+        static void BuildVaultLock(Transform content)
+        {
+            var holder = R(content, "VaultLock", Center, Center, Vector2.zero, Vector2.zero);
+            var view = holder.gameObject.AddComponent<VaultLockView>();
+            var root = R(holder, "Panel", Center, Center, new Vector2(0, -20), new Vector2(520, 270));
+            view.Root = root.gameObject;
+            var gold = new Color(1f, 0.78f, 0.32f);
+            var edge = Img(root, new Color(gold.r, gold.g, gold.b, 0.45f), S("RoundPanel"));
+            edge.type = Image.Type.Sliced;
+            var back = Img(Stretch(root, "Back", 1.5f), new Color(0.035f, 0.04f, 0.05f, 0.96f), S("RoundPanel"));
+            back.type = Image.Type.Sliced;
+            view.Flash = Img(Stretch(root, "Flash", 2f), new Color(1f, 0.25f, 0.18f, 0.35f), S("RoundPanel"));
+            view.Flash.type = Image.Type.Sliced;
+            view.Title = Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(480, 26)), "", 17, TextAnchor.MiddleCenter, gold, true);
+            const int lamps = 7;
+            view.Lamps = new Image[lamps];
+            view.Keys = new Text[lamps];
+            for (int i = 0; i < lamps; i++)
+            {
+                view.Lamps[i] = Img(R(root, $"Lamp{i}", Center, Center, new Vector2(0, 14), new Vector2(62, 62)), new Color(0.16f, 0.17f, 0.19f), S("Disc"));
+                view.Keys[i] = Txt(R(root, $"Key{i}", Center, Center, new Vector2(0, -46), new Vector2(40, 28)), (i + 1).ToString(), 18, TextAnchor.MiddleCenter, new Color(0.95f, 0.93f, 0.86f), true);
+            }
+            const int dots = 8;
+            view.Dots = new Image[dots];
+            for (int i = 0; i < dots; i++)
+                view.Dots[i] = Img(R(root, $"Dot{i}", Center, Center, new Vector2(0, -90), new Vector2(12, 12)), new Color(1f, 1f, 1f, 0.4f), S("Disc"));
+            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 14), new Vector2(480, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
             root.gameObject.SetActive(false);
         }
 
