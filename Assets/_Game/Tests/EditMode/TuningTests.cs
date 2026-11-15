@@ -92,8 +92,8 @@ namespace Stealth.Tests
         public void DefaultSettingsKeepTheBalanceOfTheCode()
         {
             // The same seed with explicit defaults and without settings: identical houses.
-            var a = LevelGenerator.Generate(77, 3);
-            var b = LevelGenerator.Generate(77, 3, new BuildingSettings(), new SecuritySettings());
+            var a = TestHouses.Get(1, 0);
+            var b = LevelGenerator.Generate(1, 0, new BuildingSettings(), new SecuritySettings());
             Assert.AreEqual(a.Floors, b.Floors);
             CollectionAssert.AreEqual(a.Rooms.Select(r => (r.Type, r.Area)), b.Rooms.Select(r => (r.Type, r.Area)));
             Assert.AreEqual(a.RobotSpawns.Count, b.RobotSpawns.Count);
@@ -103,7 +103,7 @@ namespace Stealth.Tests
         public void SecurityCountsAndRosterFollowTheSettings()
         {
             var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0 };
-            var l = LevelGenerator.Generate(9, 4, null, calm);
+            var l = LevelGenerator.Generate(9, 1, null, calm);
             Assert.AreEqual(0, l.RobotSpawns.Count(r => r.Kind != RobotKind.Warden), "only wardens (HouseFeatures)");
             Assert.AreEqual(0, l.CameraSpots.Count);
             Assert.AreEqual(0, l.LaserSpots.Count);
@@ -116,7 +116,7 @@ namespace Stealth.Tests
         [Test]
         public void LootCountFollowsTheSettings()
         {
-            var l = LevelGenerator.Generate(3, 0);
+            var l = TestHouses.Get(1, 0);
             Assert.Greater(LootPlanner.ItemCount(l, new LootSettings { BaseItems = 20 }), LootPlanner.ItemCount(l));
             Assert.AreEqual(0, LootPlanner.Plan(l, new System.Random(1), new LootSettings { BaseItems = 0, ItemsPerHouse = 0, RoomsPerExtraItem = 1000 }).Count);
         }

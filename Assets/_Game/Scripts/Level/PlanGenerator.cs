@@ -122,9 +122,10 @@ namespace Stealth.Level
 
         /// <summary>
         /// The wings of the building in metres (x, z from 0): a bar, an L, a T, a U, a courtyard or an H, sized to the
-        /// floor area, plus sometimes an annex sticking out. Wings overlap where they meet.
+        /// floor area, plus sometimes an annex sticking out. Wings overlap where they meet. Public for the tests: the
+        /// variety of masses is a property of this function alone.
         /// </summary>
-        static List<RectInt> Mass(System.Random rng, float area, int house, out string kind)
+        public static List<RectInt> Mass(System.Random rng, float area, int house, out string kind)
         {
             var list = new List<RectInt>();
             int Even(float v) => Mathf.Max(2, Mathf.RoundToInt(v / 2f) * 2);

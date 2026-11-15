@@ -7,31 +7,39 @@ namespace Stealth.Tests
 {
     public class DifficultyTests
     {
-        static readonly int[] Seeds = { 1, 2, 3, 4, 5, 6 };
-
         [Test]
         public void BuildingsGrowWithDepth()
         {
-            int prevRooms = 0, prevRobots = 0;
+            // the numbers the generator builds from: rooms per floor, floors and guards never shrink from house to house
+            var b = new BuildingSettings();
+            var sec = new SecuritySettings();
+            float prevRooms = 0f;
+            int prevFloors = 0, prevRobots = 0;
             for (int level = 0; level < 8; level++)
             {
-                var l = LevelGenerator.Generate(1, level);
-                int rooms = Mathf.RoundToInt(l.RoomUnits);
+                float rooms = b.RoomsFor(level, 1);
+                int floors = b.FloorsFor(level), robots = sec.RobotsFor(level, floors, 0);
                 Assert.GreaterOrEqual(rooms, prevRooms, $"level {level}");
-                Assert.GreaterOrEqual(l.RobotSpawns.Count, prevRobots, $"level {level}");
+                Assert.GreaterOrEqual(floors, prevFloors, $"level {level}");
+                Assert.Greater(robots, prevRobots, $"level {level}");
                 prevRooms = rooms;
-                prevRobots = l.RobotSpawns.Count;
+                prevFloors = floors;
+                prevRobots = robots;
             }
-            Assert.Greater(prevRooms, 18);
+            Assert.Greater(prevRooms * prevFloors, 18f);
+            // and a house follows them
+            var first = TestHouses.Get(1, 0);
+            var deep = TestHouses.Get(99991, 4);
+            Assert.Greater(deep.RoomUnits, first.RoomUnits);
+            Assert.Greater(deep.RobotSpawns.Count, first.RobotSpawns.Count);
         }
 
         [Test]
         public void NothingHostileStartsNearTheHatch()
         {
-            foreach (var seed in Seeds)
-                for (int level = 0; level < 6; level++)
+            foreach (var l in TestHouses.Sample)
                 {
-                    var l = LevelGenerator.Generate(seed, level);
+                    int seed = l.Seed, level = l.LevelIndex;
                     foreach (var r in l.RobotSpawns)
                         if (r.Floor == 0)
                         {

@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Dev loop helpers (Git Bash on Windows). Usage:
-#   Tools/dev.sh tests            compile + EditMode tests (FILTER=<name> runs only those)
+#   Tools/dev.sh tests            compile + EditMode tests (FILTER=<name>: only those)
 #   Tools/dev.sh plans            pictures of floor plans: Logs/plans/plan_<seed>_<house>.png
 #   Tools/dev.sh assets           build missing assets (FORCE=1: regenerate everything from code)
 #   Tools/dev.sh player           build Windows player
-#   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario>
+#   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario> (SEEDS=7,42,3: one window per seed, at once)
+#   Tools/dev.sh cycle           ONE Unity launch: missing assets + EditMode tests + development player (scripts only when
+#                                only code changed). FILTER / FORCE / REBUILD as above; NOASSETS / NOTESTS / NOPLAYER / FULL = 1
 set -u
 UNITY="${UNITY:-/d/Apps/Unity/Hub/Editor/6000.6.0f1/Editor/Unity.exe}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,8 +49,32 @@ EOF
     code=$?
     grep -E "error CS|\[Builder\] Player" "$LOGS/build_player.log" | sort -u | head -30
     exit $code ;;
+  cycle)
+    start=$(date +%s)
+    "$UNITY" -batchmode -nographics -projectPath "$P" -executeMethod Stealth.EditorTools.DevCycle.RunBatch ${FORCE:+-force} -logFile "$P/Logs/cycle.log"
+    code=$?
+    grep -E "error CS|Exception|\[Builder\] Assets built|\[Cycle\]" "$LOGS/cycle.log" | sed 's/^\[Cycle\] //' | awk '!seen[$0]++' | head -60
+    echo "cycle: $(( $(date +%s) - start )) s, exit $code"
+    exit $code ;;
   run)
     scenario="${2:-full}"; clients="${3:-0}"
+    if [ -n "${SEEDS:-}" ] && [ "$clients" -eq 0 ]; then
+      # one quiet window per seed, all at once: shots in Builds/shots/<scenario>_<seed>, logs in Builds/host_<seed>.log
+      exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+      pids=()
+      for seed in ${SEEDS//,/ }; do
+        dir="$ROOT/Builds/shots/${scenario}_$seed"; rm -rf "$dir"; mkdir -p "$dir"
+        python "$ROOT/Tools/launch_quiet.py" "$exe" -nosteam -host-local -autotest "$scenario" -seed "$seed" ${PEACEFUL:+-peaceful} ${LEVEL:+-level $LEVEL}           -shotdir "$(cygpath -w "$dir" 2>/dev/null || echo "$dir")" -screen-width ${RESW:-1280} -screen-height ${RESH:-720} -screen-fullscreen 0           -logFile "$P/Builds/host_$seed.log" &
+        pids+=($!)
+      done
+      for pid in "${pids[@]}"; do wait "$pid"; done
+      for seed in ${SEEDS//,/ }; do
+        echo "== seed $seed"
+        grep -h -E "AUTOTEST" "$ROOT/Builds/host_$seed.log" | grep -v screenshot
+        grep -h -i -E "exception" "$ROOT/Builds/host_$seed.log" | sort | uniq -c | head -5
+      done
+      exit 0
+    fi
     shots="$P/Builds/shots/$scenario"
     rm -rf "$ROOT/Builds/shots/$scenario"; mkdir -p "$ROOT/Builds/shots/$scenario"
     exe="$ROOT/Builds/Windows/StealthPrototype.exe"
@@ -72,5 +98,5 @@ EOF
     grep -h -E "AUTOTEST" "${logs[@]}" | grep -v screenshot
     grep -h -i -E "exception|error" "${logs[@]}" | grep -v -i -E "memorysetup|d3d12|licens" | sort | uniq -c | head -20
     ls "$ROOT/Builds/shots/$scenario" ;;
-  *) echo "usage: $0 tests|assets|player|run <scenario> [clients]"; exit 1 ;;
+  *) echo "usage: $0 cycle|tests|assets|player|run <scenario> [clients]"; exit 1 ;;
 esac

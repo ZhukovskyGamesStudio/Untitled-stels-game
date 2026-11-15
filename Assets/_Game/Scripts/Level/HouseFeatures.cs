@@ -300,15 +300,28 @@ namespace Stealth.Level
         public static void PlanObjective(LevelLayout l, FeatureSettings s, Furnisher furnisher)
         {
             if (s == null || l.LevelIndex < s.ObjectivesFromHouse) return;
-            // the house's number in too, and the first draw thrown away: close seeds give close first draws
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, l.LevelIndex + 1));
-            rng.Next();
-            bool vaultFirst = rng.NextDouble() < s.VaultShare;
+            var rng = ObjectiveRandom(l.Seed, l.LevelIndex, s, out bool vaultFirst);
             foreach (bool vault in vaultFirst ? new[] { true, false } : new[] { false, true })
             {
                 if (vault && PlanVault(l, s, rng, furnisher)) { l.Objective = ObjectiveKind.Vault; return; }
                 if (!vault && PlanCage(l, s, rng, furnisher)) { l.Objective = ObjectiveKind.Hostage; return; }
             }
+        }
+
+        /// <summary>Whether the house tries a vault before a hostage (the seed's choice, before the plan says what fits).</summary>
+        public static bool VaultFirst(int seed, int house, FeatureSettings s)
+        {
+            ObjectiveRandom(seed, house, s, out bool vault);
+            return vault;
+        }
+
+        static System.Random ObjectiveRandom(int seed, int house, FeatureSettings s, out bool vaultFirst)
+        {
+            // the house's number in too, and the first draw thrown away: close seeds give close first draws
+            var rng = new System.Random(LevelRandom.Mix(seed, 0x0B7E, house + 1));
+            rng.Next();
+            vaultFirst = rng.NextDouble() < s.VaultShare;
+            return rng;
         }
 
         static int ExitRoomId(LevelLayout l) => l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;

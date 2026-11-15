@@ -132,6 +132,10 @@ namespace Stealth.Net
         [Rpc(SendTo.Server)]
         void OpenSafeRpc(int safe) => GameManager.Instance?.OpenSafeServer(m_Player, safe);
         public void SendMark(Detector target) => MarkRpc(target.GetComponent<NetworkObject>());
+        public void SendMarkThing(Vector3 point) => MarkThingRpc(point);
+
+        [Rpc(SendTo.Server)]
+        void MarkThingRpc(Vector3 point) => m_Player.OnMarkThingRequest(point);
 
         [Rpc(SendTo.Server)]
         void PingRpc(Vector3 position) => m_Player.OnPingRequest(position);

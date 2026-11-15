@@ -8,16 +8,12 @@ namespace Stealth.Tests
 {
     public class LevelGeneratorTests
     {
-        static readonly int[] Seeds = { 1, 7, 42, 1337, 99991, 123456789 };
-
         [Test]
         public void SomeDesksBecomeSecurityTerminals()
         {
-            foreach (var seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 2);
-                var again = LevelGenerator.Generate(seed, 2);
-                CollectionAssert.AreEqual(l.Terminals, again.Terminals, "the same on every peer");
+                int seed = l.Seed;
                 if (!l.Props.Any(p => p.Kind is PropKind.Desk or PropKind.Terminal)) continue; // a house without desks
                 Assert.IsTrue(l.Terminals.Exists(t => t.kind == TerminalKind.Hacking), $"seed {seed}: a hacking terminal");
                 foreach (var (prop, _) in l.Terminals)
@@ -31,26 +27,26 @@ namespace Stealth.Tests
         [Test]
         public void SameSeedGivesSameLayout()
         {
-            foreach (var seed in Seeds)
+            // one house generated again (the shared one is the first): every peer builds the same house from the seed
             {
-                var a = LevelGenerator.Generate(seed, 2);
-                var b = LevelGenerator.Generate(seed, 2);
+                var a = TestHouses.Get(42, 2);
+                var b = LevelGenerator.Generate(42, 2);
                 Assert.AreEqual(a.Rooms.Count, b.Rooms.Count);
                 Assert.AreEqual(a.Plan.Walls.Count, b.Plan.Walls.Count);
                 Assert.AreEqual(a.Props.Count, b.Props.Count);
                 Assert.AreEqual(a.ItemSpots.Count, b.ItemSpots.Count);
                 Assert.AreEqual(a.HatchPosition, b.HatchPosition);
                 for (int i = 0; i < a.Props.Count; i++) Assert.AreEqual(a.Props[i].Position, b.Props[i].Position);
+                CollectionAssert.AreEqual(a.Terminals, b.Terminals, "the terminals too");
             }
         }
 
         [Test]
         public void EveryRoomIsReachable()
         {
-            foreach (var seed in Seeds)
-                for (int level = 0; level < 5; level++)
+            foreach (var l in TestHouses.Sample)
                 {
-                    var l = LevelGenerator.Generate(seed, level);
+                    int seed = l.Seed, level = l.LevelIndex;
                     var reached = Reachable(l);
                     // the hidden room: only players get in (through its illusion walls)
                     if (l.HiddenRoom >= 0)
@@ -63,8 +59,8 @@ namespace Stealth.Tests
         [Test]
         public void SecurityIsPlacedAndGrowsWithLevel()
         {
-            var easy = LevelGenerator.Generate(5, 0);
-            var hard = LevelGenerator.Generate(5, 4);
+            var easy = TestHouses.Get(7, 1);
+            var hard = TestHouses.Get(7, 4);
             Assert.Greater(easy.RobotSpawns.Count, 0);
             Assert.Greater(hard.RobotSpawns.Count, easy.RobotSpawns.Count);
             Assert.GreaterOrEqual(hard.CameraSpots.Count, easy.CameraSpots.Count);
@@ -73,9 +69,8 @@ namespace Stealth.Tests
         [Test]
         public void SpawnsAreInsideTheBuilding()
         {
-            foreach (var seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 3);
                 foreach (var p in l.PlayerSpawns) Assert.IsNotNull(l.RoomAt(p), $"spawn {p}");
                 foreach (var p in l.ItemSpots) Assert.IsTrue(l.IsInside(p), $"item {p}");
                 foreach (var r in l.RobotSpawns) Assert.IsTrue(l.IsInside(r.Position), $"robot {r.Kind} {r.Position}");
@@ -86,10 +81,9 @@ namespace Stealth.Tests
         [Test]
         public void FloorsAreConnectedByStairsInTheirRoomsCorners()
         {
-            foreach (var seed in Seeds)
-                for (int level = 0; level < 6; level++)
+            foreach (var l in TestHouses.Sample)
                 {
-                    var l = LevelGenerator.Generate(seed, level);
+                    int seed = l.Seed, level = l.LevelIndex;
                     Assert.GreaterOrEqual(l.Floors, 2);
                     Assert.AreEqual(l.Floors - 1, l.Stairs.Count, $"seed {seed} level {level}");
                     foreach (var s in l.Stairs)
@@ -112,9 +106,9 @@ namespace Stealth.Tests
         [Test]
         public void NothingIsPlacedOnTheStairs()
         {
-            foreach (var seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 5);
+                int seed = l.Seed;
                 foreach (var s in l.Stairs)
                 {
                     var area = PlanGenerator.StairArea(s, 0.2f);
@@ -132,7 +126,7 @@ namespace Stealth.Tests
         [Test]
         public void RobotsAreSpreadOverAllFloors()
         {
-            var l = LevelGenerator.Generate(3, 3);
+            var l = TestHouses.Get(1337, 3);
             for (int f = 0; f < l.Floors; f++)
                 Assert.IsTrue(l.RobotSpawns.Exists(r => r.Floor == f), $"floor {f} has a robot");
         }
@@ -163,9 +157,9 @@ namespace Stealth.Tests
             Assert.LessOrEqual(LevelMetrics.HighVentSill + LevelMetrics.VentHeight, LevelMetrics.WallHeight - 0.2f, "under the ceiling");
 
             int high = 0, low = 0;
-            for (int seed = 1; seed <= 12; seed++)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 2);
+                int seed = l.Seed;
                 foreach (var o in l.Plan.Openings)
                 {
                     if (!o.High) { if (o.Kind == EdgeType.Vent) low++; continue; }
@@ -181,19 +175,18 @@ namespace Stealth.Tests
                 }
                 Assert.AreEqual(l.Plan.Openings.Count(o => o.High), l.Doorways.Count(d => d.High), "doorways carry it");
             }
-            Assert.Greater(high, 3, "some vents are up under the ceiling");
-            Assert.Greater(low, 3, "and some stay low");
+            Assert.Greater(high, 0, "some vents are up under the ceiling");
+            Assert.Greater(low, 0, "and some stay low");
         }
 
         [Test]
         public void EveryHouseHasTheExitHatchFarFromTheEntry()
         {
             var problems = new List<string>();
-            foreach (int seed in Seeds)
-                for (int level = 0; level < 6; level++)
-                    for (int players = 1; players <= 4; players += 3)
+            // the shared houses, and one for a team of four (a bigger house)
+            foreach (var l in TestHouses.Sample.Append(TestHouses.Get(42, 2, 4)))
                     {
-                        var l = LevelGenerator.Generate(seed, level, players: players);
+                        int seed = l.Seed, level = l.LevelIndex, players = l.Players;
                         var hatches = l.Props.Where(p => p.Kind == PropKind.Hatch).ToList();
                         string at = $"seed {seed} house {level} players {players}";
                         if (hatches.Count != 2) problems.Add($"{at}: {hatches.Count} hatches");

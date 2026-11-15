@@ -9,26 +9,30 @@ namespace Stealth.Tests
     /// <summary>The house's main job: a vault behind three lock panels, or a hostage in a cage whose key a guard carries.</summary>
     public class ObjectiveTests
     {
-        static readonly int[] Seeds = { 1, 7, 42, 1337, 99991, 123456789, 5, 77 };
+        static IEnumerable<LevelLayout> Houses() => TestHouses.Sample;
 
-        static IEnumerable<LevelLayout> Houses()
+        [Test]
+        public void BothKindsOfJobComeUp()
         {
-            foreach (int seed in Seeds)
-                for (int level = 0; level < 5; level++)
-                    yield return LevelGenerator.Generate(seed, level);
+            // the seed's choice alone (no house): about half vaults, half hostages, the house's number mixed in
+            var s = new FeatureSettings();
+            int vaults = 0, total = 0;
+            for (int seed = 1; seed <= 400; seed++)
+                for (int house = 0; house < 5; house++, total++)
+                    if (HouseFeatures.VaultFirst(seed, house, s)) vaults++;
+            Assert.That(vaults / (float)total, Is.InRange(0.4f, 0.6f), $"{vaults} vaults first of {total}");
+            Assert.AreEqual(HouseFeatures.VaultFirst(42, 3, s), HouseFeatures.VaultFirst(42, 3, s), "the same seed, the same job");
         }
 
         [Test]
-        public void NearlyEveryHouseHasAMainJobAndBothKindsComeUp()
+        public void NearlyEveryHouseHasAMainJob()
         {
             var houses = Houses().ToList();
-            int vaults = houses.Count(l => l.Objective == ObjectiveKind.Vault), hostages = houses.Count(l => l.Objective == ObjectiveKind.Hostage);
-            Assert.GreaterOrEqual(vaults + hostages, houses.Count * 9 / 10, $"{vaults} vaults, {hostages} hostages in {houses.Count} houses");
-            Assert.Greater(vaults, houses.Count / 5, "vaults come up");
-            Assert.Greater(hostages, houses.Count / 5, "hostages come up");
-            // the same seed, the same job: the sewer's panel shows it before the house is built
-            var again = LevelGenerator.Generate(Seeds[2], 3);
-            Assert.AreEqual(houses[2 * 5 + 3].Objective, again.Objective);
+            int jobs = houses.Count(l => l.Objective is ObjectiveKind.Vault or ObjectiveKind.Hostage);
+            Assert.GreaterOrEqual(jobs, houses.Count - 1, $"{jobs} jobs in {houses.Count} houses");
+            // the planned job is the seed's choice when it fits
+            int asChosen = houses.Count(l => (l.Objective == ObjectiveKind.Vault) == HouseFeatures.VaultFirst(l.Seed, l.LevelIndex, new FeatureSettings()));
+            Assert.GreaterOrEqual(asChosen, houses.Count / 2, "mostly the seed's choice");
         }
 
         [Test]
@@ -74,8 +78,10 @@ namespace Stealth.Tests
         {
             var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0 };
             int found = 0;
-            for (int seed = 1; seed < 40 && found < 3; seed++)
+            // one calm house (its own generation): the first seed whose choice is the hostage
+            for (int seed = 1; seed < 40 && found < 1; seed++)
             {
+                if (HouseFeatures.VaultFirst(seed, 2, new FeatureSettings())) continue;
                 var l = LevelGenerator.Generate(seed, 2, null, calm);
                 if (l.Objective != ObjectiveKind.Hostage) continue;
                 found++;

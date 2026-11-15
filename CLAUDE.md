@@ -19,15 +19,18 @@
 Unity в batchmode не запустится, если проект открыт в редакторе — закрой его или работай через редактор.
 
 ```bash
-Tools/dev.sh tests              # компиляция + все EditMode-тесты (итог и упавшие — в конце вывода)
+Tools/dev.sh cycle              # ОДИН запуск Unity: недостающие ассеты + EditMode-тесты + development-билд (только скрипты, если менялся лишь код)
+NOASSETS=1 NOTESTS=1 Tools/dev.sh cycle  # шаги можно пропускать (NOPLAYER=1 — без билда, FULL=1 — полный билд); FILTER/FORCE/REBUILD как ниже
+Tools/dev.sh tests              # компиляция + все EditMode-тесты (итог и упавшие — в конце вывода); в открытом редакторе — MCP run_tests
 Tools/dev.sh assets             # дособрать недостающие ассеты (существующие префабы не трогает)
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
 REBUILD_UI=1 Tools/dev.sh assets  # пересобрать только UI-префабы (HUD, меню, инвентарь, элементы)
 REBUILD=RobotGuard,Safe Tools/dev.sh assets  # пересобрать только эти префабы (по имени файла), GUID сохраняются
 FILTER=HousePlanTests Tools/dev.sh tests  # только эти тесты
 PLANS="7:3,42:5" Tools/dev.sh plans       # картинки планов домов (сид:дом) в Logs/plans/
-Tools/dev.sh player             # Windows-билд в Builds/Windows/StealthPrototype.exe
+Tools/dev.sh player             # релизный Windows-билд в Builds/Windows/StealthPrototype.exe (cycle собирает development)
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
+SEEDS=7,42,3 Tools/dev.sh run sewer          # несколько сидов сразу, по окну на сид: Builds/shots/<сценарий>_<сид>, Builds/host_<сид>.log
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
 ```
 

@@ -121,6 +121,9 @@ namespace Stealth.Game
         void SendPing(Vector3 position);
         /// <summary>Owner → server: mark this robot / device for the team.</summary>
         void SendMark(Detector target);
+
+        /// <summary>Owner → server: mark the thing at this point for the team (loot, a crate, a panel…; not a robot).</summary>
+        void SendMarkThing(Vector3 point);
         /// <summary>Owner → server: hide in the hatch (true) or climb back out (false).</summary>
         void SendHatch(bool hide);
         /// <summary>Owner → server: finished hacking the lock of this door (index in the layout's doors).</summary>

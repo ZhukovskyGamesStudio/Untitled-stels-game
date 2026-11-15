@@ -243,6 +243,15 @@ namespace Stealth.Game
             standAt.y = sewer.Gate.transform.position.y + 0.05f;
             LookFrom(standAt, lever.Point);
             yield return new WaitForSeconds(0.5f);
+            // the lever on the wall: the brick right behind its back, open air in front of it
+            var lp = lever.transform.position;
+            var outOfWall = lever.Point - lp;
+            outOfWall.y = 0f;
+            bool behind = Physics.Raycast(lp + outOfWall.normalized * 0.3f, -outOfWall.normalized, out var wallHit, 0.6f, ~0, QueryTriggerInteraction.Ignore);
+            float gap = behind ? wallHit.distance - 0.3f : float.NaN;
+            bool front = !Physics.Raycast(lp + outOfWall.normalized * 0.2f, outOfWall.normalized, 0.6f, ~0, QueryTriggerInteraction.Ignore);
+            Log($"lever: at {sewer.Gate.transform.InverseTransformPoint(lp)} (gate's frame), wall behind it {gap:0.000} m, free in front {front} -> " +
+                (behind && Mathf.Abs(gap) < 0.03f && front ? "ON THE WALL" : "FAIL: not on the wall"));
             Log($"at the lever: target {(Me.UseTarget != null ? Me.UseTarget.name : "none")}, prompt '{Me.UsePrompt}'");
             yield return Shot("10_gate_shut");
             yield return HoldKeys(1.2f, UnityEngine.InputSystem.Key.E);

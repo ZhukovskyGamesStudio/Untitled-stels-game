@@ -8,64 +8,62 @@ namespace Stealth.Tests
 {
     public class LootPlannerTests
     {
-        static readonly int[] Seeds = { 1, 2, 3, 42, 777 };
-
+        // loot planning is cheap: many draws over the shared houses (generating a house is the slow part)
         [Test]
         public void ItemsAreSpacedApart()
         {
-            foreach (var seed in Seeds)
-            {
-                var loot = LootPlanner.Plan(LevelGenerator.Generate(seed, 3), new System.Random(seed));
-                for (int i = 0; i < loot.Count; i++)
-                    for (int j = i + 1; j < loot.Count; j++)
-                        Assert.GreaterOrEqual(Vector3.Distance(loot[i].Position, loot[j].Position), new LootSettings().MinSpacing - 1e-4f);
-            }
+            foreach (var l in TestHouses.Sample)
+                for (int k = 0; k < 4; k++)
+                {
+                    var loot = LootPlanner.Plan(l, new System.Random(k));
+                    for (int i = 0; i < loot.Count; i++)
+                        for (int j = i + 1; j < loot.Count; j++)
+                            Assert.GreaterOrEqual(Vector3.Distance(loot[i].Position, loot[j].Position), new LootSettings().MinSpacing - 1e-4f, $"seed {l.Seed}");
+                }
         }
 
         [Test]
         public void EveryFloorGetsLoot()
         {
-            foreach (var seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 4);
-                var loot = LootPlanner.Plan(l, new System.Random(seed));
+                var loot = LootPlanner.Plan(l, new System.Random(l.Seed));
                 for (int f = 0; f < l.Floors; f++)
-                    Assert.IsTrue(loot.Any(x => LevelLayout.FloorOf(x.Position.y) == f), $"seed {seed} floor {f}");
+                    Assert.IsTrue(loot.Any(x => LevelLayout.FloorOf(x.Position.y) == f), $"seed {l.Seed} floor {f}");
             }
         }
 
         [Test]
         public void EnoughLootForTheQuotaAndMoreOnDeeperLevels()
         {
-            int Total(int level)
+            int Total(LevelLayout l)
             {
                 int sum = 0;
-                foreach (var seed in Seeds)
-                    foreach (var x in LootPlanner.Plan(LevelGenerator.Generate(seed, level), new System.Random(seed)))
+                for (int k = 0; k < 8; k++)
+                    foreach (var x in LootPlanner.Plan(l, new System.Random(k)))
                         sum += ItemCatalog.Value(x.Shape, x.Color);
-                return sum / Seeds.Length;
+                return sum / 8;
             }
-            int easy = Total(0), hard = Total(5);
-            Assert.Greater(easy, 100, "level 0 has enough loot for a sensible quota");
-            Assert.Greater(hard, easy * 2, "deeper buildings are much richer");
+            int easy = Total(TestHouses.Get(1, 0)), hard = Total(TestHouses.Get(99991, 4));
+            Assert.Greater(easy, 100, "the first house has enough loot for a sensible quota");
+            Assert.Greater(hard, easy * 2, $"deeper buildings are much richer: {easy} → {hard}");
         }
 
         [Test]
         public void HigherFloorsAreRicherOnAverage()
         {
-            float low = 0, high = 0;
-            int nl = 0, nh = 0;
-            foreach (var seed in Enumerable.Range(1, 40))
+            // a higher floor adds to the bonus, and a bigger bonus draws more valuable colours
+            var s = new LootSettings();
+            Assert.Greater(s.BonusPerFloor, 0);
+            float Mean(int bonus)
             {
-                var l = LevelGenerator.Generate(seed, 3);
-                foreach (var x in LootPlanner.Plan(l, new System.Random(seed)))
-                {
-                    int f = LevelLayout.FloorOf(x.Position.y);
-                    if (f == 0) { low += ItemCatalog.Colors[x.Color].Multiplier; nl++; }
-                    if (f == l.Floors - 1) { high += ItemCatalog.Colors[x.Color].Multiplier; nh++; }
-                }
+                var rng = new System.Random(5);
+                float sum = 0f;
+                for (int i = 0; i < 4000; i++) sum += ItemCatalog.Colors[ItemCatalog.RandomColor(rng, bonus)].Multiplier;
+                return sum / 4000f;
             }
-            Assert.Greater(high / nh, low / nl);
+            float ground = Mean(3 * s.BonusPerHouse), top = Mean(3 * s.BonusPerHouse + 2 * s.BonusPerFloor);
+            Assert.Greater(top, ground * 1.05f, $"ground {ground:0.00}, two floors up {top:0.00}");
         }
     }
 }

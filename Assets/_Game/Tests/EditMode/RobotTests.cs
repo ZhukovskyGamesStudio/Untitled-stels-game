@@ -73,12 +73,12 @@ namespace Stealth.Tests
         [Test]
         public void LevelsPlaceRobotsAndDevicesOfKnownKinds()
         {
-            var l = LevelGenerator.Generate(3, 5);
+            var l = TestHouses.Get(99991, 4);
             int devices = 0, robots = 0;
             foreach (var r in l.RobotSpawns)
             {
                 if (r.Kind == RobotKind.Warden) continue; // placed at loot rooms by HouseFeatures, not by the roster
-                Assert.IsTrue(RobotRoster.IsUnlocked(r.Kind, 5));
+                Assert.IsTrue(RobotRoster.IsUnlocked(r.Kind, l.LevelIndex), r.Kind.ToString());
                 if (RobotRoster.IsDevice(r.Kind)) devices++; else robots++;
             }
             Assert.Greater(robots, 4);
@@ -257,9 +257,10 @@ namespace Stealth.Tests
             var second = RobotRoster.Newcomers(roster.Robots, 1);
             CollectionAssert.Contains(second, RobotKind.Spider);
             CollectionAssert.Contains(second, RobotKind.Sweeper);
-            for (int seed = 1; seed <= 20; seed++)
+            // the shared second house
             {
-                var l = LevelGenerator.Generate(seed, 1);
+                var l = TestHouses.Get(7, 1);
+                int seed = l.Seed;
                 foreach (var kind in second)
                     Assert.IsTrue(l.RobotSpawns.Exists(r => r.Kind == kind), $"seed {seed}: no {kind} in the house that introduces it");
             }

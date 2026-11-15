@@ -143,20 +143,31 @@ namespace Stealth.EditorTools
         /// </summary>
         static void AddXrayFeature()
         {
+            AddXray(XrayMaterialPath, "MarkedXray", new[] { "MarkedXray", "MarkedXrayOutline", "MarkedXrayFill" }, Stealth.Enemies.Detector.XrayLayer,
+                null, null);
+            // marked things (loot, crates, panels…): the same three passes on their own layer, in yellow-green
+            AddXray(MaterialsDir + "/FX/MarkedThingXray.mat", "MarkedThingXray", new[] { "MarkedThing", "MarkedThingOutline", "MarkedThingFill" },
+                Stealth.Level.MarkedThings.XrayLayer, new Color(0.75f, 1f, 0.2f, 0.36f), new Color(0.85f, 1f, 0.35f, 1f));
+        }
+
+        /// <summary>Three RenderObjects passes of the x-ray shader (mask, outline, fill) on one layer, with their material (colours: null = the shader's).</summary>
+        static void AddXray(string materialPath, string materialName, string[] names, int layer, Color? fill, Color? edge)
+        {
             var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
             var shader = Shader.Find("Stealth/MarkedXray");
-            if (data == null || shader == null) { Debug.LogWarning("[Builder] no PC renderer or x-ray shader: marked robots are not seen through walls"); return; }
-            var mat = AssetDatabase.LoadAssetAtPath<Material>(XrayMaterialPath);
+            if (data == null || shader == null) { Debug.LogWarning("[Builder] no PC renderer or x-ray shader: marked things are not seen through walls"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
             if (mat == null)
             {
                 EnsureFolder(MaterialsDir + "/FX");
-                mat = new Material(shader) { name = "MarkedXray" };
-                AssetDatabase.CreateAsset(mat, XrayMaterialPath);
+                mat = new Material(shader) { name = materialName };
+                if (fill.HasValue) mat.SetColor("_Color", fill.Value);
+                if (edge.HasValue) mat.SetColor("_Edge", edge.Value);
+                AssetDatabase.CreateAsset(mat, materialPath);
             }
             else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
 
             // Three passes of the same material, in this order: mask (stencil), outline outside it, fill inside it.
-            string[] names = { "MarkedXray", "MarkedXrayOutline", "MarkedXrayFill" };
             for (int pass = 0; pass < names.Length; pass++)
             {
                 var feature = data.rendererFeatures.OfType<RenderObjects>().FirstOrDefault(f => f.name == names[pass]);
@@ -179,7 +190,7 @@ namespace Stealth.EditorTools
                 s.passTag = names[pass];
                 s.Event = RenderPassEvent.AfterRenderingTransparents;
                 s.filterSettings.RenderQueueType = RenderQueueType.Opaque;
-                s.filterSettings.LayerMask = 1 << Stealth.Enemies.Detector.XrayLayer;
+                s.filterSettings.LayerMask = 1 << layer;
                 s.overrideMode = RenderObjects.RenderObjectsSettings.OverrideMaterialMode.Material;
                 s.overrideMaterial = mat;
                 s.overrideMaterialPassIndex = pass;

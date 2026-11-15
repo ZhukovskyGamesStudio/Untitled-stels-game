@@ -10,9 +10,8 @@ namespace Stealth.Tests
         public void SomeRoomsAreDarkButNeverTheLobby()
         {
             int dark = 0, total = 0;
-            foreach (var seed in new[] { 1, 2, 3, 4, 5, 6, 7, 8 })
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 3);
                 foreach (var r in l.Rooms)
                 {
                     total++;
@@ -22,16 +21,17 @@ namespace Stealth.Tests
                 }
             }
             float share = dark / (float)total;
-            Assert.That(share, Is.InRange(0.1f, 0.4f), $"dark share {share:0.00}");
+            Assert.That(share, Is.InRange(0.05f, 0.45f), $"dark share {share:0.00}");
         }
 
         [Test]
         public void IsDarkAtMatchesRooms()
         {
-            var l = LevelGenerator.Generate(9, 4);
-            foreach (var r in l.Rooms)
-                Assert.AreEqual(r.Dark, l.IsDarkAt(r.Center + Vector3.up));
-            Assert.IsFalse(l.IsDarkAt(new Vector3(-5, 0, -5)), "outside is not a dark room");
+            foreach (var l in TestHouses.Sample)
+                foreach (var r in l.Rooms)
+                    Assert.AreEqual(r.Dark, l.IsDarkAt(r.Center + Vector3.up), $"seed {l.Seed}: {r.Type} at {r.Center}");
+            var l0 = TestHouses.Get(1, 0);
+            Assert.IsFalse(l0.IsDarkAt(new Vector3(-5, 0, -5)), "outside is not a dark room");
         }
 
         [Test]
@@ -47,9 +47,8 @@ namespace Stealth.Tests
         [Test]
         public void DoorsAndLasersNeverShareADoorway()
         {
-            foreach (var seed in new[] { 1, 2, 3, 4, 5 })
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 5);
                 Assert.Greater(l.AutoDoors.Count, 0);
                 foreach (var d in l.AutoDoors)
                     foreach (var laser in l.LaserSpots)

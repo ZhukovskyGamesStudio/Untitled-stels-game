@@ -41,8 +41,8 @@ namespace Stealth.Tests
                 Assert.Greater(four, solo, $"house {house}");
                 Assert.Less(four, solo * 2.1f, "much softer than x4");
             }
-            var small = LevelGenerator.Generate(7, 1, players: 1);
-            var big = LevelGenerator.Generate(7, 1, players: 4);
+            var small = TestHouses.Get(42, 2);
+            var big = TestHouses.Get(42, 2, 4);
             Assert.AreEqual(4, big.Players);
             Assert.Greater(big.RoomUnits, small.RoomUnits);
             Assert.Greater(big.RobotSpawns.Count, small.RobotSpawns.Count, "more rooms, more guards");
@@ -87,7 +87,7 @@ namespace Stealth.Tests
         [Test]
         public void NothingIsSeenUntilSomebodyLooks()
         {
-            var l = LevelGenerator.Generate(3, 1);
+            var l = TestHouses.Get(7, 1);
             var map = new ExplorationMap(l);
             Assert.AreEqual(0f, map.RevealedShare(0));
             Assert.AreEqual(Mathf.CeilToInt((l.SizeX + 2f * ExplorationMap.Margin) / ExplorationMap.Tile), map.Width);
@@ -104,7 +104,7 @@ namespace Stealth.Tests
         [Test]
         public void WallsHideTheNextRoomDoorsShowIt()
         {
-            var l = LevelGenerator.Generate(11, 2);
+            var l = TestHouses.Get(42, 2);
             int checkedWalls = 0, checkedDoors = 0;
             var plan = l.Plan;
             for (int i = 0; i < plan.Walls.Count; i++)
@@ -116,7 +116,8 @@ namespace Stealth.Tests
                 var openings = plan.OpeningsOf(i);
                 // straight through the middle of the wall: an opening there lets the view through, a wall does not
                 bool through = ExplorationMap.CanSee(l, 0, mid - n * 0.6f, mid + n * 0.6f);
-                bool open = openings.Any(o => o.Kind == EdgeType.Open || Mathf.Abs(o.At - w.Length / 2f) < LevelMetrics.ClearWidth(o.Width) / 2f - 0.05f);
+                // (an illusion wall of the hidden room is an opening the view does not pass)
+                bool open = openings.Any(o => o.Kind == EdgeType.Open || o.Kind != EdgeType.Illusion && Mathf.Abs(o.At - w.Length / 2f) < LevelMetrics.ClearWidth(o.Width) / 2f - 0.05f);
                 bool solid = !openings.Any(o => o.Kind == EdgeType.Open || Mathf.Abs(o.At - w.Length / 2f) < o.Width / 2f + 0.1f);
                 if (open) { Assert.IsTrue(through, $"through the opening at {mid}"); checkedDoors++; }
                 else if (solid) { Assert.IsFalse(through, $"through the wall at {mid}"); checkedWalls++; }
@@ -131,16 +132,16 @@ namespace Stealth.Tests
         public void PassingADoorRevealsWhatIsSeenThroughIt()
         {
             int checkedDoors = 0;
-            foreach (int seed in new[] { 11, 12, 13, 14 })
+            foreach (var l in TestHouses.Sample)
             {
-                // plain doors only (a hidden room changes the walls these cases were picked from)
-                var l = LevelGenerator.Generate(seed, 2, null, null, 1, new FeatureSettings { HiddenRoomChance = 0f });
+                int seed = l.Seed;
                 var plan = l.Plan;
                 foreach (var o in plan.Openings)
                 {
                     if (o.Kind != EdgeType.Door) continue;
                     var w = plan.Walls[o.Wall];
                     if (w.Floor != 0 || w.Railing || w.Shaped || w.RoomA < 0 || w.RoomB < 0) continue;
+                    if (l.HiddenRoom >= 0 && (w.RoomA == l.HiddenRoom || w.RoomB == l.HiddenRoom)) continue; // plain doors only
                     var n = new Vector2(-w.Dir.y, w.Dir.x);
                     var door = w.At(o.At);
                     var eye = door - n * 1.2f;                                  // a step in front of the door
@@ -167,7 +168,7 @@ namespace Stealth.Tests
         [Test]
         public void OutsideTheMapOpensOnlyCloseBy()
         {
-            var l = LevelGenerator.Generate(5, 1);
+            var l = TestHouses.Get(7, 1);
             var map = new ExplorationMap(l);
             var eye = new Vector3(-3f, 1.6f, l.SizeZ / 2f); // in the yard, 3 m off the building's side
             Assert.Greater(map.RevealAround(eye, 14f, 4f), 0, "the yard round the player opens");
@@ -214,7 +215,7 @@ namespace Stealth.Tests
         [Test]
         public void PeersMergeWhatTheOthersSaw()
         {
-            var l = LevelGenerator.Generate(4, 0);
+            var l = TestHouses.Get(1, 0);
             var server = new ExplorationMap(l);
             var client = new ExplorationMap(l);
             var ground = l.Rooms.Where(r => r.Floor == 0).OrderBy(r => r.Center.x + r.Center.z).ToList();
@@ -230,7 +231,7 @@ namespace Stealth.Tests
         [Test]
         public void TheMapDrawsOnlyWhatWasSeen()
         {
-            var l = LevelGenerator.Generate(6, 1);
+            var l = TestHouses.Get(7, 1);
             var map = new ExplorationMap(l);
             var rects = new List<MapRect>();
             MapSketch.Build(map, 0, null, rects);

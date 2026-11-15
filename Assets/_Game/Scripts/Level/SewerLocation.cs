@@ -118,6 +118,7 @@ namespace Stealth.Level
                 Gate.name = "Gate";
                 Gate.transform.localPosition = new Vector3(plan.GateX, 0f, 0f);
                 foreach (var use in Gate.GetComponentsInChildren<Interactable>()) use.Configure(0);
+                PlaceLever(Gate);
             }
 
             // where the team stands when it comes down: at the exit's ladder (after a house) or around the car (the start)
@@ -170,6 +171,47 @@ namespace Stealth.Level
                 Water = water.transform;
                 m_WaterBase = Water.localPosition.y;
             }
+        }
+
+        /// <summary>The lever's height on the wall and the stretch past the gate (exit side, +X) it may hang along.</summary>
+        static readonly float[] LeverAlong = { 1.2f, 1.6f, 2.0f, 2.4f, 2.8f, 3.2f, 0.9f };
+        const float LeverHeight = 1.25f;
+
+        /// <summary>
+        /// Hangs the gate's lever on the real face of the tunnel's wall on the exit's side: the segments differ (ribs at
+        /// their joints, niches, pipes), so a fixed spot sank into the brick in some of them and E never reached it. A ray
+        /// from the tunnel's axis finds the wall at a few heights; the first stretch where it is flat takes the lever, its
+        /// back (the model's origin) on the brick.
+        /// </summary>
+        void PlaceLever(SewerGate gate)
+        {
+            var lever = gate.GetComponentInChildren<GateLever>();
+            if (lever == null) return;
+            Physics.SyncTransforms();
+            var g = gate.transform;
+            float side = Mathf.Sign(g.InverseTransformPoint(lever.transform.position).z);
+            if (side == 0f) side = 1f;
+            float Wall(float x, float y)
+            {
+                var from = g.TransformPoint(new Vector3(x, y, 0f));
+                var dir = g.forward * side;
+                var hits = Physics.RaycastAll(from, dir, 8f, ~0, QueryTriggerInteraction.Ignore);
+                float best = float.MaxValue;
+                foreach (var h in hits)
+                    if (!h.collider.transform.IsChildOf(g) && h.distance < best) best = h.distance;
+                return best < float.MaxValue ? best : -1f;
+            }
+            foreach (float x in LeverAlong)
+            {
+                float a = Wall(x, LeverHeight - 0.25f), b = Wall(x, LeverHeight), c = Wall(x, LeverHeight + 0.25f);
+                float l = Wall(x - 0.2f, LeverHeight), r = Wall(x + 0.2f, LeverHeight);
+                if (a < 0f || b < 0f || c < 0f || l < 0f || r < 0f) continue;
+                float flat = Mathf.Max(Mathf.Abs(a - b), Mathf.Abs(c - b), Mathf.Abs(l - b), Mathf.Abs(r - b));
+                if (flat > 0.03f) continue; // a rib, a niche, a pipe: further along
+                lever.transform.localPosition = new Vector3(x, LeverHeight, side * (b - 0.005f));
+                return;
+            }
+            Debug.LogWarning("[Sewer] no flat wall for the gate's lever: left where the prefab has it");
         }
 
         // ------------------------------------------------------------------ queries

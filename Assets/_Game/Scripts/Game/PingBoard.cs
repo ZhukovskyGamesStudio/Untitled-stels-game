@@ -3,8 +3,11 @@ using UnityEngine;
 
 namespace Stealth.Game
 {
-    /// <summary>"Here!" — a spot; Enemy — a robot marked for the team (it is also lit through walls while marked).</summary>
-    public enum PingKind : byte { Here, Enemy }
+    /// <summary>
+    /// "Here!" — a spot; Enemy — a robot marked for the team (it is also lit through walls while marked); Thing — a thing
+    /// marked for the team (loot, a crate, a panel…: lit through walls in yellow-green, <see cref="Level.MarkedThings"/>).
+    /// </summary>
+    public enum PingKind : byte { Here, Enemy, Thing }
 
     public struct TeamPing
     {
@@ -31,7 +34,7 @@ namespace Stealth.Game
         public float PingDuration = 8f;
         [Tooltip("How far a ping reaches along the view, metres.")]
         public float PingRange = 80f;
-        [Tooltip("Seconds a marked robot is shown through walls to the whole team.")]
+        [Tooltip("Seconds a marked robot or thing is shown through walls to the whole team.")]
         public float MarkDuration = 12f;
         [Tooltip("How far a robot can be marked, metres.")]
         public float MarkRange = 45f;
@@ -56,7 +59,12 @@ namespace Stealth.Game
             for (int i = m_Pings.Count - 1; i >= 0; i--)
             {
                 var o = m_Pings[i];
-                bool same = p.Kind == PingKind.Here ? o.Kind == PingKind.Here && o.Owner == p.Owner : o.Kind == PingKind.Enemy && o.Target == p.Target;
+                bool same = p.Kind switch
+                {
+                    PingKind.Here => o.Kind == PingKind.Here && o.Owner == p.Owner,
+                    PingKind.Thing => o.Kind == PingKind.Thing && (o.Position - p.Position).sqrMagnitude < 0.25f, // the same thing marked again
+                    _ => o.Kind == PingKind.Enemy && o.Target == p.Target,
+                };
                 if (same) m_Pings.RemoveAt(i);
             }
             m_Pings.Add(p);

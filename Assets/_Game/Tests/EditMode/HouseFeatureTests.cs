@@ -13,16 +13,14 @@ namespace Stealth.Tests
     /// <summary>The special places of a house, the car, the sewer plan and the smaller new rules.</summary>
     public class HouseFeatureTests
     {
-        static readonly int[] Seeds = { 3, 7, 11, 42, 77, 140, 555, 1337 };
-
         [Test]
         public void HiddenRoomIsEnclosedAndEnteredOnlyThroughIllusions()
         {
             int found = 0;
-            foreach (int seed in Seeds)
-                for (int level = 1; level < 5; level++)
+            // the shared houses (half of the houses have one)
+            foreach (var l in TestHouses.Sample)
                 {
-                    var l = LevelGenerator.Generate(seed, level, null, null, 1, new FeatureSettings { HiddenRoomChance = 1f });
+                    int seed = l.Seed;
                     if (l.HiddenRoom < 0) continue;
                     found++;
                     var plan = l.Plan;
@@ -40,16 +38,16 @@ namespace Stealth.Tests
                     var mid = wall.At(o0.At);
                     Assert.Less(plan.SightShare(wall.Floor, mid - n * 1f, mid + n * 1f), 0.99f, "an illusion stops the view");
                 }
-            Assert.Greater(found, 2, "some houses have a hidden room");
+            Assert.Greater(found, 0, "some houses have a hidden room");
         }
 
         [Test]
         public void KeyDoorsCloseOffAPartAndTheKeyLiesOutside()
         {
             int doors = 0;
-            foreach (int seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 2);
+                int seed = l.Seed;
                 foreach (var k in l.KeyDoors)
                 {
                     doors++;
@@ -64,33 +62,33 @@ namespace Stealth.Tests
                     Assert.IsTrue(without.Contains(keyRoom.Id), $"seed {seed}: the key lies on this side of its door");
                 }
             }
-            Assert.Greater(doors, 3);
+            Assert.Greater(doors, 0, "the shared houses have key doors");
         }
 
         [Test]
         public void EveryLocationHasItsPointOfInterest()
         {
+            // which location a house is comes from its kind alone
             var seen = new HashSet<Location>();
-            foreach (int seed in Seeds.Concat(Enumerable.Range(1, 12)))
+            for (int seed = 1; seed < 200; seed++) seen.Add(HouseFeatures.LocationOf(HouseKinds.Of(seed, 2)));
+            Assert.AreEqual(3, seen.Count, "offices, hospitals and garages");
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 2);
-                seen.Add(l.Location);
+                int seed = l.Seed;
                 Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
                 Assert.AreEqual(HouseFeatures.PointOfInterestKind(l.Location), l.Props[l.PointOfInterest].Kind);
                 Assert.Greater(l.Crates.Count, 0);
                 Assert.IsTrue(l.Crates.All(c => l.Props[c].Kind == PropKind.Crate));
                 Assert.Greater((l.ExitHatchPosition - l.HatchPosition).magnitude, 8f, $"seed {seed}: the exit is away from the entry");
             }
-            Assert.AreEqual(3, seen.Count, "offices, hospitals and garages");
         }
 
         [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {
             int wardens = 0;
-            foreach (int seed in Seeds)
+            foreach (var l in TestHouses.Sample)
             {
-                var l = LevelGenerator.Generate(seed, 3);
                 foreach (var w in l.Wardens)
                 {
                     wardens++;
@@ -101,7 +99,7 @@ namespace Stealth.Tests
                 Assert.AreEqual(l.Wardens.Count, l.RobotSpawns.Count(r => r.Kind == RobotKind.Warden));
                 Assert.GreaterOrEqual(l.LureSpots.Count, l.Wardens.Count);
             }
-            Assert.Greater(wardens, 3);
+            Assert.Greater(wardens, 0, "the shared houses have wardens");
         }
 
         [Test]

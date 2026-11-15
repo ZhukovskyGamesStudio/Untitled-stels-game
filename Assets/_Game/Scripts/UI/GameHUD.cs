@@ -338,6 +338,18 @@ namespace Stealth.UI
                 var red = new Color(1f, 0.25f, 0.18f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
                 Callout(cam, size, top, red, Loc.F("hud.metres", Vector3.Distance(me.transform.position, d.Position)), false, 0f);
             }
+            // marked things: lit through walls (their layer) and a yellow-green marker over each
+            s_ThingMarks.Clear();
+            foreach (var p in gm.Pings.Active)
+            {
+                if (p.Kind != PingKind.Thing) continue;
+                s_ThingMarks.Add(p.Position);
+                if (cam == null) continue;
+                float left = p.Until - now;
+                var green = new Color(0.8f, 1f, 0.25f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
+                Callout(cam, size, p.Position + Vector3.up * 0.35f, green, Loc.F("hud.metres", Vector3.Distance(me.transform.position, p.Position)), p.Age(now) < 0.6f, p.Age(now));
+            }
+            MarkedThings.Show(s_ThingMarks);
             if (cam != null)
                 foreach (var p in gm.Pings.Active)
                 {
@@ -348,6 +360,8 @@ namespace Stealth.UI
                 }
             m_Callouts.End();
         }
+
+        static readonly List<Vector3> s_ThingMarks = new();
 
         void Callout(Camera cam, Vector2 size, Vector3 world, Color color, string label, bool ring, float age)
         {

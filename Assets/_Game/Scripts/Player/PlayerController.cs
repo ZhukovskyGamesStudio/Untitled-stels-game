@@ -984,6 +984,13 @@ namespace Stealth.Player
                     else OnMarkRequest(target);
                     return;
                 }
+                // not a robot: a thing (loot, a crate, a panel…) — marked for the team in yellow-green
+                if (MarkedThings.Target(view.position, view.forward, Team.MarkRange, out var point) != null)
+                {
+                    if (m_Link != null) m_Link.SendMarkThing(point);
+                    else OnMarkThingRequest(point);
+                    return;
+                }
             }
             if (!Physics.Raycast(view.position, view.forward, out var hit, Team.PingRange, Perception.SightMask, QueryTriggerInteraction.Ignore)) return;
             var spot = hit.point + hit.normal * 0.05f;
@@ -1293,6 +1300,14 @@ namespace Stealth.Player
             var gm = GameManager.Instance;
             if (gm == null || (AtTerminal < 0 && !WithinCallRange(position, Team.PingRange + 5f))) return;
             gm.CalloutServer(ClientId, PingKind.Here, position, null);
+        }
+
+        /// <summary>Server: the owner marked a thing (every peer finds it at this point and lights it through walls).</summary>
+        public void OnMarkThingRequest(Vector3 point)
+        {
+            var gm = GameManager.Instance;
+            if (gm == null || (AtTerminal < 0 && !WithinCallRange(point, Team.MarkRange + 5f))) return;
+            gm.CalloutServer(ClientId, PingKind.Thing, point, null);
         }
 
         /// <summary>Server: the owner marked a robot / device.</summary>

@@ -64,6 +64,8 @@ namespace Stealth.Tests
     {
         public readonly List<float> Noises = new();
         public readonly List<Vector3> HitFeedback = new();
+        public readonly List<Vector3> MarkedThings = new();
+        public void SendMarkThing(Vector3 point) => MarkedThings.Add(point);
         public readonly List<PlayerController> Revives = new();
         public readonly List<Detector> Hacks = new();
         public int GasKnockouts, Teleports;

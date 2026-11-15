@@ -10,15 +10,27 @@ namespace Stealth.Tests
     /// <summary>The architecture a visual style adds to the house: where it goes and what it never covers.</summary>
     public class ArchitectureTests
     {
-        [TearDown]
-        public void TearDown() => ActiveLevel.Clear();
+        static LevelShell s_Shell;
+        static LevelLayout s_Layout;
 
-        static LevelShell Shell(int seed, int level, out LevelLayout layout)
+        [OneTimeTearDown]
+        public void TearDown()
         {
-            layout = LevelGenerator.Generate(seed, level);
-            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
-            ActiveLevel.Load(layout, art);
-            return ActiveLevel.Shell;
+            ActiveLevel.Clear();
+            s_Shell = null;
+        }
+
+        /// <summary>One shared house built once for the fixture (the planner only reads its shell).</summary>
+        static LevelShell Shell(out LevelLayout layout)
+        {
+            if (s_Shell == null || ActiveLevel.Layout != s_Layout)
+            {
+                s_Layout = TestHouses.Get(99991, 4);
+                ActiveLevel.Load(s_Layout, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
+                s_Shell = ActiveLevel.Shell;
+            }
+            layout = s_Layout;
+            return s_Shell;
         }
 
         static StyleGeometry Everything(CeilingKind ceiling) => new()
@@ -30,7 +42,7 @@ namespace Stealth.Tests
         [Test]
         public void DecayAndPostersAreSeededStayOnTheirSurfacesAndSkipTheWindows()
         {
-            var shell = Shell(6, 3, out var layout);
+            var shell = Shell(out var layout);
             Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
             var g = new StyleGeometry
             {
@@ -79,7 +91,7 @@ namespace Stealth.Tests
         [Test]
         public void TheShellRecordsWallsFloorsOpeningsAndWindows()
         {
-            var shell = Shell(3, 2, out var layout);
+            var shell = Shell(out var layout);
             Assert.IsNotEmpty(shell.Walls);
             Assert.IsNotEmpty(shell.Openings);
             Assert.AreEqual(LevelBuilder.WindowSpots(layout).Count, shell.Windows.Count);
@@ -100,7 +112,7 @@ namespace Stealth.Tests
         [Test]
         public void TrimsNeverCrossADoorwayAndFinishesSkipTheWindows()
         {
-            var shell = Shell(5, 3, out var layout);
+            var shell = Shell(out var layout);
             var pieces = ArchitecturePlanner.Plan(shell, layout, Everything(CeilingKind.Coffers));
             foreach (var o in shell.Openings.Where(o => !o.Vent))
             {
@@ -131,7 +143,7 @@ namespace Stealth.Tests
         [TestCase(DoorTrim.Pilasters)]
         public void LowTrimsStopWhereTheDoorTrimStarts(DoorTrim trim)
         {
-            var shell = Shell(5, 3, out var layout);
+            var shell = Shell(out var layout);
             var g = new StyleGeometry { Baseboard = true, Crown = true, RailHeight = 0.9f, Doors = trim };
             var pieces = ArchitecturePlanner.Plan(shell, layout, g);
             var panels = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { WainscotHeight = 1f, Doors = trim });
@@ -171,7 +183,7 @@ namespace Stealth.Tests
             Assert.IsFalse(StyleDecor.IsWallPart(DecorKind.Pilaster, "Body", g));
             Assert.IsFalse(StyleDecor.IsWallPart(DecorKind.Arch, "Body", new StyleGeometry { Doors = DoorTrim.Arch }), "no finish: nothing to continue");
             // a point on a wall gets the texture coordinate the wall's finish quad gives it
-            var shell = Shell(5, 3, out var layout);
+            var shell = Shell(out var layout);
             g.WallTile = 1.7f;
             int n = 0;
             foreach (var p in ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.WallFinish && Mathf.Abs((p.Rotation * Vector3.forward).y) < 0.1f).Take(400))
@@ -198,7 +210,7 @@ namespace Stealth.Tests
         [Test]
         public void CeilingPiecesAvoidStairHolesAndLamps()
         {
-            var shell = Shell(8, 4, out var layout);
+            var shell = Shell(out var layout);
             foreach (var kind in new[] { CeilingKind.Beams, CeilingKind.Coffers, CeilingKind.Trays })
             {
                 var pieces = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { Ceiling = kind });

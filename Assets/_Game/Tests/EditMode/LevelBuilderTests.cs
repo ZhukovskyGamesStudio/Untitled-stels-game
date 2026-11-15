@@ -10,16 +10,24 @@ namespace Stealth.Tests
     /// <summary>Geometry built from prefabs: stair placement, lights, lamps, the built level itself.</summary>
     public class LevelBuilderTests
     {
-        [TearDown]
+        [OneTimeTearDown]
         public void Cleanup() => ActiveLevel.Clear();
+
+        /// <summary>One shared house, built once for the fixture's scene tests (they only look at it).</summary>
+        static GameObject Built(out LevelLayout layout)
+        {
+            layout = TestHouses.Get(99991, 4);
+            if (ActiveLevel.Layout != layout || ActiveLevel.Root == null)
+                ActiveLevel.Load(layout, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
+            return ActiveLevel.Root;
+        }
 
         static readonly Vector2Int[] Corners = { new(1, 1), new(-1, -1), new(1, -1), new(-1, 1) };
 
         [Test]
-        public void TheBuiltHouseHasBothHatches([Values(7, 42, 1337)] int seed, [Values(0, 3)] int level)
+        public void TheBuiltHouseHasBothHatches()
         {
-            var l = LevelGenerator.Generate(seed, level);
-            ActiveLevel.Load(l, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
+            Built(out var l);
             var hatches = Object.FindObjectsByType<Hatch>(FindObjectsSortMode.None);
             Assert.AreEqual(2, hatches.Length, "the way in and the way out");
             Assert.IsTrue(hatches.Any(h => (h.transform.position - l.ExitHatchPosition).magnitude < 0.1f), "one stands at the exit");
@@ -75,9 +83,7 @@ namespace Stealth.Tests
         [Test]
         public void BuiltLevelIsMadeOfPrefabInstances()
         {
-            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
-            var layout = LevelGenerator.Generate(77, 3);
-            var root = ActiveLevel.Load(layout, art);
+            var root = Built(out var layout);
             Assert.AreSame(layout, ActiveLevel.Layout);
             Assert.AreEqual(layout.Stairs.Count, CountNamed(root, "Stairs_"), "one staircase prefab per stair");
             int exits = layout.Doorways.Count(d => d.Exterior && d.Kind == EdgeType.Door);
@@ -89,8 +95,6 @@ namespace Stealth.Tests
             Assert.IsNotNull(root.GetComponent<Unity.AI.Navigation.NavMeshSurface>(), "the root carries the navmesh surface");
             int vents = layout.Doorways.Count(d => d.Kind == EdgeType.Vent);
             Assert.AreEqual(vents, CountNamed(root, "VentFrame"));
-            ActiveLevel.Clear();
-            Assert.IsNull(ActiveLevel.Layout);
         }
 
         static readonly HashSet<string> Floors = new() { "Floor", "Slab", "Roof", "OutsideGround", "Fence" };
@@ -101,11 +105,9 @@ namespace Stealth.Tests
         /// (blinds and sills stick into the room) count as well.
         /// </summary>
         [Test]
-        public void FurnitureDoesNotClip([Values(3, 21, 77, 140, 555)] int seed)
+        public void FurnitureDoesNotClip()
         {
-            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
-            var layout = LevelGenerator.Generate(seed, 4);
-            var root = ActiveLevel.Load(layout, art);
+            var root = Built(out _);
             var scratch = new GameObject("ClipProbe");
             try
             {
@@ -165,9 +167,9 @@ namespace Stealth.Tests
         [Test]
         public void WindowsFaceIntoTheBuilding()
         {
-            foreach (var seed in new[] { 3, 21, 77 })
+            foreach (var layout in TestHouses.Sample)
             {
-                var layout = LevelGenerator.Generate(seed, 3);
+                int seed = layout.Seed;
                 var spots = LevelBuilder.WindowSpots(layout);
                 Assert.Greater(spots.Count, 10, "windows along the facades");
                 foreach (var (pos, yaw) in spots)

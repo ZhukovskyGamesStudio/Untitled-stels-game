@@ -131,6 +131,10 @@ namespace Stealth.Level
         public int LasersPerHouse = 1;
         [Tooltip("A bigger team gets a bigger house: one more robot per this many rooms it adds (all floors).")]
         public int TeamRoomsPerExtraRobot = 10;
+
+        /// <summary>Mobile robots in a house: base, per house, per floor above the ground and per rooms a bigger team adds.</summary>
+        public int RobotsFor(int house, int floors, int teamRooms) =>
+            Robots + house * RobotsPerHouse + (floors - 1) * RobotsPerExtraFloor + teamRooms / Mathf.Max(1, TeamRoomsPerExtraRobot);
         [Tooltip("…and one more device per this many.")]
         public int TeamRoomsPerExtraDevice = 15;
         [Tooltip("House (0-based) from which lasers can move up and down.")]
@@ -457,7 +461,7 @@ namespace Stealth.Level
             // A bigger team gets a bigger house — and the guards to go with it.
             float solo = b.RoomsFor(level, 1) * l.Floors;
             int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
-            int robots = s.Robots + level * s.RobotsPerHouse + (l.Floors - 1) * s.RobotsPerExtraFloor + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraRobot);
+            int robots = s.RobotsFor(level, l.Floors, teamRooms);
             var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)

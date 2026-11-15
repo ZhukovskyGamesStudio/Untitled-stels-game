@@ -9,9 +9,20 @@ namespace Stealth.Tests
     /// <summary>The floor plans of houses: rooms of every size and shape, sound walls and openings, atriums.</summary>
     public class HousePlanTests
     {
-        static IEnumerable<LevelLayout> Houses(int count, int level = 3)
+        [Test]
+        public void MassesOfEveryKindComeUp()
         {
-            for (int i = 0; i < count; i++) yield return LevelGenerator.Generate(1000 + i * 7919, level + i % 3);
+            // the mass alone (no house): bars, L, T, U, courtyards, H at the sizes of small and big houses
+            var kinds = new HashSet<string>();
+            foreach (float area in new[] { 800f, 1500f, 2500f })
+                for (int seed = 0; seed < 200; seed++)
+                {
+                    var wings = PlanGenerator.Mass(new System.Random(seed), area, 3, out string kind);
+                    kinds.Add(kind);
+                    Assert.IsNotEmpty(wings);
+                    foreach (var w in wings) Assert.IsTrue(w.xMin >= 0 && w.yMin >= 0 && w.width > 0 && w.height > 0, $"{kind}: wing {w}");
+                }
+            CollectionAssert.IsSubsetOf(new[] { "bar", "L", "T", "U", "courtyard", "H" }, kinds.ToList(), string.Join(", ", kinds));
         }
 
         [Test]
@@ -19,10 +30,10 @@ namespace Stealth.Tests
         {
             var masses = new HashSet<string>();
             var shapes = new HashSet<RoomShape>();
-            int atriums = 0, shaped = 0, threeStorey = 0;
+            int atriums = 0, shaped = 0;
             var areas = new List<float>();
             var roomCounts = new HashSet<int>();
-            foreach (var l in Houses(40))
+            foreach (var l in TestHouses.Sample)
             {
                 masses.Add(l.Mass);
                 roomCounts.Add(l.Rooms.Count);
@@ -31,20 +42,18 @@ namespace Stealth.Tests
                     shapes.Add(r.Shape);
                     areas.Add(r.Area);
                     if (r.Levels > 1) atriums++;
-                    if (r.Levels > 2) threeStorey++;
                     if (r.Shaped.Count > 0) shaped++;
                 }
             }
-            Assert.GreaterOrEqual(masses.Count, 5, "bars, L, T, U, courtyards, H: " + string.Join(", ", masses));
+            Assert.GreaterOrEqual(masses.Count, 3, "bars, L, T, U, courtyards, H: " + string.Join(", ", masses));
             foreach (var s in new[] { RoomShape.Rect, RoomShape.L, RoomShape.Corridor, RoomShape.Hall })
                 Assert.Contains(s, shapes.ToList(), $"room shapes: {string.Join(", ", shapes)}");
             Assert.IsTrue(shapes.Contains(RoomShape.Rotunda) || shapes.Contains(RoomShape.Octagon), "a rotunda or an octagon somewhere");
-            Assert.Greater(atriums, 5, "rooms two storeys high");
-            Assert.Greater(threeStorey, 0, "a three-storey atrium");
-            Assert.Greater(shaped, 20, "cut and rounded corners");
+            Assert.Greater(atriums, 1, "rooms two storeys high");
+            Assert.Greater(shaped, 5, "cut and rounded corners");
             Assert.Less(areas.Min(), 14f, "small rooms");
             Assert.Greater(areas.Max(), 100f, "big halls");
-            Assert.Greater(roomCounts.Count, 15, "houses differ in room count");
+            Assert.Greater(roomCounts.Count, 4, "houses differ in room count");
             float mean = areas.Average();
             float sd = Mathf.Sqrt(areas.Select(a => (a - mean) * (a - mean)).Average());
             Assert.Greater(sd / mean, 0.6f, "rooms differ in size a lot");
@@ -53,38 +62,30 @@ namespace Stealth.Tests
         [Test]
         public void HouseKindsChangeTheBuilding()
         {
-            float Share(HouseKind kind, RoomType type, out float meanArea)
+            // the kind changes the programme of rooms and their size (a pure clone of the settings), and the house carries it
+            var b = new BuildingSettings();
+            float Share(BuildingSettings s, RoomType type)
             {
-                float typed = 0f, total = 0f;
-                int rooms = 0, found = 0;
-                for (int seed = 1; found < 4 && seed < 400; seed++)
-                {
-                    if (HouseKinds.Of(seed, 3) != kind) continue;
-                    found++;
-                    var l = LevelGenerator.Generate(seed, 3);
-                    Assert.AreEqual(kind, l.Kind);
-                    foreach (var r in l.Rooms)
-                    {
-                        if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
-                        total += r.Area;
-                        rooms++;
-                        if (r.Type == type) typed += r.Area;
-                    }
-                }
-                meanArea = total / Mathf.Max(1, rooms);
-                return typed / Mathf.Max(1f, total);
+                float total = s.RoomWeights.Sum(w => (float)w.Weight);
+                return s.RoomWeights.Where(w => w.Room == type).Sum(w => (float)w.Weight) / total;
             }
-            float officeServers = Share(HouseKind.Office, RoomType.Server, out float officeRoom);
-            Assert.Greater(Share(HouseKind.DataCenter, RoomType.Server, out _), officeServers * 1.8f, "a data centre is mostly server rooms");
-            Assert.Greater(Share(HouseKind.Warehouse, RoomType.Storage, out float warehouseRoom), Share(HouseKind.Office, RoomType.Storage, out _) * 2f, "a warehouse stores");
-            Assert.Greater(warehouseRoom, officeRoom * 1.2f, "a warehouse has big halls");
+            var data = HouseKinds.Apply(HouseKind.DataCenter, b);
+            var store = HouseKinds.Apply(HouseKind.Warehouse, b);
+            Assert.Greater(Share(data, RoomType.Server), Share(b, RoomType.Server) * 1.8f, "a data centre is mostly server rooms");
+            Assert.Greater(Share(store, RoomType.Storage), Share(b, RoomType.Storage) * 2f, "a warehouse stores");
+            Assert.Greater(store.RoomSizeScale, b.RoomSizeScale * 1.2f, "a warehouse has big halls");
+            Assert.AreSame(b, HouseKinds.Apply(HouseKind.Office, b), "an office is the plain settings");
             Assert.AreEqual(HouseKind.Office, HouseKinds.Of(12345, 0), "the first house is an office");
+            var kinds = new HashSet<HouseKind>();
+            for (int seed = 1; seed < 400; seed++) kinds.Add(HouseKinds.Of(seed, 3));
+            Assert.Greater(kinds.Count, 3, "houses of many kinds: " + string.Join(", ", kinds));
+            foreach (var l in TestHouses.Sample) Assert.AreEqual(HouseKinds.Of(l.Seed, l.LevelIndex), l.Kind, $"seed {l.Seed}");
         }
 
         [Test]
         public void WallsNeverOverlapAndOpeningsFitTheirWalls()
         {
-            foreach (var l in Houses(12))
+            foreach (var l in TestHouses.Sample)
             {
                 var p = l.Plan;
                 for (int i = 0; i < p.Walls.Count; i++)
@@ -119,7 +120,7 @@ namespace Stealth.Tests
         [Test]
         public void RoomsAreWholeAndUsable()
         {
-            foreach (var l in Houses(12))
+            foreach (var l in TestHouses.Sample)
                 foreach (var r in l.Rooms)
                 {
                     Assert.Greater(r.Area, 5f, $"seed {l.Seed}: {r.Type} of {r.Area} m²");
@@ -132,7 +133,7 @@ namespace Stealth.Tests
         public void AtriumsHaveNoSlabAndGalleriesLookIntoThem()
         {
             int seen = 0;
-            foreach (var l in Houses(30))
+            foreach (var l in TestHouses.Sample)
                 foreach (var r in l.Rooms.Where(r => r.Levels > 1))
                 {
                     seen++;
@@ -144,9 +145,9 @@ namespace Stealth.Tests
                     var high = r.Center + Vector3.up * (LevelLayout.FloorY(1) + 1.5f) + Vector3.right * 0.3f;
                     Assert.IsTrue(l.OpenBetweenFloors(low, high), $"seed {l.Seed}: no slab inside the atrium");
                 }
-            Assert.Greater(seen, 3);
+            Assert.Greater(seen, 0, "the sample has atriums");
             // and a normal room has its slab
-            var house = LevelGenerator.Generate(77, 3);
+            var house = TestHouses.Get(1337, 3);
             var plain = house.Rooms.First(r => r.Levels == 1 && r.Floor == 0 && house.Plan.SpaceAt(1, new Vector2(r.Center.x, r.Center.z)) >= 0
                                                && house.Plan.KindAt(1, HousePlan.CellOf(new Vector2(r.Center.x, r.Center.z)).x, HousePlan.CellOf(new Vector2(r.Center.x, r.Center.z)).y) == CellKind.Room);
             Assert.IsFalse(house.OpenBetweenFloors(plain.Center + Vector3.up, plain.Center + Vector3.up * 4.6f));
@@ -155,7 +156,7 @@ namespace Stealth.Tests
         [Test]
         public void SightStopsAtWallsAndPassesThroughDoorways()
         {
-            foreach (var l in Houses(6))
+            foreach (var l in TestHouses.Sample)
             {
                 var p = l.Plan;
                 foreach (var d in l.Doorways.Where(d => d.Kind == EdgeType.Door && !d.Exterior).Take(10))

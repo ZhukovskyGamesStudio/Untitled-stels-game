@@ -11,19 +11,20 @@ namespace Stealth.Tests
     /// <summary>Builds real level geometry in the editor, bakes the navmesh and checks paths between floors.</summary>
     public class LevelNavMeshTests
     {
-        GameObject m_Root;
+        // one shared house, built and baked once for the fixture: every test only asks the navmesh
+        const int Seed = 99991, Level = 4;
         LevelLayout m_Layout;
 
-        void Build(int seed, int level)
+        [OneTimeSetUp]
+        public void Build()
         {
             var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
             Assert.IsNotNull(art, "run Stealth/Build Prototype Assets first");
-            m_Layout = LevelGenerator.Generate(seed, level);
-            m_Root = ActiveLevel.Load(m_Layout, art);
-            m_Root.GetComponent<NavMeshSurface>().BuildNavMesh(); // configured in the LevelRoot prefab
+            m_Layout = TestHouses.Get(Seed, Level);
+            ActiveLevel.Load(m_Layout, art).GetComponent<NavMeshSurface>().BuildNavMesh(); // configured in the LevelRoot prefab
         }
 
-        [TearDown]
+        [OneTimeTearDown]
         public void Cleanup()
         {
             NavMesh.RemoveAllNavMeshData();
@@ -39,9 +40,9 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void EveryFloorIsReachableFromTheHatchByStairs([Values(1, 42, 1337)] int seed)
+        public void EveryFloorIsReachableFromTheHatchByStairs()
         {
-            Build(seed, 3);
+            const int seed = Seed;
             foreach (var r in m_Layout.Rooms)
                 if (r.Id != m_Layout.HiddenRoom) // robots never get into the hidden room
                 {
@@ -53,9 +54,8 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void WithoutStairsAreaRobotsStayOnTheirFloor([Values(7, 99991)] int seed)
+        public void WithoutStairsAreaRobotsStayOnTheirFloor()
         {
-            Build(seed, 2);
             int noStairs = NavMesh.AllAreas & ~(1 << LevelMetrics.StairsArea);
             var upstairs = LevelLayout.StairEnds(m_Layout.Stairs[0]).top;
             Assert.IsTrue(Reach(m_Layout.HatchPosition, upstairs, NavMesh.AllAreas));
@@ -63,9 +63,9 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void RobotsCannotUseVents([Values(1, 2, 3)] int seed)
+        public void RobotsCannotUseVents()
         {
-            Build(seed, 4);
+            const int seed = Seed;
             int checkedVents = 0;
             foreach (var d in m_Layout.Doorways)
                     {
@@ -89,9 +89,9 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void ItemSpotsAreOnTheNavMeshOrFurniture([Values(5, 123456789)] int seed)
+        public void ItemSpotsAreOnTheNavMeshOrFurniture()
         {
-            Build(seed, 4);
+            const int seed = Seed;
             foreach (var spot in m_Layout.ItemSpots)
             {
                 // Spots on desks / shelves are above the floor: there must be walkable floor of the same storey nearby.

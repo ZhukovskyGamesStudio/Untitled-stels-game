@@ -76,7 +76,10 @@ namespace Stealth.Level
                 if (prop == null) continue;
                 foreach (var r in prop.GetComponentsInChildren<MeshRenderer>())
                 {
-                    if (r.GetComponentInParent<KeepUnmerged>() != null || !MeshBatcher.CanMerge(r, out var mesh)) continue;
+                    // things that are used (and can be marked: their layer changes) draw themselves
+                    if (r.GetComponentInParent<KeepUnmerged>() != null || r.GetComponentInParent<Interactable>() != null
+                        || r.GetComponentInParent<Items.SafeBox>() != null || r.GetComponentInParent<SecurityTerminal>() != null
+                        || !MeshBatcher.CanMerge(r, out var mesh)) continue;
                     batcher.Add(r, mesh);
                     merged.Add(r);
                 }

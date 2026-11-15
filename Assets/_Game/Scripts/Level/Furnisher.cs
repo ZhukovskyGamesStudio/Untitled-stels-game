@@ -70,17 +70,78 @@ namespace Stealth.Level
         readonly LevelLayout m_L;
         readonly HousePlan m_P;
         readonly System.Random m_Rng;
-        readonly List<Rect>[] m_Taken;   // per floor: placed footprints
-        readonly List<Rect>[] m_Keep;    // per floor: must stay clear (doorways, stairs, the hatch)
+        readonly RectGrid[] m_Taken;   // per floor: placed footprints
+        readonly RectGrid[] m_Keep;    // per floor: must stay clear (doorways, stairs, the hatch)
+
+        /// <summary>
+        /// Rectangles of a floor in 2 m buckets: "does anything overlap this?" looks only at the buckets the question touches
+        /// (a big house has hundreds of pieces per floor; scanning them all for every try was most of the furnishing time).
+        /// The answers are exactly those of a full scan.
+        /// </summary>
+        sealed class RectGrid
+        {
+            const float Cell = 2f;
+            readonly Dictionary<long, List<int>> m_Buckets = new();
+            readonly List<Rect> m_Rects = new();
+            int m_Stamp;
+            readonly List<int> m_Mark = new();
+
+            static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
+            static int C(float v) => Mathf.FloorToInt(v / Cell);
+
+            public void Add(Rect r)
+            {
+                int i = m_Rects.Count;
+                m_Rects.Add(r);
+                m_Mark.Add(0);
+                for (int x = C(r.xMin); x <= C(r.xMax); x++)
+                    for (int z = C(r.yMin); z <= C(r.yMax); z++)
+                    {
+                        if (!m_Buckets.TryGetValue(Key(x, z), out var list)) m_Buckets[Key(x, z)] = list = new List<int>();
+                        list.Add(i);
+                    }
+            }
+
+            public void Clear()
+            {
+                m_Buckets.Clear();
+                m_Rects.Clear();
+                m_Mark.Clear();
+            }
+
+            public bool Overlaps(Rect q)
+            {
+                m_Stamp++;
+                for (int x = C(q.xMin); x <= C(q.xMax); x++)
+                    for (int z = C(q.yMin); z <= C(q.yMax); z++)
+                    {
+                        if (!m_Buckets.TryGetValue(Key(x, z), out var list)) continue;
+                        foreach (int i in list)
+                        {
+                            if (m_Mark[i] == m_Stamp) continue;
+                            m_Mark[i] = m_Stamp;
+                            if (m_Rects[i].Overlaps(q)) return true;
+                        }
+                    }
+                return false;
+            }
+
+            public bool Contains(Vector2 p)
+            {
+                if (!m_Buckets.TryGetValue(Key(C(p.x), C(p.y)), out var list)) return false;
+                foreach (int i in list) if (m_Rects[i].Contains(p)) return true;
+                return false;
+            }
+        }
 
         public Furnisher(LevelLayout l, System.Random rng)
         {
             m_L = l;
             m_P = l.Plan;
             m_Rng = rng;
-            m_Taken = new List<Rect>[m_P.Floors];
-            m_Keep = new List<Rect>[m_P.Floors];
-            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new List<Rect>(); m_Keep[f] = new List<Rect>(); }
+            m_Taken = new RectGrid[m_P.Floors];
+            m_Keep = new RectGrid[m_P.Floors];
+            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); }
             foreach (var d in l.Doorways)
             {
                 // the doorway and a step either side of it stay free (an open passage: the whole wall)
@@ -177,8 +238,8 @@ namespace Stealth.Level
         bool Clear(int floor, Rect r, float gap)
         {
             var g = Grow(r, gap);
-            foreach (var t in m_Taken[floor]) if (t.Overlaps(g)) return false;
-            foreach (var k in m_Keep[floor]) if (k.Overlaps(r)) return false;
+            if (m_Taken[floor].Overlaps(g)) return false;
+            if (m_Keep[floor].Overlaps(r)) return false;
             return true;
         }
 
@@ -197,7 +258,7 @@ namespace Stealth.Level
                     // a walkway in front of a group along a wall: nothing placed there already, and still the room's floor
                     var ahead = Rect.MinMaxRect(Mathf.Min(r.xMin, r.xMin + n.x * Aisle), Mathf.Min(r.yMin, r.yMin + n.z * Aisle),
                                                 Mathf.Max(r.xMax, r.xMax + n.x * Aisle), Mathf.Max(r.yMax, r.yMax + n.z * Aisle));
-                    foreach (var t in m_Taken[f]) if (t.Overlaps(ahead)) return false;
+                    if (m_Taken[f].Overlaps(ahead)) return false;
                 }
                 rects.Add(r);
             }
@@ -557,6 +618,18 @@ namespace Stealth.Level
                     lost[start] = true;
                     stack.Push(start);
                 }
+                // and the unreached ends of stairs: furniture can wall off the approach to a flight inside a room that is
+                // reached itself (a narrow strip beside the stair), and then the whole floor beyond is lost
+                foreach (var s in m_L.Stairs)
+                {
+                    var (bottom, top) = LevelLayout.StairEnds(s);
+                    foreach (int end in new[] { Nearest(s.Floor, new Vector2(bottom.x, bottom.z), s.Room), Nearest(s.Floor + 1, new Vector2(top.x, top.z), s.RoomAbove) })
+                    {
+                        if (end < 0 || seen[end] || lost[end]) continue;
+                        lost[end] = true;
+                        stack.Push(end);
+                    }
+                }
                 while (stack.Count > 0)
                 {
                     int i = stack.Pop();
@@ -845,7 +918,7 @@ namespace Stealth.Level
                     {
                         var q = c + n * d;
                         if (!InRoom(room.Floor, room.Id, q.x, q.z)) return false;
-                        foreach (var t in m_Taken[room.Floor]) if (d > 0.2f && t.Contains(new Vector2(q.x, q.z))) return false;
+                        if (d > 0.2f && m_Taken[room.Floor].Contains(new Vector2(q.x, q.z))) return false;
                     }
             }
             return true;

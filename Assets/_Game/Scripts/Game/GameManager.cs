@@ -476,10 +476,10 @@ namespace Stealth.Game
         public void ReceivePing(ulong owner, PingKind kind, Vector3 position, ulong target)
         {
             var team = Tuning.Player.Team;
-            float duration = kind == PingKind.Enemy ? team.MarkDuration : team.PingDuration;
+            float duration = kind is PingKind.Enemy or PingKind.Thing ? team.MarkDuration : team.PingDuration;
             Pings.Add(new TeamPing { Owner = owner, Kind = kind, Position = position, Target = target, Born = Time.time, Until = Time.time + duration });
             var bank = Audio.Sfx.Bank;
-            Audio.Sfx.Ui(kind == PingKind.Enemy ? bank?.Mark : bank?.Ping, 0.8f);
+            Audio.Sfx.Ui(kind is PingKind.Enemy or PingKind.Thing ? bank?.Mark : bank?.Ping, 0.8f);
         }
 
         /// <summary>Server: publish when the next hunter comes, and warn the team a minute before.</summary>

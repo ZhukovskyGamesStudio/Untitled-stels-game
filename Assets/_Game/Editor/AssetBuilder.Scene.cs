@@ -207,21 +207,30 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ player build
 
+        public const string PlayerExe = "Builds/Windows/StealthPrototype.exe";
+
         [MenuItem("Stealth/Build Windows Player")]
-        public static void BuildPlayerWindows()
+        public static void BuildPlayerWindows() =>
+            // DEV=1: a development player, so the perf scenario can read the profiler's markers (per script, per system)
+            BuildPlayerWindows(System.Environment.GetEnvironmentVariable("DEV") == "1" ? BuildOptions.Development : BuildOptions.None);
+
+        /// <summary>The Windows player with these options (DevCycle: development, scripts only when only code changed).</summary>
+        public static bool BuildPlayerWindows(BuildOptions options)
         {
-            const string exe = "Builds/Windows/StealthPrototype.exe";
+            // a release build replaces the development one: the next dev cycle must not patch only its scripts
+            if ((options & BuildOptions.Development) == 0 && File.Exists("Builds/Windows/dev_build_stamp.txt")) File.Delete("Builds/Windows/dev_build_stamp.txt");
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },
-                locationPathName = exe,
+                locationPathName = PlayerExe,
                 target = BuildTarget.StandaloneWindows64,
-                // DEV=1: a development player, so the perf scenario can read the profiler's markers (per script, per system)
-                options = System.Environment.GetEnvironmentVariable("DEV") == "1" ? BuildOptions.Development : BuildOptions.None,
+                options = options,
             });
+            bool ok = report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded;
             Debug.Log($"[Builder] Player build: {report.summary.result}, {report.summary.totalErrors} errors, {report.summary.totalSize / (1024 * 1024)} MB");
-            if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded && File.Exists("steam_appid.txt"))
-                File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(exe)!, "steam_appid.txt"), true);
+            if (ok && File.Exists("steam_appid.txt"))
+                File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(PlayerExe)!, "steam_appid.txt"), true);
+            return ok;
         }
 
         public static void BuildPlayerBatch()
