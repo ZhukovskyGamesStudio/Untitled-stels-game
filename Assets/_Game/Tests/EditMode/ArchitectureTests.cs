@@ -135,9 +135,8 @@ namespace Stealth.Tests
             var g = new StyleGeometry { Baseboard = true, Crown = true, RailHeight = 0.9f, Doors = trim };
             var pieces = ArchitecturePlanner.Plan(shell, layout, g);
             var panels = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { WainscotHeight = 1f, Doors = trim });
-            float reach = ArchitecturePlanner.TrimReach(trim);
             int checkedRuns = 0;
-            foreach (var o in shell.Openings.Where(o => !o.Vent && !o.Exterior))
+            foreach (var o in shell.Openings.Where(o => !o.Exterior))
                 foreach (var p in pieces.Concat(panels).Where(p => p.Kind is DecorKind.Baseboard or DecorKind.Rail or DecorKind.Wainscot))
                 {
                     var d = p.Position - o.Center;
@@ -145,16 +144,55 @@ namespace Stealth.Tests
                     if (!sameWall) continue;
                     float along = Mathf.Abs(Vector3.Dot(d, o.Along));
                     float half = Mathf.Abs(Vector3.Dot(p.Rotation * Vector3.right, o.Along)) * p.Scale.x / 2f;
+                    float reach = ArchitecturePlanner.ReachOf(o, g);
                     if (along - half > o.Width / 2f + reach + 1f) continue; // far along the wall
                     checkedRuns++;
                     Assert.Greater(along - half + 0.001f, o.Width / 2f + reach,
-                        $"{p.Kind} at {p.Position} pokes into the {trim} of the doorway at {o.Center}");
+                        $"{p.Kind} at {p.Position} pokes into the {(o.Vent ? "vent's flange" : o.Squeeze ? "slot's frame" : trim.ToString())} of the opening at {o.Center}");
                 }
             Assert.Greater(checkedRuns, 0, "runs next to doorways were checked");
+            // vents and squeeze slots have frames of their own: no door trim on them
+            foreach (var o in shell.Openings.Where(o => o.Vent || o.Squeeze))
+                Assert.IsFalse(pieces.Any(p => p.Kind is DecorKind.Arch or DecorKind.Casing or DecorKind.Pilaster &&
+                                               Vector3.Distance(p.Position, o.Center) < o.Width / 2f + 0.6f),
+                    $"a {trim} on the {(o.Vent ? "vent" : "slot")} at {o.Center}");
             if (trim == DoorTrim.Casing) return;
             foreach (var p in pieces.Where(p => p.Kind == DecorKind.Pilaster))
                 Assert.AreEqual(LevelMetrics.WallHeight - ArchitecturePlanner.CrownDrop, p.Scale.y * LevelMetrics.WallHeight, 1e-3f,
                     "a pilaster stops under the cornice, which runs on over its capital");
+        }
+
+        [Test]
+        public void TheArchsSpandrelsContinueTheWallsFinishWithoutASeam()
+        {
+            var g = Everything(CeilingKind.None);
+            Assert.IsTrue(StyleDecor.IsWallPart(DecorKind.Arch, "Body", g), "the spandrels are the wall");
+            Assert.IsFalse(StyleDecor.IsWallPart(DecorKind.Arch, "Accent", g), "the moulding is trim");
+            Assert.IsFalse(StyleDecor.IsWallPart(DecorKind.Pilaster, "Body", g));
+            Assert.IsFalse(StyleDecor.IsWallPart(DecorKind.Arch, "Body", new StyleGeometry { Doors = DoorTrim.Arch }), "no finish: nothing to continue");
+            // a point on a wall gets the texture coordinate the wall's finish quad gives it
+            var shell = Shell(5, 3, out var layout);
+            g.WallTile = 1.7f;
+            int n = 0;
+            foreach (var p in ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.WallFinish && Mathf.Abs((p.Rotation * Vector3.forward).y) < 0.1f).Take(400))
+            {
+                var right = p.Rotation * Vector3.right;
+                var corner = p.Position - right * (p.Scale.x / 2f) - Vector3.up * (p.Scale.y / 2f); // the quad's uv (0, 0)
+                bool reveal = Mathf.Abs(Mathf.Abs(p.Surface.x) - LevelMetrics.WallThickness) < 1e-3f && p.Scale.x < LevelMetrics.WallThickness + 1e-3f;
+                // a face: its normal is the wall's; a reveal (across the wall's thickness): the wall runs along its normal
+                var normal = -(p.Rotation * Vector3.forward);
+                var wallRight = reveal ? normal : right;
+                var wall = new WallProjection
+                {
+                    Right = wallRight, Normal = Vector3.Cross(wallRight, Vector3.up), Across = ArchitecturePlanner.Across(wallRight),
+                    Tile = g.WallTile, FloorY = corner.y - p.Surface.w,
+                };
+                var uv = MeshBatcher.Project(wall, corner, normal);
+                Assert.AreEqual(p.Surface.z / g.WallTile, uv.x, 1e-3f, reveal ? "across the wall, like the arch's soffit" : "along the wall");
+                Assert.AreEqual(p.Surface.w / g.WallTile, uv.y, 1e-3f, "up the wall");
+                n++;
+            }
+            Assert.Greater(n, 0);
         }
 
         [Test]

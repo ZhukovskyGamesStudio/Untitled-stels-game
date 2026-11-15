@@ -179,7 +179,8 @@ namespace Stealth.Level
                 list.Add(new DecorPiece { Kind = kind, Position = At((a + b) / 2f, y), Rotation = rot, Scale = new Vector3(b - a, 1f, 1f) });
             }
 
-            bool wainscot = fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + 0.02f;
+            // under a vent the panels must clear its bottom flange too
+            bool wainscot = fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + (toTop ? 0.02f : FrameReach);
             if (fullHeight && g.Baseboard && !wainscot && f.Y1 >= 0.2f) foreach (var (a, b) in low) Run(DecorKind.Baseboard, 0f, a, b);
             if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight, u0, u1);
             if (fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, g.RailHeight, a, b);
@@ -227,21 +228,29 @@ namespace Stealth.Level
             _ => 0f,
         };
 
+        /// <summary>How far the frame of a vent (its flanges) or of a squeeze slot reaches onto the wall past the opening's edge.</summary>
+        public const float FrameReach = 0.08f;
+
+        /// <summary>How far the wall finish quads stand off the wall (no z-fighting with it).</summary>
+        public const float FinishLift = 0.006f;
+
         /// <summary>A pilaster's centre from the opening's edge, and half its base's width (kit_pilaster).</summary>
         const float PilasterOffset = 0.3f, PilasterHalfWidth = 0.23f;
         /// <summary>The cornice hangs this far under the ceiling (kit_crown): pilasters stop under it.</summary>
         public const float CrownDrop = 0.23f;
 
-        /// <summary>Along-wall spans of this face covered by the trim of doorways in the same wall (and its other face).</summary>
+        /// <summary>How far whatever frames an opening reaches onto its wall: a vent's flanges, a slot's frame, the style's door trim.</summary>
+        public static float ReachOf(WallOpening o, StyleGeometry g) => o.Vent || o.Squeeze ? FrameReach : TrimReach(g.Doors);
+
+        /// <summary>Along-wall spans of this face covered by the frames and trims of openings in the same wall (and its other face).</summary>
         static List<(float, float)> TrimSpans(WallFace f, LevelShell shell, StyleGeometry g)
         {
             var spans = new List<(float, float)>();
-            float reach = TrimReach(g.Doors);
-            if (reach <= 0f) return spans;
             var dir = f.Along;
             foreach (var o in shell.Openings)
             {
-                if (o.Vent || o.Exterior || o.Floor != f.Floor || Mathf.Abs(Vector3.Dot(o.Along, dir)) < 0.99f) continue;
+                float reach = ReachOf(o, g);
+                if (reach <= 0f || o.Exterior || o.Floor != f.Floor || Mathf.Abs(Vector3.Dot(o.Along, dir)) < 0.99f) continue;
                 var d = new Vector3(o.Center.x - f.A.x, 0f, o.Center.z - f.A.z);
                 if (Mathf.Abs(Vector3.Dot(d, f.Normal)) > 0.05f) continue; // another wall
                 float u = Vector3.Dot(d, dir), half = o.Width / 2f + reach;
@@ -299,7 +308,7 @@ namespace Stealth.Level
             void Rect(float a, float b, float y0, float y1)
             {
                 if (b - a < 0.02f || y1 - y0 < 0.02f) return;
-                var c = f.At((a + b) / 2f) + f.Normal * 0.006f + Vector3.up * ((y0 + y1) / 2f);
+                var c = f.At((a + b) / 2f) + f.Normal * FinishLift + Vector3.up * ((y0 + y1) / 2f);
                 // the texture follows the world along the quad's own x axis, so neighbouring pieces line up
                 var right = Vector3.Cross(Vector3.up, -f.Normal);
                 float worldU = Vector3.Dot(c, right) - (b - a) / 2f;
@@ -326,7 +335,8 @@ namespace Stealth.Level
 
         static void PlanOpening(List<DecorPiece> list, WallOpening o, StyleGeometry g)
         {
-            if (o.Vent || o.Exterior || g.Doors == DoorTrim.None) return;
+            // a vent and a squeeze slot carry their own frames (Level/VentFrame, Level/SqueezeFrame): a door trim would clash with them
+            if (o.Vent || o.Squeeze || o.Exterior || g.Doors == DoorTrim.None) return;
             var n = new Vector3(-o.Along.z, 0f, o.Along.x);
             foreach (var side in new[] { n, -n })
             {
@@ -354,6 +364,13 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>The horizontal normal of a wall running along <paramref name="along"/>, the same whichever face it is seen from.</summary>
+        public static Vector3 Across(Vector3 along)
+        {
+            var n = new Vector3(-along.z, 0f, along.x).normalized;
+            return n.x < -1e-4f || (Mathf.Abs(n.x) <= 1e-4f && n.z < 0f) ? -n : n;
+        }
+
         /// <summary>
         /// The wall's finish carried into a doorway: both reveals and the head, across the wall's thickness, so the opening
         /// reads as cut into the same wall instead of a bare block between two papered faces. Vents have their lining.
@@ -362,15 +379,18 @@ namespace Stealth.Level
         {
             if (o.Vent || o.Exterior) return;
             float w = o.Width, h = o.Height;
-            const float lift = 0.006f;
+            const float lift = FinishLift;
             foreach (float s in new[] { -1f, 1f })
             {
                 // the reveal at the +s end faces back into the opening (−s along the wall)
                 var c = o.Center + o.Along * (s * (w / 2f - lift)) + Vector3.up * (h / 2f);
+                // the texture runs across the wall by the world (Across), like an arch's soffit over it (MeshBatcher.Project)
+                var across = Across(o.Along);
+                float sign = Mathf.Sign(Vector3.Dot(Vector3.Cross(Vector3.up, o.Along * s), across));
                 list.Add(new DecorPiece
                 {
                     Kind = DecorKind.WallFinish, Position = c, Rotation = Quaternion.LookRotation(o.Along * s),
-                    Scale = new Vector3(T, h, 1f), Surface = new Vector4(T, h, 0f, 0f),
+                    Scale = new Vector3(T, h, 1f), Surface = new Vector4(T * sign, h, Vector3.Dot(c, across) - sign * T / 2f, 0f),
                 });
             }
             list.Add(new DecorPiece

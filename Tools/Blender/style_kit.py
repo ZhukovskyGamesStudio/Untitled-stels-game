@@ -71,13 +71,20 @@ def merge(name, parts):
     return obj
 
 
-def finish(obj):
-    """Reshape a finished piece like the models of the family (see style_families.py)."""
+def finish(obj, wall=()):
+    """
+    Reshape a finished piece like the models of the family (see style_families.py). Parts named in `wall` are part of the
+    wall the piece stands in (an arch's spandrels, dressed in the wall's finish in Unity): no bevels on them — a chamfer
+    along their edge shows as a line at the joint with the wall.
+    """
     if family is None:
         return False
     bm = bmesh.new()
     bm.from_mesh(obj.data)
+    flat = obj.name.split(".")[0] in wall
     def bevel(offset, segments):
+        if flat:
+            return
         edges = [e for e in bm.edges if e.is_manifold and e.calc_face_angle(0) > math.radians(30)]
         if edges:
             bmesh.ops.bevel(bm, geom=edges, offset=offset, offset_type="OFFSET", segments=segments, profile=0.5,
@@ -122,17 +129,18 @@ def finish(obj):
     return smooth
 
 
-def export(name, smooth=False):
+def export(name, smooth=False, wall=()):
+    """`wall`: parts that are the wall itself (flat-shaded, never bevelled: see finish)."""
     bpy.ops.object.select_all(action="SELECT")
     for obj in list(bpy.context.scene.objects):
         if obj.type == "MESH":
-            smooth = finish(obj) or smooth
+            smooth = finish(obj, wall) or smooth
     # kit pieces may be separate on purpose (a hanger beside its tray): only part faces that share a plane
     meshfix.fix_objects([o for o in bpy.context.scene.objects if o.type == "MESH"], snap=None, name=name)
     bpy.ops.object.select_all(action="SELECT")
     for obj in bpy.context.selected_objects:
         for p in obj.data.polygons:
-            p.use_smooth = smooth
+            p.use_smooth = smooth and obj.name.split(".")[0] not in wall
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, name + ".fbx")
     bpy.ops.export_scene.fbx(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z",
@@ -255,7 +263,7 @@ def arch():
     legs = [box(-r - mould, -r, 0.0, 0.04, 0, spring), box(r, r + mould, 0.0, 0.04, 0, spring)]
     merge("Body", [spandrels])
     merge("Accent", [ring] + legs)  # no keystone: the exit sign hangs right above the doorway
-    export("kit_arch")
+    export("kit_arch", wall=("Body",))
 
 
 def beam():

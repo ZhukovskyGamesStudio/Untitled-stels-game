@@ -45,6 +45,8 @@ namespace Stealth.Level
         public Vector3 Along;
         public float Width, Height;
         public bool Vent, Exterior;
+        /// <summary>A narrow slot with its own frame on both faces (Level/SqueezeFrame): no door trim of the style.</summary>
+        public bool Squeeze;
         public int Floor;
     }
 

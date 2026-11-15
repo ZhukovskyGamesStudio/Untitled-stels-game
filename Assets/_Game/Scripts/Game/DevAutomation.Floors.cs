@@ -264,18 +264,61 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             DevFlags.FreezeRobots = true;
-            int doors = 0, open = 0;
+            // two doors, two open passages and a squeeze slot, in the default style: every angle
+            var picked = new System.Collections.Generic.List<(Doorway d, string tag)>();
+            int doors = 0, open = 0, squeezes = 0, vents = 0;
             foreach (var d in l.Doorways)
             {
                 if (d.Exterior || d.High) continue;
-                bool isDoor = d.Kind == EdgeType.Door;
-                if (!isDoor && d.Kind != EdgeType.Open) continue;
-                if (isDoor ? doors >= 3 : open >= 3) continue;
-                if (isDoor) doors++; else open++;
-                string tag = $"{(isDoor ? "door" : "open")}{(isDoor ? doors : open)}";
-                var along = d.Rotation * Vector3.right;
+                if (d.Kind == EdgeType.Door && doors < 2) picked.Add((d, $"door{++doors}"));
+                else if (d.Kind == EdgeType.Open && open < 2) picked.Add((d, $"open{++open}"));
+                else if (d.Kind == EdgeType.Squeeze && squeezes < 1) picked.Add((d, $"squeeze{++squeezes}"));
+                else if (d.Kind == EdgeType.Vent && vents < 1) picked.Add((d, $"vent{++vents}"));
+            }
+            var start = VisualStyles.Current;
+            foreach (var (d, tag) in picked)
+                yield return ShootDoorway(d, $"{start?.name}_{tag}", true);
+            // the ink outlines by channel over a door's head: a joint that looks seamless can still be inked (a chamfer, a
+            // smoothed normal, a gap in the depth); "normalink" exaggerates the creases
+            var ink = Shader.GetGlobalVector("_StyOutline");
+            foreach (var (d, tag) in picked)
+            {
+                if (!tag.StartsWith("door")) continue;
                 var across = d.Rotation * Vector3.forward;
-                var joint = d.Position + along * (d.Width / 2f);
+                var near = d.Position + across * 1.3f + d.Rotation * Vector3.right * 0.3f;
+                LookAtFrom(new Pose(near + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + d.Rotation * Vector3.right * 0.25f + Vector3.up * 2.35f);
+                foreach (var (name, v) in new[] { ("noink", new Vector4(0f, ink.y, ink.z, ink.w)), ("depthink", new Vector4(1f, ink.y, 8f, 0f)), ("normalink", new Vector4(1f, ink.y, 0f, 8f)) })
+                {
+                    Shader.SetGlobalVector("_StyOutline", v);
+                    yield return new WaitForSeconds(0.3f);
+                    yield return Shot($"{tag}_debug_{name}");
+                }
+                Shader.SetGlobalVector("_StyOutline", ink);
+                break;
+            }
+            // the other kinds of door trim (pilasters, casings with panels or a cornice): the same doorways from the front
+            foreach (var name in new[] { "S03_Heist", "S02_Scrapyard", "S15_Blueprint", "S11_Noir" })
+            {
+                var style = VisualStyles.Find(name);
+                if (style == null) continue;
+                VisualStyles.Apply(style);
+                yield return new WaitForSeconds(0.6f);
+                foreach (var (d, tag) in picked)
+                    if (!tag.StartsWith("squeeze") && !tag.StartsWith("vent") && (tag.EndsWith("1") || style.Geometry.Doors != Configs.DoorTrim.None))
+                        yield return ShootDoorway(d, $"{name}_{tag}", false);
+            }
+            if (start != null) VisualStyles.Apply(start);
+            Log($"doors: {doors} doors, {open} open passages, {squeezes} squeezes shot (style {start?.name} + 4 more)");
+        }
+
+        /// <summary>A doorway's joints with its wall: from both sides at the jamb (all), straight on, and up at the wall over its head.</summary>
+        IEnumerator ShootDoorway(Doorway d, string tag, bool all)
+        {
+            var along = d.Rotation * Vector3.right;
+            var across = d.Rotation * Vector3.forward;
+            float half = LevelMetrics.ClearWidth(d.Width) / 2f;
+            var joint = d.Position + along * half;
+            if (all)
                 foreach (float side in new[] { 1f, -1f })
                 {
                     // standing in the room, off to one side, looking at the jamb where the trim meets the wall
@@ -284,18 +327,18 @@ namespace Stealth.Game
                     yield return new WaitForSeconds(0.4f);
                     yield return Shot($"{tag}_{(side > 0 ? "a" : "b")}_jamb");
                 }
-                // straight on from 2.6 m, and up at the head of the opening from close by
-                var front = d.Position + across * 2.6f;
-                LookAtFrom(new Pose(front + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + Vector3.up * 1.3f);
+            var front = d.Position + across * 2.6f;
+            LookAtFrom(new Pose(front + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + Vector3.up * 1.3f);
+            yield return new WaitForSeconds(0.4f);
+            yield return Shot($"{tag}_front");
+            // close up at the wall over the head of the opening, both faces: where the trim's top meets the wall above it
+            foreach (float side in all ? new[] { 1f, -1f } : new[] { 1f })
+            {
+                var near = d.Position + across * (side * 1.3f) + along * 0.3f;
+                LookAtFrom(new Pose(near + Vector3.up * 0.05f, Quaternion.LookRotation(-across * side)), d.Position + along * (half * 0.6f) + Vector3.up * 2.35f);
                 yield return new WaitForSeconds(0.4f);
-                yield return Shot($"{tag}_front");
-                var near = d.Position + across * 1.1f + along * 0.5f;
-                LookAtFrom(new Pose(near + Vector3.up * 0.05f, Quaternion.LookRotation(-across)), d.Position + along * (d.Width / 2f) + Vector3.up * 2.4f);
-                yield return new WaitForSeconds(0.4f);
-                yield return Shot($"{tag}_head");
-                if (doors >= 3 && open >= 3) break;
+                yield return Shot($"{tag}_{(side > 0 ? "a" : "b")}_top");
             }
-            Log($"doors: {doors} doors, {open} open passages shot (style {VisualStyles.Current?.name})");
         }
 
         /// <summary>One screenshot of every room type and every room shape present in the building; atriums from below and above.</summary>

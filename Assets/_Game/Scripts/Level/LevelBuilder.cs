@@ -364,7 +364,7 @@ namespace Stealth.Level
                 WallPiece(m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
-                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Floor = m_Floor });
+                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);

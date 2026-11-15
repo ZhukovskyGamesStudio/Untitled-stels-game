@@ -63,9 +63,26 @@ namespace Stealth.Level
                         batcher.Add(chunk, part.look, mat, part.mesh, 0, at * part.local, tiling);
                         continue;
                     }
+                    if (IsWallPart(p.Kind, part.name, g))
+                    {
+                        // an arch's spandrels are the wall itself: its finish, its texture continuing over the opening
+                        var n = p.Rotation * Vector3.forward;
+                        var right = Vector3.Cross(Vector3.up, -n);
+                        var wall = new WallProjection
+                        {
+                            Right = right, Normal = n, Across = ArchitecturePlanner.Across(right), Tile = g.WallTile, FloorY = p.Position.y,
+                        };
+                        // in the plane of the finish quads around the opening (6 mm off the wall), or the outline filters draw the step
+                        batcher.Add(chunk, part.look, g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
+                        continue;
+                    }
                     var style = MaterialFor(p.Kind, part.name, g);
+                    // no wall finish to continue: the spandrels with their lap stand just proud of the wall (no z-fighting with it)
+                    var place = p.Kind == DecorKind.Arch && part.name.StartsWith("Body")
+                        ? Matrix4x4.Translate(p.Rotation * Vector3.forward * ArchitecturePlanner.FinishLift) * at * part.local
+                        : at * part.local;
                     for (int i = 0; i < (style != null ? 1 : part.materials.Length); i++)
-                        batcher.Add(chunk, part.look, style != null ? style : part.materials[i], part.mesh, i, at * part.local);
+                        batcher.Add(chunk, part.look, style != null ? style : part.materials[i], part.mesh, i, place);
                 }
             }
             var baked = batcher.Bake();
@@ -148,6 +165,14 @@ namespace Stealth.Level
             s_Parts[prefab] = parts;
             return parts;
         }
+
+        /// <summary>
+        /// A child of a kit piece that is part of the wall it stands in — the spandrels (Body) of an arch, flush with the
+        /// wall face — so it takes the style's wall finish with the wall's own texture layout instead of a trim colour:
+        /// otherwise the joint with the wall over the opening shows as a line.
+        /// </summary>
+        public static bool IsWallPart(DecorKind kind, string child, StyleGeometry g) =>
+            kind == DecorKind.Arch && g.Wall != null && child.StartsWith("Body");
 
         /// <summary>The style material for a child of a kit piece (pure).</summary>
         public static Material MaterialFor(DecorKind kind, string child, StyleGeometry g)

@@ -22,6 +22,19 @@ namespace Stealth.Level
         public override int GetHashCode() => (Layer * 397 ^ (int)Shadows * 31 ^ (ReceiveShadows ? 17 : 0)) ^ (int)RenderingLayers;
     }
 
+    /// <summary>
+    /// UVs projected from the world like the wall finish quads (<see cref="ArchitecturePlanner"/>): along the wall by
+    /// <see cref="Right"/>, up by the height over the floor, one repeat every <see cref="Tile"/> metres. A part dressed in
+    /// the wall's finish this way continues its texture without a seam (the spandrels of an arch). Faces turned away from
+    /// the wall (an arch's soffit) project along the axes they face, across the wall by <see cref="Across"/> (the same from
+    /// both faces, as the doorway's reveals: <see cref="ArchitecturePlanner.Across"/>).
+    /// </summary>
+    public struct WallProjection
+    {
+        public Vector3 Right, Normal, Across;
+        public float Tile, FloorY;
+    }
+
     /// <summary>One merged mesh: a submesh per material, drawn the way <see cref="Look"/> says.</summary>
     public struct BakedBatch
     {
@@ -48,6 +61,9 @@ namespace Stealth.Level
             public Matrix4x4 Matrix;
             public bool Tiled;
             public Vector4 Tiling;
+            public bool Projected;
+            public WallProjection Projection;
+            public Matrix4x4 World;
         }
 
         sealed class Source
@@ -99,7 +115,9 @@ namespace Stealth.Level
 
         /// <summary>Adds one submesh of <paramref name="mesh"/> placed by <paramref name="world"/>.</summary>
         /// <param name="tiling">Texture tiling of this part (as a _BaseMap_ST); folded into the UVs against the material's own.</param>
-        public void Add(Vector3Int chunk, BatchLook look, Material material, Mesh mesh, int subMesh, Matrix4x4 world, Vector4? tiling = null)
+        /// <param name="projection">UVs from the world like the wall finish (instead of the mesh's own).</param>
+        public void Add(Vector3Int chunk, BatchLook look, Material material, Mesh mesh, int subMesh, Matrix4x4 world, Vector4? tiling = null,
+            WallProjection? projection = null)
         {
             if (material == null || mesh == null || Mathf.Abs(world.determinant) < 1e-12f) return;
             var key = (chunk, look);
@@ -113,6 +131,7 @@ namespace Stealth.Level
             {
                 Mesh = mesh, SubMesh = Mathf.Clamp(subMesh, 0, mesh.subMeshCount - 1), Matrix = m_ToRoot * world,
                 Tiled = tiling.HasValue, Tiling = tiling ?? default,
+                Projected = projection.HasValue, Projection = projection ?? default, World = world,
             });
             Parts++;
         }
@@ -212,7 +231,14 @@ namespace Stealth.Level
                 }
                 else tangents.Add(new Vector4(1f, 0f, 0f, 1f));
                 var c = s.Uv != null ? s.Uv[i] : Vector2.zero;
-                if (p.Tiled)
+                if (p.Projected)
+                {
+                    var w = p.World.MultiplyPoint3x4(s.Vertices[i]);
+                    var wn = s.Normals != null ? p.World.inverse.transpose.MultiplyVector(s.Normals[i]) : p.Projection.Normal;
+                    var want = Project(p.Projection, w, wn);
+                    c = new Vector2((want.x - materialTiling.z) / sx, (want.y - materialTiling.w) / sy);
+                }
+                else if (p.Tiled)
                     c = new Vector2((c.x * p.Tiling.x + p.Tiling.z - materialTiling.z) / sx, (c.y * p.Tiling.y + p.Tiling.w - materialTiling.w) / sy);
                 uv.Add(c);
             }
@@ -223,6 +249,16 @@ namespace Stealth.Level
                 if (mirrored) { indices.Add(start + src[i + 2]); indices.Add(start + src[i + 1]); }
                 else { indices.Add(start + src[i + 1]); indices.Add(start + src[i + 2]); }
             }
+        }
+
+        /// <summary>The texture coordinate of a world point (with its normal) under a wall projection (before the material's tiling).</summary>
+        public static Vector2 Project(WallProjection p, Vector3 world, Vector3 normal)
+        {
+            float tile = Mathf.Max(0.05f, p.Tile);
+            float u = Vector3.Dot(world, p.Right), v = world.y - p.FloorY, d = Vector3.Dot(world, p.Across);
+            float face = Mathf.Abs(Vector3.Dot(normal, p.Normal)), up = Mathf.Abs(normal.y), side = Mathf.Abs(Vector3.Dot(normal, p.Right));
+            if (face >= up && face >= side) return new Vector2(u, v) / tile; // on the wall: exactly as the finish quads
+            return up >= side ? new Vector2(u, d) / tile : new Vector2(d, v) / tile;
         }
 
         /// <summary>A part copies the vertices its submesh uses (the descriptor's range) and its triangles.</summary>
