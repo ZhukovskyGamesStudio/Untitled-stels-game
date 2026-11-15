@@ -161,6 +161,13 @@ namespace Stealth.Player
     [System.Serializable]
     public class InteractionSettings
     {
+        [Tooltip("How far from the eyes an object can be used: you must look right at it (doors, safes, terminals, " +
+                 "drawers and lockers, robots and devices to hack), metres.")]
+        public float LookReach = 2.2f;
+        [Tooltip("How thick the look ray is: how precisely you must aim at the object, metres.")]
+        public float LookRadius = 0.06f;
+        [Tooltip("Devices without a body to hit (cameras, motion sensors, plates): how far off the crosshair they may be, degrees.")]
+        public float LookAngle = 10f;
         public float ReviveTime = 2f;
         public float ReviveDistance = 2.2f;
         [Tooltip("Seconds to hold E to hack.")]

@@ -43,7 +43,12 @@ namespace Stealth.EditorTools
             var desk = Prefab(p + "Desk.prefab", () => PropObject("Desk", "desk", "PropBody", "PropAccent", "PropScreen"));
             var chair = Prefab(p + "Chair.prefab", () => PropObject("Chair", "chair", "PropAccent", "PropBody", "PropScreen"));
             var rack = Prefab(p + "ServerRack.prefab", () => PropObject("ServerRack", "server_rack", "Rack", "Rack", "RackLights"));
-            var cabinet = Prefab(p + "Cabinet.prefab", () => PropObject("Cabinet", "cabinet", "PropBody", "PropAccent", "PropScreen"));
+            var cabinet = Prefab(p + "Cabinet.prefab", () =>
+            {
+                var go = PropObject("Cabinet", "cabinet", "PropBody", "PropAccent", "PropScreen");
+                go.AddComponent<Stealth.Items.Storage>(); // the drawers slide out (BodyDrawer0..2)
+                return go;
+            });
             var meeting = Prefab(p + "MeetingTable.prefab", () => PropObject("MeetingTable", "meeting_table", "PropBody", "PropAccent", "PropScreen"));
             var plant = Prefab(p + "Plant.prefab", () => PropObject("Plant", "plant", "Plant", "PlantPot", "Plant"));
             var kitchen = Prefab(p + "KitchenCounter.prefab", () => PropObject("KitchenCounter", "kitchen_counter", "PropBody", "PropAccent", "PropAccent"));
@@ -65,7 +70,12 @@ namespace Stealth.EditorTools
             var pReceptionDesk = Prefab(p + "ReceptionDesk.prefab", () => PropObject("ReceptionDesk", "reception_desk", "Wood", "Ceiling", "PropScreen"));
             var pTrashBin = Prefab(p + "TrashBin.prefab", () => PropObject("TrashBin", "trash_bin", "Metal", "PropAccent", "PropAccent"));
             var pCoatRack = Prefab(p + "CoatRack.prefab", () => PropObject("CoatRack", "coat_rack", "Fabric", "Metal", "Metal"));
-            var pLockers = Prefab(p + "Lockers.prefab", () => PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent"));
+            var pLockers = Prefab(p + "Lockers.prefab", () =>
+            {
+                var go = PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent");
+                go.AddComponent<Stealth.Items.Storage>(); // the doors swing open (BodyDoor0..2)
+                return go;
+            });
             var pPallet = Prefab(p + "Pallet.prefab", () => PropObject("Pallet", "pallet", "Cardboard", "Wood", "Wood"));
             var pWashBasin = Prefab(p + "WashBasin.prefab", () => PropObject("WashBasin", "wash_basin", "Ceiling", "Metal", "Mirror"));
             var pVendingMachine = Prefab(p + "VendingMachine.prefab", () =>
@@ -474,7 +484,12 @@ namespace Stealth.EditorTools
         static GameObject BuildWindow()
         {
             var go = PropObject("Window", "window", "Blinds", "WindowFrame", "Window", collider: false);
-            foreach (var r in Parts(go, "Eye")) r.shadowCastingMode = ShadowCastingMode.Off;
+            foreach (var r in Parts(go, "Eye")) r.shadowCastingMode = ShadowCastingMode.Off; // the moon shines in through it
+            // the glass fills the wall's hole: bodies and items stop at it, sight and light pass (it is glass);
+            // sound comes through muffled like a door
+            var glass = go.AddComponent<BoxCollider>();
+            glass.size = new Vector3(LevelMetrics.WindowWidth, LevelMetrics.WindowHeight, LevelMetrics.WallThickness);
+            go.AddComponent<SoundBlocker>().Material = SoundMaterial.Door;
             return go;
         }
 
@@ -503,8 +518,10 @@ namespace Stealth.EditorTools
             hatch.AddComponent<Hatch>().Lid = hinge.transform;
             var b = LocalBounds(hatch);
             var box = hatch.AddComponent<BoxCollider>();
-            box.size = new Vector3(b.size.x, 0.3f, b.size.z); // easy target for dropping items
-            box.center = new Vector3(b.center.x, 0.1f, b.center.z);
+            // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
+            // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it
+            box.size = new Vector3(b.size.x, 0.08f, b.size.z);
+            box.center = new Vector3(b.center.x, 0.04f, b.center.z);
             return hatch;
         }
 

@@ -36,6 +36,10 @@ STYLES = ["S01_NightShift", "S02_Scrapyard", "S03_Heist", "S04_Hunted", "S05_Too
 
 LEVEL = ("hatch", "window", "ceiling_lamp", "exit_sign")
 
+# Furniture that opens in the game (drawers and doors are separate moving parts, Items.Storage): every style shows its
+# model family's version, which has those parts; the designs here are single closed bodies and are not built.
+OPENING = ("cabinet", "lockers")
+
 
 def category(name):
     if name.startswith("robot_") or name.startswith("attach_"):
@@ -187,7 +191,8 @@ def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     root = argv[0] if argv and not argv[0].startswith("--") else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
     opt = {argv[i]: argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else "" for i in range(len(argv)) if argv[i].startswith("--")}
-    styles = opt["--styles"].split(",") if opt.get("--styles") else list(STYLES)
+    # this branch plays only S16 «Заброшенный комплекс»: the other styles are built only when named with --styles
+    styles = opt["--styles"].split(",") if opt.get("--styles") else ["S16_Derelict"]
     if "--base" in opt:
         styles = ["Base"] + styles if "--styles" not in opt else styles
     only = set(opt["--only"].split(",")) if opt.get("--only") else None
@@ -202,7 +207,7 @@ def main():
         L, own = load_style(style)
         L.name = style
         for name, design in catalogue.items():
-            if only and name not in only:
+            if (only and name not in only) or name in OPENING:
                 continue
             objs = build(name, L, own.get(name, design))
             errors += check_contract(name, objs, print)

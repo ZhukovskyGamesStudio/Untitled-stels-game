@@ -201,18 +201,19 @@ def model_microwave():
 def model_wall_cabinet():
     """Upper kitchen cupboards 1.2 m hung at 1.45..2.15, depth 0.35 with the back on the wall: a carcass with a slim
     cornice, two shaker doors and bar pulls at their lower inner corners."""
-    carcass = s.rbox((1.2, 0.316, 0.7), (0, 0.017, 1.8), r=0.01, seg=2)
+    # the carcass is open at the front (sides, top, bottom, a shelf, the back): the doors open onto a real inside
+    carcass = [s.rbox((0.02, 0.316, 0.7), (x * 0.59, 0.017, 1.8), r=0.004, seg=1) for x in (-1, 1)]
+    carcass += [s.rbox((1.2, 0.316, 0.02), (0, 0.017, z), r=0.004, seg=1) for z in (1.46, 2.14)]
+    carcass += [s.rbox((1.16, 0.02, 0.66), (0, 0.165, 1.8), r=0.003, seg=1),            # the back on the wall
+                s.rbox((1.16, 0.28, 0.018), (0, 0.025, 1.8), r=0.003, seg=1)]            # a shelf
     cornice = s.rbox((1.2, 0.03, 0.04), (0, -0.152, 2.128), r=0.008, seg=2)
-    doors = []
-    for x in (-0.2975, 0.2975):
+    s.part("Body", [*carcass, cornice])
+    # two doors (Items.Storage swings them on their left edge), each with its pull
+    for i, x in enumerate((-0.2975, 0.2975)):
         d = s.rbox((0.586, 0.022, 0.64), (x, -0.148, 1.785), r=0.008, seg=2)
         shaker(d, 0.15, thickness=0.05)
-        doors.append(d)
-    s.part("Body", [carcass, cornice, *doors])
-    handles = []
-    for x in (-0.06, 0.06):
-        handles += bar_handle(x, 1.56, -0.158, 0.13, r=0.008, stand=0.016)
-    s.part("Accent", handles)
+        pull = bar_handle(x + 0.2375, 1.56, -0.158, 0.13, r=0.008, stand=0.016)
+        s.part(f"BodyDoor{i}", [d, *pull])
     return export("wall_cabinet")
 
 

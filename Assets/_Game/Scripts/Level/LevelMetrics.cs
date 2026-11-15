@@ -23,7 +23,7 @@ namespace Stealth.Level
         // climb: a jump onto the desk, JumpHeight 0.9; from its top a short crouched step into the duct).
         public const float HighVentSill = 1.05f;
         /// <summary>Top of a desk (the climbing furniture under a high vent), metres.</summary>
-        public const float DeskTop = 0.765f;
+        public const float DeskTop = 0.918f;    // the office desk's top (generate_models.DESK_TOP_NEW): taller desks, still a jump up
         /// <summary>How far the desk under a high vent and the room to climb onto it reach into the room from the wall's face.</summary>
         public const float VentDeskReach = 0.9f, VentDeskAisle = 1.0f;
         public const float SqueezeWidth = 1.1f; // nominal; the clear slot is 0.9 m: a player (0.78 m with skin) fits, a robot does not (navmesh volume)

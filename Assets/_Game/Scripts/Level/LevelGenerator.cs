@@ -46,6 +46,10 @@ namespace Stealth.Level
         public int MaxDarkHouses = 5;
         [Tooltip("Chance of a flickering lamp in a lit room.")]
         public float FlickerChance = 0.12f;
+        [Tooltip("Dark rooms get dim lamps instead of none: every room has a light (the kinds are normal, dim, flickering).")]
+        public bool DarkRoomsDim;
+        [Tooltip("How bright a dim lamp is, share of a normal one.")]
+        public float DimShare = 0.3f;
 
         [Header("Passages")]
         [Tooltip("Share of the main passages that are open arches instead of doors.")]
@@ -67,8 +71,87 @@ namespace Stealth.Level
         public float CornerCutChance = 0.3f;
         [Tooltip("Chance of a wing getting a corridor spine (otherwise its rooms open into each other).")]
         public float CorridorChance = 0.82f;
+        [Tooltip("Chance of a wing getting a corridor across it, between the rooms on its two sides (a short passage joining two rooms).")]
+        public float CrossCorridorChance;
         [Tooltip("Room sizes: 1 = the usual mix of closets, offices and halls; more = bigger rooms.")]
         public float RoomSizeScale = 1f;
+        [Tooltip("Weights of the building shapes: bar, L, T, U, courtyard, H (6 numbers; empty = by floor area, the usual mix).")]
+        public int[] MassWeights = new int[0];
+        [Tooltip("Chance of an annex: a smaller block sticking out of a wing.")]
+        public float AnnexChance = 0.45f;
+        [Tooltip("Fewest rooms in a house, all floors (corridors and stair halls not counted; 0 = any): a plan with fewer is redrawn.")]
+        public int RoomCountMin;
+        [Tooltip("Most rooms in a house, all floors (corridors and stair halls not counted; 0 = any): a plan with more is redrawn.")]
+        public int RoomCountMax;
+
+        /// <summary>The rooms the count limits look at: everything but corridors and stair halls (the lobby counts).</summary>
+        public static int CountRooms(LevelLayout l)
+        {
+            int n = 0;
+            foreach (var r in l.Rooms) if (r.Type != RoomType.Corridor && r.Type != RoomType.Hall) n++;
+            return n;
+        }
+
+        /// <summary>The house has a room count inside the limits (pure).</summary>
+        public bool RoomCountOk(int rooms) => (RoomCountMin <= 0 || rooms >= RoomCountMin) && (RoomCountMax <= 0 || rooms <= RoomCountMax);
+
+        [Tooltip("Smallest room, m² (corridors and stair halls not counted; 0 = any): the splitter aims above it, a plan with a smaller room is redrawn.")]
+        public float RoomAreaMin;
+        [Tooltip("Biggest room, m² (corridors and stair halls not counted; 0 = any): the splitter aims below it, a plan with a bigger room is redrawn.")]
+        public float RoomAreaMax;
+
+        /// <summary>Every room (not the corridors and stair halls) is inside the area limits (pure).</summary>
+        public bool RoomAreasOk(LevelLayout l)
+        {
+            if (RoomAreaMin <= 0f && RoomAreaMax <= 0f) return true;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Type == RoomType.Corridor || r.Type == RoomType.Hall) continue;
+                if (RoomAreaMin > 0f && r.Area < RoomAreaMin - 0.01f) return false;
+                if (RoomAreaMax > 0f && r.Area > RoomAreaMax + 0.01f) return false;
+            }
+            return true;
+        }
+
+        [Tooltip("Fewest corridors in a house (0 = any): a plan with fewer is redrawn.")]
+        public int MinCorridors;
+
+        /// <summary>The house has enough corridors that join rooms: doors from at least two rooms into each (pure).</summary>
+        public bool CorridorsOk(LevelLayout l)
+        {
+            if (MinCorridors <= 0) return true;
+            return CountJoiningCorridors(l) >= MinCorridors;
+        }
+
+        /// <summary>Corridors with doorways into two or more rooms (a corridor between rooms, not a dead-end alcove).</summary>
+        public static int CountJoiningCorridors(LevelLayout l)
+        {
+            int n = 0;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Type != RoomType.Corridor) continue;
+                var rooms = new HashSet<int>(l.Neighbours(r.Id));
+                rooms.Remove(r.Id);
+                if (rooms.Count >= 2) n++;
+            }
+            return n;
+        }
+
+        /// <summary>Limits that make the generator redraw plans (more attempts are allowed then).</summary>
+        public bool HasRoomLimits => RoomCountMin > 0 || RoomCountMax > 0 || RoomAreaMin > 0f || RoomAreaMax > 0f || MinCorridors > 0;
+
+        [Tooltip("Fewest windows on the facade of a house (with WindowsMax ≥ 0).")]
+        public int WindowsMin;
+        [Tooltip("Most windows on the facade of a house (−1 = a window wherever one fits, every ~5 m of outer wall).")]
+        public int WindowsMax = -1;
+
+        /// <summary>How many windows a house may have (−1 = no limit), from its own stream (pure).</summary>
+        public int WindowLimit(int seed)
+        {
+            if (WindowsMax < 0) return -1;
+            int lo = Mathf.Clamp(WindowsMin, 0, WindowsMax);
+            return new System.Random(LevelRandom.Mix(seed, (int)RandomChannel.Windows, 0)).Next(lo, WindowsMax + 1);
+        }
 
         [Tooltip("Chance of a sliding door in a doorway without a laser.")]
         public float AutoDoorChance = 0.45f;
@@ -121,6 +204,9 @@ namespace Stealth.Level
     [System.Serializable]
     public class SecuritySettings
     {
+        [Tooltip("Guards at all: off = no robots, devices, cameras, lasers or terminals in the house (a quiet test level).")]
+        public bool Enemies = true;
+
         [Header("Counts: base + per house")]
         public int Robots = 2;
         public int RobotsPerHouse = 1;
@@ -182,7 +268,8 @@ namespace Stealth.Level
             LevelLayout l = null;
             Furnisher checker = null;
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            for (int attempt = 0; attempt < 16; attempt++)
+            int attempts = building.HasRoomLimits ? 64 : 16;
+            for (int attempt = 0; attempt < attempts; attempt++)
             {
                 int planSeed = attempt == 0 ? seed : LevelRandom.Mix(seed, 0xBAD, attempt);
                 var o = PlanGenerator.Generate(planSeed, levelIndex, floors, area, building);
@@ -203,7 +290,8 @@ namespace Stealth.Level
                 Doorways(l);
                 l.HatchPosition = l.Lobby.Center;
                 long planMs = watch.ElapsedMilliseconds;
-                checker = o.Unreached == 0 ? new Furnisher(l, new System.Random(0)) : null;
+                bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
+                checker = o.Unreached == 0 && countOk ? new Furnisher(l, new System.Random(0)) : null;
                 bool ok = checker != null && checker.Unreached().Count == 0;
                 Timing.Plan += planMs; Timing.Check += watch.ElapsedMilliseconds - planMs;
                 watch.Restart();
@@ -263,16 +351,22 @@ namespace Stealth.Level
             watch.Restart();
             furnisher.EnsureWalkable();
             Timing.Walk += watch.ElapsedMilliseconds;
-            PlaceSecurity(l, rng, building, security);
-            PlaceTerminals(l, security);
+            if (security.Enemies)
+            {
+                PlaceSecurity(l, rng, building, security);
+                PlaceTerminals(l, security);
+            }
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
             HouseFeatures.PointOfInterest(l);
-            HouseFeatures.Wardens(l, features);
+            if (security.Enemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either
             HouseFeatures.FinishObjective(l);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));
+            l.WindowLimit = building.WindowLimit(seed);
+            l.DarkRoomsDim = building.DarkRoomsDim;
+            l.DimShare = building.DimShare;
             return l;
         }
 

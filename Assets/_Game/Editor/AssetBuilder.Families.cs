@@ -54,8 +54,9 @@ namespace Stealth.EditorTools
                 var filter = pixel ? FilterMode.Point : FilterMode.Trilinear;
                 bool decal = path.StartsWith(DerelictDecals);            // single images with edges: never repeat
                 var wrap = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+                int maxSize = decal ? 2048 : 1024;                       // decals are single big images: keep their detail
                 if (imp.textureType == type && imp.sRGBTexture == srgb && imp.filterMode == filter && imp.wrapMode == wrap &&
-                    imp.mipmapEnabled == !pixel && imp.maxTextureSize == 1024 && imp.alphaIsTransparency == decal) continue;
+                    imp.mipmapEnabled == !pixel && imp.maxTextureSize == maxSize && imp.alphaIsTransparency == decal) continue;
                 imp.textureType = type;
                 imp.sRGBTexture = srgb;
                 imp.filterMode = filter;
@@ -63,7 +64,7 @@ namespace Stealth.EditorTools
                 imp.alphaIsTransparency = decal;
                 imp.mipmapEnabled = !pixel;
                 imp.anisoLevel = pixel ? 0 : 4;
-                imp.maxTextureSize = 1024;
+                imp.maxTextureSize = maxSize;
                 imp.SaveAndReimport();
             }
         }
@@ -223,7 +224,7 @@ namespace Stealth.EditorTools
             EditorUtility.SetDirty(screen);
             s_Kit["Dr_Screen"] = screen;
             // decay decals (soft transparent stains) and posters (torn paper: alpha clipped)
-            foreach (var id in new[] { "floor_rust", "floor_oil", "floor_scorch", "floor_rubble", "wall_leak", "wall_mold", "wall_peel", "wall_scorch" })
+            foreach (var id in new[] { "floor_rust", "floor_oil", "floor_scorch", "floor_rubble", "wall_leak", "wall_mold", "wall_peel", "wall_scorch", "wall_rust" })
                 s_Kit[$"Dc_{id}"] = DecalMaterial($"Dc_{id}", $"{DerelictDecals}/{id}.png", id == "floor_oil" ? 0.85f : 0.2f, clip: false);
             for (int i = 0; i < 6; i++)
                 s_Kit[$"Dc_poster_{i}"] = DecalMaterial($"Dc_poster_{i}", $"{DerelictDecals}/poster_{i}.png", 0.15f, clip: true);

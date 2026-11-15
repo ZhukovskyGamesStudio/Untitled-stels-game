@@ -47,9 +47,10 @@ namespace Stealth.Level
         /// <summary>Ceiling panels sit this far either side of the room centre (along x).</summary>
         public const float LampOffset = 2.5f;
 
-        public static (Color color, float intensity) For(RoomType room, bool dark)
+        public static (Color color, float intensity) For(RoomType room, bool dark, float dimShare = 0f)
         {
-            if (dark) return (new Color(1f, 0.95f, 0.85f), 0f); // switched off: exit signs, lamps and the moon only
+            if (dark && dimShare <= 0f) return (new Color(1f, 0.95f, 0.85f), 0f); // switched off: exit signs, lamps and the moon only
+            if (dark) return (new Color(1f, 0.88f, 0.72f), LightMath.RoomIntensity * dimShare); // a dim lamp: a weak warm glow
             return room switch
             {
                 RoomType.Server => (new Color(0.55f, 0.75f, 1f), LightMath.RoomIntensity * 0.6f),
@@ -105,6 +106,12 @@ namespace Stealth.Level
             Block(m_Art.Fence, "Fence", new Vector3(-25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
             Block(m_Art.Fence, "Fence", new Vector3(W + 25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
 
+            m_WindowCuts.Clear();
+            foreach (var cut in WindowCuts(l))
+            {
+                if (!m_WindowCuts.TryGetValue(cut.wall, out var at)) m_WindowCuts[cut.wall] = at = new List<float>();
+                at.Add(cut.at);
+            }
             for (int f = 0; f < l.Floors; f++)
             {
                 m_Floor = f;
@@ -147,6 +154,7 @@ namespace Stealth.Level
                 RecordProp(go, p.Kind, LevelLayout.FloorOf(p.Position.y));
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
+                if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind);
@@ -257,6 +265,8 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ walls
 
         readonly Dictionary<Vector3, float> m_Posts = new();
+        /// <summary>Where windows cut the outer walls: wall index → positions along it (<see cref="WindowCuts"/>).</summary>
+        readonly Dictionary<int, List<float>> m_WindowCuts = new();
         /// <summary>Walls of the floor by their end points (cm keys): to find bent walls whose pieces meet at a shallow angle.</summary>
         readonly Dictionary<Vector3, List<int>> m_Ends = new();
 
@@ -345,8 +355,29 @@ namespace Stealth.Level
             float from = t / 2f;
             bool jointA = SmoothJoint(w.A, out _), jointB = SmoothJoint(w.B, out _);
             bool cornerA = !jointA;
-            foreach (var o in openings)
+            // the cuts along the wall in order: the plan's openings and the windows (a real hole with glass in it)
+            var cuts = new List<(float at, int opening)>();
+            for (int k = 0; k < openings.Count; k++) cuts.Add((openings[k].At, k));
+            if (m_WindowCuts.TryGetValue(index, out var windows)) foreach (float at in windows) cuts.Add((at, -1));
+            cuts.Sort((x, y) => x.at.CompareTo(y.at));
+            foreach (var cut in cuts)
             {
+                if (cut.opening < 0)
+                {
+                    // a window: wall up to the sill, the hole (the Window prefab's glass fills it), wall above
+                    float w0 = cut.at - LevelMetrics.WindowWidth / 2f, w1 = cut.at + LevelMetrics.WindowWidth / 2f;
+                    float sillY = LevelMetrics.WindowCenterY - LevelMetrics.WindowHeight / 2f, topY = sillY + LevelMetrics.WindowHeight;
+                    WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * w0, 0f, height);
+                    RecordFaces(a3 + d3 * from, a3 + d3 * w0, 0f, height, w.Exterior, inner, cornerA, false, jointA && cornerA == false && from <= t / 2f + 0.001f);
+                    WallPiece(m_Art.WallBlock, a3 + d3 * w0, a3 + d3 * w1, 0f, sillY);
+                    RecordFaces(a3 + d3 * w0, a3 + d3 * w1, 0f, sillY, w.Exterior, inner, false, false);
+                    WallPiece(m_Art.WallBlock, a3 + d3 * w0, a3 + d3 * w1, topY, height);
+                    RecordFaces(a3 + d3 * w0, a3 + d3 * w1, topY, height, w.Exterior, inner, false, false);
+                    from = w1;
+                    cornerA = false;
+                    continue;
+                }
+                var o = openings[cut.opening];
                 if (o.Kind == EdgeType.Illusion)
                 {
                     // the entrance of a hidden room: a wall to look at (with all its decor), nothing to bump into
@@ -472,7 +503,7 @@ namespace Stealth.Level
         /// <summary>Ceiling lights of a room: about one per 70 m², spread over its floor (clear of stair holes), under its own ceiling.</summary>
         void BuildLights(PlanRoom r)
         {
-            var (color, intensity) = RoomLighting.For(r.Type, r.Dark);
+            var (color, intensity) = RoomLighting.For(r.Type, r.Dark, m_Layout.DarkRoomsDim ? m_Layout.DimShare : 0f);
             float ceiling = LevelLayout.FloorY(r.Floor + r.Levels - 1) + LevelMetrics.WallHeight;
             int k = 0;
             foreach (var p in LightSpots(m_Layout, r))
@@ -514,7 +545,10 @@ namespace Stealth.Level
                 look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
         }
 
-        /// <summary>Windows on the outer walls of every floor (visual only, blinds facing the room).</summary>
+        /// <summary>
+        /// Windows in the outer walls of every floor: the wall has a real hole there (<see cref="Wall"/>), the prefab
+        /// frames it with glass you see the yard, the gas and the sky through (it blocks bodies, not sight), blinds inside.
+        /// </summary>
         void BuildFacade()
         {
             foreach (var (p, yaw) in WindowSpots(m_Layout))
@@ -531,6 +565,14 @@ namespace Stealth.Level
         public static List<(Vector3 pos, float yaw)> WindowSpots(LevelLayout l)
         {
             var list = new List<(Vector3, float)>();
+            foreach (var c in WindowCuts(l)) list.Add((c.pos, c.yaw));
+            return list;
+        }
+
+        /// <summary>The windows as cuts in the walls (pure): where (centre, yaw) and in which wall, how far along it.</summary>
+        public static List<(Vector3 pos, float yaw, int wall, float at)> WindowCuts(LevelLayout l)
+        {
+            var list = new List<(Vector3, float, int, float)>();
             var plan = l.Plan;
             const float spacing = 5f, clear = LevelMetrics.WindowWidth / 2f + 0.9f;
             for (int i = 0; i < plan.Walls.Count; i++)
@@ -556,8 +598,21 @@ namespace Stealth.Level
                     var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
                     var ik = plan.KindAt(w.Floor, inside.x, inside.y);
                     if (ik != CellKind.Room && ik != CellKind.Void) continue;
-                    list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg));
+                    list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));
                 }
+            }
+            if (l.WindowLimit >= 0 && list.Count > l.WindowLimit)
+            {
+                // a few windows only: which ones from the house's own stream, kept in facade order
+                var rng = new System.Random(LevelRandom.Mix(l.Seed, (int)RandomChannel.Windows, 1));
+                var keep = new List<int>();
+                for (int i = 0; i < list.Count; i++) keep.Add(i);
+                for (int i = keep.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (keep[i], keep[j]) = (keep[j], keep[i]); }
+                keep.RemoveRange(l.WindowLimit, keep.Count - l.WindowLimit);
+                keep.Sort();
+                var picked = new List<(Vector3, float, int, float)>();
+                foreach (int i in keep) picked.Add(list[i]);
+                return picked;
             }
             return list;
         }

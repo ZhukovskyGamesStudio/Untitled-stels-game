@@ -10,5 +10,8 @@ namespace Stealth.Items
         public Material[] ColorMaterials;
         [Tooltip("Tools with a model of their own (lure speaker): shown instead of the tinted mesh; null = the mesh.")]
         public GameObject[] Models;
+        [Tooltip("Pictures drawn over an item's cells in the backpack and the stash (real items: the shovel); null = cells only. " +
+                 "The picture is the size of the shape's cells in its base turn (Tools/Blender/item_icons.py).")]
+        public Sprite[] Icons;
     }
 }

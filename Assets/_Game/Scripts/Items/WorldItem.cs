@@ -16,6 +16,10 @@ namespace Stealth.Items
         public MeshFilter MeshFilter;
         public MeshRenderer Renderer;
         public BoxCollider Collider;
+        [Tooltip("Physics of real items (ItemCatalog.HasPhysics): dynamic on the server, kinematic elsewhere (NetworkTransform moves it).")]
+        public Rigidbody Body;
+        [Tooltip("The solid box a real item lies and tumbles on (the grab box above is a larger trigger).")]
+        public BoxCollider Solid;
         [Tooltip("The lure speaker's music (plays while it is on).")]
         public AudioSource Music;
 
@@ -74,6 +78,23 @@ namespace Stealth.Items
             m_HiddenUntil = now + seconds;
             if (Renderer != null) Renderer.enabled = false;
             if (Collider != null) Collider.enabled = false;
+            if (m_Special != null) m_Special.SetActive(false);
+            ApplyPhysics(hidden: true);
+        }
+
+        /// <summary>
+        /// A real item falls on the server (it lies where it landed, the NetworkTransform shows it on the clients); hidden
+        /// (being taken) it freezes. Tetris pieces have no solid box and stay where they were put.
+        /// </summary>
+        void ApplyPhysics(bool hidden)
+        {
+            bool physics = ItemCatalog.HasPhysics(Shape);
+            if (Solid != null) Solid.enabled = physics && !hidden;
+            if (Body == null) return;
+            bool dynamic = physics && !hidden && Game.Session.IsServer;
+            if (Body.isKinematic == !dynamic) return;
+            Body.isKinematic = !dynamic;
+            if (dynamic) Body.WakeUp();
         }
 
         void Update()
@@ -83,6 +104,8 @@ namespace Stealth.Items
             m_HiddenUntil = -1f;
             if (Renderer != null) Renderer.enabled = true;
             if (Collider != null) Collider.enabled = true;
+            if (m_Special != null) m_Special.SetActive(true);
+            ApplyPhysics(hidden: false);
         }
 
         bool m_Playing;
@@ -122,6 +145,20 @@ namespace Stealth.Items
         public void SetHighlighted(bool on)
         {
             if (Renderer == null || Visuals == null) return;
+            if (m_Special != null && ItemCatalog.HasPhysics(Shape))
+            {
+                // a real item's own model: a soft glow of its value colour while under the crosshair
+                m_Block ??= new MaterialPropertyBlock();
+                m_Block.Clear();
+                if (on) m_Block.SetColor(EmissionId, ItemCatalog.UiColor(Shape, Color) * 0.6f);
+                foreach (var r in m_Special.GetComponentsInChildren<Renderer>())
+                {
+                    if (!on) { r.SetPropertyBlock(null); continue; }
+                    r.material.EnableKeyword("_EMISSION");
+                    r.SetPropertyBlock(m_Block);
+                }
+                return;
+            }
             if (!on) { Renderer.SetPropertyBlock(null); return; }
             m_Block ??= new MaterialPropertyBlock();
             var c = ItemCatalog.UiColor(Shape, Color);
@@ -137,9 +174,20 @@ namespace Stealth.Items
             Renderer.sharedMaterial = Visuals.ColorMaterials[Mathf.Clamp(Color, 0, Visuals.ColorMaterials.Length - 1)];
             if (mesh != null)
             {
+                // a real item is sized by its own model (lying along X, centred, on the floor), a piece by its mesh
                 var b = mesh.bounds;
+                if (ItemCatalog.HasPhysics(Shape))
+                {
+                    var size = ItemCatalog.ModelSize(Shape);
+                    b = new Bounds(new Vector3(0f, size.y / 2f, 0f), size);
+                }
                 Collider.center = b.center;
                 Collider.size = b.size + Vector3.one * 0.12f; // a bit larger: easier to grab with the mouse
+                if (Solid != null)
+                {
+                    Solid.center = b.center;
+                    Solid.size = Vector3.Max(b.size, Vector3.one * 0.04f); // not paper-thin: it must not fall through the floor
+                }
             }
             // a tool with a model of its own: the model instead of the tinted piece
             var model = Visuals.Models != null && Shape < Visuals.Models.Length ? Visuals.Models[Shape] : null;
@@ -153,6 +201,7 @@ namespace Stealth.Items
                 m_Glow = list.ToArray();
             }
             Renderer.forceRenderingOff = m_Special != null;
+            ApplyPhysics(hidden: Taking);
             Level.VisualStyles.Dress(gameObject); // the item's model in the current visual style
         }
     }

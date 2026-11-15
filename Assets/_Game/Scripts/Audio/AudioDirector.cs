@@ -175,7 +175,7 @@ namespace Stealth.Audio
         void UpdateMusic(PlayerController me, GameManager gm, bool inGame)
         {
             if (inGame && (gm.AlarmActive || InDanger(me))) m_LastDanger = Time.time;
-            var track = AudioRules.ChooseMusic(inGame, Time.time - m_LastDanger, m_Mix.ChaseHold);
+            var track = AudioRules.ChooseMusic(inGame, Time.time - m_LastDanger, m_Mix.ChaseHold, m_Mix.LevelMusic);
             if (track != m_Track)
             {
                 m_Track = track;

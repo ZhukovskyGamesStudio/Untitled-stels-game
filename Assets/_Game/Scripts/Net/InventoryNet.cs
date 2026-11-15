@@ -83,6 +83,22 @@ namespace Stealth.Net
         [Rpc(SendTo.Server)]
         void TakeCargoRpc(ulong cargo, byte x, byte y, byte rot) => m_Inventory.TakeCargoServer(Vehicles.CargoItem.Unpack(cargo), x, y, rot);
 
+        public void RequestRecharge(int battery, int flashlight) => RechargeRpc(battery, flashlight);
+        public void RequestRechargeWorld(WorldItem battery, int flashlight) => RechargeWorldRpc(battery.GetComponent<NetworkObject>(), flashlight);
+        public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => DropStashedRpc(NetInventoryEntry.From(from), position, yaw);
+
+        [Rpc(SendTo.Server)]
+        void RechargeRpc(int battery, int flashlight) => m_Inventory.RechargeServer(battery, flashlight);
+
+        [Rpc(SendTo.Server)]
+        void RechargeWorldRpc(NetworkObjectReference itemRef, int flashlight)
+        {
+            if (itemRef.TryGet(out var obj)) m_Inventory.RechargeWorldServer(obj.GetComponent<WorldItem>(), flashlight);
+        }
+
+        [Rpc(SendTo.Server)]
+        void DropStashedRpc(NetInventoryEntry from, Vector3 position, float yaw) => m_Inventory.DropStashedServer(from.ToEntry(), position, yaw);
+
         [Rpc(SendTo.Server)]
         void StashAllRpc() => m_Inventory.StashAllServer();
 

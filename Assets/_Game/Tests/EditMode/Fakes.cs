@@ -94,6 +94,10 @@ namespace Stealth.Tests
         public void SendHatch(bool hide) => Hatch.Add(hide);
         public void SendUnlockDoor(int door) => Doors.Add(door);
         public void SendOpenSafe(int safe) => Safes.Add(safe);
+        public readonly List<(int prop, int part)> StorageToggles = new();
+        public void SendToggleStorage(int prop, int part) => StorageToggles.Add((prop, part));
+        public int HandUses;
+        public void SendUseHand() => HandUses++;
         public readonly List<(Cheat cheat, bool on)> Cheats = new();
         public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
         public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();
@@ -121,6 +125,9 @@ namespace Stealth.Tests
         public void RequestSellWorld(WorldItem item) => Requests.Add("sell-world");
         public void RequestStashAll() => Requests.Add("stash-all");
         public void RequestTakeCargo(ulong cargo, byte x, byte y, byte rot) => Requests.Add($"take-cargo {x},{y},{rot}");
+        public void RequestRecharge(int battery, int flashlight) => Requests.Add($"recharge {battery} {flashlight}");
+        public void RequestRechargeWorld(WorldItem battery, int flashlight) => Requests.Add($"recharge-world {flashlight}");
+        public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => Requests.Add($"drop-stashed {from.X},{from.Y}");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

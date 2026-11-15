@@ -381,6 +381,18 @@ namespace Stealth.UI
             Ui.Set(m.Label, label, new Color(color.r, color.g, color.b, color.a * (clamped ? 0.8f : 1f)));
         }
 
+        /// <summary>The hint of the hand key: switch the flashlight, or put the battery in a flashlight.</summary>
+        static string HandUse(PlayerController me, PlayerInventory inventory)
+        {
+            int hand = inventory.HandIndex();
+            if (hand < 0) return null;
+            var e = inventory.Items[hand];
+            if (e.Shape == ItemCatalog.Flashlight) return e.Color > 0 || me.FlashlightOn ? Loc.T(me.FlashlightOn ? "hint.flashlight.off" : "hint.flashlight.on") : null;
+            if (e.Shape == ItemCatalog.Battery)
+                for (int i = 0; i < inventory.Items.Count; i++) if (inventory.CanRecharge(i)) return Loc.T("hint.battery.use");
+            return null;
+        }
+
         PromptContext BuildContext(GameManager gm, PlayerController me)
         {
             var hover = InventoryUI.Instance != null ? InventoryUI.Instance.Hover : null;
@@ -400,13 +412,16 @@ namespace Stealth.UI
                 CanHack = me.HackTarget != null,
                 HackProgress = me.HackShare,
                 Playing = gm.Phase == RunPhase.Playing,
-                NearHatch = gm.Phase == RunPhase.Playing && Hatch.IsNear(me.transform.position),
+                NearHatch = gm.Phase == RunPhase.Playing && me.AtHatch, // looking at the hatch
                 NearExit = Hatch.IndexNear(me.transform.position) == 1,
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
                 LockedDoor = me.DoorTarget != null,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
+                Storage = me.StorageTarget != null
+                    ? Loc.T((me.StorageTarget.Drawers ? "hint.drawer." : "hint.locker.") + (me.StorageTarget.IsOpen(me.StoragePart) ? "close" : "open"))
+                    : null,
                 Cracking = me.Cracking != null || me.AtConsole != null,
                 NearTerminal = me.TerminalTarget != null && terminal == null,
                 TerminalUsable = me.TerminalTarget != null && !me.TerminalTarget.Spent,
@@ -422,6 +437,7 @@ namespace Stealth.UI
                 Driving = me.SeatIndex == 0,
                 Passenger = me.SeatIndex > 0,
                 HasStun = inventory.Items.Any(i => i.Shape == ItemCatalog.Stun),
+                HandUse = HandUse(me, inventory),
                 HoverItem = hover != null,
                 BigMap = m_BigMapOpen,
             };

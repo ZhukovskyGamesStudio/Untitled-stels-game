@@ -28,6 +28,8 @@ namespace Stealth.UI
         public float DoorProgress;
         /// <summary>A closed safe in reach.</summary>
         public bool SafeNear;
+        /// <summary>A drawer / locker door looked at: what pressing E does with it (null if none).</summary>
+        public string Storage;
         /// <summary>A terminal in reach (and whether it can do anything).</summary>
         public bool NearTerminal, TerminalUsable;
         /// <summary>Sitting at a terminal: which kind, and whether E hacks the robot on its screen now.</summary>
@@ -44,6 +46,8 @@ namespace Stealth.UI
         /// <summary>Sitting in the car: at the wheel / as a passenger.</summary>
         public bool Driving, Passenger;
         public bool HasStun;
+        /// <summary>What the hand key does now (the item in the hand slot), null if nothing.</summary>
+        public string HandUse;
         /// <summary>A world item under the crosshair (it can be taken).</summary>
         public bool HoverItem;
         public bool BigMap;
@@ -175,6 +179,7 @@ namespace Stealth.UI
             if (c.CanHack) return new Reticle(ReticleIcon.Hack, true, c.HackProgress);
             if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
             if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
+            if (c.Storage != null) return new Reticle(ReticleIcon.Hand);
             if (c.HasUse) return new Reticle(IconOf(c.UseKind), c.UseAvailable, c.UseAvailable && c.UseProgress > 0f ? c.UseProgress : -1f);
             if (c.NearTerminal) return new Reticle(ReticleIcon.Terminal, c.TerminalUsable);
             if (c.HoverItem) return new Reticle(ReticleIcon.Hand);
@@ -241,6 +246,7 @@ namespace Stealth.UI
                 into.Add(new Hint(K(GameAction.Mirror), Loc.T("hint.mirror")));
             }
             if (c.HasStun && !c.CursorMode) into.Add(new Hint(K(GameAction.Gadget), Loc.T("hint.stun")));
+            if (c.HandUse != null && !c.CursorMode) into.Add(new Hint(K(GameAction.UseHand), c.HandUse));
             if (c.InHatch)
             {
                 into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
@@ -268,6 +274,7 @@ namespace Stealth.UI
             if (c.CanHack) return new Hint(e, Loc.T("hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T("hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
+            if (c.Storage != null) return new Hint(e, c.Storage);
             if (c.HasUse && !string.IsNullOrEmpty(c.UseText)) return new Hint(e, c.UseText, !c.UseAvailable);
             if (c.NearTerminal) return new Hint(e, Loc.T("hint.terminal"), !c.TerminalUsable);
             if (c.HoverItem) return new Hint(Lmb, Loc.T("hint.take"));

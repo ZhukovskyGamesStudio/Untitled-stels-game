@@ -35,8 +35,13 @@ namespace Stealth.Tests
                 int[] seeds = { 1, 7, 42, 1337, 99991, 2024, 555, 31337 };
                 for (int i = 0; i < seeds.Length; i++) list.Add((seeds[i], i % 6));
             }
+            // PLANCONFIG=RoomsTest draws the houses of that level config (Data/Config/<name>/Level.asset), else the game's
+            var config = System.Environment.GetEnvironmentVariable("PLANCONFIG");
+            var level = string.IsNullOrEmpty(config) ? null
+                : UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.LevelConfig>($"Assets/_Game/Data/Config/{config}/Level.asset");
             foreach (var (seed, house) in list)
-                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house)));
+                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}.png"),
+                    Draw(level != null ? LevelGenerator.Generate(seed, house, level.Building, level.Security, 1) : LevelGenerator.Generate(seed, house)));
         }
 
         static Color TypeColor(RoomType t) => t switch

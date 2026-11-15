@@ -25,8 +25,8 @@ namespace Stealth.Audio
         public const float CameraBeepVolume = 0.5f;
 
         /// <summary>Menu music outside a game; in a game — exploring, or the chase track while in danger and a bit after.</summary>
-        public static MusicTrack ChooseMusic(bool inGame, float secondsSinceDanger, float chaseHold) =>
-            !inGame ? MusicTrack.Menu : secondsSinceDanger <= chaseHold ? MusicTrack.Chase : MusicTrack.Explore;
+        public static MusicTrack ChooseMusic(bool inGame, float secondsSinceDanger, float chaseHold, bool levelMusic = true) =>
+            !inGame ? MusicTrack.Menu : !levelMusic ? MusicTrack.None : secondsSinceDanger <= chaseHold ? MusicTrack.Chase : MusicTrack.Explore;
 
         /// <summary>Seconds between footsteps at <paramref name="speed"/> m/s; infinity when standing.</summary>
         public static float StepInterval(float speed, float stepLength) =>

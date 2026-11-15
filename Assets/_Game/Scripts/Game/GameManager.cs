@@ -74,6 +74,11 @@ namespace Stealth.Game
         public static int SafeKey(int safe) => 1_000_000 + safe;
         /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
         public static int TerminalKey(int terminal, int use) => 2_000_000 + terminal * 16 + use;
+        /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
+        public static int StorageKey(int prop, int part) => 3_000_000 + prop * 8 + part;
+
+        /// <summary>Server: loot hidden behind a drawer / locker door (<see cref="StorageKey"/> → shape, colour) until it is opened.</summary>
+        readonly Dictionary<int, (byte shape, byte color)> m_Hidden = new();
 
         /// <summary>Hacks already made from this terminal in this house (kept with the opened doors and safes, so replicated).</summary>
         public int TerminalUses(int terminal)
@@ -129,6 +134,7 @@ namespace Stealth.Game
             m_Run = new RunState(Tuning.Run.Rules);
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
+            Items.Storage.IsOpened = (prop, part) => IsOpened(StorageKey(prop, part));
             SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
             HookFeatures();
             if (!isServer) return;
@@ -351,11 +357,33 @@ namespace Stealth.Game
         int SpawnContent(LevelLayout layout, int seed)
         {
             var rng = LevelRandom.Stream(RandomChannel.Loot);
+            var hideRng = LevelRandom.Stream(RandomChannel.Storage);
+            var free = new List<int>();
+            var parts = new Dictionary<int, (Items.Storage storage, int part)>();
+            foreach (var s in Items.Storage.All)
+                if (s.Index >= 0)
+                    for (int part = 0; part < s.PartCount; part++)
+                    {
+                        free.Add(StorageKey(s.Index, part));
+                        parts[StorageKey(s.Index, part)] = (s, part);
+                    }
+            free.Sort(); // the same order on every run of the same house
+            m_Hidden.Clear();
             int total = 0;
+            float inStorage = Tuning.Level.Loot.InStorageChance;
             foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
             {
-                var item = SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, rng.Next(4) * 90f + (float)rng.NextDouble() * 20f);
-                total += item.Value;
+                float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
+                // a part it fits in: a shovel only stands in a tall compartment, small things go in drawers and cupboards too
+                int key = Items.StorageMath.Hide(free, hideRng, inStorage, k => parts[k].storage.Fits(parts[k].part, loot.Shape));
+                if (key >= 0)
+                {
+                    // hidden in a drawer or a locker: it appears when that part is first opened (it still counts for the quota)
+                    m_Hidden[key] = ((byte)loot.Shape, (byte)loot.Color);
+                    total += ItemCatalog.Value(loot.Shape, loot.Color);
+                    continue;
+                }
+                total += SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, yaw).Value;
             }
             total += SpawnFeatures(layout);
             SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
@@ -672,6 +700,27 @@ namespace Stealth.Game
             target.HackServer(Tuning.Player.Interaction.HackDuration);
         }
 
+        /// <summary>
+        /// Server: a player opens or closes a drawer / locker door (looking right at it). The first time a part with hidden
+        /// loot opens, the item appears inside.
+        /// </summary>
+        public void ToggleStorageServer(PlayerController player, int prop, int part)
+        {
+            if (Phase != RunPhase.Playing || player == null || player.Downed) return;
+            var storage = Items.Storage.All.FirstOrDefault(s => s.Index == prop);
+            if (storage == null || part < 0 || part >= storage.PartCount) return;
+            if (Vector3.Distance(storage.transform.position, player.transform.position) > StorageReach) return;
+            int key = StorageKey(prop, part);
+            if (!m_Opened.Remove(key)) m_Opened.Add(key);
+            OpenedVersion++;
+            if (!m_Opened.Contains(key) || !m_Hidden.Remove(key, out var loot)) return;
+            var (pos, rot) = storage.LootPose(part, loot.shape);
+            Session.Spawn(ItemPrefab, pos, rot, go => go.GetComponent<WorldItem>().SetLook(loot.shape, loot.color));
+        }
+
+        /// <summary>How far from a drawer cabinet / lockers a player can be to use them (the client asks by looking at a part).</summary>
+        const float StorageReach = 3.2f;
+
         /// <summary>Server: a player cracked a safe — it opens and gives valuable loot.</summary>
         public void OpenSafeServer(PlayerController player, int safe)
         {
@@ -687,7 +736,7 @@ namespace Stealth.Game
             for (int i = 0; i < s.LootItems; i++)
             {
                 byte color = (byte)Mathf.Clamp(s.LootColors[rng.Next(s.LootColors.Length)], 0, ItemCatalog.Colors.Length - 1);
-                byte shape = (byte)rng.Next(ItemCatalog.LootShapes);
+                byte shape = ItemCatalog.LootShape(rng);
                 value += SpawnItemServer(shape, color, box.LootSpot(i), rng.Next(360)).Value;
             }
             Banner(Loc.Pack("banner.safe", player.Nick, value));

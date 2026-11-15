@@ -9,6 +9,7 @@ namespace Stealth.Player
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
         Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats, Gadget, Horn,
+        UseHand,
     }
 
     /// <summary>
@@ -93,6 +94,7 @@ namespace Stealth.Player
             new(GameAction.Cheats, "other", KeyBinding.Of(Key.F4)),
             new(GameAction.Gadget, "actions", KeyBinding.Of(Key.X)),
             new(GameAction.Horn, "car", KeyBinding.Of(Key.H)),
+            new(GameAction.UseHand, "actions", KeyBinding.Of(Key.V)),
         };
 
         const string Prefix = "stealth.key.";

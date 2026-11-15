@@ -213,6 +213,19 @@ namespace Stealth.EditorTools
             var mr = root.AddComponent<MeshRenderer>();
             var col = root.AddComponent<BoxCollider>();
             col.isTrigger = true;
+            // real items (the shovel) fall: a solid box and a body, dynamic on the server only (WorldItem.ApplyPhysics);
+            // the server's NetworkTransform shows where it landed on the clients
+            var body = root.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.mass = 2f;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            var solid = Child(root.transform, "Solid").AddComponent<BoxCollider>();
+            solid.enabled = false;
+            var nt = root.AddComponent<NetworkTransform>();
+            nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            nt.Interpolate = true;
             mf.sharedMesh = visuals.Meshes[0];
             mr.sharedMaterial = visuals.ColorMaterials[0];
             var item = root.AddComponent<WorldItem>();
@@ -231,6 +244,8 @@ namespace Stealth.EditorTools
             item.MeshFilter = mf;
             item.Renderer = mr;
             item.Collider = col;
+            item.Body = body;
+            item.Solid = solid;
             return root;
         }
 
@@ -267,6 +282,30 @@ namespace Stealth.EditorTools
             cam.enabled = false;
             var listener = head.AddComponent<AudioListener>();
             listener.enabled = false;
+            // the flashlight's beam from the head (on only while a charged flashlight in the hand is switched on);
+            // robots see a player in it (LightSource), like in any lamp's light
+            // the hand holding the flashlight in the view (Tools/Blender/poi.py view_flashlight; only its owner sees it)
+            Mat("Player", "ViewSleeve", new Color(0.16f, 0.17f, 0.19f), smoothness: 0.2f);
+            var view = Model("view_flashlight");
+            view.name = "ViewFlashlight";
+            view.transform.SetParent(head.transform, false);
+            view.transform.localPosition = new Vector3(0.16f, -0.2f, 0.3f);
+            view.transform.localRotation = Quaternion.Euler(-4f, -6f, 0f);
+            foreach (var r in view.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = M(n.StartsWith("AccentSleeve") ? "ViewSleeve" : n.StartsWith("AccentTorch") ? "FlashlightBody"
+                    : n.StartsWith("AccentHead") ? "FlashlightMetal" : n.StartsWith("AccentLens") ? "FlashlightLens" : "PlayerAccent");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            view.SetActive(false);
+            // the beam from the flashlight's lens in the view
+            var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
+                new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
+            beam.spotAngle = 55f;
+            beam.innerSpotAngle = 22f;
+            beam.enabled = false;
 
             var motor = root.AddComponent<PlayerMotor>();
             root.AddComponent<PlayerInventory>();
@@ -277,6 +316,8 @@ namespace Stealth.EditorTools
             pc.Head = head.transform;
             pc.Camera = cam;
             pc.Listener = listener;
+            pc.Flashlight = beam;
+            pc.ViewFlashlight = view;
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);

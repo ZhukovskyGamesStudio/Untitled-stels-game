@@ -57,6 +57,8 @@ namespace Stealth.Game
         public float GracePeriod = 8f;
 
         [Header("Hunter")]
+        [Tooltip("The hunter at all: off = it never comes and there is no countdown on the screen (a quiet test level).")]
+        public bool Hunter = true;
         [Tooltip("Alarms that bring the hunter in the first house.")]
         public int HunterAlarmsFirstHouse = 3;
         [Tooltip("Alarms that bring the hunter in later houses.")]
@@ -124,7 +126,7 @@ namespace Stealth.Game
         public static (float seconds, int alarms) HunterForecast(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
         {
             s ??= new RunSettings();
-            if (huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return (-1f, -1);
+            if (!s.Hunter || huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return (-1f, -1);
             int alarmLimit = (levelIndex == 0 ? s.HunterAlarmsFirstHouse : s.HunterAlarmsLater) * (huntersSoFar + 1);
             float timeLimit = Mathf.Max(s.HunterMinTime, s.HunterTime - levelIndex * s.HunterTimeStepPerHouse) * (huntersSoFar + 1);
             return (Mathf.Max(0f, timeLimit - elapsed), Mathf.Max(0, alarmLimit - alarms));
