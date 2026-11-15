@@ -197,6 +197,12 @@ namespace Stealth.EditorTools
             icons[ItemCatalog.Shovel] = ItemIcon("shovel");
             icons[ItemCatalog.Flashlight] = ItemIcon("flashlight");
             icons[ItemCatalog.Battery] = ItemIcon("battery");
+            // the tools and the crafted diamond (Tools/Blender/item_icons.py renders their models too)
+            icons[ItemCatalog.Diamond] = ItemIcon("diamond");
+            icons[ItemCatalog.Key] = ItemIcon("key");
+            icons[ItemCatalog.CageKey] = ItemIcon("cagekey");
+            icons[ItemCatalog.Stun] = ItemIcon("stun");
+            icons[ItemCatalog.Speaker] = ItemIcon("speaker");
             var meshes = ItemCatalog.Shapes.Select(s =>
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in

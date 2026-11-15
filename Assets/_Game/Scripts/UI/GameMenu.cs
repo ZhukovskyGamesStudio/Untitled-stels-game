@@ -102,7 +102,11 @@ namespace Stealth.UI
             if (TestRooms != null)
             {
                 TestRooms.SetIsOnWithoutNotify(Configs.Tuning.TestRooms);
-                TestRooms.onValueChanged.AddListener(Configs.Tuning.SetTestRooms);
+                TestRooms.onValueChanged.AddListener(on =>
+                {
+                    Configs.Tuning.SetTestRooms(on);
+                    Level.VisualStyles.UseConfig(Configs.Tuning.Styles); // the test rooms: «Заброшенный комплекс» only
+                });
             }
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);

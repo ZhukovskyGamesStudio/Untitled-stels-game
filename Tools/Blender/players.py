@@ -305,7 +305,7 @@ def build(style, finish, p, dept):
 
 if __name__ == "__main__":
     G.g.clear_scene()
-    only = argv[1:] or ["S16_Derelict"]  # style asset names to build (this branch plays only S16 by default)
+    only = argv[1:]  # optional: style asset names to build (default: all)
     for style, (finish, plan) in PLANS.items():
         if only and style not in only:
             continue

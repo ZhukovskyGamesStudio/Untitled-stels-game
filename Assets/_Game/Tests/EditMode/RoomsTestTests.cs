@@ -45,7 +45,10 @@ namespace Stealth.Tests
             Assert.AreEqual(AssetDatabase.LoadAssetAtPath<LevelConfig>(LevelPath), root.Level, "the test scene plays its own level");
             Assert.AreNotEqual(main.Level, root.Level);
             Assert.AreEqual(main.Player, root.Player, "the rest of the tuning is the game's own");
-            Assert.AreEqual(main.Styles, root.Styles);
+            Assert.AreNotEqual(main.Styles, root.Styles, "the test rooms have their own style list…");
+            CollectionAssert.AreEqual(new[] { "S16_Derelict" }, root.Styles.Styles.Select(s => s.name).ToArray(), "…with the abandoned facility only");
+            Assert.AreEqual("S16_Derelict", root.Styles.Default.name);
+            Assert.Greater(main.Styles.Styles.Length, 1, "the main game has all the styles (F8)");
         }
 
         [Test]

@@ -1,6 +1,6 @@
 """Architecture kit of the visual styles: trims, panels, columns, beams, pipes, light strips.
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/style_kit.py -- Assets/_Game/Art/Models/StyleKit [family ...]  (default: derelict)
+Run:  blender.exe -b --factory-startup --python Tools/Blender/style_kit.py -- Assets/_Game/Art/Models/StyleKit
 
 Conventions (Unity side, after export): local X runs along the wall, +Z points out of the wall into the room, +Y is up.
 The origin is on the wall face. Pieces that run along a wall are 1 m long (x from -0.5 to 0.5) and get stretched to the
@@ -20,8 +20,7 @@ import meshfix  # noqa: E402
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 base_dir = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleKit")
 # no family: the plain kit in StyleKit/; with families: StyleKit/<Family>/ reshaped like the family's models
-# this branch plays only S16 «Заброшенный комплекс»: by default only the derelict kit (name others to make them)
-FAMILIES = argv[1:] or ["derelict"]
+FAMILIES = argv[1:] or [None]
 family = None
 out_dir = base_dir
 

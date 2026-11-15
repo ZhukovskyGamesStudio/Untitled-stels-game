@@ -37,6 +37,38 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void EveryItemThatIsNotATetrisPieceHasAPictureOfItsCells()
+        {
+            var visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>("Assets/_Game/Data/ItemVisuals.asset");
+            for (int s = ItemCatalog.LootShapes; s < ItemCatalog.Shapes.Length; s++)
+            {
+                var icon = visuals.Icons[s];
+                Assert.IsNotNull(icon, $"{ItemCatalog.Shapes[s].Id}: a picture in the backpack");
+                var size = ItemCatalog.Size(ItemCatalog.Shapes[s].Cells);
+                Assert.AreEqual(size.x / (float)size.y, icon.rect.width / icon.rect.height, 0.01f, $"{ItemCatalog.Shapes[s].Id}: its cells' shape");
+            }
+        }
+
+        [Test]
+        public void TheLootTableKeepsTheHousesValueBudget()
+        {
+            // the old loot: the eight tetris pieces, drawn evenly — that is the budget the quota is a share of
+            ItemCatalog.ConfigureLoot(null);
+            float oldMean = 0f;
+            for (int i = 0; i < ItemCatalog.LootShapes; i++) oldMean += ItemCatalog.MeanValueCells(i);
+            oldMean /= ItemCatalog.LootShapes;
+            Assert.AreEqual(oldMean / ItemCatalog.MeanValueCells(ItemCatalog.Shovel), ItemCatalog.ItemsPerOldItem(), 1e-4f, "shovels only: fewer, bigger");
+            var level = AssetDatabase.LoadAssetAtPath<LevelConfig>("Assets/_Game/Data/Config/Level.asset");
+            ItemCatalog.ConfigureLoot(level.Loot.Table);
+            float k = ItemCatalog.ItemsPerOldItem();
+            float now = 0f, w = 0f;
+            foreach (var t in ItemCatalog.LootTable) { now += t.weight * ItemCatalog.MeanValueCells(t.shape); w += t.weight; }
+            Assert.AreEqual(oldMean, k * now / w, 1e-3f, "items × their mean value = the old budget");
+            Assert.Greater(ItemCatalog.MeanValueCells(ItemCatalog.Battery), 1f, "batteries carry a value colour like loot");
+            Assert.IsTrue(ItemCatalog.LootTable.All(t => t.shape >= ItemCatalog.LootShapes), "no tetris pieces in the table");
+        }
+
+        [Test]
         public void TheViewShowsAHandHoldingTheFlashlight()
         {
             var player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Player/Player.prefab").GetComponent<PlayerController>();

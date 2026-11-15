@@ -1,3 +1,4 @@
+using System.Linq;
 using Stealth.Configs;
 using UnityEditor;
 using UnityEngine;
@@ -19,6 +20,24 @@ namespace Stealth.EditorTools
             var root = BuildRoomsTestConfigs();
             var main = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             if (main != null && main.TestRooms != root) { main.TestRooms = root; EditorUtility.SetDirty(main); }
+            // the test rooms play only «Заброшенный комплекс» (S16): their own style list, a copy of the game's with one style
+            if (main != null && main.Styles != null)
+            {
+                const string path = StylesDir + "/StylesTestRooms.asset";
+                var styles = AssetDatabase.LoadAssetAtPath<StyleConfig>(path);
+                if (styles == null)
+                {
+                    styles = ScriptableObject.CreateInstance<StyleConfig>();
+                    AssetDatabase.CreateAsset(styles, path);
+                }
+                EditorUtility.CopySerialized(main.Styles, styles);
+                styles.name = "StylesTestRooms";
+                var derelict = main.Styles.Styles.FirstOrDefault(s => s != null && s.name == "S16_Derelict");
+                styles.Styles = derelict != null ? new[] { derelict } : main.Styles.Styles;
+                styles.Default = derelict != null ? derelict : main.Styles.Default;
+                EditorUtility.SetDirty(styles);
+                if (root.Styles != styles) { root.Styles = styles; EditorUtility.SetDirty(root); }
+            }
             if (AssetDatabase.LoadAssetAtPath<SceneAsset>(RoomsTestScenePath) != null) AssetDatabase.DeleteAsset(RoomsTestScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();
