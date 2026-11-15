@@ -16,6 +16,10 @@ namespace Stealth.Items
         public int RoomsPerExtraItem = 3;
         [Tooltip("Items never lie closer than this, meters.")]
         public float MinSpacing = 1.5f;
+        [Tooltip("Chance of an item to be hidden in a drawer or a locker instead (it appears when that part is opened).")]
+        [Range(0, 1)] public float InStorageChance = 0.3f;
+        [Tooltip("What the loot is (shape id and weight): shovel, flashlight, battery. Empty = shovels only.")]
+        public ItemCatalog.LootWeight[] Table = { new() { Item = "shovel", Weight = 1 } };
 
         [Header("Value bonus (shifts colours towards valuable ones)")]
         public int BonusPerHouse = 2;
@@ -84,9 +88,9 @@ namespace Stealth.Items
             // in a room worth the detour the shape is the bigger of two draws (bigger things are worth more)
             int Shape(Vector3 p)
             {
-                int a = rng.Next(ItemCatalog.LootShapes);
+                int a = ItemCatalog.LootShape(rng); // from the loot table (shovels, flashlights, batteries…)
                 if (!InHidden(p) && RegionOf(p) < 0) return a;
-                int b = rng.Next(ItemCatalog.LootShapes);
+                int b = ItemCatalog.LootShape(rng);
                 return ItemCatalog.Value(b, 0) > ItemCatalog.Value(a, 0) ? b : a;
             }
             // the hidden room and the parts behind key doors are worth finding: a few things there first
@@ -100,7 +104,7 @@ namespace Stealth.Items
                         var p = spots[i];
                         spots.RemoveAt(i);
                         if (result.Exists(r => (r.Position - p).sqrMagnitude < spacing * spacing)) continue;
-                        result.Add(new Loot { Position = p, Shape = Shape(p), Color = ItemCatalog.RandomColor(rng, Bonus(p)) });
+                        { int shape = Shape(p); result.Add(new Loot { Position = p, Shape = shape, Color = ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, Bonus(p))) }); }
                         placed++;
                     }
             }
@@ -128,7 +132,7 @@ namespace Stealth.Items
                     var p = spots[i];
                     spots.RemoveAt(i);
                     if (result.Exists(r => (r.Position - p).sqrMagnitude < spacing * spacing)) continue;
-                    result.Add(new Loot { Position = p, Shape = Shape(p), Color = ItemCatalog.RandomColor(rng, Bonus(p)) });
+                    { int shape = Shape(p); result.Add(new Loot { Position = p, Shape = shape, Color = ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, Bonus(p))) }); }
                     placed = true;
                 }
                 misses = placed ? 0 : misses + 1;

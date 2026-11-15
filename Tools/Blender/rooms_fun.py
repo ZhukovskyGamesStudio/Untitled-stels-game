@@ -611,11 +611,18 @@ def model_lab_bench():
 def model_parts_cabinet():
     """Small-parts cabinet 0.9 x 0.45, 1.4 high: a steel base cabinet with two doors and a 5 x 8 grid of little
     clear drawers with pulls on top of it."""
-    body = [s.rbox((0.9, 0.45, 0.8), (0, 0, 0.4), r=0.01, seg=2),
-            s.rbox((0.9, 0.42, 0.605), (0, 0.015, 1.0975), r=0.01, seg=2)]
-    body += [s.rbox((0.43, 0.02, 0.7), (xs * 0.2175, -0.22, 0.43), r=0.006, seg=1) for xs in (-1, 1)]
-    s.groove(body[0], "Z", 0.05, 0.01, 0.005)
+    # the base: an open-fronted steel carcass (sides, top, bottom, a shelf, the back) behind two swinging doors
+    body = [s.rbox((0.02, 0.45, 0.8), (x * 0.44, 0, 0.4), r=0.004, seg=1) for x in (-1, 1)]
+    body += [s.rbox((0.9, 0.45, 0.02), (0, 0, z), r=0.004, seg=1) for z in (0.06, 0.79)]
+    body += [s.rbox((0.86, 0.02, 0.76), (0, 0.215, 0.42), r=0.003, seg=1),
+             s.rbox((0.86, 0.4, 0.018), (0, 0.02, 0.42), r=0.003, seg=1),
+             s.rbox((0.86, 0.4, 0.06), (0, 0.02, 0.03), r=0.004, seg=1),                     # plinth
+             s.rbox((0.9, 0.42, 0.605), (0, 0.015, 1.0975), r=0.01, seg=2)]
     s.part("Body", body)
+    for i, xs in enumerate((-1, 1)):
+        door = s.rbox((0.43, 0.02, 0.7), (xs * 0.2175, -0.22, 0.43), r=0.006, seg=1)
+        pull = s.rbox((0.022, 0.025, 0.16), (xs * 0.035, -0.235, 0.55), r=0.006, seg=1)
+        s.part(f"BodyDoor{i}", [door, pull])
 
     acc, trim = [], []
     for c in range(5):
@@ -624,7 +631,6 @@ def model_parts_cabinet():
             z = 0.838 + r * 0.07
             acc.append(s.rbox((0.156, 0.03, 0.061), (x, -0.2, z), r=0.006, seg=1))
             trim.append(s.rbox((0.05, 0.012, 0.012), (x, -0.217, z - 0.012), r=0))
-    trim += [s.rbox((0.022, 0.025, 0.16), (xs * 0.035, -0.235, 0.55), r=0.006, seg=1) for xs in (-1, 1)]
     s.part("Accent", acc)
     s.part("Trim", trim)
     return export("parts_cabinet")

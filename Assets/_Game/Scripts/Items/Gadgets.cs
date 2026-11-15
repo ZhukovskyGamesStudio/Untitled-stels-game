@@ -12,6 +12,10 @@ namespace Stealth.Items
         [Tooltip("Seconds every robot and camera of the house is stunned.")]
         public float StunDuration = 10f;
 
+        [Header("Flashlight")]
+        [Tooltip("Seconds a full flashlight shines before it is empty (a battery fills it again).")]
+        public float FlashlightSeconds = 180f;
+
         [Header("Lure speaker")]
         [Tooltip("Seconds it plays when dropped (unless a robot switches it off first).")]
         public float LureDuration = 25f;

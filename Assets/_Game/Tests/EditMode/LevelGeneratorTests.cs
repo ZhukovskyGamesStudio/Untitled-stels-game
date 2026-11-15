@@ -150,7 +150,10 @@ namespace Stealth.Tests
         public void HighVentsCanBeClimbedTo()
         {
             // the climb in numbers: floor → desk is a jump, desk → sill a crouched step, the duct fits a crouched player
-            const float jump = 0.9f, step = 0.35f, crouched = Stealth.Player.PlayerController.CrouchHeight;
+            float jump = new Stealth.Player.MovementSettings().JumpHeight;
+            const float step = 0.35f, crouched = Stealth.Player.PlayerController.CrouchHeight;
+            var tuned = UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.PlayerConfig>("Assets/_Game/Data/Config/Player.asset");
+            if (tuned != null) Assert.AreEqual(jump, tuned.Movement.JumpHeight, 1e-4f, "the tuned jump is the one the desks are made for");
             Assert.LessOrEqual(LevelMetrics.DeskTop, jump - 0.1f);
             Assert.LessOrEqual(LevelMetrics.HighVentSill - LevelMetrics.DeskTop, step - 0.03f, "a step up from the desk into the duct");
             Assert.GreaterOrEqual(LevelMetrics.VentHeight, crouched + step, "room to step in crouched");

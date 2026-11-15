@@ -52,6 +52,8 @@ namespace Stealth.Player
         public bool Downed { get; private set; }
         /// <summary>Server-owned: hiding in the hatch (robots do not see you; when the whole team is in, it leaves the house).</summary>
         public bool InHatch { get; private set; }
+        /// <summary>Owner: next to the hatch and looking right at it (its collider), so the hatch key climbs in.</summary>
+        public bool AtHatch { get; private set; }
         /// <summary>Owner-owned.</summary>
         public bool Crouching { get; private set; }
         /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
@@ -189,7 +191,7 @@ namespace Stealth.Player
                 var nick = Session.Launcher?.LocalPlayerName ?? "";
                 DisplayName = nick.Length > 28 ? nick.Substring(0, 28) : nick;
                 Camera.enabled = true;
-                Camera.clearFlags = CameraClearFlags.SolidColor; // no sky: outside is a wall of gas
+                Camera.clearFlags = CameraClearFlags.SolidColor; // the sky is drawn by the gas pass (GasView), never the engine's skybox
                 Listener.enabled = true;
                 foreach (var r in BodyRenderers) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
                 LocalChanged?.Invoke(true);
@@ -209,17 +211,94 @@ namespace Stealth.Player
             m_Link = null;
             if (Local != this) return;
             Local = null;
+            GasView.Hide();
             LocalChanged?.Invoke(false);
         }
 
         /// <summary>Client: health as decided by the server.</summary>
-        public void ApplyServerState(int hp, bool downed, bool inHatch, int hatch = 0)
+        public void ApplyServerState(int hp, bool downed, bool inHatch, int hatch = 0, bool flashlight = false)
         {
             if (downed && !Downed) m_DownedSince = Time.time;
             Hp = hp;
             Downed = downed;
             InHatch = inHatch;
             HatchIndex = hatch;
+            FlashlightOn = flashlight;
+        }
+
+        // ------------------------------------------------------------------ the hand: flashlight
+
+        [Tooltip("The flashlight's beam (off unless a charged flashlight in the hand is switched on).")]
+        public Light Flashlight;
+        [Tooltip("The hand holding the flashlight, seen in the first-person view while a flashlight is in the hand slot (owner only).")]
+        public GameObject ViewFlashlight;
+        /// <summary>The flashlight in the hand shines (server-decided, replicated).</summary>
+        public bool FlashlightOn { get; private set; }
+        float m_Drain;
+
+        /// <summary>Owner: the hand key — use what the hand holds.</summary>
+        void UpdateHand()
+        {
+            if (!Controls.Pressed(GameAction.UseHand) || CursorMode || Downed) return;
+            if (m_Link != null) m_Link.SendUseHand();
+            else UseHandServer();
+        }
+
+        /// <summary>
+        /// Server: the hand key. A flashlight switches on (if it has charge) or off; a battery goes into the first flashlight
+        /// in the backpack that is not full.
+        /// </summary>
+        public void UseHandServer()
+        {
+            var inv = GetComponent<PlayerInventory>();
+            int hand = inv.HandIndex();
+            if (Downed || hand < 0) return;
+            var e = inv.Items[hand];
+            if (e.Shape == Items.ItemCatalog.Flashlight)
+            {
+                FlashlightOn = !FlashlightOn && e.Color > 0;
+                return;
+            }
+            if (e.Shape == Items.ItemCatalog.Battery)
+                for (int i = 0; i < inv.Items.Count; i++)
+                    if (inv.CanRecharge(i)) { inv.RechargeServer(hand, i); return; }
+        }
+
+        /// <summary>Server: the flashlight drains while it shines; it goes out when empty, put away or when its holder falls.</summary>
+        void UpdateFlashlightServer(float dt)
+        {
+            if (!FlashlightOn) { m_Drain = 0f; return; }
+            var inv = GetComponent<PlayerInventory>();
+            int hand = inv.HandIndex();
+            if (Downed || InHatch || hand < 0 || inv.Items[hand].Shape != Items.ItemCatalog.Flashlight || inv.Items[hand].Color == 0)
+            {
+                FlashlightOn = false;
+                return;
+            }
+            float seconds = Mathf.Max(1f, Configs.Tuning.Items.Gadgets.FlashlightSeconds);
+            m_Drain += dt * Items.ItemCatalog.FullCharge / seconds;
+            if (m_Drain < 1f) return;
+            int used = Mathf.FloorToInt(m_Drain);
+            m_Drain -= used;
+            int charge = Mathf.Max(0, inv.Items[hand].Color - used);
+            inv.SetChargeServer(hand, (byte)charge);
+            if (charge == 0) FlashlightOn = false;
+        }
+
+        /// <summary>Every peer: the beam where the holder looks.</summary>
+        void UpdateFlashlightView()
+        {
+            if (ViewFlashlight != null)
+            {
+                var inv = GetComponent<PlayerInventory>();
+                int hand = inv != null ? inv.HandIndex() : -1;
+                bool show = IsOwner && hand >= 0 && inv.Items[hand].Shape == Items.ItemCatalog.Flashlight && !Downed && !InHatch && UsingTerminal == null;
+                if (ViewFlashlight.activeSelf != show) ViewFlashlight.SetActive(show);
+            }
+            if (Flashlight == null) return;
+            bool on = FlashlightOn && !Downed && !InHatch;
+            if (Flashlight.enabled != on) Flashlight.enabled = on;
+            if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, 0f, 0f); // the head of a remote player does not pitch
         }
 
         /// <summary>Which hatch of the house the player sits in: 0 the entry (where the team comes up), 1 the exit (the way down).</summary>
@@ -253,7 +332,9 @@ namespace Stealth.Player
                 d.y = 0;
                 float s = d.magnitude / Time.deltaTime;
                 ServerSpeed = s > 20f ? 0f : Mathf.Lerp(ServerSpeed, s, 1f - Mathf.Exp(-10f * Time.deltaTime));
+                UpdateFlashlightServer(Time.deltaTime);
             }
+            UpdateFlashlightView();
             UpdateModelPose();
             if (!IsOwner) return;
 
@@ -281,6 +362,8 @@ namespace Stealth.Player
 
             UpdateNoise();
             UpdateGas();
+            UpdateHand();
+            AtHatch = !InHatch && Hatch.IsNear(transform.position) && (!UseLook || Aimed<Hatch>() != null);
             UpdateInteractions();
             UpdateCallouts();
             UpdateFog();
@@ -293,6 +376,7 @@ namespace Stealth.Player
             if (layout == null)
             {
                 // The sewer: a damp indoor haze, the background is the haze too (never the default sky colour).
+                GasView.Hide();
                 if (SewerLocation.Active == null) return;
                 var a = VisualStyles.World;
                 RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, a.IndoorFogDensity * 1.4f, Time.deltaTime * 3f);
@@ -300,13 +384,14 @@ namespace Stealth.Player
                 Camera.backgroundColor = RenderSettings.fogColor;
                 return;
             }
-            bool outside = !layout.IsInside(transform.position);
-            // Outside the gas is a wall: 1.5 m away nothing is seen — lose sight of the house and you are lost.
-            var air = VisualStyles.World; // the gas density is gameplay; a style changes only the colours and the indoor haze
-            float target = outside ? LightMath.GasFogDensity : air.IndoorFogDensity;
-            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, target, Time.deltaTime * 3f);
-            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, outside ? air.GasFog : air.IndoorFog, Time.deltaTime * 2f);
-            Camera.backgroundColor = RenderSettings.fogColor;
+            // The engine's fog is only the dark haze, inside and out. The gas is drawn in the world by the gas pass
+            // (GasView): none at the walls, full 15 m out (lose sight of the house and you are lost), the sky above it.
+            // Visual only — the gas still hurts where it did (UpdateGas).
+            var air = VisualStyles.World;
+            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, air.IndoorFogDensity, Time.deltaTime * 3f);
+            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, air.IndoorFog, Time.deltaTime * 2f);
+            Camera.backgroundColor = Color.black; // the gas pass adds the sky where nothing was drawn
+            GasView.Show(layout, air, layout.IsInside(Camera.transform.position));
         }
 
         bool m_PlacedInHatch;
@@ -614,6 +699,7 @@ namespace Stealth.Player
 
             UpdateSafe();
             UpdateConsole();
+            UpdateStorage();
             UpdateTerminal(holdE);
             UpdateUse(holdE);
             if (Controls.Pressed(GameAction.Gadget) && !CursorMode && HasItem(Items.ItemCatalog.Stun))
@@ -626,7 +712,7 @@ namespace Stealth.Player
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
             // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
             if (InHatch) SetHatch(false);
-            else if (Hatch.IsNear(transform.position)) SetHatch(true);
+            else if (AtHatch) SetHatch(true);
         }
 
         // ------------------------------------------------------------------ in the car
@@ -828,6 +914,25 @@ namespace Stealth.Player
         {
             if (m_Link != null) m_Link.SendHatch(hide);
             else OnHatchRequest(hide);
+        }
+
+        /// <summary>The drawer cabinet / lockers looked at and which part (E opens or closes it), or null.</summary>
+        public Items.Storage StorageTarget { get; private set; }
+        public int StoragePart { get; private set; } = -1;
+
+        /// <summary>Owner: look right at a drawer or a locker door and press E to open or close it (the server decides).</summary>
+        void UpdateStorage()
+        {
+            StorageTarget = null;
+            StoragePart = -1;
+            if (ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || Cracking != null || Camera == null) return;
+            var storage = LookTarget.At<Items.Storage>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius, out var hit);
+            if (storage == null || storage.Index < 0) return;
+            StorageTarget = storage;
+            StoragePart = storage.PartOf(hit.collider, hit.point);
+            if (StoragePart < 0 || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
+            if (m_Link != null) m_Link.SendToggleStorage(storage.Index, StoragePart);
+            else GameManager.Instance?.ToggleStorageServer(this, storage.Index, StoragePart);
         }
 
         /// <summary>Locked door in reach (hold E to hack), or null.</summary>
@@ -1134,7 +1239,7 @@ namespace Stealth.Player
         {
             if (UsingTerminal == null)
             {
-                TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null
+                TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null && StorageTarget == null
                     ? SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View) : null;
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
@@ -1330,9 +1435,34 @@ namespace Stealth.Player
         /// <summary>Where the player reaches from (chest height): hacking and cracking need a clear line from here.</summary>
         public Vector3 Hands => transform.position + Vector3.up * (Height * 0.7f);
 
-        /// <summary>The nearest robot / device that can be hacked from where we stand.</summary>
+        /// <summary>
+        /// Interactive objects are used by looking right at them (<see cref="LookTarget"/>); the autopilot (tests) and a
+        /// player without a camera still use the old "anything within reach".
+        /// </summary>
+        bool UseLook => Camera != null && !DevFlags.AutoInteract;
+
+        /// <summary>The <typeparamref name="T"/> under the crosshair within <see cref="InteractionSettings.LookReach"/>, or null.</summary>
+        T Aimed<T>() where T : Component => LookTarget.At<T>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius);
+
+        /// <summary>The robot / device to hack: the one looked at (or, for the autopilot, the nearest in reach).</summary>
         Detector FindHackTarget()
         {
+            if (UseLook)
+            {
+                var looked = Aimed<Detector>();
+                if (looked != null) return looked.CanBeHackedFrom(transform.position, HackReach) && looked.ReachableFrom(Hands) ? looked : null;
+                // devices without a body to hit (cameras, sensors, plates): the one closest to the crosshair, if close enough
+                Detector bestLook = null;
+                float bestAngle = m_Interaction.LookAngle;
+                var eye = Camera.transform;
+                foreach (var d in Detector.All)
+                {
+                    if (!d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
+                    float angle = Vector3.Angle(eye.forward, d.Position - eye.position);
+                    if (angle < bestAngle) { bestLook = d; bestAngle = angle; }
+                }
+                return bestLook;
+            }
             Detector best = null;
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)

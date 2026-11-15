@@ -39,6 +39,8 @@ namespace Stealth.Level
 
         [Header("Key doors (lock off a part of the house; the key block lies elsewhere)")]
         public int KeyDoors = 1;
+        [Tooltip("Lure speakers and stun cubes lie in the house (off: none of these tools spawn).")]
+        public bool Gadgets = true;
         [Tooltip("One more key door every this many houses.")]
         public int HousesPerExtraKeyDoor = 3;
         public int MaxKeyDoors = 2;

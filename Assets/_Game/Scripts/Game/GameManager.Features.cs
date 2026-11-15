@@ -44,7 +44,11 @@ namespace Stealth.Game
             int count = rng.Next(g.CrateItems.x, g.CrateItems.y + 1);
             int bonus = l.LevelIndex * loot.BonusPerHouse + g.CrateBonus;
             var list = new List<(byte, byte)>();
-            for (int i = 0; i < count; i++) list.Add(((byte)rng.Next(ItemCatalog.LootShapes), (byte)ItemCatalog.RandomColor(rng, bonus)));
+            for (int i = 0; i < count; i++)
+            {
+                byte shape = ItemCatalog.LootShape(rng);
+                list.Add((shape, ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, bonus))));
+            }
             return list;
         }
 
@@ -53,8 +57,10 @@ namespace Stealth.Game
         int SpawnFeatures(LevelLayout l)
         {
             foreach (var k in l.KeyDoors) SpawnItemServer(ItemCatalog.Key, 4, k.Key + Vector3.up * 0.02f, 0f);
-            for (int i = 0; i < l.LureSpots.Count; i++) SpawnItemServer(ItemCatalog.Speaker, 1, l.LureSpots[i] + Vector3.up * 0.02f, i * 70f);
-            if (l.PointOfInterest >= 0 && l.Props[l.PointOfInterest].Kind == PropKind.Programmer)
+            bool gadgets = Tuning.Level.Features.Gadgets;
+            if (gadgets)
+                for (int i = 0; i < l.LureSpots.Count; i++) SpawnItemServer(ItemCatalog.Speaker, 1, l.LureSpots[i] + Vector3.up * 0.02f, i * 70f);
+            if (gadgets && l.PointOfInterest >= 0 && l.Props[l.PointOfInterest].Kind == PropKind.Programmer)
             {
                 var p = l.Props[l.PointOfInterest];
                 var rot = Quaternion.Euler(0f, p.RotationY, 0f);

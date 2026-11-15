@@ -58,7 +58,10 @@ namespace Stealth.EditorTools
         };
 
         /// <summary>Kinds hung on a wall or standing on a counter: no collider (nothing walks into them, nothing stands on them).</summary>
-        static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.WallCabinet, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard };
+        static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard };
+
+        /// <summary>Cupboards whose doors open (Items.Storage, models with BodyDoor{n} parts): loot may hide behind them.</summary>
+        static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf };
 
         /// <summary>Prefabs of the themed rooms' furniture whose models exist, into <see cref="LevelArt.RoomProps"/>.</summary>
         static void BuildRoomProps(LevelArt art)
@@ -73,6 +76,7 @@ namespace Stealth.EditorTools
                     var go = PropObject(kind.ToString(), file, body, accent, eye, collider: !NoCollider.Contains(kind));
                     PaintTrim(go, trim);
                     if (kind == PropKind.HandDryer) DressDryer(go);
+                    if (Opens.Contains(kind)) go.AddComponent<Stealth.Items.Storage>();
                     return go;
                 });
                 list.Add(new PropPrefab { Kind = kind, Prefab = prefab });

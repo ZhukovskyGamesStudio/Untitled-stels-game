@@ -9,6 +9,8 @@ namespace Stealth.Configs
     {
         [Header("Volumes (0..1)")]
         public float Music = 0.35f;
+        [Tooltip("Music in the houses and the sewer (off = only the menu plays music).")]
+        public bool LevelMusic = true;
         [Tooltip("Office hum inside, gas wind outside.")]
         public float Ambience = 0.3f;
         public float Alarm = 0.3f;

@@ -424,7 +424,10 @@ def cubby_floors():
 def model_mail_shelf():
     """Mail-room cabinet 1.2 x 0.4 x 1.8: a base cupboard with three doors and a counter top, on it a 6 x 5 grid
     of open pigeonholes with bundles of letters (Accent) and parcels (Trim) in some of them."""
-    base = s.rbox((1.18, 0.37, 0.76), (0, 0.015, 0.45), r=0.01, seg=1)
+    # the base cupboard: open-fronted (sides, dividers, bottom, the back) behind three swinging doors
+    base = [s.rbox((0.02, 0.37, 0.76), (x, 0.015, 0.45), r=0.004, seg=1) for x in (-0.58, -0.196, 0.196, 0.58)]
+    base += [s.rbox((1.18, 0.37, 0.02), (0, 0.015, 0.08), r=0.004, seg=1),
+             s.rbox((1.14, 0.02, 0.74), (0, 0.19, 0.45), r=0.003, seg=1)]
     kick = s.rbox((1.14, 0.34, 0.08), (0, 0.02, 0.04), r=0.006, seg=1)
     counter = s.rbox((1.2, 0.4, 0.035), (0, 0.0, 0.8375), r=0.008, seg=2)
     doors = [s.rbox((0.382, 0.02, 0.68), (x, -0.175, 0.455), r=0.006, seg=1) for x in (-0.392, 0.0, 0.392)]
@@ -447,7 +450,9 @@ def model_mail_shelf():
         grid.append(s.rbox((MAIL_DIV, 0.315, MAIL_H - 2 * MAIL_WALL + 0.012), (x, 0.0275, MAIL_Z0 + MAIL_H / 2),
                            r=0.003, seg=1))
     cap = s.rbox((1.2, 0.345, 0.03), (0, 0.0275, MAIL_Z0 + MAIL_H - 0.005), r=0.008, seg=2)
-    s.part("Body", [base, kick, counter, *doors, *knobs, *grid, cap])
+    s.part("Body", [*base, kick, counter, *grid, cap])
+    for i, (d, k) in enumerate(zip(doors, (knobs[0], knobs[1], knobs[2]))):
+        s.part(f"BodyDoor{i}", [d, k])
 
     rng = random.Random(4106)
     letters, parcels = [], []

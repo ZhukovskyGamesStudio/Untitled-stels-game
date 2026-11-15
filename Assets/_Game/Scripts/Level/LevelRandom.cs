@@ -14,6 +14,8 @@ namespace Stealth.Level
         Devices = 5,  // start positions of spiders and vacuums
         Audio = 6,    // pitch of steps and thumps, where a loop starts (cosmetic, every peer)
         Engine = 7,   // UnityEngine.Random of the level (safety net for code that still uses it)
+        Storage = 8,  // which loot hides in drawers and lockers, and behind which part
+        Windows = 9,  // how many windows a house with a window limit gets, and which
     }
 
     /// <summary>

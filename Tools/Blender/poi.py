@@ -1,5 +1,6 @@
 """Points of interest and their items: crafted loot (diamond, key block, stun gadget), the lure speaker, the medical
-table, the workbench, the robot programming console, a searchable crate, a door key lock and the Warden robot.
+table, the workbench, the robot programming console, a searchable crate, a door key lock, the Warden robot and the
+shovel (the first real loot, item_shovel_model; in grids and the cart it is its T piece, item_tet_t).
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/poi.py -- Assets/_Game/Art/Models [--only a,b]
       (files land in the sub-folders generate_models.category picks: item_* -> Items, robot_* -> Robots, else Props)
@@ -558,6 +559,111 @@ def model_robot_warden():
     return export("robot_warden")
 
 
+# --------------------------------------------------------------------------- shovel (the first real loot)
+
+SHOVEL_SHIFT = -0.025  # centres the shovel on its length (the game puts items by their middle)
+
+
+def shovel_parts():
+    """A T-handle spade lying flat on the floor along X, 1.09 m: a wooden crossbar grip and shaft, a steel socket with
+    rivets and a pointed blade with rolled treads. Returns (wood, steel) bmesh lists."""
+    x0 = SHOVEL_SHIFT
+    h = 0.03                                             # the shaft's axis: the socket's wide end rests on the floor
+    wood = [s.rcyl(0.018, 0.70, (x0 - 0.14, 0, h), axis="X", seg=20, r=0.004),        # shaft -0.49 .. 0.21
+            s.rcyl(0.021, 0.15, (x0 - 0.505, 0, h), axis="Y", seg=20, r=0.006)]        # crossbar grip, on the shaft's end
+    steel = [s.rcyl(0.021, 0.05, (x0 - 0.46, 0, h), axis="X", seg=20, r=0.003),        # grip ferrule
+             s.rcyl(0.021, 0.11, (x0 + 0.245, 0, h), axis="X", seg=20, r=0.003, radius2=0.03)]  # socket (tapers to the blade)
+    steel += [s.rcyl(0.006, 0.006, (x0 + 0.23 + k * 0.05, 0, h + 0.022), seg=10, r=0.001) for k in range(2)]  # rivets
+    # the blade: a flat plate, square shoulders, straight sides, a rounded point; tilted so its tip touches the floor
+    bm = bmesh.new()
+    outline = [(0.30, -0.11), (0.48, -0.105), (0.53, -0.08), (0.565, -0.04), (0.58, 0.0),
+               (0.565, 0.04), (0.53, 0.08), (0.48, 0.105), (0.30, 0.11)]
+    vs = [bm.verts.new((x + x0, y, 0.0)) for x, y in outline]
+    face = bm.faces.new(vs)
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    bmesh.ops.translate(bm, vec=Vector((0, 0, 0.005)), verts=[v for v in ext["geom"] if isinstance(v, bmesh.types.BMVert)])
+    import mathutils
+    bmesh.ops.rotate(bm, cent=Vector((0.30 + x0, 0, 0)), matrix=mathutils.Matrix.Rotation(math.radians(4.9), 3, "Y"), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=Vector((0, 0, h - 0.004)), verts=bm.verts)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    steel.append(bm)
+    steel.append(s.rcyl(0.007, 0.22, (x0 + 0.303, 0, h + 0.004), axis="Y", seg=12, r=0.002))  # the rolled tread
+    return wood, steel
+
+
+def model_item_shovel_model():
+    """The shovel as it is seen: Body = wood, Accent = steel (WorldItem shows it instead of the tinted piece)."""
+    wood, steel = shovel_parts()
+    s.part("Body", wood)
+    s.part("Accent", steel)
+    return export("item_shovel_model")
+
+
+# --------------------------------------------------------------------------- flashlight and batteries
+
+def model_item_flashlight_model():
+    """A metal flashlight lying along X, 0.26 m: a ribbed rubber grip, a tail cap, a push switch, the flared head
+    with its bezel and lens at +X (the beam comes from the player's head, PlayerController.Flashlight)."""
+    h = 0.031                                                   # its axis: the head's rim rests on the floor
+    body = [s.rcyl(0.017, 0.19, (-0.035, 0, h), axis="X", seg=20, r=0.003),          # the tube -0.13 .. 0.06
+            s.rcyl(0.019, 0.02, (-0.12, 0, h), axis="X", seg=20, r=0.004)]           # tail cap
+    body += [s.rcyl(0.0185, 0.006, (-0.09 + k * 0.016, 0, h), axis="X", seg=20, r=0.001) for k in range(5)]  # grip rings
+    s.part("Body", body)
+    head = [s.rcyl(0.017, 0.045, (0.0825, 0, h), axis="X", seg=24, r=0.002, radius2=0.03),  # the flared head
+            s.rcyl(0.031, 0.024, (0.117, 0, h), axis="X", seg=24, r=0.003),               # bezel
+            s.rcyl(0.007, 0.02, (-0.01, 0, h + 0.015), seg=12, r=0.002)]                    # the switch
+    s.part("Accent", head)
+    s.part("AccentLens", [s.rcyl(0.026, 0.004, (0.13, 0, h), axis="X", seg=24, r=0.001)])
+    return export("item_flashlight_model")
+
+
+def model_item_battery_model():
+    """A pair of AA cells taped together lying along X, 0.07 m: a coloured label, steel ends, the + nub at +X."""
+    h = 0.017
+    cells = [s.rcyl(0.0145, 0.05, (0.0, y, h), axis="X", seg=20, r=0.002) for y in (-0.0145, 0.0145)]
+    s.part("Body", cells)
+    ends = [s.rcyl(0.0145, 0.004, (x, y, h), axis="X", seg=20, r=0.001) for x in (-0.027, 0.027) for y in (-0.0145, 0.0145)]
+    ends += [s.rcyl(0.005, 0.005, (0.0315, y, h), axis="X", seg=12, r=0.001) for y in (-0.0145, 0.0145)]
+    ends.append(s.rbox((0.012, 0.06, 0.031), (0.0, 0.0, h), r=0.002))                  # the tape round both
+    s.part("Accent", ends)
+    return export("item_battery_model")
+
+
+# --------------------------------------------------------------------------- the first-person hand with the flashlight
+
+def model_view_flashlight():
+    """What the player sees holding the flashlight: a right forearm in a sleeve coming from the bottom right of the view,
+    the hand closed round the flashlight's grip, the light pointing ahead (Blender -Y = the view's forward). Origin at
+    the grip; the lens is 0.19 m ahead of it (PlayerController.Flashlight's beam starts there)."""
+    import math as m
+    r = 0.017
+    # the flashlight along -Y: tail cap at +0.09, the flared head and lens at -0.19
+    torch = [s.rcyl(r, 0.2, (0, 0.0, 0), axis="Y", seg=20, r=0.003),
+             s.rcyl(0.019, 0.02, (0, 0.09, 0), axis="Y", seg=20, r=0.004)]
+    torch += [s.rcyl(0.0185, 0.006, (0, 0.05 - k * 0.016, 0), axis="Y", seg=20, r=0.001) for k in range(3)]
+    s.part("AccentTorch", torch)
+    s.part("AccentHead", [s.rcyl(r, 0.045, (0, -0.1225, 0), axis="Y", seg=24, r=0.002, radius2=0.03),
+                          s.rcyl(0.031, 0.024, (0, -0.157, 0), axis="Y", seg=24, r=0.003)])
+    s.part("AccentLens", [s.rcyl(0.026, 0.004, (0, -0.17, 0), axis="Y", seg=24, r=0.001)])
+    # the hand: four fingers curled round the grip from the right, the palm on the right side, the thumb over the top
+    fingers = []
+    for k in range(4):
+        y = 0.035 - k * 0.022
+        pts = [(0.03 + 0.012 * m.cos(a), y, 0.03 * m.sin(a)) if a > 2.6 else (0.031 * m.cos(a), y, 0.031 * m.sin(a))
+               for a in [m.radians(d) for d in (40, 0, -40, -90, -140, -185)]]
+        fingers.append(s.tube(pts, 0.0095 - 0.0008 * k, res=2, segments_per=4))
+    palm = s.rbox((0.04, 0.095, 0.075), (0.042, 0.0, -0.004), r=0.018, seg=3)
+    thumb = s.tube([(0.035, 0.03, 0.028), (0.018, 0.0, 0.034), (0.002, -0.03, 0.03)], 0.011, res=2, segments_per=4)
+    wrist = s.rcyl(0.032, 0.06, (0.05, 0.075, -0.012), axis="Y", seg=20, r=0.01, rot=(m.radians(8), 0, m.radians(-12)))
+    forearm = s.tube([(0.052, 0.09, -0.014), (0.085, 0.22, -0.05), (0.12, 0.38, -0.09)], 0.034, res=5, segments_per=6,
+                     radii=[1.0, 1.15, 1.3])
+    s.part("Body", [*fingers, palm, thumb, wrist, forearm])
+    sleeve = s.tube([(0.095, 0.25, -0.058), (0.13, 0.42, -0.1)], 0.048, res=5, segments_per=4)
+    cuff = s.tube([(0.088, 0.235, -0.054), (0.096, 0.26, -0.06)], 0.05, res=5, segments_per=2)
+    s.part("AccentSleeve", [sleeve, cuff])
+    return export("view_flashlight")
+
+
 MODELS = {
     "item_diamond": model_item_diamond,
     "item_key": model_item_key,
@@ -569,6 +675,10 @@ MODELS = {
     "crate": model_crate,
     "key_lock": model_key_lock,
     "robot_warden": model_robot_warden,
+    "item_shovel_model": model_item_shovel_model,
+    "item_flashlight_model": model_item_flashlight_model,
+    "item_battery_model": model_item_battery_model,
+    "view_flashlight": model_view_flashlight,
 }
 
 

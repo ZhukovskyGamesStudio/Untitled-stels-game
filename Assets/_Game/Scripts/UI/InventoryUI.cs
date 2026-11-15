@@ -49,8 +49,16 @@ namespace Stealth.UI
         public Image HighlightPrefab;
         public Text Tooltip;
 
+        [Header("Hand slot")]
+        [Tooltip("The hand slot next to the backpack: one item held (the flashlight, batteries), used with the hand key.")]
+        public RectTransform HandSlot;
+        public Image HandBackground;
+        [Tooltip("Where the held item is drawn (top-left pivot, cells like the grid).")]
+        public RectTransform HandItems;
+        public Text HandLabel;
+
         enum DragSource { None, Inventory, World, Stash, Cargo }
-        enum Target { None, Backpack, Stash, Sell, StashAll }
+        enum Target { None, Backpack, Stash, Sell, StashAll, Hand }
 
         DragSource m_Source;
         int m_DragIndex = -1;
@@ -67,6 +75,10 @@ namespace Stealth.UI
         float m_Expand; // 0 = compact (just carrying), 1 = hands mode (Tab / dragging)
         UiPool<InventoryBlockView> m_Items, m_GhostBlocks, m_StashItems;
         UiPool<Image> m_Highlights, m_StashHighlights;
+        UiPool<Image> m_Icons, m_GhostIcons, m_StashIcons; // pictures of real items over their cells (ItemVisuals.Icons)
+        UiPool<InventoryBlockView> m_HandBlocks;
+        UiPool<Image> m_HandIcons;
+        float m_FullChargeUntil = -1f;
 
         /// <summary>World item under the crosshair / cursor (in reach), null if none.</summary>
         public WorldItem Hover => m_Hover;
@@ -83,6 +95,13 @@ namespace Stealth.UI
             m_Items = new UiPool<InventoryBlockView>(BlockPrefab, ItemLayer);
             m_GhostBlocks = new UiPool<InventoryBlockView>(BlockPrefab, Ghost);
             m_Highlights = new UiPool<Image>(HighlightPrefab, HighlightLayer);
+            m_Icons = new UiPool<Image>(HighlightPrefab, ItemLayer);
+            m_GhostIcons = new UiPool<Image>(HighlightPrefab, Ghost);
+            if (HandItems != null)
+            {
+                m_HandBlocks = new UiPool<InventoryBlockView>(BlockPrefab, HandItems);
+                m_HandIcons = new UiPool<Image>(HighlightPrefab, HandItems);
+            }
         }
 
         void OnDestroy()
@@ -114,6 +133,7 @@ namespace Stealth.UI
         Target MouseTarget(PlayerController me, out Vector2Int cell)
         {
             if (MouseCell(out cell)) return Target.Backpack;
+            if (HandSlot != null && RectTransformUtility.RectangleContainsScreenPoint(HandSlot, MouseScreen, null)) return Target.Hand;
             if (!StashActive(me) || !Board.Visible) return Target.None;
             if (CellIn(Board.Grid, me.Camera, MouseScreen, out cell)) return Target.Stash;
             if (Board.SellZone.gameObject.activeInHierarchy && RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
@@ -171,6 +191,7 @@ namespace Stealth.UI
             {
                 m_StashItems = new UiPool<InventoryBlockView>(BlockPrefab, Board.ItemLayer);
                 m_StashHighlights = new UiPool<Image>(HighlightPrefab, Board.HighlightLayer);
+                m_StashIcons = new UiPool<Image>(HighlightPrefab, Board.ItemLayer);
             }
         }
 
@@ -228,7 +249,7 @@ namespace Stealth.UI
             }
             if (!mouse.leftButton.isPressed) // released (or the press was lost)
             {
-                Drop(me, inv, over, cell - m_GrabCell, mouseRay);
+                Drop(me, inv, over, cell - m_GrabCell, mouseRay, cell);
                 CancelDrag();
             }
         }
@@ -257,6 +278,19 @@ namespace Stealth.UI
                 m_Source = DragSource.Stash;
                 m_DragStashed = e;
                 StartShape(e, cell);
+            }
+            else if (over == Target.Hand)
+            {
+                int idx = inv.HandIndex();
+                if (idx < 0) return;
+                var e = inv.Items[idx];
+                m_Tooltip = ItemCatalog.Describe(e.Shape, e.Color);
+                if (!press) return;
+                m_Source = DragSource.Inventory;
+                m_DragIndex = idx;
+                m_DragShape = e.Shape; m_DragColor = e.Color; m_DragRot = 0;
+                m_GrabCell = Vector2Int.zero;
+                m_DragTravel = 0f;
             }
             else if (over == Target.Sell)
             {
@@ -341,13 +375,32 @@ namespace Stealth.UI
             return along > 0f && (v - ray.direction * along).magnitude < hopper.AimRadius + 0.25f;
         }
 
-        void Drop(PlayerController me, PlayerInventory inv, Target over, Vector2Int target, Ray mouseRay)
+        void Drop(PlayerController me, PlayerInventory inv, Target over, Vector2Int target, Ray mouseRay, Vector2Int cell)
         {
-            byte x = (byte)Mathf.Clamp(target.x, 0, 255), y = (byte)Mathf.Clamp(target.y, 0, 255), rot = (byte)m_DragRot;
+            byte x = (byte)Mathf.Clamp(target.x, 0, 254), y = (byte)Mathf.Clamp(target.y, 0, 254), rot = (byte)m_DragRot;
             var bank = Sfx.Bank;
             bool inside = target.x >= 0 && target.y >= 0;
+            // batteries dropped onto a flashlight (in the backpack or in the hand) recharge it
+            if (m_DragShape == ItemCatalog.Battery && (over == Target.Backpack || over == Target.Hand) && m_Source != DragSource.Stash)
+            {
+                int flash = over == Target.Hand ? inv.HandIndex() : inv.IndexAt(cell);
+                if (flash >= 0 && flash != m_DragIndex && inv.Items[flash].Shape == ItemCatalog.Flashlight)
+                {
+                    if (!inv.CanRecharge(flash)) { m_FullChargeUntil = Time.time + 1.5f; return; } // already full: the battery stays
+                    if (m_Source == DragSource.Inventory) inv.RequestRecharge(m_DragIndex, flash);
+                    else if (m_Source == DragSource.World) { inv.RequestRechargeWorld(m_DragWorld, flash); m_DragWorld.HideWhileTaking(Time.time); }
+                    Sfx.Ui(bank?.Click, 0.7f);
+                    return;
+                }
+            }
             switch (over)
             {
+                case Target.Hand:
+                    if (!ItemCatalog.Holdable(m_DragShape)) return;
+                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) Take(inv, PlayerInventory.HandX, 0, 0);
+                    else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
+                    else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    return;
                 case Target.Backpack:
                     if (!inside) return;
                     if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, rot, x, y)) Take(inv, x, y, rot);
@@ -383,6 +436,8 @@ namespace Stealth.UI
                 if (inv.FindSpot(m_DragShape, out var cx, out var cy, out var cr)) { inv.RequestTakeCargo(m_DragCargo, cx, cy, cr); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                 else m_FullUntil = Time.time + 1.5f;
             }
+            // from the team stash straight onto the floor, the same way as from the backpack
+            else if (m_Source == DragSource.Stash) DropIntoWorld(me, inv, mouseRay, stashed: true);
             // A world item released anywhere but a grid (a click, or a drag that missed): into the first free spot.
             else if (m_Source == DragSource.World)
             {
@@ -407,25 +462,27 @@ namespace Stealth.UI
             Sfx.Ui(Sfx.Bank?.Pickup, 0.8f, Sfx.Group.Items);
         }
 
-        void DropIntoWorld(PlayerController me, PlayerInventory inv, Ray ray)
+        void DropIntoWorld(PlayerController me, PlayerInventory inv, Ray ray, bool stashed = false)
         {
             const int mask = ~(1 << LevelMetrics.CeilingLayer);
+            float yaw = me.transform.eulerAngles.y;
+            var at = me.transform.position + me.transform.forward * 0.8f;
             if (Physics.Raycast(ray, out var hit, PlayerInventory.ReachDistance, mask, QueryTriggerInteraction.Ignore))
             {
-                if (hit.collider.GetComponentInParent<Hatch>() != null)
+                if (!stashed && hit.collider.GetComponentInParent<Hatch>() != null)
                 {
                     inv.RequestDeposit(m_DragIndex);
                     return;
                 }
-                var point = hit.point;
+                at = hit.point;
                 if (hit.normal.y < 0.5f &&
                     Physics.Raycast(hit.point + hit.normal * 0.3f + Vector3.up * 0.2f, Vector3.down, out var floor, 3f, mask, QueryTriggerInteraction.Ignore))
-                    point = floor.point;
-                inv.RequestDrop(m_DragIndex, point + Vector3.up * 0.01f, me.transform.eulerAngles.y);
-                Sfx.At(Sfx.Bank?.Drop, point, 0.8f, Sfx.Group.Items);
-                return;
+                    at = floor.point;
+                at += Vector3.up * 0.01f;
+                Sfx.At(Sfx.Bank?.Drop, at, 0.8f, Sfx.Group.Items);
             }
-            inv.RequestDrop(m_DragIndex, me.transform.position + me.transform.forward * 0.8f, me.transform.eulerAngles.y);
+            if (stashed) inv.RequestDropStashed(m_DragStashed, at, yaw);
+            else inv.RequestDrop(m_DragIndex, at, yaw);
         }
 
         void CancelDrag()
@@ -494,28 +551,50 @@ namespace Stealth.UI
             // Compact while walking around: small and quiet, it only shows what you carry.
             Panel.localScale = Vector3.one * Mathf.Lerp(CompactScale, 1f, m_Expand);
             float alpha = Mathf.Lerp(0.3f, 0.6f, m_Expand);
-            Ui.Alpha(GridBackground, alpha);
+            Ui.Alpha(GridBackground, Mathf.Lerp(0.7f, 1f, m_Expand)); // the backpack itself: solid when open
             Ui.Alpha(HeaderBackground, alpha);
             bool header = m_Expand > 0.5f || inv.Items.Count > 0;
             Ui.Show(Header, header);
             if (header) SetIfChanged(ValueLabel, Loc.F("common.points", inv.TotalValue));
-            float cellAlpha = Mathf.Lerp(0.04f, 0.07f, m_Expand);
+            // the grid shows only while something is dragged: otherwise it is just the backpack with its things in it
+            float cellAlpha = m_Source != DragSource.None ? 0.16f : 0f;
             foreach (var c in Cells) Ui.Alpha(c, cellAlpha);
 
             m_Items.Begin();
+            m_Icons.Begin();
+            m_HandBlocks?.Begin();
+            m_HandIcons?.Begin();
             for (int i = 0; i < inv.Items.Count; i++)
             {
                 if (m_Source == DragSource.Inventory && i == m_DragIndex) continue;
                 var e = inv.Items[i];
-                AddShape(m_Items, new Vector2Int(e.X, e.Y), e.Shape, e.Color, e.Rot, 1f);
+                if (PlayerInventory.InHand(e))
+                {
+                    // the hand: the item upright in the slot, centred
+                    if (m_HandBlocks == null) continue;
+                    var size = ItemCatalog.Size(ItemCatalog.Shapes[e.Shape].Cells);
+                    HandItems.anchoredPosition = new Vector2(-size.x * Cell / 2f, size.y * Cell / 2f);
+                    AddShape(m_HandBlocks, m_HandIcons, Vector2Int.zero, e.Shape, e.Color, 0, 1f);
+                    continue;
+                }
+                AddShape(m_Items, m_Icons, new Vector2Int(e.X, e.Y), e.Shape, e.Color, e.Rot, 1f);
             }
             m_Items.End();
+            m_Icons.End();
+            m_HandBlocks?.End();
+            m_HandIcons?.End();
+            if (HandSlot != null)
+            {
+                Ui.Alpha(HandBackground, Mathf.Lerp(0.55f, 0.85f, m_Expand));
+                SetIfChanged(HandLabel, $"{Loc.T("inventory.hand")} [{Controls.Label(GameAction.UseHand)}]");
+            }
 
             bool board = Board != null && Board.Visible && m_StashItems != null;
             if (board) DrawStashItems();
 
             m_Highlights.Begin();
             m_GhostBlocks.Begin();
+            m_GhostIcons.Begin();
             if (board) m_StashHighlights.Begin();
             bool dragging = m_Source != DragSource.None;
             string hint = null;
@@ -544,10 +623,11 @@ namespace Stealth.UI
                 else if (m_Source == DragSource.Inventory && AtHopper(me, me.Camera.ScreenPointToRay(MouseScreen)))
                     hint = ItemCatalog.IsTool(m_DragShape) ? Loc.T("use.hopper.empty") : Loc.F("use.hopper", ItemCatalog.Value(m_DragShape, m_DragColor));
                 Ghost.anchoredPosition = MouseCanvas - new Vector2(m_GrabCell.x * Cell + Cell / 2f, -(m_GrabCell.y * Cell + Cell / 2f));
-                AddShape(m_GhostBlocks, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
+                AddShape(m_GhostBlocks, m_GhostIcons, Vector2Int.zero, m_DragShape, m_DragColor, m_DragRot, 0.75f);
             }
             m_Highlights.End();
             m_GhostBlocks.End();
+            m_GhostIcons.End();
             if (board)
             {
                 m_StashHighlights.End();
@@ -564,6 +644,7 @@ namespace Stealth.UI
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);
             bool full = Time.time < m_FullUntil;
             if (full && tip == null) tip = Loc.T("inventory.full");
+            if (tip == null && Time.time < m_FullChargeUntil) tip = Loc.T("inventory.full_charge");
             Ui.Show(Tooltip, tip != null);
             if (tip == null) return;
             Tooltip.text = tip;
@@ -576,14 +657,16 @@ namespace Stealth.UI
         {
             var stash = Stash;
             m_StashItems.Begin();
+            m_StashIcons.Begin();
             if (stash != null)
                 for (int i = 0; i < stash.Items.Count; i++)
                 {
                     var e = stash.Items[i];
                     if (m_Source == DragSource.Stash && e.Equals(m_DragStashed)) continue;
-                    AddShape(m_StashItems, new Vector2Int(e.X, e.Y), e.Shape, e.Color, e.Rot, 1f);
+                    AddShape(m_StashItems, m_StashIcons, new Vector2Int(e.X, e.Y), e.Shape, e.Color, e.Rot, 1f);
                 }
             m_StashItems.End();
+            m_StashIcons.End();
             SetIfChanged(Board.ValueLabel, Loc.F("stash.title", stash != null ? stash.TotalValue : 0));
         }
 
@@ -603,17 +686,65 @@ namespace Stealth.UI
             }
         }
 
-        static void AddShape(UiPool<InventoryBlockView> pool, Vector2Int origin, int shape, int color, int rot, float alpha)
+        static void AddShape(UiPool<InventoryBlockView> pool, UiPool<Image> icons, Vector2Int origin, int shape, int color, int rot, float alpha)
         {
             var c = ItemCatalog.UiColor(shape, color);
             foreach (var cell in ItemCatalog.RotatedCells(shape, rot))
                 pool.Next().Set(new Vector2((origin.x + cell.x) * Cell + 2, -((origin.y + cell.y) * Cell + 2)), Cell - 4, c, alpha);
+            var sprite = IconOf(shape);
+            if (sprite == null) return;
+            // the picture over the cells (made for the base turn), turned and mirrored with the item
+            var size = ItemCatalog.Size(ItemCatalog.Shapes[shape].Cells);
+            var turned = ItemCatalog.Size(ItemCatalog.RotatedCells(shape, rot));
+            var img = icons.Next();
+            var rt = img.rectTransform;
+            img.sprite = sprite;
+            img.type = Image.Type.Simple;
+            img.preserveAspect = false;
+            img.raycastTarget = false;
+            img.color = new Color(1f, 1f, 1f, alpha);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(size.x * Cell - 2, size.y * Cell - 2);
+            rt.anchoredPosition = new Vector2((origin.x + turned.x / 2f) * Cell, -(origin.y + turned.y / 2f) * Cell);
+            rt.localScale = new Vector3(ItemCatalog.IsMirrored(rot) ? -1f : 1f, 1f, 1f);
+            rt.localRotation = Quaternion.Euler(0f, 0f, -90f * (rot & 3)); // a quarter turn clockwise per step (RotatedCells)
+            rt.SetAsLastSibling();                                         // over the cells
+            if (shape != ItemCatalog.Flashlight) return;
+            // the flashlight's charge: a thin bar along the bottom of its cells, green when full, red when nearly empty
+            float k = Mathf.Clamp01(color / (float)ItemCatalog.FullCharge);
+            var bar = icons.Next();
+            var b = bar.rectTransform;
+            bar.sprite = null;
+            bar.raycastTarget = false;
+            bar.color = new Color(Mathf.Lerp(1f, 0.3f, k), Mathf.Lerp(0.25f, 0.95f, k), 0.2f, alpha);
+            b.pivot = new Vector2(0f, 0f);
+            b.localScale = Vector3.one;
+            b.localRotation = Quaternion.identity;
+            float w = turned.x * Cell - 8f, h = turned.y * Cell;
+            b.sizeDelta = new Vector2(Mathf.Max(2f, w * k), 4f);
+            b.anchoredPosition = new Vector2(origin.x * Cell + 4f, -(origin.y * Cell + h) + 4f);
+            b.SetAsLastSibling();
+        }
+
+        static ItemVisuals s_Visuals;
+
+        /// <summary>The backpack picture of a shape (the item prefab's visuals), null if it has none.</summary>
+        static Sprite IconOf(int shape)
+        {
+            if (s_Visuals == null && GameManager.Instance != null && GameManager.Instance.ItemPrefab != null)
+                s_Visuals = GameManager.Instance.ItemPrefab.GetComponent<WorldItem>().Visuals;
+            var icons = s_Visuals != null ? s_Visuals.Icons : null;
+            return icons != null && shape < icons.Length ? icons[shape] : null;
         }
 
         void HideDynamic()
         {
             m_Items.Begin(); m_Items.End();
+            m_Icons.Begin(); m_Icons.End();
             m_GhostBlocks.Begin(); m_GhostBlocks.End();
+            m_GhostIcons.Begin(); m_GhostIcons.End();
+            m_HandBlocks?.Begin(); m_HandBlocks?.End();
+            m_HandIcons?.Begin(); m_HandIcons?.End();
             m_Highlights.Begin(); m_Highlights.End();
             Ui.Show(Tooltip, false);
         }

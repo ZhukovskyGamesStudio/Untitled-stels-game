@@ -162,17 +162,81 @@ namespace Stealth.EditorTools
                 Paint(m, "PropBody", "Metal", "LampBulb");
                 return m;
             });
-            if (visuals.Meshes != null && visuals.Meshes.Length == ItemCatalog.Shapes.Length && visuals.Models != null && visuals.Models.Length == ItemCatalog.Shapes.Length
-                && visuals.Models[ItemCatalog.Speaker] == lure) return;
-            visuals.Meshes = ItemCatalog.Shapes.Select(s =>
+            // the shovel: wood and steel (Tools/Blender/poi.py item_shovel_model), its backpack picture (Tools/Blender/item_icons.py)
+            Mat("Items", "ShovelWood", new Color(0.42f, 0.27f, 0.14f), smoothness: 0.3f);
+            Mat("Items", "ShovelSteel", new Color(0.5f, 0.52f, 0.55f), smoothness: 0.55f);
+            var shovel = Prefab($"{PrefabsDir}/Items/ShovelModel.prefab", () =>
             {
-                // the speaker's piece in a grid is a domino; the cage's key looks like the door keys
+                var m = Model("item_shovel_model");
+                m.name = "ShovelModel";
+                Paint(m, "ShovelWood", "ShovelSteel", "ShovelSteel");
+                return m;
+            });
+            // the flashlight (Tools/Blender/poi.py item_flashlight_model) and its batteries (item_battery_model)
+            Mat("Items", "FlashlightBody", new Color(0.09f, 0.09f, 0.1f), smoothness: 0.45f);
+            Mat("Items", "FlashlightMetal", new Color(0.6f, 0.62f, 0.64f), smoothness: 0.7f);
+            Mat("Items", "FlashlightLens", new Color(0.8f, 0.85f, 0.9f), smoothness: 0.95f);
+            Mat("Items", "BatteryLabel", new Color(0.1f, 0.38f, 0.85f), smoothness: 0.5f);
+            Mat("Items", "BatterySteel", new Color(0.7f, 0.72f, 0.74f), smoothness: 0.7f);
+            var flashlight = Prefab($"{PrefabsDir}/Items/FlashlightModel.prefab", () =>
+            {
+                var m = Model("item_flashlight_model");
+                m.name = "FlashlightModel";
+                Paint(m, "FlashlightBody", "FlashlightMetal", "FlashlightMetal");
+                foreach (var r in Parts(m, "AccentLens")) r.sharedMaterial = M("FlashlightLens");
+                return m;
+            });
+            var battery = Prefab($"{PrefabsDir}/Items/BatteryModel.prefab", () =>
+            {
+                var m = Model("item_battery_model");
+                m.name = "BatteryModel";
+                Paint(m, "BatteryLabel", "BatterySteel", "BatterySteel");
+                return m;
+            });
+            var icons = new Sprite[ItemCatalog.Shapes.Length];
+            icons[ItemCatalog.Shovel] = ItemIcon("shovel");
+            icons[ItemCatalog.Flashlight] = ItemIcon("flashlight");
+            icons[ItemCatalog.Battery] = ItemIcon("battery");
+            var meshes = ItemCatalog.Shapes.Select(s =>
+            {
+                // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
+                // the cart is item_shovel (its own model shows in the world: Models)
                 string file = s.Id == "speaker" ? "item_domino" : s.Id == "cagekey" ? "item_key" : $"item_{s.Id}";
                 return AssetDatabase.LoadAllAssetsAtPath(ModelPath(file)).OfType<Mesh>().First();
             }).ToArray();
+            if (visuals.Meshes != null && visuals.Meshes.SequenceEqual(meshes) && visuals.Models != null && visuals.Models.Length == ItemCatalog.Shapes.Length
+                && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Shovel] == shovel
+                && visuals.Models[ItemCatalog.Flashlight] == flashlight && visuals.Models[ItemCatalog.Battery] == battery
+                && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
+            visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
             visuals.Models[ItemCatalog.Speaker] = lure;
+            visuals.Models[ItemCatalog.Shovel] = shovel;
+            visuals.Models[ItemCatalog.Flashlight] = flashlight;
+            visuals.Models[ItemCatalog.Battery] = battery;
+            visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
+        }
+
+        /// <summary>A backpack picture of a real item (Art/Sprites/Items/&lt;id&gt;.png) as a sprite.</summary>
+        static Sprite ItemIcon(string id)
+        {
+            var path = $"{SpritesDir}/Items/{id}.png";
+            if (AssetImporter.GetAtPath(path) is not TextureImporter importer)
+            {
+                Debug.LogWarning($"[Builder] {path} missing: run Tools/Blender/item_icons.py");
+                return null;
+            }
+            if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled || importer.wrapMode != TextureWrapMode.Clamp || !importer.alphaIsTransparency)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
 
         /// <summary>The warden: a tall sentinel on wheels with a floodlight head; it watches a doorway and raises the alarm.</summary>

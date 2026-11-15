@@ -19,6 +19,9 @@ namespace Stealth.Configs
         public AudioConfig Audio;
         public PerceptionConfig Perception;
         public StyleConfig Styles;
+        [Tooltip("The test rooms: a root with its own level (small houses of 3–4 rooms, no guards, Data/Config/RoomsTest). " +
+                 "The main menu's switch plays it instead of this one (Tuning.TestRooms).")]
+        public GameConfig TestRooms;
     }
 
     /// <summary>
@@ -45,6 +48,23 @@ namespace Stealth.Configs
         public static PerceptionConfig Perception => Pick(Root != null ? Root.Perception : null, ref s_Perception);
         /// <summary>Visual styles (an empty list without the asset: the game keeps its base look).</summary>
         public static StyleConfig Styles => Pick(Root != null ? Root.Styles : null, ref s_Styles);
+
+        /// <summary>Playing the test rooms (the main menu's switch) instead of the main game. Off by default.</summary>
+        public static bool TestRooms { get; private set; }
+
+        /// <summary>
+        /// The main game or the test rooms: the test rooms swap the root for Resources/GameConfig's TestRooms (its own
+        /// level), the main game goes back to Resources/GameConfig. Set before a game is started; every peer must match.
+        /// </summary>
+        public static void SetTestRooms(bool on)
+        {
+            var main = Resources.Load<GameConfig>(GameConfig.ResourcePath);
+            var test = main != null ? main.TestRooms : null;
+            TestRooms = on && test != null;
+            s_Root = TestRooms ? test : main;
+            s_Loaded = true;
+            Apply();
+        }
 
         static GameConfig Root
         {
@@ -73,6 +93,7 @@ namespace Stealth.Configs
         {
             ItemCatalog.Configure(Items.Colors, Items.PointsPerCell);
             ItemCatalog.DiamondValueCells = Items.Gadgets.DiamondValueCells;
+            ItemCatalog.ConfigureLoot(Level.Loot.Table);
         }
 
         /// <summary>Use another root (tests, A/B balance); null returns to Resources/GameConfig.</summary>

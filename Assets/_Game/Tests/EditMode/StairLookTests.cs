@@ -20,11 +20,12 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheDefaultStyleHasWoodenStairsDressedInItsOwnFinishes()
+        public void TheDefaultStyleHasStairsDressedInItsOwnFinishes()
         {
+            // this branch plays only the abandoned facility (S16): its stairs follow the house (Auto), not the storybook's wood
             var config = AssetDatabase.LoadAssetAtPath<StyleConfig>("Assets/_Game/Data/Styles/Styles.asset");
             var g = config.Default.Geometry;
-            Assert.AreEqual(StairChoice.Wood, g.Stairs, "painted wood with balusters, like the panelled rooms around it");
+            Assert.AreEqual("S16_Derelict", config.Default.name);
             Assert.IsNotNull(g.Floor, "its treads take the floor finish");
             Assert.IsNotNull(g.Wall, "its body the wall finish");
             Assert.IsNotNull(g.Trim, "its balusters the trim");

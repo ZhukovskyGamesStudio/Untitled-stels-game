@@ -62,7 +62,9 @@ MonoBehaviour:
     DarkChance: 0.15
     DarkChancePerHouse: 0.03
     MaxDarkHouses: 5
-    FlickerChance: 0.12
+    FlickerChance: 0.25
+    DarkRoomsDim: 1
+    DimShare: 0.3
     OpenPassageChance: 0.3
     ExtraDoorChance: 0.2
     VentChance: 0.45
@@ -123,6 +125,13 @@ MonoBehaviour:
         Weight: 1.5
   Loot:
     BaseItems: 6
+    Table:
+    - Item: shovel
+      Weight: 5
+    - Item: flashlight
+      Weight: 2
+    - Item: battery
+      Weight: 3
     ItemsPerHouse: 2
     RoomsPerExtraItem: 3
     MinSpacing: 1.5

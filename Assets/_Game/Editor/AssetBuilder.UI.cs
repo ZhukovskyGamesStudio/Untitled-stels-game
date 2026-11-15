@@ -622,6 +622,27 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ inventory
 
+        /// <summary>A UI picture from <c>Art/Sprites/UI</c> (drawn by Tools/Blender/ui_backpack.py) as a sprite.</summary>
+        static Sprite UiSprite(string name)
+        {
+            var path = $"{SpritesDir}/UI/{name}.png";
+            if (AssetImporter.GetAtPath(path) is not TextureImporter importer)
+            {
+                Debug.LogWarning($"[Builder] {path} missing: run Tools/Blender/ui_backpack.py");
+                return null;
+            }
+            if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled || !importer.alphaIsTransparency)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
         static GameObject BuildInventoryScreen(UiElements e)
         {
             var root = CanvasRoot("Inventory", 5, false);
@@ -630,16 +651,19 @@ namespace Stealth.EditorTools
             const float c = InventoryUI.Cell;
             float gw = InventoryLayout.Width * c, gh = InventoryLayout.Height * c;
 
-            ui.Panel = R(root.transform, "Panel", BottomCenter, BottomCenter, new Vector2(0, 13), new Vector2(gw + 10, gh + 9 + 22));
-            ui.GridBackground = Img(R(ui.Panel, "GridBackground", BottomCenter, BottomCenter, Vector2.zero, new Vector2(gw + 10, gh + 9)), new Color(0, 0, 0, 0.6f));
-            var header = R(ui.Panel, "Header", BottomCenter, BottomCenter, new Vector2(0, gh + 9), new Vector2(gw + 10, 22));
+            // the open backpack (Tools/Blender/ui_backpack.py): the grid lies on its lining, 20 px of backpack around it
+            const float pad = 20f;
+            ui.Panel = R(root.transform, "Panel", BottomCenter, BottomCenter, new Vector2(0, 13), new Vector2(gw + 2 * pad, gh + 2 * pad + 22));
+            ui.GridBackground = Img(R(ui.Panel, "GridBackground", BottomCenter, BottomCenter, Vector2.zero, new Vector2(gw + 2 * pad, gh + 2 * pad)),
+                Color.white, UiSprite("backpack"));
+            var header = R(ui.Panel, "Header", BottomCenter, BottomCenter, new Vector2(0, gh + 2 * pad), new Vector2(gw + 2 * pad, 22));
             ui.Header = header.gameObject;
             ui.HeaderBackground = Img(header, new Color(0, 0, 0, 0.6f));
             ui.ValueLabel = Txt(R(header, "Value", Left, Left, new Vector2(5, 0), new Vector2(120, 20)), "0", 13, TextAnchor.MiddleLeft, Color.white);
 
-            ui.Grid = R(ui.Panel, "Grid", BottomCenter, TopCenter, new Vector2(0, 5 + gh), new Vector2(gw, gh));
+            ui.Grid = R(ui.Panel, "Grid", BottomCenter, TopCenter, new Vector2(0, pad + gh), new Vector2(gw, gh));
             ui.Grid.pivot = TopLeft;
-            ui.Grid.anchoredPosition = new Vector2(-gw / 2f, 5 + gh);
+            ui.Grid.anchoredPosition = new Vector2(-gw / 2f, pad + gh);
             var cells = new List<Image>();
             for (int y = 0; y < InventoryLayout.Height; y++)
                 for (int x = 0; x < InventoryLayout.Width; x++)
@@ -650,6 +674,13 @@ namespace Stealth.EditorTools
             ui.ItemLayer.pivot = TopLeft;
             ui.HighlightLayer = Stretch(ui.Grid, "Highlights");
             ui.HighlightLayer.pivot = TopLeft;
+
+            // the hand slot right of the backpack: one held item (the flashlight, batteries), used with the hand key
+            ui.HandSlot = R(ui.Panel, "HandSlot", new Vector2(1, 0), BottomLeft, new Vector2(8, 0), new Vector2(2 * c + 12, 3 * c + 30));
+            ui.HandBackground = Img(Stretch(ui.HandSlot, "Background"), Color.white, UiSprite("hand_slot"));
+            var hole = R(ui.HandSlot, "Hole", TopCenter, TopCenter, new Vector2(0, -8), new Vector2(2 * c - 4, 3 * c + 30 - 32));
+            ui.HandItems = R(hole, "HandItems", Center, TopLeft, Vector2.zero, Vector2.zero);
+            ui.HandLabel = Txt(R(ui.HandSlot, "Label", BottomCenter, BottomCenter, new Vector2(0, 2), new Vector2(2 * c + 12, 18)), "", 11, TextAnchor.MiddleCenter, Color.white);
 
             ui.Ghost = R(root.transform, "DragGhost", BottomLeft, TopLeft, Vector2.zero, Vector2.zero);
             ui.BlockPrefab = e.InventoryBlock;
@@ -722,6 +753,7 @@ namespace Stealth.EditorTools
             Spacer(col, 14);
             menu.LocalCaption = ColumnText(col, "LocalCaption", "LAN", 14, Color.white, 22);
             menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
+            menu.TestRooms = ToggleIn(e, col, "TestRooms", L("menu.test_rooms")); // off: the main game
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(row, 34);
             var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();

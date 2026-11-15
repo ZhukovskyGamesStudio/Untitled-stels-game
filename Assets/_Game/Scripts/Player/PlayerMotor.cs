@@ -46,7 +46,7 @@ namespace Stealth.Player
         public float AirAccel = 8f;
 
         [Header("Jump")]
-        public float JumpHeight = 0.9f;
+        public float JumpHeight = 1.05f;
         [Tooltip("Jump still works this long after walking off an edge.")]
         public float CoyoteTime = 0.12f;
         [Tooltip("A jump pressed this long before landing is executed on landing.")]

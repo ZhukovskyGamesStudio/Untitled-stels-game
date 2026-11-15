@@ -51,7 +51,7 @@ namespace Stealth.Level
         {
             var c = new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b };
             var o = new Output();
-            var wings = Mass(c.Rng(0xA55), area, house, out o.Mass);
+            var wings = Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
             foreach (var w in wings) { maxX = Mathf.Max(maxX, w.xMax); maxZ = Mathf.Max(maxZ, w.yMax); }
@@ -125,13 +125,17 @@ namespace Stealth.Level
         /// floor area, plus sometimes an annex sticking out. Wings overlap where they meet. Public for the tests: the
         /// variety of masses is a property of this function alone.
         /// </summary>
-        public static List<RectInt> Mass(System.Random rng, float area, int house, out string kind)
+        public static List<RectInt> Mass(System.Random rng, float area, int house, out string kind) => Mass(rng, area, house, new BuildingSettings(), out kind);
+
+        /// <summary>The mass with the weights of kinds and the annex chance of these settings (the rooms test: a bar only).</summary>
+        public static List<RectInt> Mass(System.Random rng, float area, int house, BuildingSettings b, out string kind)
         {
             var list = new List<RectInt>();
             int Even(float v) => Mathf.Max(2, Mathf.RoundToInt(v / 2f) * 2);
             int ww = Even(Mathf.Clamp(Mathf.Sqrt(area) / 2.1f, 12f, 22f) + (float)rng.NextDouble() * 4f - 2f); // wing depth
             string[] kinds = { "bar", "L", "T", "U", "courtyard", "H" };
-            int[] weights = area < 1100f ? new[] { 35, 35, 25, 5, 0, 0 } : area < 1800f ? new[] { 18, 26, 22, 18, 8, 8 } : new[] { 10, 18, 18, 20, 18, 16 };
+            int[] weights = b.MassWeights is { Length: 6 } && System.Array.Exists(b.MassWeights, x => x > 0) ? b.MassWeights
+                          : area < 1100f ? new[] { 35, 35, 25, 5, 0, 0 } : area < 1800f ? new[] { 18, 26, 22, 18, 8, 8 } : new[] { 10, 18, 18, 20, 18, 16 };
             int total = 0;
             foreach (var w in weights) total += w;
             int roll = rng.Next(total), pick = 0;
@@ -197,7 +201,7 @@ namespace Stealth.Level
                 }
             }
             // An annex: a smaller block sticking out of a wing (a bay, a pavilion).
-            if (rng.NextDouble() < 0.45)
+            if (rng.NextDouble() < b.AnnexChance)
             {
                 var host = list[rng.Next(list.Count)];
                 int w = Even(8 + rng.Next(8)), d = Even(6 + rng.Next(6));
@@ -412,6 +416,28 @@ namespace Stealth.Level
                 }
                 MarkSpine(spine, wing, alongX, off, cw);
             }
+            // Cross corridors: a passage across a wing, between the rooms on its two sides (the rooms test: a corridor
+            // joins two rooms instead of a spine lined with many).
+            var crossRng = c.Rng(0xC105, f);
+            foreach (var wing in c.Wings)
+            {
+                int across = Mathf.Min(wing.width, wing.height), along = Mathf.Max(wing.width, wing.height);
+                if (along < 18 * M || crossRng.NextDouble() >= c.B.CrossCorridorChance) continue;
+                int cw = crossRng.NextDouble() < 0.5 ? 5 : 6;                   // 2.5 or 3 m
+                bool alongX = wing.width >= wing.height;                        // the wing's long side
+                // where it may go: rooms of a decent size on both sides (not at the very ends), and clear of the lobby and
+                // the stair halls — a reserved room across it would join the two sides itself and cut it into a stub
+                var spots = new List<int>();
+                for (int off = Mathf.Max(MinSide * 2, along / 5) / M * M; off + cw <= along - Mathf.Max(MinSide * 2, along / 5); off += M)
+                {
+                    var strip = alongX ? new RectInt(wing.xMin + off, wing.yMin, cw, wing.height) : new RectInt(wing.xMin, wing.yMin + off, wing.width, cw);
+                    bool clear = f != 0 || !strip.Overlaps(c.Lobby);
+                    foreach (var h in c.Halls) if ((h.floor == f || h.floor + 1 == f) && strip.Overlaps(h.hall)) clear = false;
+                    if (clear) spots.Add(off);
+                }
+                if (spots.Count == 0) continue;
+                MarkSpine(spine, wing, !alongX, spots[crossRng.Next(spots.Count)], cw);
+            }
             // Corridor cells → corridor regions (connected pieces).
             var seen = new bool[nx, nz];
             for (int x = 0; x < nx; x++)
@@ -444,7 +470,7 @@ namespace Stealth.Level
             // What is left: rectangles, split recursively into rooms.
             var target = c.Rng(0x5D1, f);
             foreach (var rect in Rectangles(owner, nx, nz))
-                Split(rect, target, c.House, c.B.RoomSizeScale, r => Claim(r, new Region { Shape = RoomShape.Rect }));
+                Split(rect, target, c.House, c.B, r => Claim(r, new Region { Shape = RoomShape.Rect }));
 
             Cleanup(regions, owner, nx, nz);
             Merge(regions, owner, nx, nz, c.Rng(0x3E6, f));
@@ -502,15 +528,20 @@ namespace Stealth.Level
         }
 
         /// <summary>Splits a rectangle in two until the pieces are room-sized; sizes of every kind, from closets to halls.</summary>
-        static void Split(RectInt r, System.Random rng, int house, float scale, System.Action<RectInt> room)
+        static void Split(RectInt r, System.Random rng, int house, BuildingSettings b, System.Action<RectInt> room)
         {
+            float scale = b.RoomSizeScale;
             float area = r.width * r.height / (float)(M * M);
             double roll = rng.NextDouble();
             float want = roll < 0.28 ? 9f + (float)rng.NextDouble() * 10f        // small: closets, offices, toilets
                        : roll < 0.7 ? 20f + (float)rng.NextDouble() * 25f        // medium
                        : 45f + (float)rng.NextDouble() * (60f + house * 8f);    // large: open spaces, halls
             want *= scale;
+            // room area limits (the rooms test: 30..200 m²): aim inside them, never cut into pieces below the smallest
+            if (b.RoomAreaMax > 0f) want = Mathf.Min(want, b.RoomAreaMax / 1.3f);
+            if (b.RoomAreaMin > 0f) want = Mathf.Max(want, b.RoomAreaMin * 1.4f);
             bool canX = r.width >= 2 * MinSide, canZ = r.height >= 2 * MinSide;
+            if (b.RoomAreaMin > 0f && area < b.RoomAreaMin * 2f && (b.RoomAreaMax <= 0f || area <= b.RoomAreaMax)) { room(r); return; }
             if (area <= want * 1.25f || (!canX && !canZ)) { room(r); return; }
             bool cutX = canX && (!canZ || (r.width > r.height * 1.25f || (r.height <= r.width * 1.25f && rng.Next(2) == 0)));
             int side = cutX ? r.width : r.height;
@@ -518,13 +549,13 @@ namespace Stealth.Level
             int at = Mathf.Clamp(Mathf.RoundToInt(side * k / M) * M, MinSide, side - MinSide);
             if (cutX)
             {
-                Split(new RectInt(r.x, r.y, at, r.height), rng, house, scale, room);
-                Split(new RectInt(r.x + at, r.y, r.width - at, r.height), rng, house, scale, room);
+                Split(new RectInt(r.x, r.y, at, r.height), rng, house, b, room);
+                Split(new RectInt(r.x + at, r.y, r.width - at, r.height), rng, house, b, room);
             }
             else
             {
-                Split(new RectInt(r.x, r.y, r.width, at), rng, house, scale, room);
-                Split(new RectInt(r.x, r.y + at, r.width, r.height - at), rng, house, scale, room);
+                Split(new RectInt(r.x, r.y, r.width, at), rng, house, b, room);
+                Split(new RectInt(r.x, r.y + at, r.width, r.height - at), rng, house, b, room);
             }
         }
 

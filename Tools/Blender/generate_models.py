@@ -255,6 +255,26 @@ def model_hatch():
 
 # --------------------------------------------------------------------------- office props
 
+# desks were low next to a 1.8 m person: the same 1.6 x 0.8 m, but the top at 0.918 m instead of 0.765 m (the player
+# jumps 1.05 m: high vents are still climbed from a desk; Furnisher, LevelMetrics.DeskTop)
+DESK_TOP, DESK_TOP_NEW = 0.765, 0.918
+
+
+def raise_top(old_top, new_top):
+    """Makes a desk taller: what is under its top (legs, panels, drawers) stretches, what stands on it moves up as is
+    (the monitor keeps its shape)."""
+    k = new_top / old_top
+    for obj in bpy.context.scene.objects:
+        if obj.type != "MESH":
+            continue
+        mw = obj.matrix_world
+        inv = mw.inverted()
+        for v in obj.data.vertices:
+            w = mw @ v.co
+            w.z = w.z * k if w.z <= old_top + 1e-4 else w.z + old_top * (k - 1)
+            v.co = inv @ w
+
+
 def model_desk():
     merge("Body", [box((1.6, 0.8, 0.05), (0, 0, 0.74))])
     merge("Accent", [
@@ -266,6 +286,7 @@ def model_desk():
         box((0.55, 0.04, 0.34), (0, 0.15, 0.98)),                   # monitor
         box((0.06, 0.06, 0.2), (0, 0.19, 0.84)),                    # its stand, 1 cm into the monitor
     ])
+    raise_top(DESK_TOP, DESK_TOP_NEW)
     export("desk")
 
 
@@ -290,6 +311,7 @@ def model_terminal():
         box((0.3, 0.03, 0.24), (0, 0.19, 1.01)),
         box((0.29, 0.03, 0.22), (0.32, 0.17, 1.0)),
     ])
+    raise_top(DESK_TOP, DESK_TOP_NEW)  # the office desk's height (a desk turned into a console)
     export("terminal")
 
 
@@ -314,8 +336,23 @@ def model_server_rack():
 
 
 def model_cabinet():
-    merge("Body", [box((0.9, 0.5, 1.4), (0, 0, 0.7))])
-    merge("Accent", [box((0.3, 0.03, 0.04), (0, -0.26, 0.4 + i * 0.4)) for i in range(3)])
+    """Office drawer cabinet 0.9 x 0.5 x 1.19 (waist-to-chest high next to a 1.8 m person): an open-fronted carcass and
+    three drawers that slide out (separate parts BodyDrawer0..2, each a tray with its front and handle: the game moves
+    them, Items.Storage)."""
+    H, P = 1.19, 0.37                      # height, drawer pitch
+    merge("Body", [box((0.02, 0.5, H), (x, 0, H / 2)) for x in (-0.44, 0.44)]          # sides
+          + [box((0.9, 0.5, 0.02), (0, 0, H - 0.01)), box((0.9, 0.5, 0.06), (0, 0, 0.03)),  # top, plinth
+             box((0.9, 0.02, H), (0, 0.24, H / 2))]                                    # back
+          + [box((0.86, 0.48, 0.02), (0, 0.01, 0.06 + k * P)) for k in range(1, 3)])   # runners between the drawers
+    for k in range(3):
+        z0 = 0.07 + k * P
+        merge(f"BodyDrawer{k}", [
+            box((0.86, 0.02, P - 0.03), (0, -0.24, z0 + (P - 0.03) / 2)),    # front
+            box((0.8, 0.4, 0.015), (0, -0.03, z0 + 0.02)),                   # bottom
+            box((0.015, 0.4, 0.19), (-0.4, -0.03, z0 + 0.105)), box((0.015, 0.4, 0.19), (0.4, -0.03, z0 + 0.105)),  # sides
+            box((0.8, 0.015, 0.19), (0, 0.17, z0 + 0.105)),                  # back
+            box((0.3, 0.03, 0.04), (0, -0.265, z0 + P - 0.1)),               # handle
+        ])
     export("cabinet")
 
 
@@ -485,11 +522,19 @@ def model_coat_rack():
 
 
 def model_lockers():
-    """Three staff lockers, 0.9 x 0.5 x 1.9."""
-    merge("Body", [box((0.9, 0.5, 1.9), (0, 0, 0.95))])
-    merge("Accent", [box((0.01, 0.02, 1.85), (x, -0.255, 0.95)) for x in (-0.15, 0.15)]
-          + [box((0.03, 0.03, 0.12), (x + 0.1, -0.265, 1.0)) for x in (-0.3, 0.0, 0.3)]
-          + [box((0.2, 0.02, 0.02), (x, -0.258, 1.75 - k * 0.04)) for x in (-0.3, 0.0, 0.3) for k in range(3)])
+    """Staff lockers, 1.0 x 0.5 x 2.05 (a head above a 1.8 m person): an open-fronted carcass with two compartments
+    0.47 m wide inside (any loot item stands in one on end: Items.StorageMath.LootPose; a hat shelf in each) and two
+    doors that swing open (separate parts BodyDoor0..1 with their vents and handle: the game moves them, Items.Storage)."""
+    W, H, C = 1.0, 2.05, 0.49              # width, height, compartment pitch
+    xs = (-C / 2, C / 2)
+    merge("Body", [box((0.02, 0.5, H), (x, 0, H / 2)) for x in (-W / 2 + 0.01, 0.0, W / 2 - 0.01)]  # sides and the divider
+          + [box((W, 0.5, 0.02), (0, 0, H - 0.01)), box((W, 0.5, 0.06), (0, 0, 0.03)),     # top, plinth
+             box((W, 0.02, H), (0, 0.24, H / 2))]                                         # back
+          + [box((C - 0.03, 0.46, 0.02), (x, 0.01, H - 0.38)) for x in xs])              # hat shelves
+    for i, x in enumerate(xs):
+        merge(f"BodyDoor{i}", [box((C - 0.02, 0.02, H - 0.08), (x, -0.245, H / 2 + 0.02))]  # the door
+              + [box((0.32, 0.012, 0.02), (x, -0.258, H - 0.17 - k * 0.04)) for k in range(3)]  # vents
+              + [box((0.03, 0.03, 0.12), (x + C / 2 - 0.05, -0.265, 1.05))])                    # handle
     export("lockers")
 
 
@@ -552,6 +597,9 @@ SHAPES = {
     "tet_t":  [(0, 0), (1, 0), (2, 0), (1, 1)],
     "tet_l":  [(0, 0), (0, 1), (0, 2), (1, 0)],
     "tet_s":  [(0, 0), (1, 0), (1, 1), (2, 1)],
+    "shovel": [(0, 0), (0, 1), (0, 2), (0, 3)],                    # the shovel's piece in grids and the cart (ItemCatalog.Shovel, 1 x 4)
+    "flashlight": [(0, 0), (0, 1), (0, 2)],                       # ItemCatalog.Flashlight (1 x 3)
+    "battery": [(0, 0)],                                          # ItemCatalog.Battery
 }
 
 

@@ -40,6 +40,8 @@ namespace Stealth.UI
         public Button HostSteam;
         public Text LocalCaption;
         public Button HostLocal;
+        [Tooltip("Main game (off) or the test rooms (on): small houses of 3–4 rooms with no guards, to tune rooms in.")]
+        public Toggle TestRooms;
         public InputField Address;
         public Button Join;
         public Text NetStatus;
@@ -97,6 +99,11 @@ namespace Stealth.UI
             RefreshFriends.onClick.AddListener(() => m_NextFriendsRefresh = 0f);
             HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());
             HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
+            if (TestRooms != null)
+            {
+                TestRooms.SetIsOnWithoutNotify(Configs.Tuning.TestRooms);
+                TestRooms.onValueChanged.AddListener(Configs.Tuning.SetTestRooms);
+            }
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);
             MainControls.onClick.AddListener(() => ControlsOpen = true);

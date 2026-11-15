@@ -85,7 +85,7 @@ def blob(seed, n, h=None, sx=1.0, sy=1.0, rough=0.35, edge=0.12):
 # --------------------------------------------------------------------------- floor
 
 def floor_rust():
-    n = 1024
+    n = 2048
     cover = blob(1, n, rough=0.8, edge=0.2)
     flakes = smooth(0.55, 0.6, noise(2, n, 60, 4))
     tone = noise(3, n, 8, 4)
@@ -94,6 +94,27 @@ def floor_rust():
     density = smooth(0.25, 0.75, noise(4, n, 12, 4))              # patchy: thick in places, a stain in others
     alpha = cover * (0.25 + 0.75 * density)
     save("floor_rust", rgb, alpha)
+
+
+def wall_rust():
+    """A big rust bloom on a wall (2048 px): flaking crust, a darker heart, streaks running down from it."""
+    w, h = 1536, 2048
+    y, x = np.mgrid[0:h, 0:w].astype(np.float32)
+    v = y / h
+    cover = blob(81, w, h, sx=0.85, sy=0.55, rough=0.9, edge=0.18)
+    cover = np.roll(cover, -int(h * 0.18), axis=0)               # the bloom sits in the upper part
+    heart = blob(82, w, h, sx=0.45, sy=0.28, rough=0.9, edge=0.25)
+    heart = np.roll(heart, -int(h * 0.18), axis=0)
+    cols = noise(83, w, 22, 3, h=1)[0]
+    run = smooth(0.5, 0.85, cols)[None, :] * smooth(0.3, 0.45, v) * (1 - smooth(0.55, 0.98, v))
+    run *= smooth(0.0, 0.3, np.max(cover, axis=0))[None, :]      # streaks only under the bloom
+    flakes = smooth(0.55, 0.6, noise(84, w, 90, 4, h=h))
+    tone = noise(85, w, 10, 4, h=h)
+    rgb = mix(col(0.26, 0.12, 0.05), col(0.5, 0.26, 0.1), tone)
+    rgb = mix(rgb, col(0.12, 0.06, 0.03), np.clip(heart * 0.6 + flakes * 0.4, 0, 1))
+    density = smooth(0.2, 0.7, noise(86, w, 14, 4, h=h))
+    alpha = np.clip(cover * (0.35 + 0.65 * density) + run * 0.6 * (0.5 + 0.5 * tone), 0, 1)
+    save("wall_rust", rgb, alpha)
 
 
 def floor_oil():
@@ -352,7 +373,7 @@ def screen_static():
 
 
 if __name__ == "__main__":
-    for make in (floor_rust, floor_oil, floor_scorch, floor_rubble, wall_leak, wall_mold, wall_peel, wall_scorch):
+    for make in (floor_rust, floor_oil, floor_scorch, floor_rubble, wall_leak, wall_mold, wall_peel, wall_scorch, wall_rust):
         make()
     screen_terminal()
     screen_static()

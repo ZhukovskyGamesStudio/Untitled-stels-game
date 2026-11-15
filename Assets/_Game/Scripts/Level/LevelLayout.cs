@@ -159,6 +159,11 @@ namespace Stealth.Level
         public readonly List<RobotSpawn> RobotSpawns = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
+        /// <summary>Most windows on the facade (<see cref="LevelBuilder.WindowSpots"/>), −1 = wherever one fits.</summary>
+        public int WindowLimit = -1;
+        /// <summary>Dark rooms have dim lamps (<see cref="DimShare"/> of the usual brightness) instead of none.</summary>
+        public bool DarkRoomsDim;
+        public float DimShare = 0.3f;
 
         /// <summary>Size of the building's bounding box, metres (x, z).</summary>
         public float SizeX => Plan != null ? Plan.SizeX : 0f;

@@ -56,6 +56,11 @@ namespace Stealth.Items
             new Shape { Id = "stun",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             new Shape { Id = "speaker", Cells = new[] { V(0, 0), V(1, 0) } },
             new Shape { Id = "cagekey", Cells = new[] { V(0, 0) } },
+            // the first real loot: a shovel, 1 x 4 in the backpack (its picture: ItemVisuals.Icons), a model with physics in the world
+            new Shape { Id = "shovel",  Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(0, 3) } },
+            // the flashlight (1 x 3; it lights when held and switched on, its charge is its colour byte) and its batteries
+            new Shape { Id = "flashlight", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
+            new Shape { Id = "battery", Cells = new[] { V(0, 0) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
@@ -63,12 +68,87 @@ namespace Stealth.Items
         public const byte Diamond = 8, Key = 9, Stun = 10, Speaker = 11;
         /// <summary>The key of the hostage's cage (a guard carries it: hack him and he drops it).</summary>
         public const byte CageKey = 12;
+        /// <summary>The shovel: the first real loot item (every loot of the houses is a shovel now, <see cref="LootShape"/>).</summary>
+        public const byte Shovel = 13;
+
+        public const byte Flashlight = 14, Battery = 15;
+        /// <summary>A flashlight's full charge (its colour byte holds the charge, 0..FullCharge).</summary>
+        public const byte FullCharge = 100;
+
+        [System.Serializable]
+        public struct LootWeight
+        {
+            [Tooltip("Shape id: shovel, flashlight, battery …")] public string Item;
+            [Tooltip("Relative chance")] public int Weight;
+        }
+
+        /// <summary>What the loot of the houses is (by shape, weighted); set from LevelConfig.Loot.Table (only shovels by default).</summary>
+        public static (byte shape, int weight)[] LootTable { get; private set; } = { (Shovel, 1) };
+
+        /// <summary>Use this loot table (unknown ids are skipped; an empty table means shovels only).</summary>
+        public static void ConfigureLoot(LootWeight[] table)
+        {
+            var list = new List<(byte, int)>();
+            if (table != null)
+                foreach (var t in table)
+                {
+                    int i = System.Array.FindIndex(Shapes, s => s.Id == t.Item);
+                    if (i >= 0 && t.Weight > 0) list.Add(((byte)i, t.Weight));
+                }
+            LootTable = list.Count > 0 ? list.ToArray() : new[] { (Shovel, 1) };
+        }
+
+        /// <summary>
+        /// The loot a house, a robot's cargo, a crate or the vault gets, from the loot table (by default every loot is a
+        /// shovel). The old roll among the tetris pieces is still made, so the rest of the stream does not shift much.
+        /// </summary>
+        public static byte LootShape(System.Random rng)
+        {
+            rng.Next(LootShapes);
+            var table = LootTable;
+            if (table.Length == 1) return table[0].shape;
+            int total = 0;
+            foreach (var t in table) total += t.weight;
+            int roll = rng.Next(total);
+            foreach (var t in table)
+            {
+                if (roll < t.weight) return t.shape;
+                roll -= t.weight;
+            }
+            return table[0].shape;
+        }
+
+        /// <summary>The colour byte a new item of this shape spawns with: a flashlight comes fully charged.</summary>
+        public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)color;
+
+        /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
+        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery;
+
+        /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
+        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery;
+
+        /// <summary>
+        /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
+        /// The tetris pieces are their cells (<see cref="Items.StorageMath.ItemCell"/> each); the shovel is a 1.1 m spade
+        /// (Tools/Blender/poi.py shovel_parts).
+        /// </summary>
+        public static Vector3 ModelSize(int shape)
+        {
+            if (shape == Shovel) return new Vector3(1.105f, 0.06f, 0.22f);
+            if (shape == Flashlight) return new Vector3(0.263f, 0.065f, 0.065f);
+            if (shape == Battery) return new Vector3(0.066f, 0.032f, 0.061f);
+            var size = Size(Shapes[shape].Cells);
+            return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
+        }
+
+        /// <summary>A drawer (0.8 m wide inside) holds it lying flat.</summary>
+        public static bool FitsInDrawer(int shape) => ModelSize(shape).x <= 0.8f;
 
         /// <summary>A diamond (workbench) is worth this many cells of its colour.</summary>
         public static int DiamondValueCells { get; set; } = 10;
 
         /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
-        public static bool IsLoot(int shape) => shape < LootShapes;
+        public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel;
         /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
         public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey;
 
@@ -82,11 +162,13 @@ namespace Stealth.Items
             Stun => StunColor,
             Speaker => SpeakerColor,
             CageKey => CageKeyColor,
+            Flashlight => FlashlightColor,
+            Battery => BatteryColor,
             _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
         };
 
         public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f),
-            CageKeyColor = new(0.55f, 1.00f, 0.15f);
+            CageKeyColor = new(0.55f, 1.00f, 0.15f), FlashlightColor = new(0.95f, 0.78f, 0.25f), BatteryColor = new(0.35f, 0.75f, 0.95f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
@@ -100,8 +182,15 @@ namespace Stealth.Items
 
         static Vector2Int V(int x, int y) => new Vector2Int(x, y);
 
+        /// <summary>
+        /// The flashlight and the batteries burn into fuel like loot (in the car's hopper, into the entry hatch): worth
+        /// their cells at the grey colour's rate, whatever their charge (their colour byte holds the charge).
+        /// </summary>
+        static bool Plain(int shape) => shape == Flashlight || shape == Battery;
+
         public static int Value(int shape, int color) =>
             IsTool(shape) ? 0
+            : Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
             : (shape == Diamond ? DiamondValueCells : Shapes[shape].Cells.Length) * Colors[color].Multiplier * PointsPerCell;
 
         /// <summary>Bit of an item's rotation byte: the piece is mirrored (left-right) before it is turned.</summary>
@@ -172,6 +261,9 @@ namespace Stealth.Items
             Speaker => Loc.T("item.speaker"),
             CageKey => Loc.T("item.cagekey"),
             Diamond => Loc.F("item.diamond", ColorName(color), Value(shape, color)),
+            Shovel => Loc.F("item.shovel", ColorName(color), Value(shape, color)),
+            Flashlight => Loc.F("item.flashlight", Mathf.Min(color, FullCharge)),
+            Battery => Loc.T("item.battery"),
             _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
         };
     }

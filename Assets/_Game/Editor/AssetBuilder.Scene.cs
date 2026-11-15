@@ -235,7 +235,8 @@ namespace Stealth.EditorTools
             SetAppIcon();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
+                // the build list (RoomsTest first: a new game starts there), or the game scene alone before it is set up
+                scenes = EditorBuildSettings.scenes.Length > 0 ? System.Array.ConvertAll(EditorBuildSettings.scenes, sc => sc.path) : new[] { ScenePath },
                 locationPathName = PlayerExe,
                 target = BuildTarget.StandaloneWindows64,
                 options = options,

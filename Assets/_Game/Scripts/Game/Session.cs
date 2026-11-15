@@ -130,6 +130,10 @@ namespace Stealth.Game
         void SendUnlockDoor(int door);
         /// <summary>Owner → server: cracked the dial of this safe (index in the layout's props).</summary>
         void SendOpenSafe(int safe);
+        /// <summary>Owner → server: open or close a drawer / locker door (index in the layout's props, part of it).</summary>
+        void SendToggleStorage(int prop, int part);
+        /// <summary>Owner → server: use the item in the hand (switch the flashlight, put a battery in a flashlight).</summary>
+        void SendUseHand();
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>
         void SendHitFeedback(Vector3 awayFromSource);
     }
@@ -152,6 +156,12 @@ namespace Stealth.Game
         void RequestStashAll();
         /// <summary>A thing from the car's bed into a cell of the backpack (named by value: <see cref="Vehicles.CargoItem.Pack"/>).</summary>
         void RequestTakeCargo(ulong cargo, byte x, byte y, byte rot);
+        /// <summary>A battery (backpack index) onto a flashlight (backpack index): recharge.</summary>
+        void RequestRecharge(int battery, int flashlight);
+        /// <summary>A battery lying in the world onto a flashlight (backpack index): recharge.</summary>
+        void RequestRechargeWorld(WorldItem battery, int flashlight);
+        /// <summary>An item of the team stash dropped into the world.</summary>
+        void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw);
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

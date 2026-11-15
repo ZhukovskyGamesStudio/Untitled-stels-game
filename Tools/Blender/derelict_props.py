@@ -25,6 +25,7 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleProps", "Derelict"))
 ONLY = argv[1:]
 
+DESK_TOP_NEW = 0.918  # generate_models.DESK_TOP_NEW: the desk's top (it is taller; its footprint stays)
 SURFACES = ("Paint", "Composite", "Rust", "Vinyl", "Rubber", "Steel", "Screen", "ScreenText", "ScreenStatic", "Glass")
 parts = {}   # surface -> [bmesh]
 rng = random.Random(11)
@@ -335,6 +336,12 @@ def desk():
     mug(0.6, 0.05, 0.74)
     for k in range(4):                                                                         # binders
         box("Vinyl" if k % 2 else "Rust", 0.52 + k * 0.045, 0.56 + k * 0.045, 0.12, 0.38, 0.74, 1.02, ry=0.05 * k)
+    top = 0.74                                                                                 # the game's desk height:
+    k = DESK_TOP_NEW / top                                                                     # stretch what is under the
+    for bms in parts.values():                                                                 # top, lift what is on it
+        for bm in bms:
+            for v in bm.verts:
+                v.co.z = v.co.z * k if v.co.z <= top + 1e-4 else v.co.z + top * (k - 1)
     export("desk")
 
 
@@ -448,19 +455,37 @@ def tv_stand():
 
 
 def printer():
-    """A line printer on a stand: a fan-fold paper stack, the last printout spilling over the front onto the floor."""
-    box("Composite", -0.3, 0.3, -0.38, 0.38, 0.62, 0.98, panel=True)
-    box("Composite", -0.3, 0.3, -0.38, -0.1, 0.98, 1.05, rx=-0.25)                            # lid
-    box("Screen", 0.12, 0.24, -0.395, -0.385, 0.9, 0.94, bev=0.0)                              # status panel
-    for k in range(4):
-        box("Rubber", -0.2 + k * 0.05, -0.17 + k * 0.05, -0.395, -0.385, 0.9, 0.93, bev=0.001)
-    legs4(0.26, 0.34, 0.62, r=0.02)
-    box("Paint", -0.27, 0.27, -0.35, 0.35, 0.2, 0.22)
-    for k in range(10):                                                                        # fan-fold stack below
-        box("Composite", -0.2, 0.2, -0.2, 0.2, 0.22 + k * 0.012, 0.231 + k * 0.012, rz=(k % 2) * 0.02, bev=0.0)
-    pts = [(-0.38, 0.96), (-0.45, 0.9), (-0.5, 0.7), (-0.52, 0.45), (-0.55, 0.2), (-0.7, 0.02), (-0.95, 0.005)]
-    for (ya, za), (yb, zb) in zip(pts, pts[1:]):                                               # the printout, spilling
-        box("Composite", -0.19, 0.19, min(ya, yb), max(ya, yb) + 0.002, min(za, zb), max(za, zb) + 0.002, bev=0.0)
+    """An office copier in the 0.6 x 0.6 x 1.1 block of the game's printer (its collider): a cabinet with two paper
+    drawers (one pulled ajar), the print engine with a side output tray holding a few yellowed sheets, a scanner lid
+    on top left half-open, a control panel with a dead status screen, scuffs and a loose cable. Nothing spills out."""
+    box("Paint", -0.3, 0.3, -0.29, 0.29, 0.04, 0.5, panel=True)                               # the cabinet
+    for k, ajar in ((0, 0.0), (1, 0.06)):                                                    # paper drawers
+        z = 0.08 + k * 0.2
+        box("Paint", -0.28, 0.28, -0.31 - ajar, -0.29 - ajar, z, z + 0.17, panel=True)
+        box("Steel", -0.08, 0.08, -0.325 - ajar, -0.31 - ajar, z + 0.12, z + 0.14)            # handle
+        box("Composite", -0.24, 0.24, -0.27 - ajar, 0.2, z + 0.04, z + 0.05, bev=0.0)         # the paper inside
+        if ajar:
+            box("Paint", -0.27, 0.27, -0.3 - ajar, -0.2, z + 0.01, z + 0.03)                  # the pulled drawer's tray
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            cyl("Rubber", sx * 0.25, sy * 0.24, 0.0, 0.04, 0.025, seg=12)                    # casters
+    box("Composite", -0.29, 0.29, -0.28, 0.28, 0.5, 0.92, panel=True)                         # the print engine
+    box("Rust", -0.29, -0.2, -0.285, -0.27, 0.52, 0.6, bev=0.0)                               # a scuffed corner
+    box("Composite", -0.27, 0.27, -0.29, -0.28, 0.6, 0.7, bev=0.002)                           # the front door seam
+    # the output tray on the left side, sloping down, with a few sheets in it
+    box("Composite", -0.42, -0.29, -0.16, 0.16, 0.7, 0.71, ry=-0.12, bev=0.0)
+    for k in range(3):
+        box("Composite", -0.41, -0.3, -0.105, 0.105, 0.712 + k * 0.003, 0.714 + k * 0.003, ry=-0.12 + k * 0.03, rz=0.04 * k, bev=0.0)
+    # the scanner on top: glass bed, the lid propped a little open
+    box("Paint", -0.29, 0.29, -0.28, 0.28, 0.92, 0.97, panel=True)
+    box("Glass", -0.25, 0.25, -0.24, 0.2, 0.97, 0.972, bev=0.0)
+    box("Composite", -0.28, 0.28, -0.26, 0.27, 1.02, 1.05, rx=0.2, panel=True)
+    # the control panel at the front right, tilted up
+    box("Composite", 0.02, 0.28, -0.3, -0.18, 0.9, 0.95, rx=-0.35)
+    box("ScreenStatic", 0.05, 0.16, -0.31, -0.25, 0.935, 0.96, rx=-0.35, bev=0.0)
+    for k in range(6):
+        box("Rubber", 0.18 + (k % 3) * 0.03, 0.2 + (k % 3) * 0.03, -0.29 + (k // 3) * 0.03, -0.27 + (k // 3) * 0.03, 0.915, 0.95, bev=0.002)
+    cable((0.25, 0.28, 0.6), (0.27, 0.32, 0.0), sag=0.04, r=0.007)
     export("printer")
 
 
@@ -762,7 +787,7 @@ def trash_bin():
 
 
 PROPS = [desk, chair, sofa, armchair, bean_bag, coffee_table, plant, bookshelf, round_table, meeting_table, ping_pong_table,
-         arcade_machine, coat_rack, whiteboard, reception_desk, partition, cabinet, shelf, boxes, trash_bin,
+         arcade_machine, coat_rack, whiteboard, reception_desk, partition, shelf, boxes, trash_bin,  # cabinet: opens (Items.Storage), keeps its family model
          server_rack, tv_stand, printer]
 
 if __name__ == "__main__":

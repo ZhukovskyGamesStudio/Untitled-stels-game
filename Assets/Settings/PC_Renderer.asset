@@ -249,7 +249,8 @@ MonoBehaviour:
   - {fileID: 1182369268985442178}
   - {fileID: 4739043123170908920}
   - {fileID: -7286244957583121396}
-  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c820f47c6ae54871200b8885769de5eca577c6671bd1acbbbf82def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1cbc79cbf7c6a87378822f37ef959e6810f81adcab9c76c4410ce4c6b4d00ee29al
+  - {fileID: 7899965770110007457}
+  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c820f47c6ae54871200b8885769de5eca577c6671bd1acbbbf82def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1cbc79cbf7c6a87378822f37ef959e6810f81adcab9c76c4410ce4c6b4d00ee29aa1f826190351a26dl
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -476,6 +477,26 @@ MonoBehaviour:
     BlurQuality: 0
     Falloff: 100
     SampleCount: -1
+--- !u!114 &7899965770110007457
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b00045f12942b46c698459096c89274e, type: 3}
+  m_Name: GasFog
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.FullScreenPassRendererFeature
+  m_Active: 1
+  injectionPoint: 550
+  fetchColorBuffer: 1
+  requirements: 1
+  passMaterial: {fileID: 2100000, guid: 04cd1bf7dd005e646b1958d9e667862a, type: 2}
+  passIndex: 0
+  bindDepthStencilAttachment: 0
+  m_Version: 1
 --- !u!114 &8679466479387376060
 MonoBehaviour:
   m_ObjectHideFlags: 1

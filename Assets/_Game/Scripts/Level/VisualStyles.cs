@@ -146,8 +146,9 @@ namespace Stealth.Level
         public static void SnapFog(bool outside)
         {
             var w = World;
-            RenderSettings.fogColor = outside ? w.GasFog : w.IndoorFog;
-            RenderSettings.fogDensity = outside ? LightMath.GasFogDensity : w.IndoorFogDensity;
+            // the gas outside is the gas pass (GasView); the engine's fog is the dark haze everywhere
+            RenderSettings.fogColor = w.IndoorFog;
+            RenderSettings.fogDensity = w.IndoorFogDensity;
         }
 
         // ------------------------------------------------------------------ geometry
@@ -310,6 +311,7 @@ namespace Stealth.Level
         static void Replace(Transform root, PropReplacement prop)
         {
             if (root == null || !Application.isPlaying) return;
+            if (root.GetComponentInParent<Items.Storage>() != null) return; // opening furniture keeps its own moving parts
             foreach (var (r0, _, _) in s_Replaced) if (r0 == root) return;
             var hidden = new List<Renderer>();
             foreach (var r in root.GetComponentsInChildren<Renderer>())

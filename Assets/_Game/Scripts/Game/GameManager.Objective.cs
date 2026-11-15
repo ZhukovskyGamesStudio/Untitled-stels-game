@@ -91,7 +91,7 @@ namespace Stealth.Game
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, 2));
             for (int i = 0; i < Mathf.Min(s.VaultTreasure, l.VaultTreasure.Count); i++)
             {
-                byte shape = (byte)rng.Next(ItemCatalog.LootShapes);
+                byte shape = ItemCatalog.LootShape(rng);
                 byte color = (byte)Mathf.Clamp(s.TreasureColors[rng.Next(s.TreasureColors.Length)], 0, ItemCatalog.Colors.Length - 1);
                 SpawnItemServer(shape, color, l.VaultTreasure[i] + Vector3.up * 0.05f, rng.Next(4) * 90f);
             }

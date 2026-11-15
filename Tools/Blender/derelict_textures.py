@@ -146,7 +146,9 @@ def steel_panels():
     paint = mix(paint, col(0.22, 0.25, 0.24), noise(13, 3, 1) * 0.5)          # panel to panel variation
     bare = mix(col(0.38, 0.38, 0.37), col(0.26, 0.26, 0.26), noise(14, 90, 2))
     rust, rust_amt = rust_layer(15)
-    rust_amt = np.maximum(rust_amt * 0.6, edge_wear * smooth(0.4, 0.7, wear))
+    # no rust patches baked in (they repeat with every tile): only a thin rusty line where the paint is worn through;
+    # the big rust comes as decals placed at random (derelict_decals.py wall_rust)
+    rust_amt = edge_wear * smooth(0.55, 0.8, wear) * 0.35
     alb = mix(paint, bare, edge_wear * 0.7)
     alb = mix(alb, rust, rust_amt * 0.8)
     run = streaks(16, 0.45, 30)
@@ -210,7 +212,8 @@ def painted_metal():
     paint = mix(col(0.24, 0.28, 0.27), col(0.3, 0.33, 0.31), noise(43, 6, 2))
     steel = col(0.45, 0.45, 0.44)
     alb = mix(paint, steel, chips)
-    alb = mix(alb, rust, rust_amt * 0.5)
+    rust_amt = rust_amt * 0.0                                   # doors and furniture: no tiled rust (decals bring it)
+    alb = mix(alb, rust, rust_amt)
     grime = smooth(0.5, 0.8, noise(44, 10, 3))
     alb = mix(alb, col(0.06, 0.06, 0.05), grime * 0.45)
     h = chips * -0.3 + rust_amt * 0.1 + (noise(45, 200, 1) - 0.5) * 0.03

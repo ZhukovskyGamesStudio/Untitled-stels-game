@@ -333,7 +333,11 @@ def model_medicine_cabinet():
     for dd in doors:
         s.inset_faces(dd, s.facing((0, -1, 0), min_area=0.08, tol=0.95), thickness=0.035, depth=-0.005)
     sign = s.rbox((0.26, 0.03, 0.2), (0, -0.02, 1.73), r=0.012, seg=2)
-    s.part("Body", [*sides, back, cornice, plinth, *floors, *shelves, *doors, sign])
+    s.part("Body", [*sides, back, cornice, plinth, *floors, *shelves, sign])
+    # the two lower doors swing open (Items.Storage), each with its pull
+    for i, (x, dd) in enumerate(zip((-1, 1), doors)):
+        pull = s.rbox((0.12, 0.03, 0.018), (x * 0.205, -0.212, 0.46), r=0.007, seg=1)
+        s.part(f"BodyDoor{i}", [dd, pull])
 
     frames, glass = [], []
     for x in (-1, 1):
@@ -344,7 +348,6 @@ def model_medicine_cabinet():
         frames.append(s.rbox((0.32, 0.024, 0.04), (cx, -0.192, 1.555), r=0.006, seg=1))
         glass.append(s.rbox((0.34, 0.006, 0.98), (cx, -0.192, 1.065), r=0.002, seg=1))
     handles = [s.rbox((0.018, 0.03, 0.16), (x * 0.04, -0.212, 1.05), r=0.007, seg=1) for x in (-1, 1)]
-    handles += [s.rbox((0.12, 0.03, 0.018), (x * 0.205, -0.212, 0.46), r=0.007, seg=1) for x in (-1, 1)]
     s.part("Accent", [*frames, *handles])
 
     stuff = []

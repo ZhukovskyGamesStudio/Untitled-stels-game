@@ -38,6 +38,7 @@ namespace Stealth.EditorTools
             AddFxaaFeature();
             AddXrayFeature();
             AddWorldTextFeature();
+            AddGasFeature();
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
@@ -46,6 +47,7 @@ namespace Stealth.EditorTools
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
             {
+                if (!EnabledStyles.Contains(def.name)) continue; // the other styles stay on disk, out of the game
                 var path = $"{StylesDir}/{def.name}.asset";
                 var asset = AssetDatabase.LoadAssetAtPath<VisualStyle>(path);
                 if (asset != null && rebuild) { EditorUtility.CopySerialized(def, asset); asset.name = def.name; EditorUtility.SetDirty(asset); }
@@ -61,8 +63,8 @@ namespace Stealth.EditorTools
                 AssetDatabase.CreateAsset(config, StyleConfigPath);
             }
             config.Styles = styles.ToArray();
-            // the game's look (chosen by hand later; first time: the storybook style)
-            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
+            // the game's look: the abandoned facility (the only style of this branch)
+            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S16_Derelict");
             config.Building = MaterialsIn("Environment");
             config.Furniture = MaterialsIn("Props");
             config.Robots = MaterialsIn("Robots");
@@ -87,6 +89,13 @@ namespace Stealth.EditorTools
             if (root != null && root.Styles != config) { root.Styles = config; EditorUtility.SetDirty(root); }
             AssetDatabase.SaveAssets();
         }
+
+        /// <summary>
+        /// The styles in the game (F8 cycles through them). This branch plays only «Заброшенный комплекс»: the other style
+        /// assets stay on disk but are not built into the game, and the model generators make nothing for them
+        /// (Tools/Blender: style_families, style_kit, build_bestiary, players default to S16 / the derelict family).
+        /// </summary>
+        static readonly string[] EnabledStyles = { "S16_Derelict" };
 
         /// <summary>
         /// Models designed for one style: every robot, device and sensor module (Tools/Blender/build_bestiary.py →
@@ -289,7 +298,8 @@ namespace Stealth.EditorTools
             AddFullScreenFeature("ScreenFxaa", mat, ScriptableRenderPassInput.None);
         }
 
-        static void AddFullScreenFeature(string name, Material mat, ScriptableRenderPassInput requirements)
+        static void AddFullScreenFeature(string name, Material mat, ScriptableRenderPassInput requirements,
+            FullScreenPassRendererFeature.InjectionPoint at = FullScreenPassRendererFeature.InjectionPoint.AfterRenderingPostProcessing)
         {
             var data = AssetDatabase.LoadAssetAtPath<UniversalRendererData>(PcRendererPath);
             if (data == null) { Debug.LogWarning($"[Builder] PC renderer not found: no {name} pass"); return; }
@@ -309,7 +319,7 @@ namespace Stealth.EditorTools
                 map.GetArrayElementAtIndex(map.arraySize - 1).longValue = id;
                 so.ApplyModifiedProperties();
             }
-            feature.injectionPoint = FullScreenPassRendererFeature.InjectionPoint.AfterRenderingPostProcessing;
+            feature.injectionPoint = at;
             feature.fetchColorBuffer = true;
             feature.requirements = requirements;
             feature.passMaterial = mat;
@@ -317,6 +327,63 @@ namespace Stealth.EditorTools
             feature.SetActive(true);
             EditorUtility.SetDirty(feature);
             EditorUtility.SetDirty(data);
+        }
+
+        const string GasMaterialPath = StylesDir + "/GasFog.mat";
+        const string SkyDir = Root + "/Art/Textures/Sky";
+        const string DerelictSkyPath = SkyDir + "/derelict_night.png";
+
+        /// <summary>
+        /// The gas outside and the sky above it (Stealth.Level.GasView): a full-screen pass before post-processing that
+        /// reads depth, and window glass that shows the same outside from within the house.
+        /// </summary>
+        static void AddGasFeature()
+        {
+            var shader = Shader.Find("Stealth/GasFog");
+            if (shader == null) { Debug.LogWarning("[Builder] gas shader not found"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(GasMaterialPath);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = "GasFog" };
+                AssetDatabase.CreateAsset(mat, GasMaterialPath);
+            }
+            else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
+            AddFullScreenFeature("GasFog", mat, ScriptableRenderPassInput.Depth, FullScreenPassRendererFeature.InjectionPoint.BeforeRenderingPostProcessing);
+
+            // window glass: lit, clear, a faint tint and sharp reflections — the real outside shows through the hole
+            var window = AssetDatabase.LoadAssetAtPath<Material>($"{MaterialsDir}/Environment/Window.mat");
+            var lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (window != null && lit != null && (window.shader != lit || window.renderQueue != (int)UnityEngine.Rendering.RenderQueue.Transparent))
+            {
+                window.shader = lit;
+                window.SetColor("_BaseColor", new Color(0.55f, 0.62f, 0.6f, 0.14f));
+                window.SetFloat("_Smoothness", 0.92f);
+                window.SetFloat("_Metallic", 0f);
+                window.SetColor("_EmissionColor", Color.black);
+                window.DisableKeyword("_EMISSION");
+                Translucent(window);
+            }
+        }
+
+        /// <summary>The night sky of the derelict style (Tools/Blender/derelict_sky.py): a lat-long panorama imported as a cubemap.</summary>
+        static Cubemap DerelictSky()
+        {
+            if (AssetImporter.GetAtPath(DerelictSkyPath) is not TextureImporter imp) return null;
+            if (imp.textureShape != TextureImporterShape.TextureCube || imp.generateCubemap != TextureImporterGenerateCubemap.Cylindrical ||
+                imp.maxTextureSize != 2048)
+            {
+                imp.textureType = TextureImporterType.Default;
+                imp.textureShape = TextureImporterShape.TextureCube;
+                imp.generateCubemap = TextureImporterGenerateCubemap.Cylindrical;
+                imp.sRGBTexture = true;
+                imp.mipmapEnabled = false;
+                imp.wrapMode = TextureWrapMode.Clamp;
+                imp.filterMode = FilterMode.Bilinear;
+                imp.maxTextureSize = 2048;
+                imp.textureCompression = TextureImporterCompression.CompressedHQ;
+                imp.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Cubemap>(DerelictSkyPath);
         }
 
         // ------------------------------------------------------------------ the styles
@@ -338,6 +405,7 @@ namespace Stealth.EditorTools
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
             if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
+            if (asset.World.Sky == null && def.World.Sky != null) { asset.World.Sky = def.World.Sky; dirty = true; }
             if (dirty) EditorUtility.SetDirty(asset);
         }
 
@@ -717,18 +785,19 @@ namespace Stealth.EditorTools
                 s =>
                 {
                     var g = s.Grade;
-                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.8f; g.Contrast = 18f; g.Saturation = -35f;
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 2.1f; g.Contrast = 4f; g.Saturation = -35f;
                     g.ColorFilter = C(0.86f, 0.97f, 0.94f); g.Temperature = -18f; g.Tint = -8f;
                     g.SplitShadows = C(0.3f, 0.45f, 0.45f); g.SplitHighlights = C(0.55f, 0.6f, 0.5f); g.SplitBalance = -20f;
-                    g.BloomIntensity = 1.2f; g.BloomThreshold = 1.1f; g.BloomScatter = 0.8f; g.BloomTint = C(0.8f, 1f, 0.95f);
-                    g.Vignette = 0.32f; g.VignetteColor = C(0f, 0.01f, 0.01f);
+                    g.BloomIntensity = 0.9f; g.BloomThreshold = 0.95f; g.BloomScatter = 0.88f; // a soft halo round the lamps g.BloomTint = C(0.8f, 1f, 0.95f);
+                    g.Vignette = 0.2f; g.VignetteColor = C(0f, 0.01f, 0.01f);
                     g.ChromaticAberration = 0.25f; g.FilmGrain = 0.4f; g.LensDistortion = 0.06f;
-                    s.World.Ambient = C(0.13f, 0.15f, 0.15f);
-                    s.World.IndoorFog = C(0.012f, 0.02f, 0.02f); s.World.IndoorFogDensity = 0.035f;
-                    s.World.GasFog = C(0.22f, 0.3f, 0.2f); s.World.LightScale = 1.3f; s.World.LampGlow = 0.15f; // rooms lit, diffusers not glaring
+                    s.World.Ambient = C(0.07f, 0.08f, 0.08f); // the lamps light the rooms, not a flat grey fill
+                    s.World.IndoorFog = C(0.012f, 0.02f, 0.02f); s.World.IndoorFogDensity = 0.02f;
+                    s.World.GasFog = C(0.22f, 0.3f, 0.2f); s.World.LightScale = 1.4f; s.World.LampGlow = 0.5f; // gentle lamps: soft pools of light, diffusers read as lamps without glare
+                    s.World.Sky = DerelictSky(); // a dead city under toxic clouds, above the gas
                     var p = s.Palette;
-                    p.Building.Saturation = 0.45f; p.Building.Brightness = 1.15f;
-                    p.Furniture.Saturation = 0.5f; p.Furniture.Brightness = 1.15f; p.Furniture.Smoothness = 0.25f;
+                    p.Building.Saturation = 0.45f; p.Building.Brightness = 1.3f;
+                    p.Furniture.Saturation = 0.5f; p.Furniture.Brightness = 1.3f; p.Furniture.Smoothness = 0.25f;
                     p.Robots.Saturation = 0.6f;
                     p.Players.Saturation = 0.8f;
                     var geo = s.Geometry;
@@ -739,10 +808,10 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Dr_Rust"); geo.Pipe = K("Dr_Rust"); geo.Beam = K("Dr_PaintedMetal"); geo.Glow = K("Glow_DimCyan");
                     geo.PlayerRig = s_HumanRig;
                     geo.FloorDecay = new[] { K("Dc_floor_rust"), K("Dc_floor_oil"), K("Dc_floor_scorch"), K("Dc_floor_rubble") };
-                    geo.WallDecay = new[] { K("Dc_wall_leak"), K("Dc_wall_mold"), K("Dc_wall_peel"), K("Dc_wall_scorch") };
+                    geo.WallDecay = new[] { K("Dc_wall_rust"), K("Dc_wall_rust"), K("Dc_wall_leak"), K("Dc_wall_mold"), K("Dc_wall_peel"), K("Dc_wall_scorch") }; // rust twice as often
                     geo.Posters = Enumerable.Range(0, 6).Select(i => K($"Dc_poster_{i}")).ToArray();
                     geo.DecayDensity = 0.14f;
-                    geo.PosterChance = 0.7f;
+                    geo.PosterChance = 0.25f;
                 });
         }
     }

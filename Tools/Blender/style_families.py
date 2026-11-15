@@ -34,7 +34,8 @@ import robots as r  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ROOT = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
-FAMILIES = argv[1:] or ["lowpoly", "toy", "lofi", "clean", "realistic", "derelict"]
+# this branch plays only S16 «Заброшенный комплекс» (derelict family): the others are made only when named
+FAMILIES = argv[1:] or ["derelict"]
 
 orig_box, orig_cyl, orig_sphere, orig_merge = g.box, g.cylinder, g.sphere, g.merge
 family = None

@@ -23,6 +23,10 @@ namespace Stealth.Player
     public class PlayerInventory : MonoBehaviour
     {
         public const float ReachDistance = 3.5f;
+        /// <summary>The hand slot: an entry with this X is held in the hand, not in the backpack's grid (one at a time).</summary>
+        public const byte HandX = 255;
+
+        public static bool InHand(InventoryEntry e) => e.X == HandX;
 
         readonly List<InventoryEntry> m_Items = new();
         IInventoryLink m_Link;
@@ -65,7 +69,7 @@ namespace Stealth.Player
             var set = new HashSet<Vector2Int>();
             for (int i = 0; i < m_Items.Count; i++)
             {
-                if (i == ignoreIndex) continue;
+                if (i == ignoreIndex || InHand(m_Items[i])) continue;
                 var e = m_Items[i];
                 foreach (var c in e.Cells) set.Add(new Vector2Int(e.X + c.x, e.Y + c.y));
             }
@@ -77,6 +81,7 @@ namespace Stealth.Player
             for (int i = 0; i < m_Items.Count; i++)
             {
                 var e = m_Items[i];
+                if (InHand(e)) continue;
                 foreach (var c in e.Cells)
                     if (e.X + c.x == cell.x && e.Y + c.y == cell.y) return i;
             }
@@ -84,7 +89,19 @@ namespace Stealth.Player
         }
 
         public bool CanPlace(int shape, int rot, int x, int y, int ignoreIndex = -1) =>
-            InventoryLayout.Fits(ItemCatalog.RotatedCells(shape, rot), x, y, Occupied(ignoreIndex));
+            x == HandX ? ItemCatalog.Holdable(shape) && HandIndex(ignoreIndex) < 0
+                       : InventoryLayout.Fits(ItemCatalog.RotatedCells(shape, rot), x, y, Occupied(ignoreIndex));
+
+        /// <summary>The item held in the hand slot (index in <see cref="Items"/>), -1 if the hand is empty.</summary>
+        public int HandIndex(int ignoreIndex = -1)
+        {
+            for (int i = 0; i < m_Items.Count; i++) if (i != ignoreIndex && InHand(m_Items[i])) return i;
+            return -1;
+        }
+
+        /// <summary>A flashlight that a battery can recharge: a flashlight below full charge.</summary>
+        public bool CanRecharge(int flashlight) =>
+            flashlight >= 0 && flashlight < m_Items.Count && m_Items[flashlight].Shape == ItemCatalog.Flashlight && m_Items[flashlight].Color < ItemCatalog.FullCharge;
 
         /// <summary>First free position for an item, trying all rotations. Used by tests and quick pickup.</summary>
         public bool FindSpot(int shape, out byte x, out byte y, out byte rot)
@@ -194,6 +211,27 @@ namespace Stealth.Player
             else StashAllServer();
         }
 
+        /// <summary>A battery from the backpack onto a flashlight: the flashlight is full again, the battery is used up.</summary>
+        public void RequestRecharge(int battery, int flashlight)
+        {
+            if (m_Link != null) m_Link.RequestRecharge(battery, flashlight);
+            else RechargeServer(battery, flashlight);
+        }
+
+        /// <summary>A battery lying in the world dragged onto a flashlight.</summary>
+        public void RequestRechargeWorld(WorldItem battery, int flashlight)
+        {
+            if (m_Link != null) m_Link.RequestRechargeWorld(battery, flashlight);
+            else RechargeWorldServer(battery, flashlight);
+        }
+
+        /// <summary>An item of the team stash dropped into the world (like from the backpack).</summary>
+        public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw)
+        {
+            if (m_Link != null) m_Link.RequestDropStashed(from, position, yaw);
+            else DropStashedServer(from, position, yaw);
+        }
+
         // ------------------------------------------------------------------ server
 
         bool CanAct => m_Player == null || !m_Player.Downed;
@@ -254,6 +292,49 @@ namespace Stealth.Player
             Changed();
             game.BurnServer(GetComponent<PlayerController>(), e.Value);
         }
+
+        /// <summary>Server: a battery recharges a flashlight below full charge and is used up.</summary>
+        public void RechargeServer(int battery, int flashlight)
+        {
+            if (!CanAct || battery < 0 || battery >= m_Items.Count || m_Items[battery].Shape != ItemCatalog.Battery || !CanRecharge(flashlight)) return;
+            var e = m_Items[flashlight];
+            e.Color = ItemCatalog.FullCharge;
+            m_Items[flashlight] = e;
+            m_Items.RemoveAt(battery);
+            Changed();
+        }
+
+        /// <summary>Server: a battery from the world (in reach) recharges a flashlight below full charge.</summary>
+        public void RechargeWorldServer(WorldItem battery, int flashlight)
+        {
+            if (!CanAct || !InReach(battery) || battery.Shape != ItemCatalog.Battery || !CanRecharge(flashlight)) return;
+            var e = m_Items[flashlight];
+            e.Color = ItemCatalog.FullCharge;
+            m_Items[flashlight] = e;
+            Changed();
+            Session.Despawn(battery.gameObject);
+        }
+
+        /// <summary>Server: the charge of the flashlight at this index (it drains while it shines).</summary>
+        public void SetChargeServer(int index, byte charge)
+        {
+            if (index < 0 || index >= m_Items.Count || m_Items[index].Shape != ItemCatalog.Flashlight || m_Items[index].Color == charge) return;
+            var e = m_Items[index];
+            e.Color = charge;
+            m_Items[index] = e;
+            Changed();
+        }
+
+        /// <summary>Server: an item of the stash at this hatch dropped into the world.</summary>
+        public void DropStashedServer(InventoryEntry from, Vector3 position, float yaw)
+        {
+            if (!AtHatch(out var stash) || stash.IndexOf(from) < 0) return;
+            if ((position - transform.position).magnitude > ReachDistance + 1.5f)
+                position = transform.position + transform.forward * 0.8f;
+            stash.Take(from);
+            GameManager.Instance?.SpawnItemServer(from.Shape, from.Color, position, yaw);
+        }
+
 
         // Team stash: at the hatch of a house, or at the board in the sewer.
 

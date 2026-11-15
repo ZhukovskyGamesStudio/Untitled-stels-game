@@ -73,7 +73,10 @@ namespace Stealth.Enemies
             var rng = LevelRandom.Next(RandomChannel.Robots);
             if (Senses.ColorSorter) SetVariant((sbyte)rng.Next(ItemCatalog.Colors.Length));
             if (Traits.CargoChance > 0f && rng.Value() < Traits.CargoChance)
-                SetCargo(EncodeCargo((byte)rng.Next(ItemCatalog.LootShapes), (byte)ItemCatalog.RandomColor(rng, 0)));
+            {
+                byte shape = ItemCatalog.LootShape(rng);
+                SetCargo(EncodeCargo(shape, ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, 0))));
+            }
             m_NextStomp = Time.time + rng.Range(0.5f, Senses.SeismicPeriod);
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
