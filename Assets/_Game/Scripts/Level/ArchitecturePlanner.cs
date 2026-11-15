@@ -286,7 +286,7 @@ namespace Stealth.Level
         public const float CrownDrop = 0.23f;
 
         /// <summary>How far whatever frames an opening reaches onto its wall: a vent's flanges, a slot's frame, the style's door trim.</summary>
-        public static float ReachOf(WallOpening o, StyleGeometry g) => o.Vent || o.Squeeze ? FrameReach : TrimReach(g.Doors);
+        public static float ReachOf(WallOpening o, StyleGeometry g) => o.Vent || o.Squeeze || o.Vault ? FrameReach : TrimReach(g.Doors);
 
         /// <summary>Along-wall spans of this face covered by the frames and trims of openings in the same wall (and its other face).</summary>
         static List<(float, float)> TrimSpans(WallFace f, LevelShell shell, StyleGeometry g)
@@ -382,7 +382,7 @@ namespace Stealth.Level
         static void PlanOpening(List<DecorPiece> list, WallOpening o, StyleGeometry g)
         {
             // a vent and a squeeze slot carry their own frames (Level/VentFrame, Level/SqueezeFrame): a door trim would clash with them
-            if (o.Vent || o.Squeeze || o.Exterior || g.Doors == DoorTrim.None) return;
+            if (o.Vent || o.Squeeze || o.Vault || o.Exterior || g.Doors == DoorTrim.None) return; // the vault: its ring
             var n = new Vector3(-o.Along.z, 0f, o.Along.x);
             foreach (var side in new[] { n, -n })
             {
@@ -423,7 +423,7 @@ namespace Stealth.Level
         /// </summary>
         static void PlanReveals(List<DecorPiece> list, WallOpening o)
         {
-            if (o.Vent || o.Exterior) return;
+            if (o.Vent || o.Exterior || o.Vault) return; // the vault's steel sleeve lines its bore
             float w = o.Width, h = o.Height;
             const float lift = FinishLift;
             foreach (float s in new[] { -1f, 1f })

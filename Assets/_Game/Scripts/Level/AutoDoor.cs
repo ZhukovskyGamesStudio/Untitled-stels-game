@@ -29,6 +29,8 @@ namespace Stealth.Level
         public float SwingAngle = 90f;
         [Tooltip("Padlocks on both faces, hung on the panels' seam: shown while a hackable lock holds the door.")]
         public Transform[] Padlocks;
+        [Tooltip("Parts that are the wall itself (the corners round the vault's round door): dressed in the style's wall finish by StyleDecor.")]
+        public MeshRenderer[] WallParts;
         public BoxCollider Blocker;
         public float Width = LevelMetrics.DoorWidth;
         [Tooltip("Lock lamps on both sides above the door (shown only on locked doors).")]

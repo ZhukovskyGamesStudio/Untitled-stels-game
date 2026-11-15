@@ -132,6 +132,9 @@ namespace Stealth.Level
                     bool keyed = false;
                     foreach (var k in l.KeyDoors) keyed |= k.Door == i;
                     door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor);
+                    if (door.WallParts != null)
+                        foreach (var part in door.WallParts)
+                            if (part != null) Shell.WallParts.Add(part);
                 }
                 if (i == l.VaultDoor && m_Art.VaultPanel != null)
                 {
@@ -395,7 +398,9 @@ namespace Stealth.Level
                     continue;
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
-                float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth : LevelMetrics.DoorWidth);
+                bool vault = IsVaultDoorway(index, o);
+                float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth
+                    : vault ? LevelMetrics.VaultDoorWidth : LevelMetrics.DoorWidth);
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
                 float sill = o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
                 float openH = vent ? sill + LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
@@ -410,13 +415,13 @@ namespace Stealth.Level
                 WallPiece(m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
-                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Floor = m_Floor });
+                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Vault = vault, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
                 else if (w.Exterior) Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, along);
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
-                else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
+                else if (m_Art.ExitSign != null && !vault) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
                 from = o1;
                 cornerA = false;
             }
@@ -447,6 +452,15 @@ namespace Stealth.Level
                 if (k == CellKind.Room || k == CellKind.Void) list.Add(new Vector3(side.x, 0f, side.y));
             }
             return list;
+        }
+
+        /// <summary>The vault's doorway (<see cref="LevelLayout.VaultDoorway"/>) — wider, for the round bank door.</summary>
+        bool IsVaultDoorway(int wall, PlanOpening o)
+        {
+            int v = m_Layout.VaultDoorway;
+            if (v < 0 || v >= m_Plan.Openings.Count || m_Art.VaultDoor == null) return false;
+            var vo = m_Plan.Openings[v];
+            return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
         }
 
         void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, List<Vector3> sides, bool cornerA, bool cornerB,

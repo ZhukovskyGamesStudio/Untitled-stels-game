@@ -336,6 +336,62 @@ namespace Stealth.Level
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
             r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && !HasStair(l, r.Id);
 
+        /// <summary>
+        /// Makes the vault's doorway wide enough for the round bank door (<see cref="LevelMetrics.VaultDoorWidth"/>):
+        /// where it is, or slid along its wall as little as possible — clear of the wall's ends, its other openings and the
+        /// stairs on both sides. False (nothing changed) when the wall has no such place.
+        /// </summary>
+        public static bool WidenVaultDoorway(LevelLayout l, int opening)
+        {
+            const float margin = 0.45f, width = LevelMetrics.VaultDoorWidth;
+            var plan = l.Plan;
+            var o = plan.Openings[opening];
+            var w = plan.Walls[o.Wall];
+            if (w.Railing || w.Shaped) return false;
+            float lo = margin + width / 2f, hi = w.Length - margin - width / 2f;
+            if (lo > hi) return false;
+            var tries = new List<float>();
+            float at0 = Mathf.Clamp(o.At, lo, hi);
+            for (float step = 0f; step <= hi - lo + 0.001f; step += HousePlan.Res)
+            {
+                if (at0 + step <= hi + 0.001f) tries.Add(at0 + step);
+                if (step > 0f && at0 - step >= lo - 0.001f) tries.Add(at0 - step);
+            }
+            var dir = w.Dir;
+            var n = new Vector2(-dir.y, dir.x);
+            foreach (float at in tries)
+            {
+                bool free = true;
+                for (int k = 0; k < plan.Openings.Count && free; k++)
+                {
+                    var p = plan.Openings[k];
+                    if (k == opening || p.Wall != o.Wall) continue;
+                    if (p.Kind == EdgeType.Open || Mathf.Abs(p.At - at) < (p.Width + width) / 2f + margin) free = false;
+                }
+                // the way through stays clear of the stairs on both sides
+                for (int k = 0; k < l.Stairs.Count && free; k++)
+                {
+                    var st = l.Stairs[k];
+                    if (st.Floor != w.Floor && st.Floor + 1 != w.Floor) continue;
+                    var area = PlanGenerator.StairArea(st, 0.1f);
+                    for (float u = -width / 2f; u <= width / 2f + 0.001f && free; u += HousePlan.Res)
+                        foreach (float side in new[] { -1f, 1f })
+                            if (area.Contains(w.At(at + u) + n * (side * 0.8f))) free = false;
+                }
+                if (!free) continue;
+                o.At = at;
+                o.Width = width;
+                plan.Openings[opening] = o;
+                var d = l.Doorways[opening];
+                var p3 = w.At(at);
+                d.Position = new Vector3(p3.x, d.Position.y, p3.y);
+                d.Width = width;
+                l.Doorways[opening] = d;
+                return true;
+            }
+            return false;
+        }
+
         static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
         {
             var plan = l.Plan;
@@ -359,8 +415,15 @@ namespace Stealth.Level
                 if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y) continue;
                 var w = plan.Walls[plan.Openings[i].Wall];
                 int outside = w.RoomA == v ? w.RoomB : w.RoomA;
+                var (oldOpening, oldDoorway) = (plan.Openings[i], l.Doorways[i]);
+                if (!WidenVaultDoorway(l, i)) continue;
                 var consoles = ConsolePlaces(l, v, outside);
-                if (consoles.Count < 3) continue;
+                if (consoles.Count < 3)
+                {
+                    plan.Openings[i] = oldOpening;
+                    l.Doorways[i] = oldDoorway;
+                    continue;
+                }
                 l.VaultRoom = v;
                 l.VaultDoorway = i;
                 foreach (var c in consoles)

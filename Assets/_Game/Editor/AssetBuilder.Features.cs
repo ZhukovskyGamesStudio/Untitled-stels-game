@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Stealth.Enemies;
 using Stealth.Items;
@@ -133,13 +134,28 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("VaultDoor");
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
-            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth, wall = LevelMetrics.WallThickness;
+            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.ClearWidth(LevelMetrics.VaultDoorWidth), wall = LevelMetrics.WallThickness;
             var door = root.AddComponent<AutoDoor>();
             door.Width = w;
+            // the steel ring through the wall: a collar on the corridor's face, the sleeve lining the bore, rivets
             var frame = Model("vault_frame");
             frame.transform.SetParent(root.transform, false);
-            frame.transform.localPosition = new Vector3(0f, 0f, -wall / 2f - 0.07f);
             Paint(frame, "Metal", "PropAccent", "PropAccent");
+            // the corners between the round bore and the rectangular doorway are wall: the bare wall's material here,
+            // the style's wall finish once StyleDecor dresses them (their +Z looks out of the wall)
+            var corners = WallCornerMeshes(w, LevelMetrics.DoorHeight, VaultBoreCentre, VaultBoreRadius + 0.005f, wall);
+            door.WallParts = new MeshRenderer[2];
+            for (int k = 0; k < 2; k++)
+            {
+                var part = Child(root.transform, k == 0 ? "WallFront" : "WallBack", new Vector3(0f, 0f, k == 0 ? -wall / 2f : wall / 2f));
+                if (k == 0) part.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                part.AddComponent<MeshFilter>().sharedMesh = corners.face;
+                var r = part.AddComponent<MeshRenderer>();
+                r.sharedMaterial = M("Wall");
+                door.WallParts[k] = r;
+            }
+            // and solid like a wall: the faces and the bore between them
+            root.AddComponent<MeshCollider>().sharedMesh = corners.collider;
             // the hinge at the doorway's +X edge, on the vault's side of the wall; the leaf turned to show its front to the corridor
             var hinge = Child(root.transform, "Hinge", new Vector3(1.1f, 0f, wall / 2f + 0.21f));
             var leaf = Model("vault_door");
@@ -157,6 +173,104 @@ namespace Stealth.EditorTools
             door.Padlocks = new Transform[0];
             Muffles(root, SoundMaterial.Door);
             return root;
+        }
+
+        /// <summary>The vault door's round bore through the wall (Tools/Blender/rooms2_special.py vault_frame): centre height and radius.</summary>
+        const float VaultBoreCentre = 1.15f, VaultBoreRadius = 1.135f;
+
+        /// <summary>
+        /// The wall round a round bore in a rectangular doorway (width × height, bottom centre at the origin): the face
+        /// (plane z = 0, looking along +Z; rectangle minus disc, a fan of quads from the circle to the rectangle with its
+        /// corners on the rays) and a collider (both faces at z = ±depth/2 and the bore's band between them).
+        /// </summary>
+        static (Mesh face, Mesh collider) WallCornerMeshes(float width, float height, float cy, float radius, float depth)
+        {
+            const int seg = 64;
+            float hw = width / 2f;
+            var angles = new List<float>();
+            for (int k = 0; k < seg; k++) angles.Add(2f * Mathf.PI * (k + 0.5f) / seg);
+            foreach (var c in new[] { new Vector2(hw, height), new Vector2(-hw, height), new Vector2(-hw, 0f), new Vector2(hw, 0f) })
+                angles.Add(Mathf.Repeat(Mathf.Atan2(c.y - cy, c.x), 2f * Mathf.PI));
+            angles.Sort();
+            Vector2 OnRect(float a)
+            {
+                var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float t = float.MaxValue;
+                if (Mathf.Abs(d.x) > 1e-6f) t = Mathf.Min(t, hw / Mathf.Abs(d.x));
+                if (d.y > 1e-6f) t = Mathf.Min(t, (height - cy) / d.y);
+                if (d.y < -1e-6f) t = Mathf.Min(t, cy / -d.y);
+                return new Vector2(0f, cy) + d * t;
+            }
+            Vector2 OnCircle(float a, float r) => new Vector2(Mathf.Cos(a) * r, cy + Mathf.Sin(a) * r);
+
+            void Tri(List<Vector3> v, List<int> tris, Vector3 a, Vector3 b, Vector3 c, Vector3 n)
+            {
+                int i = v.Count;
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), n) < 0f) (b, c) = (c, b);
+                v.Add(a); v.Add(b); v.Add(c);
+                tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+            }
+            void Face(List<Vector3> v, List<int> tris, float z, Vector3 n, float r)
+            {
+                for (int k = 0; k < angles.Count; k++)
+                {
+                    float a0 = angles[k], a1 = angles[(k + 1) % angles.Count];
+                    Vector2 c0 = OnCircle(a0, r), c1 = OnCircle(a1, r);
+                    Vector2 b0 = OnRect(a0), b1 = OnRect(a1);
+                    Vector3 P(Vector2 p) => new Vector3(p.x, p.y, z);
+                    Tri(v, tris, P(c0), P(c1), P(b1), n);
+                    Tri(v, tris, P(c0), P(b1), P(b0), n);
+                }
+            }
+
+            // the face: flat, UVs in metres (the finish replaces them by the wall's projection)
+            var fv = new List<Vector3>();
+            var ft = new List<int>();
+            Face(fv, ft, 0f, Vector3.forward, radius);
+            var face = new Mesh { name = "vault_wall" };
+            face.SetVertices(fv);
+            face.SetTriangles(ft, 0);
+            face.SetNormals(fv.ConvertAll(_ => Vector3.forward));
+            face.SetUVs(0, fv.ConvertAll(p => new Vector2(p.x, p.y)));
+            face.RecalculateTangents();
+            face.RecalculateBounds();
+
+            // the collider: both faces and the band round the bore (the passage's edge)
+            var cv = new List<Vector3>();
+            var ct = new List<int>();
+            Face(cv, ct, -depth / 2f, Vector3.back, radius - 0.005f);
+            Face(cv, ct, depth / 2f, Vector3.forward, radius - 0.005f);
+            for (int k = 0; k < angles.Count; k++)
+            {
+                float a0 = angles[k], a1 = angles[(k + 1) % angles.Count];
+                float r = radius - 0.005f;
+                Vector3 Q(float a, float z) => new Vector3(Mathf.Cos(a) * r, cy + Mathf.Sin(a) * r, z);
+                var inward = -new Vector3(Mathf.Cos((a0 + a1) / 2f), Mathf.Sin((a0 + a1) / 2f), 0f);
+                Tri(cv, ct, Q(a0, -depth / 2f), Q(a1, -depth / 2f), Q(a1, depth / 2f), inward);
+                Tri(cv, ct, Q(a0, -depth / 2f), Q(a1, depth / 2f), Q(a0, depth / 2f), inward);
+            }
+            var collider = new Mesh { name = "vault_wall_collider" };
+            collider.SetVertices(cv);
+            collider.SetTriangles(ct, 0);
+            collider.RecalculateNormals();
+            collider.RecalculateBounds();
+
+            EnsureFolder(Root + "/Art/Models/Level");
+            return (SaveMesh(face, Root + "/Art/Models/Level/vault_wall.asset"), SaveMesh(collider, Root + "/Art/Models/Level/vault_wall_collider.asset"));
+        }
+
+        /// <summary>A generated mesh as an asset at a fixed path (rewritten in place: references keep their GUID).</summary>
+        static Mesh SaveMesh(Mesh mesh, string path)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(mesh, path);
+                return mesh;
+            }
+            EditorUtility.CopySerialized(mesh, existing);
+            EditorUtility.SetDirty(existing);
+            return existing;
         }
 
         /// <summary>

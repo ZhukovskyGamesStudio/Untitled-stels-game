@@ -279,7 +279,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 **Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
 (`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
 **большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами;
-дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`, открывается внутрь и остаётся открытой; внутри — ячейки, полки с деньгами,
+дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`, открывается внутрь и остаётся открытой; проём хранилища шире (`LevelMetrics.VaultDoorWidth`, `HouseFeatures.WidenVaultDoorway` двигает его вдоль стены), стальное кольцо проходит сквозь стену, а углы между кругом и прямоугольником проёма — сама стена (`AutoDoor.WallParts` → `LevelShell.WallParts`: `StyleDecor` одевает их в отделку стены с её раскладкой, как пазухи арки; меши — `AssetBuilder.WallCornerMeshes`), у такого проёма нет обрамления и откосов стиля (`WallOpening.Vault`); внутри — ячейки, полки с деньгами,
 золото на поддонах и тележки, `Furnisher.VaultRoom`; запертые двери — с навесным замком `AutoDoor.Padlocks`, двери фасада — тяжёлые `LevelArt.ExteriorDoor`),
 три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
 `SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь открыта, внутри сокровища (`VaultTreasure`);

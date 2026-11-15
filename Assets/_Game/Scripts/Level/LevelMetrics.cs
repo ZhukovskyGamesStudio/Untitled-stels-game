@@ -14,6 +14,8 @@ namespace Stealth.Level
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
+        /// <summary>The vault's doorway (nominal): the round bank door (bore d 2.27 m) needs 2.4 m clear; the corners round it are wall.</summary>
+        public const float VaultDoorWidth = 2.6f;
         public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
         // A vent is a duct through the wall: its floor is a sill above the room's floor (a step for a player, a wall for a robot),
         // the clear height above the sill fits the crouched capsule (1.1 m) + the step-up probe (0.35); standing 1.8 m does not fit.

@@ -89,6 +89,22 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheVaultsRoundDoorGetsNoTrimAndNoReveals()
+        {
+            // its own steel ring and wall corners frame it: a style's casing, arch or reveal finish would clash with them
+            LevelShell ShellWith(bool vault)
+            {
+                var shell = new LevelShell();
+                shell.Openings.Add(new WallOpening { Center = Vector3.zero, Along = Vector3.right, Width = 2.4f, Height = LevelMetrics.DoorHeight, Vault = vault });
+                return shell;
+            }
+            var g = Everything(CeilingKind.None);
+            Assert.IsNotEmpty(ArchitecturePlanner.Plan(ShellWith(false), null, g), "an ordinary doorway is trimmed");
+            Assert.IsEmpty(ArchitecturePlanner.Plan(ShellWith(true), null, g), "the vault's is not");
+            Assert.AreEqual(ArchitecturePlanner.FrameReach, ArchitecturePlanner.ReachOf(ShellWith(true).Openings[0], g), "trims along the wall stop short of its ring");
+        }
+
+        [Test]
         public void TheShellRecordsWallsFloorsOpeningsAndWindows()
         {
             var shell = Shell(out var layout);

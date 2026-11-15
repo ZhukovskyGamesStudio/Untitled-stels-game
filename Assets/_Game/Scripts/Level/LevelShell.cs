@@ -47,6 +47,8 @@ namespace Stealth.Level
         public bool Vent, Exterior;
         /// <summary>A narrow slot with its own frame on both faces (Level/SqueezeFrame): no door trim of the style.</summary>
         public bool Squeeze;
+        /// <summary>The vault's round door: its own steel ring and wall corners, no trim, no reveals.</summary>
+        public bool Vault;
         public int Floor;
     }
 
@@ -59,6 +61,8 @@ namespace Stealth.Level
         public readonly List<WallFace> Walls = new();
         public readonly List<FloorRect> Floors = new();
         public readonly List<WallOpening> Openings = new();
+        /// <summary>Renderers that are the wall itself (<see cref="AutoDoor.WallParts"/>): <see cref="StyleDecor"/> dresses them in the wall finish.</summary>
+        public readonly List<MeshRenderer> WallParts = new();
         /// <summary>Window centres and yaws (see <see cref="LevelBuilder.WindowSpots"/>).</summary>
         public readonly List<(Vector3 pos, float yaw)> Windows = new();
         /// <summary>Furniture footprints for the map (x/z in metres, from the placed models).</summary>

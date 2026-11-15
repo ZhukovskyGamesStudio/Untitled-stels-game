@@ -237,33 +237,24 @@ def model_vault_door():
 
 
 def model_vault_frame():
-    """The square steel plate the round door sits in: 2.7 x 2.7, 0.08 thick, a round bore d 2.2 centred 1.15 up,
-    a chunky 0.12-deep collar round the bore (cut at the floor), rivets round the collar and the plate's edge.
-    Body = steel plate, Accent = dark steel collar and rivets."""
-    plate = s.rbox((2.7, 0.08, 2.7), (0, 0, 1.35), r=0.02, seg=2)
-    plate = s.boolean(plate, s.rcyl(1.135, 0.3, (0, 0, 1.15), axis="Y", seg=64, r=0, rot=(0, math.pi / 64, 0)),
-                      "DIFFERENCE")
-    s.part("Body", [plate])
-
-    collar = flat_ring(1.26, 1.105, 0.12, (0, 0, 1.15), axis="Y", seg=64, r=0.014)
-    collar = s.boolean(collar, s.rbox((3.0, 0.5, 1.0), (0, 0, -0.497), r=0), "DIFFERENCE")   # cut 3 mm over the floor
-    inner = flat_ring(1.2, 1.1, 0.13, (0, 0, 1.15), axis="Y", seg=64, r=0.01)   # the bore's lip, 5 mm proud each side
-    inner = s.boolean(inner, s.rbox((3.0, 0.5, 1.0), (0, 0, -0.494), r=0), "DIFFERENCE")
-    s.part("Accent", [collar, inner])
+    """The steel ring of the round door set into the wall (the wall's centre plane at y = 0, its faces at y = +-0.1;
+    +Y = the corridor): a chunky collar 0.1 proud of the corridor's face with a stepped lip round the bore, the sleeve
+    lining the bore d 2.27 (centre 1.15 up) through the wall and 1 cm out of the vault's face, rivets round the collar;
+    all cut at the floor. The corners between the bore and the doorway are wall (AssetBuilder.WallCornerMeshes).
+    Body = steel collar and sleeve, Accent = dark steel lip and rivets."""
+    cut = lambda bm, z: s.boolean(bm, s.rbox((3.0, 0.6, 1.0), (0, 0, z - 0.5), r=0), "DIFFERENCE")
+    collar = cut(flat_ring(1.26, 1.13, 0.105, (0, 0.1475, 1.15), axis="Y", seg=64, r=0.014), 0.003)  # y 0.095 .. 0.2
+    sleeve = cut(flat_ring(1.15, 1.135, 0.213, (0, -0.0045, 1.15), axis="Y", seg=64, r=0.004), 0.003)  # y -0.111 .. 0.102
+    s.part("Body", [collar, sleeve])
+    lip = cut(flat_ring(1.19, 1.125, 0.117, (0, 0.1565, 1.15), axis="Y", seg=64, r=0.01), 0.006)     # y 0.098 .. 0.215
+    s.part("Accent", [lip])
     acc = []
-    for k in range(20):
-        th = 2 * math.pi * (k + 0.5) / 20
-        x, z = 1.23 * math.cos(th), 1.15 + 1.23 * math.sin(th)
+    for k in range(24):
+        th = 2 * math.pi * (k + 0.5) / 24
+        x, z = 1.226 * math.cos(th), 1.15 + 1.226 * math.sin(th)
         if z < 0.06:
             continue
-        for y in (-0.062, 0.062):
-            acc.append(s.rcyl(0.018, 0.01, (x, y, z), axis="Y", seg=6, r=0))
-    for k in range(7):                                                # along the top and down the sides
-        u = -1.2 + 2.4 * k / 6
-        for p in ((u, 2.6), (-1.3, 0.25 + 2.3 * k / 6), (1.3, 0.25 + 2.3 * k / 6)):
-            if p[1] > 2.62 or (abs(p[0]) < 1.25 and p[1] < 2.5):
-                continue
-            acc.append(s.rcyl(0.018, 0.012, (p[0], -0.044, p[1]), axis="Y", seg=6, r=0))
+        acc.append(s.rcyl(0.016, 0.012, (x, 0.203, z), axis="Y", seg=8, r=0.003, bevel_seg=1))
     s.part("AccentRivets", acc)
     return export("vault_frame")
 

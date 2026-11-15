@@ -36,9 +36,14 @@ namespace Stealth.Level
         public static void Rebuild(StyleGeometry g, StyleKit kit, GameObject holder)
         {
             Clear();
+            var wallParts = ActiveLevel.Shell?.WallParts;
+            if (wallParts != null)
+                foreach (var r in wallParts)
+                    if (r != null) r.forceRenderingOff = false; // the bare wall's look until the finish takes over
             if (g == null || kit == null || holder == null || !g.HasArchitecture || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
             var root = ActiveLevel.Root.transform;
             var batcher = new MeshBatcher(root.worldToLocalMatrix);
+            if (g.Wall != null) AddWallParts(batcher, wallParts, g);
             foreach (var p in ArchitecturePlanner.Plan(ActiveLevel.Shell, ActiveLevel.Layout, g))
             {
                 bool finish = p.IsQuad;
@@ -88,6 +93,30 @@ namespace Stealth.Level
             var baked = batcher.Bake();
             foreach (var b in baked) s_Meshes.Add(b.Mesh);
             MeshBatcher.Spawn(baked, holder, root, "Decor", s_Batches);
+        }
+
+        /// <summary>
+        /// Parts of doors that are the wall itself (the corners round the vault's round door, <see cref="AutoDoor.WallParts"/>):
+        /// the wall finish with the wall's own texture layout, in the plane of the finish quads round the opening — the
+        /// door sits in the wall without a seam. Their own renderers (the bare wall's look) step aside.
+        /// </summary>
+        static void AddWallParts(MeshBatcher batcher, List<MeshRenderer> parts, StyleGeometry g)
+        {
+            if (parts == null) return;
+            foreach (var r in parts)
+            {
+                if (r == null || !r.TryGetComponent<MeshFilter>(out var mf) || !MeshBatcher.CanMerge(mf.sharedMesh)) continue;
+                var t = r.transform;
+                var n = t.forward; // the face looks out of the wall along the part's +Z
+                var wall = new WallProjection
+                {
+                    Right = Vector3.Cross(Vector3.up, -n), Normal = n, Across = ArchitecturePlanner.Across(Vector3.Cross(Vector3.up, -n)),
+                    Tile = g.WallTile, FloorY = t.position.y,
+                };
+                batcher.Add(MeshBatcher.ChunkOf(t.position), BatchLook.Of(r), g.Wall, mf.sharedMesh, 0,
+                    Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * t.localToWorldMatrix, null, wall);
+                r.forceRenderingOff = true;
+            }
         }
 
         static readonly Dictionary<GameObject, bool> s_Mergeable = new();
