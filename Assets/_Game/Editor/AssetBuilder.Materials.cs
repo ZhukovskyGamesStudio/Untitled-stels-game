@@ -17,40 +17,26 @@ namespace Stealth.EditorTools
         static Material M(string name) =>
             s_Mats.TryGetValue(name, out var m) ? m : throw new KeyNotFoundException($"Material {name} is not registered in BuildMaterials");
 
-        /// <summary>Loads or creates Art/Materials/<paramref name="category"/>/<paramref name="name"/>.mat.</summary>
-        /// <summary>
-        /// The spider's web: white threads on transparent (Art/Textures/Web/web_panel.png), faintly glowing so a careful
-        /// player sees it in a dark room, both sides drawn, blended (threads are thinner than a pixel from afar).
-        /// </summary>
+        /// <summary>The spider's web threads (Tools/Blender/web.py): pale silk with a faint glow.</summary>
         static Material WebMaterial()
         {
+            // the threads are geometry (Tools/Blender/web.py): opaque silk with a faint glow, so a careful player sees them
+            // in a dark room. (An alpha card of hair-thin threads read as a milky sheet: its mipmaps blend threads and air.)
             var mat = M("Web");
-            const string texPath = Root + "/Art/Textures/Web/web_panel.png";
-            if (AssetImporter.GetAtPath(texPath) is TextureImporter imp && (imp.wrapMode != TextureWrapMode.Clamp || !imp.alphaIsTransparency))
-            {
-                imp.wrapMode = TextureWrapMode.Clamp;
-                imp.alphaIsTransparency = true;
-                imp.mipmapEnabled = true;
-                imp.SaveAndReimport();
-            }
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
-            mat.SetTexture("_BaseMap", tex);
-            mat.SetColor("_BaseColor", new Color(0.85f, 0.95f, 1f, 1f));
-            mat.SetTexture("_EmissionMap", tex);
-            mat.SetColor("_EmissionColor", new Color(0.7f, 1.2f, 1.4f));
+            mat.SetTexture("_BaseMap", null);
+            mat.SetTexture("_EmissionMap", null);
+            mat.SetColor("_BaseColor", new Color(0.86f, 0.92f, 0.95f, 1f));
+            mat.SetColor("_EmissionColor", new Color(0.55f, 0.85f, 1f) * 1.2f);
             mat.EnableKeyword("_EMISSION");
             mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
-            mat.SetFloat("_Surface", 1f); // transparent
-            mat.SetFloat("_Blend", 0f);   // alpha
-            mat.SetOverrideTag("RenderType", "Transparent");
-            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
-            mat.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetFloat("_ZWrite", 0f);
-            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
-            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            mat.SetFloat("_Surface", 0f);
+            mat.SetOverrideTag("RenderType", "Opaque");
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.Zero);
+            mat.SetFloat("_ZWrite", 1f);
+            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = -1;
             EditorUtility.SetDirty(mat);
             return mat;
         }
@@ -180,6 +166,14 @@ namespace Stealth.EditorTools
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);
             Mat(props, "Gold", new Color(1f, 0.76f, 0.22f), smoothness: 0.8f); // the vault's bars, the padlocks
+            // the auto repair shop: customers' cars in glossy paint, tinted glass, the shop's red tools and yellow safety paint
+            Mat(props, "CarRed", new Color(0.55f, 0.06f, 0.05f), smoothness: 0.82f);
+            Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
+            Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
+            Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
+            Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
+            Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

@@ -93,6 +93,10 @@ namespace Stealth.Enemies
                 {
                     var view = Instantiate(Strand, w.A + dir * (length * k / pieces), Quaternion.LookRotation(dir), parent);
                     view.transform.localScale = new Vector3(1f, k % 2 == 0 ? 1f : -1f, length / pieces);
+                    // one of its variants (an orb, two small orbs, a tangle), the same on every peer
+                    var variants = view.GetComponentsInChildren<MeshRenderer>(true);
+                    int show = variants.Length > 0 ? (rng.Next(variants.Length)) : -1;
+                    for (int v = 0; v < variants.Length; v++) variants[v].enabled = v == show;
                     m_WebViews.Add(view);
                 }
             }

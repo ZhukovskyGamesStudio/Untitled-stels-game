@@ -178,13 +178,20 @@ namespace Stealth.EditorTools
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
-            // one wire of the spider's web: a thin glowing fibre a unit long along +Z (scaled to each wire), no collider, no shadow
+            // one metre of the spider's web along +Z (scaled to each wire), threads as geometry in three variants (Web0..2,
+            // Tools/Blender/web.py); SpiderBot lays pieces end to end and shows one variant each; no collider, no shadow
             var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
             {
-                // one 1 m x 0.5 m piece of cobweb along the wire (Tools/Art/generate_web.py); SpiderBot lays them end to end
                 var go = new GameObject("SpiderStrand");
-                var web = Cube(go.transform, "Web", new Vector3(0f, 0f, 0.5f), new Vector3(0.003f, 0.5f, 1f), WebMaterial(), false);
-                web.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var model = Model("web_piece");
+                model.transform.SetParent(go.transform, false);
+                var mat = WebMaterial();
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    r.sharedMaterial = mat;
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                foreach (var c in model.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
                 return go;
             });
             Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) =>
