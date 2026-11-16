@@ -97,7 +97,7 @@ namespace Stealth.Tests
             var robot = new Vector3(0f, 3f, 0f);
             var items = new List<Vector3>
             {
-                new(1f, 3f + 0.9f, 0f),   // on a desk: out of reach
+                new(1f, 3f + 1.65f, 0f),  // on a high shelf: out of reach (a desk is not: it lifts things off it)
                 new(4f, 3.02f, 0f),
                 new(0f, 0.02f, 1f),       // the floor below
                 new(-2f, 3.02f, 1f),      // nearest on its floor

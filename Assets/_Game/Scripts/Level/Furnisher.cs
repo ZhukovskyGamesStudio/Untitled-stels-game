@@ -25,6 +25,7 @@ namespace Stealth.Level
             [PropKind.Plant] = Rect.MinMaxRect(-0.35f, -0.35f, 0.35f, 0.35f),
             [PropKind.KitchenCounter] = Rect.MinMaxRect(-1.22f, -0.35f, 1.22f, 0.35f),
             [PropKind.Shelf] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
+            [PropKind.StorageRack] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
             [PropKind.Boxes] = Rect.MinMaxRect(-0.78f, -0.33f, 0.3f, 0.3f), // Unity mirrors X on import: the stack leans to −X
             [PropKind.WaterCooler] = Rect.MinMaxRect(-0.17f, -0.17f, 0.17f, 0.17f),
             [PropKind.Whiteboard] = Rect.MinMaxRect(-0.95f, -0.08f, 0.95f, 0.08f),
@@ -250,7 +251,7 @@ namespace Stealth.Level
             PropKind.DisplayCase, PropKind.PlanterLarge, PropKind.CracUnit, PropKind.TapeLibrary, PropKind.MetalShelving, PropKind.RadioRack,
             PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
             PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
-            PropKind.Pinball, PropKind.MedTable, PropKind.Workbench,
+            PropKind.Pinball, PropKind.MedTable, PropKind.Workbench, PropKind.StorageRack,
             PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
         };
 
@@ -2487,17 +2488,17 @@ namespace Stealth.Level
                     return Single(PropKind.TireStack, 0.85f);
                 case RoomType.Storage:
                     if (m_L.Kind == HouseKind.Garage && roll < 30) return Single(PropKind.TireRack, 2.1f); // the parts store keeps tyres too
-                    if (roll < 80)
+                    if (roll < 86)
                     {
-                        // shelves all round: loot on the upper boards from the start, the bottom board for the workers
-                        b.Add(PropKind.Shelf, f.P(0, BackOf(PropKind.Shelf)), f.Face);
-                        if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[1 + m_Rng.Next(2)]));
-                        foreach (float along in new[] { -0.5f, 0.5f })
-                            b.Drops.Add(new StorageDrop { Spot = f.P(along, BackOf(PropKind.Shelf), Enemies.CargoMotion.ShelfTop + 0.02f), Facing = -f.N, Shelf = true });
+                        // empty pallet racks all round (no boxes on them: the decks are for loot): now and then a thing
+                        // on an upper deck from the start, the bottom deck for the workers — three places along it
+                        b.Add(PropKind.StorageRack, f.P(0, BackOf(PropKind.StorageRack)), f.Face);
+                        if (Chance(0.5)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.StorageRack), ShelfLevels[1 + m_Rng.Next(2)]));
+                        foreach (float along in new[] { -0.62f, 0f, 0.62f })
+                            b.Drops.Add(new StorageDrop { Spot = f.P(along, BackOf(PropKind.StorageRack), Enemies.CargoMotion.ShelfTop + 0.02f), Facing = -f.N, Shelf = true });
                         return 2.05f;
                     }
-                    // the rest of the walls: steel shelving, boxes, drums, crates (the shelves above carry the workers' drops)
-                    if (roll < 86) { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                    // the rest of the walls: boxes, drums, crates
                     if (roll < 91) { b.Add(PropKind.Boxes, f.P(-0.2f, 0.45f), f.Face + m_Rng.Next(4) * 90f); return 1.2f; }
                     if (roll < 95) return Single(PropKind.DrumPair, 0.95f);
                     if (roll < 98) { Single(PropKind.CrateStack, 1.25f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.CrateStack), 1.385f)); return 1.25f; }

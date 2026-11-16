@@ -18,6 +18,8 @@ namespace Stealth.Items
         public float MinSpacing = 1.5f;
         [Tooltip("Chance of an item to be hidden in a drawer or a locker instead (it appears when that part is opened).")]
         [Range(0, 1)] public float InStorageChance = 0.3f;
+        [Tooltip("Share of the loot lying on the floor (open floor of a room, clear of the furniture) instead of on desks and shelves: dropped, forgotten — and what the workers pick up first.")]
+        [Range(0, 1)] public float FloorShare = 0.25f;
         [Tooltip("What the loot is (shape id and weight): shovel, flashlight, battery. Empty = shovels only.")]
         public ItemCatalog.LootWeight[] Table = { new() { Item = "shovel", Weight = 1 } };
 
@@ -75,6 +77,7 @@ namespace Stealth.Items
 
             int want = ItemCount(l, s);
             var result = new List<Loot>();
+            var onFloor = FloorLoot(l, s, spacing);
             var behind = KeyRegions(l);
             int RegionOf(Vector3 p)
             {
@@ -132,7 +135,10 @@ namespace Stealth.Items
             int floor = 0, misses = 0;
             while (result.Count < want && misses < l.Floors)
             {
+                // now and then off the floor of a room instead of a desk or a shelf
                 var spots = byFloor[floor];
+                var loose = onFloor[floor];
+                if (loose.Count > 0 && (spots.Count == 0 || rng.NextDouble() < s.FloorShare)) spots = loose;
                 floor = (floor + 1) % l.Floors;
                 bool placed = false;
                 while (spots.Count > 0 && !placed)
@@ -149,6 +155,49 @@ namespace Stealth.Items
             return result;
         }
 
+        /// <summary>
+        /// Spots on the open floor for <see cref="LootSettings.FloorShare"/>, by floor: one per room (not the lobby with its
+        /// hatch, the storage room — the workers' — or the vault), not by a hatch.
+        /// </summary>
+        static List<List<Vector3>> FloorLoot(LevelLayout l, LootSettings s, float spacing)
+        {
+            var byFloor = new List<List<Vector3>>();
+            for (int f = 0; f < l.Floors; f++) byFloor.Add(new List<Vector3>());
+            if (s.FloorShare <= 0f || l.Plan == null) return byFloor;
+            var one = new HashSet<int>();
+            foreach (var r in l.Plan.Rooms)
+            {
+                if (r.Id == l.LobbyRoom || r.Id == l.StorageRoom || r.Id == l.VaultRoom || r.Area < 6f) continue;
+                one.Clear();
+                one.Add(r.Id);
+                foreach (var p in FloorSpots(l, one, 1, spacing))
+                {
+                    if (Flat(p - l.HatchPosition) < 2.5f || Flat(p - l.ExitHatchPosition) < 2.5f) continue;
+                    byFloor[Mathf.Clamp(r.Floor, 0, l.Floors - 1)].Add(p);
+                }
+            }
+            return byFloor;
+        }
+
+        static float Flat(Vector3 d) => new Vector2(d.x, d.z).magnitude;
+
+        /// <summary>A point on the floor clear of every piece of furniture on it: outside its footprint grown by <paramref name="margin"/>.</summary>
+        public static bool ClearOfFurniture(LevelLayout l, Vector3 p, int floor, float margin)
+        {
+            foreach (var prop in l.Props)
+            {
+                if (LevelLayout.FloorOf(prop.Position.y + 0.1f) != floor) continue;
+                var d = p - prop.Position;
+                if (d.x * d.x + d.z * d.z > 9f) continue; // nothing is 3 m from its middle to its edge
+                var local = Quaternion.Euler(0f, -prop.RotationY, 0f) * new Vector3(d.x, 0f, d.z);
+                float k = prop.Scale > 0f ? prop.Scale : 1f;
+                var f = Furnisher.FootprintOf(prop.Kind);
+                if (local.x >= f.xMin * k - margin && local.x <= f.xMax * k + margin && local.z >= f.yMin * k - margin && local.z <= f.yMax * k + margin)
+                    return false;
+            }
+            return true;
+        }
+
         /// <summary>The parts of the house behind each key door (the key is a detour: things worth it lie there). One set of room ids per door.</summary>
         public static List<HashSet<int>> KeyRegions(LevelLayout l)
         {
@@ -158,8 +207,8 @@ namespace Stealth.Items
         }
 
         /// <summary>
-        /// Up to <paramref name="count"/> spots on the floor of these rooms, clear of the furniture (0.8 m from any piece's
-        /// middle, 0.6 m from the walls) and apart from each other — for a room that has nothing to lay a thing on.
+        /// Up to <paramref name="count"/> spots on the floor of these rooms, clear of the furniture (0.35 m round any piece's
+        /// footprint, 0.6 m from the walls) and apart from each other — for a room that has nothing to lay a thing on.
         /// </summary>
         public static List<Vector3> FloorSpots(LevelLayout l, HashSet<int> rooms, int count, float spacing)
         {
@@ -185,10 +234,7 @@ namespace Stealth.Items
                         if (plan.RoomAt(new Vector3(q.x + d.x, y + 0.3f, q.y + d.y))?.Id != id) { inside = false; break; }
                     if (!inside) continue;
                     var p = new Vector3(q.x, y + 0.02f, q.y);
-                    bool clear = true;
-                    foreach (var prop in l.Props)
-                        if (LevelLayout.FloorOf(prop.Position.y) == r.Floor && (new Vector2(prop.Position.x - q.x, prop.Position.z - q.y)).magnitude < 0.8f) { clear = false; break; }
-                    if (!clear || found.Exists(o => (o - p).magnitude < spacing)) continue;
+                    if (!ClearOfFurniture(l, p, r.Floor, 0.35f) || found.Exists(o => (o - p).magnitude < spacing)) continue;
                     found.Add(p);
                 }
             }

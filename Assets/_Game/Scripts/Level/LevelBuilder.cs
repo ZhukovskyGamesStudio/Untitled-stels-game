@@ -146,6 +146,7 @@ namespace Stealth.Level
                 // the shop's doors are steel; its paint booth's is wide, for a car
                 bool shop = l.Kind == HouseKind.Garage;
                 var prefab = vault ? m_Art.VaultDoor
+                    : i == l.StorageDoor && StorageRooms.Locked(l) && m_Art.StorageDoor != null ? m_Art.StorageDoor
                     : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
                     : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor : m_Art.AutoDoor;
                 var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();

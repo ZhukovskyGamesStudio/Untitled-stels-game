@@ -88,12 +88,14 @@ namespace Stealth.Enemies
         // one down-and-up swing of the worker's lift (CargoMotion), from the network pulse
         float m_SwingT = -1f, m_SwingTime = 1f, m_Bow, m_Dip;
         SwingKind m_Swing;
+        float m_Surface;
 
         /// <summary>Every peer: the lift swings down and back up in <paramref name="seconds"/> (picking up, setting down, shelving).</summary>
-        public void HandleCargo(SwingKind kind, float seconds)
+        public void HandleCargo(SwingKind kind, float seconds, float surface = -1f)
         {
             if (LiftArm == null || LiftTray == null) return;
             m_Swing = kind;
+            m_Surface = surface >= 0f ? surface : CargoMotion.Surface(kind);
             m_SwingTime = Mathf.Max(seconds, 0.1f);
             m_SwingT = 0f;
         }
@@ -104,7 +106,7 @@ namespace Stealth.Enemies
             if (LiftArm == null || LiftTray == null || m_SwingT < 0f) return;
             float before = m_SwingT;
             m_SwingT = Mathf.Min(m_SwingT + dt / m_SwingTime, 1f);
-            var pose = CargoMotion.At(m_SwingT, m_Swing);
+            var pose = CargoMotion.At(m_SwingT, m_Swing, m_Surface);
             LiftArm.localRotation = Quaternion.Euler(pose.Arm, 0f, 0f);
             LiftTray.localPosition = pose.Tray; // the tray stays level
             // the loot stays put on the floor while the tray slides under it / out from under it
@@ -114,7 +116,7 @@ namespace Stealth.Enemies
             m_Bow = pose.Bow;
             m_Dip = pose.Dip;
             if (CargoMotion.Touched(before, m_SwingT))
-                Audio.Sfx.At(m_Swing == SwingKind.Pickup ? Audio.Sfx.Bank?.Pickup : Audio.Sfx.Bank?.Drop, LiftTray.position, 0.8f, Audio.Sfx.Group.Robots);
+                Audio.Sfx.At(m_Swing is SwingKind.Pickup or SwingKind.Lift ? Audio.Sfx.Bank?.Pickup : Audio.Sfx.Bank?.Drop, LiftTray.position, 0.8f, Audio.Sfx.Group.Robots);
             if (m_SwingT >= 1f) m_SwingT = -1f;
         }
 

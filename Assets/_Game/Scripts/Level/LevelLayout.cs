@@ -81,7 +81,9 @@ namespace Stealth.Level
         DepositWall, GoldPallet, MoneyCart, CashShelf,
         // the auto repair shop (Tools/Blender/garage.py): customers' cars, the lifts, the shop's equipment, the bays' doors and lines
         CarParked, CarHoodOpen, LiftCar, LiftEmpty, CarOnStands, ToolChest, TireChanger, WheelBalancer, TireRack, TireStack,
-        EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack }
+        EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack,
+        // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
+        StorageRack }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
