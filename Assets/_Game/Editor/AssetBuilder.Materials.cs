@@ -17,7 +17,30 @@ namespace Stealth.EditorTools
         static Material M(string name) =>
             s_Mats.TryGetValue(name, out var m) ? m : throw new KeyNotFoundException($"Material {name} is not registered in BuildMaterials");
 
-        /// <summary>Loads or creates Art/Materials/<paramref name="category"/>/<paramref name="name"/>.mat.</summary>
+        /// <summary>The spider's web threads (Tools/Blender/web.py): pale silk with a faint glow.</summary>
+        static Material WebMaterial()
+        {
+            // the threads are geometry (Tools/Blender/web.py): opaque silk with a faint glow, so a careful player sees them
+            // in a dark room. (An alpha card of hair-thin threads read as a milky sheet: its mipmaps blend threads and air.)
+            var mat = M("Web");
+            mat.SetTexture("_BaseMap", null);
+            mat.SetTexture("_EmissionMap", null);
+            mat.SetColor("_BaseColor", new Color(0.86f, 0.92f, 0.95f, 1f));
+            mat.SetColor("_EmissionColor", new Color(0.55f, 0.85f, 1f) * 1.2f);
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+            mat.SetFloat("_Surface", 0f);
+            mat.SetOverrideTag("RenderType", "Opaque");
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.Zero);
+            mat.SetFloat("_ZWrite", 1f);
+            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = -1;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         static Material Mat(string category, string name, Color color, Color? emission = null, bool unlit = false, float smoothness = 0.25f)
         {
             var dir = $"{MaterialsDir}/{category}";
@@ -142,6 +165,15 @@ namespace Stealth.EditorTools
             // the themed rooms' furniture (AssetBuilder.Rooms)
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);
+            Mat(props, "Gold", new Color(1f, 0.76f, 0.22f), smoothness: 0.8f); // the vault's bars, the padlocks
+            // the auto repair shop: customers' cars in glossy paint, tinted glass, the shop's red tools and yellow safety paint
+            Mat(props, "CarRed", new Color(0.55f, 0.06f, 0.05f), smoothness: 0.82f);
+            Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
+            Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
+            Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
+            Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
+            Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

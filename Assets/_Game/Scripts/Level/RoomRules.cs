@@ -142,6 +142,9 @@ namespace Stealth.Level
             new RoomRule(RoomType.LockerRoom, new Vector2(16f, 50f), zone: RoomZone.Interior, perHouse: 1),
             new RoomRule(RoomType.Infirmary, new Vector2(18f, 50f), perHouse: 1),
             new RoomRule(RoomType.GameRoom, new Vector2(26f, 100f), perHouse: 1, privacy: -1),
+            // the auto repair shop's own rooms: never drawn by the program (no weight), laid out by PlanGenerator.Garage
+            new RoomRule(RoomType.Workshop, new Vector2(80f, 700f), perHouse: 1),
+            new RoomRule(RoomType.PaintBooth, new Vector2(20f, 80f), zone: RoomZone.Interior, perHouse: 1),
         };
 
         /// <summary>The rule of a type, or one without limits.</summary>
@@ -196,12 +199,12 @@ namespace Stealth.Level
         {
             foreach (var r in plan.Rooms)
             {
-                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall || Holds(plan, r, r.Type, rules)) continue;
+                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Workshop or RoomType.PaintBooth || Holds(plan, r, r.Type, rules)) continue;
                 bool swapped = false;
                 if (r.Type != RoomType.Storage) // the storage room's place is its own (one door: StorageRooms)
                     foreach (var o in plan.Rooms)
                     {
-                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage || o.Type == r.Type) continue;
+                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth || o.Type == r.Type) continue;
                         if (!Holds(plan, o, r.Type, rules) || !Holds(plan, r, o.Type, rules)) continue;
                         (o.Type, r.Type) = (r.Type, o.Type);
                         swapped = true;

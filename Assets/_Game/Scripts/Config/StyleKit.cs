@@ -14,6 +14,16 @@ namespace Stealth.Configs
         [Tooltip("Indexed by DecorKind; the finish kinds use the Finish quad")]
         public GameObject[] Pieces = new GameObject[0];
         public GameObject Finish;
+        [Tooltip("The bank vault's steel wall cladding and floor plate (every style: a vault looks like a vault)")]
+        public Material VaultWall, VaultFloor;
+        [Tooltip("Metres one texture repeat covers on the vault's walls / floor")]
+        public float VaultWallTile = 2f, VaultFloorTile = 1f;
+        [Tooltip("The metal strip over a doorway where two different floors meet")]
+        public Material Threshold;
+        [Tooltip("The auto repair shop in every style (Level.ShopLook): painted block walls with a dark band low, an epoxy floor, a metal deck overhead")]
+        public Material ShopWall, ShopWallLower, ShopFloor, ShopCeiling;
+        [Tooltip("The shop's paint booth: white filter panels on the walls and overhead, a steel grating underfoot")]
+        public Material BoothWall, BoothFloor, BoothCeiling;
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

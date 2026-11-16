@@ -19,6 +19,10 @@ namespace Stealth.Level
 
         [Tooltip("The glowing screens (kept out of the merged furniture by their property block).")]
         public Renderer Screens;
+        [Tooltip("The robots' control console (hacking, cameras) and the storage door's access kiosk: the one for its kind shows.")]
+        public GameObject Console, Access;
+        [Tooltip("The kiosk's screen and beacon.")]
+        public Renderer AccessScreens;
 
         /// <summary>Hacks left on a terminal (set by the game: index in the layout's props → charges left).</summary>
         public static System.Func<int, int> ChargesLeft = _ => 0;
@@ -44,6 +48,11 @@ namespace Stealth.Level
         {
             Index = index;
             Kind = kind;
+            // the door's terminal is a kiosk, never mistaken for the robots' console
+            bool access = kind == TerminalKind.Doors && Access != null;
+            if (Console != null) Console.SetActive(!access);
+            if (Access != null) Access.SetActive(access);
+            if (access && AccessScreens != null) Screens = AccessScreens;
             m_Shown = -1;
             Show();
         }

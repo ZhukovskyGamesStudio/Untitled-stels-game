@@ -416,32 +416,45 @@ def listener(L):
 
 
 def worker(L):
-    """Scrap crane: a lopsided boiler on knobbly wheels with a smokestack, a gallows crane of square tube hanging the
-    strapped loot crate in front, a caged headlamp."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", comic_wheel(L, c, .12, .1))
-        P.add("Accent", L.rod((c[0] * .55, c[1], .12), (c[0] * .9, c[1], .12), .03))
-    P.add("Body", plate((.48, .66, .08), (0, 0, .17)))
-    P.add("Body", L.loft([(.18, .22, .24, 2.4, 0, .1), (.4, .25, .27, 2.4, .02, .12), (.62, .22, .24, 2.4, .04, .16),
-                          (.75, .14, .16, 2.4, .05, .18)], round_caps=.04))
-    P.add("Accent", L.loft([(.38, .26, .28, 2.4, .02, .12), (.43, .265, .285, 2.4, .02, .12)]))
-    P.add("Body", L.cyl(.05, .4, (.14, .28, .9)) + L.cyl(.07, .06, (.14, .28, 1.1), radius2=.05))
-    P.add("Body", L.rod((-.17, .28, .5), (-.17, .24, 1.6), .035) + L.rod((-.17, .24, 1.6), (0, -.18, 1.6), .035)
-          + L.rod((-.17, .28, 1.2), (-.04, -.1, 1.6), .022))
-    P.add("Accent", L.rod((0, -.15, 1.62), (0, -.15, 1.33), .015) + L.cyl(.05, .03, (0, -.15, 1.52), axis="X"))
-    P.add("Accent", [s.rbox((.5, .42, .36), (0, -.15, 1.15), r=.025, seg=1)])
-    for sx in (-1, 1):
-        P.add("Body", plate((.06, .44, .38), (sx * .21, -.15, 1.15)))
-        P.add("Body", [align(s.rbox((.05, .025, .5), r=.008, seg=1), (sx * .22, -.37, .99), (-sx * .22, -.37, 1.31))])
-    P.add("Accent", L.rod((0, -.12, .45), (0, -.32, .49), .03))
-    P.add("Accent", L.cyl(.075, .08, (0, -.35, .5), axis="Y"))
-    P.add("Eye", L.cyl(.06, .02, (0, -.39, .5), axis="Y", seg=12))
-    for k in (-1, 0, 1):
-        P.add("Accent", [s.rbox((.012, .02, .16), (k * .035, -.405, .5), r=0, seg=1)])
-    P.add("Accent", plate((.04, .3, .2), (.27, .1, .45), rot=(.2, 0, 0)))
-    return P
+    """Scrap hauler: a riveted plate deck on knobbly wheels with a tyre for a front bumper, a gas-mask snout with two
+    goggle lamps, a lopsided riveted boiler for a mast with a smokestack and a spike, a caged lamp on top."""
+    def deck(L, P):
+        P.add("Body", plate((.5, .74, .16), (0, 0, .21)))
+        P.add("Body", plate((.7, .8, .07), (0, 0, .29)))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.rod((x * .55, y, .12), (x * .9, y, .12), .03))
+        P.add("Accent", tyre(.12, .045, .045, (0, -.4, .22), (0, 1, 0), m=16, n=6))                       # tyre bumper
+        P.add("Accent", plate((.62, .06, .12), (0, .41, .22)))
+        P.add("Body", rivets([(x, .445, z) for x in (-.26, -.13, 0, .13, .26) for z in (.19, .25)], r=.014))
+
+    def pod(L, P):
+        P.add("Body", plate((.46, .32, .3), (0, -.22, .47)))
+        P.add("Body", plate((.3, .2, .05), (.05, -.2, .64), rot=(0, .12, 0)))                            # tacked-on lid
+        for sx in (-1, 1):
+            acc, glow = goggle(.05, (sx * .15, -.375, .39), (sx * .25, -1, 0), .04)
+            P.add("Accent", acc).add("Eye", glow)
+        P.add("Body", rivets([(x, -.385, z) for x in (-.2, .2) for z in (.35, .6)], r=.014))
+        D.worker_shoulders(L, P, inner=.2)
+
+    def mast(L, P):
+        P.add("Body", L.loft([(.3, .2, .14, 2.4, 0, .23), (.6, .22, .15, 2.4, .01, .23), (1.0, .2, .14, 2.4, .02, .24),
+                              (1.24, .15, .11, 2.4, .03, .25)], round_caps=.04))                          # the boiler
+        P.add("Accent", L.loft([(.58, .225, .155, 2.4, .01, .23), (.63, .225, .155, 2.4, .01, .23)]))     # seam band
+        P.add("Body", rivets([(.01 + .23 * math.cos(a), .23 + .16 * math.sin(a), .605) for a in [k / 10 * math.tau for k in range(10)]], r=.016))
+        P.add("Body", plate((.16, .03, .22), (-.1, .095, .85), rot=(0, .15, 0)))                          # patch
+        P.add("Accent", L.cyl(.05, .4, (-.1, .32, 1.2)) + L.cyl(.07, .05, (-.1, .32, 1.42), radius2=.05))  # smokestack
+        P.add("Accent", spike((.12, .3, 1.15), (0, 0, 1), .14, .03))
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.065, .04, (.02, .25, 1.25)))
+        P.add("Eye", L.cyl(.045, .07, (.02, .25, 1.3)))
+        for k in range(3):
+            a = k / 3 * math.tau
+            P.add("Accent", L.rod((.02 + .05 * math.cos(a), .25 + .05 * math.sin(a), 1.26),
+                                  (.02 + .05 * math.cos(a), .25 + .05 * math.sin(a), 1.35), .008))
+        P.add("Accent", L.cyl(.06, .02, (.02, .25, 1.355)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon, wheel=lambda c, r, w: comic_wheel(L, c, r, w))
 
 
 def sweeper(L):

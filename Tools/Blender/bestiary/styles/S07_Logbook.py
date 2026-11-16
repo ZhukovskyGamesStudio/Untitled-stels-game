@@ -411,32 +411,49 @@ def listener(L):
 
 
 def worker(L):
-    """Davit crane: a squat deck cart with a little funnel, a curved davit arm from the stern swinging over the bow,
-    the crate hanging from it on ropes."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.loft([(0, .0, .0), (.05, .22, .12, 2.6), (.15, .3, .17, 2.6), (.62, .3, .18, 2.6), (.78, .26, .15, 2.6)],
-                         axis="-Y", loc=(0, .39, .36)))
-    P.add("Accent", L.box((.64, .76, .05), (0, 0, .53), r=.02))
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Accent", L.rod((x * .6, y, .12), (x * 1.12, y, .12), .03))
-    for y in (-.25, .25):
-        P.add("Body", L.box((.56, .1, .1), (0, y, .16), r=.025))                                   # axle beams
-    P.add("Body", L.lathe([(0, .5), (.12, .5), (.11, .86), (.14, .9), (.14, .96), (0, .96)], loc=(-.15, .24, 0)))  # funnel
-    P.add("Accent", L.hoop(.115, .115, .8, loc=(-.15, .24, 0), t=.03))
-    # the davit: a thick curved arm from the stern post over the bow
-    arm = [(.14, .26, .5), (.14, .26, 1.3), (.14, .16, 1.6), (.12, -.05, 1.68), (.06, -.15, 1.64)]
-    P.add("Body", [s.tube(arm, .075, res=3)])
-    P.add("Body", L.lathe([(0, .5), (.13, .5), (.1, .62), (0, .63)], loc=(.14, .26, 0)))
-    P.add("Accent", L.ball(.08, (.03, -.15, 1.6)))                                                 # pulley block
-    for sx in (-1, 1):
-        P.add("Accent", L.rope([(.03, -.15, 1.54), (sx * .17, -.15, 1.31)], r=.02))
-    P.add("Accent", L.box((.46, .42, .36), (0, -.15, 1.15), r=.03))                                 # crate
-    for z in (1.02, 1.28):
-        P.add("Accent", L.box((.48, .44, .04), (0, -.15, z), r=.01))
-    acc, glow = L.porthole(.045, (0, -.38, .44), bolts=6)
-    P.add("Accent", acc).add("Eye", glow)
-    return P
+    """Deck tender: a little planked hull on wheels with rope fenders, a brass diving helmet for a snout (two small
+    portholes under the camera), a stub ship's mast with a yard and a lantern for a mast and beacon, a ventilator cowl
+    and a lashed cask behind it; the tray rests on a bracket off the mast."""
+    def deck(L, P):
+        P.add("Body", L.loft([(0, .2, .06, 2.6), (.08, .3, .1, 2.6), (.7, .3, .1, 2.6), (.8, .24, .08, 2.6)],
+                             axis="-Y", loc=(0, .4, .25)))                                           # the hull
+        P.add("Accent", L.box((.64, .76, .04), (0, 0, .33), r=.015))                                 # planked deck
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.rod((x * .6, y, .12), (x * 1.08, y, .12), .03))
+        for sy in (-1, 1):
+            P.add("Accent", L.rope([(-.26, sy * .41, .26), (0, sy * .43, .24), (.26, sy * .41, .26)], r=.03))  # fenders
+
+    def pod(L, P):
+        P.add("Body", L.ball(.2, (0, -.23, .5)))                                                     # the helmet
+        P.add("Accent", L.cyl(.21, .06, (0, -.23, .34)))                                             # its collar
+        for sx in (-1, 1):
+            acc, glow = L.porthole(.04, (sx * .13, -.335, .39))
+            P.add("Accent", acc).add("Eye", glow)
+        D.worker_shoulders(L, P, inner=.15)
+
+    def mast(L, P):
+        P.add("Body", L.cyl(.06, 1.0, (0, .16, .83)))                                                # stub mast
+        P.add("Accent", L.cyl(.08, .06, (0, .16, .36)))                                              # its step
+        P.add("Body", L.rod((-.22, .16, 1.18), (.22, .16, 1.18), .025))                              # the yard
+        P.add("Accent", L.rope([(-.21, .16, 1.17), (-.2, .2, .7), (-.18, .26, .34)], r=.012))       # shrouds
+        P.add("Accent", L.rope([(.21, .16, 1.17), (.2, .2, .7), (.18, .26, .34)], r=.012))
+        pipe, _ = L.cowl((-.12, .27, .32), 1.0, (-1, 0, 0), r=.06, mouth=.14)
+        P.add("Accent", pipe)
+        P.add("Body", barrel(.13, .5, (.13, .26, .58)))                                              # cask
+        P.add("Accent", rope_coil(.09, .02, (.13, .26, .83), turns=2))
+
+    def dock(L, P):
+        z = D.worker_clear_z(-.08) - .02
+        P.add("Accent", L.box((.4, .2, .04), (0, .02, z)))
+        P.add("Accent", L.box((.08, .1, .12), (0, .1, z - .07)))                                    # bracket off the mast
+        D.worker_cradle(L, P)
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.06, .03, (0, .16, 1.345)))
+        P.add("Eye", L.cyl(.042, .08, (0, .16, 1.4)))
+        P.add("Accent", L.cyl(.055, .025, (0, .16, 1.45)) + L.hoop(.044, .044, 1.4, loc=(0, .16, 0), t=.006))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, dock=dock, beacon=beacon)
 
 
 def sweeper(L):

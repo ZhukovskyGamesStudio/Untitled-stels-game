@@ -114,6 +114,20 @@ namespace Stealth.UI
         public bool Done;
     }
 
+    /// <summary>When the screen stays black while a location is set up (pure, unit tested).</summary>
+    public static class LoadingRules
+    {
+        /// <summary>Seconds after which the screen opens even if something never arrived (a lost message must not leave it black).</summary>
+        public const float GiveUp = 10f;
+
+        /// <summary>
+        /// Black until this peer has its player, the player stands where the location put them (no jump from the network's
+        /// spawn point to the real one) and, in the sewer, the car is there; <paramref name="waited"/> — seconds it has been black.
+        /// </summary>
+        public static bool StillLoading(bool hasPlayer, bool placed, bool inSewer, bool carHere, float waited) =>
+            waited < GiveUp && (!hasPlayer || !placed || (inSewer && !carHere));
+    }
+
     public static class ObjectiveRules
     {
         /// <summary>
@@ -199,6 +213,8 @@ namespace Stealth.UI
             Level.UseKind.VaultConsole => ReticleIcon.Terminal,
             Level.UseKind.Cage => ReticleIcon.Key,
             Level.UseKind.HandDryer => ReticleIcon.Hand,
+            Level.UseKind.LightSwitch => ReticleIcon.Hand,
+            Level.UseKind.VaultDoor => ReticleIcon.Lever,
             _ => ReticleIcon.Dot,
         };
     }

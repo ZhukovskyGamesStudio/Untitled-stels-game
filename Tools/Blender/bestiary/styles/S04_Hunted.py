@@ -454,34 +454,50 @@ def listener(L):
 
 
 def worker(L):
-    """The butler's tea trolley: two railed tiers on turned brass posts and four little wheels, a steamer trunk with
-    straps on the top tier, a bowler-hatted head on a tall neck behind it, a carriage lamp at the front."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Accent", L.rod((x * .75, y, .12), (x * 1.1, y, .12), .02))
-        P.add("Accent", L.lathe([(.025, .12), (.035, .3), (.025, .5), (.035, .7), (.025, .94)], loc=(x * .75, y, 0)))   # turned posts
-    P.add("Body", L.box((.54, .62, .04), (0, 0, .32), r=.012))                                               # lower shelf
-    P.add("Body", L.box((.56, .64, .04), (0, 0, .93), r=.012))                                               # tray
-    P.add("Accent", [s.tube([(-.28, -.33, .95), (-.28, .33, .95), (.28, .33, .95), (.28, -.33, .95), (-.28, -.33, .95)], .012, smooth=False)])
-    # the steamer trunk (crate): a domed lid, leather straps, brass corners
-    P.add("Accent", L.box((.48, .4, .24), (0, -.15, 1.07), r=.02))
-    P.add("Accent", L.loft([(0, .2, .12, 3.0), (.44, .2, .12, 3.0)], axis="X", loc=(-.22, -.15, 1.19)))
-    for x in (-.12, .12):
-        P.add("Accent", L.box((.05, .42, .3), (x, -.15, 1.13), r=.012))
-    # the butler: a post neck, a gaunt head, a bowler, a monocle
-    P.add("Body", L.lathe([(.04, .95), (.05, 1.2), (.035, 1.42)], loc=(0, .24, 0)))
-    P.add("Body", L.loft([(1.4, .0, .0), (1.42, .07, .08, 2.0), (1.5, .09, .1, 2.0), (1.6, .08, .09, 2.0), (1.63, .0, .0)], loc=(0, .22, 0)))
-    crown, band = L.bowler((0, .22, 1.6), r=.095, h=.1)
-    P.add("Body", crown).add("Accent", band)
-    acc, glow = L.monocle(.032, (.035, .115, 1.52), chain=False)
-    P.add("Accent", acc).add("Eye", glow)
-    for sx in (-1, 1):
-        P.add("Body", L.rod((sx * .06, .24, 1.3), (sx * .2, .1, 1.24), .025) + L.ball(.035, (sx * .2, .08, 1.22)))
-    P.add("Accent", L.rod((0, -.31, .34), (0, -.36, .45), .012))
-    P.add("Accent", L.lathe([(0, .38), (.06, .38), (.065, .42), (.05, .43), (.05, .5), (.065, .51), (.03, .55), (0, .56)], loc=(0, -.38, 0)))
-    P.add("Eye", L.lathe([(0, .42), (.055, .42), (.055, .5), (0, .5)], loc=(0, -.38, 0)))
-    return P
+    """The longcase porter: a mahogany trolley deck with a brass rail and brass bumpers, a carriage-lamp snout with two
+    monocle lamps, a grandfather-clock case for a mast (its pocket-watch face looks ahead under the tray), a brass
+    carriage lantern under a bowler on top for a beacon."""
+    def deck(L, P):
+        P.add("Body", L.box((.5, .74, .16), (0, 0, .21)))
+        P.add("Body", L.box((.7, .8, .05), (0, 0, .3), r=.012))
+        P.add("Accent", [s.tube([(-.335, -.385, .335), (-.335, .385, .335), (.335, .385, .335), (.335, -.385, .335),
+                                 (-.335, -.385, .335)], .012, smooth=False)])                        # brass gallery rail
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.cyl(.03, .12, (x * .78, y, .12), axis="X"))
+        for sy in (-1, 1):
+            P.add("Accent", L.rod((-.32, sy * .42, .21), (.32, sy * .42, .21), .03))                 # brass bumper bars
+            for sx in (-1, 1):
+                P.add("Accent", L.rod((sx * .2, sy * .35, .21), (sx * .2, sy * .425, .21), .02))
+
+    def pod(L, P):
+        P.add("Body", L.box((.46, .32, .28), (0, -.22, .46), r=.02))
+        P.add("Body", L.loft([(0, .07, .155, 3.0), (.44, .07, .155, 3.0)], axis="X", loc=(-.22, -.22, .6)))  # rounded hood
+        P.add("Accent", L.box((.42, .03, .2), (0, -.385, .46), r=.01))                                    # brass face plate
+        for sx in (-1, 1):
+            acc, glow = L.monocle(.04, (sx * .165, -.4, .4), chain=sx > 0)
+            P.add("Accent", acc).add("Eye", glow)
+        D.worker_shoulders(L, P, inner=.2, r=.075)
+
+    def mast(L, P):
+        P.add("Body", L.box((.46, .29, .12), (0, .22, .38), r=.015))                                  # plinth
+        P.add("Body", L.box((.38, .22, .68), (0, .23, .77), r=.012))                                  # trunk
+        P.add("Accent", L.box((.2, .02, .4), (0, .115, .76), r=.008))                                 # its door glass frame
+        P.add("Body", L.box((.44, .27, .26), (0, .22, 1.19), r=.015))                                 # hood
+        P.add("Body", L.loft([(0, .05, .13, 3.0), (.44, .05, .13, 3.0)], axis="X", loc=(-.22, .22, 1.3)))  # arched top
+        case, face, glow = L.watch(.085, (0, .08, 1.19))
+        P.add("Accent", case + face).add("Eye", glow)
+        for sx in (-1, 1):
+            P.add("Accent", L.lathe([(0, 0), (.02, 0), (.025, .03), (.015, .06), (0, .08)], loc=(sx * .2, .32, 1.32)))  # finials
+
+    def beacon(L, P):
+        crown, band = L.bowler((0, .25, 1.45), r=.06, h=.07)
+        P.add("Body", crown).add("Accent", band)
+        P.add("Accent", L.lathe([(0, 1.35), (.06, 1.35), (.05, 1.37), (.04, 1.37), (0, 1.37)], loc=(0, .25, 0)))
+        P.add("Eye", L.cyl(.04, .08, (0, .25, 1.41)))
+        for sx in (-1, 1):
+            P.add("Accent", L.rod((sx * .045, .25, 1.36), (sx * .045, .25, 1.455), .006))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

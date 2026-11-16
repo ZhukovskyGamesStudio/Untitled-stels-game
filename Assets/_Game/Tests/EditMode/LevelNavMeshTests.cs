@@ -9,11 +9,19 @@ using UnityEngine.AI;
 namespace Stealth.Tests
 {
     /// <summary>Builds real level geometry in the editor, bakes the navmesh and checks paths between floors.</summary>
+    [TestFixture(99991, 4)] // a hospital
+    [TestFixture(7, 1)]     // an auto repair shop: the hall, its cars and lifts, the gallery
     public class LevelNavMeshTests
     {
         // one shared house, built and baked once for the fixture: every test only asks the navmesh
-        const int Seed = 99991, Level = 4;
+        readonly int Seed, Level;
         LevelLayout m_Layout;
+
+        public LevelNavMeshTests(int seed, int level)
+        {
+            Seed = seed;
+            Level = level;
+        }
 
         [OneTimeSetUp]
         public void Build()
@@ -42,7 +50,7 @@ namespace Stealth.Tests
         [Test]
         public void EveryFloorIsReachableFromTheHatchByStairs()
         {
-            const int seed = Seed;
+            int seed = Seed;
             foreach (var r in m_Layout.Rooms)
                 if (r.Id != m_Layout.HiddenRoom) // robots never get into the hidden room
                 {
@@ -65,7 +73,7 @@ namespace Stealth.Tests
         [Test]
         public void RobotsCannotUseVents()
         {
-            const int seed = Seed;
+            int seed = Seed;
             int checkedVents = 0;
             foreach (var d in m_Layout.Doorways)
                     {
@@ -91,7 +99,7 @@ namespace Stealth.Tests
         [Test]
         public void ItemSpotsAreOnTheNavMeshOrFurniture()
         {
-            const int seed = Seed;
+            int seed = Seed;
             foreach (var spot in m_Layout.ItemSpots)
             {
                 // Spots on desks / shelves are above the floor: there must be walkable floor of the same storey nearby.

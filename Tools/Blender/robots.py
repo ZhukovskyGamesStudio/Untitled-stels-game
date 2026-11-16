@@ -105,13 +105,62 @@ def sorter():
     export("robot_sorter")
 
 
+# The worker's lift (worker_lift.py, CargoMotion): two arms hinged on the sides of the sensor pod swing a level tray
+# from its dock on top of the mast (at rest) forward and down to the floor in front. Everything of the body stays out
+# of the tray's path: under the tray's resting place the body keeps below the arc its back edge sweeps
+# (z < WORKER_SWEEP_Z0 + sqrt(WORKER_SWEEP_R² - (y - WORKER_SWEEP_Y)²)), and within x ±0.36 (the arms run at ±0.4).
+WORKER_HINGE = (-0.15, 0.562)                       # (y, z) of the arms' hinge (CargoMotion.Hinge)
+WORKER_SWEEP_Y, WORKER_SWEEP_Z0, WORKER_SWEEP_R = 0.05, 0.547, 0.843
+
+
 def worker():
-    """Small wheeled worker carrying a crate — it snitches but cannot fight."""
-    merge("Body", [box((0.6, 0.7, 0.35), (0, 0, 0.35)), box((0.08, 0.08, 0.5), (-0.25, -0.2, 0.75)), box((0.08, 0.08, 0.5), (0.25, -0.2, 0.75))])
-    merge("Accent", [box((0.55, 0.45, 0.4), (0, -0.15, 1.15))])
+    """Warehouse runner, 1.4 m: a low drive deck on four small wheels with rubber bumpers front and back, a sensor pod
+    in front (the camera module seats on its face at z 0.5; the lift's arms are hinged on its flanks) joined by a
+    fairing to a stepped mast at the back (a wide battery block, a slimmer electronics tower) with a cable chain up its
+    front, the tray's dock and cradle at its top and an amber beacon on its cap. The tray and the arms are
+    worker_lift.py: at rest the tray sits on the dock against the cradle's pads, over the open space between the arms.
+    Contract: wheels r 0.12, width 0.1 at (±0.31, ±0.25, 0.12); hinge (0, -0.15, 0.562)."""
+    hy, hz = WORKER_HINGE
+    # drive deck: a chassis between the wheels, a deck plate over them (the arms swing past outside it), bumpers
+    body = [box((0.5, 0.74, 0.16), (0, 0, 0.2)),
+            box((0.7, 0.8, 0.07), (0, 0, 0.285))]                                    # deck plate over the wheels
     for i, (x, y) in enumerate([(0.31, 0.25), (-0.31, 0.25), (0.31, -0.25), (-0.31, -0.25)]):
-        merge(f"AccentWheel{i}", [cylinder(0.12, 0.1, (x, y, 0.12), axis="X")])   # hubs 4 cm into the body
-    merge("Eye", [box((0.3, 0.04, 0.08), (0, -0.36, 0.45))])
+        merge(f"AccentWheel{i}", [cylinder(0.12, 0.1, (x, y, 0.12), axis="X", segments=20),
+                                  cylinder(0.07, 0.11, (x, y, 0.12), axis="X", segments=12)])   # tyre + hub
+    accent = [cylinder(0.035, 0.12, (x * 0.24, y, 0.12), axis="X", segments=10)
+              for x, y in ((1, 0.25), (-1, 0.25), (1, -0.25), (-1, -0.25))]           # axles into the hubs
+    accent += [box((0.7, 0.07, 0.11), (0, -0.41, 0.205)),                             # front bumper (rubber)
+               box((0.7, 0.07, 0.11), (0, 0.41, 0.205))]                              # rear bumper
+    # sensor pod in front: the face the camera module sits on, the arms' shoulders on its flanks
+    body.append(box((0.48, 0.34, 0.32), (0, -0.23, 0.47)))                            # y -0.40..-0.06, z 0.31..0.63
+    body.append(box((0.4, 0.28, 0.05), (0, -0.23, 0.645)))                            # its lid
+    accent.append(box((0.42, 0.03, 0.2), (0, -0.405, 0.47)))                          # dark face plate
+    eye = [box((0.08, 0.02, 0.035), (sx * 0.15, -0.425, 0.385)) for sx in (-1, 1)]     # headlights under the camera
+    for sx in (-1, 1):
+        accent.append(cylinder(0.085, 0.07, (sx * 0.26, hy, hz), axis="X", segments=20))   # shoulder drum (the arm's axle goes in)
+        body.append(cylinder(0.05, 0.02, (sx * 0.3, hy, hz), axis="X", segments=16))      # its cap
+    body.append(box((0.4, 0.2, 0.12), (0, 0.0, 0.37)))                               # fairing from the pod to the mast
+    # the mast at the back (nothing swings behind the hinge, so it may be wider than the deck at its foot): a battery
+    # block, a slimmer electronics tower, the dock and the cradle the tray rests against, a cable chain, a beacon
+    body.append(box((0.6, 0.32, 0.48), (0, 0.23, 0.54)))                              # battery block, y 0.07..0.39
+    body.append(box((0.44, 0.26, 0.54), (0, 0.2, 1.04)))                              # tower, y 0.07..0.33, up to 1.31
+    accent.append(box((0.62, 0.34, 0.05), (0, 0.23, 0.78)))                           # band between them
+    body.append(box((0.48, 0.3, 0.05), (0, 0.2, 1.315)))                              # cap (yellow: seen from above)
+    accent.append(box((0.4, 0.2, 0.04), (0, 0.02, 1.335)))                            # dock under the tray's back (y -0.08..0.12)
+    for sx in (-1, 1):
+        accent.append(box((0.04, 0.16, 0.12), (sx * 0.17, 0.04, 1.27)))              # the dock's brackets
+        accent.append(box((0.045, 0.045, 0.22), (sx * 0.2, 0.0875, 1.37)))            # cradle posts behind the tray
+        accent.append(box((0.07, 0.03, 0.07), (sx * 0.2, 0.072, 1.45)))               # their pads (the backrest docks here)
+    for k in range(7):                                                                # cable chain up the mast's front
+        accent.append(box((0.12, 0.04, 0.1), (0, 0.06, 0.48 + k * 0.115)))
+    for k in range(4):                                                                # hazard stripes on the battery's back
+        a, b = Vector((-0.24 + k * 0.12, 0.395, 0.36)), Vector((-0.12 + k * 0.12, 0.395, 0.56))
+        accent.append(beam(a, b, 0.045))
+    accent.append(cylinder(0.075, 0.035, (0, 0.26, 1.355), segments=16))              # beacon base, at the back
+    eye.append(cylinder(0.055, 0.075, (0, 0.26, 1.41), segments=16, radius2=0.045))   # the beacon (status colour)
+    merge("Body", body)
+    merge("Accent", accent)
+    merge("Eye", eye)
     export("robot_worker")
 
 

@@ -19,7 +19,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "bestiary"))
 
+import math  # noqa: E402
+
 import bpy  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
+from mathutils.bvhtree import BVHTree  # noqa: E402
 
 import meshfix  # noqa: E402
 import voxel  # noqa: E402
@@ -42,7 +46,7 @@ OPENING = ("cabinet", "lockers")
 
 
 def category(name):
-    if name.startswith("robot_") or name.startswith("attach_"):
+    if name.startswith("robot_") or name.startswith("attach_") or name == "worker_lift":
         return "Robots"
     if name.startswith("sensor_") or name in ("security_camera", "laser_emitter"):
         return "Sensors"
@@ -98,6 +102,10 @@ def check_contract(name, objs, report):
     if missing or extra:
         report(f"  CONTRACT {name}: missing {sorted(missing)} extra {sorted(extra)}")
         errors += 1
+    if name == "worker_lift":
+        errors += check_lift(have, want, report)
+    if name == "robot_worker":
+        errors += check_sweep(objs, report)
     for part, (lo, hi) in want.items():
         if part not in have:
             continue
@@ -121,6 +129,83 @@ def check_contract(name, objs, report):
                     report(f"  CONTRACT {name}.{part}: {'xy'[k]} {c1[k]:.2f}, the original's {c0[k]:.2f}")
                     errors += 1
     return errors
+
+
+# The worker's lift (CargoMotion): the booms swing about the hinge, the tray stays level; its bottom is TrayHalf under
+# the pin and must stay there (the tray lands on the floor with 1 cm to spare).
+LIFT_HINGE, LIFT_ARM = Vector((0, -0.15, 0.562)), 0.843
+LIFT_FLOOR_ANGLE = 129.6   # CargoMotion.ArmDown
+
+
+def check_lift(have, want, report):
+    errors = 0
+    tray, arm = have.get("BodyLiftTray"), have.get("AccentLiftArm")
+    if tray is not None and "BodyLiftTray" in want:
+        lo, hi = bounds(tray)
+        if abs(lo[2] - want["BodyLiftTray"][0][2]) > 0.005:
+            report(f"  CONTRACT worker_lift.BodyLiftTray: bottom at {lo[2]:.3f}, CargoMotion wants {want['BodyLiftTray'][0][2]:.3f}")
+            errors += 1
+        if max(abs(hi[0]), abs(lo[0])) > 0.43:
+            report(f"  CONTRACT worker_lift.BodyLiftTray: {max(abs(hi[0]), abs(lo[0])):.2f} wide of the centre (the booms are at 0.4)")
+            errors += 1
+    if arm is not None and "AccentLiftArm" in want:
+        lo, hi = bounds(arm)
+        wl, wh = want["AccentLiftArm"]
+        off = max(max(abs(a - b) for a, b in zip(lo, wl)), max(abs(a - b) for a, b in zip(hi, wh)))
+        if off > 0.04:
+            report(f"  CONTRACT worker_lift.AccentLiftArm: bounds off the original's by {off * 100:.0f} cm")
+            errors += 1
+    return errors
+
+
+_lift = []
+
+
+def lift_meshes():
+    """The original lift's parts as (name, world vertices, polygons), imported once."""
+    if _lift:
+        return _lift
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.fbx(filepath=os.path.join(REPO_MODELS, "Robots", "worker_lift.fbx"))
+    bpy.context.view_layer.update()
+    for o in set(bpy.data.objects) - before:
+        if o.type == "MESH":
+            name = o.name.split(".")[0]
+            verts = [o.matrix_world @ v.co for v in o.data.vertices]
+            polys = [tuple(p.vertices) for p in o.data.polygons]
+            if name.startswith("AccentLiftArm"):  # the axles go into the shoulder drums on purpose
+                polys = [q for q in polys if all(math.hypot(verts[i].y - LIFT_HINGE.y, verts[i].z - LIFT_HINGE.z) > 0.09 for i in q)]
+            _lift.append((name, verts, polys))
+        data = o.data
+        bpy.data.objects.remove(o, do_unlink=True)
+        if data is not None and data.users == 0:
+            bpy.data.meshes.remove(data)
+    return _lift
+
+
+def check_sweep(objs, report):
+    """The worker's body must leave the lift's path clear: the tray and the booms swing from rest down to the floor."""
+    bpy.context.view_layer.update()
+    body = []
+    for o in objs:
+        mw = o.matrix_world
+        body.append((o.name, BVHTree.FromPolygons([mw @ v.co for v in o.data.vertices], [tuple(p.vertices) for p in o.data.polygons])))
+    rest = LIFT_HINGE + Vector((0, 0, LIFT_ARM))
+    hits = {}
+    for k in range(0, 66):
+        ang = min(k * 2.0, LIFT_FLOOR_ANGLE)
+        r = math.radians(ang)
+        pin = LIFT_HINGE + Vector((0, -math.sin(r), math.cos(r))) * LIFT_ARM
+        rot = Matrix.Translation(LIFT_HINGE) @ Matrix.Rotation(r, 4, "X") @ Matrix.Translation(-LIFT_HINGE)
+        for name, verts, polys in lift_meshes():
+            moved = [rot @ v for v in verts] if name.startswith("AccentLiftArm") else [v + (pin - rest) for v in verts]
+            tree = BVHTree.FromPolygons(moved, polys)
+            for bn, bt in body:
+                if tree.overlap(bt):
+                    hits.setdefault((name, bn), []).append(ang)
+    for (ln, bn), angs in hits.items():
+        report(f"  CONTRACT robot_worker: the lift's {ln} hits {bn} at {min(angs):.0f}..{max(angs):.0f} degrees of its swing")
+    return len(hits)
 
 
 def load_style(style):
@@ -149,7 +234,8 @@ def fit_roles(name, P):
 def build(name, L, design):
     s.clear_scene()
     P = design(L)
-    P = L.signature(name, P) or P
+    if name != "worker_lift":   # the lift has only its two moving parts: no signature pieces
+        P = L.signature(name, P) or P
     P = fit_roles(name, P)
     objs = []
     for role, bms in P.items():
@@ -166,7 +252,8 @@ def build(name, L, design):
     meshfix.fix_objects(objs, floor=category(name) in ("Props", "Level"), name=f"{name}__{L.name}",
                         pinned=lambda n: n.startswith(MOVING))
     if getattr(L, "voxel", 0.0) > 0.0:
-        voxel.voxelize(objs, L.voxel)  # a voxel style: every part rebuilt from cubes
+        # a voxel style: every part rebuilt from cubes — but the lift's tray, 3 cm thick, must keep its exact bottom
+        voxel.voxelize([o for o in objs if not (name == "worker_lift" and o.name == "BodyLiftTray")], L.voxel)
     objs += fillers(name, objs)
     taller(name, objs)
     return objs

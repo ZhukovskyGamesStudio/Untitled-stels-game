@@ -19,8 +19,8 @@ namespace Stealth.Level
     {
         [Header("Size by house (0-based); the last entry repeats")]
         public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        [Tooltip("Rooms per floor in the first house (9 = 3 x 3).")]
-        public float BaseRooms = 9f;
+        [Tooltip("Rooms per floor in the first house (6 = 3 x 2): the first houses are small and easy.")]
+        public float BaseRooms = 6f;
         [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
         public float RoomsPerHouse = 2.5f;
         [Tooltip("Rooms per floor never go above this (36 = 6 x 6).")]
@@ -188,6 +188,13 @@ namespace Stealth.Level
 
         public object Clone() => MemberwiseClone();
 
+        /// <summary>
+        /// The auto repair shop's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Garage"/>, never saved):
+        /// a double-height workshop hall with bays along the street, a two-storey block with the reception, rooms behind
+        /// the hall and a gallery over it (<see cref="PlanGenerator"/>, PlanGenerator.Garage.cs).
+        /// </summary>
+        [System.NonSerialized] public bool Garage;
+
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
         public float AreaFor(int players) =>
@@ -234,17 +241,17 @@ namespace Stealth.Level
         public bool Enemies = true;
 
         [Header("Counts: base + per house")]
-        public int Robots = 2;
+        public int Robots = 1;
         public int RobotsPerHouse = 1;
         [Tooltip("Extra robots per floor above the ground floor.")]
         public int RobotsPerExtraFloor = 1;
         [Tooltip("Robots keep to the rooms deep inside: the deepest room is (1 + this) times as likely as one by the lobby (RoomDepth).")]
         public float DeepRoomWeight = 2f;
-        public int Devices = 1;
+        public int Devices = 0;
         public int DevicesPerHouse = 1;
-        public int Cameras = 2;
+        public int Cameras = 1;
         public int CamerasPerHouse = 1;
-        public int Lasers = 1;
+        public int Lasers = 0;
         public int LasersPerHouse = 1;
         [Tooltip("A bigger team gets a bigger house: one more robot per this many rooms it adds (all floors).")]
         public int TeamRoomsPerExtraRobot = 10;
@@ -332,6 +339,7 @@ namespace Stealth.Level
                 l.Stairs.AddRange(o.Stairs);
                 RaiseVents(l, building);
                 Doorways(l);
+                if (building.Garage) WidenBoothDoorway(l);
                 l.HatchPosition = l.Lobby.Center;
                 long planMs = watch.ElapsedMilliseconds;
                 bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
@@ -394,10 +402,12 @@ namespace Stealth.Level
             // the locked storage room (furnished as storage: shelves and a pile; it brings the workers)
             l.RoomRules = building.RoomTypeRules;
             StorageRooms.Plan(l, features, storage);
+            EnsureControlRoom(l, building);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
             foreach (var p in l.PatrolPoints) furnisher.Reserve(LevelLayout.FloorOf(p.y), p, 0.75f);
+            l.WindowLimit = building.WindowLimit(seed); // the furniture keeps the windows clear: it must know which ones there are
             watch.Restart();
             foreach (var r in l.Rooms) furnisher.FurnishRoom(r);
             Timing.Furnish += watch.ElapsedMilliseconds;
@@ -410,6 +420,7 @@ namespace Stealth.Level
                 PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
                 PlaceTerminals(l, security);
             }
+            else IdleConsoles(l);
             StorageRooms.Finish(l, features);
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
@@ -518,7 +529,7 @@ namespace Stealth.Level
             float far = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage || r.Area < 10f) continue;
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth || r.Area < 10f) continue; // (the booth: its car)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (d > far) { far = d; best = r; }
@@ -531,7 +542,7 @@ namespace Stealth.Level
         {
             foreach (var r in l.Rooms)
             {
-                l.PatrolPoints.Add(PatrolCentre(l, r));
+                l.PatrolPoints.Add(PatrolSpot(l, r));
                 if (r.Area < 60f) continue;
                 foreach (var rect in r.Rects)
                 {
@@ -543,19 +554,35 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// A room's own patrol stop: its middle — except a kitchen's, whose table stands in the middle: the robots stop
-        /// beside it, along the room's long side (the stop is kept free of furniture).
+        /// Where a patrol stands in a room: its middle — except the rooms whose middle belongs to their furniture (the
+        /// table of a meeting room, the stalls of a small restroom reach it): there a step inside the first doorway; and a
+        /// kitchen's, whose table stands in the middle: beside it, along the room's long side (kept free of furniture).
         /// </summary>
-        static Vector3 PatrolCentre(LevelLayout l, PlanRoom r)
+        public static Vector3 PatrolSpot(LevelLayout l, PlanRoom r)
         {
-            if (r.Type != RoomType.Kitchen) return r.Center;
-            var along = r.Bounds.width >= r.Bounds.height ? Vector3.right : Vector3.forward;
-            foreach (float off in new[] { 2.0f, 1.6f })
-                foreach (float side in new[] { 1f, -1f })
+            if (r.Type == RoomType.Kitchen)
+            {
+                var along = r.Bounds.width >= r.Bounds.height ? Vector3.right : Vector3.forward;
+                foreach (float off in new[] { 2.0f, 1.6f })
+                    foreach (float side in new[] { 1f, -1f })
+                    {
+                        var p = r.Center + along * (side * off);
+                        if (l.Plan.RoomAt(p + Vector3.up * 0.3f) == r && !l.NearStair(r.Floor, p, 0.8f)) return p;
+                    }
+                return r.Center;
+            }
+            if (!Furnisher.MiddleIsFurniture(r)) return r.Center;
+            foreach (var d in l.Doorways)
+            {
+                if (d.Floor != r.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open) || d.Exterior) continue;
+                var across = d.Rotation * Vector3.forward;
+                foreach (float side in new[] { -1f, 1f })
                 {
-                    var p = r.Center + along * (side * off);
-                    if (l.Plan.RoomAt(p + Vector3.up * 0.3f) == r && !l.NearStair(r.Floor, p, 0.8f)) return p;
+                    var p = d.Position + across * side;
+                    p.y = r.Center.y;
+                    if (l.Plan.RoomAt(p) == r && !l.NearStair(r.Floor, p, 0.8f)) return p;
                 }
+            }
             return r.Center;
         }
 
@@ -626,18 +653,68 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// The robots' control room, where the camera and hacking terminals stand (<see cref="PlaceTerminals"/>): a house
+        /// whose program could have one but drew none turns an office of a control room's size into it (the plan is laid
+        /// out already — only the room's type, and so its furniture, changes). Not the lobby, the vault, the hidden room,
+        /// the storage room nor the exit's room.
+        /// </summary>
+        static void EnsureControlRoom(LevelLayout l, BuildingSettings b)
+        {
+            bool wanted = false;
+            foreach (var w in b.RoomWeights) wanted |= w.Room == RoomType.ControlRoom && w.Weight > 0;
+            if (!wanted) return;
+            foreach (var r in l.Rooms) if (r.Type == RoomType.ControlRoom) return;
+            int exit = l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            PlanRoom best = null;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Type != RoomType.Office || r.Levels != 1 || r.Area < 16f || r.Area > 60f) continue;
+                if (r.Id == l.LobbyRoom || r.Id == l.VaultRoom || r.Id == l.HiddenRoom || r.Id == l.StorageRoom || r.Id == exit) continue;
+                if (best == null || Mathf.Abs(r.Area - 32f) < Mathf.Abs(best.Area - 32f)) best = r;
+            }
+            if (best != null) best.Type = RoomType.ControlRoom;
+        }
+
+        /// <summary>No security: the control room's consoles are plain desks.</summary>
+        static void IdleConsoles(LevelLayout l)
+        {
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i))
+                {
+                    var p = l.Props[i];
+                    p.Kind = PropKind.Desk;
+                    l.Props[i] = p;
+                }
+        }
+
         static void PlaceTerminals(LevelLayout l, SecuritySettings s)
         {
+            // the control room's consoles first (Furnisher puts them there); what is left of them becomes a plain desk
+            var consoles = new List<int>();
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i)
+                    && l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.LobbyRoom) consoles.Add(i); // like any terminal: not in the lobby
+            var leftover = new List<int>();
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f) desks.Add(i);
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i)) desks.Add(i);
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
             var want = new List<TerminalKind>();
-            for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
+            // the hacking terminal first: with a single console in the control room, it is the one there
             for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
+            for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
             foreach (var kind in want)
             {
-                if (desks.Count == 0) return;
+                if (consoles.Count > 0)
+                {
+                    l.Terminals.Add((consoles[0], kind));
+                    consoles.RemoveAt(0);
+                    continue;
+                }
+                if (desks.Count == 0) break;
                 int pick = desks[rng.Next(desks.Count)];
                 if (l.Terminals.Count > 0)
                 {
@@ -656,6 +733,38 @@ namespace Stealth.Level
                 l.Props[pick] = p;
                 l.Terminals.Add((pick, kind));
             }
+            consoles.AddRange(leftover);
+            foreach (int i in consoles)
+            {
+                var p = l.Props[i];
+                p.Kind = PropKind.Desk; // a console with nothing to do: a desk like the others
+                l.Props[i] = p;
+            }
+        }
+
+        /// <summary>The shop's paint booth: its one door widened for a car (it is driven in), remembered for its big sliding door.</summary>
+        static void WidenBoothDoorway(LevelLayout l)
+        {
+            int booth = -1;
+            foreach (var r in l.Rooms) if (r.Type == RoomType.PaintBooth) booth = r.Id;
+            if (booth < 0) return;
+            for (int i = 0; i < l.Doorways.Count; i++)
+            {
+                var d = l.Doorways[i];
+                if (d.Kind != EdgeType.Door || (d.RoomA != booth && d.RoomB != booth)) continue;
+                if (HouseFeatures.WidenDoorway(l, i, VehicleDoorWidth)) l.BoothDoorway = i;
+                return;
+            }
+        }
+
+        /// <summary>A desk lamp stands on this desk (it would go through a terminal's monitors: such a desk stays a desk).</summary>
+        public static bool LampOn(LevelLayout l, int desk)
+        {
+            var d = l.Props[desk].Position;
+            foreach (var p in l.Props)
+                if (p.Kind == PropKind.DeskLamp && p.Position.y > d.y + 0.4f && p.Position.y < d.y + 1.5f
+                    && new Vector2(p.Position.x - d.x, p.Position.z - d.z).magnitude < 1.0f) return true;
+            return false;
         }
 
         static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s, int storageWorkers = 0)
@@ -697,9 +806,12 @@ namespace Stealth.Level
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
-            foreach (var d in l.Doorways)
-                if (d.Kind == EdgeType.Door && !d.Exterior)
+            for (int i = 0; i < l.Doorways.Count; i++)
+            {
+                var d = l.Doorways[i];
+                if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway) // (the paint booth's: its big door, nothing in the way)
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
+            }
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.HatchPosition;
@@ -767,6 +879,13 @@ namespace Stealth.Level
             // Sliding doors in some of the remaining doorways (never together with a laser).
             foreach (var d in doors)
                 if (rng.NextDouble() < b.AutoDoorChance) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+            // the paint booth's sliding door (wide enough for a car), never locked
+            if (l.BoothDoorway >= 0)
+            {
+                var bd = l.Doorways[l.BoothDoorway];
+                l.BoothDoor = l.AutoDoors.Count;
+                l.AutoDoors.Add(new Pose(bd.Position, bd.Rotation));
+            }
 
             // Some of them are locked (own stream: the rest of the house does not shift). Never next to the lobby.
             if (level < b.LockedDoorsFromHouse) return;
@@ -774,7 +893,7 @@ namespace Stealth.Level
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
-                if (locks.NextDouble() < b.LockedDoorChance && !lobby) l.LockedDoors.Add(i);
+                if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
             }
         }
 

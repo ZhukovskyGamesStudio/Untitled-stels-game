@@ -53,7 +53,10 @@ namespace Stealth.EditorTools
             var innerWindow = Prefab($"{LevelPrefabs}/InnerWindowFrame.prefab", BuildInnerWindowFrame);
             var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
             var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
-            var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
+            var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", () => BuildAutoDoor());
+            // the auto repair shop: steel leaves; the paint booth's door as wide as a car needs
+            var shopDoor = Prefab($"{LevelPrefabs}/ShopDoor.prefab", () => BuildAutoDoor("ShopDoor", LevelMetrics.DoorWidth, "ShopSteel"));
+            var vehicleDoor = Prefab($"{LevelPrefabs}/VehicleDoor.prefab", () => BuildAutoDoor("VehicleDoor", LevelMetrics.VehicleDoorWidth, "ShopSteel"));
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
@@ -120,10 +123,23 @@ namespace Stealth.EditorTools
             });
             var pTerminal = Prefab(p + "Terminal.prefab", () =>
             {
-                var go = PropObject("Terminal", "terminal", "PropBody", "PropAccent", "Keypad");
-                // The screens glow in the terminal's colour (SecurityTerminal keeps them out of the merged furniture).
+                // Two looks on one desk's place (Tools/Blender/terminals.py): the robots' control console (hacking, cameras)
+                // and the storage door's access kiosk; SecurityTerminal shows the one for its kind. The screens glow in the
+                // terminal's colour (SecurityTerminal keeps them out of the merged furniture).
+                var go = PropObject("Terminal", "terminal_console", "PropBody", "PropAccent", "Keypad");
+                var console = go.transform.GetChild(0).gameObject;
+                console.name = "Console";
+                var access = Model("terminal_access");
+                access.name = "Access";
+                access.transform.SetParent(go.transform, false);
+                Paint(access, "Metal", "PropAccent", "Keypad");
+                foreach (var mf in access.GetComponentsInChildren<MeshFilter>(true)) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                access.SetActive(false);
                 var terminal = go.AddComponent<Stealth.Level.SecurityTerminal>();
-                terminal.Screens = go.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.Console = console;
+                terminal.Access = access;
+                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
@@ -164,6 +180,8 @@ namespace Stealth.EditorTools
                 art.HoleFrame = hole;
                 art.InnerWindowFrame = innerWindow;
                 art.AutoDoor = door;
+                art.ShopDoor = shopDoor;
+                art.VehicleDoor = vehicleDoor;
                 art.RoomLight = light;
                 art.Window = window;
                 art.ExitSign = exitSign;
@@ -218,7 +236,14 @@ namespace Stealth.EditorTools
                 levelArt.OutsideTerrain = terrain;
                 EditorUtility.SetDirty(levelArt);
             }
+            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor)
+            {
+                levelArt.ShopDoor = shopDoor;
+                levelArt.VehicleDoor = vehicleDoor;
+                EditorUtility.SetDirty(levelArt);
+            }
             BuildFeatureArt(levelArt);
+            BuildCityArt(levelArt);
             BuildRoomProps(levelArt);
             return levelArt;
         }
@@ -406,11 +431,15 @@ namespace Stealth.EditorTools
         /// Sliding door: two panels and a blocker collider (enabled only while closed). Ignored by the navmesh:
         /// robots plan through doorways and the door opens when they arrive.
         /// </summary>
-        static GameObject BuildAutoDoor()
+        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "Door");
+
+        /// <summary>A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.</summary>
+        static GameObject BuildAutoDoor(string name, float width, string paint)
         {
-            var root = new GameObject("AutoDoor");
+            var root = new GameObject(name);
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
-            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth;
+            float h = LevelMetrics.DoorHeight - 0.02f, w = width;
+            float stretch = width / LevelMetrics.DoorWidth;
             var door = root.AddComponent<AutoDoor>();
             door.Width = w;
             // the two leaves: a model of their own (Tools/Blender/door_leaf.py), so a style can give them its own form
@@ -422,7 +451,8 @@ namespace Stealth.EditorTools
                 leaf.transform.SetParent(root.transform, false);
                 leaf.transform.localPosition = new Vector3(x, 0f, 0f);
                 leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
-                Paint(leaf, "Door", "Door", "Door");
+                leaf.transform.localScale = new Vector3(stretch, 1f, 1f);
+                Paint(leaf, paint, paint, paint);
                 foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                 return leaf.transform;
             }
@@ -439,6 +469,20 @@ namespace Stealth.EditorTools
                 Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
             };
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
+            // a locked (hackable) door: a hasp across the seam with a padlock hanging from it, on both faces
+            door.Padlocks = new[] { 1f, -1f }.Select(side =>
+            {
+                var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(0f, 1.2f, side * 0.032f)).transform;
+                holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                var lockModel = Model("padlock");
+                lockModel.transform.SetParent(holder, false);
+                lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
+                Paint(lockModel, "Gold", "Metal", "Metal");
+                NoShadows(lockModel);
+                holder.gameObject.SetActive(false);
+                return holder;
+            }).ToArray();
             // a key door: the lock panels beside the frame on both sides (shown only on doors of LevelLayout.KeyDoors)
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
@@ -607,8 +651,14 @@ namespace Stealth.EditorTools
             var hinge = Child(hatch.transform, "LidHinge", new Vector3(0.75f, 0.03f, 0f));
             foreach (var part in hatch.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
                 if (part.name.StartsWith("Body") || part.name.StartsWith("Accent")) part.SetParent(hinge.transform, true);
-            hatch.AddComponent<Hatch>().Lid = hinge.transform;
+            var h = hatch.AddComponent<Hatch>();
+            h.Lid = hinge.transform;
             var b = LocalBounds(hatch);
+            // a post at the rim with a lamp on top: the hatch's colour (entry blue — the tank's filler, exit green — the way down)
+            Cube(hatch.transform, "MarkPost", new Vector3(0f, 0.65f, -0.85f), new Vector3(0.07f, 1.3f, 0.07f), M("Metal"), false);
+            Cube(hatch.transform, "EyeMarkLamp", new Vector3(0f, 1.36f, -0.85f), new Vector3(0.2f, 0.14f, 0.2f), M("HatchRing"), false);
+            h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
             var box = hatch.AddComponent<BoxCollider>();
             // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
             // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it

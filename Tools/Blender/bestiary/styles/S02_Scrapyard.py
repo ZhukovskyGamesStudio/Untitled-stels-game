@@ -406,40 +406,41 @@ def listener(L):
 
 
 def worker(L):
-    """Kettle porter: a round kettle on a little wheeled tray carries a fruit crate over its head with two stubby arms
-    (a spring under the crate keeps the balance), its spout is a headlamp."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", L.wheel(c, .12, .1))
-    P.add("Body", L.box((.5, .68, .07), (0, 0, .13)))
-    P.add("Body", L.lathe([(0, .14), (.22, .14), (.26, .2), (.27, .36), (.25, .55), (.19, .68), (.1, .74), (0, .75)],
-                          loc=(0, .02, 0)))
-    P.add("Accent", L.cyl(.275, .04, (0, .02, .3)))
-    P.add("Accent", [tube([(0, -.2, .36), (0, -.33, .43), (0, -.39, .5)], .045, res=1, radii=[1, .8, .7])])
-    P.add("Accent", L.cyl(.05, .04, (0, -.4, .5), axis="Y"))
-    P.add("Eye", L.cyl(.04, .02, (0, -.42, .5), axis="Y"))
-    for sx in (-1, 1):
-        P.eye(goggle(.075, (sx * .1, -.19, .56), (sx * .25, -1, .2), .045))
-        P.add("Body", [tube([(sx * .2, 0, .6), (sx * .32, -.05, .8), (sx * .3, -.13, .96)], .04, res=1)])
-        P.add("Body", L.ball(.07, (sx * .29, -.14, .99)))
-    P.add("Accent", spring((0, .02, .73), (0, -.1, .96), .06, .016, 3))
-    # fruit crate: bottom board, slats, corner posts, the load inside
-    c = (0, -.15)
+    """Tin-can porter: a puffy tray cart, a paint-tin head with two goggle headlamps in front, a ribbed trash can for a
+    mast with its lid as the tray's dock, a spring antenna with a glowing ball for a beacon, a kettle-spout exhaust."""
+    def deck(L, P):
+        P.add("Body", L.hull((.52, .76, .16), (0, 0, .21)))
+        P.add("Body", L.box((.7, .8, .07), (0, 0, .29)))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.cyl(.035, .12, (x * .78, y, .12), axis="X"))
+        for y in (-.41, .41):
+            P.add("Accent", L.box((.7, .09, .13), (0, y, .21)))                                      # fat rubber bumpers
 
-    def slat(size, loc):
-        return [s.rbox(size, loc, r=.01, seg=1)]
-    P.add("Accent", slat((.5, .42, .03), (c[0], c[1], .965)))
-    for z in (1.05, 1.17, 1.29):
-        for y in (-.36, .06):
-            P.add("Accent", slat((.5, .03, .08), (0, y, z)))
-        for x in (-.24, .24):
-            P.add("Accent", slat((.03, .42, .08), (x, c[1], z)))
-    for x in (-.235, .235):
-        for y in (-.355, .055):
-            P.add("Accent", slat((.05, .05, .4), (x, y, 1.15)))
-    P.add("Accent", L.box((.44, .36, .3), (0, c[1], 1.12), r=.03))
-    return P
+    def pod(L, P):
+        P.add("Body", L.cyl(.205, .3, (0, -.23, .47)))                                               # the paint tin
+        P.add("Accent", L.cyl(.215, .035, (0, -.23, .63)))                                           # its lid
+        P.add("Accent", [tube([(-.17, -.23, .64), (0, -.23, .74), (.17, -.23, .64)], .014)])        # bail handle
+        for sx in (-1, 1):
+            P.eye(goggle(.05, (sx * .15, -.36, .37), (sx * .3, -1, 0), .035))
+        D.worker_shoulders(L, P, inner=.17)
+
+    def mast(L, P):
+        P.add("Body", L.lathe([(0, .3), (.16, .3), (.17, .48), (.155, .5), (.17, .52), (.175, .74), (.16, .76), (.175, .78),
+                               (.185, 1.0), (.17, 1.02), (.185, 1.04), (.19, 1.24), (0, 1.24)], loc=(0, .22, 0)))   # trash can
+        P.add("Accent", L.cyl(.21, .05, (0, .22, 1.26)))                                             # its lid
+        P.add("Accent", [tube([(.18, .26, .62), (.27, .26, .7), (.27, .3, .82)], .03, radii=[1, .8, .6])])  # spout
+        for sx in (-1, 1):
+            P.add("Accent", L.box((.03, .1, .12), (sx * .19, .22, .9), r=.012))                      # handles
+
+    def dock(L, P):
+        D.worker_dock(L, P)
+
+    def beacon(L, P):
+        P.add("Accent", spring((0, .28, 1.27), (0, .28, 1.38), .03, .01, 2.5))
+        P.add("Accent", L.cyl(.05, .03, (0, .28, 1.38)))
+        P.add("Eye", L.ball(.055, (0, .28, 1.43)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, dock=dock, beacon=beacon)
 
 
 def sweeper(L):

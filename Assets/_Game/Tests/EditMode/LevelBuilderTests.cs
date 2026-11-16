@@ -13,10 +13,26 @@ namespace Stealth.Tests
         [OneTimeTearDown]
         public void Cleanup() => ActiveLevel.Clear();
 
-        /// <summary>One shared house, built once for the fixture's scene tests (they only look at it).</summary>
-        static GameObject Built(out LevelLayout layout)
+        [Test]
+        public void WallsAlongAStairwellRiseToTheNextFloor()
         {
-            layout = TestHouses.Get(99991, 4);
+            var stairs = new List<Stair> { new() { Floor = 0, Origin = Vector2.zero, Corner = new Vector2Int(-1, -1) } }; // hole [0, 4] x [0, 4]
+            var along = new PlanWall { Floor = 0, A = new Vector2(-2f, 0f), B = new Vector2(10f, 0f), Exterior = true };
+            var bands = LevelBuilder.StairBands(along, stairs);
+            Assert.AreEqual(1, bands.Count, "the outer wall by the stairs gets one band");
+            Assert.LessOrEqual(bands[0].from, 2f, "from the hole's start");
+            Assert.GreaterOrEqual(bands[0].to, 6f, "to its end");
+            Assert.Less(bands[0].to, 7f, "not much further");
+            Assert.AreEqual(0, LevelBuilder.StairBands(new PlanWall { Floor = 1, A = along.A, B = along.B }, stairs).Count, "the floor above has its slab");
+            Assert.AreEqual(0, LevelBuilder.StairBands(new PlanWall { Floor = 0, A = new Vector2(-2f, 6f), B = new Vector2(10f, 6f) }, stairs).Count, "a wall away from the hole");
+        }
+
+        /// <summary>One shared house, built once for the fixture's scene tests (they only look at it).</summary>
+        static GameObject Built(out LevelLayout layout) => Built(out layout, 99991, 4);
+
+        static GameObject Built(out LevelLayout layout, int seed, int house)
+        {
+            layout = TestHouses.Get(seed, house);
             if (ActiveLevel.Layout != layout || ActiveLevel.Root == null)
                 ActiveLevel.Load(layout, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
             return ActiveLevel.Root;
@@ -36,10 +52,10 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner)
+        public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner, [Values(false, true)] bool flip)
         {
-            var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner };
-            var (mirrored, yaw) = StairGeometry.Placement(corner);
+            var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner, Flip = flip };
+            var (mirrored, yaw) = StairGeometry.Placement(corner, flip);
             var rotation = Quaternion.Euler(0f, yaw, 0f);
             foreach (var box in StairGeometry.Boxes())
             {
@@ -49,7 +65,7 @@ namespace Stealth.Tests
                 var placed = StairGeometry.Origin(stair) + rotation * local;
                 // ... must be where the corner frame says it is.
                 var expected = StairGeometry.ToWorld(stair, box.Center);
-                Assert.That(Vector3.Distance(placed, expected), Is.LessThan(1e-3f), $"{box.Name} for corner {corner}");
+                Assert.That(Vector3.Distance(placed, expected), Is.LessThan(1e-3f), $"{box.Name} for corner {corner}, flip {flip}");
             }
         }
 
@@ -104,10 +120,11 @@ namespace Stealth.Tests
         /// own oriented box (the mesh bounds of that part), with 2 cm of tolerance for things that only touch. Facade windows
         /// (blinds and sills stick into the room) count as well.
         /// </summary>
-        [Test]
-        public void FurnitureDoesNotClip()
+        [TestCase(99991, 4)] // a hospital
+        [TestCase(7, 1)]     // an auto repair shop: cars, lifts, the bays' doors
+        public void FurnitureDoesNotClip(int seed, int house)
         {
-            var root = Built(out _);
+            var root = Built(out _, seed, house);
             var scratch = new GameObject("ClipProbe");
             try
             {

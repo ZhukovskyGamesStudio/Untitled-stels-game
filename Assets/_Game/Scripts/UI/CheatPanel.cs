@@ -48,9 +48,22 @@ namespace Stealth.UI
         /// <summary>Test hook (autopilot): open or close the panel.</summary>
         public void SetOpen(bool open) => Show(open);
 
+        /// <summary>
+        /// The toggles of the panel onto the player (owner side): whatever differs is asked for again. The panel lives in
+        /// the scene, the player object does not — after a new session or a reconnect a fresh player came without the
+        /// cheats while the panel still showed them on, and they had to be switched off and on to work.
+        /// </summary>
+        public static void Sync(PlayerController me, bool invulnerable, bool invisible)
+        {
+            if (me == null) return;
+            if (me.Invulnerable != invulnerable) me.RequestCheat(Cheat.Invulnerable, invulnerable);
+            if (me.Invisible != invisible) me.RequestCheat(Cheat.Invisible, invisible);
+        }
+
         void Update()
         {
             if (Me == null) { Show(false); return; }
+            Sync(Me, m_Invulnerable, m_Invisible);
             if (!GameMenu.IsOpen && Controls.Pressed(GameAction.Cheats)) Show(!IsOpen);
             if (GameMenu.IsOpen && IsOpen) Show(false);
             if (!IsOpen) return;

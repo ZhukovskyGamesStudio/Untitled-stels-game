@@ -282,22 +282,31 @@ def listener(L):
 
 
 def worker(L):
-    """One low hexagonal slab on faceted wheels; two shard prongs rise from its nose and hold a cut geode for a
-    crate, split by a crack of light; a small lit gem looks ahead."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", L.wheel(c, .12, .1))
-        P.add("Body", prism((c[0] * .4, c[1], .13), (c[0] * 1.0, c[1], .12), .04, .04, n=4))
-    P.add("Body", gem([(.13, .3, .38), (.22, .34, .43), (.36, .3, .38), (.42, .18, .24)], n=6, phase=0.0, loc=(0, .03, 0)))
-    P.add("Body", spike((-.12, .32, .38), (-.2, .45, .78), .07, n=4) + spike((.1, .3, .38), (.16, .42, .66), .06, n=4))
-    for sx in (-1, 1):
-        P.add("Body", along((sx * .17, -.2, .38), (sx * .21, -.18, 1.08), [(0, .04, .04), (.7, .05, .05), (1, 0, 0)], n=4))
-    P.add("Accent", gem([(.93, .15, .14), (.98, .24, .22), (1.27, .24, .22), (1.36, .1, .09)], n=6, phase=0.0, loc=(0, -.15, 0)))
-    P.add("Eye", ring(1.12, .24, .22, n=6, h=.035, grow=1.04, phase=0.0, loc=(0, -.15, 0)))
-    P.add("Eye", gem([(-.03, 0, 0), (0, .07, .05), (.08, 0, 0)], n=4, phase=0.0, axis="-Y", loc=(0, -.38, .44)))
-    P.add("Body", prism((0, -.25, .36), (0, -.36, .44), .05, .05, n=4))
-    return P
+    """Crystal carrier: a hexagonal slab on faceted wheels, a cut-gem snout with two lit facets, a tall cut crystal for
+    a mast split by a crack of light with smaller shards growing from its foot, a lit octahedron for a beacon; the
+    tray rests on a crystal ledge."""
+    def deck(L, P):
+        P.add("Body", gem([(.13, .27, .38), (.25, .3, .41), (.33, .27, .38)], n=6, phase=0.0))           # hex slab
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", prism((x * .4, y, .13), (x * 1.0, y, .12), .04, .04, n=4))
+        for y in (-.41, .41):
+            P.add("Accent", prism((-.3, y * .95, .21), (.3, y * .95, .21), .055, .055, n=4))                 # bumpers
+
+    def pod(L, P):
+        P.add("Body", gem([(.31, .2, .16), (.48, .24, .18), (.66, .15, .11)], n=6, loc=(0, -.23, 0)))
+        for sx in (-1, 1):
+            P.add("Eye", gem([(-.03, 0, 0), (0, .045, .035), (.06, 0, 0)], n=4, phase=0.0, axis="-Y", loc=(sx * .13, -.36, .4)))
+        D.worker_shoulders(L, P, inner=.17)
+
+    def mast(L, P):
+        P.add("Body", gem([(.3, .19, .13), (.5, .23, .15), (1.18, .2, .13), (1.32, .11, .07)], n=6, loc=(0, .23, 0)))
+        P.add("Eye", crack([(0, .085, .45), (.03, .085, .7), (-.02, .088, .92), (.01, .095, 1.15)], w=.03))
+        P.add("Body", spike((-.17, .3, .32), (-.27, .38, .8), .06, n=4) + spike((.16, .28, .32), (.24, .36, .66), .05, n=4))
+
+    def beacon(L, P):
+        P.add("Eye", octa((0, .23, 1.37), .06))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

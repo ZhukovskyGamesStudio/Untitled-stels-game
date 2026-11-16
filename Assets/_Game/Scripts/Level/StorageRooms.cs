@@ -118,14 +118,15 @@ namespace Stealth.Level
                 l.ItemSpots.Add(p);
             }
 
-            // the door terminal: a desk out of the room, far from its door (the nearest such if none is that far)
+            // the door terminal: a desk (or a work table) out of the room, far from its door (the nearest such if none is that far)
             int best = -1;
             float bestScore = float.MinValue;
             for (int i = 0; i < l.Props.Count; i++)
             {
                 var p = l.Props[i];
-                if (p.Kind != PropKind.Desk) continue;
+                if (p.Kind is not (PropKind.Desk or PropKind.WorkTable or PropKind.ExecutiveDesk or PropKind.Credenza or PropKind.ToolChest or PropKind.Cabinet)) continue; // (no lamp on it: LevelGenerator.LampOn) // (a shop has few desks: a bench of the workshop)
                 if (l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == room.Id) continue;
+                if (LevelGenerator.LampOn(l, i)) continue;
                 if ((p.Position - l.HatchPosition).magnitude <= 7.5f) continue; // like the other terminals: not in the lobby
                 float dist = (p.Position - d.Position).magnitude + Mathf.Abs(p.Position.y - d.Position.y) * 2f;
                 // far enough: any of them (by chance); none far enough: the farthest

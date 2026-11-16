@@ -13,6 +13,7 @@ namespace Stealth.Level
         /// <summary>The furniture placed in the house (one object per prop).</summary>
         public static IReadOnlyList<GameObject> Props => s_Props;
         static readonly List<GameObject> s_Props = new();
+        static readonly List<Mesh> s_Meshes = new();
 
         /// <summary>Builds <paramref name="layout"/> from the prefabs in <paramref name="art"/>, replacing the previous level.</summary>
         public static GameObject Load(LevelLayout layout, LevelArt art)
@@ -23,6 +24,7 @@ namespace Stealth.Level
             Root = builder.Build();
             Shell = builder.Shell;
             s_Props.AddRange(builder.Props);
+            s_Meshes.AddRange(builder.Meshes);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             return Root;
         }
@@ -38,6 +40,13 @@ namespace Stealth.Level
             Layout = null;
             Shell = null;
             s_Props.Clear();
+            foreach (var m in s_Meshes)
+                if (m != null)
+                {
+                    if (Application.isPlaying) Object.Destroy(m);
+                    else Object.DestroyImmediate(m);
+                }
+            s_Meshes.Clear();
         }
     }
 
@@ -56,6 +65,9 @@ namespace Stealth.Level
                 RoomType.Server => (new Color(0.55f, 0.75f, 1f), LightMath.RoomIntensity * 0.6f),
                 RoomType.Storage => (new Color(1f, 0.92f, 0.8f), LightMath.RoomIntensity * 0.75f),
                 RoomType.Lobby => (new Color(0.92f, 1f, 0.95f), LightMath.RoomIntensity * 1.15f),
+                // the shop: the hall under cold daylight tubes, the paint booth flooded white (colours must be judged true)
+                RoomType.Workshop => (new Color(0.9f, 0.96f, 1f), LightMath.RoomIntensity * 1.1f),
+                RoomType.PaintBooth => (new Color(0.95f, 0.98f, 1f), LightMath.RoomIntensity * 1.3f),
                 _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
@@ -81,6 +93,8 @@ namespace Stealth.Level
         public LevelShell Shell { get; } = new();
         /// <summary>The furniture placed (not static-batched: styles swap its meshes; <see cref="PropBatches"/> merges it).</summary>
         public List<GameObject> Props { get; } = new();
+        /// <summary>Meshes made while building (the city's): destroyed with the level.</summary>
+        public List<Mesh> Meshes { get; } = new();
 
         public LevelBuilder(LevelArt art, LevelLayout layout)
         {
@@ -100,21 +114,14 @@ namespace Stealth.Level
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
             for (int f = 0; f < l.Floors; f++) BuildSlab(f);
             BuildRoof();
-            var ground = Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, -0.07f, H / 2), new Vector3(W + 60f, 0.1f, H + 60f));
-            if (m_Art.OutsideTerrain != null)
-            {
-                // the terrain's flat middle is the yard's surface (metre UVs: its earth tiles right); the block under
-                // the yard stays as what the feet stand on, not drawn
-                foreach (var r in ground.GetComponentsInChildren<Renderer>()) r.enabled = false;
-                // the land to the horizon, centred on the house; its flat middle (80 m) grown to hold the yard of a big house
-                float yard = Mathf.Sqrt((W / 2 + 30f) * (W / 2 + 30f) + (H / 2 + 30f) * (H / 2 + 30f));
-                var land = Place(m_Art.OutsideTerrain, "OutsideTerrain", new Vector3(W / 2, 0f, H / 2), Quaternion.identity);
-                land.transform.localScale = Vector3.one * Mathf.Max(1f, yard / TerrainFlat);
-            }
-            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, -25f), new Vector3(W + 60f, 5f, 1f));
-            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, H + 25f), new Vector3(W + 60f, 5f, 1f));
-            Block(m_Art.Fence, "Fence", new Vector3(-25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
-            Block(m_Art.Fence, "Fence", new Vector3(W + 25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
+            float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
+            // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
+            Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, CityPlan.RoadTop - 0.06f, H / 2), new Vector3(W + far, 0.1f, H + far));
+            // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
+            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, -yard - 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
+            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, H + yard + 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
+            Block(m_Art.Fence, "Fence", new Vector3(-yard - 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
+            Block(m_Art.Fence, "Fence", new Vector3(W + yard + 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
 
             m_WindowCuts.Clear();
             foreach (var cut in WindowCuts(l))
@@ -132,7 +139,16 @@ namespace Stealth.Level
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 var d = l.AutoDoors[i];
-                var door = Place(m_Art.AutoDoor, "AutoDoor", d.position, d.rotation).GetComponent<AutoDoor>();
+                bool vault = i == l.VaultDoor && m_Art.VaultDoor != null;
+                var rot = d.rotation;
+                if (vault && l.VaultRoom >= 0 && Vector3.Dot(l.Plan.Rooms[l.VaultRoom].Center - d.position, d.rotation * Vector3.forward) < 0f)
+                    rot *= Quaternion.Euler(0f, 180f, 0f); // the round door's +Z into the vault
+                // the shop's doors are steel; its paint booth's is wide, for a car
+                bool shop = l.Kind == HouseKind.Garage;
+                var prefab = vault ? m_Art.VaultDoor
+                    : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
+                    : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor : m_Art.AutoDoor;
+                var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
                     bool keyed = false;
@@ -151,13 +167,16 @@ namespace Stealth.Level
                         room = l.Plan.Rooms[l.StorageRoom].Bounds;
                     }
                     door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room);
+                    if (door.WallParts != null)
+                        foreach (var part in door.WallParts)
+                            if (part != null) Shell.WallParts.Add(part);
                 }
                 if (i == l.VaultDoor && m_Art.VaultPanel != null)
                 {
                     // the vault's plate with its three lamps over the doorway, on both faces of the wall
                     var across = d.rotation * Vector3.forward;
                     foreach (float side in new[] { 1f, -1f })
-                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.36f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
+                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.56f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
                             Quaternion.LookRotation(across * side));
                 }
             }
@@ -166,6 +185,9 @@ namespace Stealth.Level
                     Place(m_Art.VaultConsole, $"VaultConsole{i}", l.VaultConsoles[i].position, l.VaultConsoles[i].rotation).GetComponent<VaultConsole>()?.Configure(i);
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
+            BuildCity(W, H); // one mesh of its own: not static-batched
+            BuildUtilities();
+            BuildSwitches();
 
             for (int i = 0; i < l.Props.Count; i++)
             {
@@ -203,8 +225,6 @@ namespace Stealth.Level
             Shell.Props.Add(new MapProp { Floor = floor, Kind = kind, Area = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z) });
         }
 
-        /// <summary>Radius of the flat middle of the terrain model (Tools/Blender/terrain.py FLAT), metres.</summary>
-        const float TerrainFlat = 78f;
 
         GameObject Place(GameObject prefab, string name, Vector3 position, Quaternion rotation)
         {
@@ -290,7 +310,8 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ walls
 
-        readonly Dictionary<Vector3, float> m_Posts = new();
+        /// <summary>Posts of the floor being built: by their place rounded to a centimetre (shared ends meet there), the exact place and the height.</summary>
+        readonly Dictionary<Vector3, (Vector3 at, float height)> m_Posts = new();
         /// <summary>Where windows cut the outer walls: wall index → positions along it (<see cref="WindowCuts"/>).</summary>
         readonly Dictionary<int, List<float>> m_WindowCuts = new();
         /// <summary>Walls of the floor by their end points (cm keys): to find bent walls whose pieces meet at a shallow angle.</summary>
@@ -344,17 +365,39 @@ namespace Stealth.Level
             float y = LevelLayout.FloorY(f);
             foreach (var kv in m_Posts)
             {
-                // a post between two pieces of a bent wall turns with them: its faces run on with the wall's, no cube sticks out
-                var at = new Vector2(kv.Key.x, kv.Key.z);
+                // a post between two pieces of a bent wall turns with them: its faces run on with the wall's, no cube sticks out;
+                // it stands at the walls' exact end (the rounded key moved it up to 5 mm out of the facade: a seam outside)
+                var (p, h) = kv.Value;
+                var at = new Vector2(p.x, p.z);
                 var rot = SmoothJoint(at, out float yaw) ? Quaternion.Euler(0f, yaw, 0f) : (Quaternion?)null;
-                Block(m_Art.WallBlock, "WallPost", kv.Key + Vector3.up * (y + kv.Value / 2f), new Vector3(t, kv.Value, t), rot);
+                Block(m_Art.WallBlock, "WallPost", p + Vector3.up * (y + h / 2f), new Vector3(t, h, t), rot);
             }
+        }
+
+        /// <summary>
+        /// Past the post at this end of the wall another wall runs straight on (a T-junction seen from its flat side, a
+        /// wall split where the room behind it changes): decoration of the two meets in the middle of the post.
+        /// </summary>
+        bool RunsOn(int index, Vector2 end)
+        {
+            if (!m_Ends.TryGetValue(EndKey(end), out var walls)) return false;
+            var w = m_Plan.Walls[index];
+            foreach (int i in walls)
+            {
+                if (i == index) continue;
+                var o = m_Plan.Walls[i];
+                if (o.Railing || Mathf.Abs(Vector2.Dot(o.Dir, w.Dir)) < 0.999f) continue;
+                bool open = false;
+                foreach (var op in m_Plan.OpeningsOf(i)) if (op.Kind == EdgeType.Open) open = true;
+                if (!open) return true; // (an open passage is no wall: the post there is a free end)
+            }
+            return false;
         }
 
         void Post(Vector2 p, float height)
         {
             var key = new Vector3(Mathf.Round(p.x * 100f) / 100f, 0f, Mathf.Round(p.y * 100f) / 100f);
-            m_Posts[key] = m_Posts.TryGetValue(key, out var h) ? Mathf.Max(h, height) : height;
+            m_Posts[key] = m_Posts.TryGetValue(key, out var was) ? (was.at, Mathf.Max(was.height, height)) : (new Vector3(p.x, 0f, p.y), height);
         }
 
         void Wall(int index)
@@ -372,15 +415,26 @@ namespace Stealth.Level
                 RailingPiece(a3, b3);
                 return;
             }
-            float height = w.FullHeight ? LevelMetrics.FloorHeight : LevelMetrics.WallHeight;
+            // an outer wall runs up to the next floor (the roof): the slab's edge between the floors is behind it, the facade is one plane
+            float height = w.FullHeight || w.Exterior ? LevelMetrics.FloorHeight : LevelMetrics.WallHeight;
             Post(w.A, height);
             Post(w.B, height);
             const float t = LevelMetrics.WallThickness;
             float len = w.Length;
+            if (height < LevelMetrics.FloorHeight)
+                foreach (var (u0, u1) in StairBands(w, m_Layout.Stairs))
+                {
+                    // over the stairwell no slab fills the band up to the next floor: the wall does
+                    WallPiece(m_Art.WallBlock, a3 + d3 * u0, a3 + d3 * u1, LevelMetrics.WallHeight, LevelMetrics.FloorHeight);
+                    if (u0 <= t) Post(w.A, LevelMetrics.FloorHeight);
+                    if (u1 >= len - t) Post(w.B, LevelMetrics.FloorHeight);
+                }
             var inner = InnerNormals(w);
             float from = t / 2f;
             bool jointA = SmoothJoint(w.A, out _), jointB = SmoothJoint(w.B, out _);
             bool cornerA = !jointA;
+            m_StraightA = RunsOn(index, w.A);
+            m_StraightB = RunsOn(index, w.B);
             // the cuts along the wall in order: the plan's openings and the windows (a real hole with glass in it)
             var cuts = new List<(float at, int opening)>();
             for (int k = 0; k < openings.Count; k++) cuts.Add((openings[k].At, k));
@@ -418,7 +472,9 @@ namespace Stealth.Level
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
                 bool breach = o.Kind == EdgeType.Breach, hole = o.Kind == EdgeType.Hole, window = o.Kind == EdgeType.InnerWindow;
-                float clear = LevelMetrics.ClearWidth(LevelMetrics.OpeningWidth(o.Kind));
+                bool vault = IsVaultDoorway(index, o), booth = IsBoothDoorway(index, o);
+                float clear = LevelMetrics.ClearWidth(vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth
+                    : LevelMetrics.OpeningWidth(o.Kind));
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
                 float sill = window ? LevelMetrics.InnerWindowSill : o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
                 float openH = vent ? sill + LevelMetrics.VentHeight
@@ -432,21 +488,27 @@ namespace Stealth.Level
                     WallPiece(m_Art.WallBlock, a3 + d3 * o0, a3 + d3 * o1, 0f, sill);
                     RecordFaces(a3 + d3 * o0, a3 + d3 * o1, 0f, sill, w.Exterior, inner, false, false);
                 }
-                WallPiece(m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
+                // over a street door the facade runs on (the door's frame paints the inside): no trim-coloured lintel outside
+                WallPiece(w.Exterior ? m_Art.WallBlock : m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
                 // a window between rooms has a sill like a vent and a frame of its own; breaches and holes are ruins, no door trim
                 Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent || window, Exterior = w.Exterior,
-                    Squeeze = squeeze || breach || hole, Floor = m_Floor });
+                    Squeeze = squeeze || breach || hole, Vault = vault, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
                 else if (window) { if (m_Art.InnerWindowFrame != null) Place(m_Art.InnerWindowFrame, "InnerWindow", mid, along); }
                 else if (breach) { if (m_Art.BreachFrame != null) Place(m_Art.BreachFrame, "Breach", mid, along); }
                 else if (hole) { if (m_Art.HoleFrame != null) Place(m_Art.HoleFrame, "Hole", mid, along); }
-                else if (w.Exterior) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
+                else if (w.Exterior)
+                {
+                    // the street door's +Z out of the house: its leaves swing outwards
+                    var outward = inner.Count > 0 ? -inner[0] : along * Vector3.forward;
+                    Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
+                }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
-                else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
+                else if (m_Art.ExitSign != null && !vault) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
                 from = o1;
                 cornerA = false;
             }
@@ -479,6 +541,26 @@ namespace Stealth.Level
             return list;
         }
 
+        /// <summary>The vault's doorway (<see cref="LevelLayout.VaultDoorway"/>) — wider, for the round bank door.</summary>
+        bool IsVaultDoorway(int wall, PlanOpening o)
+        {
+            int v = m_Layout.VaultDoorway;
+            if (v < 0 || v >= m_Plan.Openings.Count || m_Art.VaultDoor == null) return false;
+            var vo = m_Plan.Openings[v];
+            return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
+        }
+
+        /// <summary>The paint booth's doorway (<see cref="LevelLayout.BoothDoorway"/>) — a car goes through it.</summary>
+        bool IsBoothDoorway(int wall, PlanOpening o)
+        {
+            int v = m_Layout.BoothDoorway;
+            if (v < 0 || v >= m_Plan.Openings.Count) return false;
+            var vo = m_Plan.Openings[v];
+            return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
+        }
+
+        bool m_StraightA, m_StraightB; // of the wall being built (see RunsOn)
+
         void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, List<Vector3> sides, bool cornerA, bool cornerB,
             bool jointA = false, bool jointB = false)
         {
@@ -488,7 +570,35 @@ namespace Stealth.Level
                 {
                     A = a, B = b, Y0 = y0, Y1 = y1, Normal = side, Floor = m_Floor, Exterior = outside,
                     CornerA = cornerA, CornerB = cornerB, JointA = jointA, JointB = jointB,
+                    StraightA = cornerA && m_StraightA, StraightB = cornerB && m_StraightB,
                 });
+        }
+
+        /// <summary>
+        /// Where a wall runs along the hole in the slab above it that the stairs leaving its floor climb through: spans
+        /// along the wall (metres from A). Elsewhere the slab fills the band between the wall's top and the next floor; over
+        /// the hole nothing did, and by an outer wall a strip of sky showed between the floors.
+        /// </summary>
+        public static List<(float from, float to)> StairBands(PlanWall w, IReadOnlyList<Stair> stairs)
+        {
+            var spans = new List<(float, float)>();
+            const float step = 0.1f, reach = LevelMetrics.WallThickness / 2f + 0.15f;
+            if (w.Railing) return spans;
+            foreach (var s in stairs)
+            {
+                if (s.Floor != w.Floor) continue;
+                var hole = PlanGenerator.StairArea(s, reach);
+                float from = -1f, to = -1f;
+                for (float u = 0f; u <= w.Length + step - 0.001f; u += step)
+                {
+                    float at = Mathf.Min(u, w.Length);
+                    if (!hole.Contains(w.At(at))) continue;
+                    if (from < 0f) from = at;
+                    to = at;
+                }
+                if (from >= 0f && to - from > 0.05f) spans.Add((Mathf.Max(0f, from - step), Mathf.Min(w.Length, to + step)));
+            }
+            return spans;
         }
 
         /// <summary>A wall block exactly from <paramref name="a"/> to <paramref name="b"/> (no overlap with neighbours), any direction.</summary>
@@ -538,12 +648,13 @@ namespace Stealth.Level
         void BuildLights(PlanRoom r)
         {
             var (color, intensity) = RoomLighting.For(r.Type, r.Dark, m_Layout.DarkRoomsDim ? m_Layout.DimShare : 0f);
+            var (litColor, litIntensity) = RoomLighting.For(r.Type, false); // a light switch turns a dark room on
             float ceiling = LevelLayout.FloorY(r.Floor + r.Levels - 1) + LevelMetrics.WallHeight;
             int k = 0;
             foreach (var p in LightSpots(m_Layout, r))
             {
                 var go = Place(m_Art.RoomLight, $"Light_{r.Id}_{k}", new Vector3(p.x, ceiling, p.y), Quaternion.identity);
-                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f);
+                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f, r.Id, r.Dark, litColor, litIntensity);
                 k++;
             }
         }
@@ -572,11 +683,104 @@ namespace Stealth.Level
 
         void BuildStair(Stair s)
         {
-            var (mirrored, yaw) = StairGeometry.Placement(s.Corner);
+            var (mirrored, yaw) = StairGeometry.Placement(s.Corner, s.Flip);
             var go = Place(mirrored ? m_Art.StairsMirrored : m_Art.Stairs, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
                 look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
+        }
+
+        /// <summary>The house's services (<see cref="UtilityPlan"/>: ducts, pipes, panels, sockets): one mesh, a submesh per material.</summary>
+        /// <summary>A light switch beside every doorway of a room (<see cref="UtilityPlan.SwitchSpots"/>), numbered in the plan's order on every peer.</summary>
+        void BuildSwitches()
+        {
+            if (m_Art.LightSwitch == null) return;
+            var spots = UtilityPlan.SwitchSpots(m_Layout, Shell);
+            for (int i = 0; i < spots.Count; i++)
+            {
+                var s = spots[i];
+                var room = m_Layout.Plan.Rooms.Find(r => r.Id == s.Room);
+                var go = Place(m_Art.LightSwitch, $"LightSwitch_{i}", s.Position, Quaternion.LookRotation(s.Facing));
+                if (go.TryGetComponent<LightSwitch>(out var sw)) sw.Setup(i, s.Room, room != null && room.Dark);
+            }
+        }
+
+        void BuildUtilities()
+        {
+            var mats = m_Art.UtilityMaterials;
+            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
+            var parts = UtilityPlan.Make(m_Layout, Shell);
+            if (parts.Count == 0) return;
+            int slots = System.Enum.GetValues(typeof(UtilitySlot)).Length;
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[slots];
+            for (int i = 0; i < slots; i++) tris[i] = new List<int>();
+            foreach (var p in parts) UtilityPlan.AddFaces(p, verts, normals, uvs, tris);
+            var mesh = new Mesh { name = "Utilities", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            var used = new List<Material>();
+            var subs = new List<List<int>>();
+            for (int i = 0; i < slots; i++)
+                if (tris[i].Count > 0 && i < mats.Length && mats[i] != null) { used.Add(mats[i]); subs.Add(tris[i]); }
+            mesh.subMeshCount = subs.Count;
+            for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
+            mesh.RecalculateBounds();
+            Meshes.Add(mesh);
+            var go = Place(m_Art.CityPiece, "Utilities", Vector3.zero, Quaternion.identity);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
+        }
+
+        /// <summary>The city round the yard (<see cref="CityPlan"/>): one mesh, a submesh per material, and the street lamps' lights.</summary>
+        void BuildCity(float w, float h)
+        {
+            var mats = m_Art.CityMaterials;
+            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
+            var house = new Rect(0f, 0f, w, h);
+            var lobby = m_Layout.Lobby.Center;
+            var city = CityPlan.Make(house, CityPlan.SideNearest(house, new Vector2(lobby.x, lobby.z)), m_Layout.Floors, m_Layout.Seed);
+            // the house's own corners (an L, a courtyard): pavement too
+            foreach (var r in Rectangles(m_Plan.NX, m_Plan.NZ, (x, z) => m_Plan.KindAt(0, x, z) == CellKind.Outside))
+            {
+                var box = new CityBox(new Vector3(r.xMin * HousePlan.Res, -0.3f, r.yMin * HousePlan.Res), new Vector3(r.xMax * HousePlan.Res, CityPlan.WalkTop, r.yMax * HousePlan.Res),
+                    CitySlot.Sidewalk, CitySlot.Sidewalk);
+                city.Boxes.Add(box);
+                city.Ground.Add(box.Bounds);
+            }
+            // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
+            var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
+            foreach (var b in city.Ground)
+                if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
+            foreach (var b in city.Solids)
+                if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
+            int slots = System.Enum.GetValues(typeof(CitySlot)).Length;
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[slots];
+            for (int i = 0; i < slots; i++) tris[i] = new List<int>();
+            foreach (var b in city.Boxes) CityPlan.AddFaces(b, verts, normals, uvs, tris);
+            var mesh = new Mesh { name = "City", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            var used = new List<Material>();
+            var subs = new List<List<int>>();
+            for (int i = 0; i < slots; i++)
+                if (tris[i].Count > 0 && i < mats.Length && mats[i] != null) { used.Add(mats[i]); subs.Add(tris[i]); }
+            mesh.subMeshCount = subs.Count;
+            for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
+            mesh.RecalculateBounds();
+            Meshes.Add(mesh);
+            var go = Place(m_Art.CityPiece, "City", Vector3.zero, Quaternion.identity);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
+            if (m_Art.CityLamp != null)
+                foreach (var p in city.Lamps) Place(m_Art.CityLamp, "CityLamp", p, Quaternion.identity);
         }
 
         /// <summary>
@@ -633,6 +837,12 @@ namespace Stealth.Level
                     var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
                     var ik = plan.KindAt(w.Floor, inside.x, inside.y);
                     if (ik != CellKind.Room && ik != CellKind.Void) continue;
+                    // nobody looks into a restroom, a changing room or the vault from the street
+                    if (ik == CellKind.Room)
+                    {
+                        int id = plan.IdAt(w.Floor, inside.x, inside.y);
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop)) continue; // the hall's street wall is its doors
+                    }
                     roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));
                 }

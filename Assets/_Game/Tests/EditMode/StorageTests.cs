@@ -13,6 +13,22 @@ namespace Stealth.Tests
     public class StorageTests
     {
         [Test]
+        public void TwoDoorsSideBySideOpenFromTheMiddle()
+        {
+            // a two-door cupboard (0.9 m wide), a bank of three lockers, a door over a drawer
+            var pair = new List<Bounds> { new(new Vector3(-0.22f, 1f, 0f), new Vector3(0.44f, 1.8f, 0.02f)), new(new Vector3(0.22f, 1f, 0f), new Vector3(0.44f, 1.8f, 0.02f)) };
+            CollectionAssert.AreEqual(new[] { false, true }, StorageMath.RightHinged(pair, Vector3.right), "the right leaf on its right");
+            CollectionAssert.AreEqual(new[] { true, false }, StorageMath.RightHinged(pair, Vector3.left), "seen from behind (turned 180°) the other way round");
+            var three = new List<Bounds>();
+            for (int i = 0; i < 3; i++) three.Add(new Bounds(new Vector3(i * 0.4f, 1f, 0f), new Vector3(0.38f, 1.8f, 0.02f)));
+            Assert.AreEqual(1, StorageMath.RightHinged(three, Vector3.right).Count(x => x), "one pair, the third alone");
+            var stacked = new List<Bounds> { new(new Vector3(0f, 1.4f, 0f), new Vector3(0.5f, 0.6f, 0.02f)), new(new Vector3(0f, 0.6f, 0f), new Vector3(0.5f, 0.6f, 0.02f)) };
+            CollectionAssert.AreEqual(new[] { false, false }, StorageMath.RightHinged(stacked, Vector3.right), "one above the other: no pair");
+            var hinge = StorageMath.Hinge(pair[1], Vector3.right, Vector3.forward, true);
+            Assert.AreEqual(0.44f, hinge.x, 1e-4f, "the right leaf's hinge on its right edge");
+        }
+
+        [Test]
         public void DoorsHingeOnTheirFrontLeftEdge()
         {
             var door = new Bounds(new Vector3(2f, 1f, 5f), new Vector3(0.28f, 1.8f, 0.02f));

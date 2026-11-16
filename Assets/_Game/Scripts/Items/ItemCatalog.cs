@@ -55,7 +55,7 @@ namespace Stealth.Items
             new Shape { Id = "key",     Cells = new[] { V(0, 0) } },
             new Shape { Id = "stun",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             new Shape { Id = "speaker", Cells = new[] { V(0, 0), V(1, 0) } },
-            new Shape { Id = "cagekey", Cells = new[] { V(0, 0) } },
+            new Shape { Id = "cagekey", Cells = new[] { V(0, 0), V(0, 1) } },
             // the first real loot: a shovel, 1 x 4 in the backpack (its picture: ItemVisuals.Icons), a model with physics in the world
             new Shape { Id = "shovel",  Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(0, 3) } },
             // the flashlight (1 x 3; it lights when held and switched on, its charge is its colour byte) and its batteries
@@ -122,10 +122,13 @@ namespace Stealth.Items
         public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)color;
 
         /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
-        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery;
+        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey;
+
+        /// <summary>How much larger than life the keys' models are (Tools/Blender/rooms2_special.py): found on a floor.</summary>
+        public const float KeyScale = 2f, CageKeyScale = 1.6f;
 
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
-        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery;
+        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun;
 
         /// <summary>
         /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
@@ -137,6 +140,8 @@ namespace Stealth.Items
             if (shape == Shovel) return new Vector3(1.105f, 0.06f, 0.22f);
             if (shape == Flashlight) return new Vector3(0.263f, 0.065f, 0.065f);
             if (shape == Battery) return new Vector3(0.066f, 0.032f, 0.061f);
+            if (shape == Key) return new Vector3(0.086f, 0.012f, 0.024f) * KeyScale;
+            if (shape == CageKey) return new Vector3(0.178f, 0.02f, 0.054f) * CageKeyScale;
             var size = Size(Shapes[shape].Cells);
             return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
         }
@@ -184,9 +189,10 @@ namespace Stealth.Items
 
         /// <summary>
         /// The flashlight burns into fuel like loot (in the car's hopper, into the entry hatch), worth its cells at the grey
-        /// colour's rate whatever its charge (its colour byte holds the charge). Batteries have a colour like any loot.
+        /// colour's rate whatever its charge (its colour byte holds the charge). So do the tools (key, stun, speaker, cage key):
+        /// whatever their colour, they burn at the grey rate. Batteries have a colour like any loot.
         /// </summary>
-        static bool Plain(int shape) => shape == Flashlight;
+        static bool Plain(int shape) => shape == Flashlight || IsTool(shape);
 
         /// <summary>The value of a loot item in cells of the grey colour, on average (its cells × the mean colour multiplier).</summary>
         public static float MeanValueCells(int shape)
@@ -213,8 +219,7 @@ namespace Stealth.Items
         }
 
         public static int Value(int shape, int color) =>
-            IsTool(shape) ? 0
-            : Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
+            Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
             : (shape == Diamond ? DiamondValueCells : Shapes[shape].Cells.Length) * Colors[color].Multiplier * PointsPerCell;
 
         /// <summary>Bit of an item's rotation byte: the piece is mirrored (left-right) before it is turned.</summary>

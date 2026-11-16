@@ -40,6 +40,74 @@ namespace Stealth.Tests
         };
 
         [Test]
+        public void ThresholdsLieWhereTwoFloorsMeetInADoorway()
+        {
+            var shell = Shell(out var layout);
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            var g = new StyleGeometry { Floor = Lit() };
+            Assert.IsFalse(ArchitecturePlanner.Plan(shell, layout, g).Any(p => p.Threshold), "one floor everywhere: no thresholds");
+            var type = layout.Rooms.First(r => r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby)).Type;
+            g.RoomFloors = new[] { new RoomFloor { Room = type, Material = Lit(), Tile = 1f } };
+            var strips = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Threshold).ToList();
+            Assert.IsNotEmpty(strips, $"the {type} rooms' doorways get thresholds");
+            foreach (var s in strips)
+            {
+                var o = shell.Openings.OrderBy(x => (x.Center - s.Position).sqrMagnitude).First();
+                Assert.Less(Vector3.Distance(o.Center + Vector3.up * ArchitecturePlanner.ThresholdLift, s.Position), 0.01f, "in a doorway");
+                Assert.AreEqual(o.Width, s.Scale.y, 1e-4f, "as wide as the opening");
+                var n = new Vector3(-o.Along.z, 0f, o.Along.x);
+                var a = layout.Plan.RoomAt(o.Center + n * 0.6f + Vector3.up * 0.5f);
+                var b = layout.Plan.RoomAt(o.Center - n * 0.6f + Vector3.up * 0.5f);
+                Assert.IsTrue((a.Type == type) != (b.Type == type), "between the room with its own floor and another");
+            }
+        }
+
+        [Test]
+        public void OuterWallsRunUpToTheNextFloor()
+        {
+            var shell = Shell(out _);
+            // the slab's edge between the floors stays behind the facade: no dark band outside, one plane
+            var tall = shell.Walls.Where(f => f.Exterior && f.Y0 < 0.01f && f.Y1 > 2.5f).ToList();
+            Assert.IsNotEmpty(tall);
+            Assert.IsTrue(tall.All(f => f.Y1 >= LevelMetrics.FloorHeight - 0.01f), "an outer wall stops under the slab");
+        }
+
+        [Test]
+        public void ARoomTypeGetsItsOwnTilesPaintAndCeiling()
+        {
+            var shell = Shell(out var layout);
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            var type = layout.Rooms.First(r => r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && r.Levels == 1).Type;
+            var g = Everything(CeilingKind.Trays);
+            g.WainscotHeight = 1f;
+            g.RoomLooks = new[] { new RoomLook { Room = type, Wall = Lit(), WallTile = 2f, Lower = Lit(), LowerTile = 1f, LowerHeight = 1.6f, Plain = true, Ceiling = Lit(), CeilingTile = 1.2f } };
+            var plan = ArchitecturePlanner.Plan(shell, layout, g);
+            PlanRoom At(Vector3 p) => layout.Plan.RoomAt(p);
+            // probed just over the piece's bottom edge (a piece's middle near the ceiling reads as the floor above)
+            bool Ours(DecorPiece p, Vector3 into) => At(p.Position + into * 0.3f + Vector3.up * (0.1f - (p.IsQuad ? p.Scale.y / 2f : 0f)))?.Type == type;
+            var finishes = plan.Where(p => p.Kind == DecorKind.WallFinish && Ours(p, -(p.Rotation * Vector3.forward))).ToList();
+            var lower = finishes.Where(p => p.Variant == 2).ToList();
+            var upper = finishes.Where(p => p.Variant == 1).ToList();
+            Assert.IsNotEmpty(lower, "tiles at the bottom");
+            Assert.IsNotEmpty(upper, "the room's paint above");
+            // (the reveals inside the doorways keep the style's wall: they belong to the opening, both rooms see them)
+            bool InOpening(DecorPiece p) => shell.Openings.Any(o => Mathf.Abs(o.Center.y - LevelLayout.FloorY(LevelLayout.FloorOf(p.Position.y - p.Scale.y / 2f + 0.1f))) < 0.5f
+                && Vector2.Distance(new Vector2(o.Center.x, o.Center.z), new Vector2(p.Position.x, p.Position.z)) < o.Width / 2f + 0.3f);
+            var left = finishes.Where(p => p.Variant == 0 && !InOpening(p)).ToList();
+            Assert.IsEmpty(left, $"no style wallpaper left in the room: {string.Join(", ", left.Take(3).Select(p => p.Position))}");
+            Assert.IsTrue(lower.All(p => p.Position.y + p.Scale.y / 2f - LevelLayout.FloorY(LevelLayout.FloorOf(p.Position.y - p.Scale.y / 2f + 0.1f)) <= 1.6f + 1e-3f), "tiles up to their height");
+            Assert.IsFalse(plan.Any(p => p.Kind == DecorKind.Wainscot && Ours(p, p.Rotation * Vector3.forward)), "plain walls: no panels");
+            Assert.IsTrue(plan.Any(p => p.Kind == DecorKind.CeilingFinish && p.Variant == 1), "a ceiling of its own");
+            // its doorways: each half of a reveal (across the wall) in the finish of the room on its side, the arch's spandrels too
+            const float halfWall = LevelMetrics.WallThickness / 2f;
+            var reveals = plan.Where(p => p.Kind == DecorKind.WallFinish && Mathf.Abs(p.Scale.x - halfWall) < 1e-3f).ToList();
+            Assert.IsTrue(reveals.Any(p => p.Variant is 1 or 2), "the room's half of its doorways' reveals");
+            Assert.IsTrue(reveals.Any(p => p.Variant == 0), "the neighbours' halves keep theirs");
+            Assert.IsTrue(plan.Any(p => p.Kind == DecorKind.Arch && p.Variant == 1), "arches on the room's side in its paint");
+            Assert.IsFalse(plan.Any(p => p.Kind is DecorKind.Tray or DecorKind.TrayHanger && At(p.Position - Vector3.up * 0.5f)?.Type == type), "no trays under it");
+        }
+
+        [Test]
         public void DecayAndPostersAreSeededStayOnTheirSurfacesAndSkipTheWindows()
         {
             var shell = Shell(out var layout);
@@ -89,6 +157,22 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheVaultsRoundDoorGetsNoTrimAndNoReveals()
+        {
+            // its own steel ring and wall corners frame it: a style's casing, arch or reveal finish would clash with them
+            LevelShell ShellWith(bool vault)
+            {
+                var shell = new LevelShell();
+                shell.Openings.Add(new WallOpening { Center = Vector3.zero, Along = Vector3.right, Width = 2.4f, Height = LevelMetrics.DoorHeight, Vault = vault });
+                return shell;
+            }
+            var g = Everything(CeilingKind.None);
+            Assert.IsNotEmpty(ArchitecturePlanner.Plan(ShellWith(false), null, g), "an ordinary doorway is trimmed");
+            Assert.IsEmpty(ArchitecturePlanner.Plan(ShellWith(true), null, g), "the vault's is not");
+            Assert.AreEqual(ArchitecturePlanner.FrameReach, ArchitecturePlanner.ReachOf(ShellWith(true).Openings[0], g), "trims along the wall stop short of its ring");
+        }
+
+        [Test]
         public void TheShellRecordsWallsFloorsOpeningsAndWindows()
         {
             var shell = Shell(out var layout);
@@ -113,7 +197,7 @@ namespace Stealth.Tests
         public void TrimsNeverCrossADoorwayAndFinishesSkipTheWindows()
         {
             var shell = Shell(out var layout);
-            var pieces = ArchitecturePlanner.Plan(shell, layout, Everything(CeilingKind.Coffers));
+            var pieces = ArchitecturePlanner.Plan(shell, layout, Everything(CeilingKind.Trays));
             foreach (var o in shell.Openings.Where(o => !o.Vent))
             {
                 // the doorway's clear volume (walking height) must stay free of baseboards, rails, panels and strips
@@ -211,7 +295,7 @@ namespace Stealth.Tests
         public void CeilingPiecesAvoidStairHolesAndLamps()
         {
             var shell = Shell(out var layout);
-            foreach (var kind in new[] { CeilingKind.Beams, CeilingKind.Coffers, CeilingKind.Trays })
+            foreach (var kind in new[] { CeilingKind.Trays })
             {
                 var pieces = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { Ceiling = kind });
                 Assert.IsNotEmpty(pieces, kind.ToString());
@@ -318,7 +402,7 @@ namespace Stealth.Tests
                 RoomFloors = layout.Rooms.Select(r => r.Type).Distinct().Where(t => t != RoomType.Lobby)
                     .Select(t => new RoomFloor { Room = t, Material = tiles, Tile = 1f }).Take(3).ToArray(),
             };
-            var floors = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.FloorFinish).ToList();
+            var floors = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.FloorFinish && !p.Threshold).ToList();
             Assert.IsTrue(floors.Any(p => p.Variant == 0), "the style's floor elsewhere");
             Assert.IsTrue(floors.Any(p => p.Variant > 0), "rooms of their own");
             foreach (var p in floors)
@@ -330,6 +414,44 @@ namespace Stealth.Tests
                 int expect = g.RoomFloorOf(room.Type) + 1;
                 Assert.AreEqual(expect, p.Variant, $"{room.Type} at {p.Position}");
             }
+        }
+
+        /// <summary>A slanted wall cuts its pocket's cells at an angle: their room-side halves carry the room's floor, not the style's.</summary>
+        [Test]
+        public void ThePocketBehindASlantedWallHasItsRoomsFloor()
+        {
+            LevelLayout layout = null;
+            foreach (var l in TestHouses.Sample)
+                if (l.Rooms.Any(r => r.Shaped.Count > 0 && r.Type != RoomType.Lobby)) { layout = l; break; }
+            Assume.That(layout, Is.Not.Null, "a house with a slanted or round wall");
+            var plan = layout.Plan;
+            // the planner only needs the slabs here: one over each whole floor
+            var shell = new LevelShell();
+            for (int f = 0; f < layout.Floors; f++)
+                shell.Floors.Add(new FloorRect { Min = Vector2.zero, Max = new Vector2(plan.NX, plan.NZ) * HousePlan.Res, Y = LevelLayout.FloorY(f), Floor = f });
+            var tiles = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var g = new StyleGeometry
+            {
+                Floor = new Material(Shader.Find("Universal Render Pipeline/Lit")),
+                RoomFloors = layout.Rooms.Where(r => r.Shaped.Count > 0 && r.Type != RoomType.Lobby).Select(r => r.Type).Distinct()
+                    .Select(t => new RoomFloor { Room = t, Material = tiles, Tile = 1f }).ToArray(),
+            };
+            var floors = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.FloorFinish && !p.Threshold).ToList();
+            int pockets = 0;
+            for (int f = 0; f < layout.Floors; f++)
+                for (int x = 0; x < plan.NX; x++)
+                    for (int z = 0; z < plan.NZ; z++)
+                    {
+                        if (plan.KindAt(f, x, z) != CellKind.Pocket) continue;
+                        int id = plan.IdAt(f, x, z);
+                        if (id < 0 || id >= plan.Rooms.Count || g.RoomFloorOf(plan.Rooms[id].Type) < 0) continue;
+                        pockets++;
+                        var c = HousePlan.CellCenter(x, z);
+                        var quad = floors.First(p => Mathf.Abs(p.Position.y - LevelLayout.FloorY(f)) < 0.1f &&
+                                                     Mathf.Abs(p.Position.x - c.x) < p.Scale.x / 2f && Mathf.Abs(p.Position.z - c.y) < p.Scale.y / 2f);
+                        Assert.AreEqual(g.RoomFloorOf(plan.Rooms[id].Type) + 1, quad.Variant, $"the pocket cell {x},{z} of the {plan.Rooms[id].Type}");
+                    }
+            Assert.Greater(pockets, 0);
         }
     }
 }

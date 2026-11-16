@@ -389,28 +389,34 @@ def listener(L):
 
 
 def worker(L):
-    """The cash courier: a low chamfered base, a rear tower with a strobe, a lift carriage holding the armoured
-    case on two forks, a lit sensor slit on the bumper."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.box((.56, .76, .2), (0, 0, .27)))
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Body", L.cyl(.04, .14, (x * .8, y, .12), axis="X"))
-    P.add("Accent", L.box((.6, .1, .14), (0, -.38, .3)))
-    a, g = visor(L, (0, -.43, .32), .4, .03, depth=.04)
-    P.add("Body", a).add("Eye", g)
-    P.add("Body", grooved(L.box((.4, .22, .92), (0, .24, .8), taper=(.9, .9))[0], "Z", (.6, 1.0)))       # tower
-    a, g = strobe((0, .24, 1.26), .035)
-    P.add("Body", a).add("Eye", g)
-    for sx in (-1, 1):
-        P.add("Body", L.box((.05, .05, .86), (sx * .16, .11, .78)))                                     # lift rails
-        P.add("Accent", L.box((.06, .5, .04), (sx * .14, -.12, .93)))                                   # forks
-    P.add("Body", L.box((.38, .06, .2), (0, .1, .98)))                                                 # carriage
-    P.add("Accent", L.box((.48, .44, .38), (0, -.15, 1.14)))                                           # the case
-    P.add("Accent", L.box((.5, .46, .04), (0, -.15, 1.08), r=.012))
-    P.add("Body", L.box((.18, .04, .03), (0, -.38, 1.26), r=.008) + L.box((.04, .04, .04), (-.08, -.38, 1.24), r=.008)
-          + L.box((.04, .04, .04), (.08, -.38, 1.24), r=.008))                                         # handle
-    return P
+    """Cash-in-transit runner: a chamfered armoured deck, an armoured sensor pod with a lit visor slit, a grooved
+    armoured mast with steel rails up its front corners and a strobe on top; the fork tray docks on a machined cradle."""
+    def deck(L, P):
+        P.add("Body", L.box((.52, .76, .18), (0, 0, .22)))
+        P.add("Body", L.box((.7, .8, .06), (0, 0, .3), taper=(.96, .96)))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", L.cyl(.04, .14, (x * .8, y, .12), axis="X"))
+        for y in (-.41, .41):
+            P.add("Accent", L.box((.62, .08, .12), (0, y, .23)))
+
+    def pod(L, P):
+        P.add("Body", grooved(L.box((.48, .34, .3), (0, -.23, .47), taper=(.9, .86))[0], "Z", (.53,)))
+        a, g = visor(L, (0, -.405, .355), .36, .03, depth=.04)
+        P.add("Accent", a).add("Eye", g)
+        D.worker_shoulders(L, P, inner=.2)
+
+    def mast(L, P):
+        P.add("Body", grooved(L.box((.44, .28, 1.0), (0, .22, .8), taper=(.86, .9))[0], "Z", (.62, .98)))
+        for sx in (-1, 1):
+            P.add("Accent", L.box((.04, .05, .9), (sx * .19, .085, .8)))                             # rails
+        P.add("Accent", L.box((.46, .3, .05), (0, .22, 1.315)))
+        D.worker_chain(L, P, (0, .08), .38, 1.24, w=.09)
+
+    def beacon(L, P):
+        a, g = strobe((0, .25, 1.34), .04)
+        P.add("Accent", a).add("Eye", g)
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

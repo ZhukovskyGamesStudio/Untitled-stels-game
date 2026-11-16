@@ -13,15 +13,35 @@ namespace Stealth.Level
 
         [Tooltip("The lid on its hinge: it swings open while someone hides inside.")]
         public Transform Lid;
+        [Tooltip("The glowing ring and the lamp on the post: blue at the entry, green at the exit (the map's colours).")]
+        public Renderer[] Glow;
+
+        public static readonly Color EntryColor = new(0.3f, 0.6f, 1f), ExitColor = new(0.3f, 1f, 0.4f);
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
 
         float m_Open;
+        int m_Painted = -1;
 
         void Update()
         {
-            if (Lid == null) return;
-            bool someone = false;
             var layout = ActiveLevel.Layout;
             int mine = layout != null && (transform.position - layout.ExitHatchPosition).sqrMagnitude < 1f ? 1 : 0;
+            if (mine != m_Painted && Glow != null)
+            {
+                m_Painted = mine;
+                var block = new MaterialPropertyBlock();
+                var c = mine == 1 ? ExitColor : EntryColor;
+                foreach (var r in Glow)
+                {
+                    if (r == null) continue;
+                    r.GetPropertyBlock(block);
+                    block.SetColor(BaseColorId, c);
+                    block.SetColor(EmissionId, c * 2.4f);
+                    r.SetPropertyBlock(block);
+                }
+            }
+            if (Lid == null) return;
+            bool someone = false;
             foreach (var p in Stealth.Player.PlayerController.All) someone |= p.InHatch && p.HatchIndex == mine;
             m_Open = Mathf.MoveTowards(m_Open, someone ? 1f : 0f, Time.deltaTime * 2.5f);
             Lid.localRotation = Quaternion.Euler(0f, 0f, -Mathf.SmoothStep(0f, 105f, m_Open));

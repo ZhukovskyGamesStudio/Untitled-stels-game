@@ -11,5 +11,7 @@ namespace Stealth.Level
     {
         public GameObject Bars;
         public GameObject WhenOpen;
+        [Tooltip("Bricks in the mouth, shown with the bars when the tunnel leads nowhere this time.")]
+        public GameObject Plug;
     }
 }

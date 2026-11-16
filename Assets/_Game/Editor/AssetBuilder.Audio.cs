@@ -107,6 +107,13 @@ namespace Stealth.EditorTools
                 s_Bank.HandDryer = Clip("Environment/hand_dryer");
                 EditorUtility.SetDirty(s_Bank);
             }
+            if (s_Bank.GasBreath == null || s_Bank.GasLaugh == null || s_Bank.GasLaugh.Length != 3 || s_Bank.HostageVoice == null || s_Bank.HostageVoice.Length != 5)
+            {
+                s_Bank.GasBreath = Clip("Player/gas_breath");
+                s_Bank.GasLaugh = Enumerable.Range(0, 3).Select(i => Clip($"Player/gas_laugh_{i}")).ToArray();
+                s_Bank.HostageVoice = new[] { "help", "key", "out", "quiet", "hurry" }.Select(n => Clip($"Voices/hostage_{n}")).ToArray();
+                EditorUtility.SetDirty(s_Bank);
+            }
             return s_Bank;
         }
 

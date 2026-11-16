@@ -302,24 +302,36 @@ def listener(L):
 
 
 def worker(L):
-    """A wedge cart whose swan-neck arm lifts a data-cube crate (light seams on its edges) over its nose."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", grid_wheel(c, .12, .1))
-        P.add("Body", L.rod((c[0] * .4, c[1], .13), (c[0] * 1.0, c[1], .12), .04))
-    P.add("Body", lo([(-.42, .16, .08, 2.6, 0, .05), (-.25, .23, .14, 3.0), (.3, .23, .13, 3.0), (.44, .14, .07, 2.4, 0, -.03)],
-                     axis="-Y", loc=(0, .02, .28), caps=.03))
-    P.add("Body", [s.tube([(0, .3, .38), (0, .32, .7), (0, .2, .92), (0, .02, .96)], .055, res=2)])
-    P.add("Accent", [s.rbox((.48, .44, .04), (0, -.15, .945), r=.012, seg=2)])
-    P.add("Accent", [s.rbox((.44, .42, .36), (0, -.15, 1.145), r=.03, seg=2)])
-    P.add("Eye", [s.rbox((.46, .44, .03), (0, -.15, 1.15), r=.01, seg=1)])
-    for x in (-.2, .2):
-        P.add("Eye", [s.rbox((.03, .44, .34), (x, -.15, 1.145), r=.01, seg=1)])
-    P.add("Body", lo([(0, .1, .06, 2.4), (.12, .12, .07, 2.6), (.2, .07, .045, 2.2)], axis="-Y", loc=(0, -.24, .48), seg=24))
-    P.add("Eye", band(.15, .1, .06, axis="-Y", loc=(0, -.24, .48), h=.04, grow=.008, seg=24))
-    P.add("Eye", band(.38, .23, .13, axis="-Y", loc=(0, .02, .29), h=.03, grow=.006, n=3.0))
-    return P
+    """Data courier: a low wedge deck with light seams down its flanks, a smooth nose pod ringed by a glowing visor, a
+    swept aerofoil column for a mast with a light line up its leading edge, a ring light on top; dark solid wheels."""
+    def deck(L, P):
+        P.add("Body", lo([(-.4, .17, .06, 2.6), (-.26, .25, .1, 3.0), (.3, .25, .1, 3.0), (.42, .18, .07, 2.6)],
+                         axis="-Y", loc=(0, .02, .25), caps=.03))
+        P.add("Body", [s.rbox((.68, .78, .05), (0, 0, .3), r=.02, seg=2)])
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", L.rod((x * .4, y, .13), (x * 1.0, y, .12), .04))
+        for y in (-.41, .41):
+            P.add("Accent", [s.rbox((.6, .06, .08), (0, y, .22), r=.025, seg=2)])
+        for sx in (-1, 1):
+            P.add("Eye", line([(sx * .35, -.36, .3), (sx * .35, .36, .3)], .014))
+
+    def pod(L, P):
+        P.add("Body", lo([(-.14, .22, .14, 3.0), (.06, .23, .15, 3.0), (.17, .19, .12, 2.6)], axis="-Y", loc=(0, -.235, .47), caps=.03))
+        P.add("Eye", band(.13, .2, .125, n=2.8, axis="-Y", loc=(0, -.235, .47), h=.025, grow=.008))
+        D.worker_shoulders(L, P, inner=.2)
+
+    def mast(L, P):
+        P.add("Body", lo([(.3, .2, .15, 2.6, 0, .24), (.8, .19, .14, 2.6, 0, .23), (1.22, .15, .11, 2.4, 0, .22),
+                          (1.3, .12, .08, 2.2, 0, .22)], caps=.03))
+        P.add("Eye", line([(0, .095, .4), (0, .092, .9), (0, .112, 1.22)], .016))
+        for sx in (-1, 1):
+            P.add("Accent", fin_panel(sx * .17, .3, .44, .32, 1.0, t=.03, sweep=.1))                  # tail fins
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.07, .03, (0, .22, 1.315)))
+        P.add("Eye", L.cyl(.055, .04, (0, .22, 1.35)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon, wheel=grid_wheel)
 
 
 def sweeper(L):

@@ -98,6 +98,194 @@ namespace Stealth.Level
             [PropKind.LabBench] = Rect.MinMaxRect(-0.9f, -0.375f, 0.9f, 0.375f),
             [PropKind.PartsCabinet] = Rect.MinMaxRect(-0.45f, -0.225f, 0.45f, 0.225f),
             [PropKind.RobotArm] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.45f),
+            // round 2: five more pieces for every room type, and the vault (Tools/Blender/rooms2_*.py)
+            [PropKind.StandingDesk] = Rect.MinMaxRect(-0.7f, -0.35f, 0.7f, 0.37f),
+            [PropKind.PlanterDivider] = Rect.MinMaxRect(-0.81f, -0.18f, 0.81f, 0.18f),
+            [PropKind.MobileWhiteboard] = Rect.MinMaxRect(-0.71f, -0.28f, 0.71f, 0.28f),
+            [PropKind.FilePedestal] = Rect.MinMaxRect(-0.2f, -0.28f, 0.2f, 0.29f),
+            [PropKind.SofaPod] = Rect.MinMaxRect(-0.9f, -0.45f, 0.9f, 0.45f),
+            [PropKind.ExecutiveDesk] = Rect.MinMaxRect(-0.9f, -0.45f, 0.9f, 0.45f),
+            [PropKind.FilingCabinet] = Rect.MinMaxRect(-0.23f, -0.3f, 0.23f, 0.3f),
+            [PropKind.Credenza] = Rect.MinMaxRect(-0.8f, -0.23f, 0.8f, 0.25f),
+            [PropKind.GuestChair] = Rect.MinMaxRect(-0.3f, -0.29f, 0.3f, 0.26f),
+            [PropKind.WallClock] = Rect.MinMaxRect(-0.175f, -0.03f, 0.175f, 0.027f),
+            [PropKind.ConferenceTable] = Rect.MinMaxRect(-1.8f, -0.6f, 1.8f, 0.6f),
+            [PropKind.ProjectorScreen] = Rect.MinMaxRect(-1f, -0.08f, 1f, 0.06f),
+            [PropKind.Flipchart] = Rect.MinMaxRect(-0.35f, -0.3f, 0.35f, 0.28f),
+            [PropKind.AvCredenza] = Rect.MinMaxRect(-0.8f, -0.25f, 0.8f, 0.27f),
+            [PropKind.MeetingChair] = Rect.MinMaxRect(-0.28f, -0.29f, 0.28f, 0.27f),
+            [PropKind.InfoKiosk] = Rect.MinMaxRect(-0.3f, -0.25f, 0.3f, 0.25f),
+            [PropKind.SecurityTurnstile] = Rect.MinMaxRect(-0.6f, -0.3f, 0.6f, 0.3f),
+            [PropKind.RoundBenchPlanter] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
+            [PropKind.LogoTotem] = Rect.MinMaxRect(-0.4f, -0.2f, 0.4f, 0.2f),
+            [PropKind.QueueBarrier] = Rect.MinMaxRect(-0.8f, -0.15f, 0.8f, 0.15f),
+            [PropKind.DiningTable] = Rect.MinMaxRect(-0.8f, -0.45f, 0.8f, 0.45f),
+            [PropKind.KitchenIsland] = Rect.MinMaxRect(-1f, -0.455f, 1f, 0.455f),
+            [PropKind.Dishwasher] = Rect.MinMaxRect(-0.3f, -0.31f, 0.3f, 0.31f),
+            [PropKind.RecyclingBins] = Rect.MinMaxRect(-0.603f, -0.2f, 0.603f, 0.2f),
+            [PropKind.PantryCabinet] = Rect.MinMaxRect(-0.45f, -0.305f, 0.45f, 0.305f),
+            [PropKind.DoubleSink] = Rect.MinMaxRect(-0.7f, -0.28f, 0.7f, 0.28f),
+            [PropKind.JanitorCart] = Rect.MinMaxRect(-0.45f, -0.23f, 0.45f, 0.23f),
+            [PropKind.ChangingTable] = Rect.MinMaxRect(-0.45f, -0.25f, 0.45f, 0.25f),
+            [PropKind.TowelDispenser] = Rect.MinMaxRect(-0.15f, -0.06f, 0.15f, 0.06f),
+            [PropKind.SanitaryBin] = Rect.MinMaxRect(-0.15f, -0.128f, 0.15f, 0.128f),
+            [PropKind.SectionalSofa] = Rect.MinMaxRect(-1.2f, -0.8f, 1.2f, 0.8f),
+            [PropKind.EggChair] = Rect.MinMaxRect(-0.4f, -0.39f, 0.4f, 0.39f),
+            [PropKind.SideTable] = Rect.MinMaxRect(-0.25f, -0.25f, 0.25f, 0.25f),
+            [PropKind.MagazineRack] = Rect.MinMaxRect(-0.3f, -0.17f, 0.3f, 0.17f),
+            [PropKind.AreaRug] = Rect.MinMaxRect(-1f, -0.7f, 1f, 0.7f),
+            [PropKind.CorridorBench] = Rect.MinMaxRect(-0.7f, -0.22f, 0.7f, 0.22f),
+            [PropKind.FireCabinet] = Rect.MinMaxRect(-0.2f, -0.126f, 0.2f, 0.126f),
+            [PropKind.NoticeBoard] = Rect.MinMaxRect(-0.6f, -0.024f, 0.6f, 0.024f),
+            [PropKind.BinPair] = Rect.MinMaxRect(-0.35f, -0.179f, 0.35f, 0.179f),
+            [PropKind.UmbrellaStand] = Rect.MinMaxRect(-0.155f, -0.155f, 0.155f, 0.155f),
+            [PropKind.NetworkCabinet] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.31f),
+            [PropKind.UpsUnit] = Rect.MinMaxRect(-0.25f, -0.4f, 0.25f, 0.4f),
+            [PropKind.CrashCart] = Rect.MinMaxRect(-0.3f, -0.25f, 0.3f, 0.24f),
+            [PropKind.CracUnit] = Rect.MinMaxRect(-0.5f, -0.4f, 0.5f, 0.4f),
+            [PropKind.TapeLibrary] = Rect.MinMaxRect(-0.6f, -0.4f, 0.6f, 0.41f),
+            [PropKind.MetalShelving] = Rect.MinMaxRect(-0.9f, -0.25f, 0.9f, 0.25f),
+            [PropKind.DrumPair] = Rect.MinMaxRect(-0.45f, -0.3f, 0.45f, 0.3f),
+            [PropKind.HandTruck] = Rect.MinMaxRect(-0.24f, -0.26f, 0.24f, 0.25f),
+            [PropKind.CrateStack] = Rect.MinMaxRect(-0.6f, -0.39f, 0.6f, 0.39f),
+            [PropKind.RollingCage] = Rect.MinMaxRect(-0.44f, -0.34f, 0.44f, 0.34f),
+            [PropKind.Plotter] = Rect.MinMaxRect(-0.75f, -0.3f, 0.75f, 0.3f),
+            [PropKind.WorkTable] = Rect.MinMaxRect(-0.8f, -0.4f, 0.8f, 0.4f),
+            [PropKind.SupplyShelf] = Rect.MinMaxRect(-0.5f, -0.2f, 0.5f, 0.2f),
+            [PropKind.MailCart] = Rect.MinMaxRect(-0.43f, -0.24f, 0.47f, 0.24f),
+            [PropKind.PaperBin] = Rect.MinMaxRect(-0.3f, -0.2f, 0.3f, 0.2f),
+            [PropKind.MapBoard] = Rect.MinMaxRect(-1f, -0.05f, 1f, 0.04f),
+            [PropKind.RadioRack] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
+            [PropKind.OperatorChair] = Rect.MinMaxRect(-0.34f, -0.35f, 0.34f, 0.32f),
+            [PropKind.SupervisorDesk] = Rect.MinMaxRect(-0.9f, -0.4f, 0.9f, 0.4f),
+            [PropKind.AlarmPanel] = Rect.MinMaxRect(-0.4f, -0.06f, 0.4f, 0.08f),
+            [PropKind.DisplayCase] = Rect.MinMaxRect(-0.5f, -0.25f, 0.5f, 0.25f),
+            [PropKind.PlanterLarge] = Rect.MinMaxRect(-0.49f, -0.47f, 0.5f, 0.46f),
+            [PropKind.HallBench] = Rect.MinMaxRect(-0.9f, -0.24f, 0.9f, 0.24f),
+            [PropKind.Sculpture] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
+            [PropKind.DirectoryBoard] = Rect.MinMaxRect(-0.4f, -0.15f, 0.4f, 0.15f),
+            [PropKind.RowingMachine] = Rect.MinMaxRect(-0.3f, -1.03f, 0.3f, 1.03f),
+            [PropKind.PowerCage] = Rect.MinMaxRect(-0.705f, -0.7f, 0.705f, 0.7f),
+            [PropKind.KettlebellRack] = Rect.MinMaxRect(-0.505f, -0.2f, 0.505f, 0.2f),
+            [PropKind.MatRack] = Rect.MinMaxRect(-0.4f, -0.25f, 0.4f, 0.25f),
+            [PropKind.CableMachine] = Rect.MinMaxRect(-0.6f, -0.5f, 0.6f, 0.5f),
+            [PropKind.TowelShelf] = Rect.MinMaxRect(-0.45f, -0.2f, 0.45f, 0.2f),
+            [PropKind.LaundryCart] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
+            [PropKind.BenchIsland] = Rect.MinMaxRect(-0.9f, -0.4f, 0.9f, 0.4f),
+            [PropKind.WeighingScale] = Rect.MinMaxRect(-0.2f, -0.21f, 0.2f, 0.2f),
+            [PropKind.ShoeRack] = Rect.MinMaxRect(-0.5f, -0.18f, 0.5f, 0.18f),
+            [PropKind.ExamTable] = Rect.MinMaxRect(-0.35f, -0.9f, 0.35f, 0.9f),
+            [PropKind.Wheelchair] = Rect.MinMaxRect(-0.325f, -0.5f, 0.325f, 0.5f),
+            [PropKind.IvStand] = Rect.MinMaxRect(-0.235f, -0.25f, 0.235f, 0.25f),
+            [PropKind.DoctorDesk] = Rect.MinMaxRect(-0.7f, -0.35f, 0.7f, 0.35f),
+            [PropKind.DefibCabinet] = Rect.MinMaxRect(-0.2f, -0.08f, 0.2f, 0.096f),
+            [PropKind.BunkBed] = Rect.MinMaxRect(-0.5f, -1f, 0.5f, 1f),
+            [PropKind.Daybed] = Rect.MinMaxRect(-1f, -0.45f, 1f, 0.44f),
+            [PropKind.CurtainDivider] = Rect.MinMaxRect(-0.795f, -0.1f, 0.795f, 0.1f),
+            [PropKind.FloorCushions] = Rect.MinMaxRect(-0.575f, -0.58f, 0.575f, 0.6f),
+            [PropKind.NightTable] = Rect.MinMaxRect(-0.25f, -0.22f, 0.25f, 0.22f),
+            [PropKind.CardCatalog] = Rect.MinMaxRect(-0.4f, -0.23f, 0.4f, 0.23f),
+            [PropKind.StudyCarrel] = Rect.MinMaxRect(-0.5f, -0.35f, 0.5f, 0.35f),
+            [PropKind.Lectern] = Rect.MinMaxRect(-0.25f, -0.25f, 0.25f, 0.25f),
+            [PropKind.WingbackChair] = Rect.MinMaxRect(-0.395f, -0.4f, 0.395f, 0.4f),
+            [PropKind.BookCart] = Rect.MinMaxRect(-0.385f, -0.2f, 0.385f, 0.2f),
+            [PropKind.FumeHood] = Rect.MinMaxRect(-0.75f, -0.4f, 0.75f, 0.41f),
+            [PropKind.Printer3d] = Rect.MinMaxRect(-0.36f, -0.36f, 0.36f, 0.35f),
+            [PropKind.ComponentShelf] = Rect.MinMaxRect(-0.6f, -0.22f, 0.6f, 0.22f),
+            [PropKind.RobotTable] = Rect.MinMaxRect(-0.9f, -0.45f, 0.9f, 0.45f),
+            [PropKind.ScopeCart] = Rect.MinMaxRect(-0.3f, -0.25f, 0.3f, 0.25f),
+            [PropKind.GuitarStand] = Rect.MinMaxRect(-0.22f, -0.19f, 0.22f, 0.18f),
+            [PropKind.SynthStand] = Rect.MinMaxRect(-0.65f, -0.25f, 0.65f, 0.25f),
+            [PropKind.VocalBooth] = Rect.MinMaxRect(-0.6f, -0.6f, 0.6f, 0.63f),
+            [PropKind.AmpCabinet] = Rect.MinMaxRect(-0.355f, -0.2f, 0.355f, 0.2f),
+            [PropKind.StudioCouch] = Rect.MinMaxRect(-1f, -0.45f, 1f, 0.45f),
+            [PropKind.AirHockey] = Rect.MinMaxRect(-1f, -0.55f, 1f, 0.55f),
+            [PropKind.PokerTable] = Rect.MinMaxRect(-0.65f, -0.65f, 0.65f, 0.65f),
+            [PropKind.Jukebox] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
+            [PropKind.Pinball] = Rect.MinMaxRect(-0.375f, -0.7f, 0.375f, 0.73f),
+            [PropKind.GamingCorner] = Rect.MinMaxRect(-0.8f, -0.3f, 0.8f, 0.3f),
+            [PropKind.DepositWall] = Rect.MinMaxRect(-1.005f, -0.175f, 1.005f, 0.177f),
+            [PropKind.GoldPallet] = Rect.MinMaxRect(-0.5f, -0.4f, 0.5f, 0.4f),
+            [PropKind.MoneyCart] = Rect.MinMaxRect(-0.456f, -0.282f, 0.44f, 0.282f),
+            [PropKind.CashShelf] = Rect.MinMaxRect(-0.8f, -0.25f, 0.8f, 0.25f),
+            // the auto repair shop (Tools/Blender/garage.py)
+            [PropKind.CarParked] = Rect.MinMaxRect(-0.95f, -2.27f, 0.95f, 2.27f),
+            [PropKind.CarHoodOpen] = Rect.MinMaxRect(-0.95f, -2.27f, 0.95f, 2.27f),
+            [PropKind.LiftCar] = Rect.MinMaxRect(-1.7f, -2.27f, 1.7f, 2.27f),
+            [PropKind.LiftEmpty] = Rect.MinMaxRect(-1.7f, -1.25f, 1.7f, 1.25f),
+            [PropKind.CarOnStands] = Rect.MinMaxRect(-1.25f, -2.27f, 1.6f, 2.27f), // (Blender x is mirrored: the loose wheels lie on +x)
+            [PropKind.ToolChest] = Rect.MinMaxRect(-0.57f, -0.25f, 0.57f, 0.25f),
+            [PropKind.TireChanger] = Rect.MinMaxRect(-0.7f, -0.52f, 0.42f, 0.61f),
+            [PropKind.WheelBalancer] = Rect.MinMaxRect(-0.53f, -0.42f, 0.6f, 0.42f),
+            [PropKind.TireRack] = Rect.MinMaxRect(-1.0f, -0.28f, 1.0f, 0.28f),
+            [PropKind.TireStack] = Rect.MinMaxRect(-0.38f, -0.38f, 0.38f, 0.38f),
+            [PropKind.EngineStand] = Rect.MinMaxRect(-0.34f, -0.46f, 0.44f, 0.46f),
+            [PropKind.EngineHoist] = Rect.MinMaxRect(-0.45f, -0.66f, 0.45f, 1.1f),
+            [PropKind.AirCompressor] = Rect.MinMaxRect(-0.61f, -0.26f, 0.61f, 0.26f),
+            [PropKind.OilDrain] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
+            [PropKind.HoseReel] = Rect.MinMaxRect(-0.19f, -0.1f, 0.19f, 0.27f),
+            [PropKind.FloorJack] = Rect.MinMaxRect(-0.16f, -0.87f, 0.16f, 0.59f),
+            [PropKind.OilDrums] = Rect.MinMaxRect(-0.6f, -0.55f, 0.6f, 0.55f),
+            [PropKind.WeldingCart] = Rect.MinMaxRect(-0.28f, -0.61f, 0.28f, 0.35f),
+            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -3f, 1.7f, 3f),
+            [PropKind.GarageDoor] = Rect.MinMaxRect(-1.7f, 0f, 1.7f, 0.1f),
+            [PropKind.PaintRack] = Rect.MinMaxRect(-0.8f, -0.25f, 0.66f, 0.25f),
+        };
+
+        /// <summary>Round-2 pieces hung on a wall (a clock, a board, a cabinet): no footprint on the floor to walk into.</summary>
+        static readonly HashSet<PropKind> Hung = new() { PropKind.WallClock, PropKind.ProjectorScreen, PropKind.ChangingTable, PropKind.TowelDispenser, PropKind.FireCabinet, PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet,
+            PropKind.HoseReel };
+
+        /// <summary>
+        /// Big pieces that stand higher than a window's sill by more than a monitor does (shelving, lockers, fridges,
+        /// boards on legs, stalls): never in front of a window. Slim things (a floor lamp, a coat rack) and whatever stays
+        /// under ~1.6 m (desks, sofas, counters, a water cooler) may stand there. Checked against the models by a test.
+        /// </summary>
+        public static readonly HashSet<PropKind> Tall = new()
+        {
+            PropKind.ServerRack, PropKind.Shelf, PropKind.Whiteboard, PropKind.ToiletStall, PropKind.Bookshelf, PropKind.Fridge, PropKind.Lockers,
+            PropKind.VendingMachine, PropKind.ArcadeMachine, PropKind.Cage, PropKind.Urinal, PropKind.MirrorSink, PropKind.ShowerStall,
+            PropKind.MedicineCabinet, PropKind.TallBookcase, PropKind.MailShelf, PropKind.MonitorWall, PropKind.MobileWhiteboard,
+            PropKind.Flipchart, PropKind.LogoTotem, PropKind.RoundBenchPlanter, PropKind.PantryCabinet, PropKind.DirectoryBoard,
+            PropKind.DisplayCase, PropKind.PlanterLarge, PropKind.CracUnit, PropKind.TapeLibrary, PropKind.MetalShelving, PropKind.RadioRack,
+            PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
+            PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
+            PropKind.Pinball, PropKind.MedTable, PropKind.Workbench,
+            PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
+        };
+
+        /// <summary>Pieces that hang on the wall itself: never on a window's glass or its frame.</summary>
+        public static readonly HashSet<PropKind> OnWall = new()
+        {
+            PropKind.WallCabinet, PropKind.WallClock, PropKind.HandDryer, PropKind.TowelDispenser, PropKind.ChangingTable, PropKind.FireCabinet,
+            PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
+            PropKind.DartBoard, PropKind.HoseReel,
+        };
+
+        /// <summary>
+        /// How many of a kind one room takes (twice that in a hall of a room, over 70 m²): one water cooler, one clock, one
+        /// safe… — three coolers along one wall read as a mistake, not as an office.
+        /// </summary>
+        public static int CapOf(PropKind k) => k switch
+        {
+            PropKind.WaterCooler or PropKind.WallClock or PropKind.Safe or PropKind.Printer or PropKind.JanitorCart or PropKind.Jukebox or
+                PropKind.DefibCabinet or PropKind.CoatRack or PropKind.Globe or PropKind.Lectern or PropKind.WeighingScale or PropKind.ChangingTable or
+                PropKind.Shredder or PropKind.Sculpture or PropKind.UmbrellaStand or PropKind.Wheelchair or PropKind.VendingMachine or
+                PropKind.HandDryer or PropKind.TowelDispenser or PropKind.Stove or PropKind.Dishwasher or PropKind.MonitorWall or PropKind.ProjectorScreen or
+                PropKind.TvStand or PropKind.Flipchart or PropKind.MapBoard or PropKind.AlarmPanel or PropKind.DirectoryBoard or PropKind.LogoTotem or
+                PropKind.MagazineRack or PropKind.DartBoard or PropKind.Fridge or PropKind.CoffeeMachine or PropKind.Copier or PropKind.Plotter or
+                PropKind.RecyclingBins or PropKind.PantryCabinet or PropKind.MedicineCabinet or PropKind.CardCatalog or PropKind.BookCart or
+                PropKind.MailCart or PropKind.LaundryCart or PropKind.HandTruck or PropKind.CrashCart or PropKind.ScopeCart or PropKind.Printer3d or
+                PropKind.FumeHood or PropKind.VocalBooth or PropKind.DrumKit or PropKind.PowerCage or PropKind.CableMachine or PropKind.MatRack or
+                PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
+                PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
+                PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist => 1,
+            PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or
+                PropKind.RobotArm or PropKind.MicStand or PropKind.InfoKiosk or PropKind.Whiteboard or PropKind.NoticeBoard or PropKind.BinPair or
+                PropKind.PaperBin or PropKind.PaperStack or PropKind.GuitarStand or PropKind.AmpCabinet or PropKind.NightTable or PropKind.Plant or
+                PropKind.PlanterLarge or PropKind.BeanBag or PropKind.StandingDesk or PropKind.PlanterDivider or PropKind.PaintRack or
+                PropKind.HoseReel or PropKind.EngineStand or PropKind.OilDrums => 2,
+            _ => int.MaxValue,
         };
 
         /// <summary>A model's footprint in its own frame (x = local X, y = local Z), metres.</summary>
@@ -106,7 +294,9 @@ namespace Stealth.Level
         const float DeskTop = LevelMetrics.DeskTop;
         const float CabinetTop = 1.2f; // the drawer cabinet's top (Tools/Blender/generate_models.py model_cabinet)
         const float WallGap = 0.06f;    // between a back and the wall's face
+        const float HungGap = 0.005f;   // between the back of a thing hung on the wall (a board, a cabinet) and the wall's face
         const float Aisle = 1.25f;      // free walkway around an island and in front of a wall group (robots are 0.8 m wide)
+        const float Facing = 0.3f;      // more than that between two pieces facing each other across a walkway
         static readonly float[] ShelfLevels = { 0.47f, 1.07f, 1.67f };
         /// <summary>The tall bookcase's shelves within reach (Tools/Blender/rooms_paper.py).</summary>
         static readonly float[] BookcaseLevels = { 0.56f, 0.97f, 1.38f };
@@ -116,6 +306,10 @@ namespace Stealth.Level
         readonly System.Random m_Rng;
         readonly RectGrid[] m_Taken;   // per floor: placed footprints
         readonly RectGrid[] m_Keep;    // per floor: must stay clear (doorways, stairs, the hatch)
+        readonly RectGrid[] m_Solid;   // per floor: the footprints a walker has to go around (no rugs, nothing hung or standing on a top)
+        RectGrid[] m_Windows;          // per floor: the strip of floor in front of every window (built with the first room)
+        readonly Dictionary<PropKind, int> m_InRoom = new(); // pieces of the room being furnished, by kind (see CapOf)
+        int m_Cap = 1;                 // CapOf times this in the room being furnished
 
         /// <summary>
         /// Rectangles of a floor in 2 m buckets: "does anything overlap this?" looks only at the buckets the question touches
@@ -170,6 +364,23 @@ namespace Stealth.Level
                 return false;
             }
 
+            /// <summary>Every rectangle that overlaps <paramref name="q"/>, appended to <paramref name="into"/>.</summary>
+            public void Query(Rect q, List<Rect> into)
+            {
+                m_Stamp++;
+                for (int x = C(q.xMin); x <= C(q.xMax); x++)
+                    for (int z = C(q.yMin); z <= C(q.yMax); z++)
+                    {
+                        if (!m_Buckets.TryGetValue(Key(x, z), out var list)) continue;
+                        foreach (int i in list)
+                        {
+                            if (m_Mark[i] == m_Stamp) continue;
+                            m_Mark[i] = m_Stamp;
+                            if (m_Rects[i].Overlaps(q)) into.Add(m_Rects[i]);
+                        }
+                    }
+            }
+
             public bool Contains(Vector2 p)
             {
                 if (!m_Buckets.TryGetValue(Key(C(p.x), C(p.y)), out var list)) return false;
@@ -185,7 +396,8 @@ namespace Stealth.Level
             m_Rng = rng;
             m_Taken = new RectGrid[m_P.Floors];
             m_Keep = new RectGrid[m_P.Floors];
-            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); }
+            m_Solid = new RectGrid[m_P.Floors];
+            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); m_Solid[f] = new RectGrid(); }
             foreach (var d in l.Doorways)
             {
                 // the doorway and a step either side of it stay free (an open passage: the whole wall)
@@ -201,11 +413,11 @@ namespace Stealth.Level
                 // the approach to the first step and the landing above (towards +u, the room side of the frame)
                 var bottom = LevelLayout.StairEnds(s).bottom;
                 grown = Union(grown, new Rect(bottom.x - 1.1f, bottom.z - 1.1f, 2.2f, 2.2f));
-                m_Keep[s.Floor].Add(Grow(grown, 0.15f));
+                m_Keep[s.Floor].Add(Grow(grown, 0.25f)); // a clock on the far side of the hall's wall is still "at the stair"
                 if (s.Floor + 1 < m_P.Floors)
                 {
                     var top = LevelLayout.StairEnds(s).top;
-                    m_Keep[s.Floor + 1].Add(Grow(Union(a, new Rect(top.x - 1.1f, top.z - 1.1f, 2.2f, 2.2f)), 0.15f));
+                    m_Keep[s.Floor + 1].Add(Grow(Union(a, new Rect(top.x - 1.1f, top.z - 1.1f, 2.2f, 2.2f)), 0.25f));
                 }
             }
         }
@@ -295,6 +507,26 @@ namespace Stealth.Level
             int f = room.Floor;
             if (m_Fridge && b.Pieces.Exists(p => p.Kind == PropKind.Fridge)) return false; // one fridge a kitchen
             var rects = new List<Rect>();
+            // windows: a tall piece in front of one fails the group; a thing hung on the wall there is left out of it
+            // (the kitchen run stays, its cupboards over the window do not) unless the group is only that
+            if (m_Windows != null)
+                for (int i = b.Pieces.Count - 1; i >= 0; i--)
+                {
+                    var p = b.Pieces[i];
+                    bool tall = Tall.Contains(p.Kind), hangs = OnWall.Contains(p.Kind);
+                    if ((!tall && !hangs) || !m_Windows[f].Overlaps(FootAt(p.Kind, p.Pos, p.Yaw))) continue;
+                    if (tall || i == 0) return false;
+                    b.Pieces.RemoveAt(i);
+                }
+            // one water cooler, one clock… per room
+            foreach (var p in b.Pieces)
+            {
+                int cap = CapOf(p.Kind);
+                if (cap == int.MaxValue) continue;
+                int n = m_InRoom.TryGetValue(p.Kind, out int have) ? have : 0;
+                foreach (var q in b.Pieces) if (q.Kind == p.Kind) n++;
+                if (n > cap * m_Cap) return false;
+            }
             foreach (var p in b.Pieces)
             {
                 // a thing hung on the wall (cupboards, a dart board, foam): nothing to walk into, but never over a doorway
@@ -319,15 +551,21 @@ namespace Stealth.Level
             {
                 var all = rects[0];
                 foreach (var r in rects) all = Union(all, r);
-                if (!Clear(f, Grow(all, aisle), 0f) || !OnFloor(f, room.Id, all, aisle * 0.7f)) return false;
+                // an aisle to the other furniture and most of one to the walls; the kept spots (a doorway's own depth,
+                // the square a patrol stands on) only need a step: an aisle more around them kept every table out of
+                // a room under 7 × 5 m
+                if (m_Taken[f].Overlaps(Grow(all, aisle)) || m_Keep[f].Overlaps(Grow(all, 0.3f)) || !OnFloor(f, room.Id, all, aisle * 0.7f)) return false;
             }
+            if (rects.Count > 0 && !StaysWalkable(room, rects)) return false;
             // pieces of one group may touch each other, but not other groups
             int group = m_Groups++;
             foreach (var p in b.Pieces)
             {
                 m_L.Props.Add(new PropPlacement { Kind = p.Kind, Position = p.Pos, RotationY = p.Yaw });
                 m_GroupOf.Add(group);
+                m_InRoom[p.Kind] = (m_InRoom.TryGetValue(p.Kind, out int have) ? have : 0) + 1;
                 m_Taken[f].Add(FootAt(p.Kind, p.Pos, p.Yaw)); // hung and standing-on things too: nothing else goes under or into them
+                if (p.Solid && InTheWay(p.Kind)) m_Solid[f].Add(FootAt(p.Kind, p.Pos, p.Yaw));
             }
             foreach (var i in b.Items) { m_L.ItemSpots.Add(i); m_ItemGroup.Add(group); }
             if (room.Id == m_L.StorageRoom) m_L.StorageDrops.AddRange(b.Drops);
@@ -376,9 +614,165 @@ namespace Stealth.Level
             m_L.Props.Add(new PropPlacement { Kind = k, Position = p, RotationY = yaw });
             m_GroupOf.Add(-1);
             m_Taken[room.Floor].Add(FootAt(k, p, yaw));
+            if (InTheWay(k)) m_Solid[room.Floor].Add(FootAt(k, p, yaw));
         }
 
         // ------------------------------------------------------------------ walkability
+
+        /// <summary>
+        /// The middle of this room is for its furniture (a meeting room's table, a restroom's stalls): the patrol stands
+        /// by the door instead (<see cref="LevelGenerator.PatrolSpot"/>) and "reached" means any free spot near the middle.
+        /// </summary>
+        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom or RoomType.PaintBooth; // (the booth: its car)
+
+        /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
+        static bool InTheWay(PropKind k) =>
+            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
+                or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
+                or PropKind.BayLines) && !Hung.Contains(k);
+
+        // The room being furnished, as the walkability check will see it (same grid, same margins): its free cells
+        // without furniture, and the spots a walker must still get between: its middle, the inner side of each of its
+        // doorways and open passages, the ends of its stairs.
+        PlanRoom m_WalkRoom;
+        int m_WX, m_WZ, m_WNX, m_WNZ;
+        bool[] m_WBare, m_WFree, m_WSeen;
+        readonly List<int> m_WTargets = new();
+        readonly List<int> m_WStack = new();
+        readonly List<Rect> m_WRects = new();
+        const float WalkCell = 0.25f, WalkAgent = 0.4f, WalkClutter = 0.55f; // those of Walk
+
+        void BeginRoomWalk(PlanRoom room)
+        {
+            m_WalkRoom = room;
+            var b = room.Bounds;
+            m_WX = Mathf.FloorToInt(b.xMin / WalkCell);
+            m_WZ = Mathf.FloorToInt(b.yMin / WalkCell);
+            m_WNX = Mathf.CeilToInt(b.xMax / WalkCell) - m_WX;
+            m_WNZ = Mathf.CeilToInt(b.yMax / WalkCell) - m_WZ;
+            int n = m_WNX * m_WNZ;
+            if (m_WBare == null || m_WBare.Length < n) { m_WBare = new bool[n]; m_WFree = new bool[n]; m_WSeen = new bool[n]; }
+            float reach = LevelMetrics.WallThickness / 2f + WalkAgent - 0.01f;
+            for (int z = 0; z < m_WNZ; z++)
+                for (int x = 0; x < m_WNX; x++)
+                {
+                    float cx = (m_WX + x + 0.5f) * WalkCell, cz = (m_WZ + z + 0.5f) * WalkCell;
+                    // this room's floor, a walker's half width off everything that is not (walls; other rooms count too:
+                    // the way through a doorway is checked by the whole-house pass, here only the way to it)
+                    m_WBare[z * m_WNX + x] = InRoom(room.Floor, room.Id, cx, cz)
+                        && InRoom(room.Floor, room.Id, cx - reach, cz) && InRoom(room.Floor, room.Id, cx + reach, cz)
+                        && InRoom(room.Floor, room.Id, cx, cz - reach) && InRoom(room.Floor, room.Id, cx, cz + reach);
+                }
+            // a staircase in the room is solid, as in the whole-house pass (Walk): else a piece beside it could close the way
+            // round it and only the final check would see it (taking half the house's furniture with it)
+            foreach (var st in m_L.Stairs)
+            {
+                if (st.Floor != room.Floor && st.Floor + 1 != room.Floor) continue;
+                var sa = PlanGenerator.StairArea(st, WalkAgent + 0.05f);
+                int x0 = Mathf.Max(0, Mathf.FloorToInt(sa.xMin / WalkCell) - m_WX), x1 = Mathf.Min(m_WNX - 1, Mathf.FloorToInt(sa.xMax / WalkCell) - m_WX);
+                int z0 = Mathf.Max(0, Mathf.FloorToInt(sa.yMin / WalkCell) - m_WZ), z1 = Mathf.Min(m_WNZ - 1, Mathf.FloorToInt(sa.yMax / WalkCell) - m_WZ);
+                for (int z = z0; z <= z1; z++)
+                    for (int x = x0; x <= x1; x++)
+                        m_WBare[z * m_WNX + x] = false;
+            }
+            m_WTargets.Clear();
+            void Target(Vector3 p)
+            {
+                // the free cell nearest to the spot, within 1 m
+                int best = -1;
+                float bestD = 1.0f;
+                int px = Mathf.FloorToInt(p.x / WalkCell) - m_WX, pz = Mathf.FloorToInt(p.z / WalkCell) - m_WZ;
+                for (int dz = -4; dz <= 4; dz++)
+                    for (int dx = -4; dx <= 4; dx++)
+                    {
+                        int x = px + dx, z = pz + dz;
+                        if (x < 0 || z < 0 || x >= m_WNX || z >= m_WNZ || !m_WBare[z * m_WNX + x]) continue;
+                        float d = new Vector2((m_WX + x + 0.5f) * WalkCell - p.x, (m_WZ + z + 0.5f) * WalkCell - p.z).magnitude;
+                        if (d < bestD) { bestD = d; best = z * m_WNX + x; }
+                    }
+                if (best >= 0 && !m_WTargets.Contains(best)) m_WTargets.Add(best);
+            }
+            if (!MiddleIsFurniture(room)) Target(room.Center);
+            foreach (var d in m_L.Doorways)
+            {
+                if (d.Floor != room.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open or EdgeType.Breach)) continue;
+                var across = d.Rotation * Vector3.forward;
+                foreach (float side in new[] { -0.75f, 0.75f })
+                {
+                    var p = d.Position + across * side;
+                    if (InRoom(room.Floor, room.Id, p.x, p.z)) Target(p);
+                }
+            }
+            foreach (var s in m_L.Stairs)
+            {
+                var (bottom, top) = LevelLayout.StairEnds(s);
+                if (s.Floor == room.Floor && InRoom(room.Floor, room.Id, bottom.x, bottom.z)) Target(bottom);
+                if (s.Floor + 1 == room.Floor && InRoom(room.Floor, room.Id, top.x, top.z)) Target(top);
+            }
+            // what the furniture already there (desks under vents, the hatch) leaves linked is the baseline
+            Linked(null, m_WTargets);
+        }
+
+        /// <summary>
+        /// Floods the room's free cells around its furniture (plus <paramref name="more"/>) from the first target; true
+        /// when every target of <paramref name="keep"/> is reached. Without <paramref name="more"/> (the baseline) the
+        /// targets it does not reach are dropped from the list.
+        /// </summary>
+        bool Linked(List<Rect> more, List<int> keep)
+        {
+            if (m_WTargets.Count < 2) return true;
+            int n = m_WNX * m_WNZ;
+            System.Array.Copy(m_WBare, m_WFree, n);
+            System.Array.Clear(m_WSeen, 0, n);
+            m_WRects.Clear();
+            m_Solid[m_WalkRoom.Floor].Query(Grow(m_WalkRoom.Bounds, 1f), m_WRects);
+            if (more != null) m_WRects.AddRange(more);
+            foreach (var r in m_WRects)
+            {
+                var g = Grow(r, WalkClutter);
+                int x0 = Mathf.Max(0, Mathf.FloorToInt(g.xMin / WalkCell) - m_WX), x1 = Mathf.Min(m_WNX - 1, Mathf.FloorToInt(g.xMax / WalkCell) - m_WX);
+                int z0 = Mathf.Max(0, Mathf.FloorToInt(g.yMin / WalkCell) - m_WZ), z1 = Mathf.Min(m_WNZ - 1, Mathf.FloorToInt(g.yMax / WalkCell) - m_WZ);
+                for (int z = z0; z <= z1; z++)
+                    for (int x = x0; x <= x1; x++)
+                        m_WFree[z * m_WNX + x] = false;
+            }
+            int start = m_WTargets[0];
+            if (m_WFree[start])
+            {
+                m_WStack.Clear();
+                m_WStack.Add(start);
+                m_WSeen[start] = true;
+                while (m_WStack.Count > 0)
+                {
+                    int i = m_WStack[m_WStack.Count - 1];
+                    m_WStack.RemoveAt(m_WStack.Count - 1);
+                    int x = i % m_WNX, z = i / m_WNX;
+                    if (x > 0 && m_WFree[i - 1] && !m_WSeen[i - 1]) { m_WSeen[i - 1] = true; m_WStack.Add(i - 1); }
+                    if (x < m_WNX - 1 && m_WFree[i + 1] && !m_WSeen[i + 1]) { m_WSeen[i + 1] = true; m_WStack.Add(i + 1); }
+                    if (z > 0 && m_WFree[i - m_WNX] && !m_WSeen[i - m_WNX]) { m_WSeen[i - m_WNX] = true; m_WStack.Add(i - m_WNX); }
+                    if (z < m_WNZ - 1 && m_WFree[i + m_WNX] && !m_WSeen[i + m_WNX]) { m_WSeen[i + m_WNX] = true; m_WStack.Add(i + m_WNX); }
+                }
+            }
+            bool all = true;
+            for (int k = keep.Count - 1; k >= 1; k--)
+                if (!m_WSeen[keep[k]])
+                {
+                    all = false;
+                    if (more == null) keep.RemoveAt(k);
+                }
+            return all && (more == null || m_WFree[start]);
+        }
+
+        /// <summary>
+        /// With these footprints added, a walker still gets from the middle of the room to each of its doorways and
+        /// stairs: checked when a group is placed, so a group that would wall something off is never put there (the
+        /// whole-house check after the furnishing used to take it out again, with its neighbours: rooms went bare).
+        /// </summary>
+        bool StaysWalkable(PlanRoom room, List<Rect> rects)
+        {
+            if (m_WalkRoom != room) return true; // pieces put outside FurnishRoom (tests, the features)
+            return Linked(rects, m_WTargets);
+        }
 
         /// <summary>
         /// The safety net under all the rules above: a walker 0.8 m wide (a robot) must get from the hatch to the middle of
@@ -390,6 +784,8 @@ namespace Stealth.Level
         public static int LastRemoved { get; private set; }
         public static int LastDroppedItems { get; private set; }
         public static readonly List<string> LastNotes = new();
+        /// <summary>The pieces the last walkability check took out (for the space audit and tests).</summary>
+        public static readonly List<(PropKind kind, Vector3 pos)> LastCut = new();
 
         /// <summary>Rooms whose middle cannot be walked to from the hatch (walls, doorways, stairs, furniture placed so far).</summary>
         public List<PlanRoom> Unreached()
@@ -414,6 +810,7 @@ namespace Stealth.Level
             LastRemoved = 0;
             LastDroppedItems = 0;
             LastNotes.Clear();
+            LastCut.Clear();
             for (int round = 0; round < 40; round++)
             {
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -423,7 +820,7 @@ namespace Stealth.Level
                 long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var lostRooms = new List<PlanRoom>();
                 // the walker is a robot: it never gets into the hidden room (players do, through its illusion walls)
-                foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r.Center)) lostRooms.Add(r);
+                foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r)) lostRooms.Add(r);
                 long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var cut = lostRooms.Count > 0 ? grid.Barrier(reached, lostRooms) : new HashSet<int>();
                 long t4 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -436,7 +833,7 @@ namespace Stealth.Level
                     foreach (var s in m_L.Stairs)
                         LastNotes.Add($"stair from {s.Floor} room {s.Room} reached {grid.Reached(reached, m_L.Rooms[s.Room].Center)} -> room {s.RoomAbove} reached {grid.Reached(reached, m_L.Rooms[s.RoomAbove].Center)}");
                     foreach (var r in m_L.Rooms)
-                        if (!grid.Reached(reached, r.Center)) LastNotes.Add($"lost #{r.Id} {r.Type} f{r.Floor} {r.Center}");
+                        if (!grid.Reached(reached, r)) LastNotes.Add($"lost #{r.Id} {r.Type} f{r.Floor} {r.Center}");
                     // loot nobody can reach (in a niche walled off by furniture) is not left there
                     for (int i = m_L.ItemSpots.Count - 1; i >= 0; i--)
                     {
@@ -477,13 +874,21 @@ namespace Stealth.Level
         void RemoveGroups(HashSet<int> groups)
         {
             for (int i = m_L.Props.Count - 1; i >= 0; i--)
-                if (m_GroupOf[i] >= 0 && groups.Contains(m_GroupOf[i])) { m_L.Props.RemoveAt(i); m_GroupOf.RemoveAt(i); }
+                if (m_GroupOf[i] >= 0 && groups.Contains(m_GroupOf[i]))
+                {
+                    LastCut.Add((m_L.Props[i].Kind, m_L.Props[i].Position));
+                    m_L.Props.RemoveAt(i);
+                    m_GroupOf.RemoveAt(i);
+                }
             for (int i = m_L.ItemSpots.Count - 1; i >= 0; i--)
                 if (groups.Contains(m_ItemGroup[i])) { m_L.ItemSpots.RemoveAt(i); m_ItemGroup.RemoveAt(i); }
-            for (int f = 0; f < m_Taken.Length; f++) m_Taken[f].Clear();
+            for (int f = 0; f < m_Taken.Length; f++) { m_Taken[f].Clear(); m_Solid[f].Clear(); }
             foreach (var p in m_L.Props)
+            {
                 if (p.Kind is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine))
                     m_Taken[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
+                if (InTheWay(p.Kind)) m_Solid[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
+            }
         }
 
         /// <summary>The walkable grid of the house for one check.</summary>
@@ -555,8 +960,7 @@ namespace Stealth.Level
                 for (int i = 0; i < l.Props.Count; i++)
                 {
                     var p = l.Props[i];
-                    if (p.Kind is PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
-                        or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard) continue; // on a top or up on a wall
+                    if (!InTheWay(p.Kind)) continue; // on a top or up on a wall, or flat on the floor
                     var r = FootAt(p.Kind, p.Position, p.RotationY);
                     Box(LevelLayout.FloorOf(p.Position.y), Grow(r, Clutter), fur.m_GroupOf[i] >= 0 ? fur.m_GroupOf[i] : -2);
                 }
@@ -653,14 +1057,14 @@ namespace Stealth.Level
                 return seen;
             }
 
-            /// <summary>The free cell nearest to a point of a floor (within 1.5 m; of that room when given), or −1.</summary>
-            int Nearest(int f, Vector2 p, int room = -1)
+            /// <summary>The free cell nearest to a point of a floor (within 1.5 m, or <paramref name="reach"/> cells; of that room when given), or −1.</summary>
+            int Nearest(int f, Vector2 p, int room = -1, int reach = 6)
             {
                 var c = CellOf(p);
                 int best = -1;
-                float bestD = 1.5f;
-                for (int dx = -6; dx <= 6; dx++)
-                    for (int dz = -6; dz <= 6; dz++)
+                float bestD = reach * S;
+                for (int dx = -reach; dx <= reach; dx++)
+                    for (int dz = -reach; dz <= reach; dz++)
                     {
                         if (!In(f, c.x + dx, c.y + dz)) continue;
                         int i = Index(f, c.x + dx, c.y + dz);
@@ -672,12 +1076,15 @@ namespace Stealth.Level
                 return best;
             }
 
-            public bool Reached(bool[] seen, Vector3 p)
+            public bool Reached(bool[] seen, Vector3 p, int reach = 6)
             {
                 int f = LevelLayout.FloorOf(p.y);
-                int i = Nearest(f, new Vector2(p.x, p.z), m_L.Plan.SpaceAt(f, new Vector2(p.x, p.z)));
+                int i = Nearest(f, new Vector2(p.x, p.z), m_L.Plan.SpaceAt(f, new Vector2(p.x, p.z)), reach);
                 return i >= 0 && seen[i];
             }
+
+            /// <summary>A walker gets into the room: to its middle, or (a table stands there) to the free floor around it.</summary>
+            public bool Reached(bool[] seen, PlanRoom r) => Reached(seen, r.Center, MiddleIsFurniture(r) ? 14 : 6);
 
             const int Reach = 6; // 1.5 m in cells: how close a blocking group has to be to both sides
 
@@ -773,11 +1180,35 @@ namespace Stealth.Level
             }
         }
 
-        float BackOf(PropKind k) => -(Foot.TryGetValue(k, out var f) ? f.yMin : -0.3f) + WallGap;
+        /// <summary>
+        /// How far from the wall's face a piece's origin goes so its back touches the wall: standing furniture keeps
+        /// <see cref="WallGap"/> (skirting, panels), what hangs on the wall itself sits flat against it (<see cref="HungGap"/>).
+        /// </summary>
+        float BackOf(PropKind k) => -(Foot.TryGetValue(k, out var f) ? f.yMin : -0.3f) + (OnWall.Contains(k) ? HungGap : WallGap);
         float R(float a, float b) => a + (float)m_Rng.NextDouble() * (b - a);
         bool Chance(double p) => m_Rng.NextDouble() < p;
 
         // ------------------------------------------------------------------ rooms
+
+        /// <summary>How far in front of a window (from the wall's axis) a tall piece still covers it.</summary>
+        const float WindowDepth = 1.0f;
+
+        /// <summary>The strip of floor in front of every window of the house, per floor (<see cref="LevelBuilder.WindowCuts"/>).</summary>
+        RectGrid[] WindowStrips()
+        {
+            var grids = new RectGrid[m_P.Floors];
+            for (int f = 0; f < grids.Length; f++) grids[f] = new RectGrid();
+            foreach (var (pos, yaw, _, _) in LevelBuilder.WindowCuts(m_L))
+            {
+                var q = Quaternion.Euler(0f, yaw, 0f);
+                Vector3 inward = q * Vector3.forward, along = q * Vector3.right * (LevelMetrics.WindowWidth / 2f + 0.1f);
+                Vector3 a = pos - along, c = pos + along + inward * WindowDepth;
+                int floor = LevelLayout.FloorOf(pos.y - LevelMetrics.WindowCenterY + 0.3f);
+                if (floor < 0 || floor >= grids.Length) continue;
+                grids[floor].Add(Rect.MinMaxRect(Mathf.Min(a.x, c.x), Mathf.Min(a.z, c.z), Mathf.Max(a.x, c.x), Mathf.Max(a.z, c.z)));
+            }
+            return grids;
+        }
 
         /// <summary>Furnishes one room: islands first in big rooms, then the walls, then the corners.</summary>
         /// <summary>A printer stands in this room already: at most one per room (they looked like a row of kiosks).</summary>
@@ -793,35 +1224,156 @@ namespace Stealth.Level
             m_Printer = false;
             m_Fridge = false;
             m_Table = false;
+            m_InRoom.Clear();
+            m_Cap = room.Area > 70f ? 2 : 1;
+            m_Windows ??= WindowStrips();
+            BeginRoomWalk(room);
+            if (room.Id == m_L.VaultRoom) { VaultRoom(room); return; }
+            // islands in the middle: about one and a half times what an office planner would call "enough" — a house to search
             int islands = room.Type switch
             {
-                RoomType.OpenSpace => Mathf.RoundToInt(room.Area / 22f),
-                RoomType.Server => Mathf.RoundToInt(room.Area / 16f),
-                RoomType.Storage => room.Area > 24f ? 1 : 0, // a pallet or so: the middle is the pile's floor
-                RoomType.Meeting => 1,
-                RoomType.Kitchen => Mathf.Max(1, Mathf.RoundToInt(room.Area / 25f)),
-                RoomType.Lounge => Mathf.Max(1, Mathf.RoundToInt(room.Area / 28f)),
-                RoomType.Lobby => 2,
-                RoomType.Office => room.Area > 30f ? 1 : 0,
-                RoomType.Hall => room.Area > 45f ? 1 : 0,
-                RoomType.Gym => Mathf.Max(1, Mathf.RoundToInt(room.Area / 24f)),
-                RoomType.Library => Mathf.RoundToInt(room.Area / 20f),
-                RoomType.CopyRoom => room.Area > 18f ? 1 : 0,
-                RoomType.ControlRoom => room.Area > 28f ? 1 : 0,
-                RoomType.Lab => Mathf.RoundToInt(room.Area / 24f),
-                RoomType.NapRoom => room.Area > 20f ? 1 : 0,
-                RoomType.Studio => room.Area > 18f ? 1 : 0,
-                RoomType.LockerRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 26f)),
-                RoomType.Infirmary => room.Area > 22f ? 1 : 0,
-                RoomType.GameRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 22f)),
+                RoomType.OpenSpace => Mathf.RoundToInt(room.Area / 15f),
+                RoomType.Server => Mathf.RoundToInt(room.Area / 11f),
+                RoomType.Storage => room.Area > 24f ? 1 : 0, // a pallet or so: the middle is the pile's floor (the workers stack loot there)
+                RoomType.Meeting => room.Area > 60f ? 3 : room.Area > 30f ? 2 : 1,
+                RoomType.Kitchen => Mathf.Max(1, Mathf.RoundToInt(room.Area / 17f)),
+                RoomType.Lounge => Mathf.Max(1, Mathf.RoundToInt(room.Area / 19f)),
+                RoomType.Lobby => 3,
+                RoomType.Office => room.Area > 22f ? Mathf.Max(1, Mathf.RoundToInt(room.Area / 28f)) : 0,
+                RoomType.Hall => room.Area > 30f ? 1 : 0,
+                RoomType.Gym => Mathf.Max(1, Mathf.RoundToInt(room.Area / 16f)),
+                RoomType.Library => Mathf.Max(1, Mathf.RoundToInt(room.Area / 14f)),
+                RoomType.CopyRoom => room.Area > 14f ? 1 : 0,
+                RoomType.ControlRoom => room.Area > 20f ? 1 : 0,
+                RoomType.Lab => Mathf.Max(1, Mathf.RoundToInt(room.Area / 16f)),
+                RoomType.NapRoom => room.Area > 16f ? 1 : 0,
+                RoomType.Studio => room.Area > 14f ? 1 : 0,
+                RoomType.LockerRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 18f)),
+                RoomType.Infirmary => room.Area > 16f ? 1 : 0,
+                RoomType.GameRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 15f)),
+                RoomType.Workshop => Mathf.RoundToInt(room.Area / 70f), // tyres, an engine, the drain cart: the walkway behind the bays stays open
                 _ => 0,
             };
             Anchor(room);
             Islands(room, islands);
+            if (room.Type == RoomType.Meeting) MeetingTable(room);
             if (room.Type == RoomType.Kitchen && !m_Table) SmallTable(room);
             Walls(room);
-            if (room.Type >= RoomType.Gym) Walls(room); // themed rooms are fuller: a second pass fills the gaps the first left
+            if (room.Type != RoomType.Corridor) Walls(room); // a second pass fills the gaps the first left
             Corners(room);
+            Sparse(room);
+        }
+
+        /// <summary>
+        /// The vault behind the bank door: deposit boxes and cash shelves along every wall, gold on pallets and carts of
+        /// money around the treasure in the middle (kept free by <see cref="HouseFeatures.PlanObjective"/>); the quarter
+        /// circle the round door swings through stays clear.
+        /// </summary>
+        void VaultRoom(PlanRoom room)
+        {
+            if (m_L.VaultDoorway >= 0 && m_L.VaultDoorway < m_L.Doorways.Count)
+            {
+                var d = m_L.Doorways[m_L.VaultDoorway];
+                var along = d.Rotation * Vector3.right;
+                var across = d.Rotation * Vector3.forward;
+                if (Vector3.Dot(room.Center - d.Position, across) < 0f) across = -across;
+                Keep(room.Floor, d.Position - along * 1.4f, d.Position + along * 1.4f + across * 2.6f);
+            }
+            var faces = FacesOf(room);
+            float y = LevelLayout.FloorY(room.Floor);
+            foreach (var (w, n) in faces)
+            {
+                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
+                for (float t = 0.1f; t < w.Length - 0.3f;)
+                {
+                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
+                    var f = new Frame(face, u, n);
+                    var batch = new Batch();
+                    bool boxes = Chance(0.7);
+                    var kind = boxes ? PropKind.DepositWall : PropKind.CashShelf;
+                    float width = boxes ? 2.05f : 1.65f;
+                    batch.Add(kind, f.P(width / 2f, BackOf(kind)), f.Face);
+                    if (!boxes) batch.Item(f.P(width / 2f + R(-0.5f, 0.5f), BackOf(kind), 1.06f));
+                    if (t + width <= w.Length - 0.05f && Deep(room, face, n, batch, 0.9f) && TryCommit(room, batch, 0.02f)) t += width + 0.02f;
+                    else t += 0.25f;
+                }
+            }
+            // gold and money between the walls and the treasure
+            var b = room.Bounds;
+            var spots = new List<Vector3>();
+            for (float x = b.xMin + 1.0f; x < b.xMax - 0.9f; x += 0.5f)
+                for (float z = b.yMin + 1.0f; z < b.yMax - 0.9f; z += 0.5f)
+                    if (InRoom(room.Floor, room.Id, x, z)) spots.Add(new Vector3(x, y, z));
+            Shuffle(spots);
+            int placed = 0, max = Mathf.Clamp(Mathf.RoundToInt(room.Area / 6f), 2, 8);
+            foreach (var s in spots)
+            {
+                if (placed >= max) break;
+                var batch = new Batch();
+                var kind = Chance(0.6) ? PropKind.GoldPallet : PropKind.MoneyCart;
+                batch.Add(kind, s, m_Rng.Next(4) * 90f);
+                if (kind == PropKind.GoldPallet && Chance(0.5)) batch.Item(s + Vector3.up * 0.6f);
+                if (TryCommit(room, batch, 0.05f, 0.75f)) placed++;
+            }
+        }
+
+        /// <summary>
+        /// A meeting room is its table. Where the islands found no place for one (doors on every wall leave little of a
+        /// small room), a smaller set gets every spot of the room and a narrower way round: the long table with six chairs,
+        /// the round one with four, with two, alone.
+        /// </summary>
+        void MeetingTable(PlanRoom room)
+        {
+            if (m_InRoom.ContainsKey(PropKind.ConferenceTable) || m_InRoom.ContainsKey(PropKind.MeetingTable) || m_InRoom.ContainsKey(PropKind.RoundTable)) return;
+            var b = room.Bounds;
+            var spots = new List<Vector3>();
+            float y = LevelLayout.FloorY(room.Floor);
+            for (float x = b.xMin + 1.0f; x < b.xMax - 0.9f; x += 0.5f)
+                for (float z = b.yMin + 1.0f; z < b.yMax - 0.9f; z += 0.5f)
+                    if (InRoom(room.Floor, room.Id, x, z)) spots.Add(new Vector3(x, y, z));
+            var c = room.Center;
+            spots.Sort((p, q) => (p - c).sqrMagnitude.CompareTo((q - c).sqrMagnitude));
+            bool wide = b.width >= b.height;
+            for (int option = room.Area > 18f ? 0 : 1; option < 4; option++)
+                foreach (var s in spots)
+                    for (int turn = 0; turn < (option == 3 ? 1 : 2); turn++)
+                    {
+                        // the table along the room first
+                        bool alongX = wide == (turn == 0);
+                        var f = new Frame(s, alongX ? Vector3.right : Vector3.forward, alongX ? Vector3.forward : Vector3.left);
+                        var batch = new Batch();
+                        if (option == 0)
+                        {
+                            batch.Add(PropKind.MeetingTable, f.P(0, 0), f.Face);
+                            for (int i = -1; i <= 1; i++)
+                            {
+                                batch.Add(PropKind.MeetingChair, f.P(i * 1.1f, 1.0f), f.Back);
+                                batch.Add(PropKind.MeetingChair, f.P(i * 1.1f, -1.0f), f.Face);
+                            }
+                            batch.Item(f.P(R(-1.2f, 1.2f), R(-0.3f, 0.3f), 0.78f));
+                        }
+                        else
+                        {
+                            batch.Add(PropKind.RoundTable, f.P(0, 0), 0);
+                            if (option == 1) Chairs(f, batch, 4);
+                            if (option == 2)
+                            {
+                                batch.Add(PropKind.Chair, f.P(0, 1.0f), f.Back);
+                                batch.Add(PropKind.Chair, f.P(0, -1.0f), f.Face);
+                            }
+                            batch.Item(f.P(0, 0, 0.76f));
+                        }
+                        if (TryCommit(room, batch, 0.05f, 0.6f)) return;
+                    }
+        }
+
+        void Shuffle<T>(List<T> list)
+        {
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = m_Rng.Next(i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
         }
 
         /// <summary>
@@ -832,10 +1384,87 @@ namespace Stealth.Level
         void Anchor(PlanRoom room)
         {
             if (room.Type < RoomType.Gym && room.Type is not (RoomType.Kitchen or RoomType.Restroom)) return;
+            if (room.Type == RoomType.Restroom)
+            {
+                // a restroom is its stalls and its basins: both, each as big as the room takes; where no stall fits
+                // (they are 1.5 m deep: a narrow room with doors at both ends has no place for one) urinals on a wall
+                if (!Anchor(room, 0, 3, false)) Anchor(room, 6, 9, false);
+                Anchor(room, 3, 6, false);
+                return;
+            }
+            if (room.Type == RoomType.Workshop) { WorkshopBays(room); return; }
+            if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
+            if (room.Type == RoomType.ControlRoom)
+            {
+                // the house's two robot terminals: side by side, or each against its own wall (the video wall if neither fits)
+                if (Anchor(room, 0, 1, false)) return;
+                if (Anchor(room, 1, 2, false)) { Anchor(room, 1, 2, false); return; }
+                Anchor(room, 2, 3, true);
+                return;
+            }
+            Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>
+        /// The workshop hall's service bays along the street wall, one per 4 m: a closed sectional door against the wall, the
+        /// painted lines of the bay and in it a car up on a lift, a car with its hood up, one parked, one on jack stands or
+        /// a lift waiting empty — nose in, as they drive in. Where a doorway keeps the floor clear, the bay is left out.
+        /// </summary>
+        void WorkshopBays(PlanRoom room)
+        {
+            (PlanWall w, Vector3 n) street = default;
+            bool found = false;
+            foreach (var face in FacesOf(room))
+            {
+                if (face.n.z < 0.9f) continue;                     // the street is at z = 0: its wall's inner side looks +z
+                if (!found || face.w.A.y < street.w.A.y - 0.01f || (Mathf.Abs(face.w.A.y - street.w.A.y) < 0.01f && face.w.Length > street.w.Length))
+                {
+                    street = face;
+                    found = true;
+                }
+            }
+            if (!found) return;
+            var (wall, n) = street;
+            var u = new Vector3(wall.Dir.x, 0, wall.Dir.y);
+            float y = LevelLayout.FloorY(room.Floor);
+            var origin = new Vector3(wall.A.x, y, wall.A.y) + n * (LevelMetrics.WallThickness / 2f);
+            float bay = PlanGenerator.BayWidth;
+            int count = Mathf.FloorToInt((wall.Length - 0.6f) / bay);
+            float t0 = (wall.Length - count * bay) / 2f;
+            var cars = new[] { PropKind.LiftCar, PropKind.CarHoodOpen, PropKind.CarParked, PropKind.CarOnStands, PropKind.LiftEmpty };
+            var odds = new[] { 0.35, 0.2, 0.15, 0.15, 0.15 };
+            for (int k = 0; k < count; k++)
+            {
+                var f = new Frame(origin + u * (t0 + k * bay + bay / 2f), u, n);
+                double roll = m_Rng.NextDouble();
+                int pick = 0;
+                for (double acc = odds[0]; pick < odds.Length - 1 && roll > acc; acc += odds[++pick]) { }
+                var car = cars[pick];
+                // the whole bay first; where a doorway or a patrol keeps some of it free: without the door, without the lines,
+                // a narrower car
+                foreach (var (door, lines, kind) in new[] { (true, true, car), (false, true, car), (false, false, car), (false, false, PropKind.CarParked) })
+                {
+                    var b = new Batch();
+                    if (door) b.Add(PropKind.GarageDoor, f.P(0, 0.01f), f.Face, solid: false);
+                    if (lines) b.Add(PropKind.BayLines, f.P(0, 3.3f, 0.002f), f.Face, solid: false);
+                    b.Add(kind, f.P(0, 3.4f), f.Face);
+                    // a part left on the trunk lid of a car waiting its turn
+                    if (kind is PropKind.CarParked or PropKind.CarHoodOpen && Chance(0.5)) b.Item(f.P(R(-0.3f, 0.3f), 1.7f, 0.9f));
+                    if (TryCommit(room, b, 0.05f)) break;
+                }
+            }
+        }
+
+        /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
+        bool Anchor(PlanRoom room, int from, int to, bool free)
+        {
             var faces = FacesOf(room);
+            // stalls are deep (1.5 m): at the end wall of a narrow restroom they leave the whole length to walk, along
+            // its side they would leave a slot
+            if (room.Type == RoomType.Restroom && from == 0) faces.Reverse();
             float y = LevelLayout.FloorY(room.Floor);
             // the best option first (the biggest), smaller ones where doors leave too little wall
-            for (int option = 0; option < 3; option++)
+            for (int option = from; option < to; option++)
                 foreach (float walk in new[] { 1.7f, 1.0f })
                     foreach (var (w, n) in faces)
                     {
@@ -849,9 +1478,10 @@ namespace Stealth.Level
                             var shift = u * (width / 2f);
                             for (int i = 0; i < batch.Pieces.Count; i++) { var q = batch.Pieces[i]; q.Pos += shift; batch.Pieces[i] = q; }
                             for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                            if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) return;
+                            if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) return true;
                         }
                     }
+            if (!free) return false;
             // doors everywhere along the walls: the piece stands free in the room, an aisle round it
             var b = room.Bounds;
             var spots = new List<Vector3>();
@@ -867,8 +1497,9 @@ namespace Stealth.Level
                 var f = new Frame(s, wide ? Vector3.right : Vector3.forward, wide ? Vector3.forward : Vector3.left);
                 var batch = new Batch();
                 Island(room, f, batch);
-                if (batch.Pieces.Count > 0 && batch.Pieces.TrueForAll(p => p.Solid) && TryCommit(room, batch, 0.05f, 0.9f)) return;
+                if (batch.Pieces.Count > 0 && batch.Pieces.TrueForAll(p => p.Solid) && TryCommit(room, batch, 0.05f, 0.9f)) return true;
             }
+            return false;
         }
 
         /// <summary>
@@ -913,16 +1544,24 @@ namespace Stealth.Level
                     b.Add(PropKind.WallCabinet, f.P(-0.36f, BackOf(PropKind.WallCabinet)), f.Face, solid: false);
                     b.Add(PropKind.Fridge, f.P(0.61f, BackOf(PropKind.Fridge)), f.Face);
                     return 1.96f;
-                case (RoomType.Restroom, 0):
+                // the stalls: three, two, one
+                case (RoomType.Restroom, 0): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 3 : 2, 1.06f);
+                case (RoomType.Restroom, 1): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 2 : 1, 1.06f);
+                case (RoomType.Restroom, 2): return Row(f, b, PropKind.ToiletStall, 1, 1.06f);
+                // the basins under their mirrors, the hand dryer beside them
+                case (RoomType.Restroom, 3):
                     b.Add(PropKind.MirrorSink, f.P(-0.62f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.MirrorSink, f.P(0.18f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.82f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 2.0f;
-                case (RoomType.Restroom, 1):
+                case (RoomType.Restroom, 4):
                     b.Add(PropKind.MirrorSink, f.P(-0.22f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.42f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 1.2f;
-                case (RoomType.Restroom, 2): return Row(f, b, PropKind.Urinal, 2, 0.7f);
+                case (RoomType.Restroom, 5): return Single(PropKind.MirrorSink, 0.75f);
+                case (RoomType.Restroom, 6): return Row(f, b, PropKind.Urinal, 3, 0.7f);
+                case (RoomType.Restroom, 7): return Row(f, b, PropKind.Urinal, 2, 0.7f);
+                case (RoomType.Restroom, 8): return Single(PropKind.Urinal, 0.6f);
                 case (RoomType.Gym, 0): return Single(PropKind.DumbbellRack, 1.5f);
                 case (RoomType.Gym, 1): return Single(PropKind.ExerciseBike, 0.65f);
                 case (RoomType.Gym, 2): return Out(PropKind.PunchingBag, 0.5f, 0.7f);
@@ -932,8 +1571,19 @@ namespace Stealth.Level
                 case (RoomType.CopyRoom, 0): { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
                 case (RoomType.CopyRoom, 1): return Single(PropKind.PaperStack, 0.85f);
                 case (RoomType.CopyRoom, 2): return Single(PropKind.Shredder, 0.5f);
-                case (RoomType.ControlRoom, 0): return Single(PropKind.MonitorWall, 2.45f);
-                case (RoomType.ControlRoom, 1): return Single(PropKind.ConsoleDesk, 2.45f);
+                // the robots' control consoles (the house's terminals, LevelGenerator.PlaceTerminals), an operator's chair at each
+                case (RoomType.ControlRoom, 0):
+                    foreach (float u in new[] { -0.85f, 0.85f })
+                    {
+                        b.Add(PropKind.Terminal, f.P(u, BackOf(PropKind.Terminal)), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(u, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                    }
+                    return 3.4f;
+                case (RoomType.ControlRoom, 1):
+                    b.Add(PropKind.Terminal, f.P(0, BackOf(PropKind.Terminal)), f.Face);
+                    b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                    return 1.7f;
+                case (RoomType.ControlRoom, 2): return Single(PropKind.MonitorWall, 2.45f);
                 case (RoomType.Lab, 0):
                     b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);
                     b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.LabBench) + 0.1f, 0.91f));
@@ -1002,50 +1652,97 @@ namespace Stealth.Level
                 var f = new Frame(s, turn ? Vector3.forward : Vector3.right, turn ? Vector3.left : Vector3.forward);
                 var batch = new Batch();
                 Island(room, f, batch);
-                if (batch.Pieces.Count > 0 && TryCommit(room, batch, 0.05f, Aisle)) placed++;
+                // a small room keeps a narrower way round its table (the walk check at placement has the last word)
+                if (batch.Pieces.Count > 0 && TryCommit(room, batch, 0.05f, room.Area < 24f ? 0.8f : Aisle)) placed++;
             }
         }
 
         /// <summary>One island group of the room's type around frame origin.</summary>
         void Island(PlanRoom room, Frame f, Batch b)
         {
+            double roll = m_Rng.NextDouble();
             switch (room.Type)
             {
                 case RoomType.OpenSpace:
-                    if (Chance(0.85)) DeskCluster(f, b);
+                    if (roll < 0.62) DeskCluster(f, b);
+                    else if (roll < 0.78)
+                    {   // standing desks back to back, a planter at the end
+                        b.Add(PropKind.StandingDesk, f.P(0, 0.38f), f.Face);
+                        b.Add(PropKind.StandingDesk, f.P(0, -0.38f), f.Back);
+                        b.Add(PropKind.PlanterDivider, f.P(1.12f, 0), f.Face + 90f);
+                        b.Item(f.P(R(-0.4f, 0.4f), Chance(0.5) ? 0.4f : -0.4f, 1.105f));
+                    }
+                    else if (roll < 0.88)
+                    {   // two quiet pods facing each other over a pedestal
+                        b.Add(PropKind.SofaPod, f.P(0, 0.75f), f.Back);
+                        b.Add(PropKind.SofaPod, f.P(0, -0.75f), f.Face);
+                    }
                     else { b.Add(PropKind.RoundTable, f.P(0, 0), 0); Chairs(f, b, 3); }
                     break;
                 case RoomType.Meeting:
-                    if (room.Area > 22f && Chance(0.75))
+                    if (room.Area > 26f && roll < 0.55)
+                    {   // the board table: chairs down both sides and one at each end
+                        b.Add(PropKind.ConferenceTable, f.P(0, 0), f.Face);
+                        for (int i = -1; i <= 1; i++)
+                        {
+                            b.Add(PropKind.MeetingChair, f.P(i * 1.1f, 0.95f), f.Back);
+                            b.Add(PropKind.MeetingChair, f.P(i * 1.1f, -0.95f), f.Face);
+                        }
+                        b.Add(PropKind.MeetingChair, f.P(-2.15f, 0), f.Face + 90f);
+                        b.Add(PropKind.MeetingChair, f.P(2.15f, 0), f.Face - 90f);
+                        b.Item(f.P(R(-1.4f, 1.4f), R(-0.3f, 0.3f), 0.755f));
+                    }
+                    else if (room.Area > 20f && roll < 0.85)
                     {
                         b.Add(PropKind.MeetingTable, f.P(0, 0), f.Face);
                         for (int i = -1; i <= 1; i++)
                         {
-                            b.Add(PropKind.Chair, f.P(i * 1.1f, 1.05f), f.Back);
-                            b.Add(PropKind.Chair, f.P(i * 1.1f, -1.05f), f.Face);
+                            b.Add(PropKind.MeetingChair, f.P(i * 1.1f, 1.0f), f.Back);
+                            b.Add(PropKind.MeetingChair, f.P(i * 1.1f, -1.0f), f.Face);
                         }
                         b.Item(f.P(R(-1.2f, 1.2f), R(-0.3f, 0.3f), 0.78f));
                     }
                     else { b.Add(PropKind.RoundTable, f.P(0, 0), 0); Chairs(f, b, 4); b.Item(f.P(0, 0, 0.76f)); }
                     break;
                 case RoomType.Kitchen:
-                    if (Chance(0.2))
+                    if (roll < 0.35)
+                    {   // the island: worktop, cupboards to the back, three stools at its overhang
+                        b.Add(PropKind.KitchenIsland, f.P(0, 0), f.Face);
+                        for (int i = -1; i <= 1; i++) b.Add(PropKind.BarStool, f.P(i * 0.62f, 0.78f), f.Back);
+                        b.Item(f.P(R(-0.7f, 0.7f), 0, 0.925f));
+                    }
+                    else if (roll < 0.55)
                     {   // a breakfast bar: the counter and its stools on the far side
                         b.Add(PropKind.BarCounter, f.P(0, 0), f.Face);
                         for (int i = -1; i <= 1; i++) b.Add(PropKind.BarStool, f.P(i * 0.62f, 0.62f), f.Back);
                         b.Item(f.P(R(-0.6f, 0.6f), 0, 1.06f));
-                        break;
                     }
-                    b.Add(PropKind.RoundTable, f.P(0, 0), 0); // the kitchen table, chairs all round
-                    Chairs(f, b, 3 + m_Rng.Next(2));
-                    b.Item(f.P(R(-0.2f, 0.2f), 0, 0.76f));
+                    else if (roll < 0.85)
+                    {   // the dining table, chairs round it
+                        b.Add(PropKind.DiningTable, f.P(0, 0), f.Face);
+                        foreach (float u in new[] { -0.42f, 0.42f })
+                        {
+                            b.Add(PropKind.Chair, f.P(u, 0.78f), f.Back);
+                            b.Add(PropKind.Chair, f.P(u, -0.78f), f.Face);
+                        }
+                        if (Chance(0.5)) b.Add(PropKind.Chair, f.P(1.12f, 0), f.Face - 90f);
+                        b.Item(f.P(R(-0.5f, 0.5f), R(-0.2f, 0.2f), 0.755f));
+                    }
+                    else
+                    {
+                        b.Add(PropKind.RoundTable, f.P(0, 0), 0);
+                        Chairs(f, b, 3 + m_Rng.Next(2)); // the kitchen table, chairs all round
+                        b.Item(f.P(R(-0.2f, 0.2f), 0, 0.76f));
+                    }
                     break;
                 case RoomType.Gym:
-                    if (Chance(0.55)) { b.Add(PropKind.WeightBench, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0.4f)); }
-                    else { b.Add(PropKind.Treadmill, f.P(-0.5f, 0), f.Face); b.Add(PropKind.Treadmill, f.P(0.5f, 0), f.Face); }
+                    if (roll < 0.3) { b.Add(PropKind.WeightBench, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0.4f)); }
+                    else if (roll < 0.5) { b.Add(PropKind.Treadmill, f.P(-0.5f, 0), f.Face); b.Add(PropKind.Treadmill, f.P(0.5f, 0), f.Face); }
+                    else if (roll < 0.72) { b.Add(PropKind.PowerCage, f.P(0, 0), f.Face); b.Item(f.P(0, 0)); }
+                    else { b.Add(PropKind.RowingMachine, f.P(-0.42f, 0), f.Face); b.Add(PropKind.RowingMachine, f.P(0.42f, 0), f.Face); }
                     break;
                 case RoomType.Library:
-                    if (Chance(0.5))
+                    if (roll < 0.38)
                     {   // a reading table, chairs along both sides
                         b.Add(PropKind.ReadingTable, f.P(0, 0), f.Face);
                         foreach (float u in new[] { -0.5f, 0.5f })
@@ -1055,7 +1752,7 @@ namespace Stealth.Level
                         }
                         b.Item(f.P(R(-0.7f, 0.7f), R(-0.2f, 0.2f), 0.77f));
                     }
-                    else
+                    else if (roll < 0.72)
                     {   // a double-sided stack of bookcases
                         foreach (float u in new[] { -0.5f, 0.5f })
                         {
@@ -1064,21 +1761,48 @@ namespace Stealth.Level
                         }
                         b.Item(f.P(R(-0.8f, 0.8f), Chance(0.5) ? 0.2f : -0.2f, BookcaseLevels[m_Rng.Next(3)]));
                     }
+                    else
+                    {   // study carrels back to back, a chair at each
+                        b.Add(PropKind.StudyCarrel, f.P(0, 0.36f), f.Face);
+                        b.Add(PropKind.StudyCarrel, f.P(0, -0.36f), f.Back);
+                        b.Add(PropKind.Chair, f.P(0, 1.05f), f.Back);
+                        b.Add(PropKind.Chair, f.P(0, -1.05f), f.Face);
+                        b.Item(f.P(R(-0.3f, 0.3f), 0.45f, 0.765f));
+                    }
                     break;
                 case RoomType.CopyRoom:
-                    b.Add(PropKind.Desk, f.P(0, 0.4f), f.Face);
-                    b.Add(PropKind.Desk, f.P(0, -0.4f), f.Back);
-                    b.Add(PropKind.PaperStack, f.P(1.3f, 0), f.Face);
-                    b.Item(f.P(R(-0.5f, 0.5f), 0.3f, 0.77f));
+                    if (roll < 0.5)
+                    {
+                        b.Add(PropKind.Desk, f.P(0, 0.4f), f.Face);
+                        b.Add(PropKind.Desk, f.P(0, -0.4f), f.Back);
+                        b.Add(PropKind.PaperStack, f.P(1.3f, 0), f.Face);
+                        b.Item(f.P(R(-0.5f, 0.5f), 0.3f, 0.77f));
+                    }
+                    else
+                    {   // the binding table, the mail cart beside it
+                        b.Add(PropKind.WorkTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.MailCart, f.P(1.35f, 0), f.Face + 90f);
+                        b.Item(f.P(R(-0.5f, 0.5f), R(-0.2f, 0.2f), 0.905f));
+                    }
                     break;
                 case RoomType.ControlRoom:
-                    b.Add(PropKind.ConsoleDesk, f.P(0, 0), f.Face);
-                    b.Add(PropKind.Chair, f.P(-0.6f, 0.85f), f.Back);
-                    b.Add(PropKind.Chair, f.P(0.6f, 0.85f), f.Back);
-                    b.Item(f.P(R(-0.9f, 0.9f), 0.2f, 0.77f));
+                    if (roll < 0.5)
+                    {
+                        b.Add(PropKind.ConsoleDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(-0.6f, 0.85f), f.Back);
+                        b.Add(PropKind.OperatorChair, f.P(0.6f, 0.85f), f.Back);
+                        b.Item(f.P(R(-0.9f, 0.9f), 0.2f, 0.77f));
+                    }
+                    else
+                    {   // the supervisor's desk: screens at its back, two operators at its front
+                        b.Add(PropKind.SupervisorDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(-0.45f, 0.85f), f.Back);
+                        b.Add(PropKind.OperatorChair, f.P(0.45f, 0.85f), f.Back);
+                        b.Item(f.P(R(-0.6f, 0.6f), 0.2f, 1.105f));
+                    }
                     break;
                 case RoomType.Lab:
-                    if (Chance(0.6))
+                    if (roll < 0.45)
                     {   // two benches back to back
                         b.Add(PropKind.LabBench, f.P(0, 0.4f), f.Face);
                         b.Add(PropKind.LabBench, f.P(0, -0.4f), f.Back);
@@ -1086,72 +1810,152 @@ namespace Stealth.Level
                         b.Add(PropKind.Chair, f.P(R(-0.4f, 0.4f), -1.2f), f.Face);
                         b.Item(f.P(R(-0.6f, 0.6f), Chance(0.5) ? 0.5f : -0.5f, 0.91f));
                     }
-                    else { b.Add(PropKind.RobotArm, f.P(0, 0), f.Face + m_Rng.Next(4) * 90f); b.Item(f.P(0.7f, 0.4f)); }
+                    else if (roll < 0.62) { b.Add(PropKind.RobotArm, f.P(0, 0), f.Face + m_Rng.Next(4) * 90f); b.Item(f.P(0.7f, 0.4f)); }
+                    else
+                    {   // the robot on its table, a stool each side and the scope cart
+                        b.Add(PropKind.RobotTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(-0.5f, 0.85f), f.Back);
+                        b.Add(PropKind.ScopeCart, f.P(1.3f, 0), f.Face - 90f);
+                        b.Item(f.P(0.35f, 0.1f, 0.905f));
+                    }
                     break;
                 case RoomType.NapRoom:
-                    if (Chance(0.5)) b.Add(PropKind.Hammock, f.P(0, 0), f.Face);
-                    else
+                    if (roll < 0.32) b.Add(PropKind.Hammock, f.P(0, 0), f.Face);
+                    else if (roll < 0.6)
                     {
                         b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
                         b.Add(PropKind.BeanBag, f.P(-1.0f, 0.2f), f.Face + 60f);
                         b.Add(PropKind.BeanBag, f.P(1.0f, 0.2f), f.Face - 60f);
                         b.Item(f.P(0, 0, 0.42f));
                     }
+                    else if (roll < 0.8)
+                    {   // a daybed screened off by its curtain, the night table at its head
+                        b.Add(PropKind.Daybed, f.P(0, 0), f.Face);
+                        b.Add(PropKind.CurtainDivider, f.P(0, -0.62f), f.Face);
+                        b.Add(PropKind.NightTable, f.P(1.3f, -0.1f), f.Face);
+                        b.Item(f.P(1.3f, -0.1f, 0.405f));
+                    }
+                    else { b.Add(PropKind.FloorCushions, f.P(0, 0), f.Face); b.Add(PropKind.FloorLamp, f.P(0.95f, -0.4f), f.Face); }
                     break;
                 case RoomType.Studio:
-                    if (Chance(0.5)) { b.Add(PropKind.DrumKit, f.P(0, 0), f.Face); }
-                    else
+                    if (roll < 0.4) { b.Add(PropKind.DrumKit, f.P(0, 0), f.Face); }
+                    else if (roll < 0.7)
                     {   // two voices at their mics, facing each other
                         b.Add(PropKind.MicStand, f.P(0, 0.45f), f.Back);
                         b.Add(PropKind.MicStand, f.P(0, -0.45f), f.Face);
                         b.Add(PropKind.BarStool, f.P(0, 1.0f), f.Back);
                         b.Add(PropKind.BarStool, f.P(0, -1.0f), f.Face);
                     }
+                    else
+                    {   // the keyboard player: synth, stool, an amp beside
+                        b.Add(PropKind.SynthStand, f.P(0, 0), f.Face);
+                        b.Add(PropKind.BarStool, f.P(0, 0.75f), f.Back);
+                        b.Add(PropKind.AmpCabinet, f.P(1.1f, 0), f.Face);
+                    }
                     break;
                 case RoomType.LockerRoom:
-                    b.Add(PropKind.Bench, f.P(0, 0), f.Face);
-                    if (Chance(0.5)) b.Item(f.P(R(-0.5f, 0.5f), 0, 0.46f));
+                    if (roll < 0.5) { b.Add(PropKind.Bench, f.P(0, 0), f.Face); if (Chance(0.5)) b.Item(f.P(R(-0.5f, 0.5f), 0, 0.46f)); }
+                    else { b.Add(PropKind.BenchIsland, f.P(0, 0), f.Face); b.Item(f.P(R(-0.6f, 0.6f), Chance(0.5) ? 0.25f : -0.25f, 0.455f)); }
                     break;
                 case RoomType.Infirmary:
-                    b.Add(PropKind.HospitalBed, f.P(0, 0), f.Face);
-                    b.Add(PropKind.PrivacyScreen, f.P(1.25f, 0), f.Face + 90f);
-                    b.Item(f.P(0, 0.6f, 0.66f));
+                    if (roll < 0.5)
+                    {
+                        b.Add(PropKind.HospitalBed, f.P(0, 0), f.Face);
+                        b.Add(PropKind.PrivacyScreen, f.P(1.25f, 0), f.Face + 90f);
+                        b.Add(PropKind.IvStand, f.P(-0.8f, -0.6f), f.Face);
+                        b.Item(f.P(0, 0.6f, 0.66f));
+                    }
+                    else
+                    {   // the examination couch, the drip by it
+                        b.Add(PropKind.ExamTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.IvStand, f.P(0.65f, -0.55f), f.Face);
+                        b.Item(f.P(0, 0.3f, 0.725f));
+                    }
                     break;
                 case RoomType.GameRoom:
-                    int game = m_Rng.Next(3);
+                    int game = m_Rng.Next(5);
                     if (game == 0) { b.Add(PropKind.PoolTable, f.P(0, 0), f.Face); b.Item(f.P(R(-0.8f, 0.8f), R(-0.3f, 0.3f), 0.81f)); }
                     else if (game == 1) { b.Add(PropKind.Foosball, f.P(0, 0), f.Face); b.Item(f.P(R(-0.4f, 0.4f), 0, 0.77f)); }
-                    else { b.Add(PropKind.PingPongTable, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0, 0.78f)); }
+                    else if (game == 2) { b.Add(PropKind.PingPongTable, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0, 0.78f)); }
+                    else if (game == 3) { b.Add(PropKind.AirHockey, f.P(0, 0), f.Face); b.Item(f.P(R(-0.6f, 0.6f), 0, 0.85f)); }
+                    else { b.Add(PropKind.PokerTable, f.P(0, 0), f.Face); Chairs(f, b, 4); b.Item(f.P(R(-0.3f, 0.3f), R(-0.3f, 0.3f), 0.785f)); }
                     break;
                 case RoomType.Server: // a cold aisle between two rows of racks
-                    for (int i = -1; i <= 1; i++)
+                    if (roll < 0.75)
                     {
-                        b.Add(PropKind.ServerRack, f.P(i * 0.72f, 1.25f), f.Back);
-                        b.Add(PropKind.ServerRack, f.P(i * 0.72f, -1.25f), f.Face);
+                        for (int i = -1; i <= 1; i++)
+                        {
+                            b.Add(PropKind.ServerRack, f.P(i * 0.72f, 1.25f), f.Back);
+                            b.Add(PropKind.ServerRack, f.P(i * 0.72f, -1.25f), f.Face);
+                        }
+                        b.Item(f.P(R(-0.8f, 0.8f), 0));
                     }
-                    b.Item(f.P(R(-0.8f, 0.8f), 0));
+                    else
+                    {   // the tape library back to back with the power: a block in the middle of the floor
+                        b.Add(PropKind.TapeLibrary, f.P(-0.3f, 0.42f), f.Face);
+                        b.Add(PropKind.UpsUnit, f.P(0.6f, -0.42f), f.Back + 90f);
+                        b.Add(PropKind.NetworkCabinet, f.P(-0.55f, -0.33f), f.Back);
+                    }
+                    break;
+                case RoomType.Workshop: // loose things on the floor between the bays and the benches
+                    if (roll < 0.3) b.Add(PropKind.TireStack, f.P(0, 0), 0);
+                    else if (roll < 0.55) { b.Add(PropKind.EngineStand, f.P(0, 0), f.Face); b.Item(f.P(-0.2f, 0, 1.14f)); }
+                    else if (roll < 0.75) b.Add(PropKind.OilDrain, f.P(0, 0), 0);
+                    else if (roll < 0.9) b.Add(PropKind.FloorJack, f.P(0, 0), f.Face);
+                    else { b.Add(PropKind.TireStack, f.P(-0.45f, 0), 0); b.Add(PropKind.TireStack, f.P(0.45f, 0), 0); }
+                    break;
+                case RoomType.PaintBooth: // the car being painted, lengthwise in the booth
+                    b.Add(PropKind.CarParked, f.P(0, 0), f.AlongU);
                     break;
                 case RoomType.Storage: // a wrapped pallet and a stack of boxes by the pile
                     b.Add(PropKind.Pallet, f.P(0, 0), m_Rng.Next(2) * 90f);
                     b.Add(PropKind.Boxes, f.P(0.2f, 1.2f), f.Face);
                     break;
                 case RoomType.Lounge:
-                    if (Chance(0.35)) { b.Add(PropKind.PingPongTable, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0, 0.78f)); }
-                    else
-                    {
+                    if (roll < 0.22) { b.Add(PropKind.PingPongTable, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0, 0.78f)); }
+                    else if (roll < 0.72)
+                    {   // the living corner on a rug: coffee table, sofa, armchairs at its ends
+                        b.Add(PropKind.AreaRug, f.P(0, -0.3f), f.Face, solid: false);
                         b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
                         b.Add(PropKind.Sofa, f.P(0, -1.15f), f.Face);
                         b.Add(PropKind.Armchair, f.P(-1.35f, 0.2f), f.Face + 90f);
                         if (Chance(0.6)) b.Add(PropKind.Armchair, f.P(1.35f, 0.2f), f.Face - 90f);
                         b.Item(f.P(0, 0, 0.42f));
                     }
+                    else
+                    {   // the big sectional round a coffee table
+                        b.Add(PropKind.SectionalSofa, f.P(0, -0.55f), f.Face);
+                        b.Add(PropKind.AreaRug, f.P(0, 0.6f), f.Face, solid: false);
+                        b.Add(PropKind.CoffeeTable, f.P(0, 0.85f), f.Face);
+                        b.Item(f.P(0, 0.85f, 0.42f));
+                    }
                     break;
-                case RoomType.Lobby:
-                    if (b.Pieces.Count == 0 && Chance(0.5))
+                case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
+                    // the shop's front desk: the service counter, a row of waiting chairs facing it, a stack of tyres on show
+                    if (roll < 0.45)
                     {
                         b.Add(PropKind.ReceptionDesk, f.P(0, 0), f.Face);
                         b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
                         b.Item(f.P(-0.4f, 0.33f, 1.14f));
+                    }
+                    else if (roll < 0.8)
+                        for (int i = -1; i <= 1; i++) b.Add(PropKind.GuestChair, f.P(i * 0.65f, 0), f.Face);
+                    else { b.Add(PropKind.TireStack, f.P(-0.45f, 0), 0f); b.Add(PropKind.TireStack, f.P(0.45f, 0), 0f); }
+                    break;
+                case RoomType.Lobby:
+                    if (roll < 0.32)
+                    {   // the reception, the queue lines in front of it
+                        b.Add(PropKind.ReceptionDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
+                        b.Add(PropKind.QueueBarrier, f.P(-0.85f, 1.55f), f.Face);
+                        b.Add(PropKind.QueueBarrier, f.P(0.85f, 1.55f), f.Face);
+                        b.Item(f.P(-0.4f, 0.33f, 1.14f));
+                    }
+                    else if (roll < 0.55) b.Add(PropKind.RoundBenchPlanter, f.P(0, 0), 0f);
+                    else if (roll < 0.7)
+                    {   // the security line: turnstiles side by side, a kiosk at the end
+                        for (int i = -1; i <= 1; i++) b.Add(PropKind.SecurityTurnstile, f.P(i * 1.22f, 0), f.Face);
+                        b.Add(PropKind.InfoKiosk, f.P(2.2f, 0), f.Face);
                     }
                     else
                     {
@@ -1162,16 +1966,40 @@ namespace Stealth.Level
                     }
                     break;
                 case RoomType.Office:
+                    if (roll < 0.5)
+                    {   // the boss's desk in the middle: the chair behind it, two guests in front
+                        b.Add(PropKind.ExecutiveDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, -0.8f), f.Face);
+                        b.Add(PropKind.GuestChair, f.P(-0.45f, 0.85f), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(0.45f, 0.85f), f.Back);
+                        b.Item(f.P(R(-0.5f, 0.5f), 0.1f, 0.765f));
+                    }
+                    else
+                    {
+                        b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Armchair, f.P(0, 0.85f), f.Back);
+                        b.Add(PropKind.Armchair, f.P(0, -0.85f), f.Face);
+                        b.Item(f.P(0, 0, 0.42f));
+                    }
+                    break;
                 case RoomType.Hall:
-                    b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
-                    b.Add(PropKind.Armchair, f.P(0, 0.85f), f.Back);
-                    b.Add(PropKind.Armchair, f.P(0, -0.85f), f.Face);
-                    b.Item(f.P(0, 0, 0.42f));
+                    if (roll < 0.4) b.Add(PropKind.Sculpture, f.P(0, 0), f.Face);
+                    else if (roll < 0.7) b.Add(PropKind.RoundBenchPlanter, f.P(0, 0), 0f);
+                    else
+                    {
+                        b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Armchair, f.P(0, 0.85f), f.Back);
+                        b.Add(PropKind.Armchair, f.P(0, -0.85f), f.Face);
+                        b.Item(f.P(0, 0, 0.42f));
+                    }
                     break;
             }
         }
 
-        /// <summary>Back-to-back cluster of four desks with privacy screens; loot on some of them.</summary>
+        /// <summary>The metal shelving's decks within reach (Tools/Blender/rooms2_tech.py).</summary>
+        static readonly float[] StorageDecks = { 0.61f, 1.09f, 1.57f };
+
+        /// <summary>Back-to-back cluster of four desks with privacy screens, a planter closing one end sometimes; loot on some of them.</summary>
         void DeskCluster(Frame f, Batch b)
         {
             foreach (float u in new[] { -0.8f, 0.8f })
@@ -1184,6 +2012,7 @@ namespace Stealth.Level
                 if (Chance(0.6)) b.Item(f.P(u + (Chance(0.5) ? -0.5f : 0.5f), Chance(0.5) ? 0.2f : -0.2f, DeskTop + 0.005f));
                 if (Chance(0.35)) b.Add(PropKind.DeskLamp, f.P(u + 0.55f, 0.55f, DeskTop), f.Back, solid: false);
             }
+            if (Chance(0.5)) b.Add(PropKind.PlanterDivider, f.P(Chance(0.5) ? 1.82f : -1.82f, 0), f.Face + 90f);
         }
 
         /// <summary>
@@ -1264,49 +2093,56 @@ namespace Stealth.Level
             float y = LevelLayout.FloorY(room.Floor);
             foreach (var (w, n) in list)
             {
-                if (room.Type == RoomType.Corridor) continue; // corridors stay bare: they are the walkways
                 var u = new Vector3(w.Dir.x, 0, w.Dir.y);
                 float t = R(0.15f, 0.9f);
-                int fails = 0;
-                while (t < w.Length - 0.3f && fails < 12)
+                // a corridor is a walkway (1.7 m stays free in front of its things), a room keeps an aisle
+                float walk = room.Type == RoomType.Corridor ? 1.4f : Aisle + 0.1f;
+                while (t < w.Length - 0.3f)
                 {
                     var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
-                    var batch = new Batch();
-                    float width = WallGroup(room, batch, face, u, n);
-                    if (width <= 0f) break;
-                    // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
-                    var shift = u * (width / 2f);
-                    for (int i = 0; i < batch.Pieces.Count; i++)
+                    // what does not fit here (too deep for the room, tall under a window, one too many) gives way to
+                    // another group of the room's set before the spot is given up
+                    float placed = 0f;
+                    for (int attempt = 0; attempt < 3 && placed <= 0f; attempt++)
                     {
-                        var p = batch.Pieces[i];
-                        p.Pos += shift;
-                        batch.Pieces[i] = p;
+                        var batch = new Batch();
+                        float width = WallGroup(room, batch, face, u, n);
+                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
+                        // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
+                        var shift = u * (width / 2f);
+                        for (int i = 0; i < batch.Pieces.Count; i++)
+                        {
+                            var p = batch.Pieces[i];
+                            p.Pos += shift;
+                            batch.Pieces[i] = p;
+                        }
+                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                        for (int i = 0; i < batch.Drops.Count; i++) { var d = batch.Drops[i]; d.Spot += shift; batch.Drops[i] = d; }
+                        if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) placed = width;
                     }
-                    for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                    for (int i = 0; i < batch.Drops.Count; i++) { var d = batch.Drops[i]; d.Spot += shift; batch.Drops[i] = d; }
-                    if (t + width <= w.Length - 0.1f && Deep(room, face + shift, n, batch) && TryCommit(room, batch, front: n))
-                    {
-                        t += width + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
-                        fails = 0;
-                    }
-                    else { t += 0.5f; fails++; }
+                    if (placed > 0f) t += placed + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
+                    else t += 0.5f;
                 }
             }
         }
 
-        /// <summary>A corridor keeps 1.6 m of walkway in front of anything along its walls.</summary>
-        bool Deep(PlanRoom room, Vector3 face, Vector3 n, Batch b, float walk = 1.7f)
+        /// <summary>
+        /// A walkway stays in front of a group along a wall: <paramref name="walk"/> of the room's floor, and no other
+        /// furniture within <see cref="Facing"/> more — the walkability check wants more room between two pieces than
+        /// between a piece and a bare wall (<see cref="Walk"/>: the navmesh erodes more around furniture).
+        /// </summary>
+        bool Deep(PlanRoom room, Vector3 face, Vector3 n, Batch b, float walk = Aisle + 0.1f)
         {
-            // the whole footprint, pushed 1.7 m (walk) further into the room, must still be the room's floor (a walkway stays)
+            // the whole footprint, pushed walk further into the room, must still be the room's floor
             var u = Vector3.Cross(Vector3.up, n);
             foreach (var p in b.Pieces)
             {
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
                 foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
-                    for (float d = 0f; d <= walk + 0.01f; d += 0.25f)
+                    for (float d = 0f; d <= walk + Facing + 0.01f; d += 0.25f)
                     {
                         var q = c + n * d;
-                        if (!InRoom(room.Floor, room.Id, q.x, q.z)) return false;
+                        if (d <= walk + 0.01f && !InRoom(room.Floor, room.Id, q.x, q.z)) return false;
                         if (d > 0.2f && m_Taken[room.Floor].Contains(new Vector2(q.x, q.z))) return false;
                     }
             }
@@ -1322,58 +2158,130 @@ namespace Stealth.Level
                 b.Add(k, f.P(0, BackOf(k)), f.Face);
                 return w;
             }
+            // a thing on the wall (a clock, a board, a cabinet) — nothing on the floor to walk into
+            float Hung(PropKind k, float w)
+            {
+                b.Add(k, f.P(0, BackOf(k)), f.Face, solid: false);
+                return w;
+            }
+            // lying along the wall (its side to it): beds, a rowing machine
+            float Along(PropKind k, float du = 0f)
+            {
+                var r = FootprintOf(k);
+                b.Add(k, f.P(du, r.width / 2f + WallGap), f.Face + 90f);
+                return r.height + 0.05f;
+            }
+            float Clock(float w)
+            {
+                if (Chance(0.3)) b.Add(PropKind.WallClock, f.P(0, BackOf(PropKind.WallClock)), f.Face, solid: false); // over something low
+                return w;
+            }
             int roll = m_Rng.Next(100);
             switch (room.Type)
             {
                 case RoomType.Corridor:
-                    return roll < 35 ? Single(PropKind.WaterCooler, 0.4f) : roll < 65 ? Single(PropKind.TrashBin, 0.45f)
-                         : Single(PropKind.Cabinet, 0.95f);                                     // drawers to open instead of a plant
+                    // corridors are walkways: only slim things, far apart (Walls keeps 1.7 m free in front of them)
+                    if (roll < 28) return Hung(PropKind.FireCabinet, 0.45f);
+                    if (roll < 52) return Hung(PropKind.NoticeBoard, 1.25f);
+                    if (roll < 70) return Single(PropKind.BinPair, 0.75f);
+                    if (roll < 84) return Single(PropKind.UmbrellaStand, 0.35f);
+                    return Single(PropKind.CorridorBench, 1.45f);
                 case RoomType.Hall:
-                    return roll < 50 ? Single(PropKind.Plant, 0.75f) // stair halls stay clear (no vending machines: they look like ATMs)
-                         : roll < 70 ? Single(PropKind.WaterCooler, 0.4f) : roll < 85 ? Single(PropKind.CoatRack, 0.6f) : Single(PropKind.Armchair, 0.9f);
+                    if (roll < 26) return Single(PropKind.Plant, 0.75f); // stair halls stay clear (no vending machines: they look like ATMs)
+                    if (roll < 34) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 40) return Single(PropKind.CoatRack, 0.6f);
+                    if (roll < 46) return Single(PropKind.Armchair, 0.9f);
+                    if (roll < 58) { Single(PropKind.DisplayCase, 1.05f); return Clock(1.05f); }
+                    if (roll < 72) { Single(PropKind.HallBench, 1.85f); if (Chance(0.4)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.HallBench), 0.455f)); return 1.85f; }
+                    if (roll < 82) return Single(PropKind.DirectoryBoard, 0.85f);
+                    if (roll < 92) return Single(PropKind.PlanterLarge, 1.05f);
+                    { b.Add(PropKind.Sculpture, f.P(0, 0.45f), f.Face); return 0.7f; }
+                case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
+                    // the waiting area: chairs along the wall, the tyre display, coffee and water, a rack of brochures
+                    if (roll < 30) return Row(f, b, PropKind.GuestChair, 3, 0.65f);
+                    if (roll < 48) return Single(PropKind.TireRack, 2.1f);
+                    if (roll < 58) return Single(PropKind.VendingMachine, 1.0f);
+                    if (roll < 66) return Single(PropKind.WaterCooler, 0.5f);
+                    if (roll < 76) { b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face); b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face); b.Item(f.P(0, 1.35f, 0.42f)); return 2.25f; }
+                    if (roll < 84) return Single(PropKind.MagazineRack, 0.6f);
+                    if (roll < 92) return Single(PropKind.Plant, 0.75f);
+                    return Single(PropKind.TireStack, 0.85f);
                 case RoomType.Lobby:
-                    if (roll < 25) { b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face); b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face); b.Item(f.P(0, 1.35f, 0.42f)); return 2.25f; }
-                    if (roll < 45) { b.Add(PropKind.Lockers, f.P(-0.525f, BackOf(PropKind.Lockers)), f.Face); b.Add(PropKind.Lockers, f.P(0.525f, BackOf(PropKind.Lockers)), f.Face); return 2.1f; }
-                    if (roll < 60) return Single(PropKind.Plant, 0.75f);                  // no vending machines
-                    if (roll < 80) return Single(PropKind.Lockers, 1.05f);                 // lockers to open instead of a plant
-                    if (roll < 90) return Single(PropKind.CoatRack, 0.6f);
-                    return Single(PropKind.FloorLamp, 0.45f);
+                    if (roll < 18) { b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face); b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face); b.Item(f.P(0, 1.35f, 0.42f)); return 2.25f; }
+                    if (roll < 30) { b.Add(PropKind.Lockers, f.P(-0.525f, BackOf(PropKind.Lockers)), f.Face); b.Add(PropKind.Lockers, f.P(0.525f, BackOf(PropKind.Lockers)), f.Face); return 2.1f; }
+                    if (roll < 40) return Single(PropKind.Plant, 0.75f);                  // no vending machines
+                    if (roll < 48) return Single(PropKind.Lockers, 1.05f);                 // lockers to open instead of a plant
+                    if (roll < 54) return Single(PropKind.CoatRack, 0.6f);
+                    if (roll < 60) return Single(PropKind.FloorLamp, 0.45f);
+                    if (roll < 70) return Single(PropKind.LogoTotem, 0.85f);
+                    if (roll < 80) return Row(f, b, PropKind.InfoKiosk, 2, 0.7f);
+                    if (roll < 90) return Single(PropKind.PlanterLarge, 1.05f);
+                    return Single(PropKind.DirectoryBoard, 0.85f);
                 case RoomType.Office:
-                    if (roll < 30)
+                    if (roll < 20)
                     {   // a work desk against the wall
                         b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face);
                         b.Add(PropKind.Chair, f.P(R(-0.1f, 0.1f), 1.2f), f.Back + R(-15f, 15f));
                         if (Chance(0.6)) b.Add(PropKind.DeskLamp, f.P(0.55f, 0.3f, DeskTop), f.Face, solid: false);
                         b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f));
-                        return 1.65f;
+                        if (!Chance(0.5)) return 1.65f;
+                        b.Add(PropKind.FilePedestal, f.P(1.05f, BackOf(PropKind.FilePedestal)), f.Face); // its drawers beside it
+                        return 2.55f;
                     }
-                    if (roll < 48)
+                    if (roll < 32)
                     {   // the manager's desk: bookcase behind, the desk facing the room, a guest chair
                         b.Add(PropKind.Bookshelf, f.P(0, BackOf(PropKind.Bookshelf)), f.Face);
                         b.Add(PropKind.Chair, f.P(0, 0.85f), f.Face);
                         b.Add(PropKind.Desk, f.P(0, 1.6f), f.Back);
-                        b.Add(PropKind.Chair, f.P(0, 2.4f), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(0, 2.4f), f.Back);
                         b.Item(f.P(R(-0.5f, 0.5f), 1.6f, DeskTop + 0.005f));
                         return 1.65f;
                     }
-                    if (roll < 62) { Single(PropKind.Safe, 0.85f); b.Item(f.P(0, BackOf(PropKind.Safe), 1.02f)); return 0.85f; }
-                    if (roll < 74) { b.Add(PropKind.Bookshelf, f.P(-0.51f, BackOf(PropKind.Bookshelf)), f.Face); b.Add(PropKind.Bookshelf, f.P(0.51f, BackOf(PropKind.Bookshelf)), f.Face); return 2.05f; }
-                    if (roll < 84) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
-                    if (roll < 92 && !m_Printer) { m_Printer = true; return Single(PropKind.Printer, 0.65f); }
+                    if (roll < 42)
+                    {   // the boss's suite: credenza at the wall, the big desk in front of it facing the door, two guest chairs
+                        b.Add(PropKind.Credenza, f.P(0, BackOf(PropKind.Credenza)), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, 0.9f), f.Face);
+                        b.Add(PropKind.ExecutiveDesk, f.P(0, 1.72f), f.Face);
+                        b.Add(PropKind.GuestChair, f.P(-0.45f, 2.55f), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(0.45f, 2.55f), f.Back);
+                        b.Item(f.P(R(-0.5f, 0.5f), 1.7f, 0.765f));
+                        b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.Credenza), 0.755f));
+                        return Clock(1.85f);
+                    }
+                    if (roll < 50) { Single(PropKind.Safe, 0.85f); b.Item(f.P(0, BackOf(PropKind.Safe), 1.02f)); return 0.85f; }
+                    if (roll < 58) { b.Add(PropKind.Bookshelf, f.P(-0.51f, BackOf(PropKind.Bookshelf)), f.Face); b.Add(PropKind.Bookshelf, f.P(0.51f, BackOf(PropKind.Bookshelf)), f.Face); return 2.05f; }
+                    if (roll < 66) { Row(f, b, PropKind.FilingCabinet, 2, 0.5f); b.Item(f.P(R(-0.2f, 0.2f), BackOf(PropKind.FilingCabinet), 1.305f)); return Clock(1.05f); }
+                    if (roll < 73) { Single(PropKind.Credenza, 1.65f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.Credenza), 0.755f)); return Clock(1.65f); }
+                    if (roll < 80) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return Clock(0.95f); }
+                    if (roll < 86 && !m_Printer) { m_Printer = true; return Single(PropKind.Printer, 0.65f); }
+                    if (roll < 93) return Row(f, b, PropKind.GuestChair, 2, 0.65f);
                     return Single(PropKind.Lockers, 1.05f);
                 case RoomType.OpenSpace:
-                    if (roll < 10 && !m_Printer) { m_Printer = true; return Single(PropKind.Printer, 0.65f); } // one per room, rarely
-                    if (roll < 50) { b.Add(PropKind.Cabinet, f.P(-0.475f, BackOf(PropKind.Cabinet)), f.Face); b.Add(PropKind.Cabinet, f.P(0.475f, BackOf(PropKind.Cabinet)), f.Face); b.Item(f.P(0.4f, BackOf(PropKind.Cabinet), CabinetTop)); return 1.9f; }
-                    if (roll < 65) return Single(PropKind.WaterCooler, 0.4f);
-                    if (roll < 80) return Single(PropKind.Cabinet, 0.95f);
-                    if (roll < 90) { b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face); b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back); b.Item(f.P(0.3f, 0.5f, DeskTop + 0.005f)); return 1.65f; }
+                    if (roll < 8 && !m_Printer) { m_Printer = true; return Single(PropKind.Printer, 0.65f); } // one per room, rarely
+                    if (roll < 30) { b.Add(PropKind.Cabinet, f.P(-0.475f, BackOf(PropKind.Cabinet)), f.Face); b.Add(PropKind.Cabinet, f.P(0.475f, BackOf(PropKind.Cabinet)), f.Face); b.Item(f.P(0.4f, BackOf(PropKind.Cabinet), CabinetTop)); return Clock(1.9f); }
+                    if (roll < 40) { Single(PropKind.StandingDesk, 1.45f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.StandingDesk), 1.105f)); return 1.45f; }
+                    if (roll < 48) return Row(f, b, PropKind.FilePedestal, 2, 0.45f);
+                    if (roll < 56) return Single(PropKind.MobileWhiteboard, 1.45f);
+                    if (roll < 64) return Single(PropKind.SofaPod, 1.85f);
+                    if (roll < 72) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 82) { b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face); b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back); b.Item(f.P(0.3f, 0.5f, DeskTop + 0.005f)); return 1.65f; }
+                    if (roll < 92) return Single(PropKind.PlanterDivider, 1.65f);
                     return Single(PropKind.TrashBin, 0.45f);
                 case RoomType.Meeting:
-                    if (roll < 30) { Single(PropKind.TvStand, 1.45f); return 1.45f; }
-                    if (roll < 55) { b.Add(PropKind.Whiteboard, f.P(0, 0.14f), f.Face); return 1.95f; }
-                    if (roll < 75) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
-                    if (roll < 88) return Single(PropKind.WaterCooler, 0.4f);
-                    return Single(PropKind.Cabinet, 0.95f);
+                    if (roll < 20) { Single(PropKind.TvStand, 1.45f); return 1.45f; }
+                    if (roll < 34) { b.Add(PropKind.Whiteboard, f.P(0, 0.14f), f.Face); return 1.95f; }
+                    if (roll < 50)
+                    {   // the projector screen over the AV cabinet
+                        b.Add(PropKind.AvCredenza, f.P(0, BackOf(PropKind.AvCredenza)), f.Face);
+                        b.Add(PropKind.ProjectorScreen, f.P(0, BackOf(PropKind.ProjectorScreen)), f.Face, solid: false);
+                        b.Item(f.P(R(-0.6f, 0.1f), BackOf(PropKind.AvCredenza), 0.755f));
+                        return 2.05f;
+                    }
+                    if (roll < 60) return Single(PropKind.Flipchart, 0.75f);
+                    if (roll < 70) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return Clock(0.95f); }
+                    if (roll < 78) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 90) return Row(f, b, PropKind.MeetingChair, 2, 0.62f);
+                    { Single(PropKind.Credenza, 1.65f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.Credenza), 0.755f)); return Clock(1.65f); }
                 case RoomType.Kitchen:
                     if (!m_Fridge) return Single(PropKind.Fridge, 0.75f); // every kitchen has its fridge
                     if (!m_Table)
@@ -1384,10 +2292,11 @@ namespace Stealth.Level
                         b.Item(table + Vector3.up * 0.76f);
                         return 2.6f;
                     }
-                    if (roll < 30)
-                    {   // the kitchen run: sink, cooker, worktop with the microwave and the coffee machine, cupboards over it
+                    if (roll < 26)
+                    {   // the kitchen run: sink, cooker (or the dishwasher), worktop with the microwave and the coffee machine, cupboards over it
                         b.Add(PropKind.KitchenSink, f.P(-1.52f, BackOf(PropKind.KitchenSink)), f.Face);
-                        b.Add(PropKind.Stove, f.P(-0.62f, BackOf(PropKind.Stove)), f.Face);
+                        var mid = Chance(0.5) ? PropKind.Stove : PropKind.Dishwasher;
+                        b.Add(mid, f.P(-0.62f, BackOf(mid)), f.Face);
                         b.Add(PropKind.KitchenCounter, f.P(0.92f, BackOf(PropKind.KitchenCounter)), f.Face);
                         // the counter has its microwave at its local −X: the coffee machine on the other end
                         var cx = Quaternion.Euler(0, f.Face, 0) * Vector3.right;
@@ -1397,7 +2306,7 @@ namespace Stealth.Level
                         b.Item(f.P(0.9f, BackOf(PropKind.KitchenCounter), 0.93f));
                         return 4.3f;
                     }
-                    if (roll < 48)
+                    if (roll < 40)
                     {   // a shorter run: the sink and a worktop
                         b.Add(PropKind.KitchenSink, f.P(-1.22f, BackOf(PropKind.KitchenSink)), f.Face);
                         b.Add(PropKind.KitchenCounter, f.P(0.62f, BackOf(PropKind.KitchenCounter)), f.Face);
@@ -1405,20 +2314,53 @@ namespace Stealth.Level
                         b.Item(f.P(0.3f, BackOf(PropKind.KitchenCounter), 0.93f));
                         return 3.7f;
                     }
-                    // the fridge is there already (one a kitchen): drawers, the water, the bin
-                    if (roll < 66) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
-                    if (roll < 84) return Single(PropKind.WaterCooler, 0.4f);
-                    return Single(PropKind.TrashBin, 0.45f);
+                    // the fridge is there already (one a kitchen): drawers, a pantry, the water, the recycling, the bin
+                    if (roll < 50) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 58) { Single(PropKind.PantryCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.PantryCabinet), 0.915f)); return 0.95f; }
+                    if (roll < 66) return Single(PropKind.RecyclingBins, 1.25f);
+                    if (roll < 72) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 84)
+                    {   // a table pushed against the wall, two chairs at it
+                        b.Add(PropKind.DiningTable, f.P(0, 0.45f + WallGap), f.Face);
+                        b.Add(PropKind.Chair, f.P(-0.42f, 1.25f), f.Back);
+                        b.Add(PropKind.Chair, f.P(0.42f, 1.25f), f.Back);
+                        b.Item(f.P(R(-0.5f, 0.5f), 0.4f, 0.755f));
+                        return Clock(1.65f);
+                    }
+                    if (roll < 92) return Single(PropKind.TrashBin, 0.45f);
+                    { Single(PropKind.PantryCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.PantryCabinet), 1.315f)); return 0.95f; }
                 case RoomType.Server:
-                    if (roll < 70)
+                    if (roll < 45)
                     {
                         for (int i = -1; i <= 1; i++) b.Add(PropKind.ServerRack, f.P(i * 0.72f, BackOf(PropKind.ServerRack)), f.Face);
                         return 2.2f;
                     }
-                    Single(PropKind.Cabinet, 0.95f);
-                    b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop));
-                    return 0.95f;
+                    if (roll < 56) return Row(f, b, PropKind.NetworkCabinet, 2, 0.62f);
+                    if (roll < 66) return Single(PropKind.CracUnit, 1.05f);
+                    if (roll < 75) return Single(PropKind.TapeLibrary, 1.25f);
+                    if (roll < 84) { Row(f, b, PropKind.UpsUnit, 2, 0.55f); b.Item(f.P(R(-0.2f, 0.2f), BackOf(PropKind.UpsUnit), 0.985f)); return 1.15f; }
+                    if (roll < 92) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    { Single(PropKind.CrashCart, 0.65f); b.Item(f.P(0, BackOf(PropKind.CrashCart), 0.815f)); return 0.65f; }
+                case RoomType.Workshop:
+                    // the benches and machines along the walls behind the bays: a real shop's equipment list
+                    if (roll < 22) { Single(PropKind.ToolChest, 1.2f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.ToolChest), 1.06f)); return 1.2f; }
+                    if (roll < 34) return Single(PropKind.TireRack, 2.1f);
+                    if (roll < 42) return Single(PropKind.TireChanger, 1.2f);
+                    if (roll < 50) return Single(PropKind.WheelBalancer, 1.2f);
+                    if (roll < 56) return Single(PropKind.AirCompressor, 1.3f);
+                    if (roll < 64) { Single(PropKind.OilDrums, 1.25f); return 1.25f; }
+                    if (roll < 70) return Single(PropKind.WeldingCart, 0.7f);
+                    if (roll < 76) return Single(PropKind.EngineHoist, 1.0f);
+                    if (roll < 86) { Single(PropKind.WorkTable, 1.7f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.WorkTable), 0.92f)); return 1.7f; }
+                    if (roll < 93) return Hung(PropKind.HoseReel, 0.6f);
+                    { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                case RoomType.PaintBooth:
+                    if (roll < 50) { Single(PropKind.PaintRack, 1.45f); b.Item(f.P(-0.3f, BackOf(PropKind.PaintRack), 0.95f)); return 1.45f; }
+                    if (roll < 70) return Single(PropKind.ToolChest, 1.2f);
+                    if (roll < 85) return Hung(PropKind.HoseReel, 0.6f);
+                    return Single(PropKind.TireStack, 0.85f);
                 case RoomType.Storage:
+                    if (m_L.Kind == HouseKind.Garage && roll < 30) return Single(PropKind.TireRack, 2.1f); // the parts store keeps tyres too
                     if (roll < 80)
                     {
                         // shelves all round: loot on the upper boards from the start, the bottom board for the workers
@@ -1428,16 +2370,20 @@ namespace Stealth.Level
                             b.Drops.Add(new StorageDrop { Spot = f.P(along, BackOf(PropKind.Shelf), Enemies.CargoMotion.ShelfTop + 0.02f), Facing = -f.N, Shelf = true });
                         return 2.05f;
                     }
-                    b.Add(PropKind.Boxes, f.P(-0.2f, 0.45f), f.Face + m_Rng.Next(4) * 90f);
-                    return 1.2f;
+                    // the rest of the walls: steel shelving, boxes, drums, crates (the shelves above carry the workers' drops)
+                    if (roll < 86) { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                    if (roll < 91) { b.Add(PropKind.Boxes, f.P(-0.2f, 0.45f), f.Face + m_Rng.Next(4) * 90f); return 1.2f; }
+                    if (roll < 95) return Single(PropKind.DrumPair, 0.95f);
+                    if (roll < 98) { Single(PropKind.CrateStack, 1.25f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.CrateStack), 1.385f)); return 1.25f; }
+                    return Single(PropKind.RollingCage, 0.95f);
                 case RoomType.Restroom:
-                    if (roll < 55)
+                    if (roll < 38)
                     {
                         for (int i = -1; i <= 1; i++) b.Add(PropKind.ToiletStall, f.P(i * 1.06f, BackOf(PropKind.ToiletStall)), f.Face);
                         b.Item(f.P(0, 2.1f));
                         return 3.2f;
                     }
-                    if (roll < 75)
+                    if (roll < 52)
                     {   // basins with mirrors, the hand dryer beside them
                         b.Add(PropKind.MirrorSink, f.P(-0.62f, BackOf(PropKind.MirrorSink)), f.Face);
                         b.Add(PropKind.MirrorSink, f.P(0.18f, BackOf(PropKind.MirrorSink)), f.Face);
@@ -1445,124 +2391,223 @@ namespace Stealth.Level
                         if (Chance(0.4)) b.Item(f.P(-0.62f, BackOf(PropKind.MirrorSink), 0.86f));
                         return 2.0f;
                     }
-                    if (roll < 90) return Row(f, b, PropKind.Urinal, 3, 0.7f);
+                    if (roll < 64)
+                    {   // the double vanity, the towels beside it
+                        b.Add(PropKind.DoubleSink, f.P(-0.15f, BackOf(PropKind.DoubleSink)), f.Face);
+                        b.Add(PropKind.TowelDispenser, f.P(0.82f, BackOf(PropKind.TowelDispenser)), f.Face, solid: false);
+                        if (Chance(0.4)) b.Item(f.P(-0.15f, BackOf(PropKind.DoubleSink) + 0.05f, 0.855f));
+                        return 2.0f;
+                    }
+                    if (roll < 74) return Row(f, b, PropKind.Urinal, 3, 0.7f);
+                    if (roll < 82) return Single(PropKind.JanitorCart, 0.95f);
+                    if (roll < 88) return Hung(PropKind.ChangingTable, 0.95f);
+                    if (roll < 94) return Single(PropKind.SanitaryBin, 0.35f);
                     return Single(PropKind.TrashBin, 0.45f);
                 case RoomType.Lounge:
-                    if (roll < 25)
+                    if (roll < 16)
                     {
                         b.Add(PropKind.TvStand, f.P(0, BackOf(PropKind.TvStand)), f.Face);
                         b.Add(PropKind.Armchair, f.P(-0.6f, 2.0f), f.Back);
                         b.Add(PropKind.Armchair, f.P(0.6f, 2.0f), f.Back);
                         return 1.45f;
                     }
-                    if (roll < 45)
+                    if (roll < 30)
                     {
                         b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face);
                         b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face);
                         b.Item(f.P(0, BackOf(PropKind.Sofa), 0.46f));
                         b.Item(f.P(0, 1.35f, 0.42f));
-                        return 2.25f;
+                        return Clock(2.25f);
                     }
-                    if (roll < 60) return Single(PropKind.ArcadeMachine, 0.8f);
-                    if (roll < 72) return Single(PropKind.Plant, 0.75f);                  // no vending machines
-                    if (roll < 82) return Single(PropKind.WaterCooler, 0.4f);
-                    if (roll < 92) { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
-                    return Single(PropKind.FloorLamp, 0.45f);
+                    if (roll < 40)
+                    {   // the sectional against the wall, a lamp table at its end
+                        b.Add(PropKind.SectionalSofa, f.P(-0.3f, BackOf(PropKind.SectionalSofa)), f.Face);
+                        b.Add(PropKind.SideTable, f.P(1.2f, BackOf(PropKind.SideTable)), f.Face);
+                        b.Item(f.P(1.2f, BackOf(PropKind.SideTable) + 0.1f, 0.555f));
+                        return 3.0f;
+                    }
+                    if (roll < 47) return Single(PropKind.ArcadeMachine, 0.8f);
+                    if (roll < 53) return Single(PropKind.Plant, 0.75f);                  // no vending machines
+                    if (roll < 58) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 65) { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
+                    if (roll < 76) { b.Add(PropKind.EggChair, f.P(-0.3f, BackOf(PropKind.EggChair)), f.Face); b.Add(PropKind.SideTable, f.P(0.45f, BackOf(PropKind.SideTable)), f.Face); return 1.45f; }
+                    if (roll < 84) { Single(PropKind.MagazineRack, 0.65f); b.Item(f.P(0, BackOf(PropKind.MagazineRack), 0.41f)); return 0.65f; }
+                    if (roll < 92) return Single(PropKind.FloorLamp, 0.45f);
+                    return Single(PropKind.Plant, 0.75f);
                 case RoomType.Gym:
-                    if (roll < 30) return Row(f, b, PropKind.Treadmill, 2, 0.95f);
-                    if (roll < 50) return Row(f, b, PropKind.ExerciseBike, 2, 0.65f);
-                    if (roll < 68) { Single(PropKind.DumbbellRack, 1.5f); return 1.5f; }
-                    if (roll < 80) { b.Add(PropKind.PunchingBag, f.P(0, 0.75f), f.Face); return 0.8f; }
-                    if (roll < 90) return Single(PropKind.WaterCooler, 0.4f);
-                    return Single(PropKind.Bench, 1.7f);
+                    if (roll < 18) return Row(f, b, PropKind.Treadmill, 2, 0.95f);
+                    if (roll < 30) return Row(f, b, PropKind.ExerciseBike, 2, 0.65f);
+                    if (roll < 40) { Single(PropKind.DumbbellRack, 1.5f); return 1.5f; }
+                    if (roll < 47) { b.Add(PropKind.PunchingBag, f.P(0, 0.75f), f.Face); return 0.8f; }
+                    if (roll < 52) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 58) return Single(PropKind.Bench, 1.7f);
+                    if (roll < 67) return Single(PropKind.KettlebellRack, 1.05f);
+                    if (roll < 75) return Single(PropKind.MatRack, 0.85f);
+                    if (roll < 85) return Single(PropKind.CableMachine, 1.25f);
+                    if (roll < 94) return Along(PropKind.RowingMachine);
+                    return Single(PropKind.PowerCage, 1.45f);
                 case RoomType.Library:
-                    if (roll < 55)
+                    if (roll < 36)
                     {
                         Row(f, b, PropKind.TallBookcase, 2, 1.02f);
                         if (Chance(0.6)) b.Item(f.P(R(-0.8f, 0.8f), BackOf(PropKind.TallBookcase), BookcaseLevels[m_Rng.Next(3)]));
                         return 2.05f;
                     }
-                    if (roll < 72)
-                    {   // a reading corner: an armchair under a floor lamp
-                        b.Add(PropKind.Armchair, f.P(-0.3f, 0.5f), f.Face);
+                    if (roll < 48)
+                    {   // a reading corner: the wingback under a floor lamp
+                        b.Add(PropKind.WingbackChair, f.P(-0.3f, BackOf(PropKind.WingbackChair) + 0.1f), f.Face);
                         b.Add(PropKind.FloorLamp, f.P(0.45f, 0.3f), f.Face);
                         return 1.4f;
                     }
-                    if (roll < 82) { b.Add(PropKind.Globe, f.P(0, 0.4f), f.Face + R(-40f, 40f)); return 0.7f; }
-                    if (roll < 92) return Row(f, b, PropKind.Bookshelf, 2, 1.02f);
-                    return Single(PropKind.Plant, 0.75f);
+                    if (roll < 54) { b.Add(PropKind.Globe, f.P(0, 0.4f), f.Face + R(-40f, 40f)); return 0.7f; }
+                    if (roll < 60) return Row(f, b, PropKind.Bookshelf, 2, 1.02f);
+                    if (roll < 70) { Single(PropKind.CardCatalog, 0.85f); b.Item(f.P(0, BackOf(PropKind.CardCatalog), 1.305f)); return 0.85f; }
+                    if (roll < 82)
+                    {   // a study carrel with its chair
+                        b.Add(PropKind.StudyCarrel, f.P(0, BackOf(PropKind.StudyCarrel)), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, 1.12f), f.Back);
+                        b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.StudyCarrel) + 0.1f, 0.765f));
+                        return 1.05f;
+                    }
+                    if (roll < 92) return Single(PropKind.BookCart, 0.8f);
+                    { b.Add(PropKind.Lectern, f.P(0, 0.45f), f.Face); return 0.55f; }
                 case RoomType.CopyRoom:
-                    if (roll < 32) { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
-                    if (roll < 54) { Single(PropKind.MailShelf, 1.25f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.MailShelf), 0.87f)); return 1.25f; }
-                    if (roll < 68) return Single(PropKind.PaperStack, 0.85f);
-                    if (roll < 80) return Single(PropKind.Shredder, 0.5f);
-                    if (roll < 90) return Single(PropKind.Printer, 0.65f);
-                    { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 22) { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
+                    if (roll < 36) { Single(PropKind.MailShelf, 1.25f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.MailShelf), 0.87f)); return 1.25f; }
+                    if (roll < 44) return Single(PropKind.PaperStack, 0.85f);
+                    if (roll < 50) return Single(PropKind.Shredder, 0.5f);
+                    if (roll < 56) return Single(PropKind.Printer, 0.65f);
+                    if (roll < 62) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return Clock(0.95f); }
+                    if (roll < 72) return Single(PropKind.Plotter, 1.55f);
+                    if (roll < 82) { Single(PropKind.SupplyShelf, 1.05f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.SupplyShelf), 0.915f)); return 1.05f; }
+                    if (roll < 91) return Single(PropKind.PaperBin, 0.65f);
+                    return Single(PropKind.MailCart, 0.95f);
                 case RoomType.ControlRoom:
+                    if (roll < 30)
+                    {   // another robots' control console and its operator (LevelGenerator.PlaceTerminals; spare ones are desks)
+                        b.Add(PropKind.Terminal, f.P(0, BackOf(PropKind.Terminal)), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                        return 1.7f;
+                    }
                     if (roll < 50)
                     {   // the video wall, the operators' console in front of it facing it
                         b.Add(PropKind.MonitorWall, f.P(0, BackOf(PropKind.MonitorWall)), f.Face);
                         b.Add(PropKind.ConsoleDesk, f.P(0, 1.55f), f.Face); // its screens face the operators, who face the wall
-                        b.Add(PropKind.Chair, f.P(-0.6f, 2.35f), f.Back);
-                        b.Add(PropKind.Chair, f.P(0.6f, 2.35f), f.Back);
+                        b.Add(PropKind.OperatorChair, f.P(-0.6f, 2.35f), f.Back);
+                        b.Add(PropKind.OperatorChair, f.P(0.6f, 2.35f), f.Back);
                         b.Item(f.P(R(-0.9f, 0.9f), 1.45f, 0.77f));
                         return 2.45f;
                     }
-                    if (roll < 72) return Row(f, b, PropKind.ServerRack, 2, 0.72f);
-                    if (roll < 86) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
-                    return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 44) return Row(f, b, PropKind.ServerRack, 2, 0.72f);
+                    if (roll < 52) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 56) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 66) return Row(f, b, PropKind.RadioRack, 2, 0.65f);
+                    if (roll < 78)
+                    {   // the supervisor at the wall: the desk, its chair in front
+                        b.Add(PropKind.SupervisorDesk, f.P(0, BackOf(PropKind.SupervisorDesk)), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(0, 1.3f), f.Back);
+                        b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.SupervisorDesk) + 0.2f, 1.105f));
+                        return 1.85f;
+                    }
+                    if (roll < 90) return Hung(PropKind.MapBoard, 2.05f);
+                    return Hung(PropKind.AlarmPanel, 0.85f);
                 case RoomType.Lab:
-                    if (roll < 40)
+                    if (roll < 26)
                     {
                         b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);
                         b.Add(PropKind.Chair, f.P(R(-0.3f, 0.3f), 1.2f), f.Back);
                         b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.LabBench) + 0.1f, 0.91f));
                         return 1.85f;
                     }
-                    if (roll < 60) { Single(PropKind.PartsCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.PartsCabinet), 1.41f)); return 0.95f; }
-                    if (roll < 75) { b.Add(PropKind.RobotArm, f.P(0, BackOf(PropKind.RobotArm)), f.Face); return 0.7f; }
-                    if (roll < 88) { Single(PropKind.Shelf, 2.05f); if (Chance(0.6)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[m_Rng.Next(3)])); return 2.05f; }
-                    return Single(PropKind.TrashBin, 0.45f);
+                    if (roll < 36) { Single(PropKind.PartsCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.PartsCabinet), 1.41f)); return 0.95f; }
+                    if (roll < 42) { b.Add(PropKind.RobotArm, f.P(0, BackOf(PropKind.RobotArm)), f.Face); return 0.7f; }
+                    if (roll < 48) { Single(PropKind.Shelf, 2.05f); if (Chance(0.6)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[m_Rng.Next(3)])); return 2.05f; }
+                    if (roll < 52) return Single(PropKind.TrashBin, 0.45f);
+                    if (roll < 63) { Single(PropKind.FumeHood, 1.55f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.FumeHood) + 0.05f, 0.935f)); return 1.55f; }
+                    if (roll < 73) return Single(PropKind.ComponentShelf, 1.25f);
+                    if (roll < 82) return Single(PropKind.Printer3d, 0.78f);
+                    if (roll < 90) { Single(PropKind.ScopeCart, 0.65f); b.Item(f.P(0.1f, BackOf(PropKind.ScopeCart), 0.955f)); return 0.65f; }
+                    {
+                        b.Add(PropKind.RobotTable, f.P(0, BackOf(PropKind.RobotTable)), f.Face);
+                        b.Add(PropKind.Chair, f.P(0.35f, 1.3f), f.Back);
+                        b.Item(f.P(0.35f, BackOf(PropKind.RobotTable), 0.905f));
+                        return 1.85f;
+                    }
                 case RoomType.NapRoom:
-                    if (roll < 45) { Row(f, b, PropKind.SleepPod, 2, 1.15f); b.Item(f.P(R(-0.6f, 0.6f), 2.35f)); return 2.3f; }
-                    if (roll < 65) { b.Add(PropKind.Hammock, f.P(0, 0.55f), f.Face); return 2.65f; }
-                    if (roll < 80) { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
-                    if (roll < 90) return Single(PropKind.FloorLamp, 0.45f);
+                    if (roll < 26) { Row(f, b, PropKind.SleepPod, 2, 1.15f); b.Item(f.P(R(-0.6f, 0.6f), 2.35f)); return 2.3f; }
+                    if (roll < 36) { b.Add(PropKind.Hammock, f.P(0, 0.55f), f.Face); return 2.65f; }
+                    if (roll < 42) { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
+                    if (roll < 46) return Single(PropKind.FloorLamp, 0.45f);
+                    if (roll < 60)
+                    {   // the bunk bed lengthwise along the wall, the night table at its head
+                        float w = Along(PropKind.BunkBed, 0.3f);
+                        b.Add(PropKind.NightTable, f.P(0.3f - w / 2f - 0.3f, BackOf(PropKind.NightTable)), f.Face);
+                        b.Item(f.P(0.3f, 0.5f, 0.505f));
+                        return w + 0.6f;
+                    }
+                    if (roll < 74)
+                    {
+                        b.Add(PropKind.Daybed, f.P(-0.3f, BackOf(PropKind.Daybed)), f.Face);
+                        b.Add(PropKind.NightTable, f.P(1.0f, BackOf(PropKind.NightTable)), f.Face);
+                        b.Item(f.P(1.0f, BackOf(PropKind.NightTable), 0.405f));
+                        return 2.6f;
+                    }
+                    if (roll < 84) { b.Add(PropKind.FloorCushions, f.P(0, 0.7f), f.Face); return 1.2f; }
+                    if (roll < 92) return Single(PropKind.NightTable, 0.55f);
                     return Single(PropKind.Plant, 0.75f);
                 case RoomType.Studio:
-                    if (roll < 35)
+                    if (roll < 20)
                     {
                         b.Add(PropKind.MixingDesk, f.P(0, BackOf(PropKind.MixingDesk)), f.Face);
                         b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back);
                         b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MixingDesk) + 0.25f, 0.76f));
                         return 1.65f;
                     }
-                    if (roll < 62) { b.Add(PropKind.AcousticPanel, f.P(-0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); b.Add(PropKind.AcousticPanel, f.P(0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); return 2.45f; }
-                    if (roll < 76) { b.Add(PropKind.DrumKit, f.P(0, 0.75f), f.Face); return 1.65f; }
-                    if (roll < 88) { b.Add(PropKind.MicStand, f.P(0, 0.5f), f.Face); return 0.55f; }
-                    return Single(PropKind.Sofa, 2.25f);
+                    if (roll < 34) { b.Add(PropKind.AcousticPanel, f.P(-0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); b.Add(PropKind.AcousticPanel, f.P(0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); return 2.45f; }
+                    if (roll < 42) { b.Add(PropKind.DrumKit, f.P(0, 0.75f), f.Face); return 1.65f; }
+                    if (roll < 48) { b.Add(PropKind.MicStand, f.P(0, 0.5f), f.Face); return 0.55f; }
+                    if (roll < 56) { Single(PropKind.StudioCouch, 2.05f); b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.StudioCouch), 0.465f)); return 2.05f; }
+                    if (roll < 66) { b.Add(PropKind.SynthStand, f.P(0, BackOf(PropKind.SynthStand)), f.Face); b.Add(PropKind.BarStool, f.P(0, 0.95f), f.Back); return 1.35f; }
+                    if (roll < 76) { b.Add(PropKind.AmpCabinet, f.P(-0.25f, BackOf(PropKind.AmpCabinet)), f.Face); b.Add(PropKind.GuitarStand, f.P(0.4f, BackOf(PropKind.GuitarStand) + 0.05f), f.Face); b.Item(f.P(-0.25f, BackOf(PropKind.AmpCabinet), 0.675f)); return 1.2f; }
+                    if (roll < 84) return Row(f, b, PropKind.GuitarStand, 2, 0.5f);
+                    if (roll < 93) return Single(PropKind.VocalBooth, 1.25f);
+                    return Single(PropKind.AmpCabinet, 0.75f);
                 case RoomType.LockerRoom:
-                    if (roll < 40) return Row(f, b, PropKind.Lockers, 3, 1.05f);
-                    if (roll < 60) return Row(f, b, PropKind.ShowerStall, 2, 0.98f);
-                    if (roll < 75)
+                    if (roll < 26) return Row(f, b, PropKind.Lockers, 3, 1.05f);
+                    if (roll < 38) return Row(f, b, PropKind.ShowerStall, 2, 0.98f);
+                    if (roll < 47)
                     {
                         b.Add(PropKind.MirrorSink, f.P(-0.25f, BackOf(PropKind.MirrorSink)), f.Face);
                         b.Add(PropKind.HandDryer, f.P(0.45f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                         return 1.2f;
                     }
-                    if (roll < 90) { b.Add(PropKind.Bench, f.P(0, 0.35f), f.Face); if (Chance(0.4)) b.Item(f.P(R(-0.5f, 0.5f), 0.35f, 0.46f)); return 1.65f; }
-                    return Single(PropKind.TrashBin, 0.45f);
+                    if (roll < 56) { b.Add(PropKind.Bench, f.P(0, 0.35f), f.Face); if (Chance(0.4)) b.Item(f.P(R(-0.5f, 0.5f), 0.35f, 0.46f)); return 1.65f; }
+                    if (roll < 60) return Single(PropKind.TrashBin, 0.45f);
+                    if (roll < 70) { Single(PropKind.TowelShelf, 0.95f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.TowelShelf), 0.865f)); return 0.95f; }
+                    if (roll < 80) { Single(PropKind.ShoeRack, 1.05f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.ShoeRack), 0.605f)); return 1.05f; }
+                    if (roll < 88) return Single(PropKind.WeighingScale, 0.45f);
+                    return Single(PropKind.LaundryCart, 0.85f);
                 case RoomType.Infirmary:
-                    if (roll < 35) { Row(f, b, PropKind.HospitalBed, 2, 1.15f); b.Item(f.P(R(-0.5f, 0.5f), 1.2f, 0.66f)); return 2.3f; }
-                    if (roll < 55) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
-                    if (roll < 70) { b.Add(PropKind.PrivacyScreen, f.P(0, 0.35f), f.Face); return 1.65f; }
-                    if (roll < 82) { Single(PropKind.MirrorSink, 0.75f); return 0.75f; }
-                    if (roll < 92) return Single(PropKind.Cabinet, 0.95f);
-                    return Single(PropKind.Plant, 0.75f);
+                    if (roll < 22) { Row(f, b, PropKind.HospitalBed, 2, 1.15f); b.Item(f.P(R(-0.5f, 0.5f), 1.2f, 0.66f)); return 2.3f; }
+                    if (roll < 34) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                    if (roll < 41) { b.Add(PropKind.PrivacyScreen, f.P(0, 0.35f), f.Face); return 1.65f; }
+                    if (roll < 47) { Single(PropKind.MirrorSink, 0.75f); return 0.75f; }
+                    if (roll < 52) return Single(PropKind.Cabinet, 0.95f);
+                    if (roll < 64)
+                    {   // the doctor's desk at the wall, the doctor's chair in front of it
+                        b.Add(PropKind.DoctorDesk, f.P(0, BackOf(PropKind.DoctorDesk)), f.Face);
+                        b.Add(PropKind.Chair, f.P(-0.3f, 1.1f), f.Back);
+                        b.Item(f.P(0.35f, BackOf(PropKind.DoctorDesk) + 0.1f, 0.765f));
+                        return Clock(1.45f);
+                    }
+                    if (roll < 74) { float w = Along(PropKind.ExamTable); b.Item(f.P(0, 0.35f + WallGap, 0.725f)); return w; }
+                    if (roll < 80) return Hung(PropKind.DefibCabinet, 0.45f);
+                    if (roll < 90) { b.Add(PropKind.Wheelchair, f.P(0, BackOf(PropKind.Wheelchair)), f.Face); return 0.7f; }
+                    return Single(PropKind.IvStand, 0.5f);
                 case RoomType.GameRoom:
-                    if (roll < 22) { b.Add(PropKind.DartBoard, f.P(0, BackOf(PropKind.DartBoard)), f.Face, solid: false); return 0.65f; }
-                    if (roll < 42) return Row(f, b, PropKind.ArcadeMachine, 2, 0.8f);
-                    if (roll < 62)
+                    if (roll < 12) { b.Add(PropKind.DartBoard, f.P(0, BackOf(PropKind.DartBoard)), f.Face, solid: false); return 0.65f; }
+                    if (roll < 24) return Row(f, b, PropKind.ArcadeMachine, 2, 0.8f);
+                    if (roll < 36)
                     {   // the bar with stools in front of it
                         b.Add(PropKind.BarCounter, f.P(0, BackOf(PropKind.BarCounter)), f.Face);
                         b.Add(PropKind.BarStool, f.P(-0.55f, 0.95f), f.Back);
@@ -1570,15 +2615,26 @@ namespace Stealth.Level
                         b.Item(f.P(R(-0.7f, 0.7f), BackOf(PropKind.BarCounter), 1.06f));
                         return 2.05f;
                     }
-                    if (roll < 76)
+                    if (roll < 46)
                     {
                         b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face);
                         b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face);
                         b.Item(f.P(0, 1.35f, 0.42f));
                         return 2.25f;
                     }
-                    if (roll < 90) return Single(PropKind.VendingMachine, 0.95f);
-                    { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
+                    if (roll < 52) return Single(PropKind.VendingMachine, 0.95f);
+                    if (roll < 56) { b.Add(PropKind.BeanBag, f.P(0, 0.6f), f.Face); return 0.95f; }
+                    if (roll < 66) return Single(PropKind.Jukebox, 0.85f);
+                    if (roll < 78) return Row(f, b, PropKind.Pinball, 2, 0.8f);
+                    if (roll < 90)
+                    {   // the console corner: the TV on its stand, two bean bags in front of it
+                        b.Add(PropKind.GamingCorner, f.P(0, BackOf(PropKind.GamingCorner)), f.Face);
+                        b.Add(PropKind.BeanBag, f.P(-0.5f, 1.45f), f.Back + 15f);
+                        b.Add(PropKind.BeanBag, f.P(0.55f, 1.45f), f.Back - 15f);
+                        b.Item(f.P(0.65f, BackOf(PropKind.GamingCorner), 0.38f));
+                        return 1.65f;
+                    }
+                    return Single(PropKind.Pinball, 0.8f);
             }
             return 0f;
         }
@@ -1590,9 +2646,46 @@ namespace Stealth.Level
             return n * step + 0.05f;
         }
 
+        /// <summary>
+        /// A room the rules above left almost bare (small, doors on every wall, windows): its own wall groups once more,
+        /// at every spot of every wall, more tries at each, until it has a few pieces for its size.
+        /// </summary>
+        void Sparse(PlanRoom room)
+        {
+            if (room.Type is RoomType.Corridor or RoomType.Hall) return;
+            int want = Mathf.Clamp(Mathf.RoundToInt(room.Area / 5f), 3, 8);
+            int Have() { int n = 0; foreach (var kv in m_InRoom) n += kv.Value; return n; }
+            if (Have() >= want) return;
+            float y = LevelLayout.FloorY(room.Floor);
+            foreach (var (w, n) in FacesOf(room))
+            {
+                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
+                for (float t = 0.15f; t < w.Length - 0.3f;)
+                {
+                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
+                    float placed = 0f;
+                    for (int attempt = 0; attempt < 4 && placed <= 0f; attempt++)
+                    {
+                        var batch = new Batch();
+                        float width = WallGroup(room, batch, face, u, n);
+                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
+                        var shift = u * (width / 2f);
+                        for (int i = 0; i < batch.Pieces.Count; i++) { var p = batch.Pieces[i]; p.Pos += shift; batch.Pieces[i] = p; }
+                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                        if (Deep(room, face + shift, n, batch, Aisle) && TryCommit(room, batch, front: n)) placed = width;
+                    }
+                    if (placed > 0f)
+                    {
+                        if (Have() >= want) return;
+                        t += placed + 0.15f;
+                    }
+                    else t += 0.25f;
+                }
+            }
+        }
+
         // ------------------------------------------------------------------ corners
 
-        /// <summary>Plants, floor lamps, bins and coat racks in the free inner corners of a room.</summary>
         /// <summary>
         /// A piece the room must have and the walls had no run for (a kitchen's fridge): against any bit of wall, its back to
         /// it, wherever it fits.
@@ -1618,13 +2711,14 @@ namespace Stealth.Level
                 }
         }
 
+        /// <summary>Plants, lamps, bins, stands and the room's own odds and ends in the free inner corners of a room.</summary>
         void Corners(PlanRoom room)
         {
             if (room.Type == RoomType.Kitchen && !m_Fridge) AgainstAnyWall(room, PropKind.Fridge);
             if (room.Type is RoomType.Corridor or RoomType.Server) return;
             var b = room.Bounds;
             float y = LevelLayout.FloorY(room.Floor);
-            int placed = 0, max = Mathf.Clamp(Mathf.RoundToInt(room.Area / 25f), 1, 5);
+            int placed = 0, max = Mathf.Clamp(Mathf.RoundToInt(room.Area / 16f), 1, 7);
             for (float x = b.xMin + 0.4f; x < b.xMax && placed < max; x += 0.5f)
                 for (float z = b.yMin + 0.4f; z < b.yMax && placed < max; z += 0.5f)
                 {
@@ -1632,22 +2726,30 @@ namespace Stealth.Level
                     // a corner: room cells on two sides, a wall within 0.6 m on two perpendicular sides
                     bool wx = !InRoom(room.Floor, room.Id, x - 0.6f, z) || !InRoom(room.Floor, room.Id, x + 0.6f, z);
                     bool wz = !InRoom(room.Floor, room.Id, x, z - 0.6f) || !InRoom(room.Floor, room.Id, x, z + 0.6f);
-                    if (!wx || !wz || !Chance(0.35)) continue;
+                    if (!wx || !wz || !Chance(0.45)) continue;
+                    PropKind Pick(params PropKind[] kinds) => kinds[m_Rng.Next(kinds.Length)];
                     var kind = room.Type switch
                     {
-                        RoomType.Lounge or RoomType.Lobby => Chance(0.5) ? PropKind.FloorLamp : PropKind.Plant,
-                        RoomType.Office => Chance(0.6) ? PropKind.Plant : PropKind.CoatRack,
-                        RoomType.Storage => PropKind.Boxes,
+                        RoomType.Lounge => Pick(PropKind.FloorLamp, PropKind.Plant, PropKind.PlanterLarge),
+                        RoomType.Lobby => Pick(PropKind.FloorLamp, PropKind.PlanterLarge, PropKind.UmbrellaStand),
+                        RoomType.Hall => Pick(PropKind.PlanterLarge, PropKind.UmbrellaStand, PropKind.Plant),
+                        RoomType.Office => Pick(PropKind.Plant, PropKind.CoatRack, PropKind.FilingCabinet),
+                        RoomType.OpenSpace => Pick(PropKind.Plant, PropKind.TrashBin, PropKind.FilePedestal),
+                        RoomType.Meeting => Pick(PropKind.Plant, PropKind.Flipchart),
+                        RoomType.Kitchen => Pick(PropKind.TrashBin, PropKind.Plant),
+                        RoomType.Restroom => Pick(PropKind.SanitaryBin, PropKind.TrashBin),
+                        RoomType.Storage => Pick(PropKind.Boxes, PropKind.HandTruck, PropKind.DrumPair),
                         // the themed rooms' own odds and ends
-                        RoomType.Gym => Chance(0.5) ? PropKind.PunchingBag : PropKind.WaterCooler,
-                        RoomType.Library => Chance(0.5) ? PropKind.Globe : PropKind.FloorLamp,
-                        RoomType.CopyRoom => Chance(0.5) ? PropKind.Shredder : PropKind.PaperStack,
-                        RoomType.Lab => Chance(0.5) ? PropKind.RobotArm : PropKind.TrashBin,
-                        RoomType.NapRoom => Chance(0.5) ? PropKind.BeanBag : PropKind.FloorLamp,
-                        RoomType.Studio => Chance(0.5) ? PropKind.MicStand : PropKind.FloorLamp,
-                        RoomType.Infirmary => Chance(0.5) ? PropKind.PrivacyScreen : PropKind.Plant,
-                        RoomType.GameRoom => Chance(0.5) ? PropKind.BarStool : PropKind.BeanBag,
-                        RoomType.LockerRoom => PropKind.TrashBin,
+                        RoomType.Gym => Pick(PropKind.PunchingBag, PropKind.WaterCooler),
+                        RoomType.Library => Pick(PropKind.Globe, PropKind.FloorLamp, PropKind.Lectern),
+                        RoomType.CopyRoom => Pick(PropKind.Shredder, PropKind.PaperStack, PropKind.PaperBin),
+                        RoomType.ControlRoom => Pick(PropKind.Plant, PropKind.WaterCooler),
+                        RoomType.Lab => Pick(PropKind.RobotArm, PropKind.TrashBin, PropKind.ScopeCart),
+                        RoomType.NapRoom => Pick(PropKind.BeanBag, PropKind.FloorLamp, PropKind.NightTable),
+                        RoomType.Studio => Pick(PropKind.MicStand, PropKind.FloorLamp, PropKind.GuitarStand, PropKind.AmpCabinet),
+                        RoomType.Infirmary => Pick(PropKind.PrivacyScreen, PropKind.Plant, PropKind.IvStand, PropKind.Wheelchair),
+                        RoomType.GameRoom => Pick(PropKind.BarStool, PropKind.BeanBag),
+                        RoomType.LockerRoom => Pick(PropKind.TrashBin, PropKind.LaundryCart, PropKind.WeighingScale),
                         _ => Chance(0.7) ? PropKind.Plant : PropKind.TrashBin,
                     };
                     var p = new Vector3(x, y, z);

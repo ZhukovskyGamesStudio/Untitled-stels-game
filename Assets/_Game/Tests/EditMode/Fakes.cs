@@ -76,6 +76,7 @@ namespace Stealth.Tests
         public int GasKnockouts, Teleports;
 
         public void Teleport(Vector3 position, Quaternion rotation) => Teleports++;
+        public void PlaceOwner(Vector3 position, float yaw) => Teleports++;
         public void SendNoise(Vector3 position, float radius) => Noises.Add(radius);
         public void SendGasKnockout() => GasKnockouts++;
         public void SendRevive(PlayerController target) => Revives.Add(target);

@@ -29,6 +29,16 @@ namespace Stealth.Level
         [Tooltip("The land round the house to the horizon (looks only): flat in the middle, mounds, rubble, far ridges")]
         public GameObject OutsideTerrain;
         public GameObject Fence;
+        [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
+        public GameObject CityPiece;
+        public Material[] CityMaterials = new Material[0];
+        [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
+        public Material[] UtilityMaterials = new Material[0];
+        [Tooltip("The auto repair shop's sliding door: steel leaves")] public GameObject ShopDoor;
+        [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
+        [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
+        public GameObject LightSwitch;
+        public GameObject CityLamp;
 
         [Header("Pieces")]
         public GameObject Stairs;
@@ -105,6 +115,8 @@ namespace Stealth.Level
         public GameObject IllusionBlock;
         [Tooltip("The house's main job: a lock panel of the vault on a wall (VaultConsole), the hostage's cage (Cage), the vault door's lamps (VaultPanel).")]
         public GameObject VaultConsole, Cage, VaultPanel;
+        [Tooltip("The vault's round bank door (an AutoDoor that swings), and the heavy doors in the facade.")]
+        public GameObject VaultDoor, ExteriorDoor;
         [Tooltip("The furniture of the themed rooms (gym, library, kitchen run, restrooms…), by kind.")]
         public PropPrefab[] RoomProps = new PropPrefab[0];
 

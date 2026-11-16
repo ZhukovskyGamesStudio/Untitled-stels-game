@@ -236,6 +236,91 @@ def panels():
     save("panels", a * (1 - 0.5 * gaps))
 
 
+def vaultsteel():
+    """2 m: the steel lining of a bank vault — four 1 m panels, horizontally brushed, a dark seam round each and a row
+    of rivets 4 cm inside its edges."""
+    y, x = np.mgrid[0:N, 0:N]
+    row = rng(46).random(N)
+    for _ in range(3):
+        row = (row + np.roll(row, 1) + np.roll(row, -1)) / 3
+    brushed = (row - row.min()) / (row.max() - row.min() + 1e-9)
+    a = 0.8 + (brushed[y] - 0.5) * 0.1 + (noise(47, 3) - 0.5) * 0.05
+    half = N // 2
+    seams = lines_mask(lambda d: [d.line([(0, k * half), (N, k * half)], fill=255, width=4) for k in range(3)]
+                       + [d.line([(k * half, 0), (k * half, N)], fill=255, width=4) for k in range(3)])
+    inset, step, rad = 10, half // 8, 3
+
+    def rivets(d):
+        for px in range(2):
+            for py in range(2):
+                x0, y0 = px * half, py * half
+                for k in range(1, 8):
+                    t = k * step
+                    for cx, cy in ((x0 + t, y0 + inset), (x0 + t, y0 + half - inset), (x0 + inset, y0 + t), (x0 + half - inset, y0 + t)):
+                        d.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=255)
+    heads = lines_mask(rivets)
+    rings = np.clip(np.asarray(Image.fromarray((heads * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3)), dtype=np.float64) / 255 - heads, 0, 1)
+    save("vaultsteel", a * (1 - 0.5 * seams) * (1 - 0.35 * rings) + heads * 0.12)
+
+
+def blockwall():
+    """2 m: a painted concrete block wall (an auto repair shop) — 40 x 20 cm blocks in running bond, the mortar joints
+    sunk into the paint, the blocks' pitted face showing through it, a few scuffs."""
+    a = 0.82 + (noise(61, 40, 2) - 0.5) * 0.08 + (noise(62, 4) - 0.5) * 0.06
+    bw, bh = N // 5, N // 10          # 40 x 20 cm on a 2 m tile
+
+    def joints(d):
+        for row in range(11):
+            y = row * bh
+            d.line([(0, y), (N, y)], fill=255, width=3)
+            off = (bw // 2) if row % 2 else 0
+            for k in range(-1, 6):
+                x = off + k * bw
+                d.line([(x, y), (x, y + bh)], fill=255, width=3)
+    j = lines_mask(joints)
+    j = np.asarray(Image.fromarray((j * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2)), dtype=np.float64) / 255
+    pits = (noise(63, 90, 1) > 0.86) * 0.08
+    scuffs = np.clip((noise(64, 6) - 0.72) * 2.5, 0, 1) * 0.12
+    save("blockwall", a * (1 - 0.32 * j) - pits - scuffs)
+
+
+def epoxy():
+    """2 m: an epoxy-coated workshop floor — smooth grey with fine flecks, a saw-cut joint along the tile's edges, faint
+    tyre marks and a couple of oil stains."""
+    a = 0.78 + (noise(71, 3) - 0.5) * 0.06
+    r = rng(72)
+    flecks = (r.random((N, N)) > 0.985) * (r.random((N, N)) - 0.5) * 0.25
+    joint = lines_mask(lambda d: [d.line([(0, 1), (N, 1)], fill=255, width=3), d.line([(1, 0), (1, N)], fill=255, width=3)])
+    tyres = np.clip((noise(73, 2, 2) - 0.6) * 1.5, 0, 1) * 0.06 * (np.sin(np.mgrid[0:N, 0:N][1] / N * math.pi * 6) ** 8)
+    stains = np.zeros((N, N))
+    y, x = np.mgrid[0:N, 0:N]
+    for cx, cy, rad in ((0.3, 0.65, 0.07), (0.72, 0.28, 0.05)):
+        d = np.sqrt((x / N - cx) ** 2 + (y / N - cy) ** 2) / rad
+        stains += np.clip(1 - d + (noise(74, 12, 2) - 0.5) * 0.6, 0, 1) * 0.22
+    save("epoxy", a + flecks - 0.4 * joint * 0.5 - tyres - stains)
+
+
+def boothwall():
+    """1 m: a paint booth's wall of white filter panels — 50 cm squares in thin metal frames, the filter's quilted cells."""
+    y, x = np.mgrid[0:N, 0:N]
+    cells = (np.sin(x / N * math.pi * 24) * np.sin(y / N * math.pi * 24)) * 0.03
+    a = 0.92 + cells + (noise(81, 8, 2) - 0.5) * 0.04
+    frames = lines_mask(lambda d: [d.line([(0, k * N // 2), (N, k * N // 2)], fill=255, width=6) for k in range(3)]
+                        + [d.line([(k * N // 2, 0), (k * N // 2, N)], fill=255, width=6) for k in range(3)])
+    save("boothwall", a * (1 - 0.25 * frames))
+
+
+def grating():
+    """1 m: the steel grating over a paint booth's exhaust pit — bearing bars every 3 cm, cross bars every 10 cm, the dark
+    pit between them."""
+    y, x = np.mgrid[0:N, 0:N]
+    bars = ((x % (N // 32)) < 4).astype(float)
+    cross = ((y % (N // 10)) < 5).astype(float)
+    metal = np.clip(bars + cross, 0, 1)
+    a = 0.12 + metal * (0.7 + (noise(91, 6) - 0.5) * 0.1)
+    save("grating", a)
+
+
 def circuit():
     """1 m: dark panel with circuit traces that glow (circuit_glow)."""
     r = rng(26)
@@ -297,5 +382,6 @@ def rubber():
 
 if __name__ == "__main__":
     for fn in (planks, parquet, checker, bigtiles, marble, diamondplate, carpet, concrete, gridtiles,
-               damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber):
+               damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber, vaultsteel,
+               blockwall, epoxy, boothwall, grating):
         fn()

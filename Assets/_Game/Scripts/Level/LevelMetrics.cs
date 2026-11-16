@@ -14,6 +14,10 @@ namespace Stealth.Level
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
+        /// <summary>The vault's doorway (nominal): the round bank door (bore d 2.27 m) needs 2.4 m clear; the corners round it are wall.</summary>
+        public const float VaultDoorWidth = 2.6f;
+        /// <summary>The auto repair shop's paint booth door, nominal (a car drives through it: 1.9 m wide with its mirrors).</summary>
+        public const float VehicleDoorWidth = 3.4f;
         public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
         // A vent is a duct through the wall: its floor is a sill above the room's floor (a step for a player, a wall for a robot),
         // the clear height above the sill fits the crouched capsule (1.1 m) + the step-up probe (0.35); standing 1.8 m does not fit.
@@ -119,12 +123,15 @@ namespace Stealth.Level
 
         /// <summary>
         /// Which prefab variant and yaw place the corner frame for a stair in <paramref name="corner"/> (±1, ±1).
-        /// The frame maps u → -corner.x and v → -corner.y in world space; when that is a mirror image the
+        /// The frame maps u → -corner.x and v → -corner.y in world space (flipped: u → -corner.y along z, v → -corner.x
+        /// along x — the flights along the other wall); when that is a mirror image the
         /// mirrored variant is used, so the instance itself is only ever rotated (0° or 180°).
         /// </summary>
-        public static (bool mirrored, float yaw) Placement(Vector2Int corner)
+        public static (bool mirrored, float yaw) Placement(Vector2Int corner, bool flip = false)
         {
             int ux = -corner.x, vz = -corner.y;
+            if (flip) // u ↔ v: local z → world x along ux, local x → world z along vz (a turn by ±90°, mirrored when ux·vz > 0)
+                return (ux * vz > 0, ux > 0 ? 90f : -90f);
             bool mirrored = ux * vz < 0;
             int xAxis = mirrored ? -ux : ux; // world sign of the variant's local +X
             return (mirrored, xAxis > 0 ? 0f : 180f);
@@ -134,7 +141,8 @@ namespace Stealth.Level
         public static Vector3 Origin(Stair s) => new(s.Origin.x, LevelLayout.FloorY(s.Floor), s.Origin.y);
 
         /// <summary>World point of a corner-frame point (u, y, v) for a stair (the same mapping the prefab placement gives).</summary>
-        public static Vector3 ToWorld(Stair s, Vector3 local) =>
-            Origin(s) + new Vector3(-s.Corner.x * local.x, local.y, -s.Corner.y * local.z);
+        public static Vector3 ToWorld(Stair s, Vector3 local) => s.Flip
+            ? Origin(s) + new Vector3(-s.Corner.x * local.z, local.y, -s.Corner.y * local.x)
+            : Origin(s) + new Vector3(-s.Corner.x * local.x, local.y, -s.Corner.y * local.z);
     }
 }

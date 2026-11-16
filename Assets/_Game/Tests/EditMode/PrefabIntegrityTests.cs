@@ -35,6 +35,11 @@ namespace Stealth.Tests
             "RobotAnimator.LiftArm",         // only workers have a lift
             "RobotAnimator.LiftTray",
             "Blob.m_Material",               // a UI graphic: empty is Unity's default UI material
+            "AutoDoor.Swing",                // sliding doors have panels, the vault's round door a hinge instead
+            "AutoDoor.PanelA",
+            "AutoDoor.PanelB",
+            "AutoDoor.SwingB",               // only the street doors have a second leaf
+            "AutoDoor.Wheel",                // only the vault's door has a wheel to spin
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

@@ -344,26 +344,35 @@ def listener(L):
 
 
 def worker(L):
-    """The coolant hauler: a block tug with two coolant tanks and a fin stack behind the forks, the crate on the
-    forks, hot vents on the bumper."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", [blk((.56, .78, .22), (0, 0, .28))])
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Body", [blk((.14, .1, .08), (x * .82, y, .13))])
-    for sx in (-1, 1):
-        P.add("Body", [cyl(.11, .5, (sx * .14, .24, .5), axis="Y", n=8)])
-    P.add("Accent", fins((0, .24, .78), "Y", 5, .09, .44, .32))
-    P.add("Body", [blk((.48, .4, .06), (0, .24, .63))])
-    for sx in (-1, 1):
-        P.add("Body", [blk((.06, .06, .86), (sx * .2, -.02, .78))])
-        P.add("Body", [blk((.06, .5, .05), (sx * .14, -.16, .93))])
-    P.add("Body", [blk((.46, .06, .1), (0, -.02, 1.18))])
-    P.add("Accent", [blk((.48, .44, .4), (0, -.15, 1.15))])
-    P.add("Accent", [blk((.5, .46, .05), (0, -.15, 1.32))])
-    P.add("Body", [blk((.6, .1, .14), (0, -.42, .32))])
-    P.add("Eye", vents((0, -.47, .32), .44, 2, .03, .06))
-    return P
+    """Coolant hauler: a block deck, a block snout with hot vent slots, a radiator stack for a mast — a core wrapped in
+    a tower of fins — with two coolant tanks behind it and hoses to the snout, a hot core on top for a beacon."""
+    def deck(L, P):
+        P.add("Body", [blk((.5, .74, .16), (0, 0, .21)), blk((.7, .8, .07), (0, 0, .29))])
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", [blk((.14, .1, .08), (x * .82, y, .13))])
+        for y in (-.41, .41):
+            P.add("Accent", [blk((.6, .08, .12), (0, y, .22))])
+
+    def pod(L, P):
+        P.add("Body", [blk((.46, .32, .3), (0, -.22, .47), taper=(.9, .85))])
+        P.add("Eye", vents((0, -.385, .37), .34, 2, .025, .045))
+        D.worker_shoulders(L, P, inner=.19)
+
+    def mast(L, P):
+        P.add("Body", [blk((.34, .22, .92), (0, .24, .78))])                                               # core
+        P.add("Accent", fins((0, .24, .82), "Z", 8, .1, .46, .3, t=.04))                                   # radiator fins
+        for sx in (-1, 1):
+            P.add("Body", [blk((.04, .32, .86), (sx * .245, .24, .8))])                                    # the stack's side plates
+        P.add("Body", [blk((.46, .32, .05), (0, .24, 1.25))])                                              # cap
+        for sx in (-1, 1):
+            P.add("Body", [cyl(.08, .7, (sx * .17, .42, .68))])                                            # coolant tanks
+            P.add("Accent", [hose([(sx * .17, .4, .36), (sx * .2, .1, .37), (sx * .19, -.08, .42)], .022)])
+
+    def beacon(L, P):
+        P.add("Accent", [blk((.14, .14, .04), (0, .25, 1.29))])
+        P.add("Eye", [cyl(.055, .08, (0, .25, 1.35))])
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

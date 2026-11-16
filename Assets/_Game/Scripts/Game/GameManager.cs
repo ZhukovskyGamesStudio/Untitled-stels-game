@@ -331,6 +331,7 @@ namespace Stealth.Game
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
             m_Opened.Clear();
+            m_Hacked.Clear();
             OpenedVersion++;
             LeaveAt = 0;
             GoAt = 0;
@@ -467,6 +468,7 @@ namespace Stealth.Game
             if (Phase == RunPhase.Sewer) { UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
+            UpdateHacks();
             UpdateDryers();
             UpdateStorageDoor();
             UpdateObjective();
@@ -622,6 +624,7 @@ namespace Stealth.Game
             DriveUntil = 0;
             int lost = LoadCarServer();
             m_Opened.Clear(); // the house is gone; the gate is shut
+            m_Hacked.Clear();
             OpenedVersion++;
             foreach (var p in PlayerController.All)
             {
@@ -653,6 +656,8 @@ namespace Stealth.Game
             EnsureRoute(m_RunSeed);
             m_Run.BeginRun();
             m_Opened.Clear();
+            m_Hacked.Clear();
+            ForgetLeavers();
             OpenedVersion++;
             LeaveAt = 0;
             GoAt = 0;
@@ -742,7 +747,7 @@ namespace Stealth.Game
             if (uses >= Tuning.Player.Interaction.TerminalHacks) return;
             m_Opened.Add(TerminalKey(terminal, uses));
             OpenedVersion++;
-            target.HackServer(Tuning.Player.Interaction.HackDuration);
+            TeamHackServer(target);
         }
 
         /// <summary>

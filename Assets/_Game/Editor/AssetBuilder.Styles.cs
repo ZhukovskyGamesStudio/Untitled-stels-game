@@ -404,6 +404,7 @@ namespace Stealth.EditorTools
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
             if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
+            if ((a.RoomLooks == null || a.RoomLooks.Length == 0) && d.RoomLooks.Length > 0) { a.RoomLooks = d.RoomLooks; dirty = true; }
             if (asset.World.Sky == null && def.World.Sky != null) { asset.World.Sky = def.World.Sky; dirty = true; }
             if (dirty) EditorUtility.SetDirty(asset);
         }
@@ -448,7 +449,7 @@ namespace Stealth.EditorTools
                     s.Palette.Building.Saturation = 0.7f;
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Lofi;
-                    geo.Pipes = true; geo.Ceiling = CeilingKind.IBeams; geo.Baseboard = true;
+                    geo.Pipes = true; geo.Baseboard = true;
                     geo.Floor = K("Px_Plate"); geo.FloorTile = 1.5f; geo.Wall = K("Px_Corrugated"); geo.WallTile = 2f;
                     geo.CeilingFinish = K("Px_Concrete"); geo.CeilingTile = 2f;
                     geo.Trim = K("Px_Rust"); geo.Beam = K("Px_Rust"); geo.Pipe = K("Px_Pipe");
@@ -513,7 +514,7 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.62f, 0.58f, 0.32f);
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Realistic;
-                    geo.Baseboard = true; geo.RailHeight = 0.95f; geo.Ceiling = CeilingKind.Beams; geo.Doors = DoorTrim.Casing;
+                    geo.Baseboard = true; geo.RailHeight = 0.95f; geo.Doors = DoorTrim.Casing;
                     geo.Floor = K("Real_OldFloor"); geo.FloorTile = 1.5f; geo.Wall = K("Real_Peeling"); geo.WallTile = 2.5f;
                     geo.CeilingFinish = K("Real_Plaster2"); geo.CeilingTile = 2f;
                     geo.Trim = K("Real_DarkPlanks"); geo.Beam = K("Real_DarkPlanks");
@@ -560,9 +561,10 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.6f, 0.64f, 0.68f);
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Clean;
-                    geo.WainscotHeight = 1f; geo.Crown = true; geo.Doors = DoorTrim.Arch; geo.Ceiling = CeilingKind.Coffers;
+                    geo.WainscotHeight = 1f; geo.Crown = true; geo.Doors = DoorTrim.Arch;
                     geo.Floor = K("Real_Herringbone"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
                     geo.RoomFloors = StorybookRoomFloors();
+                    geo.RoomLooks = StorybookRoomLooks();
                     geo.Trim = K("Trim_White"); geo.Panel = K("Panel_PaleBlue"); geo.Column = K("Trim_PaleBlue"); geo.Beam = K("Trim_White");
                 });
 
@@ -582,7 +584,7 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.5f, 0.5f, 0.5f);
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Clean;
-                    geo.Baseboard = true; geo.Ceiling = CeilingKind.Beams; geo.Doors = DoorTrim.Casing;
+                    geo.Baseboard = true; geo.Doors = DoorTrim.Casing;
                     geo.Floor = K("Real_PlankFloor"); geo.FloorTile = 1.5f; geo.Wall = K("Real_RawPlanks"); geo.WallTile = 1.5f;
                     geo.CeilingFinish = K("Real_RawPlanks"); geo.CeilingTile = 1.5f;
                     geo.Trim = K("Trim_WoodMid"); geo.Beam = K("Trim_WoodMid");
@@ -725,7 +727,7 @@ namespace Stealth.EditorTools
                     foreach (var t in new[] { s.Palette.Building, s.Palette.Furniture, s.Palette.Robots, s.Palette.Players }) t.Saturation = 1.3f;
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Clean;
-                    geo.Pipes = true; geo.Ceiling = CeilingKind.IBeams; geo.Baseboard = true;
+                    geo.Pipes = true; geo.Baseboard = true;
                     geo.Floor = K("Floor_Diamond"); geo.FloorTile = 1.5f; geo.Wall = K("Wall_Corrugated"); geo.WallTile = 2f;
                     geo.Trim = K("Trim_Rust"); geo.Beam = K("Trim_Rust"); geo.Pipe = K("Pipe_Green");
                 });
@@ -771,7 +773,7 @@ namespace Stealth.EditorTools
                     s.World.GasFog = C(0.2f, 0.35f, 0.6f);
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Clean;
-                    geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Casing; geo.Ceiling = CeilingKind.Coffers;
+                    geo.Baseboard = true; geo.Crown = true; geo.Doors = DoorTrim.Casing;
                     geo.Floor = K("Floor_Concrete"); geo.FloorTile = 2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
                     geo.Trim = K("Trim_White"); geo.Beam = K("Trim_White");
                 });

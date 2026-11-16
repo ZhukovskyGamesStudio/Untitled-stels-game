@@ -18,19 +18,18 @@ namespace Stealth.Level
         public override float Reach => 2.0f;
         public override Vector3 Point => transform.position + Vector3.up * 1.1f;
 
-        public static bool HasKey(PlayerController player)
-        {
-            var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null) return false;
-            foreach (var e in inventory.Items) if (e.Shape == ItemCatalog.Key) return true;
-            return false;
-        }
+        /// <summary>The key works only from the hand.</summary>
+        public static bool HasKey(PlayerController player) =>
+            player.TryGetComponent<PlayerInventory>(out var inventory) && inventory.Holds(ItemCatalog.Key);
+
+        static bool Carries(PlayerController player) =>
+            player.TryGetComponent<PlayerInventory>(out var inventory) && inventory.Has(ItemCatalog.Key);
 
         public override string Prompt(PlayerController player, out bool available)
         {
             available = Door != null && Door.Locked && HasKey(player);
             if (Door == null || !Door.Locked) return null;
-            return available ? Loc.T("use.keydoor") : Loc.T("use.keydoor.nokey");
+            return available ? Loc.T("use.keydoor") : Carries(player) ? Loc.T("use.keydoor.hand") : Loc.T("use.keydoor.nokey");
         }
 
         void LateUpdate()

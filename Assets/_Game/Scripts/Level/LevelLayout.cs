@@ -5,7 +5,9 @@ namespace Stealth.Level
 {
     public enum RoomType { Lobby, OpenSpace, Office, Meeting, Kitchen, Server, Storage, Restroom, Lounge, Corridor, Hall,
         // themed rooms (append only): each furnished as what it is (Furnisher), some with a floor of their own (StyleGeometry.RoomFloors)
-        Gym, Library, CopyRoom, ControlRoom, Lab, NapRoom, Studio, LockerRoom, Infirmary, GameRoom }
+        Gym, Library, CopyRoom, ControlRoom, Lab, NapRoom, Studio, LockerRoom, Infirmary, GameRoom,
+        // the auto repair shop (HouseKind.Garage, PlanGenerator.Garage): the double-height workshop hall with its bays, the paint booth
+        Workshop, PaintBooth }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -32,7 +34,54 @@ namespace Stealth.Level
         // library, copy room, control room
         TallBookcase, ReadingTable, Globe, Copier, PaperStack, MailShelf, Shredder, MonitorWall, ConsoleDesk,
         // studio, game room, lab
-        MixingDesk, MicStand, AcousticPanel, DrumKit, PoolTable, Foosball, DartBoard, BarCounter, BarStool, LabBench, PartsCabinet, RobotArm }
+        MixingDesk, MicStand, AcousticPanel, DrumKit, PoolTable, Foosball, DartBoard, BarCounter, BarStool, LabBench, PartsCabinet, RobotArm,
+        // round 2: open space
+        StandingDesk, PlanterDivider, MobileWhiteboard, FilePedestal, SofaPod,
+        // round 2: office
+        ExecutiveDesk, FilingCabinet, Credenza, GuestChair, WallClock,
+        // round 2: meeting
+        ConferenceTable, ProjectorScreen, Flipchart, AvCredenza, MeetingChair,
+        // round 2: lobby
+        InfoKiosk, SecurityTurnstile, RoundBenchPlanter, LogoTotem, QueueBarrier,
+        // round 2: kitchen
+        DiningTable, KitchenIsland, Dishwasher, RecyclingBins, PantryCabinet,
+        // round 2: restroom
+        DoubleSink, JanitorCart, ChangingTable, TowelDispenser, SanitaryBin,
+        // round 2: lounge
+        SectionalSofa, EggChair, SideTable, MagazineRack, AreaRug,
+        // round 2: corridor
+        CorridorBench, FireCabinet, NoticeBoard, BinPair, UmbrellaStand,
+        // round 2: server
+        NetworkCabinet, UpsUnit, CrashCart, CracUnit, TapeLibrary,
+        // round 2: storage
+        MetalShelving, DrumPair, HandTruck, CrateStack, RollingCage,
+        // round 2: copy room
+        Plotter, WorkTable, SupplyShelf, MailCart, PaperBin,
+        // round 2: control room
+        MapBoard, RadioRack, OperatorChair, SupervisorDesk, AlarmPanel,
+        // round 2: hall
+        DisplayCase, PlanterLarge, HallBench, Sculpture, DirectoryBoard,
+        // round 2: gym
+        RowingMachine, PowerCage, KettlebellRack, MatRack, CableMachine,
+        // round 2: locker room
+        TowelShelf, LaundryCart, BenchIsland, WeighingScale, ShoeRack,
+        // round 2: infirmary
+        ExamTable, Wheelchair, IvStand, DoctorDesk, DefibCabinet,
+        // round 2: nap room
+        BunkBed, Daybed, CurtainDivider, FloorCushions, NightTable,
+        // round 2: library
+        CardCatalog, StudyCarrel, Lectern, WingbackChair, BookCart,
+        // round 2: lab
+        FumeHood, Printer3d, ComponentShelf, RobotTable, ScopeCart,
+        // round 2: studio
+        GuitarStand, SynthStand, VocalBooth, AmpCabinet, StudioCouch,
+        // round 2: game room
+        AirHockey, PokerTable, Jukebox, Pinball, GamingCorner,
+        // round 2: the vault
+        DepositWall, GoldPallet, MoneyCart, CashShelf,
+        // the auto repair shop (Tools/Blender/garage.py): customers' cars, the lifts, the shop's equipment, the bays' doors and lines
+        CarParked, CarHoodOpen, LiftCar, LiftEmpty, CarOnStands, ToolChest, TireChanger, WheelBalancer, TireRack, TireStack,
+        EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -92,6 +141,8 @@ namespace Stealth.Level
         public int Floor;
         public Vector2 Origin;
         public Vector2Int Corner;
+        /// <summary>The flights run along the other wall of the corner (the mirror image of the usual staircase).</summary>
+        public bool Flip;
         /// <summary>The room it starts in and the room it arrives in (plan ids).</summary>
         public int Room, RoomAbove;
     }
@@ -149,6 +200,8 @@ namespace Stealth.Level
         /// -1: the door is open from the start).
         /// </summary>
         public int StorageRoom = -1, StorageDoorway = -1, StorageDoor = -1, StorageTerminal = -1;
+        /// <summary>The auto repair shop's paint booth doorway (index in <see cref="Doorways"/>, widened for a car) and its big sliding door (in <see cref="AutoDoors"/>).</summary>
+        public int BoothDoorway = -1, BoothDoor = -1;
         /// <summary>Where the workers leave loot in the storage room: shelves and the pile.</summary>
         public readonly List<StorageDrop> StorageDrops = new();
         /// <summary>What each room type allows (<see cref="BuildingSettings.RoomTypeRules"/>): loot sizes and bonuses read it.</summary>

@@ -40,6 +40,7 @@ namespace Stealth.Tests
                 for (int house = 1; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 6007 + house, house, null, null, 2, null, classic);
+                    if (l.Kind == HouseKind.Garage) continue; // the repair shop: its own plan, no open space (PlanGenerator.Garage)
                     var plan = l.Plan;
                     bool Touches(PlanRoom r, params RoomType[] types) => plan.Walls.Any(w => w.Length >= 1f && w.RoomA >= 0 && w.RoomB >= 0
                         && (w.RoomA == r.Id || w.RoomB == r.Id) && types.Contains(plan.Rooms[w.RoomA == r.Id ? w.RoomB : w.RoomA].Type));
@@ -63,6 +64,7 @@ namespace Stealth.Tests
                 {
                     var l = LevelGenerator.Generate(seed * 7727 + house, house, null, null, 2, null, classic);
                     var plan = l.Plan;
+                    bool garage = l.Kind == HouseKind.Garage; // the repair shop lays out its rooms by hand: caps hold, zones are its own
                     var rules = HouseKinds.Apply(l.Kind, new BuildingSettings()).RoomTypeRules;
                     var inHouse = new Dictionary<RoomType, int>();
                     var onFloor = new Dictionary<(int, RoomType), int>();
@@ -72,10 +74,10 @@ namespace Stealth.Tests
                         inHouse[r.Type] = (inHouse.TryGetValue(r.Type, out var h) ? h : 0) + 1;
                         onFloor[(r.Floor, r.Type)] = (onFloor.TryGetValue((r.Floor, r.Type), out var n) ? n : 0) + 1;
                         float outside = plan.Walls.Where(w => w.Exterior && (w.RoomA == r.Id || w.RoomB == r.Id)).Sum(w => w.Length);
-                        var zone = RoomRules.For(r.Type, rules).Zone;
+                        var zone = garage ? RoomZone.Any : RoomRules.For(r.Type, rules).Zone;
                         if (zone == RoomZone.Facade) { work++; if (outside < Zoning.FacadeWall) workDark++; }
                         if (zone == RoomZone.Interior) { service++; if (outside < Zoning.FacadeWall) serviceIn++; }
-                        if (r.Type != RoomType.Restroom) continue;
+                        if (r.Type != RoomType.Restroom || garage) continue;
                         wc++;
                         var c = new Vector2(r.Center.x, r.Center.z);
                         bool core = l.Stairs.Any(s => (s.Floor == r.Floor || s.Floor + 1 == r.Floor) && (s.Origin - c).magnitude <= Zoning.CoreReach)

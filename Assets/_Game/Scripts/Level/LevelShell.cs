@@ -21,6 +21,11 @@ namespace Stealth.Level
         /// joint, so the pieces of both meet instead of crossing.
         /// </summary>
         public bool JointA, JointB;
+        /// <summary>
+        /// The corner post at this end stands in the middle of a straight wall (another wall runs on behind it, a third
+        /// meets them from the other side): this face and the next one share the post's face — half of it each.
+        /// </summary>
+        public bool StraightA, StraightB;
 
         public Vector3 Along => (B - A).normalized;
         public float Length => (B - A).magnitude;
@@ -47,6 +52,8 @@ namespace Stealth.Level
         public bool Vent, Exterior;
         /// <summary>A narrow slot with its own frame on both faces (Level/SqueezeFrame): no door trim of the style.</summary>
         public bool Squeeze;
+        /// <summary>The vault's round door: its own steel ring and wall corners, no trim, no reveals.</summary>
+        public bool Vault;
         public int Floor;
     }
 
@@ -59,6 +66,8 @@ namespace Stealth.Level
         public readonly List<WallFace> Walls = new();
         public readonly List<FloorRect> Floors = new();
         public readonly List<WallOpening> Openings = new();
+        /// <summary>Renderers that are the wall itself (<see cref="AutoDoor.WallParts"/>): <see cref="StyleDecor"/> dresses them in the wall finish.</summary>
+        public readonly List<MeshRenderer> WallParts = new();
         /// <summary>Window centres and yaws (see <see cref="LevelBuilder.WindowSpots"/>).</summary>
         public readonly List<(Vector3 pos, float yaw)> Windows = new();
         /// <summary>Furniture footprints for the map (x/z in metres, from the placed models).</summary>

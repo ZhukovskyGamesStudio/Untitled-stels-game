@@ -388,32 +388,39 @@ def listener(L):
 
 
 def worker(L):
-    """Hotel luggage trolley: a low cabinet on four wheels, a fluted post with a dial-faced driver at the back,
-    the crate on a brass deck under a tall arched hoop with a finial."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.loft([(.15, .24, .36, 3.0), (.36, .26, .38, 3.0), (.42, .22, .34, 3.0)]))
-    P.add("Accent", L.loft([(.33, .275, .395, 3.0), (.37, .275, .395, 3.0)]))
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Accent", L.rod((x * .6, y, .12), (x * 1.02, y, .12), .028))
-    P.add("Body", L.fluted(.07, .4, .96, loc=(0, .2), n=6))
-    P.add("Accent", L.steps([(.3, .025), (.26, .025)], loc=(0, -.15, .9)))                          # deck
-    P.add("Body", L.rod((0, .2, .7), (0, -.1, .91), .04))
-    P.add("Accent", L.box((.44, .38, .3), (0, -.15, 1.1), r=.025))                                 # crate
-    P.add("Accent", L.box((.46, .05, .32), (0, -.15, 1.1), r=.012))
-    # the arched hoop over the crate
-    pts = [(math.cos(a) * .28, -.15, 1.0 + math.sin(a) * .5) for a in [k / 10 * math.pi for k in range(11)]]
-    P.add("Accent", [s.tube(pts, .024, res=1, segments_per=2)])
-    P.add("Accent", L.finial((0, -.15, 1.49), h=.13, r=.04))
-    # the driver: a dial face on the post
-    P.add("Body", L.lathe([(0, .94), (.13, .94), (.14, .98), (.14, 1.2), (.12, 1.24), (0, 1.24)], loc=(0, .24, 0)))
-    face, rim = L.dial(.1, (0, .1, 1.11))
-    P.add("Body", face).add("Accent", rim)
-    P.add("Eye", L.box((.1, .02, .022), (0, .08, 1.12), r=.008))
-    P.add("Accent", L.key((0, .37, 1.11), .8))
-    acc, glow = L.monocle(.04, (0, -.375, .33))
-    P.add("Accent", acc).add("Eye", glow)
-    return P
+    """Clockwork bellhop trolley: a brass-rimmed cabinet deck, a drum snout with two monocle lamps, a fluted column for
+    a mast on a stepped plinth, a clock dial under its stepped capital and a wind-up key in its back, a ball finial
+    lamp on top; the tray rests on a brass bracket."""
+    def deck(L, P):
+        P.add("Body", L.loft([(.14, .25, .37, 3.0), (.28, .26, .38, 3.0), (.32, .24, .36, 3.0)]))
+        P.add("Accent", L.loft([(.26, .35, .4, 3.0), (.31, .35, .4, 3.0)]))                          # brass rim
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.rod((x * .6, y, .12), (x * 1.02, y, .12), .028))
+        for sy in (-1, 1):
+            P.add("Accent", L.rod((-.3, sy * .39, .22), (.3, sy * .39, .22), .03))                   # brass bumper bars
+            for sx in (-1, 1):
+                P.add("Accent", L.ball(.04, (sx * .3, sy * .39, .22)))
+
+    def pod(L, P):
+        P.add("Body", L.hull((.46, .32, .3), (0, -.22, .47)))
+        for sx in (-1, 1):
+            acc, glow = L.monocle(.035, (sx * .15, -.345, .4))
+            P.add("Accent", acc).add("Eye", glow)
+        D.worker_shoulders(L, P, inner=.19)
+
+    def mast(L, P):
+        P.add("Accent", L.steps([(.2, .04), (.17, .04)], loc=(0, .22, .3)))                          # plinth
+        P.add("Body", L.fluted(.12, .38, 1.12, loc=(0, .22), n=10))
+        P.add("Accent", L.steps([(.15, .03), (.18, .04), (.2, .05)], loc=(0, .22, 1.12)))           # capital
+        face, rim = L.dial(.08, (0, .095, .98))
+        P.add("Body", face).add("Accent", rim)
+        P.add("Accent", L.key((0, .33, .78), .8))
+
+    def beacon(L, P):
+        f = L.finial((0, .25, 1.24), h=.12, r=.045)
+        P.add("Accent", f[:1]).add("Eye", f[1:])
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

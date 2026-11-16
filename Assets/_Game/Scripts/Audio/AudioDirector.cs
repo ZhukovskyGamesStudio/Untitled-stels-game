@@ -48,7 +48,9 @@ namespace Stealth.Audio
         float m_BannerMuteUntil;
         bool m_WasCursor;
 
-        class Walker { public Vector3 Pos; public float NextStep; public float VSpeed; public bool Airborne; public bool Downed; }
+        class Walker { public Vector3 Pos; public float NextStep; public readonly AirState Air = new(); public bool Downed; public float NextGas; }
+        float m_NextHostage;
+        int m_HostageSaid, m_HostageLast = -1;
         class Watched
         {
             public int Level; public bool Hacked; public float Cooldown; public Vector3 Pos; public float NextStep;
@@ -168,6 +170,7 @@ namespace Stealth.Audio
             }
             UpdateRun(gm);
             UpdatePlayers(me);
+            UpdateHostage(me);
             UpdateDetectors();
             UpdateBackpack(me);
         }
@@ -256,7 +259,6 @@ namespace Stealth.Audio
                 w.Pos = pos;
                 if (delta.magnitude > 3f) continue; // teleported
                 float vy = delta.y / dt;
-                w.VSpeed = Mathf.Lerp(w.VSpeed, vy, 0.5f);
                 delta.y = 0f;
                 float speed = delta.magnitude / dt;
                 float volume = p == me ? 0.8f : 1f; // your own steps a touch quieter
@@ -268,15 +270,26 @@ namespace Stealth.Audio
                 }
                 if (p.Downed) continue;
 
-                if (!w.Airborne && w.VSpeed > 2.5f) { w.Airborne = true; Sfx.At(Bank.Jump, pos, volume * 0.8f, Sfx.Group.Footsteps); }
-                else if (!w.Airborne && w.VSpeed < -4f) w.Airborne = true; // walked off an edge
-                else if (w.Airborne && Mathf.Abs(w.VSpeed) < 0.5f)
+                // the laughing gas: heavy breathing, then laughing ever harder (everyone hears it, from the replicated share)
+                var (gasClip, gasVolume, gasGap) = PeopleSounds.Gas(p.GasShare, p.GasLaughShare);
+                if (gasClip > -2 && Time.time >= w.NextGas)
                 {
-                    w.Airborne = false;
-                    Sfx.At(Bank.Land, pos, volume, Sfx.Group.Footsteps);
-                    w.NextStep = Time.time + 0.25f;
+                    var clip = gasClip < 0 ? Bank.GasBreath : Bank.GasLaugh != null && gasClip < Bank.GasLaugh.Length ? Bank.GasLaugh[gasClip] : null;
+                    if (clip != null)
+                    {
+                        Sfx.At(clip, pos + Vector3.up * 1.6f, volume * gasVolume, Sfx.Group.Footsteps);
+                        w.NextGas = Time.time + clip.length + gasGap;
+                    }
                 }
-                if (w.Airborne) continue;
+                switch (w.Air.Step(vy, dt, Time.time))
+                {
+                    case AirEvent.Jump: Sfx.At(Bank.Jump, pos, volume * 0.8f, Sfx.Group.Footsteps); break;
+                    case AirEvent.Land:
+                        Sfx.At(Bank.Land, pos, volume, Sfx.Group.Footsteps);
+                        w.NextStep = Time.time + 0.25f;
+                        break;
+                }
+                if (w.Air.Airborne) continue;
 
                 float interval = AudioRules.StepInterval(speed, m_Mix.StepLength);
                 if (float.IsInfinity(interval)) { w.NextStep = Mathf.Max(w.NextStep, Time.time + 0.12f); continue; }
@@ -287,6 +300,31 @@ namespace Stealth.Audio
                 Sfx.At(clips[Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Next(clips.Length)], pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
             }
             Prune(m_Players, PlayerController.All);
+        }
+
+        /// <summary>The hostage calls to this player while it sees the cage close by (every peer for its own player).</summary>
+        void UpdateHostage(PlayerController me)
+        {
+            if (me == null || Bank.HostageVoice == null || Bank.HostageVoice.Length == 0) return;
+            foreach (var i in Interactable.All)
+            {
+                if (i is not Cage cage || cage.Freed || cage.Hostage == null || !cage.Hostage.activeInHierarchy) continue;
+                var head = cage.transform.position + Vector3.up * 1.0f;
+                var eye = me.Camera != null ? me.Camera.transform.position : me.transform.position + Vector3.up * 1.6f;
+                float dist = Vector3.Distance(eye, head);
+                bool sight = dist <= PeopleSounds.HostageReach && Stealth.Enemies.Perception.ReachClear(eye, head, cage.transform);
+                if (!PeopleSounds.HostageSpeaks(dist, sight, Time.time, m_NextHostage)) continue;
+                var rng = Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio);
+                bool keyHeld = GameManager.Instance != null && GameManager.Instance.ObjectiveStage.KeyHeld;
+                int line = Mathf.Clamp(PeopleSounds.HostageLine(m_HostageSaid, m_HostageLast, keyHeld, rng.Next(1000)), 0, Bank.HostageVoice.Length - 1);
+                var clip = Bank.HostageVoice[line];
+                if (clip == null) continue;
+                Sfx.At(clip, head + Vector3.up * 0.3f, 1f, Sfx.Group.Items);
+                m_HostageSaid++;
+                m_HostageLast = line;
+                m_NextHostage = Time.time + clip.length + rng.Range(6f, 11f);
+                return;
+            }
         }
 
         /// <summary>Robots and devices: beeps when they notice / lose someone, a glitch when hacked, steps of legged robots.</summary>

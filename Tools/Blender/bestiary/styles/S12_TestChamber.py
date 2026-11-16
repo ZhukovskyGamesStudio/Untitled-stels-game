@@ -271,25 +271,30 @@ def listener(L):
 
 
 def worker(L):
-    """A pill cart with a white egg cab; two pill arms hold the black sample case up front."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", soft_wheel(c, .12, .1, seg=14))
-        P.add("Accent", capsule((c[0] * .4, c[1], .13), (c[0] * 1.0, c[1], .12), .04, seg=10))
-    split_egg(P, (0, .03, .27), .25, .15, .42, .42, [.0], gap=.03, axis="-Y", seg=16)
-    for sx in (-1, 1):
-        P.add("Accent", capsule((sx * .2, .33, .14), (sx * .2, -.33, .14), .055, seg=12))
-    P.add("Body", egg((0, .22, .59), .2, .16, .2, .26, seg=16))
-    P.add("Accent", [s.loft([(.63, .2, .16), (.65, .2, .16)], seg=16, loc=(0, .22, 0))])
-    for sx in (-1, 1):
-        P.add("Accent", ball(.05, (sx * .2, -.15, .38)) + ball(.045, (sx * .2, -.18, .66)))
-        P.add("Body", capsule((sx * .2, -.15, .38), (sx * .2, -.18, .66), .045, seg=12) + capsule((sx * .2, -.18, .66), (sx * .2, -.16, .93), .04, seg=12))
-    P.add("Accent", [s.rbox((.5, .44, .04), (0, -.15, .93), r=.015, seg=2)])
-    P.add("Accent", [s.rbox((.46, .42, .36), (0, -.15, 1.13), r=.07, seg=2)])
-    P.add("Body", [s.rbox((.48, .44, .06), (0, -.15, 1.15), r=.025, seg=2)])
-    optic(P, (0, -.39, .36), .07, depth=.05)
-    return P
+    """Specimen cart: a white pill deck on soft wheels with black capsule bumpers, a split white egg for a snout, a tall
+    split egg for a mast with black seams, a white ball lamp in a black collar on top."""
+    def deck(L, P):
+        P.add("Body", L.hull((.52, .76, .16), (0, 0, .22)))
+        P.add("Body", L.box((.68, .8, .06), (0, 0, .3)))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", capsule((x * .4, y, .13), (x * 1.0, y, .12), .04, seg=10))
+        for y in (-.41, .41):
+            P.add("Accent", capsule((-.3, y, .21), (.3, y, .21), .05, seg=12))
+
+    def pod(L, P):
+        split_egg(P, (0, -.23, .47), .22, .16, .15, .17, [0.0], gap=.03, seg=18)
+        for sx in (-1, 1):
+            P.add("Eye", ball(.025, (sx * .13, -.36, .4)))
+        D.worker_shoulders(L, P, inner=.17)
+
+    def mast(L, P):
+        split_egg(P, (0, .22, .8), .21, .15, .48, .5, [-.15, .2], gap=.03, seg=18)
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.06, .04, (0, .22, 1.3)))
+        P.add("Eye", ball(.055, (0, .22, 1.36)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon, wheel=lambda c, r, w: soft_wheel(c, r, w, seg=14))
 
 
 def sweeper(L):

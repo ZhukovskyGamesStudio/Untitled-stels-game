@@ -36,6 +36,7 @@ namespace Stealth.Items
             public Vector3 ClosedPos;
             public Quaternion ClosedRot;
             public Vector3 Hinge;       // doors: the vertical axis at the front edge, world
+            public bool RightHinge;     // doors: the right leaf of a pair, hinged on its right edge, swings the other way
             public float T01;           // 0 closed .. 1 open (shown)
             public Bounds Closed;       // world bounds when closed
             public Collider[] Colliders;
@@ -71,12 +72,17 @@ namespace Stealth.Items
             var fwd = transform.forward;
             m_Depth = Mathf.Max(0.1f, Mathf.Abs(body.size.x * fwd.x) + Mathf.Abs(body.size.z * fwd.z) - 0.06f);
             var block = new MaterialPropertyBlock();
-            foreach (var p in m_Parts)
+            var closed = new List<Bounds>();
+            foreach (var p in m_Parts) closed.Add(WorldBounds(p.T));
+            var rightHinged = StorageMath.RightHinged(closed, transform.right);
+            for (int i = 0; i < m_Parts.Count; i++)
             {
+                var p = m_Parts[i];
                 p.ClosedPos = p.T.position;
                 p.ClosedRot = p.T.rotation;
-                p.Closed = WorldBounds(p.T);
-                p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward);
+                p.Closed = closed[i];
+                p.RightHinge = !Drawers && rightHinged[i];
+                p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward, p.RightHinge);
                 p.T01 = 0f;
                 foreach (var r in p.T.GetComponentsInChildren<Renderer>(true))
                 {
@@ -107,7 +113,8 @@ namespace Stealth.Items
                 p.T.SetPositionAndRotation(p.ClosedPos + transform.forward * (StorageMath.DrawerTravel * t), p.ClosedRot);
                 return;
             }
-            var turn = Quaternion.AngleAxis(-StorageMath.DoorAngle * t, transform.up); // outwards: right swings to the front
+            // outwards: a left-hinged door's free edge (its right) swings to the front, a right-hinged one's (its left) too
+            var turn = Quaternion.AngleAxis((p.RightHinge ? 1f : -1f) * StorageMath.DoorAngle * t, transform.up);
             p.T.SetPositionAndRotation(p.Hinge + turn * (p.ClosedPos - p.Hinge), turn * p.ClosedRot);
         }
 
@@ -180,15 +187,48 @@ namespace Stealth.Items
 
         /// <summary>
         /// The hinge of a door: the front edge on its left (looking at the furniture from the front, <paramref name="forward"/>
-        /// pointing at the viewer), from the door's world bounds.
+        /// pointing at the viewer) — or on its right for the right leaf of a pair — from the door's world bounds.
         /// </summary>
-        public static Vector3 Hinge(Bounds door, Vector3 right, Vector3 forward)
+        public static Vector3 Hinge(Bounds door, Vector3 right, Vector3 forward, bool rightHinge = false)
         {
             right.y = 0; forward.y = 0;
             right.Normalize(); forward.Normalize();
             float halfW = Mathf.Abs(Vector3.Dot(door.extents, Abs(right)));
             float halfD = Mathf.Abs(Vector3.Dot(door.extents, Abs(forward)));
-            return door.center - right * halfW + forward * halfD;
+            return door.center + right * (rightHinge ? halfW : -halfW) + forward * halfD;
+        }
+
+        /// <summary>
+        /// Which doors are the right leaves of pairs (pure): doors at the same height (overlapping over half the shorter one)
+        /// form a row; in a row read left to right, every second door of a pair of neighbours (nearly touching) is hinged on
+        /// its right, so a two-door cupboard opens from the middle. A lone door, or the odd one out, keeps its hinge left.
+        /// </summary>
+        public static bool[] RightHinged(IReadOnlyList<Bounds> doors, Vector3 right)
+        {
+            right.y = 0f;
+            right.Normalize();
+            var result = new bool[doors.Count];
+            var used = new bool[doors.Count];
+            for (int i = 0; i < doors.Count; i++)
+            {
+                if (used[i]) continue;
+                var row = new List<int>();
+                for (int j = 0; j < doors.Count; j++)
+                {
+                    float overlap = Mathf.Min(doors[i].max.y, doors[j].max.y) - Mathf.Max(doors[i].min.y, doors[j].min.y);
+                    if (!used[j] && overlap > 0.5f * Mathf.Min(doors[i].size.y, doors[j].size.y)) { row.Add(j); used[j] = true; }
+                }
+                row.Sort((a, b) => Vector3.Dot(doors[a].center, right).CompareTo(Vector3.Dot(doors[b].center, right)));
+                for (int k = 0; k + 1 < row.Count; k += 2)
+                {
+                    var a = doors[row[k]];
+                    var b = doors[row[k + 1]];
+                    float aRight = Vector3.Dot(a.center, right) + Mathf.Abs(Vector3.Dot(a.extents, Abs(right)));
+                    float bLeft = Vector3.Dot(b.center, right) - Mathf.Abs(Vector3.Dot(b.extents, Abs(right)));
+                    if (bLeft - aRight < 0.06f) result[row[k + 1]] = true; // neighbours: a pair opening from the middle
+                }
+            }
+            return result;
         }
 
         /// <summary>

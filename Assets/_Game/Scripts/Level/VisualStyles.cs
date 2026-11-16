@@ -220,6 +220,7 @@ namespace Stealth.Level
             PropBatches.Clear(); // the furniture is about to change: it draws itself until merged again
             if (family != s_Family) UndoReplacements();
             s_Family = family;
+            StyleParts.ShowAll(s_Current != null && g != null ? s_Current.name : null); // things with a model of their own in a style
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
             if (!Application.isPlaying) return;
             var holder = Config != null ? Config.Batch : null;

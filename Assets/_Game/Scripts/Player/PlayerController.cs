@@ -61,6 +61,8 @@ namespace Stealth.Player
         /// <summary>Owner-owned: Steam name or empty.</summary>
         public string DisplayName { get; private set; } = "";
         public string Nick => DisplayName.Length > 0 ? DisplayName : Loc.F("player.nick", ClientId + 1);
+        /// <summary>Who the player is across reconnects (<see cref="ISessionLauncher.LocalPlayerId"/>; the owner sets it, everyone sees it).</summary>
+        public string Identity { get; private set; } = "";
 
         public ulong ClientId { get; private set; }
         /// <summary>This peer controls the player (input, camera).</summary>
@@ -109,6 +111,13 @@ namespace Stealth.Player
         public Vector3 Position => transform.position;
         public bool IsCrouching => Crouching;
         public bool IsDown => !IsSpawned || Downed || InHatch || Invisible;
+
+        /// <summary>How deep in the laughing gas this player is: 0 clear … 1 passing out (the owner's own, the others' replicated).</summary>
+        public float GasShare { get; private set; }
+        /// <summary>The share at which the laughing starts (the same settings on every peer).</summary>
+        public float GasLaughShare => Gas.LaughAfter / Mathf.Max(0.01f, Gas.Limit);
+        /// <summary>A copy of the owner's gas share (the network twin).</summary>
+        public void ApplyGas(byte share) => GasShare = share / 255f;
 
         /// <summary>Server: cheats of the F4 panel — nothing hurts this player / robots do not perceive them.</summary>
         public bool Invulnerable { get; private set; }
@@ -190,6 +199,7 @@ namespace Stealth.Player
                 GameSettings.EnsureLoaded(); // and the controls
                 var nick = Session.Launcher?.LocalPlayerName ?? "";
                 DisplayName = nick.Length > 28 ? nick.Substring(0, 28) : nick;
+                Identity = Session.Launcher?.LocalPlayerId ?? "";
                 Camera.enabled = true;
                 Camera.clearFlags = CameraClearFlags.SolidColor; // the sky is drawn by the gas pass (GasView), never the engine's skybox
                 Listener.enabled = true;
@@ -206,6 +216,7 @@ namespace Stealth.Player
 
         public void Unbind()
         {
+            if (IsServer && !IsOwner) GameManager.Instance?.PlayerLeftServer(this); // keep the backpack and the spot for a reconnect
             All.Remove(this);
             IsSpawned = false;
             m_Link = null;
@@ -558,9 +569,60 @@ namespace Stealth.Player
 
         SewerLocation m_PlacedSewer;
 
+        Vector3? m_ServerPlace;
+        float m_ServerPlaceYaw;
+
+        /// <summary>Peers: the owner's identity arrived; the server gives a player who came back their things.</summary>
+        public void ApplyIdentity(string identity)
+        {
+            if (string.IsNullOrEmpty(identity) || identity == Identity) return;
+            Identity = identity;
+            if (IsServer) GameManager.Instance?.PlayerJoinedServer(this);
+        }
+
+        /// <summary>Server: tell the owner where to stand (a reconnect).</summary>
+        public void PlaceServer(Vector3 position, float yaw)
+        {
+            if (m_Link != null) m_Link.PlaceOwner(position, yaw);
+            else PlaceFromServer(position, yaw);
+        }
+
+        /// <summary>
+        /// Owner: whether this player already stands where the current location put them (the sewer's spawn, the house's
+        /// hatch, or the server's spot after a reconnect). Until then the screen stays black (<see cref="UI.LoadingRules"/>).
+        /// </summary>
+        public bool PlacedHere
+        {
+            get
+            {
+                if (m_ServerPlace != null) return false;
+                var sewer = SewerLocation.Active;
+                if (sewer != null) return m_PlacedSewer == sewer;
+                var layout = ActiveLevel.Layout;
+                return layout != null && (m_PlacedSeed == layout.Seed || layout.PlayerSpawns.Count == 0);
+            }
+        }
+
+        /// <summary>Owner: the server's spot wins over the usual spawn, once the house or the sewer is built here.</summary>
+        public void PlaceFromServer(Vector3 position, float yaw)
+        {
+            m_ServerPlace = position;
+            m_ServerPlaceYaw = yaw;
+        }
+
         void PlaceOnLevelIfNeeded()
         {
             var sewer = SewerLocation.Active;
+            if (m_ServerPlace is Vector3 place && (sewer != null || ActiveLevel.Layout != null))
+            {
+                m_ServerPlace = null;
+                m_PlacedSewer = sewer;
+                if (ActiveLevel.Layout != null) m_PlacedSeed = ActiveLevel.Layout.Seed;
+                m_PlacedInHatch = InHatch;
+                TeleportOwner(place, Quaternion.Euler(0f, m_ServerPlaceYaw, 0f));
+                Motor.SetPitch(0f);
+                return;
+            }
             if (sewer != null && sewer != m_PlacedSewer)
             {
                 m_PlacedSewer = sewer;
@@ -647,8 +709,9 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             bool outside = layout != null && !layout.IsInside(transform.position);
             // Lying, watching a teammate or in god mode, the gas has nothing to do with you (no overlay, no knockout).
-            if (Downed || Invulnerable) { Gas.Reset(); return; }
+            if (Downed || Invulnerable) { Gas.Reset(); GasShare = 0f; return; }
             var effect = Gas.Tick(outside, Time.deltaTime);
+            GasShare = Gas.Share;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
             else if (effect == GasExposure.Effect.Knockout)
             {
@@ -720,7 +783,7 @@ namespace Stealth.Player
             UpdateStorage();
             UpdateTerminal(holdE);
             UpdateUse(holdE);
-            if (Controls.Pressed(GameAction.Gadget) && !CursorMode && HasItem(Items.ItemCatalog.Stun))
+            if (Controls.Pressed(GameAction.Gadget) && !CursorMode && m_Inventory != null && m_Inventory.Holds(Items.ItemCatalog.Stun))
             {
                 if (m_Link != null) m_Link.SendGadget();
                 else GameManager.Instance?.GadgetServer(this);
@@ -789,13 +852,6 @@ namespace Stealth.Player
         public float UseProgress { get; private set; }
         readonly HoldProgress<Interactable> m_UseHeld = new();
         bool m_UseWaitRelease;
-
-        bool HasItem(byte shape)
-        {
-            if (m_Inventory == null) return false;
-            foreach (var e in m_Inventory.Items) if (e.Shape == shape) return true;
-            return false;
-        }
 
         /// <summary>Owner: press (or hold) E at a crate, the med table, the workbench, a key lock, a lever, the car.</summary>
         // ------------------------------------------------------------------ the vault's lock panels
@@ -1592,7 +1648,8 @@ namespace Stealth.Player
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            target.HackServer(m_Interaction.HackDuration);
+            if (target is Enemies.Detector d && GameManager.Instance != null) GameManager.Instance.TeamHackServer(d);
+            else target.HackServer(m_Interaction.HackDuration);
         }
     }
 }

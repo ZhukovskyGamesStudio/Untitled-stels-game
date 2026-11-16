@@ -21,18 +21,33 @@ namespace Stealth.Level
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly Color AlarmColor = new(1f, 0.15f, 0.1f);
 
+        /// <summary>Whether a room's lights were switched from how the house started (room id; set by the game, <see cref="LightSwitch"/>).</summary>
+        public static System.Func<int, bool> IsSwitched = _ => false;
+
         Light m_Light;
-        Color m_BaseColor;
-        float m_BaseIntensity;
+        Color m_BaseColor, m_LitColor;
+        float m_BaseIntensity, m_LitIntensity;
+        int m_Room = -1;
+        bool m_Dark;
         MaterialPropertyBlock m_Block;
         float m_LastGlow = -1f;
         Color m_LastColor;
 
-        public void Init(Color color, float intensity, bool flicker, float seed)
+        public void Init(Color color, float intensity, bool flicker, float seed) => Init(color, intensity, flicker, seed, -1, false, color, intensity);
+
+        /// <summary>
+        /// A lamp of room <paramref name="room"/>: <paramref name="color"/>/<paramref name="intensity"/> as the house starts
+        /// (<paramref name="dark"/>: off or dim), the lit look when a switch turns a dark room on, nothing when it turns a lit one off.
+        /// </summary>
+        public void Init(Color color, float intensity, bool flicker, float seed, int room, bool dark, Color litColor, float litIntensity)
         {
             m_Light = Lamp != null ? Lamp : GetComponentInChildren<Light>();
             m_BaseColor = color;
             m_BaseIntensity = intensity;
+            m_Room = room;
+            m_Dark = dark;
+            m_LitColor = litColor;
+            m_LitIntensity = litIntensity;
             Flicker = flicker;
             Seed = seed;
             Apply(color, intensity);
@@ -44,8 +59,11 @@ namespace Stealth.Level
             float k = Flicker ? LightMath.Flicker(Time.time + Seed) : 1f;
             var gm = GameManager.Instance;
             bool alarm = gm != null && gm.AlarmActive;
-            var color = alarm ? Color.Lerp(m_BaseColor, AlarmColor, 0.8f) : m_BaseColor;
-            float baseIntensity = alarm ? Mathf.Max(m_BaseIntensity, LightMath.AlarmIntensity) : m_BaseIntensity; // alarm lights even dark rooms
+            bool switched = m_Room >= 0 && IsSwitched(m_Room);
+            var own = switched ? m_LitColor : m_BaseColor;
+            float ownIntensity = !switched ? m_BaseIntensity : LightMath.SwitchedOn(m_Dark, true) ? m_LitIntensity : 0f;
+            var color = alarm ? Color.Lerp(own, AlarmColor, 0.8f) : own;
+            float baseIntensity = alarm ? Mathf.Max(ownIntensity, LightMath.AlarmIntensity) : ownIntensity; // alarm lights even dark rooms
             Apply(color, baseIntensity * k * (alarm ? 0.7f + 0.3f * Mathf.Sin(Time.time * 6f) : 1f));
         }
 
@@ -83,6 +101,9 @@ namespace Stealth.Level
         public const float AlarmIntensity = 1.4f;
         /// <summary>Emission of a lit panel (HDR, catches the bloom).</summary>
         public const float PanelGlow = 2.2f;
+
+        /// <summary>Whether a room's lamps are on (pure): a room that started lit goes dark when switched, a dark one lights up.</summary>
+        public static bool SwitchedOn(bool startedDark, bool switched) => startedDark == switched;
 
         /// <summary>Ceiling lamp cookie (pure): full light below the horizon, none straight up (dir.y = direction's height).</summary>
         public static float CookieUpFade(float dirY) => 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.02f, 0.2f, dirY));

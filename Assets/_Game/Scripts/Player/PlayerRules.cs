@@ -172,8 +172,10 @@ namespace Stealth.Player
         public float ReviveDistance = 2.2f;
         [Tooltip("Seconds to hold E to hack.")]
         public float HackHoldTime = 1.75f;
-        [Tooltip("Seconds a hacked robot / device stays off.")]
-        public float HackDuration = 30f;
+        [Tooltip("Seconds a hacked robot / device stays off; 0 = for good (until a hack over the limit wakes it, MaxHacked).")]
+        public float HackDuration = 0f;
+        [Tooltip("Robots and devices the team can keep switched off at once: hacking one more wakes the first.")]
+        public int MaxHacked = 2;
         [Tooltip("How close you must be to hack, meters.")]
         public float HackReach = 1.9f;
         [Tooltip("Seconds to hold E to hack the lock of a door.")]
@@ -183,7 +185,7 @@ namespace Stealth.Player
         [Tooltip("Hacks a hacking terminal can make per house.")]
         public int TerminalHacks = 3;
         [Tooltip("Seconds to hold E at a hacking terminal to hack the robot on its screen.")]
-        public float TerminalHackTime = 3f;
+        public float TerminalHackTime = 0.5f;
     }
 
     /// <summary>

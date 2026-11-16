@@ -191,31 +191,149 @@ def listener(L):
     return P
 
 
-def worker(L):
-    """Little forklift worker: a low chassis on four wheels, a lift mast in front carrying the crate of loot,
-    a headlight bar under it. Contract: wheels r 0.12, width 0.1 at (±0.31, ±0.25, 0.12) — 0: (+,+), 1: (-,+),
-    2: (+,-), 3: (-,-); the crate (Accent) at y -0.38..0.08, z 0.95..1.35."""
-    P = Parts()
-    wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.hull((.56, .7, .3), (0, .02, .34), taper=(.94, .94)))
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Accent", L.rod((x * .4, y, .12), (x, y, .12), .035))                                   # axles
-        P.add("Body", L.box((.1, .12, .14), (x * .62, y, .2)))                                        # axle boxes
-    P.add("Body", L.hull((.46, .3, .42), (0, .22, .66), taper=(.85, .9)))                             # cab
-    P.add("Accent", L.box((.3, .02, .16), (0, .06, .72), r=.01))                                    # cab window frame
-    P.add("Eye", L.box((.26, .02, .12), (0, .065, .72), r=.01))
+# --------------------------------------------------------------------------- the worker and its lift
+# The worker carries loot on a fork tray that two booms swing from its dock on top of the mast (at rest) forward and
+# down to the floor (CargoMotion, Tools/Blender/worker_lift.py). The body is laid out around that motion, so every
+# style keeps the same plan and changes the forms:
+#   deck    the drive base: z < 0.34, |x| <= 0.35 in front of y = -0.1 (the booms swing past at |x| 0.37..0.43)
+#   pod     the sensor head in front, |x| <= 0.25, y -0.42..-0.06, z <= 0.7: the camera module seats on its face at
+#           z 0.5 (SensorRig), the booms' shoulders (WORKER_HINGE) sit on its flanks
+#   mast    at the back, y >= 0.07 (it may be wider than the deck: nothing swings behind the hinge), z <= ~1.36
+#   dock    what the tray rests on: under the tray's resting place keep below worker_clear_z(y)
+#   beacon  on the mast's cap; keep (+-0.17, 0.25) on the cap free (a place for the microphones)
+# Nothing else may enter the space above the pod and in front of the mast: the tray and the loot pass there.
+WORKER_WHEELS = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
+WORKER_HINGE = (-.15, .562)                  # (y, z) of the booms' hinge (CargoMotion.Hinge)
+LIFT_ARM_X, LIFT_PIN, LIFT_TRAY_W, LIFT_TRAY_D = .40, 1.405, .70, .40
+
+
+def worker_clear_z(y, margin=.02):
+    """The highest z the body may reach at y under the tray's resting place: the arc the tray's back edge sweeps."""
+    return .547 + math.sqrt(max(0.0, .843 ** 2 - (y - .05) ** 2)) - margin
+
+
+def worker_deck(L, P):
+    P.add("Body", L.hull((.5, .74, .16), (0, 0, .21)))
+    P.add("Body", L.box((.7, .8, .07), (0, 0, .29)))                                                  # deck over the wheels
+    for x, y, _ in WORKER_WHEELS:
+        P.add("Accent", L.cyl(.035, .12, (x * .78, y, .12), axis="X"))                                # axles
+    for y in (-.41, .41):
+        P.add("Accent", L.box((.7, .07, .11), (0, y, .21)))                                           # rubber bumpers
+
+
+def worker_shoulders(L, P, inner=.225, r=.085, role="Accent", cap="Body"):
+    """The booms' shoulder drums from the pod's flank (|x| = inner, keep it inside the pod) out to |x| 0.305, where the
+    booms' axles go in, with a cap."""
+    hy, hz = WORKER_HINGE
     for sx in (-1, 1):
-        P.add("Body", L.box((.05, .07, .9), (sx * .22, -.33, .72)))                                    # mast rails
-    P.add("Body", L.box((.48, .05, .06), (0, -.33, 1.16)))
-    P.add("Accent", L.box((.5, .42, .05), (0, -.16, .93)))                                           # fork plate
-    P.add("Accent", L.box((.48, .4, .34), (0, -.16, 1.13)))                                          # crate
-    for k in (-1, 1):
-        P.add("Accent", L.box((.5, .03, .05), (0, -.16 + k * .2, 1.13), r=.006))
-    P.add("Accent", L.box((.44, .1, .1), (0, -.37, .45)))
-    P.add("Eye", L.box((.32, .03, .05), (0, -.42, .45), r=.012))
-    P.add("Accent", L.rod((.18, .3, .8), (.18, .32, 1.05), .012))
-    P.add("Eye", L.ball(.03, (.18, .32, 1.07)))
+        P.add(role, L.cyl(r, .305 - inner, (sx * (inner + .305) / 2, hy, hz), axis="X"))
+        P.add(cap, L.cyl(r * .6, .02, (sx * .31, hy, hz), axis="X"))
+
+
+def worker_pod(L, P):
+    P.add("Body", L.hull((.48, .34, .32), (0, -.23, .47), taper=(.94, .92)))
+    P.add("Accent", L.box((.42, .03, .2), (0, -.405, .47)))                                           # dark face
+    P.add("Eye", L.box((.08, .02, .035), (-.15, -.425, .385)) + L.box((.08, .02, .035), (.15, -.425, .385)))  # headlights
+    P.add("Body", L.box((.4, .2, .12), (0, 0, .37)))                                                  # fairing to the mast
+    worker_shoulders(L, P)
+
+
+def worker_mast(L, P):
+    P.add("Body", L.hull((.6, .32, .48), (0, .23, .54)))                                              # battery block
+    P.add("Body", L.hull((.44, .26, .54), (0, .2, 1.04), taper=(.94, 1.0)))                           # electronics tower
+    P.add("Accent", L.box((.62, .34, .05), (0, .23, .78)))                                            # band
+    P.add("Body", L.box((.48, .3, .05), (0, .2, 1.315)))                                              # cap
+    worker_chain(L, P, (0, .06), .43, 1.27)
+
+
+def worker_chain(L, P, xy, z0, z1, w=.1, role="Accent"):
+    """A cable chain up the mast's front: links with gaps between them."""
+    n = max(3, int((z1 - z0) / .115))
+    step = (z1 - z0) / n
+    for k in range(n):
+        P.add(role, [s.rbox((w, .035, step * .8), (xy[0], xy[1], z0 + (k + .5) * step), r=0 if L.flat else .005,
+                            seg=1)])
+
+
+def worker_dock(L, P):
+    z = worker_clear_z(-.08) - .02
+    P.add("Accent", L.box((.4, .2, .04), (0, .02, z)))
+    for sx in (-1, 1):
+        P.add("Accent", L.box((.04, .16, .12), (sx * .17, .04, z - .07)))
+    P.add("Accent", L.box((.12, .24, .12), (0, .12, z - .06)))                                        # spine into the mast
+    worker_cradle(L, P)
+
+
+def worker_cradle(L, P, role="Accent"):
+    """Two posts behind the tray with pads its backrest docks against at rest (the tray only ever swings forward)."""
+    dy = getattr(L, "voxel", 0.0) * .6   # cubes grow a part by up to half a cube: keep the pads off the tray
+    for sx in (-1, 1):
+        P.add(role, L.box((.045, .045, .22), (sx * .2, .0875 + dy, 1.37)))
+        P.add(role, L.box((.07, .03, .07), (sx * .2, .072 + dy, 1.45)))
+
+
+def worker_beacon(L, P, loc=(0, .26, 1.34)):
+    x, y, z = loc
+    P.add("Accent", L.cyl(.075, .035, (x, y, z + .015)))
+    P.add("Eye", L.cyl(.055, .075, (x, y, z + .07), radius2=.045))
+
+
+def worker(L, deck=worker_deck, pod=worker_pod, mast=worker_mast, dock=worker_dock, beacon=worker_beacon, wheel=None,
+           extra=None):
+    """Warehouse runner, 1.4 m: a drive deck on four small wheels with bumpers, a sensor pod in front carrying the
+    booms' shoulders, a mast at the back with a cable chain, the tray's dock and a beacon on its cap (the booms and
+    the fork tray are worker_lift). Contract: wheels r 0.12, width 0.1 at (+-0.31, +-0.25, 0.12) - 0: (+,+), 1: (-,+),
+    2: (+,-), 3: (-,-); the camera seats on the pod's face at (0, -0.4, 0.5). A style passes its own pieces."""
+    P = Parts()
+    for i, c in enumerate(WORKER_WHEELS):
+        P.add(f"AccentWheel{i}", (wheel or L.wheel)(c, .12, .1))
+    for piece in (deck, pod, mast, dock, beacon, extra):
+        if piece:
+            piece(L, P)
     return P
+
+
+def worker_lift(L, boom=None, tray=None):
+    """The worker's lift in this style (the game swaps it onto Robots/worker_lift by mesh name): AccentLiftArm - both
+    booms with their knuckles and the axles into the shoulder drums; BodyLiftTray - the fork tray. The numbers are
+    CargoMotion's: hinge (0, -0.15, 0.562), pin (0, -0.15, 1.405) at rest, the tray's bottom 0.015 under the pin, the
+    loot's seat 0.023 over it (the tines' tops); the booms at x +-0.4."""
+    P = Parts()
+    (boom or lift_booms)(L, P)
+    (tray or lift_tray)(L, P)
+    return P
+
+
+def lift_booms(L, P, radius=.034):
+    hy, hz = WORKER_HINGE
+    for sx in (-1, 1):
+        x = sx * LIFT_ARM_X
+        P.add("AccentLiftArm", L.rod((x, hy, hz + .03), (x, hy, LIFT_PIN - .02), radius))
+        P.add("AccentLiftArm", L.cyl(.056, .06, (x, hy, hz), axis="X"))                                # shoulder knuckle
+        P.add("AccentLiftArm", L.cyl(.026, .12, (sx * .345, hy, hz), axis="X"))                        # axle into the drum
+        P.add("AccentLiftArm", L.cyl(.025, .05, (x, hy, LIFT_PIN), axis="X"))                          # end knuckle
+        P.add("AccentLiftArm", L.box((.05, .04, .18), (x, hy + .045, hz + .14)))                       # gusset
+
+
+def lift_tray(L, P):
+    hy, pin = WORKER_HINGE[0], LIFT_PIN
+    bottom, seat = pin - .015, pin + .023
+    w, d = LIFT_TRAY_W, LIFT_TRAY_D
+    back = hy + d / 2
+    T = "BodyLiftTray"
+
+    def bx(size, loc, r=.006, taper=(1.0, 1.0)):  # thin plates: one chamfer (the style's roundness would cost thousands)
+        return [s.rbox(size, loc, r=0.0 if L.flat else r, seg=1, taper=taper)]
+    P.add(T, bx((w - .04, d - .04, .022), (0, hy + .02, bottom + .011)))                                 # deck
+    P.add(T, bx((w - .04, .07, .018), (0, hy - d / 2 + .04, bottom + .009), r=.005, taper=(1.0, .45)))  # front lip
+    for sx in (-1, 1):
+        P.add(T, bx((.12, d + .03, seat - bottom), (sx * .17, hy - .02, (seat + bottom) / 2), r=.01, taper=(.86, 1.0)))  # tines
+        P.add(T, bx((.025, d - .03, .045), (sx * (w / 2 - .0125), hy + .005, bottom + .0225), r=.008))  # side rails
+        P.add(T, L.cyl(.025, .05, (sx * (w / 2 + .02), hy, pin), axis="X", seg=12))                    # pin bosses
+    y = back - .0125
+    P.add(T, bx((w, .04, .03), (0, y - .005, bottom + .015)))                                            # backrest sill
+    P.add(T, bx((w - .08, .019, .1), (0, y, bottom + .065)))                                             # backrest plate
+    P.add(T, L.cyl(.016, w, (0, y, bottom + .12), axis="X", seg=10))                                     # its rolled top
 
 
 def sweeper(L):
@@ -470,5 +588,5 @@ DESIGNS = {
     "robot_hunter": hunter, "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
     "sensor_lidar": lidar, "sensor_pir": pir, "sensor_plate": plate, "security_camera": security_camera,
     "laser_emitter": laser_emitter, "attach_eye": attach_eye, "attach_mic": attach_mic,
-    "attach_seismic": attach_seismic, "attach_nose": attach_nose,
+    "attach_seismic": attach_seismic, "attach_nose": attach_nose, "worker_lift": worker_lift,
 }
