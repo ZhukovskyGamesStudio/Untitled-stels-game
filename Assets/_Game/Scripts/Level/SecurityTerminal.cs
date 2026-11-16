@@ -26,11 +26,13 @@ namespace Stealth.Level
         public int Index { get; private set; } = -1;
         public TerminalKind Kind { get; private set; }
         public int Charges => Kind == TerminalKind.Hacking ? ChargesLeft(Index) : 0;
-        public bool Spent => Kind == TerminalKind.Hacking && Charges <= 0;
+        /// <summary>Nothing left to do: a hacking terminal out of charges, a door terminal whose door is open.</summary>
+        public bool Spent => Kind == TerminalKind.Hacking ? Charges <= 0 : Kind == TerminalKind.Doors && (AutoDoor.StorageDoor?.TerminalOpen ?? true);
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), SpentColor = new(0.25f, 0.27f, 0.3f);
+        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
+            SpentColor = new(0.25f, 0.27f, 0.3f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -54,7 +56,7 @@ namespace Stealth.Level
             if (state == m_Shown || Screens == null) return;
             m_Shown = state;
             m_Block ??= new MaterialPropertyBlock();
-            var c = Spent ? SpentColor : Kind == TerminalKind.Cameras ? CamerasColor : HackingColor;
+            var c = Spent ? SpentColor : Kind switch { TerminalKind.Cameras => CamerasColor, TerminalKind.Doors => DoorsColor, _ => HackingColor };
             Screens.GetPropertyBlock(m_Block);
             m_Block.SetColor(BaseColorId, c);
             m_Block.SetColor(EmissionId, c * (Spent ? 0.3f : 1.6f));

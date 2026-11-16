@@ -94,6 +94,18 @@ namespace Stealth.Enemies
         public float AttackRange = 1.7f;
         public float AttackCooldown = 1.7f;
 
+        [Header("Moving loot (workers)")]
+        [Tooltip("On patrol it picks up loot lying on the floor nearby and puts what it carries down somewhere else.")]
+        public bool MovesLoot;
+        [Tooltip("How far it notices loot lying on the floor, metres (in a straight line over the navmesh).")]
+        public float LootSeekRadius = 6f;
+        [Tooltip("Chance to put down what it carries at a patrol stop.")]
+        [Range(0f, 1f)] public float PutDownChance = 0.3f;
+        [Tooltip("Seconds after a pickup or put-down before the next one.")]
+        public float LootErrandCooldown = 12f;
+        [Tooltip("How long lifting or lowering takes, seconds (the animation and the stop).")]
+        public float LootHandleTime = 1.8f;
+
         [Header("Attention")]
         [Tooltip("Above this suspicion a patrolling robot stops and stares.")]
         public float SuspiciousAt = 0.25f;

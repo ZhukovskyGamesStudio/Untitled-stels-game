@@ -80,6 +80,44 @@ namespace Stealth.Enemies
         /// <summary>Seismic stomp (every peer, from the network pulse): the body dips, the floor probes punch.</summary>
         public void Stomp() => m_Stomp = 1f;
 
+        [Tooltip("Worker: the pivot of the lift's arms, at their hinge on the body (CargoMotion).")]
+        public Transform LiftArm;
+        [Tooltip("Worker: the pivot of the lift's tray, at the arms' end pin; carried loot is its child.")]
+        public Transform LiftTray;
+
+        // one down-and-up swing of the worker's lift (CargoMotion), from the network pulse
+        float m_SwingT = -1f, m_SwingTime = 1f, m_Bow, m_Dip;
+        SwingKind m_Swing;
+
+        /// <summary>Every peer: the lift swings down and back up in <paramref name="seconds"/> (picking up, setting down, shelving).</summary>
+        public void HandleCargo(SwingKind kind, float seconds)
+        {
+            if (LiftArm == null || LiftTray == null) return;
+            m_Swing = kind;
+            m_SwingTime = Mathf.Max(seconds, 0.1f);
+            m_SwingT = 0f;
+        }
+
+        void AnimateLift(float dt)
+        {
+            m_Bow = m_Dip = 0f;
+            if (LiftArm == null || LiftTray == null || m_SwingT < 0f) return;
+            float before = m_SwingT;
+            m_SwingT = Mathf.Min(m_SwingT + dt / m_SwingTime, 1f);
+            var pose = CargoMotion.At(m_SwingT, m_Swing);
+            LiftArm.localRotation = Quaternion.Euler(pose.Arm, 0f, 0f);
+            LiftTray.localPosition = pose.Tray; // the tray stays level
+            // the loot stays put on the floor while the tray slides under it / out from under it
+            var cargo = m_Robot != null && m_Robot.CargoMesh != null ? m_Robot.CargoMesh.transform : null;
+            if (cargo != null && cargo.parent == LiftTray)
+                cargo.localPosition = new Vector3(0f, CargoMotion.OnTray, m_SwingT >= 1f ? 0f : CargoMotion.CargoAhead(m_SwingT, m_Swing));
+            m_Bow = pose.Bow;
+            m_Dip = pose.Dip;
+            if (CargoMotion.Touched(before, m_SwingT))
+                Audio.Sfx.At(m_Swing == SwingKind.Pickup ? Audio.Sfx.Bank?.Pickup : Audio.Sfx.Bank?.Drop, LiftTray.position, 0.8f, Audio.Sfx.Group.Robots);
+            if (m_SwingT >= 1f) m_SwingT = -1f;
+        }
+
         void Awake()
         {
             m_Detector = GetComponent<Detector>();
@@ -145,6 +183,7 @@ namespace Stealth.Enemies
                 leg.localRotation = Quaternion.Euler(Mathf.Sin(m_Phase + phase) * swing, 0f, 0f);
 
             AnimateSensors(dt, hacked, state);
+            AnimateLift(dt);
             // Devices (turret, spider, vacuum…) move their bodies themselves; only mobile robots get the body motion.
             if (Model == null || m_Robot == null) return;
 
@@ -162,12 +201,12 @@ namespace Stealth.Enemies
             // Ground robots: lean into speed and turns, startle back when they spot someone, sag when hacked,
             // breathe a little when standing, dip on a seismic stomp.
             bool chasing = state == RobotState.Chase;
-            float pitch = Mathf.Clamp(local.z, -3f, 6f) * (chasing ? 1.6f : 0.9f) - m_Recoil * 10f + m_Slump * 14f;
+            float pitch = Mathf.Clamp(local.z, -3f, 6f) * (chasing ? 1.6f : 0.9f) - m_Recoil * 10f + m_Slump * 14f + m_Bow * CargoMotion.BowAngle;
             float roll = Mathf.Clamp(-m_TurnRate * 0.03f, -7f, 7f) * Mathf.Clamp01(m_Speed);
             Model.localRotation = m_ModelRest * Quaternion.Euler(pitch, 0f, roll);
             float bob = Bob > 0f ? Mathf.Abs(Mathf.Sin(m_Phase)) * Bob * Mathf.Clamp01(m_Speed / 2f) : 0f;
             float breathe = Mathf.Sin(t * 1.6f) * 0.012f * (1f - Mathf.Clamp01(m_Speed)) * power;
-            Model.localPosition = m_ModelBase + Vector3.up * (bob + breathe + m_Recoil * 0.06f - m_Stomp * 0.14f - m_Slump * 0.08f);
+            Model.localPosition = m_ModelBase + Vector3.up * (bob + breathe + m_Recoil * 0.06f - m_Stomp * 0.14f - m_Slump * 0.08f - m_Dip);
         }
 
         /// <summary>

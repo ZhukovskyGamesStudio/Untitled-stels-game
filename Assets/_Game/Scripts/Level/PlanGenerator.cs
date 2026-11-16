@@ -13,7 +13,7 @@ namespace Stealth.Level
     /// from the lobby / the stairs (every room reachable), extra doors for loops, open passages, vents and slots.
     /// Every step draws from its own stream (<see cref="LevelRandom.Mix"/>), so tuning one does not reshuffle the rest.
     /// </summary>
-    public static class PlanGenerator
+    public static partial class PlanGenerator
     {
         /// <summary>Raster cells per metre.</summary>
         const int M = 2;
@@ -44,19 +44,79 @@ namespace Stealth.Level
             public readonly List<(int floor, RectInt hall, Vector2Int corner)> Halls = new(); // stair from floor to floor + 1
             public readonly Dictionary<(int, int, int), bool> Galleries = new();
             public readonly List<int> StairRooms = new();  // per hall: room on the lower floor, then on the upper
+            public LinkedMass Linked;                       // a house of blocks joined by corridors (null: one mass)
+            public RoomProgram Program;                     // the rooms the house is to have (decided first)
+            public readonly List<RectInt> LinkBlocks = new();    // cells
+            public readonly List<RectInt> LinkCorridors = new(); // cells
             public System.Random Rng(int channel, int k = 0) => new(LevelRandom.Mix(Seed, channel, k));
+            /// <summary>The floor being zoned: which sides of a rectangle (W, E, S, N) lie on a corridor, hall or lobby.</summary>
+            public System.Func<RectInt, bool[]> Front;
         }
 
-        public static Output Generate(int seed, int house, int floors, float area, BuildingSettings b)
+        /// <summary>A house of about <paramref name="area"/> m² of rooms per floor (its program drawn here: no storage room).</summary>
+        public static Output Generate(int seed, int house, int floors, float area, BuildingSettings b) =>
+            Generate(seed, house, floors, RoomProgram.Make(seed, floors, area * RoomShareOfArea, b, false), b);
+
+        /// <summary>Of a floor's area, the share that is rooms (the rest: corridors, the lobby, the stair halls).</summary>
+        public const float RoomShareOfArea = 0.75f;
+
+        /// <summary>
+        /// The plan of a house that has the rooms of <paramref name="program"/>: the building is sized for them, every room
+        /// gets a place of at least its type's smallest size and keeps its type.
+        /// </summary>
+        public static Output Generate(int seed, int house, int floors, RoomProgram program, BuildingSettings b)
         {
-            var c = new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b };
+            var c = new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b, Program = program };
+            foreach (var list in program.Floors) for (int i = 0; i < list.Count; i++) { var r = list[i]; r.Block = -1; list[i] = r; }
+            return Build(c, FootprintArea(program, b));
+        }
+
+        /// <summary>
+        /// The classic way (the menu's switch, <see cref="LevelGenerator.Classic"/>): no room program — the mass of about
+        /// <paramref name="area"/> m² a floor is cut into rooms of every size (BSP, <see cref="Split"/>), then each room's
+        /// type is guessed from its size and proportions by the weights (<see cref="AssignTypes"/>, <see cref="Fit"/>).
+        /// </summary>
+        public static Output GenerateClassic(int seed, int house, int floors, float area, BuildingSettings b) =>
+            Build(new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b }, area);
+
+        static Output Build(Ctx c, float area)
+        {
+            var b = c.B;
+            int house = c.House;
+            var program = c.Program;
             var o = new Output();
-            var wings = Mass(c.Rng(0xA55), area, house, b, out o.Mass);
+            // first of all: does this house have corridors between its rooms? Then the links and corridor lengths come
+            // first and the blocks are placed to fit them (PlanGenerator.Linked), one block per room; otherwise one mass
+            // cut into the rooms
+            List<RectInt> wings = null;
+            var linkRng = c.Rng(0x11CC);
+            if (b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
+            {
+                if (program != null)
+                {
+                    var (sizes, storage) = LinkedSizes(linkRng, c);
+                    c.Linked = Linked(linkRng, sizes, storage, c.Floors, b);
+                }
+                else c.Linked = Linked(linkRng, LinkedBlocks(linkRng, area, c.Floors, b), c.Floors, b);
+                if (c.Linked == null && program != null) foreach (var list in program.Floors) for (int i = 0; i < list.Count; i++) { var r = list[i]; r.Block = -1; list[i] = r; }
+                if (c.Linked != null)
+                {
+                    wings = new List<RectInt>(c.Linked.Blocks);
+                    wings.AddRange(c.Linked.Corridors);
+                    o.Mass = "linked";
+                }
+            }
+            wings ??= Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
             foreach (var w in wings) { maxX = Mathf.Max(maxX, w.xMax); maxZ = Mathf.Max(maxZ, w.yMax); }
             c.Plan = new HousePlan(c.Floors, maxX * M, maxZ * M);
             c.Footprint = new bool[maxX * M, maxZ * M];
+            if (c.Linked != null)
+            {
+                foreach (var r in c.Linked.Blocks) c.LinkBlocks.Add(new RectInt(r.x * M, r.y * M, r.width * M, r.height * M));
+                foreach (var r in c.Linked.Corridors) c.LinkCorridors.Add(new RectInt(r.x * M, r.y * M, r.width * M, r.height * M));
+            }
             foreach (var w in wings)
             {
                 var cw = new RectInt(w.x * M, w.y * M, w.width * M, w.height * M);
@@ -228,6 +288,7 @@ namespace Stealth.Level
         /// <summary>The lobby: a room at the facade on the ground floor, the hatch in its middle.</summary>
         static void ReserveLobby(Ctx c)
         {
+            if (c.Linked != null) { c.Lobby = c.LinkBlocks[0]; return; } // a linked house: the first block is the lobby
             var rng = c.Rng(0x10B);
             for (int attempt = 0; attempt < 200; attempt++)
             {
@@ -255,9 +316,30 @@ namespace Stealth.Level
         static void ReserveHalls(Ctx c)
         {
             var rng = c.Rng(0x57A);
+            if (c.Linked != null)
+            {
+                // a linked house: the stair halls are blocks of their own, the stair in a corner on the yard
+                for (int f = 0; f < c.Floors - 1 && f < c.Linked.Halls.Count; f++)
+                {
+                    var r = c.LinkBlocks[c.Linked.Halls[f]];
+                    // the corner farthest from what joins the hall (a corridor or a block): the stair must not stand in the way in
+                    var corner = new Vector2Int(1, 1);
+                    int best = int.MaxValue;
+                    foreach (var cand in new[] { new Vector2Int(-1, -1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(1, 1) })
+                    {
+                        int joined = JoinedNear(c, r, cand, StairHole + M);
+                        if (joined < best || (joined == best && rng.Next(2) == 0)) { best = joined; corner = cand; }
+                    }
+                    c.Halls.Add((f, r, corner));
+                }
+                return;
+            }
+            // the stairs make a core, as in a real building: each next stair hall as close to the one below as the halls allow,
+            // the first one near the lobby (a few valid places drawn, the nearest taken)
             for (int f = 0; f < c.Floors - 1; f++)
             {
-                for (int attempt = 0; attempt < 400; attempt++)
+                var found = new List<(RectInt hall, Vector2Int corner)>();
+                for (int attempt = 0; attempt < 400 && found.Count < CoreCandidates; attempt++)
                 {
                     int w = (6 + rng.Next(3)) * M, d = (6 + rng.Next(3)) * M;
                     var wing = c.Wings[rng.Next(c.Wings.Count)];
@@ -265,10 +347,7 @@ namespace Stealth.Level
                     var r = new RectInt(wing.xMin + rng.Next(wing.width - w + 1) / M * M, wing.yMin + rng.Next(wing.height - d + 1) / M * M, w, d);
                     if (!Inside(c, r)) continue;
                     if (f == 0 && Grow(c.Lobby, 2 * M).Overlaps(r)) continue;
-                    bool clash = false;
-                    foreach (var h in c.Halls)
-                        if (Mathf.Abs(h.floor - f) <= 1 && Grow(h.hall, M).Overlaps(r)) clash = true;
-                    if (clash) continue;
+                    if (HallClash(c, f, r)) continue;
                     r = Snug(c, r);
                     // the stair goes into the corner whose walls face the outside (or are the fewest doors lost)
                     var corner = new Vector2Int(rng.Next(2) == 0 ? -1 : 1, rng.Next(2) == 0 ? -1 : 1);
@@ -278,17 +357,60 @@ namespace Stealth.Level
                         int outside = (SideOutside(c, r, cand.x, 0) ? 1 : 0) + (SideOutside(c, r, 0, cand.y) ? 1 : 0);
                         if (outside > bestOut || (outside == bestOut && rng.Next(2) == 0)) { bestOut = outside; corner = cand; }
                     }
-                    clash = f == 0 && Grow(c.Lobby, 2 * M).Overlaps(r);
-                    foreach (var h in c.Halls)
-                        if (Mathf.Abs(h.floor - f) <= 1 && Grow(h.hall, M).Overlaps(r)) clash = true;
-                    if (clash) continue;
-                    c.Halls.Add((f, r, corner));
-                    break;
+                    if ((f == 0 && Grow(c.Lobby, 2 * M).Overlaps(r)) || HallClash(c, f, r)) continue;
+                    found.Add((r, corner));
                 }
+                if (found.Count == 0) continue;
+                var anchor = f == 0 ? c.Lobby.center : c.Halls.Count > 0 ? c.Halls[c.Halls.Count - 1].hall.center : c.Lobby.center;
+                int pick = 0;
+                float best = float.MaxValue;
+                for (int i = 0; i < found.Count; i++)
+                {
+                    float d = (found[i].hall.center - anchor).magnitude + (float)rng.NextDouble() * 2f * M; // a little play
+                    if (d < best) { best = d; pick = i; }
+                }
+                c.Halls.Add((f, found[pick].hall, found[pick].corner));
             }
         }
 
+        /// <summary>
+        /// A stair hall here would clash with the halls of the floors next to it: overlap one, or leave a strip narrower than a
+        /// room between them (it could only become a sliver of a room). Touching is fine: the stairs make one core.
+        /// </summary>
+        static bool HallClash(Ctx c, int f, RectInt r)
+        {
+            foreach (var h in c.Halls)
+            {
+                if (Mathf.Abs(h.floor - f) > 1) continue;
+                if (h.hall.Overlaps(r)) return true;
+                int gapX = Mathf.Max(r.xMin - h.hall.xMax, h.hall.xMin - r.xMax), gapZ = Mathf.Max(r.yMin - h.hall.yMax, h.hall.yMin - r.yMax);
+                bool sideBySide = (gapX >= 0 && gapZ < 0) || (gapZ >= 0 && gapX < 0);
+                int gap = Mathf.Max(gapX, gapZ);
+                if (gap > 0 && gap < (sideBySide ? RoomSide : 2 * M)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Valid places drawn for a stair hall before the one nearest the core is taken.</summary>
+        const int CoreCandidates = 12;
+
         static RectInt Grow(RectInt r, int k) => new(r.x - k, r.y - k, r.width + 2 * k, r.height + 2 * k);
+
+        /// <summary>Building cells just outside a rectangle along the two sides of one corner, within <paramref name="reach"/> of it.</summary>
+        static int JoinedNear(Ctx c, RectInt r, Vector2Int corner, int reach)
+        {
+            int n = 0;
+            bool In(int x, int z) => x >= 0 && z >= 0 && x < c.Plan.NX && z < c.Plan.NZ && c.Footprint[x, z];
+            int sx = corner.x > 0 ? r.xMax : r.xMin - 1, sz = corner.y > 0 ? r.yMax : r.yMin - 1;
+            for (int k = 0; k < reach; k++)
+            {
+                int z = corner.y > 0 ? r.yMax - 1 - k : r.yMin + k;
+                int x = corner.x > 0 ? r.xMax - 1 - k : r.xMin + k;
+                if (z >= r.yMin && z < r.yMax && In(sx, z)) n++;
+                if (x >= r.xMin && x < r.xMax && In(x, sz)) n++;
+            }
+            return n;
+        }
 
         /// <summary>The side of a rectangle (dx or dz = ±1) lies on the facade along most of its length.</summary>
         static bool SideOutside(Ctx c, RectInt r, int dx, int dz)
@@ -355,6 +477,8 @@ namespace Stealth.Level
             public RoomType Type;
             public RoomShape Shape;
             public bool Fixed;           // lobby, stair hall: never merged or shaped away
+            public bool Typed;           // a room of the program: its type is decided (AssignTypes leaves it)
+            public bool Required;        // the program must have it
             public int Hall = -1;        // index of the stair hall on this floor
             public readonly List<Vector2Int> Cells = new();
             public readonly List<RectInt> Rects = new();
@@ -395,27 +519,41 @@ namespace Stealth.Level
                 if (h.floor == f || h.floor + 1 == f) Claim(h.hall, new Region { Type = RoomType.Hall, Shape = RoomShape.Hall, Fixed = true, Hall = i });
             }
 
+            if (c.Linked != null)
+            {
+                ZoneLinked(c, f, regions, owner, Claim);
+                return;
+            }
+
             // Corridor spines along the wings (some floors / wings are open plan).
             var corridorRng = c.Rng(0xC0D, f);
             var spine = new bool[nx, nz];
             foreach (var wing in c.Wings)
             {
                 int across = Mathf.Min(wing.width, wing.height), along = Mathf.Max(wing.width, wing.height);
-                if (across < 13 * M || along < 10 * M || corridorRng.NextDouble() > c.B.CorridorChance) continue;
+                if (across < SingleLoaded * M || along < 10 * M || corridorRng.NextDouble() > c.B.CorridorChance) continue;
                 int cw = (corridorRng.NextDouble() < 0.5 ? 5 : 6);          // 2.5 or 3 m
                 bool alongX = wing.width >= wing.height;
-                // Double-loaded (rooms on both sides) or single-loaded along one facade.
-                int lo = 9, hi = across - 9 - cw;
-                int off = (hi > lo ? lo + corridorRng.Next(hi - lo + 1) : (across - cw) / 2) / M * M;
-                if (across >= 22 * M && corridorRng.NextDouble() < 0.35)
+                if (across < DoubleLoaded * M)
                 {
-                    // two parallel corridors with a middle band of rooms
-                    int band = across / 3 / M * M;
-                    MarkSpine(spine, wing, alongX, band - cw / 2, cw);
-                    MarkSpine(spine, wing, alongX, across - band - cw / 2, cw);
+                    // a narrow wing: one row of rooms with the corridor along its inner side (the rooms keep the windows);
+                    // both sides on the facade: either
+                    bool lowOut = alongX ? SideOutside(c, wing, 0, -1) : SideOutside(c, wing, -1, 0);
+                    bool highOut = alongX ? SideOutside(c, wing, 0, 1) : SideOutside(c, wing, 1, 0);
+                    bool atLow = lowOut != highOut ? !lowOut : corridorRng.Next(2) == 0;
+                    MarkSpine(spine, wing, alongX, atLow ? 0 : across - cw, cw);
                     continue;
                 }
-                MarkSpine(spine, wing, alongX, off, cw);
+                // Double-loaded: as in a real office, no room deeper than about 8 m from its corridor — a deep wing gets
+                // several corridors, evenly spaced (a band of rooms between two of them opens onto either)
+                int count = Mathf.Clamp(Mathf.CeilToInt(across / (float)(ModuleDepth * M)), 1, Mathf.Max(1, across / (2 * MinRoomDepth * M + cw)));
+                float module = across / (float)count;
+                for (int k = 0; k < count; k++)
+                {
+                    float jitter = ((float)corridorRng.NextDouble() - 0.5f) * M; // up to half a metre either way
+                    int off = Mathf.Clamp(Mathf.RoundToInt(module * (k + 0.5f) - cw / 2f + jitter) / M * M, MinRoomDepth * M, across - cw - MinRoomDepth * M);
+                    MarkSpine(spine, wing, alongX, off, cw);
+                }
             }
             // Cross corridors: a passage across a wing, between the rooms on its two sides (the rooms test: a corridor
             // joins two rooms instead of a spine lined with many).
@@ -439,6 +577,9 @@ namespace Stealth.Level
                 if (spots.Count == 0) continue;
                 MarkSpine(spine, wing, !alongX, spots[crossRng.Next(spots.Count)], cw);
             }
+            // Which sides of a rectangle face circulation (rooms are then cut to keep their door onto it, Treemap)
+            c.Front = r => FrontOf(r, owner, regions, nx, nz);
+
             // Corridor cells → corridor regions (connected pieces).
             var seen = new bool[nx, nz];
             for (int x = 0; x < nx; x++)
@@ -468,10 +609,8 @@ namespace Stealth.Level
                     regions.Add(reg);
                 }
 
-            // What is left: rectangles, split recursively into rooms.
-            var target = c.Rng(0x5D1, f);
-            foreach (var rect in Rectangles(owner, nx, nz))
-                Split(rect, target, c.House, c.B, r => Claim(r, new Region { Shape = RoomShape.Rect }));
+            // What is left: rectangles, cut into the program's rooms of this floor (the classic way: into rooms of any size).
+            Cut(c, f, Rectangles(owner, nx, nz), Claim, c.Rng(0x5D1, f));
 
             Cleanup(regions, owner, nx, nz);
             Merge(regions, owner, nx, nz, c.Rng(0x3E6, f));
@@ -490,6 +629,125 @@ namespace Stealth.Level
         }
 
         static readonly Vector2Int[] Dirs4 = { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
+
+        /// <summary>
+        /// One floor of a linked house: every corridor is a corridor, every block a room (whole when it is inside the room
+        /// area limits — the rooms test — otherwise cut into rooms like any wing); no spines, no merging across blocks.
+        /// </summary>
+        static void ZoneLinked(Ctx c, int f, List<Region> regions, int[,] owner, System.Func<RectInt, Region, int> claim)
+        {
+            int nx = c.Plan.NX, nz = c.Plan.NZ;
+            foreach (var r in c.LinkCorridors) claim(r, new Region { Type = RoomType.Corridor, Shape = RoomShape.Corridor });
+            c.Front = r => FrontOf(r, owner, regions, nx, nz);
+            // the ground floor: every block holds the rooms it was sized for. The floors above are cut the same way (the same
+            // walls, so the same ways between blocks), their rooms of that floor's program put into the ground floor's places
+            if (c.Program != null)
+            {
+                var pool = f == 0 ? null : new List<ProgramRoom>(c.Program.Floors[Mathf.Min(f, c.Program.Floors.Length - 1)]);
+                pool?.Sort((a, b) => a.Required != b.Required ? (a.Required ? -1 : 1) : b.Area.CompareTo(a.Area));
+                var rng = c.Rng(0x5D2, f);
+                for (int k = 0; k < c.LinkBlocks.Count; k++)
+                {
+                    var rooms = c.Program.Floors[0].FindAll(r => r.Block == k);
+                    if (rooms.Count == 0)
+                    {
+                        // the lobby's block (or a stair hall's on a floor it does not reach) above the ground: one room, as
+                        // it is one room below
+                        var blk = c.LinkBlocks[k];
+                        if (f == 0 || owner[blk.x + blk.width / 2, blk.y + blk.height / 2] != -1) continue;
+                        rooms.Add(new ProgramRoom { Type = RoomType.Office, Area = blk.width * blk.height / (float)(M * M), Block = k });
+                    }
+                    rooms.Sort((a, b) => b.Area.CompareTo(a.Area));
+                    if (pool != null)
+                        for (int i = 0; i < rooms.Count; i++)
+                        {
+                            var slot = rooms[i];
+                            slot.Type = TakeFitting(pool, slot.Area, c.B, rng, out slot.Required);
+                            rooms[i] = slot;
+                        }
+                    Treemap(c.LinkBlocks[k], rooms, claim, Joins(c, c.LinkBlocks[k]), c.Front?.Invoke(c.LinkBlocks[k]));
+                }
+            }
+            // the floors above (and anything the ground floor left): the blocks hold that floor's rooms
+            var rects = new List<RectInt>();
+            foreach (var block in c.LinkBlocks)
+            {
+                // what the lobby / a stair hall / a room left of the block
+                var mask = new int[nx, nz];
+                for (int x = 0; x < nx; x++)
+                    for (int z = 0; z < nz; z++) mask[x, z] = block.Contains(new Vector2Int(x, z)) && owner[x, z] == -1 ? -1 : -2;
+                rects.AddRange(Rectangles(mask, nx, nz));
+            }
+            Cut(c, f, rects, claim, c.Rng(0x5D1, f));
+            Cleanup(regions, owner, nx, nz);
+            for (int settle = 0; settle < 2; settle++)
+            {
+                Slim(regions, owner, nx, nz);
+                SplitDisconnected(regions, owner, nx, nz);
+                Cleanup(regions, owner, nx, nz);
+            }
+            AssignTypes(c, f, regions);
+            Atriums(c, f, regions, owner);
+            Commit(c, f, regions, owner);
+        }
+
+        /// <summary>
+        /// A place of this size on a floor above: the first room of the floor's program it holds (required ones first, then
+        /// the biggest), taken out of the pool; none fits: a type drawn by the weights that does, else an office.
+        /// </summary>
+        static RoomType TakeFitting(List<ProgramRoom> pool, float area, BuildingSettings b, System.Random rng, out bool required)
+        {
+            required = false;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (RoomRules.MinArea(pool[i].Type, b.RoomTypeRules) > area) continue;
+                var t = pool[i].Type;
+                required = pool[i].Required;
+                pool.RemoveAt(i);
+                return t;
+            }
+            for (int tries = 0; tries < 8; tries++)
+            {
+                var t = RoomProgram.Pick(rng, b);
+                if (RoomRules.MinArea(t, b.RoomTypeRules) <= area) return t;
+            }
+            return RoomType.Office;
+        }
+
+        /// <summary>
+        /// Free rectangles into rooms: the program's rooms of the floor (<see cref="Fill"/>), or the classic way — split
+        /// until room-sized, the types guessed afterwards (<see cref="Split"/>, <see cref="AssignTypes"/>).
+        /// </summary>
+        static void Cut(Ctx c, int f, List<RectInt> rects, System.Func<RectInt, Region, int> claim, System.Random rng)
+        {
+            if (c.Program != null) { Fill(c, f, rects, claim, rng); return; }
+            foreach (var rect in rects) Split(rect, rng, c.House, c.B, r => claim(r, new Region { Shape = RoomShape.Rect }));
+        }
+
+        /// <summary>Width of a wing per corridor (metres): rooms on both sides about 8 m deep.</summary>
+        const int ModuleDepth = 19;
+        /// <summary>Rooms between a corridor and the facade or the next corridor at least this deep (metres).</summary>
+        const int MinRoomDepth = 4;
+
+        /// <summary>A wing at least this wide (metres) gets a corridor with rooms on both sides; narrower, one row of rooms.</summary>
+        const int DoubleLoaded = 11;
+        /// <summary>A wing narrower than this (metres) has no corridor: its rooms open onto each other.</summary>
+        const int SingleLoaded = 8;
+
+        /// <summary>Sides (W, E, S, N) of a rectangle along which at least 2 m touch a corridor, a stair hall or the lobby.</summary>
+        static bool[] FrontOf(RectInt r, int[,] owner, List<Region> regions, int nx, int nz)
+        {
+            bool Circ(int x, int z)
+            {
+                if (x < 0 || z < 0 || x >= nx || z >= nz) return false;
+                int o = owner[x, z];
+                return o >= 0 && o < regions.Count && regions[o].Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby;
+            }
+            int w = 0, e = 0, s = 0, n = 0;
+            for (int z = r.yMin; z < r.yMax; z++) { if (Circ(r.xMin - 1, z)) w++; if (Circ(r.xMax, z)) e++; }
+            for (int x = r.xMin; x < r.xMax; x++) { if (Circ(x, r.yMin - 1)) s++; if (Circ(x, r.yMax)) n++; }
+            return new[] { w >= 2 * M, e >= 2 * M, s >= 2 * M, n >= 2 * M };
+        }
 
         static void MarkSpine(bool[,] spine, RectInt wing, bool alongX, int off, int width)
         {
@@ -723,6 +981,7 @@ namespace Stealth.Level
                 var rb = regions[b];
                 if (ra.Cells.Count == 0 || rb.Cells.Count == 0 || ra.Fixed || rb.Fixed) continue;
                 if (ra.Type == RoomType.Corridor || rb.Type == RoomType.Corridor) continue;
+                if (rb.Typed) continue; // a room of the program is never swallowed (a scrap may join one)
                 float area = (ra.Cells.Count + rb.Cells.Count) / (float)(M * M);
                 if (area > 130f || borders[(a, b)] < 3 * M || rng.NextDouble() > 0.28) continue;
                 Absorb(regions, owner, b, a);
@@ -743,13 +1002,20 @@ namespace Stealth.Level
             foreach (var r in regions)
             {
                 if (r.Cells.Count == 0 || r.Fixed || r.Type == RoomType.Corridor) continue;
+                if (r.Typed) { r.Shape = r.Cells.Count == BoundsOf(r.Cells).width * BoundsOf(r.Cells).height ? RoomShape.Rect : r.Rects.Count >= 3 ? RoomShape.U : RoomShape.L; continue; }
                 var b = BoundsOf(r.Cells);
                 float area = r.Cells.Count / (float)(M * M);
                 float aspect = Mathf.Max(b.width, b.height) / (float)Mathf.Max(1, Mathf.Min(b.width, b.height));
                 int total = 0;
                 var weights = new List<(RoomType, int)>();
-                foreach (var w in c.B.RoomWeights)
+                float outside = -1f;
+                foreach (var w0 in c.B.RoomWeights)
                 {
+                    // the locked storage room is chosen on its own (StorageRooms): the back rooms its weight stood for are offices
+                    var w = w0.Room == RoomType.Storage ? new RoomWeight(RoomType.Office, w0.Weight) : w0;
+                    var rule = RoomRules.For(w.Room, c.B.RoomTypeRules);
+                    if (rule.OutsideWall > 0f && outside < 0f) outside = OutsideWall(c, r);
+                    if (!RoomRules.Fits(rule, area, aspect, Mathf.Max(0f, outside), r.Cells.Count == b.width * b.height)) continue;
                     float fit = Fit(w.Room, area, aspect);
                     int k = w.Weight > 0 && fit > 0f ? Mathf.Max(1, Mathf.RoundToInt(w.Weight * fit * 10f)) : 0;
                     if (k > 0) { weights.Add((w.Room, k)); total += k; }
@@ -764,6 +1030,21 @@ namespace Stealth.Level
                 bool rect = r.Cells.Count == b.width * b.height;
                 r.Shape = rect ? RoomShape.Rect : r.Rects.Count >= 3 ? RoomShape.U : RoomShape.L;
             }
+        }
+
+        /// <summary>How much outside wall a region has, metres (cell edges on the building's outline: where its windows go).</summary>
+        static float OutsideWall(Ctx c, Region r)
+        {
+            var own = new HashSet<Vector2Int>(r.Cells);
+            int edges = 0;
+            foreach (var p in r.Cells)
+                foreach (var d in new[] { Vector2Int.left, Vector2Int.right, Vector2Int.up, Vector2Int.down })
+                {
+                    var q = p + d;
+                    if (own.Contains(q)) continue;
+                    if (q.x < 0 || q.y < 0 || q.x >= c.Plan.NX || q.y >= c.Plan.NZ || !c.Footprint[q.x, q.y]) edges++;
+                }
+            return edges * HousePlan.Res;
         }
 
         static float Fit(RoomType t, float area, float aspect) => t switch
@@ -796,6 +1077,7 @@ namespace Stealth.Level
         static void Atriums(Ctx c, int f, List<Region> regions, int[,] owner)
         {
             if (f >= c.Floors - 1) return;
+            if (c.Linked != null) return; // a linked house: every block may be the way between others upstairs — none becomes a hole
             var rng = c.Rng(0xA7E, f);
             var plan = c.Plan;
             int made = 0;
@@ -806,7 +1088,7 @@ namespace Stealth.Level
             {
                 var r = regions[i];
                 float area = r.Cells.Count / (float)(M * M);
-                bool kind = r.Type is RoomType.Lobby or RoomType.OpenSpace or RoomType.Lounge or RoomType.Storage or RoomType.Meeting
+                bool kind = r.Type is RoomType.Lobby or RoomType.OpenSpace or RoomType.Lounge or RoomType.Meeting
                     or RoomType.Library or RoomType.GameRoom or RoomType.Gym;
                 if (!kind || r.Hall >= 0 || area < 45f || area > 260f || made >= 1 + c.House / 3) continue;
                 if (rng.NextDouble() > c.B.AtriumChance) continue;
@@ -924,6 +1206,8 @@ namespace Stealth.Level
         static void Shape(Ctx c, PlanRoom room, Region reg, System.Random rng)
         {
             if (reg.Type == RoomType.Corridor) return;
+            // a cut corner or a rotunda takes up to a fifth of the floor: never below the type's smallest size
+            if (reg.Cells.Count / (float)(M * M) * 0.78f < RoomRules.MinArea(reg.Type, c.B.RoomTypeRules)) return;
             var b = BoundsOf(reg.Cells);
             bool rect = reg.Cells.Count == b.width * b.height;
             float minSide = Mathf.Min(b.width, b.height) / (float)M;
@@ -1204,13 +1488,25 @@ namespace Stealth.Level
                 foreach (var kv in pairs)
                 {
                     var (a, bb) = kv.Key;
-                    bool corridor = plan.Rooms[a].Type == RoomType.Corridor || plan.Rooms[bb].Type == RoomType.Corridor;
-                    order.Add((kv.Key, (corridor ? 3f : 1f) * (float)(0.2 + rng.NextDouble())));
+                    // circulation first (a room that touches a corridor, a hall or the lobby opens onto it, like an office
+                    // off a corridor), rooms through rooms only where there is no other way; the storage room last: everything
+                    // else joins without it, then it gets its one door (a dead end)
+                    bool circulation = IsCirculation(plan, a) || IsCirculation(plan, bb);
+                    float w = IsStorage(plan, kv.Key) ? -1f : (circulation ? 10f : 0f) + (float)rng.NextDouble();
+                    order.Add((kv.Key, w));
                 }
                 order.Sort((p, q) => q.weight.CompareTo(p.weight));
+                var storageDoor = new HashSet<int>();
                 foreach (var (key, _) in order)
                 {
                     if (Find(key.Item1) == Find(key.Item2)) continue;
+                    if (IsStorage(plan, key))
+                    {
+                        int s = plan.Rooms[key.Item1].Type == RoomType.Storage ? key.Item1 : key.Item2;
+                        if (storageDoor.Contains(s) || plan.Rooms[key.Item1].Type == plan.Rooms[key.Item2].Type) continue;
+                        if (TryOpen(key, EdgeType.Door)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
+                        continue;
+                    }
                     bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key);
                     if ((open && TryOpen(key, EdgeType.Open)) || TryOpen(key, EdgeType.Door))
                     {
@@ -1221,7 +1517,7 @@ namespace Stealth.Level
                 // groups still apart (only short walls between them): an open passage on any walkable wall between them
                 foreach (var (key, _) in order)
                 {
-                    if (Find(key.Item1) == Find(key.Item2)) continue;
+                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key)) continue;
                     foreach (int wi in pairs[key])
                     {
                         var w = plan.Walls[wi];
@@ -1234,15 +1530,37 @@ namespace Stealth.Level
                 }
                 foreach (int r in rooms) if (Find(r) == Find(start)) reached.Add(r);
 
-                // loops, vents, slots
+                // loops, vents, slots: a budget a floor, each where it makes the longest way round (the walk between the
+                // two rooms before it, a little shuffled) — planned loops instead of a door in every other wall
                 var slots = c.Rng(0x5A0E, f);
-                foreach (var key in new List<(int, int)>(pairs.Keys))
+                int floorRooms = 0;
+                foreach (int r in rooms) if (!IsCirculation(plan, r)) floorRooms++;
+                var links = new Dictionary<int, List<int>>();
+                foreach (var key in done) { Link(links, key.Item1, key.Item2); }
+                void Place(EdgeType kind, float perRoom, System.Random pick)
                 {
-                    if (done.Contains(key) && HasPassage(plan, pairs[key])) continue;
-                    if (rng.NextDouble() < b.ExtraDoorChance && TryOpen(key, EdgeType.Door)) continue;
-                    if (rng.NextDouble() < b.VentChance && TryOpen(key, EdgeType.Vent)) continue;
-                    if (slots.NextDouble() < b.SqueezeChance) TryOpen(key, EdgeType.Squeeze);
+                    int want = Mathf.RoundToInt(floorRooms * perRoom + (float)pick.NextDouble() * 0.5f);
+                    for (int n = 0; n < want; n++)
+                    {
+                        (int, int) best = default;
+                        float bestScore = 0f;
+                        foreach (var key in pairs.Keys)
+                        {
+                            if (IsStorage(plan, key) || links.TryGetValue(key.Item1, out var l1) && l1.Contains(key.Item2)) continue;
+                            if (kind == EdgeType.Door && IsCirculation(plan, key.Item1) == IsCirculation(plan, key.Item2) && IsCirculation(plan, key.Item1)) continue;
+                            int d = Walk(links, key.Item1, key.Item2);
+                            if (d < (kind == EdgeType.Door ? 3 : 2)) continue; // a door loop round one wall is no loop; a vent may short-cut one
+                            float score = d + (float)pick.NextDouble() * 3f;
+                            if (score > bestScore) { bestScore = score; best = key; }
+                        }
+                        if (bestScore <= 0f) break;
+                        if (TryOpen(best, kind)) Link(links, best.Item1, best.Item2);
+                        else Link(links, best.Item1, best.Item2); // no room for it there: never tried again
+                    }
                 }
+                Place(EdgeType.Door, b.LoopsPerRoom, rng);
+                Place(EdgeType.Vent, b.VentsPerRoom, rng);
+                Place(EdgeType.Squeeze, b.SqueezesPerRoom, slots);
             }
 
             // Exterior doors: two ways out into the gas on the ground floor (not from the lobby).
@@ -1254,7 +1572,7 @@ namespace Stealth.Level
                 var w = plan.Walls[i];
                 if (w.Floor != 0 || !w.Exterior || w.Shaped || w.Length < DoorWidth + 2f * DoorMargin) continue;
                 int room = Mathf.Max(w.RoomA, w.RoomB);
-                if (room < 0 || room == o.Lobby) continue;
+                if (room < 0 || room == o.Lobby || plan.Rooms[room].Type == RoomType.Storage) continue;
                 candidates.Add(i);
             }
             while (doors < 2 && candidates.Count > 0)
@@ -1269,6 +1587,35 @@ namespace Stealth.Level
                 doors++;
             }
         }
+
+        static bool IsCirculation(HousePlan plan, int room) => plan.Rooms[room].Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby;
+
+        static void Link(Dictionary<int, List<int>> links, int a, int b)
+        {
+            if (!links.TryGetValue(a, out var la)) links[a] = la = new List<int>();
+            if (!links.TryGetValue(b, out var lb)) links[b] = lb = new List<int>();
+            la.Add(b);
+            lb.Add(a);
+        }
+
+        /// <summary>Steps from room a to room b over these links (breadth first); not joined: a long way (99).</summary>
+        static int Walk(Dictionary<int, List<int>> links, int a, int b)
+        {
+            var dist = new Dictionary<int, int> { [a] = 0 };
+            var q = new Queue<int>();
+            q.Enqueue(a);
+            while (q.Count > 0)
+            {
+                int r = q.Dequeue();
+                if (r == b) return dist[r];
+                if (!links.TryGetValue(r, out var next)) continue;
+                foreach (int n in next)
+                    if (!dist.ContainsKey(n)) { dist[n] = dist[r] + 1; q.Enqueue(n); }
+            }
+            return 99;
+        }
+
+        static bool IsStorage(HousePlan plan, (int, int) key) => plan.Rooms[key.Item1].Type == RoomType.Storage || plan.Rooms[key.Item2].Type == RoomType.Storage;
 
         static bool IsHall(HousePlan plan, (int, int) key) => plan.Rooms[key.Item1].Type == RoomType.Hall || plan.Rooms[key.Item2].Type == RoomType.Hall;
 

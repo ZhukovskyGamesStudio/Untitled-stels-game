@@ -170,6 +170,8 @@ namespace Stealth.Level
         static readonly Dictionary<Mesh, Mesh> s_MeshOriginal = new();
         static readonly Dictionary<Material, Material>[] s_MatVariants = NewMaps<Material>();
         static readonly Dictionary<Material, Material> s_MatOriginal = new();
+        /// <summary>Wear levels of a material (family version → its levels); a level's material maps back to the original.</summary>
+        static readonly Dictionary<Material, Material[]> s_Wear = new();
         static readonly Dictionary<Mesh, PropReplacement>[] s_Props = NewMaps2();
         /// <summary>Models of the current style itself (its own guard, the players by department), over the family's; key = variant.</summary>
         static readonly Dictionary<int, Dictionary<Mesh, Mesh>> s_StyleMeshes = new();
@@ -246,6 +248,14 @@ namespace Stealth.Level
                         s_MatVariants[(int)set.Family][set.From[i]] = set.To[i];
                         s_MatOriginal[set.To[i]] = set.From[i];
                     }
+            foreach (var w in c.Wear ?? new WearVariants[0])
+            {
+                if (w.From == null || w.To == null || w.To.Length == 0) continue;
+                s_Wear[w.From] = w.To;
+                var back = s_MatOriginal.TryGetValue(w.From, out var o) ? o : w.From;
+                foreach (var m in w.To)
+                    if (m != null) s_MatOriginal[m] = back;
+            }
             foreach (var p in c.Props ?? new PropReplacement[0])
                 if (p.Key != null && p.Prefab != null) s_Props[(int)p.Family][p.Key] = p;
             foreach (var set in c.StyleModels ?? new StyleMeshes[0])
@@ -305,15 +315,28 @@ namespace Stealth.Level
             }
             var mats = r.sharedMaterials;
             bool changed = false;
+            int wear = -1;
             for (int i = 0; i < mats.Length; i++)
             {
                 var m = mats[i];
                 if (m == null) continue;
                 var original = s_MatOriginal.TryGetValue(m, out var o) ? o : m;
                 var target = s_MatVariants[f].TryGetValue(original, out var v) ? v : original;
+                if (s_Wear.TryGetValue(target, out var levels))
+                {
+                    if (wear < 0) wear = WearMath.PartLevel(ObjectRoot(r.transform).position, r.name, levels.Length);
+                    target = levels[Mathf.Min(wear, levels.Length - 1)] ?? target;
+                }
                 if (target != m) { mats[i] = target; changed = true; }
             }
             if (changed) r.sharedMaterials = mats;
+        }
+
+        /// <summary>The object a renderer belongs to: the scene root's child it is under (a prop of the house), or its own root.</summary>
+        static Transform ObjectRoot(Transform t)
+        {
+            while (t.parent != null && t.parent.parent != null) t = t.parent;
+            return t;
         }
 
         /// <summary>

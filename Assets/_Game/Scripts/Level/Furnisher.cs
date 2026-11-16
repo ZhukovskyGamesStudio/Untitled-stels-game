@@ -415,6 +415,8 @@ namespace Stealth.Level
         {
             public readonly List<Piece> Pieces = new();
             public readonly List<Vector3> Items = new();
+            /// <summary>Where workers leave loot (the storage room's shelves).</summary>
+            public readonly List<StorageDrop> Drops = new();
             public void Add(PropKind k, Vector3 p, float yaw, bool solid = true) => Pieces.Add(new Piece { Kind = k, Pos = p, Yaw = yaw, Solid = solid });
             public void Item(Vector3 p) => Items.Add(p);
         }
@@ -477,6 +479,7 @@ namespace Stealth.Level
         bool TryCommit(PlanRoom room, Batch b, float gap = 0.04f, float aisle = 0f, Vector3? front = null)
         {
             int f = room.Floor;
+            if (m_Fridge && b.Pieces.Exists(p => p.Kind == PropKind.Fridge)) return false; // one fridge a kitchen
             var rects = new List<Rect>();
             // windows: a tall piece in front of one fails the group; a thing hung on the wall there is left out of it
             // (the kitchen run stays, its cupboards over the window do not) unless the group is only that
@@ -504,7 +507,7 @@ namespace Stealth.Level
                 if (!p.Solid)
                 {
                     var hung = FootAt(p.Kind, p.Pos, p.Yaw);
-                    if (m_Keep[f].Overlaps(hung) || m_Taken[f].Overlaps(Grow(hung, -0.02f))) return false;
+                    if (m_Keep[f].Overlaps(Grow(hung, 0.06f)) || m_Taken[f].Overlaps(Grow(hung, -0.02f))) return false; // a thin thing: a margin round it
                     continue;
                 }
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
@@ -539,6 +542,12 @@ namespace Stealth.Level
                 if (p.Solid && InTheWay(p.Kind)) m_Solid[f].Add(FootAt(p.Kind, p.Pos, p.Yaw));
             }
             foreach (var i in b.Items) { m_L.ItemSpots.Add(i); m_ItemGroup.Add(group); }
+            if (room.Id == m_L.StorageRoom) m_L.StorageDrops.AddRange(b.Drops);
+            foreach (var p in b.Pieces)
+            {
+                m_Fridge |= p.Kind == PropKind.Fridge;
+                m_Table |= p.Kind is PropKind.RoundTable or PropKind.BarCounter;
+            }
             return true;
         }
 
@@ -799,6 +808,28 @@ namespace Stealth.Level
                 LastRemoved += cut.Count;
                 RemoveGroups(cut);
             }
+        }
+
+        /// <summary>
+        /// After <see cref="EnsureWalkable"/>: a kitchen whose run (with its fridge) had to go, because it stood in the way
+        /// between doors, gets a fridge of its own back — against any wall, with a walkway in front of it. True if one was
+        /// put back (then check the walking again).
+        /// </summary>
+        public bool RestoreFridges()
+        {
+            bool any = false;
+            foreach (var room in m_L.Rooms)
+            {
+                if (room.Type != RoomType.Kitchen) continue;
+                bool has = false;
+                foreach (var p in m_L.Props) has |= p.Kind == PropKind.Fridge && m_P.RoomAt(p.Position + Vector3.up * 0.3f) == room;
+                if (has) continue;
+                m_Fridge = false;
+                int before = m_L.Props.Count;
+                AgainstAnyWall(room, PropKind.Fridge, walkway: true);
+                any |= m_L.Props.Count > before;
+            }
+            return any;
         }
 
         void RemoveGroups(HashSet<int> groups)
@@ -1143,11 +1174,17 @@ namespace Stealth.Level
         /// <summary>Furnishes one room: islands first in big rooms, then the walls, then the corners.</summary>
         /// <summary>A printer stands in this room already: at most one per room (they looked like a row of kiosks).</summary>
         bool m_Printer;
+        /// <summary>A fridge stands in this room already: every kitchen gets one, first thing along its walls.</summary>
+        bool m_Fridge;
+        /// <summary>A table stands in this room already (a kitchen gets one: a small one if the big one did not fit).</summary>
+        bool m_Table;
 
         public void FurnishRoom(PlanRoom room)
         {
             if (room.Area < 4f) return;
             m_Printer = false;
+            m_Fridge = false;
+            m_Table = false;
             m_InRoom.Clear();
             m_Cap = room.Area > 70f ? 2 : 1;
             m_Windows ??= WindowStrips();
@@ -1158,7 +1195,7 @@ namespace Stealth.Level
             {
                 RoomType.OpenSpace => Mathf.RoundToInt(room.Area / 15f),
                 RoomType.Server => Mathf.RoundToInt(room.Area / 11f),
-                RoomType.Storage => Mathf.RoundToInt(room.Area / 12f),
+                RoomType.Storage => room.Area > 24f ? 1 : 0, // a pallet or so: the middle is the pile's floor (the workers stack loot there)
                 RoomType.Meeting => room.Area > 60f ? 3 : room.Area > 30f ? 2 : 1,
                 RoomType.Kitchen => Mathf.Max(1, Mathf.RoundToInt(room.Area / 17f)),
                 RoomType.Lounge => Mathf.Max(1, Mathf.RoundToInt(room.Area / 19f)),
@@ -1180,6 +1217,7 @@ namespace Stealth.Level
             Anchor(room);
             Islands(room, islands);
             if (room.Type == RoomType.Meeting) MeetingTable(room);
+            if (room.Type == RoomType.Kitchen && !m_Table) SmallTable(room);
             Walls(room);
             if (room.Type != RoomType.Corridor) Walls(room); // a second pass fills the gaps the first left
             Corners(room);
@@ -1384,20 +1422,28 @@ namespace Stealth.Level
                 case (RoomType.Kitchen, 0):
                 case (RoomType.Kitchen, 1):
                 {
-                    // the kitchen run (or its shorter half): sink, cooker, worktop with its microwave and the coffee machine, cupboards over it
+                    // the kitchen run (or its shorter half): sink, cooker, worktop with its microwave and the coffee machine, cupboards
+                    // over it, and the fridge at its end (every kitchen has one); the whole run shifted to centre it
                     bool full = option == 0;
-                    float sink = full ? -1.52f : -1.22f, counter = full ? 0.92f : 0.62f;
+                    float shift = full ? -0.36f : -0.355f;
+                    float sink = (full ? -1.52f : -1.22f) + shift, counter = (full ? 0.92f : 0.62f) + shift;
                     b.Add(PropKind.KitchenSink, f.P(sink, BackOf(PropKind.KitchenSink)), f.Face);
-                    if (full) b.Add(PropKind.Stove, f.P(-0.62f, BackOf(PropKind.Stove)), f.Face);
+                    if (full) b.Add(PropKind.Stove, f.P(-0.62f + shift, BackOf(PropKind.Stove)), f.Face);
+                    b.Add(PropKind.Fridge, f.P(counter + 1.22f + 0.37f, BackOf(PropKind.Fridge)), f.Face);
                     b.Add(PropKind.KitchenCounter, f.P(counter, BackOf(PropKind.KitchenCounter)), f.Face);
                     var cx = Quaternion.Euler(0, f.Face, 0) * Vector3.right;
                     b.Add(PropKind.CoffeeMachine, f.P(counter, BackOf(PropKind.KitchenCounter) + 0.05f, 0.93f) + cx * 0.75f, f.Face, solid: false);
                     b.Add(PropKind.WallCabinet, f.P(sink, BackOf(PropKind.WallCabinet)), f.Face, solid: false);
                     if (full) b.Add(PropKind.WallCabinet, f.P(counter, BackOf(PropKind.WallCabinet)), f.Face, solid: false);
                     b.Item(f.P(counter, BackOf(PropKind.KitchenCounter), 0.93f));
-                    return full ? 4.3f : 3.7f;
+                    return full ? 5.02f : 4.41f;
                 }
-                case (RoomType.Kitchen, 2): { b.Add(PropKind.KitchenSink, f.P(0, BackOf(PropKind.KitchenSink)), f.Face); b.Add(PropKind.WallCabinet, f.P(0, BackOf(PropKind.WallCabinet)), f.Face, solid: false); return 1.25f; }
+                case (RoomType.Kitchen, 2):
+                    // the smallest: the sink and the fridge beside it
+                    b.Add(PropKind.KitchenSink, f.P(-0.36f, BackOf(PropKind.KitchenSink)), f.Face);
+                    b.Add(PropKind.WallCabinet, f.P(-0.36f, BackOf(PropKind.WallCabinet)), f.Face, solid: false);
+                    b.Add(PropKind.Fridge, f.P(0.61f, BackOf(PropKind.Fridge)), f.Face);
+                    return 1.96f;
                 // the stalls: three, two, one
                 case (RoomType.Restroom, 0): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 3 : 2, 1.06f);
                 case (RoomType.Restroom, 1): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 2 : 1, 1.06f);
@@ -1574,7 +1620,7 @@ namespace Stealth.Level
                     else
                     {
                         b.Add(PropKind.RoundTable, f.P(0, 0), 0);
-                        Chairs(f, b, 2 + m_Rng.Next(2));
+                        Chairs(f, b, 3 + m_Rng.Next(2)); // the kitchen table, chairs all round
                         b.Item(f.P(R(-0.2f, 0.2f), 0, 0.76f));
                     }
                     break;
@@ -1740,32 +1786,9 @@ namespace Stealth.Level
                         b.Add(PropKind.NetworkCabinet, f.P(-0.55f, -0.33f), f.Back);
                     }
                     break;
-                case RoomType.Storage:
-                    if (roll < 0.45)
-                    {
-                        b.Add(PropKind.Shelf, f.P(0, 0.31f), f.Face);
-                        b.Add(PropKind.Shelf, f.P(0, -0.31f), f.Back);
-                        if (Chance(0.8)) b.Item(f.P(R(-0.7f, 0.7f), Chance(0.5) ? 0.31f : -0.31f, ShelfLevels[m_Rng.Next(3)]));
-                    }
-                    else if (roll < 0.62)
-                    {
-                        b.Add(PropKind.MetalShelving, f.P(0, 0.26f), f.Face);
-                        b.Add(PropKind.MetalShelving, f.P(0, -0.26f), f.Back);
-                        b.Item(f.P(R(-0.7f, 0.7f), Chance(0.5) ? 0.26f : -0.26f, StorageDecks[m_Rng.Next(3)]));
-                    }
-                    else if (roll < 0.82)
-                    {
-                        b.Add(PropKind.Pallet, f.P(0, 0), m_Rng.Next(2) * 90f);
-                        b.Add(PropKind.Boxes, f.P(0.2f, 1.2f), f.Face);
-                        b.Item(f.P(0.9f, 0.9f));
-                    }
-                    else
-                    {   // crates as they came off the truck, the drums and the trolley beside them
-                        b.Add(PropKind.CrateStack, f.P(0, 0), f.Face);
-                        b.Add(PropKind.DrumPair, f.P(0, -0.8f), f.Face);
-                        b.Add(PropKind.HandTruck, f.P(0.95f, -0.75f), f.Face + 30f);
-                        b.Item(f.P(R(-0.3f, 0.3f), 0, 1.385f));
-                    }
+                case RoomType.Storage: // a wrapped pallet and a stack of boxes by the pile
+                    b.Add(PropKind.Pallet, f.P(0, 0), m_Rng.Next(2) * 90f);
+                    b.Add(PropKind.Boxes, f.P(0.2f, 1.2f), f.Face);
                     break;
                 case RoomType.Lounge:
                     if (roll < 0.22) { b.Add(PropKind.PingPongTable, f.P(0, 0), f.Face); b.Item(f.P(0.6f, 0, 0.78f)); }
@@ -1859,6 +1882,65 @@ namespace Stealth.Level
             if (Chance(0.5)) b.Add(PropKind.PlanterDivider, f.P(Chance(0.5) ? 1.82f : -1.82f, 0), f.Face + 90f);
         }
 
+        /// <summary>
+        /// A kitchen whose middle had no room for the table with chairs all round (its middle stays free for the robots'
+        /// patrol stop): a round table with a chair on each of two sides and a narrower walkway, or else the table against a
+        /// wall with chairs on its three open sides.
+        /// </summary>
+        void SmallTable(PlanRoom room)
+        {
+            if (FreeTable(room)) return;
+            float y = LevelLayout.FloorY(room.Floor);
+            foreach (var (w, n) in FacesOf(room))
+            {
+                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
+                for (float t = 1.4f; t < w.Length - 1.4f; t += 0.25f)
+                {
+                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
+                    var f = new Frame(face, u, n);
+                    var batch = new Batch();
+                    var table = f.P(0, 0.5f + WallGap);
+                    batch.Add(PropKind.RoundTable, table, 0);
+                    foreach (var d in new[] { f.U, -f.U, f.N }) batch.Add(PropKind.Chair, table + d * 1.0f, Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg);
+                    batch.Item(table + Vector3.up * 0.76f);
+                    if (TryCommit(room, batch, 0.05f, front: n)) return;
+                }
+            }
+        }
+
+        bool FreeTable(PlanRoom room)
+        {
+            var b = room.Bounds;
+            float y = LevelLayout.FloorY(room.Floor);
+            var spots = new List<Vector3>();
+            for (float x = b.xMin + 1.1f; x < b.xMax - 1.0f; x += 0.25f)
+                for (float z = b.yMin + 1.1f; z < b.yMax - 1.0f; z += 0.25f)
+                    if (InRoom(room.Floor, room.Id, x, z)) spots.Add(new Vector3(x, y, z));
+            var c = room.Center;
+            spots.Sort((p, q) => (p - c).sqrMagnitude.CompareTo((q - c).sqrMagnitude));
+            // the chairs across the room: the robots' stop is along its long side (LevelGenerator.PatrolCentre)
+            bool wide = b.width >= b.height;
+            // two chairs, else one (a doorway's free floor on one side)
+            foreach (int chairs in new[] { 2, 1 })
+                foreach (var s in spots)
+                    foreach (float side in chairs == 2 ? new[] { 1f } : new[] { 1f, -1f })
+                    {
+                        var f = new Frame(s, wide ? Vector3.forward : Vector3.right, wide ? Vector3.right : Vector3.forward);
+                        var batch = new Batch();
+                        batch.Add(PropKind.RoundTable, f.P(0, 0), 0);
+                        foreach (var d in chairs == 2 ? new[] { f.U, -f.U } : new[] { f.U * side })
+                            batch.Add(PropKind.Chair, f.O + d * 1.0f, Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg);
+                        batch.Item(f.P(0, 0, 0.76f));
+                        // a walkway round it, clear of other furniture (it may cross a doorway's or the patrol stop's free
+                        // floor: those are walkways too)
+                        var all = FootAt(PropKind.RoundTable, f.O, 0);
+                        foreach (var p in batch.Pieces) all = Union(all, FootAt(p.Kind, p.Pos, p.Yaw));
+                        if (m_Taken[room.Floor].Overlaps(Grow(all, 0.7f)) || !OnFloor(room.Floor, room.Id, all, 0.5f)) continue;
+                        if (TryCommit(room, batch, 0.05f)) return true;
+                    }
+            return false;
+        }
+
         void Chairs(Frame f, Batch b, int n)
         {
             // around a round table: on its four sides, facing it
@@ -1902,6 +1984,7 @@ namespace Stealth.Level
                             batch.Pieces[i] = p;
                         }
                         for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                        for (int i = 0; i < batch.Drops.Count; i++) { var d = batch.Drops[i]; d.Spot += shift; batch.Drops[i] = d; }
                         if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) placed = width;
                     }
                     if (placed > 0f) t += placed + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
@@ -2057,6 +2140,15 @@ namespace Stealth.Level
                     if (roll < 90) return Row(f, b, PropKind.MeetingChair, 2, 0.62f);
                     { Single(PropKind.Credenza, 1.65f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.Credenza), 0.755f)); return Clock(1.65f); }
                 case RoomType.Kitchen:
+                    if (!m_Fridge) return Single(PropKind.Fridge, 0.75f); // every kitchen has its fridge
+                    if (!m_Table)
+                    {   // and its table: by the wall, a chair on each side of it
+                        var table = f.P(0, 0.5f + WallGap);
+                        b.Add(PropKind.RoundTable, table, 0);
+                        foreach (var d in new[] { f.U, -f.U }) b.Add(PropKind.Chair, table + d * 0.95f, Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg);
+                        b.Item(table + Vector3.up * 0.76f);
+                        return 2.6f;
+                    }
                     if (roll < 26)
                     {   // the kitchen run: sink, cooker (or the dishwasher), worktop with the microwave and the coffee machine, cupboards over it
                         b.Add(PropKind.KitchenSink, f.P(-1.52f, BackOf(PropKind.KitchenSink)), f.Face);
@@ -2079,8 +2171,9 @@ namespace Stealth.Level
                         b.Item(f.P(0.3f, BackOf(PropKind.KitchenCounter), 0.93f));
                         return 3.7f;
                     }
-                    if (roll < 50) return Single(PropKind.Fridge, 0.75f);
-                    if (roll < 58) { b.Add(PropKind.PantryCabinet, f.P(-0.47f, BackOf(PropKind.PantryCabinet)), f.Face); b.Add(PropKind.Fridge, f.P(0.42f, BackOf(PropKind.Fridge)), f.Face); b.Item(f.P(-0.47f, BackOf(PropKind.PantryCabinet), 0.915f)); return 1.75f; }
+                    // the fridge is there already (one a kitchen): drawers, a pantry, the water, the recycling, the bin
+                    if (roll < 50) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 58) { Single(PropKind.PantryCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.PantryCabinet), 0.915f)); return 0.95f; }
                     if (roll < 66) return Single(PropKind.RecyclingBins, 1.25f);
                     if (roll < 72) return Single(PropKind.WaterCooler, 0.4f);
                     if (roll < 84)
@@ -2106,19 +2199,21 @@ namespace Stealth.Level
                     if (roll < 92) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
                     { Single(PropKind.CrashCart, 0.65f); b.Item(f.P(0, BackOf(PropKind.CrashCart), 0.815f)); return 0.65f; }
                 case RoomType.Storage:
-                    if (roll < 32)
+                    if (roll < 80)
                     {
+                        // shelves all round: loot on the upper boards from the start, the bottom board for the workers
                         b.Add(PropKind.Shelf, f.P(0, BackOf(PropKind.Shelf)), f.Face);
-                        if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[m_Rng.Next(3)]));
+                        if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[1 + m_Rng.Next(2)]));
+                        foreach (float along in new[] { -0.5f, 0.5f })
+                            b.Drops.Add(new StorageDrop { Spot = f.P(along, BackOf(PropKind.Shelf), Enemies.CargoMotion.ShelfTop + 0.02f), Facing = -f.N, Shelf = true });
                         return 2.05f;
                     }
-                    if (roll < 48) { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
-                    if (roll < 58) return Single(PropKind.Lockers, 1.05f);
-                    if (roll < 67) { b.Add(PropKind.Boxes, f.P(-0.2f, 0.45f), f.Face + m_Rng.Next(4) * 90f); return 1.2f; }
-                    if (roll < 76) return Single(PropKind.DrumPair, 0.95f);
-                    if (roll < 86) { Single(PropKind.CrateStack, 1.25f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.CrateStack), 1.385f)); return 1.25f; }
-                    if (roll < 94) return Single(PropKind.RollingCage, 0.95f);
-                    return Single(PropKind.HandTruck, 0.55f);
+                    // the rest of the walls: steel shelving, boxes, drums, crates (the shelves above carry the workers' drops)
+                    if (roll < 86) { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                    if (roll < 91) { b.Add(PropKind.Boxes, f.P(-0.2f, 0.45f), f.Face + m_Rng.Next(4) * 90f); return 1.2f; }
+                    if (roll < 95) return Single(PropKind.DrumPair, 0.95f);
+                    if (roll < 98) { Single(PropKind.CrateStack, 1.25f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.CrateStack), 1.385f)); return 1.25f; }
+                    return Single(PropKind.RollingCage, 0.95f);
                 case RoomType.Restroom:
                     if (roll < 38)
                     {
@@ -2423,9 +2518,35 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ corners
 
+        /// <summary>
+        /// A piece the room must have and the walls had no run for (a kitchen's fridge): against any bit of wall, its back to
+        /// it, wherever it fits.
+        /// </summary>
+        void AgainstAnyWall(PlanRoom room, PropKind kind, bool walkway = false)
+        {
+            var b = room.Bounds;
+            float y = LevelLayout.FloorY(room.Floor);
+            var dirs = new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right };
+            for (float x = b.xMin + 0.25f; x < b.xMax; x += 0.25f)
+                for (float z = b.yMin + 0.25f; z < b.yMax; z += 0.25f)
+                {
+                    if (!InRoom(room.Floor, room.Id, x, z)) continue;
+                    foreach (var d in dirs)
+                    {
+                        // the wall right behind it (a model's back sits on BackOf from the wall's face)
+                        var behind = new Vector3(x, 0f, z) + d * (BackOf(kind) + 0.15f);
+                        if (InRoom(room.Floor, room.Id, behind.x, behind.z)) continue;
+                        var batch = new Batch();
+                        batch.Add(kind, new Vector3(x, y, z), Mathf.Atan2(-d.x, -d.z) * Mathf.Rad2Deg);
+                        if (TryCommit(room, batch, 0.05f, front: walkway ? -d : null)) return;
+                    }
+                }
+        }
+
         /// <summary>Plants, lamps, bins, stands and the room's own odds and ends in the free inner corners of a room.</summary>
         void Corners(PlanRoom room)
         {
+            if (room.Type == RoomType.Kitchen && !m_Fridge) AgainstAnyWall(room, PropKind.Fridge);
             if (room.Type is RoomType.Corridor or RoomType.Server) return;
             var b = room.Bounds;
             float y = LevelLayout.FloorY(room.Floor);

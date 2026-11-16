@@ -441,10 +441,18 @@ CRATE_HINGE = (0.0, 0.30, 0.50)
 def model_crate():
     """Storage crate 0.8 x 0.6 x 0.6: a ribbed box with corner caps, side grips and front latches; the lid is its own
     object (AccentLid) with the origin on the hinge line at the back edge where the lid meets the box (+Y), so it
-    swings open around X (negative angle about +X in Blender lifts the front)."""
-    shell = s.rbox((0.78, 0.58, 0.5), (0, 0, 0.25), r=0.025, seg=3)
-    ribs = [s.rbox((0.8, 0.6, 0.045), (0, 0, z), r=0.015, seg=2) for z in (0.06, 0.44)]
-    s.part("Body", [shell, *ribs])
+    swings open around X (negative angle about +X in Blender lifts the front). The box is hollow (a floor and four
+    walls, 3 cm steel): what was inside lies on its floor when the lid opens (GameManager.SearchCrateServer)."""
+    t = 0.03
+    shell = [s.rbox((0.78, 0.58, 0.05), (0, 0, 0.025), r=0.02, seg=2)]                          # the floor
+    shell += [s.rbox((t, 0.58, 0.5), (x * (0.39 - t / 2), 0, 0.25), r=0.012, seg=2) for x in (-1, 1)]
+    shell += [s.rbox((0.78 - 2 * t, t, 0.5), (0, y * (0.29 - t / 2), 0.25), r=0.012, seg=2) for y in (-1, 1)]
+    # the ribs: bands round the outside of the walls, not slabs through the inside
+    ribs = []
+    for z in (0.06, 0.44):
+        ribs += [s.rbox((0.02, 0.6, 0.045), (x * 0.39, 0, z), r=0.008, seg=1) for x in (-1, 1)]
+        ribs += [s.rbox((0.8, 0.02, 0.045), (0, y * 0.29, z), r=0.008, seg=1) for y in (-1, 1)]
+    s.part("Body", [*shell, *ribs])
 
     caps = [s.rbox((0.09, 0.09, 0.12), (x * 0.36, y * 0.26, 0.06), r=0.02, seg=2) for x in (-1, 1) for y in (-1, 1)]
     grips = []

@@ -115,10 +115,23 @@ namespace Stealth.EditorTools
                     t.CanUseStairs = false; // wheels
                     t.PatrolSpeed = 1.6f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
                     t.CargoChance = 0.6f;   // carries loot on its tray: hack it and it drops it
+                    t.MovesLoot = true;     // lifts loot lying on the floor onto its tray, sets it down elsewhere
                 });
-                // The tray on top of the box it carries (model: box at 1.15 m, 0.4 high).
+                // The lift (Tools/Blender/worker_lift.py): arms on a pivot at their hinge, the tray on a pivot at the arms'
+                // end pin; what it carries lies on the tray. RobotAnimator swings them (CargoMotion).
                 var rc = go.GetComponent<RobotController>();
-                var cargo = Child(go.transform, "Cargo", new Vector3(0f, 1.36f, 0.15f));
+                var lift = Model("worker_lift");
+                lift.name = "Lift";
+                lift.transform.SetParent(go.transform, false);
+                Paint(lift, "WorkerBody", "RobotAccent", "SensorGlow");
+                var armPivot = Child(lift.transform, "LiftArmPivot", CargoMotion.Hinge);
+                var trayPivot = Child(lift.transform, "LiftTrayPivot", CargoMotion.PinRest);
+                Find(lift, "AccentLiftArm").SetParent(armPivot.transform, true);
+                Find(lift, "BodyLiftTray").SetParent(trayPivot.transform, true);
+                var anim = go.GetComponent<RobotAnimator>();
+                anim.LiftArm = armPivot.transform;
+                anim.LiftTray = trayPivot.transform;
+                var cargo = Child(trayPivot.transform, "Cargo", new Vector3(0f, CargoMotion.OnTray, 0f));
                 rc.CargoMesh = cargo.AddComponent<MeshFilter>();
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;

@@ -49,6 +49,52 @@ namespace Stealth.Configs
         public Material[] To = new Material[0];
     }
 
+    /// <summary>
+    /// Wear levels of one material (painted metal from clean to rotten): every object picks one by where it stands
+    /// (<see cref="WearMath.Pick"/>), so no two cupboards rust the same way. Visual only.
+    /// </summary>
+    [Serializable]
+    public class WearVariants
+    {
+        public Material From;
+        [Tooltip("From the least worn to the most")] public Material[] To = new Material[0];
+    }
+
+    /// <summary>Which wear level an object takes (pure, the same on every peer).</summary>
+    public static class WearMath
+    {
+        /// <summary>
+        /// The level of one part of an object (a drawer, a door, the carcass): the object's level is the most any of its
+        /// parts rusts, each part takes its own level up to that — so rust lands on some parts and leaves others clean.
+        /// </summary>
+        public static int PartLevel(Vector3 objectPosition, string part, int count)
+        {
+            int most = Pick(objectPosition, count);
+            if (most <= 0) return 0;
+            // by the part's name, not where it is: an open drawer keeps its rust (string.GetHashCode differs between runs)
+            int h = 17;
+            foreach (char ch in part ?? "") h = unchecked(h * 31 + ch);
+            return Pick(objectPosition + new Vector3(h % 997, h / 997 % 991, 0.5f), most + 1);
+        }
+
+        /// <summary>A level 0..count-1 from the object's position (rounded to centimetres, so peers agree).</summary>
+        public static int Pick(Vector3 position, int count)
+        {
+            if (count <= 1) return 0;
+            unchecked
+            {
+                uint h = 2166136261u;
+                foreach (var v in new[] { Mathf.RoundToInt(position.x * 100f), Mathf.RoundToInt(position.y * 100f), Mathf.RoundToInt(position.z * 100f) })
+                {
+                    h = (h ^ (uint)v) * 16777619u;
+                    h ^= h >> 13;
+                }
+                h *= 0x9E3779B1u;
+                return (int)((h >> 8) % (uint)count);
+            }
+        }
+    }
+
     /// <summary>A model replaced as a whole in one family (a CC0 scanned desk for ours): placed in the model's space.</summary>
     [Serializable]
     public class PropReplacement

@@ -74,7 +74,7 @@ namespace Stealth.Tests
         [Test]
         public void BuildingFollowsItsSettings()
         {
-            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentChance = 0f, AutoDoorChance = 0f };
+            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentsPerRoom = 0f, AutoDoorChance = 0f };
             var l = LevelGenerator.Generate(5, 0, b);
             Assert.AreEqual(4, l.Floors);
             Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
@@ -85,7 +85,8 @@ namespace Stealth.Tests
             // an office (a hospital and a garage have programs of their own)
             int officeSeed = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 1) == HouseKind.Office);
             var s = LevelGenerator.Generate(officeSeed, 1, onlyServers);
-            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall, room.Type.ToString());
+            // the locked storage room comes from the house's features, not from the weights
+            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage, room.Type.ToString());
         }
 
         [Test]

@@ -57,7 +57,7 @@ namespace Stealth.Enemies
         public static readonly List<Detector> All = new();
 
         /// <summary>One-shot effects shown on every peer (see <see cref="Pulse"/>).</summary>
-        protected const byte PulseRadio = 1, PulseShot = 2, PulseStomp = 3;
+        protected const byte PulseRadio = 1, PulseShot = 2, PulseStomp = 3, PulseLift = 4, PulseLower = 5, PulseShelve = 6;
 
         [Header("Detector")]
         public RobotKind Kind;

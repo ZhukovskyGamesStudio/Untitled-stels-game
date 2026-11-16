@@ -235,5 +235,13 @@ namespace Stealth.Player
         /// <summary>How far (degrees) a leg swings forward and back at this speed: wider when running, short crouched.</summary>
         public static float LegSwing(float speed, bool crouching) =>
             (crouching ? 0.6f : 1f) * Mathf.Lerp(14f, 34f, Mathf.InverseLerp(1.5f, 6f, speed));
+
+        /// <summary>
+        /// Share of a flashlight's intensity with a surface this close in front of it: light falls off with the square of
+        /// the distance, so held against a drawer the spot burned white and bloomed over the screen; closer than
+        /// <paramref name="near"/> the lamp dims by the same square, the spot stays as bright as at that distance.
+        /// </summary>
+        public static float FlashlightNear(float distance, float near) =>
+            near <= 0f ? 1f : Mathf.Clamp(distance * distance / (near * near), 0.01f, 1f);
     }
 }

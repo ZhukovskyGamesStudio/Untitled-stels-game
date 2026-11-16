@@ -145,7 +145,20 @@ namespace Stealth.Level
                 {
                     bool keyed = false;
                     foreach (var k in l.KeyDoors) keyed |= k.Door == i;
-                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor);
+                    bool storage = i == l.StorageDoor && StorageRooms.Locked(l);
+                    var inward = Vector3.zero;
+                    var room = default(Rect);
+                    if (storage)
+                    {
+                        // which way the room is: across the doorway, towards the storage room's middle
+                        var across = d.rotation * Vector3.forward;
+                        var to = l.Plan.Rooms[l.StorageRoom].Center - d.position;
+                        inward = Vector3.Dot(to, across) >= 0f ? across : -across;
+                        inward.y = 0f;
+                        inward.Normalize();
+                        room = l.Plan.Rooms[l.StorageRoom].Bounds;
+                    }
+                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room);
                     if (door.WallParts != null)
                         foreach (var part in door.WallParts)
                             if (part != null) Shell.WallParts.Add(part);
@@ -201,6 +214,7 @@ namespace Stealth.Level
             if (!any || kind == PropKind.Hatch) return;
             Shell.Props.Add(new MapProp { Floor = floor, Kind = kind, Area = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z) });
         }
+
 
         GameObject Place(GameObject prefab, string name, Vector3 position, Quaternion rotation)
         {
@@ -724,6 +738,7 @@ namespace Stealth.Level
         public static List<(Vector3 pos, float yaw, int wall, float at)> WindowCuts(LevelLayout l)
         {
             var list = new List<(Vector3, float, int, float)>();
+            var roomOf = new List<int>(); // the room each window lights (a kitchen keeps one when windows are few)
             var plan = l.Plan;
             const float spacing = 5f, clear = LevelMetrics.WindowWidth / 2f + 0.9f;
             for (int i = 0; i < plan.Walls.Count; i++)
@@ -755,6 +770,7 @@ namespace Stealth.Level
                         int id = plan.IdAt(w.Floor, inside.x, inside.y);
                         if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom)) continue;
                     }
+                    roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));
                 }
             }
@@ -765,6 +781,16 @@ namespace Stealth.Level
                 var keep = new List<int>();
                 for (int i = 0; i < list.Count; i++) keep.Add(i);
                 for (int i = keep.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (keep[i], keep[j]) = (keep[j], keep[i]); }
+                // every kitchen keeps a window: the first of each in the shuffled order goes to the front
+                var lit = new HashSet<int>();
+                var first = new List<int>();
+                foreach (int i in keep)
+                {
+                    int r = roomOf[i];
+                    if (r >= 0 && r < plan.Rooms.Count && plan.Rooms[r].Type == RoomType.Kitchen && lit.Add(r)) first.Add(i);
+                }
+                keep.RemoveAll(first.Contains);
+                keep.InsertRange(0, first);
                 keep.RemoveRange(l.WindowLimit, keep.Count - l.WindowLimit);
                 keep.Sort();
                 var picked = new List<(Vector3, float, int, float)>();

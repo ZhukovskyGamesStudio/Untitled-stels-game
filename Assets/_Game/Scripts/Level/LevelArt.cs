@@ -26,6 +26,8 @@ namespace Stealth.Level
         public GameObject FloorSlab;
         public GameObject Roof;
         public GameObject OutsideGround;
+        [Tooltip("The land round the house to the horizon (looks only): flat in the middle, mounds, rubble, far ridges")]
+        public GameObject OutsideTerrain;
         public GameObject Fence;
         [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
         public GameObject CityPiece;

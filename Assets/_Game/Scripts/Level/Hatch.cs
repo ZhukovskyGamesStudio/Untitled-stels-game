@@ -9,7 +9,7 @@ namespace Stealth.Level
     /// </summary>
     public class Hatch : MonoBehaviour
     {
-        public const float UseDistance = 3.2f;
+        public const float UseDistance = 1.6f; // standing at its rim, not across the room
 
         [Tooltip("The lid on its hinge: it swings open while someone hides inside.")]
         public Transform Lid;

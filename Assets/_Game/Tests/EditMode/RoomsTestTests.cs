@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Stealth.Tests
 {
-    /// <summary>The rooms-test scene: a new game starts in it, with a small house of three or four rooms.</summary>
+    /// <summary>The rooms-test level: a house of one floor with every room type at least once, its size unlimited; workers only.</summary>
     public class RoomsTestTests
     {
         const string LevelPath = "Assets/_Game/Data/Config/RoomsTest/Level.asset";
@@ -52,45 +52,46 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void HousesHaveThreeOrFourRoomsOnOneFloor()
+        public void HousesHaveEveryRoomTypeOnOneFloorAndOnlyWorkers()
         {
             var level = AssetDatabase.LoadAssetAtPath<LevelConfig>(LevelPath);
             Assert.IsNotNull(level, "no rooms-test level config");
-            for (int seed = 1; seed <= 12; seed++)
+            Assert.IsTrue(level.Building.EveryRoomType);
+            Assert.AreEqual(0, level.Building.RoomCountMin + level.Building.RoomCountMax, "no room count limits: the house is as big as its rooms");
+            Assert.AreEqual(0f, level.Building.RoomAreaMin + level.Building.RoomAreaMax, "no size limits but each type's own");
+            for (int seed = 1; seed <= 6; seed++)
                 for (int house = 0; house < 3; house++)
                     for (int players = 1; players <= 4; players += 3)
                     {
-                        var l = LevelGenerator.Generate(seed * 7919 + house, house, level.Building, level.Security, players);
-                        int rooms = BuildingSettings.CountRooms(l);
-                        Assert.That(rooms, Is.InRange(level.Building.RoomCountMin, level.Building.RoomCountMax),
-                            $"seed {seed} house {house} players {players}: {rooms} rooms");
+                        var l = LevelGenerator.Generate(seed * 7919 + house, house, level.Building, level.Security, players, level.Features);
+                        string at = $"seed {seed} house {house} players {players}";
+                        foreach (var t in RoomRules.Programmed)
+                            Assert.IsTrue(l.Rooms.Any(r => r.Type == t), $"{at}: a {t}");
                         Assert.AreEqual(1, l.Floors);
-                        Assert.IsEmpty(l.RobotSpawns, "no guards in the test level");
+                        Assert.That(l.StorageRoom, Is.GreaterThanOrEqualTo(0), $"{at}: the storage room, locked");
+                        Assert.IsNotEmpty(l.RobotSpawns, $"{at}: its workers");
+                        foreach (var r in l.RobotSpawns) Assert.AreEqual(Stealth.Level.RobotKind.Worker, r.Kind, $"{at}: workers only");
                         Assert.IsEmpty(l.CameraSpots);
                         Assert.IsEmpty(l.LaserSpots);
-                        Assert.IsEmpty(l.Terminals);
+                        foreach (var t in l.Terminals) Assert.AreEqual(TerminalKind.Doors, t.kind, "only the storage room's door terminal");
                     }
         }
 
         [Test]
-        public void EveryRoomIsThirtyToTwoHundredSquareMetresAndCorridorsJoinSome()
+        public void EveryRoomIsAtLeastItsTypesSmallestAndCorridorsJoinSome()
         {
-            var level = AssetDatabase.LoadAssetAtPath<LevelConfig>("Assets/_Game/Data/Config/RoomsTest/Level.asset");
-            Assert.AreEqual(30f, level.Building.RoomAreaMin);
-            Assert.AreEqual(200f, level.Building.RoomAreaMax);
+            var level = AssetDatabase.LoadAssetAtPath<LevelConfig>(LevelPath);
             int withCorridor = 0, houses = 0;
-            for (int seed = 1; seed <= 16; seed++)
+            for (int seed = 1; seed <= 10; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 104729, 0, level.Building, level.Security, 1);
+                var l = LevelGenerator.Generate(seed * 104729, 0, level.Building, level.Security, 1, level.Features);
                 houses++;
                 if (BuildingSettings.CountJoiningCorridors(l) > 0) withCorridor++;
                 foreach (var r in l.Rooms)
                 {
-                    if (r.Type == RoomType.Corridor) continue;
-                    if (r.Type == RoomType.Hall) continue;
-                    Assert.That(r.Area, Is.InRange(30f, 200f), $"seed {seed}: {r.Type} {r.Area:0} m²");
+                    if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
+                    Assert.That(r.Area, Is.GreaterThanOrEqualTo(RoomRules.MinArea(r.Type, level.Building.RoomTypeRules) - 0.01f), $"seed {seed}: {r.Type} {r.Area:0} m²");
                 }
-                Assert.That(BuildingSettings.CountRooms(l), Is.InRange(3, 4), $"seed {seed}");
             }
             Assert.AreEqual(houses, withCorridor, $"every house has a corridor between its rooms ({withCorridor} of {houses})");
             Assert.IsTrue(new BuildingSettings { RoomAreaMin = 30f }.HasRoomLimits);

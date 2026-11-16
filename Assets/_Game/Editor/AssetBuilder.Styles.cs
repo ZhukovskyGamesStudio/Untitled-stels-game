@@ -73,6 +73,7 @@ namespace Stealth.EditorTools
             config.Batch = BuildBatchHolder();
             config.Meshes = BuildMeshVariants();
             config.Materials = BuildMaterialVariants();
+            config.Wear = BuildWearVariants(config.Materials);
             config.Props = BuildPropReplacements();
             config.StyleModels = BuildStyleModels(styles);
             // the palette of a style recolours the family versions of a material too
@@ -82,6 +83,12 @@ namespace Stealth.EditorTools
             config.Furniture = WithVariants(config.Furniture);
             config.Robots = WithVariants(config.Robots);
             config.Players = WithVariants(config.Players);
+            // ...and their wear levels
+            Material[] WithWear(Material[] a) => a.Concat(config.Wear.Where(w => a.Contains(w.From)).SelectMany(w => w.To)).ToArray();
+            config.Building = WithWear(config.Building);
+            config.Furniture = WithWear(config.Furniture);
+            config.Robots = WithWear(config.Robots);
+            config.Players = WithWear(config.Players);
             EditorUtility.SetDirty(config);
 
             var root = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
@@ -796,7 +803,7 @@ namespace Stealth.EditorTools
                     p.Players.Saturation = 0.8f;
                     var geo = s.Geometry;
                     geo.Family = ModelFamily.Derelict;
-                    geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true; geo.StripSpacing = 7f;
+                    geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true; geo.StripSpacing = 0f; // no glowing slits: the power is out
                     geo.Floor = K("Dr_FloorPlate"); geo.FloorTile = 2f; geo.Wall = K("Dr_SteelPanels"); geo.WallTile = 2.4f;
                     geo.CeilingFinish = K("Dr_CeilingVents"); geo.CeilingTile = 2.4f;
                     geo.Trim = K("Dr_Rust"); geo.Pipe = K("Dr_Rust"); geo.Beam = K("Dr_PaintedMetal"); geo.Glow = K("Glow_DimCyan");
