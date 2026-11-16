@@ -132,8 +132,8 @@ Not worth it here: learned generators at runtime, WFC for room layout.
 | 2 | **Corridor-first floors**: most rooms are dead ends off corridors (1–2 doors), with a few planned loops and vents instead of walk-through chains | **Done** (see below) |
 | 3 | **Depth from the lobby** (BFS on the room graph): public types shallow, private deep; use depth for loot value, robot density and lock/key placement; loops made of ruins (breaches, holes, inner windows) instead of doors | **Done** (see below; lock/key by depth still open) |
 | 4 | **Adjacency score**: kitchen beside open space, meeting rooms near the lobby, storage near a service entrance; keep the best of several plan attempts | **Done** (swaps; best-of-attempts not needed) |
-| 5 | **Furniture**: fill empty offices and server rooms; then a cost-based polish pass or hand templates for themed rooms | Planned |
-| 6 | **Stealth checks** (later): camera coverage on the plan grid, a hidden path to every loot room, mission-graph lock and key | Idea |
+| 5 | **Furniture**: fill empty offices and server rooms; then a cost-based polish pass or hand templates for themed rooms | **Done** (George's A31–A33 + signature pass, see below) |
+| 6 | **Stealth checks**: a second way into every loot room, keys deeper than their doors; later camera coverage and a hidden path on the plan grid | **Partly done** (see below) |
 
 ### Step 2 result: corridor-first floors (room program; classic is within a few points)
 - Wings at least 11 m deep get evenly spaced corridors (one per ~19 m of depth, rooms at most ~8 m from a corridor);
@@ -197,6 +197,50 @@ corridor by roll or house kind).
 | Nap room ~ noisy room (bad) | 24 % / 7 % | 2 % / 0 % |
 | Kitchen ~ toilets (bad) | 15 % / 10 % | 1 % / 1 % |
 | Storage with an outside door next door | 2 / 43 | 22 / 43 (program) |
+
+### Step 5 result: furniture (George's work merged, then the gaps)
+George's A31–A33 (merged 2026-11-16) did most of the planned step: 109 new pieces, every room type with its own
+groups, ~25–30 % more furniture, half-empty rooms topped up (`Sparse`), each group checked for walkability as it is
+placed (`StaysWalkable`), tall things kept off windows, caps per room (one cooler, one clock). Rooms are full: 2–3
+pieces per 10 m² in every room type, bare rooms (< 2 pieces) under 5 %. What was left:
+- **The two walkability checks disagreed** — the final pass still took out ~3 groups a house: the per-room check ignored
+  the stairs' squares (a sculpture closed the way round a staircase: half a garage's furniture went), counted a room
+  whose middle is its furniture (meeting table, cage) as reached only within 3.5 m of the middle (long meeting rooms lost
+  table and chairs), linked stair ends only within 1 m, and the barrier took every group within 1.5 m of the lost side
+  *through walls* (a lost wing took toilet stalls, beds, lab benches with it). Fixed: 129 → 9–12 groups in 40–72
+  houses (`FurnishingTests.TheFinalWalkabilityCheckHasLittleToTakeOut`).
+- **Rooms without the piece that makes them** (`Furnisher.Signatures`, `Signature`: after the room's groups and islands,
+  a compact one against a wall, walkway down to 0.7 m):
+
+| Without its piece (72 houses) | Before | After |
+|---|---|---|
+| Office (desk) | 61 % | 9 % |
+| Open space (desk) | 12 % | 0 % |
+| Server (rack) | 20 % | 6 % |
+| Meeting (table) | 13 % | 5 % |
+| Lab (bench / work table) | 16 % | 14 % |
+| Infirmary (bed / couch) | 18 % | 13 % |
+
+Left: small (16–20 m²) labs, infirmaries and locker rooms with doors on three walls; a cost-based polish pass was not
+needed for these numbers.
+
+### Step 6 result: second ways in, keys deeper
+- Crawl ways (vent, slot, hole, window without glass) prefer rooms with one way in so far (`BuildingSettings.DeadEndSneakBonus`
+  = 4 added to the pair's score per such room); walked loops still prefer the long ones. Not into the control room (its
+  walls are for the robot terminals; zoning may still swap a room with a crawl way into one).
+- A key door's key goes in a room deeper than the door (`HouseFeatures.KeyDoors`, `RoomSteps`) when there is one.
+
+| 72 houses | Before | After |
+|---|---|---|
+| Loot rooms with two or more ways in | 67 % | 82 % |
+| Loot rooms with one way in | 33 % | 18 % |
+| Loot rooms watched (robot / camera) with one way in | 4 % | 3 % |
+| Key deeper than its door | 45 % | 93 % |
+| Key one step from the lobby | 10 % | 2 % |
+
+Tests: `StealthLayoutTests`. Not done: camera placement is still random by room (73 % of cameras are in loot rooms
+anyway); a camera-coverage map and a hidden-path check on the plan grid (Tremblay et al.) would need the cameras'
+cones and robots' patrols on the grid — next if stealth difficulty needs tuning.
 
 ### How to measure
 A temporary EditMode test generated 72 houses per mode and printed the metrics above (windowless work rooms, service

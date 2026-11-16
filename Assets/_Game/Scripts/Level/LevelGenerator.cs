@@ -77,6 +77,8 @@ namespace Stealth.Level
         public float HighVentChance = 0.4f;
         [Tooltip("Narrow slots (players squeeze through, robots do not) a floor gets, per room on it.")]
         public float SqueezesPerRoom = 0.1f;
+        [Tooltip("A crawl way (vent, slot, hole, window without glass) prefers a room with one way in so far: added to its score per such room (the score is the walk it saves, metres-ish). A loot room with a second way in is a room to sneak into.")]
+        public float DeadEndSneakBonus = 4f;
         [Header("Shapes")]
         [Tooltip("Chance per big room (lobby, open space, lounge, storage, meeting) to rise through two or three storeys: an atrium with galleries above.")]
         public float AtriumChance = 0.35f;

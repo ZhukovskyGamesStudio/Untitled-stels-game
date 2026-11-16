@@ -1562,9 +1562,19 @@ namespace Stealth.Level
                         {
                             if (IsStorage(plan, key) || links.TryGetValue(key.Item1, out var l1) && l1.Contains(key.Item2)) continue;
                             if (kind != EdgeType.Vent && kind != EdgeType.Squeeze && IsCirculation(plan, key.Item1) && IsCirculation(plan, key.Item2)) continue;
+                            // the security control room: one way in, its walls for the robot terminals
+                            if (kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow
+                                && (plan.Rooms[key.Item1].Type == RoomType.ControlRoom || plan.Rooms[key.Item2].Type == RoomType.ControlRoom)) continue;
                             int d = Walk(links, key.Item1, key.Item2);
                             if (d < (kind is EdgeType.Door or EdgeType.Breach ? 3 : 2)) continue; // a walked loop round one wall is no loop; a crawl may short-cut one
                             float score = d + (float)pick.NextDouble() * 3f;
+                            // a crawl way into a room with one way in: the second approach a room to sneak into needs
+                            // (walked loops keep to the long ones: a door next to a door is no loop)
+                            if (kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow)
+                            {
+                                if (DeadEnd(plan, links, key.Item1)) score += b.DeadEndSneakBonus;
+                                if (DeadEnd(plan, links, key.Item2)) score += b.DeadEndSneakBonus;
+                            }
                             if (score > bestScore) { bestScore = score; best = key; }
                         }
                         if (bestScore <= 0f) break;
@@ -1572,6 +1582,8 @@ namespace Stealth.Level
                         else Link(links, best.Item1, best.Item2); // no room for it there: never tried again
                     }
                 }
+                static bool DeadEnd(HousePlan p, Dictionary<int, List<int>> ways, int room) =>
+                    !IsCirculation(p, room) && (!ways.TryGetValue(room, out var set) || set.Count <= 1);
                 Place(EdgeType.Door, b.LoopsPerRoom, rng);
                 Place(EdgeType.Vent, b.VentsPerRoom, rng);
                 Place(EdgeType.Squeeze, b.SqueezesPerRoom, slots);

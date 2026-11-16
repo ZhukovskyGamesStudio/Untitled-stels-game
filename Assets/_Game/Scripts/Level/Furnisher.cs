@@ -676,14 +676,14 @@ namespace Stealth.Level
                         m_WBare[z * m_WNX + x] = false;
             }
             m_WTargets.Clear();
-            void Target(Vector3 p)
+            void Target(Vector3 p, int reach = 4)
             {
-                // the free cell nearest to the spot, within 1 m
+                // the free cell nearest to the spot, within 1 m (a stair's end: 1.5 m, as the whole-house pass links it)
                 int best = -1;
-                float bestD = 1.0f;
+                float bestD = reach * WalkCell;
                 int px = Mathf.FloorToInt(p.x / WalkCell) - m_WX, pz = Mathf.FloorToInt(p.z / WalkCell) - m_WZ;
-                for (int dz = -4; dz <= 4; dz++)
-                    for (int dx = -4; dx <= 4; dx++)
+                for (int dz = -reach; dz <= reach; dz++)
+                    for (int dx = -reach; dx <= reach; dx++)
                     {
                         int x = px + dx, z = pz + dz;
                         if (x < 0 || z < 0 || x >= m_WNX || z >= m_WNZ || !m_WBare[z * m_WNX + x]) continue;
@@ -706,8 +706,8 @@ namespace Stealth.Level
             foreach (var s in m_L.Stairs)
             {
                 var (bottom, top) = LevelLayout.StairEnds(s);
-                if (s.Floor == room.Floor && InRoom(room.Floor, room.Id, bottom.x, bottom.z)) Target(bottom);
-                if (s.Floor + 1 == room.Floor && InRoom(room.Floor, room.Id, top.x, top.z)) Target(top);
+                if (s.Floor == room.Floor && InRoom(room.Floor, room.Id, bottom.x, bottom.z)) Target(bottom, 6);
+                if (s.Floor + 1 == room.Floor && InRoom(room.Floor, room.Id, top.x, top.z)) Target(top, 6);
             }
             // what the furniture already there (desks under vents, the hatch) leaves linked is the baseline
             Linked(null, m_WTargets);
@@ -1083,8 +1083,36 @@ namespace Stealth.Level
                 return i >= 0 && seen[i];
             }
 
-            /// <summary>A walker gets into the room: to its middle, or (a table stands there) to the free floor around it.</summary>
-            public bool Reached(bool[] seen, PlanRoom r) => Reached(seen, r.Center, MiddleIsFurniture(r) ? 14 : 6);
+            /// <summary>
+            /// A walker gets into the room: to its middle, or, where the middle is furniture (a meeting room's table, a
+            /// restroom's stalls, the hostage's cage) and no free floor lies near it, to any of the room's free floor —
+            /// as the check while furnishing has it (StaysWalkable: the doors, not the middle). Asking for a spot within
+            /// 3.5 m of the middle stripped long meeting rooms with their door at the short end of the table and chairs.
+            /// </summary>
+            public bool Reached(bool[] seen, PlanRoom r)
+            {
+                if (!MiddleIsFurniture(r))
+                {
+                    int i = Nearest(r.Floor, new Vector2(r.Center.x, r.Center.z), r.Id);
+                    if (i >= 0) return seen[i];
+                }
+                return AnyReached(seen, r);
+            }
+
+            /// <summary>Any free cell of the room is reached.</summary>
+            bool AnyReached(bool[] seen, PlanRoom r)
+            {
+                var a = CellOf(r.Bounds.min);
+                var b = CellOf(r.Bounds.max);
+                for (int x = a.x; x <= b.x; x++)
+                    for (int z = a.y; z <= b.y; z++)
+                    {
+                        if (!In(r.Floor, x, z)) continue;
+                        int i = Index(r.Floor, x, z);
+                        if (seen[i] && m_L.Plan.SpaceAt(r.Floor, Center(x, z)) == r.Id) return true;
+                    }
+                return false;
+            }
 
             const int Reach = 6; // 1.5 m in cells: how close a blocking group has to be to both sides
 
@@ -1134,6 +1162,7 @@ namespace Stealth.Level
                     lost[j] = true;
                     stack.Push(j);
                 }
+                var near = new List<int>();
                 var nearSeen = Table(seen);
                 var nearLost = Table(lost);
                 int w = m_NX + 1;
@@ -1150,11 +1179,33 @@ namespace Stealth.Level
                             int x0 = Mathf.Max(0, x - Reach), x1 = Mathf.Min(m_NX, x + Reach + 1);
                             int a = tb + z0 * w + x0, b = tb + z0 * w + x1, c = tb + z1 * w + x0, d = tb + z1 * w + x1;
                             if (nearSeen[d] - nearSeen[b] - nearSeen[c] + nearSeen[a] > 0 &&
-                                nearLost[d] - nearLost[b] - nearLost[c] + nearLost[a] > 0) found.Add(m_Owner[i]);
+                                nearLost[d] - nearLost[b] - nearLost[c] + nearLost[a] > 0) { found.Add(m_Owner[i]); near.Add(i); }
                         }
                     }
                 }
-                return found;
+                // ...and of those, the groups that stand between the two sides in their own room: the reached and the lost
+                // floor near them on their side of the walls. Counted through walls, a wing out of reach took with it every
+                // piece standing against the far side of a wall (toilet stalls, a hospital bed, lab benches), not just the
+                // one in the way.
+                var mine = new HashSet<int>();
+                foreach (int i in near)
+                {
+                    if (mine.Contains(m_Owner[i])) continue;
+                    int f = i / plane, x = i % m_NX, z = i / m_NX % m_NZ;
+                    int space = m_L.Plan.SpaceAt(f, Center(x, z));
+                    bool r = false, l = false;
+                    for (int dz = -Reach; dz <= Reach && !(r && l); dz++)
+                        for (int dx = -Reach; dx <= Reach && !(r && l); dx++)
+                        {
+                            if (!In(f, x + dx, z + dz)) continue;
+                            int j = Index(f, x + dx, z + dz);
+                            if (!m_Free[j] || !(seen[j] || lost[j])) continue;
+                            if (m_L.Plan.SpaceAt(f, Center(x + dx, z + dz)) != space) continue;
+                            if (seen[j]) r = true; else l = true;
+                        }
+                    if (r && l) mine.Add(m_Owner[i]);
+                }
+                return mine.Count > 0 ? mine : found;
             }
 
             /// <summary>Summed-area table of the marked free cells, per floor ((NX + 1) × (NZ + 1) each, zero first row and column).</summary>
@@ -1258,6 +1309,7 @@ namespace Stealth.Level
             Islands(room, islands);
             if (room.Type == RoomType.Meeting) MeetingTable(room);
             if (room.Type == RoomType.Kitchen && !m_Table) SmallTable(room);
+            Signature(room);
             Walls(room);
             if (room.Type != RoomType.Corridor) Walls(room); // a second pass fills the gaps the first left
             Corners(room);
@@ -1367,6 +1419,36 @@ namespace Stealth.Level
                     }
         }
 
+        /// <summary>
+        /// The pieces that make a room what it is: an office without a desk, a server room without a rack, a meeting room
+        /// without a table reads as a mistake (measured over 72 houses: 61 % of offices had no desk — the wall groups gave
+        /// them guest chairs, a safe and shelves —, 20 % of server rooms no rack, 13 % of meeting rooms no table).
+        /// </summary>
+        public static readonly Dictionary<RoomType, PropKind[]> Signatures = new()
+        {
+            [RoomType.Office] = new[] { PropKind.Desk, PropKind.ExecutiveDesk, PropKind.StandingDesk, PropKind.Terminal, PropKind.ConsoleDesk, PropKind.SupervisorDesk },
+            [RoomType.OpenSpace] = new[] { PropKind.Desk, PropKind.StandingDesk, PropKind.Terminal },
+            [RoomType.Server] = new[] { PropKind.ServerRack, PropKind.NetworkCabinet, PropKind.TapeLibrary },
+            [RoomType.Meeting] = new[] { PropKind.MeetingTable, PropKind.RoundTable, PropKind.ConferenceTable },
+            [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.RobotTable, PropKind.WorkTable },
+            [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.ExamTable },
+        };
+
+        /// <summary>
+        /// After the room's own groups and islands: a room still without its signature piece (<see cref="Signatures"/>)
+        /// gets a compact one against a wall — a desk and its chair, a row of racks, a small table with two chairs, a work
+        /// table, an examination couch — before the walls fill up with the rest.
+        /// </summary>
+        void Signature(PlanRoom room)
+        {
+            if (!Signatures.TryGetValue(room.Type, out var kinds)) return;
+            foreach (var k in kinds) if (m_InRoom.ContainsKey(k)) return;
+            Anchor(room, SignatureOption, SignatureOption + 3, false, 0.7f); // a small room with doors on every wall: a narrower way past it
+        }
+
+        /// <summary>The first option of <see cref="AnchorGroup"/> that <see cref="Signature"/> tries (the themed rooms' own options come before).</summary>
+        const int SignatureOption = 10;
+
         void Shuffle<T>(List<T> list)
         {
             for (int i = list.Count - 1; i > 0; i--)
@@ -1397,8 +1479,9 @@ namespace Stealth.Level
             if (room.Type == RoomType.ControlRoom)
             {
                 // the house's two robot terminals: side by side, or each against its own wall (the video wall if neither fits)
-                if (Anchor(room, 0, 1, false)) return;
-                if (Anchor(room, 1, 2, false)) { Anchor(room, 1, 2, false); return; }
+                // (a narrower way past them where the walls are short: the second terminal belongs here too)
+                if (Anchor(room, 0, 1, false, 0.7f)) return;
+                if (Anchor(room, 1, 2, false, 0.7f)) { Anchor(room, 1, 2, false, 0.7f); return; }
                 Anchor(room, 2, 3, true);
                 return;
             }
@@ -1456,7 +1539,7 @@ namespace Stealth.Level
         }
 
         /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
-        bool Anchor(PlanRoom room, int from, int to, bool free)
+        bool Anchor(PlanRoom room, int from, int to, bool free, float narrowest = 1.0f)
         {
             var faces = FacesOf(room);
             // stalls are deep (1.5 m): at the end wall of a narrow restroom they leave the whole length to walk, along
@@ -1465,7 +1548,7 @@ namespace Stealth.Level
             float y = LevelLayout.FloorY(room.Floor);
             // the best option first (the biggest), smaller ones where doors leave too little wall
             for (int option = from; option < to; option++)
-                foreach (float walk in new[] { 1.7f, 1.0f })
+                foreach (float walk in narrowest < 1.0f ? new[] { 1.7f, 1.0f, narrowest } : new[] { 1.7f, 1.0f })
                     foreach (var (w, n) in faces)
                     {
                         var u = new Vector3(w.Dir.x, 0, w.Dir.y);
@@ -1605,6 +1688,49 @@ namespace Stealth.Level
                 case (RoomType.Infirmary, 0): { float w = Along(PropKind.HospitalBed); b.Item(f.P(0, 0.5f, 0.66f)); return w; }
                 case (RoomType.Infirmary, 1): { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
                 case (RoomType.Infirmary, 2): return Out(PropKind.PrivacyScreen, 0.3f, 1.65f);
+                // the signature pieces (Signature): compact, against a wall
+                case (RoomType.Office, SignatureOption):
+                case (RoomType.Office, SignatureOption + 1):
+                case (RoomType.OpenSpace, SignatureOption + 1):
+                    b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face);
+                    b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back);
+                    b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f));
+                    if (option != SignatureOption) return 1.65f;
+                    b.Add(PropKind.FilePedestal, f.P(1.05f, BackOf(PropKind.FilePedestal)), f.Face);
+                    return 2.55f;
+                case (RoomType.OpenSpace, SignatureOption):
+                    foreach (float u in new[] { -0.82f, 0.82f })
+                    {
+                        b.Add(PropKind.Desk, f.P(u, 0.4f + WallGap), f.Face);
+                        b.Add(PropKind.Chair, f.P(u, 1.2f), f.Back);
+                    }
+                    b.Item(f.P(R(-1.2f, 1.2f), 0.5f, DeskTop + 0.005f));
+                    return 3.3f;
+                case (RoomType.OpenSpace, SignatureOption + 2):
+                    Single(PropKind.StandingDesk, 1.45f);
+                    b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.StandingDesk), 1.105f));
+                    return 1.45f;
+                case (RoomType.Server, SignatureOption):
+                    for (int i = -1; i <= 1; i++) b.Add(PropKind.ServerRack, f.P(i * 0.72f, BackOf(PropKind.ServerRack)), f.Face);
+                    return 2.2f;
+                case (RoomType.Server, SignatureOption + 1): return Row(f, b, PropKind.ServerRack, 2, 0.72f);
+                case (RoomType.Server, SignatureOption + 2): return Row(f, b, PropKind.NetworkCabinet, 2, 0.62f);
+                case (RoomType.Meeting, SignatureOption):
+                case (RoomType.Meeting, SignatureOption + 1):
+                    // a small table against the wall, two chairs on the room side (or one)
+                    b.Add(PropKind.RoundTable, f.P(0, 0.5f + WallGap), 0);
+                    if (option == SignatureOption) { b.Add(PropKind.Chair, f.P(-0.35f, 1.3f), f.Back); b.Add(PropKind.Chair, f.P(0.35f, 1.3f), f.Back); }
+                    else b.Add(PropKind.Chair, f.P(0, 1.3f), f.Back);
+                    b.Item(f.P(0, 0.5f + WallGap, 0.76f));
+                    return 1.25f;
+                case (RoomType.Lab, SignatureOption):
+                    b.Add(PropKind.WorkTable, f.P(0, BackOf(PropKind.WorkTable)), f.Face);
+                    b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back);
+                    b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.WorkTable), DeskTop + 0.005f));
+                    return 1.65f;
+                case (RoomType.Lab, SignatureOption + 1): return Single(PropKind.WorkTable, 1.65f);
+                case (RoomType.Office, SignatureOption + 2): b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f)); return Single(PropKind.Desk, 1.65f);
+                case (RoomType.Infirmary, SignatureOption): return Along(PropKind.ExamTable);
                 case (RoomType.GameRoom, 0): return Row(f, b, PropKind.ArcadeMachine, 2, 0.8f);
                 case (RoomType.GameRoom, 1): return Single(PropKind.ArcadeMachine, 0.8f);
                 case (RoomType.GameRoom, 2): { b.Add(PropKind.DartBoard, f.P(0, BackOf(PropKind.DartBoard)), f.Face, solid: false); return 0.65f; }
@@ -2629,8 +2755,9 @@ namespace Stealth.Level
                     if (roll < 90)
                     {   // the console corner: the TV on its stand, two bean bags in front of it
                         b.Add(PropKind.GamingCorner, f.P(0, BackOf(PropKind.GamingCorner)), f.Face);
-                        b.Add(PropKind.BeanBag, f.P(-0.5f, 1.45f), f.Back + 15f);
-                        b.Add(PropKind.BeanBag, f.P(0.55f, 1.45f), f.Back - 15f);
+                        // turned by 15° a 0.9 m bean bag takes 1.1 m: 1.16 m apart, or the two sink into each other
+                        b.Add(PropKind.BeanBag, f.P(-0.58f, 1.45f), f.Back + 15f);
+                        b.Add(PropKind.BeanBag, f.P(0.58f, 1.45f), f.Back - 15f);
                         b.Item(f.P(0.65f, BackOf(PropKind.GamingCorner), 0.38f));
                         return 1.65f;
                     }
