@@ -226,6 +226,34 @@ namespace Stealth.EditorTools
             if (dryer.Led != null) dryer.Led.enabled = false;
         }
 
+        /// <summary>
+        /// Walls and ceilings of the themed rooms in the storybook style (Blue Prince): tiles to head height where water is,
+        /// padding and bare concrete in the gym, white paint and acoustic tiles where people work with machines and medicine,
+        /// brick in the game room, damask in the library; plain rooms have no panels and chair rail.
+        /// </summary>
+        static RoomLook[] StorybookRoomLooks()
+        {
+            RoomLook R(RoomType room, string wall, float wallTile, string lower, float lowerHeight, bool plain, string ceiling, float ceilingTile) => new()
+            {
+                Room = room, Wall = wall != null ? K(wall) : null, WallTile = wallTile, Lower = lower != null ? K(lower) : null, LowerTile = 1f,
+                LowerHeight = lowerHeight, Plain = plain, Ceiling = ceiling != null ? K(ceiling) : null, CeilingTile = ceilingTile,
+            };
+            return new[]
+            {
+                R(RoomType.Restroom, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 2.0f, true, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.LockerRoom, "Wall_PlasterPale", 2f, "Wall_TilesMint", 1.6f, true, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Kitchen, "Wall_PlasterWarm", 2f, "Wall_TilesCream", 1.4f, true, "Ceiling_Plain", 2f),
+                R(RoomType.Gym, "Wall_Concrete", 3f, "Wall_Padding", 1.2f, true, "Ceiling_Concrete", 3f),
+                R(RoomType.Infirmary, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 1.2f, true, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Lab, "Wall_PaintWhite", 2f, null, 0f, true, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Server, "Wall_Panels", 2f, null, 0f, true, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Storage, "Wall_Concrete", 3f, null, 0f, true, "Ceiling_Concrete", 3f),
+                R(RoomType.Studio, "Wall_Boards", 2f, null, 0f, true, null, 0f),
+                R(RoomType.GameRoom, "Wall_Brick", 2f, null, 0f, true, null, 0f),
+                R(RoomType.Library, "Wall_Damask", 1.5f, null, 0f, false, null, 0f),
+            };
+        }
+
         /// <summary>Floors of the themed rooms in the storybook style (Blue Prince): tiles where water is, rubber, carpet, lino.</summary>
         static RoomFloor[] StorybookRoomFloors()
         {

@@ -89,6 +89,13 @@ MonoBehaviour:
     GasFog: {r: 0.6, g: 0.64, b: 0.68, a: 1}
     LightScale: 1
     LampGlow: 1
+    Sky: {fileID: 0}
+    SkyExposure: 1
+    GasDensity: 0.03
+    SkyDistance: 70
+    GasClear: 15
+    GasLayer: 2.5
+    GasFalloff: 2.5
   Palette:
     Building:
       Tint: {r: 1, g: 1, b: 1, a: 1}
@@ -181,6 +188,106 @@ MonoBehaviour:
       Tile: 1
     Wall: {fileID: 2100000, guid: d5684c7c7c6afa048a26b605e532cd39, type: 2}
     WallTile: 2
+    RoomLooks:
+    - Room: 7
+      Wall: {fileID: 2100000, guid: 55a5ce360e1af4446abfdd33bb0deda0, type: 2}
+      WallTile: 2
+      Lower: {fileID: 2100000, guid: e5bc6b8e1106b694c9504b4c85373337, type: 2}
+      LowerTile: 1
+      LowerHeight: 2
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 5836cc53bc626ba47bc3eb1b3455687c, type: 2}
+      CeilingTile: 1.2
+    - Room: 18
+      Wall: {fileID: 2100000, guid: d5684c7c7c6afa048a26b605e532cd39, type: 2}
+      WallTile: 2
+      Lower: {fileID: 2100000, guid: 9cd026bb617b12e4cbffc05ddcd4702b, type: 2}
+      LowerTile: 1
+      LowerHeight: 1.6
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 5836cc53bc626ba47bc3eb1b3455687c, type: 2}
+      CeilingTile: 1.2
+    - Room: 4
+      Wall: {fileID: 2100000, guid: e13af629449780848a011642ca50b838, type: 2}
+      WallTile: 2
+      Lower: {fileID: 2100000, guid: b8255722d3c3f844c95ea34845df14a1, type: 2}
+      LowerTile: 1
+      LowerHeight: 1.4
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 4118717e0364e7845b4f809288d1d7e9, type: 2}
+      CeilingTile: 2
+    - Room: 11
+      Wall: {fileID: 2100000, guid: 6a2b200d5c7146f47b8a4456500afefe, type: 2}
+      WallTile: 3
+      Lower: {fileID: 2100000, guid: f96e8f646ce25df42852c96dd0c2afeb, type: 2}
+      LowerTile: 1
+      LowerHeight: 1.2
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 0a096f9837bbed7489136d3079953263, type: 2}
+      CeilingTile: 3
+    - Room: 19
+      Wall: {fileID: 2100000, guid: 55a5ce360e1af4446abfdd33bb0deda0, type: 2}
+      WallTile: 2
+      Lower: {fileID: 2100000, guid: e5bc6b8e1106b694c9504b4c85373337, type: 2}
+      LowerTile: 1
+      LowerHeight: 1.2
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 5836cc53bc626ba47bc3eb1b3455687c, type: 2}
+      CeilingTile: 1.2
+    - Room: 15
+      Wall: {fileID: 2100000, guid: 55a5ce360e1af4446abfdd33bb0deda0, type: 2}
+      WallTile: 2
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 5836cc53bc626ba47bc3eb1b3455687c, type: 2}
+      CeilingTile: 1.2
+    - Room: 5
+      Wall: {fileID: 2100000, guid: be1ae1c9cb989b44aa6dd53562e3b6dc, type: 2}
+      WallTile: 2
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 5836cc53bc626ba47bc3eb1b3455687c, type: 2}
+      CeilingTile: 1.2
+    - Room: 6
+      Wall: {fileID: 2100000, guid: 6a2b200d5c7146f47b8a4456500afefe, type: 2}
+      WallTile: 3
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 1
+      Ceiling: {fileID: 2100000, guid: 0a096f9837bbed7489136d3079953263, type: 2}
+      CeilingTile: 3
+    - Room: 17
+      Wall: {fileID: 2100000, guid: 28b4a091fa969ec4a8fcbd3cc05d7512, type: 2}
+      WallTile: 2
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 1
+      Ceiling: {fileID: 0}
+      CeilingTile: 0
+    - Room: 20
+      Wall: {fileID: 2100000, guid: 39cc53d2369783b49b21fc0d0c2bee15, type: 2}
+      WallTile: 2
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 1
+      Ceiling: {fileID: 0}
+      CeilingTile: 0
+    - Room: 12
+      Wall: {fileID: 2100000, guid: 641c9c0fbc68aa84da89edecff93a1a7, type: 2}
+      WallTile: 1.5
+      Lower: {fileID: 0}
+      LowerTile: 1
+      LowerHeight: 0
+      Plain: 0
+      Ceiling: {fileID: 0}
+      CeilingTile: 0
     Trim: {fileID: 2100000, guid: fe5ca12aa19bd3a429580e116aa2e322, type: 2}
     Panel: {fileID: 2100000, guid: d21cbe30f287f3d4a95c3affb5117b65, type: 2}
     Column: {fileID: 2100000, guid: d3773d572adf14347bae234751ccaf99, type: 2}

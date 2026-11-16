@@ -34,6 +34,16 @@ namespace Stealth.Vehicles
             }
         }
 
+        /// <summary>The steering column of the model (car.py STEER_AXIS in Unity axes): from the wheel's face to the driver.</summary>
+        public static readonly Vector3 SteeringAxis = new Vector3(0f, Mathf.Sin(25f * Mathf.Deg2Rad), -Mathf.Cos(25f * Mathf.Deg2Rad));
+
+        /// <summary>
+        /// The steering wheel's turn for the front wheels' angle (positive = right): clockwise as the driver sees it for a
+        /// right turn (Unity turns a positive angle clockwise round an axis that points at the viewer), <paramref name="ratio"/>
+        /// times the wheels' angle.
+        /// </summary>
+        public static Quaternion SteeringWheel(float steer, float ratio) => Quaternion.AngleAxis(steer * ratio, SteeringAxis);
+
         /// <summary>The rotation seen in a mirror across the YZ plane (M·R·M).</summary>
         public static Quaternion Mirror(Quaternion q) => new(q.x, -q.y, -q.z, q.w);
     }

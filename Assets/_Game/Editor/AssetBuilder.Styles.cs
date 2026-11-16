@@ -397,6 +397,7 @@ namespace Stealth.EditorTools
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
             if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
+            if ((a.RoomLooks == null || a.RoomLooks.Length == 0) && d.RoomLooks.Length > 0) { a.RoomLooks = d.RoomLooks; dirty = true; }
             if (asset.World.Sky == null && def.World.Sky != null) { asset.World.Sky = def.World.Sky; dirty = true; }
             if (dirty) EditorUtility.SetDirty(asset);
         }
@@ -556,6 +557,7 @@ namespace Stealth.EditorTools
                     geo.WainscotHeight = 1f; geo.Crown = true; geo.Doors = DoorTrim.Arch; geo.Ceiling = CeilingKind.Coffers;
                     geo.Floor = K("Real_Herringbone"); geo.FloorTile = 1.2f; geo.Wall = K("Wall_PlasterPale"); geo.WallTile = 2f;
                     geo.RoomFloors = StorybookRoomFloors();
+                    geo.RoomLooks = StorybookRoomLooks();
                     geo.Trim = K("Trim_White"); geo.Panel = K("Panel_PaleBlue"); geo.Column = K("Trim_PaleBlue"); geo.Beam = K("Trim_White");
                 });
 

@@ -14,6 +14,10 @@ namespace Stealth.Configs
         [Tooltip("Indexed by DecorKind; the finish kinds use the Finish quad")]
         public GameObject[] Pieces = new GameObject[0];
         public GameObject Finish;
+        [Tooltip("The bank vault's steel wall cladding and floor plate (every style: a vault looks like a vault)")]
+        public Material VaultWall, VaultFloor;
+        [Tooltip("Metres one texture repeat covers on the vault's walls / floor")]
+        public float VaultWallTile = 2f, VaultFloorTile = 1f;
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

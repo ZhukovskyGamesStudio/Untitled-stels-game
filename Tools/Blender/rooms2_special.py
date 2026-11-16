@@ -192,7 +192,8 @@ def model_vault_door():
     """Round bank-vault door, d 2.2, 0.4 thick, hinged on the axis x = 0: a stepped plug behind (the part that goes into
     the frame) with radial locking bolts, a polished face with a raised rim of bolt heads, a seam ring, a ridge and a
     centre boss, a big three-spoke wheel with ball grips and a combination dial; two hinge arms and knuckles on a pin.
-    Body = steel slab, Accent = dark steel bolts and hinge, Trim = the brass wheel and dial."""
+    Body = steel slab, Accent = dark steel bolts and hinge, TrimWheel = the brass wheel (spun about the disc's axis when
+    the door opens), TrimDial = the combination dial."""
     cx, _, cz = DOOR_C
     prof = [(0.0, 0.0), (1.0, 0.0), (1.02, 0.02), (1.02, 0.16), (1.09, 0.16), (1.10, 0.17), (1.10, 0.37),
             (1.085, 0.385), (0.94, 0.385), (0.925, 0.37), (0.905, 0.33), (0.89, 0.32), (0.85, 0.32), (0.845, 0.31),
@@ -227,12 +228,14 @@ def model_vault_door():
     for th in (math.radians(30), math.radians(150), math.radians(270)):
         brass.append(s.rcyl(0.032, 0.5, on_disc(DOOR_C, 0.3, th, -0.165), axis="X", seg=12, r=0.005, rot=(0, -th, 0)))
         brass.append(s.ball(0.05, on_disc(DOOR_C, 0.56, th, -0.15), seg=14))
+    s.part("TrimWheel", brass)                                         # turns when the door is opened (AutoDoor.Wheel)
+    brass = []
     d = on_disc(DOOR_C, 0.55, math.pi / 2, 0)
     brass.append(s.lathe([(0.0, 0.0), (0.088, 0.0), (0.09, 0.006), (0.084, 0.012), (0.09, 0.018), (0.084, 0.024),
                           (0.09, 0.03), (0.082, 0.04), (0.04, 0.046), (0.0, 0.046)], seg=28, axis="-Y",
                          loc=(d[0], -0.133, d[2])))                     # knurled dial, t 0.333 .. 0.379
     brass.append(s.rbox((0.012, 0.012, 0.03), (d[0], -0.178, d[2] + 0.06), r=0.003, seg=1))  # index mark on the dial
-    s.part("Trim", brass)
+    s.part("TrimDial", brass)
     return export("vault_door")
 
 
@@ -477,6 +480,144 @@ def model_exterior_door_panel():
     return export("exterior_door_panel")
 
 
+# --------------------------------------------------------------------------- the hostage's cage (storybook style)
+
+CAGE_H = 2.2          # top rail of the bars (the prefab's colliders); the dome rises over it
+CAGE_HALF = 1.0       # HouseFeatures.CageSize / 2
+
+
+def _bars(y_or_x, along, fixed, z0, z1, step=0.11, r=0.011):
+    """Vertical round bars every step along one side, from z0 to z1 (along: 'x' bars spread on x at y=fixed, 'y' on y)."""
+    out = []
+    n = int((2 * (CAGE_HALF - 0.09)) / step)
+    for k in range(n + 1):
+        t = -(CAGE_HALF - 0.09) + k * (2 * (CAGE_HALF - 0.09)) / n
+        loc = (t, fixed, (z0 + z1) / 2) if along == "x" else (fixed, t, (z0 + z1) / 2)
+        out.append(s.rcyl(r, z1 - z0, loc, seg=8, r=0.002, bevel_seg=1))
+    return out
+
+
+def _band(along, fixed, z, h=0.045, t=0.016):
+    """A flat brass band across one side at height z."""
+    w = 2 * (CAGE_HALF - 0.05)
+    size = (w, t, h) if along == "x" else (t, w, h)
+    loc = (0, fixed, z) if along == "x" else (fixed, 0, z)
+    return s.rbox(size, loc, r=0.004, seg=1)
+
+
+def _scrolls(along, fixed, z, n=7, rr=0.045):
+    """A row of little brass rings standing in the band zone (the ornament of a birdcage)."""
+    out = []
+    for k in range(n):
+        t = -(CAGE_HALF - 0.2) + k * (2 * (CAGE_HALF - 0.2)) / (n - 1)
+        rot = (math.pi / 2, 0, 0) if along == "x" else (math.pi / 2, 0, math.pi / 2)
+        loc = (t, fixed, z) if along == "x" else (fixed, t, z)
+        out.append(torus(rr, 0.007, loc, seg=16, seg_r=6, rot=rot))
+    return out
+
+
+def model_cage_storybook():
+    """The hostage's cage in the storybook style (Blue Prince): a big ornate birdcage on a dark wooden plinth — turned
+    brass corner columns with ball finials, rails top and bottom, round bars with two flat bands and a row of little
+    rings between them, a dome of eight curved ribs and a ring up to a crown finial with a hanging ring; the front is the
+    door (its own parts: bars, bands, hinges, a hasp and a big brass padlock with a red enamel keyhole plate); inside,
+    the hostage sits against the back bars hugging the knees, wrists and chest tied with rope.
+    Footprint 2 x 2 m (origin in the middle on the floor, front = Blender -Y), bars to 2.2 m, crown at 2.78 m.
+    Body = wood, Accent = brass, Door* = the door, Hostage* = the person (Body clothes, Skin, Hair (+ shoes), Rope)."""
+    h, half = CAGE_H, CAGE_HALF
+    plinth = 0.12
+    wood = [s.rbox((2 * half, 2 * half, plinth - 0.02), (0, 0, (plinth - 0.02) / 2), r=0.02, seg=2),
+            s.rbox((2 * half - 0.08, 2 * half - 0.08, 0.03), (0, 0, plinth - 0.015), r=0.012, seg=2)]
+    s.part("Body", wood)
+
+    brass = []
+    col = [(0.0, 0.0), (0.07, 0.0), (0.07, 0.04), (0.055, 0.06), (0.042, 0.09), (0.036, 0.3), (0.048, 0.33), (0.036, 0.36),
+           (0.03, h - plinth - 0.36), (0.042, h - plinth - 0.33), (0.03, h - plinth - 0.3), (0.03, h - plinth - 0.06),
+           (0.05, h - plinth - 0.03), (0.05, h - plinth), (0.0, h - plinth)]
+    for x in (-1, 1):
+        for y in (-1, 1):
+            cx, cy = x * (half - 0.06), y * (half - 0.06)
+            brass.append(s.lathe(col, seg=16, loc=(cx, cy, plinth)))
+            brass.append(s.ball(0.055, (cx, cy, h + 0.07), seg=14))
+            brass.append(s.rcyl(0.025, 0.06, (cx, cy, h + 0.02), seg=12, r=0.004))
+    for z in (plinth + 0.04, h - 0.02):                               # rails round the bottom and the top
+        for y in (-1, 1):
+            brass.append(s.rbox((2 * half - 0.08, 0.05, 0.045), (0, y * (half - 0.06), z), r=0.008, seg=1))
+        for x in (-1, 1):
+            brass.append(s.rbox((0.05, 2 * half - 0.08, 0.045), (x * (half - 0.06), 0, z), r=0.008, seg=1))
+    zb0, zb1 = plinth + 0.06, h - 0.04
+    brass += _bars(None, "x", half - 0.06, zb0, zb1)                  # back
+    brass += _bars(None, "y", -(half - 0.06), zb0, zb1)               # the two sides
+    brass += _bars(None, "y", half - 0.06, zb0, zb1)
+    for z in (0.75, 1.8):
+        brass.append(_band("x", half - 0.06, z))
+        brass.append(_band("y", -(half - 0.06), z))
+        brass.append(_band("y", half - 0.06, z))
+    brass += _scrolls("x", half - 0.06, 1.97)
+    brass += _scrolls("y", -(half - 0.06), 1.97)
+    brass += _scrolls("y", half - 0.06, 1.97)
+    # the dome: eight ribs from the top rail curving up to the crown, a ring round them halfway up
+    apex = h + 0.5
+    ring = []
+    for k in range(8):
+        a = math.pi / 4 * k
+        rr = (half - 0.06) / max(abs(math.cos(a)), abs(math.sin(a)))  # on the square rail
+        pts = []
+        for i in range(9):
+            t = i / 8
+            q = math.cos(t * math.pi / 2)
+            pts.append(Vector((rr * q * math.cos(a), rr * q * math.sin(a), h + (apex - h) * math.sin(t * math.pi / 2))))
+        brass.append(s.tube(pts, 0.016, res=2, smooth=True, segments_per=4))
+        ring.append(pts[4])
+    ring.append(ring[0])
+    brass.append(s.tube(ring, 0.012, res=1, smooth=False))
+    crown = [(0.0, 0.0), (0.09, 0.0), (0.1, 0.02), (0.05, 0.06), (0.035, 0.1), (0.06, 0.14), (0.035, 0.18), (0.0, 0.19)]
+    brass.append(s.lathe(crown, seg=16, loc=(0, 0, apex - 0.03)))
+    brass.append(torus(0.06, 0.01, (0, 0, apex + 0.22), seg=16, seg_r=6, rot=(math.pi / 2, 0, 0)))
+    s.part("Accent", brass)
+
+    # the door: the whole front between the columns
+    fy = -(half - 0.06)
+    door = _bars(None, "x", fy, zb0, zb1)
+    for z in (0.75, 1.8):
+        door.append(_band("x", fy, z))
+    door += _scrolls("x", fy, 1.97)
+    for z in (0.5, 1.6):                                              # hinge knuckles on the left column (Unity +X = Blender -X)
+        door.append(s.rcyl(0.022, 0.12, (half - 0.1, fy - 0.02, z), seg=10, r=0.004))
+    door.append(s.rbox((0.12, 0.03, 0.05), (-(half - 0.3), fy - 0.02, 1.12), r=0.006, seg=1))  # the hasp
+    s.part("DoorAccent", door)
+    lock = [s.rbox((0.17, 0.06, 0.19), (-(half - 0.3), fy - 0.06, 0.98), r=0.03, seg=3),
+            torus(0.055, 0.013, (-(half - 0.3), fy - 0.06, 1.08), seg=18, seg_r=6, rot=(math.pi / 2, 0, 0))]
+    s.part("DoorLock", lock)
+    s.part("DoorEye", [s.rbox((0.07, 0.01, 0.09), (-(half - 0.3), fy - 0.095, 0.96), r=0.012, seg=2)])
+
+    # the hostage: sitting on the plinth against the back bars, knees up, arms round them, facing the door
+    base = plinth
+    hip_y, back_y = 0.55, 0.68
+    clothes = [
+        s.rbox((0.36, 0.22, 0.5), (0, back_y - 0.06, base + 0.42), r=0.07, seg=3, taper=(0.85, 0.9)),         # torso
+        s.rbox((0.34, 0.26, 0.16), (0, hip_y, base + 0.1), r=0.07, seg=3),                                     # hips
+    ]
+    for x in (-0.1, 0.1):
+        clothes.append(s.tube([Vector((x, hip_y - 0.02, base + 0.1)), Vector((x, 0.25, base + 0.46))], 0.075, res=2, smooth=False))   # thighs up
+        clothes.append(s.tube([Vector((x, 0.25, base + 0.46)), Vector((x, 0.16, base + 0.08))], 0.06, res=2, smooth=False))           # shins down
+        clothes.append(s.tube([Vector((x * 2.0, back_y - 0.06, base + 0.6)), Vector((x * 2.1, 0.36, base + 0.42))], 0.048, res=2, smooth=False))  # upper arms
+        clothes.append(s.tube([Vector((x * 2.1, 0.36, base + 0.42)), Vector((x * 0.5, 0.2, base + 0.45))], 0.042, res=2, smooth=False))  # forearms round the knees
+    s.part("HostageBody", clothes)
+    skin = [s.ball(0.1, (0, back_y - 0.1, base + 0.86), seg=16, scale=(0.95, 1.0, 1.1)),                        # head, a little bowed
+            s.rcyl(0.045, 0.1, (0, back_y - 0.07, base + 0.72), seg=10, r=0.01),                                 # neck
+            s.ball(0.042, (-0.05, 0.19, base + 0.45), seg=10), s.ball(0.042, (0.05, 0.19, base + 0.45), seg=10)]  # hands together
+    s.part("HostageSkin", skin)
+    hair = [s.ball(0.104, (0, back_y - 0.085, base + 0.9), seg=16, scale=(1.0, 1.05, 0.85))]
+    for x in (-0.1, 0.1):
+        hair.append(s.rbox((0.1, 0.22, 0.08), (x, 0.11, base + 0.04), r=0.03, seg=2))                           # shoes
+    s.part("HostageHair", hair)
+    rope = [torus(0.065, 0.014, (0, 0.19, base + 0.45), seg=14, seg_r=5, rot=(0, math.pi / 2, 0)),             # round the wrists
+            s.place(torus(0.2, 0.016, (0, 0, 0), seg=20, seg_r=5), (0, back_y - 0.06, base + 0.5), scale=(1.0, 0.65, 1.0))]  # round the chest
+    s.part("HostageRope", rope)
+    return export("cage_storybook")
+
+
 MODELS = {
     "item_key_model": model_item_key_model,
     "item_cagekey_model": model_item_cagekey_model,
@@ -488,6 +629,7 @@ MODELS = {
     "cash_shelf": model_cash_shelf,
     "padlock": model_padlock,
     "exterior_door_panel": model_exterior_door_panel,
+    "cage_storybook": model_cage_storybook,
 }
 
 

@@ -36,6 +36,8 @@ namespace Stealth.Tests
             "AutoDoor.Swing",                // sliding doors have panels, the vault's round door a hinge instead
             "AutoDoor.PanelA",
             "AutoDoor.PanelB",
+            "AutoDoor.SwingB",               // only the street doors have a second leaf
+            "AutoDoor.Wheel",                // only the vault's door has a wheel to spin
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

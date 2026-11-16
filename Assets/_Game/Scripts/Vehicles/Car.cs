@@ -376,7 +376,7 @@ namespace Stealth.Vehicles
                 float yaw = i < 2 ? steer : 0f;
                 Wheels[i].localRotation = m_WheelRest[i] * Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(m_Spin, 0f, 0f);
             }
-            if (Steering != null) Steering.localRotation = m_SteeringRest * Quaternion.AngleAxis(-steer * 9f, new Vector3(0f, 0.42f, -0.9f).normalized);
+            if (Steering != null) Steering.localRotation = m_SteeringRest * CarLook.SteeringWheel(steer, s.SteeringRatio);
             m_Grind = (m_Grind + (EngineOn ? 540f : 0f) * dt) % 360f;
             if (Grinder != null) Grinder.localRotation = m_GrinderRest * Quaternion.Euler(m_Grind, 0f, 0f);
             if (Body != null)

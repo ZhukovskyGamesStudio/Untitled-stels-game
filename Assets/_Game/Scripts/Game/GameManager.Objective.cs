@@ -20,6 +20,8 @@ namespace Stealth.Game
         public static int CageOpenKey(int prop) => 6_000_000 + prop;
         /// <summary>Stages of the job (in <see cref="IsOpened"/>, replicated): the vault seen, somebody inside it; the hostage spoken to, its key in hand.</summary>
         public const int VaultFoundKey = 9_000_001, VaultEnteredKey = 9_000_002, CageFoundKey = 9_000_003, CageKeyHeldKey = 9_000_004;
+        /// <summary>A player has opened the unlocked vault door (its wheel spun, it swung in).</summary>
+        public const int VaultOpenKey = 9_000_005;
 
         /// <summary>How long the hostage's pointing marks the guard with the key, seconds.</summary>
         const float KeyCarrierMark = 90f;
@@ -78,6 +80,7 @@ namespace Stealth.Game
         {
             VaultConsole.IsSolved = i => IsOpened(ConsoleKey(i));
             VaultPanel.Solved = () => VaultSolved;
+            AutoDoor.IsSwungOpen = i => ActiveLevel.Layout != null && i >= 0 && i == ActiveLevel.Layout.VaultDoor && IsOpened(VaultOpenKey);
             Cage.IsFreed = i => IsOpened(CageOpenKey(i));
         }
 
@@ -120,7 +123,17 @@ namespace Stealth.Game
             }
             m_Opened.Add(DoorKey(l.VaultDoor));
             OpenedVersion++;
-            Banner(Loc.Pack("banner.vault_open"));
+            Banner(Loc.Pack("banner.vault_unlocked"));
+        }
+
+        /// <summary>Server: a player turns the wheel of the unlocked vault door — it opens (and stays open).</summary>
+        void OpenVaultServer(int door)
+        {
+            var l = ActiveLevel.Layout;
+            if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Vault || door != l.VaultDoor
+                || !IsOpened(DoorKey(door)) || IsOpened(VaultOpenKey)) return;
+            m_Opened.Add(VaultOpenKey);
+            OpenedVersion++;
         }
 
         /// <summary>
@@ -138,7 +151,7 @@ namespace Stealth.Game
                     var d = l.Doorways[l.VaultDoorway].Position;
                     if (MapSketch.AnyRevealed(Exploration, LevelLayout.FloorOf(d.y), new Rect(d.x - 0.75f, d.z - 0.75f, 1.5f, 1.5f))) SetStage(VaultFoundKey, true);
                 }
-                if (!IsOpened(VaultEnteredKey) && l.VaultDoor >= 0 && IsOpened(DoorKey(l.VaultDoor)))
+                if (!IsOpened(VaultEnteredKey) && l.VaultDoor >= 0 && IsOpened(VaultOpenKey))
                     foreach (var p in PlayerController.All)
                         if (!p.Downed && l.Plan.RoomAt(p.transform.position + Vector3.up * 0.3f)?.Id == l.VaultRoom)
                         {

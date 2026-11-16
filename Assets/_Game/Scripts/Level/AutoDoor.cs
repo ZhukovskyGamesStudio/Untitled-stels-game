@@ -20,13 +20,21 @@ namespace Stealth.Level
         public const float SlideTime = 0.35f;
         /// <summary>Seconds the vault's door takes to swing open.</summary>
         public const float VaultSwingTime = 2.6f;
+        /// <summary>Seconds the vault door's wheel spins (drawing the bolts) before the door moves, and how many turns.</summary>
+        public const float VaultSpinTime = 1.8f, VaultWheelTurns = 1.5f;
 
         public static readonly List<AutoDoor> All = new();
 
         public Transform PanelA, PanelB;
-        [Tooltip("A door on a hinge instead of sliding panels (the vault's round door): turns by SwingAngle when open.")]
+        [Tooltip("A door on a hinge instead of sliding panels (the vault's round door, the street doors): turns by SwingAngle when open.")]
         public Transform Swing;
+        [Tooltip("The second leaf of a double swing door: turns the other way (by −SwingAngle).")]
+        public Transform SwingB;
         public float SwingAngle = 90f;
+        [Tooltip("Seconds a swing door takes to open (the vault's: VaultSwingTime).")]
+        public float SwingTime = VaultSwingTime;
+        [Tooltip("The vault door's wheel (pivot on the disc's axis, local Z): spins before the door swings.")]
+        public Transform Wheel;
         [Tooltip("Padlocks on both faces, hung on the panels' seam: shown while a hackable lock holds the door.")]
         public Transform[] Padlocks;
         [Tooltip("Parts that are the wall itself (the corners round the vault's round door): dressed in the style's wall finish by StyleDecor.")]
@@ -41,6 +49,26 @@ namespace Stealth.Level
 
         /// <summary>Which doors are unlocked now (set by the game: index in the layout's door list).</summary>
         public static System.Func<int, bool> IsUnlocked = _ => false;
+        /// <summary>The vault's door a player has opened (set by the game): unlocking alone does not move it.</summary>
+        public static System.Func<int, bool> IsSwungOpen = _ => false;
+
+        /// <summary>
+        /// The vault door's motion (pure): <paramref name="spin"/> 0..1 of the wheel's turning, then <paramref name="swing"/>
+        /// 0..1 of the door's — the door waits for the wheel, and closes (never, in play) only after it has.
+        /// </summary>
+        public static void VaultStep(bool opened, float dt, ref float spin, ref float swing)
+        {
+            if (opened)
+            {
+                spin = Mathf.MoveTowards(spin, 1f, dt / VaultSpinTime);
+                if (spin >= 1f) swing = Mathf.MoveTowards(swing, 1f, dt / VaultSwingTime);
+            }
+            else
+            {
+                swing = Mathf.MoveTowards(swing, 0f, dt / VaultSwingTime);
+                if (swing <= 0f) spin = Mathf.MoveTowards(spin, 0f, dt / VaultSpinTime);
+            }
+        }
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -85,6 +113,7 @@ namespace Stealth.Level
         }
 
         float m_Open; // 0 closed .. 1 open
+        float m_Spin; // the vault's wheel: 0 .. 1 turned
         bool m_Opening;
         public bool IsOpen => m_Open > 0.5f;
         public float OpenAmount => m_Open;
@@ -115,6 +144,7 @@ namespace Stealth.Level
             foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
             ShowLock(locked);
             bool open = ShouldOpen(transform.position, s_Agents);
+            if (Swing != null && Vault) open = !locked && IsSwungOpen(Index); // unlocked by the panels, opened by a player
             if (open != m_Opening)
             {
                 m_Opening = open;
@@ -122,10 +152,13 @@ namespace Stealth.Level
             }
             if (Swing != null)
             {
-                // the vault door: heavy, slow, and once unlocked it stays open
-                if (Vault && !locked) open = true;
-                m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / VaultSwingTime);
-                Swing.localRotation = Quaternion.Euler(0f, SwingAngle * Mathf.SmoothStep(0f, 1f, m_Open), 0f);
+                // the vault door: heavy and slow; its wheel turns first, then it swings in and stays open
+                if (Vault) VaultStep(open, Time.deltaTime, ref m_Spin, ref m_Open);
+                else m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / Mathf.Max(0.05f, SwingTime));
+                if (Wheel != null) Wheel.localRotation = Quaternion.Euler(0f, 0f, -VaultWheelTurns * 360f * Mathf.SmoothStep(0f, 1f, m_Spin));
+                float turn = SwingAngle * Mathf.SmoothStep(0f, 1f, m_Open);
+                Swing.localRotation = Quaternion.Euler(0f, turn, 0f);
+                if (SwingB != null) SwingB.localRotation = Quaternion.Euler(0f, -turn, 0f);
                 Blocker.enabled = m_Open < 0.15f;
                 return;
             }

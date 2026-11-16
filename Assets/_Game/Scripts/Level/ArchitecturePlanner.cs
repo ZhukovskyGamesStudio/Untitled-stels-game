@@ -24,6 +24,10 @@ namespace Stealth.Level
         public Vector4 Surface;
         /// <summary>Decals: which material of the style's list.</summary>
         public int Variant;
+        /// <summary>A finish of the bank vault: its steel cladding and floor plate (<see cref="StyleKit.VaultWall"/>), whatever the style.</summary>
+        public bool Vault;
+        // (Variant of a wall finish: 0 the style's wall, 1 + 2k the k-th room look's wall, 2 + 2k its lower band; of a ceiling
+        // finish: 0 the style's, k + 1 the k-th room look's ceiling)
 
         public bool IsQuad => Kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish or
                               DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster;
@@ -47,13 +51,16 @@ namespace Stealth.Level
         {
             var list = new List<DecorPiece>();
             if (shell == null || g == null) return list;
-            foreach (var face in shell.Walls) PlanFace(list, face, shell, g);
+            foreach (var face in shell.Walls)
+                if (InVault(face, layout)) PlanVaultFace(list, face);
+                else PlanFace(list, face, shell, g, LookOf(face, layout, g));
             foreach (var o in shell.Openings) PlanOpening(list, o, g);
             if (g.Wall != null)
                 foreach (var o in shell.Openings) PlanReveals(list, o);
-            if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling);
+            if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling, g);
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
-            if (g.Floor != null && layout != null && g.RoomFloors != null && g.RoomFloors.Length > 0) PlanFloors(list, shell, layout, g);
+            if (layout != null) PlanRoomCeilings(list, layout, g);
+            if (layout != null && (layout.VaultRoom >= 0 || g.Floor != null && g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
             else if (g.Floor != null)
                 foreach (var r in shell.Floors)
                 {
@@ -78,6 +85,7 @@ namespace Stealth.Level
         /// </summary>
         static void PlanFloors(List<DecorPiece> list, LevelShell shell, LevelLayout layout, StyleGeometry g)
         {
+            const int vaultCell = -2;
             var plan = layout.Plan;
             for (int f = 0; f < layout.Floors; f++)
             {
@@ -98,24 +106,99 @@ namespace Stealth.Level
                         // a pocket behind a slanted or round wall belongs to its room: the wall cuts its cells at an angle, and
                         // the half on the room's side must have the room's floor (the style's floor showed there as a saw edge)
                         int id = plan.KindAt(f, x, z) is CellKind.Room or CellKind.Pocket ? plan.IdAt(f, x, z) : -1;
-                        int k = id >= 0 && id < plan.Rooms.Count ? g.RoomFloorOf(plan.Rooms[id].Type) + 1 : 0;
+                        int k = id >= 0 && id == layout.VaultRoom ? vaultCell
+                            : id >= 0 && id < plan.Rooms.Count ? g.RoomFloorOf(plan.Rooms[id].Type) + 1 : 0;
                         kind[x, z] = k;
                         used.Add(k);
                     }
                 foreach (int k in used)
+                {
+                    if (k == 0 && g.Floor == null) continue; // the style keeps the bare slab
                     foreach (var cells in LevelBuilder.Rectangles(plan.NX, plan.NZ, (x, z) => kind[x, z] == k))
                     {
                         float x0 = cells.xMin * HousePlan.Res, x1 = cells.xMax * HousePlan.Res, z0 = cells.yMin * HousePlan.Res, z1 = cells.yMax * HousePlan.Res;
                         list.Add(new DecorPiece
                         {
-                            Kind = DecorKind.FloorFinish, Variant = k,
+                            Kind = DecorKind.FloorFinish, Variant = k == vaultCell ? 0 : k, Vault = k == vaultCell,
                             Position = new Vector3((x0 + x1) / 2f, y + 0.008f, (z0 + z1) / 2f),
                             Rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward),
                             Scale = new Vector3(x1 - x0, z1 - z0, 1f),
                             Surface = new Vector4(x1 - x0, z1 - z0, x0, z0),
                         });
                     }
+                }
             }
+        }
+
+        /// <summary>
+        /// The room a face looks into, or null: probed in front of its middle, then of its quarters, ever deeper (behind a
+        /// slanted wall the cells next to it are the sealed pocket, not the room).
+        /// </summary>
+        static PlanRoom RoomOf(WallFace f, LevelLayout layout)
+        {
+            if (layout == null || layout.Plan == null) return null;
+            foreach (float depth in new[] { 0.3f, 0.7f, 1.2f })
+                foreach (float t in new[] { 0.5f, 0.25f, 0.75f })
+                {
+                    var room = layout.Plan.RoomAt(f.At(f.Length * t) + f.Normal * depth + Vector3.up * 0.5f);
+                    if (room != null) return room;
+                }
+            return null;
+        }
+
+        /// <summary>The style's own look (<see cref="StyleGeometry.RoomLooks"/>) for the room a face looks into, or −1.</summary>
+        static int LookOf(WallFace f, LevelLayout layout, StyleGeometry g)
+        {
+            if (g.RoomLooks == null || g.RoomLooks.Length == 0) return -1;
+            var room = RoomOf(f, layout);
+            return room != null ? g.RoomLookOf(room.Type) : -1;
+        }
+
+        /// <summary>The look of a room type with a ceiling of its own, or −1.</summary>
+        static int CeilingLookOf(PlanRoom room, StyleGeometry g)
+        {
+            int k = g != null ? g.RoomLookOf(room.Type) : -1;
+            return k >= 0 && g.RoomLooks[k].Ceiling != null && room.Levels == 1 ? k : -1;
+        }
+
+        /// <summary>Ceilings of their own (<see cref="RoomLook.Ceiling"/>): a finish just under the style's, over the whole room.</summary>
+        static void PlanRoomCeilings(List<DecorPiece> list, LevelLayout l, StyleGeometry g)
+        {
+            if (g.RoomLooks == null || g.RoomLooks.Length == 0) return;
+            foreach (var room in l.Rooms)
+            {
+                int k = CeilingLookOf(room, g);
+                if (k < 0) continue;
+                float y = LevelLayout.FloorY(room.Floor) + LevelMetrics.WallHeight - 0.014f;
+                foreach (var r in CeilingRects(l, room))
+                    list.Add(new DecorPiece
+                    {
+                        Kind = DecorKind.CeilingFinish, Variant = k + 1,
+                        Position = new Vector3(r.center.x, y, r.center.y),
+                        Rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward),
+                        Scale = new Vector3(r.width, r.height, 1f),
+                        Surface = new Vector4(r.width, r.height, r.xMin, r.yMin),
+                    });
+            }
+        }
+
+        /// <summary>The face looks into the bank vault (<see cref="LevelLayout.VaultRoom"/>).</summary>
+        static bool InVault(WallFace f, LevelLayout layout)
+        {
+            if (layout == null || layout.VaultRoom < 0 || layout.Plan == null) return false;
+            return RoomOf(f, layout)?.Id == layout.VaultRoom;
+        }
+
+        /// <summary>
+        /// A wall of the bank vault: steel cladding from floor to ceiling instead of the style's panels, trims and finish
+        /// (real vaults are steel-lined boxes; the deposit boxes stand along them). No windows there.
+        /// </summary>
+        static void PlanVaultFace(List<DecorPiece> list, WallFace f)
+        {
+            float u0 = f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f;
+            float u1 = f.Length + (f.CornerB ? (f.StraightB ? T / 2f : T) : f.JointB ? T / 2f : 0f);
+            if (u1 - u0 < 0.05f) return;
+            PlanWallFinish(list, f, u0, u1, new List<(float a, float b)>(), true);
         }
 
         // ------------------------------------------------------------------ decay and posters
@@ -142,6 +225,7 @@ namespace Stealth.Level
                         float s = Mathf.Min(rng.Range(1.6f, 4f), Mathf.Min(size.x, size.y) * 0.9f);
                         if (s < 0.5f) continue;
                         float x = rng.Range(r.Min.x + s * 0.5f, r.Max.x - s * 0.5f), z = rng.Range(r.Min.y + s * 0.5f, r.Max.y - s * 0.5f);
+                        if (layout.VaultRoom >= 0 && layout.Plan.RoomAt(new Vector3(x, r.Y + 0.3f, z))?.Id == layout.VaultRoom) continue;
                         list.Add(new DecorPiece
                         {
                             Kind = DecorKind.FloorDecal, Variant = rng.Next(nf),
@@ -154,7 +238,7 @@ namespace Stealth.Level
 
             foreach (var f in shell.Walls)
             {
-                if (f.Y0 > 0.001f || f.Length < 1.2f) continue;                // full-height faces only
+                if (f.Y0 > 0.001f || f.Length < 1.2f || InVault(f, layout)) continue; // full-height faces only; the vault is clean steel
                 var holes = WindowHoles(f, shell);
                 var rot = Quaternion.LookRotation(-f.Normal);
                 if (nw > 0 && g.DecayDensity > 0f)
@@ -207,8 +291,10 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ walls
 
-        static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g)
+        static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g, int lookIndex = -1)
         {
+            var look = lookIndex >= 0 ? g.RoomLooks[lookIndex] : default;
+            bool plain = lookIndex >= 0 && look.Plain, tiled = lookIndex >= 0 && look.Lower != null;
             // Reach into the room's corners: past the corner post on that side; at the joint of a bent wall exactly to the joint.
             // A post in the middle of a straight wall is shared with the face that runs on behind it: half each.
             float u0 = f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f;
@@ -230,10 +316,12 @@ namespace Stealth.Level
             }
 
             // under a vent the panels must clear its bottom flange too
-            bool wainscot = fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + (toTop ? 0.02f : FrameReach);
-            if (fullHeight && g.Baseboard && !wainscot && f.Y1 >= 0.2f) foreach (var (a, b) in low) Run(DecorKind.Baseboard, 0f, a, b);
+            bool wainscot = !plain && fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + (toTop ? 0.02f : FrameReach);
+            if (fullHeight && g.Baseboard && !wainscot && !tiled && f.Y1 >= 0.2f) foreach (var (a, b) in low) Run(DecorKind.Baseboard, 0f, a, b);
             if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight, u0, u1);
-            if (fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, g.RailHeight, a, b);
+            if (!plain && fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, g.RailHeight, a, b);
+            // tiles (padding) up to some height: a cap rail along their top edge
+            if (tiled && fullHeight && f.Y1 >= look.LowerHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, look.LowerHeight, a, b);
             if (wainscot)
                 foreach (var (a, b) in low)
                 {
@@ -267,7 +355,16 @@ namespace Stealth.Level
                     });
                 }
             }
-            if (g.Wall != null) PlanWallFinish(list, f, u0, u1, holes);
+            if (lookIndex < 0)
+            {
+                if (g.Wall != null) PlanWallFinish(list, f, u0, u1, holes);
+                return;
+            }
+            // the room's own walls: the lower band, then the wall above it (the room's finish, or the style's)
+            int upper = look.Wall != null ? 1 + 2 * lookIndex : g.Wall != null ? 0 : -1;
+            float split = tiled ? look.LowerHeight : f.Y0;
+            if (tiled && f.Y0 < split) PlanWallFinish(list, f, u0, u1, holes, false, f.Y0, Mathf.Min(f.Y1, split), 2 + 2 * lookIndex);
+            if (upper >= 0 && f.Y1 > split) PlanWallFinish(list, f, u0, u1, holes, false, Mathf.Max(f.Y0, split), f.Y1, upper);
         }
 
         /// <summary>How far a doorway's trim reaches onto the wall past the opening's edge (the kit's casing, the pilasters).</summary>
@@ -353,8 +450,11 @@ namespace Stealth.Level
             return false;
         }
 
-        static void PlanWallFinish(List<DecorPiece> list, WallFace f, float u0, float u1, List<(float a, float b)> holes)
+        static void PlanWallFinish(List<DecorPiece> list, WallFace f, float u0, float u1, List<(float a, float b)> holes, bool vault = false,
+            float yLo = float.NaN, float yHi = float.NaN, int variant = 0)
         {
+            if (float.IsNaN(yLo)) yLo = f.Y0;
+            if (float.IsNaN(yHi)) yHi = f.Y1;
             void Rect(float a, float b, float y0, float y1)
             {
                 if (b - a < 0.02f || y1 - y0 < 0.02f) return;
@@ -364,7 +464,7 @@ namespace Stealth.Level
                 float worldU = Vector3.Dot(c, right) - (b - a) / 2f;
                 list.Add(new DecorPiece
                 {
-                    Kind = DecorKind.WallFinish, Position = c, Rotation = Quaternion.LookRotation(-f.Normal),
+                    Kind = DecorKind.WallFinish, Position = c, Rotation = Quaternion.LookRotation(-f.Normal), Vault = vault, Variant = variant,
                     Scale = new Vector3(b - a, y1 - y0, 1f), Surface = new Vector4(b - a, y1 - y0, worldU, y0),
                 });
             }
@@ -373,12 +473,12 @@ namespace Stealth.Level
             {
                 float ha = Mathf.Max(a, u0), hb = Mathf.Min(b, u1);
                 if (hb <= ha) continue;
-                Rect(cur, ha, f.Y0, f.Y1);
-                Rect(ha, hb, f.Y0, Mathf.Min(f.Y1, WindowBottom));
-                Rect(ha, hb, Mathf.Max(f.Y0, WindowTop), f.Y1);
+                Rect(cur, ha, yLo, yHi);
+                Rect(ha, hb, yLo, Mathf.Min(yHi, WindowBottom));
+                Rect(ha, hb, Mathf.Max(yLo, WindowTop), yHi);
                 cur = hb;
             }
-            Rect(cur, u1, f.Y0, f.Y1);
+            Rect(cur, u1, yLo, yHi);
         }
 
         // ------------------------------------------------------------------ doorways
@@ -452,12 +552,13 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ ceilings
 
-        static void PlanCeilings(List<DecorPiece> list, LevelLayout l, CeilingKind kind)
+        static void PlanCeilings(List<DecorPiece> list, LevelLayout l, CeilingKind kind, StyleGeometry g = null)
         {
             var alongZ = Quaternion.LookRotation(Vector3.right);   // local X → world Z
             var alongX = Quaternion.LookRotation(Vector3.forward); // local X → world X
             foreach (var room in l.Rooms)
             {
+                if (CeilingLookOf(room, g) >= 0) continue; // a ceiling of its own: no beams or coffers
                 var lamps = LevelBuilder.LightSpots(l, room);
                 // a beam along z at x (or along x at z) keeps clear of the lamps it passes; shifted aside or left out
                 float? Dodge(float at, bool alongZ, Rect r)

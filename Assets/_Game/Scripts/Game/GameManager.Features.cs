@@ -105,6 +105,7 @@ namespace Stealth.Game
                 case UseKind.Workbench: CraftServer(player); break;
                 case UseKind.KeyDoor: UnlockWithKeyServer(player, index); break;
                 case UseKind.VaultConsole: SolveConsoleServer(player, index); break;
+                case UseKind.VaultDoor: OpenVaultServer(index); break;
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 default: UseSewerServer(player, kind, index); break;

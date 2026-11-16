@@ -40,6 +40,45 @@ namespace Stealth.Tests
         };
 
         [Test]
+        public void OuterWallsRunUpToTheNextFloor()
+        {
+            var shell = Shell(out _);
+            // the slab's edge between the floors stays behind the facade: no dark band outside, one plane
+            var tall = shell.Walls.Where(f => f.Exterior && f.Y0 < 0.01f && f.Y1 > 2.5f).ToList();
+            Assert.IsNotEmpty(tall);
+            Assert.IsTrue(tall.All(f => f.Y1 >= LevelMetrics.FloorHeight - 0.01f), "an outer wall stops under the slab");
+        }
+
+        [Test]
+        public void ARoomTypeGetsItsOwnTilesPaintAndCeiling()
+        {
+            var shell = Shell(out var layout);
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            var type = layout.Rooms.First(r => r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && r.Levels == 1).Type;
+            var g = Everything(CeilingKind.Coffers);
+            g.WainscotHeight = 1f;
+            g.RoomLooks = new[] { new RoomLook { Room = type, Wall = Lit(), WallTile = 2f, Lower = Lit(), LowerTile = 1f, LowerHeight = 1.6f, Plain = true, Ceiling = Lit(), CeilingTile = 1.2f } };
+            var plan = ArchitecturePlanner.Plan(shell, layout, g);
+            PlanRoom At(Vector3 p) => layout.Plan.RoomAt(p);
+            // probed just over the piece's bottom edge (a piece's middle near the ceiling reads as the floor above)
+            bool Ours(DecorPiece p, Vector3 into) => At(p.Position + into * 0.3f + Vector3.up * (0.1f - (p.IsQuad ? p.Scale.y / 2f : 0f)))?.Type == type;
+            var finishes = plan.Where(p => p.Kind == DecorKind.WallFinish && Ours(p, -(p.Rotation * Vector3.forward))).ToList();
+            var lower = finishes.Where(p => p.Variant == 2).ToList();
+            var upper = finishes.Where(p => p.Variant == 1).ToList();
+            Assert.IsNotEmpty(lower, "tiles at the bottom");
+            Assert.IsNotEmpty(upper, "the room's paint above");
+            // (the reveals inside the doorways keep the style's wall: they belong to the opening, both rooms see them)
+            bool InOpening(DecorPiece p) => shell.Openings.Any(o => Mathf.Abs(o.Center.y - LevelLayout.FloorY(LevelLayout.FloorOf(p.Position.y - p.Scale.y / 2f + 0.1f))) < 0.5f
+                && Vector2.Distance(new Vector2(o.Center.x, o.Center.z), new Vector2(p.Position.x, p.Position.z)) < o.Width / 2f + 0.3f);
+            var left = finishes.Where(p => p.Variant == 0 && !InOpening(p)).ToList();
+            Assert.IsEmpty(left, $"no style wallpaper left in the room: {string.Join(", ", left.Take(3).Select(p => p.Position))}");
+            Assert.IsTrue(lower.All(p => p.Position.y + p.Scale.y / 2f - LevelLayout.FloorY(LevelLayout.FloorOf(p.Position.y - p.Scale.y / 2f + 0.1f)) <= 1.6f + 1e-3f), "tiles up to their height");
+            Assert.IsFalse(plan.Any(p => p.Kind == DecorKind.Wainscot && Ours(p, p.Rotation * Vector3.forward)), "plain walls: no panels");
+            Assert.IsTrue(plan.Any(p => p.Kind == DecorKind.CeilingFinish && p.Variant == 1), "a ceiling of its own");
+            Assert.IsFalse(plan.Any(p => p.Kind == DecorKind.Coffer && At(p.Position - Vector3.up * 0.5f)?.Type == type), "no coffers under it");
+        }
+
+        [Test]
         public void DecayAndPostersAreSeededStayOnTheirSurfacesAndSkipTheWindows()
         {
             var shell = Shell(out var layout);

@@ -392,6 +392,21 @@ namespace Stealth.Level
             return false;
         }
 
+        /// <summary>
+        /// The room has no opening but <paramref name="door"/>: no street door, vent or slot of its own (the reach test
+        /// ignores the outside, so a vault with a door to the street passed it).
+        /// </summary>
+        public static bool OnlyWayIn(HousePlan plan, int room, int door)
+        {
+            for (int k = 0; k < plan.Openings.Count; k++)
+            {
+                if (k == door) continue;
+                var w = plan.Walls[plan.Openings[k].Wall];
+                if (w.RoomA == room || w.RoomB == room) return false;
+            }
+            return true;
+        }
+
         static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
         {
             var plan = l.Plan;
@@ -412,7 +427,7 @@ namespace Stealth.Level
                 int v = 0;
                 foreach (int id in behind) v = id;
                 var room = plan.Rooms[v];
-                if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y) continue;
+                if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y || !OnlyWayIn(plan, v, i)) continue;
                 var w = plan.Walls[plan.Openings[i].Wall];
                 int outside = w.RoomA == v ? w.RoomB : w.RoomA;
                 var (oldOpening, oldDoorway) = (plan.Openings[i], l.Doorways[i]);

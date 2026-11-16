@@ -268,6 +268,7 @@ namespace Stealth.Level
         const float DeskTop = LevelMetrics.DeskTop;
         const float CabinetTop = 1.2f; // the drawer cabinet's top (Tools/Blender/generate_models.py model_cabinet)
         const float WallGap = 0.06f;    // between a back and the wall's face
+        const float HungGap = 0.005f;   // between the back of a thing hung on the wall (a board, a cabinet) and the wall's face
         const float Aisle = 1.25f;      // free walkway around an island and in front of a wall group (robots are 0.8 m wide)
         const float Facing = 0.3f;      // more than that between two pieces facing each other across a walkway
         static readonly float[] ShelfLevels = { 0.47f, 1.07f, 1.67f };
@@ -1109,7 +1110,11 @@ namespace Stealth.Level
             }
         }
 
-        float BackOf(PropKind k) => -(Foot.TryGetValue(k, out var f) ? f.yMin : -0.3f) + WallGap;
+        /// <summary>
+        /// How far from the wall's face a piece's origin goes so its back touches the wall: standing furniture keeps
+        /// <see cref="WallGap"/> (skirting, panels), what hangs on the wall itself sits flat against it (<see cref="HungGap"/>).
+        /// </summary>
+        float BackOf(PropKind k) => -(Foot.TryGetValue(k, out var f) ? f.yMin : -0.3f) + (OnWall.Contains(k) ? HungGap : WallGap);
         float R(float a, float b) => a + (float)m_Rng.NextDouble() * (b - a);
         bool Chance(double p) => m_Rng.NextDouble() < p;
 

@@ -27,6 +27,10 @@ namespace Stealth.Level
         public GameObject Roof;
         public GameObject OutsideGround;
         public GameObject Fence;
+        [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
+        public GameObject CityPiece;
+        public Material[] CityMaterials = new Material[0];
+        public GameObject CityLamp;
 
         [Header("Pieces")]
         public GameObject Stairs;

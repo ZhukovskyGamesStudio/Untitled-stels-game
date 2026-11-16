@@ -13,6 +13,7 @@ namespace Stealth.Level
         /// <summary>The furniture placed in the house (one object per prop).</summary>
         public static IReadOnlyList<GameObject> Props => s_Props;
         static readonly List<GameObject> s_Props = new();
+        static readonly List<Mesh> s_Meshes = new();
 
         /// <summary>Builds <paramref name="layout"/> from the prefabs in <paramref name="art"/>, replacing the previous level.</summary>
         public static GameObject Load(LevelLayout layout, LevelArt art)
@@ -23,6 +24,7 @@ namespace Stealth.Level
             Root = builder.Build();
             Shell = builder.Shell;
             s_Props.AddRange(builder.Props);
+            s_Meshes.AddRange(builder.Meshes);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             return Root;
         }
@@ -38,6 +40,13 @@ namespace Stealth.Level
             Layout = null;
             Shell = null;
             s_Props.Clear();
+            foreach (var m in s_Meshes)
+                if (m != null)
+                {
+                    if (Application.isPlaying) Object.Destroy(m);
+                    else Object.DestroyImmediate(m);
+                }
+            s_Meshes.Clear();
         }
     }
 
@@ -81,6 +90,8 @@ namespace Stealth.Level
         public LevelShell Shell { get; } = new();
         /// <summary>The furniture placed (not static-batched: styles swap its meshes; <see cref="PropBatches"/> merges it).</summary>
         public List<GameObject> Props { get; } = new();
+        /// <summary>Meshes made while building (the city's): destroyed with the level.</summary>
+        public List<Mesh> Meshes { get; } = new();
 
         public LevelBuilder(LevelArt art, LevelLayout layout)
         {
@@ -100,11 +111,14 @@ namespace Stealth.Level
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
             for (int f = 0; f < l.Floors; f++) BuildSlab(f);
             BuildRoof();
-            Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, -0.07f, H / 2), new Vector3(W + 60f, 0.1f, H + 60f));
-            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, -25f), new Vector3(W + 60f, 5f, 1f));
-            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, H + 25f), new Vector3(W + 60f, 5f, 1f));
-            Block(m_Art.Fence, "Fence", new Vector3(-25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
-            Block(m_Art.Fence, "Fence", new Vector3(W + 25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
+            float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
+            // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
+            Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, CityPlan.RoadTop - 0.06f, H / 2), new Vector3(W + far, 0.1f, H + far));
+            // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
+            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, -yard - 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
+            Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, H + yard + 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
+            Block(m_Art.Fence, "Fence", new Vector3(-yard - 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
+            Block(m_Art.Fence, "Fence", new Vector3(W + yard + 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
 
             m_WindowCuts.Clear();
             foreach (var cut in WindowCuts(l))
@@ -150,6 +164,7 @@ namespace Stealth.Level
                     Place(m_Art.VaultConsole, $"VaultConsole{i}", l.VaultConsoles[i].position, l.VaultConsoles[i].rotation).GetComponent<VaultConsole>()?.Configure(i);
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
+            BuildCity(W, H); // one mesh of its own: not static-batched
 
             for (int i = 0; i < l.Props.Count; i++)
             {
@@ -271,7 +286,8 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ walls
 
-        readonly Dictionary<Vector3, float> m_Posts = new();
+        /// <summary>Posts of the floor being built: by their place rounded to a centimetre (shared ends meet there), the exact place and the height.</summary>
+        readonly Dictionary<Vector3, (Vector3 at, float height)> m_Posts = new();
         /// <summary>Where windows cut the outer walls: wall index → positions along it (<see cref="WindowCuts"/>).</summary>
         readonly Dictionary<int, List<float>> m_WindowCuts = new();
         /// <summary>Walls of the floor by their end points (cm keys): to find bent walls whose pieces meet at a shallow angle.</summary>
@@ -325,10 +341,12 @@ namespace Stealth.Level
             float y = LevelLayout.FloorY(f);
             foreach (var kv in m_Posts)
             {
-                // a post between two pieces of a bent wall turns with them: its faces run on with the wall's, no cube sticks out
-                var at = new Vector2(kv.Key.x, kv.Key.z);
+                // a post between two pieces of a bent wall turns with them: its faces run on with the wall's, no cube sticks out;
+                // it stands at the walls' exact end (the rounded key moved it up to 5 mm out of the facade: a seam outside)
+                var (p, h) = kv.Value;
+                var at = new Vector2(p.x, p.z);
                 var rot = SmoothJoint(at, out float yaw) ? Quaternion.Euler(0f, yaw, 0f) : (Quaternion?)null;
-                Block(m_Art.WallBlock, "WallPost", kv.Key + Vector3.up * (y + kv.Value / 2f), new Vector3(t, kv.Value, t), rot);
+                Block(m_Art.WallBlock, "WallPost", p + Vector3.up * (y + h / 2f), new Vector3(t, h, t), rot);
             }
         }
 
@@ -355,7 +373,7 @@ namespace Stealth.Level
         void Post(Vector2 p, float height)
         {
             var key = new Vector3(Mathf.Round(p.x * 100f) / 100f, 0f, Mathf.Round(p.y * 100f) / 100f);
-            m_Posts[key] = m_Posts.TryGetValue(key, out var h) ? Mathf.Max(h, height) : height;
+            m_Posts[key] = m_Posts.TryGetValue(key, out var was) ? (was.at, Mathf.Max(was.height, height)) : (new Vector3(p.x, 0f, p.y), height);
         }
 
         void Wall(int index)
@@ -373,11 +391,20 @@ namespace Stealth.Level
                 RailingPiece(a3, b3);
                 return;
             }
-            float height = w.FullHeight ? LevelMetrics.FloorHeight : LevelMetrics.WallHeight;
+            // an outer wall runs up to the next floor (the roof): the slab's edge between the floors is behind it, the facade is one plane
+            float height = w.FullHeight || w.Exterior ? LevelMetrics.FloorHeight : LevelMetrics.WallHeight;
             Post(w.A, height);
             Post(w.B, height);
             const float t = LevelMetrics.WallThickness;
             float len = w.Length;
+            if (height < LevelMetrics.FloorHeight)
+                foreach (var (u0, u1) in StairBands(w, m_Layout.Stairs))
+                {
+                    // over the stairwell no slab fills the band up to the next floor: the wall does
+                    WallPiece(m_Art.WallBlock, a3 + d3 * u0, a3 + d3 * u1, LevelMetrics.WallHeight, LevelMetrics.FloorHeight);
+                    if (u0 <= t) Post(w.A, LevelMetrics.FloorHeight);
+                    if (u1 >= len - t) Post(w.B, LevelMetrics.FloorHeight);
+                }
             var inner = InnerNormals(w);
             float from = t / 2f;
             bool jointA = SmoothJoint(w.A, out _), jointB = SmoothJoint(w.B, out _);
@@ -434,14 +461,20 @@ namespace Stealth.Level
                     WallPiece(m_Art.WallBlock, a3 + d3 * o0, a3 + d3 * o1, 0f, sill);
                     RecordFaces(a3 + d3 * o0, a3 + d3 * o1, 0f, sill, w.Exterior, inner, false, false);
                 }
-                WallPiece(m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
+                // over a street door the facade runs on (the door's frame paints the inside): no trim-coloured lintel outside
+                WallPiece(w.Exterior ? m_Art.WallBlock : m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
                 Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Vault = vault, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
-                else if (w.Exterior) Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, along);
+                else if (w.Exterior)
+                {
+                    // the street door's +Z out of the house: its leaves swing outwards
+                    var outward = inner.Count > 0 ? -inner[0] : along * Vector3.forward;
+                    Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
+                }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
                 else if (m_Art.ExitSign != null && !vault) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
                 from = o1;
@@ -498,6 +531,33 @@ namespace Stealth.Level
                     CornerA = cornerA, CornerB = cornerB, JointA = jointA, JointB = jointB,
                     StraightA = cornerA && m_StraightA, StraightB = cornerB && m_StraightB,
                 });
+        }
+
+        /// <summary>
+        /// Where a wall runs along the hole in the slab above it that the stairs leaving its floor climb through: spans
+        /// along the wall (metres from A). Elsewhere the slab fills the band between the wall's top and the next floor; over
+        /// the hole nothing did, and by an outer wall a strip of sky showed between the floors.
+        /// </summary>
+        public static List<(float from, float to)> StairBands(PlanWall w, IReadOnlyList<Stair> stairs)
+        {
+            var spans = new List<(float, float)>();
+            const float step = 0.1f, reach = LevelMetrics.WallThickness / 2f + 0.15f;
+            if (w.Railing) return spans;
+            foreach (var s in stairs)
+            {
+                if (s.Floor != w.Floor) continue;
+                var hole = PlanGenerator.StairArea(s, reach);
+                float from = -1f, to = -1f;
+                for (float u = 0f; u <= w.Length + step - 0.001f; u += step)
+                {
+                    float at = Mathf.Min(u, w.Length);
+                    if (!hole.Contains(w.At(at))) continue;
+                    if (from < 0f) from = at;
+                    to = at;
+                }
+                if (from >= 0f && to - from > 0.05f) spans.Add((Mathf.Max(0f, from - step), Mathf.Min(w.Length, to + step)));
+            }
+            return spans;
         }
 
         /// <summary>A wall block exactly from <paramref name="a"/> to <paramref name="b"/> (no overlap with neighbours), any direction.</summary>
@@ -586,6 +646,54 @@ namespace Stealth.Level
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
                 look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
+        }
+
+        /// <summary>The city round the yard (<see cref="CityPlan"/>): one mesh, a submesh per material, and the street lamps' lights.</summary>
+        void BuildCity(float w, float h)
+        {
+            var mats = m_Art.CityMaterials;
+            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
+            var house = new Rect(0f, 0f, w, h);
+            var lobby = m_Layout.Lobby.Center;
+            var city = CityPlan.Make(house, CityPlan.SideNearest(house, new Vector2(lobby.x, lobby.z)), m_Layout.Floors, m_Layout.Seed);
+            // the house's own corners (an L, a courtyard): pavement too
+            foreach (var r in Rectangles(m_Plan.NX, m_Plan.NZ, (x, z) => m_Plan.KindAt(0, x, z) == CellKind.Outside))
+            {
+                var box = new CityBox(new Vector3(r.xMin * HousePlan.Res, -0.3f, r.yMin * HousePlan.Res), new Vector3(r.xMax * HousePlan.Res, CityPlan.WalkTop, r.yMax * HousePlan.Res),
+                    CitySlot.Sidewalk, CitySlot.Sidewalk);
+                city.Boxes.Add(box);
+                city.Ground.Add(box.Bounds);
+            }
+            // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
+            var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
+            foreach (var b in city.Ground)
+                if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
+            foreach (var b in city.Solids)
+                if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
+            int slots = System.Enum.GetValues(typeof(CitySlot)).Length;
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[slots];
+            for (int i = 0; i < slots; i++) tris[i] = new List<int>();
+            foreach (var b in city.Boxes) CityPlan.AddFaces(b, verts, normals, uvs, tris);
+            var mesh = new Mesh { name = "City", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            var used = new List<Material>();
+            var subs = new List<List<int>>();
+            for (int i = 0; i < slots; i++)
+                if (tris[i].Count > 0 && i < mats.Length && mats[i] != null) { used.Add(mats[i]); subs.Add(tris[i]); }
+            mesh.subMeshCount = subs.Count;
+            for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
+            mesh.RecalculateBounds();
+            Meshes.Add(mesh);
+            var go = Place(m_Art.CityPiece, "City", Vector3.zero, Quaternion.identity);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
+            if (m_Art.CityLamp != null)
+                foreach (var p in city.Lamps) Place(m_Art.CityLamp, "CityLamp", p, Quaternion.identity);
         }
 
         /// <summary>

@@ -103,6 +103,16 @@ namespace Stealth.EditorTools
             Mat("Wall_Hatch", new Color(0.78f, 0.78f, 0.76f), "hatch", 0.1f);
             Mat("Wall_Panels", new Color(0.96f, 0.97f, 0.99f), "panels", 0.35f);
             Mat("Wall_Circuit", new Color(0.24f, 0.24f, 0.3f), "circuit", 0.5f, 0f, "circuit_glow", new Color(0.15f, 1.3f, 1.5f));
+            // the themed rooms' walls and ceilings (StyleGeometry.RoomLooks): tiles, paint, padding, plain and acoustic ceilings
+            Mat("Wall_TilesWhite", new Color(0.93f, 0.95f, 0.96f), "smalltiles", 0.65f);
+            Mat("Wall_TilesMint", new Color(0.7f, 0.85f, 0.8f), "smalltiles", 0.6f);
+            Mat("Wall_TilesCream", new Color(0.95f, 0.89f, 0.76f), "smalltiles", 0.6f);
+            Mat("Wall_PaintWhite", new Color(0.9f, 0.91f, 0.9f), "plaster", 0.15f);
+            Mat("Wall_Concrete", new Color(0.7f, 0.7f, 0.68f), "concrete", 0.1f);
+            Mat("Wall_Padding", new Color(0.2f, 0.32f, 0.52f), "panels", 0.2f);
+            Mat("Ceiling_Plain", new Color(0.93f, 0.93f, 0.91f), "plaster", 0.1f);
+            Mat("Ceiling_Acoustic", new Color(0.9f, 0.9f, 0.87f), "panels", 0.1f);
+            Mat("Ceiling_Concrete", new Color(0.6f, 0.6f, 0.6f), "concrete", 0.1f);
             // trims and parts
             Mat("Trim_WoodDark", new Color(0.24f, 0.14f, 0.08f), null, 0.45f);
             Mat("Trim_WoodMid", new Color(0.46f, 0.3f, 0.18f), null, 0.35f);
@@ -118,6 +128,9 @@ namespace Stealth.EditorTools
             Mat("Pipe_Green", new Color(0.24f, 0.36f, 0.28f), null, 0.4f, 0.3f);
             Mat("Panel_WoodDark", new Color(0.3f, 0.18f, 0.1f), "boards", 0.4f);
             Mat("Panel_PaleBlue", new Color(0.66f, 0.74f, 0.84f), null, 0.3f);
+            // the bank vault in every style: brushed steel panels, a clean steel floor plate
+            Mat("Vault_Wall", new Color(0.74f, 0.76f, 0.8f), "vaultsteel", 0.6f, 0.35f);
+            Mat("Vault_Floor", new Color(0.6f, 0.62f, 0.65f), "diamondplate", 0.5f, 0.35f);
             Mat("Glow_White", Color.white, null, 0.5f, 0f, null, new Color(2.4f, 2.6f, 2.8f));
             Mat("Glow_Cyan", new Color(0.2f, 1f, 1f), null, 0.5f, 0f, null, new Color(0.3f, 2.6f, 3f));
             Mat("Glow_DimCyan", new Color(0.1f, 0.5f, 0.5f), null, 0.5f, 0f, null, new Color(0.1f, 0.9f, 1.05f)); // dying electronics (S16_Derelict)
@@ -157,6 +170,10 @@ namespace Stealth.EditorTools
                 AssetDatabase.CreateAsset(kit, asset);
             }
             kit.Family = family;
+            kit.VaultWall = K("Vault_Wall");
+            kit.VaultFloor = K("Vault_Floor");
+            kit.VaultWallTile = 2f;
+            kit.VaultFloorTile = 1f;
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

@@ -37,6 +37,7 @@ python Tools/unity_mcp.py refresh_unity '{"mode":"force","scope":"all","compile"
 Tools/unity_test.sh Stealth.Tests.HousePlanTests Stealth.Tests.SpaceRulesTests                 # тесты по классам / именам, ждёт итог
 python Tools/unity_mcp.py execute_menu_item '{"menu_path":"Stealth/Build Windows Player"}'     # билд (и другие пункты меню Stealth)
 Tools/shoot.sh tour 5 5 S06_Storybook 7811   # сценарий <имя> <сид> <дом> [стиль] [порт] тихим окном → Builds/shots/<имя>_<сид>_<дом>; python Tools/sheet.py <папка> 3 2 — контактные листы
+python Tools/unity_mcp.py execute_menu_item '{"menu_path":"Stealth/Rebuild Listed Prefabs (Temp-rebuild.txt)"}'  # REBUILD в открытом редакторе: имена префабов через запятую — в Temp/rebuild.txt
 Tools/unity_test.sh Stealth.Tests.SpaceAudit.WriteReport   # аудит пространства → Logs/space_audit.txt (мебель на окнах, пустые комнаты, повторы, наложения стен и панелей)
 ```
 
@@ -125,8 +126,9 @@ LaserGate — отдельная ловушка (не детектор)
 → `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
 Удар сбивает с ног (`HealthState.TryHit` → `Downed`): лежачих роботы не видят (`IIntruder.IsDown`), робот говорит «Нарушитель устранён»
 и возвращается к работе; с HP > 0 игрок встаёт сам (`CanGetUp`, Пробел → `IPlayerLink.SendGetUp`), с 0 — только союзник; провал забега — когда все `KnockedOut`.
-Потолочный пылесос — вертикальный лазерный веер от робота до пола (`ScanLine.CutsFan`, меш `Art/Models/FX/LaserHalfFan`, две половины
-обрезаются стенами): касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
+Потолочный пылесос — вертикальный лазерный веер от линзы робота вниз: `ScanLine.FanRays` лучей на половину, каждый останавливается на первом,
+во что упёрся (стена, мебель, дверь, пол; игроки не заслоняют), меш веера собирается из этих точек каждый кадр, той же формой сервер ловит
+игрока (`ScanLine.FanTouches`); линии на полу нет. Касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
 противоположную стену (`SpiderProfile.CeilingEvery`; ступни ног находят и крышу верхнего этажа).
 Паук без глаз: его комната перетянута паутиной, как простой лабиринт (`SpiderWebs`, каждый пир натягивает те же нити; префаб
 `Robots/SpiderStrand` — кусок паутины 1 × 0,5 м, текстура `Tools/Art/generate_web.py`, куски встык вдоль нити), коснулся — паук бежит по стенам к тебе и прыгает. Охранник на точке патруля стоит в три фазы, видные издалека
@@ -165,8 +167,10 @@ LaserGate — отдельная ловушка (не детектор)
 перед ними и второй проход по стенам у всех комнат, в коридорах — только тонкое у стен (огнетушитель, доска, урны) далеко друг от друга, вокруг проёмов, лестниц, люка и
 точек патруля — свободно; тематические комнаты (`RoomType` от `Gym` до `GameRoom`, плюс кухня и туалет) сначала получают свой узнаваемый
 предмет (`Furnisher.Anchor`: варианты от большого к компактному, у стены или посреди комнаты), потом второй проход по стенам; модели —
-`Tools/Blender/rooms_*.py` и `rooms2_*.py` (по пять предметов на каждый тип комнаты, висящие на стене — `Furnisher.Hung`), префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors` (пока у
-«Книжки-чертежа»), сушилка для рук — `HandDryer` (E: гудит `GadgetSettings.DryerTime` и шумит для роботов); `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
+`Tools/Blender/rooms_*.py` и `rooms2_*.py` (по пять предметов на каждый тип комнаты, висящие на стене — `Furnisher.Hung`), префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors`, стены и потолки — `StyleGeometry.RoomLooks`
+(`RoomLook`: отделка стен, нижний пояс плитки/мягких панелей до `LowerHeight` с рейкой поверху, `Plain` — без панелей и рейки стиля, свой потолок — тогда без
+кессонов и балок; комната грани — `ArchitecturePlanner.RoomOf`; пока у «Книжки-чертежа»: туалет, раздевалка, кухня, спортзал, медпункт, лаборатория, серверная,
+склад, студия, игровая, библиотека — `AssetBuilder.StorybookRoomLooks`), сушилка для рук — `HandDryer` (E: гудит `GadgetSettings.DryerTime` и шумит для роботов); `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
 без запуска игры — `PLANS="seed:дом,…" Tools/dev.sh plans` → `Logs/plans/`. Размеры — `LevelMetrics`. Пристенная мебель держит ≥ 20 см
 от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
 со стенами, лестницами и друг с другом, `LevelNavMeshTests` — что до лута можно дойти.
@@ -290,12 +294,18 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 **Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
 (`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
 **большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами;
-дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`, открывается внутрь и остаётся открытой; проём хранилища шире (`LevelMetrics.VaultDoorWidth`, `HouseFeatures.WidenVaultDoorway` двигает его вдоль стены), стальное кольцо проходит сквозь стену, а углы между кругом и прямоугольником проёма — сама стена (`AutoDoor.WallParts` → `LevelShell.WallParts`: `StyleDecor` одевает их в отделку стены с её раскладкой, как пазухи арки; меши — `AssetBuilder.WallCornerMeshes`), у такого проёма нет обрамления и откосов стиля (`WallOpening.Vault`); внутри — ячейки, полки с деньгами,
-золото на поддонах и тележки, `Furnisher.VaultRoom`; запертые двери — с навесным замком `AutoDoor.Padlocks`, двери фасада — тяжёлые `LevelArt.ExteriorDoor`),
+дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`; диск увеличен (`AssetBuilder.VaultDoorScale`) и прижат к стене — перекрывает отверстие
+и гильзу без щели; пульты её только разблокируют, открывает игрок по E (`VaultHandle`, `UseKind.VaultDoor` → `GameManager.OpenVaultServer`, ключ `VaultOpenKey`,
+`AutoDoor.IsSwungOpen`): сначала крутится штурвал (`AutoDoor.Wheel`, часть модели `TrimWheel`), потом дверь поворачивается внутрь (`AutoDoor.VaultStep`) и остаётся открытой;
+в комнате сейфа нет других проёмов (`HouseFeatures.OnlyWayIn`: ни двери на улицу, ни лаза); стены — стальные панели с заклёпками, пол — рифлёная сталь в любом стиле
+(`ArchitecturePlanner.PlanVaultFace`, `DecorPiece.Vault`, материалы `StyleKit.VaultWall/VaultFloor`, текстура `vaultsteel` из `generate_textures.py`), без постеров и пятен; проём хранилища шире (`LevelMetrics.VaultDoorWidth`, `HouseFeatures.WidenVaultDoorway` двигает его вдоль стены), стальное кольцо проходит сквозь стену, а углы между кругом и прямоугольником проёма — сама стена (`AutoDoor.WallParts` → `LevelShell.WallParts`: `StyleDecor` одевает их в отделку стены с её раскладкой, как пазухи арки; меши — `AssetBuilder.WallCornerMeshes`), у такого проёма нет обрамления и откосов стиля (`WallOpening.Vault`); внутри — ячейки, полки с деньгами,
+золото на поддонах и тележки, `Furnisher.VaultRoom`; запертые двери — с навесным замком `AutoDoor.Padlocks`, двери фасада — тяжёлые распашные `LevelArt.ExteriorDoor`: две створки открываются наружу (`AutoDoor.SwingB`,
+`SwingTime`; `LevelBuilder` поворачивает +Z двери на улицу), стальная коробка ровно по проёму — обкладка откосов и наличники на обеих сторонах стены),
 три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
-`SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь открыта, внутри сокровища (`VaultTreasure`);
+`SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь разблокирована, внутри сокровища (`VaultTreasure`);
 задание показывается по шагам (`ObjectiveRules.Step`, `GameManager.ObjectiveStage`: найдите сейф → разблокируйте дверь (k/3) → откройте её;
-найдите заложника → заберите ключ у охранника (заложник по E помечает его для всех) → освободите); **заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате, ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
+найдите заложника → заберите ключ у охранника (заложник по E помечает его для всех) → освободите); **заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате (в «Книжке-чертеже» — своя модель: латунная клетка-«птичья» на деревянном
+постаменте, замок, связанный заложник — `rooms2_special.py cage_storybook`; вид по стилю переключает `StyleParts`), ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
 взломан — роняет), с ключом E → награда (алмаз). Награды не входят в квоту дома. Сервер — `GameManager.Objective.cs`, строка в HUD — `ObjectiveRules`;
 сценарий `objective` проходит оба задания настоящими клавишами.
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
@@ -318,6 +328,18 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 стена), отстающая ступня шагает дугой, ноги — двумя чередующимися группами, колени — двухзвенная ИК (`LegMath`). Охранник, пёс, паук.
 Шаг — `AnimationSettings.StepStride/StepTime/StepLift` в конфиге робота.
 
+**Город вокруг дома** — декорация (`CityPlan`, чистый, от сида дома): дом — одно из зданий квартала. Фасад (сторона лобби, `CityPlan.SideNearest`) выходит
+на тротуар 3,5 м и двухполосную улицу, соседи примерно той же высоты стоят в 3–6 м по бокам на той же линии застройки, за кварталом — задний проезд, по краям —
+поперечные улицы с зебрами; напротив и за проездом — ряды домов, позади — башни; фонари и деревья на тротуарах, машины у бордюров. Тротуар — на уровне пола дома
+(`CityPlan.WalkTop`), дороги и земля — на бордюр ниже (`RoadTop`). Невидимая стена — в `CityPlan.Yard` = 10 м от дома (`LevelArt.Fence`); тротуары, дома, машины,
+столбы и стволы в пределах досягаемости получают коллайдеры (`City.Ground`/`City.Solids` → блоки `Fence`). Всё — коробки (`CityBox`), `LevelBuilder.BuildCity`
+склеивает их в один меш с подмешем на материал (`CitySlot` → `LevelArt.CityMaterials`, `AssetBuilder.City`, текстуры фасадов с горящими окнами — `python Tools/Art/generate_city.py`,
+этаж фасада = этаж дома); свет фонарей — `Level/CityLamp` (конус 70° вниз, без теней и без `LightSource`: в дом не светит, на геймплей не влияет).
+**Фасад без швов** — наружные стены каждого этажа доходят до пола следующего (кромка плиты за ними), над уличной дверью — стена, а не перемычка цвета обрамления,
+столбы в стыках стоят точно в концах стен (ключ словаря округлён, позиция — нет).
+**Стены у лестничного проёма** — над проёмом в перекрытии плиты нет, поэтому стены нижнего этажа вдоль него достраиваются полосой до пола следующего (`LevelBuilder.StairBands`).
+Настенное (`Furnisher.OnWall`: доска, огнетушитель, часы…) висит вплотную к стене (`HungGap`), стоящая у стены мебель — с зазором `WallGap`.
+Руль машины поворачивается в сторону поворота, в `CarSettings.SteeringRatio` раз дальше колёс (`CarLook.SteeringWheel`).
 **Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
 `RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).
 

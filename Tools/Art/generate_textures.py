@@ -236,6 +236,33 @@ def panels():
     save("panels", a * (1 - 0.5 * gaps))
 
 
+def vaultsteel():
+    """2 m: the steel lining of a bank vault — four 1 m panels, horizontally brushed, a dark seam round each and a row
+    of rivets 4 cm inside its edges."""
+    y, x = np.mgrid[0:N, 0:N]
+    row = rng(46).random(N)
+    for _ in range(3):
+        row = (row + np.roll(row, 1) + np.roll(row, -1)) / 3
+    brushed = (row - row.min()) / (row.max() - row.min() + 1e-9)
+    a = 0.8 + (brushed[y] - 0.5) * 0.1 + (noise(47, 3) - 0.5) * 0.05
+    half = N // 2
+    seams = lines_mask(lambda d: [d.line([(0, k * half), (N, k * half)], fill=255, width=4) for k in range(3)]
+                       + [d.line([(k * half, 0), (k * half, N)], fill=255, width=4) for k in range(3)])
+    inset, step, rad = 10, half // 8, 3
+
+    def rivets(d):
+        for px in range(2):
+            for py in range(2):
+                x0, y0 = px * half, py * half
+                for k in range(1, 8):
+                    t = k * step
+                    for cx, cy in ((x0 + t, y0 + inset), (x0 + t, y0 + half - inset), (x0 + inset, y0 + t), (x0 + half - inset, y0 + t)):
+                        d.ellipse([cx - rad, cy - rad, cx + rad, cy + rad], fill=255)
+    heads = lines_mask(rivets)
+    rings = np.clip(np.asarray(Image.fromarray((heads * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3)), dtype=np.float64) / 255 - heads, 0, 1)
+    save("vaultsteel", a * (1 - 0.5 * seams) * (1 - 0.35 * rings) + heads * 0.12)
+
+
 def circuit():
     """1 m: dark panel with circuit traces that glow (circuit_glow)."""
     r = rng(26)
@@ -297,5 +324,5 @@ def rubber():
 
 if __name__ == "__main__":
     for fn in (planks, parquet, checker, bigtiles, marble, diamondplate, carpet, concrete, gridtiles,
-               damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber):
+               damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber, vaultsteel):
         fn()

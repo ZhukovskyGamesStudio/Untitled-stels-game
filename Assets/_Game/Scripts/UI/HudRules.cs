@@ -199,6 +199,7 @@ namespace Stealth.UI
             Level.UseKind.VaultConsole => ReticleIcon.Terminal,
             Level.UseKind.Cage => ReticleIcon.Key,
             Level.UseKind.HandDryer => ReticleIcon.Hand,
+            Level.UseKind.VaultDoor => ReticleIcon.Lever,
             _ => ReticleIcon.Dot,
         };
     }

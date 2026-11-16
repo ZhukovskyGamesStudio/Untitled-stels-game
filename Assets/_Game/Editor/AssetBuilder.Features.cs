@@ -156,15 +156,26 @@ namespace Stealth.EditorTools
             }
             // and solid like a wall: the faces and the bore between them
             root.AddComponent<MeshCollider>().sharedMesh = corners.collider;
-            // the hinge at the doorway's +X edge, on the vault's side of the wall; the leaf turned to show its front to the corridor
-            var hinge = Child(root.transform, "Hinge", new Vector3(1.1f, 0f, wall / 2f + 0.21f));
+            // the hinge at the doorway's +X edge, on the vault's side of the wall; the leaf turned to show its front to the
+            // corridor, grown so its rim covers the bore and the sleeve (the model's disc, r 1.10, is smaller than the bore,
+            // r 1.135: a ring of light showed round it), its face flat against the wall just clear of the sleeve's lip
+            const float grow = VaultDoorScale;
+            var hinge = Child(root.transform, "Hinge", new Vector3(VaultDoorOffAxis * grow, VaultBoreCentre * (1f - grow), wall / 2f + VaultDoorFront + 0.015f));
             var leaf = Model("vault_door");
             leaf.transform.SetParent(hinge.transform, false);
             leaf.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            leaf.transform.localScale = new Vector3(grow, grow, 1f);
             Paint(leaf, "Metal", "PropAccent", "PropAccent");
             PaintTrimParts(leaf, "Metal");
             door.Swing = hinge.transform;
             door.SwingAngle = 92f;
+            // the wheel spins about the disc's axis (the hinge's local Z through the disc's centre) before the door moves
+            var wheel = Child(hinge.transform, "Wheel", new Vector3(-VaultDoorOffAxis * grow, VaultBoreCentre * grow, 0f));
+            var spokes = Find(leaf, "TrimWheel");
+            if (spokes != null) spokes.SetParent(wheel.transform, true);
+            else Debug.LogWarning("[Builder] vault_door has no TrimWheel: run Tools/Blender/rooms2_special.py --only vault_door");
+            door.Wheel = wheel.transform;
+            root.AddComponent<VaultHandle>().Door = door;
             var blocker = root.AddComponent<BoxCollider>();
             blocker.center = new Vector3(0, h / 2f, 0);
             blocker.size = new Vector3(w, h, wall + 0.1f);
@@ -177,6 +188,10 @@ namespace Stealth.EditorTools
 
         /// <summary>The vault door's round bore through the wall (Tools/Blender/rooms2_special.py vault_frame): centre height and radius.</summary>
         const float VaultBoreCentre = 1.15f, VaultBoreRadius = 1.135f;
+        /// <summary>The round door's model (rooms2_special.py vault_door): disc centre off the hinge axis, its face in front of the hinge.</summary>
+        const float VaultDoorOffAxis = 1.1f, VaultDoorFront = 0.185f;
+        /// <summary>The door's disc grown from r 1.10 to 1.166: over the bore (1.135) and its sleeve (1.15).</summary>
+        const float VaultDoorScale = 1.06f;
 
         /// <summary>
         /// The wall round a round bore in a rectangular doorway (width × height, bottom centre at the origin): the face
@@ -274,37 +289,55 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
-        /// A door of the facade: two heavy leaves (Tools/Blender/rooms2_special.py exterior_door_panel: glass, a push bar)
-        /// sliding apart like the inside doors, in a deep steel frame — the house's real doors look like outside doors.
+        /// A door of the facade (+Z out of the house, LevelBuilder turns it so): two heavy leaves
+        /// (Tools/Blender/rooms2_special.py exterior_door_panel: wired glass, a push bar inside, a pull handle outside) hinged
+        /// at the jambs and swinging out to the street, in a steel frame that lines the doorway exactly — jambs and head on the
+        /// opening's reveals, casings over both faces of the wall round it — so no wall shows between the frame and the leaves.
         /// </summary>
         static GameObject BuildExteriorDoor()
         {
             var root = new GameObject("ExteriorDoor");
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
-            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth, wall = LevelMetrics.WallThickness;
+            float clear = LevelMetrics.ClearWidth(LevelMetrics.DoorWidth), height = LevelMetrics.DoorHeight, wall = LevelMetrics.WallThickness;
+            const float lining = 0.06f, proud = 0.02f, casing = 0.12f, casingDepth = 0.03f;
             var door = root.AddComponent<AutoDoor>();
-            door.Width = w;
-            Transform Leaf(string name, float x, bool mirror)
-            {
-                var holder = Child(root.transform, name, new Vector3(x, 0f, 0f)).transform;
-                var leaf = Model("exterior_door_panel");
-                leaf.transform.SetParent(holder, false);
-                if (mirror) leaf.transform.localScale = new Vector3(-1f, 1f, 1f);
-                Paint(leaf, "PropAccent", "Metal", "StairGlass");
-                return holder;
-            }
-            door.PanelA = Leaf("PanelA", -w / 4f, false);
-            door.PanelB = Leaf("PanelB", w / 4f, true);
-            // the frame: deep jambs and a head, proud of both faces of the wall
+            door.Width = clear;
+            // the frame: a lining on the reveals (2 cm proud of both faces) and casings on both faces, all over the wall's cut edge
             var steel = M("Metal");
-            float depth = wall + 0.16f;
-            Cube(root.transform, "JambL", new Vector3(-w / 2f - 0.07f, (h + 0.12f) / 2f, 0f), new Vector3(0.14f, h + 0.12f, depth), steel, false);
-            Cube(root.transform, "JambR", new Vector3(w / 2f + 0.07f, (h + 0.12f) / 2f, 0f), new Vector3(0.14f, h + 0.12f, depth), steel, false);
-            Cube(root.transform, "Head", new Vector3(0f, h + 0.06f, 0f), new Vector3(w + 0.28f, 0.14f, depth), steel, false);
-            Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(w + 0.28f, 0.02f, depth), M("PropAccent"), false);
+            float depth = wall + 2f * proud;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), steel, false);
+                foreach (float face in new[] { -1f, 1f })
+                    Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
+                        new Vector3(casing, height + casing - lining, casingDepth), steel, false);
+            }
+            Cube(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), steel, false);
+            foreach (float face in new[] { -1f, 1f })
+                Cube(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
+                    new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
+            Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("PropAccent"), false);
+            // the leaves: hinged at the inner edges of the jambs, against the outer face, their glass and handles as modelled
+            // (0.9 x 2.28 x 0.09) scaled to the opening; turned so the push bar faces in and the pull handle out at the meeting stiles
+            float leafW = (clear - 2f * lining) / 2f, leafH = height - lining - 0.01f, hingeZ = wall / 2f + proud - 0.05f;
+            Transform Leaf(string name, float side)
+            {
+                var hinge = Child(root.transform, name, new Vector3(side * (clear / 2f - lining), 0f, hingeZ)).transform;
+                var leaf = Model("exterior_door_panel");
+                leaf.transform.SetParent(hinge, false);
+                leaf.transform.localPosition = new Vector3(-side * leafW / 2f, 0.005f, 0f);
+                leaf.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                leaf.transform.localScale = new Vector3((side < 0f ? 1f : -1f) * leafW / 0.9f, leafH / 2.28f, 1f);
+                Paint(leaf, "PropAccent", "Metal", "StairGlass");
+                return hinge;
+            }
+            door.Swing = Leaf("LeafL", -1f);   // the left leaf turns by −SwingAngle about Y: its free edge (+X) out to +Z
+            door.SwingB = Leaf("LeafR", 1f);
+            door.SwingAngle = -100f;
+            door.SwingTime = 0.55f;
             var blocker = root.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0, h / 2f, 0);
-            blocker.size = new Vector3(w, h, 0.14f);
+            blocker.center = new Vector3(0, height / 2f, 0);
+            blocker.size = new Vector3(clear, height, 0.14f);
             door.Blocker = blocker;
             door.LockLamps = new Renderer[0];
             door.Padlocks = new Transform[0];
@@ -333,35 +366,45 @@ namespace Stealth.EditorTools
 
         /// <summary>
         /// The hostage's cage, 2 x 2 m (its door on +Z): a floor plate, corner posts, bars on every side and over the top,
-        /// the door's bars a part of their own (hidden once open), a person inside; box colliders keep everyone out.
+        /// the door's bars a part of their own (hidden once open), a person inside; box colliders keep everyone out. The
+        /// storybook style (Blue Prince) has a model of its own (Tools/Blender/rooms2_special.py cage_storybook: an ornate
+        /// brass birdcage on a wooden plinth, a padlock, a tied-up hostage sitting inside), switched by <see cref="StyleParts"/>.
         /// </summary>
         static GameObject BuildCage()
         {
             var root = new GameObject("Cage");
             float half = HouseFeatures.CageSize / 2f, h = 2.2f;
             var steel = M("Metal");
-            Cube(root.transform, "Floor", new Vector3(0f, 0.03f, 0f), new Vector3(2f * half, 0.06f, 2f * half), steel, false);
+            Transform Group(Transform parent, string name)
+            {
+                var g = new GameObject(name);
+                g.transform.SetParent(parent, false);
+                return g.transform;
+            }
+            var frame = Group(root.transform, "Base");
+            Cube(frame, "Floor", new Vector3(0f, 0.03f, 0f), new Vector3(2f * half, 0.06f, 2f * half), steel, false);
             foreach (var (x, z) in new[] { (-1, -1), (-1, 1), (1, -1), (1, 1) })
-                Cube(root.transform, "Post", new Vector3(x * (half - 0.04f), h / 2f, z * (half - 0.04f)), new Vector3(0.08f, h, 0.08f), steel, false);
-            Cube(root.transform, "Top", new Vector3(0f, h, 0f), new Vector3(2f * half, 0.05f, 2f * half), M("DoorFrame"), false);
+                Cube(frame, "Post", new Vector3(x * (half - 0.04f), h / 2f, z * (half - 0.04f)), new Vector3(0.08f, h, 0.08f), steel, false);
+            Cube(frame, "Top", new Vector3(0f, h, 0f), new Vector3(2f * half, 0.05f, 2f * half), M("DoorFrame"), false);
             const float step = 0.18f;
             int bars = Mathf.FloorToInt((2f * half - 0.2f) / step);
             for (int i = 0; i <= bars; i++)
             {
                 float t = -half + 0.1f + i * (2f * half - 0.2f) / bars;
-                Cube(root.transform, "BarBack", new Vector3(t, h / 2f, -half + 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
-                Cube(root.transform, "BarLeft", new Vector3(-half + 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
-                Cube(root.transform, "BarRight", new Vector3(half - 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
+                Cube(frame, "BarBack", new Vector3(t, h / 2f, -half + 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
+                Cube(frame, "BarLeft", new Vector3(-half + 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
+                Cube(frame, "BarRight", new Vector3(half - 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
             }
             var door = new GameObject("Door");
             door.transform.SetParent(root.transform, false);
             door.AddComponent<KeepUnmerged>();
+            var baseDoor = Group(door.transform, "BaseDoor");
             for (int i = 0; i <= bars; i++)
             {
                 float t = -half + 0.1f + i * (2f * half - 0.2f) / bars;
-                Cube(door.transform, "Bar", new Vector3(t, h / 2f, half - 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
+                Cube(baseDoor, "Bar", new Vector3(t, h / 2f, half - 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
             }
-            Cube(door.transform, "Lock", new Vector3(half - 0.35f, 1.1f, half - 0.02f), new Vector3(0.16f, 0.2f, 0.08f), M("LockLamp"), false);
+            Cube(baseDoor, "Lock", new Vector3(half - 0.35f, 1.1f, half - 0.02f), new Vector3(0.16f, 0.2f, 0.08f), M("LockLamp"), false);
             // the walls of bars and the door are solid
             void Wall(GameObject on, Vector3 c, Vector3 size)
             {
@@ -377,12 +420,47 @@ namespace Stealth.EditorTools
             doorCollider.center = new Vector3(0f, h / 2f, half - 0.04f);
             doorCollider.size = new Vector3(2f * half, h, 0.1f);
             // the person inside: a player's model, standing at the back, facing the door
-            var hostage = Model("player");
-            hostage.name = "Hostage";
+            var hostage = new GameObject("Hostage");
             hostage.transform.SetParent(root.transform, false);
-            hostage.transform.localPosition = new Vector3(0f, 0.06f, -0.25f);
-            Paint(hostage, "PlayerBody", "PlayerAccent", "PlayerGlasses");
             hostage.AddComponent<KeepUnmerged>();
+            var person = Model("player");
+            person.name = "BaseHostage";
+            person.transform.SetParent(hostage.transform, false);
+            person.transform.localPosition = new Vector3(0f, 0.06f, -0.25f);
+            Paint(person, "PlayerBody", "PlayerAccent", "PlayerGlasses");
+
+            // the storybook model: its frame, its door and its hostage go under the same groups as the base parts
+            Mat("Props", "CageWood", new Color(0.3f, 0.18f, 0.1f), smoothness: 0.45f);
+            Mat("Props", "CageBrass", new Color(0.78f, 0.6f, 0.3f), smoothness: 0.65f);
+            Mat("Props", "HostageCoat", new Color(0.16f, 0.3f, 0.34f), smoothness: 0.2f);
+            Mat("Props", "HostageSkin", new Color(0.86f, 0.68f, 0.56f), smoothness: 0.3f);
+            Mat("Props", "HostageHair", new Color(0.18f, 0.12f, 0.08f), smoothness: 0.25f);
+            Mat("Props", "Rope", new Color(0.66f, 0.55f, 0.36f), smoothness: 0.1f);
+            var story = Model("cage_storybook");
+            story.name = "Storybook";
+            story.transform.SetParent(root.transform, false);
+            var storyDoor = Group(door.transform, "StoryDoor");
+            var storyHostage = Group(hostage.transform, "StoryHostage");
+            var materials = new Dictionary<string, string>
+            {
+                ["Body"] = "CageWood", ["Accent"] = "CageBrass", ["DoorAccent"] = "CageBrass", ["DoorLock"] = "CageBrass", ["DoorEye"] = "LockLamp",
+                ["HostageBody"] = "HostageCoat", ["HostageSkin"] = "HostageSkin", ["HostageHair"] = "HostageHair", ["HostageRope"] = "Rope",
+            };
+            foreach (var r in story.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = M(materials.TryGetValue(n, out var m) ? m : "CageBrass");
+                if (n.StartsWith("Door")) r.transform.SetParent(storyDoor, true);
+                else if (n.StartsWith("Hostage")) r.transform.SetParent(storyHostage, true);
+            }
+            var parts = root.AddComponent<StyleParts>();
+            parts.Style = "S06_Storybook";
+            parts.Own = new[] { story, storyDoor.gameObject, storyHostage.gameObject };
+            parts.Default = new[] { frame.gameObject, baseDoor.gameObject, person };
+            story.SetActive(false);
+            storyDoor.gameObject.SetActive(false);
+            storyHostage.gameObject.SetActive(false);
+
             var cage = root.AddComponent<Cage>();
             cage.Door = door;
             cage.DoorCollider = doorCollider;

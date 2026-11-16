@@ -27,6 +27,8 @@ namespace Stealth.Vehicles
         public float SteerSpeed = 140f;
         [Tooltip("Distance between the axles, m (with the steering angle it gives the turning circle).")]
         public float Wheelbase = 3.0f;
+        [Tooltip("The steering wheel turns this many times further than the front wheels (34° of the wheels × 4 = 136° of the steering wheel).")]
+        public float SteeringRatio = 4f;
 
         [Header("Feel")]
         [Tooltip("Bounce of the body on the grate, metres (the side view of the drive shows it).")]

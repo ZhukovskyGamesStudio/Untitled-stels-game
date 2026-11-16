@@ -53,6 +53,24 @@ namespace Stealth.Configs
     }
 
     /// <summary>
+    /// A kind of room dressed its own way in a style (<see cref="StyleGeometry.RoomLooks"/>): tiles up to some height in the
+    /// restrooms and the kitchen, padding in the gym, paint instead of the style's wallpaper, a plain or acoustic ceiling.
+    /// </summary>
+    [Serializable]
+    public struct RoomLook
+    {
+        public Stealth.Level.RoomType Room;
+        [Tooltip("The walls' finish (null = the style's)")] public Material Wall;
+        [Tooltip("Metres covered by one repeat of its texture")] public float WallTile;
+        [Tooltip("From the floor up to LowerHeight: tiles, padding (null = none)")] public Material Lower;
+        public float LowerTile;
+        public float LowerHeight;
+        [Tooltip("No panels and chair rail of the style (and no skirting under tiles): plain walls")] public bool Plain;
+        [Tooltip("A ceiling of its own (null = the style's); the style's beams or coffers are left out there")] public Material Ceiling;
+        public float CeilingTile;
+    }
+
+    /// <summary>
     /// The shape of the world in a style: reshaped models and the architecture added to the house — trims, panels,
     /// columns, beams, pipes, light strips, floor and wall finishes. Decoration only: no colliders, no shadows, robots and
     /// players move and see exactly as without it.
@@ -96,6 +114,8 @@ namespace Stealth.Configs
         public RoomFloor[] RoomFloors = new RoomFloor[0];
         public Material Wall;
         [Tooltip("Metres covered by one repeat of the wall texture")] public float WallTile = 1f;
+        [Tooltip("Walls and ceilings of their own in some kinds of rooms (tiles in restrooms and kitchens, padding in the gym…)")]
+        public RoomLook[] RoomLooks = new RoomLook[0];
         [Tooltip("Baseboards, cornices, rails, casings")] public Material Trim;
         [Tooltip("The boards of the wall panels")] public Material Panel;
         public Material Column;
@@ -111,6 +131,15 @@ namespace Stealth.Configs
             if (RoomFloors == null) return -1;
             for (int i = 0; i < RoomFloors.Length; i++)
                 if (RoomFloors[i].Room == room && RoomFloors[i].Material != null) return i;
+            return -1;
+        }
+
+        /// <summary>The index in <see cref="RoomLooks"/> of a room type's own look, or −1.</summary>
+        public int RoomLookOf(Stealth.Level.RoomType room)
+        {
+            if (RoomLooks == null) return -1;
+            for (int i = 0; i < RoomLooks.Length; i++)
+                if (RoomLooks[i].Room == room) return i;
             return -1;
         }
 

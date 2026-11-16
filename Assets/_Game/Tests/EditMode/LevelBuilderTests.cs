@@ -13,6 +13,20 @@ namespace Stealth.Tests
         [OneTimeTearDown]
         public void Cleanup() => ActiveLevel.Clear();
 
+        [Test]
+        public void WallsAlongAStairwellRiseToTheNextFloor()
+        {
+            var stairs = new List<Stair> { new() { Floor = 0, Origin = Vector2.zero, Corner = new Vector2Int(-1, -1) } }; // hole [0, 4] x [0, 4]
+            var along = new PlanWall { Floor = 0, A = new Vector2(-2f, 0f), B = new Vector2(10f, 0f), Exterior = true };
+            var bands = LevelBuilder.StairBands(along, stairs);
+            Assert.AreEqual(1, bands.Count, "the outer wall by the stairs gets one band");
+            Assert.LessOrEqual(bands[0].from, 2f, "from the hole's start");
+            Assert.GreaterOrEqual(bands[0].to, 6f, "to its end");
+            Assert.Less(bands[0].to, 7f, "not much further");
+            Assert.AreEqual(0, LevelBuilder.StairBands(new PlanWall { Floor = 1, A = along.A, B = along.B }, stairs).Count, "the floor above has its slab");
+            Assert.AreEqual(0, LevelBuilder.StairBands(new PlanWall { Floor = 0, A = new Vector2(-2f, 6f), B = new Vector2(10f, 6f) }, stairs).Count, "a wall away from the hole");
+        }
+
         /// <summary>One shared house, built once for the fixture's scene tests (they only look at it).</summary>
         static GameObject Built(out LevelLayout layout)
         {

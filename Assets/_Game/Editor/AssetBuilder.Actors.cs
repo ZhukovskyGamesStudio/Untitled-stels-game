@@ -173,7 +173,6 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Vacuum, RobotPrefabs + "/RobotVacuum.prefab", () => Device<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
             {
                 v.Profile = Profile<VacuumProfile>("RobotVacuum", p => p.ForgetRate = 0.6f);
-                v.Line = Beam(root, "ScanLine", 0.03f);
                 v.FanARenderer = LaserFan(root, "LaserFanA");
                 v.FanBRenderer = LaserFan(root, "LaserFanB");
                 v.FanA = v.FanARenderer.transform;

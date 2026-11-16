@@ -39,6 +39,22 @@ namespace Stealth.EditorTools
         [MenuItem("Stealth/Build Missing Assets")]
         public static void BuildMissing() => BuildAll(false);
 
+        /// <summary>
+        /// REBUILD in an open editor (its process cannot be given the variable): the prefab names, comma separated, from
+        /// Temp/rebuild.txt; then the missing assets as usual.
+        /// </summary>
+        [MenuItem("Stealth/Rebuild Listed Prefabs (Temp-rebuild.txt)")]
+        public static void RebuildListed()
+        {
+            const string file = "Temp/rebuild.txt";
+            string list = File.Exists(file) ? File.ReadAllText(file).Trim() : "";
+            if (list.Length == 0) { Debug.LogWarning($"[Builder] {file} is empty: nothing to rebuild"); return; }
+            Environment.SetEnvironmentVariable("REBUILD", list);
+            try { BuildAll(false); }
+            finally { Environment.SetEnvironmentVariable("REBUILD", null); }
+            Debug.Log($"[Builder] rebuilt {list}");
+        }
+
         [MenuItem("Stealth/Rebuild All Assets (overwrite)")]
         public static void RebuildAll()
         {
