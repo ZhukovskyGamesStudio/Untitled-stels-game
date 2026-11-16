@@ -46,7 +46,10 @@ namespace Stealth.Game
             var list = new List<(byte, byte)>();
             for (int i = 0; i < count; i++)
             {
+                // only what lies inside the crate (a shovel is longer than the crate: drawn again)
                 byte shape = ItemCatalog.LootShape(rng);
+                for (int tries = 0; tries < 8 && ItemCatalog.ModelSize(shape).x > SearchCrate.InsideLength; tries++) shape = ItemCatalog.LootShape(rng);
+                if (ItemCatalog.ModelSize(shape).x > SearchCrate.InsideLength) shape = ItemCatalog.Battery;
                 list.Add((shape, ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, bonus))));
             }
             return list;
@@ -141,10 +144,12 @@ namespace Stealth.Game
             m_Opened.Add(CrateKey(prop));
             OpenedVersion++;
             var items = CrateContents(l, prop, Gadgets, Tuning.Level.Loot);
+            // inside the crate, on its floor: rows front to back, layers up (lengthwise, along the crate)
             for (int i = 0; i < items.Count; i++)
             {
-                var at = crate.position + crate.forward * 0.75f + crate.right * ((i - (items.Count - 1) / 2f) * 0.32f) + Vector3.up * 0.05f;
-                SpawnItemServer(items[i].shape, items[i].color, at, crate.eulerAngles.y + i * 35f);
+                var local = SearchCrate.SlotInside(i);
+                var at = crate.TransformPoint(local);
+                SpawnItemServer(items[i].shape, items[i].color, at, crate.eulerAngles.y);
             }
         }
 

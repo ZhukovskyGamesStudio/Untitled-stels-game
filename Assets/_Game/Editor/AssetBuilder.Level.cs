@@ -24,6 +24,23 @@ namespace Stealth.EditorTools
             var roof = Prefab($"{LevelPrefabs}/Roof.prefab", () => Muffles(Block("Roof", M("Ceiling"), layer: LevelMetrics.CeilingLayer), SoundMaterial.Slab));
             var ground = Prefab($"{LevelPrefabs}/OutsideGround.prefab", () => Block("OutsideGround", M("OutsideGround"), layer: LevelMetrics.CeilingLayer));
             var fence = Prefab($"{LevelPrefabs}/Fence.prefab", BuildFence);
+            // the land round the house out to the horizon (Tools/Blender/terrain.py): looks only — no collider, not in the
+            // navmesh, no shadows; it wears the ground's material (the earth of the style)
+            var terrain = Prefab($"{LevelPrefabs}/OutsideTerrain.prefab", () =>
+            {
+                var go = Model("outside_terrain");
+                go.name = "OutsideTerrain";
+                go.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
+                foreach (var c in go.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    r.sharedMaterial = M("OutsideGround");
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    r.gameObject.layer = LevelMetrics.CeilingLayer;
+                }
+                go.layer = LevelMetrics.CeilingLayer;
+                return go;
+            });
 
             // Pieces.
             var stairs = Prefab($"{LevelPrefabs}/Stairs.prefab", () => BuildStairs("Stairs", false));
@@ -133,6 +150,7 @@ namespace Stealth.EditorTools
                 art.FloorSlab = slab;
                 art.Roof = roof;
                 art.OutsideGround = ground;
+                art.OutsideTerrain = terrain;
                 art.Fence = fence;
                 art.Stairs = stairs;
                 art.StairsMirrored = stairsMirrored;
@@ -181,12 +199,13 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock)
+            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain)
             {
                 // fields newer than the asset: filled without overwriting the rest
                 levelArt.HighVentFrame = highVent;
                 levelArt.RailingBay = railingBay;
                 levelArt.RailingBlock = railingBlock;
+                levelArt.OutsideTerrain = terrain;
                 EditorUtility.SetDirty(levelArt);
             }
             BuildFeatureArt(levelArt);
@@ -334,8 +353,21 @@ namespace Stealth.EditorTools
             float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth;
             var door = root.AddComponent<AutoDoor>();
             door.Width = w;
-            door.PanelA = Cube(root.transform, "PanelA", new Vector3(-w / 4f, h / 2f, 0), new Vector3(w / 2f, h, 0.06f), M("Door"), false).transform;
-            door.PanelB = Cube(root.transform, "PanelB", new Vector3(w / 4f, h / 2f, 0), new Vector3(w / 2f, h, 0.06f), M("Door"), false).transform;
+            // the two leaves: a model of their own (Tools/Blender/door_leaf.py), so a style can give them its own form
+            // (the derelict riveted steel leaf); B is A turned round, its pull and seal on the meeting edge too
+            Transform Leaf(string name, string file, float x, float turn)
+            {
+                var leaf = Model(file);
+                leaf.name = name;
+                leaf.transform.SetParent(root.transform, false);
+                leaf.transform.localPosition = new Vector3(x, 0f, 0f);
+                leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
+                Paint(leaf, "Door", "Door", "Door");
+                foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
+                return leaf.transform;
+            }
+            door.PanelA = Leaf("PanelA", "door_leaf", -w / 4f, 0f);
+            door.PanelB = Leaf("PanelB", "door_leaf_b", w / 4f, 180f); // its texture shifted: the halves do not mirror
             var blocker = root.AddComponent<BoxCollider>();
             blocker.center = new Vector3(0, h / 2f, 0);
             blocker.size = new Vector3(w, h, 0.1f);

@@ -32,6 +32,8 @@ namespace Stealth.Tests
             "RobotController.CargoMesh",     // only workers carry loot
             "RobotController.CargoRenderer",
             "RobotController.CargoVisuals",
+            "RobotAnimator.LiftArm",         // only workers have a lift
+            "RobotAnimator.LiftTray",
             "Blob.m_Material",               // a UI graphic: empty is Unity's default UI material
         };
 

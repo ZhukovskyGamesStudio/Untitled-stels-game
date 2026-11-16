@@ -100,7 +100,17 @@ namespace Stealth.Level
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
             for (int f = 0; f < l.Floors; f++) BuildSlab(f);
             BuildRoof();
-            Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, -0.07f, H / 2), new Vector3(W + 60f, 0.1f, H + 60f));
+            var ground = Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, -0.07f, H / 2), new Vector3(W + 60f, 0.1f, H + 60f));
+            if (m_Art.OutsideTerrain != null)
+            {
+                // the terrain's flat middle is the yard's surface (metre UVs: its earth tiles right); the block under
+                // the yard stays as what the feet stand on, not drawn
+                foreach (var r in ground.GetComponentsInChildren<Renderer>()) r.enabled = false;
+                // the land to the horizon, centred on the house; its flat middle (80 m) grown to hold the yard of a big house
+                float yard = Mathf.Sqrt((W / 2 + 30f) * (W / 2 + 30f) + (H / 2 + 30f) * (H / 2 + 30f));
+                var land = Place(m_Art.OutsideTerrain, "OutsideTerrain", new Vector3(W / 2, 0f, H / 2), Quaternion.identity);
+                land.transform.localScale = Vector3.one * Mathf.Max(1f, yard / TerrainFlat);
+            }
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, -25f), new Vector3(W + 60f, 5f, 1f));
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 2.5f, H + 25f), new Vector3(W + 60f, 5f, 1f));
             Block(m_Art.Fence, "Fence", new Vector3(-25f, 2.5f, H / 2), new Vector3(1f, 5f, H + 60f));
@@ -127,7 +137,20 @@ namespace Stealth.Level
                 {
                     bool keyed = false;
                     foreach (var k in l.KeyDoors) keyed |= k.Door == i;
-                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor);
+                    bool storage = i == l.StorageDoor && StorageRooms.Locked(l);
+                    var inward = Vector3.zero;
+                    var room = default(Rect);
+                    if (storage)
+                    {
+                        // which way the room is: across the doorway, towards the storage room's middle
+                        var across = d.rotation * Vector3.forward;
+                        var to = l.Plan.Rooms[l.StorageRoom].Center - d.position;
+                        inward = Vector3.Dot(to, across) >= 0f ? across : -across;
+                        inward.y = 0f;
+                        inward.Normalize();
+                        room = l.Plan.Rooms[l.StorageRoom].Bounds;
+                    }
+                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room);
                 }
                 if (i == l.VaultDoor && m_Art.VaultPanel != null)
                 {
@@ -179,6 +202,9 @@ namespace Stealth.Level
             if (!any || kind == PropKind.Hatch) return;
             Shell.Props.Add(new MapProp { Floor = floor, Kind = kind, Area = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z) });
         }
+
+        /// <summary>Radius of the flat middle of the terrain model (Tools/Blender/terrain.py FLAT), metres.</summary>
+        const float TerrainFlat = 78f;
 
         GameObject Place(GameObject prefab, string name, Vector3 position, Quaternion rotation)
         {
@@ -573,6 +599,7 @@ namespace Stealth.Level
         public static List<(Vector3 pos, float yaw, int wall, float at)> WindowCuts(LevelLayout l)
         {
             var list = new List<(Vector3, float, int, float)>();
+            var roomOf = new List<int>(); // the room each window lights (a kitchen keeps one when windows are few)
             var plan = l.Plan;
             const float spacing = 5f, clear = LevelMetrics.WindowWidth / 2f + 0.9f;
             for (int i = 0; i < plan.Walls.Count; i++)
@@ -598,6 +625,7 @@ namespace Stealth.Level
                     var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
                     var ik = plan.KindAt(w.Floor, inside.x, inside.y);
                     if (ik != CellKind.Room && ik != CellKind.Void) continue;
+                    roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));
                 }
             }
@@ -608,6 +636,16 @@ namespace Stealth.Level
                 var keep = new List<int>();
                 for (int i = 0; i < list.Count; i++) keep.Add(i);
                 for (int i = keep.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (keep[i], keep[j]) = (keep[j], keep[i]); }
+                // every kitchen keeps a window: the first of each in the shuffled order goes to the front
+                var lit = new HashSet<int>();
+                var first = new List<int>();
+                foreach (int i in keep)
+                {
+                    int r = roomOf[i];
+                    if (r >= 0 && r < plan.Rooms.Count && plan.Rooms[r].Type == RoomType.Kitchen && lit.Add(r)) first.Add(i);
+                }
+                keep.RemoveAll(first.Contains);
+                keep.InsertRange(0, first);
                 keep.RemoveRange(l.WindowLimit, keep.Count - l.WindowLimit);
                 keep.Sort();
                 var picked = new List<(Vector3, float, int, float)>();

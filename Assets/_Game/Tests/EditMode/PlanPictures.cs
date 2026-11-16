@@ -39,9 +39,11 @@ namespace Stealth.Tests
             var config = System.Environment.GetEnvironmentVariable("PLANCONFIG");
             var level = string.IsNullOrEmpty(config) ? null
                 : UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.LevelConfig>($"Assets/_Game/Data/Config/{config}/Level.asset");
+            // PLANCLASSIC=1 draws the classic generator's houses (rooms cut first, types guessed), else the room program's
+            bool classic = System.Environment.GetEnvironmentVariable("PLANCLASSIC") == "1";
             foreach (var (seed, house) in list)
-                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}.png"),
-                    Draw(level != null ? LevelGenerator.Generate(seed, house, level.Building, level.Security, 1) : LevelGenerator.Generate(seed, house)));
+                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}{(classic ? "_classic" : "")}.png"),
+                    Draw(LevelGenerator.Generate(seed, house, level != null ? level.Building : null, level != null ? level.Security : null, 1, null, classic)));
         }
 
         static Color TypeColor(RoomType t) => t switch

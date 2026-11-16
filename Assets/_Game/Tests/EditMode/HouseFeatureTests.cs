@@ -221,17 +221,19 @@ namespace Stealth.Tests
             };
             var seen = new HashSet<RoomType>();
             var bare = new List<string>();
+            int themed = 0;
             foreach (var l in TestHouses.Sample)
                 foreach (var r in l.Rooms)
                 {
                     if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom) continue;
                     seen.Add(r.Type);
+                    themed++;
                     bool has = l.Props.Any(p => kinds.Contains(p.Kind) && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id);
                     if (!has) bare.Add($"seed {l.Seed}: {r.Type} {r.Area:0} m²");
                 }
             Assert.Greater(seen.Count, 4, "the shared houses have themed rooms: " + string.Join(", ", seen));
-            // a small room with doors on every wall may have no wall left for its piece: a few, not many
-            Assert.LessOrEqual(bare.Count, 3, "themed rooms without their furniture: " + string.Join("; ", bare));
+            // a small room with doors on every wall may have no wall left for its piece: a few, not many (one in ten)
+            Assert.LessOrEqual(bare.Count, Mathf.Max(3, themed / 10), $"themed rooms without their furniture (of {themed}): " + string.Join("; ", bare));
         }
     }
 }

@@ -322,7 +322,7 @@ def desk():
         open_ = 0.14 if k == 1 else 0.0
         box("Paint", 0.32, 0.69, -0.37 - open_, -0.34 - open_, z, z + 0.15, panel=True)
         box("Steel", 0.45, 0.56, -0.39 - open_, -0.37 - open_, z + 0.1, z + 0.12)
-    zc = crt(0.02, 0.0, 0.74, w=0.46, h=0.36, depth=0.44, face=-1, kind="ScreenText")  # a big CRT: the player is 1.8 m
+    zc = crt(0.02, -0.04, 0.74, w=0.54, h=0.43, depth=0.46, face=-1, kind="ScreenText")  # a big CRT: the player is 1.8 m
     box("Composite", -0.12, -0.04, -0.005, -0.004, zc + 0.12, zc + 0.15, bev=0.0)               # a sticky note on the bezel
     keyboard(0.0, -0.26, 0.74, face=-1, missing={(2, 3), (3, 11), (1, 7)}, w=0.56, d=0.19)
     box("Rubber", 0.28, 0.48, -0.32, -0.12, 0.74, 0.743, bev=0.0)                              # mouse pad

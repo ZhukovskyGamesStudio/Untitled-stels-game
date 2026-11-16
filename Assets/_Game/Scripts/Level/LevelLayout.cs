@@ -35,8 +35,19 @@ namespace Stealth.Level
     /// <summary>The vault's three locks, one console each (in the order of <see cref="LevelLayout.VaultConsoles"/>).</summary>
     public enum VaultGame : byte { Dial, Switches, Sequence }
 
-    /// <summary>What a security terminal does: show the house's cameras, or hack robots and devices from afar.</summary>
-    public enum TerminalKind : byte { Cameras, Hacking }
+    /// <summary>What a security terminal does: show the house's cameras, hack robots and devices from afar, or unlock the storage room's door.</summary>
+    public enum TerminalKind : byte { Cameras, Hacking, Doors }
+
+    /// <summary>
+    /// Where a worker leaves loot in the storage room (<see cref="LevelLayout.StorageDrops"/>): on a shelf's bottom board
+    /// (faced square on: <see cref="Facing"/> points from the robot at the shelf) or on the floor of the pile (any side).
+    /// </summary>
+    public struct StorageDrop
+    {
+        public Vector3 Spot;
+        public Vector3 Facing;
+        public bool Shelf;
+    }
 
     public struct PropPlacement
     {
@@ -127,6 +138,16 @@ namespace Stealth.Level
         public readonly HashSet<int> LockedDoors = new();
         /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
         public readonly List<(int prop, TerminalKind kind)> Terminals = new();
+        /// <summary>
+        /// The storage room (plan id, -1 if none: <see cref="StorageRoom"/>): its only doorway (index in <see cref="Doorways"/>),
+        /// its door (in <see cref="AutoDoors"/>; locked for players, robots pass), the door terminal (in <see cref="Props"/>,
+        /// -1: the door is open from the start).
+        /// </summary>
+        public int StorageRoom = -1, StorageDoorway = -1, StorageDoor = -1, StorageTerminal = -1;
+        /// <summary>Where the workers leave loot in the storage room: shelves and the pile.</summary>
+        public readonly List<StorageDrop> StorageDrops = new();
+        /// <summary>What each room type allows (<see cref="BuildingSettings.RoomTypeRules"/>): loot sizes and bonuses read it.</summary>
+        public RoomRule[] RoomRules;
         /// <summary>The hidden room (plan id; its entrances are <see cref="EdgeType.Illusion"/>), -1 if none.</summary>
         public int HiddenRoom = -1;
         /// <summary>Doors locked with a key block, and where each key lies (<see cref="HouseFeatures.KeyDoors"/>).</summary>
@@ -177,8 +198,9 @@ namespace Stealth.Level
         {
             get
             {
+                // rooms only: corridors and stair halls never count
                 float a = 0f;
-                foreach (var r in Plan.Rooms) a += r.Area;
+                foreach (var r in Plan.Rooms) if (r.Type is not (RoomType.Corridor or RoomType.Hall)) a += r.Area;
                 return a / 100f;
             }
         }

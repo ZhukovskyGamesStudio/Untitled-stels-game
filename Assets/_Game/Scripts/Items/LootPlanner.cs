@@ -81,7 +81,8 @@ namespace Stealth.Items
                 for (int k = 0; k < behind.Count; k++) if (behind[k].Contains(room.Id)) return k;
                 return -1;
             }
-            int Bonus(Vector3 p) => l.LevelIndex * s.BonusPerHouse + LevelLayout.FloorOf(p.y) * s.BonusPerFloor
+            RoomRule RuleAt(Vector3 p) => RoomRules.For(l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Type ?? RoomType.Office, l.RoomRules);
+            int Bonus(Vector3 p) => RuleAt(p).LootBonus + l.LevelIndex * s.BonusPerHouse + LevelLayout.FloorOf(p.y) * s.BonusPerFloor
                 + (l.IsDarkAt(p + Vector3.up * 0.5f) ? s.DarkRoomBonus : 0)
                 + (l.Location == Location.Office ? s.OfficeBonus : 0)
                 + (InHidden(p) ? s.HiddenRoomBonus : 0)
@@ -91,6 +92,9 @@ namespace Stealth.Items
             int Shape(Vector3 p)
             {
                 int a = ItemCatalog.LootShape(rng); // from the loot table (shovels, flashlights, batteries…)
+                // the room's type says how big a thing lies in it (a kitchen: small things)
+                var rule = RuleAt(p);
+                for (int k = 0; k < 6 && !RoomRules.LootFits(rule, ItemCatalog.Cells(a)); k++) a = ItemCatalog.LootShape(rng);
                 if (!InHidden(p) && RegionOf(p) < 0) return a;
                 int b = ItemCatalog.LootShape(rng);
                 return ItemCatalog.Value(b, 0) > ItemCatalog.Value(a, 0) ? b : a;

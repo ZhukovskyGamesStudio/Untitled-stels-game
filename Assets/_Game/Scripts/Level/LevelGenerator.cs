@@ -37,6 +37,9 @@ namespace Stealth.Level
             new(RoomType.Gym, 4), new(RoomType.Library, 4), new(RoomType.CopyRoom, 4), new(RoomType.ControlRoom, 3), new(RoomType.Lab, 4),
             new(RoomType.NapRoom, 3), new(RoomType.Studio, 3), new(RoomType.LockerRoom, 3), new(RoomType.Infirmary, 3), new(RoomType.GameRoom, 4),
         };
+        [Tooltip("What a room type allows: size, proportions, an outside wall (windows), loot. The storage room is never drawn " +
+                 "by weight: a house has one only by FeatureSettings.StorageChance (StorageRoom).")]
+        public RoomRule[] RoomTypeRules = Stealth.Level.RoomRules.Defaults();
 
         [Header("Light")]
         [Tooltip("Chance of a dark room in the first house.")]
@@ -54,14 +57,16 @@ namespace Stealth.Level
         [Header("Passages")]
         [Tooltip("Share of the main passages that are open arches instead of doors.")]
         public float OpenPassageChance = 0.3f;
-        [Tooltip("Chance of an extra door in a remaining wall (loops).")]
-        public float ExtraDoorChance = 0.2f;
-        [Tooltip("Chance of a crawl vent in a remaining wall.")]
-        public float VentChance = 0.45f;
+        [Tooltip("Loops: extra doors a floor gets, per room on it (0.08 = about one per 12 rooms). Every room first gets its " +
+                 "way in — off a corridor, a hall or the lobby when it touches one — so the rest are dead ends; these doors " +
+                 "are placed where they make the longest way round (a second door onto the corridor, or between two rooms).")]
+        public float LoopsPerRoom = 0.08f;
+        [Tooltip("Crawl vents a floor gets, per room on it: the hidden ways round, placed where they cut the longest walk short.")]
+        public float VentsPerRoom = 0.25f;
         [Tooltip("Share of the vents that sit up under the ceiling, climbed to by crates stacked under them on both sides.")]
         public float HighVentChance = 0.4f;
-        [Tooltip("Chance of a narrow slot (players squeeze through, robots do not) in a wall still left.")]
-        public float SqueezeChance = 0.3f;
+        [Tooltip("Narrow slots (players squeeze through, robots do not) a floor gets, per room on it.")]
+        public float SqueezesPerRoom = 0.1f;
         [Header("Shapes")]
         [Tooltip("Chance per big room (lobby, open space, lounge, storage, meeting) to rise through two or three storeys: an atrium with galleries above.")]
         public float AtriumChance = 0.35f;
@@ -73,6 +78,17 @@ namespace Stealth.Level
         public float CorridorChance = 0.82f;
         [Tooltip("Chance of a wing getting a corridor across it, between the rooms on its two sides (a short passage joining two rooms).")]
         public float CrossCorridorChance;
+        [Tooltip("Chance of a house of separate blocks joined by corridors (decided first: which blocks link and how long each corridor is, then the blocks are placed to fit, then the corridors laid). Otherwise one mass cut into rooms.")]
+        public float LinkedChance;
+        [Tooltip("In a linked house: share of the links that are corridors (the rest join wall to wall).")]
+        public float LinkedCorridorShare = 0.6f;
+        [Tooltip("In a linked house: corridor length, metres (min, max).")]
+        public Vector2Int LinkCorridorLength = new(3, 9);
+        [Tooltip("Every room type at least once in every house (the rooms test).")]
+        public bool EveryRoomType;
+        [Tooltip("Floor area the corridors take on top of the rooms (0.2 = a fifth more): corridors are never rooms, " +
+                 "they do not count towards the room program or the room limits.")]
+        public float CorridorShare = 0.2f;
         [Tooltip("Room sizes: 1 = the usual mix of closets, offices and halls; more = bigger rooms.")]
         public float RoomSizeScale = 1f;
         [Tooltip("Weights of the building shapes: bar, L, T, U, courtyard, H (6 numbers; empty = by floor area, the usual mix).")]
@@ -252,8 +268,18 @@ namespace Stealth.Level
         public static class Timing { public static long Plan, Check, Furnish, Walk, Grid, Flood, Reach, Barrier, Rounds; public static void Reset() => Plan = Check = Furnish = Walk = Grid = Flood = Reach = Barrier = Rounds = 0; }
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
+        /// <summary>
+        /// The classic generator (the main menu's switch, "-classicrooms"): the plan is cut into rooms first and each room's
+        /// type guessed from its size and proportions (<see cref="PlanGenerator.GenerateClassic"/>), instead of the room
+        /// program deciding the rooms first. Off by default; set before a game starts — every peer must match.
+        /// </summary>
+        public static bool Classic;
+
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null)
+            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic);
+
+        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
+            FeatureSettings features, bool classic)
         {
             building ??= new BuildingSettings();
             security ??= new SecuritySettings();
@@ -262,7 +288,11 @@ namespace Stealth.Level
             building = HouseKinds.Apply(kind, building);
             var rng = new System.Random(seed);
             int floors = building.FloorsFor(levelIndex);
-            float area = building.RoomsFor(levelIndex, players) * 100f;
+            // what the house is made of comes first: its rooms, their types and sizes (corridors not counted); the plan is
+            // then laid out to hold them. A storage room (it brings the workers) is decided here, from the house's own stream.
+            float roomArea = building.RoomsFor(levelIndex, players) * 100f * PlanGenerator.RoomShareOfArea;
+            bool storage = building.EveryRoomType || (features.StorageChance > 0f && levelIndex >= features.StorageFromHouse
+                && new System.Random(LevelRandom.Mix(seed, 0x5702, 0)).NextDouble() < features.StorageChance);
             // Generate and check: a plan where some room cannot be walked to (a doorway that did not fit, a sealed
             // corner) is thrown away and the next variant of the same house is drawn (deterministic: attempt by attempt).
             LevelLayout l = null;
@@ -272,7 +302,9 @@ namespace Stealth.Level
             for (int attempt = 0; attempt < attempts; attempt++)
             {
                 int planSeed = attempt == 0 ? seed : LevelRandom.Mix(seed, 0xBAD, attempt);
-                var o = PlanGenerator.Generate(planSeed, levelIndex, floors, area, building);
+                var o = classic
+                    ? PlanGenerator.GenerateClassic(planSeed, levelIndex, floors, building.RoomsFor(levelIndex, players) * 100f, building)
+                    : PlanGenerator.Generate(planSeed, levelIndex, floors, RoomProgram.Make(planSeed, floors, roomArea, building, storage), building);
                 l = new LevelLayout
                 {
                     Seed = seed,
@@ -339,8 +371,16 @@ namespace Stealth.Level
             furnisher.PlaceVentDesks();
             for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
 
+            // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
+            RoomRules.Enforce(l.Plan, building.RoomTypeRules);
+            // zoning: themed rooms capped (one kitchen a floor…), work rooms to the facade, service rooms inside, toilets by the stairs
+            Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules);
+
             // the house's main job: the vault and its lock panels, or the hostage's cage (their places kept free)
             HouseFeatures.PlanObjective(l, features, furnisher);
+            // the locked storage room (furnished as storage: shelves and a pile; it brings the workers)
+            l.RoomRules = building.RoomTypeRules;
+            StorageRooms.Plan(l, features, storage);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
@@ -350,12 +390,14 @@ namespace Stealth.Level
             Timing.Furnish += watch.ElapsedMilliseconds;
             watch.Restart();
             furnisher.EnsureWalkable();
+            if (furnisher.RestoreFridges()) furnisher.EnsureWalkable(); // every kitchen keeps its one fridge
             Timing.Walk += watch.ElapsedMilliseconds;
             if (security.Enemies)
             {
-                PlaceSecurity(l, rng, building, security);
+                PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
                 PlaceTerminals(l, security);
             }
+            StorageRooms.Finish(l, features);
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
             HouseFeatures.PointOfInterest(l);
@@ -463,7 +505,7 @@ namespace Stealth.Level
             float far = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type == RoomType.Corridor || r.Area < 10f) continue;
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage || r.Area < 10f) continue;
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (d > far) { far = d; best = r; }
@@ -476,7 +518,7 @@ namespace Stealth.Level
         {
             foreach (var r in l.Rooms)
             {
-                l.PatrolPoints.Add(r.Center);
+                l.PatrolPoints.Add(PatrolCentre(l, r));
                 if (r.Area < 60f) continue;
                 foreach (var rect in r.Rects)
                 {
@@ -485,6 +527,23 @@ namespace Stealth.Level
                     if ((p - r.Center).magnitude > 4f && l.Plan.RoomAt(p) == r && !l.NearStair(r.Floor, p, 0.8f)) l.PatrolPoints.Add(p);
                 }
             }
+        }
+
+        /// <summary>
+        /// A room's own patrol stop: its middle — except a kitchen's, whose table stands in the middle: the robots stop
+        /// beside it, along the room's long side (the stop is kept free of furniture).
+        /// </summary>
+        static Vector3 PatrolCentre(LevelLayout l, PlanRoom r)
+        {
+            if (r.Type != RoomType.Kitchen) return r.Center;
+            var along = r.Bounds.width >= r.Bounds.height ? Vector3.right : Vector3.forward;
+            foreach (float off in new[] { 2.0f, 1.6f })
+                foreach (float side in new[] { 1f, -1f })
+                {
+                    var p = r.Center + along * (side * off);
+                    if (l.Plan.RoomAt(p + Vector3.up * 0.3f) == r && !l.NearStair(r.Floor, p, 0.8f)) return p;
+                }
+            return r.Center;
         }
 
         static float Range(System.Random rng, float min, float max) => min + (float)rng.NextDouble() * (max - min);
@@ -521,6 +580,39 @@ namespace Stealth.Level
         /// Some office desks become security terminals (own stream: the rest of the house does not shift). Not in the lobby,
         /// and as far from each other as the desks allow, so the two kinds are not side by side.
         /// </summary>
+        /// <summary>
+        /// A house with a storage room has its workers: at least <paramref name="want"/> (once workers are on the roster),
+        /// and all of them on the storage room's floor — wheels do not climb stairs, and their work is there.
+        /// </summary>
+        static void StorageWorkers(LevelLayout l, System.Random rng, SecuritySettings s, List<PlanRoom> candidates, int want, int fresh)
+        {
+            if (l.StorageRoom < 0) return;
+            bool onRoster = false;
+            foreach (var e in s.Roster.Robots) onRoster |= e.Kind == RobotKind.Worker && e.Weight > 0f && e.MinLevel <= l.LevelIndex;
+            int workers = 0;
+            foreach (var r in l.RobotSpawns) if (r.Kind == RobotKind.Worker) workers++;
+            for (int i = l.RobotSpawns.Count - 1; onRoster && workers < want && i >= fresh; i--)
+            {
+                var r = l.RobotSpawns[i];
+                if (r.Kind == RobotKind.Worker) continue;
+                r.Kind = RobotKind.Worker;
+                l.RobotSpawns[i] = r;
+                workers++;
+            }
+            int floor = l.Plan.Rooms[l.StorageRoom].Floor;
+            var rooms = candidates.FindAll(c => c.Floor == floor && c.Id != l.StorageRoom);
+            if (rooms.Count == 0) return;
+            for (int i = 0; i < l.RobotSpawns.Count; i++)
+            {
+                var r = l.RobotSpawns[i];
+                if (r.Kind != RobotKind.Worker || r.Floor == floor) continue;
+                var room = Weighted(rooms, rng);
+                r.Floor = floor;
+                r.Position = SpotIn(l, room, rng, 1.2f);
+                l.RobotSpawns[i] = r;
+            }
+        }
+
         static void PlaceTerminals(LevelLayout l, SecuritySettings s)
         {
             var desks = new List<int>();
@@ -553,7 +645,7 @@ namespace Stealth.Level
             }
         }
 
-        static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s)
+        static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s, int storageWorkers = 0)
         {
             int level = l.LevelIndex;
             // Rooms for guards and devices: not the lobby nor right next to it.
@@ -564,7 +656,7 @@ namespace Stealth.Level
             if (candidates.Count == 0) foreach (var r in l.Rooms) if (r.Id != l.LobbyRoom) candidates.Add(r);
 
             // A bigger team gets a bigger house — and the guards to go with it.
-            float solo = b.RoomsFor(level, 1) * l.Floors;
+            float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
             int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
             var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
@@ -583,8 +675,12 @@ namespace Stealth.Level
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
                 var kind = RobotRoster.PickRobot(level, rng, s.Roster);
                 if (i < freshRobots.Count) kind = freshRobots[i]; // the house that introduces a kind shows it
+                // workers haul loot to the storage room: no storage room, no workers
+                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = RobotKind.Guard;
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
+            StorageWorkers(l, rng, s, candidates, storageWorkers, freshRobots.Count);
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();

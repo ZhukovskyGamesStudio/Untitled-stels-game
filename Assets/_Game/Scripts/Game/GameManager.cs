@@ -72,6 +72,8 @@ namespace Stealth.Game
 
         public static int DoorKey(int door) => door;
         public static int SafeKey(int safe) => 1_000_000 + safe;
+        /// <summary>The storage door held open from inside, for now (<see cref="AutoDoor.IsEscaping"/>).</summary>
+        public static int EscapeKey(int door) => 7_000_000 + door;
         /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
         public static int TerminalKey(int terminal, int use) => 2_000_000 + terminal * 16 + use;
         /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
@@ -133,6 +135,7 @@ namespace Stealth.Game
             m_IsServer = isServer;
             m_Run = new RunState(Tuning.Run.Rules);
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
+            AutoDoor.IsEscaping = i => IsOpened(EscapeKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
             Items.Storage.IsOpened = (prop, part) => IsOpened(StorageKey(prop, part));
             SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
@@ -465,6 +468,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
             UpdateDryers();
+            UpdateStorageDoor();
             UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
@@ -680,8 +684,49 @@ namespace Stealth.Game
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock && !a.NeedsKey); // a key door needs its key
-            if (d == null || Vector3.Distance(d.transform.position, player.transform.position) > AutoDoor.HackReach + 1.5f) return;
+            if (d == null) return;
+            var at = player.transform.position;
+            bool byHand = Vector3.Distance(d.transform.position, at) <= AutoDoor.HackReach + 1.5f;
+            if (d.Storage)
+            {
+                // the storage room's door: from its terminal, or by hand from inside
+                bool terminal = SecurityTerminal.All.Any(t => t.Kind == TerminalKind.Doors
+                    && Vector3.Distance(Flat(t.transform.position), Flat(at)) <= SecurityTerminal.Reach + 1.5f && Mathf.Abs(t.transform.position.y - at.y) < 2f);
+                if (!terminal)
+                {
+                    // by hand from inside: open for now, so the player gets out; locked again behind them (UpdateStorageDoor)
+                    if (!byHand || !AutoDoor.IsInside(d.transform.position, d.Inward, at)) return;
+                    m_EscapeSeen = Time.time;
+                    if (m_Opened.Add(EscapeKey(door))) OpenedVersion++;
+                    return;
+                }
+            }
+            else if (!byHand) return;
             if (m_Opened.Add(DoorKey(door))) OpenedVersion++;
+        }
+
+        static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);
+
+        /// <summary>Server: last time a player was in the storage room or at its door while it was held open from inside.</summary>
+        float m_EscapeSeen;
+        /// <summary>Server: how long the storage door stays open from inside with nobody left in the room or at the door, s.</summary>
+        const float EscapeLinger = 1f;
+
+        /// <summary>Server: the storage door opened from inside locks again once no player is in the room or at the door.</summary>
+        void UpdateStorageDoor()
+        {
+            var d = AutoDoor.StorageDoor;
+            if (d == null || !IsOpened(EscapeKey(d.Index))) return;
+            var at = d.transform.position;
+            foreach (var p in PlayerController.All)
+                if (AutoDoor.AtDoor(at, p.transform.position) || AutoDoor.InRoom(at, d.Inward, d.Room, p.transform.position))
+                {
+                    m_EscapeSeen = Time.time;
+                    return;
+                }
+            if (Time.time - m_EscapeSeen < EscapeLinger) return;
+            m_Opened.Remove(EscapeKey(d.Index));
+            OpenedVersion++;
         }
 
         /// <summary>Server: a player at a hacking terminal hacks a robot / device anywhere in the house (a charge is spent).</summary>

@@ -15,7 +15,7 @@ namespace Stealth.Enemies
     /// (<see cref="Senses"/>, <see cref="Traits"/>): guard, listener, drone, thumper, hound, sorter, worker, hunter.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
-    public class RobotController : Detector, IRobotBody
+    public partial class RobotController : Detector, IRobotBody
     {
         public static readonly List<RobotController> Robots = new();
 
@@ -81,6 +81,7 @@ namespace Stealth.Enemies
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
             m_Brain.StateChanged += s => SetMode((byte)s);
+            m_LootRng = new System.Random(rng.Next());
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
         }
@@ -98,6 +99,7 @@ namespace Stealth.Enemies
         {
             m_Brain?.Reset(Time.time);
             if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
+            EndLootErrand(); // whatever it was lifting or lowering falls in front of it
             DropCargoServer();
         }
 
@@ -114,13 +116,24 @@ namespace Stealth.Enemies
 
         protected override void OnStatusChanged() => ShowCargo();
 
+        // the carried thing's own model (a real item or a tool), under the cargo slot; null: the tinted piece shows
+        GameObject m_CargoModel;
+
         void ShowCargo()
         {
             if (CargoRenderer == null) return;
             bool has = Cargo >= 0 && CargoVisuals != null;
-            CargoRenderer.enabled = has;
+            var (shape, color) = has ? DecodeCargo(Cargo) : ((byte)0, (byte)0);
+            // the same look as the item lying on the floor (WorldItem): its model if it has one, else the tinted piece
+            var model = has && CargoVisuals.Models != null && shape < CargoVisuals.Models.Length ? CargoVisuals.Models[shape] : null;
+            if (m_CargoModel != null && (model == null || m_CargoModel.name != model.name)) { Destroy(m_CargoModel); m_CargoModel = null; }
+            if (model != null && m_CargoModel == null)
+            {
+                m_CargoModel = Instantiate(model, CargoMesh.transform);
+                m_CargoModel.name = model.name;
+            }
+            CargoRenderer.enabled = has && m_CargoModel == null;
             if (!has) return;
-            var (shape, color) = DecodeCargo(Cargo);
             CargoMesh.sharedMesh = CargoVisuals.Meshes[Mathf.Clamp(shape, 0, CargoVisuals.Meshes.Length - 1)];
             CargoRenderer.sharedMaterial = CargoVisuals.ColorMaterials[Mathf.Clamp(color, 0, CargoVisuals.ColorMaterials.Length - 1)];
             VisualStyles.Dress(CargoMesh.gameObject);
@@ -151,7 +164,7 @@ namespace Stealth.Enemies
                 m_Brain.OnSensed(Sense(), now, dt);
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
-            m_Brain.Tick(now, dt);
+            if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
             if (m_HasPost && State == RobotState.Patrol && Arrived)
             {
                 // a warden at its post watches the way in
@@ -383,6 +396,11 @@ namespace Stealth.Enemies
                 Audio.Sfx.At(Audio.Sfx.Bank?.SeismicThump, transform.position, 1f, Audio.Sfx.Group.Robots, LevelRandom.Shared(RandomChannel.Audio).Range(0.92f, 1.05f));
                 var anim = GetComponent<RobotAnimator>();
                 if (anim != null) anim.Stomp();
+                return;
+            }
+            if (effect is PulseLift or PulseLower or PulseShelve)
+            {
+                PlayCargoMotion(effect == PulseLift ? SwingKind.Pickup : effect == PulseLower ? SwingKind.PutDown : SwingKind.Shelve);
                 return;
             }
             if (effect != PulseRadio) return;

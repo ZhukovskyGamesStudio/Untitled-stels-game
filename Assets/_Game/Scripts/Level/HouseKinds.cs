@@ -75,6 +75,13 @@ namespace Stealth.Level
                     RoomType.Lab => 2.5f, RoomType.LockerRoom => 2f, RoomType.Library => 0.2f, RoomType.Studio => 0.2f, _ => 1f },
                 _ => 1f,
             };
+            if (b.RoomTypeRules != null)
+            {
+                var rules = (RoomRule[])b.RoomTypeRules.Clone();
+                for (int i = 0; i < rules.Length; i++)
+                    if (Mul(rules[i].Room) >= 2f) { rules[i].PerFloor = 0; rules[i].PerHouse = 0; }
+                s.RoomTypeRules = rules;
+            }
             var weights = new RoomWeight[b.RoomWeights.Length];
             for (int i = 0; i < weights.Length; i++)
                 weights[i] = new RoomWeight(b.RoomWeights[i].Room, Mathf.RoundToInt(b.RoomWeights[i].Weight * Mul(b.RoomWeights[i].Room)));

@@ -220,6 +220,94 @@ def painted_metal():
     save("dr_painted_metal", alb, h, chips * 0.9 * (1 - rust_amt), 1 - grime * 0.25, 0.3 + chips * 0.3 - rust_amt * 0.2 - grime * 0.1, 3.0)
 
 
+# five wear levels of the painted metal, from clean paint to rotten steel; each object picks one (VisualStyles.Wear):
+# (seed, chip threshold — lower = more chips, chip size — lower noise scale = bigger chunks, rust share of the chips,
+#  grime amount, flaking edge width)
+WEAR = [
+    (101, 1.10, 40, 0.0, 0.15, 0.00),   # w0: clean — no chips, no rust, a little grime
+    (111, 0.70, 46, 0.25, 0.30, 0.02),  # w1: sparse small specks
+    (121, 0.62, 22, 0.55, 0.40, 0.03),  # w2: medium chips, half of them rusted
+    (131, 0.56, 11, 0.8, 0.50, 0.04),   # w3: big chunks, mostly rust
+    (141, 0.48, 6, 1.0, 0.60, 0.06),    # w4: large rotten patches everywhere
+]
+
+
+# share of the surface the rust patches cover, per level
+COVER = [0.0, 0.25, 0.35, 0.45, 0.6]
+
+
+def painted_metal_wear():
+    """dr_painted_metal_w0..w4: the same paint, five amounts of rust (frequency, chunk size; the material tiles each its own)."""
+    for k, (seed, thr, size, rust_share, grime_amt, edge) in enumerate(WEAR):
+        n = noise(seed, size, 5)
+        # rust only in a part of the surface: one or two big patches per tile (more of the surface the worse the level),
+        # the paint around them clean; inside a patch the chips are denser towards its middle
+        reg = noise(seed + 9, 1.6, 2)
+        cut = float(np.quantile(reg, 1.0 - COVER[k]))
+        region = smooth(cut, cut + 0.08, reg)
+        chips = smooth(thr, thr + 0.03, n + 0.08 * region) * region         # where the paint is gone
+        halo = smooth(thr - edge - 0.03, thr - 0.0, n + 0.08 * region) * region * (1 - chips) if edge > 0 else np.zeros((N, N), np.float32)
+        tone = noise(seed + 1, 60, 2)
+        rust_col = mix(col(0.3, 0.14, 0.07), col(0.5, 0.27, 0.11), tone)
+        rusty = chips * smooth(1 - rust_share - 0.05, 1 - rust_share + 0.05, noise(seed + 2, 8, 2)) if rust_share > 0 else chips * 0
+        paint = mix(col(0.24, 0.28, 0.27), col(0.3, 0.33, 0.31), noise(seed + 3, 6, 2))
+        steel = col(0.42, 0.42, 0.41)
+        alb = mix(paint, steel, chips)
+        alb = mix(alb, rust_col, rusty)
+        alb = mix(alb, col(0.2, 0.12, 0.06), halo * 0.5)                   # rust bleeding under the paint round a chip
+        # grime: smaller, crisper stains than before (big soft blobs made close surfaces look blurry)
+        grime = smooth(0.6, 0.74, noise(seed + 4, 16, 4)) * smooth(0.35, 0.7, noise(seed + 8, 3, 1))
+        alb = mix(alb, col(0.06, 0.06, 0.05), grime * grime_amt)
+        # the fine grain is not here: it is the detail map (dr_paint_detail), tiled much finer — this tile covers ~2 m,
+        # so its patches do not repeat across one piece of furniture
+        h = -chips * 0.3 + rusty * 0.15
+        metal = (chips - rusty) * 0.9
+        save(f"dr_painted_metal_w{k}", alb, h, metal, 1 - grime * 0.25,
+             0.32 + (chips - rusty) * 0.3 - rusty * 0.2 - grime * 0.1, 4.0)
+
+
+def paint_detail():
+    """dr_paint_detail: the fine grain of old paint (orange peel, pitting, hairline scratches) as a URP detail map —
+    albedo around mid grey (×2 in the shader: grey changes nothing), its own normal; tiled ~3 times per metre."""
+    grain = noise(201, 160, 2)
+    pits = smooth(0.7, 0.76, noise(202, 120, 1))
+    scratches = np.zeros((N, N), np.float32)
+    rng = np.random.default_rng(203)
+    for _ in range(90):
+        x0, y0 = rng.random(2)
+        ang = rng.random() * np.pi
+        ln = 0.03 + rng.random() * 0.12
+        dx, dy = np.cos(ang), np.sin(ang)
+        px = (XX - x0 + 0.5) % 1.0 - 0.5
+        py = (YY - y0 + 0.5) % 1.0 - 0.5
+        t = np.clip(px * dx + py * dy, 0, ln)
+        d = np.sqrt((px - t * dx) ** 2 + (py - t * dy) ** 2) * N
+        scratches = np.maximum(scratches, np.clip(1 - d / 1.0, 0, 1) * 0.7)
+    grey = 0.5 * (0.88 + 0.24 * grain) * (1 - 0.3 * pits) * (1 + 0.25 * scratches)
+    alb = np.repeat(grey[..., None], 3, axis=2)
+    h = (grain - 0.5) * 0.15 - pits * 0.12 - scratches * 0.08
+    save("dr_paint_detail", alb, h, np.zeros((N, N)), np.ones((N, N)), np.full((N, N), 0.4), 4.0)
+
+
+def earth():
+    """dr_earth: the ground outside — packed dark mud with gravel, puddle-dark hollows, cracks and broken concrete
+    bits; meant to tile every ~4 m on the yard and the terrain around the house."""
+    base = noise(301, 6, 4)
+    mud = mix(col(0.11, 0.1, 0.08), col(0.19, 0.17, 0.13), base)
+    damp = smooth(0.55, 0.7, noise(302, 3, 2))                          # darker wet hollows
+    mud = mix(mud, col(0.06, 0.06, 0.05), damp * 0.6)
+    gravel = smooth(0.72, 0.78, noise(303, 140, 2))
+    stones = smooth(0.76, 0.8, noise(304, 40, 3))
+    alb = mix(mud, col(0.3, 0.29, 0.26), gravel * 0.7)
+    alb = mix(alb, col(0.36, 0.35, 0.32), stones * 0.8)                # bits of broken concrete
+    cells = noise(305, 30, 3)
+    cracks = 1 - smooth(0.0, 0.015, np.abs(cells - 0.5))
+    cracks = cracks * (1 - damp)
+    alb = mix(alb, col(0.03, 0.03, 0.025), cracks * 0.7)
+    h = base * 0.4 - damp * 0.3 + gravel * 0.2 + stones * 0.5 - cracks * 0.4
+    save("dr_earth", alb, h, np.zeros((N, N)), 1 - cracks * 0.5 - damp * 0.2, 0.08 + damp * 0.45, 6.0)
+
+
 def rust():
     """Pipes and trims: heavy rust with flaking scales and a few remains of paint."""
     n = noise(51, 30, 5)
@@ -267,6 +355,9 @@ def vinyl():
 
 
 if __name__ == "__main__":
-    for make in (steel_panels, floor_plate, ceiling_vents, painted_metal, rust, composite, vinyl):
+    only = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
+    for make in (steel_panels, floor_plate, ceiling_vents, painted_metal, painted_metal_wear, paint_detail, earth, rust, composite, vinyl):
+        if only and make.__name__ not in only:
+            continue
         make()
     print("DONE")

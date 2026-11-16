@@ -75,6 +75,18 @@ namespace Stealth.Level
         public Vector2 VaultArea = new(8f, 45f);
         [Tooltip("The hostage's room: at least this many m² (the cage stands in its middle).")]
         public float HostageMinArea = 14f;
+
+        [Header("Storage room (locked; opens from its terminal or from inside; workers haul loot to it)")]
+        [Tooltip("Chance that a house has a storage room. Only then do workers come (they haul loot there).")]
+        [Range(0f, 1f)] public float StorageChance = 0.6f;
+        [Tooltip("From which house (0 = the first).")]
+        public int StorageFromHouse = 0;
+        [Tooltip("The door terminal stands at least this far from the storage room's door, metres (closer if no desk is that far).")]
+        public float StorageTerminalDistance = 10f;
+        [Tooltip("Spots on the floor of the pile where workers leave loot (and where the pile's first loot lies).")]
+        public int StoragePileSpots = 6;
+        [Tooltip("At least this many of the house's robots are workers when it has a storage room (if workers are on the roster yet).")]
+        public int StorageWorkers = 1;
     }
 
     /// <summary>
@@ -171,7 +183,7 @@ namespace Stealth.Level
             var candidates = new List<PlanRoom>();
             foreach (var r in plan.Rooms)
             {
-                if (r.Id == l.LobbyRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
+                if (r.Id == l.LobbyRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage) continue;
                 if (r.Area < s.HiddenRoomMinArea || r.Area > s.HiddenRoomMaxArea || HasStair(l, r.Id)) continue;
                 bool enclosed = true;
                 int walls = 0;
@@ -180,6 +192,7 @@ namespace Stealth.Level
                     if (w.RoomA != r.Id && w.RoomB != r.Id) continue;
                     int other = w.RoomA == r.Id ? w.RoomB : w.RoomA;
                     if (w.Exterior || w.Railing || other < 0) { enclosed = false; break; }
+                    if (plan.Rooms[other].Type == RoomType.Storage) { enclosed = false; break; } // no second way into the storage room
                     walls++;
                 }
                 if (enclosed && walls > 0) candidates.Add(r);
@@ -253,6 +266,7 @@ namespace Stealth.Level
                 behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
                 if (behind.Count == 0 || behind.Count > s.KeyRegionRooms || behind.Contains(l.LobbyRoom) || behind.Overlaps(taken)) continue;
                 if (i == l.VaultDoorway || (l.VaultRoom >= 0 && behind.Contains(l.VaultRoom))) continue; // the vault has a lock of its own
+                if (i == l.StorageDoorway || (l.StorageRoom >= 0 && behind.Contains(l.StorageRoom))) continue; // so has the storage room
                 // no room two storeys high behind it: from a gallery above a player drops in past the door — and is shut in
                 bool atrium = false;
                 foreach (int r in behind) atrium |= plan.Rooms[r].Levels > 1;
@@ -334,7 +348,7 @@ namespace Stealth.Level
 
         static bool Plain(LevelLayout l, PlanRoom r) =>
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
-            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && !HasStair(l, r.Id);
+            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage) && !HasStair(l, r.Id);
 
         static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
         {
@@ -558,7 +572,9 @@ namespace Stealth.Level
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0xC7A7, 0));
             var options = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack) options.Add(i);
+                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack
+                    && (l.StorageRoom < 0 || l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.StorageRoom)) // the storage room's shelves take the workers' loot
+                    options.Add(i);
             // a house without a store room: a cabinet or a locker stands in (every house has something to search)
             if (options.Count == 0)
                 for (int i = 0; i < l.Props.Count; i++)

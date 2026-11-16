@@ -299,7 +299,25 @@ namespace Stealth.Player
             bool on = FlashlightOn && !Downed && !InHatch;
             if (Flashlight.enabled != on) Flashlight.enabled = on;
             if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, 0f, 0f); // the head of a remote player does not pitch
+            if (!on) return;
+            // close to a surface the lamp dims (no white blown-out spot): the nearest thing in front that is not this player
+            if (m_FlashBase < 0f)
+            {
+                // the intensity as built, without the style's visual scale (LightSource writes that over the light)
+                var source = Flashlight.GetComponent<LightSource>();
+                m_FlashBase = source != null ? source.RawIntensity : Flashlight.intensity;
+            }
+            var t = Flashlight.transform;
+            float d = FlashNear;
+            int n = Physics.RaycastNonAlloc(t.position, t.forward, s_FlashHits, FlashNear, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+                if (s_FlashHits[i].distance < d && !s_FlashHits[i].collider.transform.IsChildOf(transform)) d = s_FlashHits[i].distance;
+            Flashlight.intensity = m_FlashBase * PlayerRules.FlashlightNear(d, FlashNear);
         }
+
+        const float FlashNear = 1.6f;          // closer than this the flashlight dims (metres)
+        float m_FlashBase = -1f;               // its intensity as built
+        static readonly RaycastHit[] s_FlashHits = new RaycastHit[8];
 
         /// <summary>Which hatch of the house the player sits in: 0 the entry (where the team comes up), 1 the exit (the way down).</summary>
         public int HatchIndex { get; private set; }
@@ -689,7 +707,7 @@ namespace Stealth.Player
             HackProgress = m_HackHeld.Of(HackTarget);
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
-            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) : null;
+            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) ?? StorageDoorAtTerminal() : null;
             if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
             {
                 if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
@@ -937,6 +955,15 @@ namespace Stealth.Player
 
         /// <summary>Locked door in reach (hold E to hack), or null.</summary>
         public AutoDoor DoorTarget { get; private set; }
+
+        /// <summary>At the door terminal, looking at it: the storage room's door, while it is locked (hold E opens it from here).</summary>
+        AutoDoor StorageDoorAtTerminal()
+        {
+            var t = SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View);
+            if (t == null || t.Kind != TerminalKind.Doors) return null;
+            var d = AutoDoor.StorageDoor;
+            return d != null && !d.TerminalOpen ? d : null; // even while a worker holds it open: unlocking it is for good
+        }
         public float DoorProgress { get; private set; }
         public float DoorShare => DoorProgress / m_Interaction.DoorHackTime;
 
@@ -1241,6 +1268,7 @@ namespace Stealth.Player
             {
                 TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null && StorageTarget == null
                     ? SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View) : null;
+                if (TerminalTarget != null && TerminalTarget.Kind == TerminalKind.Doors) TerminalTarget = null; // nothing to sit at: hold E to open the door
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
                 return;
