@@ -75,7 +75,8 @@ namespace Stealth.Tests
             Assert.Greater(Share(store, RoomType.Storage), Share(b, RoomType.Storage) * 2f, "a warehouse stores");
             Assert.Greater(store.RoomSizeScale, b.RoomSizeScale * 1.2f, "a warehouse has big halls");
             Assert.AreSame(b, HouseKinds.Apply(HouseKind.Office, b), "an office is the plain settings");
-            Assert.AreEqual(HouseKind.Office, HouseKinds.Of(12345, 0), "the first house is an office");
+            var first = Enumerable.Range(1, 60).Select(seed => HouseKinds.Of(seed, 0)).ToList();
+            Assert.IsTrue(first.Contains(HouseKind.Garage) && first.Contains(HouseKind.Hospital), "the first house may be a shop or a hospital too");
             var kinds = new HashSet<HouseKind>();
             for (int seed = 1; seed < 400; seed++) kinds.Add(HouseKinds.Of(seed, 3));
             Assert.Greater(kinds.Count, 3, "houses of many kinds: " + string.Join(", ", kinds));

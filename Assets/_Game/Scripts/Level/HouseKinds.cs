@@ -12,13 +12,12 @@ namespace Stealth.Level
     /// <summary>
     /// House kinds (pure): which one a house is (from its seed: every peer and the route panel agree without sending
     /// anything) and what it does to the building settings — room mix, room sizes, corridors, atriums, rotundas,
-    /// cut corners, darkness. The first house is always an office.
+    /// cut corners, darkness. Any house may be any kind, the first too (its size and its guards come from its number).
     /// </summary>
     public static class HouseKinds
     {
         public static HouseKind Of(int seed, int house)
         {
-            if (house <= 0) return HouseKind.Office;
             var rng = new System.Random(LevelRandom.Mix(seed, 0x4B1D, 0));
             int roll = rng.Next(100);
             // a third each: an office (of some character), a hospital, a garage
