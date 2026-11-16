@@ -75,12 +75,13 @@ namespace Stealth.Level
                         // an arch's spandrels are the wall itself: its finish, its texture continuing over the opening
                         var n = p.Rotation * Vector3.forward;
                         var right = Vector3.Cross(Vector3.up, -n);
+                        var (paper, tile) = WallOf(p.Variant, g); // the finish of the room on the arch's side
                         var wall = new WallProjection
                         {
-                            Right = right, Normal = n, Across = ArchitecturePlanner.Across(right), Tile = g.WallTile, FloorY = p.Position.y,
+                            Right = right, Normal = n, Across = ArchitecturePlanner.Across(right), Tile = tile, FloorY = p.Position.y,
                         };
                         // in the plane of the finish quads around the opening (6 mm off the wall), or the outline filters draw the step
-                        batcher.Add(chunk, part.look, g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
+                        batcher.Add(chunk, part.look, paper ?? g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
                         continue;
                     }
                     var style = MaterialFor(p.Kind, part.name, g);
@@ -167,6 +168,18 @@ namespace Stealth.Level
 
         static bool IsDecal(DecorKind k) => k is DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster;
 
+        /// <summary>
+        /// A wall finish by its variant (<see cref="DecorPiece.Variant"/>): 0 the style's wall, 1 + 2k the k-th room look's
+        /// wall, 2 + 2k its lower band; and the metres one repeat of its texture covers.
+        /// </summary>
+        static (Material, float) WallOf(int variant, StyleGeometry g)
+        {
+            int k = (variant - 1) / 2;
+            if (variant <= 0 || g.RoomLooks == null || k >= g.RoomLooks.Length) return (g.Wall, g.WallTile);
+            var look = g.RoomLooks[k];
+            return variant % 2 == 1 ? (look.Wall ?? g.Wall, look.Wall != null ? look.WallTile : g.WallTile) : (look.Lower, look.LowerTile);
+        }
+
         /// <summary>The material of a decal: its variant in the style's decay or poster list.</summary>
         static Material DecalOf(DecorPiece p, StyleGeometry g)
         {
@@ -181,9 +194,7 @@ namespace Stealth.Level
             {
                 DecorKind.FloorFinish when p.Vault && s_Kit != null && s_Kit.VaultFloor != null => (s_Kit.VaultFloor, s_Kit.VaultFloorTile),
                 DecorKind.WallFinish when p.Vault && s_Kit != null && s_Kit.VaultWall != null => (s_Kit.VaultWall, s_Kit.VaultWallTile),
-                DecorKind.WallFinish when p.Variant > 0 && g.RoomLooks != null && (p.Variant - 1) / 2 < g.RoomLooks.Length
-                    => p.Variant % 2 == 1 ? (g.RoomLooks[(p.Variant - 1) / 2].Wall, g.RoomLooks[(p.Variant - 1) / 2].WallTile)
-                                          : (g.RoomLooks[(p.Variant - 1) / 2].Lower, g.RoomLooks[(p.Variant - 1) / 2].LowerTile),
+                DecorKind.WallFinish when p.Variant > 0 => WallOf(p.Variant, g),
                 DecorKind.CeilingFinish when p.Variant > 0 && g.RoomLooks != null && p.Variant <= g.RoomLooks.Length
                     => (g.RoomLooks[p.Variant - 1].Ceiling, g.RoomLooks[p.Variant - 1].CeilingTile),
                 DecorKind.FloorFinish when p.Variant > 0 && g.RoomFloors != null && p.Variant <= g.RoomFloors.Length

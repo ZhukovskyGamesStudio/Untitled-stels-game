@@ -61,6 +61,7 @@ namespace Stealth.EditorTools
                     anim.Bob = 0.06f;
                     s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
                     t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
+                    t.PatrolWaitMin = 6.25f; t.PatrolWaitMax = 12.5f; // stands at a point long enough to be read and slipped past
                 });
                 // what a guard may carry (the hostage's cage key) hangs at its belt behind, off to one side — the lower edge of
                 // the torso (it starts at 1.5 m over the legs), where a player sneaking up sees it

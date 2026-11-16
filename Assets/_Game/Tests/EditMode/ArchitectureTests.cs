@@ -75,6 +75,12 @@ namespace Stealth.Tests
             Assert.IsTrue(lower.All(p => p.Position.y + p.Scale.y / 2f - LevelLayout.FloorY(LevelLayout.FloorOf(p.Position.y - p.Scale.y / 2f + 0.1f)) <= 1.6f + 1e-3f), "tiles up to their height");
             Assert.IsFalse(plan.Any(p => p.Kind == DecorKind.Wainscot && Ours(p, p.Rotation * Vector3.forward)), "plain walls: no panels");
             Assert.IsTrue(plan.Any(p => p.Kind == DecorKind.CeilingFinish && p.Variant == 1), "a ceiling of its own");
+            // its doorways: each half of a reveal (across the wall) in the finish of the room on its side, the arch's spandrels too
+            const float halfWall = LevelMetrics.WallThickness / 2f;
+            var reveals = plan.Where(p => p.Kind == DecorKind.WallFinish && Mathf.Abs(p.Scale.x - halfWall) < 1e-3f).ToList();
+            Assert.IsTrue(reveals.Any(p => p.Variant is 1 or 2), "the room's half of its doorways' reveals");
+            Assert.IsTrue(reveals.Any(p => p.Variant == 0), "the neighbours' halves keep theirs");
+            Assert.IsTrue(plan.Any(p => p.Kind == DecorKind.Arch && p.Variant == 1), "arches on the room's side in its paint");
             Assert.IsFalse(plan.Any(p => p.Kind == DecorKind.Coffer && At(p.Position - Vector3.up * 0.5f)?.Type == type), "no coffers under it");
         }
 

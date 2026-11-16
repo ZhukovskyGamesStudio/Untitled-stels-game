@@ -54,9 +54,9 @@ namespace Stealth.Level
             foreach (var face in shell.Walls)
                 if (InVault(face, layout)) PlanVaultFace(list, face);
                 else PlanFace(list, face, shell, g, LookOf(face, layout, g));
-            foreach (var o in shell.Openings) PlanOpening(list, o, g);
-            if (g.Wall != null)
-                foreach (var o in shell.Openings) PlanReveals(list, o);
+            foreach (var o in shell.Openings) PlanOpening(list, o, g, layout);
+            if (g.Wall != null || (g.RoomLooks != null && g.RoomLooks.Length > 0))
+                foreach (var o in shell.Openings) PlanReveals(list, o, g, layout);
             if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling, g);
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (layout != null) PlanRoomCeilings(list, layout, g);
@@ -483,7 +483,26 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ doorways
 
-        static void PlanOpening(List<DecorPiece> list, WallOpening o, StyleGeometry g)
+        /// <summary>
+        /// The wall finish of the room on one side of a doorway (probed <paramref name="into"/> it): the variant of its wall
+        /// (<see cref="DecorPiece.Variant"/>: 0 the style's, 1 + 2k a room look's, −1 none), of its lower band (−1 none) and
+        /// the band's top.
+        /// </summary>
+        static (int upper, int lower, float split) SideFinish(WallOpening o, Vector3 into, StyleGeometry g, LevelLayout layout)
+        {
+            int k = -1;
+            if (layout != null && layout.Plan != null && g.RoomLooks != null && g.RoomLooks.Length > 0)
+            {
+                var room = layout.Plan.RoomAt(o.Center + into * 0.5f + Vector3.up * 0.5f);
+                if (room != null) k = g.RoomLookOf(room.Type);
+            }
+            if (k < 0) return (g.Wall != null ? 0 : -1, -1, 0f);
+            var look = g.RoomLooks[k];
+            int upper = look.Wall != null ? 1 + 2 * k : g.Wall != null ? 0 : -1;
+            return look.Lower != null ? (upper, 2 + 2 * k, look.LowerHeight) : (upper, -1, 0f);
+        }
+
+        static void PlanOpening(List<DecorPiece> list, WallOpening o, StyleGeometry g, LevelLayout layout = null)
         {
             // a vent and a squeeze slot carry their own frames (Level/VentFrame, Level/SqueezeFrame): a door trim would clash with them
             if (o.Vent || o.Squeeze || o.Vault || o.Exterior || g.Doors == DoorTrim.None) return; // the vault: its ring
@@ -499,7 +518,8 @@ namespace Stealth.Level
                         list.Add(new DecorPiece { Kind = DecorKind.Casing, Position = at, Rotation = rot, Scale = scale });
                         break;
                     case DoorTrim.Arch:
-                        list.Add(new DecorPiece { Kind = DecorKind.Arch, Position = at, Rotation = rot, Scale = scale });
+                        // its spandrels are wall: the finish of the room on this side (two rooms, two papers, each its own half)
+                        list.Add(new DecorPiece { Kind = DecorKind.Arch, Position = at, Rotation = rot, Scale = scale, Variant = Mathf.Max(0, SideFinish(o, side, g, layout).upper) });
                         goto case DoorTrim.Pilasters;
                     case DoorTrim.Pilasters:
                         foreach (float s in new[] { -1f, 1f })
@@ -523,31 +543,46 @@ namespace Stealth.Level
 
         /// <summary>
         /// The wall's finish carried into a doorway: both reveals and the head, across the wall's thickness, so the opening
-        /// reads as cut into the same wall instead of a bare block between two papered faces. Vents have their lining.
+        /// reads as cut into the same wall instead of a bare block between two papered faces. Each half of the thickness
+        /// takes the finish of the room on its side (with its band of tiles), so a doorway between a tiled restroom and a
+        /// papered corridor meets in the middle of the wall like a real one. Vents have their lining.
         /// </summary>
-        static void PlanReveals(List<DecorPiece> list, WallOpening o)
+        static void PlanReveals(List<DecorPiece> list, WallOpening o, StyleGeometry g, LevelLayout layout = null)
         {
             if (o.Vent || o.Exterior || o.Vault) return; // the vault's steel sleeve lines its bore
             float w = o.Width, h = o.Height;
-            const float lift = FinishLift;
-            foreach (float s in new[] { -1f, 1f })
+            const float lift = FinishLift, half = T / 2f;
+            var n = new Vector3(-o.Along.z, 0f, o.Along.x);
+            // the texture runs across the wall by the world (Across), like an arch's soffit over it (MeshBatcher.Project)
+            var across = Across(o.Along);
+            foreach (var side in new[] { n, -n })
             {
-                // the reveal at the +s end faces back into the opening (−s along the wall)
-                var c = o.Center + o.Along * (s * (w / 2f - lift)) + Vector3.up * (h / 2f);
-                // the texture runs across the wall by the world (Across), like an arch's soffit over it (MeshBatcher.Project)
-                var across = Across(o.Along);
-                float sign = Mathf.Sign(Vector3.Dot(Vector3.Cross(Vector3.up, o.Along * s), across));
-                list.Add(new DecorPiece
+                var (upper, lower, split) = SideFinish(o, side, g, layout);
+                foreach (float s in new[] { -1f, 1f })
                 {
-                    Kind = DecorKind.WallFinish, Position = c, Rotation = Quaternion.LookRotation(o.Along * s),
-                    Scale = new Vector3(T, h, 1f), Surface = new Vector4(T * sign, h, Vector3.Dot(c, across) - sign * T / 2f, 0f),
-                });
+                    // the reveal at the +s end faces back into the opening (−s along the wall); this side's half of it
+                    var c = o.Center + o.Along * (s * (w / 2f - lift)) + side * (half / 2f);
+                    float sign = Mathf.Sign(Vector3.Dot(Vector3.Cross(Vector3.up, o.Along * s), across));
+                    void Band(int variant, float y0, float y1)
+                    {
+                        if (variant < 0 || y1 - y0 < 0.02f) return;
+                        var at = c + Vector3.up * ((y0 + y1) / 2f);
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.WallFinish, Position = at, Rotation = Quaternion.LookRotation(o.Along * s), Variant = variant,
+                            Scale = new Vector3(half, y1 - y0, 1f), Surface = new Vector4(half * sign, y1 - y0, Vector3.Dot(at, across) - sign * half / 2f, y0),
+                        });
+                    }
+                    if (lower >= 0) { Band(lower, 0f, Mathf.Min(split, h)); Band(upper, Mathf.Min(split, h), h); }
+                    else Band(upper, 0f, h);
+                }
+                if (upper >= 0)
+                    list.Add(new DecorPiece
+                    {
+                        Kind = DecorKind.WallFinish, Position = o.Center + side * (half / 2f) + Vector3.up * (h - lift), Variant = upper,
+                        Rotation = Quaternion.LookRotation(Vector3.up, o.Along), Scale = new Vector3(half, w, 1f), Surface = new Vector4(half, w, 0f, h),
+                    });
             }
-            list.Add(new DecorPiece
-            {
-                Kind = DecorKind.WallFinish, Position = o.Center + Vector3.up * (h - lift),
-                Rotation = Quaternion.LookRotation(Vector3.up, o.Along), Scale = new Vector3(T, w, 1f), Surface = new Vector4(T, w, 0f, h),
-            });
         }
 
         // ------------------------------------------------------------------ ceilings
