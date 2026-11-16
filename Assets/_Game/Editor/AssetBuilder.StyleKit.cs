@@ -139,6 +139,14 @@ namespace Stealth.EditorTools
             Mat("Booth_Wall", new Color(0.97f, 0.97f, 0.96f), "boothwall", 0.15f);
             Mat("Booth_Floor", new Color(0.55f, 0.57f, 0.6f), "grating", 0.45f, 0.6f);
             Mat("Booth_Ceiling", new Color(0.98f, 0.98f, 0.97f), "boothwall", 0.1f);
+            // the hospital (Level.ClinicLook)
+            Mat("Clinic_Wall", new Color(0.84f, 0.92f, 0.9f), "plaster", 0.3f);
+            Mat("Clinic_WardWall", new Color(0.95f, 0.9f, 0.82f), "plaster", 0.3f);
+            Mat("Clinic_Guard", new Color(0.6f, 0.71f, 0.78f), "panels", 0.5f);
+            Mat("Clinic_Ceiling", new Color(0.95f, 0.95f, 0.93f), "panels", 0.1f);
+            Mat("Clinic_Floor", new Color(0.8f, 0.84f, 0.86f), "vinyl", 0.5f);
+            Mat("Theatre_Wall", new Color(0.9f, 0.96f, 0.93f), "panels", 0.45f);
+            Mat("Theatre_Floor", new Color(0.55f, 0.7f, 0.65f), "vinyl", 0.6f);
             Mat("Glow_White", Color.white, null, 0.5f, 0f, null, new Color(2.4f, 2.6f, 2.8f));
             Mat("Glow_Cyan", new Color(0.2f, 1f, 1f), null, 0.5f, 0f, null, new Color(0.3f, 2.6f, 3f));
             Mat("Glow_DimCyan", new Color(0.1f, 0.5f, 0.5f), null, 0.5f, 0f, null, new Color(0.1f, 0.9f, 1.05f)); // dying electronics (S16_Derelict)
@@ -190,6 +198,13 @@ namespace Stealth.EditorTools
             kit.BoothWall = K("Booth_Wall");
             kit.BoothFloor = K("Booth_Floor");
             kit.BoothCeiling = K("Booth_Ceiling");
+            kit.ClinicWall = K("Clinic_Wall");
+            kit.ClinicWardWall = K("Clinic_WardWall");
+            kit.ClinicGuard = K("Clinic_Guard");
+            kit.ClinicCeiling = K("Clinic_Ceiling");
+            kit.ClinicFloor = K("Clinic_Floor");
+            kit.TheatreWall = K("Theatre_Wall");
+            kit.TheatreFloor = K("Theatre_Floor");
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

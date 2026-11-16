@@ -24,6 +24,10 @@ namespace Stealth.Configs
         public Material ShopWall, ShopWallLower, ShopFloor, ShopCeiling;
         [Tooltip("The shop's paint booth: white filter panels on the walls and overhead, a steel grating underfoot")]
         public Material BoothWall, BoothFloor, BoothCeiling;
+        [Tooltip("The hospital in every style (Level.ClinicLook): washable paint over a wall-protection band, the wards warmer, acoustic tiles, sheet vinyl")]
+        public Material ClinicWall, ClinicWardWall, ClinicGuard, ClinicCeiling, ClinicFloor;
+        [Tooltip("The hospital's theatres and imaging rooms: white panels, a seamless green-grey floor")]
+        public Material TheatreWall, TheatreFloor;
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

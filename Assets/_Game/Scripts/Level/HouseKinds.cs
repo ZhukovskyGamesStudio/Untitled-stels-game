@@ -67,8 +67,10 @@ namespace Stealth.Level
                 HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f,
                     RoomType.Library => 2f, RoomType.ControlRoom => 1.5f, RoomType.Studio => 1.5f, _ => 1f },
                 // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
-                HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f,
-                    RoomType.Infirmary => 3f, RoomType.LockerRoom => 1.5f, RoomType.Lab => 1.5f, RoomType.GameRoom => 0.3f, RoomType.Studio => 0.2f, _ => 1f },
+                // the hospital's own plan lays out the wards, the station, the theatres and imaging (PlanGenerator.Hospital); what
+                // is left over: examination rooms, doctors' offices, toilets, stores, the lab, the staff's rooms
+                HouseKind.Hospital => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Infirmary => 2f, RoomType.Storage => 1f,
+                    RoomType.LockerRoom => 1f, RoomType.Lab => 1f, RoomType.Kitchen => 1f, RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, _ => 0f },
                 // the shop's own plan lays out the hall, the booth and the block (PlanGenerator.Garage); what is left over is
                 // the service office, the toilets, the mechanics' locker room and break room, a waiting lounge, the robots' room
                 HouseKind.Garage => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Kitchen => 1f, RoomType.LockerRoom => 1.4f,
@@ -114,10 +116,14 @@ namespace Stealth.Level
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;
                     break;
                 case HouseKind.Hospital:
-                    s.CorridorChance = 1f;
-                    s.AtriumChance = b.AtriumChance * 0.5f;
-                    s.RotundaChance = b.RotundaChance * 0.4f;
-                    s.RoomSizeScale = b.RoomSizeScale * 0.9f;
+                    // a slab: the corridor down its length, rooms on both sides; two or three floors (the theatres on top)
+                    if (b.EveryRoomType) { s.CorridorChance = 1f; break; }
+                    s.Hospital = true;
+                    s.FloorsPerHouse = new[] { 2, 2, 3, 3, 3 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
+                    s.RotundaChance = 0f;
+                    s.CornerCutChance = 0f;
                     break;
                 case HouseKind.Garage:
                     // a box of a building: the hall two storeys high, the block beside it two floors, square rooms (not in the

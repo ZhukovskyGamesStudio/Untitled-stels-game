@@ -187,11 +187,28 @@ namespace Stealth.EditorTools
             (PropKind.BayLines, "bay_lines", "ShopYellow", "ShopYellow", "ShopYellow", "PropScreen"),
             (PropKind.GarageDoor, "garage_door", "Ceiling", "PropAccent", "CarGlass", "PropScreen"),
             (PropKind.PaintRack, "paint_rack", "Vending", "Rack", "Metal", "PropScreen"),
+            // the hospital (Tools/Blender/hospital.py)
+            (PropKind.BedHeadwall, "bed_headwall", "Metal", "PropAccent", "Metal", "LampBulb"),
+            (PropKind.BedCurtain, "bed_curtain", "Curtain", "Metal", "Metal", "PropScreen"),
+            (PropKind.NurseStationDesk, "nurse_station", "Ceiling", "MedicalBlue", "Metal", "PropScreen"),
+            (PropKind.Gurney, "gurney", "Ceiling", "MedicalBlue", "Metal", "PropScreen"),
+            (PropKind.MedicationCart, "medication_cart", "MedicalBlue", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.LinenCart, "linen_cart", "MedicalBlue", "Rubber", "Metal", "PropScreen"),
+            (PropKind.SurgicalTable, "surgical_table", "Ceiling", "Rubber", "Metal", "PropScreen"),
+            (PropKind.SurgicalLights, "surgical_lights", "Ceiling", "Metal", "Metal", "LampBulb"),
+            (PropKind.AnesthesiaMachine, "anesthesia_machine", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.InstrumentTable, "instrument_table", "Metal", "SurgicalGreen", "Metal", "PropScreen"),
+            (PropKind.ScrubSink, "scrub_sink", "Metal", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.XrayMachine, "xray_machine", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.CtScanner, "ct_scanner", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.WaitingSeats, "waiting_seats", "MedicalBlue", "Rubber", "Metal", "PropScreen"),
+            (PropKind.VitalsMonitor, "vitals_monitor", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.HandSanitizer, "hand_sanitizer", "Ceiling", "PropAccent", "Metal", "PropScreen"),
         };
 
         /// <summary>Kinds hung on a wall or standing on a counter: no collider (nothing walks into them, nothing stands on them).</summary>
         static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard, PropKind.AreaRug,
-            PropKind.BayLines, PropKind.HoseReel };
+            PropKind.BayLines, PropKind.HoseReel, PropKind.BedHeadwall, PropKind.BedCurtain, PropKind.SurgicalLights, PropKind.HandSanitizer };
 
         /// <summary>Cupboards whose doors open (Items.Storage, models with BodyDoor{n} parts): loot may hide behind them.</summary>
         static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet };

@@ -1,0 +1,118 @@
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using Stealth.Configs;
+using Stealth.Level;
+using UnityEditor;
+using UnityEngine;
+
+namespace Stealth.Tests
+{
+    /// <summary>
+    /// The hospital is a building of its own: a slab with a corridor down its length and rooms on both sides, the
+    /// admissions with X-ray and CT on the ground floor, patient rooms and a nurse station upstairs, the theatres on top.
+    /// </summary>
+    public class HospitalTests
+    {
+        static readonly List<LevelLayout> s_Hospitals = new();
+
+        static List<LevelLayout> Hospitals()
+        {
+            if (s_Hospitals.Count > 0) return s_Hospitals;
+            for (int seed = 1; s_Hospitals.Count < 4 && seed < 400; seed++)
+            {
+                int house = 1 + seed % 4;
+                if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;
+                s_Hospitals.Add(TestHouses.Get(seed, house));
+            }
+            return s_Hospitals;
+        }
+
+        [Test]
+        public void TheHospitalIsASlabWithACorridorAndRoomsOnBothSides()
+        {
+            foreach (var l in Hospitals())
+            {
+                string name = $"{l.Seed}/{l.LevelIndex}";
+                Assert.AreEqual("hospital", l.Mass, name);
+                Assert.That(l.Floors, Is.InRange(2, 3), name);
+                for (int f = 0; f < l.Floors; f++)
+                {
+                    var corridor = l.Rooms.Where(r => r.Floor == f && r.Type == RoomType.Corridor).OrderByDescending(r => r.Area).FirstOrDefault();
+                    Assert.IsNotNull(corridor, $"{name}: a corridor on floor {f}");
+                    Assert.Greater(corridor.Bounds.width, l.Plan.SizeX - 1f, $"{name}: it runs the building's length on floor {f}");
+                }
+                Assert.Greater(l.Rooms.Count(r => r.Type == RoomType.Imaging && r.Floor == 0), 0, $"{name}: X-ray and CT on the ground floor");
+                Assert.Greater(l.Rooms.Count(r => r.Type == RoomType.Infirmary && r.Floor == 0), 1, $"{name}: examination rooms in the admissions");
+                for (int f = 1; f < l.Floors; f++)
+                {
+                    Assert.GreaterOrEqual(l.Rooms.Count(r => r.Type == RoomType.Ward && r.Floor == f), 6, $"{name}: patient rooms on floor {f}");
+                    Assert.AreEqual(1, l.Rooms.Count(r => r.Type == RoomType.NurseStation && r.Floor == f), $"{name}: one nurse station on floor {f}");
+                }
+                Assert.AreEqual(2, l.Rooms.Count(r => r.Type == RoomType.Operating && r.Floor == l.Floors - 1), $"{name}: two theatres on the top floor");
+            }
+        }
+
+        [Test]
+        public void PatientRoomsOpenOntoTheCorridorAndTheStationIsOpenToIt()
+        {
+            foreach (var l in Hospitals())
+            {
+                string name = $"{l.Seed}/{l.LevelIndex}";
+                foreach (var r in l.Rooms.Where(r => r.Type is RoomType.Ward or RoomType.Operating or RoomType.Imaging))
+                {
+                    var ways = l.Doorways.Where(d => d.RoomA == r.Id || d.RoomB == r.Id).ToList();
+                    Assert.AreEqual(1, ways.Count, $"{name}: one way into the {r.Type} at {r.Center}");
+                    var other = l.Plan.Rooms[ways[0].RoomA == r.Id ? ways[0].RoomB : ways[0].RoomA];
+                    Assert.AreEqual(RoomType.Corridor, other.Type, $"{name}: the {r.Type} at {r.Center} opens onto the corridor");
+                    Assert.AreEqual(EdgeType.Door, ways[0].Kind, $"{name}: through a door");
+                }
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.NurseStation))
+                    Assert.IsTrue(l.Doorways.Any(d => (d.RoomA == r.Id || d.RoomB == r.Id) && d.Kind == EdgeType.Open), $"{name}: the station is open to the corridor");
+            }
+        }
+
+        [Test]
+        public void TheRoomsAreFurnishedAsAHospital()
+        {
+            foreach (var l in Hospitals())
+            {
+                string name = $"{l.Seed}/{l.LevelIndex}";
+                IEnumerable<PropKind> In(PlanRoom r) => l.Props.Where(p => l.Plan.RoomAt(p.Position + Vector3.up * 0.3f) == r).Select(p => p.Kind);
+                var wards = l.Rooms.Where(r => r.Type == RoomType.Ward).ToList();
+                int withBeds = wards.Count(r => In(r).Contains(PropKind.HospitalBed) && In(r).Contains(PropKind.BedHeadwall));
+                Assert.Greater(withBeds, wards.Count * 0.8f, $"{name}: beds with their headwalls in the patient rooms ({withBeds} of {wards.Count})");
+                Assert.IsTrue(l.Props.Any(p => p.Kind == PropKind.BedCurtain), $"{name}: privacy curtains round the beds");
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.NurseStation))
+                    Assert.Contains(PropKind.NurseStationDesk, In(r).ToList(), $"{name}: the station's counter");
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.Operating))
+                {
+                    var kinds = In(r).ToList();
+                    Assert.Contains(PropKind.SurgicalTable, kinds, $"{name}: the theatre's table");
+                    Assert.Contains(PropKind.SurgicalLights, kinds, $"{name}: its lamps");
+                }
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.Imaging))
+                    Assert.IsTrue(In(r).Any(k => k is PropKind.CtScanner or PropKind.XrayMachine), $"{name}: a scanner in the imaging room at {r.Center}");
+                Assert.IsTrue(l.Props.Any(p => p.Kind == PropKind.WaitingSeats), $"{name}: waiting seats");
+            }
+        }
+
+        [Test]
+        public void TheHospitalIsDressedAsOneInEveryStyle()
+        {
+            var kit = AssetDatabase.LoadAssetAtPath<StyleKit>("Assets/_Game/Data/Styles/StyleKit.asset");
+            Assert.IsNotNull(kit.ClinicWall);
+            var style = new StyleGeometry { Doors = DoorTrim.Arch, Crown = true, WainscotHeight = 1f };
+            var clinic = ClinicLook.For(style, kit, Hospitals()[0]);
+            Assert.AreEqual(DoorTrim.Casing, clinic.Doors, "plain frames");
+            Assert.IsFalse(clinic.Crown);
+            var ward = clinic.RoomLooks[clinic.RoomLookOf(RoomType.Ward)];
+            Assert.AreSame(kit.ClinicWardWall, ward.Wall, "warm paint in the wards");
+            Assert.AreSame(kit.ClinicGuard, ward.Lower, "a wall-protection band");
+            Assert.AreEqual(1f, ward.LowerHeight, 1e-4f, "to a metre, with its bumper rail on top");
+            Assert.AreSame(kit.TheatreWall, clinic.RoomLooks[clinic.RoomLookOf(RoomType.Operating)].Wall, "white panels in the theatres");
+            Assert.AreSame(kit.ClinicFloor, clinic.RoomFloors[clinic.RoomFloorOf(RoomType.Corridor)].Material, "sheet vinyl in the corridors");
+            Assert.AreSame(style, ClinicLook.For(style, kit, TestHouses.Get(42, 2)), "an office keeps the style");
+        }
+    }
+}

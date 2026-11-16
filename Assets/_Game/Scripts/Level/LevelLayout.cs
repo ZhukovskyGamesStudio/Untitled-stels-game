@@ -9,7 +9,9 @@ namespace Stealth.Level
         // the auto repair shop (HouseKind.Garage, PlanGenerator.Garage): the double-height workshop hall with its bays, the paint booth
         Workshop, PaintBooth,
         // the plant room off the lobby at the outer wall: where the building's drain leaves for the street sewer — the entry hatch (PlanGenerator.UtilityCorner)
-        Utility }
+        Utility,
+        // the hospital (HouseKind.Hospital, PlanGenerator.Hospital): patient rooms, the nurse station open to the corridor, theatres, X-ray and CT rooms
+        Ward, NurseStation, Operating, Imaging }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -78,7 +80,10 @@ namespace Stealth.Level
         DepositWall, GoldPallet, MoneyCart, CashShelf,
         // the auto repair shop (Tools/Blender/garage.py): customers' cars, the lifts, the shop's equipment, the bays' doors and lines
         CarParked, CarHoodOpen, LiftCar, LiftEmpty, CarOnStands, ToolChest, TireChanger, WheelBalancer, TireRack, TireStack,
-        EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack }
+        EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack,
+        // the hospital (Tools/Blender/hospital.py): the wards, the nurse station, the theatres, imaging, the corridors
+        BedHeadwall, BedCurtain, NurseStationDesk, Gurney, MedicationCart, LinenCart, SurgicalTable, SurgicalLights, AnesthesiaMachine,
+        InstrumentTable, ScrubSink, XrayMachine, CtScanner, WaitingSeats, VitalsMonitor, HandSanitizer }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }

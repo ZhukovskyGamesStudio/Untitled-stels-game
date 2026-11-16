@@ -321,6 +321,16 @@ def grating():
     save("grating", a)
 
 
+def vinyl():
+    """2 m: hospital sheet vinyl — a fine speckle of chips in the light grey, the welded seams every 2 m (the tile's edges)."""
+    a = 0.8 + (noise(101, 3) - 0.5) * 0.04
+    r = rng(102)
+    chips = (r.random((N, N)) > 0.93) * (r.random((N, N)) - 0.5) * 0.18
+    chips = np.asarray(Image.fromarray(((chips + 0.5) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.6)), dtype=np.float64) / 255 - 0.5
+    seams = lines_mask(lambda d: [d.line([(0, 1), (N, 1)], fill=255, width=2), d.line([(1, 0), (1, N)], fill=255, width=2)])
+    save("vinyl", a + chips - 0.15 * seams)
+
+
 def circuit():
     """1 m: dark panel with circuit traces that glow (circuit_glow)."""
     r = rng(26)
@@ -383,5 +393,5 @@ def rubber():
 if __name__ == "__main__":
     for fn in (planks, parquet, checker, bigtiles, marble, diamondplate, carpet, concrete, gridtiles,
                damask, boards, brick, corrugated, plaster, panels, circuit, hatch, smalltiles, rubber, vaultsteel,
-               blockwall, epoxy, boothwall, grating):
+               blockwall, epoxy, boothwall, grating, vinyl):
         fn()

@@ -62,6 +62,22 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>Logs/plans/hospital_&lt;seed&gt;_&lt;house&gt;.png — the first hospitals of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteHospitalPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = 1 + seed % 4;
+                if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"hospital_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
+        }
+
         static Color TypeColor(RoomType t) => t switch
         {
             RoomType.Lobby => new Color(0.55f, 0.85f, 0.6f),
@@ -77,6 +93,11 @@ namespace Stealth.Tests
             RoomType.Workshop => new Color(0.6f, 0.62f, 0.66f),
             RoomType.PaintBooth => new Color(0.95f, 0.45f, 0.4f),
             RoomType.Utility => new Color(0.4f, 0.45f, 0.5f),
+            RoomType.Ward => new Color(0.7f, 0.85f, 0.95f),
+            RoomType.NurseStation => new Color(0.95f, 0.85f, 0.3f),
+            RoomType.Operating => new Color(0.4f, 0.8f, 0.6f),
+            RoomType.Imaging => new Color(0.65f, 0.5f, 0.85f),
+            RoomType.Infirmary => new Color(0.9f, 0.6f, 0.6f),
             _ => new Color(0.85f, 0.85f, 0.7f),
         };
 

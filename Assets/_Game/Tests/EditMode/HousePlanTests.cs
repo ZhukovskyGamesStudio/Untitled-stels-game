@@ -33,7 +33,10 @@ namespace Stealth.Tests
             int atriums = 0, shaped = 0;
             var areas = new List<float>();
             var roomCounts = new HashSet<int>();
-            foreach (var l in TestHouses.Sample)
+            // the office generator's variety: the sample's offices and a few more (a shop and a hospital have plans of their own)
+            var houses = TestHouses.Sample.Where(h => h.Kind is not (HouseKind.Garage or HouseKind.Hospital)).ToList();
+            for (int seed = 3; houses.Count < 7; seed++) if (HouseKinds.Of(seed * 101, 2) is not (HouseKind.Garage or HouseKind.Hospital)) houses.Add(TestHouses.Get(seed * 101, 2));
+            foreach (var l in houses)
             {
                 masses.Add(l.Mass);
                 roomCounts.Add(l.Rooms.Count);

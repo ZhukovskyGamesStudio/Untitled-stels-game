@@ -348,7 +348,7 @@ namespace Stealth.Level
 
         static bool Plain(LevelLayout l, PlanRoom r) =>
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
-            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility) && !HasStair(l, r.Id);
+            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility or RoomType.Operating or RoomType.Imaging or RoomType.NurseStation) && !HasStair(l, r.Id);
 
         /// <summary>
         /// Makes the vault's doorway wide enough for the round bank door (<see cref="LevelMetrics.VaultDoorWidth"/>):

@@ -185,6 +185,12 @@ namespace Stealth.Level
         /// </summary>
         [System.NonSerialized] public bool Garage;
 
+        /// <summary>
+        /// The hospital's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Hospital"/>, never saved): a slab
+        /// with a corridor down its length and rooms on both sides, admissions below, wards above, theatres on top (PlanGenerator.Hospital.cs).
+        /// </summary>
+        [System.NonSerialized] public bool Hospital;
+
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
         public float AreaFor(int players) =>
@@ -523,7 +529,8 @@ namespace Stealth.Level
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility || r.Area < 10f) continue; // (the booth: its car)
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility or RoomType.Operating or RoomType.Imaging
+                    or RoomType.NurseStation || r.Area < 10f) continue; // (the booth: its car; the theatres, imaging and the station: their equipment)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;

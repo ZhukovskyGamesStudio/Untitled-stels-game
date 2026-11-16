@@ -174,6 +174,10 @@ namespace Stealth.EditorTools
             Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
             Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
             Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors
+            Mat(props, "ClinicDoor", new Color(0.72f, 0.82f, 0.86f), smoothness: 0.5f); // the hospital's washable laminate doors
+            Mat(props, "MedicalBlue", new Color(0.22f, 0.45f, 0.66f), smoothness: 0.4f);   // mattresses, carts, seats
+            Mat(props, "SurgicalGreen", new Color(0.2f, 0.46f, 0.4f), smoothness: 0.15f);  // drapes
+            Mat(props, "Curtain", new Color(0.62f, 0.78f, 0.8f), smoothness: 0.05f);       // the beds' privacy curtains
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

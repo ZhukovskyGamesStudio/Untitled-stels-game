@@ -75,11 +75,12 @@ namespace Stealth.Tests
         public void BuildingFollowsItsSettings()
         {
             var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentsPerRoom = 0f, AutoDoorChance = 0f };
-            var l = LevelGenerator.Generate(5, 0, b);
+            int seed0 = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 0) == HouseKind.Office); // an office: a hospital and a shop choose their floors
+            var l = LevelGenerator.Generate(seed0, 0, b);
             Assert.AreEqual(4, l.Floors);
             Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
             Assert.IsFalse(l.Doorways.Any(d => d.Kind == EdgeType.Vent), "no vents");
-            Assert.AreEqual(l.KeyDoors.Count, l.AutoDoors.Count, "only the key doors");
+            Assert.AreEqual(l.KeyDoors.Count + (l.VaultDoor >= 0 ? 1 : 0) + (l.StorageDoor >= 0 ? 1 : 0), l.AutoDoors.Count, "only the key doors (and the vault's and the storage room's, when the house has them)");
 
             var onlyServers = new BuildingSettings { RoomWeights = new[] { new RoomWeight(RoomType.Server, 1) } };
             // an office (a hospital and a garage have programs of their own)

@@ -89,6 +89,10 @@ namespace Stealth.Level
             new RoomRule(RoomType.Workshop, new Vector2(80f, 700f), perHouse: 1),
             new RoomRule(RoomType.PaintBooth, new Vector2(20f, 80f), zone: RoomZone.Interior, perHouse: 1),
             new RoomRule(RoomType.Utility, new Vector2(6f, 24f), perHouse: 1),
+            new RoomRule(RoomType.Ward, new Vector2(12f, 40f)),
+            new RoomRule(RoomType.NurseStation, new Vector2(10f, 40f)),
+            new RoomRule(RoomType.Operating, new Vector2(24f, 70f)),
+            new RoomRule(RoomType.Imaging, new Vector2(18f, 60f)),
         };
 
         /// <summary>The rule of a type, or one without limits.</summary>
@@ -143,12 +147,12 @@ namespace Stealth.Level
         {
             foreach (var r in plan.Rooms)
             {
-                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility || Holds(plan, r, r.Type, rules)) continue;
+                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall || Planned(r.Type) || Holds(plan, r, r.Type, rules)) continue;
                 bool swapped = false;
                 if (r.Type != RoomType.Storage) // the storage room's place is its own (one door: StorageRooms)
                     foreach (var o in plan.Rooms)
                     {
-                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility || o.Type == r.Type) continue;
+                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage || Planned(o.Type) || o.Type == r.Type) continue;
                         if (!Holds(plan, o, r.Type, rules) || !Holds(plan, r, o.Type, rules)) continue;
                         (o.Type, r.Type) = (r.Type, o.Type);
                         swapped = true;
@@ -160,6 +164,13 @@ namespace Stealth.Level
                     if (Holds(plan, r, t, rules)) { r.Type = t; break; }
             }
         }
+
+        /// <summary>
+        /// Types a location's own plan lays out where they belong (the shop's hall and booth, the plant room, the hospital's
+        /// wards, station, theatres and imaging rooms): neither rule enforcement nor zoning moves or retypes them.
+        /// </summary>
+        public static bool Planned(RoomType t) => t is RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility
+            or RoomType.Ward or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging;
 
         /// <summary>What a room that fits nothing else becomes, in order (an office takes almost any room).</summary>
         static readonly RoomType[] Fallbacks = { RoomType.OpenSpace, RoomType.Office, RoomType.Lounge, RoomType.Meeting, RoomType.CopyRoom, RoomType.Restroom };

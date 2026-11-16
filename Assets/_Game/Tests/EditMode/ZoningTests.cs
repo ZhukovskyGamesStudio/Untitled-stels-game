@@ -40,6 +40,7 @@ namespace Stealth.Tests
                 for (int house = 0; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 7727 + house, house, null, null, 2, null, classic);
+                    if (l.Kind is HouseKind.Garage or HouseKind.Hospital) continue; // a plan of its own (PlanGenerator.Garage/Hospital): its zones are its layout
                     var plan = l.Plan;
                     var rules = HouseKinds.Apply(l.Kind, new BuildingSettings()).RoomTypeRules;
                     var inHouse = new Dictionary<RoomType, int>();

@@ -135,6 +135,8 @@ namespace Stealth.Tests
                 {
                     index++;
                     string owner = $"{child.name}#{index}@{child.position}";
+                    // (a bed's privacy curtain and the theatre's lamps hang round and over the furniture on purpose: no collider, not probed)
+                    if (child.name is nameof(PropKind.BedCurtain) or nameof(PropKind.SurgicalLights)) continue;
                     if (child.name == "Window" || System.Enum.TryParse<PropKind>(child.name, out _))
                     {
                         foreach (var mf in child.GetComponentsInChildren<MeshFilter>())

@@ -230,11 +230,28 @@ namespace Stealth.Level
             [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -3f, 1.7f, 3f),
             [PropKind.GarageDoor] = Rect.MinMaxRect(-1.7f, 0f, 1.7f, 0.1f),
             [PropKind.PaintRack] = Rect.MinMaxRect(-0.8f, -0.25f, 0.66f, 0.25f),
+            // the hospital (Tools/Blender/hospital.py; Blender x mirrored)
+            [PropKind.BedHeadwall] = Rect.MinMaxRect(-0.73f, -0.21f, 0.73f, 0.21f),
+            [PropKind.BedCurtain] = Rect.MinMaxRect(-0.65f, -1.18f, 0.42f, 1.2f),
+            [PropKind.NurseStationDesk] = Rect.MinMaxRect(-1.53f, -0.54f, 1.53f, 0.54f),
+            [PropKind.Gurney] = Rect.MinMaxRect(-0.43f, -1.03f, 0.43f, 1.03f),
+            [PropKind.MedicationCart] = Rect.MinMaxRect(-0.48f, -0.29f, 0.48f, 0.29f),
+            [PropKind.LinenCart] = Rect.MinMaxRect(-0.34f, -0.32f, 0.34f, 0.32f),
+            [PropKind.SurgicalTable] = Rect.MinMaxRect(-0.89f, -1.0f, 0.89f, 1.0f),
+            [PropKind.SurgicalLights] = Rect.MinMaxRect(-1.03f, -0.58f, 1.01f, 0.64f),
+            [PropKind.AnesthesiaMachine] = Rect.MinMaxRect(-0.54f, -0.49f, 0.54f, 0.49f),
+            [PropKind.InstrumentTable] = Rect.MinMaxRect(-0.94f, -0.32f, 0.94f, 0.32f),
+            [PropKind.ScrubSink] = Rect.MinMaxRect(-0.76f, -0.28f, 0.76f, 0.28f),
+            [PropKind.XrayMachine] = Rect.MinMaxRect(-0.71f, -1.52f, 0.71f, 1.52f),
+            [PropKind.CtScanner] = Rect.MinMaxRect(-0.95f, -1.4f, 0.95f, 1.4f),
+            [PropKind.WaitingSeats] = Rect.MinMaxRect(-1.23f, -0.31f, 1.23f, 0.31f),
+            [PropKind.VitalsMonitor] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
+            [PropKind.HandSanitizer] = Rect.MinMaxRect(-0.06f, -0.06f, 0.06f, 0.06f),
         };
 
         /// <summary>Round-2 pieces hung on a wall (a clock, a board, a cabinet): no footprint on the floor to walk into.</summary>
         static readonly HashSet<PropKind> Hung = new() { PropKind.WallClock, PropKind.ProjectorScreen, PropKind.ChangingTable, PropKind.TowelDispenser, PropKind.FireCabinet, PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet,
-            PropKind.HoseReel };
+            PropKind.HoseReel, PropKind.BedHeadwall, PropKind.BedCurtain, PropKind.SurgicalLights, PropKind.HandSanitizer };
 
         /// <summary>
         /// Big pieces that stand higher than a window's sill by more than a monitor does (shelving, lockers, fridges,
@@ -252,6 +269,7 @@ namespace Stealth.Level
             PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
             PropKind.Pinball, PropKind.MedTable, PropKind.Workbench,
             PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
+            PropKind.BedCurtain, PropKind.Gurney, PropKind.AnesthesiaMachine, PropKind.XrayMachine, PropKind.CtScanner,
         };
 
         /// <summary>Pieces that hang on the wall itself: never on a window's glass or its frame.</summary>
@@ -259,7 +277,7 @@ namespace Stealth.Level
         {
             PropKind.WallCabinet, PropKind.WallClock, PropKind.HandDryer, PropKind.TowelDispenser, PropKind.ChangingTable, PropKind.FireCabinet,
             PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
-            PropKind.DartBoard, PropKind.HoseReel,
+            PropKind.DartBoard, PropKind.HoseReel, PropKind.BedHeadwall, PropKind.SurgicalLights, PropKind.HandSanitizer,
         };
 
         /// <summary>
@@ -279,12 +297,13 @@ namespace Stealth.Level
                 PropKind.FumeHood or PropKind.VocalBooth or PropKind.DrumKit or PropKind.PowerCage or PropKind.CableMachine or PropKind.MatRack or
                 PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
                 PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
-                PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist => 1,
+                PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist or PropKind.CtScanner or PropKind.XrayMachine or
+                PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink => 1,
             PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or
                 PropKind.RobotArm or PropKind.MicStand or PropKind.InfoKiosk or PropKind.Whiteboard or PropKind.NoticeBoard or PropKind.BinPair or
                 PropKind.PaperBin or PropKind.PaperStack or PropKind.GuitarStand or PropKind.AmpCabinet or PropKind.NightTable or PropKind.Plant or
                 PropKind.PlanterLarge or PropKind.BeanBag or PropKind.StandingDesk or PropKind.PlanterDivider or PropKind.PaintRack or
-                PropKind.HoseReel or PropKind.EngineStand or PropKind.OilDrums => 2,
+                PropKind.HoseReel or PropKind.EngineStand or PropKind.OilDrums or PropKind.HandSanitizer or PropKind.Gurney or PropKind.LinenCart => 2,
             _ => int.MaxValue,
         };
 
@@ -623,13 +642,14 @@ namespace Stealth.Level
         /// The middle of this room is for its furniture (a meeting room's table, a restroom's stalls): the patrol stands
         /// by the door instead (<see cref="LevelGenerator.PatrolSpot"/>) and "reached" means any free spot near the middle.
         /// </summary>
-        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom or RoomType.PaintBooth; // (the booth: its car)
+        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom or RoomType.PaintBooth
+            or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging; // (the booth: its car; the hospital's: its counter, table, scanner)
 
         /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
         static bool InTheWay(PropKind k) =>
             k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
                 or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
-                or PropKind.BayLines) && !Hung.Contains(k);
+                or PropKind.BayLines or PropKind.BedCurtain or PropKind.SurgicalLights) && !Hung.Contains(k);
 
         // The room being furnished, as the walkability check will see it (same grid, same margins): its free cells
         // without furniture, and the spots a walker must still get between: its middle, the inner side of each of its
@@ -1371,6 +1391,7 @@ namespace Stealth.Level
         /// </summary>
         void Anchor(PlanRoom room)
         {
+            if (room.Type == RoomType.Lobby && m_L.Kind == HouseKind.Hospital) { Anchor(room, 0, 2, false); return; } // the waiting area's rows of seats
             if (room.Type < RoomType.Gym && room.Type is not (RoomType.Kitchen or RoomType.Restroom)) return;
             if (room.Type == RoomType.Restroom)
             {
@@ -1381,6 +1402,21 @@ namespace Stealth.Level
                 return;
             }
             if (room.Type == RoomType.Workshop) { WorkshopBays(room); return; }
+            if (room.Type == RoomType.Ward) { if (!Anchor(room, 0, 1, false)) Anchor(room, 1, 2, false); return; } // two beds, or one
+            if (room.Type == RoomType.NurseStation && StationCounter(room)) return;
+            if (room.Type is RoomType.NurseStation or RoomType.Operating or RoomType.Imaging) // in the middle
+            {
+                Anchor(room, 0, 0, true);
+                if (room.Type == RoomType.Operating)
+                    for (int i = m_L.Props.Count - 1; i >= 0; i--)
+                        if (m_L.Props[i].Kind == PropKind.SurgicalTable && m_P.RoomAt(m_L.Props[i].Position + Vector3.up * 0.3f) == room)
+                        {
+                            // the lamps hang from the ceiling over the table (nothing to walk into: no check against what stands under them)
+                            Put(room, PropKind.SurgicalLights, m_L.Props[i].Position, m_L.Props[i].RotationY);
+                            break;
+                        }
+                return;
+            }
             if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
             if (room.Type == RoomType.ControlRoom)
             {
@@ -1441,6 +1477,36 @@ namespace Stealth.Level
                     if (TryCommit(room, b, 0.05f)) break;
                 }
             }
+        }
+
+        /// <summary>
+        /// The nurse station's counter: parallel to its open side, facing the corridor a little way in (the nurses see
+        /// the corridor and whoever comes up to the ledge), their chairs behind it.
+        /// </summary>
+        bool StationCounter(PlanRoom room)
+        {
+            foreach (var d in m_L.Doorways)
+            {
+                if (d.Kind != EdgeType.Open || (d.RoomA != room.Id && d.RoomB != room.Id)) continue;
+                var across = d.Rotation * Vector3.forward;
+                across.y = 0f;
+                if (Vector3.Dot(room.Center - d.Position, across) < 0f) across = -across;
+                across.Normalize();
+                var along = Vector3.Cross(Vector3.up, across);
+                float yaw = Mathf.Atan2(-across.x, -across.z) * Mathf.Rad2Deg; // its front to the corridor
+                foreach (float depth in new[] { 4.6f, 4.0f, 3.2f, 2.6f }) // past the room's middle: the floor before it stays open to the corridor
+                {
+                    var p = d.Position + across * depth;
+                    p.y = LevelLayout.FloorY(room.Floor);
+                    var b = new Batch();
+                    b.Add(PropKind.NurseStationDesk, p, yaw);
+                    b.Add(PropKind.Chair, p + across * 0.95f - along * 0.7f, yaw);
+                    b.Add(PropKind.Chair, p + across * 0.95f + along * 0.7f, yaw);
+                    b.Item(p + across * 0.1f + along * R(-1f, 1f) + Vector3.up * 0.78f);
+                    if (TryCommit(room, b, 0.05f)) return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
@@ -1590,6 +1656,26 @@ namespace Stealth.Level
                 case (RoomType.LockerRoom, 0): return Row(f, b, PropKind.Lockers, 2, 1.05f);
                 case (RoomType.LockerRoom, 1): return Single(PropKind.Lockers, 1.05f);
                 case (RoomType.LockerRoom, 2): return Out(PropKind.Bench, 0.3f, 1.65f);
+                case (RoomType.Lobby, 0): return Row(f, b, PropKind.WaitingSeats, 2, 2.5f);
+                case (RoomType.Lobby, 1): return Single(PropKind.WaitingSeats, 2.5f);
+                case (RoomType.Ward, 0):
+                case (RoomType.Ward, 1):
+                {
+                    // patient beds head to the wall: the headwall unit over each, its curtain round it, a monitor and a night table beside
+                    int beds = option == 0 ? 2 : 1;
+                    float step = 1.95f, w = beds * step;
+                    for (int i = 0; i < beds; i++)
+                    {
+                        float u = (i - (beds - 1) / 2f) * step;
+                        float n = BackOf(PropKind.HospitalBed) + 0.45f; // pulled out from the wall: the nurses reach the head, the headwall's call cord hangs free
+                        b.Add(PropKind.HospitalBed, f.P(u, n), f.Face);
+                        b.Add(PropKind.BedHeadwall, f.P(u, BackOf(PropKind.BedHeadwall)), f.Face, solid: false);
+                        b.Add(PropKind.BedCurtain, f.P(u - 0.05f, n + 0.05f), f.Face, solid: false);
+                        if (Chance(0.6)) b.Item(f.P(u + 0.2f, n + 0.4f, 0.66f));
+                    }
+                    b.Add(PropKind.NightTable, f.P(beds == 2 ? 0f : 0.82f, BackOf(PropKind.NightTable)), f.Face);
+                    return w + (beds == 1 ? 0.5f : 0f);
+                }
                 case (RoomType.Infirmary, 0): { float w = Along(PropKind.HospitalBed); b.Item(f.P(0, 0.5f, 0.66f)); return w; }
                 case (RoomType.Infirmary, 1): { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
                 case (RoomType.Infirmary, 2): return Out(PropKind.PrivacyScreen, 0.3f, 1.65f);
@@ -1892,6 +1978,22 @@ namespace Stealth.Level
                     else if (roll < 0.9) b.Add(PropKind.FloorJack, f.P(0, 0), f.Face);
                     else { b.Add(PropKind.TireStack, f.P(-0.45f, 0), 0); b.Add(PropKind.TireStack, f.P(0.45f, 0), 0); }
                     break;
+                case RoomType.NurseStation: // the counter facing the corridor's way, the nurses' chairs behind, a cart beside
+                    b.Add(PropKind.NurseStationDesk, f.P(0, 0), f.Face);
+                    b.Add(PropKind.Chair, f.P(-0.7f, -0.95f), f.Face);
+                    b.Add(PropKind.Chair, f.P(0.7f, -0.95f), f.Face);
+                    b.Item(f.P(R(-1f, 1f), 0.1f, 0.78f));
+                    break;
+                case RoomType.Operating: // the table under its lamps, the anaesthesia machine at the head, the instruments at the side
+                    b.Add(PropKind.SurgicalTable, f.P(0, 0), f.AlongU);
+                    b.Add(PropKind.AnesthesiaMachine, f.P(-1.75f, 0), f.AlongU);
+                    b.Add(PropKind.InstrumentTable, f.P(0.3f, 1.5f), f.Back);
+                    b.Add(PropKind.VitalsMonitor, f.P(-1.6f, 1.0f), f.Back);
+                    break;
+                case RoomType.Imaging: // a CT scanner where it fits, else the X-ray room's table and tube stand
+                    if (room.Area >= 30f && roll < 0.6) b.Add(PropKind.CtScanner, f.P(0, 0), f.AlongU);
+                    else b.Add(PropKind.XrayMachine, f.P(0, 0), f.AlongU);
+                    break;
                 case RoomType.PaintBooth: // the car being painted, lengthwise in the booth
                     b.Add(PropKind.CarParked, f.P(0, 0), f.AlongU);
                     break;
@@ -1916,6 +2018,20 @@ namespace Stealth.Level
                         b.Add(PropKind.AreaRug, f.P(0, 0.6f), f.Face, solid: false);
                         b.Add(PropKind.CoffeeTable, f.P(0, 0.85f), f.Face);
                         b.Item(f.P(0, 0.85f, 0.42f));
+                    }
+                    break;
+                case RoomType.Lobby when m_L.Kind == HouseKind.Hospital:
+                    // the admissions desk, rows of waiting seats back to back
+                    if (roll < 0.45)
+                    {
+                        b.Add(PropKind.ReceptionDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
+                        b.Item(f.P(-0.4f, 0.33f, 1.14f));
+                    }
+                    else
+                    {
+                        b.Add(PropKind.WaitingSeats, f.P(0, 0.35f), f.Back);
+                        b.Add(PropKind.WaitingSeats, f.P(0, -0.35f), f.Face);
                     }
                     break;
                 case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
@@ -2167,6 +2283,15 @@ namespace Stealth.Level
             int roll = m_Rng.Next(100);
             switch (room.Type)
             {
+                case RoomType.Corridor when m_L.Kind == HouseKind.Hospital:
+                    // a ward corridor: trolleys and chairs along the walls, far apart (the beds pass in the middle)
+                    if (roll < 22) return Along(PropKind.Gurney);
+                    if (roll < 40) return Single(PropKind.WaitingSeats, 2.5f);
+                    if (roll < 55) return Single(PropKind.Wheelchair, 0.75f);
+                    if (roll < 68) return Single(PropKind.LinenCart, 0.75f);
+                    if (roll < 80) return Single(PropKind.MedicationCart, 1.05f);
+                    if (roll < 90) return Hung(PropKind.HandSanitizer, 0.3f);
+                    return Hung(PropKind.FireCabinet, 0.45f);
                 case RoomType.Corridor:
                     // corridors are walkways: only slim things, far apart (Walls keeps 1.7 m free in front of them)
                     if (roll < 28) return Hung(PropKind.FireCabinet, 0.45f);
@@ -2184,6 +2309,15 @@ namespace Stealth.Level
                     if (roll < 82) return Single(PropKind.DirectoryBoard, 0.85f);
                     if (roll < 92) return Single(PropKind.PlanterLarge, 1.05f);
                     { b.Add(PropKind.Sculpture, f.P(0, 0.45f), f.Face); return 0.7f; }
+                case RoomType.Lobby when m_L.Kind == HouseKind.Hospital:
+                    // the admissions' waiting area: rows of seats, water, a wheelchair or two by the door
+                    if (roll < 40) return Single(PropKind.WaitingSeats, 2.5f);
+                    if (roll < 52) return Single(PropKind.Wheelchair, 0.75f);
+                    if (roll < 62) return Single(PropKind.WaterCooler, 0.5f);
+                    if (roll < 72) return Single(PropKind.VendingMachine, 1.0f);
+                    if (roll < 82) return Hung(PropKind.HandSanitizer, 0.3f);
+                    if (roll < 92) return Single(PropKind.Plant, 0.75f);
+                    return Single(PropKind.MagazineRack, 0.6f);
                 case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
                     // the waiting area: chairs along the wall, the tyre display, coffee and water, a rack of brochures
                     if (roll < 30) return Row(f, b, PropKind.GuestChair, 3, 0.65f);
@@ -2342,6 +2476,30 @@ namespace Stealth.Level
                     if (roll < 86) { Single(PropKind.WorkTable, 1.7f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.WorkTable), 0.92f)); return 1.7f; }
                     if (roll < 93) return Hung(PropKind.HoseReel, 0.6f);
                     { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                case RoomType.Ward:
+                    if (roll < 25) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 45) return Single(PropKind.GuestChair, 0.7f);
+                    if (roll < 60) return Single(PropKind.VitalsMonitor, 0.7f);
+                    if (roll < 72) return Hung(PropKind.HandSanitizer, 0.3f);
+                    if (roll < 86) return Single(PropKind.Wheelchair, 0.75f);
+                    return Single(PropKind.IvStand, 0.5f);
+                case RoomType.NurseStation:
+                    if (roll < 30) { Single(PropKind.MedicationCart, 1.05f); b.Item(f.P(0, BackOf(PropKind.MedicationCart), 1.06f)); return 1.05f; }
+                    if (roll < 50) return Single(PropKind.LinenCart, 0.75f);
+                    if (roll < 70) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 85) return Single(PropKind.VitalsMonitor, 0.7f);
+                    return Hung(PropKind.HandSanitizer, 0.3f);
+                case RoomType.Operating:
+                    if (roll < 30) return Single(PropKind.ScrubSink, 1.6f);
+                    if (roll < 55) { Single(PropKind.MedicationCart, 1.05f); b.Item(f.P(0, BackOf(PropKind.MedicationCart), 1.06f)); return 1.05f; }
+                    if (roll < 75) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 88) return Single(PropKind.LinenCart, 0.75f);
+                    return Hung(PropKind.HandSanitizer, 0.3f);
+                case RoomType.Imaging:
+                    if (roll < 35) { Single(PropKind.Desk, 1.45f); b.Item(f.P(R(-0.4f, 0.4f), 0.4f + WallGap, DeskTop + 0.005f)); return 1.45f; }
+                    if (roll < 60) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 80) return Single(PropKind.Wheelchair, 0.75f);
+                    return Hung(PropKind.HandSanitizer, 0.3f);
                 case RoomType.PaintBooth:
                     if (roll < 50) { Single(PropKind.PaintRack, 1.45f); b.Item(f.P(-0.3f, BackOf(PropKind.PaintRack), 0.95f)); return 1.45f; }
                     if (roll < 70) return Single(PropKind.ToolChest, 1.2f);

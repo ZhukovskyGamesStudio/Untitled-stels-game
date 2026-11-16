@@ -43,8 +43,8 @@ namespace Stealth.Level
         }
 
         /// <summary>Capped and zoned (an atrium is capped too, but keeps its place: its type was chosen for the void).</summary>
-        static bool Movable(PlanRoom r) => r.Type is not (RoomType.Lobby or RoomType.Hall or RoomType.Corridor or RoomType.Storage
-            or RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility); // the shop's hall and booth, the plant room: laid out where they belong
+        static bool Movable(PlanRoom r) => r.Type is not (RoomType.Lobby or RoomType.Hall or RoomType.Corridor or RoomType.Storage)
+            && !RoomRules.Planned(r.Type); // the locations' own rooms: laid out where they belong
 
         /// <summary>The room touches a stair hall or lies close to a staircase on its floor.</summary>
         static bool NearCore(HousePlan plan, IReadOnlyList<Stair> stairs, PlanRoom r)

@@ -46,6 +46,7 @@ namespace Stealth.Level
             public readonly List<int> StairRooms = new();  // per hall: room on the lower floor, then on the upper
             public LinkedMass Linked;                       // a house of blocks joined by corridors (null: one mass)
             public GarageLayout Garage;                     // the auto repair shop's parts (null: any other house)
+            public HospitalLayout Hospital;                 // the hospital's corridor and bands (null: any other house)
             public RoomProgram Program;                     // the rooms the house is to have (decided first)
             public readonly List<RectInt> LinkBlocks = new();    // cells
             public readonly List<RectInt> LinkCorridors = new(); // cells
@@ -91,7 +92,7 @@ namespace Stealth.Level
             // cut into the rooms
             List<RectInt> wings = null;
             var linkRng = c.Rng(0x11CC);
-            if (!b.Garage && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
+            if (!b.Garage && !b.Hospital && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
             {
                 if (program != null)
                 {
@@ -107,7 +108,9 @@ namespace Stealth.Level
                     o.Mass = "linked";
                 }
             }
-            wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass) : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
+            wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass)
+                : b.Hospital ? HospitalMass(c, c.Rng(0xA55), area, out o.Mass)
+                : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
             foreach (var w in wings) { maxX = Mathf.Max(maxX, w.xMax); maxZ = Mathf.Max(maxZ, w.yMax); }
@@ -128,6 +131,7 @@ namespace Stealth.Level
             CarveCourtyards(c, wings);
 
             if (c.Garage != null) ReserveGarage(c);
+            else if (c.Hospital != null) ReserveHospital(c);
             else
             {
                 ReserveLobby(c);
@@ -577,6 +581,11 @@ namespace Stealth.Level
             if (c.Garage != null)
             {
                 ZoneGarage(c, f, regions, owner, Claim);
+                return;
+            }
+            if (c.Hospital != null)
+            {
+                ZoneHospital(c, f, regions, owner, Claim);
                 return;
             }
 
@@ -1584,7 +1593,9 @@ namespace Stealth.Level
                     {
                         int s = OneDoor(plan.Rooms[key.Item1].Type) ? key.Item1 : key.Item2;
                         if (storageDoor.Contains(s) || (OneDoor(plan.Rooms[key.Item1].Type) && OneDoor(plan.Rooms[key.Item2].Type))) continue;
-                        if (TryOpen(key, EdgeType.Door)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
+                        // the nurse station is open to its corridor (the whole wall), every other one-door room has a door
+                        var way = Touches(plan, key, RoomType.NurseStation) && Touches(plan, key, RoomType.Corridor) ? EdgeType.Open : EdgeType.Door;
+                        if (TryOpen(key, way)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
                         continue;
                     }
                     bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key);
@@ -1698,11 +1709,14 @@ namespace Stealth.Level
         static bool IsStorage(HousePlan plan, (int, int) key) => OneDoor(plan.Rooms[key.Item1].Type) || OneDoor(plan.Rooms[key.Item2].Type);
 
         /// <summary>A room with a single door, a dead end: the storage room (it is locked), the shop's paint booth (sealed).</summary>
-        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth or RoomType.Utility;
+        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth or RoomType.Utility
+            or RoomType.Ward or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging; // (the hospital's: one way in, off the corridor)
 
         /// <summary>The door a one-door room should have: the paint booth's into the workshop, the plant room's into the lobby.</summary>
         static bool OwnDoor(HousePlan plan, (int, int) key) =>
-            (Touches(plan, key, RoomType.PaintBooth) && Touches(plan, key, RoomType.Workshop)) || (Touches(plan, key, RoomType.Utility) && Touches(plan, key, RoomType.Lobby));
+            (Touches(plan, key, RoomType.PaintBooth) && Touches(plan, key, RoomType.Workshop)) || (Touches(plan, key, RoomType.Utility) && Touches(plan, key, RoomType.Lobby))
+            || (Touches(plan, key, RoomType.Corridor) && (Touches(plan, key, RoomType.Ward) || Touches(plan, key, RoomType.NurseStation)
+                || Touches(plan, key, RoomType.Operating) || Touches(plan, key, RoomType.Imaging)));
 
         static bool Touches(HousePlan plan, (int, int) key, RoomType t) => plan.Rooms[key.Item1].Type == t || plan.Rooms[key.Item2].Type == t;
 

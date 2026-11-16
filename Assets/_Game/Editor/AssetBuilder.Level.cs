@@ -54,6 +54,7 @@ namespace Stealth.EditorTools
             // the auto repair shop: steel leaves; the paint booth's door as wide as a car needs
             var shopDoor = Prefab($"{LevelPrefabs}/ShopDoor.prefab", () => BuildAutoDoor("ShopDoor", LevelMetrics.DoorWidth, "ShopSteel"));
             var vehicleDoor = Prefab($"{LevelPrefabs}/VehicleDoor.prefab", () => BuildAutoDoor("VehicleDoor", LevelMetrics.VehicleDoorWidth, "ShopSteel"));
+            var clinicDoor = Prefab($"{LevelPrefabs}/ClinicDoor.prefab", () => BuildAutoDoor("ClinicDoor", LevelMetrics.DoorWidth, "ClinicDoor"));
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
@@ -226,10 +227,11 @@ namespace Stealth.EditorTools
                 levelArt.OutsideTerrain = terrain;
                 EditorUtility.SetDirty(levelArt);
             }
-            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor)
+            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor)
             {
                 levelArt.ShopDoor = shopDoor;
                 levelArt.VehicleDoor = vehicleDoor;
+                levelArt.ClinicDoor = clinicDoor;
                 EditorUtility.SetDirty(levelArt);
             }
             BuildFeatureArt(levelArt);

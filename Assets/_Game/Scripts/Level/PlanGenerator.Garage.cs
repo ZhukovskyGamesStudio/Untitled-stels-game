@@ -145,17 +145,21 @@ namespace Stealth.Level
         /// A strip cut across its length into rooms of the given types, in order (each 5–9 m along it, the paint booth the
         /// widest); what is left at the end joins the last room.
         /// </summary>
-        static void CutStrip(RectInt strip, List<RoomType> types, System.Random rng, System.Action<RectInt, RoomType> room)
+        static void CutStrip(RectInt strip, List<RoomType> types, System.Random rng, System.Action<RectInt, RoomType> room,
+            System.Func<RoomType, System.Random, int> widthOf = null, bool fromEnd = false, int minRest = MinSide)
         {
+            widthOf ??= (t, r) => t == RoomType.PaintBooth ? 8 + r.Next(2) : 5 + r.Next(3);
             bool alongX = strip.width >= strip.height;
             int length = alongX ? strip.width : strip.height;
             int at = 0, k = 0;
             while (at < length)
             {
                 var type = k < types.Count ? types[k] : RoomType.Office;
-                int w = (type == RoomType.PaintBooth ? 8 + rng.Next(2) : 5 + rng.Next(3)) * M;
-                if (length - (at + w) < MinSide) w = length - at;
-                var r = alongX ? new RectInt(strip.xMin + at, strip.yMin, w, strip.height) : new RectInt(strip.xMin, strip.yMin + at, strip.width, w);
+                int w = widthOf(type, rng) * M;
+                if (length - (at + w) < minRest) w = length - at; // a sliver at the end joins this room (too short for a door of its own)
+                // from the start of the strip, or from its far end (fromEnd: the first rooms at the strip's high end)
+                int o = fromEnd ? length - at - w : at;
+                var r = alongX ? new RectInt(strip.xMin + o, strip.yMin, w, strip.height) : new RectInt(strip.xMin, strip.yMin + o, strip.width, w);
                 room(r, type);
                 at += w;
                 k++;

@@ -69,6 +69,10 @@ namespace Stealth.Level
                 RoomType.Workshop => (new Color(0.9f, 0.96f, 1f), LightMath.RoomIntensity * 1.1f),
                 RoomType.PaintBooth => (new Color(0.95f, 0.98f, 1f), LightMath.RoomIntensity * 1.3f),
                 RoomType.Utility => (new Color(1f, 0.9f, 0.75f), LightMath.RoomIntensity * 0.7f), // a bare bulb over the pipes
+                // the hospital: theatres flooded cold white, imaging dimmed for the screens, wards warm
+                RoomType.Operating => (new Color(0.92f, 0.97f, 1f), LightMath.RoomIntensity * 1.35f),
+                RoomType.Imaging => (new Color(0.85f, 0.9f, 1f), LightMath.RoomIntensity * 0.7f),
+                RoomType.Ward => (new Color(1f, 0.93f, 0.84f), LightMath.RoomIntensity * 0.9f),
                 _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
@@ -148,7 +152,8 @@ namespace Stealth.Level
                 bool shop = l.Kind == HouseKind.Garage;
                 var prefab = vault ? m_Art.VaultDoor
                     : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
-                    : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor : m_Art.AutoDoor;
+                    : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor
+                    : l.Kind == HouseKind.Hospital && m_Art.ClinicDoor != null ? m_Art.ClinicDoor : m_Art.AutoDoor;
                 var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
@@ -834,7 +839,7 @@ namespace Stealth.Level
                     if (ik == CellKind.Room)
                     {
                         int id = plan.IdAt(w.Floor, inside.x, inside.y);
-                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop or RoomType.Utility)) continue; // the hall's street wall is its doors
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop or RoomType.Utility or RoomType.Operating or RoomType.Imaging)) continue; // the hall's street wall is its doors; theatres and X-ray rooms are shut in
                     }
                     roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));

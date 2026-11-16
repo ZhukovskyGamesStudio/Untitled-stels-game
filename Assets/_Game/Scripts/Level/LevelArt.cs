@@ -36,6 +36,7 @@ namespace Stealth.Level
         public Material[] UtilityMaterials = new Material[0];
         [Tooltip("The auto repair shop's sliding door: steel leaves")] public GameObject ShopDoor;
         [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
+        [Tooltip("The hospital's sliding door: pale washable leaves")] public GameObject ClinicDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
         public GameObject CityLamp;
