@@ -129,11 +129,39 @@ Not worth it here: learned generators at runtime, WFC for room layout.
 | # | Step | Status |
 |---|---|---|
 | 1 | **Zoning**: facade band for work rooms, interior for service rooms, stair core, caps on themed rooms | **Done** (`Zoning`, `ZoningTests`) |
-| 2 | **Corridor-first floors**: most rooms are dead ends off corridors (1–2 doors), with a few planned loops and vents instead of walk-through chains; decide the stealth-loops vs realism balance first | Next |
+| 2 | **Corridor-first floors**: most rooms are dead ends off corridors (1–2 doors), with a few planned loops and vents instead of walk-through chains | **Done** (see below) |
 | 3 | **Depth from the lobby** (BFS on the room graph): public types shallow, private deep; use depth for loot value, robot density and lock/key placement | Planned |
 | 4 | **Adjacency score**: kitchen beside open space, meeting rooms near the lobby, storage near a service entrance; keep the best of several plan attempts | Planned |
 | 5 | **Furniture**: fill empty offices and server rooms; then a cost-based polish pass or hand templates for themed rooms | Planned |
 | 6 | **Stealth checks** (later): camera coverage on the plan grid, a hidden path to every loot room, mission-graph lock and key | Idea |
+
+### Step 2 result: corridor-first floors (room program; classic is within a few points)
+- Wings at least 11 m deep get evenly spaced corridors (one per ~19 m of depth, rooms at most ~8 m from a corridor);
+  8–11 m wings get a single-loaded corridor on their inner side; narrower wings have none. `CorridorChance` and house
+  kinds still leave some wings open-plan.
+- Rectangles next to circulation are cut across it so every room keeps a wall on the corridor (`Treemap` frontage,
+  strips at most 2.6× deeper than wide).
+- Doors: circulation edges first in the spanning tree (room-to-room only where there is no other way); then per-floor
+  budgets placed where they make the longest way round: `LoopsPerRoom` 0.08, `VentsPerRoom` 0.25, `SqueezesPerRoom` 0.1
+  (replace the old per-wall `ExtraDoorChance` / `VentChance` / `SqueezeChance`).
+- Stair halls of neighbouring floors touch or keep a room's width apart (no 1 m slivers).
+
+| Metric (72 houses) | Before | After |
+|---|---|---|
+| Rooms touching circulation | 56 % | 66 % |
+| Rooms with a door onto circulation | 45 % | 59 % |
+| Dead ends (doors/arches) | 40 % | 56 % |
+| Dead ends counting vents | 16 % | 31 % |
+| Rooms with 3+ walk ways | 21 % | 11 % |
+| Room-to-room doors / house | 77 | 51 |
+| Doors onto circulation / house | 55 | 71 |
+| Walk loops / house | 13 | 4 |
+| Vents / squeezes per house | 31 / 11 | 18 / 8 |
+| Corridor share of area | 12 % | 16 % |
+
+Stealth trade-off: walk loops dropped a lot; vents and squeezes remain the hidden ways round. Tune `LoopsPerRoom` /
+`VentsPerRoom` in `Data/Config/Level` if houses feel too linear. Remaining enfilade comes from open-plan wings (no
+corridor by roll or house kind).
 
 ### How to measure
 A temporary EditMode test generated 72 houses per mode and printed the metrics above (windowless work rooms, service
