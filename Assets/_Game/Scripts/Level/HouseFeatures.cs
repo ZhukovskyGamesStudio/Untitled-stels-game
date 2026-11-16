@@ -655,11 +655,13 @@ namespace Stealth.Level
             var need = Furnisher.FootprintOf(kind);
             // away from the hatch where the house allows it; a small first house has no "far"
             foreach (float away in new[] { 6f, 2.5f })
-            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.ConferenceTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa,
-                         PropKind.SectionalSofa, PropKind.StudioCouch, PropKind.Shelf, PropKind.MetalShelving, PropKind.PoolTable, PropKind.AirHockey,
+            // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
+            foreach (var wanted in new[] { PropKind.PingPongTable, PropKind.PoolTable, PropKind.SectionalSofa, PropKind.AirHockey, PropKind.ReceptionDesk,
+                         PropKind.Sofa, PropKind.StudioCouch, PropKind.Daybed, PropKind.BenchIsland, PropKind.MeetingTable, PropKind.ConferenceTable,
+                         PropKind.Shelf, PropKind.MetalShelving,
                          PropKind.PokerTable, PropKind.ReadingTable, PropKind.DiningTable, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.LabBench,
                          PropKind.RobotTable, PropKind.WorkTable, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball, PropKind.Credenza,
-                         PropKind.AvCredenza, PropKind.HallBench, PropKind.BenchIsland, PropKind.Daybed, PropKind.DoctorDesk })
+                         PropKind.AvCredenza, PropKind.HallBench, PropKind.DoctorDesk })
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)

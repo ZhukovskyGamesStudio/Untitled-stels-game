@@ -228,7 +228,7 @@ namespace Stealth.Level
             }
             foreach (var r in Rooms)
                 for (int lv = 0; lv < r.Levels; lv++)
-                    foreach (var (a, b) in r.Shaped)
+                    foreach (var (a, b) in ShapedWalls(r))
                         Walls.Add(new PlanWall { Floor = r.Floor + lv, A = a, B = b, RoomA = lv == 0 ? r.Id : -1, Shaped = true, FullHeight = lv + 1 < r.Levels });
             // A room more than one storey high: its walls go up to the slab (there is none over it).
             foreach (var w in Walls)
@@ -236,6 +236,40 @@ namespace Stealth.Level
                 if (w.Railing) continue;
                 if (Tall(w.RoomA, w.Floor) || Tall(w.RoomB, w.Floor)) w.FullHeight = true;
             }
+        }
+
+        /// <summary>
+        /// The slanted and round walls of a room as they are built. Where an arc touches the straight side of the room's
+        /// box its pieces run almost along the grid wall there, inside its thickness: such a piece is left out (the
+        /// grid wall is that stretch of the room's wall) and its neighbours end on the grid wall's axis — no wall inside
+        /// a wall, no panels and cornices laid twice.
+        /// </summary>
+        public static List<(Vector2 a, Vector2 b)> ShapedWalls(PlanRoom r)
+        {
+            const float near = 0.12f; // within the grid wall's half thickness (and a little)
+            var list = new List<(Vector2, Vector2)>();
+            var box = r.Bounds;
+            var sides = new List<(bool, float)> { (true, box.xMin), (true, box.xMax), (false, box.yMin), (false, box.yMax) };
+            foreach (var c in r.Rects)
+            {
+                sides.Add((true, c.xMin * Res)); sides.Add((true, c.xMax * Res));
+                sides.Add((false, c.yMin * Res)); sides.Add((false, c.yMax * Res));
+            }
+            foreach (var (a, b) in r.Shaped)
+            {
+                Vector2 p = a, q = b;
+                bool skip = false;
+                // the sides of the room's box and of every rectangle it is made of: (is x, coordinate)
+                foreach (var (isX, at) in sides)
+                {
+                    float da = Mathf.Abs((isX ? a.x : a.y) - at), db = Mathf.Abs((isX ? b.x : b.y) - at);
+                    if (da < near && db < near) { skip = true; break; }
+                    if (da < near) { if (isX) p.x = at; else p.y = at; }
+                    if (db < near) { if (isX) q.x = at; else q.y = at; }
+                }
+                if (!skip && (q - p).sqrMagnitude > 0.01f) list.Add((p, q));
+            }
+            return list;
         }
 
         bool Tall(int room, int floor) => room >= 0 && Rooms[room].Floor == floor && Rooms[room].Levels > 1

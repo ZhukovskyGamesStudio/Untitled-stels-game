@@ -347,5 +347,43 @@ namespace Stealth.Tests
                 Assert.AreEqual(expect, p.Variant, $"{room.Type} at {p.Position}");
             }
         }
+
+        /// <summary>A slanted wall cuts its pocket's cells at an angle: their room-side halves carry the room's floor, not the style's.</summary>
+        [Test]
+        public void ThePocketBehindASlantedWallHasItsRoomsFloor()
+        {
+            LevelLayout layout = null;
+            foreach (var l in TestHouses.Sample)
+                if (l.Rooms.Any(r => r.Shaped.Count > 0 && r.Type != RoomType.Lobby)) { layout = l; break; }
+            Assume.That(layout, Is.Not.Null, "a house with a slanted or round wall");
+            var plan = layout.Plan;
+            // the planner only needs the slabs here: one over each whole floor
+            var shell = new LevelShell();
+            for (int f = 0; f < layout.Floors; f++)
+                shell.Floors.Add(new FloorRect { Min = Vector2.zero, Max = new Vector2(plan.NX, plan.NZ) * HousePlan.Res, Y = LevelLayout.FloorY(f), Floor = f });
+            var tiles = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var g = new StyleGeometry
+            {
+                Floor = new Material(Shader.Find("Universal Render Pipeline/Lit")),
+                RoomFloors = layout.Rooms.Where(r => r.Shaped.Count > 0 && r.Type != RoomType.Lobby).Select(r => r.Type).Distinct()
+                    .Select(t => new RoomFloor { Room = t, Material = tiles, Tile = 1f }).ToArray(),
+            };
+            var floors = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.FloorFinish).ToList();
+            int pockets = 0;
+            for (int f = 0; f < layout.Floors; f++)
+                for (int x = 0; x < plan.NX; x++)
+                    for (int z = 0; z < plan.NZ; z++)
+                    {
+                        if (plan.KindAt(f, x, z) != CellKind.Pocket) continue;
+                        int id = plan.IdAt(f, x, z);
+                        if (id < 0 || id >= plan.Rooms.Count || g.RoomFloorOf(plan.Rooms[id].Type) < 0) continue;
+                        pockets++;
+                        var c = HousePlan.CellCenter(x, z);
+                        var quad = floors.First(p => Mathf.Abs(p.Position.y - LevelLayout.FloorY(f)) < 0.1f &&
+                                                     Mathf.Abs(p.Position.x - c.x) < p.Scale.x / 2f && Mathf.Abs(p.Position.z - c.y) < p.Scale.y / 2f);
+                        Assert.AreEqual(g.RoomFloorOf(plan.Rooms[id].Type) + 1, quad.Variant, $"the pocket cell {x},{z} of the {plan.Rooms[id].Type}");
+                    }
+            Assert.Greater(pockets, 0);
+        }
     }
 }

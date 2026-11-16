@@ -95,7 +95,9 @@ namespace Stealth.Level
                         foreach (var r in slabs)
                             if (c.x > r.Min.x && c.x < r.Max.x && c.y > r.Min.y && c.y < r.Max.y) { slab = true; break; }
                         if (!slab) { kind[x, z] = -1; continue; }
-                        int id = plan.KindAt(f, x, z) == CellKind.Room ? plan.IdAt(f, x, z) : -1;
+                        // a pocket behind a slanted or round wall belongs to its room: the wall cuts its cells at an angle, and
+                        // the half on the room's side must have the room's floor (the style's floor showed there as a saw edge)
+                        int id = plan.KindAt(f, x, z) is CellKind.Room or CellKind.Pocket ? plan.IdAt(f, x, z) : -1;
                         int k = id >= 0 && id < plan.Rooms.Count ? g.RoomFloorOf(plan.Rooms[id].Type) + 1 : 0;
                         kind[x, z] = k;
                         used.Add(k);
@@ -208,7 +210,9 @@ namespace Stealth.Level
         static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g)
         {
             // Reach into the room's corners: past the corner post on that side; at the joint of a bent wall exactly to the joint.
-            float u0 = f.CornerA ? -T : f.JointA ? -T / 2f : 0f, u1 = f.Length + (f.CornerB ? T : f.JointB ? T / 2f : 0f);
+            // A post in the middle of a straight wall is shared with the face that runs on behind it: half each.
+            float u0 = f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f;
+            float u1 = f.Length + (f.CornerB ? (f.StraightB ? T / 2f : T) : f.JointB ? T / 2f : 0f);
             float len = u1 - u0;
             if (len < 0.05f) return;
             var rot = Quaternion.LookRotation(f.Normal);

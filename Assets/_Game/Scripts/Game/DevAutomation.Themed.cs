@@ -50,6 +50,36 @@ namespace Stealth.Game
             Log($"themed: {shots} shots");
         }
 
+        /// <summary>
+        /// A walk through the house for the eye: every lit room that is not a corridor (up to 60), shot across from one of
+        /// its corners, robots frozen; -kinds Restroom,Meeting keeps only those room types. Screenshots for a review of how
+        /// the rooms are furnished and how things join, not a check.
+        /// </summary>
+        IEnumerator TourScenario()
+        {
+            var l = ActiveLevel.Layout;
+            DevFlags.FreezeRobots = true;
+            var only = Arg("-kinds");
+            var wanted = string.IsNullOrEmpty(only) ? null : new HashSet<string>(only.Split(','));
+            int shots = 0;
+            foreach (var r in l.Rooms)
+            {
+                if (shots >= 60) break;
+                if (r.Dark || r.Area < 8f || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor) continue;
+                if (wanted != null && !wanted.Contains(r.Type.ToString())) continue;
+                Vector3 from = default;
+                bool found = false;
+                foreach (var c in CornersOf(l, r)) { from = c; found = true; break; }
+                if (!found) continue;
+                var to = r.Center + Vector3.up * 0.8f;
+                LookAtFrom(new Pose(from, Quaternion.LookRotation(Flat(to - from))), to);
+                yield return new WaitForSeconds(0.45f);
+                yield return Shot($"f{r.Floor}_{r.Type}_{r.Id}_{r.Area:0}m");
+                shots++;
+            }
+            Log($"tour: {shots} rooms");
+        }
+
         /// <summary>Points 0.7 of the way from the middle to each corner of a room, on its floor and clear of furniture.</summary>
         static IEnumerable<Vector3> CornersOf(LevelLayout l, PlanRoom r)
         {

@@ -332,6 +332,26 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// Past the post at this end of the wall another wall runs straight on (a T-junction seen from its flat side, a
+        /// wall split where the room behind it changes): decoration of the two meets in the middle of the post.
+        /// </summary>
+        bool RunsOn(int index, Vector2 end)
+        {
+            if (!m_Ends.TryGetValue(EndKey(end), out var walls)) return false;
+            var w = m_Plan.Walls[index];
+            foreach (int i in walls)
+            {
+                if (i == index) continue;
+                var o = m_Plan.Walls[i];
+                if (o.Railing || Mathf.Abs(Vector2.Dot(o.Dir, w.Dir)) < 0.999f) continue;
+                bool open = false;
+                foreach (var op in m_Plan.OpeningsOf(i)) if (op.Kind == EdgeType.Open) open = true;
+                if (!open) return true; // (an open passage is no wall: the post there is a free end)
+            }
+            return false;
+        }
+
         void Post(Vector2 p, float height)
         {
             var key = new Vector3(Mathf.Round(p.x * 100f) / 100f, 0f, Mathf.Round(p.y * 100f) / 100f);
@@ -362,6 +382,8 @@ namespace Stealth.Level
             float from = t / 2f;
             bool jointA = SmoothJoint(w.A, out _), jointB = SmoothJoint(w.B, out _);
             bool cornerA = !jointA;
+            m_StraightA = RunsOn(index, w.A);
+            m_StraightB = RunsOn(index, w.B);
             // the cuts along the wall in order: the plan's openings and the windows (a real hole with glass in it)
             var cuts = new List<(float at, int opening)>();
             for (int k = 0; k < openings.Count; k++) cuts.Add((openings[k].At, k));
@@ -463,6 +485,8 @@ namespace Stealth.Level
             return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
         }
 
+        bool m_StraightA, m_StraightB; // of the wall being built (see RunsOn)
+
         void RecordFaces(Vector3 a, Vector3 b, float y0, float y1, bool outside, List<Vector3> sides, bool cornerA, bool cornerB,
             bool jointA = false, bool jointB = false)
         {
@@ -472,6 +496,7 @@ namespace Stealth.Level
                 {
                     A = a, B = b, Y0 = y0, Y1 = y1, Normal = side, Floor = m_Floor, Exterior = outside,
                     CornerA = cornerA, CornerB = cornerB, JointA = jointA, JointB = jointB,
+                    StraightA = cornerA && m_StraightA, StraightB = cornerB && m_StraightB,
                 });
         }
 
@@ -616,6 +641,12 @@ namespace Stealth.Level
                     var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
                     var ik = plan.KindAt(w.Floor, inside.x, inside.y);
                     if (ik != CellKind.Room && ik != CellKind.Void) continue;
+                    // nobody looks into a restroom, a changing room or the vault from the street
+                    if (ik == CellKind.Room)
+                    {
+                        int id = plan.IdAt(w.Floor, inside.x, inside.y);
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom)) continue;
+                    }
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));
                 }
             }

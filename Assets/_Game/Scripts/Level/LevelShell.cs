@@ -21,6 +21,11 @@ namespace Stealth.Level
         /// joint, so the pieces of both meet instead of crossing.
         /// </summary>
         public bool JointA, JointB;
+        /// <summary>
+        /// The corner post at this end stands in the middle of a straight wall (another wall runs on behind it, a third
+        /// meets them from the other side): this face and the next one share the post's face — half of it each.
+        /// </summary>
+        public bool StraightA, StraightB;
 
         public Vector3 Along => (B - A).normalized;
         public float Length => (B - A).magnitude;

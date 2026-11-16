@@ -213,6 +213,55 @@ namespace Stealth.Level
         /// <summary>Round-2 pieces hung on a wall (a clock, a board, a cabinet): no footprint on the floor to walk into.</summary>
         static readonly HashSet<PropKind> Hung = new() { PropKind.WallClock, PropKind.ProjectorScreen, PropKind.ChangingTable, PropKind.TowelDispenser, PropKind.FireCabinet, PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet };
 
+        /// <summary>
+        /// Big pieces that stand higher than a window's sill by more than a monitor does (shelving, lockers, fridges,
+        /// boards on legs, stalls): never in front of a window. Slim things (a floor lamp, a coat rack) and whatever stays
+        /// under ~1.6 m (desks, sofas, counters, a water cooler) may stand there. Checked against the models by a test.
+        /// </summary>
+        public static readonly HashSet<PropKind> Tall = new()
+        {
+            PropKind.ServerRack, PropKind.Shelf, PropKind.Whiteboard, PropKind.ToiletStall, PropKind.Bookshelf, PropKind.Fridge, PropKind.Lockers,
+            PropKind.VendingMachine, PropKind.ArcadeMachine, PropKind.Cage, PropKind.Urinal, PropKind.MirrorSink, PropKind.ShowerStall,
+            PropKind.MedicineCabinet, PropKind.TallBookcase, PropKind.MailShelf, PropKind.MonitorWall, PropKind.MobileWhiteboard,
+            PropKind.Flipchart, PropKind.LogoTotem, PropKind.RoundBenchPlanter, PropKind.PantryCabinet, PropKind.DirectoryBoard,
+            PropKind.DisplayCase, PropKind.PlanterLarge, PropKind.CracUnit, PropKind.TapeLibrary, PropKind.MetalShelving, PropKind.RadioRack,
+            PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
+            PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
+            PropKind.Pinball, PropKind.MedTable, PropKind.Workbench,
+        };
+
+        /// <summary>Pieces that hang on the wall itself: never on a window's glass or its frame.</summary>
+        public static readonly HashSet<PropKind> OnWall = new()
+        {
+            PropKind.WallCabinet, PropKind.WallClock, PropKind.HandDryer, PropKind.TowelDispenser, PropKind.ChangingTable, PropKind.FireCabinet,
+            PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
+            PropKind.DartBoard,
+        };
+
+        /// <summary>
+        /// How many of a kind one room takes (twice that in a hall of a room, over 70 m²): one water cooler, one clock, one
+        /// safe… — three coolers along one wall read as a mistake, not as an office.
+        /// </summary>
+        public static int CapOf(PropKind k) => k switch
+        {
+            PropKind.WaterCooler or PropKind.WallClock or PropKind.Safe or PropKind.Printer or PropKind.JanitorCart or PropKind.Jukebox or
+                PropKind.DefibCabinet or PropKind.CoatRack or PropKind.Globe or PropKind.Lectern or PropKind.WeighingScale or PropKind.ChangingTable or
+                PropKind.Shredder or PropKind.Sculpture or PropKind.UmbrellaStand or PropKind.Wheelchair or PropKind.VendingMachine or
+                PropKind.HandDryer or PropKind.TowelDispenser or PropKind.Stove or PropKind.Dishwasher or PropKind.MonitorWall or PropKind.ProjectorScreen or
+                PropKind.TvStand or PropKind.Flipchart or PropKind.MapBoard or PropKind.AlarmPanel or PropKind.DirectoryBoard or PropKind.LogoTotem or
+                PropKind.MagazineRack or PropKind.DartBoard or PropKind.Fridge or PropKind.CoffeeMachine or PropKind.Copier or PropKind.Plotter or
+                PropKind.RecyclingBins or PropKind.PantryCabinet or PropKind.MedicineCabinet or PropKind.CardCatalog or PropKind.BookCart or
+                PropKind.MailCart or PropKind.LaundryCart or PropKind.HandTruck or PropKind.CrashCart or PropKind.ScopeCart or PropKind.Printer3d or
+                PropKind.FumeHood or PropKind.VocalBooth or PropKind.DrumKit or PropKind.PowerCage or PropKind.CableMachine or PropKind.MatRack or
+                PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
+                PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary => 1,
+            PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or
+                PropKind.RobotArm or PropKind.MicStand or PropKind.InfoKiosk or PropKind.Whiteboard or PropKind.NoticeBoard or PropKind.BinPair or
+                PropKind.PaperBin or PropKind.PaperStack or PropKind.GuitarStand or PropKind.AmpCabinet or PropKind.NightTable or PropKind.Plant or
+                PropKind.PlanterLarge or PropKind.BeanBag or PropKind.StandingDesk or PropKind.PlanterDivider => 2,
+            _ => int.MaxValue,
+        };
+
         /// <summary>A model's footprint in its own frame (x = local X, y = local Z), metres.</summary>
         public static Rect FootprintOf(PropKind kind) => Foot.TryGetValue(kind, out var r) ? r : new Rect(-0.5f, -0.5f, 1f, 1f);
 
@@ -220,6 +269,7 @@ namespace Stealth.Level
         const float CabinetTop = 1.2f; // the drawer cabinet's top (Tools/Blender/generate_models.py model_cabinet)
         const float WallGap = 0.06f;    // between a back and the wall's face
         const float Aisle = 1.25f;      // free walkway around an island and in front of a wall group (robots are 0.8 m wide)
+        const float Facing = 0.3f;      // more than that between two pieces facing each other across a walkway
         static readonly float[] ShelfLevels = { 0.47f, 1.07f, 1.67f };
         /// <summary>The tall bookcase's shelves within reach (Tools/Blender/rooms_paper.py).</summary>
         static readonly float[] BookcaseLevels = { 0.56f, 0.97f, 1.38f };
@@ -229,6 +279,10 @@ namespace Stealth.Level
         readonly System.Random m_Rng;
         readonly RectGrid[] m_Taken;   // per floor: placed footprints
         readonly RectGrid[] m_Keep;    // per floor: must stay clear (doorways, stairs, the hatch)
+        readonly RectGrid[] m_Solid;   // per floor: the footprints a walker has to go around (no rugs, nothing hung or standing on a top)
+        RectGrid[] m_Windows;          // per floor: the strip of floor in front of every window (built with the first room)
+        readonly Dictionary<PropKind, int> m_InRoom = new(); // pieces of the room being furnished, by kind (see CapOf)
+        int m_Cap = 1;                 // CapOf times this in the room being furnished
 
         /// <summary>
         /// Rectangles of a floor in 2 m buckets: "does anything overlap this?" looks only at the buckets the question touches
@@ -283,6 +337,23 @@ namespace Stealth.Level
                 return false;
             }
 
+            /// <summary>Every rectangle that overlaps <paramref name="q"/>, appended to <paramref name="into"/>.</summary>
+            public void Query(Rect q, List<Rect> into)
+            {
+                m_Stamp++;
+                for (int x = C(q.xMin); x <= C(q.xMax); x++)
+                    for (int z = C(q.yMin); z <= C(q.yMax); z++)
+                    {
+                        if (!m_Buckets.TryGetValue(Key(x, z), out var list)) continue;
+                        foreach (int i in list)
+                        {
+                            if (m_Mark[i] == m_Stamp) continue;
+                            m_Mark[i] = m_Stamp;
+                            if (m_Rects[i].Overlaps(q)) into.Add(m_Rects[i]);
+                        }
+                    }
+            }
+
             public bool Contains(Vector2 p)
             {
                 if (!m_Buckets.TryGetValue(Key(C(p.x), C(p.y)), out var list)) return false;
@@ -298,7 +369,8 @@ namespace Stealth.Level
             m_Rng = rng;
             m_Taken = new RectGrid[m_P.Floors];
             m_Keep = new RectGrid[m_P.Floors];
-            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); }
+            m_Solid = new RectGrid[m_P.Floors];
+            for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); m_Solid[f] = new RectGrid(); }
             foreach (var d in l.Doorways)
             {
                 // the doorway and a step either side of it stay free (an open passage: the whole wall)
@@ -405,6 +477,26 @@ namespace Stealth.Level
         {
             int f = room.Floor;
             var rects = new List<Rect>();
+            // windows: a tall piece in front of one fails the group; a thing hung on the wall there is left out of it
+            // (the kitchen run stays, its cupboards over the window do not) unless the group is only that
+            if (m_Windows != null)
+                for (int i = b.Pieces.Count - 1; i >= 0; i--)
+                {
+                    var p = b.Pieces[i];
+                    bool tall = Tall.Contains(p.Kind), hangs = OnWall.Contains(p.Kind);
+                    if ((!tall && !hangs) || !m_Windows[f].Overlaps(FootAt(p.Kind, p.Pos, p.Yaw))) continue;
+                    if (tall || i == 0) return false;
+                    b.Pieces.RemoveAt(i);
+                }
+            // one water cooler, one clock… per room
+            foreach (var p in b.Pieces)
+            {
+                int cap = CapOf(p.Kind);
+                if (cap == int.MaxValue) continue;
+                int n = m_InRoom.TryGetValue(p.Kind, out int have) ? have : 0;
+                foreach (var q in b.Pieces) if (q.Kind == p.Kind) n++;
+                if (n > cap * m_Cap) return false;
+            }
             foreach (var p in b.Pieces)
             {
                 // a thing hung on the wall (cupboards, a dart board, foam): nothing to walk into, but never over a doorway
@@ -429,15 +521,21 @@ namespace Stealth.Level
             {
                 var all = rects[0];
                 foreach (var r in rects) all = Union(all, r);
-                if (!Clear(f, Grow(all, aisle), 0f) || !OnFloor(f, room.Id, all, aisle * 0.7f)) return false;
+                // an aisle to the other furniture and most of one to the walls; the kept spots (a doorway's own depth,
+                // the square a patrol stands on) only need a step: an aisle more around them kept every table out of
+                // a room under 7 × 5 m
+                if (m_Taken[f].Overlaps(Grow(all, aisle)) || m_Keep[f].Overlaps(Grow(all, 0.3f)) || !OnFloor(f, room.Id, all, aisle * 0.7f)) return false;
             }
+            if (rects.Count > 0 && !StaysWalkable(room, rects)) return false;
             // pieces of one group may touch each other, but not other groups
             int group = m_Groups++;
             foreach (var p in b.Pieces)
             {
                 m_L.Props.Add(new PropPlacement { Kind = p.Kind, Position = p.Pos, RotationY = p.Yaw });
                 m_GroupOf.Add(group);
+                m_InRoom[p.Kind] = (m_InRoom.TryGetValue(p.Kind, out int have) ? have : 0) + 1;
                 m_Taken[f].Add(FootAt(p.Kind, p.Pos, p.Yaw)); // hung and standing-on things too: nothing else goes under or into them
+                if (p.Solid && InTheWay(p.Kind)) m_Solid[f].Add(FootAt(p.Kind, p.Pos, p.Yaw));
             }
             foreach (var i in b.Items) { m_L.ItemSpots.Add(i); m_ItemGroup.Add(group); }
             return true;
@@ -480,9 +578,152 @@ namespace Stealth.Level
             m_L.Props.Add(new PropPlacement { Kind = k, Position = p, RotationY = yaw });
             m_GroupOf.Add(-1);
             m_Taken[room.Floor].Add(FootAt(k, p, yaw));
+            if (InTheWay(k)) m_Solid[room.Floor].Add(FootAt(k, p, yaw));
         }
 
         // ------------------------------------------------------------------ walkability
+
+        /// <summary>
+        /// The middle of this room is for its furniture (a meeting room's table, a restroom's stalls): the patrol stands
+        /// by the door instead (<see cref="LevelGenerator.PatrolSpot"/>) and "reached" means any free spot near the middle.
+        /// </summary>
+        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom;
+
+        /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
+        static bool InTheWay(PropKind k) =>
+            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
+                or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug) && !Hung.Contains(k);
+
+        // The room being furnished, as the walkability check will see it (same grid, same margins): its free cells
+        // without furniture, and the spots a walker must still get between: its middle, the inner side of each of its
+        // doorways and open passages, the ends of its stairs.
+        PlanRoom m_WalkRoom;
+        int m_WX, m_WZ, m_WNX, m_WNZ;
+        bool[] m_WBare, m_WFree, m_WSeen;
+        readonly List<int> m_WTargets = new();
+        readonly List<int> m_WStack = new();
+        readonly List<Rect> m_WRects = new();
+        const float WalkCell = 0.25f, WalkAgent = 0.4f, WalkClutter = 0.55f; // those of Walk
+
+        void BeginRoomWalk(PlanRoom room)
+        {
+            m_WalkRoom = room;
+            var b = room.Bounds;
+            m_WX = Mathf.FloorToInt(b.xMin / WalkCell);
+            m_WZ = Mathf.FloorToInt(b.yMin / WalkCell);
+            m_WNX = Mathf.CeilToInt(b.xMax / WalkCell) - m_WX;
+            m_WNZ = Mathf.CeilToInt(b.yMax / WalkCell) - m_WZ;
+            int n = m_WNX * m_WNZ;
+            if (m_WBare == null || m_WBare.Length < n) { m_WBare = new bool[n]; m_WFree = new bool[n]; m_WSeen = new bool[n]; }
+            float reach = LevelMetrics.WallThickness / 2f + WalkAgent - 0.01f;
+            for (int z = 0; z < m_WNZ; z++)
+                for (int x = 0; x < m_WNX; x++)
+                {
+                    float cx = (m_WX + x + 0.5f) * WalkCell, cz = (m_WZ + z + 0.5f) * WalkCell;
+                    // this room's floor, a walker's half width off everything that is not (walls; other rooms count too:
+                    // the way through a doorway is checked by the whole-house pass, here only the way to it)
+                    m_WBare[z * m_WNX + x] = InRoom(room.Floor, room.Id, cx, cz)
+                        && InRoom(room.Floor, room.Id, cx - reach, cz) && InRoom(room.Floor, room.Id, cx + reach, cz)
+                        && InRoom(room.Floor, room.Id, cx, cz - reach) && InRoom(room.Floor, room.Id, cx, cz + reach);
+                }
+            m_WTargets.Clear();
+            void Target(Vector3 p)
+            {
+                // the free cell nearest to the spot, within 1 m
+                int best = -1;
+                float bestD = 1.0f;
+                int px = Mathf.FloorToInt(p.x / WalkCell) - m_WX, pz = Mathf.FloorToInt(p.z / WalkCell) - m_WZ;
+                for (int dz = -4; dz <= 4; dz++)
+                    for (int dx = -4; dx <= 4; dx++)
+                    {
+                        int x = px + dx, z = pz + dz;
+                        if (x < 0 || z < 0 || x >= m_WNX || z >= m_WNZ || !m_WBare[z * m_WNX + x]) continue;
+                        float d = new Vector2((m_WX + x + 0.5f) * WalkCell - p.x, (m_WZ + z + 0.5f) * WalkCell - p.z).magnitude;
+                        if (d < bestD) { bestD = d; best = z * m_WNX + x; }
+                    }
+                if (best >= 0 && !m_WTargets.Contains(best)) m_WTargets.Add(best);
+            }
+            if (!MiddleIsFurniture(room)) Target(room.Center);
+            foreach (var d in m_L.Doorways)
+            {
+                if (d.Floor != room.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open)) continue;
+                var across = d.Rotation * Vector3.forward;
+                foreach (float side in new[] { -0.75f, 0.75f })
+                {
+                    var p = d.Position + across * side;
+                    if (InRoom(room.Floor, room.Id, p.x, p.z)) Target(p);
+                }
+            }
+            foreach (var s in m_L.Stairs)
+            {
+                var (bottom, top) = LevelLayout.StairEnds(s);
+                if (s.Floor == room.Floor && InRoom(room.Floor, room.Id, bottom.x, bottom.z)) Target(bottom);
+                if (s.Floor + 1 == room.Floor && InRoom(room.Floor, room.Id, top.x, top.z)) Target(top);
+            }
+            // what the furniture already there (desks under vents, the hatch) leaves linked is the baseline
+            Linked(null, m_WTargets);
+        }
+
+        /// <summary>
+        /// Floods the room's free cells around its furniture (plus <paramref name="more"/>) from the first target; true
+        /// when every target of <paramref name="keep"/> is reached. Without <paramref name="more"/> (the baseline) the
+        /// targets it does not reach are dropped from the list.
+        /// </summary>
+        bool Linked(List<Rect> more, List<int> keep)
+        {
+            if (m_WTargets.Count < 2) return true;
+            int n = m_WNX * m_WNZ;
+            System.Array.Copy(m_WBare, m_WFree, n);
+            System.Array.Clear(m_WSeen, 0, n);
+            m_WRects.Clear();
+            m_Solid[m_WalkRoom.Floor].Query(Grow(m_WalkRoom.Bounds, 1f), m_WRects);
+            if (more != null) m_WRects.AddRange(more);
+            foreach (var r in m_WRects)
+            {
+                var g = Grow(r, WalkClutter);
+                int x0 = Mathf.Max(0, Mathf.FloorToInt(g.xMin / WalkCell) - m_WX), x1 = Mathf.Min(m_WNX - 1, Mathf.FloorToInt(g.xMax / WalkCell) - m_WX);
+                int z0 = Mathf.Max(0, Mathf.FloorToInt(g.yMin / WalkCell) - m_WZ), z1 = Mathf.Min(m_WNZ - 1, Mathf.FloorToInt(g.yMax / WalkCell) - m_WZ);
+                for (int z = z0; z <= z1; z++)
+                    for (int x = x0; x <= x1; x++)
+                        m_WFree[z * m_WNX + x] = false;
+            }
+            int start = m_WTargets[0];
+            if (m_WFree[start])
+            {
+                m_WStack.Clear();
+                m_WStack.Add(start);
+                m_WSeen[start] = true;
+                while (m_WStack.Count > 0)
+                {
+                    int i = m_WStack[m_WStack.Count - 1];
+                    m_WStack.RemoveAt(m_WStack.Count - 1);
+                    int x = i % m_WNX, z = i / m_WNX;
+                    if (x > 0 && m_WFree[i - 1] && !m_WSeen[i - 1]) { m_WSeen[i - 1] = true; m_WStack.Add(i - 1); }
+                    if (x < m_WNX - 1 && m_WFree[i + 1] && !m_WSeen[i + 1]) { m_WSeen[i + 1] = true; m_WStack.Add(i + 1); }
+                    if (z > 0 && m_WFree[i - m_WNX] && !m_WSeen[i - m_WNX]) { m_WSeen[i - m_WNX] = true; m_WStack.Add(i - m_WNX); }
+                    if (z < m_WNZ - 1 && m_WFree[i + m_WNX] && !m_WSeen[i + m_WNX]) { m_WSeen[i + m_WNX] = true; m_WStack.Add(i + m_WNX); }
+                }
+            }
+            bool all = true;
+            for (int k = keep.Count - 1; k >= 1; k--)
+                if (!m_WSeen[keep[k]])
+                {
+                    all = false;
+                    if (more == null) keep.RemoveAt(k);
+                }
+            return all && (more == null || m_WFree[start]);
+        }
+
+        /// <summary>
+        /// With these footprints added, a walker still gets from the middle of the room to each of its doorways and
+        /// stairs: checked when a group is placed, so a group that would wall something off is never put there (the
+        /// whole-house check after the furnishing used to take it out again, with its neighbours: rooms went bare).
+        /// </summary>
+        bool StaysWalkable(PlanRoom room, List<Rect> rects)
+        {
+            if (m_WalkRoom != room) return true; // pieces put outside FurnishRoom (tests, the features)
+            return Linked(rects, m_WTargets);
+        }
 
         /// <summary>
         /// The safety net under all the rules above: a walker 0.8 m wide (a robot) must get from the hatch to the middle of
@@ -494,6 +735,8 @@ namespace Stealth.Level
         public static int LastRemoved { get; private set; }
         public static int LastDroppedItems { get; private set; }
         public static readonly List<string> LastNotes = new();
+        /// <summary>The pieces the last walkability check took out (for the space audit and tests).</summary>
+        public static readonly List<(PropKind kind, Vector3 pos)> LastCut = new();
 
         /// <summary>Rooms whose middle cannot be walked to from the hatch (walls, doorways, stairs, furniture placed so far).</summary>
         public List<PlanRoom> Unreached()
@@ -518,6 +761,7 @@ namespace Stealth.Level
             LastRemoved = 0;
             LastDroppedItems = 0;
             LastNotes.Clear();
+            LastCut.Clear();
             for (int round = 0; round < 40; round++)
             {
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -527,7 +771,7 @@ namespace Stealth.Level
                 long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var lostRooms = new List<PlanRoom>();
                 // the walker is a robot: it never gets into the hidden room (players do, through its illusion walls)
-                foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r.Center)) lostRooms.Add(r);
+                foreach (var r in m_L.Rooms) if (r.Id != m_L.HiddenRoom && !grid.Reached(reached, r)) lostRooms.Add(r);
                 long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
                 var cut = lostRooms.Count > 0 ? grid.Barrier(reached, lostRooms) : new HashSet<int>();
                 long t4 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -540,7 +784,7 @@ namespace Stealth.Level
                     foreach (var s in m_L.Stairs)
                         LastNotes.Add($"stair from {s.Floor} room {s.Room} reached {grid.Reached(reached, m_L.Rooms[s.Room].Center)} -> room {s.RoomAbove} reached {grid.Reached(reached, m_L.Rooms[s.RoomAbove].Center)}");
                     foreach (var r in m_L.Rooms)
-                        if (!grid.Reached(reached, r.Center)) LastNotes.Add($"lost #{r.Id} {r.Type} f{r.Floor} {r.Center}");
+                        if (!grid.Reached(reached, r)) LastNotes.Add($"lost #{r.Id} {r.Type} f{r.Floor} {r.Center}");
                     // loot nobody can reach (in a niche walled off by furniture) is not left there
                     for (int i = m_L.ItemSpots.Count - 1; i >= 0; i--)
                     {
@@ -559,13 +803,21 @@ namespace Stealth.Level
         void RemoveGroups(HashSet<int> groups)
         {
             for (int i = m_L.Props.Count - 1; i >= 0; i--)
-                if (m_GroupOf[i] >= 0 && groups.Contains(m_GroupOf[i])) { m_L.Props.RemoveAt(i); m_GroupOf.RemoveAt(i); }
+                if (m_GroupOf[i] >= 0 && groups.Contains(m_GroupOf[i]))
+                {
+                    LastCut.Add((m_L.Props[i].Kind, m_L.Props[i].Position));
+                    m_L.Props.RemoveAt(i);
+                    m_GroupOf.RemoveAt(i);
+                }
             for (int i = m_L.ItemSpots.Count - 1; i >= 0; i--)
                 if (groups.Contains(m_ItemGroup[i])) { m_L.ItemSpots.RemoveAt(i); m_ItemGroup.RemoveAt(i); }
-            for (int f = 0; f < m_Taken.Length; f++) m_Taken[f].Clear();
+            for (int f = 0; f < m_Taken.Length; f++) { m_Taken[f].Clear(); m_Solid[f].Clear(); }
             foreach (var p in m_L.Props)
+            {
                 if (p.Kind is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine))
                     m_Taken[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
+                if (InTheWay(p.Kind)) m_Solid[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
+            }
         }
 
         /// <summary>The walkable grid of the house for one check.</summary>
@@ -637,9 +889,7 @@ namespace Stealth.Level
                 for (int i = 0; i < l.Props.Count; i++)
                 {
                     var p = l.Props[i];
-                    if (p.Kind is PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
-                        or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
-                        || Hung.Contains(p.Kind)) continue; // on a top or up on a wall, or flat on the floor
+                    if (!InTheWay(p.Kind)) continue; // on a top or up on a wall, or flat on the floor
                     var r = FootAt(p.Kind, p.Position, p.RotationY);
                     Box(LevelLayout.FloorOf(p.Position.y), Grow(r, Clutter), fur.m_GroupOf[i] >= 0 ? fur.m_GroupOf[i] : -2);
                 }
@@ -736,14 +986,14 @@ namespace Stealth.Level
                 return seen;
             }
 
-            /// <summary>The free cell nearest to a point of a floor (within 1.5 m; of that room when given), or −1.</summary>
-            int Nearest(int f, Vector2 p, int room = -1)
+            /// <summary>The free cell nearest to a point of a floor (within 1.5 m, or <paramref name="reach"/> cells; of that room when given), or −1.</summary>
+            int Nearest(int f, Vector2 p, int room = -1, int reach = 6)
             {
                 var c = CellOf(p);
                 int best = -1;
-                float bestD = 1.5f;
-                for (int dx = -6; dx <= 6; dx++)
-                    for (int dz = -6; dz <= 6; dz++)
+                float bestD = reach * S;
+                for (int dx = -reach; dx <= reach; dx++)
+                    for (int dz = -reach; dz <= reach; dz++)
                     {
                         if (!In(f, c.x + dx, c.y + dz)) continue;
                         int i = Index(f, c.x + dx, c.y + dz);
@@ -755,12 +1005,15 @@ namespace Stealth.Level
                 return best;
             }
 
-            public bool Reached(bool[] seen, Vector3 p)
+            public bool Reached(bool[] seen, Vector3 p, int reach = 6)
             {
                 int f = LevelLayout.FloorOf(p.y);
-                int i = Nearest(f, new Vector2(p.x, p.z), m_L.Plan.SpaceAt(f, new Vector2(p.x, p.z)));
+                int i = Nearest(f, new Vector2(p.x, p.z), m_L.Plan.SpaceAt(f, new Vector2(p.x, p.z)), reach);
                 return i >= 0 && seen[i];
             }
+
+            /// <summary>A walker gets into the room: to its middle, or (a table stands there) to the free floor around it.</summary>
+            public bool Reached(bool[] seen, PlanRoom r) => Reached(seen, r.Center, MiddleIsFurniture(r) ? 14 : 6);
 
             const int Reach = 6; // 1.5 m in cells: how close a blocking group has to be to both sides
 
@@ -862,6 +1115,26 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ rooms
 
+        /// <summary>How far in front of a window (from the wall's axis) a tall piece still covers it.</summary>
+        const float WindowDepth = 1.0f;
+
+        /// <summary>The strip of floor in front of every window of the house, per floor (<see cref="LevelBuilder.WindowCuts"/>).</summary>
+        RectGrid[] WindowStrips()
+        {
+            var grids = new RectGrid[m_P.Floors];
+            for (int f = 0; f < grids.Length; f++) grids[f] = new RectGrid();
+            foreach (var (pos, yaw, _, _) in LevelBuilder.WindowCuts(m_L))
+            {
+                var q = Quaternion.Euler(0f, yaw, 0f);
+                Vector3 inward = q * Vector3.forward, along = q * Vector3.right * (LevelMetrics.WindowWidth / 2f + 0.1f);
+                Vector3 a = pos - along, c = pos + along + inward * WindowDepth;
+                int floor = LevelLayout.FloorOf(pos.y - LevelMetrics.WindowCenterY + 0.3f);
+                if (floor < 0 || floor >= grids.Length) continue;
+                grids[floor].Add(Rect.MinMaxRect(Mathf.Min(a.x, c.x), Mathf.Min(a.z, c.z), Mathf.Max(a.x, c.x), Mathf.Max(a.z, c.z)));
+            }
+            return grids;
+        }
+
         /// <summary>Furnishes one room: islands first in big rooms, then the walls, then the corners.</summary>
         /// <summary>A printer stands in this room already: at most one per room (they looked like a row of kiosks).</summary>
         bool m_Printer;
@@ -870,6 +1143,10 @@ namespace Stealth.Level
         {
             if (room.Area < 4f) return;
             m_Printer = false;
+            m_InRoom.Clear();
+            m_Cap = room.Area > 70f ? 2 : 1;
+            m_Windows ??= WindowStrips();
+            BeginRoomWalk(room);
             if (room.Id == m_L.VaultRoom) { VaultRoom(room); return; }
             // islands in the middle: about one and a half times what an office planner would call "enough" — a house to search
             int islands = room.Type switch
@@ -877,11 +1154,11 @@ namespace Stealth.Level
                 RoomType.OpenSpace => Mathf.RoundToInt(room.Area / 15f),
                 RoomType.Server => Mathf.RoundToInt(room.Area / 11f),
                 RoomType.Storage => Mathf.RoundToInt(room.Area / 12f),
-                RoomType.Meeting => room.Area > 30f ? 2 : 1,
+                RoomType.Meeting => room.Area > 60f ? 3 : room.Area > 30f ? 2 : 1,
                 RoomType.Kitchen => Mathf.Max(1, Mathf.RoundToInt(room.Area / 17f)),
                 RoomType.Lounge => Mathf.Max(1, Mathf.RoundToInt(room.Area / 19f)),
                 RoomType.Lobby => 3,
-                RoomType.Office => room.Area > 22f ? 1 : 0,
+                RoomType.Office => room.Area > 22f ? Mathf.Max(1, Mathf.RoundToInt(room.Area / 28f)) : 0,
                 RoomType.Hall => room.Area > 30f ? 1 : 0,
                 RoomType.Gym => Mathf.Max(1, Mathf.RoundToInt(room.Area / 16f)),
                 RoomType.Library => Mathf.Max(1, Mathf.RoundToInt(room.Area / 14f)),
@@ -897,9 +1174,11 @@ namespace Stealth.Level
             };
             Anchor(room);
             Islands(room, islands);
+            if (room.Type == RoomType.Meeting) MeetingTable(room);
             Walls(room);
             if (room.Type != RoomType.Corridor) Walls(room); // a second pass fills the gaps the first left
             Corners(room);
+            Sparse(room);
         }
 
         /// <summary>
@@ -955,6 +1234,56 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// A meeting room is its table. Where the islands found no place for one (doors on every wall leave little of a
+        /// small room), a smaller set gets every spot of the room and a narrower way round: the long table with six chairs,
+        /// the round one with four, with two, alone.
+        /// </summary>
+        void MeetingTable(PlanRoom room)
+        {
+            if (m_InRoom.ContainsKey(PropKind.ConferenceTable) || m_InRoom.ContainsKey(PropKind.MeetingTable) || m_InRoom.ContainsKey(PropKind.RoundTable)) return;
+            var b = room.Bounds;
+            var spots = new List<Vector3>();
+            float y = LevelLayout.FloorY(room.Floor);
+            for (float x = b.xMin + 1.0f; x < b.xMax - 0.9f; x += 0.5f)
+                for (float z = b.yMin + 1.0f; z < b.yMax - 0.9f; z += 0.5f)
+                    if (InRoom(room.Floor, room.Id, x, z)) spots.Add(new Vector3(x, y, z));
+            var c = room.Center;
+            spots.Sort((p, q) => (p - c).sqrMagnitude.CompareTo((q - c).sqrMagnitude));
+            bool wide = b.width >= b.height;
+            for (int option = room.Area > 18f ? 0 : 1; option < 4; option++)
+                foreach (var s in spots)
+                    for (int turn = 0; turn < (option == 3 ? 1 : 2); turn++)
+                    {
+                        // the table along the room first
+                        bool alongX = wide == (turn == 0);
+                        var f = new Frame(s, alongX ? Vector3.right : Vector3.forward, alongX ? Vector3.forward : Vector3.left);
+                        var batch = new Batch();
+                        if (option == 0)
+                        {
+                            batch.Add(PropKind.MeetingTable, f.P(0, 0), f.Face);
+                            for (int i = -1; i <= 1; i++)
+                            {
+                                batch.Add(PropKind.MeetingChair, f.P(i * 1.1f, 1.0f), f.Back);
+                                batch.Add(PropKind.MeetingChair, f.P(i * 1.1f, -1.0f), f.Face);
+                            }
+                            batch.Item(f.P(R(-1.2f, 1.2f), R(-0.3f, 0.3f), 0.78f));
+                        }
+                        else
+                        {
+                            batch.Add(PropKind.RoundTable, f.P(0, 0), 0);
+                            if (option == 1) Chairs(f, batch, 4);
+                            if (option == 2)
+                            {
+                                batch.Add(PropKind.Chair, f.P(0, 1.0f), f.Back);
+                                batch.Add(PropKind.Chair, f.P(0, -1.0f), f.Face);
+                            }
+                            batch.Item(f.P(0, 0, 0.76f));
+                        }
+                        if (TryCommit(room, batch, 0.05f, 0.6f)) return;
+                    }
+        }
+
         void Shuffle<T>(List<T> list)
         {
             for (int i = list.Count - 1; i > 0; i--)
@@ -972,10 +1301,27 @@ namespace Stealth.Level
         void Anchor(PlanRoom room)
         {
             if (room.Type < RoomType.Gym && room.Type is not (RoomType.Kitchen or RoomType.Restroom)) return;
+            if (room.Type == RoomType.Restroom)
+            {
+                // a restroom is its stalls and its basins: both, each as big as the room takes; where no stall fits
+                // (they are 1.5 m deep: a narrow room with doors at both ends has no place for one) urinals on a wall
+                if (!Anchor(room, 0, 3, false)) Anchor(room, 6, 9, false);
+                Anchor(room, 3, 6, false);
+                return;
+            }
+            Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
+        bool Anchor(PlanRoom room, int from, int to, bool free)
+        {
             var faces = FacesOf(room);
+            // stalls are deep (1.5 m): at the end wall of a narrow restroom they leave the whole length to walk, along
+            // its side they would leave a slot
+            if (room.Type == RoomType.Restroom && from == 0) faces.Reverse();
             float y = LevelLayout.FloorY(room.Floor);
             // the best option first (the biggest), smaller ones where doors leave too little wall
-            for (int option = 0; option < 3; option++)
+            for (int option = from; option < to; option++)
                 foreach (float walk in new[] { 1.7f, 1.0f })
                     foreach (var (w, n) in faces)
                     {
@@ -989,9 +1335,10 @@ namespace Stealth.Level
                             var shift = u * (width / 2f);
                             for (int i = 0; i < batch.Pieces.Count; i++) { var q = batch.Pieces[i]; q.Pos += shift; batch.Pieces[i] = q; }
                             for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                            if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) return;
+                            if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) return true;
                         }
                     }
+            if (!free) return false;
             // doors everywhere along the walls: the piece stands free in the room, an aisle round it
             var b = room.Bounds;
             var spots = new List<Vector3>();
@@ -1007,8 +1354,9 @@ namespace Stealth.Level
                 var f = new Frame(s, wide ? Vector3.right : Vector3.forward, wide ? Vector3.forward : Vector3.left);
                 var batch = new Batch();
                 Island(room, f, batch);
-                if (batch.Pieces.Count > 0 && batch.Pieces.TrueForAll(p => p.Solid) && TryCommit(room, batch, 0.05f, 0.9f)) return;
+                if (batch.Pieces.Count > 0 && batch.Pieces.TrueForAll(p => p.Solid) && TryCommit(room, batch, 0.05f, 0.9f)) return true;
             }
+            return false;
         }
 
         /// <summary>
@@ -1045,16 +1393,24 @@ namespace Stealth.Level
                     return full ? 4.3f : 3.7f;
                 }
                 case (RoomType.Kitchen, 2): { b.Add(PropKind.KitchenSink, f.P(0, BackOf(PropKind.KitchenSink)), f.Face); b.Add(PropKind.WallCabinet, f.P(0, BackOf(PropKind.WallCabinet)), f.Face, solid: false); return 1.25f; }
-                case (RoomType.Restroom, 0):
+                // the stalls: three, two, one
+                case (RoomType.Restroom, 0): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 3 : 2, 1.06f);
+                case (RoomType.Restroom, 1): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 2 : 1, 1.06f);
+                case (RoomType.Restroom, 2): return Row(f, b, PropKind.ToiletStall, 1, 1.06f);
+                // the basins under their mirrors, the hand dryer beside them
+                case (RoomType.Restroom, 3):
                     b.Add(PropKind.MirrorSink, f.P(-0.62f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.MirrorSink, f.P(0.18f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.82f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 2.0f;
-                case (RoomType.Restroom, 1):
+                case (RoomType.Restroom, 4):
                     b.Add(PropKind.MirrorSink, f.P(-0.22f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.42f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 1.2f;
-                case (RoomType.Restroom, 2): return Row(f, b, PropKind.Urinal, 2, 0.7f);
+                case (RoomType.Restroom, 5): return Single(PropKind.MirrorSink, 0.75f);
+                case (RoomType.Restroom, 6): return Row(f, b, PropKind.Urinal, 3, 0.7f);
+                case (RoomType.Restroom, 7): return Row(f, b, PropKind.Urinal, 2, 0.7f);
+                case (RoomType.Restroom, 8): return Single(PropKind.Urinal, 0.6f);
                 case (RoomType.Gym, 0): return Single(PropKind.DumbbellRack, 1.5f);
                 case (RoomType.Gym, 1): return Single(PropKind.ExerciseBike, 0.65f);
                 case (RoomType.Gym, 2): return Out(PropKind.PunchingBag, 0.5f, 0.7f);
@@ -1134,7 +1490,8 @@ namespace Stealth.Level
                 var f = new Frame(s, turn ? Vector3.forward : Vector3.right, turn ? Vector3.left : Vector3.forward);
                 var batch = new Batch();
                 Island(room, f, batch);
-                if (batch.Pieces.Count > 0 && TryCommit(room, batch, 0.05f, Aisle)) placed++;
+                // a small room keeps a narrower way round its table (the walk check at placement has the last word)
+                if (batch.Pieces.Count > 0 && TryCommit(room, batch, 0.05f, room.Area < 24f ? 0.8f : Aisle)) placed++;
             }
         }
 
@@ -1518,45 +1875,53 @@ namespace Stealth.Level
             {
                 var u = new Vector3(w.Dir.x, 0, w.Dir.y);
                 float t = R(0.15f, 0.9f);
-                int fails = 0;
-                while (t < w.Length - 0.3f && fails < 12)
+                // a corridor is a walkway (1.7 m stays free in front of its things), a room keeps an aisle
+                float walk = room.Type == RoomType.Corridor ? 1.4f : Aisle + 0.1f;
+                while (t < w.Length - 0.3f)
                 {
                     var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
-                    var batch = new Batch();
-                    float width = WallGroup(room, batch, face, u, n);
-                    if (width <= 0f) break;
-                    // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
-                    var shift = u * (width / 2f);
-                    for (int i = 0; i < batch.Pieces.Count; i++)
+                    // what does not fit here (too deep for the room, tall under a window, one too many) gives way to
+                    // another group of the room's set before the spot is given up
+                    float placed = 0f;
+                    for (int attempt = 0; attempt < 3 && placed <= 0f; attempt++)
                     {
-                        var p = batch.Pieces[i];
-                        p.Pos += shift;
-                        batch.Pieces[i] = p;
+                        var batch = new Batch();
+                        float width = WallGroup(room, batch, face, u, n);
+                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
+                        // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
+                        var shift = u * (width / 2f);
+                        for (int i = 0; i < batch.Pieces.Count; i++)
+                        {
+                            var p = batch.Pieces[i];
+                            p.Pos += shift;
+                            batch.Pieces[i] = p;
+                        }
+                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                        if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) placed = width;
                     }
-                    for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                    if (t + width <= w.Length - 0.1f && Deep(room, face + shift, n, batch) && TryCommit(room, batch, front: n))
-                    {
-                        t += width + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
-                        fails = 0;
-                    }
-                    else { t += 0.5f; fails++; }
+                    if (placed > 0f) t += placed + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
+                    else t += 0.5f;
                 }
             }
         }
 
-        /// <summary>A corridor keeps 1.6 m of walkway in front of anything along its walls.</summary>
-        bool Deep(PlanRoom room, Vector3 face, Vector3 n, Batch b, float walk = 1.7f)
+        /// <summary>
+        /// A walkway stays in front of a group along a wall: <paramref name="walk"/> of the room's floor, and no other
+        /// furniture within <see cref="Facing"/> more — the walkability check wants more room between two pieces than
+        /// between a piece and a bare wall (<see cref="Walk"/>: the navmesh erodes more around furniture).
+        /// </summary>
+        bool Deep(PlanRoom room, Vector3 face, Vector3 n, Batch b, float walk = Aisle + 0.1f)
         {
-            // the whole footprint, pushed 1.7 m (walk) further into the room, must still be the room's floor (a walkway stays)
+            // the whole footprint, pushed walk further into the room, must still be the room's floor
             var u = Vector3.Cross(Vector3.up, n);
             foreach (var p in b.Pieces)
             {
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
                 foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
-                    for (float d = 0f; d <= walk + 0.01f; d += 0.25f)
+                    for (float d = 0f; d <= walk + Facing + 0.01f; d += 0.25f)
                     {
                         var q = c + n * d;
-                        if (!InRoom(room.Floor, room.Id, q.x, q.z)) return false;
+                        if (d <= walk + 0.01f && !InRoom(room.Floor, room.Id, q.x, q.z)) return false;
                         if (d > 0.2f && m_Taken[room.Floor].Contains(new Vector2(q.x, q.z))) return false;
                     }
             }
@@ -2011,6 +2376,44 @@ namespace Stealth.Level
         {
             for (int i = 0; i < n; i++) b.Add(k, f.P((i - (n - 1) / 2f) * step, BackOf(k)), f.Face);
             return n * step + 0.05f;
+        }
+
+        /// <summary>
+        /// A room the rules above left almost bare (small, doors on every wall, windows): its own wall groups once more,
+        /// at every spot of every wall, more tries at each, until it has a few pieces for its size.
+        /// </summary>
+        void Sparse(PlanRoom room)
+        {
+            if (room.Type is RoomType.Corridor or RoomType.Hall) return;
+            int want = Mathf.Clamp(Mathf.RoundToInt(room.Area / 5f), 3, 8);
+            int Have() { int n = 0; foreach (var kv in m_InRoom) n += kv.Value; return n; }
+            if (Have() >= want) return;
+            float y = LevelLayout.FloorY(room.Floor);
+            foreach (var (w, n) in FacesOf(room))
+            {
+                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
+                for (float t = 0.15f; t < w.Length - 0.3f;)
+                {
+                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
+                    float placed = 0f;
+                    for (int attempt = 0; attempt < 4 && placed <= 0f; attempt++)
+                    {
+                        var batch = new Batch();
+                        float width = WallGroup(room, batch, face, u, n);
+                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
+                        var shift = u * (width / 2f);
+                        for (int i = 0; i < batch.Pieces.Count; i++) { var p = batch.Pieces[i]; p.Pos += shift; batch.Pieces[i] = p; }
+                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                        if (Deep(room, face + shift, n, batch, Aisle) && TryCommit(room, batch, front: n)) placed = width;
+                    }
+                    if (placed > 0f)
+                    {
+                        if (Have() >= want) return;
+                        t += placed + 0.15f;
+                    }
+                    else t += 0.25f;
+                }
+            }
         }
 
         // ------------------------------------------------------------------ corners

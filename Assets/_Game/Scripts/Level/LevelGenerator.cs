@@ -345,6 +345,7 @@ namespace Stealth.Level
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
             foreach (var p in l.PatrolPoints) furnisher.Reserve(LevelLayout.FloorOf(p.y), p, 0.75f);
+            l.WindowLimit = building.WindowLimit(seed); // the furniture keeps the windows clear: it must know which ones there are
             watch.Restart();
             foreach (var r in l.Rooms) furnisher.FurnishRoom(r);
             Timing.Furnish += watch.ElapsedMilliseconds;
@@ -476,7 +477,7 @@ namespace Stealth.Level
         {
             foreach (var r in l.Rooms)
             {
-                l.PatrolPoints.Add(r.Center);
+                l.PatrolPoints.Add(PatrolSpot(l, r));
                 if (r.Area < 60f) continue;
                 foreach (var rect in r.Rects)
                 {
@@ -485,6 +486,27 @@ namespace Stealth.Level
                     if ((p - r.Center).magnitude > 4f && l.Plan.RoomAt(p) == r && !l.NearStair(r.Floor, p, 0.8f)) l.PatrolPoints.Add(p);
                 }
             }
+        }
+
+        /// <summary>
+        /// Where a patrol stands in a room: its middle — except the rooms whose middle belongs to their furniture (the
+        /// table of a meeting room, the stalls of a small restroom reach it): there a step inside the first doorway.
+        /// </summary>
+        public static Vector3 PatrolSpot(LevelLayout l, PlanRoom r)
+        {
+            if (!Furnisher.MiddleIsFurniture(r)) return r.Center;
+            foreach (var d in l.Doorways)
+            {
+                if (d.Floor != r.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open) || d.Exterior) continue;
+                var across = d.Rotation * Vector3.forward;
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var p = d.Position + across * side;
+                    p.y = r.Center.y;
+                    if (l.Plan.RoomAt(p) == r && !l.NearStair(r.Floor, p, 0.8f)) return p;
+                }
+            }
+            return r.Center;
         }
 
         static float Range(System.Random rng, float min, float max) => min + (float)rng.NextDouble() * (max - min);

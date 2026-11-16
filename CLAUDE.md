@@ -32,10 +32,16 @@ Tools/dev.sh player             # релизный Windows-билд в Builds/Wi
 SEED=8 LEVEL=5 Tools/dev.sh run gallery      # билд с автопилотом: лог [AUTOTEST] + скриншоты в Builds/shots/<сценарий>
 SEEDS=7,42,3 Tools/dev.sh run sewer          # несколько сидов сразу, по окну на сид (свой UDP-порт, -port): Builds/shots/<сценарий>_<сид>, Builds/host_<сид>.log
 Tools/dev.sh run full 1         # хост + 1 клиент по сети (без звука и за другими окнами; SOUND=1 / FRONT=1 — со звуком / на переднем плане)
+# Редактор открыт (batchmode не запустится) — то же через его MCP-мост (порт 6400), MCP-клиент не нужен:
+python Tools/unity_mcp.py refresh_unity '{"mode":"force","scope":"all","compile":"request"}'   # компиляция; ошибки — read_console '{"action":"get","types":["error"]}'
+Tools/unity_test.sh Stealth.Tests.HousePlanTests Stealth.Tests.SpaceRulesTests                 # тесты по классам / именам, ждёт итог
+python Tools/unity_mcp.py execute_menu_item '{"menu_path":"Stealth/Build Windows Player"}'     # билд (и другие пункты меню Stealth)
+Tools/shoot.sh tour 5 5 S06_Storybook 7811   # сценарий <имя> <сид> <дом> [стиль] [порт] тихим окном → Builds/shots/<имя>_<сид>_<дом>; python Tools/sheet.py <папка> 3 2 — контактные листы
+Tools/unity_test.sh Stealth.Tests.SpaceAudit.WriteReport   # аудит пространства → Logs/space_audit.txt (мебель на окнах, пустые комнаты, повторы, наложения стен и панелей)
 ```
 
 Логи: `Logs/tests.log`, `Logs/build_assets.log`, `Logs/build_player.log`, `Builds/host.log`, `Builds/client*.log`.
-Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `themed`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`, `cheats`, `features`).
+Сценарии автопилота — в `Scripts/Game/DevAutomation*.cs` (`full`, `client`, `coop`, `move`, `ui`, `menu`, `floors`, `rooms`, `themed`, `vent`, `perf`, `gallery`, `hunter`, `lasers`, `radio`, `hack`, `detect`, `darkbox`, `newbots`, `fog`, `styles`, `map`, `sewer`, `legs`, `plate`, `terminals`, `cheats`, `features`, `tour` — все освещённые комнаты дома по кадру, `-kinds Restroom,Meeting` — только эти типы).
 Как проверять изменения — скилл [`stealth-verify`](.claude/skills/stealth-verify/SKILL.md).
 
 ## Структура `Assets/_Game`
@@ -150,6 +156,11 @@ LaserGate — отдельная ловушка (не детектор)
 `HouseKinds` — характер дома из сида (офис, бизнес-центр, дата-центр, склад, штаб-квартира): клон `BuildingSettings` с другой программой комнат
 и формами. `LevelGenerator` — «сгенерируй и проверь»: до 16 вариантов плана (`LevelLayout.PlanAttempt`), берётся первый, где до каждой комнаты
 можно дойти. `LevelLayout` — адаптеры для остального кода (`Rooms`, `Doorways`, `Stairs`, `RoomAt`, `OpenBetweenFloors`…).
+Мебель знает про окна и про проходимость: высокое (`Furnisher.Tall`) и висящее на стене (`OnWall`) не встаёт перед окном (`WindowStrips`; в туалетах,
+раздевалках и хранилище окон нет — `LevelBuilder.WindowCuts`), одного вида в комнате не больше `Furnisher.CapOf` (один кулер, одни часы), каждая группа
+при постановке проверяется той же сеткой, что и `EnsureWalkable` (`StaysWalkable`: середина комнаты, её двери и лестницы остаются связаны) — проверка
+после расстановки почти ничего не выбрасывает; туалет всегда пробует кабинки (или писсуары) и раковины (`Anchor`), полупустая комната добирает группы
+(`Sparse`); в переговорных и туалетах середина — для мебели, патруль стоит у двери (`LevelGenerator.PatrolSpot`, `Furnisher.MiddleIsFurniture`).
 Мебель — `Furnisher`: острова с проходами 1,25 м (их примерно в полтора раза больше, чем «достаточно»: дом обыскивают), пристенные группы с дорожкой
 перед ними и второй проход по стенам у всех комнат, в коридорах — только тонкое у стен (огнетушитель, доска, урны) далеко друг от друга, вокруг проёмов, лестниц, люка и
 точек патруля — свободно; тематические комнаты (`RoomType` от `Gym` до `GameRoom`, плюс кухня и туалет) сначала получают свой узнаваемый
@@ -388,7 +399,9 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 с её же раскладкой текстуры (`MeshBatcher.WallProjection`, откосы тоже по миру — `ArchitecturePlanner.Across`), в плоскости отделки, без фасок и сглаживания
 (`style_kit.py`, `export(..., wall=)`); сценарий `doors` снимает стыки крупно в пяти стилях (кадры `*_debug_normalink` — усиленный контур по нормалям);
 обшивка, карниз, трубы ставятся только на куски стены нужной высоты (под лазом — нет); стыки скошенных и дуговых стен — повёрнутый столб и декор ровно до стыка
-(`WallFace.JointA/B`), грани таких стен находятся сквозь «карман» (`LevelBuilder.InnerNormals`). Балки — одна система на комнату, от стены до стены (`ArchitecturePlanner.BeamLines`).
+(`WallFace.JointA/B`), грани таких стен находятся сквозь «карман» (`LevelBuilder.InnerNormals`); столб посреди прямой стены (Т-стык) две соседние грани
+делят пополам (`WallFace.StraightA/B`, `LevelBuilder.RunsOn`) — панели и карниз не кладутся дважды; кусок дуги, идущий внутри прямой стены у точки касания,
+не строится (`HousePlan.ShapedWalls`); пол комнаты заходит в её «карман» за скошенной стеной (`ArchitecturePlanner.PlanFloors`). Проверяет `SpaceRulesTests`. Балки — одна система на комнату, от стены до стены (`ArchitecturePlanner.BeamLines`).
 Держатель склеенного меша — `StyleConfig.Batch`.
 **Воксельный стиль `S11_Noir`** («Нуар-детектив», по мотивам Shadows of Doubt): роботы, датчики, мебель и игроки этого стиля пересобраны из кубиков 4 см
 (`Lang.voxel`, `Tools/Blender/voxel.py` — Remesh Blocks по каждой части, мельче для тонких деталей, светящиеся части — на сетке вдвое мельче), без пиксельного фильтра.
