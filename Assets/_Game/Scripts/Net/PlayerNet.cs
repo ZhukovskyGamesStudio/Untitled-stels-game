@@ -22,6 +22,7 @@ namespace Stealth.Net
         readonly NetworkVariable<bool> m_Flashlight = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<byte> m_Gas = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString64Bytes> m_Identity = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -47,6 +48,7 @@ namespace Stealth.Net
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
             m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
+            m_Gas.OnValueChanged += (_, now) => { if (!IsOwner) m_Player.ApplyGas(now); };
             PushState();
             if (!IsOwner) m_Player.ApplyIdentity(m_Identity.Value.ToString());
             Pull();
@@ -72,6 +74,7 @@ namespace Stealth.Net
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
             NetSync.Set(m_LookPitch, m_Player.LookPitch);
+            NetSync.Set(m_Gas, (byte)Mathf.RoundToInt(Mathf.Clamp01(m_Player.GasShare) * 255f));
             if (m_PushedIdentity != m_Player.Identity)
             {
                 m_PushedIdentity = m_Player.Identity;

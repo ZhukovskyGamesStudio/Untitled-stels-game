@@ -52,6 +52,14 @@ namespace Stealth.Audio
         [Tooltip("«Нарушитель устранён» — it knocked its target down and goes back to work.")]
         public AudioClip VoiceEliminated;
 
+        [Header("People")]
+        [Tooltip("A player breathing hard in the laughing gas (before the laughing starts).")]
+        public AudioClip GasBreath;
+        [Tooltip("A player laughing in the gas, ever harder: a giggle, a laugh, a helpless fit (Tools/Audio/generate_sounds.py).")]
+        public AudioClip[] GasLaugh = new AudioClip[0];
+        [Tooltip("The hostage calling to a player who sees it (Tools/Audio/generate_voices.py).")]
+        public AudioClip[] HostageVoice = new AudioClip[0];
+
         [Header("Environment")]
         public AudioClip LaserHum, DoorSlide, Alarm, OfficeHum, GasWind;
         [Tooltip("A restroom's hand dryer running (4 s, loud: robots come to check).")]

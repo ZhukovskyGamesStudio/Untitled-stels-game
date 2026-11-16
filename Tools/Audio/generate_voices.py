@@ -26,6 +26,15 @@ LINES = {
     "voice_eliminated": "Нарушитель устранён.",
 }
 
+# The hostage in the cage calls to the players who see it (a person, not a robot: no robot effect, a small room around it).
+HOSTAGE = {
+    "hostage_help": "Эй! Я здесь! Помогите!",
+    "hostage_key": "Ключ у охранника! Заберите ключ!",
+    "hostage_out": "Вытащите меня отсюда, пожалуйста!",
+    "hostage_quiet": "Тише... Они где-то рядом.",
+    "hostage_hurry": "Быстрее, пока они не вернулись!",
+}
+
 SPEAK = r"""
 Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
@@ -84,6 +93,16 @@ def robotize(x):
     return y
 
 
+def roomify(x):
+    """A frightened person in a concrete room: a touch higher and quicker, a narrow-ish band, two short echoes."""
+    x = signal.resample(x, int(len(x) / 1.04))
+    y = x.copy()
+    for delay, gain in ((0.023, 0.28), (0.041, 0.16)):
+        d = int(delay * SR)
+        y[d:] += gain * x[:-d]
+    return bandpass(y, 140, 6500, 2)
+
+
 def write(path, x, peak=0.9):
     x = x / max(np.max(np.abs(x)), 1e-9) * peak
     data = (np.clip(x, -1, 1) * 32767).astype(np.int16)
@@ -106,6 +125,9 @@ def main():
             pre = np.concatenate([chirp(900, 1500, 0.07) if up else chirp(1500, 900, 0.07), np.zeros(int(0.05 * SR))])
             x = np.concatenate([pre * 0.6, voice / max(np.max(np.abs(voice)), 1e-9), np.zeros(int(0.05 * SR))])
             write(os.path.join(out, "Robots", name + ".wav"), x)
+        for name, text in HOSTAGE.items():
+            voice = roomify(trim(speak(text, os.path.join(tmp, name + ".wav"))))
+            write(os.path.join(out, "Voices", name + ".wav"), np.concatenate([voice, np.zeros(int(0.08 * SR))]), 0.85)
 
 
 if __name__ == "__main__":

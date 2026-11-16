@@ -112,6 +112,13 @@ namespace Stealth.Player
         public bool IsCrouching => Crouching;
         public bool IsDown => !IsSpawned || Downed || InHatch || Invisible;
 
+        /// <summary>How deep in the laughing gas this player is: 0 clear … 1 passing out (the owner's own, the others' replicated).</summary>
+        public float GasShare { get; private set; }
+        /// <summary>The share at which the laughing starts (the same settings on every peer).</summary>
+        public float GasLaughShare => Gas.LaughAfter / Mathf.Max(0.01f, Gas.Limit);
+        /// <summary>A copy of the owner's gas share (the network twin).</summary>
+        public void ApplyGas(byte share) => GasShare = share / 255f;
+
         /// <summary>Server: cheats of the F4 panel — nothing hurts this player / robots do not perceive them.</summary>
         public bool Invulnerable { get; private set; }
         public bool Invisible { get; private set; }
@@ -686,8 +693,9 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             bool outside = layout != null && !layout.IsInside(transform.position);
             // Lying, watching a teammate or in god mode, the gas has nothing to do with you (no overlay, no knockout).
-            if (Downed || Invulnerable) { Gas.Reset(); return; }
+            if (Downed || Invulnerable) { Gas.Reset(); GasShare = 0f; return; }
             var effect = Gas.Tick(outside, Time.deltaTime);
+            GasShare = Gas.Share;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
             else if (effect == GasExposure.Effect.Knockout)
             {

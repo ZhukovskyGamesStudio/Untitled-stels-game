@@ -766,6 +766,59 @@ def music_chase():
 
 # --------------------------------------------------------------------------- main
 
+# --------------------------------------------------------------------------- the laughing gas
+
+def _formants(src, formants):
+    """A voiced source through vowel formants (centre Hz, bandwidth Hz, gain)."""
+    return sum(bandpass(src, max(60, f - bw / 2), f + bw / 2, 2) * g for f, bw, g in formants)
+
+
+def _ha(f0, dur, loud=1.0, breathy=0.3, gen=None):
+    """One "ha" of a laugh: a puff of breath (h), then a voiced /a/ with the pitch falling a little."""
+    gen = gen or rng
+    h = int(0.035 * SR)
+    puff = bandpass(gen.uniform(-1, 1, h), 600, 3500) * env(h, 0.005, 0.03) * 0.6
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f = f0 * (1.0 - 0.18 * t / dur) * (1 + 0.012 * np.sin(2 * np.pi * 6.5 * t))
+    phase = np.cumsum(f) / SR
+    pulses = 2 * (phase % 1.0) - 1.0                          # a saw of glottal pulses
+    voiced = _formants(pulses, [(780, 160, 1.0), (1250, 200, 0.55), (2600, 300, 0.25), (3400, 400, 0.1)])
+    voiced = voiced / (np.max(np.abs(voiced)) + 1e-9)
+    air = bandpass(gen.uniform(-1, 1, n), 700, 4000) * breathy
+    syll = (voiced * (1 - breathy * 0.5) + air) * env(n, 0.012, dur * 0.9, curve=2.5)
+    return np.concatenate([puff, syll]) * loud
+
+
+def gas_breath():
+    """Heavy breathing in the gas: a strained inhale through the teeth, a long tired exhale with a little groan."""
+    gen = np.random.default_rng(71)
+    i = int(0.75 * SR)
+    inhale = bandpass(gen.uniform(-1, 1, i), 900, 4200) * np.linspace(0.2, 1.0, i) ** 1.5 * env(i, 0.25, 0.75, curve=1.5) * 0.55
+    e = int(1.0 * SR)
+    t = np.arange(e) / SR
+    exhale = bandpass(gen.uniform(-1, 1, e), 300, 1800) * env(e, 0.04, 1.0, curve=2.2)
+    groan = _formants(2 * ((np.cumsum(np.full(e, 118.0) * (1 - 0.1 * t)) / SR) % 1.0) - 1, [(600, 150, 1.0), (1000, 200, 0.4)])
+    groan = groan / (np.max(np.abs(groan)) + 1e-9) * env(e, 0.06, 0.6, curve=2.5) * 0.25
+    return fade(np.concatenate([inhale, silence(0.08), exhale + groan, silence(0.12)]))
+
+
+def gas_laugh(level):
+    """A laugh, ever harder: 0 a nervous giggle (three high "hee"s), 1 a laugh, 2 a helpless fit with a wheezing gasp."""
+    gen = np.random.default_rng(80 + level)
+    count, f0, gap, loud, breathy = [(3, 330, 0.07, 0.6, 0.45), (5, 250, 0.06, 0.85, 0.35), (9, 225, 0.045, 1.0, 0.3)][level]
+    parts = []
+    for k in range(count):
+        dur = 0.13 + gen.uniform(0, 0.04) + (0.06 if k == 0 else 0.0)
+        parts.append(_ha(f0 * (1.0 - 0.05 * k / count) * (1 + gen.uniform(-0.04, 0.04)), dur, loud * (1.0 - 0.35 * k / count), breathy, gen))
+        parts.append(silence(gap + gen.uniform(0, 0.03)))
+    if level == 2:
+        w = int(0.55 * SR)
+        wheeze = bandpass(gen.uniform(-1, 1, w), 1200, 5000) * np.linspace(0.3, 1.0, w) * env(w, 0.3, 0.55, curve=1.4) * 0.5
+        parts += [silence(0.06), wheeze]
+    return fade(np.concatenate(parts))
+
+
 def main():
     out = sys.argv[-1] if len(sys.argv) > 1 and not sys.argv[-1].endswith(".py") else "Assets/_Game/Art/Audio"
     P = lambda cat, name: os.path.join(out, cat, name + ".wav")
@@ -834,6 +887,9 @@ def main():
     write(P("Car", "car_horn"), car_horn(), 0.7)
     write(P("Car", "car_bump"), car_bump(), 0.7)
     write(P("Environment", "gate_open"), gate_open(), 0.8)
+    write(P("Player", "gas_breath"), gas_breath(), 0.7)
+    for level in range(3):
+        write(P("Player", f"gas_laugh_{level}"), gas_laugh(level), 0.8)
 
 
 if __name__ == "__main__":

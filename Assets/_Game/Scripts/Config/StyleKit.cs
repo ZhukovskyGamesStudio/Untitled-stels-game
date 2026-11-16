@@ -18,6 +18,8 @@ namespace Stealth.Configs
         public Material VaultWall, VaultFloor;
         [Tooltip("Metres one texture repeat covers on the vault's walls / floor")]
         public float VaultWallTile = 2f, VaultFloorTile = 1f;
+        [Tooltip("The metal strip over a doorway where two different floors meet")]
+        public Material Threshold;
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

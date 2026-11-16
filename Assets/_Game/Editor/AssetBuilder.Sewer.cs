@@ -30,6 +30,7 @@ namespace Stealth.EditorTools
             var cuts = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}Cut.prefab", () => KitPiece($"sewer_seg_{i}_cut", false))).ToArray();
             var cap = Prefab($"{SewerKit}/Cap.prefab", () => KitPiece("sewer_cap", true, KitYaw));
             var hub = Prefab($"{SewerKit}/Hub.prefab", () => KitPiece("sewer_hub", true, KitYaw));
+            var plug = Prefab($"{SewerKit}/Plug.prefab", () => KitPiece("sewer_plug", true, KitYaw));
             var lamp = Prefab($"{SewerKit}/Lamp.prefab", () =>
             {
                 var root = new GameObject("SewerLamp");
@@ -82,6 +83,7 @@ namespace Stealth.EditorTools
                 loc.Cap = cap;
                 loc.BackWall = backWall;
                 loc.Hub = hub;
+                loc.Plug = plug;
                 loc.Lamp = lamp;
                 loc.Barrel = barrel;
                 loc.Crate = crate;
@@ -271,6 +273,8 @@ namespace Stealth.EditorTools
             var root = new GameObject("SewerBranch");
             var b = root.AddComponent<SewerBranch>();
             SewerModel("sewer_branch", root.transform, Vector3.zero, KitYaw, true, "Tunnel");
+            b.Plug = SewerModel("sewer_plug", root.transform, Vector3.zero, KitYaw, true, "Plug");
+            b.Plug.SetActive(false);
             var bars = new GameObject("Bars");
             bars.transform.SetParent(root.transform, false);
             for (int i = 0; i < 12; i++)
@@ -302,7 +306,7 @@ namespace Stealth.EditorTools
                 Strip($"Chevron{k}L", new Vector3(x, y, -0.4f), new Vector3(1.1f, 0.01f, line * 1.6f), -40f); // the tips point into the tunnel
                 Strip($"Chevron{k}R", new Vector3(x, y, 0.4f), new Vector3(1.1f, 0.01f, line * 1.6f), 40f);
             }
-            foreach (var (x, power) in new[] { (5f, 3.5f), (16f, 2.6f), (28f, 2f) })
+            foreach (var (x, power) in new[] { (5f, 3.5f), (17f, 2.8f), (30f, 2.4f), (44f, 2.2f), (58f, 2f), (72f, 1.8f), (86f, 1.6f) })
             {
                 var l = Lamp(open.transform, "TunnelLight", new Vector3(x, 3.3f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(0.65f, 0.85f, 1f), power, 9f);
                 l.spotAngle = 150f;

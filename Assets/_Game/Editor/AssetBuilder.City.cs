@@ -79,6 +79,11 @@ namespace Stealth.EditorTools
             mats[(int)CitySlot.CarSilver] = Mat("CityCarSilver", new Color(0.62f, 0.64f, 0.66f), null, 0.75f, 0.4f);
             mats[(int)CitySlot.Glass] = Mat("CityGlass", new Color(0.08f, 0.1f, 0.13f), null, 0.9f, 0.2f);
             mats[(int)CitySlot.Tyre] = Mat("CityTyre", new Color(0.05f, 0.05f, 0.05f), null, 0.2f);
+            // the buildings' stone trims and plinths, the cars' tail lamps (and the traffic lights' red), the tree pits
+            mats[(int)CitySlot.Stone] = Mat("CityStone", new Color(0.78f, 0.75f, 0.68f), "paving", 0.2f);
+            mats[(int)CitySlot.Plinth] = Mat("CityPlinth", new Color(0.36f, 0.35f, 0.34f), "paving", 0.25f);
+            mats[(int)CitySlot.TailLight] = Mat("CityTailLight", new Color(1f, 0.12f, 0.08f), null, 0.5f, 0f, null, new Color(2.6f, 0.25f, 0.15f));
+            mats[(int)CitySlot.Soil] = Mat("CitySoil", new Color(0.16f, 0.12f, 0.09f), "asphalt", 0.05f);
 
             var piece = Prefab($"{LevelPrefabs}/City.prefab", () =>
             {
@@ -100,11 +105,42 @@ namespace Stealth.EditorTools
                 Object.DestroyImmediate(l.GetComponent<LightSource>()); // scenery: robots and the stealth meter never see it
                 return go;
             });
+            // the house's services (UtilityPlan)
+            var util = new Material[System.Enum.GetValues(typeof(UtilitySlot)).Length];
+            util[(int)UtilitySlot.Duct] = Mat("UtilDuct", new Color(0.7f, 0.72f, 0.74f), null, 0.55f, 0.6f);
+            util[(int)UtilitySlot.Grille] = Mat("UtilGrille", new Color(0.18f, 0.19f, 0.2f), null, 0.3f, 0.4f);
+            util[(int)UtilitySlot.Pipe] = Mat("UtilPipe", new Color(0.82f, 0.82f, 0.8f), null, 0.45f);
+            util[(int)UtilitySlot.Copper] = Mat("UtilCopper", new Color(0.72f, 0.42f, 0.24f), null, 0.6f, 0.7f);
+            util[(int)UtilitySlot.Conduit] = Mat("UtilConduit", new Color(0.55f, 0.56f, 0.57f), null, 0.3f);
+            util[(int)UtilitySlot.Plate] = Mat("UtilPlate", new Color(0.93f, 0.93f, 0.91f), null, 0.4f);
+            util[(int)UtilitySlot.Dark] = Mat("UtilDark", new Color(0.05f, 0.05f, 0.05f), null, 0.2f);
+            util[(int)UtilitySlot.Panel] = Mat("UtilPanel", new Color(0.62f, 0.64f, 0.62f), null, 0.4f, 0.3f);
+            util[(int)UtilitySlot.Warning] = Mat("UtilWarning", new Color(0.95f, 0.75f, 0.1f), null, 0.3f);
+            // a light switch beside a doorway (LightSwitch): a plate on the wall, a rocker that tilts, a small green lamp in it
+            // that glows while the room is dark; +Z out of the wall, the pivot in the plate's middle on the wall's face
+            var led = Mat("UtilLed", new Color(0.35f, 1f, 0.55f), null, 0.5f, 0f, null, new Color(0.5f, 2.4f, 1f));
+            var lightSwitch = Prefab($"{LevelPrefabs}/LightSwitch.prefab", () =>
+            {
+                var go = new GameObject("LightSwitch");
+                Cube(go.transform, "Plate", new Vector3(0f, 0f, 0.006f), new Vector3(0.085f, 0.125f, 0.012f), util[(int)UtilitySlot.Plate], collider: false);
+                var rocker = new GameObject("Rocker").transform;
+                rocker.SetParent(go.transform, false);
+                rocker.localPosition = new Vector3(0f, 0f, 0.012f);
+                Cube(rocker, "Key", new Vector3(0f, 0f, 0.005f), new Vector3(0.036f, 0.064f, 0.01f), util[(int)UtilitySlot.Plate], collider: false);
+                var glow = Cube(rocker, "Led", new Vector3(0f, -0.022f, 0.0105f), new Vector3(0.008f, 0.008f, 0.002f), led, collider: false);
+                var s = go.AddComponent<LightSwitch>();
+                s.Rocker = rocker;
+                s.Led = glow.GetComponent<MeshRenderer>();
+                return go;
+            });
+            if (art.LightSwitch != lightSwitch) { art.LightSwitch = lightSwitch; EditorUtility.SetDirty(art); }
             if (art.CityPiece == piece && art.CityLamp == lamp && art.CityMaterials != null && art.CityMaterials.Length == mats.Length
-                && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats)) return;
+                && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats) && art.UtilityMaterials != null
+                && System.Linq.Enumerable.SequenceEqual(art.UtilityMaterials, util)) return;
             art.CityPiece = piece;
             art.CityLamp = lamp;
             art.CityMaterials = mats;
+            art.UtilityMaterials = util;
             EditorUtility.SetDirty(art);
         }
     }

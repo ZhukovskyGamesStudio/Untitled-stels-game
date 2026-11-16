@@ -192,6 +192,7 @@ namespace Stealth.Level
         {
             var (mat, tileSize) = p.Kind switch
             {
+                DecorKind.FloorFinish when p.Threshold => (s_Kit != null && s_Kit.Threshold != null ? s_Kit.Threshold : g.Trim, 1f),
                 DecorKind.FloorFinish when p.Vault && s_Kit != null && s_Kit.VaultFloor != null => (s_Kit.VaultFloor, s_Kit.VaultFloorTile),
                 DecorKind.WallFinish when p.Vault && s_Kit != null && s_Kit.VaultWall != null => (s_Kit.VaultWall, s_Kit.VaultWallTile),
                 DecorKind.WallFinish when p.Variant > 0 => WallOf(p.Variant, g),

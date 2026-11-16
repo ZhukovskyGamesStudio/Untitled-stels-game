@@ -174,6 +174,7 @@ namespace Stealth.EditorTools
             kit.VaultFloor = K("Vault_Floor");
             kit.VaultWallTile = 2f;
             kit.VaultFloorTile = 1f;
+            kit.Threshold = K("Trim_Brass");
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

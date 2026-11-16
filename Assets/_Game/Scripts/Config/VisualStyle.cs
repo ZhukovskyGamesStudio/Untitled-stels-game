@@ -41,7 +41,8 @@ namespace Stealth.Configs
     public enum StairChoice { Auto, Concrete, Wood, Steel, Glass }
 
     /// <summary>What hangs under the ceiling.</summary>
-    public enum CeilingKind { None, Beams, IBeams, Coffers, Trays }
+    // (beams, I-beams and coffers, 1–3, are gone: they kept ending in the middle of rooms — playtest; Trays keeps its saved value)
+    public enum CeilingKind { None = 0, Trays = 4 }
 
     /// <summary>A kind of room with a floor of its own in a style (<see cref="StyleGeometry.RoomFloors"/>).</summary>
     [Serializable]
@@ -257,11 +258,11 @@ namespace Stealth.Configs
         public Cubemap Sky;
         [Tooltip("How bright the sky looks")] public float SkyExposure = 1f;
         [Tooltip("How thick the gas looks where it is full, per metre (0.03: half gone ~25 m into it; 1.6: nothing seen 2 m into it)")]
-        public float GasDensity = 0.03f;
+        public float GasDensity = 0.07f;
         [Tooltip("How far the sky panorama is, metres: the gas between the eye and it veils it (shorter = the world outside shows more)")]
         public float SkyDistance = 70f;
         [Tooltip("Metres from the outer walls over which the gas thickens from none to full (it looks pushed away from the house)")]
-        public float GasClear = 15f;
+        public float GasClear = 10f;
         [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 2.5f;
         [Tooltip("Above that it thins out over this many metres (exponentially): the sky shows overhead and from upper floors")]
         public float GasFalloff = 2.5f;

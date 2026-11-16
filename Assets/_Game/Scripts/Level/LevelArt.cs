@@ -32,6 +32,10 @@ namespace Stealth.Level
         [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
         public GameObject CityPiece;
         public Material[] CityMaterials = new Material[0];
+        [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
+        public Material[] UtilityMaterials = new Material[0];
+        [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
+        public GameObject LightSwitch;
         public GameObject CityLamp;
 
         [Header("Pieces")]

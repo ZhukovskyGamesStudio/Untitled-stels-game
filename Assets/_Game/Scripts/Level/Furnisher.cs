@@ -1352,6 +1352,14 @@ namespace Stealth.Level
                 Anchor(room, 3, 6, false);
                 return;
             }
+            if (room.Type == RoomType.ControlRoom)
+            {
+                // the house's two robot terminals: side by side, or each against its own wall (the video wall if neither fits)
+                if (Anchor(room, 0, 1, false)) return;
+                if (Anchor(room, 1, 2, false)) { Anchor(room, 1, 2, false); return; }
+                Anchor(room, 2, 3, true);
+                return;
+            }
             Anchor(room, 0, 3, true);
         }
 
@@ -1471,8 +1479,19 @@ namespace Stealth.Level
                 case (RoomType.CopyRoom, 0): { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
                 case (RoomType.CopyRoom, 1): return Single(PropKind.PaperStack, 0.85f);
                 case (RoomType.CopyRoom, 2): return Single(PropKind.Shredder, 0.5f);
-                case (RoomType.ControlRoom, 0): return Single(PropKind.MonitorWall, 2.45f);
-                case (RoomType.ControlRoom, 1): return Single(PropKind.ConsoleDesk, 2.45f);
+                // the robots' control consoles (the house's terminals, LevelGenerator.PlaceTerminals), an operator's chair at each
+                case (RoomType.ControlRoom, 0):
+                    foreach (float u in new[] { -0.85f, 0.85f })
+                    {
+                        b.Add(PropKind.Terminal, f.P(u, BackOf(PropKind.Terminal)), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(u, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                    }
+                    return 3.4f;
+                case (RoomType.ControlRoom, 1):
+                    b.Add(PropKind.Terminal, f.P(0, BackOf(PropKind.Terminal)), f.Face);
+                    b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                    return 1.7f;
+                case (RoomType.ControlRoom, 2): return Single(PropKind.MonitorWall, 2.45f);
                 case (RoomType.Lab, 0):
                     b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);
                     b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.LabBench) + 0.1f, 0.91f));
@@ -2321,7 +2340,13 @@ namespace Stealth.Level
                     if (roll < 91) return Single(PropKind.PaperBin, 0.65f);
                     return Single(PropKind.MailCart, 0.95f);
                 case RoomType.ControlRoom:
-                    if (roll < 34)
+                    if (roll < 30)
+                    {   // another robots' control console and its operator (LevelGenerator.PlaceTerminals; spare ones are desks)
+                        b.Add(PropKind.Terminal, f.P(0, BackOf(PropKind.Terminal)), f.Face);
+                        b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
+                        return 1.7f;
+                    }
+                    if (roll < 50)
                     {   // the video wall, the operators' console in front of it facing it
                         b.Add(PropKind.MonitorWall, f.P(0, BackOf(PropKind.MonitorWall)), f.Face);
                         b.Add(PropKind.ConsoleDesk, f.P(0, 1.55f), f.Face); // its screens face the operators, who face the wall

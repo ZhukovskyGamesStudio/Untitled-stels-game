@@ -13,7 +13,8 @@ Layout (metres, Unity X):  0..12 the tunnel from the ladder (main channel in the
 The drivable modular kit (`kit()`, below the props; `-- <root> kit` builds only it): the team drives a pickup through
 the sewer, so the game assembles it at runtime along +X from pieces that join seamlessly at their ends —
 sewer_cap (closed start, faces +X) · sewer_seg_0..3 (6 m, any order) · sewer_gate_frame/door + sewer_lever ·
-sewer_hub (16 m junction hall) · sewer_branch (34 m, one per hub opening). Floor = a steel road grate (part Grate,
+sewer_hub (16 m junction hall: three openings in its end wall, one in each long wall) · sewer_branch (110 m, one
+per hub opening) · sewer_plug (bricks closing an opening that leads nowhere). Floor = a steel road grate (part Grate,
 top at z = 0, texture Art/Textures/Sewer/grate.png = 0.5 m) over a water channel; sewer_seg_<n>_cut lacks the -Y
 wall and vault for the side camera.
 """
@@ -497,7 +498,13 @@ KIT_THICK = 0.35      # vault thickness shown at the cutaway
 HUB_LEN, HUB_F0, HUB_F1, HUB_WALK_END, HUB_WALL_X = 16.0, 0.5, 5.5, 14.6, 15.4
 HUB_EDGE = 7.0        # the hub's walkways start here (y), from x = HUB_F1 to HUB_WALK_END
 HUB_OPEN_Y = (-5.5, 0.0, 5.5)
-KIT_BRANCH_LEN = 34.0
+HUB_SIDE_X = 10.0     # the two side openings (one in each long wall, y = ±8) are centred here
+HUB_SIDE_MOUTH = 8.6  # ... and their mouth: the side walls are 0.6 m thick there, like the end wall (15.4..16)
+HUB_NICHE = (7.3, 12.7)  # the side walls stand up to the vault's 4th arc vertex over this span (a niche in the vault)
+HUB_NICHE_ARC = 4     # ... vault vertex index (z 4.93): room for the sign plate (4.1..4.75) over the side opening's frame
+HUB_SIDE_RIB = 12.9   # the second hall rib (was at x = 10, now beside the side openings)
+KIT_BRANCH_LEN = 110.0
+KIT_BRANCH_RIB = 3.0  # rib spacing in a branch
 GATE_HALF, GATE_TOP, GATE_SLOT = 2.8, 3.2, 2.95
 
 
@@ -1135,34 +1142,84 @@ def hub_edge(x):
 
 
 def hub_pieces(m):
-    """Convex plan pieces covering the hub's road and channel, grown by m into the walls."""
+    """Convex plan pieces covering the hub's road and channel, grown by m into the walls; the road runs on through
+    the gaps in the walkways out to the side openings' mouths (y = ±HUB_SIDE_MOUTH)."""
     r0, r1, h = KIT_ROAD + m, HUB_EDGE + m, KIT_HUB["half"] + m
+    g0, g1 = HUB_SIDE_X - KIT_BRANCH["half"] - m, HUB_SIDE_X + KIT_BRANCH["half"] + m
     return [[(0.0, -r0), (HUB_F0, -r0), (HUB_F0, r0), (0.0, r0)],
             [(HUB_F0, -r0), (HUB_F1, -r1), (HUB_F1, r1), (HUB_F0, r0)],
-            [(HUB_F1, -r1), (HUB_WALK_END, -r1), (HUB_WALK_END, r1), (HUB_F1, r1)],
-            [(HUB_WALK_END, -h), (HUB_LEN, -h), (HUB_LEN, h), (HUB_WALK_END, h), (HUB_WALK_END, r1), (HUB_WALK_END, -r1)]]
+            [(HUB_F1, -r1), (g0, -r1), (g1, -r1), (HUB_WALK_END, -r1),
+             (HUB_WALK_END, r1), (g1, r1), (g0, r1), (HUB_F1, r1)],   # g0 / g1: shared corners with the side pieces
+            [(HUB_WALK_END, -h), (HUB_LEN, -h), (HUB_LEN, h), (HUB_WALK_END, h), (HUB_WALK_END, r1), (HUB_WALK_END, -r1)],
+            [(g0, -HUB_SIDE_MOUTH), (g1, -HUB_SIDE_MOUTH), (g1, -r1), (g0, -r1)],
+            [(g0, r1), (g1, r1), (g1, HUB_SIDE_MOUTH), (g0, HUB_SIDE_MOUTH)]]
+
+
+def side_frame(s):
+    """Matrix from an opening's own frame (x out of the hall from its mouth at x = 0, as a branch tunnel starts; y
+    across, z up — the frame of sewer_branch and sewer_plug) to the hub's frame, for the side opening at y = s * 8."""
+    from mathutils import Matrix
+    return Matrix.Translation((HUB_SIDE_X, s * HUB_SIDE_MOUTH, 0.0)) @ Matrix.Rotation(s * math.pi / 2, 4, "Z")
+
+
+def at_sides(bm, build):
+    """build(bm) in an opening's own frame, once per side opening, moved to it."""
+    for s in (-1, 1):
+        n0 = len(bm.verts)
+        build(bm)
+        bm.verts.ensure_lookup_table()
+        bmesh.ops.transform(bm, matrix=side_frame(s), verts=bm.verts[n0:])
 
 
 def kit_hub():
     """sewer_hub: from the segment's section at x = 0 a flare (x 0.5..5.5) to the hall (half width 8, vault top 6);
-    the grate road over the full width, walkways along the long walls up to x = 14.6; the end wall (x 15.4..16) has
-    three arched openings (y = -5.5, 0, 5.5; 4.6 x 3.8) to the branch tunnels, stone frames and pillars between them."""
+    the grate road over the full width, walkways along the long walls up to x = 14.6. Five arched openings of the
+    branch profile (4.6 x 3.8 above the road, down to the channel bed), each in a 0.6 m wall with a stone frame on
+    its inner face and a sign plate (z 4.1..4.75) over it; a branch tunnel (or sewer_plug) starts at the mouth:
+      * three in the end wall (x 15.4..16): centres y = -5.5, 0, 5.5, mouths at x = 16, facing +x; pillars between;
+      * two in the long walls: centre x = 10, inner faces y = ±8, mouths at y = ±8.6, facing ±y. The walkways stop
+        at them (x 7.7..12.3 is open) and the grate road runs straight out at z = 0; the channel, its ledges and the
+        edge rails turn out along the side road. Over each one the wall stands up to z 4.93 (a niche in the vault,
+        x 7.3..12.7) to carry the plate. The hall's second rib moved from x = 10 to 12.9, the pipes and junction
+        boxes on the long walls to x 13.65..15.05 and 6.25..6.95."""
     prof_s = kit_profile(KIT, KIT_WALK)
     prof_h = kit_profile(KIT_HUB, KIT_WALK)
     prof_e = kit_profile(KIT_HUB, KIT_BOTTOM, extra=(KIT_WALK,))
+    k = HUB_NICHE_ARC + 1                         # prof_h = [foot, arc 0..KIT_ARC, foot]
+    prof_n = prof_h[k:len(prof_h) - k]            # the vault over the niches: arc vertex HUB_NICHE_ARC to its mirror
+    NX0, NX1 = HUB_NICHE
+    ny, nz = abs(prof_h[k][0]), prof_h[k][1]      # the niche's top edge on the vault (6.47, 4.93)
+    W, B = KIT_HUB["half"], KIT_BRANCH["half"]
+    g0, g1 = HUB_SIDE_X - B, HUB_SIDE_X + B       # the side openings' jambs = the gap in the walkways
 
     def vault(bm):
-        skin(bm, [(0.0, prof_s), (HUB_F0, prof_s), (HUB_F1, prof_h), (HUB_WALK_END, prof_h)], 3.0)
+        skin(bm, [(0.0, prof_s), (HUB_F0, prof_s), (HUB_F1, prof_h), (NX0, prof_h)], 3.0)
+        skin(bm, [(NX0, prof_n), (NX1, prof_n)], 3.0)
+        skin(bm, [(NX1, prof_h), (HUB_WALK_END, prof_h)], 3.0)
         skin(bm, [(HUB_WALK_END, prof_e), (HUB_LEN, prof_e)], 3.0)
+        arc = prof_h[1:k + 1]                     # (-8, 3.4) .. (-6.47, 4.93): the vault the niche cuts away
+        for s in (-1, 1):
+            poly(bm, [(NX0, s * ny, nz), (NX1, s * ny, nz), (NX1, s * W, nz), (NX0, s * W, nz)], (0, 0, -1))  # ceiling
+            for x, nx in ((NX0, 1), (NX1, -1)):   # sides: fans from the niche's top back corner, turned into it
+                c = bm.verts.new((x, s * W, nz))
+                vs = [bm.verts.new((x, s * abs(y), z)) for y, z in arc]
+                for a, b in zip(vs, vs[1:]):
+                    kface(bm, (c, a, b), (nx, 0, 0))
     part("Brick", vault)
 
     end = prism("BrickEnd", kit_profile(KIT_HUB, KIT_BOTTOM - 0.05, d=0.06), HUB_WALL_X, HUB_LEN)
     for y in HUB_OPEN_Y:
         subtract(end, prism("cut", kit_profile(KIT_BRANCH, KIT_BED - 0.03), HUB_WALL_X - 0.2, HUB_LEN + 0.2, y_off=y))
+    # the side walls under the niches, 0.6 m thick, from the walkway's top (the road's channel walls are below)
+    side = part("BrickSide", lambda bm: at_sides(bm, lambda b: box(b, -0.6, 0.0, HUB_SIDE_X - NX1, HUB_SIDE_X - NX0, KIT_WALK, nz)))
+    for s in (-1, 1):
+        cut = prism("cut", kit_profile(KIT_BRANCH, KIT_BED - 0.03), -0.8, 0.2)
+        cut.data.transform(side_frame(s))
+        subtract(side, cut)
 
     def ribs(bm):
         rib(bm, kit_profile(KIT, KIT_WALK - 0.02), kit_profile(KIT, KIT_WALK - 0.02, d=-0.12), 0.0, 0.2, KIT["wall"], front=False)
-        for x in (HUB_F1, 10.0):
+        for x in (HUB_F1, HUB_SIDE_RIB):
             rib(bm, kit_profile(KIT_HUB, KIT_WALK - 0.02), kit_profile(KIT_HUB, KIT_WALK - 0.02, d=-0.18), x, x + 0.5, KIT_HUB["wall"])
         for y in HUB_OPEN_Y:   # frames round the openings
             o = [(yy + y, z) for yy, z in kit_profile(KIT_BRANCH, KIT_BED, d=0.22)]
@@ -1172,19 +1229,33 @@ def kit_hub():
             box(bm, 15.1, HUB_WALL_X + 0.02, y - 0.28, y + 0.28, KIT_BED, 4.32)
             box(bm, 15.02, HUB_WALL_X + 0.03, y - 0.35, y + 0.35, 4.3, 4.46)
             box(bm, 15.04, HUB_WALL_X + 0.04, y - 0.33, y + 0.33, -0.065, 0.3)
+        o, i = kit_profile(KIT_BRANCH, KIT_WALK, d=0.22), kit_profile(KIT_BRANCH, KIT_WALK)
+        # the side frames stand on the walkways' ends (open feet: the walkway's top closes them)
+        at_sides(bm, lambda b: rib(b, o, i, -0.75, -0.6, KIT_BRANCH["wall"], back=False, outside=True))
     part("Stone", ribs).name = "StoneRibs"
 
-    path = [(0.0, KIT_ROAD), (HUB_F0, KIT_ROAD), (HUB_F1, HUB_EDGE), (HUB_WALK_END, HUB_EDGE)]
+    start = [(0.0, KIT_ROAD), (HUB_F0, KIT_ROAD), (HUB_F1, HUB_EDGE)]
+    walk_a, walk_b = start + [(g0, HUB_EDGE)], [(g1, HUB_EDGE), (HUB_WALK_END, HUB_EDGE)]
+    edge_a, edge_b = walk_a + [(g0, HUB_SIDE_MOUTH)], [(g1, HUB_SIDE_MOUTH)] + walk_b   # turn out along the side road
 
     def walkways(bm):
+        body = [(0.0, KIT_BOTTOM), (W - HUB_EDGE, KIT_BOTTOM), (W - HUB_EDGE, KIT_WALK), (0.0, KIT_WALK)]
+        ledge = [(-0.18, -0.18), (0.02, -0.18), (0.02, -0.06), (-0.18, -0.06)]
         for s in (-1, 1):
-            sweep(bm, path, [(0.0, KIT_BOTTOM), (1.2, KIT_BOTTOM), (1.2, KIT_WALK), (0.0, KIT_WALK)], s, (False, True))
-            sweep(bm, path, [(-0.18, -0.18), (0.02, -0.18), (0.02, -0.06), (-0.18, -0.06)], s, (False, True))
+            sweep(bm, walk_a, body, s, (False, True))
+            sweep(bm, walk_b, body, s, (True, True))
+            sweep(bm, edge_a, ledge, s)
+            sweep(bm, edge_b, ledge, s, (False, True))
         for pc in hub_pieces(0.02):
             poly(bm, [(x, y, KIT_BED) for x, y in pc])
+        # the side road's channel walls inside the wall (the walkways' ends are the walls up to y = ±8)
+        at_sides(bm, lambda b: [poly(b, [(-0.6, y, KIT_BED), (0.0, y, KIT_BED), (0.0, y, KIT_WALK), (-0.6, y, KIT_WALK)],
+                                     (0, -y, 0)) for y in (-B, B)])
     part("Concrete", walkways).name = "ConcreteFloor"
-    part("Stone", lambda bm: [sweep(bm, path, [(-0.02, 0.1), (0.22, 0.1), (0.22, 0.26), (-0.02, 0.26)], s, (False, True))
-                              for s in (-1, 1)]).name = "StoneCurb"
+    curb = [(-0.02, 0.1), (0.22, 0.1), (0.22, 0.26), (-0.02, 0.26)]
+    part("Stone", lambda bm: [sweep(bm, pth, curb, s, caps) for s in (-1, 1) for pth, caps in
+                              ((start + [(g0 + 0.02, HUB_EDGE)], (False, True)),
+                               ([(g1 - 0.02, HUB_EDGE), (HUB_WALK_END + 0.02, HUB_EDGE)], (True, True)))]).name = "StoneCurb"
 
     part("Grate", lambda bm: [poly(bm, [(x, y, 0.0) for x, y in pc]) for pc in hub_pieces(0.0)])
     k_flare = math.hypot(HUB_F1 - HUB_F0, HUB_EDGE - KIT_ROAD) / (HUB_F1 - HUB_F0)
@@ -1194,60 +1265,132 @@ def kit_hub():
         return e - 0.12 * (k_flare if HUB_F0 < x < HUB_F1 else 1.0)
 
     def frame(bm):
-        rail_path = path + [(HUB_WALK_END, KIT_HUB["half"]), (HUB_LEN - 0.3, KIT_HUB["half"])]  # ends in the end wall
+        rail = [(-0.12, -0.07), (0.02, -0.07), (0.02, 0.01), (-0.12, 0.01)]
         for s in (-1, 1):
-            sweep(bm, rail_path, [(-0.12, -0.07), (0.02, -0.07), (0.02, 0.01), (-0.12, 0.01)], s)
+            sweep(bm, edge_a, rail, s)
+            sweep(bm, edge_b + [(HUB_WALK_END, W), (HUB_LEN - 0.3, W)], rail, s)   # ends in the end wall
+        reach = HUB_SIDE_MOUTH - 0.06   # beams under the side roads run out to them (1 cm short of the half beams)
         for c in [1.5 * k for k in range(10)] + [15.0]:   # the branch's half beam finishes the road at x = 16
-            beam(bm, c, lambda x: rail_inner(x) + 0.02, 0.0, HUB_LEN, web_end=hub_edge(c))
+            if g0 < c < g1:
+                beam(bm, c, lambda x: reach, 0.0, HUB_LEN, web_end=reach)
+            else:
+                beam(bm, c, lambda x: rail_inner(x) + 0.02, 0.0, HUB_LEN, web_end=hub_edge(c))
 
-        def start(ay):
+        def begin(ay):
             if ay + 0.15 <= KIT_ROAD:
                 return 0.0
             if ay + 0.15 <= HUB_EDGE:
                 return HUB_F0 + (ay + 0.15 - KIT_ROAD) / (HUB_EDGE - KIT_ROAD) * (HUB_F1 - HUB_F0)
             return HUB_WALK_END + 0.05
-        stringers(bm, [1.3 * k for k in range(-6, 7)], 0.0, HUB_LEN, start)
+        stringers(bm, [1.3 * k for k in range(-6, 7)], 0.0, HUB_LEN, begin)
+
+        def mouth(b):  # the side road at its mouth: a half beam (the branch's own completes it) and the branch's stringers
+            beam(b, 0.0, lambda x: B - 0.12, -1.0, 0.0, web_end=B)
+            stringers(b, [-1.15, 0.0, 1.15], 6.52 - HUB_SIDE_MOUTH, 0.0)
+            box(b, -0.68, -0.59, -0.9, 0.9, 4.1, 4.75)   # its sign plate, on the wall over the frame
+        at_sides(bm, mouth)
         for y in HUB_OPEN_Y:  # sign plates above the openings (the game hangs the route panels there)
             box(bm, HUB_WALL_X - 0.08, HUB_WALL_X + 0.01, y - 0.9, y + 0.9, 4.1, 4.75)
-        for s in (-1, 1):     # junction boxes on the long walls
-            box(bm, 8.2, 8.9, *sorted((s * 7.76, s * 8.02)), 1.0, 1.85)
-            box(bm, 11.8, 12.2, *sorted((s * 7.82, s * 8.02)), 1.1, 1.5)
+        for s in (-1, 1):     # junction boxes on the long walls, clear of the side openings
+            box(bm, 6.25, 6.95, *sorted((s * 7.76, s * 8.02)), 1.0, 1.85)
+            box(bm, 13.95, 14.35, *sorted((s * 7.82, s * 8.02)), 1.1, 1.5)
     part("Metal", frame).name = "MetalFrame"
     part("Water", lambda bm: [poly(bm, [(x, y, KIT_WATER) for x, y in pc]) for pc in hub_pieces(0.02)])
 
-    def pipes(bm):
+    def pipes(bm):   # between the second rib and the end wall
         for s in (-1, 1):
-            tube(bm, rounded([(6.3, s * 8.25, 2.9), (6.3, s * 7.75, 2.9), (14.3, s * 7.75, 2.9), (14.3, s * 8.25, 2.9)], 0.3, 6),
+            tube(bm, rounded([(13.65, s * 8.25, 2.9), (13.65, s * 7.75, 2.9), (15.05, s * 7.75, 2.9), (15.05, s * 8.25, 2.9)], 0.3, 6),
                  0.15, seg=14)
-            tube(bm, rounded([(6.8, s * 8.2, 3.25), (6.8, s * 7.88, 3.25), (13.8, s * 7.88, 3.25), (13.8, s * 8.2, 3.25)], 0.2, 5),
+            tube(bm, rounded([(13.85, s * 8.2, 3.25), (13.85, s * 7.88, 3.25), (14.85, s * 7.88, 3.25), (14.85, s * 8.2, 3.25)], 0.2, 5),
                  0.07, seg=10)
-            for x in (8.0, 10.3, 12.6):
+            for x in (14.45,):
                 cyl(bm, 0.19, 0.07, (x, s * 7.75, 2.9), axis="X", seg=14)
                 box(bm, x - 0.2, x - 0.13, *sorted((s * 7.75, s * 8.02)), 2.85, 2.95)
     part("Rust", pipes).name = "RustPipes"
     kit_export("sewer_hub")
 
 
-# --------------------------------------------------------------------------- a branch tunnel (x 0..34)
+# --------------------------------------------------------------------------- a branch tunnel (x 0..110)
 
 def kit_branch():
     """sewer_branch: matches a hub opening at x = 0 (half width 2.3, walls to 2.6, vault to 3.8); grate road over the
-    full width above the channel; ribs every 3 m; no lamps, it ends in a dark wall at x = 33.6 (haze hides it)."""
+    full width above the channel; ribs every 3 m; no lamps, it ends in a dark wall at x = L - 0.4 (haze hides it)."""
     p, L = KIT_BRANCH, KIT_BRANCH_LEN
     prof = kit_profile(p, 0.0)
-    xs = [3.0 * k for k in range(12)] + [L]
+    n = int((L - 0.5) // KIT_BRANCH_RIB)        # ribs at 3, 6 .. (none in the dark wall)
+    xs = [KIT_BRANCH_RIB * k for k in range(n + 1)] + [L]
     part("Brick", lambda bm: skin(bm, [(x, prof) for x in xs], p["wall"]))
 
     def ribs(bm):
         o, i = kit_profile(p, -0.02), kit_profile(p, -0.02, d=-0.1)
         rib(bm, o, i, 0.0, 0.2, p["wall"], front=False)
-        for k in range(1, 12):
-            rib(bm, o, i, 3.0 * k - 0.15, 3.0 * k + 0.15, p["wall"])
+        for k in range(1, n + 1):
+            rib(bm, o, i, KIT_BRANCH_RIB * k - 0.15, KIT_BRANCH_RIB * k + 0.15, p["wall"])
     part("Stone", ribs).name = "StoneRibs"
     part("Concrete", lambda bm: strip(bm, channel_pts(p["half"]), 0.0, L)).name = "ConcreteFloor"
-    kit_road(0.0, L, p["half"], [1.5 * k for k in range(23)], [-1.15, 0.0, 1.15])
+    kit_road(0.0, L, p["half"], [KIT_BEAM * k for k in range(int(L / KIT_BEAM) + 1)], [-1.15, 0.0, 1.15])
     prism("DarkEnd", kit_profile(p, KIT_BOTTOM, d=0.05), L - 0.4, L - 0.02)
     kit_export("sewer_branch")
+
+
+# --------------------------------------------------------------------------- a bricked-up opening
+
+def kit_plug():
+    """sewer_plug: bricks closing one opening of the branch profile (any of the hub's five) that leads nowhere this
+    time. Its frame is a branch tunnel's: origin in the middle of the opening at its mouth (the wall's outer face) at
+    road level (z = 0, the grate's top), +x out of the hall, y across, z up — put it where that branch would go
+    (Unity, turned by KitYaw like the other kit pieces: the same position and rotation as the branch's root).
+    The hub's walls are 0.6 m thick at every opening, so the infill fills x -0.575..-0.225: its face 2.5 cm behind
+    the wall's inner face (the stone frame stands 15 cm proud of that), 35 cm thick, from the channel bed (z -0.73,
+    the water and the grate run into it) up into the arch (top 3.8), 1 cm into the jambs all round. A few bricks are
+    missing (dark behind) or pushed out, a damp band along the foot with a streak from an old rusty pipe stub."""
+    import random
+    rnd = random.Random(31)
+    X0, X1 = -0.575, -0.225
+    body = prism("Brick", kit_profile(KIT_BRANCH, KIT_BED - 0.03, d=0.01), X0, X1)
+    holes = [(-1.25, 2.02, 0.26, 0.085), (-1.12, 2.105, 0.26, 0.085), (0.95, 0.82, 0.38, 0.17), (1.07, 0.99, 0.26, 0.085),
+             (-0.35, 3.02, 0.26, 0.085), (1.62, 1.95, 0.13, 0.085), (-1.85, 1.05, 0.26, 0.17)]
+    depth = (0.11, 0.09, 0.13, 0.1, 0.09, 0.08, 0.12)
+    for (y, z, w, h), d in zip(holes, depth):
+        subtract(body, part("cut", lambda bm: box(bm, X0 - 0.1, X0 + d, y - w / 2, y + w / 2, z - h / 2, z + h / 2)))
+
+    def dark(bm):   # the shadow behind the missing bricks
+        for (y, z, w, h), d in zip(holes, depth):
+            poly(bm, [(X0 + d - 0.004, y - w / 2, z - h / 2), (X0 + d - 0.004, y + w / 2, z - h / 2),
+                      (X0 + d - 0.004, y + w / 2, z + h / 2), (X0 + d - 0.004, y - w / 2, z + h / 2)], (-1, 0, 0))
+        cyl(bm, 0.08, 0.01, (PX, PY, PZ), axis="X", seg=14)   # the stub's bore, 5 mm proud of its end
+
+    def loose(bm):  # bricks pushed out of the infill, next to the gaps
+        for y, z in ((-0.72, 2.02), (0.5, 0.65), (0.15, 3.1), (1.9, 1.6)):
+            rot_box(bm, (X0 + 0.035, y, z), (0.13, 0.25, 0.08),
+                    (rnd.uniform(-0.06, 0.06), rnd.uniform(-0.05, 0.05), rnd.uniform(-0.12, 0.12)))
+    PX, PY, PZ = X0 - 0.16, 1.2, 1.5            # the pipe stub's open end
+
+    def rust(bm):
+        cyl(bm, 0.105, 0.36, (PX + 0.18, PY, PZ), axis="X", seg=16)          # from inside the bricks out to PX
+        cyl(bm, 0.165, 0.035, (X0 - 0.01, PY, PZ), axis="X", seg=16)          # wall flange, 2.5 cm into the bricks
+        cyl(bm, 0.135, 0.03, (PX + 0.02, PY, PZ), axis="X", seg=16)           # end collar, 5 mm back from the end
+    part("Brick", loose).name = "BrickLoose"
+    part("Rust", rust).name = "RustStub"
+    part("Dark", dark).name = "DarkGaps"
+
+    def damp(bm):   # a wet film just in front of the face: a band at the foot with a ragged top, a streak from the pipe
+        xf = X0 - 0.003
+        n = 26
+        ys = [-KIT_BRANCH["half"] + 0.01 + (2 * KIT_BRANCH["half"] - 0.02) * i / n for i in range(n + 1)]
+        tops = [0.38 + 0.1 * math.sin(3.1 * y + 0.7) + 0.06 * math.sin(7.3 * y) + rnd.uniform(-0.03, 0.03) for y in ys]
+        for (ya, ta), (yb, tb) in zip(zip(ys, tops), zip(ys[1:], tops[1:])):
+            poly(bm, [(xf, ya, KIT_WATER - 0.1), (xf, yb, KIT_WATER - 0.1), (xf, yb, tb), (xf, ya, ta)], (-1, 0, 0))
+        z, y = PZ - 0.17, PY
+        while z > 0.55:   # the streak, narrowing and wandering down to the band
+            z2 = z - 0.12
+            y2 = y + rnd.uniform(-0.025, 0.025)
+            w1, w2 = 0.03 + 0.04 * (z - 0.4) / PZ, 0.03 + 0.04 * (z2 - 0.4) / PZ
+            poly(bm, [(xf, y - w1, z), (xf, y2 - w2, z2), (xf, y2 + w2, z2), (xf, y + w1, z)], (-1, 0, 0))
+            z, y = z2, y2
+        poly(bm, [(xf, y - 0.03, z), (xf, y - 0.03, 0.3), (xf, y + 0.03, 0.3), (xf, y + 0.03, z)], (-1, 0, 0))
+    part("Water", damp).name = "WaterDamp"
+    kit_export("sewer_plug")
 
 
 # --------------------------------------------------------------------------- the closed start (faces +X)
@@ -1362,7 +1505,7 @@ def kit():
     for v in range(4):
         for cut in (False, True):
             kit_segment(v, cut)
-    for fn in (kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_cap):
+    for fn in (kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap):
         fn()
 
 

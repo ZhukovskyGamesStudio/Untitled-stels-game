@@ -19,9 +19,35 @@ namespace Stealth.Tests
                 foreach (var (prop, _) in l.Terminals)
                 {
                     Assert.AreEqual(PropKind.Terminal, l.Props[prop].Kind);
-                    Assert.Greater((l.Props[prop].Position - l.HatchPosition).magnitude, 7.5f, "not in the lobby");
+                    Assert.AreNotEqual(l.LobbyRoom, l.Plan.RoomAt(l.Props[prop].Position + Vector3.up * 0.3f)?.Id ?? -1, $"seed {seed}: not in the lobby");
                 }
             }
+        }
+
+        [Test]
+        public void TheRobotTerminalsStandInTheControlRoom()
+        {
+            int houses = 0, inRoom = 0;
+            var why = new System.Text.StringBuilder();
+            foreach (var l in TestHouses.Sample)
+            {
+                if (!l.Rooms.Any(r => r.Type == RoomType.ControlRoom)) continue;
+                houses++;
+                var robots = l.Terminals.Where(t => t.kind is TerminalKind.Hacking or TerminalKind.Cameras).ToList();
+                if (robots.Count > 0 && robots.All(t => l.Plan.RoomAt(l.Props[t.prop].Position + Vector3.up * 0.3f)?.Type == RoomType.ControlRoom)) inRoom++;
+                else
+                {
+                    var room = l.Rooms.First(r => r.Type == RoomType.ControlRoom);
+                    why.Append($" [seed {l.Seed}: room {room.Area:0} m², {(room.Center - l.HatchPosition).magnitude:0.0} m from the hatch, terminals in " +
+                               string.Join("/", robots.Select(t => l.Plan.RoomAt(l.Props[t.prop].Position + Vector3.up * 0.3f)?.Type.ToString() ?? "?")) +
+                               $", its props: {string.Join(",", l.Props.Where(p => l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == room.Id).Select(p => p.Kind))}]");
+                }
+                // no idle console left anywhere: every terminal prop is a working terminal
+                for (int i = 0; i < l.Props.Count; i++)
+                    if (l.Props[i].Kind == PropKind.Terminal) Assert.IsTrue(l.Terminals.Exists(t => t.prop == i), $"seed {l.Seed}: an idle console");
+            }
+            Assert.Greater(houses, 0, "houses have a control room");
+            Assert.GreaterOrEqual(inRoom, houses * 3 / 4, $"the consoles are in the control room ({inRoom} of {houses}):{why}");
         }
 
         [Test]

@@ -232,6 +232,9 @@ namespace Stealth.EditorTools
             if ((options & BuildOptions.Development) == 0 && File.Exists("Builds/Windows/dev_build_stamp.txt")) File.Delete("Builds/Windows/dev_build_stamp.txt");
             // no Unity splash: the game opens with the studio's own (StudioSplash, over the menu)
             if (PlayerSettings.SplashScreen.show) { PlayerSettings.SplashScreen.show = false; PlayerSettings.SplashScreen.showUnityLogo = false; }
+            // no graphics jobs: with them the player crashed now and then at a level's start inside the engine
+            // (ShaderRuntime::Variants::ShaderVariantMonitor::FrameFinished, a race with the worker threads uploading new shader variants)
+            if (PlayerSettings.graphicsJobs) PlayerSettings.graphicsJobs = false;
             SetAppIcon();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {

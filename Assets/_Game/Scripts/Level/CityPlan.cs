@@ -4,7 +4,8 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>What a box of the city is drawn with (an index into <see cref="LevelArt.CityMaterials"/>). Append only.</summary>
-    public enum CitySlot { Road, Sidewalk, Paint, Roof, FacadeA, FacadeB, FacadeC, Metal, LampGlow, Leaves, Bark, CarRed, CarBlue, CarSilver, Glass, Tyre }
+    public enum CitySlot { Road, Sidewalk, Paint, Roof, FacadeA, FacadeB, FacadeC, Metal, LampGlow, Leaves, Bark, CarRed, CarBlue, CarSilver, Glass, Tyre,
+        Stone, Plinth, TailLight, Soil }
 
     /// <summary>One box of the city: its sides in one material, its top in another (no bottom face).</summary>
     public struct CityBox
@@ -177,6 +178,27 @@ namespace Stealth.Level
             foreach (var (kerb, side) in new[] { (Walk + 1.1f, 0), (roadOut - 1.1f, 1) })
                 for (float u = -Reach + Range(rng, 2f, 8f); u < L + Reach - 6f; u += Range(rng, 5.5f, 14f))
                     if (!InCross(u, 6f) && !InCross(u + 4.4f, 6f)) Car(c, rng, e, u, kerb, side);
+
+            // the street's furniture: benches and bins on the pavements, bollards at the crossings, hydrants, manholes,
+            // traffic lights at the junctions
+            for (float u = -Reach + 10f; u < L + Reach - 10f; u += 16f)
+            {
+                if (InCross(u + 4f, 3f)) continue;
+                if (rng.NextDouble() < 0.5) Bench(c, e, u + 4f, Walk - 0.9f, 1f);
+                else Bin(c, e, u + 4f, Walk - 0.45f);
+                if (rng.NextDouble() < 0.5) Bench(c, e, u + 12f, roadOut + 0.9f, -1f);
+                else Bin(c, e, u + 12f, roadOut + 0.45f);
+                if (rng.NextDouble() < 0.25) Hydrant(c, e, u + 1.5f, Walk - 0.4f);
+                if (rng.NextDouble() < 0.4) Box(c, e, u + 6f, u + 6.7f, mid + 1.4f, mid + 2.1f, RoadTop, RoadTop + 0.015f, CitySlot.Tyre, CitySlot.Tyre); // a manhole
+            }
+            foreach (var cross in new[] { crossL, crossR })
+            {
+                foreach (float cu in new[] { cross.lo - CrossWalk - 4.5f, cross.hi + CrossWalk + 4.5f })
+                    foreach (float bv in new[] { Walk - 0.3f, roadOut + 0.3f })
+                        for (int k = 0; k < 3; k++) Bollard(c, e, cu + (k - 1) * 1.4f, bv);
+                TrafficLight(c, e, cross.lo - 0.6f, Walk - 0.4f, 1f);
+                TrafficLight(c, e, cross.hi + 0.6f, roadOut + 0.4f, -1f);
+            }
             return c;
         }
 
@@ -230,7 +252,35 @@ namespace Stealth.Level
             var facade = (CitySlot)((int)CitySlot.FacadeA + rng.Next(3));
             float h = storeys * Storey + Range(rng, 0.3f, 1.0f); // a parapet over the top storey
             var body = Box(c, e, u0, u1, v0, v1, WalkTop, h, facade, CitySlot.Roof);
-            c.Solids.Add(body.Bounds);
+            float f = Mathf.Sign(v0 - v1);                         // the street side: v grows out of the front along f
+            var trim = facade == CitySlot.FacadeC ? CitySlot.Metal : CitySlot.Stone;
+            CityBox Grown(float o, float y0, float y1, CitySlot sides, CitySlot top) => Box(c, e, u0 - o, u1 + o, v0 + f * o, v1 - f * o, y0, y1, sides, top);
+            // a stone plinth over the ground storey, bands between the storeys, a cornice round the top
+            var plinth = Grown(0.08f, WalkTop, Storey, CitySlot.Plinth, trim);
+            c.Solids.Add(plinth.Bounds);
+            for (int k = 2; k < storeys; k++) Grown(0.05f, k * Storey - 0.06f, k * Storey + 0.06f, trim, trim);
+            Grown(0.22f, h - 0.14f, h + 0.1f, trim, trim);
+            // the way in: a glass door in the middle of the front, a canopy over it
+            float um = (u0 + u1) / 2f;
+            Box(c, e, um - 0.8f, um + 0.8f, v0 + f * 0.08f, v0 + f * 0.1f, WalkTop, 2.4f, CitySlot.Glass, CitySlot.Glass);
+            Box(c, e, um - 1.3f, um + 1.3f, v0, v0 + f * 1.1f, 2.7f, 2.82f, CitySlot.Metal, CitySlot.Metal);
+            // balconies on the plain fronts now and then; air conditioners hung outside the windows
+            if (facade == CitySlot.FacadeA && storeys >= 3 && rng.NextDouble() < 0.6)
+                for (int k = 1; k < storeys; k++)
+                    for (float u = u0 + 1.4f; u + 2.4f <= u1 - 1.4f; u += 4.2f)
+                    {
+                        float y = k * Storey + 0.02f;
+                        Box(c, e, u, u + 2.4f, v0, v0 + f * 1.0f, y, y + 0.14f, trim, trim);
+                        Box(c, e, u, u + 2.4f, v0 + f * 0.95f, v0 + f * 1.0f, y + 0.14f, y + 1.05f, CitySlot.Metal, CitySlot.Metal);
+                        foreach (float su in new[] { u, u + 2.35f })
+                            Box(c, e, su, su + 0.05f, v0, v0 + f * 1.0f, y + 0.14f, y + 1.05f, CitySlot.Metal, CitySlot.Metal);
+                    }
+            int units = rng.NextDouble() < 0.5 ? rng.Next(2, 6) : 0;
+            for (int i = 0; i < units && storeys > 1; i++)
+            {
+                float u = Range(rng, u0 + 0.6f, u1 - 1.4f), y = rng.Next(1, storeys) * Storey + 0.7f;
+                Box(c, e, u, u + 0.8f, v0, v0 + f * 0.35f, y, y + 0.55f, CitySlot.Metal, CitySlot.Metal);
+            }
             // something on the roof now and then: a machine room, a water tank
             var b = body.Bounds;
             if (rng.NextDouble() < 0.6 && b.size.x > 7f && b.size.z > 7f)
@@ -274,27 +324,99 @@ namespace Stealth.Level
         static void Tree(City c, System.Random rng, Edge e, float u, float v)
         {
             var p = e.At(u, v);
-            float h = Range(rng, 2.4f, 3f), s = Range(rng, 1.6f, 2.2f);
-            var trunk = new CityBox(new Vector3(p.x - 0.13f, WalkTop, p.y - 0.13f), new Vector3(p.x + 0.13f, h, p.y + 0.13f), CitySlot.Bark, CitySlot.Bark);
-            c.Boxes.Add(trunk);
+            float h = Range(rng, 2.4f, 3f), s = Range(rng, 1.8f, 2.4f);
+            CityBox At(Vector3 lo, Vector3 hi, CitySlot slot) { var b = new CityBox(lo, hi, slot, slot); c.Boxes.Add(b); return b; }
+            // the tree pit in the paving, its iron grid's frame, the trunk, a crown of three tiers
+            At(new Vector3(p.x - 0.6f, WalkTop, p.y - 0.6f), new Vector3(p.x + 0.6f, WalkTop + 0.006f, p.y + 0.6f), CitySlot.Soil);
+            At(new Vector3(p.x - 0.62f, WalkTop, p.y - 0.62f), new Vector3(p.x + 0.62f, WalkTop + 0.012f, p.y - 0.56f), CitySlot.Metal);
+            At(new Vector3(p.x - 0.62f, WalkTop, p.y + 0.56f), new Vector3(p.x + 0.62f, WalkTop + 0.012f, p.y + 0.62f), CitySlot.Metal);
+            var trunk = At(new Vector3(p.x - 0.11f, WalkTop, p.y - 0.11f), new Vector3(p.x + 0.11f, h + 0.4f, p.y + 0.11f), CitySlot.Bark);
             c.Solids.Add(trunk.Bounds);
-            c.Boxes.Add(new CityBox(new Vector3(p.x - s / 2f, h - 0.3f, p.y - s / 2f), new Vector3(p.x + s / 2f, h - 0.3f + s * 0.9f, p.y + s / 2f), CitySlot.Leaves, CitySlot.Leaves));
+            float y = h - 0.2f;
+            foreach (var (k, dx, dz) in new[] { (1f, 0f, 0f), (0.72f, 0.18f, -0.12f), (0.45f, -0.08f, 0.1f) })
+            {
+                float w = s * k, t = s * k * 0.62f;
+                At(new Vector3(p.x + dx * s - w / 2f, y, p.y + dz * s - w / 2f), new Vector3(p.x + dx * s + w / 2f, y + t, p.y + dz * s + w / 2f), CitySlot.Leaves);
+                y += t * 0.7f;
+            }
+        }
+
+        /// <summary>A bench along the kerb, facing <paramref name="dir"/>·v (to the street): a wooden seat and back on iron legs.</summary>
+        static void Bench(City c, Edge e, float u, float v, float dir)
+        {
+            Box(c, e, u - 0.9f, u + 0.9f, v - 0.22f, v + 0.22f, WalkTop + 0.42f, WalkTop + 0.47f, CitySlot.Bark, CitySlot.Bark);
+            Box(c, e, u - 0.9f, u + 0.9f, v - dir * 0.24f, v - dir * 0.2f, WalkTop + 0.55f, WalkTop + 0.9f, CitySlot.Bark, CitySlot.Bark);
+            foreach (float lu in new[] { u - 0.75f, u + 0.75f })
+                Box(c, e, lu - 0.03f, lu + 0.03f, v - 0.24f, v + 0.2f, WalkTop, WalkTop + 0.9f, CitySlot.Metal, CitySlot.Metal);
+            var a = e.At(u - 0.9f, v - 0.24f);
+            var b = e.At(u + 0.9f, v + 0.24f);
+            c.Solids.Add(new Bounds(new Vector3((a.x + b.x) / 2f, WalkTop + 0.45f, (a.y + b.y) / 2f), new Vector3(Mathf.Abs(a.x - b.x), 0.9f, Mathf.Abs(a.y - b.y))));
+        }
+
+        /// <summary>A litter bin on a post.</summary>
+        static void Bin(City c, Edge e, float u, float v)
+        {
+            var bin = Box(c, e, u - 0.22f, u + 0.22f, v - 0.22f, v + 0.22f, WalkTop + 0.25f, WalkTop + 0.95f, CitySlot.Metal, CitySlot.Tyre);
+            Box(c, e, u - 0.04f, u + 0.04f, v - 0.04f, v + 0.04f, WalkTop, WalkTop + 0.25f, CitySlot.Metal, CitySlot.Metal);
+            c.Solids.Add(new Bounds(bin.Center - Vector3.up * 0.12f, bin.Size + Vector3.up * 0.25f));
+        }
+
+        /// <summary>A short iron post by a crossing.</summary>
+        static void Bollard(City c, Edge e, float u, float v)
+        {
+            var b = Box(c, e, u - 0.07f, u + 0.07f, v - 0.07f, v + 0.07f, WalkTop, WalkTop + 0.85f, CitySlot.Metal, CitySlot.Stone);
+            c.Solids.Add(b.Bounds);
+        }
+
+        /// <summary>A red fire hydrant.</summary>
+        static void Hydrant(City c, Edge e, float u, float v)
+        {
+            var b = Box(c, e, u - 0.12f, u + 0.12f, v - 0.12f, v + 0.12f, WalkTop, WalkTop + 0.6f, CitySlot.CarRed, CitySlot.CarRed);
+            Box(c, e, u - 0.2f, u + 0.2f, v - 0.05f, v + 0.05f, WalkTop + 0.35f, WalkTop + 0.45f, CitySlot.CarRed, CitySlot.CarRed);
+            c.Solids.Add(b.Bounds);
+        }
+
+        /// <summary>Traffic lights at a corner: a post and a box of lamps facing the street (red, amber, green from the top).</summary>
+        static void TrafficLight(City c, Edge e, float u, float v, float dir)
+        {
+            var post = Box(c, e, u - 0.06f, u + 0.06f, v - 0.06f, v + 0.06f, WalkTop, WalkTop + 3.1f, CitySlot.Metal, CitySlot.Metal);
+            c.Solids.Add(post.Bounds);
+            Box(c, e, u - 0.16f, u + 0.16f, v - 0.12f, v + 0.12f, WalkTop + 2.2f, WalkTop + 3.05f, CitySlot.Tyre, CitySlot.Tyre);
+            float face = v + dir * 0.125f;
+            Box(c, e, u - 0.09f, u + 0.09f, face, face + dir * 0.02f, WalkTop + 2.82f, WalkTop + 2.98f, CitySlot.TailLight, CitySlot.TailLight);
+            Box(c, e, u - 0.09f, u + 0.09f, face, face + dir * 0.02f, WalkTop + 2.27f, WalkTop + 2.43f, CitySlot.LampGlow, CitySlot.LampGlow);
         }
 
         /// <summary>A parked car along the kerb at <paramref name="v"/>, 4.4 m from u: body, cabin with glass, four wheels.</summary>
         static void Car(City c, System.Random rng, Edge e, float u, float v, int side)
         {
             var paint = (CitySlot)((int)CitySlot.CarRed + rng.Next(3));
-            const float len = 4.4f, wide = 1.8f, ground = RoadTop;
-            var body = Box(c, e, u, u + len, v - wide / 2f, v + wide / 2f, ground + 0.28f, ground + 0.85f, paint, paint);
-            c.Solids.Add(new Bounds(body.Center - Vector3.up * 0.14f, body.Size + Vector3.up * 0.28f));
-            float cab0 = side == 0 ? u + 1.1f : u + 1.0f;
-            Box(c, e, cab0, cab0 + 2.2f, v - wide / 2f + 0.12f, v + wide / 2f - 0.12f, ground + 0.85f, ground + 1.38f, CitySlot.Glass, paint);
-            foreach (float wu in new[] { u + 0.75f, u + len - 0.75f })
+            const float len = 4.4f, wide = 1.78f, g = RoadTop;
+            float hw = wide / 2f;
+            // it faces the way its lane drives: +u by the near kerb, −u by the far one
+            float front = side == 0 ? u + len : u, back = side == 0 ? u : u + len, fd = side == 0 ? 1f : -1f;
+            var body = Box(c, e, u + 0.05f, u + len - 0.05f, v - hw, v + hw, g + 0.32f, g + 0.82f, paint, paint);
+            c.Solids.Add(new Bounds(body.Center - Vector3.up * 0.16f, body.Size + Vector3.up * 0.32f));
+            // the bonnet a step lower than the boot line, the cabin set back with glass round it and a painted roof
+            Box(c, e, front - fd * 1.15f, front - fd * 0.05f, v - hw + 0.02f, v + hw - 0.02f, g + 0.82f, g + 0.86f, paint, paint);
+            float cab0 = front - fd * 1.25f, cab1 = back + fd * 0.85f;
+            Box(c, e, cab0, cab1, v - hw + 0.1f, v + hw - 0.1f, g + 0.82f, g + 1.3f, CitySlot.Glass, CitySlot.Glass);
+            Box(c, e, cab0 - fd * 0.12f, cab1 + fd * 0.08f, v - hw + 0.12f, v + hw - 0.12f, g + 1.3f, g + 1.38f, paint, paint);
+            // bumpers, lamps, mirrors
+            Box(c, e, front - fd * 0.06f, front + fd * 0.06f, v - hw, v + hw, g + 0.3f, g + 0.5f, CitySlot.Tyre, CitySlot.Tyre);
+            Box(c, e, back - fd * 0.06f, back + fd * 0.06f, v - hw, v + hw, g + 0.3f, g + 0.5f, CitySlot.Tyre, CitySlot.Tyre);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Box(c, e, front - fd * 0.06f, front + fd * 0.01f, v + s * (hw - 0.38f), v + s * (hw - 0.08f), g + 0.58f, g + 0.72f, CitySlot.LampGlow, CitySlot.LampGlow);
+                Box(c, e, back - fd * 0.01f, back + fd * 0.06f, v + s * (hw - 0.32f), v + s * (hw - 0.08f), g + 0.6f, g + 0.72f, CitySlot.TailLight, CitySlot.TailLight);
+                Box(c, e, cab0 - fd * 0.05f, cab0 + fd * 0.1f, v + s * hw, v + s * (hw + 0.16f), g + 0.88f, g + 0.98f, paint, paint);
+            }
+            foreach (float wu in new[] { u + 0.8f, u + len - 0.8f })
                 foreach (float s in new[] { -1f, 1f })
                 {
-                    float wv = v + s * (wide / 2f - 0.08f);
-                    Box(c, e, wu - 0.32f, wu + 0.32f, wv - 0.12f, wv + 0.12f, ground, ground + 0.64f, CitySlot.Tyre, CitySlot.Tyre);
+                    float wv = v + s * (hw - 0.09f);
+                    Box(c, e, wu - 0.33f, wu + 0.33f, wv - 0.11f, wv + 0.11f, g, g + 0.66f, CitySlot.Tyre, CitySlot.Tyre);
+                    Box(c, e, wu - 0.18f, wu + 0.18f, wv + s * 0.11f, wv + s * 0.115f, g + 0.15f, g + 0.51f, CitySlot.CarSilver, CitySlot.CarSilver); // the hub
                 }
         }
 

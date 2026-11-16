@@ -178,6 +178,8 @@ namespace Stealth.Level
             BuildFacade();
             if (Application.isPlaying) CombineStatic(root);
             BuildCity(W, H); // one mesh of its own: not static-batched
+            BuildUtilities();
+            BuildSwitches();
 
             for (int i = 0; i < l.Props.Count; i++)
             {
@@ -621,12 +623,13 @@ namespace Stealth.Level
         void BuildLights(PlanRoom r)
         {
             var (color, intensity) = RoomLighting.For(r.Type, r.Dark, m_Layout.DarkRoomsDim ? m_Layout.DimShare : 0f);
+            var (litColor, litIntensity) = RoomLighting.For(r.Type, false); // a light switch turns a dark room on
             float ceiling = LevelLayout.FloorY(r.Floor + r.Levels - 1) + LevelMetrics.WallHeight;
             int k = 0;
             foreach (var p in LightSpots(m_Layout, r))
             {
                 var go = Place(m_Art.RoomLight, $"Light_{r.Id}_{k}", new Vector3(p.x, ceiling, p.y), Quaternion.identity);
-                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f);
+                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f, r.Id, r.Dark, litColor, litIntensity);
                 k++;
             }
         }
@@ -660,6 +663,51 @@ namespace Stealth.Level
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
                 look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
+        }
+
+        /// <summary>The house's services (<see cref="UtilityPlan"/>: ducts, pipes, panels, sockets): one mesh, a submesh per material.</summary>
+        /// <summary>A light switch beside every doorway of a room (<see cref="UtilityPlan.SwitchSpots"/>), numbered in the plan's order on every peer.</summary>
+        void BuildSwitches()
+        {
+            if (m_Art.LightSwitch == null) return;
+            var spots = UtilityPlan.SwitchSpots(m_Layout, Shell);
+            for (int i = 0; i < spots.Count; i++)
+            {
+                var s = spots[i];
+                var room = m_Layout.Plan.Rooms.Find(r => r.Id == s.Room);
+                var go = Place(m_Art.LightSwitch, $"LightSwitch_{i}", s.Position, Quaternion.LookRotation(s.Facing));
+                if (go.TryGetComponent<LightSwitch>(out var sw)) sw.Setup(i, s.Room, room != null && room.Dark);
+            }
+        }
+
+        void BuildUtilities()
+        {
+            var mats = m_Art.UtilityMaterials;
+            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
+            var parts = UtilityPlan.Make(m_Layout, Shell);
+            if (parts.Count == 0) return;
+            int slots = System.Enum.GetValues(typeof(UtilitySlot)).Length;
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>[slots];
+            for (int i = 0; i < slots; i++) tris[i] = new List<int>();
+            foreach (var p in parts) UtilityPlan.AddFaces(p, verts, normals, uvs, tris);
+            var mesh = new Mesh { name = "Utilities", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            var used = new List<Material>();
+            var subs = new List<List<int>>();
+            for (int i = 0; i < slots; i++)
+                if (tris[i].Count > 0 && i < mats.Length && mats[i] != null) { used.Add(mats[i]); subs.Add(tris[i]); }
+            mesh.subMeshCount = subs.Count;
+            for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
+            mesh.RecalculateBounds();
+            Meshes.Add(mesh);
+            var go = Place(m_Art.CityPiece, "Utilities", Vector3.zero, Quaternion.identity);
+            go.GetComponent<MeshFilter>().sharedMesh = mesh;
+            go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
         }
 
         /// <summary>The city round the yard (<see cref="CityPlan"/>): one mesh, a submesh per material, and the street lamps' lights.</summary>

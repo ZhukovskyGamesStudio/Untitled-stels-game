@@ -89,4 +89,89 @@ namespace Stealth.Audio
         public static AlertCue Cue(int from, int to) =>
             to > from ? (to == 2 ? AlertCue.Alert : AlertCue.Suspicious) : to == 0 && from > 0 ? AlertCue.Lost : AlertCue.None;
     }
+
+    /// <summary>The voices of people: a player in the laughing gas, the hostage (pure).</summary>
+    public static class PeopleSounds
+    {
+        /// <summary>
+        /// A player in the gas: <paramref name="share"/> of the way to passing out, laughing from <paramref name="laughAt"/>.
+        /// First heavy breathing, then the laughing — a giggle, a laugh, a helpless fit — ever louder and more often.
+        /// <c>clip</c> −2 silence, −1 a breath, 0..2 a laugh; <c>gap</c> the pause after it (seconds).
+        /// </summary>
+        public static (int clip, float volume, float gap) Gas(float share, float laughAt)
+        {
+            if (share <= 0.04f) return (-2, 0f, 1f);
+            laughAt = Mathf.Clamp(laughAt, 0.05f, 0.95f);
+            if (share < laughAt)
+            {
+                float b = share / laughAt;
+                return (-1, 0.3f + 0.45f * b, Mathf.Lerp(0.9f, 0.25f, b));
+            }
+            float t = Mathf.Clamp01((share - laughAt) / (1f - laughAt));
+            int level = t < 0.34f ? 0 : t < 0.7f ? 1 : 2;
+            return (level, 0.45f + 0.55f * t, Mathf.Lerp(1.6f, 0.2f, t));
+        }
+
+        /// <summary>How near the hostage must be (and in plain sight) to call to a player, metres.</summary>
+        public const float HostageReach = 11f;
+
+        /// <summary>The hostage speaks now: a player sees it close enough and its last line has had time to sink in.</summary>
+        public static bool HostageSpeaks(float distance, bool inSight, float now, float next) => inSight && distance <= HostageReach && now >= next;
+
+        /// <summary>
+        /// Which line next (0 "help!", 1 "the guard has the key", 2 "get me out", 3 "quiet", 4 "hurry"): the call for help
+        /// first; then the key while nobody carries it, the others at random, never the same twice in a row.
+        /// </summary>
+        public static int HostageLine(int said, int last, bool keyHeld, int roll)
+        {
+            if (said == 0) return 0;
+            int[] pool = keyHeld ? new[] { 2, 3, 4 } : new[] { 1, 1, 2, 3, 4 };
+            int k = Mathf.Abs(roll) % pool.Length;
+            for (int step = 0; step < pool.Length; step++)
+                if (pool[(k + step) % pool.Length] != last) return pool[(k + step) % pool.Length];
+            return pool[k];
+        }
+    }
+
+    /// <summary>What a body's vertical motion just did, for its jump and landing sounds.</summary>
+    public enum AirEvent { None, Jump, Land }
+
+    /// <summary>
+    /// Jumps and landings from a body's height alone (pure; every peer sees only the replicated position): a jump is a
+    /// climb that lasts, a fall is a drop that lasts, a landing ends a flight that lasted. A step up onto a desk or a
+    /// stair (the controller lifts the body in one frame) and the jitter on a piece of furniture's edge are none of them —
+    /// they sounded as a jump and a thud every time a player climbed on furniture or stepped off it.
+    /// </summary>
+    public sealed class AirState
+    {
+        /// <summary>Climbing or dropping must last this long to count (a step-up is one or two frames).</summary>
+        public const float Hold = 0.08f;
+        /// <summary>A flight shorter than this lands without a sound.</summary>
+        public const float MinFlight = 0.18f;
+        const float Rise = 1.8f, Drop = -2.5f, Still = 0.6f;
+
+        public bool Airborne { get; private set; }
+        float m_Rising, m_Dropping, m_FlightStart, m_Still;
+        bool m_Fell; // came down during this flight (the top of a jump is still too, but not a landing)
+
+        /// <summary>One frame: <paramref name="vy"/> the vertical speed this frame (m/s), <paramref name="now"/> the time.</summary>
+        public AirEvent Step(float vy, float dt, float now)
+        {
+            m_Rising = vy > Rise ? m_Rising + dt : 0f;
+            m_Dropping = vy < Drop ? m_Dropping + dt : 0f;
+            if (!Airborne)
+            {
+                if (m_Rising >= Hold) { Airborne = true; m_Fell = false; m_FlightStart = now - m_Rising; m_Still = 0f; return AirEvent.Jump; }
+                if (m_Dropping >= Hold) { Airborne = true; m_Fell = true; m_FlightStart = now - m_Dropping; m_Still = 0f; }
+                return AirEvent.None;
+            }
+            if (vy < -1f) m_Fell = true;
+            // down again: the height has stopped changing for a couple of frames after coming down
+            m_Still = Mathf.Abs(vy) < Still ? m_Still + dt : 0f;
+            if (!m_Fell || m_Still < 0.03f) return AirEvent.None;
+            Airborne = false;
+            m_Rising = m_Dropping = 0f;
+            return now - m_FlightStart >= MinFlight ? AirEvent.Land : AirEvent.None;
+        }
+    }
 }

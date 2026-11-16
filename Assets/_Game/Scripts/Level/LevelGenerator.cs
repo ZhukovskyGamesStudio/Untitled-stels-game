@@ -381,6 +381,7 @@ namespace Stealth.Level
             // the locked storage room (furnished as storage: shelves and a pile; it brings the workers)
             l.RoomRules = building.RoomTypeRules;
             StorageRooms.Plan(l, features, storage);
+            EnsureControlRoom(l, building);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
@@ -398,6 +399,7 @@ namespace Stealth.Level
                 PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
                 PlaceTerminals(l, security);
             }
+            else IdleConsoles(l);
             StorageRooms.Finish(l, features);
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
@@ -630,18 +632,68 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// The robots' control room, where the camera and hacking terminals stand (<see cref="PlaceTerminals"/>): a house
+        /// whose program could have one but drew none turns an office of a control room's size into it (the plan is laid
+        /// out already — only the room's type, and so its furniture, changes). Not the lobby, the vault, the hidden room,
+        /// the storage room nor the exit's room.
+        /// </summary>
+        static void EnsureControlRoom(LevelLayout l, BuildingSettings b)
+        {
+            bool wanted = false;
+            foreach (var w in b.RoomWeights) wanted |= w.Room == RoomType.ControlRoom && w.Weight > 0;
+            if (!wanted) return;
+            foreach (var r in l.Rooms) if (r.Type == RoomType.ControlRoom) return;
+            int exit = l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            PlanRoom best = null;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Type != RoomType.Office || r.Levels != 1 || r.Area < 16f || r.Area > 60f) continue;
+                if (r.Id == l.LobbyRoom || r.Id == l.VaultRoom || r.Id == l.HiddenRoom || r.Id == l.StorageRoom || r.Id == exit) continue;
+                if (best == null || Mathf.Abs(r.Area - 32f) < Mathf.Abs(best.Area - 32f)) best = r;
+            }
+            if (best != null) best.Type = RoomType.ControlRoom;
+        }
+
+        /// <summary>No security: the control room's consoles are plain desks.</summary>
+        static void IdleConsoles(LevelLayout l)
+        {
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i))
+                {
+                    var p = l.Props[i];
+                    p.Kind = PropKind.Desk;
+                    l.Props[i] = p;
+                }
+        }
+
         static void PlaceTerminals(LevelLayout l, SecuritySettings s)
         {
+            // the control room's consoles first (Furnisher puts them there); what is left of them becomes a plain desk
+            var consoles = new List<int>();
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i)
+                    && l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.LobbyRoom) consoles.Add(i); // like any terminal: not in the lobby
+            var leftover = new List<int>();
+            for (int i = 0; i < l.Props.Count; i++)
+                if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
                 if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f) desks.Add(i);
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
             var want = new List<TerminalKind>();
-            for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
+            // the hacking terminal first: with a single console in the control room, it is the one there
             for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
+            for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
             foreach (var kind in want)
             {
-                if (desks.Count == 0) return;
+                if (consoles.Count > 0)
+                {
+                    l.Terminals.Add((consoles[0], kind));
+                    consoles.RemoveAt(0);
+                    continue;
+                }
+                if (desks.Count == 0) break;
                 int pick = desks[rng.Next(desks.Count)];
                 if (l.Terminals.Count > 0)
                 {
@@ -659,6 +711,13 @@ namespace Stealth.Level
                 p.Kind = PropKind.Terminal;
                 l.Props[pick] = p;
                 l.Terminals.Add((pick, kind));
+            }
+            consoles.AddRange(leftover);
+            foreach (int i in consoles)
+            {
+                var p = l.Props[i];
+                p.Kind = PropKind.Desk; // a console with nothing to do: a desk like the others
+                l.Props[i] = p;
             }
         }
 

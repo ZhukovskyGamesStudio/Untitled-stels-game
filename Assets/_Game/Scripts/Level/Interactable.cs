@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>).</summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the

@@ -18,6 +18,8 @@ namespace Stealth.Game
         public static int CrateKey(int prop) => 3_000_000 + prop;
         public static int MedKey(ulong client) => 4_000_000 + (int)(client % 1_000_000);
         public static int DryerKey(int prop) => 8_000_000 + prop;
+        /// <summary>A room whose lights a player switched (from how the house started).</summary>
+        public static int LightsKey(int room) => 9_200_000 + room;
 
         /// <summary>Server: the hand dryers running and until when (server time).</summary>
         readonly Dictionary<int, double> m_Dryers = new();
@@ -33,6 +35,7 @@ namespace Stealth.Game
             SearchCrate.IsSearched = i => IsOpened(CrateKey(i));
             MedTable.UsedBy = c => IsOpened(MedKey(c));
             HandDryer.IsRunning = i => IsOpened(DryerKey(i));
+            LightSwitch.IsSwitched = RoomLight.IsSwitched = r => IsOpened(LightsKey(r));
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
         }
@@ -111,8 +114,17 @@ namespace Stealth.Game
                 case UseKind.VaultDoor: OpenVaultServer(index); break;
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
+                case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
                 default: UseSewerServer(player, kind, index); break;
             }
+        }
+
+        /// <summary>Server: a room's ceiling lights go off (or on, in a room that started dark) for everyone.</summary>
+        void SwitchLightsServer(int room)
+        {
+            if (Phase != RunPhase.Playing || room < 0) return;
+            if (!m_Opened.Remove(LightsKey(room))) m_Opened.Add(LightsKey(room));
+            OpenedVersion++;
         }
 
         /// <summary>Server: a hand dryer roars for a few seconds — robots with ears around come to check (a lure on the wall).</summary>

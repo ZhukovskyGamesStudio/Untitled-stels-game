@@ -247,24 +247,36 @@ def listener(L):
 
 
 def worker(L):
-    """Pack mule: a round boulder critter on stone wheels with a tiny head and a rune headlamp, lifting the crate over its
-    back on two stubby stone arms."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", L.wheel(c, .12, .1))
-        P.add("Body", slab((.16, .08, .06), (c[0] * .7, c[1], .12)))
-    P.add("Body", slab((.46, .64, .14), (0, 0, .17)))
-    P.add("Body", rock((.52, .6, .56), (0, .04, .47)))
-    P.add("Body", rock((.2, .2, .18), (0, -.3, .5), jitter=.05))
-    P.add("Eye", slab((.14, .04, .04), (0, -.4, .5)))
-    for sx in (-1, 1):
-        P.add("Body", chunky_limb((sx * .2, 0, .66), (sx * .27, -.12, .98), .07, .08, 2, salt=11))
-    P.add("Accent", slab((.5, .42, .36), (0, -.15, 1.13)))
-    for z in (1.0, 1.26):
-        P.add("Accent", slab((.53, .45, .05), (0, -.15, z)))
-    P.add("Eye", rune((-.1, -.37, 1.06), (.1, -.37, 1.2)) + rune((.1, -.37, 1.06), (-.1, -.37, 1.2)))
-    return P
+    """Stone porter: a hewn slab cart on millstone wheels with boulder bumpers, a block snout with glowing rune slits,
+    a standing stone for a mast with runes glowing down its face and a rough cap stone, a glowing crystal for a
+    beacon; the tray rests on a stone ledge."""
+    def deck(L, P):
+        P.add("Body", slab((.5, .74, .16), (0, 0, .21)))
+        P.add("Body", slab((.7, .8, .08), (0, 0, .29), taper=(.94, .94)))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", slab((.14, .08, .06), (x * .72, y, .12)))
+        for y in (-.41, .41):
+            P.add("Accent", slab((.64, .1, .13), (0, y, .21), taper=(.92, .8)))                          # stone bumpers
+
+    def pod(L, P):
+        P.add("Body", slab((.46, .34, .3), (0, -.23, .47), taper=(.86, .8)))
+        P.add("Body", rock((.34, .24, .1), (0, -.2, .65), jitter=.06, salt=7))                      # brow stone
+        for sx in (-1, 1):
+            P.add("Eye", rune((sx * .17, -.4, .37), (sx * .09, -.4, .4)))
+        D.worker_shoulders(L, P, inner=.19)
+
+    def mast(L, P):
+        P.add("Body", rock((.56, .36, .34), (0, .23, .47), jitter=.06, salt=13))                     # the boulder it stands in
+        P.add("Body", slab((.44, .3, 1.0), (0, .23, .8), taper=(.76, .8)))                           # the standing stone
+        P.add("Body", rock((.42, .3, .12), (0, .23, 1.33), jitter=.05, salt=11))                     # cap stone
+        for k, (z0, z1, x0, x1) in enumerate(((.72, .82, -.05, .05), (.72, .82, .05, -.05), (.9, 1.02, 0, 0), (1.1, 1.18, -.04, .04))):
+            yf = .08 + (z0 + z1) / 2 * .028 - .005                                                   # on the leaning face
+            P.add("Eye", rune((x0, yf, z0), (x1, yf, z1), w=.03))
+
+    def beacon(L, P):
+        P.add("Eye", crystal((0, .25, 1.33), (0, 0, 1), .16, .05))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

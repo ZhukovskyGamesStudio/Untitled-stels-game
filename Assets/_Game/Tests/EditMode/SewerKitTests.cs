@@ -71,6 +71,35 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheWaysOnLeaveTheHallInDifferentDirections()
+        {
+            var seen = new System.Collections.Generic.HashSet<string>();
+            int sideways = 0, ahead = 0;
+            for (int seed = 0; seed < 40; seed++)
+            {
+                var p = SewerPlan.Make(seed, 2);
+                Assert.AreEqual(3, p.TunnelMouths.Distinct().Count(), "three tunnels, three mouths");
+                Assert.IsTrue(p.TunnelMouths.All(m => m >= 0 && m < SewerPlan.Mouths.Length));
+                CollectionAssert.AreEqual(p.TunnelMouths, SewerPlan.Make(seed, 2).TunnelMouths, "from the seed");
+                seen.Add(string.Join(",", p.TunnelMouths.OrderBy(m => m)));
+                if (p.TunnelMouths.Any(m => m >= 3)) sideways++;
+                if (p.TunnelMouths.Any(m => m < 3)) ahead++;
+            }
+            Assert.GreaterOrEqual(seen.Count, 6, "many arrangements of the ways on");
+            Assert.Greater(sideways, 20, "often a way to the side");
+            Assert.Greater(ahead, 20, "often one ahead");
+            // every mouth leads out of the hall
+            foreach (var m in SewerPlan.Mouths)
+            {
+                var outward = m.rotation * Vector3.right;
+                var fromCentre = m.position - new Vector3(SewerPlan.HubLength / 2f, 0f, 0f);
+                Assert.Greater(Vector3.Dot(outward, fromCentre), 0f, $"the mouth at {m.position} leads out of the hall");
+            }
+            var plug = MeshBounds(Load("Plug"));
+            Assert.Less(plug.max.x, 0.05f, "the plug sits in the wall, not in the tunnel");
+        }
+
+        [Test]
         public void TheClosedEndStandsBehindTheFirstSegment()
         {
             var cap = MeshBounds(Load("Cap"));

@@ -27,13 +27,15 @@ namespace Stealth.Enemies
         readonly Vector2[] m_HalfA = new Vector2[ScanLine.FanRays], m_HalfB = new Vector2[ScanLine.FanRays];
         Vector3 m_RayApex, m_RayDir = Vector3.forward;
         Mesh m_MeshA, m_MeshB;
-        static readonly RaycastHit[] s_Hits = new RaycastHit[8];
+        static readonly RaycastHit[] s_Hits = new RaycastHit[64]; // a ray across a furnished room meets dozens of part colliders; a short buffer can drop the nearest
         static readonly List<Vector3> s_Verts = new();
         static readonly List<Vector2> s_Uvs = new();
         static readonly List<int> s_Tris = new();
 
         Vector3 m_Min, m_Max, m_Dir;
         float m_FloorY;
+        // the body's own spin: Euler(180, y, 0) reads back as (0, y + 180, 180), so eulerAngles.y cannot carry it
+        float m_Yaw;
 
         protected override Color IdleColor => new(1f, 0.3f, 0.3f);
 
@@ -80,10 +82,12 @@ namespace Stealth.Enemies
             }
         }
 
-        protected override void TickLocal()
+        // From the shared clock so every peer agrees; the server's check uses the same rays.
+        protected override void TickLocal() => Sweep(ScanDir);
+
+        /// <summary>The fan along <paramref name="dir"/> this frame: its rays cast, both halves of the sheet drawn.</summary>
+        public void Sweep(Vector3 dir)
         {
-            // From the shared clock so every peer agrees; the server's check uses the same rays.
-            var dir = ScanDir;
             var apex = Apex;
             CastHalf(apex, dir, m_HalfA);
             CastHalf(apex, -dir, m_HalfB);
@@ -137,15 +141,26 @@ namespace Stealth.Enemies
             if (m_MeshB != null) Destroy(m_MeshB);
         }
 
-        protected override void TickServer()
+        /// <summary>
+        /// Bounces the body around the ceiling and spins it. The two halves of the light are its children: they are put back
+        /// where this frame's rays were cast, so the half cut by a wall stays on the wall's side.
+        /// </summary>
+        public void Drift(float dt)
         {
-            // Bounce around the ceiling.
-            var p = transform.position + m_Dir * Profile.Speed * Time.deltaTime;
+            var p = transform.position + m_Dir * Profile.Speed * dt;
             if (p.x < m_Min.x || p.x > m_Max.x) { m_Dir.x = -m_Dir.x; p.x = Mathf.Clamp(p.x, m_Min.x, m_Max.x); }
             if (p.z < m_Min.z || p.z > m_Max.z) { m_Dir.z = -m_Dir.z; p.z = Mathf.Clamp(p.z, m_Min.z, m_Max.z); }
             p.y = CeilingY;
-            transform.position = p;
-            transform.rotation = Quaternion.Euler(180f, transform.eulerAngles.y + 40f * Time.deltaTime, 0f);
+            m_Yaw = Mathf.Repeat(m_Yaw + 40f * dt, 360f);
+            transform.SetPositionAndRotation(p, Quaternion.Euler(180f, m_Yaw, 0f));
+            if (m_RayDir.sqrMagnitude < 0.5f) return;
+            if (FanA != null) FanA.SetPositionAndRotation(m_RayApex, Quaternion.LookRotation(Vector3.Cross(m_RayDir, Vector3.up), Vector3.up));
+            if (FanB != null) FanB.SetPositionAndRotation(m_RayApex, Quaternion.LookRotation(Vector3.Cross(-m_RayDir, Vector3.up), Vector3.up));
+        }
+
+        protected override void TickServer()
+        {
+            Drift(Time.deltaTime);
 
             // the rays cast this frame by TickLocal (it runs first on every peer, the server too)
             foreach (var pl in PlayerController.All)

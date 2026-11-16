@@ -112,7 +112,7 @@ LaserGate — отдельная ловушка (не детектор)
 - `IHackable` — что можно взломать (реализует `Detector`);
 - `IRobotBody` — что «мозг» робота делает телом (реализует `RobotController`).
 
-На мобильных роботах `SensorRig` показывает насадки-датчики (глаз-камера, микрофоны, щупы в пол, нос) по `Senses` из конфига и садит их на тело
+На мобильных роботах `SensorRig` показывает насадки-датчики (глаз-камера, щупы в пол, нос; микрофонов-стоек нет — сзади они читались как непонятные диски) по `Senses` из конфига и садит их на тело
 текущего стиля лучом по треугольникам корпуса (`MeshRay`; микрофоны на верх, щупы к передку у пола, глаз и нос на лицо) — при каждой смене мешей.
 Восприятие плавное: зрение — доля видимого тела (`Perception.Exposure`, 7 лучей), дистанция, место в конусе, присед, неподвижность, свет
 (`SensorMath.VisionFactor`); свет на игроке — `Perception.IlluminationOf`: сумма всех `LightSource` (потолочные лампы `RoomLight`, настольные/напольные
@@ -127,7 +127,7 @@ LaserGate — отдельная ловушка (не детектор)
 → `Chase` («Веду преследование»). Голос — `AudioDirector` по смене состояния (`AudioRules.Voice`), шкала над роботом — `GameHUD` (`SuspicionMarker`).
 Удар сбивает с ног (`HealthState.TryHit` → `Downed`): лежачих роботы не видят (`IIntruder.IsDown`), робот говорит «Нарушитель устранён»
 и возвращается к работе; с HP > 0 игрок встаёт сам (`CanGetUp`, Пробел → `IPlayerLink.SendGetUp`), с 0 — только союзник; провал забега — когда все `KnockedOut`.
-Потолочный пылесос — вертикальный лазерный веер от линзы робота вниз: `ScanLine.FanRays` лучей на половину, каждый останавливается на первом,
+Потолочный пылесос (`CeilingVacuum.Sweep`, буфер лучей на 64 попадания — проверяет `VacuumFanTests` на настоящем префабе) — вертикальный лазерный веер от линзы робота вниз: `ScanLine.FanRays` лучей на половину, каждый останавливается на первом,
 во что упёрся (стена, мебель, дверь, пол; игроки не заслоняют), меш веера собирается из этих точек каждый кадр, той же формой сервер ловит
 игрока (`ScanLine.FanTouches`); линии на полу нет. Касание любой частью тела — тревога, перепрыгнуть нельзя. Паук время от времени переползает через потолок на
 противоположную стену (`SpiderProfile.CeilingEvery`; ступни ног находят и крышу верхнего этажа).
@@ -170,7 +170,7 @@ LaserGate — отдельная ловушка (не детектор)
 предмет (`Furnisher.Anchor`: варианты от большого к компактному, у стены или посреди комнаты), потом второй проход по стенам; модели —
 `Tools/Blender/rooms_*.py` и `rooms2_*.py` (по пять предметов на каждый тип комнаты, висящие на стене — `Furnisher.Hung`), префабы — `AssetBuilder.Rooms` (`LevelArt.RoomProps`), полы по типу комнаты — `StyleGeometry.RoomFloors`, стены и потолки — `StyleGeometry.RoomLooks`
 (`RoomLook`: отделка стен, нижний пояс плитки/мягких панелей до `LowerHeight` с рейкой поверху, `Plain` — без панелей и рейки стиля, свой потолок — тогда без
-кессонов и балок; комната грани — `ArchitecturePlanner.RoomOf`; пока у «Книжки-чертежа»: туалет, раздевалка, кухня, спортзал, медпункт, лаборатория, серверная,
+лотков; комната грани — `ArchitecturePlanner.RoomOf`; пока у «Книжки-чертежа»: туалет, раздевалка, кухня, спортзал, медпункт, лаборатория, серверная,
 склад, студия, игровая, библиотека — `AssetBuilder.StorybookRoomLooks`), сушилка для рук — `HandDryer` (E: гудит `GadgetSettings.DryerTime` и шумит для роботов); `EnsureWalkable` (сетка 0,25 м) убирает мебель, отрезавшую комнату, и лут, до которого не дойти. Картинки планов
 без запуска игры — `PLANS="seed:дом,…" Tools/dev.sh plans` → `Logs/plans/`. Размеры — `LevelMetrics`. Пристенная мебель держит ≥ 20 см
 от оси стены (жалюзи и подоконники окон). Коллайдеры мебели — `MeshCollider` на каждой части модели. `LevelBuilderTests.FurnitureDoesNotClip` проверяет, что мебель и окна не пересекаются
@@ -259,7 +259,10 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 окончен, если топлива не хватит даже со всей добычей (`CanStillGo`, предупреждение `RunSettings.StrandedGrace`).
 Канализацию каждый пир собирает сам: `SewerPlan.Make(RunSeed, глубина)` (чистый: заглушка, участок машины под люком входа, ворота, участок
 спуска из люка выхода, зал с тремя туннелями; число и варианты сегментов, лампы, их цвет, мусор — от сида) → `SewerLocation.Build` из кусков
-набора `Tools/Blender/sewer.py` (`-- … kit`: `sewer_seg_0..3` + `_cut`, `sewer_hub`, `sewer_branch`, `sewer_gate_*`, `sewer_lever`, `sewer_cap`;
+набора `Tools/Blender/sewer.py` (`-- … kit`: `sewer_seg_0..3` + `_cut`, `sewer_hub`, `sewer_branch`, `sewer_plug`, `sewer_gate_*`, `sewer_lever`, `sewer_cap`;
+у зала пять проёмов — три в торце и по одному в длинных стенах (`SewerPlan.Mouths`); три туннеля занимают случайные из них (`SewerPlan.TunnelMouths`),
+остальные заложены кирпичом (`Sewer/Plug`), туннель без пути на этот раз — тоже кладкой (`SewerBranch.Plug`); туннели 110 м, зона выбора пути до
+`SewerLocation.VoteTo` = 90 м, стена — `StopAt` = 95 м: можно уехать в туннель, пока идёт отсчёт;
 префабы `Prefabs/Level/Sewer/*`, `AssetBuilder.Sewer`). Дорога — решётка (`SewerGrate`, alpha-clip, `Art/Textures/Sewer/grate.png`) над водой.
 Ворота (`SewerGate`, рычаг `GateLever` на стороне спуска) — `GameManager.GateKey` в `Opened`; в начале забега открыты.
 **Машина** — `Vehicles/Car` (сетевой префаб; двойник `CarNet` отдаёт владение водителю: owner-authoritative `NetworkTransform`):
@@ -315,7 +318,10 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 `ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `IPlayerLink.SendOpenSafe` → лут на сервере. Открытые двери и сейфы дома —
 `GameManager.Opened` (ключи `DoorKey`/`SafeKey`), реплицирует `GameManagerNet`.
 
-**Терминалы охраны** — `LevelLayout.Terminals`: часть столов (`PropKind.Desk`) становится `PropKind.Terminal` (свой поток рандома). `SecurityTerminal` на префабе
+**Терминалы охраны** — `LevelLayout.Terminals`. Камеры и взлом стоят в комнате управления роботами (`RoomType.ControlRoom`: если в доме её нет,
+`LevelGenerator.EnsureControlRoom` делает ею офис 16–60 м²; пульты с креслами ставит `Furnisher` как якорь и пристенные группы, `LevelGenerator.PlaceTerminals` берёт их
+первыми, лишние становятся столами; без комнаты — часть столов, свой поток рандома). Вид — `Tools/Blender/terminals.py`: пульт с тремя мониторами
+(`terminal_console`) и для двери склада — стойка доступа с маячком (`terminal_access`), `SecurityTerminal.Console/Access`. `SecurityTerminal` на префабе
 Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или взлом издалека — `IPlayerLink.SendRemoteHack` → `GameManager.RemoteHackServer`,
 заряды (`InteractionSettings.TerminalHacks`) хранятся ключами `GameManager.TerminalKey` в `Opened`. Игрок за терминалом — `PlayerController.UsingTerminal`.
 **Узкие щели** — `EdgeType.Squeeze` (`LevelMetrics.SqueezeWidth`, свой поток рандома): игрок протискивается, роботов не пускает `NavMeshModifierVolume`
@@ -336,6 +342,19 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 столбы и стволы в пределах досягаемости получают коллайдеры (`City.Ground`/`City.Solids` → блоки `Fence`). Всё — коробки (`CityBox`), `LevelBuilder.BuildCity`
 склеивает их в один меш с подмешем на материал (`CitySlot` → `LevelArt.CityMaterials`, `AssetBuilder.City`, текстуры фасадов с горящими окнами — `python Tools/Art/generate_city.py`,
 этаж фасада = этаж дома); свет фонарей — `Level/CityLamp` (конус 70° вниз, без теней и без `LightSource`: в дом не светит, на геймплей не влияет).
+**Коммуникации** — декорация (`UtilityPlan`, чистый, по плану и оболочке дома; без коллайдеров): вентиляционный короб под потолком коридоров
+(`DuctBottom..DuctTop`, над дверями, с решётками и хомутами, огибает высокие лазы и лестничные проёмы), электрощиток на стене коридора
+каждого этажа с кабель-каналом к потолку и лотком вдоль стены, накладные розетки за столами (и на стенах комнат без столов),
+стояки и труба вдоль стены в туалетах, на кухнях и в раздевалках; `LevelBuilder.BuildUtilities` склеивает в один меш (`UtilitySlot` → `LevelArt.UtilityMaterials`).
+**Выключатели света** — настоящие: у каждого проёма внутри комнаты (не коридора) префаб `Level/LightSwitch` (`UtilityPlan.SwitchSpots`, номер в списке —
+индекс; `LevelBuilder.BuildSwitches`), E (`UseKind.LightSwitch`) → `GameManager.SwitchLightsServer` переключает ключ `LightsKey(комната)` в `Opened`:
+светлая комната гаснет, тёмная загорается (`LightMath.SwitchedOn`), лампы (`RoomLight.IsSwitched`) и клавиша с зелёным огоньком в темноте следуют на каждом пире;
+роботы видят результат через `LightSource`, тревога по-прежнему зажигает все лампы.
+**Порожки** — где в проёме встречаются разные полы (`ArchitecturePlanner.PlanThresholds`, `DecorPiece.Threshold`, материал `StyleKit.Threshold`).
+**Дверцы шкафов** — две створки рядом на одной высоте открываются от середины (`StorageMath.RightHinged`: правая — на петле справа).
+**Звуки людей** — `PeopleSounds`: в газе сначала тяжёлое дыхание, потом смех всё громче и чаще (`PlayerController.GasShare`, реплицирует `PlayerNet`,
+клипы `gas_breath`/`gas_laugh_0..2` из `generate_sounds.py`); заложник окликает игрока, который видит клетку рядом (реплики `Voices/hostage_*` из
+`generate_voices.py`); прыжки и приземления — `AirState` (подъём на мебель и дрожь на краю — не прыжок).
 **Фасад без швов** — наружные стены каждого этажа доходят до пола следующего (кромка плиты за ними), над уличной дверью — стена, а не перемычка цвета обрамления,
 столбы в стыках стоят точно в концах стен (ключ словаря округлён, позиция — нет).
 **Стены у лестничного проёма** — над проёмом в перекрытии плиты нет, поэтому стены нижнего этажа вдоль него достраиваются полосой до пола следующего (`LevelBuilder.StairBands`).
@@ -398,7 +417,7 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 Игроки — айтишники четырёх отделов (`PlayerLooks`: бэкенд, тестирование, сисадмины, дизайн по слоту игрока; `VisualStyles.SetVariant`
 выбирает модель отдела). Цвет команды — только `Accent` (рюкзак, повязка, шнурок/шарф), одежда — цвет отдела, лицо — кожа, детали головы — тёмные. Новые объекты одеваются через `VisualStyles.Dress` при спавне. **Архитектура** — `LevelBuilder` записывает
 оболочку дома (`ActiveLevel.Shell`: грани стен, полы, проёмы, окна), чистый `ArchitecturePlanner` раскладывает по ней детали `StyleKit`
-(плинтусы, панели, карнизы, наличники/пилястры/арки у дверей, балки/кессоны/лотки под потолком в обход ламп и лестничных проёмов, трубы, световые щели,
+(плинтусы, панели, карнизы, наличники/пилястры/арки у дверей, кабельные лотки под потолком в обход ламп и лестничных проёмов (балок и кессонов нет: `CeilingKind` — только `None`/`Trays`), трубы, световые щели,
 отделка пола и стен в обход окон), `StyleDecor` ставит их под корень уровня. Декор без коллайдеров и теней — геймплей и свет не меняются (`ArchitectureTests`).
 **Рендер большого дома** — `MeshBatcher` склеивает статичную геометрию в один меш на клетку комнаты и этаж (вместе с мебелью — неизменная оболочка дома:
 стены, столбы, плиты, крыша, рамы окон, лазов и щелей, таблички «Выход», корпуса ламп — `PropBatches.IsShell`; static batching оставляет каждый рендерер,
@@ -424,7 +443,7 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 обшивка, карниз, трубы ставятся только на куски стены нужной высоты (под лазом — нет); стыки скошенных и дуговых стен — повёрнутый столб и декор ровно до стыка
 (`WallFace.JointA/B`), грани таких стен находятся сквозь «карман» (`LevelBuilder.InnerNormals`); столб посреди прямой стены (Т-стык) две соседние грани
 делят пополам (`WallFace.StraightA/B`, `LevelBuilder.RunsOn`) — панели и карниз не кладутся дважды; кусок дуги, идущий внутри прямой стены у точки касания,
-не строится (`HousePlan.ShapedWalls`); пол комнаты заходит в её «карман» за скошенной стеной (`ArchitecturePlanner.PlanFloors`). Проверяет `SpaceRulesTests`. Балки — одна система на комнату, от стены до стены (`ArchitecturePlanner.BeamLines`).
+не строится (`HousePlan.ShapedWalls`); пол комнаты заходит в её «карман» за скошенной стеной (`ArchitecturePlanner.PlanFloors`). Проверяет `SpaceRulesTests`.
 Держатель склеенного меша — `StyleConfig.Batch`.
 **Воксельный стиль `S11_Noir`** («Нуар-детектив», по мотивам Shadows of Doubt): роботы, датчики, мебель и игроки этого стиля пересобраны из кубиков 4 см
 (`Lang.voxel`, `Tools/Blender/voxel.py` — Remesh Blocks по каждой части, мельче для тонких деталей, светящиеся части — на сетке вдвое мельче), без пиксельного фильтра.
@@ -446,6 +465,8 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 Туман задаётся в рантайме (газ снаружи, дымка внутри), поэтому вырезание вариантов тумана — ручное (`GraphicsSettings`: Exp2 оставлен) и туман включён
 в самой сцене: иначе билд выбрасывает шейдеры с туманом и газа не видно. Материалы со свечением — `globalIlluminationFlags = BakedEmissive`
 (с `None` URP при импорте выключает `_EMISSION`). GPU Resident Drawer выключен: с ним плеер падал на старте уровня.
+Graphics jobs выключены (`BuildPlayerWindows`): с ними плеер изредка падал на старте уровня внутри движка (`ShaderVariantMonitor::FrameFinished`, гонка
+потоков при загрузке новых вариантов шейдеров; стек расшифрован по PDB из `PlaybackEngines/windowsstandalonesupport/Variations`).
 Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`;
 перед экспортом каждая модель проходит `meshfix.fix_objects`, проверка — `review.py` / `audit_models.py`, как моделировать — скилл [`blender-modeling`](.claude/skills/blender-modeling/SKILL.md)),
 звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом), голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).

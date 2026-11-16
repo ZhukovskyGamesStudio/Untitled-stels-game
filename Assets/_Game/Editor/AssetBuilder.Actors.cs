@@ -120,15 +120,16 @@ namespace Stealth.EditorTools
                 // The lift (Tools/Blender/worker_lift.py): arms on a pivot at their hinge, the tray on a pivot at the arms'
                 // end pin; what it carries lies on the tray. RobotAnimator swings them (CargoMotion).
                 var rc = go.GetComponent<RobotController>();
+                var anim = go.GetComponent<RobotAnimator>();
                 var lift = Model("worker_lift");
                 lift.name = "Lift";
-                lift.transform.SetParent(go.transform, false);
+                // under the animated body: it leans and sags with it (the poses are the robot's own: the body sits at its origin)
+                lift.transform.SetParent(anim.Model != null ? anim.Model : go.transform, false);
                 Paint(lift, "WorkerBody", "RobotAccent", "SensorGlow");
                 var armPivot = Child(lift.transform, "LiftArmPivot", CargoMotion.Hinge);
                 var trayPivot = Child(lift.transform, "LiftTrayPivot", CargoMotion.PinRest);
                 Find(lift, "AccentLiftArm").SetParent(armPivot.transform, true);
                 Find(lift, "BodyLiftTray").SetParent(trayPivot.transform, true);
-                var anim = go.GetComponent<RobotAnimator>();
                 anim.LiftArm = armPivot.transform;
                 anim.LiftTray = trayPivot.transform;
                 var cargo = Child(trayPivot.transform, "Cargo", new Vector3(0f, CargoMotion.OnTray, 0f));
@@ -136,6 +137,13 @@ namespace Stealth.EditorTools
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;
                 rc.CargoVisuals = visuals;
+                // the microphones stand on the mast's cap (the booms swing past the sides of the pod where the usual seat is):
+                // SensorRig casts down from these spots onto the body of the current style
+                var rig = go.GetComponent<SensorRig>();
+                if (rig != null && rig.Microphones != null)
+                    for (int i = 0; i < rig.Microphones.Length; i++)
+                        if (rig.Microphones[i] != null)
+                            rig.Microphones[i].transform.localPosition = new Vector3(i == 0 ? -0.17f : 0.17f, 0.55f, -0.25f);
                 return go;
             });
             Robot(RobotKind.Sweeper, RobotPrefabs + "/RobotSweeper.prefab", () =>
@@ -457,11 +465,9 @@ namespace Stealth.EditorTools
                 return go;
             }
             rig.Eyes = new[] { Mount("attach_eye", "SensorEye", eye + new Vector3(0, 0, 0.08f), Quaternion.Euler(rc.Profile.Senses.EyePitch, 0, 0)) };
-            rig.Microphones = new[]
-            {
-                Mount("attach_mic", "SensorMicL", eye + new Vector3(-side, 0.05f, -0.1f), Quaternion.Euler(0, 0, 15f)),
-                Mount("attach_mic", "SensorMicR", eye + new Vector3(side, 0.05f, -0.1f), Quaternion.Euler(0, 0, -15f)),
-            };
+            // no microphone stalks: from behind the two of them read as an odd pair of discs on the robot's back (playtest);
+            // what a robot hears is in its description (RobotInfo)
+            rig.Microphones = new GameObject[0];
             rig.GroundProbes = new[]
             {
                 Mount("attach_seismic", "SensorGroundL", new Vector3(-side, 0, radius + 0.1f), Quaternion.identity),

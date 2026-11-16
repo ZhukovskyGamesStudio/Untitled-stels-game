@@ -418,34 +418,33 @@ def listener(L):
 
 
 def worker(L):
-    """Streamlined delivery van: a teardrop body on fender skirts, chrome speed ribs on the flanks, a chrome grille and
-    one round headlight, the crate strapped on a roof rack."""
-    P = Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    for y in (-.25, .25):
-        P.add("Body", [s.rbox((.74, .1, .12), (0, y, .17), r=.015, seg=1)])
-    P.add("Body", [s.rbox((.46, .8, .1), (0, 0, .24), r=.015, seg=1)])                                         # chassis
-    P.add("Body", [lo([(-.46, .0, .0), (-.42, .18, .2), (-.3, .25, .3), (0, .27, .34), (.3, .26, .3), (.44, .17, .2), (.5, .0, .0)],
-                      axis="Y", loc=(0, 0, .55), seg=12)])                                                  # teardrop van
-    for sx in (-1, 1):
-        P.add("Body", [lo([(-.44, .0, .0), (-.36, .06, .1), (0, .07, .13), (.36, .06, .1), (.44, .0, .0)], axis="Y",
-                          loc=(sx * .29, 0, .27), seg=8)])                                                  # fender skirt
-        for k, z in enumerate((.58, .64, .7)):
-            xs = .27 * math.sqrt(max(0, 1 - ((z - .55) / .34) ** 2)) - .004
-            P.add("Accent", [s.rbox((.025, .5 - k * .08, .022), (sx * xs, .1, z), r=.006, seg=1)])
-    for k in range(-3, 4):                                                                                     # grille
-        P.add("Accent", [s.rbox((.025, .04, .16 - abs(k) * .02), (k * .045, -.43 + abs(k) * .012, .32), r=.005, seg=1)])
-    P.add("Body", [lo([(0, .0, .0), (.02, .075, .075, 2.0), (.1, .065, .065, 2.0)], axis="Y", loc=(0, -.46, .5))])
-    P.add("Eye", [s.rcyl(.06, .02, (0, -.465, .5), axis="Y", seg=10, r=0)])
-    for sx in (-1, 1):                                                                                         # roof rack
-        P.add("Accent", [s.rbox((.03, .6, .03), (sx * .2, -.1, .9), r=.006, seg=1)])
-        for y in (-.36, .16):
-            P.add("Accent", [s.rbox((.03, .03, .26), (sx * .2, y, .78), r=.006, seg=1)])
-    P.add("Accent", [s.rbox((.48, .4, .34), (0, -.15, 1.13), r=.02, seg=1)])                                    # crate
-    for z in (1.03, 1.23):
-        P.add("Accent", [s.rbox((.5, .42, .03), (0, -.15, z), r=.006, seg=1)])
-    P.add("Accent", [s.rbox((.5, .44, .08), (0, -.15, .94), r=.008, seg=1)])
-    return P
+    """Streamline porter: a deck on fender skirts with chrome bumpers, a teardrop nose pod under a chrome shoulder bar,
+    a chrome bullet for a mast with a swept tail fin, a round lamp on its nose for a beacon."""
+    def deck(L, P):
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", [s.rcyl(.035, .12, (x * .78, y, .12), axis="X", seg=8, r=0)])                # axles
+        P.add("Body", [s.rbox((.46, .8, .1), (0, 0, .24), r=.015, seg=1)])                                   # chassis
+        P.add("Body", [s.rbox((.68, .78, .06), (0, 0, .3), r=.02, seg=1)])
+        for sx in (-1, 1):
+            P.add("Body", [lo([(-.44, .0, .0), (-.36, .06, .1), (0, .07, .13), (.36, .06, .1), (.44, .0, .0)], axis="Y",
+                              loc=(sx * .29, 0, .27), seg=8)])                                            # fender skirt
+        for y in (-.42, .42):
+            P.add("Accent", [s.rbox((.54, .05, .07), (0, y, .21), r=.02, seg=1)])                         # chrome bumpers
+
+    def pod(L, P):
+        P.add("Body", L.tear(.36, .17, (0, -.42, .47), axis="Y", k=.4, squash=.85))
+        P.add("Accent", [s.rcyl(.04, .46, (0, -.15, .562), axis="X", seg=10, r=.006)])                   # shoulder bar
+        D.worker_shoulders(L, P, inner=.2, cap="Accent")   # one part: voxels of two parts must not share faces
+
+    def mast(L, P):
+        P.add("Body", [lo([(.3, .2, .14), (.5, .22, .15), (1.1, .19, .13), (1.26, .12, .09), (1.33, 0, 0)], loc=(0, .22, 0))])
+        P.add("Accent", L.tailfin((0, .35, .45), (0, .33, 1.05), (0, .5, .4), t=.03))
+
+    def beacon(L, P):
+        P.add("Accent", [s.rcyl(.065, .025, (0, .22, 1.3), seg=10, r=0)])
+        P.add("Eye", [s.rcyl(.045, .08, (0, .22, 1.35), seg=10, r=0)])
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

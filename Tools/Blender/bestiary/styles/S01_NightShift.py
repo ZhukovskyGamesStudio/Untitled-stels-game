@@ -413,39 +413,41 @@ def listener(L):
 
 
 def worker(L):
-    """The clamp truck: a low tug with a roll cage and an amber beacon, two hydraulic clamp arms squeezing the crate
-    from the sides, twin caged headlamps on the crossbar."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.box((.54, .78, .2), (0, .0, .26)))
-    for x, y in ((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25)):
-        P.add("Body", L.rod((x * .5, y, .12), (x * .96, y, .12), .035, kind="square"))
-    P.add("Body", L.box((.46, .3, .26), (0, .22, .48)))                                             # engine block
-    # roll cage over the engine
-    for sx in (-1, 1):
-        for y in (.08, .36):
-            P.add("Accent", L.rod((sx * .22, y, .5), (sx * .2, y, .98), .022, kind="square"))
-        P.add("Accent", L.rod((sx * .2, .07, .98), (sx * .2, .37, .98), .022, kind="square"))
-    P.add("Accent", L.rod((-.21, .36, .98), (.21, .36, .98), .022, kind="square"))
-    P.add("Accent", L.rod((-.21, .08, .98), (.21, .08, .98), .022, kind="square"))
-    P.add("Body", L.cyl(.04, .14, (0, .3, 1.04)))
-    P.eye(cage_lamp(L, (0, .3, 1.1), .045, axis="Z"))
-    P.add("Body", L.cyl(.035, .36, (-.16, .3, .74)) + L.cyl(.045, .04, (-.16, .3, .93)))           # exhaust
-    # clamp frame
-    P.add("Body", L.box((.6, .06, .08), (0, -.36, .5)))                                            # crossbar
-    for sx in (-1, 1):
-        x = sx * .29
-        P.add("Body", L.box((.06, .07, 1.1), (x, -.36, .8)))                                        # uprights
-        P.add("Body", L.rod((x, -.36, 1.15), (x, -.1, .38), .028, kind="piston"))
-        P.add("Accent", L.box((.05, .46, .36), (sx * .25, -.15, 1.15)))                             # clamp paddles
-        P.add("Body", L.rod((x, -.36, 1.15), (sx * .26, -.36, 1.15), .03))
-        P.eye(cage_lamp(L, (sx * .14, -.39, .5), .045))
-    P.add("Accent", L.box((.46, .44, .4), (0, -.15, 1.15)))                                        # crate
-    for z in (1.04, 1.26):
-        P.add("Body", L.box((.47, .45, .035), (0, -.15, z), r=.004))                                # straps
-    P.add("Body", L.box((.58, .06, .1), (0, -.42, .26)))
-    P.add("Accent", stripes((0, -.45, .26), .56, .09, (0, -1, 0), width=.035))
-    return P
+    """Yard tug: a steel deck with hazard-striped bumpers, a boxy cab pod with twin caged headlamps, a battery box in a
+    roll cage for a mast with a hydraulic hose run up to the tray's dock, a caged amber beacon on the cage roof; the
+    piston booms (the language's limbs) swing the fork tray."""
+    def deck(L, P):
+        D.worker_deck(L, P)
+        for sy in (-1, 1):
+            P.add("Body", stripes((0, sy * .445, .21), .66, .09, (0, sy, 0), width=.035))
+
+    def pod(L, P):
+        P.add("Body", L.box((.48, .34, .3), (0, -.23, .46)))
+        P.add("Body", L.box((.44, .3, .06), (0, -.22, .63), taper=(.92, .85)))                       # sloped lid
+        P.add("Accent", L.box((.44, .03, .22), (0, -.405, .46)))
+        for sx in (-1, 1):
+            P.eye(cage_lamp(L, (sx * .175, -.41, .4), .045))
+        D.worker_shoulders(L, P)
+
+    def mast(L, P):
+        P.add("Body", L.box((.42, .24, .64), (0, .23, .62)))                                         # battery box
+        P.add("Accent", stripes((0, .35, .62), .34, .4, (0, 1, 0), width=.04))
+        for sx in (-1, 1):
+            for y in (.09, .35):
+                P.add("Accent", L.rod((sx * .23, y, .3), (sx * .23, y, 1.3), .022, kind="square"))
+            P.add("Accent", L.rod((sx * .23, .09, 1.3), (sx * .23, .35, 1.3), .022, kind="square"))
+            P.add("Accent", L.rod((sx * .23, .09, .93), (sx * .23, .35, 1.2), .016, kind="square"))   # brace
+        for y in (.09, .35):
+            P.add("Accent", L.rod((-.23, y, 1.3), (.23, y, 1.3), .022, kind="square"))
+        P.add("Body", L.box((.44, .28, .04), (0, .22, 1.315)))                                       # cage roof
+        P.add("Body", [hose([(.13, .14, .9), (.16, .08, 1.05), (.14, .06, 1.2), (.1, .04, 1.3)], .022)])
+        P.add("Body", [corrugated((-.12, .3, .93), (-.12, .3, 1.28), .045)])                           # exhaust stack
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.07, .04, (0, .25, 1.35)))
+        P.eye(cage_lamp(L, (0, .25, 1.36), .045, axis="Z"))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

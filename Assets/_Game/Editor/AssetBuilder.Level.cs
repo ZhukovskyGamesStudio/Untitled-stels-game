@@ -117,10 +117,23 @@ namespace Stealth.EditorTools
             });
             var pTerminal = Prefab(p + "Terminal.prefab", () =>
             {
-                var go = PropObject("Terminal", "terminal", "PropBody", "PropAccent", "Keypad");
-                // The screens glow in the terminal's colour (SecurityTerminal keeps them out of the merged furniture).
+                // Two looks on one desk's place (Tools/Blender/terminals.py): the robots' control console (hacking, cameras)
+                // and the storage door's access kiosk; SecurityTerminal shows the one for its kind. The screens glow in the
+                // terminal's colour (SecurityTerminal keeps them out of the merged furniture).
+                var go = PropObject("Terminal", "terminal_console", "PropBody", "PropAccent", "Keypad");
+                var console = go.transform.GetChild(0).gameObject;
+                console.name = "Console";
+                var access = Model("terminal_access");
+                access.name = "Access";
+                access.transform.SetParent(go.transform, false);
+                Paint(access, "Metal", "PropAccent", "Keypad");
+                foreach (var mf in access.GetComponentsInChildren<MeshFilter>(true)) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                access.SetActive(false);
                 var terminal = go.AddComponent<Stealth.Level.SecurityTerminal>();
-                terminal.Screens = go.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.Console = console;
+                terminal.Access = access;
+                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
