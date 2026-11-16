@@ -7,7 +7,9 @@ namespace Stealth.Level
         // themed rooms (append only): each furnished as what it is (Furnisher), some with a floor of their own (StyleGeometry.RoomFloors)
         Gym, Library, CopyRoom, ControlRoom, Lab, NapRoom, Studio, LockerRoom, Infirmary, GameRoom,
         // the auto repair shop (HouseKind.Garage, PlanGenerator.Garage): the double-height workshop hall with its bays, the paint booth
-        Workshop, PaintBooth }
+        Workshop, PaintBooth,
+        // the plant room off the lobby at the outer wall: where the building's drain leaves for the street sewer — the entry hatch (PlanGenerator.UtilityCorner)
+        Utility }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.

@@ -328,7 +328,7 @@ namespace Stealth.Level
                 RaiseVents(l, building);
                 Doorways(l);
                 if (building.Garage) WidenBoothDoorway(l);
-                l.HatchPosition = l.Lobby.Center;
+                l.HatchPosition = EntryHatch(l);
                 long planMs = watch.ElapsedMilliseconds;
                 bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
                 checker = o.Unreached == 0 && countOk ? new Furnisher(l, new System.Random(0)) : null;
@@ -365,19 +365,21 @@ namespace Stealth.Level
                 r.Flicker = !r.Dark && roll > 1.0 - building.FlickerChance;
             }
 
-            // The hatch in the middle of the lobby, the team around it.
+            // The hatches where a building meets the sewer: the entry in the plant room's corner off the lobby (by the drain's
+            // way out to the street), the exit in a corner of a far room with drains (a wet room; the shop: its workshop).
             var lobby = l.Lobby;
-            l.HatchPosition = lobby.Center;
+            l.HatchPosition = EntryHatch(l);
+            var entryRoom = l.Plan.RoomAt(l.HatchPosition + Vector3.up * 0.3f) ?? lobby;
             var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, 0xF0E, 0)));
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
-            furnisher.Put(lobby, PropKind.Hatch, l.HatchPosition, 0f);
+            furnisher.Put(entryRoom, PropKind.Hatch, l.HatchPosition, 0f);
             var exit = ExitRoom(l);
-            l.ExitHatchPosition = exit.Center;
+            l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
-            for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
+            for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q].normalized * 0.5f); // round the hatch, in its corner of the room
 
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
             RoomRules.Enforce(l.Plan, building.RoomTypeRules);
@@ -507,21 +509,107 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// The room of the exit hatch: on the ground floor, not the lobby, not the hidden room, not a corridor, as far from the
-        /// entry as possible (the team has to cross the house).
+        /// The room of the exit hatch, on the ground floor and far from the entry (the team has to cross the house): where a
+        /// building's drains are — a restroom, a kitchen, a locker room — among the farthest rooms, else the farthest room;
+        /// in the auto repair shop its workshop (the oil separator's chamber in the floor). Never the lobby, the hidden room,
+        /// a corridor, the storage room or the paint booth.
         /// </summary>
         static PlanRoom ExitRoom(LevelLayout l)
         {
-            PlanRoom best = null;
-            float far = -1f;
+            if (l.Kind == HouseKind.Garage)
+                foreach (var r in l.Rooms)
+                    if (r.Type == RoomType.Workshop && r.Floor == 0) return r;
+            PlanRoom best = null, wet = null;
+            float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth || r.Area < 10f) continue; // (the booth: its car)
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility || r.Area < 10f) continue; // (the booth: its car)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
+                if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (d > far) { far = d; best = r; }
+                if (r.Type is RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom && d > farWet) { farWet = d; wet = r; }
             }
+            if (wet != null && farWet >= far * 0.6f && farWet > 8.5f) return wet;
             return best ?? l.Lobby;
+        }
+
+        /// <summary>The entry hatch: in the plant room's corner (the lobby's, where a house has no plant room).</summary>
+        static Vector3 EntryHatch(LevelLayout l)
+        {
+            foreach (var r in l.Rooms)
+                if (r.Type == RoomType.Utility && r.Floor == 0) return HatchCorner(l, r, null);
+            return HatchCorner(l, l.Lobby, null);
+        }
+
+        /// <summary>The corner of a room's back wall (away from the street, z = 0: the workshop's bays are there) farthest from the entry hatch.</summary>
+        static Vector3 FarFrom(LevelLayout l, PlanRoom r)
+        {
+            var b = r.Bounds;
+            Vector3 best = r.Center;
+            float far = -1f;
+            foreach (var c in new[] { new Vector3(b.xMin, 0, b.yMax), new Vector3(b.xMax, 0, b.yMax) })
+            {
+                float d = (c - l.HatchPosition).magnitude;
+                if (d > far) { far = d; best = c; }
+            }
+            return best;
+        }
+
+        /// <summary>How far a hatch's middle stays from the walls' lines (its 1.8 m cover, the wall's half, a hand's width).</summary>
+        public const float HatchFromWall = 1.1f;
+
+        /// <summary>
+        /// A hatch's place in a room: in a corner by the walls, never in the middle — where the drain stack comes down and the
+        /// cleanout is. The corner with the most outside walls first (the drain leaves the building there), or the one
+        /// nearest <paramref name="near"/>; clear of doorways and stairs, on the room's own floor. The room's middle if no corner holds it.
+        /// </summary>
+        public static Vector3 HatchCorner(LevelLayout l, PlanRoom r, Vector3? near) => TryHatchCorner(l, r, near, out var p) ? p : r.Center;
+
+        /// <summary>A hatch's place by the walls of a room (see <see cref="HatchCorner"/>); false when the room has none.</summary>
+        static bool TryHatchCorner(LevelLayout l, PlanRoom r, Vector3? near, out Vector3 spot)
+        {
+            var plan = l.Plan;
+            float y = LevelLayout.FloorY(r.Floor);
+            var spots = new List<(Vector3 p, float score)>();
+            bool Out(Vector3 q) => plan.RoomAt(q + Vector3.up * 0.3f) == null;
+            foreach (var rect in r.Rects)
+            {
+                float x0 = rect.xMin * HousePlan.Res + HatchFromWall, x1 = rect.xMax * HousePlan.Res - HatchFromWall;
+                float z0 = rect.yMin * HousePlan.Res + HatchFromWall, z1 = rect.yMax * HousePlan.Res - HatchFromWall;
+                if (x0 > x1 || z0 > z1) continue;
+                // along the walls every half metre (the corners best: two walls to run the stack down)
+                void Spot(float x, float z, bool corner)
+                {
+                    var p = new Vector3(x, y, z);
+                    float wall = HatchFromWall + 0.3f;
+                    int outside = (Out(p + Vector3.left * wall) ? 1 : 0) + (Out(p + Vector3.right * wall) ? 1 : 0)
+                                + (Out(p + Vector3.back * wall) ? 1 : 0) + (Out(p + Vector3.forward * wall) ? 1 : 0);
+                    float score = (corner ? 20f : 0f) + (near is Vector3 n ? -3f * new Vector2(p.x - n.x, p.z - n.z).magnitude : outside * 10f);
+                    spots.Add((p, score));
+                }
+                for (float x = x0; x <= x1 + 0.01f; x += 0.5f) { Spot(x, z0, false); Spot(x, z1, false); }
+                for (float z = z0; z <= z1 + 0.01f; z += 0.5f) { Spot(x0, z, false); Spot(x1, z, false); }
+                Spot(x0, z0, true); Spot(x1, z0, true); Spot(x0, z1, true); Spot(x1, z1, true);
+            }
+            spots.Sort((a, b) => b.score.CompareTo(a.score));
+            // clear of the doorways' walk-through (a smaller margin if the room's walls are all doors), then the middle
+            foreach (float margin in new[] { 1.6f, 0.7f })
+            foreach (var (p, _) in spots)
+            {
+                bool ok = !l.NearStair(r.Floor, p, 1.2f);
+                for (float dx = -0.95f; dx <= 0.96f && ok; dx += 0.95f)
+                    for (float dz = -0.95f; dz <= 0.96f && ok; dz += 0.95f)
+                    {
+                        var q = p + new Vector3(dx, 0f, dz);
+                        if (plan.RoomAt(q + Vector3.up * 0.3f) != r || !plan.IsFloor(r.Floor, new Vector2(q.x, q.z))) ok = false;
+                    }
+                foreach (var d in l.Doorways)
+                    if (ok && d.Floor == r.Floor && new Vector2(d.Position.x - p.x, d.Position.z - p.z).magnitude < d.Width / 2f + margin) ok = false;
+                if (ok) { spot = p; return true; }
+            }
+            spot = r.Center;
+            return false;
         }
 
         /// <summary>Patrol points: the middle of every room, and in big rooms the middles of the parts they were made of.</summary>

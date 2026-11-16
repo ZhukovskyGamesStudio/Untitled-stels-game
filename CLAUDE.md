@@ -250,8 +250,13 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 иначе — к хосту (`IPlayerLink.PlaceOwner` → `PlayerController.PlaceFromServer`). Выбывший видит рюкзак того, за кем смотрит (`InventoryUI`).
 
 **Между домами — канализация и машина.** `RunPhase`: `Playing` (дом) → `Sewer` → `Playing` (следующий дом) или `Failed`. В доме **два люка**:
-вход (`LevelLayout.HatchPosition`, лобби — команда начинает дом сидя в нём, `PlayerController.EnterHatchServer(0)`) и выход
-(`ExitHatchPosition`, комната первого этажа дальше всех от входа, `LevelGenerator.ExitRoom`); `PlayerController.HatchIndex` (0/1, реплицирует
+вход (`LevelLayout.HatchPosition` — команда начинает дом сидя в нём, `PlayerController.EnterHatchServer(0)`) и выход
+(`ExitHatchPosition`, `LevelGenerator.ExitRoom`). Люки — там, где здание встречается с канализацией, как в настоящем: вход — в **техпомещении**
+(`RoomType.Utility`, 4 × 3,5 м, вырезано из наружного угла лобби — `PlanGenerator.UtilityCorner`, одна дверь — в лобби, без окон и уличной двери;
+у связанных блоков — только где угол ни с чем не соприкасается), выход — в дальней комнате с канализацией (туалет, кухня, раздевалка; иначе
+самая дальняя, где у стены есть место), в мастерской — в дальнем заднем углу цеха (камера маслоуловителя). Сам люк — всегда у стены, лучше в углу
+(`LevelGenerator.HatchCorner`), рядом стояк с ревизией и отвод вдоль стены (`UtilityPlan.Drains`); точки появления — кольцом 0,5 м вокруг люка.
+Проверяет `HatchPlacementTests`; `PlayerController.HatchIndex` (0/1, реплицирует
 `PlayerNet`). Уйти — все в люках (в любом), и хотя бы один — в люке **выхода** (`RunState.TeamInHatch`) → отсчёт `LeaveAt` → `GoToSewerServer`. У каждого люка свой склад:
 `GameManager.Stash` (вход: склад, куда при старте дома выгружается кузов (`UnloadCarServer`), и горловина бака — на его доске зона «сжечь в топливо»,
 `StashBoard.SellZone` → `PlayerInventory.Sell*Server`/`DepositServer`; инструменты не горят) и `ExitStash` (выход: уезжает в кузов, `LoadCarServer`) — `GameManager.StashAt(позиция)`.

@@ -76,6 +76,7 @@ namespace Stealth.Tests
             RoomType.Corridor => new Color(0.9f, 0.9f, 0.88f),
             RoomType.Workshop => new Color(0.6f, 0.62f, 0.66f),
             RoomType.PaintBooth => new Color(0.95f, 0.45f, 0.4f),
+            RoomType.Utility => new Color(0.4f, 0.45f, 0.5f),
             _ => new Color(0.85f, 0.85f, 0.7f),
         };
 

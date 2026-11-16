@@ -418,6 +418,23 @@ namespace Stealth.Level
             return n;
         }
 
+        /// <summary>The side of a rectangle (dx or dz = ±1) lies on the facade along all of its length (a step beyond it too).</summary>
+        static bool AllOutside(Ctx c, RectInt r, int dx, int dz)
+        {
+            bool Out(int x, int z) => x < 0 || z < 0 || x >= c.Plan.NX || z >= c.Plan.NZ || !c.Footprint[x, z];
+            if (dx != 0)
+            {
+                int x = dx > 0 ? r.xMax : r.xMin - 1;
+                for (int z = r.yMin - 1; z <= r.yMax; z++) if (!Out(x, z)) return false;
+            }
+            else
+            {
+                int z = dz > 0 ? r.yMax : r.yMin - 1;
+                for (int x = r.xMin - 1; x <= r.xMax; x++) if (!Out(x, z)) return false;
+            }
+            return true;
+        }
+
         /// <summary>The side of a rectangle (dx or dz = ±1) lies on the facade along most of its length.</summary>
         static bool SideOutside(Ctx c, RectInt r, int dx, int dz)
         {
@@ -517,8 +534,35 @@ namespace Stealth.Level
                 return n;
             }
 
-            // Reserved rooms first: the lobby, the stair halls (arriving from below, going up).
-            if (f == 0) Claim(c.Lobby, new Region { Type = RoomType.Lobby, Shape = RoomShape.Rect, Fixed = true });
+            // Reserved rooms first: the plant room in the lobby's outer corner, the lobby, the stair halls (arriving from below, going up).
+            if (f == 0)
+            {
+                if (UtilityCorner(c, c.Lobby) is RectInt plant)
+                {
+                    Claim(plant, new Region { Type = RoomType.Utility, Shape = RoomShape.Rect, Fixed = true, Typed = true });
+                    // the lobby is the rest: an L of two rectangles
+                    var lobby = new Region { Type = RoomType.Lobby, Shape = RoomShape.Rect, Fixed = true };
+                    int id = regions.Count;
+                    var lb = c.Lobby;
+                    var parts = new List<RectInt>();
+                    bool left = plant.xMin == lb.xMin, low = plant.yMin == lb.yMin;
+                    parts.Add(left ? new RectInt(plant.xMax, lb.yMin, lb.xMax - plant.xMax, lb.height) : new RectInt(lb.xMin, lb.yMin, plant.xMin - lb.xMin, lb.height));
+                    parts.Add(low ? new RectInt(plant.xMin, plant.yMax, plant.width, lb.yMax - plant.yMax) : new RectInt(plant.xMin, lb.yMin, plant.width, plant.yMin - lb.yMin));
+                    foreach (var r in parts)
+                    {
+                        for (int x = r.xMin; x < r.xMax; x++)
+                            for (int z = r.yMin; z < r.yMax; z++)
+                            {
+                                if (x < 0 || z < 0 || x >= nx || z >= nz || owner[x, z] != -1) continue;
+                                owner[x, z] = id;
+                                lobby.Cells.Add(new Vector2Int(x, z));
+                            }
+                        lobby.Rects.Add(r);
+                    }
+                    regions.Add(lobby);
+                }
+                else Claim(c.Lobby, new Region { Type = RoomType.Lobby, Shape = RoomShape.Rect, Fixed = true });
+            }
             for (int i = 0; i < c.Halls.Count; i++)
             {
                 var h = c.Halls[i];
@@ -640,6 +684,30 @@ namespace Stealth.Level
         }
 
         static readonly Vector2Int[] Dirs4 = { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
+
+        /// <summary>The plant room's size, cells (4 × 3.5 m: its door needs 3.6 m of wall): a drain stack, the cleanout, the hatch down to the street sewer.</summary>
+        const int PlantW = 8, PlantD = 7;
+
+        /// <summary>
+        /// The plant room's place in the lobby's corner (cells), where the building's drain leaves for the street: the corner
+        /// with the most outside walls (both, at a building's corner; else the facade side). Null when the lobby is too small
+        /// to give it up.
+        /// </summary>
+        static RectInt? UtilityCorner(Ctx c, RectInt lobby)
+        {
+            if (lobby.width < PlantW + 4 * M || lobby.height < PlantD + 3 * M) return null; // (the rest of the lobby at least 3 m across)
+            RectInt? best = null;
+            int bestOut = 0;
+            foreach (var (sx, sz) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+            {
+                var r = new RectInt(sx < 0 ? lobby.xMin : lobby.xMax - PlantW, sz < 0 ? lobby.yMin : lobby.yMax - PlantD, PlantW, PlantD);
+                int outside = (SideOutside(c, r, sx, 0) ? 1 : 0) + (SideOutside(c, r, 0, sz) ? 1 : 0);
+                // a block of a linked house: its corridors come in at its sides — the plant room only where nothing touches it
+                if (c.Linked != null && (!AllOutside(c, r, sx, 0) || !AllOutside(c, r, 0, sz))) continue;
+                if (outside > bestOut) { bestOut = outside; best = r; }
+            }
+            return best;
+        }
 
         /// <summary>
         /// One floor of a linked house: every corridor is a corridor, every block a room (whole when it is inside the room
@@ -1216,7 +1284,7 @@ namespace Stealth.Level
         /// </summary>
         static void Shape(Ctx c, PlanRoom room, Region reg, System.Random rng)
         {
-            if (reg.Type == RoomType.Corridor) return;
+            if (reg.Type is RoomType.Corridor or RoomType.Utility) return;
             // a cut corner or a rotunda takes up to a fifth of the floor: never below the type's smallest size
             if (reg.Cells.Count / (float)(M * M) * 0.78f < RoomRules.MinArea(reg.Type, c.B.RoomTypeRules)) return;
             var b = BoundsOf(reg.Cells);
@@ -1504,7 +1572,7 @@ namespace Stealth.Level
                     // else joins without it, then it gets its one door (a dead end)
                     bool circulation = IsCirculation(plan, a) || IsCirculation(plan, bb);
                     // (the shop's paint booth too: sealed, its one door onto the workshop when it can)
-                    float w = IsStorage(plan, kv.Key) ? (Touches(plan, kv.Key, RoomType.Workshop) ? -0.5f : -1f) : (circulation ? 10f : 0f) + (float)rng.NextDouble();
+                    float w = IsStorage(plan, kv.Key) ? (OwnDoor(plan, kv.Key) ? -0.5f : -1f) : (circulation ? 10f : 0f) + (float)rng.NextDouble();
                     order.Add((kv.Key, w));
                 }
                 order.Sort((p, q) => q.weight.CompareTo(p.weight));
@@ -1584,7 +1652,7 @@ namespace Stealth.Level
                 var w = plan.Walls[i];
                 if (w.Floor != 0 || !w.Exterior || w.Shaped || w.Length < DoorWidth + 2f * DoorMargin) continue;
                 int room = Mathf.Max(w.RoomA, w.RoomB);
-                if (room < 0 || room == o.Lobby || OneDoor(plan.Rooms[room].Type) || plan.Rooms[room].Type == RoomType.Workshop) continue; // (the hall's street wall is its bays' doors)
+                if (room < 0 || room == o.Lobby || OneDoor(plan.Rooms[room].Type) || plan.Rooms[room].Type is RoomType.Workshop or RoomType.Utility) continue; // (the hall's street wall is its bays' doors; the plant room is the drain's)
                 candidates.Add(i);
             }
             while (doors < 2 && candidates.Count > 0)
@@ -1630,7 +1698,11 @@ namespace Stealth.Level
         static bool IsStorage(HousePlan plan, (int, int) key) => OneDoor(plan.Rooms[key.Item1].Type) || OneDoor(plan.Rooms[key.Item2].Type);
 
         /// <summary>A room with a single door, a dead end: the storage room (it is locked), the shop's paint booth (sealed).</summary>
-        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth;
+        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth or RoomType.Utility;
+
+        /// <summary>The door a one-door room should have: the paint booth's into the workshop, the plant room's into the lobby.</summary>
+        static bool OwnDoor(HousePlan plan, (int, int) key) =>
+            (Touches(plan, key, RoomType.PaintBooth) && Touches(plan, key, RoomType.Workshop)) || (Touches(plan, key, RoomType.Utility) && Touches(plan, key, RoomType.Lobby));
 
         static bool Touches(HousePlan plan, (int, int) key, RoomType t) => plan.Rooms[key.Item1].Type == t || plan.Rooms[key.Item2].Type == t;
 

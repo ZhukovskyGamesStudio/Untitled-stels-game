@@ -237,7 +237,7 @@ namespace Stealth.Tests
             MapSketch.Build(map, 0, null, rects);
             Assert.IsEmpty(rects, "nothing seen, nothing drawn");
 
-            var room = l.Lobby.Center;
+            var room = l.HatchPosition; // the plant room off the lobby, the way in
             map.RevealAround(room + Vector3.up * 1.6f, 8f);
             var props = new List<MapProp>
             {
@@ -248,7 +248,7 @@ namespace Stealth.Tests
             Assert.IsTrue(rects.Any(r => r.Part == MapPart.Floor));
             Assert.IsTrue(rects.Any(r => r.Part == MapPart.Wall), "the walls of the room");
             Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Prop), "only the furniture that was seen");
-            Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Hatch), "the lobby has the way in");
+            Assert.AreEqual(1, rects.Count(r => r.Part == MapPart.Hatch), "the plant room has the way in");
             Assert.AreEqual(0, rects.Count(r => r.Part == MapPart.ExitHatch), "the exit hatch is not seen yet");
             map.RevealAround(l.ExitHatchPosition + Vector3.up * 1.6f, 6f);
             MapSketch.Build(map, 0, props, rects);

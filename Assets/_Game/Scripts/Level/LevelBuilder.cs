@@ -68,6 +68,7 @@ namespace Stealth.Level
                 // the shop: the hall under cold daylight tubes, the paint booth flooded white (colours must be judged true)
                 RoomType.Workshop => (new Color(0.9f, 0.96f, 1f), LightMath.RoomIntensity * 1.1f),
                 RoomType.PaintBooth => (new Color(0.95f, 0.98f, 1f), LightMath.RoomIntensity * 1.3f),
+                RoomType.Utility => (new Color(1f, 0.9f, 0.75f), LightMath.RoomIntensity * 0.7f), // a bare bulb over the pipes
                 _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
@@ -833,7 +834,7 @@ namespace Stealth.Level
                     if (ik == CellKind.Room)
                     {
                         int id = plan.IdAt(w.Floor, inside.x, inside.y);
-                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop)) continue; // the hall's street wall is its doors
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop or RoomType.Utility)) continue; // the hall's street wall is its doors
                     }
                     roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));

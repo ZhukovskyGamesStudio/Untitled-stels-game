@@ -69,6 +69,7 @@ namespace Stealth.Level
             Panels(parts, l, shell, faces);
             Sockets(parts, l, shell, faces, rng);
             Pipes(parts, l, shell, faces);
+            Drains(parts, l);
             return parts;
         }
 
@@ -276,6 +277,35 @@ namespace Stealth.Level
                 }
             }
             return list;
+        }
+
+        // ------------------------------------------------------------------ the drains at the hatches
+
+        /// <summary>
+        /// Where the building meets the sewer: at each hatch the drain stack comes down the corner from the ceiling into the
+        /// floor beside the hatch (a cast-iron pipe with its cleanout plug at knee height) and a branch runs low along the
+        /// wall into it — the hatch is the drain's inspection chamber, not a hole in the middle of a room.
+        /// </summary>
+        static void Drains(List<UtilityPart> parts, LevelLayout l)
+        {
+            foreach (var hatch in new[] { l.HatchPosition, l.ExitHatchPosition })
+            {
+                var room = l.Plan.RoomAt(hatch + Vector3.up * 0.3f);
+                if (room == null) continue;
+                // the corner the hatch sits in: the nearer wall line on each axis
+                var b = room.Bounds;
+                float sx = hatch.x - b.xMin < b.xMax - hatch.x ? -1f : 1f, sz = hatch.z - b.yMin < b.yMax - hatch.z ? -1f : 1f;
+                float wx = sx < 0 ? b.xMin : b.xMax, wz = sz < 0 ? b.yMin : b.yMax;
+                float y = LevelLayout.FloorY(room.Floor), top = y + LevelMetrics.WallHeight;
+                var stack = new Vector3(wx - sx * (T / 2f + 0.09f), y, wz - sz * (T / 2f + 0.09f));
+                if (Mathf.Abs(stack.x - hatch.x) > 1.6f || Mathf.Abs(stack.z - hatch.z) > 1.6f) continue; // not in a corner after all
+                parts.Add(UtilityPart.Pipe(stack, new Vector3(stack.x, top, stack.z), 0.065f, UtilitySlot.Pipe));
+                parts.Add(UtilityPart.Pipe(stack + Vector3.up * 0.42f, stack + Vector3.up * 0.58f, 0.085f, UtilitySlot.Dark));   // the cleanout
+                parts.Add(UtilityPart.Pipe(stack + Vector3.up * 2.2f, stack + Vector3.up * 2.28f, 0.08f, UtilitySlot.Conduit));   // a clamp
+                // the branch along the wall at ankle height, from the room's far side into the stack
+                var along = new Vector3(stack.x - sx * 2.2f, y + 0.18f, stack.z);
+                parts.Add(UtilityPart.Pipe(along, new Vector3(stack.x, y + 0.18f, stack.z), 0.045f, UtilitySlot.Pipe));
+            }
         }
 
         // ------------------------------------------------------------------ pipes

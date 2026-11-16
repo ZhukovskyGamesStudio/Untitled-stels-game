@@ -86,7 +86,7 @@ namespace Stealth.Tests
             int officeSeed = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 1) == HouseKind.Office);
             var s = LevelGenerator.Generate(officeSeed, 1, onlyServers);
             // the locked storage room comes from the house's features, not from the weights
-            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage, room.Type.ToString());
+            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage or RoomType.Utility, room.Type.ToString()); // (the plant room: the plan's own)
         }
 
         [Test]

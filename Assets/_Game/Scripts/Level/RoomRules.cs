@@ -88,6 +88,7 @@ namespace Stealth.Level
             // the auto repair shop's own rooms: never drawn by the program (no weight), laid out by PlanGenerator.Garage
             new RoomRule(RoomType.Workshop, new Vector2(80f, 700f), perHouse: 1),
             new RoomRule(RoomType.PaintBooth, new Vector2(20f, 80f), zone: RoomZone.Interior, perHouse: 1),
+            new RoomRule(RoomType.Utility, new Vector2(6f, 24f), perHouse: 1),
         };
 
         /// <summary>The rule of a type, or one without limits.</summary>
@@ -122,7 +123,7 @@ namespace Stealth.Level
 
         internal static float AspectOf(PlanRoom r) => Mathf.Max(r.Bounds.width, r.Bounds.height) / Mathf.Max(0.5f, Mathf.Min(r.Bounds.width, r.Bounds.height));
 
-        internal static float OutsideOf(HousePlan plan, PlanRoom r)
+        public static float OutsideOf(HousePlan plan, PlanRoom r)
         {
             float outside = 0f;
             foreach (var w in plan.Walls)
@@ -142,12 +143,12 @@ namespace Stealth.Level
         {
             foreach (var r in plan.Rooms)
             {
-                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Workshop or RoomType.PaintBooth || Holds(plan, r, r.Type, rules)) continue;
+                if (r.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility || Holds(plan, r, r.Type, rules)) continue;
                 bool swapped = false;
                 if (r.Type != RoomType.Storage) // the storage room's place is its own (one door: StorageRooms)
                     foreach (var o in plan.Rooms)
                     {
-                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth || o.Type == r.Type) continue;
+                        if (o == r || o.Type is RoomType.Corridor or RoomType.Lobby or RoomType.Hall or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility || o.Type == r.Type) continue;
                         if (!Holds(plan, o, r.Type, rules) || !Holds(plan, r, o.Type, rules)) continue;
                         (o.Type, r.Type) = (r.Type, o.Type);
                         swapped = true;
