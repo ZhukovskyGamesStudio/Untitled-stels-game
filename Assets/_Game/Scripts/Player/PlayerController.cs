@@ -587,6 +587,22 @@ namespace Stealth.Player
             else PlaceFromServer(position, yaw);
         }
 
+        /// <summary>
+        /// Owner: whether this player already stands where the current location put them (the sewer's spawn, the house's
+        /// hatch, or the server's spot after a reconnect). Until then the screen stays black (<see cref="UI.LoadingRules"/>).
+        /// </summary>
+        public bool PlacedHere
+        {
+            get
+            {
+                if (m_ServerPlace != null) return false;
+                var sewer = SewerLocation.Active;
+                if (sewer != null) return m_PlacedSewer == sewer;
+                var layout = ActiveLevel.Layout;
+                return layout != null && (m_PlacedSeed == layout.Seed || layout.PlayerSpawns.Count == 0);
+            }
+        }
+
         /// <summary>Owner: the server's spot wins over the usual spawn, once the house or the sewer is built here.</summary>
         public void PlaceFromServer(Vector3 position, float yaw)
         {
