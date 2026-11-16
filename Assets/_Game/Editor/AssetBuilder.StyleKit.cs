@@ -131,6 +131,14 @@ namespace Stealth.EditorTools
             // the bank vault in every style: brushed steel panels, a clean steel floor plate
             Mat("Vault_Wall", new Color(0.74f, 0.76f, 0.8f), "vaultsteel", 0.6f, 0.35f);
             Mat("Vault_Floor", new Color(0.6f, 0.62f, 0.65f), "diamondplate", 0.5f, 0.35f);
+            // the auto repair shop (Level.ShopLook): painted block, a blue-grey band, epoxy, a metal deck; the paint booth
+            Mat("Shop_Wall", new Color(0.86f, 0.87f, 0.85f), "blockwall", 0.2f);
+            Mat("Shop_WallLower", new Color(0.32f, 0.37f, 0.44f), "blockwall", 0.3f);
+            Mat("Shop_Floor", new Color(0.62f, 0.64f, 0.66f), "epoxy", 0.55f);
+            Mat("Shop_Ceiling", new Color(0.62f, 0.64f, 0.66f), "corrugated", 0.4f, 0.5f);
+            Mat("Booth_Wall", new Color(0.97f, 0.97f, 0.96f), "boothwall", 0.15f);
+            Mat("Booth_Floor", new Color(0.55f, 0.57f, 0.6f), "grating", 0.45f, 0.6f);
+            Mat("Booth_Ceiling", new Color(0.98f, 0.98f, 0.97f), "boothwall", 0.1f);
             Mat("Glow_White", Color.white, null, 0.5f, 0f, null, new Color(2.4f, 2.6f, 2.8f));
             Mat("Glow_Cyan", new Color(0.2f, 1f, 1f), null, 0.5f, 0f, null, new Color(0.3f, 2.6f, 3f));
             Mat("Glow_DimCyan", new Color(0.1f, 0.5f, 0.5f), null, 0.5f, 0f, null, new Color(0.1f, 0.9f, 1.05f)); // dying electronics (S16_Derelict)
@@ -175,6 +183,13 @@ namespace Stealth.EditorTools
             kit.VaultWallTile = 2f;
             kit.VaultFloorTile = 1f;
             kit.Threshold = K("Trim_Brass");
+            kit.ShopWall = K("Shop_Wall");
+            kit.ShopWallLower = K("Shop_WallLower");
+            kit.ShopFloor = K("Shop_Floor");
+            kit.ShopCeiling = K("Shop_Ceiling");
+            kit.BoothWall = K("Booth_Wall");
+            kit.BoothFloor = K("Booth_Floor");
+            kit.BoothCeiling = K("Booth_Ceiling");
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

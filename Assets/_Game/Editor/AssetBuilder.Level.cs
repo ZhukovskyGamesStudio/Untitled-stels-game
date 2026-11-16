@@ -50,7 +50,10 @@ namespace Stealth.EditorTools
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
             var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
             var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
-            var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
+            var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", () => BuildAutoDoor());
+            // the auto repair shop: steel leaves; the paint booth's door as wide as a car needs
+            var shopDoor = Prefab($"{LevelPrefabs}/ShopDoor.prefab", () => BuildAutoDoor("ShopDoor", LevelMetrics.DoorWidth, "ShopSteel"));
+            var vehicleDoor = Prefab($"{LevelPrefabs}/VehicleDoor.prefab", () => BuildAutoDoor("VehicleDoor", LevelMetrics.VehicleDoorWidth, "ShopSteel"));
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
@@ -171,6 +174,8 @@ namespace Stealth.EditorTools
                 art.HighVentFrame = highVent;
                 art.SqueezeFrame = squeeze;
                 art.AutoDoor = door;
+                art.ShopDoor = shopDoor;
+                art.VehicleDoor = vehicleDoor;
                 art.RoomLight = light;
                 art.Window = window;
                 art.ExitSign = exitSign;
@@ -219,6 +224,12 @@ namespace Stealth.EditorTools
                 levelArt.RailingBay = railingBay;
                 levelArt.RailingBlock = railingBlock;
                 levelArt.OutsideTerrain = terrain;
+                EditorUtility.SetDirty(levelArt);
+            }
+            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor)
+            {
+                levelArt.ShopDoor = shopDoor;
+                levelArt.VehicleDoor = vehicleDoor;
                 EditorUtility.SetDirty(levelArt);
             }
             BuildFeatureArt(levelArt);
@@ -360,11 +371,15 @@ namespace Stealth.EditorTools
         /// Sliding door: two panels and a blocker collider (enabled only while closed). Ignored by the navmesh:
         /// robots plan through doorways and the door opens when they arrive.
         /// </summary>
-        static GameObject BuildAutoDoor()
+        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "Door");
+
+        /// <summary>A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.</summary>
+        static GameObject BuildAutoDoor(string name, float width, string paint)
         {
-            var root = new GameObject("AutoDoor");
+            var root = new GameObject(name);
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
-            float h = LevelMetrics.DoorHeight - 0.02f, w = LevelMetrics.DoorWidth;
+            float h = LevelMetrics.DoorHeight - 0.02f, w = width;
+            float stretch = width / LevelMetrics.DoorWidth;
             var door = root.AddComponent<AutoDoor>();
             door.Width = w;
             // the two leaves: a model of their own (Tools/Blender/door_leaf.py), so a style can give them its own form
@@ -376,7 +391,8 @@ namespace Stealth.EditorTools
                 leaf.transform.SetParent(root.transform, false);
                 leaf.transform.localPosition = new Vector3(x, 0f, 0f);
                 leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
-                Paint(leaf, "Door", "Door", "Door");
+                leaf.transform.localScale = new Vector3(stretch, 1f, 1f);
+                Paint(leaf, paint, paint, paint);
                 foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                 return leaf.transform;
             }

@@ -70,9 +70,10 @@ namespace Stealth.Level
                 // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
                 HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f,
                     RoomType.Infirmary => 3f, RoomType.LockerRoom => 1.5f, RoomType.Lab => 1.5f, RoomType.GameRoom => 0.3f, RoomType.Studio => 0.2f, _ => 1f },
-                // big repair bays and parts stores, a small office and a break room
-                HouseKind.Garage => t switch { RoomType.Storage => 5f, RoomType.Kitchen => 0.8f, RoomType.OpenSpace => 0.4f, RoomType.Meeting => 0.5f, RoomType.Server => 0.2f,
-                    RoomType.Lab => 2.5f, RoomType.LockerRoom => 2f, RoomType.Library => 0.2f, RoomType.Studio => 0.2f, _ => 1f },
+                // the shop's own plan lays out the hall, the booth and the block (PlanGenerator.Garage); what is left over is
+                // the service office, the toilets, the mechanics' locker room and break room, a waiting lounge, the robots' room
+                HouseKind.Garage => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Kitchen => 1f, RoomType.LockerRoom => 1.4f,
+                    RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, RoomType.Storage => 1f, _ => 0f },
                 _ => 1f,
             };
             if (b.RoomTypeRules != null)
@@ -120,11 +121,15 @@ namespace Stealth.Level
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;
                     break;
                 case HouseKind.Garage:
-                    s.CorridorChance = b.CorridorChance * 0.3f;
-                    s.AtriumChance = b.AtriumChance * 0.4f;
+                    // a box of a building: the hall two storeys high, the block beside it two floors, square rooms (not in the
+                    // rooms test: a house of every room type keeps its program)
+                    if (b.EveryRoomType) break;
+                    s.Garage = true;
+                    s.FloorsPerHouse = new[] { 2 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
                     s.RotundaChance = 0f;
-                    s.CornerCutChance = b.CornerCutChance * 0.2f;
-                    s.RoomSizeScale = b.RoomSizeScale * 1.8f;
+                    s.CornerCutChance = 0f;
                     s.DarkChance = b.DarkChance + 0.08f;
                     break;
             }

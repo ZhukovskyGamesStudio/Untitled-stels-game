@@ -28,9 +28,11 @@ namespace Stealth.Tests
         }
 
         /// <summary>One shared house, built once for the fixture's scene tests (they only look at it).</summary>
-        static GameObject Built(out LevelLayout layout)
+        static GameObject Built(out LevelLayout layout) => Built(out layout, 99991, 4);
+
+        static GameObject Built(out LevelLayout layout, int seed, int house)
         {
-            layout = TestHouses.Get(99991, 4);
+            layout = TestHouses.Get(seed, house);
             if (ActiveLevel.Layout != layout || ActiveLevel.Root == null)
                 ActiveLevel.Load(layout, AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset"));
             return ActiveLevel.Root;
@@ -118,10 +120,11 @@ namespace Stealth.Tests
         /// own oriented box (the mesh bounds of that part), with 2 cm of tolerance for things that only touch. Facade windows
         /// (blinds and sills stick into the room) count as well.
         /// </summary>
-        [Test]
-        public void FurnitureDoesNotClip()
+        [TestCase(99991, 4)] // a hospital
+        [TestCase(7, 1)]     // an auto repair shop: cars, lifts, the bays' doors
+        public void FurnitureDoesNotClip(int seed, int house)
         {
-            var root = Built(out _);
+            var root = Built(out _, seed, house);
             var scratch = new GameObject("ClipProbe");
             try
             {

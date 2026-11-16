@@ -46,6 +46,22 @@ namespace Stealth.Tests
                     Draw(LevelGenerator.Generate(seed, house, level != null ? level.Building : null, level != null ? level.Security : null, 1, null, classic)));
         }
 
+        /// <summary>Logs/plans/garage_&lt;seed&gt;_&lt;house&gt;.png — the first auto repair shops of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteGaragePlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = 1 + seed % 4;
+                if (HouseKinds.Of(seed, house) != HouseKind.Garage) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"garage_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
+        }
+
         static Color TypeColor(RoomType t) => t switch
         {
             RoomType.Lobby => new Color(0.55f, 0.85f, 0.6f),
@@ -58,6 +74,8 @@ namespace Stealth.Tests
             RoomType.Restroom => new Color(0.75f, 0.9f, 0.95f),
             RoomType.Lounge => new Color(0.95f, 0.65f, 0.75f),
             RoomType.Corridor => new Color(0.9f, 0.9f, 0.88f),
+            RoomType.Workshop => new Color(0.6f, 0.62f, 0.66f),
+            RoomType.PaintBooth => new Color(0.95f, 0.45f, 0.4f),
             _ => new Color(0.85f, 0.85f, 0.7f),
         };
 

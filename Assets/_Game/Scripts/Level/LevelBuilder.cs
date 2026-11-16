@@ -65,6 +65,9 @@ namespace Stealth.Level
                 RoomType.Server => (new Color(0.55f, 0.75f, 1f), LightMath.RoomIntensity * 0.6f),
                 RoomType.Storage => (new Color(1f, 0.92f, 0.8f), LightMath.RoomIntensity * 0.75f),
                 RoomType.Lobby => (new Color(0.92f, 1f, 0.95f), LightMath.RoomIntensity * 1.15f),
+                // the shop: the hall under cold daylight tubes, the paint booth flooded white (colours must be judged true)
+                RoomType.Workshop => (new Color(0.9f, 0.96f, 1f), LightMath.RoomIntensity * 1.1f),
+                RoomType.PaintBooth => (new Color(0.95f, 0.98f, 1f), LightMath.RoomIntensity * 1.3f),
                 _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
@@ -140,7 +143,12 @@ namespace Stealth.Level
                 var rot = d.rotation;
                 if (vault && l.VaultRoom >= 0 && Vector3.Dot(l.Plan.Rooms[l.VaultRoom].Center - d.position, d.rotation * Vector3.forward) < 0f)
                     rot *= Quaternion.Euler(0f, 180f, 0f); // the round door's +Z into the vault
-                var door = Place(vault ? m_Art.VaultDoor : m_Art.AutoDoor, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
+                // the shop's doors are steel; its paint booth's is wide, for a car
+                bool shop = l.Kind == HouseKind.Garage;
+                var prefab = vault ? m_Art.VaultDoor
+                    : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
+                    : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor : m_Art.AutoDoor;
+                var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
                     bool keyed = false;
@@ -463,9 +471,9 @@ namespace Stealth.Level
                     continue;
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
-                bool vault = IsVaultDoorway(index, o);
+                bool vault = IsVaultDoorway(index, o), booth = IsBoothDoorway(index, o);
                 float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth
-                    : vault ? LevelMetrics.VaultDoorWidth : LevelMetrics.DoorWidth);
+                    : vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth : LevelMetrics.DoorWidth);
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
                 float sill = o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
                 float openH = vent ? sill + LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
@@ -530,6 +538,15 @@ namespace Stealth.Level
         {
             int v = m_Layout.VaultDoorway;
             if (v < 0 || v >= m_Plan.Openings.Count || m_Art.VaultDoor == null) return false;
+            var vo = m_Plan.Openings[v];
+            return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
+        }
+
+        /// <summary>The paint booth's doorway (<see cref="LevelLayout.BoothDoorway"/>) — a car goes through it.</summary>
+        bool IsBoothDoorway(int wall, PlanOpening o)
+        {
+            int v = m_Layout.BoothDoorway;
+            if (v < 0 || v >= m_Plan.Openings.Count) return false;
             var vo = m_Plan.Openings[v];
             return vo.Wall == wall && Mathf.Abs(vo.At - o.At) < 0.01f && o.Kind == EdgeType.Door;
         }
@@ -816,7 +833,7 @@ namespace Stealth.Level
                     if (ik == CellKind.Room)
                     {
                         int id = plan.IdAt(w.Floor, inside.x, inside.y);
-                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom)) continue;
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop)) continue; // the hall's street wall is its doors
                     }
                     roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));

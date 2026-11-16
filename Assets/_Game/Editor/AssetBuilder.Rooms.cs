@@ -165,10 +165,33 @@ namespace Stealth.EditorTools
             (PropKind.GoldPallet, "gold_pallet", "Gold", "Wood", "Wood", "PropScreen"),
             (PropKind.MoneyCart, "money_cart", "PropBody", "Rubber", "Felt", "PropScreen"),
             (PropKind.CashShelf, "cash_shelf", "Metal", "Felt", "Cardboard", "PropScreen"),
+            // the auto repair shop (Tools/Blender/garage.py)
+            (PropKind.CarParked, "car_parked", "CarRed", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.CarHoodOpen, "car_hood_open", "CarBlue", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.LiftCar, "lift_car", "CarSilver", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.LiftEmpty, "lift_empty", "ShopYellow", "Rubber", "Metal", "LampBulb"),
+            (PropKind.CarOnStands, "car_on_stands", "Ceiling", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.ToolChest, "tool_chest", "ToolRed", "Rubber", "Metal", "LampBulb"),
+            (PropKind.TireChanger, "tire_changer", "ToolRed", "Rubber", "Metal", "PropScreen"),
+            (PropKind.WheelBalancer, "wheel_balancer", "ToolRed", "Rubber", "Metal", "PropScreen"),
+            (PropKind.TireRack, "tire_rack", "Rack", "Rubber", "Metal", "PropScreen"),
+            (PropKind.TireStack, "tire_stack", "Rubber", "Rubber", "Metal", "PropScreen"),
+            (PropKind.EngineStand, "engine_stand", "ToolRed", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.EngineHoist, "engine_hoist", "ShopYellow", "Rubber", "Metal", "PropScreen"),
+            (PropKind.AirCompressor, "air_compressor", "ToolRed", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.OilDrain, "oil_drain", "ShopYellow", "Rubber", "Metal", "PropScreen"),
+            (PropKind.HoseReel, "hose_reel", "ShopYellow", "Rubber", "Metal", "PropScreen"),
+            (PropKind.FloorJack, "floor_jack", "ToolRed", "Rubber", "Metal", "PropScreen"),
+            (PropKind.OilDrums, "oil_drums", "Lockers", "Wood", "Metal", "PropScreen"),
+            (PropKind.WeldingCart, "welding_cart", "Lockers", "Rubber", "Metal", "PropScreen"),
+            (PropKind.BayLines, "bay_lines", "ShopYellow", "ShopYellow", "ShopYellow", "PropScreen"),
+            (PropKind.GarageDoor, "garage_door", "Ceiling", "PropAccent", "CarGlass", "PropScreen"),
+            (PropKind.PaintRack, "paint_rack", "Vending", "Rack", "Metal", "PropScreen"),
         };
 
         /// <summary>Kinds hung on a wall or standing on a counter: no collider (nothing walks into them, nothing stands on them).</summary>
-        static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard, PropKind.AreaRug };
+        static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard, PropKind.AreaRug,
+            PropKind.BayLines, PropKind.HoseReel };
 
         /// <summary>Cupboards whose doors open (Items.Storage, models with BodyDoor{n} parts): loot may hide behind them.</summary>
         static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet };

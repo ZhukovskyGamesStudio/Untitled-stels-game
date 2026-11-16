@@ -45,6 +45,7 @@ namespace Stealth.Level
             public readonly Dictionary<(int, int, int), bool> Galleries = new();
             public readonly List<int> StairRooms = new();  // per hall: room on the lower floor, then on the upper
             public LinkedMass Linked;                       // a house of blocks joined by corridors (null: one mass)
+            public GarageLayout Garage;                     // the auto repair shop's parts (null: any other house)
             public RoomProgram Program;                     // the rooms the house is to have (decided first)
             public readonly List<RectInt> LinkBlocks = new();    // cells
             public readonly List<RectInt> LinkCorridors = new(); // cells
@@ -90,7 +91,7 @@ namespace Stealth.Level
             // cut into the rooms
             List<RectInt> wings = null;
             var linkRng = c.Rng(0x11CC);
-            if (b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
+            if (!b.Garage && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
             {
                 if (program != null)
                 {
@@ -106,7 +107,7 @@ namespace Stealth.Level
                     o.Mass = "linked";
                 }
             }
-            wings ??= Mass(c.Rng(0xA55), area, house, b, out o.Mass);
+            wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass) : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
             foreach (var w in wings) { maxX = Mathf.Max(maxX, w.xMax); maxZ = Mathf.Max(maxZ, w.yMax); }
@@ -126,12 +127,17 @@ namespace Stealth.Level
             }
             CarveCourtyards(c, wings);
 
-            ReserveLobby(c);
-            ReserveHalls(c);
+            if (c.Garage != null) ReserveGarage(c);
+            else
+            {
+                ReserveLobby(c);
+                ReserveHalls(c);
+            }
             for (int f = 0; f < c.Floors; f++) ZoneFloor(c, f);
             var plan = c.Plan;
             SortStairRooms(c);
             Galleries(c);
+            if (c.Garage != null) GarageGalleries(c);
             plan.DeriveWalls((f, voidRoom, other) => c.Galleries.TryGetValue((f, voidRoom, other), out var g) && g);
             o.Plan = plan;
             o.Lobby = plan.IdAt(0, c.Lobby.xMin + c.Lobby.width / 2, c.Lobby.yMin + c.Lobby.height / 2);
@@ -522,6 +528,11 @@ namespace Stealth.Level
             if (c.Linked != null)
             {
                 ZoneLinked(c, f, regions, owner, Claim);
+                return;
+            }
+            if (c.Garage != null)
+            {
+                ZoneGarage(c, f, regions, owner, Claim);
                 return;
             }
 
@@ -1492,7 +1503,8 @@ namespace Stealth.Level
                     // off a corridor), rooms through rooms only where there is no other way; the storage room last: everything
                     // else joins without it, then it gets its one door (a dead end)
                     bool circulation = IsCirculation(plan, a) || IsCirculation(plan, bb);
-                    float w = IsStorage(plan, kv.Key) ? -1f : (circulation ? 10f : 0f) + (float)rng.NextDouble();
+                    // (the shop's paint booth too: sealed, its one door onto the workshop when it can)
+                    float w = IsStorage(plan, kv.Key) ? (Touches(plan, kv.Key, RoomType.Workshop) ? -0.5f : -1f) : (circulation ? 10f : 0f) + (float)rng.NextDouble();
                     order.Add((kv.Key, w));
                 }
                 order.Sort((p, q) => q.weight.CompareTo(p.weight));
@@ -1502,8 +1514,8 @@ namespace Stealth.Level
                     if (Find(key.Item1) == Find(key.Item2)) continue;
                     if (IsStorage(plan, key))
                     {
-                        int s = plan.Rooms[key.Item1].Type == RoomType.Storage ? key.Item1 : key.Item2;
-                        if (storageDoor.Contains(s) || plan.Rooms[key.Item1].Type == plan.Rooms[key.Item2].Type) continue;
+                        int s = OneDoor(plan.Rooms[key.Item1].Type) ? key.Item1 : key.Item2;
+                        if (storageDoor.Contains(s) || (OneDoor(plan.Rooms[key.Item1].Type) && OneDoor(plan.Rooms[key.Item2].Type))) continue;
                         if (TryOpen(key, EdgeType.Door)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
                         continue;
                     }
@@ -1572,7 +1584,7 @@ namespace Stealth.Level
                 var w = plan.Walls[i];
                 if (w.Floor != 0 || !w.Exterior || w.Shaped || w.Length < DoorWidth + 2f * DoorMargin) continue;
                 int room = Mathf.Max(w.RoomA, w.RoomB);
-                if (room < 0 || room == o.Lobby || plan.Rooms[room].Type == RoomType.Storage) continue;
+                if (room < 0 || room == o.Lobby || OneDoor(plan.Rooms[room].Type) || plan.Rooms[room].Type == RoomType.Workshop) continue; // (the hall's street wall is its bays' doors)
                 candidates.Add(i);
             }
             while (doors < 2 && candidates.Count > 0)
@@ -1615,7 +1627,12 @@ namespace Stealth.Level
             return 99;
         }
 
-        static bool IsStorage(HousePlan plan, (int, int) key) => plan.Rooms[key.Item1].Type == RoomType.Storage || plan.Rooms[key.Item2].Type == RoomType.Storage;
+        static bool IsStorage(HousePlan plan, (int, int) key) => OneDoor(plan.Rooms[key.Item1].Type) || OneDoor(plan.Rooms[key.Item2].Type);
+
+        /// <summary>A room with a single door, a dead end: the storage room (it is locked), the shop's paint booth (sealed).</summary>
+        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth;
+
+        static bool Touches(HousePlan plan, (int, int) key, RoomType t) => plan.Rooms[key.Item1].Type == t || plan.Rooms[key.Item2].Type == t;
 
         static bool IsHall(HousePlan plan, (int, int) key) => plan.Rooms[key.Item1].Type == RoomType.Hall || plan.Rooms[key.Item2].Type == RoomType.Hall;
 

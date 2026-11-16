@@ -348,16 +348,22 @@ namespace Stealth.Level
 
         static bool Plain(LevelLayout l, PlanRoom r) =>
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
-            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage) && !HasStair(l, r.Id);
+            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage or RoomType.PaintBooth) && !HasStair(l, r.Id);
 
         /// <summary>
         /// Makes the vault's doorway wide enough for the round bank door (<see cref="LevelMetrics.VaultDoorWidth"/>):
         /// where it is, or slid along its wall as little as possible — clear of the wall's ends, its other openings and the
         /// stairs on both sides. False (nothing changed) when the wall has no such place.
         /// </summary>
-        public static bool WidenVaultDoorway(LevelLayout l, int opening)
+        public static bool WidenVaultDoorway(LevelLayout l, int opening) => WidenDoorway(l, opening, LevelMetrics.VaultDoorWidth);
+
+        /// <summary>
+        /// Makes a doorway <paramref name="width"/> wide (nominal): where it is, or slid along its wall as little as possible —
+        /// clear of the wall's ends, its other openings and the stairs on both sides. False (nothing changed) when the wall has no such place.
+        /// </summary>
+        public static bool WidenDoorway(LevelLayout l, int opening, float width)
         {
-            const float margin = 0.45f, width = LevelMetrics.VaultDoorWidth;
+            const float margin = 0.45f;
             var plan = l.Plan;
             var o = plan.Openings[opening];
             var w = plan.Walls[o.Wall];
@@ -684,6 +690,14 @@ namespace Stealth.Level
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the
             // place — the place shrinks to its footprint
             var need = Furnisher.FootprintOf(kind);
+            // the place is tall (Furnisher.Tall): never where it would stand in front of a window (a low piece may have)
+            var windows = LevelBuilder.WindowSpots(l);
+            bool AtWindow(Vector3 p)
+            {
+                foreach (var (w, _) in windows)
+                    if (LevelLayout.FloorOf(w.y) == LevelLayout.FloorOf(p.y + 0.1f) && new Vector2(w.x - p.x, w.z - p.z).magnitude < Mathf.Max(need.width, need.height) / 2f + 1.2f) return true;
+                return false;
+            }
             // away from the hatch where the house allows it; a small first house has no "far"
             foreach (float away in new[] { 6f, 2.5f })
             // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
@@ -692,11 +706,12 @@ namespace Stealth.Level
                          PropKind.Shelf, PropKind.MetalShelving,
                          PropKind.PokerTable, PropKind.ReadingTable, PropKind.DiningTable, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.LabBench,
                          PropKind.RobotTable, PropKind.WorkTable, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball, PropKind.Credenza,
-                         PropKind.AvCredenza, PropKind.HallBench, PropKind.DoctorDesk })
+                         PropKind.AvCredenza, PropKind.HallBench, PropKind.DoctorDesk, PropKind.TireRack, PropKind.PaintRack })
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)
-                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away) options.Add(i);
+                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away
+                        && (!Furnisher.Tall.Contains(kind) || !AtWindow(l.Props[i].Position))) options.Add(i);
                 if (options.Count == 0) continue;
                 int pick = options[rng.Next(options.Count)];
                 var p = l.Props[pick];

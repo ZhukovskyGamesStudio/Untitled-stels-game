@@ -41,6 +41,7 @@ namespace Stealth.Level
                 foreach (var r in wallParts)
                     if (r != null) r.forceRenderingOff = false; // the bare wall's look until the finish takes over
             bool vault = ActiveLevel.Layout != null && ActiveLevel.Layout.VaultRoom >= 0; // dressed in steel in every style
+            g = ShopLook.For(g, kit, ActiveLevel.Layout); // the auto repair shop dresses as one in every style
             if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
             s_Kit = kit;
             var root = ActiveLevel.Root.transform;

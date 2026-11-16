@@ -208,10 +208,33 @@ namespace Stealth.Level
             [PropKind.GoldPallet] = Rect.MinMaxRect(-0.5f, -0.4f, 0.5f, 0.4f),
             [PropKind.MoneyCart] = Rect.MinMaxRect(-0.456f, -0.282f, 0.44f, 0.282f),
             [PropKind.CashShelf] = Rect.MinMaxRect(-0.8f, -0.25f, 0.8f, 0.25f),
+            // the auto repair shop (Tools/Blender/garage.py)
+            [PropKind.CarParked] = Rect.MinMaxRect(-0.95f, -2.27f, 0.95f, 2.27f),
+            [PropKind.CarHoodOpen] = Rect.MinMaxRect(-0.95f, -2.27f, 0.95f, 2.27f),
+            [PropKind.LiftCar] = Rect.MinMaxRect(-1.7f, -2.27f, 1.7f, 2.27f),
+            [PropKind.LiftEmpty] = Rect.MinMaxRect(-1.7f, -1.25f, 1.7f, 1.25f),
+            [PropKind.CarOnStands] = Rect.MinMaxRect(-1.25f, -2.27f, 1.6f, 2.27f), // (Blender x is mirrored: the loose wheels lie on +x)
+            [PropKind.ToolChest] = Rect.MinMaxRect(-0.57f, -0.25f, 0.57f, 0.25f),
+            [PropKind.TireChanger] = Rect.MinMaxRect(-0.7f, -0.52f, 0.42f, 0.61f),
+            [PropKind.WheelBalancer] = Rect.MinMaxRect(-0.53f, -0.42f, 0.6f, 0.42f),
+            [PropKind.TireRack] = Rect.MinMaxRect(-1.0f, -0.28f, 1.0f, 0.28f),
+            [PropKind.TireStack] = Rect.MinMaxRect(-0.38f, -0.38f, 0.38f, 0.38f),
+            [PropKind.EngineStand] = Rect.MinMaxRect(-0.34f, -0.46f, 0.44f, 0.46f),
+            [PropKind.EngineHoist] = Rect.MinMaxRect(-0.45f, -0.66f, 0.45f, 1.1f),
+            [PropKind.AirCompressor] = Rect.MinMaxRect(-0.61f, -0.26f, 0.61f, 0.26f),
+            [PropKind.OilDrain] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
+            [PropKind.HoseReel] = Rect.MinMaxRect(-0.19f, -0.1f, 0.19f, 0.27f),
+            [PropKind.FloorJack] = Rect.MinMaxRect(-0.16f, -0.87f, 0.16f, 0.59f),
+            [PropKind.OilDrums] = Rect.MinMaxRect(-0.6f, -0.55f, 0.6f, 0.55f),
+            [PropKind.WeldingCart] = Rect.MinMaxRect(-0.28f, -0.61f, 0.28f, 0.35f),
+            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -3f, 1.7f, 3f),
+            [PropKind.GarageDoor] = Rect.MinMaxRect(-1.7f, 0f, 1.7f, 0.1f),
+            [PropKind.PaintRack] = Rect.MinMaxRect(-0.8f, -0.25f, 0.66f, 0.25f),
         };
 
         /// <summary>Round-2 pieces hung on a wall (a clock, a board, a cabinet): no footprint on the floor to walk into.</summary>
-        static readonly HashSet<PropKind> Hung = new() { PropKind.WallClock, PropKind.ProjectorScreen, PropKind.ChangingTable, PropKind.TowelDispenser, PropKind.FireCabinet, PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet };
+        static readonly HashSet<PropKind> Hung = new() { PropKind.WallClock, PropKind.ProjectorScreen, PropKind.ChangingTable, PropKind.TowelDispenser, PropKind.FireCabinet, PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet,
+            PropKind.HoseReel };
 
         /// <summary>
         /// Big pieces that stand higher than a window's sill by more than a monitor does (shelving, lockers, fridges,
@@ -228,6 +251,7 @@ namespace Stealth.Level
             PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
             PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
             PropKind.Pinball, PropKind.MedTable, PropKind.Workbench,
+            PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
         };
 
         /// <summary>Pieces that hang on the wall itself: never on a window's glass or its frame.</summary>
@@ -235,7 +259,7 @@ namespace Stealth.Level
         {
             PropKind.WallCabinet, PropKind.WallClock, PropKind.HandDryer, PropKind.TowelDispenser, PropKind.ChangingTable, PropKind.FireCabinet,
             PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
-            PropKind.DartBoard,
+            PropKind.DartBoard, PropKind.HoseReel,
         };
 
         /// <summary>
@@ -254,11 +278,13 @@ namespace Stealth.Level
                 PropKind.MailCart or PropKind.LaundryCart or PropKind.HandTruck or PropKind.CrashCart or PropKind.ScopeCart or PropKind.Printer3d or
                 PropKind.FumeHood or PropKind.VocalBooth or PropKind.DrumKit or PropKind.PowerCage or PropKind.CableMachine or PropKind.MatRack or
                 PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
-                PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary => 1,
+                PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
+                PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist => 1,
             PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or
                 PropKind.RobotArm or PropKind.MicStand or PropKind.InfoKiosk or PropKind.Whiteboard or PropKind.NoticeBoard or PropKind.BinPair or
                 PropKind.PaperBin or PropKind.PaperStack or PropKind.GuitarStand or PropKind.AmpCabinet or PropKind.NightTable or PropKind.Plant or
-                PropKind.PlanterLarge or PropKind.BeanBag or PropKind.StandingDesk or PropKind.PlanterDivider => 2,
+                PropKind.PlanterLarge or PropKind.BeanBag or PropKind.StandingDesk or PropKind.PlanterDivider or PropKind.PaintRack or
+                PropKind.HoseReel or PropKind.EngineStand or PropKind.OilDrums => 2,
             _ => int.MaxValue,
         };
 
@@ -597,12 +623,13 @@ namespace Stealth.Level
         /// The middle of this room is for its furniture (a meeting room's table, a restroom's stalls): the patrol stands
         /// by the door instead (<see cref="LevelGenerator.PatrolSpot"/>) and "reached" means any free spot near the middle.
         /// </summary>
-        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom;
+        public static bool MiddleIsFurniture(PlanRoom r) => r.Type is RoomType.Meeting or RoomType.Restroom or RoomType.PaintBooth; // (the booth: its car)
 
         /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
         static bool InTheWay(PropKind k) =>
             k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
-                or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug) && !Hung.Contains(k);
+                or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
+                or PropKind.BayLines) && !Hung.Contains(k);
 
         // The room being furnished, as the walkability check will see it (same grid, same margins): its free cells
         // without furniture, and the spots a walker must still get between: its middle, the inner side of each of its
@@ -1212,6 +1239,7 @@ namespace Stealth.Level
                 RoomType.LockerRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 18f)),
                 RoomType.Infirmary => room.Area > 16f ? 1 : 0,
                 RoomType.GameRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 15f)),
+                RoomType.Workshop => Mathf.RoundToInt(room.Area / 70f), // tyres, an engine, the drain cart: the walkway behind the bays stays open
                 _ => 0,
             };
             Anchor(room);
@@ -1352,6 +1380,8 @@ namespace Stealth.Level
                 Anchor(room, 3, 6, false);
                 return;
             }
+            if (room.Type == RoomType.Workshop) { WorkshopBays(room); return; }
+            if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
             if (room.Type == RoomType.ControlRoom)
             {
                 // the house's two robot terminals: side by side, or each against its own wall (the video wall if neither fits)
@@ -1361,6 +1391,56 @@ namespace Stealth.Level
                 return;
             }
             Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>
+        /// The workshop hall's service bays along the street wall, one per 4 m: a closed sectional door against the wall, the
+        /// painted lines of the bay and in it a car up on a lift, a car with its hood up, one parked, one on jack stands or
+        /// a lift waiting empty — nose in, as they drive in. Where a doorway keeps the floor clear, the bay is left out.
+        /// </summary>
+        void WorkshopBays(PlanRoom room)
+        {
+            (PlanWall w, Vector3 n) street = default;
+            bool found = false;
+            foreach (var face in FacesOf(room))
+            {
+                if (face.n.z < 0.9f) continue;                     // the street is at z = 0: its wall's inner side looks +z
+                if (!found || face.w.A.y < street.w.A.y - 0.01f || (Mathf.Abs(face.w.A.y - street.w.A.y) < 0.01f && face.w.Length > street.w.Length))
+                {
+                    street = face;
+                    found = true;
+                }
+            }
+            if (!found) return;
+            var (wall, n) = street;
+            var u = new Vector3(wall.Dir.x, 0, wall.Dir.y);
+            float y = LevelLayout.FloorY(room.Floor);
+            var origin = new Vector3(wall.A.x, y, wall.A.y) + n * (LevelMetrics.WallThickness / 2f);
+            float bay = PlanGenerator.BayWidth;
+            int count = Mathf.FloorToInt((wall.Length - 0.6f) / bay);
+            float t0 = (wall.Length - count * bay) / 2f;
+            var cars = new[] { PropKind.LiftCar, PropKind.CarHoodOpen, PropKind.CarParked, PropKind.CarOnStands, PropKind.LiftEmpty };
+            var odds = new[] { 0.35, 0.2, 0.15, 0.15, 0.15 };
+            for (int k = 0; k < count; k++)
+            {
+                var f = new Frame(origin + u * (t0 + k * bay + bay / 2f), u, n);
+                double roll = m_Rng.NextDouble();
+                int pick = 0;
+                for (double acc = odds[0]; pick < odds.Length - 1 && roll > acc; acc += odds[++pick]) { }
+                var car = cars[pick];
+                // the whole bay first; where a doorway or a patrol keeps some of it free: without the door, without the lines,
+                // a narrower car
+                foreach (var (door, lines, kind) in new[] { (true, true, car), (false, true, car), (false, false, car), (false, false, PropKind.CarParked) })
+                {
+                    var b = new Batch();
+                    if (door) b.Add(PropKind.GarageDoor, f.P(0, 0.01f), f.Face, solid: false);
+                    if (lines) b.Add(PropKind.BayLines, f.P(0, 3.3f, 0.002f), f.Face, solid: false);
+                    b.Add(kind, f.P(0, 3.4f), f.Face);
+                    // a part left on the trunk lid of a car waiting its turn
+                    if (kind is PropKind.CarParked or PropKind.CarHoodOpen && Chance(0.5)) b.Item(f.P(R(-0.3f, 0.3f), 1.7f, 0.9f));
+                    if (TryCommit(room, b, 0.05f)) break;
+                }
+            }
         }
 
         /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
@@ -1805,6 +1885,16 @@ namespace Stealth.Level
                         b.Add(PropKind.NetworkCabinet, f.P(-0.55f, -0.33f), f.Back);
                     }
                     break;
+                case RoomType.Workshop: // loose things on the floor between the bays and the benches
+                    if (roll < 0.3) b.Add(PropKind.TireStack, f.P(0, 0), 0);
+                    else if (roll < 0.55) { b.Add(PropKind.EngineStand, f.P(0, 0), f.Face); b.Item(f.P(-0.2f, 0, 1.14f)); }
+                    else if (roll < 0.75) b.Add(PropKind.OilDrain, f.P(0, 0), 0);
+                    else if (roll < 0.9) b.Add(PropKind.FloorJack, f.P(0, 0), f.Face);
+                    else { b.Add(PropKind.TireStack, f.P(-0.45f, 0), 0); b.Add(PropKind.TireStack, f.P(0.45f, 0), 0); }
+                    break;
+                case RoomType.PaintBooth: // the car being painted, lengthwise in the booth
+                    b.Add(PropKind.CarParked, f.P(0, 0), f.AlongU);
+                    break;
                 case RoomType.Storage: // a wrapped pallet and a stack of boxes by the pile
                     b.Add(PropKind.Pallet, f.P(0, 0), m_Rng.Next(2) * 90f);
                     b.Add(PropKind.Boxes, f.P(0.2f, 1.2f), f.Face);
@@ -1827,6 +1917,18 @@ namespace Stealth.Level
                         b.Add(PropKind.CoffeeTable, f.P(0, 0.85f), f.Face);
                         b.Item(f.P(0, 0.85f, 0.42f));
                     }
+                    break;
+                case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
+                    // the shop's front desk: the service counter, a row of waiting chairs facing it, a stack of tyres on show
+                    if (roll < 0.45)
+                    {
+                        b.Add(PropKind.ReceptionDesk, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
+                        b.Item(f.P(-0.4f, 0.33f, 1.14f));
+                    }
+                    else if (roll < 0.8)
+                        for (int i = -1; i <= 1; i++) b.Add(PropKind.GuestChair, f.P(i * 0.65f, 0), f.Face);
+                    else { b.Add(PropKind.TireStack, f.P(-0.45f, 0), 0f); b.Add(PropKind.TireStack, f.P(0.45f, 0), 0f); }
                     break;
                 case RoomType.Lobby:
                     if (roll < 0.32)
@@ -2082,6 +2184,16 @@ namespace Stealth.Level
                     if (roll < 82) return Single(PropKind.DirectoryBoard, 0.85f);
                     if (roll < 92) return Single(PropKind.PlanterLarge, 1.05f);
                     { b.Add(PropKind.Sculpture, f.P(0, 0.45f), f.Face); return 0.7f; }
+                case RoomType.Lobby when m_L.Kind == HouseKind.Garage:
+                    // the waiting area: chairs along the wall, the tyre display, coffee and water, a rack of brochures
+                    if (roll < 30) return Row(f, b, PropKind.GuestChair, 3, 0.65f);
+                    if (roll < 48) return Single(PropKind.TireRack, 2.1f);
+                    if (roll < 58) return Single(PropKind.VendingMachine, 1.0f);
+                    if (roll < 66) return Single(PropKind.WaterCooler, 0.5f);
+                    if (roll < 76) { b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face); b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face); b.Item(f.P(0, 1.35f, 0.42f)); return 2.25f; }
+                    if (roll < 84) return Single(PropKind.MagazineRack, 0.6f);
+                    if (roll < 92) return Single(PropKind.Plant, 0.75f);
+                    return Single(PropKind.TireStack, 0.85f);
                 case RoomType.Lobby:
                     if (roll < 18) { b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face); b.Add(PropKind.CoffeeTable, f.P(0, 1.35f), f.Face); b.Item(f.P(0, 1.35f, 0.42f)); return 2.25f; }
                     if (roll < 30) { b.Add(PropKind.Lockers, f.P(-0.525f, BackOf(PropKind.Lockers)), f.Face); b.Add(PropKind.Lockers, f.P(0.525f, BackOf(PropKind.Lockers)), f.Face); return 2.1f; }
@@ -2217,7 +2329,26 @@ namespace Stealth.Level
                     if (roll < 84) { Row(f, b, PropKind.UpsUnit, 2, 0.55f); b.Item(f.P(R(-0.2f, 0.2f), BackOf(PropKind.UpsUnit), 0.985f)); return 1.15f; }
                     if (roll < 92) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
                     { Single(PropKind.CrashCart, 0.65f); b.Item(f.P(0, BackOf(PropKind.CrashCart), 0.815f)); return 0.65f; }
+                case RoomType.Workshop:
+                    // the benches and machines along the walls behind the bays: a real shop's equipment list
+                    if (roll < 22) { Single(PropKind.ToolChest, 1.2f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.ToolChest), 1.06f)); return 1.2f; }
+                    if (roll < 34) return Single(PropKind.TireRack, 2.1f);
+                    if (roll < 42) return Single(PropKind.TireChanger, 1.2f);
+                    if (roll < 50) return Single(PropKind.WheelBalancer, 1.2f);
+                    if (roll < 56) return Single(PropKind.AirCompressor, 1.3f);
+                    if (roll < 64) { Single(PropKind.OilDrums, 1.25f); return 1.25f; }
+                    if (roll < 70) return Single(PropKind.WeldingCart, 0.7f);
+                    if (roll < 76) return Single(PropKind.EngineHoist, 1.0f);
+                    if (roll < 86) { Single(PropKind.WorkTable, 1.7f); b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.WorkTable), 0.92f)); return 1.7f; }
+                    if (roll < 93) return Hung(PropKind.HoseReel, 0.6f);
+                    { Single(PropKind.MetalShelving, 1.85f); if (Chance(0.7)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.MetalShelving), StorageDecks[m_Rng.Next(3)])); return 1.85f; }
+                case RoomType.PaintBooth:
+                    if (roll < 50) { Single(PropKind.PaintRack, 1.45f); b.Item(f.P(-0.3f, BackOf(PropKind.PaintRack), 0.95f)); return 1.45f; }
+                    if (roll < 70) return Single(PropKind.ToolChest, 1.2f);
+                    if (roll < 85) return Hung(PropKind.HoseReel, 0.6f);
+                    return Single(PropKind.TireStack, 0.85f);
                 case RoomType.Storage:
+                    if (m_L.Kind == HouseKind.Garage && roll < 30) return Single(PropKind.TireRack, 2.1f); // the parts store keeps tyres too
                     if (roll < 80)
                     {
                         // shelves all round: loot on the upper boards from the start, the bottom board for the workers

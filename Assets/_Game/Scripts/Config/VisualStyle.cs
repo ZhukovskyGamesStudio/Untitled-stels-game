@@ -144,6 +144,9 @@ namespace Stealth.Configs
             return -1;
         }
 
+        /// <summary>A copy (the arrays shared until replaced): a house kind dresses itself on top of the style (Level.ShopLook).</summary>
+        public StyleGeometry Clone() => (StyleGeometry)MemberwiseClone();
+
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
                                        Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null ||
                                        (DecayDensity > 0f && (FloorDecay.Length > 0 || WallDecay.Length > 0)) || (PosterChance > 0f && Posters.Length > 0);

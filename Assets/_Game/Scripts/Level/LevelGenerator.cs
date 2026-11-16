@@ -178,6 +178,13 @@ namespace Stealth.Level
 
         public object Clone() => MemberwiseClone();
 
+        /// <summary>
+        /// The auto repair shop's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Garage"/>, never saved):
+        /// a double-height workshop hall with bays along the street, a two-storey block with the reception, rooms behind
+        /// the hall and a gallery over it (<see cref="PlanGenerator"/>, PlanGenerator.Garage.cs).
+        /// </summary>
+        [System.NonSerialized] public bool Garage;
+
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
         public float AreaFor(int players) =>
@@ -320,6 +327,7 @@ namespace Stealth.Level
                 l.Stairs.AddRange(o.Stairs);
                 RaiseVents(l, building);
                 Doorways(l);
+                if (building.Garage) WidenBoothDoorway(l);
                 l.HatchPosition = l.Lobby.Center;
                 long planMs = watch.ElapsedMilliseconds;
                 bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
@@ -508,7 +516,7 @@ namespace Stealth.Level
             float far = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage || r.Area < 10f) continue;
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth || r.Area < 10f) continue; // (the booth: its car)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (d > far) { far = d; best = r; }
@@ -679,7 +687,7 @@ namespace Stealth.Level
                 if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f) desks.Add(i);
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i)) desks.Add(i);
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
             var want = new List<TerminalKind>();
             // the hacking terminal first: with a single console in the control room, it is the one there
@@ -721,6 +729,31 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>The shop's paint booth: its one door widened for a car (it is driven in), remembered for its big sliding door.</summary>
+        static void WidenBoothDoorway(LevelLayout l)
+        {
+            int booth = -1;
+            foreach (var r in l.Rooms) if (r.Type == RoomType.PaintBooth) booth = r.Id;
+            if (booth < 0) return;
+            for (int i = 0; i < l.Doorways.Count; i++)
+            {
+                var d = l.Doorways[i];
+                if (d.Kind != EdgeType.Door || (d.RoomA != booth && d.RoomB != booth)) continue;
+                if (HouseFeatures.WidenDoorway(l, i, VehicleDoorWidth)) l.BoothDoorway = i;
+                return;
+            }
+        }
+
+        /// <summary>A desk lamp stands on this desk (it would go through a terminal's monitors: such a desk stays a desk).</summary>
+        public static bool LampOn(LevelLayout l, int desk)
+        {
+            var d = l.Props[desk].Position;
+            foreach (var p in l.Props)
+                if (p.Kind == PropKind.DeskLamp && p.Position.y > d.y + 0.4f && p.Position.y < d.y + 1.5f
+                    && new Vector2(p.Position.x - d.x, p.Position.z - d.z).magnitude < 1.0f) return true;
+            return false;
+        }
+
         static void PlaceSecurity(LevelLayout l, System.Random rng, BuildingSettings b, SecuritySettings s, int storageWorkers = 0)
         {
             int level = l.LevelIndex;
@@ -760,9 +793,12 @@ namespace Stealth.Level
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
-            foreach (var d in l.Doorways)
-                if (d.Kind == EdgeType.Door && !d.Exterior)
+            for (int i = 0; i < l.Doorways.Count; i++)
+            {
+                var d = l.Doorways[i];
+                if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway) // (the paint booth's: its big door, nothing in the way)
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
+            }
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.HatchPosition;
@@ -830,6 +866,13 @@ namespace Stealth.Level
             // Sliding doors in some of the remaining doorways (never together with a laser).
             foreach (var d in doors)
                 if (rng.NextDouble() < b.AutoDoorChance) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+            // the paint booth's sliding door (wide enough for a car), never locked
+            if (l.BoothDoorway >= 0)
+            {
+                var bd = l.Doorways[l.BoothDoorway];
+                l.BoothDoor = l.AutoDoors.Count;
+                l.AutoDoors.Add(new Pose(bd.Position, bd.Rotation));
+            }
 
             // Some of them are locked (own stream: the rest of the house does not shift). Never next to the lobby.
             if (level < b.LockedDoorsFromHouse) return;
@@ -837,7 +880,7 @@ namespace Stealth.Level
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
-                if (locks.NextDouble() < b.LockedDoorChance && !lobby) l.LockedDoors.Add(i);
+                if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
             }
         }
 

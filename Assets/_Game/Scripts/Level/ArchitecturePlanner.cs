@@ -63,7 +63,8 @@ namespace Stealth.Level
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (layout != null) PlanRoomCeilings(list, layout, g);
             if (layout != null) PlanThresholds(list, shell, layout, g);
-            if (layout != null && (layout.VaultRoom >= 0 || g.Floor != null && g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
+            // (rooms with a floor of their own get it even where the style keeps the bare slab: the shop's epoxy, ShopLook)
+            if (layout != null && (layout.VaultRoom >= 0 || g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
             else if (g.Floor != null)
                 foreach (var r in shell.Floors)
                 {
@@ -209,7 +210,7 @@ namespace Stealth.Level
             {
                 int k = CeilingLookOf(room, g);
                 if (k < 0) continue;
-                float y = LevelLayout.FloorY(room.Floor) + LevelMetrics.WallHeight - 0.014f;
+                float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight - 0.014f; // (a hall's: on its top storey)
                 foreach (var r in CeilingRects(l, room))
                     list.Add(new DecorPiece
                     {
