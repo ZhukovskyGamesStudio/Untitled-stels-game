@@ -530,7 +530,7 @@ namespace Stealth.Level
                     foreach (var o in l.Plan.OpeningsOf(w))
                     {
                         if (o.Kind == EdgeType.Open) open = true;
-                        else if (o.Kind == EdgeType.Door) cuts.Add((o.At - LevelMetrics.ClearWidth(o.Width) / 2f, o.At + LevelMetrics.ClearWidth(o.Width) / 2f));
+                        else if (o.Kind is EdgeType.Door or EdgeType.Breach) cuts.Add((o.At - LevelMetrics.ClearWidth(o.Width) / 2f, o.At + LevelMetrics.ClearWidth(o.Width) / 2f));
                     }
                     if (open) continue;
                     cuts.Sort();

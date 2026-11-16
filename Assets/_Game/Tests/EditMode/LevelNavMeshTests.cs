@@ -70,7 +70,7 @@ namespace Stealth.Tests
             foreach (var d in m_Layout.Doorways)
                     {
                         var edge = d.Kind;
-                        if (edge != EdgeType.Vent && edge != EdgeType.Squeeze) continue; // crawl vents and narrow slots are for players only
+                        if (edge is not (EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow)) continue; // crawl vents, slots, holes, inner windows: players only
                         // Points right on both sides of the opening.
                         var across = d.Rotation * Vector3.forward;
                         var a = d.Position - across * 0.8f;

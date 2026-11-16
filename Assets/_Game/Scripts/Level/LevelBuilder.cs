@@ -417,13 +417,16 @@ namespace Stealth.Level
                     continue;
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
-                float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth : LevelMetrics.DoorWidth);
+                bool breach = o.Kind == EdgeType.Breach, hole = o.Kind == EdgeType.Hole, window = o.Kind == EdgeType.InnerWindow;
+                float clear = LevelMetrics.ClearWidth(LevelMetrics.OpeningWidth(o.Kind));
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
-                float sill = o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
-                float openH = vent ? sill + LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
+                float sill = window ? LevelMetrics.InnerWindowSill : o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
+                float openH = vent ? sill + LevelMetrics.VentHeight
+                    : window ? sill + LevelMetrics.InnerWindowHeight
+                    : hole ? LevelMetrics.HoleHeight : LevelMetrics.DoorHeight;
                 WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * o0, 0f, height);
                 RecordFaces(a3 + d3 * from, a3 + d3 * o0, 0f, height, w.Exterior, inner, cornerA, false, jointA && cornerA == false && from <= t / 2f + 0.001f);
-                if (vent)
+                if (vent || window)
                 {
                     // the duct's floor: a sill of wall under the hole
                     WallPiece(m_Art.WallBlock, a3 + d3 * o0, a3 + d3 * o1, 0f, sill);
@@ -432,10 +435,15 @@ namespace Stealth.Level
                 WallPiece(m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
-                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Floor = m_Floor });
+                // a window between rooms has a sill like a vent and a frame of its own; breaches and holes are ruins, no door trim
+                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent || window, Exterior = w.Exterior,
+                    Squeeze = squeeze || breach || hole, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
+                else if (window) { if (m_Art.InnerWindowFrame != null) Place(m_Art.InnerWindowFrame, "InnerWindow", mid, along); }
+                else if (breach) { if (m_Art.BreachFrame != null) Place(m_Art.BreachFrame, "Breach", mid, along); }
+                else if (hole) { if (m_Art.HoleFrame != null) Place(m_Art.HoleFrame, "Hole", mid, along); }
                 else if (w.Exterior) Place(m_Art.AutoDoor, "ExteriorDoor", mid, along);
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
                 else if (m_Art.ExitSign != null) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);

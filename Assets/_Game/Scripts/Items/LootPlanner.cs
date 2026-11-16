@@ -34,6 +34,8 @@ namespace Stealth.Items
         [Tooltip("The hidden room: this many items in it first, and richer ones.")]
         public int HiddenRoomItems = 3;
         public int HiddenRoomBonus = 14;
+        [Tooltip("Value bonus in the deepest room of the house (steps from the lobby), less on the way there: the best things lie deep inside.")]
+        public int DepthBonus = 8;
         [Tooltip("Behind a key door (the key is a detour): this many items there first, and richer and bigger ones.")]
         public int KeyRoomItems = 3;
         public int KeyRoomBonus = 12;
@@ -86,6 +88,7 @@ namespace Stealth.Items
                 + (l.IsDarkAt(p + Vector3.up * 0.5f) ? s.DarkRoomBonus : 0)
                 + (l.Location == Location.Office ? s.OfficeBonus : 0)
                 + (InHidden(p) ? s.HiddenRoomBonus : 0)
+                + Mathf.RoundToInt(s.DepthBonus * l.DepthShare(l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Id ?? -1))
                 + (RegionOf(p) >= 0 ? s.KeyRoomBonus : 0);
             bool InHidden(Vector3 p) => l.HiddenRoom >= 0 && l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Id == l.HiddenRoom;
             // in a room worth the detour the shape is the bigger of two draws (bigger things are worth more)

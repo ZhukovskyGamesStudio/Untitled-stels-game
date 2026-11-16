@@ -38,6 +38,12 @@ namespace Stealth.Level
         public GameObject HighVentFrame;
         [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
         public GameObject SqueezeFrame;
+        [Tooltip("The broken edges and rubble of a breach (a stretch of wall knocked out; no colliders).")]
+        public GameObject BreachFrame;
+        [Tooltip("The broken edges and rubble of a hole at the floor, with the navmesh volume that keeps robots out.")]
+        public GameObject HoleFrame;
+        [Tooltip("The frame of a window between rooms, its glass gone (no colliders: the wall pieces are the sill and the head).")]
+        public GameObject InnerWindowFrame;
         [Tooltip("One bay of a gallery railing in every staircase look (StairLook picks one).")]
         public GameObject RailingBay;
         [Tooltip("An invisible box collider, stretched along a railing.")]

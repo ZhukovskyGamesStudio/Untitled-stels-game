@@ -1,0 +1,113 @@
+"""Ruined openings between rooms: the broken edge of a breach, a pile of rubble, the frame of an inner window without glass.
+
+Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/ruins.py -- Assets/_Game/Art/Models
+
+Writes Level/breach_rim.fbx, Level/rubble.fbx and Level/inner_window_frame.fbx (prefabs Level/BreachFrame, HoleFrame,
+InnerWindowFrame, AssetBuilder.Level). All decor: no colliders in the game, the wall pieces keep the shape.
+
+- breach_rim: the broken edge of a wall along one side of a hole knocked through it — irregular chunks of concrete
+  standing 2-9 cm into the gap and a little proud of both faces. 2.3 m tall (the game scales it to the opening; lying
+  down it is the broken top). Origin at the foot of the cut line; +X into the gap, the wall's thickness along Y.
+- rubble: a low pile of broken concrete (about 0.9 x 0.5 m, 0.3 m high), origin on the floor in its middle.
+- inner_window_frame: a window between two rooms, its glass long gone: a frame on both faces round a 1.4 x 1.25 m
+  opening whose sill is 0.9 m above the floor, a sill board and a stub of the broken mullion. Origin on the floor under
+  the middle of the opening, along X.
+"""
+import math
+import os
+import random
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import meshfix  # noqa: E402
+import shapes as s  # noqa: E402
+
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+MODELS = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models"))
+WALL = 0.2                       # LevelMetrics.WallThickness
+RIM_H = 2.3                      # LevelMetrics.DoorHeight
+WIN_W, WIN_SILL, WIN_H = 1.4, 0.9, 1.25   # clear width, sill height, opening height (LevelMetrics.InnerWindow*)
+
+
+def export(path, floor):
+    import bpy
+    bpy.context.view_layer.update()
+    objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    meshfix.fix_objects(objs, floor=floor, name=os.path.basename(path))
+    s.export_fbx(path, objs)
+    print("exported", path)
+
+
+def breach_rim():
+    """Chunks stacked up the cut line, overlapping each other by a few centimetres (one piece of broken wall)."""
+    rnd = random.Random(7)
+    bms = []
+    z = 0.0
+    while z < RIM_H - 0.05:
+        h = rnd.uniform(0.14, 0.32)
+        h = min(h, RIM_H - z)
+        out = rnd.uniform(0.02, 0.09)            # into the gap
+        back = 0.06                               # into the wall (hidden in its block)
+        deep = WALL + rnd.uniform(0.0, 0.05)      # a little proud of the faces, now one, now both
+        y = rnd.uniform(-0.015, 0.015)
+        bms.append(s.rbox((out + back, deep, h + 0.04), loc=((out - back) / 2, y, z + h / 2),
+                          r=0.012, seg=1, rot=(rnd.uniform(-6, 6), rnd.uniform(-8, 8), rnd.uniform(-10, 10))))
+        # a smaller broken lump on one face now and then
+        if rnd.random() < 0.45:
+            side = rnd.choice((-1, 1))
+            bms.append(s.rbox((rnd.uniform(0.05, 0.1), 0.06, rnd.uniform(0.06, 0.12)),
+                              loc=(rnd.uniform(-0.02, 0.04), side * (WALL / 2 + 0.005), z + h * rnd.uniform(0.2, 0.8)),
+                              r=0.01, seg=1, rot=(rnd.uniform(-20, 20), rnd.uniform(-20, 20), rnd.uniform(-20, 20))))
+        z += h
+    s.part("Body", bms)
+
+
+def rubble():
+    """A pile grown chunk by chunk, each leaning on one already there: big ones low in the middle, small ones round them."""
+    rnd = random.Random(11)
+    bms = []
+    placed = [(0.0, 0.0, 0.22)]
+    bms.append(s.rbox((0.26, 0.2, 0.15), loc=(0, 0, 0.063), r=0.012, seg=1, rot=(4, -3, 20)))
+    for i in range(15):
+        px, py, ps = placed[rnd.randrange(len(placed))]
+        a = rnd.uniform(0, 2 * math.pi)
+        x = max(-0.42, min(0.42, px + math.cos(a) * ps * 0.45))
+        y = max(-0.2, min(0.2, py + math.sin(a) * ps * 0.35))
+        d = min(1.0, math.hypot(x / 0.45, y / 0.22))
+        size = 0.22 * (1.0 - 0.5 * d) * rnd.uniform(0.7, 1.05)
+        h = size * rnd.uniform(0.45, 0.75)
+        lift = (1.0 - d) * 0.07
+        bms.append(s.rbox((size, size * rnd.uniform(0.6, 1.0), h), loc=(x, y, h / 2 - 0.012 + lift),
+                          r=0.012, seg=1, rot=(rnd.uniform(-15, 15), rnd.uniform(-15, 15), rnd.uniform(0, 180))))
+        placed.append((x, y, size))
+    s.part("Body", bms)
+
+
+def inner_window_frame():
+    """A frame on both faces, the sill board across the wall, a broken mullion stub hanging from the head."""
+    bms = []
+    bar = 0.07
+    top = WIN_SILL + WIN_H
+    for side in (-1, 1):
+        y = side * (WALL / 2 + 0.012)
+        # head and jambs: an L of wood standing out of the face, overlapping the opening's edge
+        bms.append(s.rbox((WIN_W + 2 * bar, 0.035, bar), loc=(0, y, top + bar / 2 - 0.01), r=0.008, seg=1))
+        for x in (-1, 1):
+            bms.append(s.rbox((bar, 0.035, WIN_H + bar), loc=(x * (WIN_W / 2 + bar / 2 - 0.01), y, WIN_SILL + WIN_H / 2), r=0.008, seg=1))
+    # the sill board, across the wall and a little over both faces
+    bms.append(s.rbox((WIN_W + 0.1, WALL + 0.09, 0.04), loc=(0, 0, WIN_SILL + 0.01), r=0.01, seg=2))
+    # a stub of the mullion that held the panes, snapped off
+    bms.append(s.rbox((0.05, 0.035, 0.38), loc=(0.08, -(WALL / 2 + 0.012), top - 0.17), r=0.008, seg=1, rot=(0, 7, 0)))
+    s.part("Body", bms)
+
+
+def main():
+    out = os.path.join(MODELS, "Level")
+    os.makedirs(out, exist_ok=True)
+    for name, build, floor in (("breach_rim", breach_rim, True), ("rubble", rubble, True), ("inner_window_frame", inner_window_frame, False)):
+        s.clear_scene()
+        build()
+        export(os.path.join(out, name + ".fbx"), floor)
+
+
+main()

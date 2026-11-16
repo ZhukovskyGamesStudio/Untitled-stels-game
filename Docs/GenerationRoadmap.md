@@ -130,8 +130,8 @@ Not worth it here: learned generators at runtime, WFC for room layout.
 |---|---|---|
 | 1 | **Zoning**: facade band for work rooms, interior for service rooms, stair core, caps on themed rooms | **Done** (`Zoning`, `ZoningTests`) |
 | 2 | **Corridor-first floors**: most rooms are dead ends off corridors (1–2 doors), with a few planned loops and vents instead of walk-through chains | **Done** (see below) |
-| 3 | **Depth from the lobby** (BFS on the room graph): public types shallow, private deep; use depth for loot value, robot density and lock/key placement | Planned |
-| 4 | **Adjacency score**: kitchen beside open space, meeting rooms near the lobby, storage near a service entrance; keep the best of several plan attempts | Planned |
+| 3 | **Depth from the lobby** (BFS on the room graph): public types shallow, private deep; use depth for loot value, robot density and lock/key placement; loops made of ruins (breaches, holes, inner windows) instead of doors | **Done** (see below; lock/key by depth still open) |
+| 4 | **Adjacency score**: kitchen beside open space, meeting rooms near the lobby, storage near a service entrance; keep the best of several plan attempts | **Done** (swaps; best-of-attempts not needed) |
 | 5 | **Furniture**: fill empty offices and server rooms; then a cost-based polish pass or hand templates for themed rooms | Planned |
 | 6 | **Stealth checks** (later): camera coverage on the plan grid, a hidden path to every loot room, mission-graph lock and key | Idea |
 
@@ -162,6 +162,41 @@ Not worth it here: learned generators at runtime, WFC for room layout.
 Stealth trade-off: walk loops dropped a lot; vents and squeezes remain the hidden ways round. Tune `LoopsPerRoom` /
 `VentsPerRoom` in `Data/Config/Level` if houses feel too linear. Remaining enfilade comes from open-plan wings (no
 corridor by roll or house kind).
+
+### Step 3 result: depth from the lobby, ruins as loops
+- `RoomDepth`: steps from the lobby over the ways people walk (doors, open passages, breaches, illusion walls, stairs);
+  `LevelLayout.RoomSteps` / `DepthShare(room)` (0 lobby … 1 deepest).
+- Zoning adds `RoomRule.Privacy` (−1 public: meeting, kitchen, lounge, gym, game room; +1 private: server, control room,
+  lab, studio) against depth (`Zoning.PrivacyWeight` 1.5). Depth share by type now: gym 0.26, game room 0.28, kitchen 0.37,
+  lounge 0.38, meeting 0.41 … office 0.54, studio 0.57, server 0.60, lab 0.63 (was flat).
+- Loot: `LootSettings.DepthBonus` 8 × depth share. Robots: `SecuritySettings.DeepRoomWeight` 2 (the deepest room 3× as
+  likely); guards average 0.56 deep vs 0.51 for rooms.
+- **Ruins as loops** (the user's idea, to win back stealth routes without enfilades): `LoopsPerRoom` 0.16, made of doors
+  (weight 2), **breaches** (3: a stretch of wall knocked out, everyone walks), **holes** (2: at the floor, players crawl
+  crouched, robots blocked by a navmesh volume) and **inner windows** (3: no glass, sill 0.9 m — players jump on and crawl
+  through, robots cannot climb, everyone sees and hears through). About 7 ruins and 2 extra doors per house. Models
+  `Tools/Blender/ruins.py` (breach_rim, rubble, inner_window_frame), prefabs `Level/BreachFrame`, `HoleFrame`,
+  `InnerWindowFrame`.
+- Open: put key doors / locks by depth (roadmap idea), and per-style variants of the ruin models.
+
+### Step 4 result: adjacency
+- `BuildingSettings.RoomAdjacency` (`RoomRules.AdjacencyDefaults`): pairs of types and how good it is for them to be next
+  door (kitchen + open space 1.5, lockers + gym 2, server + control room 1.5 … nap room + game room −1.5, kitchen +
+  toilets −1.5, library + noise −0.8…−1). Zoning's swaps add the neighbours' scores (a shared wall ≥ 1 m, ×1.5 if a
+  walked way joins the rooms).
+- Service entrance: the first outside door goes into the room in front of the storage room when it has an outside wall
+  (room program; the classic generator picks its storage room later).
+- Best-of-several-attempts was not needed: the swaps reach it cheaply.
+
+| Pair touching (72 houses, program / classic) | Before | After |
+|---|---|---|
+| Kitchen ~ open space or lounge | 46 % / 59 % | 98 % / 97 % |
+| Server ~ control room, lab or server | 70 % / 68 % | 93 % / 88 % |
+| Locker room ~ gym or toilets | 16 % / 14 % | 53 % / 50 % |
+| Copy room ~ open space or office | 78 % / 69 % | 100 % / 98 % |
+| Nap room ~ noisy room (bad) | 24 % / 7 % | 2 % / 0 % |
+| Kitchen ~ toilets (bad) | 15 % / 10 % | 1 % / 1 % |
+| Storage with an outside door next door | 2 / 43 | 22 / 43 (program) |
 
 ### How to measure
 A temporary EditMode test generated 72 houses per mode and printed the metrics above (windowless work rooms, service

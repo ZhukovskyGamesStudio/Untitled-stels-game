@@ -40,6 +40,8 @@ namespace Stealth.Level
         [Tooltip("What a room type allows: size, proportions, an outside wall (windows), loot. The storage room is never drawn " +
                  "by weight: a house has one only by FeatureSettings.StorageChance (StorageRoom).")]
         public RoomRule[] RoomTypeRules = Stealth.Level.RoomRules.Defaults();
+        [Tooltip("Which room types belong next door to which, which should be kept apart (Zoning swaps the types of rooms on a floor by it).")]
+        public RoomAdjacency[] RoomAdjacency = Stealth.Level.RoomRules.AdjacencyDefaults();
 
         [Header("Light")]
         [Tooltip("Chance of a dark room in the first house.")]
@@ -57,10 +59,18 @@ namespace Stealth.Level
         [Header("Passages")]
         [Tooltip("Share of the main passages that are open arches instead of doors.")]
         public float OpenPassageChance = 0.3f;
-        [Tooltip("Loops: extra doors a floor gets, per room on it (0.08 = about one per 12 rooms). Every room first gets its " +
-                 "way in — off a corridor, a hall or the lobby when it touches one — so the rest are dead ends; these doors " +
-                 "are placed where they make the longest way round (a second door onto the corridor, or between two rooms).")]
-        public float LoopsPerRoom = 0.08f;
+        [Tooltip("Loops: extra ways round a floor gets, per room on it (0.16 = about one per 6 rooms). Every room first gets " +
+                 "its way in — off a corridor, a hall or the lobby when it touches one — so the rest are dead ends; these are " +
+                 "placed where they make the longest way round, and made of doors or ruins by the weights below.")]
+        public float LoopsPerRoom = 0.16f;
+        [Tooltip("What the loops are made of (weights): a door…")]
+        public float LoopDoorWeight = 2f;
+        [Tooltip("…a breach: a stretch of wall knocked out (everyone walks through)…")]
+        public float LoopBreachWeight = 3f;
+        [Tooltip("…a hole at the floor (players crawl through, robots do not)…")]
+        public float LoopHoleWeight = 2f;
+        [Tooltip("…a window between the rooms without glass (players climb through, robots only see and hear through).")]
+        public float LoopWindowWeight = 3f;
         [Tooltip("Crawl vents a floor gets, per room on it: the hidden ways round, placed where they cut the longest walk short.")]
         public float VentsPerRoom = 0.25f;
         [Tooltip("Share of the vents that sit up under the ceiling, climbed to by crates stacked under them on both sides.")]
@@ -228,6 +238,8 @@ namespace Stealth.Level
         public int RobotsPerHouse = 1;
         [Tooltip("Extra robots per floor above the ground floor.")]
         public int RobotsPerExtraFloor = 1;
+        [Tooltip("Robots keep to the rooms deep inside: the deepest room is (1 + this) times as likely as one by the lobby (RoomDepth).")]
+        public float DeepRoomWeight = 2f;
         public int Devices = 1;
         public int DevicesPerHouse = 1;
         public int Cameras = 2;
@@ -374,7 +386,8 @@ namespace Stealth.Level
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
             RoomRules.Enforce(l.Plan, building.RoomTypeRules);
             // zoning: themed rooms capped (one kitchen a floor…), work rooms to the facade, service rooms inside, toilets by the stairs
-            Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules);
+            l.RoomSteps = RoomDepth.Of(l.Plan, l.Stairs, l.LobbyRoom);
+            Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules, l.RoomSteps, building.RoomAdjacency);
 
             // the house's main job: the vault and its lock panels, or the hostage's cage (their places kept free)
             HouseFeatures.PlanObjective(l, features, furnisher);
@@ -668,9 +681,9 @@ namespace Stealth.Level
                 if (i < l.Floors)
                 {
                     var onFloor = candidates.FindAll(c => c.Floor == i);
-                    room = onFloor.Count > 0 ? onFloor[rng.Next(onFloor.Count)] : candidates[rng.Next(candidates.Count)];
+                    room = onFloor.Count > 0 ? Weighted(onFloor, rng, l, s.DeepRoomWeight) : candidates[rng.Next(candidates.Count)];
                 }
-                else room = Weighted(candidates, rng);
+                else room = Weighted(candidates, rng, l, s.DeepRoomWeight);
                 var pos = SpotIn(l, room, rng, 1.2f);
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
                 var kind = RobotRoster.PickRobot(level, rng, s.Roster);
@@ -766,14 +779,16 @@ namespace Stealth.Level
         }
 
         /// <summary>A room picked with a chance growing with its area (a hall holds more guards than a closet).</summary>
-        static PlanRoom Weighted(List<PlanRoom> rooms, System.Random rng)
+        /// <summary>A room by size (bigger: likelier); with <paramref name="deep"/> &gt; 0 the rooms deep inside count more too.</summary>
+        static PlanRoom Weighted(List<PlanRoom> rooms, System.Random rng, LevelLayout l = null, float deep = 0f)
         {
+            float Weight(PlanRoom r) => Mathf.Sqrt(Mathf.Max(1f, r.Area)) * (1f + (l != null ? deep * l.DepthShare(r.Id) : 0f));
             float total = 0f;
-            foreach (var r in rooms) total += Mathf.Sqrt(Mathf.Max(1f, r.Area));
+            foreach (var r in rooms) total += Weight(r);
             float roll = (float)rng.NextDouble() * total;
             foreach (var r in rooms)
             {
-                roll -= Mathf.Sqrt(Mathf.Max(1f, r.Area));
+                roll -= Weight(r);
                 if (roll <= 0f) return r;
             }
             return rooms[rooms.Count - 1];

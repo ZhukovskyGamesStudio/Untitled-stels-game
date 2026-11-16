@@ -112,7 +112,7 @@ namespace Stealth.Level
         };
 
         static bool PlayerPasses(EdgeType k) => k != EdgeType.Wall;
-        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open;
+        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach;
 
         /// <summary>
         /// Rooms reached from <paramref name="start"/> through the openings (players: every kind; robots: doors and open
@@ -656,7 +656,7 @@ namespace Stealth.Level
                 {
                     var d = l.Doorways[i];
                     if (d.RoomA != r.Id && d.RoomB != r.Id) continue;
-                    if (d.Kind is EdgeType.Door or EdgeType.Open) { only = i; count++; }
+                    if (d.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) { only = i; count++; }
                 }
                 if (count != 1) continue;
                 var door = l.Doorways[only];

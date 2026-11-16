@@ -29,14 +29,19 @@ namespace Stealth.Level
         /// <summary>A toilet this close to a staircase (metres, plan) is by the core.</summary>
         public const float CoreReach = 9f;
 
-        /// <summary>Caps and swaps (see the class). <paramref name="stairs"/>: the house's staircases (the core).</summary>
-        public static void Arrange(HousePlan plan, IReadOnlyList<Stair> stairs, RoomRule[] rules)
+        /// <summary>
+        /// Caps and swaps (see the class). <paramref name="stairs"/>: the house's staircases (the core); <paramref name="steps"/>:
+        /// each room's steps from the lobby (<see cref="RoomDepth"/>; null: depth not used).
+        /// </summary>
+        public static void Arrange(HousePlan plan, IReadOnlyList<Stair> stairs, RoomRule[] rules, int[] steps = null, RoomAdjacency[] adjacency = null)
         {
-            var info = new Dictionary<int, (bool facade, bool core)>();
+            s_Adjacency = RoomRules.AdjacencyMap(adjacency);
+            s_Neighbours = Neighbours(plan);
+            var info = new Dictionary<int, (bool facade, bool core, float deep)>();
             foreach (var r in plan.Rooms)
             {
                 if (!Movable(r)) continue;
-                info[r.Id] = (RoomRules.OutsideOf(plan, r) >= FacadeWall, NearCore(plan, stairs, r));
+                info[r.Id] = (RoomRules.OutsideOf(plan, r) >= FacadeWall, NearCore(plan, stairs, r), steps != null ? RoomDepth.Share(steps, r.Id) : 0.5f);
             }
             Cap(plan, rules, info);
             for (int f = 0; f < plan.Floors; f++) Swap(plan, rules, info, f);
@@ -61,21 +66,75 @@ namespace Stealth.Level
             return false;
         }
 
-        /// <summary>How well a type sits in a room of this place (higher is better).</summary>
-        public static int Score(RoomType type, bool facade, bool core, RoomRule[] rules)
+        /// <summary>
+        /// How well a type sits in a room of this place (higher is better): its zone (facade / inside), toilets by the core,
+        /// and its privacy against the room's depth from the lobby (<paramref name="deep"/> 0 … 1: public rooms near the
+        /// entrance, private ones deep inside).
+        /// </summary>
+        public static float Score(RoomType type, bool facade, bool core, RoomRule[] rules, float deep = 0.5f)
         {
-            int s = RoomRules.For(type, rules).Zone switch
+            var rule = RoomRules.For(type, rules);
+            float s = rule.Zone switch
             {
-                RoomZone.Facade => facade ? 2 : -2,      // a windowless office is the worst miss
-                RoomZone.Interior => facade ? -1 : 1,    // a store on the facade wastes its windows
-                _ => 0,
+                RoomZone.Facade => facade ? 2f : -2f,    // a windowless office is the worst miss
+                RoomZone.Interior => facade ? -1f : 1f,  // a store on the facade wastes its windows
+                _ => 0f,
             };
-            if (type == RoomType.Restroom) s += core ? 2 : -1; // the toilets with the stairs and risers
+            if (type == RoomType.Restroom) s += core ? 2f : -1f; // the toilets with the stairs and risers
+            s += rule.Privacy * (deep * 2f - 1f) * PrivacyWeight;
             return s;
         }
 
+        // the floor being arranged: who is next door, and how good a pair of types is next door (RoomAdjacency)
+        [System.ThreadStatic] static Dictionary<(RoomType, RoomType), float> s_Adjacency;
+        [System.ThreadStatic] static Dictionary<int, List<(int room, float weight)>> s_Neighbours;
+
+        /// <summary>
+        /// Rooms next door to each room: a shared wall of a metre or more on the same floor (weight 1), half again if a way
+        /// people walk joins them (a door, an arch, a breach).
+        /// </summary>
+        static Dictionary<int, List<(int room, float weight)>> Neighbours(HousePlan plan)
+        {
+            var weight = new Dictionary<(int, int), float>();
+            for (int i = 0; i < plan.Walls.Count; i++)
+            {
+                var w = plan.Walls[i];
+                if (w.RoomA < 0 || w.RoomB < 0 || w.RoomA == w.RoomB || w.Length < 1f) continue;
+                var key = w.RoomA < w.RoomB ? (w.RoomA, w.RoomB) : (w.RoomB, w.RoomA);
+                if (!weight.ContainsKey(key)) weight[key] = 1f;
+            }
+            foreach (var o in plan.Openings)
+            {
+                if (!RoomDepth.Walked(o.Kind)) continue;
+                var w = plan.Walls[o.Wall];
+                if (w.RoomA < 0 || w.RoomB < 0) continue;
+                var key = w.RoomA < w.RoomB ? (w.RoomA, w.RoomB) : (w.RoomB, w.RoomA);
+                if (weight.ContainsKey(key)) weight[key] = 1.5f;
+            }
+            var map = new Dictionary<int, List<(int, float)>>();
+            foreach (var kv in weight)
+            {
+                (map.TryGetValue(kv.Key.Item1, out var a) ? a : map[kv.Key.Item1] = new List<(int, float)>()).Add((kv.Key.Item2, kv.Value));
+                (map.TryGetValue(kv.Key.Item2, out var b) ? b : map[kv.Key.Item2] = new List<(int, float)>()).Add((kv.Key.Item1, kv.Value));
+            }
+            return map;
+        }
+
+        /// <summary>How good type <paramref name="t"/> is in room <paramref name="room"/> by its neighbours (all but <paramref name="skip"/>).</summary>
+        static float NextDoor(HousePlan plan, int room, RoomType t, int skip)
+        {
+            if (s_Adjacency == null || s_Adjacency.Count == 0 || s_Neighbours == null || !s_Neighbours.TryGetValue(room, out var list)) return 0f;
+            float s = 0f;
+            foreach (var (other, w) in list)
+                if (other != skip && s_Adjacency.TryGetValue((t, plan.Rooms[other].Type), out var v)) s += v * w;
+            return s;
+        }
+
+        /// <summary>How much depth weighs against the zone (a public room deep inside costs at most this much).</summary>
+        public const float PrivacyWeight = 1.5f;
+
         /// <summary>Rooms over their type's cap (by floor, by house) become an uncapped type that holds the room.</summary>
-        static void Cap(HousePlan plan, RoomRule[] rules, Dictionary<int, (bool facade, bool core)> info)
+        static void Cap(HousePlan plan, RoomRule[] rules, Dictionary<int, (bool facade, bool core, float deep)> info)
         {
             var house = new Dictionary<RoomType, int>();
             var floor = new Dictionary<(int, RoomType), int>();
@@ -91,7 +150,7 @@ namespace Stealth.Level
             foreach (var r in plan.Rooms) if (info.ContainsKey(r.Id)) order.Add(r);
             order.Sort((a, b) =>
             {
-                int sa = Score(a.Type, info[a.Id].facade, info[a.Id].core, rules), sb = Score(b.Type, info[b.Id].facade, info[b.Id].core, rules);
+                float sa = Score(a.Type, info[a.Id].facade, info[a.Id].core, rules, info[a.Id].deep), sb = Score(b.Type, info[b.Id].facade, info[b.Id].core, rules, info[b.Id].deep);
                 return sa != sb ? sb.CompareTo(sa) : a.Id.CompareTo(b.Id);
             });
             foreach (var r in order)
@@ -99,7 +158,7 @@ namespace Stealth.Level
                 var rule = RoomRules.For(r.Type, rules);
                 int h = house.TryGetValue(r.Type, out var hn) ? hn : 0, fl = floor.TryGetValue((r.Floor, r.Type), out var fn) ? fn : 0;
                 if ((rule.PerHouse > 0 && h >= rule.PerHouse) || (rule.PerFloor > 0 && fl >= rule.PerFloor))
-                    r.Type = Uncapped(plan, r, rules, info[r.Id].facade);
+                    r.Type = Uncapped(plan, r, rules, info[r.Id].facade, info[r.Id].deep);
                 house[r.Type] = (house.TryGetValue(r.Type, out var h2) ? h2 : 0) + 1;
                 floor[(r.Floor, r.Type)] = (floor.TryGetValue((r.Floor, r.Type), out var f2) ? f2 : 0) + 1;
             }
@@ -108,26 +167,26 @@ namespace Stealth.Level
         /// <summary>Everyday types that are never capped, in order of preference.</summary>
         static readonly RoomType[] Everyday = { RoomType.OpenSpace, RoomType.Meeting, RoomType.Office, RoomType.Lab, RoomType.Server };
 
-        static RoomType Uncapped(HousePlan plan, PlanRoom r, RoomRule[] rules, bool facade)
+        static RoomType Uncapped(HousePlan plan, PlanRoom r, RoomRule[] rules, bool facade, float deep)
         {
             RoomType best = RoomType.Office;
-            int bestScore = int.MinValue;
+            float bestScore = float.MinValue;
             foreach (var t in Everyday)
             {
                 var rule = RoomRules.For(t, rules);
                 if (rule.PerHouse > 0 || rule.PerFloor > 0 || !RoomRules.Holds(plan, r, t, rules)) continue;
-                int s = Score(t, facade, false, rules);
+                float s = Score(t, facade, false, rules, deep);
                 if (s > bestScore) { bestScore = s; best = t; }
             }
             return best;
         }
 
         /// <summary>Pairs of rooms on a floor swap types while that places them better (and both still hold their rule).</summary>
-        static void Swap(HousePlan plan, RoomRule[] rules, Dictionary<int, (bool facade, bool core)> info, int f)
+        static void Swap(HousePlan plan, RoomRule[] rules, Dictionary<int, (bool facade, bool core, float deep)> info, int f)
         {
             var rooms = new List<PlanRoom>();
             foreach (var r in plan.Rooms) if (r.Floor == f && r.Levels == 1 && info.ContainsKey(r.Id)) rooms.Add(r);
-            int Here(PlanRoom r, RoomType t) => Score(t, info[r.Id].facade, info[r.Id].core, rules);
+            float Here(PlanRoom r, RoomType t) => Score(t, info[r.Id].facade, info[r.Id].core, rules, info[r.Id].deep);
             for (int pass = 0; pass < 8; pass++)
             {
                 bool changed = false;
@@ -137,8 +196,11 @@ namespace Stealth.Level
                         var a = rooms[i];
                         var b = rooms[j];
                         if (a.Type == b.Type) continue;
-                        int gain = Here(a, b.Type) + Here(b, a.Type) - Here(a, a.Type) - Here(b, b.Type);
-                        if (gain <= 0 || !RoomRules.Holds(plan, a, b.Type, rules) || !RoomRules.Holds(plan, b, a.Type, rules)) continue;
+                        // the place itself (zone, core, depth) and the neighbours (the pair a–b itself stays the same pair)
+                        float gain = Here(a, b.Type) + Here(b, a.Type) - Here(a, a.Type) - Here(b, b.Type)
+                            + NextDoor(plan, a.Id, b.Type, b.Id) + NextDoor(plan, b.Id, a.Type, a.Id)
+                            - NextDoor(plan, a.Id, a.Type, b.Id) - NextDoor(plan, b.Id, b.Type, a.Id);
+                        if (gain <= 0.01f || !RoomRules.Holds(plan, a, b.Type, rules) || !RoomRules.Holds(plan, b, a.Type, rules)) continue;
                         (a.Type, b.Type) = (b.Type, a.Type);
                         changed = true;
                     }

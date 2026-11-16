@@ -48,6 +48,9 @@ namespace Stealth.EditorTools
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", () => BuildVentFrame(false));
             var highVent = Prefab($"{LevelPrefabs}/HighVentFrame.prefab", () => BuildVentFrame(true));
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
+            var breach = Prefab($"{LevelPrefabs}/BreachFrame.prefab", () => BuildRuin("BreachFrame", LevelMetrics.BreachWidth, LevelMetrics.DoorHeight, false));
+            var hole = Prefab($"{LevelPrefabs}/HoleFrame.prefab", () => BuildRuin("HoleFrame", LevelMetrics.HoleWidth, LevelMetrics.HoleHeight, true));
+            var innerWindow = Prefab($"{LevelPrefabs}/InnerWindowFrame.prefab", BuildInnerWindowFrame);
             var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
             var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
             var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", BuildAutoDoor);
@@ -157,6 +160,9 @@ namespace Stealth.EditorTools
                 art.VentFrame = vent;
                 art.HighVentFrame = highVent;
                 art.SqueezeFrame = squeeze;
+                art.BreachFrame = breach;
+                art.HoleFrame = hole;
+                art.InnerWindowFrame = innerWindow;
                 art.AutoDoor = door;
                 art.RoomLight = light;
                 art.Window = window;
@@ -199,9 +205,13 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain)
+            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain
+                || levelArt.BreachFrame != breach || levelArt.HoleFrame != hole || levelArt.InnerWindowFrame != innerWindow)
             {
                 // fields newer than the asset: filled without overwriting the rest
+                levelArt.BreachFrame = breach;
+                levelArt.HoleFrame = hole;
+                levelArt.InnerWindowFrame = innerWindow;
                 levelArt.HighVentFrame = highVent;
                 levelArt.RailingBay = railingBay;
                 levelArt.RailingBlock = railingBlock;
@@ -318,6 +328,56 @@ namespace Stealth.EditorTools
                 var slat = Cube(grille, $"Slat{i}", new Vector3(0, gh * i / 8f, 0.11f), new Vector3(gw - 0.08f, 0.012f, 0.06f), metal, false);
                 slat.transform.localRotation = Quaternion.Euler(35f, 0f, 0f); // louvres
             }
+            return root;
+        }
+
+        /// <summary>
+        /// The ruin round a breach or a hole knocked through a wall (Tools/Blender/ruins.py): broken edges up both sides and
+        /// along the top, a pile of rubble at the foot on either face; along local X, no colliders (the wall pieces keep the
+        /// shape). A hole also keeps robots out with a navmesh volume: a player crawls through, a robot does not.
+        /// </summary>
+        static GameObject BuildRuin(string name, float nominal, float height, bool robotsOut)
+        {
+            const float rimHeight = 2.3f; // breach_rim.fbx is modelled at the door height
+            var root = new GameObject(name);
+            float w = LevelMetrics.ClearWidth(nominal);
+            void Piece(string file, string child, Vector3 pos, Quaternion rot, Vector3 scale)
+            {
+                var m = Model(file);
+                m.name = child;
+                m.transform.SetParent(root.transform, false);
+                m.transform.localPosition = pos;
+                m.transform.localRotation = rot;
+                m.transform.localScale = scale;
+                Paint(m, "Wall", "Wall", "Wall");
+            }
+            // the sides: the rim stands on the cut line and juts into the gap (+X); the right one turned round
+            Piece("breach_rim", "EdgeLeft", new Vector3(-w / 2f, 0f, 0f), Quaternion.identity, new Vector3(1f, height / rimHeight, 1f));
+            Piece("breach_rim", "EdgeRight", new Vector3(w / 2f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1f, height / rimHeight, 1f));
+            // the top: the same rim lying along the gap, jutting down
+            Piece("breach_rim", "EdgeTop", new Vector3(-w / 2f, height, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(1f, w / rimHeight, 1f));
+            // rubble at the foot, one pile on each face, against the jambs
+            float face = LevelMetrics.WallThickness / 2f + 0.22f;
+            Piece("rubble", "RubbleA", new Vector3(-w / 2f + 0.05f, 0f, face), Quaternion.Euler(0f, 20f, 0f), Vector3.one);
+            Piece("rubble", "RubbleB", new Vector3(w / 2f - 0.05f, 0f, -face), Quaternion.Euler(0f, 200f, 0f), Vector3.one * 0.85f);
+            if (robotsOut)
+            {
+                var block = root.AddComponent<NavMeshModifierVolume>();
+                block.center = new Vector3(0f, 1.2f, 0f);
+                block.size = new Vector3(w + 0.6f, 2.4f, 1.6f);
+                block.area = 1; // Not Walkable
+            }
+            return root;
+        }
+
+        /// <summary>The frame of a window between rooms without its glass (Tools/Blender/ruins.py), along local X, no collider.</summary>
+        static GameObject BuildInnerWindowFrame()
+        {
+            var root = new GameObject("InnerWindowFrame");
+            var m = Model("inner_window_frame");
+            m.name = "Frame";
+            m.transform.SetParent(root.transform, false);
+            Paint(m, "WindowFrame", "WindowFrame", "WindowFrame");
             return root;
         }
 
