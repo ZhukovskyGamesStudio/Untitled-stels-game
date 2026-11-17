@@ -17,8 +17,9 @@ namespace Stealth.Level
         public override UseKind Kind => UseKind.VentGrate;
         /// <summary>Under the ceiling: reached from the floor below and from the duct above.</summary>
         public override Vector3 Point => transform.position + Vector3.down * 0.6f;
-        public override float AimRadius => 0.6f;
-        public override float Reach => 1.6f;
+        public override float AimRadius => 0.35f;
+        /// <summary>Right under it (or right over it in the duct): a grate is climbed from close by, not across the room.</summary>
+        public override float Reach => 0.9f;
 
         /// <summary>The room under it.</summary>
         public int Room { get; private set; } = -1;

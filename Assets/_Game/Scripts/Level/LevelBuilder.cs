@@ -117,7 +117,14 @@ namespace Stealth.Level
             BuildGrates();
             float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
             // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
-            Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, CityPlan.RoadTop - 0.06f, H / 2), new Vector3(W + far, 0.1f, H + far));
+            // (with a hole where the shaft goes down to the basement: four pieces round it)
+            float gy = CityPlan.RoadTop - 0.06f;
+            var ground = Rect.MinMaxRect(W / 2 - (W + far) / 2, H / 2 - (H + far) / 2, W / 2 + (W + far) / 2, H / 2 + (H + far) / 2);
+            var shaftHole = l.HasBasement
+                ? new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) }
+                : null;
+            foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, shaftHole))
+                Block(m_Art.OutsideGround, "OutsideGround", new Vector3((a.x + b.x) / 2f, gy, (a.y + b.y) / 2f), new Vector3(b.x - a.x, 0.1f, b.y - a.y));
             // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, -yard - 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, H + yard + 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
@@ -207,6 +214,7 @@ namespace Stealth.Level
                         if (t.prop == i) terminal.Configure(i, t.kind);
                 Props.Add(go);
             }
+            BuildBasement(); // after the props: the lid over the shaft is one
             return root;
         }
 
@@ -223,7 +231,7 @@ namespace Stealth.Level
                 if (!any) { b = r.bounds; any = true; }
                 else b.Encapsulate(r.bounds);
             }
-            if (!any || kind == PropKind.Hatch) return;
+            if (!any || kind is PropKind.Hatch or PropKind.ShaftHatch) return;
             Shell.Props.Add(new MapProp { Floor = floor, Kind = kind, Area = Rect.MinMaxRect(b.min.x, b.min.z, b.max.x, b.max.z) });
         }
 
@@ -254,6 +262,8 @@ namespace Stealth.Level
             var plan = m_Plan;
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.StairArea(s, 0f));
+            if (f == 0 && m_Layout.HasBasement) // the shaft down to the basement
+                holes.Add(new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -294,6 +304,88 @@ namespace Stealth.Level
                 SlabPiece("CeilingBoard", m_Art.FloorSlab, r, ceiling + LevelMetrics.CeilingBoard / 2f, LevelMetrics.CeilingBoard, floor, false);
             foreach (var g in net.Grates)
                 Shell.CeilingHoles.Add(new Rect(g.Cell.x * VentPlan.Res, g.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res));
+        }
+
+        /// <summary>
+        /// The basement the team arrives in (<see cref="Basement"/>): two of the sewer kit's segments under the lobby, an end
+        /// cap at the far end, the sewer's lamps; at the near end a brick wall with a doorway into the shaft chamber, the
+        /// ladder against its back wall (two lengths, up to the lobby's floor) and the ladder's ends (<see cref="ShaftLadder"/>).
+        /// </summary>
+        void BuildBasement()
+        {
+            if (!m_Layout.HasBasement || m_Art.Sewer == null) return;
+            var kit = m_Art.Sewer.GetComponent<SewerLocation>();
+            if (kit == null) return;
+            var o = m_Layout.BasementOrigin;
+            GameObject Put(GameObject prefab, string name, Vector3 local, float yaw = 0f) =>
+                prefab != null ? Place(prefab, name, o + local, Quaternion.Euler(0f, yaw, 0f)) : null;
+            Material brick = null;
+            for (int i = 0; i < Basement.Segments; i++)
+            {
+                if (kit.Segments == null || kit.Segments.Length == 0) break;
+                var seg = Put(kit.Segments[((i + m_Layout.Seed) & int.MaxValue) % kit.Segments.Length], $"BasementSegment{i}", new Vector3(i * SewerPlan.SegmentLength, 0f, 0f));
+                if (brick == null && seg != null) brick = BrickOf(seg);
+            }
+            Put(kit.Cap, "BasementCap", new Vector3(Basement.Length, 0f, 0f), 180f); // turned round: it closes the far end
+            // lit: warm lamps on both walls of each segment (the sewer's, brighter)
+            for (int i = 0; i < Basement.Segments; i++)
+                foreach (int side in new[] { 1, -1 })
+                {
+                    var lamp = Put(kit.Lamp, "BasementLamp", new Vector3(i * SewerPlan.SegmentLength + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                    if (lamp != null)
+                        foreach (var light in lamp.GetComponentsInChildren<Light>())
+                        {
+                            light.color = new Color(1f, 0.82f, 0.6f);
+                            light.intensity *= 1.6f;
+                            light.range = 12f;
+                        }
+                }
+            // the near end: a brick wall over the tunnel's whole section with a doorway, the chamber behind it up to the lobby
+            float top = Basement.Depth - 0.05f, bottom = -0.8f, wx = -Basement.EndWall / 2f, half = 4.1f;
+            void Wall(string name, float x0, float x1, float z0, float z1, float y0, float y1)
+            {
+                var go = Block(m_Art.FloorSlab, name, o + new Vector3((x0 + x1) / 2f, (y0 + y1) / 2f, (z0 + z1) / 2f), new Vector3(x1 - x0, y1 - y0, z1 - z0));
+                if (brick != null && go.TryGetComponent<Renderer>(out var r)) r.sharedMaterial = brick;
+            }
+            float d = Basement.DoorHalf, c = Basement.ChamberHalf, t = 0.3f, back = Basement.ChamberBack;
+            Wall("BasementEnd", -Basement.EndWall, 0f, -half, -d, bottom, 4.6f);
+            Wall("BasementEnd", -Basement.EndWall, 0f, d, half, bottom, 4.6f);
+            Wall("BasementEnd", -Basement.EndWall, 0f, -d, d, Basement.DoorHeight, top);
+            Wall("ChamberBack", back - t, back, -c - t, c + t, bottom, top);
+            Wall("ChamberSide", back - t, -Basement.EndWall, -c - t, -c, bottom, top);
+            Wall("ChamberSide", back - t, -Basement.EndWall, c, c + t, bottom, top);
+            Wall("ChamberFloor", back, -Basement.EndWall + 0.01f, -c, c, bottom, Basement.Road);
+            _ = wx;
+            // the ladder against the back wall, facing the doorway: two lengths up to the lid
+            Put(kit.Ladder, "BasementLadder", new Vector3(Basement.LadderX, Basement.Road, 0f));
+            Put(kit.Ladder, "BasementLadderUpper", new Vector3(Basement.LadderX, Basement.Depth - 3.5f, 0f)); // its top just under the lid
+            // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
+            var shaft = m_Layout.HatchPosition;
+            var path = Basement.ClimbPath(o, shaft);
+            // (the lid is a prop: configured with its prop's index, E on its handle opens and shuts it; the ladder is climbed by walking into it)
+            if (m_Art.ShaftLadder != null)
+            {
+                var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(o), Quaternion.identity);
+                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path);
+            }
+        }
+
+        /// <summary>The kit's brick (its walls' material): the material of the segment's biggest part that is not glass, water or a grate.</summary>
+        static Material BrickOf(GameObject segment)
+        {
+            Material best = null;
+            float size = 0f;
+            foreach (var r in segment.GetComponentsInChildren<Renderer>())
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null) continue;
+                    var n = m.name.ToLowerInvariant();
+                    if (n.Contains("water") || n.Contains("grate") || n.Contains("glow") || n.Contains("lamp")) continue;
+                    float v = r.bounds.size.sqrMagnitude;
+                    if (n.Contains("brick")) v *= 10f;
+                    if (v > size) { size = v; best = m; }
+                }
+            return best;
         }
 
         /// <summary>The grates in the ceilings (the way into the ducts), every storey's.</summary>

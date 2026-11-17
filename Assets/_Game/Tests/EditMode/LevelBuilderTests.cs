@@ -44,9 +44,16 @@ namespace Stealth.Tests
         public void TheBuiltHouseHasBothHatches()
         {
             Built(out var l);
+            // the way out: the exit's hatch; the way in: the lid over the shaft from the basement, its ladder's two ends
             var hatches = Object.FindObjectsByType<Hatch>(FindObjectsSortMode.None);
-            Assert.AreEqual(2, hatches.Length, "the way in and the way out");
-            Assert.IsTrue(hatches.Any(h => (h.transform.position - l.ExitHatchPosition).magnitude < 0.1f), "one stands at the exit");
+            Assert.AreEqual(1, hatches.Length, "the way out");
+            Assert.IsTrue(hatches.Any(h => (h.transform.position - l.ExitHatchPosition).magnitude < 0.1f), "it stands at the exit");
+            var lids = Object.FindObjectsByType<ShaftHatch>(FindObjectsSortMode.None);
+            Assert.AreEqual(1, lids.Length, "the way in");
+            Assert.Less((lids[0].transform.position - l.HatchPosition).magnitude, 0.1f, "the lid in the lobby's middle");
+            Assert.GreaterOrEqual(lids[0].Index, 0, "the lid is configured");
+            Assert.IsNotNull(ShaftLadder.Main, "the ladder is set up");
+            Assert.Greater(ShaftLadder.Main.TopY - ShaftLadder.Main.Bottom, Basement.Depth - 0.5f, "from the basement's road to the lobby's floor");
             foreach (var h in hatches)
                 Assert.IsTrue(h.GetComponentsInChildren<Renderer>().Any(r => r.enabled), "and it is drawn");
         }

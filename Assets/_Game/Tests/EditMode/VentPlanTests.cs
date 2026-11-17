@@ -23,7 +23,8 @@ namespace Stealth.Tests
         {
             Assert.Greater(LevelMetrics.VoidHeight, Player.PlayerController.CrouchHeight + 0.03f, "a crouched player fits");
             Assert.Less(LevelMetrics.VoidHeight, 1.6f, "no robot fits (its navmesh agent is 2 m tall)");
-            Assert.LessOrEqual(LevelMetrics.FloorHeight / (2 * LevelMetrics.StepsPerFlight), 0.35f, "a stair step is still a step for the player");
+            Assert.LessOrEqual(LevelMetrics.FloorHeight / (2 * LevelMetrics.StepsPerFlight), 0.3f, "a stair step is walked up, with room under the player's 0.35 m");
+            Assert.Greater(LevelMetrics.LandingEnd - 0.12f, 0.9f, "the landing is wide enough to turn on");
         }
 
         [Test]

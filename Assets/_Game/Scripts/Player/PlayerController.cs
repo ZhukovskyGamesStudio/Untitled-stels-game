@@ -383,7 +383,8 @@ namespace Stealth.Player
             if (InHatch) input = new PlayerInputState { Look = input.Look };
             EnterHatchIfNeeded();
             Motor.InHatch = InHatch;
-            Motor.Seated = SeatIndex >= 0;
+            UpdateLadder(input, Time.deltaTime);
+            Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             UpdateSeat(menu);
             Crouching = Motor.IsCrouching;
@@ -684,6 +685,41 @@ namespace Stealth.Player
             LeaveConsole();
             TeleportOwner(spot, transform.rotation);
             Debug.Log($"[Player] Unstuck: moved to {spot}");
+        }
+
+        /// <summary>On the ladder between the basement and the lobby right now (<see cref="ShaftLadder"/>).</summary>
+        public bool Climbing { get; private set; }
+
+        /// <summary>
+        /// Owner, every frame before the motor: the ladder. On it when walking into it facing it (or falling down the open
+        /// shaft past it); W up, S down, Jump lets go; off at the floor below, off onto the lobby's floor at the top when the
+        /// lid is open (shut, the head stops against it). While on it the motor only turns the view (it is "seated").
+        /// </summary>
+        void UpdateLadder(in PlayerInputState input, float dt)
+        {
+            var ladder = ShaftLadder.Main;
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; return; }
+            var feet = transform.position;
+            if (!Climbing)
+            {
+                var facing = transform.forward;
+                facing.y = 0f;
+                Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
+                if (!Climbing) return;
+            }
+            if (input.Jump || !ladder.InZone(feet)) { Climbing = false; return; }
+            // W climbs the way the player looks: facing away from the ladder (back to the rungs), W goes down and S up
+            var look = transform.forward;
+            look.y = 0f;
+            float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
+            m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
+            feet = transform.position;
+            if (LadderMath.OffAtTop(feet.y, ladder.TopY, ShaftHatch.IsOpen()))
+            {
+                Climbing = false;
+                TeleportOwner(ladder.TopExit, transform.rotation);
+            }
+            else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom)) Climbing = false;
         }
 
         public void TeleportOwner(Vector3 position, Quaternion rotation)

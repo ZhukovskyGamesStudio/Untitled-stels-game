@@ -401,13 +401,17 @@ namespace Stealth.Level
             var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, 0xF0E, 0)));
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
-            furnisher.Put(lobby, PropKind.Hatch, l.HatchPosition, 0f);
+            // the shaft down to the basement the team arrives in; its manhole is the entry hatch (Basement)
+            furnisher.Put(lobby, PropKind.ShaftHatch, l.HatchPosition, 0f);
+            l.HasBasement = true;
+            l.BasementOrigin = Basement.Origin(l.HatchPosition);
+            l.EntryHatch = Basement.StashSpot(l.BasementOrigin); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
             l.ExitHatchPosition = exit.Center;
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
-            for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q] * 0.45f);
+            l.PlayerSpawns.AddRange(Basement.Spawns(l.BasementOrigin));
 
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
             RoomRules.Enforce(l.Plan, building.RoomTypeRules);

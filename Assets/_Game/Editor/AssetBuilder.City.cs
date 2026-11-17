@@ -156,11 +156,47 @@ namespace Stealth.EditorTools
                 var floor = go.AddComponent<BoxCollider>(); // walked on in the duct; from below the grate is climbed with E
                 floor.center = new Vector3(0f, t / 2f, 0f);
                 floor.size = new Vector3(size - 0.04f, t, size - 0.04f);
+                go.AddComponent<KeepUnmerged>(); // the grille swings open
                 var g = go.AddComponent<VentGrate>();
                 g.Lid = lid;
                 return go;
             });
             if (art.VentGrate != ventGrate) { art.VentGrate = ventGrate; EditorUtility.SetDirty(art); }
+            // the lid over the shaft to the basement (ShaftHatch): a steel frame in the floor, a ribbed lid on a hinge at −Z
+            // with a yellow rim, and the ladder's top under it (ShaftLadder); the pivot on the floor in the shaft's middle
+            var shaftHatch = Prefab($"{LevelPrefabs}/ShaftHatch.prefab", () =>
+            {
+                var go = new GameObject("ShaftHatch");
+                float half = Basement.ShaftHalf + 0.1f;
+                foreach (var (c, sz) in new[]
+                         {
+                             (new Vector3(0f, 0.01f, -half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)), (new Vector3(0f, 0.01f, half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)),
+                             (new Vector3(-half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)), (new Vector3(half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)),
+                         })
+                    Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Warning], collider: false);
+                var lid = new GameObject("Lid").transform;
+                lid.SetParent(go.transform, false);
+                lid.localPosition = new Vector3(0f, 0.03f, -half);
+                var plate = Cube(lid, "Plate", new Vector3(0f, 0.02f, half), new Vector3(2 * half - 0.04f, 0.05f, 2 * half - 0.04f), util[(int)UtilitySlot.Panel], collider: true);
+                for (int i = 0; i < 5; i++)
+                    Cube(lid, "Rib", new Vector3(0f, 0.055f, 0.2f + i * (2 * half - 0.4f) / 4f), new Vector3(2 * half - 0.2f, 0.02f, 0.04f), util[(int)UtilitySlot.Dark], collider: false);
+                Cube(lid, "Handle", new Vector3(0f, 0.08f, 2 * half - 0.12f), new Vector3(0.3f, 0.04f, 0.04f), util[(int)UtilitySlot.Warning], collider: false);
+                go.AddComponent<KeepUnmerged>(); // the lid moves: never baked into the furniture's merged mesh (it would stay shut there)
+                var h = go.AddComponent<ShaftHatch>();
+                h.Lid = lid;
+                h.LidCollider = plate.GetComponent<Collider>();
+                var top = new GameObject("LadderTop");
+                top.transform.SetParent(go.transform, false);
+                top.AddComponent<ShaftLadder>().Top = true;
+                return go;
+            });
+            var shaftLadder = Prefab($"{LevelPrefabs}/ShaftLadder.prefab", () =>
+            {
+                var go = new GameObject("ShaftLadder");
+                go.AddComponent<ShaftLadder>();
+                return go;
+            });
+            if (art.ShaftHatch != shaftHatch || art.ShaftLadder != shaftLadder) { art.ShaftHatch = shaftHatch; art.ShaftLadder = shaftLadder; EditorUtility.SetDirty(art); }
             if (art.CityPiece == piece && art.CityLamp == lamp && art.CityMaterials != null && art.CityMaterials.Length == mats.Length
                 && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats) && art.UtilityMaterials != null
                 && System.Linq.Enumerable.SequenceEqual(art.UtilityMaterials, util)) return;

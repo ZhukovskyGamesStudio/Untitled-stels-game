@@ -41,9 +41,20 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
-            if (Hatch.IsNear(position, l.HatchPosition)) return Stash;
+            if (AtEntry(l, position)) return Stash;
             if (Hatch.IsNear(position, l.ExitHatchPosition)) return ExitStash;
             return null;
+        }
+
+        /// <summary>At the team's way in: anywhere in the basement (a house without one: at the entry hatch).</summary>
+        static bool AtEntry(LevelLayout l, Vector3 position) =>
+            l.HasBasement ? Basement.Contains(l.BasementOrigin, position) : Hatch.IsNear(position, l.HatchPosition);
+
+        /// <summary>In the basement the team arrives in.</summary>
+        public static bool InBasement(Vector3 position)
+        {
+            var l = ActiveLevel.Layout;
+            return l != null && l.HasBasement && Basement.Contains(l.BasementOrigin, position);
         }
 
         /// <summary>Where the stash board of the hatch near this player hangs.</summary>
@@ -52,7 +63,7 @@ namespace Stealth.Game
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
             if (Hatch.IsNear(position, l.ExitHatchPosition)) return l.ExitHatchPosition;
-            return l.HatchPosition;
+            return l.HasBasement ? l.EntryHatch : l.HatchPosition;
         }
 
         /// <summary>Server, a house starts: what lies in the car's bed is brought up into the entry hatch (as much as fits).</summary>
@@ -76,7 +87,7 @@ namespace Stealth.Game
         {
             if (Phase == RunPhase.Sewer) return Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
             var l = ActiveLevel.Layout;
-            return Phase == RunPhase.Playing && l != null && Hatch.IsNear(position, l.HatchPosition);
+            return Phase == RunPhase.Playing && l != null && AtEntry(l, position);
         }
 
         /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>

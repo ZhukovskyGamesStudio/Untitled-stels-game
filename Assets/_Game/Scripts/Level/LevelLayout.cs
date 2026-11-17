@@ -87,7 +87,9 @@ namespace Stealth.Level
         // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
         StorageRack,
         // the robots' charging room (Tools/Blender/charging.py): what the robots built themselves
-        ChargingDock, BatteryStack, Generator, ScrapShrine, ConduitGrowth, CableMass }
+        ChargingDock, BatteryStack, Generator, ScrapShrine, ConduitGrowth, CableMass,
+        // the lid over the shaft down to the basement the team arrives in (ShaftHatch), in the lobby's middle
+        ShaftHatch }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -190,6 +192,13 @@ namespace Stealth.Level
         public readonly List<Doorway> Doorways = new();
         /// <summary>The entry hatch (in the lobby): the team comes up here from the car.</summary>
         public Vector3 HatchPosition;
+        /// <summary>
+        /// The basement the team arrives in (<see cref="Basement"/>): its frame's origin under the lobby, and where the team's
+        /// stash is kept down there (<see cref="EntryHatch"/>; no hatch: the whole basement is the way back for the leave
+        /// rule). <see cref="HatchPosition"/> is the shaft's mouth in the lobby (the generator keeps things away from it).
+        /// </summary>
+        public bool HasBasement;
+        public Vector3 BasementOrigin, EntryHatch;
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
         public readonly List<Vector3> PlayerSpawns = new();
@@ -331,7 +340,7 @@ namespace Stealth.Level
         }
 
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
-        public bool IsInside(Vector3 p) => Plan != null && Plan.IsInside(new Vector2(p.x, p.z));
+        public bool IsInside(Vector3 p) => (HasBasement && Basement.Contains(BasementOrigin, p)) || (Plan != null && Plan.IsInside(new Vector2(p.x, p.z)));
 
         /// <summary>
         /// Two points see and hear each other across floors only through a void (an atrium): every floor boundary the

@@ -12,7 +12,7 @@ namespace Stealth.Level
         public const float WallHeight = 2.75f;
         /// <summary>
         /// Floor to floor: the room, then the crawl void over its ceiling (the ducts, <see cref="VentPlan"/>), then the floor
-        /// of the next storey. At most 12 × the player's step (0.35 m): the stairs keep their 4 m and 12 steps.
+        /// of the next storey. The stairs keep their 4 m: 14 steps of 0.29 m.
         /// </summary>
         public const float FloorHeight = 4.1f;
         /// <summary>Everything between a room's ceiling and the floor above: solid, but where a duct runs through it.</summary>
@@ -63,11 +63,12 @@ namespace Stealth.Level
         public const int StairsArea = 3;      // NavMesh area "Stairs": robots without legs exclude it
 
         // Staircase geometry in the corner frame (u, v = meters from the corner walls into the room).
-        public const int StepsPerFlight = 6;
-        public const float StepRun = 0.42f;
+        // seven steps a flight: a step of 0.29 m (4.1 m a storey), well under the player's 0.35 m — no jumping on the stairs
+        public const int StepsPerFlight = 7;
+        public const float StepRun = 0.38f;
         public const float StairSize = 4f;    // the stair + hole occupy [0, 4] x [0, 4] from the corner
         public const float FlightStart = 3.8f; // u where flight A starts / flight B ends
-        public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.28
+        public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.14
 
         /// <summary>Nominal width of an opening of this kind (an open passage: its whole wall, not this).</summary>
         public static float OpeningWidth(EdgeType kind) => kind switch

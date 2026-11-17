@@ -59,6 +59,7 @@ namespace Stealth.Level
             [PropKind.ArcadeMachine] = Rect.MinMaxRect(-0.36f, -0.4f, 0.36f, 0.55f),
             [PropKind.Safe] = Rect.MinMaxRect(-0.4f, -0.35f, 0.4f, 0.41f),
             [PropKind.Hatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
+            [PropKind.ShaftHatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
             [PropKind.Crate] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
             [PropKind.MedTable] = Rect.MinMaxRect(-0.97f, -0.53f, 0.97f, 0.53f),
             [PropKind.Workbench] = Rect.MinMaxRect(-1.0f, -0.43f, 1.0f, 0.55f),
@@ -638,7 +639,7 @@ namespace Stealth.Level
 
         /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
         static bool InTheWay(PropKind k) =>
-            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
+            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.ShaftHatch or PropKind.Microwave
                 or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
                 or PropKind.BayLines) && !Hung.Contains(k);
 

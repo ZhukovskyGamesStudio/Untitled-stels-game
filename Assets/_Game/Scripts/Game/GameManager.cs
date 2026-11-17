@@ -353,7 +353,7 @@ namespace Stealth.Game
             foreach (var p in PlayerController.All)
             {
                 p.ResetForLevelServer();
-                p.EnterHatchServer(0); // the team comes up into the entry hatch
+                if (!layout.HasBasement) p.EnterHatchServer(0); // the team comes up into the entry hatch (a basement: it stands down there)
             }
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
@@ -609,7 +609,8 @@ namespace Stealth.Game
         void UpdateHatch()
         {
             // everyone in a hatch (either one), at least one in the exit's
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch, p.HatchIndex == 1, p.KnockedOut)));
+            // (the basement the team came in through counts as the way back: down there is "in the entry")
+            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch || InBasement(p.transform.position), p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
             if (!hidden) { LeaveAt = 0; return; }
             if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
             else if (Session.ServerTime >= LeaveAt) GoToSewerServer();

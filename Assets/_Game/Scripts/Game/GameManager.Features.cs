@@ -20,6 +20,8 @@ namespace Stealth.Game
         public static int DryerKey(int prop) => 8_000_000 + prop;
         /// <summary>A room whose lights a player switched (from how the house started).</summary>
         public static int LightsKey(int room) => 9_200_000 + room;
+        /// <summary>The lid over the shaft to the basement is open.</summary>
+        public const int ShaftKey = 9_300_000;
 
         /// <summary>Server: the hand dryers running and until when (server time).</summary>
         readonly Dictionary<int, double> m_Dryers = new();
@@ -36,6 +38,7 @@ namespace Stealth.Game
             MedTable.UsedBy = c => IsOpened(MedKey(c));
             HandDryer.IsRunning = i => IsOpened(DryerKey(i));
             LightSwitch.IsSwitched = RoomLight.IsSwitched = r => IsOpened(LightsKey(r));
+            ShaftHatch.IsOpen = () => IsOpened(ShaftKey);
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
         }
@@ -115,8 +118,17 @@ namespace Stealth.Game
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
+                case UseKind.ShaftHatch: ToggleShaftServer(); break;
                 default: UseSewerServer(player, kind, index); break;
             }
+        }
+
+        /// <summary>Server: the lid over the shaft to the basement opens (or shuts) for everyone.</summary>
+        void ToggleShaftServer()
+        {
+            if (Phase != RunPhase.Playing) return;
+            if (!m_Opened.Remove(ShaftKey)) m_Opened.Add(ShaftKey);
+            OpenedVersion++;
         }
 
         /// <summary>Server: a room's ceiling lights go off (or on, in a room that started dark) for everyone.</summary>
