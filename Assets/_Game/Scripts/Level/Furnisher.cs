@@ -26,6 +26,12 @@ namespace Stealth.Level
             [PropKind.KitchenCounter] = Rect.MinMaxRect(-1.22f, -0.35f, 1.22f, 0.35f),
             [PropKind.Shelf] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
             [PropKind.StorageRack] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
+            [PropKind.ChargingDock] = Rect.MinMaxRect(-0.5f, -0.32f, 0.5f, 0.32f),
+            [PropKind.BatteryStack] = Rect.MinMaxRect(-0.45f, -0.3f, 0.45f, 0.3f),
+            [PropKind.Generator] = Rect.MinMaxRect(-0.8f, -0.6f, 0.8f, 0.6f),
+            [PropKind.ScrapShrine] = Rect.MinMaxRect(-0.7f, -0.25f, 0.7f, 0.25f),
+            [PropKind.ConduitGrowth] = Rect.MinMaxRect(-0.6f, -0.12f, 0.6f, 0.12f),
+            [PropKind.CableMass] = Rect.MinMaxRect(-1.0f, -0.6f, 1.0f, 0.6f),
             [PropKind.Boxes] = Rect.MinMaxRect(-0.78f, -0.33f, 0.3f, 0.3f), // Unity mirrors X on import: the stack leans to −X
             [PropKind.WaterCooler] = Rect.MinMaxRect(-0.17f, -0.17f, 0.17f, 0.17f),
             [PropKind.Whiteboard] = Rect.MinMaxRect(-0.95f, -0.08f, 0.95f, 0.08f),
@@ -252,6 +258,7 @@ namespace Stealth.Level
             PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
             PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
             PropKind.Pinball, PropKind.MedTable, PropKind.Workbench, PropKind.StorageRack,
+            PropKind.ChargingDock, PropKind.BatteryStack, PropKind.Generator, PropKind.ScrapShrine,
             PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
         };
 
@@ -260,7 +267,7 @@ namespace Stealth.Level
         {
             PropKind.WallCabinet, PropKind.WallClock, PropKind.HandDryer, PropKind.TowelDispenser, PropKind.ChangingTable, PropKind.FireCabinet,
             PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
-            PropKind.DartBoard, PropKind.HoseReel,
+            PropKind.DartBoard, PropKind.HoseReel, PropKind.ConduitGrowth,
         };
 
         /// <summary>
@@ -1304,6 +1311,7 @@ namespace Stealth.Level
                 RoomType.Infirmary => room.Area > 16f ? 1 : 0,
                 RoomType.GameRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 15f)),
                 RoomType.Workshop => Mathf.RoundToInt(room.Area / 70f), // tyres, an engine, the drain cart: the walkway behind the bays stays open
+                RoomType.ChargingStation => room.Area > 34f ? 1 : 0, // battery stacks back to back (the generator came with the anchors)
                 _ => 0,
             };
             Anchor(room);
@@ -1476,6 +1484,7 @@ namespace Stealth.Level
                 return;
             }
             if (room.Type == RoomType.Workshop) { WorkshopBays(room); return; }
+            if (room.Type == RoomType.ChargingStation) { ChargingStation(room); return; }
             if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
             if (room.Type == RoomType.ControlRoom)
             {
@@ -1487,6 +1496,29 @@ namespace Stealth.Level
                 return;
             }
             Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>How many guards' docks the charging room tries for (pairs while the walls take them, then singles).</summary>
+        const int ChargingDocksWanted = 4;
+        bool m_GeneratorPlaced;
+
+        /// <summary>
+        /// The robots' charging room (<see cref="ChargingRooms"/>): their docks along the walls first — where the guards
+        /// rest —, then the generator (free in the middle of a big room, else against a wall), and the one piece the humans
+        /// left, pushed askew against a wall. The walls then fill with battery stacks, scrap shrines, conduit growths and
+        /// cable masses (<see cref="WallGroup"/>).
+        /// </summary>
+        void ChargingStation(PlanRoom room)
+        {
+            m_GeneratorPlaced = false;
+            int docks = 0;
+            for (int k = 0; k < 2 && docks + 2 <= ChargingDocksWanted; k++)
+                if (Anchor(room, 0, 1, false, 0.8f)) docks += 2;
+                else break;
+            while (docks < ChargingDocksWanted && Anchor(room, 1, 2, false, 0.8f)) docks++;
+            if (!(room.Area >= 24f && Anchor(room, 4, 4, true))) Anchor(room, 2, 3, false, 0.8f);
+            m_GeneratorPlaced = true;
+            Anchor(room, 3, 4, false, 0.8f);
         }
 
         /// <summary>
@@ -1603,6 +1635,19 @@ namespace Stealth.Level
             }
             switch (room.Type, option)
             {
+                // the robots' charging room: docks in pairs or alone, the generator against a wall, the humans' remnant askew
+                case (RoomType.ChargingStation, 0):
+                    foreach (float u in new[] { -0.62f, 0.62f }) b.Add(PropKind.ChargingDock, f.P(u, BackOf(PropKind.ChargingDock)), f.Face);
+                    return 2.45f;
+                case (RoomType.ChargingStation, 1): return Single(PropKind.ChargingDock, 1.2f);
+                case (RoomType.ChargingStation, 2): return Single(PropKind.Generator, 1.9f);
+                case (RoomType.ChargingStation, 3):
+                {
+                    var k = ChargingRooms.Remnant(m_L.ChargingFrom);
+                    var r = FootprintOf(k);
+                    b.Add(k, f.P(0f, BackOf(k) + 0.15f), f.Face + (Chance(0.5) ? 14f : -14f));
+                    return r.width + 0.5f;
+                }
                 case (RoomType.Kitchen, 0):
                 case (RoomType.Kitchen, 1):
                 {
@@ -1790,6 +1835,12 @@ namespace Stealth.Level
             double roll = m_Rng.NextDouble();
             switch (room.Type)
             {
+                case RoomType.ChargingStation:
+                    // the generator in the middle; later islands: battery stacks back to back
+                    if (!m_GeneratorPlaced) { b.Add(PropKind.Generator, f.P(0, 0), f.Face); break; }
+                    b.Add(PropKind.BatteryStack, f.P(0, 0.31f), f.Face);
+                    b.Add(PropKind.BatteryStack, f.P(0, -0.31f), f.Back);
+                    break;
                 case RoomType.OpenSpace:
                     if (roll < 0.62) DeskCluster(f, b);
                     else if (roll < 0.78)
@@ -2306,6 +2357,13 @@ namespace Stealth.Level
             int roll = m_Rng.Next(100);
             switch (room.Type)
             {
+                case RoomType.ChargingStation:
+                    if (roll < 28) return Single(PropKind.BatteryStack, 0.95f);
+                    if (roll < 46) return Single(PropKind.ScrapShrine, 1.5f);
+                    if (roll < 62) return Hung(PropKind.ConduitGrowth, 1.3f);
+                    if (roll < 78) { b.Add(PropKind.CableMass, f.P(0, 0.65f), f.Face, solid: false); return 2.1f; }
+                    if (roll < 88) return Single(PropKind.ChargingDock, 1.2f); // a spare dock
+                    return Row(f, b, PropKind.BatteryStack, 2, 0.95f);
                 case RoomType.Corridor:
                     // corridors are walkways: only slim things, far apart (Walls keeps 1.7 m free in front of them)
                     if (roll < 28) return Hung(PropKind.FireCabinet, 0.45f);

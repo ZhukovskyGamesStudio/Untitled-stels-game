@@ -266,6 +266,12 @@ namespace Stealth.Level
         [Tooltip("House (0-based) from which lasers can move up and down.")]
         public int MovingLasersFromHouse = 2;
 
+        [Header("New enemy mode")]
+        [Tooltip("Guards resting in the charging room, at least (more come from the roster).")]
+        public int SleepingGuards = 2;
+        [Tooltip("Traps on the valuable rooms (Wards).")]
+        public WardSettings Wards = new();
+
         [Header("Terminals")]
         [Tooltip("Desks turned into a terminal that shows the house's cameras (only in houses with cameras).")]
         public int CameraTerminals = 1;
@@ -296,11 +302,18 @@ namespace Stealth.Level
         /// </summary>
         public static bool Classic;
 
+        /// <summary>
+        /// The old enemies (the main menu's switch, "-classicenemies"): guards patrol, wardens guard loot rooms, hounds and
+        /// the hunter come. Off (the new mode): guards rest in the robots' charging room until an alarm, no hounds, hunter
+        /// or wardens — traps guard the rich rooms (<see cref="Wards"/>). The host decides (<c>LevelInfo.ClassicEnemies</c>).
+        /// </summary>
+        public static bool ClassicEnemies;
+
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic);
+            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic, ClassicEnemies);
 
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
-            FeatureSettings features, bool classic)
+            FeatureSettings features, bool classic, bool classicEnemies = false)
         {
             building ??= new BuildingSettings();
             security ??= new SecuritySettings();
@@ -330,6 +343,7 @@ namespace Stealth.Level
                 {
                     Seed = seed,
                     LevelIndex = levelIndex,
+                    ClassicEnemies = classicEnemies,
                     Players = Mathf.Max(1, players),
                     Floors = floors,
                     Plan = o.Plan,
@@ -405,6 +419,8 @@ namespace Stealth.Level
             l.RoomRules = building.RoomTypeRules;
             StorageRooms.Plan(l, features, storage);
             EnsureControlRoom(l, building);
+            // the robots' charging room: a tech room they took over (every house has one; the guards rest there)
+            if (!building.EveryRoomType) ChargingRooms.Convert(l, l.ExitHatchPosition); // (the rooms test keeps every type)
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
@@ -417,6 +433,7 @@ namespace Stealth.Level
             furnisher.EnsureWalkable();
             if (furnisher.RestoreFridges()) furnisher.EnsureWalkable(); // every kitchen keeps its one fridge
             Timing.Walk += watch.ElapsedMilliseconds;
+            ChargingRooms.Docks(l);
             if (security.Enemies)
             {
                 PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
@@ -427,7 +444,7 @@ namespace Stealth.Level
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
             HouseFeatures.PointOfInterest(l);
-            if (security.Enemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either
+            if (security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
             HouseFeatures.FinishObjective(l);
 
             float height = floors * FloorHeight;
@@ -783,7 +800,9 @@ namespace Stealth.Level
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
             int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
-            var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
+            // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)
+            var table = l.ClassicEnemies ? s.Roster.Robots : RobotRoster.NewEnemies(s.Roster.Robots);
+            var freshRobots = RobotRoster.Newcomers(table, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
             {
@@ -797,14 +816,15 @@ namespace Stealth.Level
                 else room = Weighted(candidates, rng, l, s.DeepRoomWeight);
                 var pos = SpotIn(l, room, rng, 1.2f);
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
-                var kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                var kind = RobotRoster.PickRobot(table, level, rng);
                 if (i < freshRobots.Count) kind = freshRobots[i]; // the house that introduces a kind shows it
                 // workers haul loot to the storage room: no storage room, no workers
-                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(table, level, rng);
                 if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = RobotKind.Guard;
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
             StorageWorkers(l, rng, s, candidates, storageWorkers, freshRobots.Count);
+            if (!l.ClassicEnemies) DockGuards(l, s);
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
@@ -814,6 +834,9 @@ namespace Stealth.Level
                 if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway) // (the paint booth's: its big door, nothing in the way)
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
             }
+            // the new mode: the valuable rooms are guarded by traps first (their doorways get no sliding door)
+            if (!l.ClassicEnemies && !b.EveryRoomType) Wards.Place(l, doors, s.Wards, s.MovingLasersFromHouse); // (the rooms test: workers only)
+
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.HatchPosition;
@@ -896,6 +919,41 @@ namespace Stealth.Level
             {
                 bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
                 if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
+            }
+        }
+
+        /// <summary>
+        /// The new mode: every guard rests on a charging dock (<see cref="LevelLayout.ChargingDocks"/>; without a charging
+        /// room, where it stands) and at least <see cref="SecuritySettings.SleepingGuards"/> of them are there. Spare
+        /// docks stay empty; guards beyond the docks rest beside the last one.
+        /// </summary>
+        static void DockGuards(LevelLayout l, SecuritySettings s)
+        {
+            int guards = 0;
+            foreach (var r in l.RobotSpawns) if (r.Kind == RobotKind.Guard) guards++;
+            // (no charging room — the rooms test — no guards beyond the roster's)
+            for (; l.ChargingRoom >= 0 && guards < s.SleepingGuards; guards++)
+            {
+                var at = l.ChargingRoom >= 0 ? l.Plan.Rooms[l.ChargingRoom] : null;
+                var p = at != null ? at.Center : l.PatrolPoints.Count > 0 ? l.PatrolPoints[guards % l.PatrolPoints.Count] : l.HatchPosition;
+                l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.Guard, Floor = LevelLayout.FloorOf(p.y), Position = p, Rotation = Quaternion.identity });
+            }
+            if (l.ChargingRoom >= 0 && l.ChargingDocks.Count < guards) ChargingRooms.Docks(l, guards); // a spot for every guard
+            int dock = 0;
+            for (int i = 0; i < l.RobotSpawns.Count; i++)
+            {
+                var r = l.RobotSpawns[i];
+                if (r.Kind != RobotKind.Guard) continue;
+                if (l.ChargingDocks.Count > 0)
+                {
+                    var d = l.ChargingDocks[Mathf.Min(dock, l.ChargingDocks.Count - 1)];
+                    r.Position = d.position;
+                    r.Rotation = d.rotation;
+                    r.Floor = LevelLayout.FloorOf(d.position.y);
+                    dock++;
+                }
+                r.Docked = true;
+                l.RobotSpawns[i] = r;
             }
         }
 

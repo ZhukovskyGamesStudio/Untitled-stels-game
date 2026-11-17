@@ -122,7 +122,18 @@ namespace Stealth.Enemies
         public float InvestigateLookTime = 3f;
         [Tooltip("Seconds of staring before it walks over to check.")]
         public float StareTime = 4f;
+
+        [Header("Docked (guards in the new enemy mode)")]
+        [Tooltip("Woken by an alarm, a docked guard hunts through the house for this long after the last alarm, then goes back to its charging dock and sleeps.")]
+        public float AlarmHuntTime = 60f;
     }
+
+    /// <summary>
+    /// A docked robot's shift (a guard in the new enemy mode): it rests at its charging dock, deaf and blind; an alarm
+    /// wakes it — it runs to the alarm and hunts through the house; <see cref="RobotTraits.AlarmHuntTime"/> after the last
+    /// alarm it walks back to the dock and rests again.
+    /// </summary>
+    public enum GuardShift : byte { Resting, Hunting, Returning }
 
     /// <summary>Strongest sensor contact of one frame (computed by the robot's sensors).</summary>
     public struct Sighting
@@ -170,6 +181,80 @@ namespace Stealth.Enemies
 
         public event Action<RobotState> StateChanged;
 
+        /// <summary>Docked (a charging dock to rest at): the shift below drives it; otherwise it patrols as always.</summary>
+        public bool Docked { get; private set; }
+        public GuardShift Shift { get; private set; }
+        Vector3 m_Dock, m_DockFacing;
+        float m_HuntUntil;
+        bool m_HomeBound;
+
+        /// <summary>Gives it a charging dock: it rests there (from now) until an alarm wakes it.</summary>
+        public void SetDock(Vector3 dock, Vector3 facing, float now)
+        {
+            Docked = true;
+            m_Dock = dock;
+            m_DockFacing = facing.sqrMagnitude > 1e-4f ? facing.normalized : Vector3.forward;
+            Rest(now);
+        }
+
+        /// <summary>Resting at its dock: no patrol, no senses — only an alarm wakes it.</summary>
+        public bool Resting => Docked && Shift == GuardShift.Resting;
+
+        /// <summary>
+        /// An alarm anywhere in the house: a resting (or returning) docked robot wakes and runs to it; one already hunting
+        /// hunts longer (and goes to check, unless it is busy with someone).
+        /// </summary>
+        public void Alarm(Vector3 position, float now)
+        {
+            if (!Docked) { Investigate(position, true, now); return; }
+            m_HuntUntil = now + m_Traits.AlarmHuntTime;
+            Shift = GuardShift.Hunting;
+            if (State == RobotState.Chase || State == RobotState.Alerted) return;
+            BeginInvestigation(position, true, now);
+        }
+
+        void Rest(float now)
+        {
+            Shift = GuardShift.Resting;
+            Target = null;
+            Suspect = null;
+            Suspicion = 0f;
+            SetState(RobotState.Patrol, now);
+            m_Body.Stop();
+        }
+
+        /// <summary>The shift's part of a tick; true when it took the body over (resting or walking home).</summary>
+        bool TickShift(float now, float dt)
+        {
+            if (!Docked) return false;
+            switch (Shift)
+            {
+                case GuardShift.Resting:
+                    m_Body.Stop();
+                    m_Body.Face(m_Body.Position + m_DockFacing, dt * 0.5f);
+                    return true;
+                case GuardShift.Hunting:
+                    // the hunt is over once it has nobody in sight and no spot to check: it heads home
+                    if (now >= m_HuntUntil && State == RobotState.Patrol)
+                    {
+                        Shift = GuardShift.Returning;
+                        m_Body.MoveTo(m_Dock, m_Traits.PatrolSpeed);
+                        m_HomeBound = true;
+                        return true;
+                    }
+                    return false;
+                case GuardShift.Returning:
+                    if (State != RobotState.Patrol) { m_HomeBound = false; return false; } // noticed something on the way: that first
+                    var flat = m_Dock - m_Body.Position;
+                    flat.y = 0f;
+                    if (m_HomeBound && m_Body.Arrived && flat.magnitude < 1.5f) { Rest(now); return true; }
+                    if (!m_HomeBound) { m_Body.MoveTo(m_Dock, m_Traits.PatrolSpeed); m_HomeBound = true; }
+                    else m_Body.Move(m_Traits.PatrolSpeed);
+                    return true;
+            }
+            return false;
+        }
+
         public RobotBrain(RobotSenses senses, RobotTraits traits, IRobotBody body, System.Random rng)
         {
             m_Senses = senses;
@@ -196,6 +281,7 @@ namespace Stealth.Enemies
         /// <summary>The strongest sensor contact of this frame (eyes, floor, nose) — or none.</summary>
         public void OnSensed(in Sighting s, float now, float dt)
         {
+            if (Resting) return; // asleep on its dock
             if (s.Target == null)
             {
                 if (State != RobotState.Alerted) Suspicion = Mathf.Max(0f, Suspicion - m_Traits.SuspicionDecay * dt);
@@ -242,7 +328,7 @@ namespace Stealth.Enemies
 
         void OnStimulus(Vector3 position, float suspicion, IIntruder source, float now)
         {
-            if (suspicion <= 0f || Sleeper) return;
+            if (suspicion <= 0f || Sleeper || Resting) return;
             if (State == RobotState.Chase)
             {
                 if (source != null && source == Target)
@@ -265,17 +351,18 @@ namespace Stealth.Enemies
         /// <summary>Go and check a spot (radio call, alarm, noise). Ignored once it has detected someone.</summary>
         public void Investigate(Vector3 position, bool alarm, float now)
         {
-            if (State == RobotState.Chase || State == RobotState.Alerted || Sleeper) return;
+            if (State == RobotState.Chase || State == RobotState.Alerted || Sleeper || Resting) return;
             BeginInvestigation(position, alarm, now);
         }
 
-        /// <summary>Hacked: forget everything.</summary>
+        /// <summary>Hacked: forget everything (a docked robot: back to resting where it is woken next).</summary>
         public void Reset(float now)
         {
             Target = null;
             Suspect = null;
             Suspicion = 0f;
             SetState(RobotState.Patrol, now);
+            if (Docked && Shift == GuardShift.Hunting) m_HuntUntil = now; // its hunt is over: home when it wakes
         }
 
         // ------------------------------------------------------------------ decisions
@@ -327,6 +414,7 @@ namespace Stealth.Enemies
 
         public void Tick(float now, float dt)
         {
+            if (TickShift(now, dt)) return;
             switch (State)
             {
                 case RobotState.Patrol:

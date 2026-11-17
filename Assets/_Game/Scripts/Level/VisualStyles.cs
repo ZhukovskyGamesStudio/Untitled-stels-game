@@ -298,9 +298,31 @@ namespace Stealth.Level
             foreach (var r in go.GetComponentsInChildren<Renderer>(true)) DressRenderer(r);
         }
 
+        /// <summary>
+        /// The robots' own make looks the same in every style (their creature models, Tools/Blender/creatures; the charging
+        /// room's pieces): no mesh, material or palette of a style on them. The spider keeps its style versions.
+        /// </summary>
+        public static bool Invariant(Renderer r)
+        {
+            var d = r.GetComponentInParent<Enemies.Detector>(true);
+            if (d != null) return d.Kind != RobotKind.Spider;
+            return r.GetComponentInParent<Enemies.LaserGate>(true) != null;
+        }
+
+        /// <summary>
+        /// The robots' creature models (Tools/Blender/creatures): the same in every style, so the editor does not collect
+        /// their style versions (the spider and its web keep theirs).
+        /// </summary>
+        public static bool Creature(string model) =>
+            model != "robot_spider" && (model.StartsWith("robot_") || model.StartsWith("sensor_") || model.StartsWith("attach_")
+                || model == "security_camera" || model == "laser_emitter" || model == "worker_lift");
+
+        /// <summary>The robots' own materials (the charging room): never recoloured by a style's palette.</summary>
+        static bool RobotMade(Material m) => m.name.StartsWith("RobotShell") || m.name.StartsWith("RobotFlesh") || m.name.StartsWith("RobotGlow");
+
         static void DressRenderer(Renderer r)
         {
-            if (r == null) return;
+            if (r == null || Invariant(r)) return;
             Load();
             LoadStyleMeshes();
             int f = (int)s_Family;
@@ -321,6 +343,7 @@ namespace Stealth.Level
                 var m = mats[i];
                 if (m == null) continue;
                 var original = s_MatOriginal.TryGetValue(m, out var o) ? o : m;
+                if (RobotMade(original)) continue; // the robots' own make (the charging room): the same in every style
                 var target = s_MatVariants[f].TryGetValue(original, out var v) ? v : original;
                 if (s_Wear.TryGetValue(target, out var levels))
                 {
@@ -490,7 +513,7 @@ namespace Stealth.Level
             if (c == null) return;
             Recolor(c.Building, p?.Building);
             Recolor(c.Furniture, p?.Furniture);
-            Recolor(c.Robots, p?.Robots);
+            // (the robots keep their own colours in every style: Invariant — the spider's palette went with them)
             Recolor(c.Players, p?.Players);
             Recolor(c.Loot, p?.Loot);
         }
@@ -500,7 +523,7 @@ namespace Stealth.Level
             if (materials == null) return;
             foreach (var mat in materials)
             {
-                if (mat == null || !mat.HasProperty(BaseColorId)) continue;
+                if (mat == null || !mat.HasProperty(BaseColorId) || RobotMade(mat)) continue;
                 if (!s_Originals.TryGetValue(mat, out var orig))
                 {
                     orig = (mat.GetColor(BaseColorId), mat.HasProperty(SmoothnessId) ? mat.GetFloat(SmoothnessId) : 0f);

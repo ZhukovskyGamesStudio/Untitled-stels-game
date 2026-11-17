@@ -765,6 +765,7 @@ namespace Stealth.EditorTools
             menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
             menu.TestRooms = ToggleIn(e, col, "TestRooms", L("menu.test_rooms")); // off: the main game
             menu.ClassicRooms = ToggleIn(e, col, "ClassicRooms", L("menu.classic_rooms")); // off: the room program
+            menu.ClassicEnemies = ToggleIn(e, col, "ClassicEnemies", L("menu.classic_enemies")); // off: the new enemies
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(row, 34);
             var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();

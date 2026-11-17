@@ -166,6 +166,13 @@ namespace Stealth.EditorTools
             (PropKind.MoneyCart, "money_cart", "PropBody", "Rubber", "Felt", "PropScreen"),
             (PropKind.CashShelf, "cash_shelf", "Metal", "Felt", "Cardboard", "PropScreen"),
             (PropKind.StorageRack, "storage_rack", "ShopSteel", "ShopYellow", "Metal", "PropScreen"), // Tools/Blender/storage.py
+            // the robots' charging room (Tools/Blender/charging.py): their own make, the same in every style
+            (PropKind.ChargingDock, "charging_dock", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
+            (PropKind.BatteryStack, "battery_stack", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
+            (PropKind.Generator, "generator", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
+            (PropKind.ScrapShrine, "scrap_shrine", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
+            (PropKind.ConduitGrowth, "conduit_growth", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
+            (PropKind.CableMass, "cable_mass", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
             // the auto repair shop (Tools/Blender/garage.py)
             (PropKind.CarParked, "car_parked", "CarRed", "Rubber", "CarGlass", "LampBulb"),
             (PropKind.CarHoodOpen, "car_hood_open", "CarBlue", "Rubber", "CarGlass", "LampBulb"),

@@ -44,6 +44,8 @@ namespace Stealth.UI
         public Toggle TestRooms;
         [Tooltip("The classic generator: rooms cut first, their types guessed from size (LevelGenerator.Classic).")]
         public Toggle ClassicRooms;
+        [Tooltip("The old enemies: guards on patrol, wardens, hounds, the hunter (LevelGenerator.ClassicEnemies).")]
+        public Toggle ClassicEnemies;
         public InputField Address;
         public Button Join;
         public Text NetStatus;
@@ -113,6 +115,13 @@ namespace Stealth.UI
             {
                 ClassicRooms.SetIsOnWithoutNotify(Level.LevelGenerator.Classic);
                 ClassicRooms.onValueChanged.AddListener(on => Level.LevelGenerator.Classic = on);
+            }
+            // "-classicenemies": the old enemies (the host's choice travels with the house to every peer)
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-classicenemies") >= 0) Level.LevelGenerator.ClassicEnemies = true;
+            if (ClassicEnemies != null)
+            {
+                ClassicEnemies.SetIsOnWithoutNotify(Level.LevelGenerator.ClassicEnemies);
+                ClassicEnemies.onValueChanged.AddListener(on => Level.LevelGenerator.ClassicEnemies = on);
             }
             if (TestRooms != null)
             {

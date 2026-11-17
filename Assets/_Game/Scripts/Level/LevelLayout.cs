@@ -7,7 +7,9 @@ namespace Stealth.Level
         // themed rooms (append only): each furnished as what it is (Furnisher), some with a floor of their own (StyleGeometry.RoomFloors)
         Gym, Library, CopyRoom, ControlRoom, Lab, NapRoom, Studio, LockerRoom, Infirmary, GameRoom,
         // the auto repair shop (HouseKind.Garage, PlanGenerator.Garage): the double-height workshop hall with its bays, the paint booth
-        Workshop, PaintBooth }
+        Workshop, PaintBooth,
+        // the robots' charging room: a human tech room they took over (ChargingRooms), never drawn by the program
+        ChargingStation }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -83,7 +85,9 @@ namespace Stealth.Level
         CarParked, CarHoodOpen, LiftCar, LiftEmpty, CarOnStands, ToolChest, TireChanger, WheelBalancer, TireRack, TireStack,
         EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack,
         // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
-        StorageRack }
+        StorageRack,
+        // the robots' charging room (Tools/Blender/charging.py): what the robots built themselves
+        ChargingDock, BatteryStack, Generator, ScrapShrine, ConduitGrowth, CableMass }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -120,6 +124,8 @@ namespace Stealth.Level
         public int Floor;
         public Vector3 Position;
         public Quaternion Rotation;
+        /// <summary>Rests at a charging dock (here, facing <see cref="Rotation"/>) until an alarm (new enemy mode guards).</summary>
+        public bool Docked;
     }
 
     /// <summary>Laser gate patterns: one low beam, three blinking beams, one moving beam (from the third house on).</summary>
@@ -249,6 +255,15 @@ namespace Stealth.Level
         public Vector3 CageKeySpot;
         public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
+        /// <summary>The old enemies (LevelGenerator.ClassicEnemies): wardens, hounds, the hunter, guards on patrol, no wards.</summary>
+        public bool ClassicEnemies;
+        /// <summary>The robots' charging room (a human tech room they took over), or −1; its docks (guards rest there).</summary>
+        public int ChargingRoom = -1;
+        /// <summary>What the charging room was before the robots took it (its remnant shows it).</summary>
+        public RoomType ChargingFrom = RoomType.Office;
+        public readonly List<Pose> ChargingDocks = new();
+        /// <summary>Rooms guarded by traps (<see cref="Wards"/>), new enemy mode.</summary>
+        public readonly List<int> WardedRooms = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
         /// <summary>Most windows on the facade (<see cref="LevelBuilder.WindowSpots"/>), −1 = wherever one fits.</summary>

@@ -82,6 +82,20 @@ namespace Stealth.Level
 
         public static RobotKind PickRobot(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Robots, level, rng);
 
+        /// <summary>A robot from this table (the new enemy mode's, see <see cref="NewEnemies"/>).</summary>
+        public static RobotKind PickRobot(RosterEntry[] table, int level, System.Random rng) => Pick(table, level, rng);
+
+        /// <summary>Who never comes in the new enemy mode: the hound, the hunter and the warden (traps guard the rich rooms instead).</summary>
+        public static bool OldOnly(RobotKind k) => k is RobotKind.Hound or RobotKind.Hunter or RobotKind.Warden;
+
+        /// <summary>The robot table without the old-mode kinds (<see cref="OldOnly"/>).</summary>
+        public static RosterEntry[] NewEnemies(RosterEntry[] table)
+        {
+            var list = new List<RosterEntry>();
+            foreach (var e in table) if (!OldOnly(e.Kind)) list.Add(e);
+            return list.Count > 0 ? list.ToArray() : table;
+        }
+
         /// <summary>Kinds that first appear on this house: each of them is placed at least once there, so players meet it.</summary>
         public static List<RobotKind> Newcomers(RosterEntry[] table, int level)
         {

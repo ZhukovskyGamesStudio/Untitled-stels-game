@@ -148,6 +148,15 @@ namespace Stealth.Enemies
         /// <summary>Server: go and check a spot (alarm, radio).</summary>
         public void InvestigateServer(Vector3 position, bool alarm) => m_Brain?.Investigate(position, alarm, Time.time);
 
+        /// <summary>Server: rests on a charging dock here until an alarm (<see cref="RobotBrain.SetDock"/>).</summary>
+        public void DockServer(Vector3 dock, Vector3 facing) => m_Brain?.SetDock(dock, facing, Time.time);
+        /// <summary>Server: an alarm somewhere in the house (a docked robot wakes and hunts).</summary>
+        public void AlarmServer(Vector3 position) => m_Brain?.Alarm(position, Time.time);
+        /// <summary>Has a charging dock (a guard of the new enemy mode).</summary>
+        public bool Docked => m_Brain != null && m_Brain.Docked;
+        /// <summary>Resting on its dock right now.</summary>
+        public bool Resting => m_Brain != null && m_Brain.Resting;
+
         // ------------------------------------------------------------------ update
 
         void Update()

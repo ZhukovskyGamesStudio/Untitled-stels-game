@@ -293,7 +293,8 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
+                LevelGenerator.Classic, info.ClassicEnemies);
             ActiveLevel.Load(layout, Art);
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
@@ -337,7 +338,7 @@ namespace Stealth.Game
             GoAt = 0;
             ChosenLane = -1;
             Votes.Clear();
-            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed };
+            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
             BuildLocal();
             var layout = ActiveLevel.Layout;
 
@@ -401,6 +402,7 @@ namespace Stealth.Game
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
+                if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(pos, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
             }
             PostWardens(layout, wardens);
@@ -448,7 +450,8 @@ namespace Stealth.Game
         {
             m_Run.RaiseAlarm(Session.ServerTime);
             foreach (var robot in RobotController.Robots)
-                if ((robot.transform.position - position).magnitude <= radius)
+                if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
+                else if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
         }
 
@@ -474,7 +477,9 @@ namespace Stealth.Game
             UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
-            if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
+            bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
+            if (classic && !InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
             UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
