@@ -151,6 +151,7 @@ namespace Stealth.Level
                 // the shop's doors are steel; its paint booth's is wide, for a car
                 bool shop = l.Kind == HouseKind.Garage;
                 var prefab = vault ? m_Art.VaultDoor
+                    : i == l.StorageDoor && StorageRooms.Locked(l) && m_Art.StorageDoor != null ? m_Art.StorageDoor
                     : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
                     : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor
                     : l.Kind == HouseKind.Hospital && m_Art.ClinicDoor != null ? m_Art.ClinicDoor : m_Art.AutoDoor;
@@ -477,15 +478,18 @@ namespace Stealth.Level
                     continue;
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
+                bool breach = o.Kind == EdgeType.Breach, hole = o.Kind == EdgeType.Hole, window = o.Kind == EdgeType.InnerWindow;
                 bool vault = IsVaultDoorway(index, o), booth = IsBoothDoorway(index, o);
-                float clear = LevelMetrics.ClearWidth(vent ? LevelMetrics.VentWidth : squeeze ? LevelMetrics.SqueezeWidth
-                    : vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth : LevelMetrics.DoorWidth);
+                float clear = LevelMetrics.ClearWidth(vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth
+                    : LevelMetrics.OpeningWidth(o.Kind));
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
-                float sill = o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
-                float openH = vent ? sill + LevelMetrics.VentHeight : LevelMetrics.DoorHeight;
+                float sill = window ? LevelMetrics.InnerWindowSill : o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
+                float openH = vent ? sill + LevelMetrics.VentHeight
+                    : window ? sill + LevelMetrics.InnerWindowHeight
+                    : hole ? LevelMetrics.HoleHeight : LevelMetrics.DoorHeight;
                 WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * o0, 0f, height);
                 RecordFaces(a3 + d3 * from, a3 + d3 * o0, 0f, height, w.Exterior, inner, cornerA, false, jointA && cornerA == false && from <= t / 2f + 0.001f);
-                if (vent)
+                if (vent || window)
                 {
                     // the duct's floor: a sill of wall under the hole
                     WallPiece(m_Art.WallBlock, a3 + d3 * o0, a3 + d3 * o1, 0f, sill);
@@ -495,10 +499,15 @@ namespace Stealth.Level
                 WallPiece(w.Exterior ? m_Art.WallBlock : m_Art.TrimBlock, a3 + d3 * o0, a3 + d3 * o1, openH, height);
                 RecordFaces(a3 + d3 * o0, a3 + d3 * o1, openH, height, w.Exterior, inner, false, false);
                 var mid = a3 + d3 * o.At;
-                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent, Exterior = w.Exterior, Squeeze = squeeze, Vault = vault, Floor = m_Floor });
+                // a window between rooms has a sill like a vent and a frame of its own; breaches and holes are ruins, no door trim
+                Shell.Openings.Add(new WallOpening { Center = mid, Along = d3, Width = clear, Height = openH, Vent = vent || window, Exterior = w.Exterior,
+                    Squeeze = squeeze || breach || hole, Vault = vault, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
                 if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
+                else if (window) { if (m_Art.InnerWindowFrame != null) Place(m_Art.InnerWindowFrame, "InnerWindow", mid, along); }
+                else if (breach) { if (m_Art.BreachFrame != null) Place(m_Art.BreachFrame, "Breach", mid, along); }
+                else if (hole) { if (m_Art.HoleFrame != null) Place(m_Art.HoleFrame, "Hole", mid, along); }
                 else if (w.Exterior)
                 {
                     // the street door's +Z out of the house: its leaves swing outwards

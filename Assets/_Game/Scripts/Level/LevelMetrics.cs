@@ -31,6 +31,16 @@ namespace Stealth.Level
         /// <summary>How far the desk under a high vent and the room to climb onto it reach into the room from the wall's face.</summary>
         public const float VentDeskReach = 0.9f, VentDeskAisle = 1.0f;
         public const float SqueezeWidth = 1.1f; // nominal; the clear slot is 0.9 m: a player (0.78 m with skin) fits, a robot does not (navmesh volume)
+        // Ruins between rooms (EdgeType.Breach / Hole / InnerWindow), the loops that are not doors:
+        /// <summary>A breach: a stretch of wall knocked out, everyone walks through (clear 1.6 m, up to the door height).</summary>
+        public const float BreachWidth = 1.8f;
+        /// <summary>A hole broken through at the floor: a player crawls through crouched (1.1 m), a robot does not (navmesh volume).</summary>
+        public const float HoleWidth = 1.1f, HoleHeight = 1.25f;
+        /// <summary>
+        /// A window between rooms without glass: the sill above a robot's step (navmesh climb 0.75 m) and under a player's jump
+        /// (1.05 m); through it crouched (1.1 m under 1.25 m). Robots see and hear through it.
+        /// </summary>
+        public const float InnerWindowWidth = 1.6f, InnerWindowSill = 0.9f, InnerWindowHeight = 1.25f;
         public const float WindowWidth = 2.4f;   // the window model's opening
         public const float WindowHeight = 1.2f;
         public const float WindowCenterY = 1.7f; // above the floor
@@ -45,6 +55,17 @@ namespace Stealth.Level
         public const float StairSize = 4f;    // the stair + hole occupy [0, 4] x [0, 4] from the corner
         public const float FlightStart = 3.8f; // u where flight A starts / flight B ends
         public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.28
+
+        /// <summary>Nominal width of an opening of this kind (an open passage: its whole wall, not this).</summary>
+        public static float OpeningWidth(EdgeType kind) => kind switch
+        {
+            EdgeType.Vent => VentWidth,
+            EdgeType.Squeeze => SqueezeWidth,
+            EdgeType.Breach => BreachWidth,
+            EdgeType.Hole => HoleWidth,
+            EdgeType.InnerWindow => InnerWindowWidth,
+            _ => DoorWidth,
+        };
 
         /// <summary>Clear width of an opening (door, vent): the jambs take half a wall thickness on each side.</summary>
         public static float ClearWidth(float nominal) => nominal - WallThickness;

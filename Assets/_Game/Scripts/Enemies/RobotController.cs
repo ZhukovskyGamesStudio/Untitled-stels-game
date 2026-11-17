@@ -398,6 +398,11 @@ namespace Stealth.Enemies
                 if (anim != null) anim.Stomp();
                 return;
             }
+            if (effect >= PulseLiftFrom)
+            {
+                PlayCargoMotion(SwingKind.Lift, LiftSurface(effect)); // a lift off a table: the surface's height rides in the pulse
+                return;
+            }
             if (effect is PulseLift or PulseLower or PulseShelve)
             {
                 PlayCargoMotion(effect == PulseLift ? SwingKind.Pickup : effect == PulseLower ? SwingKind.PutDown : SwingKind.Shelve);

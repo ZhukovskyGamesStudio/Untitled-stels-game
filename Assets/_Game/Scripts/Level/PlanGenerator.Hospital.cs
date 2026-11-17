@@ -145,6 +145,7 @@ namespace Stealth.Level
             RoomType.Imaging => 6 + rng.Next(2),
             RoomType.Infirmary => 4,
             RoomType.Restroom => 4,
+            RoomType.Kitchen => 6, // the staff room: the kitchen run along one wall, a table with chairs in front of it
             _ => 4 + rng.Next(2),
         };
     }

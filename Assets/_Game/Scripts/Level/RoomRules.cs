@@ -28,14 +28,18 @@ namespace Stealth.Level
         public int LootBonus;
         [Tooltip("Where it belongs: on the facade (work rooms, by the windows), inside (service rooms), or anywhere (Zoning).")]
         public RoomZone Zone;
+        [Tooltip("How private: +1 deep inside the house (servers, control room, labs), −1 near the lobby (meeting rooms, " +
+                 "kitchen, lounge), 0 anywhere (RoomDepth, Zoning).")]
+        public int Privacy;
         [Tooltip("At most this many on a floor (0 = no limit): one kitchen a floor.")]
         public int PerFloor;
         [Tooltip("At most this many in a house (0 = no limit): one gym a house. A house kind that favours the type lifts both limits.")]
         public int PerHouse;
 
         public RoomRule(RoomType room, Vector2 area, float maxAspect = 0f, float outsideWall = 0f, int maxLootCells = 0, int lootBonus = 0,
-            bool rectOnly = false, RoomZone zone = RoomZone.Any, int perFloor = 0, int perHouse = 0)
+            bool rectOnly = false, RoomZone zone = RoomZone.Any, int perFloor = 0, int perHouse = 0, int privacy = 0)
         {
+            Privacy = privacy;
             Zone = zone;
             PerFloor = perFloor;
             PerHouse = perHouse;
@@ -49,9 +53,62 @@ namespace Stealth.Level
         }
     }
 
+    /// <summary>
+    /// How good it is for two room types to be next door (<see cref="BuildingSettings.RoomAdjacency"/>, <see cref="Zoning"/>):
+    /// positive — they belong together (the kitchen by the open space, lockers by the gym), negative — they should not touch
+    /// (a nap room by the game room, toilets by the kitchen).
+    /// </summary>
+    [Serializable]
+    public struct RoomAdjacency
+    {
+        public RoomType A, B;
+        [Tooltip("Positive: next door is good; negative: keep apart.")]
+        public float Score;
+
+        public RoomAdjacency(RoomType a, RoomType b, float score) { A = a; B = b; Score = score; }
+    }
+
     /// <summary>The rules of the room types (pure).</summary>
     public static class RoomRules
     {
+        /// <summary>Which types belong next door to which (as in real offices), and which should be kept apart.</summary>
+        public static RoomAdjacency[] AdjacencyDefaults() => new[]
+        {
+            new RoomAdjacency(RoomType.Kitchen, RoomType.OpenSpace, 1.5f),   // the tea point by the desks
+            new RoomAdjacency(RoomType.Kitchen, RoomType.Lounge, 1.2f),
+            new RoomAdjacency(RoomType.Kitchen, RoomType.Meeting, 0.5f),     // catering
+            new RoomAdjacency(RoomType.Kitchen, RoomType.Restroom, -1.5f),   // hygiene
+            new RoomAdjacency(RoomType.Meeting, RoomType.OpenSpace, 0.5f),
+            new RoomAdjacency(RoomType.CopyRoom, RoomType.OpenSpace, 1f),
+            new RoomAdjacency(RoomType.CopyRoom, RoomType.Office, 0.6f),
+            new RoomAdjacency(RoomType.Server, RoomType.ControlRoom, 1.5f),  // the racks and the screens that watch them
+            new RoomAdjacency(RoomType.Server, RoomType.Server, 0.6f),       // a server block
+            new RoomAdjacency(RoomType.Server, RoomType.Lab, 0.5f),
+            new RoomAdjacency(RoomType.LockerRoom, RoomType.Gym, 2f),        // change, then train
+            new RoomAdjacency(RoomType.LockerRoom, RoomType.Restroom, 0.8f),
+            new RoomAdjacency(RoomType.Infirmary, RoomType.Restroom, 0.5f),
+            new RoomAdjacency(RoomType.Lounge, RoomType.GameRoom, 0.8f),
+            new RoomAdjacency(RoomType.NapRoom, RoomType.GameRoom, -1.5f),   // noise next to sleep
+            new RoomAdjacency(RoomType.NapRoom, RoomType.Gym, -1f),
+            new RoomAdjacency(RoomType.NapRoom, RoomType.Studio, -1f),
+            new RoomAdjacency(RoomType.Library, RoomType.GameRoom, -1f),     // noise next to quiet
+            new RoomAdjacency(RoomType.Library, RoomType.Studio, -0.8f),
+            new RoomAdjacency(RoomType.Library, RoomType.Gym, -0.8f),
+        };
+
+        /// <summary>The table as a lookup (both orders).</summary>
+        public static System.Collections.Generic.Dictionary<(RoomType, RoomType), float> AdjacencyMap(RoomAdjacency[] table)
+        {
+            var map = new System.Collections.Generic.Dictionary<(RoomType, RoomType), float>();
+            if (table == null) return map;
+            foreach (var a in table)
+            {
+                map[(a.A, a.B)] = a.Score;
+                map[(a.B, a.A)] = a.Score;
+            }
+            return map;
+        }
+
         /// <summary>The types a house is made of (not the lobby, the stair halls and the corridors: the plan adds those).</summary>
         public static readonly RoomType[] Programmed =
         {
@@ -66,25 +123,25 @@ namespace Stealth.Level
             // each special room a house (real offices; a house kind that favours a type lifts its cap, HouseKinds)
             new RoomRule(RoomType.Office, new Vector2(6f, 30f), zone: RoomZone.Facade), // the catch-all: any room big enough to be one
             new RoomRule(RoomType.OpenSpace, new Vector2(40f, 140f), zone: RoomZone.Facade),
-            new RoomRule(RoomType.Meeting, new Vector2(14f, 50f), zone: RoomZone.Facade),
+            new RoomRule(RoomType.Meeting, new Vector2(14f, 50f), zone: RoomZone.Facade, privacy: -1),
             // a kitchen: a mid-sized room with its run, one fridge and a table with chairs; small things (big enough for the
             // run along a wall, the table in the middle and the doors' walkways). Windows and a plain rectangle are not needed
-            new RoomRule(RoomType.Kitchen, new Vector2(24f, 64f), maxAspect: 2.2f, maxLootCells: 3, perFloor: 1),
-            new RoomRule(RoomType.Server, new Vector2(12f, 60f), zone: RoomZone.Interior),
+            new RoomRule(RoomType.Kitchen, new Vector2(24f, 64f), maxAspect: 2.2f, maxLootCells: 3, perFloor: 1, privacy: -1),
+            new RoomRule(RoomType.Server, new Vector2(12f, 60f), zone: RoomZone.Interior, privacy: 1),
             // the storage room: a small or mid-sized room behind one locked door, shelves and a pile; anything, richer
             new RoomRule(RoomType.Storage, new Vector2(9f, 40f), maxAspect: 3.2f, lootBonus: 2, zone: RoomZone.Interior),
             new RoomRule(RoomType.Restroom, new Vector2(8f, 26f), zone: RoomZone.Interior, perFloor: 1),
-            new RoomRule(RoomType.Lounge, new Vector2(28f, 90f), zone: RoomZone.Facade, perFloor: 1),
-            new RoomRule(RoomType.Gym, new Vector2(22f, 80f), perHouse: 1),
+            new RoomRule(RoomType.Lounge, new Vector2(28f, 90f), zone: RoomZone.Facade, perFloor: 1, privacy: -1),
+            new RoomRule(RoomType.Gym, new Vector2(22f, 80f), perHouse: 1, privacy: -1),
             new RoomRule(RoomType.Library, new Vector2(22f, 70f), zone: RoomZone.Facade, perHouse: 1),
             new RoomRule(RoomType.CopyRoom, new Vector2(9f, 26f), zone: RoomZone.Interior, perFloor: 1),
-            new RoomRule(RoomType.ControlRoom, new Vector2(24f, 60f), zone: RoomZone.Interior, perHouse: 1),
-            new RoomRule(RoomType.Lab, new Vector2(16f, 70f)),
+            new RoomRule(RoomType.ControlRoom, new Vector2(24f, 60f), zone: RoomZone.Interior, perHouse: 1, privacy: 1),
+            new RoomRule(RoomType.Lab, new Vector2(16f, 70f), privacy: 1),
             new RoomRule(RoomType.NapRoom, new Vector2(14f, 36f), zone: RoomZone.Interior, perHouse: 1),
-            new RoomRule(RoomType.Studio, new Vector2(16f, 40f), zone: RoomZone.Interior, perHouse: 1),
+            new RoomRule(RoomType.Studio, new Vector2(16f, 40f), zone: RoomZone.Interior, perHouse: 1, privacy: 1),
             new RoomRule(RoomType.LockerRoom, new Vector2(16f, 50f), zone: RoomZone.Interior, perHouse: 1),
             new RoomRule(RoomType.Infirmary, new Vector2(18f, 50f), perHouse: 1),
-            new RoomRule(RoomType.GameRoom, new Vector2(26f, 100f), perHouse: 1),
+            new RoomRule(RoomType.GameRoom, new Vector2(26f, 100f), perHouse: 1, privacy: -1),
             // the auto repair shop's own rooms: never drawn by the program (no weight), laid out by PlanGenerator.Garage
             new RoomRule(RoomType.Workshop, new Vector2(80f, 700f), perHouse: 1),
             new RoomRule(RoomType.PaintBooth, new Vector2(20f, 80f), zone: RoomZone.Interior, perHouse: 1),

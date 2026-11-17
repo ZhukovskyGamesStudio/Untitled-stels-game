@@ -165,6 +165,7 @@ namespace Stealth.EditorTools
             (PropKind.GoldPallet, "gold_pallet", "Gold", "Wood", "Wood", "PropScreen"),
             (PropKind.MoneyCart, "money_cart", "PropBody", "Rubber", "Felt", "PropScreen"),
             (PropKind.CashShelf, "cash_shelf", "Metal", "Felt", "Cardboard", "PropScreen"),
+            (PropKind.StorageRack, "storage_rack", "ShopSteel", "ShopYellow", "Metal", "PropScreen"), // Tools/Blender/storage.py
             // the auto repair shop (Tools/Blender/garage.py)
             (PropKind.CarParked, "car_parked", "CarRed", "Rubber", "CarGlass", "LampBulb"),
             (PropKind.CarHoodOpen, "car_hood_open", "CarBlue", "Rubber", "CarGlass", "LampBulb"),

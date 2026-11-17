@@ -17,7 +17,12 @@ namespace Stealth.Level
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
     /// </summary>
     /// Illusion = the entrance of a hidden room: looks like a wall, players walk through, robots and the map do not.
-    public enum EdgeType { Wall, Door, Open, Vent, Squeeze, Illusion }
+    /// <summary>
+    /// What a wall opening is. Breach: a ruined stretch of wall, everyone walks through; Hole: a low hole broken through at
+    /// the floor, players crawl through (robots do not fit); InnerWindow: a window between rooms without glass, players
+    /// climb through (robots do not), everyone sees and hears through it.
+    /// </summary>
+    public enum EdgeType { Wall, Door, Open, Vent, Squeeze, Illusion, Breach, Hole, InnerWindow }
     public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall,
         Partition, Bookshelf, Printer, Fridge, CoffeeMachine, RoundTable, Armchair, CoffeeTable, TvStand, ReceptionDesk,
         TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine, DeskLamp, FloorLamp,
@@ -83,7 +88,9 @@ namespace Stealth.Level
         EngineStand, EngineHoist, AirCompressor, OilDrain, HoseReel, FloorJack, OilDrums, WeldingCart, BayLines, GarageDoor, PaintRack,
         // the hospital (Tools/Blender/hospital.py): the wards, the nurse station, the theatres, imaging, the corridors
         BedHeadwall, BedCurtain, NurseStationDesk, Gurney, MedicationCart, LinenCart, SurgicalTable, SurgicalLights, AnesthesiaMachine,
-        InstrumentTable, ScrubSink, XrayMachine, CtScanner, WaitingSeats, VitalsMonitor, HandSanitizer }
+        InstrumentTable, ScrubSink, XrayMachine, CtScanner, WaitingSeats, VitalsMonitor, HandSanitizer,
+        // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
+        StorageRack }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -210,6 +217,17 @@ namespace Stealth.Level
         public RoomRule[] RoomRules;
         /// <summary>The hidden room (plan id; its entrances are <see cref="EdgeType.Illusion"/>), -1 if none.</summary>
         public int HiddenRoom = -1;
+        /// <summary>Steps from the lobby per room id over the building's own ways (<see cref="RoomDepth"/>; −1 not reached).</summary>
+        public int[] RoomSteps;
+        int m_DeepestSteps = -1;
+
+        /// <summary>How deep a room lies: 0 the lobby … 1 the deepest room (<see cref="RoomDepth.Share"/>).</summary>
+        public float DepthShare(int room)
+        {
+            if (RoomSteps == null || room < 0 || room >= RoomSteps.Length) return 0f;
+            if (m_DeepestSteps < 0) { m_DeepestSteps = 1; foreach (int s in RoomSteps) m_DeepestSteps = Mathf.Max(m_DeepestSteps, s); }
+            return RoomSteps[room] < 0 ? 1f : RoomSteps[room] / (float)m_DeepestSteps;
+        }
         /// <summary>Doors locked with a key block, and where each key lies (<see cref="HouseFeatures.KeyDoors"/>).</summary>
         public readonly List<KeyDoor> KeyDoors = new();
         /// <summary>Searchable crates: indices in <see cref="Props"/>.</summary>
@@ -331,7 +349,7 @@ namespace Stealth.Level
         {
             foreach (var d in Doorways)
             {
-                if (d.Kind is not (EdgeType.Door or EdgeType.Open)) continue;
+                if (d.Kind is not (EdgeType.Door or EdgeType.Open or EdgeType.Breach)) continue;
                 if (d.RoomA == room && d.RoomB >= 0) yield return d.RoomB;
                 else if (d.RoomB == room && d.RoomA >= 0) yield return d.RoomA;
             }

@@ -47,6 +47,19 @@ namespace Stealth.Tests
             return NavMesh.CalculatePath(a.position, b.position, areaMask, path) && path.status == NavMeshPathStatus.PathComplete;
         }
 
+        /// <summary>The room's floor clear of furniture, nearest to <paramref name="p"/> first.</summary>
+        System.Collections.Generic.IEnumerable<Vector3> OpenFloor(PlanRoom r, Vector3 p)
+        {
+            var cells = new System.Collections.Generic.List<Vector3>();
+            for (float x = r.Bounds.xMin + 0.5f; x < r.Bounds.xMax - 0.4f; x += 0.5f)
+                for (float z = r.Bounds.yMin + 0.5f; z < r.Bounds.yMax - 0.4f; z += 0.5f)
+                {
+                    var q = new Vector3(x, p.y, z);
+                    if (m_Layout.Plan.SpaceAt(r.Floor, new Vector2(x, z)) == r.Id && Stealth.Items.LootPlanner.ClearOfFurniture(m_Layout, q, r.Floor, 0.3f)) cells.Add(q);
+                }
+            return cells.OrderBy(q => (q - p).sqrMagnitude);
+        }
+
         [Test]
         public void EveryFloorIsReachableFromTheHatchByStairs()
         {
@@ -56,6 +69,11 @@ namespace Stealth.Tests
                 {
                     // the exit hatch stands in the middle of its room: walk up to it
                     var target = (r.Center - m_Layout.ExitHatchPosition).sqrMagnitude < 0.1f ? r.Center + new Vector3(1.6f, 0f, 0f) : r.Center;
+                    // a piece standing on the middle (the hostage's cage, a table): any open floor of the room will do
+                    // (a strip walled in behind such a piece is a pocket nobody needs, not a room out of reach)
+                    if (!Stealth.Items.LootPlanner.ClearOfFurniture(m_Layout, target, r.Floor, 0.3f))
+                        foreach (var q in OpenFloor(r, target))
+                            if (Reach(m_Layout.HatchPosition, q, NavMesh.AllAreas)) { target = q; break; }
                     Assert.IsTrue(Reach(m_Layout.HatchPosition, target, NavMesh.AllAreas), $"seed {seed}: {r.Type} ({r.Shape}, {r.Area:0} m²) on floor {r.Floor} at {r.Center}" +
                         $" (exit hatch {(r.Center - m_Layout.ExitHatchPosition).magnitude:0.0} m away, hidden {m_Layout.HiddenRoom}, key rooms {string.Join(",", m_Layout.KeyDoors.SelectMany(k => k.Rooms))}, room {r.Id}, POI {m_Layout.PointOfInterest})");
                 }
@@ -78,7 +96,7 @@ namespace Stealth.Tests
             foreach (var d in m_Layout.Doorways)
                     {
                         var edge = d.Kind;
-                        if (edge != EdgeType.Vent && edge != EdgeType.Squeeze) continue; // crawl vents and narrow slots are for players only
+                        if (edge is not (EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow)) continue; // crawl vents, slots, holes, inner windows: players only
                         // Points right on both sides of the opening.
                         var across = d.Rotation * Vector3.forward;
                         var a = d.Position - across * 0.8f;

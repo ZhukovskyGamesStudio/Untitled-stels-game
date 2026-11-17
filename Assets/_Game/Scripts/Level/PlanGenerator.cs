@@ -1483,7 +1483,7 @@ namespace Stealth.Level
                 lb.Add(a);
             }
             foreach (var op in plan.Openings)
-                if (op.Kind is EdgeType.Door or EdgeType.Open) Link(plan.Walls[op.Wall].RoomA, plan.Walls[op.Wall].RoomB);
+                if (op.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) Link(plan.Walls[op.Wall].RoomA, plan.Walls[op.Wall].RoomB);
             foreach (var s in o.Stairs) Link(s.Room, s.RoomAbove);
             var seen = new HashSet<int> { o.Lobby };
             var q = new Queue<int>();
@@ -1542,7 +1542,7 @@ namespace Stealth.Level
                 {
                     var walls = new List<int>(pairs[key]);
                     walls.Sort((p, q) => plan.Walls[q].Length.CompareTo(plan.Walls[p].Length));
-                    float width = kind == EdgeType.Vent ? VentWidth : kind == EdgeType.Squeeze ? SqueezeWidth : DoorWidth;
+                    float width = LevelMetrics.OpeningWidth(kind);
                     foreach (int wi in walls)
                     {
                         var w = plan.Walls[wi];
@@ -1628,20 +1628,32 @@ namespace Stealth.Level
                 foreach (int r in rooms) if (!IsCirculation(plan, r)) floorRooms++;
                 var links = new Dictionary<int, List<int>>();
                 foreach (var key in done) { Link(links, key.Item1, key.Item2); }
-                void Place(EdgeType kind, float perRoom, System.Random pick)
+                void Place(EdgeType only, float perRoom, System.Random pick)
                 {
                     int want = Mathf.RoundToInt(floorRooms * perRoom + (float)pick.NextDouble() * 0.5f);
                     for (int n = 0; n < want; n++)
                     {
+                        // a loop: a door, or a ruin — a breach, a hole, a window without glass (LoopKinds)
+                        var kind = only == EdgeType.Door ? LoopKind(b, pick) : only;
                         (int, int) best = default;
                         float bestScore = 0f;
                         foreach (var key in pairs.Keys)
                         {
                             if (IsStorage(plan, key) || links.TryGetValue(key.Item1, out var l1) && l1.Contains(key.Item2)) continue;
-                            if (kind == EdgeType.Door && IsCirculation(plan, key.Item1) == IsCirculation(plan, key.Item2) && IsCirculation(plan, key.Item1)) continue;
+                            if (kind != EdgeType.Vent && kind != EdgeType.Squeeze && IsCirculation(plan, key.Item1) && IsCirculation(plan, key.Item2)) continue;
+                            // the security control room: one way in, its walls for the robot terminals
+                            if (kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow
+                                && (plan.Rooms[key.Item1].Type == RoomType.ControlRoom || plan.Rooms[key.Item2].Type == RoomType.ControlRoom)) continue;
                             int d = Walk(links, key.Item1, key.Item2);
-                            if (d < (kind == EdgeType.Door ? 3 : 2)) continue; // a door loop round one wall is no loop; a vent may short-cut one
+                            if (d < (kind is EdgeType.Door or EdgeType.Breach ? 3 : 2)) continue; // a walked loop round one wall is no loop; a crawl may short-cut one
                             float score = d + (float)pick.NextDouble() * 3f;
+                            // a crawl way into a room with one way in: the second approach a room to sneak into needs
+                            // (walked loops keep to the long ones: a door next to a door is no loop)
+                            if (kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow)
+                            {
+                                if (DeadEnd(plan, links, key.Item1)) score += b.DeadEndSneakBonus;
+                                if (DeadEnd(plan, links, key.Item2)) score += b.DeadEndSneakBonus;
+                            }
                             if (score > bestScore) { bestScore = score; best = key; }
                         }
                         if (bestScore <= 0f) break;
@@ -1649,6 +1661,8 @@ namespace Stealth.Level
                         else Link(links, best.Item1, best.Item2); // no room for it there: never tried again
                     }
                 }
+                static bool DeadEnd(HousePlan p, Dictionary<int, List<int>> ways, int room) =>
+                    !IsCirculation(p, room) && (!ways.TryGetValue(room, out var set) || set.Count <= 1);
                 Place(EdgeType.Door, b.LoopsPerRoom, rng);
                 Place(EdgeType.Vent, b.VentsPerRoom, rng);
                 Place(EdgeType.Squeeze, b.SqueezesPerRoom, slots);
@@ -1666,6 +1680,30 @@ namespace Stealth.Level
                 if (room < 0 || room == o.Lobby || OneDoor(plan.Rooms[room].Type) || plan.Rooms[room].Type is RoomType.Workshop or RoomType.Utility) continue; // (the hall's street wall is its bays' doors; the plant room is the drain's)
                 candidates.Add(i);
             }
+            // the storage room's loading door: the first way out goes from the room in front of the storage room (deliveries
+            // come in there), if it has an outside wall that takes a door
+            int store = -1;
+            foreach (var r in plan.Rooms) if (r.Floor == 0 && r.Type == RoomType.Storage) { store = r.Id; break; }
+            if (store >= 0)
+            {
+                var front = new HashSet<int>();
+                foreach (var op in plan.Openings)
+                {
+                    var w = plan.Walls[op.Wall];
+                    if (op.Kind == EdgeType.Door && (w.RoomA == store || w.RoomB == store)) front.Add(w.RoomA == store ? w.RoomB : w.RoomA);
+                }
+                foreach (int wi in candidates)
+                {
+                    var w = plan.Walls[wi];
+                    if (!front.Contains(Mathf.Max(w.RoomA, w.RoomB))) continue;
+                    float at = Mathf.Round(w.Length * 2f) / 4f;
+                    if (!plan.FreeOn(wi, at, DoorWidth, DoorMargin) || NearStair(stairZones, 0, w, at - 1.2f, at + 1.2f)) continue;
+                    plan.Openings.Add(new PlanOpening { Wall = wi, Kind = EdgeType.Door, At = at, Width = DoorWidth });
+                    candidates.Remove(wi);
+                    doors++;
+                    break;
+                }
+            }
             while (doors < 2 && candidates.Count > 0)
             {
                 int k = ext.Next(candidates.Count);
@@ -1677,6 +1715,17 @@ namespace Stealth.Level
                 plan.Openings.Add(new PlanOpening { Wall = wi, Kind = EdgeType.Door, At = at, Width = DoorWidth });
                 doors++;
             }
+        }
+
+        /// <summary>What a loop is made of, by the weights (<see cref="BuildingSettings.LoopDoorWeight"/> and the rest).</summary>
+        static EdgeType LoopKind(BuildingSettings b, System.Random rng)
+        {
+            float d = Mathf.Max(0f, b.LoopDoorWeight), br = Mathf.Max(0f, b.LoopBreachWeight), h = Mathf.Max(0f, b.LoopHoleWeight), w = Mathf.Max(0f, b.LoopWindowWeight);
+            float roll = (float)rng.NextDouble() * Mathf.Max(0.0001f, d + br + h + w);
+            if ((roll -= d) < 0f) return EdgeType.Door;
+            if ((roll -= br) < 0f) return EdgeType.Breach;
+            if ((roll -= h) < 0f) return EdgeType.Hole;
+            return w > 0f ? EdgeType.InnerWindow : EdgeType.Door;
         }
 
         static bool IsCirculation(HousePlan plan, int room) => plan.Rooms[room].Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby;
@@ -1725,7 +1774,7 @@ namespace Stealth.Level
         static bool HasPassage(HousePlan plan, List<int> walls)
         {
             foreach (var o in plan.Openings)
-                if (walls.Contains(o.Wall) && o.Kind is EdgeType.Door or EdgeType.Open) return true;
+                if (walls.Contains(o.Wall) && o.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) return true;
             return false;
         }
 
@@ -1768,7 +1817,7 @@ namespace Stealth.Level
             }
             foreach (var op in plan.Openings)
             {
-                if (op.Kind is not (EdgeType.Door or EdgeType.Open)) continue;
+                if (op.Kind is not (EdgeType.Door or EdgeType.Open or EdgeType.Breach)) continue;
                 var w = plan.Walls[op.Wall];
                 Link(w.RoomA, w.RoomB);
             }

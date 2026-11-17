@@ -37,6 +37,7 @@ namespace Stealth.Level
         [Tooltip("The auto repair shop's sliding door: steel leaves")] public GameObject ShopDoor;
         [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
         [Tooltip("The hospital's sliding door: pale washable leaves")] public GameObject ClinicDoor;
+        [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
         public GameObject CityLamp;
@@ -49,6 +50,12 @@ namespace Stealth.Level
         public GameObject HighVentFrame;
         [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
         public GameObject SqueezeFrame;
+        [Tooltip("The broken edges and rubble of a breach (a stretch of wall knocked out; no colliders).")]
+        public GameObject BreachFrame;
+        [Tooltip("The broken edges and rubble of a hole at the floor, with the navmesh volume that keeps robots out.")]
+        public GameObject HoleFrame;
+        [Tooltip("The frame of a window between rooms, its glass gone (no colliders: the wall pieces are the sill and the head).")]
+        public GameObject InnerWindowFrame;
         [Tooltip("One bay of a gallery railing in every staircase look (StairLook picks one).")]
         public GameObject RailingBay;
         [Tooltip("An invisible box collider, stretched along a railing.")]

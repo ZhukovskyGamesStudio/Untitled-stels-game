@@ -48,6 +48,9 @@ namespace Stealth.EditorTools
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", () => BuildVentFrame(false));
             var highVent = Prefab($"{LevelPrefabs}/HighVentFrame.prefab", () => BuildVentFrame(true));
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
+            var breach = Prefab($"{LevelPrefabs}/BreachFrame.prefab", () => BuildRuin("BreachFrame", LevelMetrics.BreachWidth, LevelMetrics.DoorHeight, false));
+            var hole = Prefab($"{LevelPrefabs}/HoleFrame.prefab", () => BuildRuin("HoleFrame", LevelMetrics.HoleWidth, LevelMetrics.HoleHeight, true));
+            var innerWindow = Prefab($"{LevelPrefabs}/InnerWindowFrame.prefab", BuildInnerWindowFrame);
             var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
             var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
             var door = Prefab($"{LevelPrefabs}/AutoDoor.prefab", () => BuildAutoDoor());
@@ -55,6 +58,8 @@ namespace Stealth.EditorTools
             var shopDoor = Prefab($"{LevelPrefabs}/ShopDoor.prefab", () => BuildAutoDoor("ShopDoor", LevelMetrics.DoorWidth, "ShopSteel"));
             var vehicleDoor = Prefab($"{LevelPrefabs}/VehicleDoor.prefab", () => BuildAutoDoor("VehicleDoor", LevelMetrics.VehicleDoorWidth, "ShopSteel"));
             var clinicDoor = Prefab($"{LevelPrefabs}/ClinicDoor.prefab", () => BuildAutoDoor("ClinicDoor", LevelMetrics.DoorWidth, "ClinicDoor"));
+            // the storage room's door: steel leaves with a hazard band, a big lit sign over it and lit bands on the leaves
+            var storageDoor = Prefab($"{LevelPrefabs}/StorageDoor.prefab", () => BuildAutoDoor("StorageDoor", LevelMetrics.DoorWidth, "ShopSteel", "storage_leaf", "ShopYellow", true));
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
@@ -174,6 +179,9 @@ namespace Stealth.EditorTools
                 art.VentFrame = vent;
                 art.HighVentFrame = highVent;
                 art.SqueezeFrame = squeeze;
+                art.BreachFrame = breach;
+                art.HoleFrame = hole;
+                art.InnerWindowFrame = innerWindow;
                 art.AutoDoor = door;
                 art.ShopDoor = shopDoor;
                 art.VehicleDoor = vehicleDoor;
@@ -218,20 +226,25 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain)
+            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain
+                || levelArt.BreachFrame != breach || levelArt.HoleFrame != hole || levelArt.InnerWindowFrame != innerWindow)
             {
                 // fields newer than the asset: filled without overwriting the rest
+                levelArt.BreachFrame = breach;
+                levelArt.HoleFrame = hole;
+                levelArt.InnerWindowFrame = innerWindow;
                 levelArt.HighVentFrame = highVent;
                 levelArt.RailingBay = railingBay;
                 levelArt.RailingBlock = railingBlock;
                 levelArt.OutsideTerrain = terrain;
                 EditorUtility.SetDirty(levelArt);
             }
-            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor)
+            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor || levelArt.StorageDoor != storageDoor)
             {
                 levelArt.ShopDoor = shopDoor;
                 levelArt.VehicleDoor = vehicleDoor;
                 levelArt.ClinicDoor = clinicDoor;
+                levelArt.StorageDoor = storageDoor;
                 EditorUtility.SetDirty(levelArt);
             }
             BuildFeatureArt(levelArt);
@@ -349,6 +362,56 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
+        /// The ruin round a breach or a hole knocked through a wall (Tools/Blender/ruins.py): broken edges up both sides and
+        /// along the top, a pile of rubble at the foot on either face; along local X, no colliders (the wall pieces keep the
+        /// shape). A hole also keeps robots out with a navmesh volume: a player crawls through, a robot does not.
+        /// </summary>
+        static GameObject BuildRuin(string name, float nominal, float height, bool robotsOut)
+        {
+            const float rimHeight = 2.3f; // breach_rim.fbx is modelled at the door height
+            var root = new GameObject(name);
+            float w = LevelMetrics.ClearWidth(nominal);
+            void Piece(string file, string child, Vector3 pos, Quaternion rot, Vector3 scale)
+            {
+                var m = Model(file);
+                m.name = child;
+                m.transform.SetParent(root.transform, false);
+                m.transform.localPosition = pos;
+                m.transform.localRotation = rot;
+                m.transform.localScale = scale;
+                Paint(m, "Wall", "Wall", "Wall");
+            }
+            // the sides: the rim stands on the cut line and juts into the gap (+X); the right one turned round
+            Piece("breach_rim", "EdgeLeft", new Vector3(-w / 2f, 0f, 0f), Quaternion.identity, new Vector3(1f, height / rimHeight, 1f));
+            Piece("breach_rim", "EdgeRight", new Vector3(w / 2f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1f, height / rimHeight, 1f));
+            // the top: the same rim lying along the gap, jutting down
+            Piece("breach_rim", "EdgeTop", new Vector3(-w / 2f, height, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(1f, w / rimHeight, 1f));
+            // rubble at the foot, one pile on each face, against the jambs
+            float face = LevelMetrics.WallThickness / 2f + 0.22f;
+            Piece("rubble", "RubbleA", new Vector3(-w / 2f + 0.05f, 0f, face), Quaternion.Euler(0f, 20f, 0f), Vector3.one);
+            Piece("rubble", "RubbleB", new Vector3(w / 2f - 0.05f, 0f, -face), Quaternion.Euler(0f, 200f, 0f), Vector3.one * 0.85f);
+            if (robotsOut)
+            {
+                var block = root.AddComponent<NavMeshModifierVolume>();
+                block.center = new Vector3(0f, 1.2f, 0f);
+                block.size = new Vector3(w + 0.6f, 2.4f, 1.6f);
+                block.area = 1; // Not Walkable
+            }
+            return root;
+        }
+
+        /// <summary>The frame of a window between rooms without its glass (Tools/Blender/ruins.py), along local X, no collider.</summary>
+        static GameObject BuildInnerWindowFrame()
+        {
+            var root = new GameObject("InnerWindowFrame");
+            var m = Model("inner_window_frame");
+            m.name = "Frame";
+            m.transform.SetParent(root.transform, false);
+            Paint(m, "WindowFrame", "WindowFrame", "WindowFrame");
+            return root;
+        }
+
+        /// <summary>
         /// Frame of a narrow slot (both faces of the wall, along local X, no collider) and a navmesh volume that keeps
         /// robots out of it: a player squeezes through, a robot does not.
         /// </summary>
@@ -375,8 +438,13 @@ namespace Stealth.EditorTools
         /// </summary>
         static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "Door");
 
-        /// <summary>A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.</summary>
-        static GameObject BuildAutoDoor(string name, float width, string paint)
+        /// <summary>
+        /// A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.
+        /// <paramref name="leafModel"/>: the leaf (and <c>_b</c>, its twin); <paramref name="accent"/>: its Accent part's paint.
+        /// <paramref name="sign"/>: instead of the small lock lamps, a big lit sign over the door on both sides and a lit band
+        /// across each leaf on both faces — red while locked, green while open, readable across the room (the storage room).
+        /// </summary>
+        static GameObject BuildAutoDoor(string name, float width, string paint, string leafModel = "door_leaf", string accent = null, bool sign = false)
         {
             var root = new GameObject(name);
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
@@ -394,22 +462,38 @@ namespace Stealth.EditorTools
                 leaf.transform.localPosition = new Vector3(x, 0f, 0f);
                 leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
                 leaf.transform.localScale = new Vector3(stretch, 1f, 1f);
-                Paint(leaf, paint, paint, paint);
+                Paint(leaf, paint, accent ?? paint, paint);
                 foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                 return leaf.transform;
             }
-            door.PanelA = Leaf("PanelA", "door_leaf", -w / 4f, 0f);
-            door.PanelB = Leaf("PanelB", "door_leaf_b", w / 4f, 180f); // its texture shifted: the halves do not mirror
+            door.PanelA = Leaf("PanelA", leafModel, -w / 4f, 0f);
+            door.PanelB = Leaf("PanelB", leafModel + "_b", w / 4f, 180f); // its texture shifted: the halves do not mirror
             var blocker = root.AddComponent<BoxCollider>();
             blocker.center = new Vector3(0, h / 2f, 0);
             blocker.size = new Vector3(w, h, 0.1f);
             door.Blocker = blocker;
             // Lock lamps above the door on both sides: red while locked, green once hacked (hidden on doors without a lock).
-            door.LockLamps = new Renderer[]
+            if (!sign)
+                door.LockLamps = new Renderer[]
+                {
+                    Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                    Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                };
+            else
             {
-                Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-                Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-            };
+                var lamps = new List<Renderer>();
+                float face = LevelMetrics.WallThickness / 2f;
+                foreach (float side in new[] { 1f, -1f })
+                {
+                    // the sign: a steel housing on the wall over the door, its whole face lit
+                    Cube(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"), false);
+                    lamps.Add(Cube(root.transform, side > 0 ? "SignLampA" : "SignLampB", new Vector3(0f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.96f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
+                    // a band across each leaf, on the leaf (it slides with it), in front of its frame
+                    foreach (var panel in new[] { door.PanelA, door.PanelB })
+                        lamps.Add(Cube(panel, $"Band{(side > 0 ? "A" : "B")}", new Vector3(0f, 1.9f, side * 0.04f), new Vector3(0.62f, 0.07f, 0.01f), M("LockLamp"), false).GetComponent<Renderer>());
+                }
+                door.LockLamps = lamps.ToArray();
+            }
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
             // a locked (hackable) door: a hasp across the seam with a padlock hanging from it, on both faces
             door.Padlocks = new[] { 1f, -1f }.Select(side =>

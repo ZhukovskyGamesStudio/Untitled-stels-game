@@ -112,7 +112,7 @@ namespace Stealth.Level
         };
 
         static bool PlayerPasses(EdgeType k) => k != EdgeType.Wall;
-        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open;
+        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach;
 
         /// <summary>
         /// Rooms reached from <paramref name="start"/> through the openings (players: every kind; robots: doors and open
@@ -279,6 +279,13 @@ namespace Stealth.Level
                         && (r.Center - d.Position).magnitude >= s.KeyMinDistance)
                         keyRooms.Add(r);
                 if (keyRooms.Count == 0) continue;
+                // deeper in than the door: the team goes past the locked door, further in, and back (RoomDepth)
+                int nearSteps = int.MaxValue;
+                if (l.RoomSteps != null)
+                    foreach (int side in new[] { d.RoomA, d.RoomB })
+                        if (side >= 0 && side < l.RoomSteps.Length && !behind.Contains(side)) nearSteps = l.RoomSteps[side];
+                var deeper = keyRooms.FindAll(r => nearSteps != int.MaxValue && l.RoomSteps[r.Id] > nearSteps);
+                if (deeper.Count > 0) keyRooms = deeper;
                 var keyRoom = keyRooms[rng.Next(keyRooms.Count)];
                 var key = keyRoom.Center + Vector3.up * 0.02f;
                 for (int k = 0; k < l.ItemSpots.Count; k++)
@@ -756,7 +763,7 @@ namespace Stealth.Level
                 {
                     var d = l.Doorways[i];
                     if (d.RoomA != r.Id && d.RoomB != r.Id) continue;
-                    if (d.Kind is EdgeType.Door or EdgeType.Open) { only = i; count++; }
+                    if (d.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) { only = i; count++; }
                 }
                 if (count != 1) continue;
                 var door = l.Doorways[only];

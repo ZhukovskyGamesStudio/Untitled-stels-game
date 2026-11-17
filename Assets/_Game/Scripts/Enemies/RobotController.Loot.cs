@@ -9,10 +9,11 @@ namespace Stealth.Enemies
 {
     /// <summary>
     /// Workers move loot around the house (<see cref="RobotTraits.MovesLoot"/>), server side. Empty-handed on patrol a
-    /// worker drives up to loot lying on the floor nearby and scoops it onto its tray. Loaded, it takes the loot to the
-    /// house's storage room (<see cref="LevelLayout.StorageRoom"/>) — through its locked door, which opens for robots —
-    /// and leaves it on a shelf or in the pile (<see cref="LevelLayout.StorageDrops"/>); in a house without one it sets
-    /// it down at some patrol stop. Every peer plays the swing from a pulse (<see cref="RobotAnimator.HandleCargo"/>,
+    /// worker drives up to loot lying nearby — on the floor (it scoops it onto its tray) or on a table, a counter, a shelf
+    /// it reaches over (<see cref="SwingKind.Lift"/>). Loaded, it goes straight to the house's storage room
+    /// (<see cref="LevelLayout.StorageRoom"/>) — through its locked door, which opens for robots — and leaves it on a rack
+    /// or in the pile (<see cref="LevelLayout.StorageDrops"/>); in a house without one, or when it cannot get there (wheels
+    /// and another floor) or the room is full, it sets it down at some patrol stop. Every peer plays the swing from a pulse (<see cref="RobotAnimator.HandleCargo"/>,
     /// <see cref="CargoMotion"/>). Anything else — a suspicion, a chase, a hack — cuts the errand short.
     /// </summary>
     public partial class RobotController
@@ -28,6 +29,10 @@ namespace Stealth.Enemies
         Vector3 m_ErrandSpot, m_ErrandFace;
         /// <summary>Hauling: where the loot goes (a storage drop); none: the floor in front.</summary>
         Vector3? m_DropAt;
+        /// <summary>Fetching from a surface: its height over the floor (a lift); 0: the floor.</summary>
+        float m_FetchSurface;
+        /// <summary>The last haul found no drop it can reach: it leaves its load at a patrol stop instead.</summary>
+        bool m_NoStorage;
         bool m_WasArrived;
         System.Random m_LootRng;
 
@@ -39,6 +44,12 @@ namespace Stealth.Enemies
         const float HaulTimeout = 60f;
         /// <summary>A storage drop is taken if loot lies this close to it, metres.</summary>
         const float DropTaken = 0.4f;
+        /// <summary>A lift's pulse: this plus the surface's height in 2 cm steps (the height rides in the byte to every peer).</summary>
+        const byte PulseLiftFrom = 64;
+        const float LiftStep = 0.02f;
+
+        static byte LiftPulse(float surface) => (byte)Mathf.Clamp(PulseLiftFrom + Mathf.RoundToInt(surface / LiftStep), PulseLiftFrom, 255);
+        static float LiftSurface(byte pulse) => (pulse - PulseLiftFrom) * LiftStep;
 
         /// <summary>Server: runs the errand; true while it drives the body (the brain's patrol waits).</summary>
         bool UpdateLootErrandServer(float now, float dt)
@@ -51,7 +62,7 @@ namespace Stealth.Enemies
                 case LootErrand.Swing:
                     return Swing(now, patrol);
                 case LootErrand.Fetch:
-                    return Approach(now, dt, patrol, BeginLiftServer);
+                    return Approach(now, dt, patrol, BeginTakeServer);
                 case LootErrand.Haul:
                     return Approach(now, dt, patrol, BeginLowerServer);
             }
@@ -64,13 +75,15 @@ namespace Stealth.Enemies
             }
             if (!LootErrands.CanTake(DecodeCargo(Cargo).shape)) return false; // a key it guards stays with it
             var layout = ActiveLevel.Layout;
-            if (layout != null && layout.StorageRoom >= 0)
+            if (layout != null && layout.StorageRoom >= 0 && now >= m_NextSeek)
             {
-                if (now < m_NextSeek) return false;
-                m_NextSeek = now + 1f;
-                return Haul(now, layout);
+                // loaded: straight to the storage room (no patrol in between); nowhere to put it there — try again a bit later
+                if (Haul(now, layout)) { m_NoStorage = false; return true; }
+                m_NoStorage = true;
+                m_NextSeek = now + 4f;
             }
-            // no storage room: it leaves its load at some patrol stop
+            if (layout != null && layout.StorageRoom >= 0 && !m_NoStorage) return false;
+            // no storage room (or none it can get to): it leaves its load at some patrol stop
             if (newStop && m_LootRng.NextDouble() < Traits.PutDownChance && CanSetDown())
             {
                 m_DropAt = null;
@@ -85,6 +98,7 @@ namespace Stealth.Enemies
             m_Errand = LootErrand.None;
             m_Fetch = null;
             m_DropAt = null;
+            m_FetchSurface = 0f;
         }
 
         /// <summary>Driving to where the swing starts, then turning to face the spot; then <paramref name="begin"/>.</summary>
@@ -99,7 +113,8 @@ namespace Stealth.Enemies
             }
             var flat = m_ErrandSpot - transform.position;
             flat.y = 0f;
-            if (flat.magnitude > 0.3f && !Arrived)
+            // right up to the spot: the tray lands where the item lies (Arrived alone stops half a metre short)
+            if (flat.magnitude > 0.12f && (m_Agent.pathPending || m_Agent.remainingDistance > 0.08f))
             {
                 Move(Traits.PatrolSpeed); // the path was set when it chose the errand
                 return true;
@@ -150,13 +165,12 @@ namespace Stealth.Enemies
             {
                 int i = LootErrands.Nearest(from, s_CandidateSpots, Traits.LootSeekRadius);
                 if (i < 0) break;
-                var spot = LootErrands.Approach(from, s_CandidateSpots[i]);
-                if (NavMesh.SamplePosition(spot, out var hit, 0.3f, m_Agent.areaMask) && !NavMesh.Raycast(from, hit.position, out _, m_Agent.areaMask))
+                var item = s_CandidateSpots[i];
+                if (FetchFrom(from, item, out var stand, out var face, out float surface))
                 {
-                    var face = s_CandidateSpots[i] - hit.position;
-                    face.y = 0f;
                     m_Fetch = s_Candidates[i];
-                    StartErrand(LootErrand.Fetch, hit.position, face, now + 4f + Traits.LootSeekRadius / Mathf.Max(Traits.PatrolSpeed, 0.3f));
+                    m_FetchSurface = surface;
+                    StartErrand(LootErrand.Fetch, stand, face, now + 6f + 2f * Traits.LootSeekRadius / Mathf.Max(Traits.PatrolSpeed, 0.3f));
                     return true;
                 }
                 s_Candidates.RemoveAt(i);
@@ -165,7 +179,68 @@ namespace Stealth.Enemies
             return false;
         }
 
-        void BeginLiftServer(float now) => BeginSwing(SwingKind.Pickup, PulseLift, now);
+        static readonly Vector3[] s_Sides =
+        {
+            new(0, 0, 1), new(0, 0, -1), new(1, 0, 0), new(-1, 0, 0),
+            new(0.7071f, 0, 0.7071f), new(-0.7071f, 0, 0.7071f), new(0.7071f, 0, -0.7071f), new(-0.7071f, 0, -0.7071f),
+        };
+
+        /// <summary>
+        /// Where it stops to take the item and which way it faces. From the floor: straight from where it is (it drives
+        /// right up). Off a surface: from the side the tray can roll in from (open floor up to the edge), the side towards
+        /// the robot first, and it can drive there.
+        /// </summary>
+        bool FetchFrom(Vector3 from, Vector3 item, out Vector3 stand, out Vector3 face, out float surface)
+        {
+            stand = face = default;
+            float height = item.y - from.y;
+            surface = LootErrands.SurfaceOf(height);
+            if (LootErrands.TakeKind(height) == SwingKind.Pickup)
+            {
+                surface = 0f;
+                var spot = LootErrands.Approach(from, item);
+                if (!NavMesh.SamplePosition(spot, out var hit, 0.3f, m_Agent.areaMask) || NavMesh.Raycast(from, hit.position, out _, m_Agent.areaMask)) return false;
+                stand = hit.position;
+                face = item - hit.position;
+                face.y = 0f;
+                return true;
+            }
+            float off = CargoMotion.StandOff(SwingKind.Lift, surface);
+            var toward = item - from;
+            toward.y = 0f;
+            toward = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.forward;
+            var path = new NavMeshPath();
+            // the side facing the robot first, then the rest by how well they face it
+            System.Array.Sort(s_Sides, (a, b) => Vector3.Dot(b, toward).CompareTo(Vector3.Dot(a, toward)));
+            foreach (var side in s_Sides)
+            {
+                var at = new Vector3(item.x, from.y, item.z) - side * off;
+                if (!NavMesh.SamplePosition(at, out var hit, 0.25f, m_Agent.areaMask)) continue;
+                // the tray rolls in this far: open floor all the way (no table leg, no wall in between)
+                var end = hit.position + side * CargoMotion.ShelfScoop;
+                if (NavMesh.Raycast(hit.position, end, out _, m_Agent.areaMask)) continue;
+                if (!m_Agent.CalculatePath(hit.position, path) || path.status != NavMeshPathStatus.PathComplete || Length(path) > Traits.LootSeekRadius * 2f) continue;
+                stand = hit.position;
+                face = side;
+                return true;
+            }
+            return false;
+        }
+
+        static float Length(NavMeshPath path)
+        {
+            float d = 0f;
+            var c = path.corners;
+            for (int i = 1; i < c.Length; i++) d += (c[i] - c[i - 1]).magnitude;
+            return d;
+        }
+
+        /// <summary>From the floor: the scoop; off a surface: the lift (its height in the pulse).</summary>
+        void BeginTakeServer(float now)
+        {
+            if (m_FetchSurface > 0f) BeginSwing(SwingKind.Lift, LiftPulse(m_FetchSurface), now, m_FetchSurface);
+            else BeginSwing(SwingKind.Pickup, PulseLift, now);
+        }
 
         /// <summary>The tray lies under the item: the world item goes, the cargo shows on the tray and rises with it.</summary>
         void TakeFetchedServer()
@@ -212,8 +287,7 @@ namespace Stealth.Enemies
                 StartErrand(LootErrand.Haul, hit.position, face, now + HaulTimeout);
                 return true;
             }
-            m_NextErrand = now + 5f; // the storage room is full or out of reach: carry it a while longer
-            return false;
+            return false; // the storage room is full or out of reach (the caller decides)
         }
 
         static bool DropTakenAt(Vector3 spot)
@@ -262,7 +336,7 @@ namespace Stealth.Enemies
 
         // ------------------------------------------------------------------ the swing
 
-        void BeginSwing(SwingKind kind, byte pulse, float now)
+        void BeginSwing(SwingKind kind, byte pulse, float now, float surface = 0f)
         {
             m_Agent.isStopped = true;
             Pulse(pulse);
@@ -272,8 +346,12 @@ namespace Stealth.Enemies
             m_Rolled = 0f;
             m_ErrandStart = now;
             m_ErrandUntil = now + CargoMotion.TimeOf(kind, Traits.LootHandleTime);
-            m_NextErrand = m_ErrandUntil + Traits.LootErrandCooldown;
+            // loaded, it sets off for the storage room right away; the rest after leaving something
+            bool taking = kind is SwingKind.Pickup or SwingKind.Lift;
+            m_NextErrand = m_ErrandUntil + (taking ? 0f : Traits.LootErrandCooldown);
+            if (taking) { m_NextSeek = m_ErrandUntil; m_NoStorage = false; }
         }
+
 
         bool Swing(float now, bool patrol)
         {
@@ -291,7 +369,7 @@ namespace Stealth.Enemies
             if (!m_Touched && t >= CargoMotion.TouchAt)
             {
                 m_Touched = true;
-                if (m_Swing == SwingKind.Pickup) TakeFetchedServer();
+                if (m_Swing is SwingKind.Pickup or SwingKind.Lift) TakeFetchedServer();
                 else FinishLowerServer();
             }
             m_Agent.isStopped = true;
@@ -300,10 +378,10 @@ namespace Stealth.Enemies
 
         // ------------------------------------------------------------------ every peer
 
-        void PlayCargoMotion(SwingKind kind)
+        void PlayCargoMotion(SwingKind kind, float surface = -1f)
         {
             var anim = GetComponent<RobotAnimator>();
-            if (anim != null) anim.HandleCargo(kind, CargoMotion.TimeOf(kind, Traits.LootHandleTime));
+            if (anim != null) anim.HandleCargo(kind, CargoMotion.TimeOf(kind, Traits.LootHandleTime), surface);
         }
     }
 }

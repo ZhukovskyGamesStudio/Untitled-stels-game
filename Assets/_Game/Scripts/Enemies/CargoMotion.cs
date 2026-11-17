@@ -4,8 +4,11 @@ using UnityEngine;
 
 namespace Stealth.Enemies
 {
-    /// <summary>Where the worker's tray goes: down to the floor, or to the bottom board of a storage shelf.</summary>
-    public enum SwingKind : byte { Pickup, PutDown, Shelve }
+    /// <summary>
+    /// Where the worker's tray goes: down to the floor (to pick up or to put down), to the bottom board of a storage shelf,
+    /// or onto a table, a counter or a shelf to take what lies there (<see cref="Lift"/>: the surface's height comes with it).
+    /// </summary>
+    public enum SwingKind : byte { Pickup, PutDown, Shelve, Lift }
 
     /// <summary>
     /// The worker's lift (pure: poses over time, no engine state). Two arms hinged low on the body's sides carry a level
@@ -70,8 +73,12 @@ namespace Stealth.Enemies
             public float Dip;
         }
 
-        /// <summary>The surface the tray lands on: the floor, or the shelf's bottom board.</summary>
+        /// <summary>The surface the tray lands on: the floor, or the shelf's bottom board (a lift: its own, see <see cref="At(float, SwingKind, float)"/>).</summary>
         public static float Surface(SwingKind k) => k == SwingKind.Shelve ? ShelfTop : 0f;
+        /// <summary>The highest surface a worker takes loot from (its arms reach over it, level, up to here).</summary>
+        public const float LiftMax = 1.3f;
+        /// <summary>A lift rolls in and out like shelving.</summary>
+        static bool InAndOut(SwingKind k) => k is SwingKind.Shelve or SwingKind.Lift;
 
         /// <summary>The arms' swing that lands the tray on a surface this high, degrees.</summary>
         public static float AngleFor(float surface) => Mathf.Acos((surface + Clearance + TrayHalf - Hinge.y) / ArmLength) * Mathf.Rad2Deg;
@@ -84,8 +91,8 @@ namespace Stealth.Enemies
         /// <summary>Where loot lies when the worker takes it from the floor or sets it down there: this far in front of its centre.</summary>
         public static float Reach => ReachFor(0f);
 
-        public static float ScoopOf(SwingKind k) => k == SwingKind.Shelve ? ShelfScoop : Scoop;
-        public static float TimeOf(SwingKind k, float handleTime) => handleTime * (k == SwingKind.Shelve ? ShelfTime : 1f);
+        public static float ScoopOf(SwingKind k) => InAndOut(k) ? ShelfScoop : Scoop;
+        public static float TimeOf(SwingKind k, float handleTime) => handleTime * (InAndOut(k) ? ShelfTime : 1f);
 
         /// <summary>Where a loot it sets down on the floor ends up, from where the robot stands when it begins: the tray's spot.</summary>
         public static Vector3 FloorSpot => new(0f, FloorHeight, Reach);
@@ -94,7 +101,10 @@ namespace Stealth.Enemies
         /// To begin, it stops with the item (or the place for it) this far in front: the tray lands just short of it and the
         /// robot rolls in. Putting down on the floor it lands right on the spot and rolls back.
         /// </summary>
-        public static float StandOff(SwingKind k) => k == SwingKind.PutDown ? Reach : ReachFor(Surface(k)) + ScoopOf(k);
+        public static float StandOff(SwingKind k) => StandOff(k, Surface(k));
+
+        /// <summary>The stand-off for a surface this high (a lift: the tray lands short of the item and rolls in under it).</summary>
+        public static float StandOff(SwingKind k, float surface) => k == SwingKind.PutDown ? Reach : ReachFor(surface) + ScoopOf(k);
 
         /// <summary>For picking up from the floor (what the errands use most).</summary>
         public static float StandOff() => StandOff(SwingKind.Pickup);
@@ -110,13 +120,16 @@ namespace Stealth.Enemies
         public static Pose At(float t) => At(t, SwingKind.Pickup);
 
         /// <summary>The pose at <paramref name="t"/> (0..1) of one down-and-up swing of this kind.</summary>
-        public static Pose At(float t, SwingKind k)
+        public static Pose At(float t, SwingKind k) => At(t, k, Surface(k));
+
+        /// <summary>The pose at <paramref name="t"/> (0..1) of one swing of this kind onto a surface this high.</summary>
+        public static Pose At(float t, SwingKind k, float surface)
         {
             t = Mathf.Clamp01(t);
             float down = t < UpFrom ? Smooth(t / DownAt) : 1f - Smooth((t - UpFrom) / (1f - UpFrom));
             // the tray bumps the surface and settles: the body takes the knock
             float onFloor = t >= DownAt && t <= UpFrom ? Mathf.Sin((t - DownAt) / (UpFrom - DownAt) * Mathf.PI) : 0f;
-            float arm = down * AngleFor(Surface(k));
+            float arm = down * AngleFor(surface);
             return new Pose
             {
                 Arm = arm,
@@ -164,13 +177,19 @@ namespace Stealth.Enemies
     /// <summary>What a worker may pick up and where it stands to do it (pure).</summary>
     public static class LootErrands
     {
-        /// <summary>Loot lying on the floor counts if its pivot is this close to the robot's floor (not on a desk or a shelf).</summary>
+        /// <summary>Loot lying on the floor counts if its pivot is this close to the robot's floor (higher: on a desk or a shelf).</summary>
         public const float FloorTolerance = 0.25f;
+
+        /// <summary>The surface an item lies on, from its pivot's height over the robot's floor: the floor, or a table's top.</summary>
+        public static float SurfaceOf(float height) => height <= FloorTolerance ? 0f : Mathf.Max(0f, height - 0.01f);
+
+        /// <summary>How it takes an item lying this high: scooped from the floor, or lifted off a surface it can reach over.</summary>
+        public static SwingKind TakeKind(float height) => height <= FloorTolerance ? SwingKind.Pickup : SwingKind.Lift;
 
         /// <summary>Workers move loot, never the team's tools (keys, stunners, speakers, the cage key).</summary>
         public static bool CanTake(int shape) => ItemCatalog.IsLoot(shape) && !ItemCatalog.IsTool(shape);
 
-        /// <summary>The nearest candidate on the robot's floor within <paramref name="radius"/>, or -1.</summary>
+        /// <summary>The nearest candidate on the robot's floor within <paramref name="radius"/> (on it, or on a surface it reaches), or -1.</summary>
         public static int Nearest(Vector3 robot, IReadOnlyList<Vector3> items, float radius)
         {
             int best = -1;
@@ -178,7 +197,7 @@ namespace Stealth.Enemies
             for (int i = 0; i < items.Count; i++)
             {
                 var d = items[i] - robot;
-                if (Mathf.Abs(d.y) > FloorTolerance) continue;
+                if (d.y < -FloorTolerance || d.y > CargoMotion.LiftMax + 0.02f) continue;
                 d.y = 0f;
                 float sq = d.sqrMagnitude;
                 if (sq <= bestD) { bestD = sq; best = i; }
