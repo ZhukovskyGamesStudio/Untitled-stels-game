@@ -314,7 +314,7 @@ namespace Stealth.Level
         {
             foreach (var room in l.Rooms)
             {
-                if (room.Type is not (RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom) || room.Levels > 1) continue;
+                if (room.Type is not (RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom or RoomType.Bathroom) || room.Levels > 1) continue;
                 // a corner of two plain walls: the end of a face whose neighbour round the corner is clear too
                 foreach (var (f, r) in faces)
                 {

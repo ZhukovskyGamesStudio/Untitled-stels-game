@@ -49,7 +49,12 @@ namespace Stealth.Tests
         public void TheFinalWalkabilityCheckHasLittleToTakeOut()
         {
             int removed = 0, houses = 0;
-            foreach (var l in Houses()) { houses++; removed += Furnisher.LastRemoved; }
+            foreach (var l in Houses())
+            {
+                if (HouseKinds.OwnPlan(l.Kind)) continue; // the office generator's rooms (the locations' are checked by their own tests)
+                houses++;
+                removed += Furnisher.LastRemoved;
+            }
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
             // against the far side of a wall from a room out of reach
             Assert.That(removed, Is.LessThanOrEqualTo(houses / 2), $"{removed} groups taken out in {houses} houses");

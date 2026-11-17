@@ -243,6 +243,8 @@ namespace Stealth.Player
         public Light Flashlight;
         [Tooltip("The hand holding the flashlight, seen in the first-person view while a flashlight is in the hand slot (owner only).")]
         public GameObject ViewFlashlight;
+        [Tooltip("The shelter map held open in front of the face while it is in the hand slot (every peer sees it: a thing in the world, not UI).")]
+        public GameObject HeldMap;
         /// <summary>The flashlight in the hand shines (server-decided, replicated).</summary>
         public bool FlashlightOn { get; private set; }
         float m_Drain;
@@ -299,6 +301,15 @@ namespace Stealth.Player
         /// <summary>Every peer: the beam where the holder looks.</summary>
         void UpdateFlashlightView()
         {
+            if (HeldMap != null)
+            {
+                var inv = GetComponent<PlayerInventory>();
+                int hand = inv != null ? inv.HandIndex() : -1;
+                bool show = hand >= 0 && inv.Items[hand].Shape == Items.ItemCatalog.ShelterMap && !Downed && !InHatch && UsingTerminal == null;
+                if (HeldMap.activeSelf != show) HeldMap.SetActive(show);
+                // a remote player's head does not pitch: the map follows their look up and down
+                if (show && !IsOwner) HeldMap.transform.localRotation = (m_HeldMapRot ??= HeldMap.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f);
+            }
             if (ViewFlashlight != null)
             {
                 var inv = GetComponent<PlayerInventory>();
@@ -326,6 +337,7 @@ namespace Stealth.Player
             Flashlight.intensity = m_FlashBase * PlayerRules.FlashlightNear(d, FlashNear);
         }
 
+        Quaternion? m_HeldMapRot;              // the held map's pose as built (a remote holder's pitch is added to it)
         const float FlashNear = 1.6f;          // closer than this the flashlight dims (metres)
         float m_FlashBase = -1f;               // its intensity as built
         static readonly RaycastHit[] s_FlashHits = new RaycastHit[8];

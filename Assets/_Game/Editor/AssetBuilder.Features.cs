@@ -532,6 +532,15 @@ namespace Stealth.EditorTools
                 Paint(m, "CageIron", "KeyBrass", "KeyBrass");
                 return root;
             });
+            // the shelter map, folded (Tools/Blender/apartments.py item_map_model): aged paper tied with a string
+            MapMaterials();
+            var map = Prefab($"{PrefabsDir}/Items/ShelterMapModel.prefab", () =>
+            {
+                var m = Model("item_map_model");
+                m.name = "ShelterMapModel";
+                Paint(m, "MapPaper", "MapString", "MapInk");
+                return m;
+            });
             var icons = new Sprite[ItemCatalog.Shapes.Length];
             icons[ItemCatalog.Shovel] = ItemIcon("shovel");
             icons[ItemCatalog.Flashlight] = ItemIcon("flashlight");
@@ -542,16 +551,17 @@ namespace Stealth.EditorTools
             icons[ItemCatalog.CageKey] = ItemIcon("cagekey");
             icons[ItemCatalog.Stun] = ItemIcon("stun");
             icons[ItemCatalog.Speaker] = ItemIcon("speaker");
+            icons[ItemCatalog.ShelterMap] = ItemIcon("map");
             var meshes = ItemCatalog.Shapes.Select(s =>
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
                 // the cart is item_shovel (its own model shows in the world: Models)
-                return AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(s.Id))).OfType<Mesh>().First();
+                return ItemPieceMesh(s.Id);
             }).ToArray();
             if (visuals.Meshes != null && visuals.Meshes.SequenceEqual(meshes) && visuals.Models != null && visuals.Models.Length == ItemCatalog.Shapes.Length
                 && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Shovel] == shovel
                 && visuals.Models[ItemCatalog.Flashlight] == flashlight && visuals.Models[ItemCatalog.Battery] == battery
-                && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey
+                && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey && visuals.Models[ItemCatalog.ShelterMap] == map
                 && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
@@ -561,6 +571,7 @@ namespace Stealth.EditorTools
             visuals.Models[ItemCatalog.Battery] = battery;
             visuals.Models[ItemCatalog.Key] = key;
             visuals.Models[ItemCatalog.CageKey] = cageKey;
+            visuals.Models[ItemCatalog.ShelterMap] = map;
             visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
         }
@@ -574,8 +585,67 @@ namespace Stealth.EditorTools
             "speaker" => "item_domino",
             "key" => "item_key_model",
             "cagekey" => "item_cagekey_model",
+            "map" => "item_map_model",
             _ => $"item_{id}",
         };
+
+        /// <summary>
+        /// The mesh of a shape's piece in grids (the cart, a robot's cargo): its model file's, and for the shelter map its
+        /// folded model stretched over its 3 × 3 cells (the real packet is smaller than its place in the backpack).
+        /// </summary>
+        static Mesh ItemPieceMesh(string id)
+        {
+            if (id != "map") return AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(id))).OfType<Mesh>().First();
+            string path = $"{Root}/Art/Models/Items/item_map_piece.asset";
+            var piece = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            bool fresh = piece == null;
+            if (fresh) piece = new Mesh();
+            // a flat folded packet over its 3 × 3 cells: its top a grid of 6 × 6 quads, a little bowed along the folds
+            const int n = 6;
+            float side = 3f * StashCart.Cell * 0.96f, h = 0.035f;
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            for (int z = 0; z <= n; z++)
+                for (int x = 0; x <= n; x++)
+                {
+                    float u = x / (float)n - 0.5f, v = z / (float)n - 0.5f;
+                    verts.Add(new Vector3(u * side, h + 0.008f * Mathf.Cos(u * Mathf.PI * 3f), v * side));
+                }
+            for (int z = 0; z < n; z++)
+                for (int x = 0; x < n; x++)
+                {
+                    int a = z * (n + 1) + x;
+                    tris.AddRange(new[] { a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2 });
+                }
+            // the four sides down to the floor
+            int top = verts.Count;
+            foreach (var (p0, p1) in new[] { (new Vector2(-1, -1), new Vector2(1, -1)), (new Vector2(1, -1), new Vector2(1, 1)), (new Vector2(1, 1), new Vector2(-1, 1)), (new Vector2(-1, 1), new Vector2(-1, -1)) })
+            {
+                int i = verts.Count;
+                verts.Add(new Vector3(p0.x * side / 2f, 0f, p0.y * side / 2f));
+                verts.Add(new Vector3(p1.x * side / 2f, 0f, p1.y * side / 2f));
+                verts.Add(new Vector3(p1.x * side / 2f, h, p1.y * side / 2f));
+                verts.Add(new Vector3(p0.x * side / 2f, h, p0.y * side / 2f));
+                tris.AddRange(new[] { i, i + 2, i + 1, i, i + 3, i + 2 });
+            }
+            piece.Clear();
+            piece.name = "item_map_piece";
+            piece.SetVertices(verts);
+            piece.SetTriangles(tris, 0);
+            piece.RecalculateNormals();
+            piece.RecalculateBounds();
+            if (fresh) AssetDatabase.CreateAsset(piece, path);
+            else EditorUtility.SetDirty(piece);
+            return piece;
+        }
+
+        /// <summary>The shelter map's paper, string and ink (its folded model and the one held open).</summary>
+        static void MapMaterials()
+        {
+            Mat("Items", "MapPaper", new Color(0.86f, 0.8f, 0.64f), smoothness: 0.12f);
+            Mat("Items", "MapString", new Color(0.45f, 0.22f, 0.14f), smoothness: 0.2f);
+            Mat("Items", "MapInk", new Color(0.2f, 0.16f, 0.12f), smoothness: 0.1f);
+        }
 
         /// <summary>A backpack picture of a real item (Art/Sprites/Items/&lt;id&gt;.png) as a sprite.</summary>
         static Sprite ItemIcon(string id)

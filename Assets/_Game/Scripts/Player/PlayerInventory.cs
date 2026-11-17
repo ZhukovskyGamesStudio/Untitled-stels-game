@@ -288,6 +288,7 @@ namespace Stealth.Player
             var game = GameManager.Instance;
             if (game == null || !game.CanBurnAt(transform.position)) return;
             var e = m_Items[index];
+            if (ItemCatalog.Unburnable(e.Shape)) return;
             m_Items.RemoveAt(index);
             Changed();
             game.BurnServer(GetComponent<PlayerController>(), e.Value);
@@ -411,7 +412,7 @@ namespace Stealth.Player
         public void SellStashedServer(InventoryEntry from)
         {
             var game = GameManager.Instance;
-            if (!AtHatch(out var stash) || game == null || stash != game.Stash || !stash.Take(from)) return;
+            if (ItemCatalog.Unburnable(from.Shape) || !AtHatch(out var stash) || game == null || stash != game.Stash || !stash.Take(from)) return;
             game.BurnServer(GetComponent<PlayerController>(), from.Value);
         }
 
@@ -425,7 +426,7 @@ namespace Stealth.Player
         public void SellWorldServer(WorldItem item)
         {
             var game = GameManager.Instance;
-            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position)) return;
+            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.Unburnable(item.Shape)) return;
             int fuel = item.Value;
             Session.Despawn(item.gameObject);
             game.BurnServer(GetComponent<PlayerController>(), fuel);

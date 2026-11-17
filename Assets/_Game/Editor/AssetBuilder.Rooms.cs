@@ -205,14 +205,28 @@ namespace Stealth.EditorTools
             (PropKind.WaitingSeats, "waiting_seats", "MedicalBlue", "Rubber", "Metal", "PropScreen"),
             (PropKind.VitalsMonitor, "vitals_monitor", "Ceiling", "PropAccent", "Metal", "PropScreen"),
             (PropKind.HandSanitizer, "hand_sanitizer", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            // the apartment block (Tools/Blender/apartments.py)
+            (PropKind.DoubleBed, "double_bed", "Wood", "Fabric", "Metal", "PropScreen"),
+            (PropKind.Wardrobe, "wardrobe", "Wood", "Metal", "Metal", "PropScreen"),
+            (PropKind.Dresser, "dresser", "Wood", "Fabric", "Metal", "PropScreen"),
+            (PropKind.Bathtub, "bathtub", "Ceiling", "Ceiling", "Metal", "PropScreen"),
+            (PropKind.HomeToilet, "home_toilet", "Ceiling", "Ceiling", "Metal", "PropScreen"),
+            (PropKind.BathVanity, "bath_vanity", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.WashingMachine, "washing_machine", "Ceiling", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.ShoeCabinet, "shoe_cabinet", "Wood", "Fabric", "Metal", "PropScreen"),
+            (PropKind.HallHooks, "hall_hooks", "Wood", "Fabric", "Metal", "PropScreen"),
+            (PropKind.Mailboxes, "mailboxes", "PropBody", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.ElevatorDoors, "elevator_doors", "Metal", "PropBody", "Metal", "LampBulb"),
         };
 
         /// <summary>Kinds hung on a wall or standing on a counter: no collider (nothing walks into them, nothing stands on them).</summary>
         static readonly HashSet<PropKind> NoCollider = new() { PropKind.Microwave, PropKind.HandDryer, PropKind.AcousticPanel, PropKind.DartBoard, PropKind.AreaRug,
-            PropKind.BayLines, PropKind.HoseReel, PropKind.BedHeadwall, PropKind.BedCurtain, PropKind.SurgicalLights, PropKind.HandSanitizer };
+            PropKind.BayLines, PropKind.HoseReel, PropKind.BedHeadwall, PropKind.BedCurtain, PropKind.SurgicalLights, PropKind.HandSanitizer,
+            PropKind.HallHooks, PropKind.Mailboxes };
 
         /// <summary>Cupboards whose doors open (Items.Storage, models with BodyDoor{n} parts): loot may hide behind them.</summary>
-        static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet };
+        static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet,
+            PropKind.Wardrobe, PropKind.Dresser, PropKind.ShoeCabinet };
 
         /// <summary>Prefabs of the themed rooms' furniture whose models exist, into <see cref="LevelArt.RoomProps"/>.</summary>
         static void BuildRoomProps(LevelArt art)

@@ -7,7 +7,7 @@ namespace Stealth.Level
     /// Office, Business, DataCenter, Warehouse and Headquarters are offices of different character (location
     /// <see cref="Location.Office"/>); Hospital and Garage are locations of their own (<see cref="HouseFeatures.LocationOf"/>).
     /// </summary>
-    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage }
+    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage, Apartments }
 
     /// <summary>
     /// House kinds (pure): which one a house is (from its seed: every peer and the route panel agree without sending
@@ -20,13 +20,17 @@ namespace Stealth.Level
         {
             var rng = new System.Random(LevelRandom.Mix(seed, 0x4B1D, 0));
             int roll = rng.Next(100);
-            // a third each: an office (of some character), a hospital, a garage
-            if (roll >= 67) return HouseKind.Garage;
-            if (roll >= 34) return HouseKind.Hospital;
+            // a quarter each: an office (of some character), a hospital, a garage, an apartment block
+            if (roll >= 75) return HouseKind.Apartments;
+            if (roll >= 50) return HouseKind.Garage;
+            if (roll >= 25) return HouseKind.Hospital;
             int office = rng.Next(100);
             return office < 34 ? HouseKind.Office : office < 52 ? HouseKind.Business : office < 68 ? HouseKind.DataCenter
                  : office < 84 ? HouseKind.Warehouse : HouseKind.Headquarters;
         }
+
+        /// <summary>A location with a plan of its own (the hospital, the repair shop, the apartment block): not the office generator's rooms and zones.</summary>
+        public static bool OwnPlan(HouseKind kind) => kind is HouseKind.Hospital or HouseKind.Garage or HouseKind.Apartments;
 
         /// <summary>The kind's name for the player (table <c>house.kind.&lt;kind&gt;</c>).</summary>
         public static string Name(HouseKind kind) => Loc.T(NameKey(kind));
@@ -75,6 +79,8 @@ namespace Stealth.Level
                 // the service office, the toilets, the mechanics' locker room and break room, a waiting lounge, the robots' room
                 HouseKind.Garage => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Kitchen => 1f, RoomType.LockerRoom => 1.4f,
                     RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, RoomType.Storage => 1f, _ => 0f },
+                // the block's own plan lays out every flat (PlanGenerator.Apartments): the program only says whether it has a store
+                HouseKind.Apartments => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, _ => 0f },
                 _ => 1f,
             };
             if (b.RoomTypeRules != null)
@@ -120,6 +126,16 @@ namespace Stealth.Level
                     if (b.EveryRoomType) { s.CorridorChance = 1f; break; }
                     s.Hospital = true;
                     s.FloorsPerHouse = new[] { 2, 2, 3, 3, 3 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
+                    s.RotundaChance = 0f;
+                    s.CornerCutChance = 0f;
+                    break;
+                case HouseKind.Apartments:
+                    // one entrance, one stairwell, a few flats a floor: more storeys than any other house
+                    if (b.EveryRoomType) break;
+                    s.Apartments = true;
+                    s.FloorsPerHouse = new[] { 4, 4, 5, 5, 6 };
                     s.LinkedChance = 0f;
                     s.AtriumChance = 0f;
                     s.RotundaChance = 0f;

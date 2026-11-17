@@ -175,6 +175,8 @@ namespace Stealth.EditorTools
             Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
             Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors
             Mat(props, "ClinicDoor", new Color(0.72f, 0.82f, 0.86f), smoothness: 0.5f); // the hospital's washable laminate doors
+            Mat(props, "FlatDoor", new Color(0.36f, 0.24f, 0.18f), smoothness: 0.35f); // a flat's entry door: brown padding / steel
+            Mat(props, "FlatDoorTrim", new Color(0.72f, 0.6f, 0.34f), smoothness: 0.65f); // its brass number, peephole and handle
             Mat(props, "MedicalBlue", new Color(0.22f, 0.45f, 0.66f), smoothness: 0.4f);   // mattresses, carts, seats
             Mat(props, "SurgicalGreen", new Color(0.2f, 0.46f, 0.4f), smoothness: 0.15f);  // drapes
             Mat(props, "Curtain", new Color(0.62f, 0.78f, 0.8f), smoothness: 0.05f);       // the beds' privacy curtains

@@ -432,7 +432,7 @@ namespace Stealth.EditorTools
                 // the house's kind on the left (office, hospital, garage…), its main job (vault / hostage) on the right
                 const float ix = 60f, jw = 42f;
                 view.KindIcon = Img(R(go.transform, "KindIcon", Left, Left, new Vector2(6, 0), new Vector2(50, 50)), Color.white, Icon("house_office"));
-                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage" }
+                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage", "house_apartments" }
                     .Select(n => Icon(n)).ToArray();
                 if (view.KindIcons.Length != System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Length)
                     throw new System.InvalidOperationException("RouteSign: one icon per HouseKind");

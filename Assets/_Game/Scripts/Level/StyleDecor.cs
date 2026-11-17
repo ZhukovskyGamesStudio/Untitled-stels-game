@@ -43,6 +43,7 @@ namespace Stealth.Level
             bool vault = ActiveLevel.Layout != null && ActiveLevel.Layout.VaultRoom >= 0; // dressed in steel in every style
             g = ShopLook.For(g, kit, ActiveLevel.Layout); // the auto repair shop dresses as one in every style
             g = ClinicLook.For(g, kit, ActiveLevel.Layout); // and the hospital as a hospital
+            g = HomeLook.For(g, kit, ActiveLevel.Layout); // and the apartment block as one
             if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
             s_Kit = kit;
             var root = ActiveLevel.Root.transform;

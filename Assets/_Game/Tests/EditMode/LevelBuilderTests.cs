@@ -122,6 +122,7 @@ namespace Stealth.Tests
         /// </summary>
         [TestCase(99991, 4)] // a hospital
         [TestCase(7, 1)]     // an auto repair shop: cars, lifts, the bays' doors
+        [TestCase(12, 2)]    // an apartment block: the flats' furniture, the stacked stairwell
         public void FurnitureDoesNotClip(int seed, int house)
         {
             var root = Built(out _, seed, house);

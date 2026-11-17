@@ -11,7 +11,9 @@ namespace Stealth.Level
         // the plant room off the lobby at the outer wall: where the building's drain leaves for the street sewer — the entry hatch (PlanGenerator.UtilityCorner)
         Utility,
         // the hospital (HouseKind.Hospital, PlanGenerator.Hospital): patient rooms, the nurse station open to the corridor, theatres, X-ray and CT rooms
-        Ward, NurseStation, Operating, Imaging }
+        Ward, NurseStation, Operating, Imaging,
+        // the apartment block (HouseKind.Apartments, PlanGenerator.Apartments): a flat's hallway, living room, bedroom and bathroom (its kitchen is a Kitchen)
+        FlatHall, Living, Bedroom, Bathroom }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -90,7 +92,9 @@ namespace Stealth.Level
         BedHeadwall, BedCurtain, NurseStationDesk, Gurney, MedicationCart, LinenCart, SurgicalTable, SurgicalLights, AnesthesiaMachine,
         InstrumentTable, ScrubSink, XrayMachine, CtScanner, WaitingSeats, VitalsMonitor, HandSanitizer,
         // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
-        StorageRack }
+        StorageRack,
+        // the apartment block (Tools/Blender/apartments.py): the flats' furniture, the lobby's mailboxes, the landing's lift doors
+        DoubleBed, Wardrobe, Dresser, Bathtub, HomeToilet, BathVanity, WashingMachine, ShoeCabinet, HallHooks, Mailboxes, ElevatorDoors }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -152,6 +156,11 @@ namespace Stealth.Level
         public Vector2Int Corner;
         /// <summary>The flights run along the other wall of the corner (the mirror image of the usual staircase).</summary>
         public bool Flip;
+        /// <summary>
+        /// One of a stairwell's flights stacked floor over floor (the apartment block): thin flights over a half landing, the
+        /// slab above cut only over them (<see cref="PlanGenerator.HoleOf"/>), its floor landing where the next one starts.
+        /// </summary>
+        public bool Stacked;
         /// <summary>The room it starts in and the room it arrives in (plan ids).</summary>
         public int Room, RoomAbove;
     }
@@ -217,6 +226,37 @@ namespace Stealth.Level
         public RoomRule[] RoomRules;
         /// <summary>The hidden room (plan id; its entrances are <see cref="EdgeType.Illusion"/>), -1 if none.</summary>
         public int HiddenRoom = -1;
+        /// <summary>
+        /// The apartment block: the flat the shelter map is hidden in (−1: no map in this house), the room of it to look in
+        /// first and a spot on its floor where the map lies when no cupboard of the flat can hold it (HouseFeatures.PlanShelterMap).
+        /// </summary>
+        public int MapFlat = -1, MapRoom = -1;
+        public Vector3 MapSpot;
+
+        /// <summary>The nominal width of the doorway the auto door <paramref name="i"/> stands in (a flat's bathroom: a narrow one).</summary>
+        public float DoorWidthOf(int i)
+        {
+            if (i < 0 || i >= AutoDoors.Count) return LevelMetrics.DoorWidth;
+            var at = AutoDoors[i].position;
+            foreach (var d in Doorways)
+                if ((d.Position - at).sqrMagnitude < 0.01f) return d.Width > 0.5f ? d.Width : LevelMetrics.DoorWidth;
+            return LevelMetrics.DoorWidth;
+        }
+
+        /// <summary>The auto door <paramref name="i"/> is a flat's entry door (its hallway onto the apartment block's landing).</summary>
+        public bool FlatEntry(int i)
+        {
+            if (i < 0 || i >= AutoDoors.Count || Kind != HouseKind.Apartments) return false;
+            var at = AutoDoors[i].position;
+            foreach (var d in Doorways)
+            {
+                if ((d.Position - at).sqrMagnitude > 0.01f || d.RoomA < 0 || d.RoomB < 0) continue;
+                var a = Plan.Rooms[d.RoomA].Type;
+                var b = Plan.Rooms[d.RoomB].Type;
+                return (a == RoomType.FlatHall && b == RoomType.Corridor) || (b == RoomType.FlatHall && a == RoomType.Corridor);
+            }
+            return false;
+        }
         /// <summary>Steps from the lobby per room id over the building's own ways (<see cref="RoomDepth"/>; −1 not reached).</summary>
         public int[] RoomSteps;
         int m_DeepestSteps = -1;

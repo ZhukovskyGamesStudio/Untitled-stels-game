@@ -150,6 +150,11 @@ namespace Stealth.Level
             new RoomRule(RoomType.NurseStation, new Vector2(10f, 40f)),
             new RoomRule(RoomType.Operating, new Vector2(24f, 70f)),
             new RoomRule(RoomType.Imaging, new Vector2(18f, 60f)),
+            // the apartment block's flats (PlanGenerator.Apartments)
+            new RoomRule(RoomType.FlatHall, new Vector2(6f, 40f), maxLootCells: 4),
+            new RoomRule(RoomType.Living, new Vector2(12f, 60f)),
+            new RoomRule(RoomType.Bedroom, new Vector2(10f, 30f), privacy: 1),
+            new RoomRule(RoomType.Bathroom, new Vector2(4f, 12f), maxLootCells: 2, privacy: 1),
         };
 
         /// <summary>The rule of a type, or one without limits.</summary>
@@ -227,7 +232,8 @@ namespace Stealth.Level
         /// wards, station, theatres and imaging rooms): neither rule enforcement nor zoning moves or retypes them.
         /// </summary>
         public static bool Planned(RoomType t) => t is RoomType.Workshop or RoomType.PaintBooth or RoomType.Utility
-            or RoomType.Ward or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging;
+            or RoomType.Ward or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging
+            or RoomType.FlatHall or RoomType.Living or RoomType.Bedroom or RoomType.Bathroom;
 
         /// <summary>What a room that fits nothing else becomes, in order (an office takes almost any room).</summary>
         static readonly RoomType[] Fallbacks = { RoomType.OpenSpace, RoomType.Office, RoomType.Lounge, RoomType.Meeting, RoomType.CopyRoom, RoomType.Restroom };

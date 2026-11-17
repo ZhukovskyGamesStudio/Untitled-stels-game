@@ -78,8 +78,28 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>Logs/plans/apartments_&lt;seed&gt;_&lt;house&gt;.png — the first apartment blocks of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteApartmentPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = seed % 5;
+                if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"apartments_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
+        }
+
         static Color TypeColor(RoomType t) => t switch
         {
+            RoomType.FlatHall => new Color(0.85f, 0.8f, 0.7f),
+            RoomType.Living => new Color(0.95f, 0.7f, 0.5f),
+            RoomType.Bedroom => new Color(0.75f, 0.6f, 0.9f),
+            RoomType.Bathroom => new Color(0.55f, 0.85f, 0.95f),
             RoomType.Lobby => new Color(0.55f, 0.85f, 0.6f),
             RoomType.OpenSpace => new Color(0.6f, 0.75f, 0.95f),
             RoomType.Office => new Color(0.75f, 0.7f, 0.95f),

@@ -25,7 +25,7 @@ namespace Stealth.Tests
             foreach (var l in Houses())
             {
                 // the hospital's patient rooms and theatres, the shop's paint booth: one door each by their plan
-                if (l.Kind is HouseKind.Garage or HouseKind.Hospital) continue;
+                if (HouseKinds.OwnPlan(l.Kind)) continue;
                 var plan = l.Plan;
                 var loot = new bool[plan.Rooms.Count];
                 foreach (var p in l.ItemSpots) { var r = plan.RoomAt(p + Vector3.up * 0.3f); if (r != null) loot[r.Id] = true; }

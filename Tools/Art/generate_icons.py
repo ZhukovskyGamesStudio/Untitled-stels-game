@@ -394,6 +394,14 @@ def house_garage(g):
     g.ellipse((0.23, 0.73, 0.31, 0.81), on="d")
 
 
+def house_apartments(g):
+    # a tall block of flats: rows of windows, the one entrance with its canopy at the bottom
+    g.rrect((0.28, 0.06, 0.72, 0.92), 0.03)
+    _windows(g, 0.32, 0.10, 0.68, 0.70, 3, 6)
+    g.rrect((0.43, 0.76, 0.57, 0.92), 0.01, on="d")
+    g.rrect((0.38, 0.72, 0.62, 0.75), 0.005, on="d")
+
+
 def job_vault(g):
     g.rrect((0.12, 0.12, 0.88, 0.88), 0.08)
     g.ellipse((0.24, 0.24, 0.76, 0.76), fill=False, width=0.06, on="d")
@@ -443,7 +451,7 @@ def main():
         make(name, draw)
     for name, draw in {"house_office": house_office, "house_business": house_business, "house_datacenter": house_datacenter,
                        "house_warehouse": house_warehouse, "house_hq": house_hq, "house_hospital": house_hospital,
-                       "house_garage": house_garage, "job_vault": job_vault, "job_hostage": job_hostage}.items():
+                       "house_garage": house_garage, "house_apartments": house_apartments, "job_vault": job_vault, "job_hostage": job_hostage}.items():
         make(name, draw, size=96)
     for level in range(4):
         make(f"noise_{level}", speaker(level))

@@ -73,6 +73,10 @@ namespace Stealth.Level
                 RoomType.Operating => (new Color(0.92f, 0.97f, 1f), LightMath.RoomIntensity * 1.35f),
                 RoomType.Imaging => (new Color(0.85f, 0.9f, 1f), LightMath.RoomIntensity * 0.7f),
                 RoomType.Ward => (new Color(1f, 0.93f, 0.84f), LightMath.RoomIntensity * 0.9f),
+                // the flats: warm ceiling lamps, a cooler bathroom, a dim hallway
+                RoomType.Living or RoomType.Bedroom => (new Color(1f, 0.86f, 0.68f), LightMath.RoomIntensity * 0.85f),
+                RoomType.FlatHall => (new Color(1f, 0.88f, 0.72f), LightMath.RoomIntensity * 0.7f),
+                RoomType.Bathroom => (new Color(0.95f, 0.97f, 1f), LightMath.RoomIntensity * 0.9f),
                 _ => (new Color(1f, 0.95f, 0.86f), LightMath.RoomIntensity),
             };
         }
@@ -154,7 +158,9 @@ namespace Stealth.Level
                     : i == l.StorageDoor && StorageRooms.Locked(l) && m_Art.StorageDoor != null ? m_Art.StorageDoor
                     : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
                     : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor
-                    : l.Kind == HouseKind.Hospital && m_Art.ClinicDoor != null ? m_Art.ClinicDoor : m_Art.AutoDoor;
+                    : l.Kind == HouseKind.Hospital && m_Art.ClinicDoor != null ? m_Art.ClinicDoor
+                    : l.FlatEntry(i) && m_Art.FlatDoor != null ? m_Art.FlatDoor
+                    : l.DoorWidthOf(i) < LevelMetrics.DoorWidth - 0.01f && m_Art.NarrowDoor != null ? m_Art.NarrowDoor : m_Art.AutoDoor;
                 var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
@@ -258,7 +264,7 @@ namespace Stealth.Level
         {
             var plan = m_Plan;
             var holes = new List<Rect>();
-            foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.StairArea(s, 0f));
+            foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -481,7 +487,7 @@ namespace Stealth.Level
                 bool breach = o.Kind == EdgeType.Breach, hole = o.Kind == EdgeType.Hole, window = o.Kind == EdgeType.InnerWindow;
                 bool vault = IsVaultDoorway(index, o), booth = IsBoothDoorway(index, o);
                 float clear = LevelMetrics.ClearWidth(vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth
-                    : LevelMetrics.OpeningWidth(o.Kind));
+                    : o.Kind == EdgeType.Door && o.Width > 0.5f && o.Width < LevelMetrics.DoorWidth - 0.01f ? o.Width : LevelMetrics.OpeningWidth(o.Kind));
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
                 float sill = window ? LevelMetrics.InnerWindowSill : o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
                 float openH = vent ? sill + LevelMetrics.VentHeight
@@ -691,7 +697,9 @@ namespace Stealth.Level
         void BuildStair(Stair s)
         {
             var (mirrored, yaw) = StairGeometry.Placement(s.Corner, s.Flip);
-            var go = Place(mirrored ? m_Art.StairsMirrored : m_Art.Stairs, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
+            var prefab = s.Stacked && m_Art.StairsStacked != null ? (mirrored ? m_Art.StairsStackedMirrored : m_Art.StairsStacked)
+                : mirrored ? m_Art.StairsMirrored : m_Art.Stairs;
+            var go = Place(prefab, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
                 look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
@@ -848,7 +856,7 @@ namespace Stealth.Level
                     if (ik == CellKind.Room)
                     {
                         int id = plan.IdAt(w.Floor, inside.x, inside.y);
-                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop or RoomType.Utility or RoomType.Operating or RoomType.Imaging)) continue; // the hall's street wall is its doors; theatres and X-ray rooms are shut in
+                        if (id == l.VaultRoom || (id >= 0 && id < plan.Rooms.Count && plan.Rooms[id].Type is RoomType.Restroom or RoomType.LockerRoom or RoomType.PaintBooth or RoomType.Workshop or RoomType.Utility or RoomType.Operating or RoomType.Imaging or RoomType.Bathroom or RoomType.FlatHall)) continue; // the hall's street wall is its doors; theatres and X-ray rooms are shut in
                     }
                     roomOf.Add(plan.IdAt(w.Floor, inside.x, inside.y));
                     list.Add((new Vector3(p.x, LevelLayout.FloorY(w.Floor) + LevelMetrics.WindowCenterY, p.y), Mathf.Atan2(n.x, n.y) * Mathf.Rad2Deg, i, at));

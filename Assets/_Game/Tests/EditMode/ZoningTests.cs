@@ -40,7 +40,7 @@ namespace Stealth.Tests
                 for (int house = 1; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 6007 + house, house, null, null, 2, null, classic);
-                    if (l.Kind is HouseKind.Garage or HouseKind.Hospital) continue; // a plan of its own, no open space (PlanGenerator.Garage/Hospital)
+                    if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own, no open space (PlanGenerator.Garage/Hospital)
                     var plan = l.Plan;
                     bool Touches(PlanRoom r, params RoomType[] types) => plan.Walls.Any(w => w.Length >= 1f && w.RoomA >= 0 && w.RoomB >= 0
                         && (w.RoomA == r.Id || w.RoomB == r.Id) && types.Contains(plan.Rooms[w.RoomA == r.Id ? w.RoomB : w.RoomA].Type));
@@ -63,7 +63,7 @@ namespace Stealth.Tests
                 for (int house = 0; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 7727 + house, house, null, null, 2, null, classic);
-                    if (l.Kind is HouseKind.Garage or HouseKind.Hospital) continue; // a plan of its own (PlanGenerator.Garage/Hospital): its zones are its layout
+                    if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own (PlanGenerator.Garage/Hospital): its zones are its layout
                     var plan = l.Plan;
                     bool garage = l.Kind == HouseKind.Garage; // the repair shop lays out its rooms by hand: caps hold, zones are its own
                     var rules = HouseKinds.Apply(l.Kind, new BuildingSettings()).RoomTypeRules;

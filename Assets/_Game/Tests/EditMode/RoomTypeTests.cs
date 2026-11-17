@@ -48,7 +48,7 @@ namespace Stealth.Tests
             foreach (var l in Houses(new FeatureSettings { StorageChance = 0f }, 20))
                 foreach (var r in l.Rooms)
                 {
-                    if (r.Type != RoomType.Kitchen) continue;
+                    if (r.Type != RoomType.Kitchen || r.Flat >= 0) continue; // (a flat's kitchen is a home's: small, its table where it fits)
                     kitchens++;
                     Assert.That(r.Area, Is.GreaterThanOrEqualTo(rule.Area.x - 0.01f), $"seed {l.Seed}: kitchen {r.Id} of {r.Area} m²");
                     bool fridge = false, table = false;
@@ -190,7 +190,7 @@ namespace Stealth.Tests
             foreach (var l in Houses(new FeatureSettings(), 10, 3))
                 foreach (var r in l.Rooms)
                 {
-                    if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
+                    if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby || r.Flat >= 0) continue; // (a flat's rooms are a home's: its kitchen is small)
                     Assert.That(r.Area, Is.GreaterThanOrEqualTo(RoomRules.MinArea(r.Type, rules) - 0.01f), $"seed {l.Seed}: {r.Type} #{r.Id} {r.Area} m²");
                 }
         }
@@ -218,6 +218,7 @@ namespace Stealth.Tests
             {
                 var l = LevelGenerator.Generate(seed * 6151, 1, null, null, 1, f, classic: true);
                 var program = LevelGenerator.Generate(seed * 6151, 1, null, null, 1, f, classic: false);
+                if (HouseKinds.OwnPlan(l.Kind)) continue; // a location's own plan: the classic switch is about the office generator
                 houses++;
                 if (l.StorageRoom >= 0) storage++;
                 foreach (var r in l.Rooms) if (r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby)) typed++;

@@ -28,6 +28,9 @@ namespace Stealth.Configs
         public Material ClinicWall, ClinicWardWall, ClinicGuard, ClinicCeiling, ClinicFloor;
         [Tooltip("The hospital's theatres and imaging rooms: white panels, a seamless green-grey floor")]
         public Material TheatreWall, TheatreFloor;
+        [Tooltip("The apartment block (Level.HomeLook): papered flats over parquet, painted kitchens over tiles, tiled bathrooms, the stairwell's oil-painted band.")]
+        public Material HomeWallpaper, HomeWallpaperBed, HomeWallpaperHall, HomeParquet, HomeCeiling, HomeKitchenWall, HomeKitchenTile, HomeKitchenFloor,
+            HomeBathTile, HomeBathFloor, HomeStairWall, HomeStairLower, HomeStairFloor;
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

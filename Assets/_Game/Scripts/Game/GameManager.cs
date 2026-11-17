@@ -375,6 +375,7 @@ namespace Stealth.Game
                     }
             free.Sort(); // the same order on every run of the same house
             m_Hidden.Clear();
+            HideShelterMap(layout, free, parts, hideRng);
             int total = 0;
             float inStorage = Tuning.Level.Loot.InStorageChance;
             foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
@@ -412,6 +413,33 @@ namespace Stealth.Game
             foreach (var spot in layout.LaserSpots)
                 m_Spawned.Add(Session.Spawn(LaserPrefab, spot.Position, spot.Rotation, go => go.GetComponent<LaserGate>().Configure(spot.Kind, spot.Width)));
             return total;
+        }
+
+        /// <summary>
+        /// Server, an apartment block: the shelter map into a cupboard of its flat (a wardrobe, a chest of drawers, the hall's
+        /// shoe cabinet…; the planned room's first) — it appears when that part is opened — or onto the room's floor.
+        /// </summary>
+        void HideShelterMap(LevelLayout layout, List<int> free, Dictionary<int, (Items.Storage storage, int part)> parts, System.Random rng)
+        {
+            if (layout.MapFlat < 0) return;
+            int best = -1, bestRank = -1;
+            foreach (int key in free)
+            {
+                var (storage, part) = parts[key];
+                if (storage.Index < 0 || storage.Index >= layout.Props.Count || !storage.Fits(part, ItemCatalog.ShelterMap)) continue;
+                var at = layout.Props[storage.Index].Position;
+                if (HouseFeatures.FlatAt(layout, at) != layout.MapFlat) continue;
+                var room = layout.Plan.RoomAt(at + Vector3.up * 0.3f);
+                int rank = (room != null && room.Id == layout.MapRoom ? 100 : 0) + rng.Next(50);
+                if (rank > bestRank) { bestRank = rank; best = key; }
+            }
+            if (best >= 0)
+            {
+                m_Hidden[best] = (ItemCatalog.ShelterMap, 0);
+                free.Remove(best);
+                return;
+            }
+            SpawnItemServer(ItemCatalog.ShelterMap, 0, layout.MapSpot + Vector3.up * 0.1f, rng.Next(360));
         }
 
         // ------------------------------------------------------------------ server API

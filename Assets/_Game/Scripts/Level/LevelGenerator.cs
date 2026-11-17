@@ -202,6 +202,11 @@ namespace Stealth.Level
         /// with a corridor down its length and rooms on both sides, admissions below, wards above, theatres on top (PlanGenerator.Hospital.cs).
         /// </summary>
         [System.NonSerialized] public bool Hospital;
+        /// <summary>
+        /// The apartment block's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Apartments"/>, never
+        /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
+        /// </summary>
+        [System.NonSerialized] public bool Apartments;
 
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
@@ -402,10 +407,11 @@ namespace Stealth.Level
             for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q].normalized * 0.5f); // round the hatch, in its corner of the room
 
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
-            RoomRules.Enforce(l.Plan, building.RoomTypeRules);
+            // (the apartment block: every room is its flat's, where its plan has it — a kitchen in every flat)
+            if (!building.Apartments) RoomRules.Enforce(l.Plan, building.RoomTypeRules);
             // zoning: themed rooms capped (one kitchen a floor…), work rooms to the facade, service rooms inside, toilets by the stairs
             l.RoomSteps = RoomDepth.Of(l.Plan, l.Stairs, l.LobbyRoom);
-            Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules, l.RoomSteps, building.RoomAdjacency);
+            if (!building.Apartments) Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules, l.RoomSteps, building.RoomAdjacency);
 
             // the house's main job: the vault and its lock panels, or the hostage's cage (their places kept free)
             HouseFeatures.PlanObjective(l, features, furnisher);
@@ -437,6 +443,7 @@ namespace Stealth.Level
             HouseFeatures.PointOfInterest(l);
             if (security.Enemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either
             HouseFeatures.FinishObjective(l);
+            HouseFeatures.PlanShelterMap(l);
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));

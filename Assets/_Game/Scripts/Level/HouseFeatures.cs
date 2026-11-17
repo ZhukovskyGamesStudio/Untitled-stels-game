@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>The three kinds of place a house can be; each has its own point of interest.</summary>
-    public enum Location : byte { Office, Hospital, Garage }
+    public enum Location : byte { Office, Hospital, Garage, Apartments }
 
     /// <summary>
     /// A warden's post (<see cref="RobotKind.Warden"/>): in front of the only doorway of a loot room, walking a few steps
@@ -101,6 +101,7 @@ namespace Stealth.Level
         {
             HouseKind.Hospital => Location.Hospital,
             HouseKind.Garage => Location.Garage,
+            HouseKind.Apartments => Location.Apartments,
             _ => Location.Office,
         };
 
@@ -108,8 +109,44 @@ namespace Stealth.Level
         {
             Location.Hospital => PropKind.MedTable,
             Location.Garage => PropKind.Workbench,
+            Location.Apartments => PropKind.MedTable, // the survivors' first-aid corner in a flat
             _ => PropKind.Programmer,
         };
+
+        /// <summary>
+        /// The apartment block's find: the map to the survivors' shelter, hidden in one flat above the ground floor (its own
+        /// stream of the house's seed: every peer agrees). The server puts it in a cupboard, wardrobe or chest of drawers of
+        /// that flat (the bedroom's first); with none that holds it, it lies in the bedroom (or the living room) at <see cref="LevelLayout.MapSpot"/>.
+        /// </summary>
+        public static void PlanShelterMap(LevelLayout l)
+        {
+            l.MapFlat = l.MapRoom = -1;
+            if (l.Kind != HouseKind.Apartments) return;
+            var flats = new SortedSet<int>();
+            foreach (var r in l.Rooms) if (r.Flat >= 0 && (r.Floor > 0 || l.Floors == 1)) flats.Add(r.Flat);
+            if (flats.Count == 0) return;
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x3A9E, 0));
+            int pick = rng.Next(flats.Count), k = 0;
+            foreach (int f in flats) { if (k++ == pick) { l.MapFlat = f; break; } }
+            PlanRoom best = null;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Flat != l.MapFlat) continue;
+                int rank = r.Type switch { RoomType.Bedroom => 3, RoomType.Living => 2, RoomType.Kitchen => 1, _ => 0 };
+                int bestRank = best == null ? -1 : best.Type switch { RoomType.Bedroom => 3, RoomType.Living => 2, RoomType.Kitchen => 1, _ => 0 };
+                if (rank > bestRank) best = r;
+            }
+            if (best == null) return;
+            l.MapRoom = best.Id;
+            l.MapSpot = best.Center;
+        }
+
+        /// <summary>The flat (−1: none) a piece of furniture of the house stands in.</summary>
+        public static int FlatAt(LevelLayout l, Vector3 position)
+        {
+            var r = l.Plan.RoomAt(position + Vector3.up * 0.3f);
+            return r != null ? r.Flat : -1;
+        }
 
         static bool PlayerPasses(EdgeType k) => k != EdgeType.Wall;
         static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach;

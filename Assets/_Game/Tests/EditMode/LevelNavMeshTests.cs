@@ -11,6 +11,7 @@ namespace Stealth.Tests
     /// <summary>Builds real level geometry in the editor, bakes the navmesh and checks paths between floors.</summary>
     [TestFixture(99991, 4)] // a hospital
     [TestFixture(7, 1)]     // an auto repair shop: the hall, its cars and lifts, the gallery
+    [TestFixture(12, 2)]    // an apartment block: the flats off the landings, the stacked stairwell
     public class LevelNavMeshTests
     {
         // one shared house, built and baked once for the fixture: every test only asks the navmesh

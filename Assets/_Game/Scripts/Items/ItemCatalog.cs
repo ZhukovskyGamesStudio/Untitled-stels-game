@@ -61,6 +61,8 @@ namespace Stealth.Items
             // the flashlight (1 x 3; it lights when held and switched on, its charge is its colour byte) and its batteries
             new Shape { Id = "flashlight", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
             new Shape { Id = "battery", Cells = new[] { V(0, 0) } },
+            // the map to the survivors' shelter (3 x 3), hidden in a flat of an apartment block: held, it opens in front of you
+            new Shape { Id = "map", Cells = new[] { V(0, 0), V(1, 0), V(2, 0), V(0, 1), V(1, 1), V(2, 1), V(0, 2), V(1, 2), V(2, 2) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
@@ -72,6 +74,8 @@ namespace Stealth.Items
         public const byte Shovel = 13;
 
         public const byte Flashlight = 14, Battery = 15;
+        /// <summary>The map to the survivors' shelter: one in every apartment block, hidden in one of its flats (worth no fuel, never burns).</summary>
+        public const byte ShelterMap = 16;
         /// <summary>A flashlight's full charge (its colour byte holds the charge, 0..FullCharge).</summary>
         public const byte FullCharge = 100;
 
@@ -122,13 +126,13 @@ namespace Stealth.Items
         public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)color;
 
         /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
-        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey;
+        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == ShelterMap;
 
         /// <summary>How much larger than life the keys' models are (Tools/Blender/rooms2_special.py): found on a floor.</summary>
         public const float KeyScale = 2f, CageKeyScale = 1.6f;
 
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
-        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun;
+        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == ShelterMap;
 
         /// <summary>
         /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
@@ -142,6 +146,7 @@ namespace Stealth.Items
             if (shape == Battery) return new Vector3(0.066f, 0.032f, 0.061f);
             if (shape == Key) return new Vector3(0.086f, 0.012f, 0.024f) * KeyScale;
             if (shape == CageKey) return new Vector3(0.178f, 0.02f, 0.054f) * CageKeyScale;
+            if (shape == ShelterMap) return new Vector3(0.30f, 0.025f, 0.22f); // folded (Tools/Blender/apartments.py item_map_model)
             var size = Size(Shapes[shape].Cells);
             return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
         }
@@ -155,7 +160,10 @@ namespace Stealth.Items
         /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
         public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel;
         /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
-        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey;
+        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == ShelterMap;
+
+        /// <summary>Never becomes fuel, not even one by one at the hatch or the hopper: the shelter map.</summary>
+        public static bool Unburnable(int shape) => shape == ShelterMap;
 
         /// <summary>
         /// The colour a thing is drawn with in the inventory and the stash: loot by its colour (its value), the tools in
@@ -169,11 +177,13 @@ namespace Stealth.Items
             CageKey => CageKeyColor,
             Flashlight => FlashlightColor,
             Battery => BatteryColor,
+            ShelterMap => MapColor,
             _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
         };
 
         public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f),
-            CageKeyColor = new(0.55f, 1.00f, 0.15f), FlashlightColor = new(0.95f, 0.78f, 0.25f), BatteryColor = new(0.35f, 0.75f, 0.95f);
+            CageKeyColor = new(0.55f, 1.00f, 0.15f), FlashlightColor = new(0.95f, 0.78f, 0.25f), BatteryColor = new(0.35f, 0.75f, 0.95f),
+            MapColor = new(0.86f, 0.74f, 0.52f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
@@ -219,7 +229,8 @@ namespace Stealth.Items
         }
 
         public static int Value(int shape, int color) =>
-            Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
+            shape == ShelterMap ? 0
+            : Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
             : (shape == Diamond ? DiamondValueCells : Shapes[shape].Cells.Length) * Colors[color].Multiplier * PointsPerCell;
 
         /// <summary>Bit of an item's rotation byte: the piece is mirrored (left-right) before it is turned.</summary>

@@ -40,6 +40,7 @@ namespace Stealth.Level
             foreach (var room in plan.Rooms)
             {
                 if (!all.Contains(room.Id) || !Fits(l, room, rule) || Exterior(l, room.Id)) continue;
+                if (room.Type == RoomType.Utility || room.Flat >= 0) continue; // the drain's plant room; a flat's rooms are its own
                 int door = OnlyDoor(l, room.Id, all);
                 if (door < 0) continue;
                 float score = room.Floor * 1000f + Mathf.Abs(room.Area - 20f);

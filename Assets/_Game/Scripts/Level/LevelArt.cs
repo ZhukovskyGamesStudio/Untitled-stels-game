@@ -37,6 +37,8 @@ namespace Stealth.Level
         [Tooltip("The auto repair shop's sliding door: steel leaves")] public GameObject ShopDoor;
         [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
         [Tooltip("The hospital's sliding door: pale washable leaves")] public GameObject ClinicDoor;
+        [Tooltip("A flat's entry door off the apartment block's landing: steel leaves with a peephole and a number")] public GameObject FlatDoor;
+        [Tooltip("A narrow sliding door (a flat's bathroom, LevelMetrics.NarrowDoorWidth)")] public GameObject NarrowDoor;
         [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
@@ -45,6 +47,8 @@ namespace Stealth.Level
         [Header("Pieces")]
         public GameObject Stairs;
         public GameObject StairsMirrored;
+        [Tooltip("A stairwell's flight stacked floor over floor (the apartment block, Stair.Stacked): thin flights, the floor's landing open.")]
+        public GameObject StairsStacked, StairsStackedMirrored;
         public GameObject VentFrame;
         [Tooltip("A vent under the ceiling with the crate stacks under it on both sides.")]
         public GameObject HighVentFrame;

@@ -32,7 +32,7 @@ namespace Stealth.EditorTools
             s_StompRipple = Prefab(PrefabsDir + "/FX/StompRipple.prefab", BuildStompRipple).GetComponent<RadioRipple>();
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
-                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(s.Id))).OfType<Mesh>().First()).ToArray();
+                v.Meshes = ItemCatalog.Shapes.Select(s => ItemPieceMesh(s.Id)).ToArray();
             });
             // One material per configured colour (ItemsConfig can grow).
             visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
@@ -329,6 +329,22 @@ namespace Stealth.EditorTools
                 r.receiveShadows = false;
             }
             view.SetActive(false);
+            // the shelter map held open in front of the face (Tools/Blender/apartments.py held_map): the owner sees it in
+            // the view, the others see it in front of the player — a thing in the world, not UI
+            MapMaterials();
+            var held = Model("held_map");
+            held.name = "HeldMap";
+            held.transform.SetParent(head.transform, false);
+            held.transform.localPosition = new Vector3(0f, -0.2f, 0.42f);
+            foreach (var r in held.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = M(n.StartsWith("AccentSleeve") ? "ViewSleeve" : n.StartsWith("AccentHand") ? "PlayerAccent"
+                    : n.StartsWith("Trim") ? "MapInk" : "MapPaper");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            held.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
                 new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
@@ -347,6 +363,7 @@ namespace Stealth.EditorTools
             pc.Listener = listener;
             pc.Flashlight = beam;
             pc.ViewFlashlight = view;
+            pc.HeldMap = held;
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);

@@ -13,6 +13,8 @@ namespace Stealth.Level
         public const float SlabThickness = FloorHeight - WallHeight;
         public const float WallThickness = 0.2f;
         public const float DoorWidth = 1.8f;
+        /// <summary>A narrow door (a flat's bathroom): nominal, the clear opening 1.4 m — a robot (0.5 m radius) and the walk check pass.</summary>
+        public const float NarrowDoorWidth = 1.6f;
         public const float DoorHeight = 2.3f;
         /// <summary>The vault's doorway (nominal): the round bank door (bore d 2.27 m) needs 2.4 m clear; the corners round it are wall.</summary>
         public const float VaultDoorWidth = 2.6f;
@@ -94,6 +96,35 @@ namespace Stealth.Level
 
         // Flight lanes across the stair (v ranges).
         public const float LaneA0 = 0.2f, LaneA1 = 1.95f, LaneB0 = 2.05f, LaneB1 = 3.85f;
+
+        /// <summary>How thick a stacked flight and its half landing are (thin: the flight above passes over the one below).</summary>
+        public const float StackedThickness = 0.28f;
+
+        /// <summary>
+        /// The colliders of a staircase. <paramref name="stacked"/>: a stairwell's flight stacked floor over floor — the same
+        /// steps and landing but thin (their undersides follow them up, so the flight of the floor above clears the head of
+        /// whoever climbs this one), no rails (the stairwell's walls close both sides; the hole above is only over the
+        /// flights) and the divider the full storey high, a wall from floor to floor.
+        /// </summary>
+        public static List<Box> Boxes(bool stacked)
+        {
+            if (!stacked) return Boxes();
+            const float half = LevelMetrics.FloorHeight / 2f;
+            const float rise = half / LevelMetrics.StepsPerFlight;
+            const float run = LevelMetrics.StepRun, size = LevelMetrics.StairSize, h = LevelMetrics.FloorHeight;
+            const float start = LevelMetrics.FlightStart, landing = LevelMetrics.LandingEnd, t = StackedThickness;
+            var list = new List<Box>();
+            void Add(string name, float u0, float u1, float v0, float v1, float y0, float y1) =>
+                list.Add(new Box(name, new Vector3((u0 + u1) / 2f, (y0 + y1) / 2f, (v0 + v1) / 2f), new Vector3(Mathf.Abs(u1 - u0), y1 - y0, Mathf.Abs(v1 - v0))));
+            for (int i = 0; i < LevelMetrics.StepsPerFlight; i++)
+                Add("StepA", start - (i + 1) * run, start - i * run, LaneA0, LaneA1, Mathf.Max(0f, (i + 1) * rise - t), (i + 1) * rise);
+            Add("Landing", 0.12f, landing, 0.12f, LaneB1, half - t, half);
+            for (int j = 0; j < LevelMetrics.StepsPerFlight; j++)
+                Add("StepB", landing + j * run, landing + (j + 1) * run, LaneB0, LaneB1, half + (j + 1) * rise - t, half + (j + 1) * rise);
+            Add("Exit", start, size + 0.08f, LaneB0, LaneB1, h - 0.25f, h);
+            Add("Divider", landing + 2 * run, start, LaneA1, LaneB0, 0f, h);
+            return list;
+        }
 
         public static List<Box> Boxes()
         {

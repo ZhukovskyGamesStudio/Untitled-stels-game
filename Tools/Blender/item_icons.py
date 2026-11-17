@@ -1,12 +1,13 @@
 """Backpack pictures of the real items: renders of their own models, drawn over the item's cells in the inventory.
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/item_icons.py -- Assets/_Game/Art/Sprites/Items [Assets/_Game/Art/Models]
+Run:  blender.exe -b --factory-startup --python Tools/Blender/item_icons.py -- Assets/_Game/Art/Sprites/Items [Assets/_Game/Art/Models] [--only map,key]
 
 Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's cells in its base turn):
   shovel      1 x 4 cells (ItemCatalog.Shovel)       Art/Models/Items/item_shovel_model.fbx
   flashlight  1 x 3 cells (ItemCatalog.Flashlight)   Art/Models/Items/item_flashlight_model.fbx
   battery     1 x 1 cell  (ItemCatalog.Battery)      Art/Models/Items/item_battery_model.fbx
   diamond, key, cagekey, stun (2 x 2), speaker (2 x 1)  the tools and the crafted diamond, seen three-quarter
+  map         3 x 3 cells                            Art/Models/Items/item_map_model.fbx (apartments.py)
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
 a dark outline so it reads on any cell colour. The UI turns and mirrors the picture with the item.
@@ -20,6 +21,11 @@ import numpy as np
 from mathutils import Euler, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+ONLY = None   # --only a,b renders just those pictures
+if "--only" in argv:
+    k = argv.index("--only")
+    ONLY = set(argv[k + 1].split(","))
+    argv = argv[:k] + argv[k + 2:]
 OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Sprites", "Items"))
 MODELS = os.path.abspath(argv[1] if len(argv) > 1 else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models"))
 CELL = 128
@@ -51,6 +57,11 @@ ITEMS = {
         "Body": ((0.14, 0.15, 0.16), 0.2, 0.5, 0.0),
         "EyeLed": ((0.3, 1.0, 0.6), 0.0, 0.3, 2.0),
         "Accent": ((0.05, 0.05, 0.05), 0.1, 0.6, 0.0)}, "front"),
+    # the shelter map, folded and tied (apartments.py)
+    "map": (3, 3, "item_map_model", {
+        "Body": ((0.86, 0.8, 0.64), 0.0, 0.8, 0.0),
+        "Accent": ((0.45, 0.2, 0.12), 0.0, 0.7, 0.0),
+        "Trim": ((0.55, 0.08, 0.06), 0.0, 0.35, 0.0)}, "top"),
 }
 
 
@@ -191,4 +202,5 @@ def outline(path, px=4):
 
 
 for item, spec in ITEMS.items():
-    render(item, *spec)
+    if ONLY is None or item in ONLY:
+        render(item, *spec)

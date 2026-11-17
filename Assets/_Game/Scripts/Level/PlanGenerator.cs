@@ -47,6 +47,7 @@ namespace Stealth.Level
             public LinkedMass Linked;                       // a house of blocks joined by corridors (null: one mass)
             public GarageLayout Garage;                     // the auto repair shop's parts (null: any other house)
             public HospitalLayout Hospital;                 // the hospital's corridor and bands (null: any other house)
+            public ApartmentLayout Apartments;              // the apartment block's landing and bands (null: any other house)
             public RoomProgram Program;                     // the rooms the house is to have (decided first)
             public readonly List<RectInt> LinkBlocks = new();    // cells
             public readonly List<RectInt> LinkCorridors = new(); // cells
@@ -92,7 +93,7 @@ namespace Stealth.Level
             // cut into the rooms
             List<RectInt> wings = null;
             var linkRng = c.Rng(0x11CC);
-            if (!b.Garage && !b.Hospital && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
+            if (!b.Garage && !b.Hospital && !b.Apartments && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
             {
                 if (program != null)
                 {
@@ -110,6 +111,7 @@ namespace Stealth.Level
             }
             wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass)
                 : b.Hospital ? HospitalMass(c, c.Rng(0xA55), area, out o.Mass)
+                : b.Apartments ? ApartmentsMass(c, c.Rng(0xA55), out o.Mass)
                 : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
@@ -132,6 +134,7 @@ namespace Stealth.Level
 
             if (c.Garage != null) ReserveGarage(c);
             else if (c.Hospital != null) ReserveHospital(c);
+            else if (c.Apartments != null) ReserveApartments(c);
             else
             {
                 ReserveLobby(c);
@@ -150,8 +153,10 @@ namespace Stealth.Level
             {
                 var (f, hall, corner) = c.Halls[i];
                 var origin = new Vector2((corner.x > 0 ? hall.xMax : hall.xMin) / (float)M, (corner.y > 0 ? hall.yMax : hall.yMin) / (float)M);
-                bool flip = c.Rng(0x57F, i).Next(2) == 1; // its own stream: which wall the flights run along
-                o.Stairs.Add(new Stair { Floor = f, Origin = origin, Corner = corner, Flip = flip, Room = c.StairRooms[2 * i], RoomAbove = c.StairRooms[2 * i + 1] });
+                // its own stream: which wall the flights run along (the apartment block: from the back wall, one above the other)
+                bool stacked = c.Apartments != null;
+                bool flip = stacked || c.Rng(0x57F, i).Next(2) == 1;
+                o.Stairs.Add(new Stair { Floor = f, Origin = origin, Corner = corner, Flip = flip, Stacked = stacked, Room = c.StairRooms[2 * i], RoomAbove = c.StairRooms[2 * i + 1] });
             }
             // rooms with a staircase: their centre (patrols, views, spawns) off the stair and its approach
             var avoid = new List<(int floor, Rect area)>();
@@ -510,6 +515,7 @@ namespace Stealth.Level
             public readonly List<Vector2Int> Cells = new();
             public readonly List<RectInt> Rects = new();
             public int Levels = 1;
+            public int Flat = -1;        // the apartment block: which flat the room belongs to
         }
 
         static void ZoneFloor(Ctx c, int f)
@@ -586,6 +592,11 @@ namespace Stealth.Level
             if (c.Hospital != null)
             {
                 ZoneHospital(c, f, regions, owner, Claim);
+                return;
+            }
+            if (c.Apartments != null)
+            {
+                ZoneApartments(c, f, regions, owner, Claim);
                 return;
             }
 
@@ -1242,7 +1253,7 @@ namespace Stealth.Level
             {
                 var reg = regions[i];
                 if (reg.Cells.Count == 0) continue;
-                var room = new PlanRoom { Id = plan.Rooms.Count, Floor = f, Type = reg.Type, Shape = reg.Shape, Levels = reg.Levels };
+                var room = new PlanRoom { Id = plan.Rooms.Count, Floor = f, Type = reg.Type, Shape = reg.Shape, Levels = reg.Levels, Flat = reg.Flat };
                 room.Rects.AddRange(reg.Rects);
                 plan.Rooms.Add(room);
                 for (int lv = 0; lv < reg.Levels; lv++)
@@ -1520,7 +1531,7 @@ namespace Stealth.Level
 
             for (int f = 0; f < plan.Floors; f++)
             {
-                var rng = c.Rng(0xD00, f);
+                var rng = c.Rng(0xD00, OpeningsFloor(c, f));
                 // interior walls per pair of rooms
                 var pairs = new Dictionary<(int, int), List<int>>();
                 for (int i = 0; i < plan.Walls.Count; i++)
@@ -1542,7 +1553,10 @@ namespace Stealth.Level
                 {
                     var walls = new List<int>(pairs[key]);
                     walls.Sort((p, q) => plan.Walls[q].Length.CompareTo(plan.Walls[p].Length));
-                    float width = LevelMetrics.OpeningWidth(kind);
+                    bool narrow = kind == EdgeType.Door && NarrowDoor(plan, key);
+                    float width = narrow ? LevelMetrics.NarrowDoorWidth : LevelMetrics.OpeningWidth(kind);
+                    // a flat's doors (its own, its bathroom's narrow one, its entry) may stand nearer a corner, as in a real flat
+                    float margin = FlatOf(plan, key.Item1) >= 0 || FlatOf(plan, key.Item2) >= 0 ? 0.6f : DoorMargin;
                     foreach (int wi in walls)
                     {
                         var w = plan.Walls[wi];
@@ -1556,9 +1570,9 @@ namespace Stealth.Level
                         for (int k = 0; k < 7; k++)
                         {
                             float t = k == 0 ? 0.5f : (float)rng.NextDouble();
-                            float at = Mathf.Lerp(width / 2f + DoorMargin, w.Length - width / 2f - DoorMargin, t);
+                            float at = Mathf.Lerp(width / 2f + margin, w.Length - width / 2f - margin, t);
                             at = Mathf.Round(at * 2f) / 2f;
-                            if (!plan.FreeOn(wi, at, width, DoorMargin)) continue;
+                            if (!plan.FreeOn(wi, at, width, margin)) continue;
                             if (NearStair(stairZones, f, w, at - width / 2f - 0.3f, at + width / 2f + 0.3f)) continue;
                             plan.Openings.Add(new PlanOpening { Wall = wi, Kind = kind, At = at, Width = width });
                             return true;
@@ -1582,6 +1596,7 @@ namespace Stealth.Level
                     bool circulation = IsCirculation(plan, a) || IsCirculation(plan, bb);
                     // (the shop's paint booth too: sealed, its one door onto the workshop when it can)
                     float w = IsStorage(plan, kv.Key) ? (OwnDoor(plan, kv.Key) ? -0.5f : -1f) : (circulation ? 10f : 0f) + (float)rng.NextDouble();
+                    if (Touches(plan, kv.Key, RoomType.FlatHall)) w += 5f; // a flat's rooms open off its hallway, not through each other
                     order.Add((kv.Key, w));
                 }
                 order.Sort((p, q) => q.weight.CompareTo(p.weight));
@@ -1589,6 +1604,7 @@ namespace Stealth.Level
                 foreach (var (key, _) in order)
                 {
                     if (Find(key.Item1) == Find(key.Item2)) continue;
+                    if (!FlatAllows(plan, key, EdgeType.Door)) continue; // the apartment block: flats apart, one door each onto the landing
                     if (IsStorage(plan, key))
                     {
                         int s = OneDoor(plan.Rooms[key.Item1].Type) ? key.Item1 : key.Item2;
@@ -1598,7 +1614,7 @@ namespace Stealth.Level
                         if (TryOpen(key, way)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
                         continue;
                     }
-                    bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key);
+                    bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key) && FlatAllows(plan, key, EdgeType.Open);
                     if ((open && TryOpen(key, EdgeType.Open)) || TryOpen(key, EdgeType.Door))
                     {
                         done.Add(key);
@@ -1608,7 +1624,7 @@ namespace Stealth.Level
                 // groups still apart (only short walls between them): an open passage on any walkable wall between them
                 foreach (var (key, _) in order)
                 {
-                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key)) continue;
+                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key) || !FlatAllows(plan, key, EdgeType.Open)) continue;
                     foreach (int wi in pairs[key])
                     {
                         var w = plan.Walls[wi];
@@ -1623,7 +1639,7 @@ namespace Stealth.Level
 
                 // loops, vents, slots: a budget a floor, each where it makes the longest way round (the walk between the
                 // two rooms before it, a little shuffled) — planned loops instead of a door in every other wall
-                var slots = c.Rng(0x5A0E, f);
+                var slots = c.Rng(0x5A0E, OpeningsFloor(c, f));
                 int floorRooms = 0;
                 foreach (int r in rooms) if (!IsCirculation(plan, r)) floorRooms++;
                 var links = new Dictionary<int, List<int>>();
@@ -1640,6 +1656,8 @@ namespace Stealth.Level
                         foreach (var key in pairs.Keys)
                         {
                             if (IsStorage(plan, key) || links.TryGetValue(key.Item1, out var l1) && l1.Contains(key.Item2)) continue;
+                            if (!FlatAllows(plan, key, kind)) continue;
+                            if (FlatOf(plan, key.Item1) >= 0 && FlatOf(plan, key.Item1) == FlatOf(plan, key.Item2)) continue; // a flat's rooms keep their walls for furniture: no loops inside
                             if (kind != EdgeType.Vent && kind != EdgeType.Squeeze && IsCirculation(plan, key.Item1) && IsCirculation(plan, key.Item2)) continue;
                             // the security control room: one way in, its walls for the robot terminals
                             if (kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow
@@ -1668,6 +1686,20 @@ namespace Stealth.Level
                 Place(EdgeType.Squeeze, b.SqueezesPerRoom, slots);
             }
 
+            // The apartment block: its one entrance, from the lobby onto the street (no other way out).
+            if (c.Apartments != null)
+            {
+                for (int i = 0; i < plan.Walls.Count; i++)
+                {
+                    var w = plan.Walls[i];
+                    if (w.Floor != 0 || !w.Exterior || w.Shaped || Mathf.Max(w.RoomA, w.RoomB) != o.Lobby || w.Length < DoorWidth + 2f * DoorMargin) continue;
+                    float at = Mathf.Round(w.Length) / 2f;
+                    if (!plan.FreeOn(i, at, DoorWidth, DoorMargin) || NearStair(stairZones, 0, w, at - 1.2f, at + 1.2f)) continue;
+                    plan.Openings.Add(new PlanOpening { Wall = i, Kind = EdgeType.Door, At = at, Width = DoorWidth });
+                    break;
+                }
+                return;
+            }
             // Exterior doors: two ways out into the gas on the ground floor (not from the lobby).
             var ext = c.Rng(0xE87);
             int doors = 0;
@@ -1785,6 +1817,18 @@ namespace Stealth.Level
         }
 
         /// <summary>The square of a staircase and its approach, grown by <paramref name="margin"/>.</summary>
+        /// <summary>
+        /// The hole a staircase needs in the slab above it: its whole square, or for a stacked one (<see cref="Stair.Stacked"/>)
+        /// only over the flights and the half landing — the floor's own landing, where the next flight starts, stays.
+        /// </summary>
+        public static Rect HoleOf(Stair s)
+        {
+            if (!s.Stacked) return StairArea(s, 0f);
+            var a = StairGeometry.ToWorld(s, new Vector3(0f, 0f, 0f));
+            var b = StairGeometry.ToWorld(s, new Vector3(LevelMetrics.FlightStart, 0f, LevelMetrics.StairSize));
+            return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.z, b.z), Mathf.Max(a.x, b.x), Mathf.Max(a.z, b.z));
+        }
+
         public static Rect StairArea(Stair s, float margin)
         {
             float x = s.Corner.x > 0 ? s.Origin.x - StairSize : s.Origin.x;

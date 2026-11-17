@@ -45,6 +45,9 @@ namespace Stealth.EditorTools
             // Pieces.
             var stairs = Prefab($"{LevelPrefabs}/Stairs.prefab", () => BuildStairs("Stairs", false));
             var stairsMirrored = Prefab($"{LevelPrefabs}/StairsMirrored.prefab", () => BuildStairs("StairsMirrored", true));
+            // the apartment block's stairwell: a flight pair stacked floor over floor (Stair.Stacked)
+            var stairsStacked = Prefab($"{LevelPrefabs}/StairsStacked.prefab", () => BuildStairs("StairsStacked", false, true));
+            var stairsStackedMirrored = Prefab($"{LevelPrefabs}/StairsStackedMirrored.prefab", () => BuildStairs("StairsStackedMirrored", true, true));
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", () => BuildVentFrame(false));
             var highVent = Prefab($"{LevelPrefabs}/HighVentFrame.prefab", () => BuildVentFrame(true));
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
@@ -60,6 +63,9 @@ namespace Stealth.EditorTools
             var clinicDoor = Prefab($"{LevelPrefabs}/ClinicDoor.prefab", () => BuildAutoDoor("ClinicDoor", LevelMetrics.DoorWidth, "ClinicDoor"));
             // the storage room's door: steel leaves with a hazard band, a big lit sign over it and lit bands on the leaves
             var storageDoor = Prefab($"{LevelPrefabs}/StorageDoor.prefab", () => BuildAutoDoor("StorageDoor", LevelMetrics.DoorWidth, "ShopSteel", "storage_leaf", "ShopYellow", true));
+            // a flat's entry door off the apartment block's landing (Tools/Blender/apartments.py flat_leaf)
+            var flatDoor = Prefab($"{LevelPrefabs}/FlatDoor.prefab", () => BuildAutoDoor("FlatDoor", LevelMetrics.DoorWidth, "FlatDoor", "flat_leaf", "FlatDoorTrim"));
+            var narrowDoor = Prefab($"{LevelPrefabs}/NarrowDoor.prefab", () => BuildAutoDoor("NarrowDoor", LevelMetrics.NarrowDoorWidth, "Door"));
             var light = Prefab($"{LevelPrefabs}/RoomLight.prefab", BuildRoomLight);
             var hatch = Prefab($"{LevelPrefabs}/Hatch.prefab", BuildHatch);
             var window = Prefab($"{LevelPrefabs}/Window.prefab", BuildWindow);
@@ -239,8 +245,14 @@ namespace Stealth.EditorTools
                 levelArt.OutsideTerrain = terrain;
                 EditorUtility.SetDirty(levelArt);
             }
-            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor || levelArt.StorageDoor != storageDoor)
+            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor || levelArt.StorageDoor != storageDoor
+                || levelArt.FlatDoor != flatDoor || levelArt.StairsStacked != stairsStacked || levelArt.StairsStackedMirrored != stairsStackedMirrored
+                || levelArt.NarrowDoor != narrowDoor)
             {
+                levelArt.NarrowDoor = narrowDoor;
+                levelArt.StairsStacked = stairsStacked;
+                levelArt.StairsStackedMirrored = stairsStackedMirrored;
+                levelArt.FlatDoor = flatDoor;
                 levelArt.ShopDoor = shopDoor;
                 levelArt.VehicleDoor = vehicleDoor;
                 levelArt.ClinicDoor = clinicDoor;
@@ -301,19 +313,19 @@ namespace Stealth.EditorTools
         /// the level builder picks the variant so that instances are only rotated.
         /// The whole staircase is NavMesh area "Stairs": robots without legs cannot use it.
         /// </summary>
-        static GameObject BuildStairs(string name, bool mirrored)
+        static GameObject BuildStairs(string name, bool mirrored, bool stacked = false)
         {
             var root = new GameObject(name);
             var mod = root.AddComponent<NavMeshModifier>();
             mod.overrideArea = true;
             mod.area = LevelMetrics.StairsArea;
-            foreach (var box in StairGeometry.Boxes())
+            foreach (var box in StairGeometry.Boxes(stacked))
             {
                 var c = box.Center;
                 if (mirrored) c.x = -c.x;
                 Cube(root.transform, box.Name, c, box.Size, M("DoorFrame"));
             }
-            AddStairLooks(root, mirrored); // what is seen: one of the built looks over these boxes
+            AddStairLooks(root, mirrored, stacked); // what is seen: one of the built looks over these boxes
             return root;
         }
 

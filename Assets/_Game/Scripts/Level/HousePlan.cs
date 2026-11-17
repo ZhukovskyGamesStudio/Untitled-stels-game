@@ -43,6 +43,8 @@ namespace Stealth.Level
         public Rect Bounds;
         /// <summary>How many doorways from the lobby (privacy: loot and guards go deeper).</summary>
         public int Depth;
+        /// <summary>The apartment block: the flat the room belongs to (−1: the landing, the stairs, any room of another house).</summary>
+        public int Flat = -1;
     }
 
     /// <summary>
