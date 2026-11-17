@@ -114,6 +114,7 @@ namespace Stealth.Level
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
             for (int f = 0; f < l.Floors; f++) BuildSlab(f);
             BuildRoof();
+            BuildGrates();
             float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
             // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
             Block(m_Art.OutsideGround, "OutsideGround", new Vector3(W / 2, CityPlan.RoadTop - 0.06f, H / 2), new Vector3(W + far, 0.1f, H + far));
@@ -263,12 +264,50 @@ namespace Stealth.Level
             }
             float thick = f == 0 ? 0.2f : LevelMetrics.SlabThickness;
             float y = f == 0 ? -0.1f : LevelLayout.FloorY(f) - LevelMetrics.SlabThickness / 2f;
-            foreach (var r in Rectangles(plan.NX, plan.NZ, Solid))
-            {
-                float x0 = r.xMin * HousePlan.Res, x1 = r.xMax * HousePlan.Res, z0 = r.yMin * HousePlan.Res, z1 = r.yMax * HousePlan.Res;
-                Block(m_Art.FloorSlab, f == 0 ? "Floor" : "Slab", new Vector3((x0 + x1) / 2f, y, (z0 + z1) / 2f), new Vector3(x1 - x0, thick, z1 - z0));
-                Shell.Floors.Add(new FloorRect { Min = new Vector2(x0, z0), Max = new Vector2(x1, z1), Y = y + thick / 2f, Floor = f });
-            }
+            // the ducts of the void under this floor run through it: a deck on top, a ceiling board under (a grate's hole in it)
+            var net = f >= 1 && f - 1 < m_Layout.Vents.Count ? m_Layout.Vents[f - 1] : null;
+            bool Duct(int x, int z) => net != null && net.Cells.Contains(new Vector2Int(x / 2, z / 2));
+            foreach (var r in Rectangles(plan.NX, plan.NZ, (x, z) => Solid(x, z) && !Duct(x, z)))
+                SlabPiece(f == 0 ? "Floor" : "Slab", m_Art.FloorSlab, r, y, thick, f, true);
+            if (net != null) DuctPieces(m_Art.FloorSlab, net, (x, z) => Solid(x, z) && Duct(x, z), f, LevelLayout.FloorY(f));
+        }
+
+        void SlabPiece(string name, GameObject prefab, RectInt r, float y, float thick, int floor, bool floorFinish)
+        {
+            float x0 = r.xMin * HousePlan.Res, x1 = r.xMax * HousePlan.Res, z0 = r.yMin * HousePlan.Res, z1 = r.yMax * HousePlan.Res;
+            Block(prefab, name, new Vector3((x0 + x1) / 2f, y, (z0 + z1) / 2f), new Vector3(x1 - x0, thick, z1 - z0));
+            if (floorFinish) Shell.Floors.Add(new FloorRect { Min = new Vector2(x0, z0), Max = new Vector2(x1, z1), Y = y + thick / 2f, Floor = floor });
+        }
+
+        /// <summary>
+        /// Over the cells of a duct: the deck (the floor above, its top at <paramref name="top"/>) and the ceiling board of the
+        /// room below — but where a grate is. Between them the duct's headroom (<see cref="LevelMetrics.VoidHeight"/>).
+        /// </summary>
+        void DuctPieces(GameObject prefab, VentNet net, System.Func<int, int, bool> cell, int floor, float top)
+        {
+            var plan = m_Plan;
+            foreach (var r in Rectangles(plan.NX, plan.NZ, cell))
+                SlabPiece("Deck", prefab, r, top - LevelMetrics.DeckThickness / 2f, LevelMetrics.DeckThickness, floor, floor < m_Layout.Floors);
+            float ceiling = top - LevelMetrics.SlabThickness;
+            bool Board(int x, int z) => cell(x, z) && !net.IsGrate(new Vector2Int(x / 2, z / 2));
+            foreach (var r in Rectangles(plan.NX, plan.NZ, Board))
+                SlabPiece("CeilingBoard", m_Art.FloorSlab, r, ceiling + LevelMetrics.CeilingBoard / 2f, LevelMetrics.CeilingBoard, floor, false);
+            foreach (var g in net.Grates)
+                Shell.CeilingHoles.Add(new Rect(g.Cell.x * VentPlan.Res, g.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res));
+        }
+
+        /// <summary>The grates in the ceilings (the way into the ducts), every storey's.</summary>
+        void BuildGrates()
+        {
+            if (m_Art.VentGrate == null) return;
+            int index = 0;
+            foreach (var net in m_Layout.Vents)
+                foreach (var g in net.Grates)
+                {
+                    var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.identity);
+                    if (go.TryGetComponent<VentGrate>(out var grate)) grate.Setup(index, g.Room);
+                    index++;
+                }
         }
 
         /// <summary>The roof over the top floor (over its rooms, pockets and the top of atriums).</summary>
@@ -276,11 +315,23 @@ namespace Stealth.Level
         {
             int top = m_Layout.Floors - 1;
             float y = LevelLayout.FloorY(top + 1) - LevelMetrics.SlabThickness / 2f;
-            foreach (var r in Rectangles(m_Plan.NX, m_Plan.NZ, (x, z) => m_Plan.KindAt(top, x, z) != CellKind.Outside))
+            var net = top < m_Layout.Vents.Count ? m_Layout.Vents[top] : null;
+            bool In(int x, int z) => x >= 0 && z >= 0 && x < m_Plan.NX && z < m_Plan.NZ && m_Plan.KindAt(top, x, z) != CellKind.Outside;
+            bool Duct(int x, int z) => net != null && net.Cells.Contains(new Vector2Int(x / 2, z / 2));
+            foreach (var r in Rectangles(m_Plan.NX, m_Plan.NZ, (x, z) => In(x, z) && !Duct(x, z)))
             {
-                float x0 = r.xMin * HousePlan.Res - 0.2f, x1 = r.xMax * HousePlan.Res + 0.2f, z0 = r.yMin * HousePlan.Res - 0.2f, z1 = r.yMax * HousePlan.Res + 0.2f;
+                // the eaves: 0.2 m over the facade, only on the sides where the building ends
+                bool Edge(int x0c, int x1c, int z0c, int z1c)
+                {
+                    for (int x = x0c; x <= x1c; x++) for (int z = z0c; z <= z1c; z++) if (In(x, z)) return false;
+                    return true;
+                }
+                float ex0 = Edge(r.xMin - 1, r.xMin - 1, r.yMin, r.yMax - 1) ? 0.2f : 0f, ex1 = Edge(r.xMax, r.xMax, r.yMin, r.yMax - 1) ? 0.2f : 0f;
+                float ez0 = Edge(r.xMin, r.xMax - 1, r.yMin - 1, r.yMin - 1) ? 0.2f : 0f, ez1 = Edge(r.xMin, r.xMax - 1, r.yMax, r.yMax) ? 0.2f : 0f;
+                float x0 = r.xMin * HousePlan.Res - ex0, x1 = r.xMax * HousePlan.Res + ex1, z0 = r.yMin * HousePlan.Res - ez0, z1 = r.yMax * HousePlan.Res + ez1;
                 Block(m_Art.Roof, "Roof", new Vector3((x0 + x1) / 2f, y, (z0 + z1) / 2f), new Vector3(x1 - x0, LevelMetrics.SlabThickness, z1 - z0));
             }
+            if (net != null) DuctPieces(m_Art.Roof, net, (x, z) => In(x, z) && Duct(x, z), m_Layout.Floors, LevelLayout.FloorY(top + 1));
         }
 
         /// <summary>Cells where <paramref name="solid"/> holds, merged into rectangles (widest run, then as tall as it stays).</summary>

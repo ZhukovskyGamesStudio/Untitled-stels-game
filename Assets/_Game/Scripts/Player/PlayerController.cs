@@ -972,6 +972,7 @@ namespace Stealth.Player
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
+            if (UseTarget is VentGrate grate) { grate.Climb(this); return; } // the owner moves itself: up into the duct or down out of it
             if (m_Link != null) m_Link.SendUse(UseTarget.Kind, UseTarget.Index);
             else GameManager.Instance?.UseServer(this, UseTarget.Kind, UseTarget.Index);
         }

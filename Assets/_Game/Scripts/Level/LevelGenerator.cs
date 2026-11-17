@@ -77,6 +77,8 @@ namespace Stealth.Level
         public float HighVentChance = 0.4f;
         [Tooltip("Narrow slots (players squeeze through, robots do not) a floor gets, per room on it.")]
         public float SqueezesPerRoom = 0.1f;
+        [Tooltip("Share of a storey's rooms (big enough for a grate) the crawl ducts in its ceiling void reach (VentPlan); the exit room always.")]
+        [Range(0f, 1f)] public float VentCoverage = 0.75f;
         [Tooltip("A crawl way (vent, slot, hole, window without glass) prefers a room with one way in so far: added to its score per such room (the score is the walk it saves, metres-ish). A loot room with a second way in is a room to sneak into.")]
         public float DeadEndSneakBonus = 4f;
         [Header("Shapes")]
@@ -422,6 +424,10 @@ namespace Stealth.Level
             // the robots' charging room: a tech room they took over (every house has one; the guards rest there)
             if (!building.EveryRoomType) ChargingRooms.Convert(l, l.ExitHatchPosition); // (the rooms test keeps every type)
 
+            // the crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
+            // within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to)
+            VentPlan.Plan(l, building.VentCoverage);
+
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
             foreach (var p in l.PatrolPoints) furnisher.Reserve(LevelLayout.FloorOf(p.y), p, 0.75f);
@@ -544,6 +550,7 @@ namespace Stealth.Level
         /// </summary>
         static PlanRoom ExitRoom(LevelLayout l)
         {
+            var reach = VoidReach(l, l.LobbyRoom);
             PlanRoom best = null;
             float far = -1f;
             foreach (var r in l.Rooms)
@@ -551,9 +558,72 @@ namespace Stealth.Level
                 if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth || r.Area < 10f) continue; // (the booth: its car)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 float d = (r.Center - l.HatchPosition).magnitude;
-                if (d > far) { far = d; best = r; }
+                // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
+                if (d > far && Ducted(l, r, reach)) { far = d; best = r; }
             }
             return best ?? l.Lobby;
+        }
+
+        /// <summary>A duct can come down into the room: one storey high, and some cell of it has the void over it.</summary>
+        /// <summary>
+        /// The duct cells of the ground floor's void a duct from <paramref name="room"/> can get to (a double-height hall or a
+        /// stair hole may cut the void in parts): the exit room must be in the lobby's part.
+        /// </summary>
+        static HashSet<Vector2Int> VoidReach(LevelLayout l, int room)
+        {
+            var seen = new HashSet<Vector2Int>();
+            var queue = new Queue<Vector2Int>();
+            int nx = l.Plan.NX / 2, nz = l.Plan.NZ / 2;
+            for (int x = 0; x < nx; x++)
+                for (int z = 0; z < nz; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (l.Plan.SpaceAt(0, new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) == room && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                }
+            if (seen.Count == 0)
+            {
+                // an atrium lobby has no ceiling: the ducts start from the rooms around it (VentPlan.Arrival)
+                var around = l.Plan.Rooms[room].Bounds;
+                around.min -= Vector2.one * 3f;
+                around.max += Vector2.one * 3f;
+                for (int x = 0; x < nx; x++)
+                    for (int z = 0; z < nz; z++)
+                    {
+                        var c = new Vector2Int(x, z);
+                        if (around.Contains(new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                    }
+            }
+            var dirs = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
+            while (queue.Count > 0)
+            {
+                var c = queue.Dequeue();
+                foreach (var d in dirs)
+                {
+                    var n = c + d;
+                    if (n.x < 0 || n.y < 0 || n.x >= nx || n.y >= nz || seen.Contains(n) || !VentPlan.Allowed(l, 0, n)) continue;
+                    seen.Add(n);
+                    queue.Enqueue(n);
+                }
+            }
+            return seen;
+        }
+
+        static bool Ducted(LevelLayout l, PlanRoom r, HashSet<Vector2Int> reach)
+        {
+            if (r.Levels != 1) return false;
+            var b = r.Bounds;
+            for (int x = Mathf.FloorToInt(b.xMin / VentPlan.Res); x * VentPlan.Res < b.xMax; x++)
+                for (int z = Mathf.FloorToInt(b.yMin / VentPlan.Res); z * VentPlan.Res < b.yMax; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (!reach.Contains(c)) continue;
+                    bool own = true;
+                    for (int px = x * 2; px <= x * 2 + 1 && own; px++)
+                        for (int pz = z * 2; pz <= z * 2 + 1 && own; pz++)
+                            own = l.Plan.SpaceAt(r.Floor, HousePlan.CellCenter(px, pz)) == r.Id;
+                    if (own) return true;
+                }
+            return false;
         }
 
         /// <summary>Patrol points: the middle of every room, and in big rooms the middles of the parts they were made of.</summary>

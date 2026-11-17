@@ -264,6 +264,8 @@ namespace Stealth.Level
         public readonly List<Pose> ChargingDocks = new();
         /// <summary>Rooms guarded by traps (<see cref="Wards"/>), new enemy mode.</summary>
         public readonly List<int> WardedRooms = new();
+        /// <summary>The crawl ducts in each storey's ceiling void (index = the storey under it), <see cref="VentPlan"/>.</summary>
+        public readonly List<VentNet> Vents = new();
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
         /// <summary>Most windows on the facade (<see cref="LevelBuilder.WindowSpots"/>), −1 = wherever one fits.</summary>

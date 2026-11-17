@@ -720,13 +720,40 @@ namespace Stealth.Level
                     Surface = new Vector4(size.x, size.y, min.x, min.y),
                 });
             }
+            // (the ceilings have holes where the duct grates are: the finish goes round them)
+            void Holed(Vector2 min, Vector2 max, float y)
+            {
+                foreach (var (a, b) in CutHoles(min, max, shell.CeilingHoles)) Quad(a, b, y);
+            }
             foreach (var r in shell.Floors)
-                if (r.Floor >= 1) Quad(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness);
+                if (r.Floor >= 1) Holed(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness);
             // under the roof: the top floor's rooms, pockets and atrium tops
             var plan = l.Plan;
             int top = l.Floors - 1;
             foreach (var r in LevelBuilder.Rectangles(plan.NX, plan.NZ, (x, z) => plan.KindAt(top, x, z) != CellKind.Outside))
-                Quad(new Vector2(r.xMin, r.yMin) * HousePlan.Res, new Vector2(r.xMax, r.yMax) * HousePlan.Res, LevelLayout.FloorY(top) + LevelMetrics.WallHeight);
+                Holed(new Vector2(r.xMin, r.yMin) * HousePlan.Res, new Vector2(r.xMax, r.yMax) * HousePlan.Res, LevelLayout.FloorY(top) + LevelMetrics.WallHeight);
+        }
+
+        /// <summary>A rectangle minus holes (pure): the pieces left, at most four round each hole.</summary>
+        public static List<(Vector2 min, Vector2 max)> CutHoles(Vector2 min, Vector2 max, List<Rect> holes)
+        {
+            var pieces = new List<(Vector2, Vector2)> { (min, max) };
+            if (holes == null) return pieces;
+            foreach (var h in holes)
+            {
+                var next = new List<(Vector2, Vector2)>();
+                foreach (var (a, b) in pieces)
+                {
+                    float hx0 = Mathf.Max(a.x, h.xMin), hx1 = Mathf.Min(b.x, h.xMax), hz0 = Mathf.Max(a.y, h.yMin), hz1 = Mathf.Min(b.y, h.yMax);
+                    if (hx0 >= hx1 - 1e-4f || hz0 >= hz1 - 1e-4f) { next.Add((a, b)); continue; }
+                    if (hz0 > a.y + 1e-4f) next.Add((a, new Vector2(b.x, hz0)));                              // below the hole
+                    if (hz1 < b.y - 1e-4f) next.Add((new Vector2(a.x, hz1), b));                              // above it
+                    if (hx0 > a.x + 1e-4f) next.Add((new Vector2(a.x, hz0), new Vector2(hx0, hz1)));          // left of it
+                    if (hx1 < b.x - 1e-4f) next.Add((new Vector2(hx1, hz0), new Vector2(b.x, hz1)));          // right of it
+                }
+                pieces = next;
+            }
+            return pieces;
         }
     }
 }

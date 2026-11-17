@@ -134,6 +134,33 @@ namespace Stealth.EditorTools
                 return go;
             });
             if (art.LightSwitch != lightSwitch) { art.LightSwitch = lightSwitch; EditorUtility.SetDirty(art); }
+            // a grate in a room's ceiling (VentGrate, the way into the crawl ducts): a frame in the ceiling board and a grille
+            // on a hinge along one edge that swings down while a player is near; the pivot in the frame's middle on the ceiling
+            var ventGrate = Prefab($"{LevelPrefabs}/VentGrate.prefab", () =>
+            {
+                var go = new GameObject("VentGrate");
+                float size = VentPlan.Res, t = LevelMetrics.CeilingBoard;
+                foreach (var (c, sz) in new[]
+                         {
+                             (new Vector3(0f, t / 2f, -size / 2f + 0.03f), new Vector3(size, t, 0.06f)), (new Vector3(0f, t / 2f, size / 2f - 0.03f), new Vector3(size, t, 0.06f)),
+                             (new Vector3(-size / 2f + 0.03f, t / 2f, 0f), new Vector3(0.06f, t, size)), (new Vector3(size / 2f - 0.03f, t / 2f, 0f), new Vector3(0.06f, t, size)),
+                         })
+                    Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Panel], collider: false);
+                var lid = new GameObject("Lid").transform;
+                lid.SetParent(go.transform, false);
+                lid.localPosition = new Vector3(0f, 0.01f, -size / 2f + 0.06f);
+                for (int i = 0; i < 9; i++)
+                    Cube(lid, "Slat", new Vector3(0f, 0f, 0.05f + i * 0.1f), new Vector3(size - 0.14f, 0.02f, 0.035f), util[(int)UtilitySlot.Dark], collider: false);
+                Cube(lid, "Rail", new Vector3(-size / 2f + 0.1f, 0f, (size - 0.12f) / 2f), new Vector3(0.03f, 0.025f, size - 0.12f), util[(int)UtilitySlot.Panel], collider: false);
+                Cube(lid, "Rail", new Vector3(size / 2f - 0.1f, 0f, (size - 0.12f) / 2f), new Vector3(0.03f, 0.025f, size - 0.12f), util[(int)UtilitySlot.Panel], collider: false);
+                var floor = go.AddComponent<BoxCollider>(); // walked on in the duct; from below the grate is climbed with E
+                floor.center = new Vector3(0f, t / 2f, 0f);
+                floor.size = new Vector3(size - 0.04f, t, size - 0.04f);
+                var g = go.AddComponent<VentGrate>();
+                g.Lid = lid;
+                return go;
+            });
+            if (art.VentGrate != ventGrate) { art.VentGrate = ventGrate; EditorUtility.SetDirty(art); }
             if (art.CityPiece == piece && art.CityLamp == lamp && art.CityMaterials != null && art.CityMaterials.Length == mats.Length
                 && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats) && art.UtilityMaterials != null
                 && System.Linq.Enumerable.SequenceEqual(art.UtilityMaterials, util)) return;

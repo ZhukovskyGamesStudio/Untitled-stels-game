@@ -139,6 +139,14 @@ namespace Stealth.Player
         public bool Seated { get; set; }
         public const float HatchEyeHeight = 0.24f;
 
+        /// <summary>Crouched at once (pulled up into a duct: no room to stand); it stays crouched until there is (BlockedByCeiling).</summary>
+        public void ForceCrouch()
+        {
+            IsCrouching = true;
+            m_Controller.height = PlayerController.CrouchHeight;
+            m_Controller.center = new Vector3(0, m_Controller.height / 2f, 0);
+        }
+
         public void ResetMotion()
         {
             m_Impulse = Vector3.zero;

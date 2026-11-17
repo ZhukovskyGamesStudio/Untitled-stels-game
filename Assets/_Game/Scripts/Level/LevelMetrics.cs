@@ -8,10 +8,23 @@ namespace Stealth.Level
     {
         /// <summary>Size of a chunk of the house that merged meshes are cut into (and the old room grid). Rooms are free now (HousePlan).</summary>
         public const float Cell = 10f;
-        public const float WallHeight = 3f;
-        public const float FloorHeight = 3.5f; // floor-to-floor: walls + slab
+        /// <summary>A room's ceiling over its floor.</summary>
+        public const float WallHeight = 2.75f;
+        /// <summary>
+        /// Floor to floor: the room, then the crawl void over its ceiling (the ducts, <see cref="VentPlan"/>), then the floor
+        /// of the next storey. At most 12 × the player's step (0.35 m): the stairs keep their 4 m and 12 steps.
+        /// </summary>
+        public const float FloorHeight = 4.1f;
+        /// <summary>Everything between a room's ceiling and the floor above: solid, but where a duct runs through it.</summary>
         public const float SlabThickness = FloorHeight - WallHeight;
-        public const float WallThickness = 0.2f;
+        /// <summary>A duct's bottom (the ceiling board under it) and top (the floor of the storey above, its deck).</summary>
+        public const float CeilingBoard = 0.05f, DeckThickness = 0.15f;
+        /// <summary>The headroom in a duct: a crouched player (1.1 m) fits, a robot (2 m) does not.</summary>
+        public const float VoidHeight = SlabThickness - CeilingBoard - DeckThickness;
+        public const float WallThickness = 0.3f;
+        /// <summary>What the jambs of an opening take from its nominal width (half the old 0.2 m wall a side): doors, vents
+        /// and slots keep their clear sizes whatever the walls' thickness.</summary>
+        public const float OpeningInset = 0.2f;
         public const float DoorWidth = 1.8f;
         public const float DoorHeight = 2.3f;
         /// <summary>The vault's doorway (nominal): the round bank door (bore d 2.27 m) needs 2.4 m clear; the corners round it are wall.</summary>
@@ -68,7 +81,7 @@ namespace Stealth.Level
         };
 
         /// <summary>Clear width of an opening (door, vent): the jambs take half a wall thickness on each side.</summary>
-        public static float ClearWidth(float nominal) => nominal - WallThickness;
+        public static float ClearWidth(float nominal) => nominal - OpeningInset;
 
         /// <summary>Furniture quadrants of a room (offsets from its centre).</summary>
         public static readonly Vector3[] Quadrants =

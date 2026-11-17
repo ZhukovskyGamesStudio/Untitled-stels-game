@@ -234,7 +234,7 @@ namespace Stealth.Level
             [PropKind.FloorJack] = Rect.MinMaxRect(-0.16f, -0.87f, 0.16f, 0.59f),
             [PropKind.OilDrums] = Rect.MinMaxRect(-0.6f, -0.55f, 0.6f, 0.55f),
             [PropKind.WeldingCart] = Rect.MinMaxRect(-0.28f, -0.61f, 0.28f, 0.35f),
-            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -3f, 1.7f, 3f),
+            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -2.9f, 1.7f, 2.9f), // (paint: a hand's breadth inside the bay's ends)
             [PropKind.GarageDoor] = Rect.MinMaxRect(-1.7f, 0f, 1.7f, 0.1f),
             [PropKind.PaintRack] = Rect.MinMaxRect(-0.8f, -0.25f, 0.66f, 0.25f),
         };
@@ -484,6 +484,9 @@ namespace Stealth.Level
         }
 
         /// <summary>The rect lies on the floor of <paramref name="room"/> with a margin from its walls.</summary>
+        /// <summary>A standing piece keeps this far from a wall's axis: the wall's face (half its thickness) and 2 cm.</summary>
+        static readonly float WallClear = Mathf.Max(0.12f, LevelMetrics.WallThickness / 2f + 0.02f);
+
         bool OnFloor(int floor, int room, Rect r, float margin)
         {
             var g = Grow(r, margin);
@@ -545,7 +548,7 @@ namespace Stealth.Level
                     continue;
                 }
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
-                if (!OnFloor(f, room.Id, r, 0.12f) || !Clear(f, r, gap)) return false;
+                if (!OnFloor(f, room.Id, r, WallClear) || !Clear(f, r, gap)) return false;
                 if (front is Vector3 n)
                 {
                     // a walkway in front of a group along a wall: nothing placed there already, and still the room's floor
@@ -1107,19 +1110,26 @@ namespace Stealth.Level
                 return AnyReached(seen, r);
             }
 
-            /// <summary>Any free cell of the room is reached.</summary>
+            /// <summary>
+            /// At least half of the room's free floor is reached (a room whose middle is furniture: the table must not cut it in two —
+            /// with the thick walls a meeting room 4 m wide has no way round its table left); a room with almost no free floor:
+            /// any of it.
+            /// </summary>
             bool AnyReached(bool[] seen, PlanRoom r)
             {
                 var a = CellOf(r.Bounds.min);
                 var b = CellOf(r.Bounds.max);
+                int free = 0, reached = 0;
                 for (int x = a.x; x <= b.x; x++)
                     for (int z = a.y; z <= b.y; z++)
                     {
                         if (!In(r.Floor, x, z)) continue;
                         int i = Index(r.Floor, x, z);
-                        if (seen[i] && m_L.Plan.SpaceAt(r.Floor, Center(x, z)) == r.Id) return true;
+                        if (!m_Free[i] || m_L.Plan.SpaceAt(r.Floor, Center(x, z)) != r.Id) continue;
+                        free++;
+                        if (seen[i]) reached++;
                     }
-                return false;
+                return reached > 0 && (free < 12 || reached >= free * 0.5f);
             }
 
             const int Reach = 6; // 1.5 m in cells: how close a blocking group has to be to both sides
