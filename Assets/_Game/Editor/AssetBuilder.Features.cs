@@ -532,7 +532,33 @@ namespace Stealth.EditorTools
                 Paint(m, "CageIron", "KeyBrass", "KeyBrass");
                 return root;
             });
+            // the book, canned food, the screwdriver, the belt bag (Tools/Blender/poi.py item_<id>_model)
+            Mat("Items", "BookCover", new Color(0.45f, 0.12f, 0.1f), smoothness: 0.25f);
+            Mat("Items", "BookPages", new Color(0.92f, 0.88f, 0.76f), smoothness: 0.1f);
+            Mat("Items", "CanTin", new Color(0.72f, 0.74f, 0.76f), smoothness: 0.75f);
+            Mat("Items", "CanLabel", new Color(0.85f, 0.32f, 0.12f), smoothness: 0.35f);
+            Mat("Items", "ScrewHandle", new Color(0.95f, 0.72f, 0.08f), smoothness: 0.6f);
+            Mat("Items", "BagFabric", new Color(0.12f, 0.24f, 0.55f), smoothness: 0.3f);
+            Mat("Items", "BagStrap", new Color(0.06f, 0.06f, 0.07f), smoothness: 0.3f);
+            GameObject ItemModel(string file, string name, string body, string accent, string eye, (string part, string mat)? extra = null) => Prefab($"{PrefabsDir}/Items/{name}.prefab", () =>
+            {
+                var m = Model(file);
+                m.name = name;
+                Paint(m, body, accent, eye);
+                if (extra is var (part, mat)) foreach (var r in Parts(m, part)) r.sharedMaterial = M(mat);
+                return m;
+            });
+            // parts: book — Body cover, Accent pages, AccentLabel the gilt title; cans — Body labels, Accent the tins;
+            // screwdriver — Body handle, Accent steel; belt bag — Body nylon, Accent strap and buckle, AccentZip the zips
+            var book = ItemModel("item_book_model", "BookModel", "BookCover", "BookPages", "BookPages", ("AccentLabel", "KeyBrass"));
+            var cans = ItemModel("item_cans_model", "CansModel", "CanLabel", "CanTin", "CanTin");
+            var screwdriver = ItemModel("item_screwdriver_model", "ScrewdriverModel", "ScrewHandle", "ShovelSteel", "ShovelSteel");
+            var beltBag = ItemModel("item_beltbag_model", "BeltBagModel", "BagFabric", "BagStrap", "ShovelSteel", ("AccentZip", "ShovelSteel"));
             var icons = new Sprite[ItemCatalog.Shapes.Length];
+            icons[ItemCatalog.Book] = ItemIcon("book");
+            icons[ItemCatalog.Cans] = ItemIcon("cans");
+            icons[ItemCatalog.Screwdriver] = ItemIcon("screwdriver");
+            icons[ItemCatalog.BeltBag] = ItemIcon("beltbag");
             icons[ItemCatalog.Shovel] = ItemIcon("shovel");
             icons[ItemCatalog.Flashlight] = ItemIcon("flashlight");
             icons[ItemCatalog.Battery] = ItemIcon("battery");
@@ -552,6 +578,8 @@ namespace Stealth.EditorTools
                 && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Shovel] == shovel
                 && visuals.Models[ItemCatalog.Flashlight] == flashlight && visuals.Models[ItemCatalog.Battery] == battery
                 && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey
+                && visuals.Models[ItemCatalog.Book] == book && visuals.Models[ItemCatalog.Cans] == cans
+                && visuals.Models[ItemCatalog.Screwdriver] == screwdriver && visuals.Models[ItemCatalog.BeltBag] == beltBag
                 && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
@@ -561,6 +589,10 @@ namespace Stealth.EditorTools
             visuals.Models[ItemCatalog.Battery] = battery;
             visuals.Models[ItemCatalog.Key] = key;
             visuals.Models[ItemCatalog.CageKey] = cageKey;
+            visuals.Models[ItemCatalog.Book] = book;
+            visuals.Models[ItemCatalog.Cans] = cans;
+            visuals.Models[ItemCatalog.Screwdriver] = screwdriver;
+            visuals.Models[ItemCatalog.BeltBag] = beltBag;
             visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
         }

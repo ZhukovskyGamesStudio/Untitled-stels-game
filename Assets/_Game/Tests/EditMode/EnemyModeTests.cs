@@ -153,6 +153,24 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void WhenTheTimeIsUpItLeavesItsDockForGood()
+        {
+            var body = new FakeBody { Position = Vector3.zero, Arrived = true };
+            var traits = new RobotTraits { AlarmHuntTime = 10f };
+            var brain = new RobotBrain(new RobotSenses(), traits, body, new System.Random(1));
+            brain.SetDock(Vector3.zero, Vector3.forward, 0f);
+            brain.WakeForGood(5f);
+            Assert.IsFalse(brain.Docked);
+            Assert.IsFalse(brain.Resting);
+            Assert.Greater(body.PatrolRequests, 0, "it sets off on patrol");
+            // no hunt timer runs out any more: it never heads home
+            for (float t = 5f; t < 100f; t += 0.5f) brain.Tick(t, 0.5f);
+            Assert.IsFalse(brain.Resting, "it never rests again");
+            brain.OnSensed(new Sighting { Target = new FakeIntruder { Position = new Vector3(0, 0, 2) }, Rate = 5f }, 100f, 0.5f);
+            Assert.Greater(brain.Suspicion, 0f, "and it sees again");
+        }
+
+        [Test]
         public void AnUndockedRobotTreatsAnAlarmAsAlways()
         {
             var body = new FakeBody { Position = Vector3.zero };

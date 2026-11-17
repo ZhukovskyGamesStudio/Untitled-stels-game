@@ -54,6 +54,10 @@ namespace Stealth.Level
             return (m_Bits[i >> 6] & (1UL << (i & 63))) != 0;
         }
 
+        /// <summary>The team has seen this point (its tile on its floor).</summary>
+        public bool IsRevealedAt(Vector3 p) =>
+            IsRevealed(LevelLayout.FloorOf(p.y), Mathf.FloorToInt((p.x + Margin) / Tile), Mathf.FloorToInt((p.z + Margin) / Tile));
+
         /// <summary>Share of a floor the team has seen (0..1).</summary>
         public float RevealedShare(int floor) => floor >= 0 && floor < Floors ? m_RevealedPerFloor[floor] / (float)(Width * Height) : 0f;
 

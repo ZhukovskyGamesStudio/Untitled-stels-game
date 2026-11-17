@@ -52,7 +52,8 @@ namespace Stealth.Tests
             foreach (var l in Houses()) { houses++; removed += Furnisher.LastRemoved; }
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
             // against the far side of a wall from a room out of reach
-            Assert.That(removed, Is.LessThanOrEqualTo(houses / 2), $"{removed} groups taken out in {houses} houses");
+            // (the ways up to the vent grates — crates and a desk set first in their room — make it a little busier)
+            Assert.That(removed, Is.LessThanOrEqualTo(houses), $"{removed} groups taken out in {houses} houses");
         }
     }
 }

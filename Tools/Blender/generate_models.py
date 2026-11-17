@@ -601,6 +601,10 @@ SHAPES = {
     "shovel": [(0, 0), (0, 1), (0, 2), (0, 3)],                    # the shovel's piece in grids and the cart (ItemCatalog.Shovel, 1 x 4)
     "flashlight": [(0, 0), (0, 1), (0, 2)],                       # ItemCatalog.Flashlight (1 x 3)
     "battery": [(0, 0)],                                          # ItemCatalog.Battery
+    "book": [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)],      # book, shape 16 (2 x 3)
+    "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
+    "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
+    "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
 }
 
 

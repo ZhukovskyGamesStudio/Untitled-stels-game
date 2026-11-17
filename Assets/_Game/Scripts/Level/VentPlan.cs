@@ -11,6 +11,13 @@ namespace Stealth.Level
         public Vector2Int Cell;
         /// <summary>The middle of the grate, on the room's ceiling.</summary>
         public Vector3 Position;
+        /// <summary>Its lid is screwed shut: only a screwdriver in hand takes it off (<see cref="VentGrate"/>).</summary>
+        public bool Closed;
+        /// <summary>
+        /// The way up to it (−1: none, only down): a crate stack right under it and a desk beside the stack on this side
+        /// (0 +x, 1 −x, 2 +z, 3 −z) — floor → desk → crates → a crouched jump into the duct (<see cref="VentPlan.ClimbSide"/>).
+        /// </summary>
+        public int ClimbDir;
     }
 
     /// <summary>The crawl ducts in one storey's ceiling void (between its ceiling and the floor above).</summary>
@@ -46,11 +53,22 @@ namespace Stealth.Level
         public static Vector2Int CellOf(Vector3 p) => new(Mathf.FloorToInt(p.x / Res), Mathf.FloorToInt(p.z / Res));
 
         /// <summary>Plans the ducts of every storey into <see cref="LevelLayout.Vents"/>.</summary>
-        public static void Plan(LevelLayout l, float coverage)
+        public static void Plan(LevelLayout l, float coverage, float closedChance = 0f, float climbChance = 0f)
         {
             l.Vents.Clear();
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E47, 0));
-            for (int f = 0; f < l.Floors; f++) l.Vents.Add(PlanFloor(l, f, coverage, rng));
+            for (int f = 0; f < l.Floors; f++) l.Vents.Add(PlanFloor(l, f, coverage, rng, climbChance));
+            // some lids are screwed shut (own stream): never the one over the room the team arrives in
+            var lids = new System.Random(LevelRandom.Mix(l.Seed, 0x6A7E, 0));
+            foreach (var net in l.Vents)
+                for (int i = 0; i < net.Grates.Count; i++)
+                {
+                    var g = net.Grates[i];
+                    bool arrival = net.Floor == 0 && i == 0; // the tree's root: the lobby's grate (or the one nearest it)
+                    g.Closed = !arrival && lids.NextDouble() < closedChance;
+                    if (arrival) g.ClimbDir = -1; // never a way up in the room the team arrives in
+                    net.Grates[i] = g;
+                }
         }
 
         /// <summary>A duct may run in this cell of floor <paramref name="f"/>'s void: over rooms or pockets, under a slab or the roof, no stair hole.</summary>
@@ -79,8 +97,64 @@ namespace Stealth.Level
             return true;
         }
 
-        static VentNet PlanFloor(LevelLayout l, int f, float coverage, System.Random rng)
+        /// <summary>The side of a climb's desk (<see cref="DuctGrate.ClimbDir"/>) as a direction.</summary>
+        public static Vector3 ClimbSide(int dir) => dir switch { 0 => Vector3.right, 1 => Vector3.left, 2 => Vector3.forward, _ => Vector3.back };
+
+        /// <summary>The crate stack under the grate and the desk beside it: half their depth, the gap between them.</summary>
+        public const float StackHalf = 0.39f, DeskHalf = 0.4f;
+
+        /// <summary>
+        /// A climb fits under a grate at <paramref name="c"/> with its desk on side <paramref name="dir"/>: the stack, the
+        /// desk and an aisle in front of the desk all on the room's floor, away from its doors.
+        /// </summary>
+        /// <summary>
+        /// Rooms that never get a way up: the walkways (corridors, halls, the lobby), the exit's room (its hatch), the robots'
+        /// rooms (control, charging: their consoles and docks), storage, the workshop and its booth, the hostage's room.
+        /// </summary>
+        static bool NoClimb(LevelLayout l, PlanRoom r)
         {
+            if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.ControlRoom or RoomType.ChargingStation
+                or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth) return true;
+            if (l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id == r.Id) return true;
+            foreach (var p in l.Props)
+                if (p.Kind is PropKind.Cage or PropKind.Hatch or PropKind.ShaftHatch && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id) return true;
+            return false;
+        }
+
+        static bool ClimbFits(LevelLayout l, int f, PlanRoom r, Vector2 c, int dir)
+        {
+            var s = ClimbSide(dir);
+            var side = new Vector2(s.x, s.z);
+            var across = new Vector2(-side.y, side.x);
+            for (float a = -0.75f; a <= 2.6f; a += 0.25f)
+                for (float b = -1.0f; b <= 1.0f; b += 0.25f)
+                {
+                    var q = c + side * a + across * b;
+                    if (l.Plan.SpaceAt(f, q) != r.Id || l.NearStair(f, new Vector3(q.x, LevelLayout.FloorY(f), q.y), 0.8f)) return false;
+                }
+            // clear of the room's middle (its patrol stop is kept free) and of the facade (the crates are tall: not before a window)
+            var mid = new Vector2(r.Center.x, r.Center.z);
+            for (float a = -0.5f; a <= 1.8f; a += 0.45f)
+            {
+                var q = c + side * a;
+                if ((q - mid).magnitude < 1.3f) return false;
+                foreach (var o in new[] { Vector2.right, Vector2.left, Vector2.up, Vector2.down })
+                    if (l.Plan.SpaceAt(f, q + o * 1.2f) < 0 && !l.Plan.IsInside(q + o * 1.2f)) return false;
+            }
+            foreach (var d in l.Doorways)
+            {
+                if (d.Floor != f || (d.RoomA != r.Id && d.RoomB != r.Id)) continue;
+                var dp = new Vector2(d.Position.x, d.Position.z);
+                for (float a = 0f; a <= 2.2f; a += 0.55f)
+                    if ((c + side * a - dp).magnitude < 1.9f) return false; // clear of the way in
+            }
+            return true;
+        }
+
+        static VentNet PlanFloor(LevelLayout l, int f, float coverage, System.Random rng, float climbChance = 0f)
+        {
+            var climbRng = new System.Random(LevelRandom.Mix(l.Seed, 0xC1B, f));
+            var climbs = new Dictionary<int, int>();
             var net = new VentNet { Floor = f };
             var plan = l.Plan;
             int nx = plan.NX / 2, nz = plan.NZ / 2;
@@ -97,6 +171,25 @@ namespace Stealth.Level
                 if (r.Floor != f || r.Levels != 1 || r.Area < 6f || r.Id == l.VaultRoom || r.Id == l.StorageRoom) continue;
                 Vector2Int? best = null;
                 float bestD = float.MaxValue;
+                // some rooms get a way up: a crate stack under the grate, a desk beside it (never the lobby: the team's room)
+                bool climb = climbRng.NextDouble() < climbChance && r.Id != l.LobbyRoom && r.Area >= 12f && !NoClimb(l, r);
+                if (climb)
+                {
+                    float far = -1f;
+                    for (int x = 0; x < nx; x++)
+                        for (int z = 0; z < nz; z++)
+                        {
+                            var c = new Vector2Int(x, z);
+                            if (!allowed[x, z] || !Inside(plan, f, r.Id, c)) continue;
+                            var m = new Vector2((x + 0.5f) * Res, (z + 0.5f) * Res);
+                            for (int dir = 0; dir < 4; dir++)
+                            {
+                                if (!ClimbFits(l, f, r, m, dir)) continue;
+                                float score = (float)climbRng.NextDouble() - (m - new Vector2(r.Center.x, r.Center.z)).magnitude * 0.05f;
+                                if (score > far) { far = score; best = c; climbs[r.Id] = dir; }
+                            }
+                        }
+                }
                 // just inside its main way in (a walkway anyway: the room's own furniture keeps its middle)
                 var centre = new Vector2(r.Center.x, r.Center.z);
                 foreach (var d in l.Doorways)
@@ -147,8 +240,12 @@ namespace Stealth.Level
                 connected.Add(pick);
                 if (connected.Count >= rooms.Count) break;
             }
+            // the root first: the arrival's grate is index 0
+            connected.Remove(root);
+            net.Grates.Add(new DuctGrate { Room = root, Cell = grates[root], Position = CellCenter(grates[root], LevelLayout.FloorY(f) + LevelMetrics.WallHeight), ClimbDir = -1 });
             foreach (int id in connected)
-                net.Grates.Add(new DuctGrate { Room = id, Cell = grates[id], Position = CellCenter(grates[id], LevelLayout.FloorY(f) + LevelMetrics.WallHeight) });
+                net.Grates.Add(new DuctGrate { Room = id, Cell = grates[id], Position = CellCenter(grates[id], LevelLayout.FloorY(f) + LevelMetrics.WallHeight),
+                    ClimbDir = climbs.TryGetValue(id, out var dir) ? dir : -1 });
             return net;
         }
 

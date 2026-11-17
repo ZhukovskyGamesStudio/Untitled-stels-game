@@ -45,6 +45,8 @@ namespace Stealth.Level
         public GameObject ShaftHatch;
         [Tooltip("The ladder's foot in the basement (ShaftLadder).")]
         public GameObject ShaftLadder;
+        [Tooltip("A navmesh link up the shaft (the storage robot climbs the ladder while the lid is open).")]
+        public GameObject ShaftLink;
         public GameObject CityLamp;
 
         [Header("Pieces")]

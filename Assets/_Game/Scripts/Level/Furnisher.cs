@@ -1299,6 +1299,7 @@ namespace Stealth.Level
             m_Windows ??= WindowStrips();
             BeginRoomWalk(room);
             if (room.Id == m_L.VaultRoom) { VaultRoom(room); return; }
+            Climb(room);
             // islands in the middle: about one and a half times what an office planner would call "enough" — a house to search
             int islands = room.Type switch
             {
@@ -1507,6 +1508,27 @@ namespace Stealth.Level
                 return;
             }
             Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>The ways up to vent grates (room → under the grate, the desk's side; <see cref="DuctGrate.ClimbDir"/>).</summary>
+        public readonly Dictionary<int, (Vector3 under, Vector3 side)> Climbs = new();
+
+        /// <summary>
+        /// The room's way up to its grate, first of all its furniture: a crate stack right under the grate, a desk along its
+        /// side, an aisle in front of the desk kept free — set like any group (no overlap, the room stays walkable) or not at all.
+        /// </summary>
+        void Climb(PlanRoom room)
+        {
+            if (!Climbs.TryGetValue(room.Id, out var c)) return;
+            float yaw = Mathf.Atan2(c.side.x, c.side.z) * Mathf.Rad2Deg;
+            var desk = c.under + c.side * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
+            var b = new Batch();
+            b.Add(PropKind.CrateStack, c.under, yaw);
+            b.Add(PropKind.Desk, desk, yaw + 180f);
+            if (!TryCommit(room, b, 0.04f)) return;
+            m_L.ClimbPieces.Add(c.under);
+            m_L.ClimbPieces.Add(desk);
+            Keep(room.Floor, desk + c.side * 0.5f - Vector3.one * 0.55f, desk + c.side * 1.5f + Vector3.one * 0.55f); // the aisle to climb from
         }
 
         /// <summary>How many guards' docks the charging room tries for (pairs while the walls take them, then singles).</summary>

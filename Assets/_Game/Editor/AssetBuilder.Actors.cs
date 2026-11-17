@@ -72,6 +72,20 @@ namespace Stealth.EditorTools
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;
                 rc.CargoVisuals = visuals;
+                // no motor hum of the old guard: its own voice says what it does (GuardSounds)
+                foreach (var loop in go.GetComponents<Stealth.Audio.LoopSound>())
+                {
+                    if (loop.Source != null) Object.DestroyImmediate(loop.Source, true);
+                    Object.DestroyImmediate(loop, true);
+                }
+                // its own voice: charging on its dock, walking its rounds, chasing (GuardSounds)
+                var voice = Child(go.transform, "GuardVoice", new Vector3(0f, 1.6f, 0f));
+                var gs = go.AddComponent<Stealth.Audio.GuardSounds>();
+                gs.Source = voice.AddComponent<AudioSource>();
+                gs.Source.playOnAwake = false;
+                gs.Charging = s_Bank.GuardCharge;
+                gs.Patrolling = s_Bank.GuardPatrol;
+                gs.Chasing = s_Bank.GuardChase;
                 return go;
             });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>

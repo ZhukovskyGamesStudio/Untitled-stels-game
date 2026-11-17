@@ -20,6 +20,8 @@ namespace Stealth.Game
         public static int DryerKey(int prop) => 8_000_000 + prop;
         /// <summary>A room whose lights a player switched (from how the house started).</summary>
         public static int LightsKey(int room) => 9_200_000 + room;
+        /// <summary>A shut vent grate whose lid was taken off with a screwdriver (by the grate's index).</summary>
+        public static int VentKey(int grate) => 9_400_000 + grate;
         /// <summary>The lid over the shaft to the basement is open.</summary>
         public const int ShaftKey = 9_300_000;
 
@@ -39,6 +41,7 @@ namespace Stealth.Game
             HandDryer.IsRunning = i => IsOpened(DryerKey(i));
             LightSwitch.IsSwitched = RoomLight.IsSwitched = r => IsOpened(LightsKey(r));
             ShaftHatch.IsOpen = () => IsOpened(ShaftKey);
+            VentGrate.IsUnscrewed = i => IsOpened(VentKey(i));
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
         }
@@ -119,8 +122,20 @@ namespace Stealth.Game
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
                 case UseKind.ShaftHatch: ToggleShaftServer(); break;
+                case UseKind.VentGrate: UnscrewServer(player, index); break;
                 default: UseSewerServer(player, kind, index); break;
             }
+        }
+
+        /// <summary>Server: a player with a screwdriver in hand takes the lid off a shut vent grate (for good, for everyone).</summary>
+        void UnscrewServer(PlayerController player, int grate)
+        {
+            if (Phase != RunPhase.Playing || grate < 0 || IsOpened(VentKey(grate))) return;
+            var inv = player.GetComponent<PlayerInventory>();
+            if (inv == null || !inv.Holds(ItemCatalog.Screwdriver)) return;
+            m_Opened.Add(VentKey(grate));
+            OpenedVersion++;
+            Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, player.transform.position + Vector3.up * 2f, 0.8f, Audio.Sfx.Group.Items);
         }
 
         /// <summary>Server: the lid over the shaft to the basement opens (or shuts) for everyone.</summary>

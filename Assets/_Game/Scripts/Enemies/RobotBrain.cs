@@ -197,6 +197,20 @@ namespace Stealth.Enemies
             Rest(now);
         }
 
+        /// <summary>
+        /// The house's time is up (the timer the hunter came by in the old mode): it leaves its dock for good — it patrols
+        /// and reacts like any guard and never goes back to rest.
+        /// </summary>
+        public void WakeForGood(float now)
+        {
+            if (!Docked) return;
+            bool resting = Shift == GuardShift.Resting;
+            Docked = false;
+            Shift = GuardShift.Hunting;
+            m_HomeBound = false;
+            if (resting || State == RobotState.Patrol) { SetState(RobotState.Patrol, now); NextPatrolPoint(); }
+        }
+
         /// <summary>Resting at its dock: no patrol, no senses — only an alarm wakes it.</summary>
         public bool Resting => Docked && Shift == GuardShift.Resting;
 

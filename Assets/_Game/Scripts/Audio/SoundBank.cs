@@ -31,6 +31,8 @@ namespace Stealth.Audio
         public AudioClip StepLight, SpiderStep;
         [Tooltip("Motor loops of the other robots: joints of legged ones, tracks, the sweeper's brush, the hunter's turbine.")]
         public AudioClip MotorServo, MotorTracks, MotorBrush, MotorTurbine;
+        [Tooltip("A guard's loops (GuardSounds): resting on its dock, walking its rounds, chasing.")]
+        public AudioClip GuardCharge, GuardPatrol, GuardChase;
 
         [Header("Items and places")]
         [Tooltip("The lure speaker's music (loop).")]

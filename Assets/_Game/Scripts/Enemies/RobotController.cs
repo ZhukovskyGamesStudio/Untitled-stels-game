@@ -39,7 +39,11 @@ namespace Stealth.Enemies
         public MeshRenderer CargoRenderer;
         public ItemVisuals CargoVisuals;
 
-        public RobotState State => (RobotState)Mode;
+        /// <summary>What it is doing (the replicated mode's low bits; the top bit: resting on its dock).</summary>
+        public RobotState State => (RobotState)(Mode & 0x7F);
+        /// <summary>Resting on its charging dock (every peer: the top bit of the replicated mode).</summary>
+        public bool RestingShown => (Mode & 0x80) != 0;
+        byte ModeOf(RobotState s) => (byte)((byte)s | (m_Brain != null && m_Brain.Resting ? 0x80 : 0));
         /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
         public sbyte ColorFilter => Variant;
 
@@ -80,7 +84,7 @@ namespace Stealth.Enemies
             m_NextStomp = Time.time + rng.Range(0.5f, Senses.SeismicPeriod);
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
-            m_Brain.StateChanged += s => SetMode((byte)s);
+            m_Brain.StateChanged += s => SetMode(ModeOf(s));
             m_LootRng = new System.Random(rng.Next());
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
@@ -152,6 +156,8 @@ namespace Stealth.Enemies
         public void DockServer(Vector3 dock, Vector3 facing) => m_Brain?.SetDock(dock, facing, Time.time);
         /// <summary>Server: an alarm somewhere in the house (a docked robot wakes and hunts).</summary>
         public void AlarmServer(Vector3 position) => m_Brain?.Alarm(position, Time.time);
+        /// <summary>Server: the house's time is up — off its dock for good (<see cref="RobotBrain.WakeForGood"/>).</summary>
+        public void WakeForGoodServer() => m_Brain?.WakeForGood(Time.time);
         /// <summary>Has a charging dock (a guard of the new enemy mode).</summary>
         public bool Docked => m_Brain != null && m_Brain.Docked;
         /// <summary>Resting on its dock right now.</summary>
@@ -174,6 +180,7 @@ namespace Stealth.Enemies
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
             if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
+            SetMode(ModeOf(m_Brain.State)); // (resting comes and goes without a change of state)
             if (m_HasPost && State == RobotState.Patrol && Arrived)
             {
                 // a warden at its post watches the way in

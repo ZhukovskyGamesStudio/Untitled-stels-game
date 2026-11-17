@@ -36,6 +36,9 @@ namespace Stealth.Level
         /// <summary>The hint for this player, and whether pressing E does something now.</summary>
         public abstract string Prompt(PlayerController player, out bool available);
 
+        /// <summary>Taken by E at all just now (an open vent grate is climbed through, not used).</summary>
+        public virtual bool Usable(PlayerController player) => true;
+
         public void Configure(int index)
         {
             Index = index;
@@ -58,7 +61,7 @@ namespace Stealth.Level
             var at = player.transform.position;
             foreach (var i in All)
             {
-                if (i.Index < 0 || !i.isActiveAndEnabled) continue;
+                if (i.Index < 0 || !i.isActiveAndEnabled || !i.Usable(player)) continue;
                 var p = i.Point;
                 if (Mathf.Abs(at.y + 0.9f - p.y) > 1.7f) continue;
                 var to = p - at;

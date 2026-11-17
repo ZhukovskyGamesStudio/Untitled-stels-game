@@ -133,6 +133,34 @@ MonoBehaviour:
       Weight: 2
     - Item: battery
       Weight: 3
+    - Item: book
+      Weight: 2
+      Only: []
+      Favoured:
+      - 12
+      FavouredBoost: 5
+    - Item: cans
+      Weight: 3
+      Only:
+      - 4
+      Favoured: []
+      FavouredBoost: 0
+    - Item: screwdriver
+      Weight: 3
+      Only:
+      - 5
+      - 13
+      - 14
+      - 15
+      - 21
+      - 23
+      Favoured: []
+      FavouredBoost: 0
+    - Item: beltbag
+      Weight: 1
+      Only: []
+      Favoured: []
+      FavouredBoost: 0
     ItemsPerHouse: 2
     RoomsPerExtraItem: 3
     MinSpacing: 1.5

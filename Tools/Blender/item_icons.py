@@ -1,11 +1,12 @@
 """Backpack pictures of the real items: renders of their own models, drawn over the item's cells in the inventory.
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/item_icons.py -- Assets/_Game/Art/Sprites/Items [Assets/_Game/Art/Models]
+Run:  blender.exe -b --factory-startup --python Tools/Blender/item_icons.py -- Assets/_Game/Art/Sprites/Items [Assets/_Game/Art/Models] [--only a,b]
 
 Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's cells in its base turn):
   shovel      1 x 4 cells (ItemCatalog.Shovel)       Art/Models/Items/item_shovel_model.fbx
   flashlight  1 x 3 cells (ItemCatalog.Flashlight)   Art/Models/Items/item_flashlight_model.fbx
   battery     1 x 1 cell  (ItemCatalog.Battery)      Art/Models/Items/item_battery_model.fbx
+  book 2 x 3, cans 2 x 2, screwdriver 1 x 3, beltbag 2 x 2   Art/Models/Items/item_<id>_model.fbx
   diamond, key, cagekey, stun (2 x 2), speaker (2 x 1)  the tools and the crafted diamond, seen three-quarter
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
@@ -20,12 +21,18 @@ import numpy as np
 from mathutils import Euler, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+ONLY = None
+if "--only" in argv:  # render just these ids
+    i = argv.index("--only")
+    ONLY = set(argv[i + 1].split(","))
+    argv = argv[:i] + argv[i + 2:]
 OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Sprites", "Items"))
 MODELS = os.path.abspath(argv[1] if len(argv) > 1 else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models"))
 CELL = 128
 
 # id: (cells wide, cells tall, model file (Items/ unless a folder is given), {part prefix: (colour, metallic, roughness,
-# emission)}, view: "top" — lying things seen from above, "front" — standing things seen three-quarter from the front)
+# emission)}, view: "top" — lying things seen from above, "tilted" — the same seen more from the near end (a book shows
+# its pages), "front" — standing things seen three-quarter from the front)
 ITEMS = {
     "shovel": (1, 4, "item_shovel_model", {
         "Body": ((0.42, 0.26, 0.12), 0.0, 0.6, 0.0),
@@ -37,6 +44,20 @@ ITEMS = {
     "battery": (1, 1, "item_battery_model", {
         "Body": ((0.1, 0.38, 0.85), 0.0, 0.35, 0.0),
         "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}),
+    "book": (2, 3, "item_book_model", {
+        "Body": ((0.45, 0.08, 0.07), 0.0, 0.55, 0.0),                     # cloth cover
+        "AccentLabel": ((0.85, 0.66, 0.25), 0.8, 0.3, 0.0),              # gilt title plate
+        "Accent": ((0.9, 0.86, 0.74), 0.0, 0.8, 0.0)}, "tilted"),        # pages
+    "cans": (2, 2, "item_cans_model", {
+        "Body": ((0.8, 0.22, 0.1), 0.0, 0.5, 0.0),                       # paper labels
+        "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}, "front"),          # tin steel
+    "screwdriver": (1, 3, "item_screwdriver_model", {
+        "Body": ((0.9, 0.62, 0.08), 0.0, 0.35, 0.0),                     # plastic handle
+        "Accent": ((0.62, 0.64, 0.66), 0.9, 0.3, 0.0)}),                 # steel
+    "beltbag": (2, 2, "item_beltbag_model", {
+        "Body": ((0.18, 0.3, 0.42), 0.0, 0.75, 0.0),                     # nylon
+        "AccentZip": ((0.62, 0.64, 0.66), 0.9, 0.3, 0.0),                # zips and pulls
+        "Accent": ((0.07, 0.07, 0.08), 0.0, 0.6, 0.0)}),                 # strap and buckle
     # the tools and the crafted diamond: their own models in the world, pictures in the backpack too
     "diamond": (1, 1, "item_diamond", {"Body": ((0.75, 0.92, 1.0), 0.0, 0.05, 0.25)}, "front"),
     "key": (1, 1, "item_key_model", {
@@ -100,7 +121,7 @@ def render(item_id, wide, tall, model, looks, view="top"):
     for o in [o for o in scene.objects if o.parent is None and o is not holder]:
         o.location -= centre
         o.parent = holder
-    if view == "top":
+    if view in ("top", "tilted"):
         # a lying thing: its length (X in the file) along the picture's longer side, its head up / to the right
         holder.rotation_euler = Euler((0, 0, math.radians(90) if tall > wide else 0))
     bpy.context.view_layer.update()
@@ -110,7 +131,7 @@ def render(item_id, wide, tall, model, looks, view="top"):
     cam = bpy.data.objects.new("cam", cam_data)
     scene.collection.objects.link(cam)
     # top: from above with a little tilt (the sides read); front: three-quarter from the front (-Y) and above
-    tilt = math.radians(7 if view == "top" else 58)
+    tilt = math.radians({"top": 7, "tilted": 30}.get(view, 58))
     cam.location = (0, -3.0 * math.sin(tilt), 3.0 * math.cos(tilt))
     cam.rotation_euler = Euler((tilt, 0, 0))
     if view == "front":
@@ -191,4 +212,5 @@ def outline(path, px=4):
 
 
 for item, spec in ITEMS.items():
-    render(item, *spec)
+    if ONLY is None or item in ONLY:
+        render(item, *spec)

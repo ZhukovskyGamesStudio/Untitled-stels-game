@@ -275,6 +275,13 @@ namespace Stealth.Level
         public readonly List<int> WardedRooms = new();
         /// <summary>The crawl ducts in each storey's ceiling void (index = the storey under it), <see cref="VentPlan"/>.</summary>
         public readonly List<VentNet> Vents = new();
+        /// <summary>Where the crates and desks of the ways up to the grates stand: never turned into a terminal or anything else.</summary>
+        public readonly List<Vector3> ClimbPieces = new();
+        public bool IsClimbPiece(Vector3 p)
+        {
+            foreach (var c in ClimbPieces) if ((c - p).sqrMagnitude < 0.01f) return true;
+            return false;
+        }
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
         /// <summary>Most windows on the facade (<see cref="LevelBuilder.WindowSpots"/>), −1 = wherever one fits.</summary>

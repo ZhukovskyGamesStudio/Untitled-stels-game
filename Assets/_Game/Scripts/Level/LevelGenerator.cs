@@ -79,6 +79,10 @@ namespace Stealth.Level
         public float SqueezesPerRoom = 0.1f;
         [Tooltip("Share of a storey's rooms (big enough for a grate) the crawl ducts in its ceiling void reach (VentPlan); the exit room always.")]
         [Range(0f, 1f)] public float VentCoverage = 0.75f;
+        [Tooltip("Chance of a grate's lid being screwed shut (a screwdriver in hand takes it off); the arrival room's grate is always open.")]
+        [Range(0f, 1f)] public float ClosedGrateChance = 0.55f;
+        [Tooltip("Chance of a room's grate having a way up to it: a crate stack under it and a desk beside (never in the team's first room).")]
+        [Range(0f, 1f)] public float ClimbChance = 0.65f;
         [Tooltip("A crawl way (vent, slot, hole, window without glass) prefers a room with one way in so far: added to its score per such room (the score is the walk it saves, metres-ish). A loot room with a second way in is a room to sneak into.")]
         public float DeadEndSneakBonus = 4f;
         [Header("Shapes")]
@@ -430,7 +434,8 @@ namespace Stealth.Level
 
             // the crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
             // within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to)
-            VentPlan.Plan(l, building.VentCoverage);
+            VentPlan.Plan(l, building.VentCoverage, building.ClosedGrateChance, building.ClimbChance);
+            PlaceClimbs(l, furnisher);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
@@ -442,6 +447,7 @@ namespace Stealth.Level
             watch.Restart();
             furnisher.EnsureWalkable();
             if (furnisher.RestoreFridges()) furnisher.EnsureWalkable(); // every kitchen keeps its one fridge
+            DropFailedClimbs(l);
             Timing.Walk += watch.ElapsedMilliseconds;
             ChargingRooms.Docks(l);
             if (security.Enemies)
@@ -456,6 +462,7 @@ namespace Stealth.Level
             HouseFeatures.PointOfInterest(l);
             if (security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
             HouseFeatures.FinishObjective(l);
+            DropFailedClimbs(l); // (and anything since that changed their pieces)
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));
@@ -793,7 +800,7 @@ namespace Stealth.Level
                 if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i)) desks.Add(i);
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i) && !l.IsClimbPiece(l.Props[i].Position)) desks.Add(i);
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
             var want = new List<TerminalKind>();
             // the hacking terminal first: with a single console in the control room, it is the one there
@@ -994,6 +1001,41 @@ namespace Stealth.Level
                 bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
                 if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
             }
+        }
+
+        /// <summary>
+        /// The ways up into the ducts (<see cref="DuctGrate.ClimbDir"/>): handed to the furnisher, which sets them first in
+        /// their room — a crate stack (1.4 m) right under the grate and a desk (0.92 m) along its side — checked like any
+        /// group (no overlap, the room still walkable). <see cref="DropFailedClimbs"/> after the furniture.
+        /// </summary>
+        static void PlaceClimbs(LevelLayout l, Furnisher furnisher)
+        {
+            foreach (var net in l.Vents)
+                foreach (var g in net.Grates)
+                    if (g.ClimbDir >= 0)
+                        furnisher.Climbs[g.Room] = (new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z), VentPlan.ClimbSide(g.ClimbDir));
+        }
+
+        /// <summary>A climb whose crates did not fit (or were taken out by the walkability check) is no way up.</summary>
+        static void DropFailedClimbs(LevelLayout l)
+        {
+            foreach (var net in l.Vents)
+                for (int i = 0; i < net.Grates.Count; i++)
+                {
+                    var g = net.Grates[i];
+                    if (g.ClimbDir < 0) continue;
+                    var under = new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z);
+                    var desk = under + VentPlan.ClimbSide(g.ClimbDir) * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
+                    bool stack = false, table = false;
+                    foreach (var p in l.Props)
+                    {
+                        stack |= p.Kind == PropKind.CrateStack && (p.Position - under).sqrMagnitude < 0.01f;
+                        table |= p.Kind == PropKind.Desk && (p.Position - desk).sqrMagnitude < 0.01f;
+                    }
+                    if (stack && table) continue;
+                    g.ClimbDir = -1;
+                    net.Grates[i] = g;
+                }
         }
 
         /// <summary>

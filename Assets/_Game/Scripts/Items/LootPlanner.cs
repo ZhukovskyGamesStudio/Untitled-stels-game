@@ -97,12 +97,14 @@ namespace Stealth.Items
             // in a room worth the detour the shape is the bigger of two draws (bigger things are worth more)
             int Shape(Vector3 p)
             {
-                int a = ItemCatalog.LootShape(rng); // from the loot table (shovels, flashlights, batteries…)
+                // from the loot table (shovels, flashlights, batteries…; canned food only in kitchens, books mostly in libraries)
+                var room = l.Plan.RoomAt(p + Vector3.up * 0.3f)?.Type;
+                int a = ItemCatalog.LootShape(rng, room);
                 // the room's type says how big a thing lies in it (a kitchen: small things)
                 var rule = RuleAt(p);
-                for (int k = 0; k < 6 && !RoomRules.LootFits(rule, ItemCatalog.Cells(a)); k++) a = ItemCatalog.LootShape(rng);
+                for (int k = 0; k < 6 && !RoomRules.LootFits(rule, ItemCatalog.Cells(a)); k++) a = ItemCatalog.LootShape(rng, room);
                 if (!InHidden(p) && RegionOf(p) < 0) return a;
-                int b = ItemCatalog.LootShape(rng);
+                int b = ItemCatalog.LootShape(rng, room);
                 return ItemCatalog.Value(b, 0) > ItemCatalog.Value(a, 0) ? b : a;
             }
             // the hidden room and the parts behind key doors are worth finding: a few things there first

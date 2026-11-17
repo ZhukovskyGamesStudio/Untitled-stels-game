@@ -196,7 +196,22 @@ namespace Stealth.EditorTools
                 go.AddComponent<ShaftLadder>();
                 return go;
             });
-            if (art.ShaftHatch != shaftHatch || art.ShaftLadder != shaftLadder) { art.ShaftHatch = shaftHatch; art.ShaftLadder = shaftLadder; EditorUtility.SetDirty(art); }
+            // the storage robot's way up the shaft: a navmesh link (the builder sets its ends; the lid opens and shuts it)
+            var shaftLink = Prefab($"{LevelPrefabs}/ShaftLink.prefab", () =>
+            {
+                var go = new GameObject("ShaftLink");
+                var link = go.AddComponent<Unity.AI.Navigation.NavMeshLink>();
+                link.width = 0.8f;
+                link.bidirectional = true;
+                link.autoUpdate = false;
+                link.costModifier = 4;
+                return go;
+            });
+            if (art.ShaftHatch != shaftHatch || art.ShaftLadder != shaftLadder || art.ShaftLink != shaftLink)
+            {
+                art.ShaftHatch = shaftHatch; art.ShaftLadder = shaftLadder; art.ShaftLink = shaftLink;
+                EditorUtility.SetDirty(art);
+            }
             if (art.CityPiece == piece && art.CityLamp == lamp && art.CityMaterials != null && art.CityMaterials.Length == mats.Length
                 && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats) && art.UtilityMaterials != null
                 && System.Linq.Enumerable.SequenceEqual(art.UtilityMaterials, util)) return;

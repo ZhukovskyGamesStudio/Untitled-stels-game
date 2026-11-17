@@ -436,6 +436,57 @@ def motor_servo(length):
     return loop(render, length)
 
 
+def guard_charge(length):
+    """Loop: a guard resting on its charging dock: a deep mains hum that breathes slowly, sparks crackling now and then."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        breath = 0.6 + 0.4 * np.sin(2 * np.pi * 0.25 * t)
+        hum = (np.sin(2 * np.pi * 50 * t) + 0.6 * np.sin(2 * np.pi * 100 * t) + 0.25 * np.sin(2 * np.pi * 150 * t)) * 0.25 * breath
+        rng = np.random.default_rng(31)
+        sparks = np.zeros_like(t)
+        for k in range(int(L * 3)):
+            i = int(rng.uniform(0, L) * SR)
+            n = int(0.02 * SR)
+            if i + n < len(sparks):
+                sparks[i:i + n] += highpass(rng.normal(0, 1, n), 2500) * np.linspace(1, 0, n) * 0.35
+        coil = bandpass(noise(d), 300, 900) * 0.06 * breath
+        return hum + sparks + coil
+    return loop(render, length)
+
+
+def guard_patrol(length):
+    """Loop: a guard walking its rounds: a low organic purr (the creature it imitates) and a dry chitter of mandibles."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        purr = lowpass(signal.sawtooth(2 * np.pi * (34 + 3 * np.sin(2 * np.pi * 0.6 * t)) * t), 220) * (0.5 + 0.5 * np.sin(2 * np.pi * 9 * t) ** 2) * 0.35
+        rng = np.random.default_rng(32)
+        chitter = np.zeros_like(t)
+        at_ = 0.0
+        while at_ < L:
+            at_ += rng.uniform(0.35, 1.1)
+            for j in range(rng.integers(3, 7)):
+                i = int((at_ + j * 0.035) * SR)
+                n = int(0.012 * SR)
+                if i + n < len(chitter):
+                    chitter[i:i + n] += bandpass(rng.normal(0, 1, n), 1800, 4200) * np.linspace(1, 0, n) * 0.45
+        return purr + chitter
+    return loop(render, length)
+
+
+def guard_chase(length):
+    """Loop: a guard on the hunt: a fast aggressive warble over a racing pulse — heard from afar, it means run."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        warble = np.sin(2 * np.pi * (480 + 160 * np.sin(2 * np.pi * 7 * t)) * t) * 0.22
+        pulse = lowpass(signal.square(2 * np.pi * 4 * t), 400) * lowpass(signal.sawtooth(2 * np.pi * 58 * t), 500) * 0.3
+        grit = bandpass(noise(d), 900, 2600) * (0.5 + 0.5 * signal.square(2 * np.pi * 8 * t)) * 0.12
+        return warble + pulse + grit
+    return loop(render, length)
+
+
 def motor_tracks(length):
     """Loop: heavy tracks: a low growl with the clatter of the links."""
     def render(L):
@@ -869,6 +920,9 @@ def main():
     write(P("Robots", "seismic_thump"), seismic_thump(), 0.9)
     write(P("Robots", "camera_beep"), camera_beep(), 0.6)
     write(P("Robots", "motor_servo"), motor_servo(2.0), 0.6)
+    write(P("Robots", "guard_charge"), guard_charge(4.0), 0.5)
+    write(P("Robots", "guard_patrol"), guard_patrol(4.0), 0.55)
+    write(P("Robots", "guard_chase"), guard_chase(2.0), 0.6)
     write(P("Robots", "motor_tracks"), motor_tracks(2.0), 0.7)
     write(P("Robots", "motor_brush"), motor_brush(2.0), 0.6)
     write(P("Robots", "motor_turbine"), motor_turbine(2.0), 0.7)

@@ -91,5 +91,55 @@ namespace Stealth.Tests
             foreach (var (a, b) in pieces) Assert.IsFalse(new Rect(a, b - a).Overlaps(new Rect(1.001f, 1.001f, 0.998f, 0.998f)), "a piece over the hole");
             Assert.AreEqual(1, ArchitecturePlanner.CutHoles(Vector2.zero, Vector2.one, new List<Rect> { new Rect(5f, 5f, 1f, 1f) }).Count, "a hole elsewhere leaves it whole");
         }
+
+        [Test]
+        public void SomeGratesHaveAWayUpButNeverTheFirstRoom()
+        {
+            int climbs = 0, grates = 0;
+            foreach (var l in Houses())
+            {
+                Assert.AreEqual(-1, l.Vents[0].Grates[0].ClimbDir, $"seed {l.Seed}: a way up in the team's first room");
+                foreach (var net in l.Vents)
+                    foreach (var g in net.Grates)
+                    {
+                        grates++;
+                        if (g.ClimbDir < 0) continue;
+                        climbs++;
+                        Assert.AreNotEqual(l.LobbyRoom, g.Room, "never in the lobby");
+                        // the crates right under the grate, the desk beside them
+                        var under = new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z);
+                        var desk = under + VentPlan.ClimbSide(g.ClimbDir) * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
+                        bool stack = l.Props.Any(p => p.Kind == PropKind.CrateStack && (p.Position - under).sqrMagnitude < 0.01f);
+                        bool table = l.Props.Any(p => p.Kind == PropKind.Desk && (p.Position - desk).sqrMagnitude < 0.01f);
+                        if (stack) Assert.IsTrue(table, $"seed {l.Seed}: crates without their desk");
+                    }
+            }
+            // (corridors, halls, the lobby, the exit and the robots' rooms never have one; a busy room may have no place for it)
+            Assert.That(climbs, Is.InRange(grates / 10, grates * 3 / 4), $"{climbs} of {grates} grates have a way up");
+        }
+
+        [Test]
+        public void ACrouchedJumpFromTheCratesGetsIntoTheDuct()
+        {
+            var grate = new Vector3(0f, LevelMetrics.WallHeight, 0f);
+            float crates = 1.385f, jump = 1.05f;
+            Assert.IsTrue(VentGrate.IntoDuct(new Vector3(0.1f, crates + jump, 0f), grate, true, true), "the top of the jump from the crates");
+            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.1f, crates + jump, 0f), grate, false, true), "standing: the head bumps");
+            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.1f, 0.92f + jump, 0f), grate, true, true), "from the desk: too low");
+            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.8f, crates + jump, 0f), grate, true, true), "beside the hole");
+            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0f, crates + jump, 0f), grate, true, false), "falling back down");
+        }
+
+        [Test]
+        public void TheStorageRobotWaddlesAndTiltsAsItClimbs()
+        {
+            var still = Stealth.Game.StorageBotAnimator.Pose(0f, 0f, 1f);
+            Assert.AreEqual(0f, still.roll, 1e-4f);
+            Assert.AreEqual(0f, still.bob, 1e-4f);
+            var walk = Stealth.Game.StorageBotAnimator.Pose(2.5f, 0f, 1f);
+            Assert.Greater(Mathf.Abs(walk.roll), 1f, "it sways walking");
+            Assert.Less(Stealth.Game.StorageBotAnimator.Pose(0f, 1.8f, 0f).pitch, -30f, "nose up climbing up");
+            Assert.Greater(Stealth.Game.StorageBotAnimator.Pose(0f, -1.8f, 0f).pitch, 30f, "nose down climbing down");
+        }
     }
 }

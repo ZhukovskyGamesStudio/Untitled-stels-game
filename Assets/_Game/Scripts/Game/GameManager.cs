@@ -41,6 +41,8 @@ namespace Stealth.Game
 
         RunState m_Run = new();
         readonly List<GameObject> m_Spawned = new();
+        /// <summary>The new enemy mode: this house's time is up and its guards are off their docks for good.</summary>
+        bool m_GuardsAwake;
         IGameLink m_Link;
         bool m_IsServer;
         int m_BuiltSeed;
@@ -348,8 +350,10 @@ namespace Stealth.Game
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
+            m_GuardsAwake = false;
             DespawnCarServer();
             UnloadCarServer();
+            SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All)
             {
                 p.ResetForLevelServer();
@@ -449,6 +453,7 @@ namespace Stealth.Game
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
             m_Run.RaiseAlarm(Session.ServerTime);
+            m_Bot?.HideServer(ActiveLevel.Layout); // the team's storage robot runs home to the basement
             foreach (var robot in RobotController.Robots)
                 if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
                 else if ((robot.transform.position - position).magnitude <= radius)
@@ -480,6 +485,13 @@ namespace Stealth.Game
             // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
             bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
             if (classic && !InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new mode: when the house's time is up (the hunter's timer) the guards leave their docks for good
+            if (!classic && !m_GuardsAwake && m_Run.HunterForecast(Time.time - LevelStartTime).seconds == 0f)
+            {
+                m_GuardsAwake = true;
+                foreach (var robot in RobotController.Robots) if (robot.Docked) robot.WakeForGoodServer();
+                Banner(Loc.Pack("banner.guards_awake"));
+            }
             UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up

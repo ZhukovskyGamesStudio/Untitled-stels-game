@@ -15,6 +15,9 @@ namespace Stealth.Level
         public Transform Lid;
         [Tooltip("Solid while the lid is (almost) shut.")]
         public Collider LidCollider;
+
+        /// <summary>The navmesh link up the shaft (set by the builder): open only while the lid is.</summary>
+        [System.NonSerialized] public Unity.AI.Navigation.NavMeshLink Link;
         public const float OpenAngle = -105f, SwingTime = 0.6f;
 
         /// <summary>The lid is open (set by the game: the server's word).</summary>
@@ -43,6 +46,7 @@ namespace Stealth.Level
                 Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.DoorSlide : null, transform.position, 0.8f, Audio.Sfx.Group.Items, open ? 0.7f : 0.6f);
             Lid.localRotation = Quaternion.Euler(Mathf.SmoothStep(0f, 1f, m_Open) * OpenAngle, 0f, 0f);
             if (LidCollider != null) LidCollider.enabled = m_Open < 0.1f;
+            if (Link != null && Link.activated != open) Link.activated = open;
         }
     }
 }

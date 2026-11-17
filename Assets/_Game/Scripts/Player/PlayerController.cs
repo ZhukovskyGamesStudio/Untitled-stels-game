@@ -386,6 +386,7 @@ namespace Stealth.Player
             UpdateLadder(input, Time.deltaTime);
             Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
+            IntoDuctIfJumping();
             UpdateSeat(menu);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
@@ -687,6 +688,25 @@ namespace Stealth.Player
             Debug.Log($"[Player] Unstuck: moved to {spot}");
         }
 
+        float m_LastFeetY;
+
+        /// <summary>
+        /// Owner: a crouched jump up through an open vent grate (from the crates under it): once the feet are nearly at the
+        /// duct's floor the body is set on it, crouched (the motor keeps it so under the duct's low top).
+        /// </summary>
+        void IntoDuctIfJumping()
+        {
+            var feet = transform.position;
+            bool rising = feet.y > m_LastFeetY + 0.0005f;
+            m_LastFeetY = feet.y;
+            if (Motor.Grounded || Climbing || Downed) return;
+            var grate = VentGrate.Under(feet, Motor.IsCrouching, rising);
+            if (grate == null) return;
+            var at = grate.transform.position;
+            TeleportOwner(new Vector3(feet.x, at.y + LevelMetrics.CeilingBoard + 0.03f, feet.z), transform.rotation);
+            Motor.ForceCrouch();
+        }
+
         /// <summary>On the ladder between the basement and the lobby right now (<see cref="ShaftLadder"/>).</summary>
         public bool Climbing { get; private set; }
 
@@ -824,6 +844,14 @@ namespace Stealth.Player
                 if (m_Link != null) m_Link.SendGadget();
                 else GameManager.Instance?.GadgetServer(this);
             }
+            // the storage robot: B calls it here, N sends it to the exit (once the exit room is known)
+            if (!CursorMode && !Downed)
+                foreach (var (action, command) in new[] { (GameAction.BotCall, (byte)0), (GameAction.BotExit, (byte)1) })
+                    if (Controls.Pressed(action))
+                    {
+                        if (m_Link != null) m_Link.SendBot(command);
+                        else GameManager.Instance?.BotCommandServer(this, command);
+                    }
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
@@ -1008,7 +1036,6 @@ namespace Stealth.Player
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
-            if (UseTarget is VentGrate grate) { grate.Climb(this); return; } // the owner moves itself: up into the duct or down out of it
             if (m_Link != null) m_Link.SendUse(UseTarget.Kind, UseTarget.Index);
             else GameManager.Instance?.UseServer(this, UseTarget.Kind, UseTarget.Index);
         }

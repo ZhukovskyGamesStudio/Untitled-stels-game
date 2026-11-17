@@ -368,6 +368,19 @@ namespace Stealth.Level
                 var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(o), Quaternion.identity);
                 if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path);
             }
+            // the storage robot's way up and down: a navmesh link from the ladder's foot to the lobby's floor, open with the lid
+            if (m_Art.ShaftLink != null)
+            {
+                var go = Place(m_Art.ShaftLink, "ShaftLink", Vector3.zero, Quaternion.identity);
+                if (go.TryGetComponent<Unity.AI.Navigation.NavMeshLink>(out var link))
+                {
+                    link.startPoint = path[0];
+                    link.endPoint = path[path.Length - 1];
+                    link.UpdateLink();
+                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) lid.Link = link;
+                    link.activated = false;
+                }
+            }
         }
 
         /// <summary>The kit's brick (its walls' material): the material of the segment's biggest part that is not glass, water or a grate.</summary>
@@ -397,7 +410,7 @@ namespace Stealth.Level
                 foreach (var g in net.Grates)
                 {
                     var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.identity);
-                    if (go.TryGetComponent<VentGrate>(out var grate)) grate.Setup(index, g.Room);
+                    if (go.TryGetComponent<VentGrate>(out var grate)) grate.Setup(index, g.Room, g.Closed);
                     index++;
                 }
         }
