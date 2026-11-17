@@ -38,6 +38,14 @@ namespace Stealth.Game
 
         public RunMap(int runSeed) => m_RunSeed = runSeed;
 
+        /// <summary>
+        /// The run's seed when a house starts: the forced one (command line), else the run's own — only a run that has none
+        /// yet (it starts right in a house) draws a fresh one. Never a new seed on the way from the sewer: the house built
+        /// must be the one the tunnel's panel showed.
+        /// </summary>
+        public static int SeedFor(int current, int forced, System.Func<int> fresh) =>
+            forced != 0 ? forced : current != 0 ? current : fresh();
+
         public int RunSeed => m_RunSeed;
 
         /// <summary>The sewer where the run starts: before the first column.</summary>

@@ -142,7 +142,11 @@ namespace Stealth.Game
             HookFeatures();
             if (!isServer) return;
             // A run starts in the sewer, at the first fork (tests and -level start right in a house).
-            if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0) StartLevel(DevFlags.ForcedLevel, 0);
+            if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0)
+            {
+                m_RunSeed = 0; // a run that starts right in a house: a fresh seed
+                StartLevel(DevFlags.ForcedLevel, 0);
+            }
             else StartRunServer();
             DevFlags.ForcedLevel = 0;
         }
@@ -321,9 +325,7 @@ namespace Stealth.Game
             foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
 
             ScentTrail.Clear();
-            // One seed per run: forced from the command line, or a fresh one when a run (house 0 or a test level) starts.
-            if (DevFlags.ForcedSeed != 0) m_RunSeed = DevFlags.ForcedSeed;
-            else if (index == DevFlags.ForcedLevel || m_RunSeed == 0) m_RunSeed = new System.Random().Next(1, int.MaxValue);
+            m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);
             lane = Mathf.Clamp(lane, 0, Route.LanesAt(index) - 1);
