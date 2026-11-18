@@ -131,6 +131,10 @@ namespace Stealth.Net
         public void SendCheat(Cheat cheat, bool on) => CheatRpc((byte)cheat, on);
         public void SendUse(Stealth.Level.UseKind kind, int index) => UseRpc((byte)kind, index);
         public void SendGadget() => GadgetRpc();
+        public void SendBot(byte command) => BotRpc(command);
+
+        [Rpc(SendTo.Server)]
+        void BotRpc(byte command) => GameManager.Instance?.BotCommandServer(m_Player, command);
 
         [Rpc(SendTo.Server)]
         void UseRpc(byte kind, int index) => GameManager.Instance?.UseServer(m_Player, (Stealth.Level.UseKind)kind, index);

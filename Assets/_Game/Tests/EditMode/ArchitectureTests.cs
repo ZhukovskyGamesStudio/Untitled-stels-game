@@ -190,7 +190,8 @@ namespace Stealth.Tests
             }
             float area = shell.Floors.Where(f => f.Floor == 0).Sum(f => (f.Max.x - f.Min.x) * (f.Max.y - f.Min.y));
             float rooms = layout.Rooms.Where(r => r.Floor == 0).Sum(r => r.Area);
-            Assert.GreaterOrEqual(area, rooms - 0.5f, "the ground floor is covered");
+            float shaft = layout.HasBasement ? 4f * Basement.ShaftHalf * Basement.ShaftHalf : 0f; // (the hole down to the basement)
+            Assert.GreaterOrEqual(area, rooms - shaft - 0.5f, "the ground floor is covered");
         }
 
         [Test]
@@ -347,19 +348,21 @@ namespace Stealth.Tests
                 Assert.Greater(p.Scale.x, 0.05f); Assert.Greater(p.Scale.y, 0.05f); Assert.Greater(p.Scale.z, 0.05f);
                 foreach (var c in p.Prefab.GetComponentsInChildren<Collider>(true)) Assert.Fail($"{p.Prefab.name} has a collider");
             }
-            // every style but the base look has its own robots, devices and sensor modules (Tools/Blender/build_bestiary.py):
-            // every part of every original model has its style version, or the original would show through
-            string[] robots =
+            // the robots are creatures of their own, the same in every style (VisualStyles.Invariant): only the spider has
+            // its style versions (Tools/Blender/build_bestiary.py) — every part of it, or the original would show through
+            string[] robots = { "robot_spider" };
+            foreach (var m in config.StyleModels.Concat<object>(config.Meshes))
             {
-                "robot_guard", "robot_hunter", "robot_hound", "robot_spider", "robot_listener", "robot_worker", "robot_sweeper",
-                "robot_thumper", "robot_sorter", "robot_drone", "robot_turret", "robot_vacuum", "sensor_lidar", "sensor_pir",
-                "sensor_plate", "security_camera", "laser_emitter", "attach_eye", "attach_mic", "attach_seismic", "attach_nose",
-            };
+                var from = m is StyleMeshes sm ? sm.From : ((MeshVariants)m).From;
+                foreach (var mesh in from)
+                    Assert.IsFalse(VisualStyles.Creature(System.IO.Path.GetFileNameWithoutExtension(AssetDatabase.GetAssetPath(mesh))),
+                        $"{AssetDatabase.GetAssetPath(mesh)}: a robot with a style version");
+            }
             var originals = robots.SelectMany(name => AssetDatabase.FindAssets(name + " t:Model", new[] { "Assets/_Game/Art/Models" })
                     .Select(AssetDatabase.GUIDToAssetPath).Where(path => System.IO.Path.GetFileNameWithoutExtension(path) == name)
                     .SelectMany(path => AssetDatabase.LoadAllAssetsAtPath(path).OfType<Mesh>()))
                 .ToList();
-            Assert.Greater(originals.Count, 90, "the original robot models are missing");
+            Assert.Greater(originals.Count, 4, "the spider's model is missing");
             foreach (var style in config.Styles.Where(s => s.Geometry.Family != ModelFamily.None))
             {
                 var own = config.StyleModels.Where(m => m.Style == style && m.Variant < 0).SelectMany(m => m.From).ToHashSet();
@@ -379,7 +382,7 @@ namespace Stealth.Tests
                 Assert.Greater(mats.To.Length, 40, $"{t}: too few materials have a version");
                 var set = config.Meshes.FirstOrDefault(m => m.Family == t);
                 Assert.IsNotNull(set, $"no {t} meshes");
-                Assert.Greater(set.From.Length, 150, $"{t}: too few meshes have a variant");
+                Assert.Greater(set.From.Length, 120, $"{t}: too few meshes have a variant"); // (the robots have none: they look the same in every style)
                 for (int i = 0; i < set.From.Length; i++)
                 {
                     // same size, give or take the reshaping (a variant must not poke through walls or float)

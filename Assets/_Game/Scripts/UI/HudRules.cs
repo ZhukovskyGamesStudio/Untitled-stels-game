@@ -217,6 +217,8 @@ namespace Stealth.UI
             Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
             Level.UseKind.VentGrille => ReticleIcon.Hack,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
+            Level.UseKind.VentGrate => ReticleIcon.Hand,
+            Level.UseKind.ShaftHatch => ReticleIcon.Lever,
             _ => ReticleIcon.Dot,
         };
     }

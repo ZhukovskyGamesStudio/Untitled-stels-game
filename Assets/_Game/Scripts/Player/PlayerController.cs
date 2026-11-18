@@ -398,8 +398,10 @@ namespace Stealth.Player
             if (InHatch) input = new PlayerInputState { Look = input.Look };
             EnterHatchIfNeeded();
             Motor.InHatch = InHatch;
-            Motor.Seated = SeatIndex >= 0;
+            UpdateLadder(input, Time.deltaTime);
+            Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
+            IntoDuctIfJumping();
             UpdateSeat(menu);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
@@ -701,6 +703,60 @@ namespace Stealth.Player
             Debug.Log($"[Player] Unstuck: moved to {spot}");
         }
 
+        float m_LastFeetY;
+
+        /// <summary>
+        /// Owner: a crouched jump up through an open vent grate (from the crates under it): once the feet are nearly at the
+        /// duct's floor the body is set on it, crouched (the motor keeps it so under the duct's low top).
+        /// </summary>
+        void IntoDuctIfJumping()
+        {
+            var feet = transform.position;
+            bool rising = feet.y > m_LastFeetY + 0.0005f;
+            m_LastFeetY = feet.y;
+            if (Motor.Grounded || Climbing || Downed) return;
+            var grate = VentGrate.Under(feet, Motor.IsCrouching, rising);
+            if (grate == null) return;
+            var at = grate.transform.position;
+            TeleportOwner(new Vector3(feet.x, at.y + LevelMetrics.CeilingBoard + 0.03f, feet.z), transform.rotation);
+            Motor.ForceCrouch();
+        }
+
+        /// <summary>On the ladder between the basement and the lobby right now (<see cref="ShaftLadder"/>).</summary>
+        public bool Climbing { get; private set; }
+
+        /// <summary>
+        /// Owner, every frame before the motor: the ladder. On it when walking into it facing it (or falling down the open
+        /// shaft past it); W up, S down, Jump lets go; off at the floor below, off onto the lobby's floor at the top when the
+        /// lid is open (shut, the head stops against it). While on it the motor only turns the view (it is "seated").
+        /// </summary>
+        void UpdateLadder(in PlayerInputState input, float dt)
+        {
+            var ladder = ShaftLadder.Main;
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; return; }
+            var feet = transform.position;
+            if (!Climbing)
+            {
+                var facing = transform.forward;
+                facing.y = 0f;
+                Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
+                if (!Climbing) return;
+            }
+            if (input.Jump || !ladder.InZone(feet)) { Climbing = false; return; }
+            // W climbs the way the player looks: facing away from the ladder (back to the rungs), W goes down and S up
+            var look = transform.forward;
+            look.y = 0f;
+            float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
+            m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
+            feet = transform.position;
+            if (LadderMath.OffAtTop(feet.y, ladder.TopY, ShaftHatch.IsOpen()))
+            {
+                Climbing = false;
+                TeleportOwner(ladder.TopExit, transform.rotation);
+            }
+            else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom)) Climbing = false;
+        }
+
         public void TeleportOwner(Vector3 position, Quaternion rotation)
         {
             m_Controller.enabled = false;
@@ -803,6 +859,14 @@ namespace Stealth.Player
                 if (m_Link != null) m_Link.SendGadget();
                 else GameManager.Instance?.GadgetServer(this);
             }
+            // the storage robot: B calls it here, N sends it to the exit (once the exit room is known)
+            if (!CursorMode && !Downed)
+                foreach (var (action, command) in new[] { (GameAction.BotCall, (byte)0), (GameAction.BotExit, (byte)1) })
+                    if (Controls.Pressed(action))
+                    {
+                        if (m_Link != null) m_Link.SendBot(command);
+                        else GameManager.Instance?.BotCommandServer(this, command);
+                    }
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;

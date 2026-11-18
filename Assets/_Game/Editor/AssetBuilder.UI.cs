@@ -690,6 +690,25 @@ namespace Stealth.EditorTools
             ui.HighlightLayer = Stretch(ui.Grid, "Highlights");
             ui.HighlightLayer.pivot = TopLeft;
 
+            // the belt bag's 4 x 4 grid left of the backpack (shown while one is worn): in the grid's cell space, columns BeltUi..
+            int bs = Stealth.Player.PlayerInventory.BeltSize;
+            var belt = R(ui.Grid, "Belt", TopLeft, TopLeft, new Vector2(InventoryUI.BeltUi * c, 0f), new Vector2(bs * c, bs * c));
+            belt.pivot = TopLeft;
+            belt.anchoredPosition = new Vector2(InventoryUI.BeltUi * c, 0f);
+            Img(R(belt, "Background", Center, Center, Vector2.zero, new Vector2(bs * c + 14, bs * c + 30)), Color.white, UiSprite("hand_slot"));
+            var beltCells = new List<Image>();
+            for (int y = 0; y < bs; y++)
+                for (int x = 0; x < bs; x++)
+                    beltCells.Add(Img(R(belt, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), new Color(1, 1, 1, 0.06f)));
+            Txt(R(belt, "Label", BottomCenter, TopCenter, new Vector2(0, -4), new Vector2(bs * c, 16)), L("inventory.belt"), 11, TextAnchor.MiddleCenter, Color.white);
+            ui.BeltPanel = belt.gameObject;
+            ui.BeltGrid = belt;
+            ui.BeltCells = beltCells.ToArray();
+            belt.gameObject.SetActive(false);
+            // (the items and highlights layers are drawn after it: the grid's own Items/Highlights children come later)
+            ui.ItemLayer.SetAsLastSibling();
+            ui.HighlightLayer.SetAsLastSibling();
+
             // the hand slot right of the backpack: one held item (the flashlight, batteries), used with the hand key
             ui.HandSlot = R(ui.Panel, "HandSlot", new Vector2(1, 0), BottomLeft, new Vector2(8, 0), new Vector2(2 * c + 12, 3 * c + 30));
             ui.HandBackground = Img(Stretch(ui.HandSlot, "Background"), Color.white, UiSprite("hand_slot"));
@@ -770,6 +789,7 @@ namespace Stealth.EditorTools
             menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
             menu.TestRooms = ToggleIn(e, col, "TestRooms", L("menu.test_rooms")); // off: the main game
             menu.ClassicRooms = ToggleIn(e, col, "ClassicRooms", L("menu.classic_rooms")); // off: the room program
+            menu.ClassicEnemies = ToggleIn(e, col, "ClassicEnemies", L("menu.classic_enemies")); // off: the new enemies
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(row, 34);
             var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();

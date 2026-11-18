@@ -61,6 +61,12 @@ namespace Stealth.Items
             // the flashlight (1 x 3; it lights when held and switched on, its charge is its colour byte) and its batteries
             new Shape { Id = "flashlight", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
             new Shape { Id = "battery", Cells = new[] { V(0, 0) } },
+            // a book (2 x 3, anywhere, most in a library), canned food (2 x 2, kitchens), a screwdriver (1 x 3, tech rooms: in
+            // hand it takes the closed lids off the vents), a belt bag (2 x 2 lying about; picked up it is worn: a 4 x 4 panel)
+            new Shape { Id = "book",        Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1), V(0, 2), V(1, 2) } },
+            new Shape { Id = "cans",        Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "screwdriver", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
+            new Shape { Id = "beltbag",     Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             // the map to the survivors' shelter (3 x 3), hidden in a flat of an apartment block: held, it opens in front of you
             new Shape { Id = "map", Cells = new[] { V(0, 0), V(1, 0), V(2, 0), V(0, 1), V(1, 1), V(2, 1), V(0, 2), V(1, 2), V(2, 2) } },
         };
@@ -74,65 +80,110 @@ namespace Stealth.Items
         public const byte Shovel = 13;
 
         public const byte Flashlight = 14, Battery = 15;
+        public const byte Book = 16, Cans = 17, Screwdriver = 18, BeltBag = 19;
         /// <summary>The map to the survivors' shelter: one in every apartment block, hidden in one of its flats (worth no fuel, never burns).</summary>
-        public const byte ShelterMap = 16;
+        public const byte ShelterMap = 20;
         /// <summary>A flashlight's full charge (its colour byte holds the charge, 0..FullCharge).</summary>
         public const byte FullCharge = 100;
 
         [System.Serializable]
         public struct LootWeight
         {
-            [Tooltip("Shape id: shovel, flashlight, battery …")] public string Item;
+            [Tooltip("Shape id: shovel, flashlight, battery, book, cans, screwdriver, beltbag …")] public string Item;
             [Tooltip("Relative chance")] public int Weight;
+            [Tooltip("Only in rooms of these types (empty: anywhere). Canned food: kitchens; the screwdriver: tech rooms.")]
+            public Stealth.Level.RoomType[] Only;
+            [Tooltip("More likely in rooms of these types (× FavouredBoost): books in a library.")]
+            public Stealth.Level.RoomType[] Favoured;
+            [Tooltip("How much more likely in a favoured room.")]
+            public float FavouredBoost;
+        }
+
+        /// <summary>One row of the loot table: the shape, its weight, where only and where most of all.</summary>
+        public struct LootRow
+        {
+            public byte Shape;
+            public int Weight;
+            public Stealth.Level.RoomType[] Only, Favoured;
+            public float Boost;
+            /// <summary>Its weight in a room of this type (null: no room — a crate, a safe, a robot's cargo: the anywhere rows only).</summary>
+            public float WeightIn(Stealth.Level.RoomType? room)
+            {
+                bool only = Only != null && Only.Length > 0;
+                if (room is not Stealth.Level.RoomType t) return only ? 0f : Weight;
+                if (only && System.Array.IndexOf(Only, t) < 0) return 0f;
+                return Favoured != null && System.Array.IndexOf(Favoured, t) >= 0 ? Weight * Mathf.Max(1f, Boost) : Weight;
+            }
         }
 
         /// <summary>What the loot of the houses is (by shape, weighted); set from LevelConfig.Loot.Table (only shovels by default).</summary>
-        public static (byte shape, int weight)[] LootTable { get; private set; } = { (Shovel, 1) };
+        public static LootRow[] LootRows { get; private set; } = { new LootRow { Shape = Shovel, Weight = 1 } };
+
+        /// <summary>The table as (shape, weight) pairs, anywhere (the value budget's view).</summary>
+        public static (byte shape, int weight)[] LootTable
+        {
+            get
+            {
+                var list = new (byte, int)[LootRows.Length];
+                for (int i = 0; i < list.Length; i++) list[i] = (LootRows[i].Shape, LootRows[i].Weight);
+                return list;
+            }
+        }
 
         /// <summary>Use this loot table (unknown ids are skipped; an empty table means shovels only).</summary>
         public static void ConfigureLoot(LootWeight[] table)
         {
-            var list = new List<(byte, int)>();
+            var list = new List<LootRow>();
             if (table != null)
                 foreach (var t in table)
                 {
                     int i = System.Array.FindIndex(Shapes, s => s.Id == t.Item);
-                    if (i >= 0 && t.Weight > 0) list.Add(((byte)i, t.Weight));
+                    if (i >= 0 && t.Weight > 0) list.Add(new LootRow { Shape = (byte)i, Weight = t.Weight, Only = t.Only, Favoured = t.Favoured, Boost = t.FavouredBoost });
                 }
-            LootTable = list.Count > 0 ? list.ToArray() : new[] { (Shovel, 1) };
+            LootRows = list.Count > 0 ? list.ToArray() : new[] { new LootRow { Shape = Shovel, Weight = 1 } };
         }
 
         /// <summary>
         /// The loot a house, a robot's cargo, a crate or the vault gets, from the loot table (by default every loot is a
         /// shovel). The old roll among the tetris pieces is still made, so the rest of the stream does not shift much.
         /// </summary>
-        public static byte LootShape(System.Random rng)
+        public static byte LootShape(System.Random rng) => LootShape(rng, null);
+
+        /// <summary>
+        /// The loot lying in a room of this type (null: no room — a crate, a safe, a robot's cargo): rows meant only for
+        /// other rooms are out (canned food in a kitchen, the screwdriver in a tech room), favoured rows count more (books
+        /// in a library).
+        /// </summary>
+        public static byte LootShape(System.Random rng, Stealth.Level.RoomType? room)
         {
             rng.Next(LootShapes);
-            var table = LootTable;
-            if (table.Length == 1) return table[0].shape;
-            int total = 0;
-            foreach (var t in table) total += t.weight;
-            int roll = rng.Next(total);
-            foreach (var t in table)
+            var rows = LootRows;
+            if (rows.Length == 1) return rows[0].Shape;
+            float total = 0f;
+            foreach (var r in rows) total += r.WeightIn(room);
+            if (total <= 0f) return rows[0].Shape;
+            float roll = (float)rng.NextDouble() * total;
+            foreach (var r in rows)
             {
-                if (roll < t.weight) return t.shape;
-                roll -= t.weight;
+                float w = r.WeightIn(room);
+                if (roll < w) return r.Shape;
+                roll -= w;
             }
-            return table[0].shape;
+            return rows[0].Shape;
         }
 
         /// <summary>The colour byte a new item of this shape spawns with: a flashlight comes fully charged.</summary>
         public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)color;
 
         /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
-        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == ShelterMap;
+        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey
+            || shape is Book or Cans or Screwdriver or BeltBag or ShelterMap;
 
         /// <summary>How much larger than life the keys' models are (Tools/Blender/rooms2_special.py): found on a floor.</summary>
         public const float KeyScale = 2f, CageKeyScale = 1.6f;
 
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
-        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == ShelterMap;
+        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == Screwdriver || shape == ShelterMap;
 
         /// <summary>
         /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
@@ -147,6 +198,10 @@ namespace Stealth.Items
             if (shape == Key) return new Vector3(0.086f, 0.012f, 0.024f) * KeyScale;
             if (shape == CageKey) return new Vector3(0.178f, 0.02f, 0.054f) * CageKeyScale;
             if (shape == ShelterMap) return new Vector3(0.30f, 0.025f, 0.22f); // folded (Tools/Blender/apartments.py item_map_model)
+            if (shape == Book) return new Vector3(0.24f, 0.042f, 0.17f);
+            if (shape == Cans) return new Vector3(0.159f, 0.111f, 0.101f);
+            if (shape == Screwdriver) return new Vector3(0.23f, 0.033f, 0.035f);
+            if (shape == BeltBag) return new Vector3(0.262f, 0.079f, 0.138f);
             var size = Size(Shapes[shape].Cells);
             return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
         }
@@ -158,9 +213,9 @@ namespace Stealth.Items
         public static int DiamondValueCells { get; set; } = 10;
 
         /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
-        public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel;
-        /// <summary>A tool: the key block, the stun cube, the lure speaker (worth nothing, used instead).</summary>
-        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == ShelterMap;
+        public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel || shape == Book || shape == Cans;
+        /// <summary>A tool: the key block, the stun cube, the lure speaker, the screwdriver, the belt bag, the shelter map (worth nothing, used instead).</summary>
+        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == Screwdriver || shape == BeltBag || shape == ShelterMap;
 
         /// <summary>Never becomes fuel, not even one by one at the hatch or the hopper: the shelter map.</summary>
         public static bool Unburnable(int shape) => shape == ShelterMap;
@@ -178,12 +233,14 @@ namespace Stealth.Items
             Flashlight => FlashlightColor,
             Battery => BatteryColor,
             ShelterMap => MapColor,
+            Screwdriver => ScrewdriverColor,
+            BeltBag => BeltBagColor,
             _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
         };
 
         public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f),
             CageKeyColor = new(0.55f, 1.00f, 0.15f), FlashlightColor = new(0.95f, 0.78f, 0.25f), BatteryColor = new(0.35f, 0.75f, 0.95f),
-            MapColor = new(0.86f, 0.74f, 0.52f);
+            ScrewdriverColor = new(0.95f, 0.10f, 0.30f), BeltBagColor = new(0.55f, 0.40f, 0.25f), MapColor = new(0.86f, 0.74f, 0.52f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
@@ -304,6 +361,10 @@ namespace Stealth.Items
             Shovel => Loc.F("item.shovel", ColorName(color), Value(shape, color)),
             Flashlight => Loc.F("item.flashlight", Mathf.Min(color, FullCharge)),
             Battery => Loc.F("item.battery", Value(shape, color)),
+            Book => Loc.F("item.book", ColorName(color), Value(shape, color)),
+            Cans => Loc.F("item.cans", ColorName(color), Value(shape, color)),
+            Screwdriver => Loc.T("item.screwdriver"),
+            BeltBag => Loc.T("item.beltbag"),
             _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
         };
     }

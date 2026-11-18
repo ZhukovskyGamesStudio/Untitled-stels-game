@@ -8,10 +8,23 @@ namespace Stealth.Level
     {
         /// <summary>Size of a chunk of the house that merged meshes are cut into (and the old room grid). Rooms are free now (HousePlan).</summary>
         public const float Cell = 10f;
-        public const float WallHeight = 3f;
-        public const float FloorHeight = 3.5f; // floor-to-floor: walls + slab
+        /// <summary>A room's ceiling over its floor.</summary>
+        public const float WallHeight = 2.75f;
+        /// <summary>
+        /// Floor to floor: the room, then the crawl void over its ceiling (the ducts, <see cref="VentPlan"/>), then the floor
+        /// of the next storey. The stairs keep their 4 m: 14 steps of 0.29 m.
+        /// </summary>
+        public const float FloorHeight = 4.1f;
+        /// <summary>Everything between a room's ceiling and the floor above: solid, but where a duct runs through it.</summary>
         public const float SlabThickness = FloorHeight - WallHeight;
-        public const float WallThickness = 0.2f;
+        /// <summary>A duct's bottom (the ceiling board under it) and top (the floor of the storey above, its deck).</summary>
+        public const float CeilingBoard = 0.05f, DeckThickness = 0.15f;
+        /// <summary>The headroom in a duct: a crouched player (1.1 m) fits, a robot (2 m) does not.</summary>
+        public const float VoidHeight = SlabThickness - CeilingBoard - DeckThickness;
+        public const float WallThickness = 0.3f;
+        /// <summary>What the jambs of an opening take from its nominal width (half the old 0.2 m wall a side): doors, vents
+        /// and slots keep their clear sizes whatever the walls' thickness.</summary>
+        public const float OpeningInset = 0.2f;
         public const float DoorWidth = 1.8f;
         /// <summary>A narrow door (a flat's bathroom): nominal, the clear opening 1.4 m — a robot (0.5 m radius) and the walk check pass.</summary>
         public const float NarrowDoorWidth = 1.6f;
@@ -54,11 +67,12 @@ namespace Stealth.Level
         public const int StairsArea = 3;      // NavMesh area "Stairs": robots without legs exclude it
 
         // Staircase geometry in the corner frame (u, v = meters from the corner walls into the room).
-        public const int StepsPerFlight = 6;
-        public const float StepRun = 0.42f;
+        // seven steps a flight: a step of 0.29 m (4.1 m a storey), well under the player's 0.35 m — no jumping on the stairs
+        public const int StepsPerFlight = 7;
+        public const float StepRun = 0.38f;
         public const float StairSize = 4f;    // the stair + hole occupy [0, 4] x [0, 4] from the corner
         public const float FlightStart = 3.8f; // u where flight A starts / flight B ends
-        public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.28
+        public const float LandingEnd = FlightStart - StepsPerFlight * StepRun; // 1.14
 
         /// <summary>Nominal width of an opening of this kind (an open passage: its whole wall, not this).</summary>
         public static float OpeningWidth(EdgeType kind) => kind switch
@@ -73,7 +87,7 @@ namespace Stealth.Level
         };
 
         /// <summary>Clear width of an opening (door, vent): the jambs take half a wall thickness on each side.</summary>
-        public static float ClearWidth(float nominal) => nominal - WallThickness;
+        public static float ClearWidth(float nominal) => nominal - OpeningInset;
 
         /// <summary>Furniture quadrants of a room (offsets from its centre).</summary>
         public static readonly Vector3[] Quadrants =

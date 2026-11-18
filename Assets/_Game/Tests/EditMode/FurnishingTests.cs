@@ -57,7 +57,9 @@ namespace Stealth.Tests
             }
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
             // against the far side of a wall from a room out of reach
-            Assert.That(removed, Is.LessThanOrEqualTo(houses / 2), $"{removed} groups taken out in {houses} houses");
+            // (the ways up to the vent grates — crates and a desk set first in their room — make it a little busier)
+            // (walls 0.3 m thick leave a little less room: a few more)
+            Assert.That(removed, Is.LessThanOrEqualTo(houses * 6 / 5), $"{removed} groups taken out in {houses} houses");
         }
     }
 }

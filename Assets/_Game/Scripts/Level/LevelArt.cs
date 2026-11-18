@@ -46,6 +46,14 @@ namespace Stealth.Level
         [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
+        [Tooltip("A grate in a room's ceiling: the way into the crawl ducts (VentPlan).")]
+        public GameObject VentGrate;
+        [Tooltip("The lid over the shaft in the lobby (ShaftHatch), with the ladder's top under it (ShaftLadder).")]
+        public GameObject ShaftHatch;
+        [Tooltip("The ladder's foot in the basement (ShaftLadder).")]
+        public GameObject ShaftLadder;
+        [Tooltip("A navmesh link up the shaft (the storage robot climbs the ladder while the lid is open).")]
+        public GameObject ShaftLink;
         public GameObject CityLamp;
 
         [Header("Pieces")]
@@ -165,6 +173,7 @@ namespace Stealth.Level
             PropKind.Plant => Plant,
             PropKind.KitchenCounter => KitchenCounter,
             PropKind.Hatch => Hatch,
+            PropKind.ShaftHatch => ShaftHatch,
             PropKind.Shelf => Shelf,
             PropKind.Boxes => Boxes,
             PropKind.WaterCooler => WaterCooler,

@@ -293,6 +293,7 @@ namespace Stealth.EditorTools
                     var file = Path.GetFileNameWithoutExtension(path);
                     int cut = file.LastIndexOf("__", System.StringComparison.Ordinal);
                     if (cut < 0) continue;
+                    if (Level.VisualStyles.Creature(file.Substring(0, cut))) continue; // the robots look the same in every style (VisualStyles.Invariant)
                     string original;
                     try { original = ModelPath(file.Substring(0, cut)); }
                     catch (FileNotFoundException) { continue; }

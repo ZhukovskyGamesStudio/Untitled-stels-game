@@ -105,6 +105,8 @@ namespace Stealth.Tests
         public void SendUse(Stealth.Level.UseKind kind, int index) => Uses.Add((kind, index));
         public int Gadgets;
         public void SendGadget() => Gadgets++;
+        public readonly System.Collections.Generic.List<byte> BotCommands = new();
+        public void SendBot(byte command) => BotCommands.Add(command);
         public readonly List<int> Terminals = new();
         public void SendTerminal(int terminal, Detector steered, float yaw) => Terminals.Add(terminal);
     }

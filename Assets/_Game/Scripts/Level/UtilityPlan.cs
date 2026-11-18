@@ -48,7 +48,7 @@ namespace Stealth.Level
     {
         const float T = LevelMetrics.WallThickness;
         /// <summary>The duct's underside and top over the floor, metres: under the ceiling, over the doors.</summary>
-        public const float DuctBottom = 2.68f, DuctTop = 2.92f; // close under the ceiling (3 m): a short hanger, nothing hangs low over heads
+        public const float DuctTop = LevelMetrics.WallHeight - 0.08f, DuctBottom = DuctTop - 0.24f; // close under the ceiling: a short hanger, nothing hangs low over heads
         const float DuctWidth = 0.4f, DuctOff = 0.25f; // its inner side this far from the wall's face
         const float SocketY = 0.3f, SwitchY = 1.05f, PipeRunY = 2.6f;
 

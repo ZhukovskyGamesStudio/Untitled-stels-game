@@ -126,7 +126,7 @@ namespace Stealth.Level
             new RoomRule(RoomType.Meeting, new Vector2(14f, 50f), zone: RoomZone.Facade, privacy: -1),
             // a kitchen: a mid-sized room with its run, one fridge and a table with chairs; small things (big enough for the
             // run along a wall, the table in the middle and the doors' walkways). Windows and a plain rectangle are not needed
-            new RoomRule(RoomType.Kitchen, new Vector2(24f, 64f), maxAspect: 2.2f, maxLootCells: 3, perFloor: 1, privacy: -1),
+            new RoomRule(RoomType.Kitchen, new Vector2(24f, 64f), maxAspect: 2.2f, maxLootCells: 4, perFloor: 1, privacy: -1),
             new RoomRule(RoomType.Server, new Vector2(12f, 60f), zone: RoomZone.Interior, privacy: 1),
             // the storage room: a small or mid-sized room behind one locked door, shelves and a pile; anything, richer
             new RoomRule(RoomType.Storage, new Vector2(9f, 40f), maxAspect: 3.2f, lootBonus: 2, zone: RoomZone.Interior),

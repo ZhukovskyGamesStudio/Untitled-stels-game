@@ -38,7 +38,9 @@ namespace Stealth.Tests
                 Assert.IsTrue(RoomRules.OutsideOf(l.Plan, room) > 0f, $"{name}: at the outer wall, where the drain leaves the building");
                 Assert.IsFalse(l.Doorways.Any(d => d.Exterior && (d.RoomA == room.Id || d.RoomB == room.Id)), $"{name}: no street door of its own");
                 Assert.Less(NearestWall(l, l.HatchPosition), LevelGenerator.HatchFromWall + 0.3f, $"{name}: by a wall");
-                foreach (var p in l.PlayerSpawns) Assert.AreSame(room, l.Plan.RoomAt(p + Vector3.up * 0.3f), $"{name}: the team around it, in the room");
+                // the team comes up from the basement under it (its shaft's lid is where the entry hatch was)
+                Assert.IsTrue(l.HasBasement, name);
+                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.BasementOrigin, p), $"{name}: the team waits in the basement");
             }
         }
 
@@ -55,8 +57,10 @@ namespace Stealth.Tests
                 if (room.Type is RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom or RoomType.Workshop) wet++;
                 if (l.Kind == HouseKind.Garage)
                 {
-                    Assert.AreEqual(RoomType.Workshop, room.Type, $"{name}: the shop's exit is the workshop's oil separator chamber");
-                    Assert.Greater(l.ExitHatchPosition.z, room.Bounds.center.y, $"{name}: at the back, away from the bays");
+                    // the workshop's oil separator chamber when the crawl ducts reach it (VentPlan: the double-height hall has no
+                    // void over a ceiling of its own, mostly not), else another room the ducts reach
+                    if (room.Type == RoomType.Workshop)
+                        Assert.Greater(l.ExitHatchPosition.z, room.Bounds.center.y, $"{name}: at the back, away from the bays");
                 }
             }
             Assert.Greater(wet, 0, "drains are where the exits are");

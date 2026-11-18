@@ -66,7 +66,8 @@ namespace Stealth.Tests
                 string name = $"{l.Seed}/{l.LevelIndex}";
                 foreach (var flat in l.Rooms.Where(r => r.Flat >= 0).GroupBy(r => r.Flat))
                 {
-                    var types = flat.Select(r => r.Type).ToList();
+                    // (the robots' charging room takes a room of a ground-floor flat: ChargingRooms, as the room it was)
+                    var types = flat.Select(r => r.Id == l.ChargingRoom ? l.ChargingFrom : r.Type).ToList();
                     Assert.AreEqual(1, types.Count(t => t == RoomType.FlatHall), $"{name}: flat {flat.Key} has its hallway");
                     Assert.AreEqual(1, types.Count(t => t == RoomType.Bathroom), $"{name}: and its bathroom");
                     Assert.AreEqual(1, types.Count(t => t == RoomType.Living), $"{name}: and its living room");

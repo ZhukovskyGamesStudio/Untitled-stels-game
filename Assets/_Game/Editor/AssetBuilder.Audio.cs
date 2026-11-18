@@ -102,6 +102,13 @@ namespace Stealth.EditorTools
                 FillLateClips(s_Bank);
                 EditorUtility.SetDirty(s_Bank);
             }
+            if (s_Bank.GuardCharge == null || s_Bank.GuardPatrol == null || s_Bank.GuardChase == null)
+            {
+                s_Bank.GuardCharge = Clip("Robots/guard_charge");
+                s_Bank.GuardPatrol = Clip("Robots/guard_patrol");
+                s_Bank.GuardChase = Clip("Robots/guard_chase");
+                EditorUtility.SetDirty(s_Bank);
+            }
             if (s_Bank.HandDryer == null)
             {
                 s_Bank.HandDryer = Clip("Environment/hand_dryer");
@@ -122,6 +129,9 @@ namespace Stealth.EditorTools
             b.StepLight = Clip("Robots/step_light");
             b.SpiderStep = Clip("Robots/spider_step");
             b.MotorServo = Clip("Robots/motor_servo");
+            b.GuardCharge = Clip("Robots/guard_charge");
+            b.GuardPatrol = Clip("Robots/guard_patrol");
+            b.GuardChase = Clip("Robots/guard_chase");
             b.MotorTracks = Clip("Robots/motor_tracks");
             b.MotorBrush = Clip("Robots/motor_brush");
             b.MotorTurbine = Clip("Robots/motor_turbine");

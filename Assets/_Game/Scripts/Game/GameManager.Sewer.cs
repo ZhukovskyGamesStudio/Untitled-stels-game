@@ -20,6 +20,8 @@ namespace Stealth.Game
     {
         [Tooltip("The team's pickup (networked, spawned in the sewer).")]
         public GameObject CarPrefab;
+        [Tooltip("The team's storage robot (StorageBot): the stash rides in it.")]
+        public GameObject StorageBotPrefab;
 
         /// <summary>What lies in the car's bed (the whole run, replicated).</summary>
         public Cargo Cargo { get; } = new();
@@ -41,9 +43,85 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
-            if (Hatch.IsNear(position, l.HatchPosition)) return Stash;
+            if (AtEntry(l, position)) return Stash;
+            if (AtBot(position)) return Stash;
             if (Hatch.IsNear(position, l.ExitHatchPosition)) return ExitStash;
             return null;
+        }
+
+        /// <summary>At the team's way in: at the entry hatch of a house without a basement (with one, the stash rides in the storage robot).</summary>
+        static bool AtEntry(LevelLayout l, Vector3 position) =>
+            !l.HasBasement ? Hatch.IsNear(position, l.HatchPosition) : StorageBot.Active == null && Basement.Contains(l.BasementOrigin, position);
+
+        /// <summary>Next to the storage robot (its stash in reach).</summary>
+        static bool AtBot(Vector3 position)
+        {
+            var bot = StorageBot.Active;
+            return bot != null && StorageBotRules.InReach(bot.Mode, bot.transform.position, position);
+        }
+
+        // ------------------------------------------------------------------ the storage robot
+
+        StorageBot m_Bot;
+
+        /// <summary>Server, a house starts: the storage robot waits in the basement (with what the car brought).</summary>
+        void SpawnStorageBotServer(LevelLayout l)
+        {
+            if (StorageBotPrefab == null || !l.HasBasement) return;
+            var at = Basement.StashSpot(l.BasementOrigin);
+            var go = Session.Spawn(StorageBotPrefab, at, Quaternion.LookRotation(Vector3.left));
+            m_Spawned.Add(go);
+            m_Bot = go.GetComponent<StorageBot>();
+            m_Bot?.BeginServer();
+        }
+
+        /// <summary>Server: a player's command to the storage robot — 0: come to me; 1: go to the exit through the ducts.</summary>
+        public void BotCommandServer(PlayerController player, byte command)
+        {
+            if (player == null || Phase != RunPhase.Playing || m_Bot == null) return;
+            var l = ActiveLevel.Layout;
+            if (command == 0)
+            {
+                var answer = m_Bot.CallServer(player.transform.position, l);
+                if (answer != StorageBot.Answer.Busy) Banner(Loc.Pack(answer == StorageBot.Answer.Coming ? "banner.bot_coming" : "banner.bot_no_way"));
+                return;
+            }
+            bool seen = Exploration != null && l != null && Exploration.IsRevealedAt(l.ExitHatchPosition + Vector3.up * 0.5f);
+            if (!StorageBotRules.CanSendToExit(m_Bot.Mode, seen)) { if (!seen) Banner(Loc.Pack("banner.bot_exit_unknown")); return; }
+            Banner(Loc.Pack(m_Bot.SendToExitServer(l) == StorageBot.Answer.Coming ? "banner.bot_exit" : "banner.bot_no_way"));
+        }
+
+        /// <summary>Server: the storage robot reached the grate over the caller but a watcher is in the room: it waits up there.</summary>
+        public void StorageBotWaitsServer() => Banner(Loc.Pack("banner.bot_unsafe"));
+
+        /// <summary>Server: the lid over the shaft is opened (the storage robot pushes it open on its way through).</summary>
+        public void OpenShaftServer()
+        {
+            if (Phase != RunPhase.Playing || m_Opened.Contains(ShaftKey)) return;
+            m_Opened.Add(ShaftKey);
+            OpenedVersion++;
+        }
+
+        /// <summary>
+        /// Server: the storage robot went down the exit hatch: what it carried goes to the exit's stash (it leaves with the
+        /// car); what does not fit stays in it — and is lost with the house.
+        /// </summary>
+        public void StorageBotLeftServer(StorageBot bot)
+        {
+            var entries = new List<InventoryEntry>(Stash.Items);
+            ExitStash.AddAll(entries, out var left);
+            Stash.Clear();
+            Stash.AddAll(left, out _);
+            Banner(Loc.Pack("banner.bot_left"));
+            if (bot != null) { m_Spawned.Remove(bot.gameObject); Session.Despawn(bot.gameObject); }
+            m_Bot = null;
+        }
+
+        /// <summary>In the basement the team arrives in.</summary>
+        public static bool InBasement(Vector3 position)
+        {
+            var l = ActiveLevel.Layout;
+            return l != null && l.HasBasement && Basement.Contains(l.BasementOrigin, position);
         }
 
         /// <summary>Where the stash board of the hatch near this player hangs.</summary>
@@ -52,7 +130,9 @@ namespace Stealth.Game
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
             if (Hatch.IsNear(position, l.ExitHatchPosition)) return l.ExitHatchPosition;
-            return l.HatchPosition;
+            var bot = StorageBot.Active;
+            if (bot != null && l.HasBasement) return bot.transform.position; // the board hangs over the robot
+            return l.HasBasement ? l.EntryHatch : l.HatchPosition;
         }
 
         /// <summary>Server, a house starts: what lies in the car's bed is brought up into the entry hatch (as much as fits).</summary>
@@ -76,7 +156,7 @@ namespace Stealth.Game
         {
             if (Phase == RunPhase.Sewer) return Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
             var l = ActiveLevel.Layout;
-            return Phase == RunPhase.Playing && l != null && Hatch.IsNear(position, l.HatchPosition);
+            return Phase == RunPhase.Playing && l != null && (AtEntry(l, position) || AtBot(position));
         }
 
         /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>

@@ -26,6 +26,12 @@ namespace Stealth.Level
             [PropKind.KitchenCounter] = Rect.MinMaxRect(-1.22f, -0.35f, 1.22f, 0.35f),
             [PropKind.Shelf] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
             [PropKind.StorageRack] = Rect.MinMaxRect(-1.0f, -0.3f, 1.0f, 0.3f),
+            [PropKind.ChargingDock] = Rect.MinMaxRect(-0.5f, -0.32f, 0.5f, 0.32f),
+            [PropKind.BatteryStack] = Rect.MinMaxRect(-0.45f, -0.3f, 0.45f, 0.3f),
+            [PropKind.Generator] = Rect.MinMaxRect(-0.8f, -0.6f, 0.8f, 0.6f),
+            [PropKind.ScrapShrine] = Rect.MinMaxRect(-0.7f, -0.25f, 0.7f, 0.25f),
+            [PropKind.ConduitGrowth] = Rect.MinMaxRect(-0.6f, -0.12f, 0.6f, 0.12f),
+            [PropKind.CableMass] = Rect.MinMaxRect(-1.0f, -0.6f, 1.0f, 0.6f),
             [PropKind.Boxes] = Rect.MinMaxRect(-0.78f, -0.33f, 0.3f, 0.3f), // Unity mirrors X on import: the stack leans to −X
             [PropKind.WaterCooler] = Rect.MinMaxRect(-0.17f, -0.17f, 0.17f, 0.17f),
             [PropKind.Whiteboard] = Rect.MinMaxRect(-0.95f, -0.08f, 0.95f, 0.08f),
@@ -53,6 +59,7 @@ namespace Stealth.Level
             [PropKind.ArcadeMachine] = Rect.MinMaxRect(-0.36f, -0.4f, 0.36f, 0.55f),
             [PropKind.Safe] = Rect.MinMaxRect(-0.4f, -0.35f, 0.4f, 0.41f),
             [PropKind.Hatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
+            [PropKind.ShaftHatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
             [PropKind.Crate] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
             [PropKind.MedTable] = Rect.MinMaxRect(-0.97f, -0.53f, 0.97f, 0.53f),
             [PropKind.Workbench] = Rect.MinMaxRect(-1.0f, -0.43f, 1.0f, 0.55f),
@@ -228,7 +235,7 @@ namespace Stealth.Level
             [PropKind.FloorJack] = Rect.MinMaxRect(-0.16f, -0.87f, 0.16f, 0.59f),
             [PropKind.OilDrums] = Rect.MinMaxRect(-0.6f, -0.55f, 0.6f, 0.55f),
             [PropKind.WeldingCart] = Rect.MinMaxRect(-0.28f, -0.61f, 0.28f, 0.35f),
-            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -3f, 1.7f, 3f),
+            [PropKind.BayLines] = Rect.MinMaxRect(-1.7f, -2.9f, 1.7f, 2.9f), // (paint: a hand's breadth inside the bay's ends)
             [PropKind.GarageDoor] = Rect.MinMaxRect(-1.7f, 0f, 1.7f, 0.1f),
             [PropKind.PaintRack] = Rect.MinMaxRect(-0.8f, -0.25f, 0.66f, 0.25f),
             // the hospital (Tools/Blender/hospital.py; Blender x mirrored)
@@ -282,6 +289,7 @@ namespace Stealth.Level
             PropKind.SupplyShelf, PropKind.PowerCage, PropKind.CableMachine, PropKind.FumeHood, PropKind.ComponentShelf, PropKind.VocalBooth,
             PropKind.DepositWall, PropKind.CashShelf, PropKind.Programmer, PropKind.WashBasin, PropKind.DoubleSink, PropKind.BunkBed,
             PropKind.Pinball, PropKind.MedTable, PropKind.Workbench, PropKind.StorageRack,
+            PropKind.ChargingDock, PropKind.BatteryStack, PropKind.Generator, PropKind.ScrapShrine,
             PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
             PropKind.BedCurtain, PropKind.Gurney, PropKind.AnesthesiaMachine, PropKind.XrayMachine, PropKind.CtScanner,
             PropKind.Wardrobe, PropKind.ElevatorDoors, PropKind.HallHooks, PropKind.BathVanity,
@@ -294,6 +302,7 @@ namespace Stealth.Level
             PropKind.NoticeBoard, PropKind.MapBoard, PropKind.AlarmPanel, PropKind.DefibCabinet, PropKind.ProjectorScreen, PropKind.AcousticPanel,
             PropKind.DartBoard, PropKind.HoseReel, PropKind.BedHeadwall, PropKind.SurgicalLights, PropKind.HandSanitizer,
             PropKind.HallHooks, PropKind.Mailboxes,
+            PropKind.DartBoard, PropKind.HoseReel, PropKind.ConduitGrowth,
         };
 
         /// <summary>
@@ -514,6 +523,9 @@ namespace Stealth.Level
         }
 
         /// <summary>The rect lies on the floor of <paramref name="room"/> with a margin from its walls.</summary>
+        /// <summary>A standing piece keeps this far from a wall's axis: the wall's face (half its thickness) and 2 cm.</summary>
+        static readonly float WallClear = Mathf.Max(0.12f, LevelMetrics.WallThickness / 2f + 0.02f);
+
         bool OnFloor(int floor, int room, Rect r, float margin)
         {
             var g = Grow(r, margin);
@@ -575,7 +587,7 @@ namespace Stealth.Level
                     continue;
                 }
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
-                if (!OnFloor(f, room.Id, r, 0.12f) || !Clear(f, r, gap)) return false;
+                if (!OnFloor(f, room.Id, r, WallClear) || !Clear(f, r, gap)) return false;
                 if (front is Vector3 n)
                 {
                     // a walkway in front of a group along a wall: nothing placed there already, and still the room's floor
@@ -667,7 +679,7 @@ namespace Stealth.Level
 
         /// <summary>A walker has to go around this piece (it is not on a top, up on a wall or flat on the floor).</summary>
         static bool InTheWay(PropKind k) =>
-            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.Microwave
+            k is not (PropKind.Partition or PropKind.DeskLamp or PropKind.CoffeeMachine or PropKind.Hatch or PropKind.ShaftHatch or PropKind.Microwave
                 or PropKind.WallCabinet or PropKind.HandDryer or PropKind.AcousticPanel or PropKind.DartBoard or PropKind.AreaRug
                 or PropKind.BayLines or PropKind.BedCurtain or PropKind.SurgicalLights) && !Hung.Contains(k);
 
@@ -1163,19 +1175,26 @@ namespace Stealth.Level
                 return AnyReached(seen, r);
             }
 
-            /// <summary>Any free cell of the room is reached.</summary>
+            /// <summary>
+            /// At least half of the room's free floor is reached (a room whose middle is furniture: the table must not cut it in two —
+            /// with the thick walls a meeting room 4 m wide has no way round its table left); a room with almost no free floor:
+            /// any of it.
+            /// </summary>
             bool AnyReached(bool[] seen, PlanRoom r)
             {
                 var a = CellOf(r.Bounds.min);
                 var b = CellOf(r.Bounds.max);
+                int free = 0, reached = 0;
                 for (int x = a.x; x <= b.x; x++)
                     for (int z = a.y; z <= b.y; z++)
                     {
                         if (!In(r.Floor, x, z)) continue;
                         int i = Index(r.Floor, x, z);
-                        if (seen[i] && m_L.Plan.SpaceAt(r.Floor, Center(x, z)) == r.Id) return true;
+                        if (!m_Free[i] || m_L.Plan.SpaceAt(r.Floor, Center(x, z)) != r.Id) continue;
+                        free++;
+                        if (seen[i]) reached++;
                     }
-                return false;
+                return reached > 0 && (free < 12 || reached >= free * 0.5f);
             }
 
             const int Reach = 6; // 1.5 m in cells: how close a blocking group has to be to both sides
@@ -1344,6 +1363,9 @@ namespace Stealth.Level
             m_Windows ??= WindowStrips();
             BeginRoomWalk(room);
             if (room.Id == m_L.VaultRoom) { VaultRoom(room); return; }
+            // the way up to the grate first — but after the hospital rooms' own pieces (a ward's beds, a theatre's table): they need those walls
+            bool climbLate = room.Type is RoomType.Ward or RoomType.Operating or RoomType.Imaging or RoomType.NurseStation;
+            if (!climbLate) Climb(room);
             // islands in the middle: about one and a half times what an office planner would call "enough" — a house to search
             int islands = room.Type switch
             {
@@ -1369,9 +1391,11 @@ namespace Stealth.Level
                 RoomType.Infirmary => room.Area > 16f ? 1 : 0,
                 RoomType.GameRoom => Mathf.Max(1, Mathf.RoundToInt(room.Area / 15f)),
                 RoomType.Workshop => Mathf.RoundToInt(room.Area / 70f), // tyres, an engine, the drain cart: the walkway behind the bays stays open
+                RoomType.ChargingStation => room.Area > 34f ? 1 : 0, // battery stacks back to back (the generator came with the anchors)
                 _ => 0,
             };
             Anchor(room);
+            if (climbLate) Climb(room);
             Islands(room, islands);
             if (room.Type == RoomType.Meeting) MeetingTable(room);
             if (room.Type == RoomType.Kitchen && !m_Table) SmallTable(room);
@@ -1563,6 +1587,7 @@ namespace Stealth.Level
                         }
                 return;
             }
+            if (room.Type == RoomType.ChargingStation) { ChargingStation(room); return; }
             if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
             if (room.Type == RoomType.ControlRoom)
             {
@@ -1574,6 +1599,50 @@ namespace Stealth.Level
                 return;
             }
             Anchor(room, 0, 3, true);
+        }
+
+        /// <summary>The ways up to vent grates (room → under the grate, the desk's side; <see cref="DuctGrate.ClimbDir"/>).</summary>
+        public readonly Dictionary<int, (Vector3 under, Vector3 side)> Climbs = new();
+
+        /// <summary>
+        /// The room's way up to its grate, first of all its furniture: a crate stack right under the grate, a desk along its
+        /// side, an aisle in front of the desk kept free — set like any group (no overlap, the room stays walkable) or not at all.
+        /// </summary>
+        void Climb(PlanRoom room)
+        {
+            if (!Climbs.TryGetValue(room.Id, out var c)) return;
+            float yaw = Mathf.Atan2(c.side.x, c.side.z) * Mathf.Rad2Deg;
+            var desk = c.under + c.side * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
+            var b = new Batch();
+            b.Add(PropKind.CrateStack, c.under, yaw);
+            b.Add(PropKind.Desk, desk, yaw + 180f);
+            if (!TryCommit(room, b, 0.04f)) return;
+            m_L.ClimbPieces.Add(c.under);
+            m_L.ClimbPieces.Add(desk);
+            Keep(room.Floor, desk + c.side * 0.5f - Vector3.one * 0.55f, desk + c.side * 1.5f + Vector3.one * 0.55f); // the aisle to climb from
+        }
+
+        /// <summary>How many guards' docks the charging room tries for (pairs while the walls take them, then singles).</summary>
+        const int ChargingDocksWanted = 4;
+        bool m_GeneratorPlaced;
+
+        /// <summary>
+        /// The robots' charging room (<see cref="ChargingRooms"/>): their docks along the walls first — where the guards
+        /// rest —, then the generator (free in the middle of a big room, else against a wall), and the one piece the humans
+        /// left, pushed askew against a wall. The walls then fill with battery stacks, scrap shrines, conduit growths and
+        /// cable masses (<see cref="WallGroup"/>).
+        /// </summary>
+        void ChargingStation(PlanRoom room)
+        {
+            m_GeneratorPlaced = false;
+            int docks = 0;
+            for (int k = 0; k < 2 && docks + 2 <= ChargingDocksWanted; k++)
+                if (Anchor(room, 0, 1, false, 0.8f)) docks += 2;
+                else break;
+            while (docks < ChargingDocksWanted && Anchor(room, 1, 2, false, 0.8f)) docks++;
+            if (!(room.Area >= 24f && Anchor(room, 4, 4, true))) Anchor(room, 2, 3, false, 0.8f);
+            m_GeneratorPlaced = true;
+            Anchor(room, 3, 4, false, 0.8f);
         }
 
         /// <summary>
@@ -1670,12 +1739,14 @@ namespace Stealth.Level
                     foreach (var (w, n) in faces)
                     {
                         var u = new Vector3(w.Dir.x, 0, w.Dir.y);
-                        for (float t = 0.2f; t < w.Length - 0.3f; t += 0.25f)
+                        // (from the faces of the walls at its ends: the wall's line runs into them by half their thickness)
+                        float end0 = LevelMetrics.WallThickness / 2f + 0.05f, end1 = w.Length - LevelMetrics.WallThickness / 2f - 0.05f;
+                        for (float t = end0; t < end1 - 0.1f; t += 0.25f)
                         {
                             var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
                             var batch = new Batch();
                             float width = AnchorGroup(room, batch, new Frame(face, u, n), option);
-                            if (width <= 0f || t + width > w.Length - 0.1f) break;
+                            if (width <= 0f || t + width > end1) break;
                             var shift = u * (width / 2f);
                             for (int i = 0; i < batch.Pieces.Count; i++) { var q = batch.Pieces[i]; q.Pos += shift; batch.Pieces[i] = q; }
                             for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
@@ -1720,6 +1791,19 @@ namespace Stealth.Level
             }
             switch (room.Type, option)
             {
+                // the robots' charging room: docks in pairs or alone, the generator against a wall, the humans' remnant askew
+                case (RoomType.ChargingStation, 0):
+                    foreach (float u in new[] { -0.62f, 0.62f }) b.Add(PropKind.ChargingDock, f.P(u, BackOf(PropKind.ChargingDock)), f.Face);
+                    return 2.45f;
+                case (RoomType.ChargingStation, 1): return Single(PropKind.ChargingDock, 1.2f);
+                case (RoomType.ChargingStation, 2): return Single(PropKind.Generator, 1.9f);
+                case (RoomType.ChargingStation, 3):
+                {
+                    var k = ChargingRooms.Remnant(m_L.ChargingFrom);
+                    var r = FootprintOf(k);
+                    b.Add(k, f.P(0f, BackOf(k) + 0.15f), f.Face + (Chance(0.5) ? 14f : -14f));
+                    return r.width + 0.5f;
+                }
                 case (RoomType.Kitchen, 0):
                 case (RoomType.Kitchen, 1):
                 {
@@ -1811,7 +1895,7 @@ namespace Stealth.Level
                 {
                     // patient beds head to the wall: the headwall unit over each, its curtain round it, a monitor and a night table beside
                     int beds = option == 0 ? 2 : 1;
-                    float step = 1.95f, w = beds * step;
+                    float step = 1.78f, w = beds * step; // (two beds in a 4 m ward between walls 0.3 m thick)
                     for (int i = 0; i < beds; i++)
                     {
                         float u = (i - (beds - 1) / 2f) * step;
@@ -1960,6 +2044,12 @@ namespace Stealth.Level
                     b.Add(PropKind.AreaRug, f.P(0, 0), f.Face, solid: false);
                     b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
                     if (roll < 0.6) b.Item(f.P(R(-0.3f, 0.3f), 0, 0.45f));
+                    break;
+                case RoomType.ChargingStation:
+                    // the generator in the middle; later islands: battery stacks back to back
+                    if (!m_GeneratorPlaced) { b.Add(PropKind.Generator, f.P(0, 0), f.Face); break; }
+                    b.Add(PropKind.BatteryStack, f.P(0, 0.31f), f.Face);
+                    b.Add(PropKind.BatteryStack, f.P(0, -0.31f), f.Back);
                     break;
                 case RoomType.OpenSpace:
                     if (roll < 0.62) DeskCluster(f, b);
@@ -2547,6 +2637,13 @@ namespace Stealth.Level
                     if (roll < 80) return Single(PropKind.MedicationCart, 1.05f);
                     if (roll < 90) return Hung(PropKind.HandSanitizer, 0.3f);
                     return Hung(PropKind.FireCabinet, 0.45f);
+                case RoomType.ChargingStation:
+                    if (roll < 28) return Single(PropKind.BatteryStack, 0.95f);
+                    if (roll < 46) return Single(PropKind.ScrapShrine, 1.5f);
+                    if (roll < 62) return Hung(PropKind.ConduitGrowth, 1.3f);
+                    if (roll < 78) { b.Add(PropKind.CableMass, f.P(0, 0.65f), f.Face, solid: false); return 2.1f; }
+                    if (roll < 88) return Single(PropKind.ChargingDock, 1.2f); // a spare dock
+                    return Row(f, b, PropKind.BatteryStack, 2, 0.95f);
                 case RoomType.Corridor:
                     // corridors are walkways: only slim things, far apart (Walls keeps 1.7 m free in front of them)
                     if (roll < 28) return Hung(PropKind.FireCabinet, 0.45f);

@@ -108,6 +108,9 @@ namespace Stealth.Game
         /// <summary>Owner → server: set off the stun cube from the backpack.</summary>
         void SendGadget();
 
+        /// <summary>Owner → server: a command to the team's storage robot (0: come to me, 1: go to the exit).</summary>
+        void SendBot(byte command);
+
         /// <summary>Owner → server: a cheat from the F4 panel.</summary>
         void SendCheat(Cheat cheat, bool on);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>

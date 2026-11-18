@@ -41,6 +41,8 @@ namespace Stealth.Game
 
         RunState m_Run = new();
         readonly List<GameObject> m_Spawned = new();
+        /// <summary>The new enemy mode: this house's time is up and its guards are off their docks for good.</summary>
+        bool m_GuardsAwake;
         IGameLink m_Link;
         bool m_IsServer;
         int m_BuiltSeed;
@@ -297,7 +299,8 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
+                LevelGenerator.Classic, info.ClassicEnemies);
             ActiveLevel.Load(layout, Art);
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
@@ -340,7 +343,7 @@ namespace Stealth.Game
             GoAt = 0;
             ChosenLane = -1;
             Votes.Clear();
-            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed };
+            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
             BuildLocal();
             var layout = ActiveLevel.Layout;
 
@@ -350,12 +353,14 @@ namespace Stealth.Game
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
+            m_GuardsAwake = false;
             DespawnCarServer();
             UnloadCarServer();
+            SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All)
             {
                 p.ResetForLevelServer();
-                p.EnterHatchServer(0); // the team comes up into the entry hatch
+                if (!layout.HasBasement) p.EnterHatchServer(0); // the team comes up into the entry hatch (a basement: it stands down there)
             }
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
@@ -405,6 +410,7 @@ namespace Stealth.Game
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
+                if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(pos, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
             }
             PostWardens(layout, wardens);
@@ -478,8 +484,10 @@ namespace Stealth.Game
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
             m_Run.RaiseAlarm(Session.ServerTime);
+            m_Bot?.HideServer(ActiveLevel.Layout); // the team's storage robot runs home to the basement
             foreach (var robot in RobotController.Robots)
-                if ((robot.transform.position - position).magnitude <= radius)
+                if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
+                else if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
         }
 
@@ -506,7 +514,16 @@ namespace Stealth.Game
             UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
-            if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
+            bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
+            if (classic && !InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new mode: when the house's time is up (the hunter's timer) the guards leave their docks for good
+            if (!classic && !m_GuardsAwake && m_Run.HunterForecast(Time.time - LevelStartTime).seconds == 0f)
+            {
+                m_GuardsAwake = true;
+                foreach (var robot in RobotController.Robots) if (robot.Docked) robot.WakeForGoodServer();
+                Banner(Loc.Pack("banner.guards_awake"));
+            }
             UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
@@ -636,7 +653,8 @@ namespace Stealth.Game
         void UpdateHatch()
         {
             // everyone in a hatch (either one), at least one in the exit's
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch, p.HatchIndex == 1, p.KnockedOut)));
+            // (the basement the team came in through counts as the way back: down there is "in the entry")
+            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch || InBasement(p.transform.position), p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
             if (!hidden) { LeaveAt = 0; return; }
             if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
             else if (Session.ServerTime >= LeaveAt) GoToSewerServer();

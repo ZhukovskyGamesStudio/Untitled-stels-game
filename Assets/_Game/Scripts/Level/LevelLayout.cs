@@ -13,7 +13,9 @@ namespace Stealth.Level
         // the hospital (HouseKind.Hospital, PlanGenerator.Hospital): patient rooms, the nurse station open to the corridor, theatres, X-ray and CT rooms
         Ward, NurseStation, Operating, Imaging,
         // the apartment block (HouseKind.Apartments, PlanGenerator.Apartments): a flat's hallway, living room, bedroom and bathroom (its kitchen is a Kitchen)
-        FlatHall, Living, Bedroom, Bathroom }
+        FlatHall, Living, Bedroom, Bathroom,
+        // the robots' charging room: a human tech room they took over (ChargingRooms), never drawn by the program
+        ChargingStation }
     /// <summary>
     /// Vent = a wall with a low crawl hole: crouching players fit, robots (2 m) do not. Squeeze = a narrow slot at full
     /// height: a player squeezes through sideways, robots (navmesh agents 1 m wide) do not fit.
@@ -95,7 +97,11 @@ namespace Stealth.Level
         // the storage room's empty pallet rack (Tools/Blender/storage.py): the workers shelve loot on it
         StorageRack,
         // the apartment block (Tools/Blender/apartments.py): the flats' furniture, the lobby's mailboxes, the landing's lift doors
-        DoubleBed, Wardrobe, Dresser, Bathtub, HomeToilet, BathVanity, WashingMachine, ShoeCabinet, HallHooks, Mailboxes, ElevatorDoors }
+        DoubleBed, Wardrobe, Dresser, Bathtub, HomeToilet, BathVanity, WashingMachine, ShoeCabinet, HallHooks, Mailboxes, ElevatorDoors,
+        // the robots' charging room (Tools/Blender/charging.py): what the robots built themselves
+        ChargingDock, BatteryStack, Generator, ScrapShrine, ConduitGrowth, CableMass,
+        // the lid over the shaft down to the basement the team arrives in (ShaftHatch), in the lobby's middle
+        ShaftHatch }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -132,6 +138,8 @@ namespace Stealth.Level
         public int Floor;
         public Vector3 Position;
         public Quaternion Rotation;
+        /// <summary>Rests at a charging dock (here, facing <see cref="Rotation"/>) until an alarm (new enemy mode guards).</summary>
+        public bool Docked;
     }
 
     /// <summary>Laser gate patterns: one low beam, three blinking beams, one moving beam (from the third house on).</summary>
@@ -201,6 +209,13 @@ namespace Stealth.Level
         public readonly List<Doorway> Doorways = new();
         /// <summary>The entry hatch (in the lobby): the team comes up here from the car.</summary>
         public Vector3 HatchPosition;
+        /// <summary>
+        /// The basement the team arrives in (<see cref="Basement"/>): its frame's origin under the lobby, and where the team's
+        /// stash is kept down there (<see cref="EntryHatch"/>; no hatch: the whole basement is the way back for the leave
+        /// rule). <see cref="HatchPosition"/> is the shaft's mouth in the lobby (the generator keeps things away from it).
+        /// </summary>
+        public bool HasBasement;
+        public Vector3 BasementOrigin, EntryHatch;
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
         public readonly List<Vector3> PlayerSpawns = new();
@@ -299,6 +314,24 @@ namespace Stealth.Level
         public Vector3 CageKeySpot;
         public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
+        /// <summary>The old enemies (LevelGenerator.ClassicEnemies): wardens, hounds, the hunter, guards on patrol, no wards.</summary>
+        public bool ClassicEnemies;
+        /// <summary>The robots' charging room (a human tech room they took over), or −1; its docks (guards rest there).</summary>
+        public int ChargingRoom = -1;
+        /// <summary>What the charging room was before the robots took it (its remnant shows it).</summary>
+        public RoomType ChargingFrom = RoomType.Office;
+        public readonly List<Pose> ChargingDocks = new();
+        /// <summary>Rooms guarded by traps (<see cref="Wards"/>), new enemy mode.</summary>
+        public readonly List<int> WardedRooms = new();
+        /// <summary>The crawl ducts in each storey's ceiling void (index = the storey under it), <see cref="VentPlan"/>.</summary>
+        public readonly List<VentNet> Vents = new();
+        /// <summary>Where the crates and desks of the ways up to the grates stand: never turned into a terminal or anything else.</summary>
+        public readonly List<Vector3> ClimbPieces = new();
+        public bool IsClimbPiece(Vector3 p)
+        {
+            foreach (var c in ClimbPieces) if ((c - p).sqrMagnitude < 0.01f) return true;
+            return false;
+        }
         public readonly List<PropPlacement> Props = new();
         public Bounds BuildingBounds;
         /// <summary>Most windows on the facade (<see cref="LevelBuilder.WindowSpots"/>), −1 = wherever one fits.</summary>
@@ -374,6 +407,7 @@ namespace Stealth.Level
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
         public bool IsInside(Vector3 p)
         {
+            if (HasBasement && Basement.Contains(BasementOrigin, p)) return true;
             if (Plan == null) return false;
             if (Plan.IsInside(new Vector2(p.x, p.z))) return true;
             // a balcony is the house's too: no gas up there

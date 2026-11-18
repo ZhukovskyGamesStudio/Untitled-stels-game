@@ -348,8 +348,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.72, y: 0.1665, z: 0.72}
-  m_Center: {x: 0, y: 0.03825, z: 0}
+  m_Size: {x: 0.43961772, y: 0.183, z: 0.68}
+  m_Center: {x: 0, y: 0.013500005, z: 0}
 --- !u!114 &1419903075540489223
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -363,6 +363,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Enemies.RobotAnimator
   Model: {fileID: 7859642962251534854}
+  LiftArm: {fileID: 0}
+  LiftTray: {fileID: 0}
 --- !u!114 &2376463188125432327
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -427,7 +429,7 @@ Transform:
   m_GameObject: {fileID: 4037357966179694599}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.22150001, z: 0}
+  m_LocalPosition: {x: 0, y: 0.20500001, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -822,7 +824,7 @@ Transform:
   m_GameObject: {fileID: 7288041999532736435}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.03825, z: 0}
+  m_LocalPosition: {x: 0, y: 0.013500005, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

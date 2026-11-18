@@ -18,8 +18,11 @@ namespace Stealth.Game
         public int Lane;
         /// <summary>The seed of the whole run: every peer draws the same route from it.</summary>
         public int RunSeed;
+        /// <summary>The old enemies (the host's switch, <c>LevelGenerator.ClassicEnemies</c>): every peer builds the same house.</summary>
+        public bool ClassicEnemies;
         public bool Equals(LevelInfo other) =>
-            Seed == other.Seed && Index == other.Index && Players == other.Players && Lane == other.Lane && RunSeed == other.RunSeed;
+            Seed == other.Seed && Index == other.Index && Players == other.Players && Lane == other.Lane && RunSeed == other.RunSeed
+            && ClassicEnemies == other.ClassicEnemies;
     }
 
     /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, hunters.</summary>

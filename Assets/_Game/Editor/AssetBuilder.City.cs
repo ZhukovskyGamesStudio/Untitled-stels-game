@@ -134,6 +134,84 @@ namespace Stealth.EditorTools
                 return go;
             });
             if (art.LightSwitch != lightSwitch) { art.LightSwitch = lightSwitch; EditorUtility.SetDirty(art); }
+            // a grate in a room's ceiling (VentGrate, the way into the crawl ducts): a frame in the ceiling board and a grille
+            // on a hinge along one edge that swings down while a player is near; the pivot in the frame's middle on the ceiling
+            var ventGrate = Prefab($"{LevelPrefabs}/VentGrate.prefab", () =>
+            {
+                var go = new GameObject("VentGrate");
+                float size = VentPlan.Res, t = LevelMetrics.CeilingBoard;
+                foreach (var (c, sz) in new[]
+                         {
+                             (new Vector3(0f, t / 2f, -size / 2f + 0.03f), new Vector3(size, t, 0.06f)), (new Vector3(0f, t / 2f, size / 2f - 0.03f), new Vector3(size, t, 0.06f)),
+                             (new Vector3(-size / 2f + 0.03f, t / 2f, 0f), new Vector3(0.06f, t, size)), (new Vector3(size / 2f - 0.03f, t / 2f, 0f), new Vector3(0.06f, t, size)),
+                         })
+                    Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Panel], collider: false);
+                var lid = new GameObject("Lid").transform;
+                lid.SetParent(go.transform, false);
+                lid.localPosition = new Vector3(0f, 0.01f, -size / 2f + 0.06f);
+                for (int i = 0; i < 9; i++)
+                    Cube(lid, "Slat", new Vector3(0f, 0f, 0.05f + i * 0.1f), new Vector3(size - 0.14f, 0.02f, 0.035f), util[(int)UtilitySlot.Dark], collider: false);
+                Cube(lid, "Rail", new Vector3(-size / 2f + 0.1f, 0f, (size - 0.12f) / 2f), new Vector3(0.03f, 0.025f, size - 0.12f), util[(int)UtilitySlot.Panel], collider: false);
+                Cube(lid, "Rail", new Vector3(size / 2f - 0.1f, 0f, (size - 0.12f) / 2f), new Vector3(0.03f, 0.025f, size - 0.12f), util[(int)UtilitySlot.Panel], collider: false);
+                var floor = go.AddComponent<BoxCollider>(); // walked on in the duct; from below the grate is climbed with E
+                floor.center = new Vector3(0f, t / 2f, 0f);
+                floor.size = new Vector3(size - 0.04f, t, size - 0.04f);
+                go.AddComponent<KeepUnmerged>(); // the grille swings open
+                var g = go.AddComponent<VentGrate>();
+                g.Lid = lid;
+                return go;
+            });
+            if (art.VentGrate != ventGrate) { art.VentGrate = ventGrate; EditorUtility.SetDirty(art); }
+            // the lid over the shaft to the basement (ShaftHatch): a steel frame in the floor, a ribbed lid on a hinge at −Z
+            // with a yellow rim, and the ladder's top under it (ShaftLadder); the pivot on the floor in the shaft's middle
+            var shaftHatch = Prefab($"{LevelPrefabs}/ShaftHatch.prefab", () =>
+            {
+                var go = new GameObject("ShaftHatch");
+                float half = Basement.ShaftHalf + 0.1f;
+                foreach (var (c, sz) in new[]
+                         {
+                             (new Vector3(0f, 0.01f, -half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)), (new Vector3(0f, 0.01f, half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)),
+                             (new Vector3(-half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)), (new Vector3(half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)),
+                         })
+                    Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Warning], collider: false);
+                var lid = new GameObject("Lid").transform;
+                lid.SetParent(go.transform, false);
+                lid.localPosition = new Vector3(0f, 0.03f, -half);
+                var plate = Cube(lid, "Plate", new Vector3(0f, 0.02f, half), new Vector3(2 * half - 0.04f, 0.05f, 2 * half - 0.04f), util[(int)UtilitySlot.Panel], collider: true);
+                for (int i = 0; i < 5; i++)
+                    Cube(lid, "Rib", new Vector3(0f, 0.055f, 0.2f + i * (2 * half - 0.4f) / 4f), new Vector3(2 * half - 0.2f, 0.02f, 0.04f), util[(int)UtilitySlot.Dark], collider: false);
+                Cube(lid, "Handle", new Vector3(0f, 0.08f, 2 * half - 0.12f), new Vector3(0.3f, 0.04f, 0.04f), util[(int)UtilitySlot.Warning], collider: false);
+                go.AddComponent<KeepUnmerged>(); // the lid moves: never baked into the furniture's merged mesh (it would stay shut there)
+                var h = go.AddComponent<ShaftHatch>();
+                h.Lid = lid;
+                h.LidCollider = plate.GetComponent<Collider>();
+                var top = new GameObject("LadderTop");
+                top.transform.SetParent(go.transform, false);
+                top.AddComponent<ShaftLadder>().Top = true;
+                return go;
+            });
+            var shaftLadder = Prefab($"{LevelPrefabs}/ShaftLadder.prefab", () =>
+            {
+                var go = new GameObject("ShaftLadder");
+                go.AddComponent<ShaftLadder>();
+                return go;
+            });
+            // the storage robot's way up the shaft: a navmesh link (the builder sets its ends; the lid opens and shuts it)
+            var shaftLink = Prefab($"{LevelPrefabs}/ShaftLink.prefab", () =>
+            {
+                var go = new GameObject("ShaftLink");
+                var link = go.AddComponent<Unity.AI.Navigation.NavMeshLink>();
+                link.width = 0.8f;
+                link.bidirectional = true;
+                link.autoUpdate = false;
+                link.costModifier = 4;
+                return go;
+            });
+            if (art.ShaftHatch != shaftHatch || art.ShaftLadder != shaftLadder || art.ShaftLink != shaftLink)
+            {
+                art.ShaftHatch = shaftHatch; art.ShaftLadder = shaftLadder; art.ShaftLink = shaftLink;
+                EditorUtility.SetDirty(art);
+            }
             if (art.CityPiece == piece && art.CityLamp == lamp && art.CityMaterials != null && art.CityMaterials.Length == mats.Length
                 && System.Linq.Enumerable.SequenceEqual(art.CityMaterials, mats) && art.UtilityMaterials != null
                 && System.Linq.Enumerable.SequenceEqual(art.UtilityMaterials, util)) return;

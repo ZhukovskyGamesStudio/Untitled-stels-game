@@ -125,7 +125,7 @@ namespace Stealth.Level
             for (int i = 0; i < l.Props.Count; i++)
             {
                 var p = l.Props[i];
-                if (p.Kind is not (PropKind.Desk or PropKind.WorkTable or PropKind.ExecutiveDesk or PropKind.Credenza or PropKind.ToolChest or PropKind.Cabinet)) continue; // (no lamp on it: LevelGenerator.LampOn) // (a shop has few desks: a bench of the workshop)
+                if (p.Kind is not (PropKind.Desk or PropKind.WorkTable or PropKind.ExecutiveDesk or PropKind.Credenza or PropKind.ToolChest or PropKind.Cabinet) || l.IsClimbPiece(p.Position)) continue; // (no lamp on it: LevelGenerator.LampOn) // (a shop has few desks: a bench of the workshop)
                 if (l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == room.Id) continue;
                 if (LevelGenerator.LampOn(l, i)) continue;
                 if ((p.Position - l.HatchPosition).magnitude <= 7.5f) continue; // like the other terminals: not in the lobby

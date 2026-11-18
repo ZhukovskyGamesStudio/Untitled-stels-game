@@ -203,6 +203,10 @@ namespace Stealth.EditorTools
             Mat(props, "MedicalBlue", new Color(0.22f, 0.45f, 0.66f), smoothness: 0.4f);   // mattresses, carts, seats
             Mat(props, "SurgicalGreen", new Color(0.2f, 0.46f, 0.4f), smoothness: 0.15f);  // drapes
             Mat(props, "Curtain", new Color(0.62f, 0.78f, 0.8f), smoothness: 0.05f);       // the beds' privacy curtains
+            // what the robots built themselves (the charging room): a dark glossy shell, a ribbed flesh-like sheath, an acid glow
+            Mat(props, "RobotShell", new Color(0.08f, 0.09f, 0.12f), smoothness: 0.85f);
+            Mat(props, "RobotFlesh", new Color(0.42f, 0.2f, 0.3f), smoothness: 0.55f);
+            Mat(props, "RobotGlow", new Color(0.3f, 1f, 0.6f), new Color(0.6f, 2.6f, 1.3f));
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

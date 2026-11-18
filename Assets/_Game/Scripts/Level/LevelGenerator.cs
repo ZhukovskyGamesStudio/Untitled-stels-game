@@ -77,6 +77,12 @@ namespace Stealth.Level
         public float HighVentChance = 0.4f;
         [Tooltip("Narrow slots (players squeeze through, robots do not) a floor gets, per room on it.")]
         public float SqueezesPerRoom = 0.1f;
+        [Tooltip("Share of a storey's rooms (big enough for a grate) the crawl ducts in its ceiling void reach (VentPlan); the exit room always.")]
+        [Range(0f, 1f)] public float VentCoverage = 0.75f;
+        [Tooltip("Chance of a grate's lid being screwed shut (a screwdriver in hand takes it off); the arrival room's grate is always open.")]
+        [Range(0f, 1f)] public float ClosedGrateChance = 0.55f;
+        [Tooltip("Chance of a room's grate having a way up to it: a crate stack under it and a desk beside (never in the team's first room).")]
+        [Range(0f, 1f)] public float ClimbChance = 0.65f;
         [Tooltip("A crawl way (vent, slot, hole, window without glass) prefers a room with one way in so far: added to its score per such room (the score is the walk it saves, metres-ish). A loot room with a second way in is a room to sneak into.")]
         public float DeadEndSneakBonus = 4f;
         [Header("Shapes")]
@@ -286,6 +292,12 @@ namespace Stealth.Level
         [Tooltip("House (0-based) from which lasers can move up and down.")]
         public int MovingLasersFromHouse = 2;
 
+        [Header("New enemy mode")]
+        [Tooltip("Guards resting in the charging room, at least (more come from the roster).")]
+        public int SleepingGuards = 2;
+        [Tooltip("Traps on the valuable rooms (Wards).")]
+        public WardSettings Wards = new();
+
         [Header("Terminals")]
         [Tooltip("Desks turned into a terminal that shows the house's cameras (only in houses with cameras).")]
         public int CameraTerminals = 1;
@@ -316,11 +328,18 @@ namespace Stealth.Level
         /// </summary>
         public static bool Classic;
 
+        /// <summary>
+        /// The old enemies (the main menu's switch, "-classicenemies"): guards patrol, wardens guard loot rooms, hounds and
+        /// the hunter come. Off (the new mode): guards rest in the robots' charging room until an alarm, no hounds, hunter
+        /// or wardens — traps guard the rich rooms (<see cref="Wards"/>). The host decides (<c>LevelInfo.ClassicEnemies</c>).
+        /// </summary>
+        public static bool ClassicEnemies;
+
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic);
+            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic, ClassicEnemies);
 
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
-            FeatureSettings features, bool classic)
+            FeatureSettings features, bool classic, bool classicEnemies = false)
         {
             building ??= new BuildingSettings();
             security ??= new SecuritySettings();
@@ -350,6 +369,7 @@ namespace Stealth.Level
                 {
                     Seed = seed,
                     LevelIndex = levelIndex,
+                    ClassicEnemies = classicEnemies,
                     Players = Mathf.Max(1, players),
                     Floors = floors,
                     Plan = o.Plan,
@@ -407,13 +427,18 @@ namespace Stealth.Level
             var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, 0xF0E, 0)));
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
-            furnisher.Put(entryRoom, PropKind.Hatch, l.HatchPosition, 0f);
+            // the shaft down to the basement the team arrives in (Basement): its lid where the entry hatch was, in the plant
+            // room's corner (the building's drain leaves for the sewer there), the lobby's where a house has no plant room
+            furnisher.Put(entryRoom, PropKind.ShaftHatch, l.HatchPosition, 0f);
+            l.HasBasement = true;
+            l.BasementOrigin = Basement.Origin(l.HatchPosition);
+            l.EntryHatch = Basement.StashSpot(l.BasementOrigin); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
             l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
-            for (int q = 0; q < 4; q++) l.PlayerSpawns.Add(l.HatchPosition + Quadrants[q].normalized * 0.5f); // round the hatch, in its corner of the room
+            l.PlayerSpawns.AddRange(Basement.Spawns(l.BasementOrigin));
 
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
             // (the apartment block: every room is its flat's, where its plan has it — a kitchen in every flat)
@@ -428,6 +453,13 @@ namespace Stealth.Level
             l.RoomRules = building.RoomTypeRules;
             StorageRooms.Plan(l, features, storage);
             EnsureControlRoom(l, building);
+            // the robots' charging room: a tech room they took over (every house has one; the guards rest there)
+            if (!building.EveryRoomType) ChargingRooms.Convert(l, l.ExitHatchPosition); // (the rooms test keeps every type)
+
+            // the crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
+            // within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to)
+            VentPlan.Plan(l, building.VentCoverage, building.ClosedGrateChance, building.ClimbChance);
+            PlaceClimbs(l, furnisher);
 
             // patrol points (room centres and the middles of big rooms) stay free of furniture
             Patrols(l);
@@ -439,7 +471,9 @@ namespace Stealth.Level
             watch.Restart();
             furnisher.EnsureWalkable();
             if (furnisher.RestoreFridges()) furnisher.EnsureWalkable(); // every kitchen keeps its one fridge
+            DropFailedClimbs(l);
             Timing.Walk += watch.ElapsedMilliseconds;
+            ChargingRooms.Docks(l);
             if (security.Enemies)
             {
                 PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
@@ -450,9 +484,10 @@ namespace Stealth.Level
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
             HouseFeatures.PointOfInterest(l);
-            if (security.Enemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either
+            if (security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
             HouseFeatures.FinishObjective(l);
             HouseFeatures.PlanShelterMap(l);
+            DropFailedClimbs(l); // (and anything since that changed their pieces)
             DoorRules.Plan(l); // every door's kind, the way it opens and its hinges, round the furniture now there
 
             float height = floors * FloorHeight;
@@ -554,9 +589,11 @@ namespace Stealth.Level
         /// </summary>
         static PlanRoom ExitRoom(LevelLayout l)
         {
+            // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
+            var reach = VoidReach(l, l.LobbyRoom);
             if (l.Kind == HouseKind.Garage)
                 foreach (var r in l.Rooms)
-                    if (r.Type == RoomType.Workshop && r.Floor == 0) return r;
+                    if (r.Type == RoomType.Workshop && r.Floor == 0 && Ducted(l, r, reach)) return r;
             PlanRoom best = null, wet = null;
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
@@ -566,6 +603,7 @@ namespace Stealth.Level
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;
+                if (!Ducted(l, r, reach)) continue;
                 if (d > far) { far = d; best = r; }
                 if (r.Type is RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom && d > farWet) { farWet = d; wet = r; }
             }
@@ -648,6 +686,68 @@ namespace Stealth.Level
                 if (ok) { spot = p; return true; }
             }
             spot = r.Center;
+            return false;
+        }
+
+        /// <summary>
+        /// The duct cells of the ground floor's void a duct from <paramref name="room"/> can get to (a double-height hall or a
+        /// stair hole may cut the void in parts): the exit room must be in the lobby's part.
+        /// </summary>
+        static HashSet<Vector2Int> VoidReach(LevelLayout l, int room)
+        {
+            var seen = new HashSet<Vector2Int>();
+            var queue = new Queue<Vector2Int>();
+            int nx = l.Plan.NX / 2, nz = l.Plan.NZ / 2;
+            for (int x = 0; x < nx; x++)
+                for (int z = 0; z < nz; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (l.Plan.SpaceAt(0, new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) == room && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                }
+            if (seen.Count == 0)
+            {
+                // an atrium lobby has no ceiling: the ducts start from the rooms around it (VentPlan.Arrival)
+                var around = l.Plan.Rooms[room].Bounds;
+                around.min -= Vector2.one * 3f;
+                around.max += Vector2.one * 3f;
+                for (int x = 0; x < nx; x++)
+                    for (int z = 0; z < nz; z++)
+                    {
+                        var c = new Vector2Int(x, z);
+                        if (around.Contains(new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                    }
+            }
+            var dirs = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
+            while (queue.Count > 0)
+            {
+                var c = queue.Dequeue();
+                foreach (var d in dirs)
+                {
+                    var n = c + d;
+                    if (n.x < 0 || n.y < 0 || n.x >= nx || n.y >= nz || seen.Contains(n) || !VentPlan.Allowed(l, 0, n)) continue;
+                    seen.Add(n);
+                    queue.Enqueue(n);
+                }
+            }
+            return seen;
+        }
+
+        /// <summary>A duct can come down into the room: one storey high, and some cell of it has the void over it.</summary>
+        static bool Ducted(LevelLayout l, PlanRoom r, HashSet<Vector2Int> reach)
+        {
+            if (r.Levels != 1) return false;
+            var b = r.Bounds;
+            for (int x = Mathf.FloorToInt(b.xMin / VentPlan.Res); x * VentPlan.Res < b.xMax; x++)
+                for (int z = Mathf.FloorToInt(b.yMin / VentPlan.Res); z * VentPlan.Res < b.yMax; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (!reach.Contains(c)) continue;
+                    bool own = true;
+                    for (int px = x * 2; px <= x * 2 + 1 && own; px++)
+                        for (int pz = z * 2; pz <= z * 2 + 1 && own; pz++)
+                            own = l.Plan.SpaceAt(r.Floor, HousePlan.CellCenter(px, pz)) == r.Id;
+                    if (own) return true;
+                }
             return false;
         }
 
@@ -814,7 +914,7 @@ namespace Stealth.Level
                 if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i)) desks.Add(i);
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i) && !l.IsClimbPiece(l.Props[i].Position)) desks.Add(i);
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
             var want = new List<TerminalKind>();
             // the hacking terminal first: with a single console in the control room, it is the one there
@@ -895,7 +995,9 @@ namespace Stealth.Level
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
             int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
-            var freshRobots = RobotRoster.Newcomers(s.Roster.Robots, level);
+            // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)
+            var table = l.ClassicEnemies ? s.Roster.Robots : RobotRoster.NewEnemies(s.Roster.Robots);
+            var freshRobots = RobotRoster.Newcomers(table, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
             {
@@ -909,14 +1011,15 @@ namespace Stealth.Level
                 else room = Weighted(candidates, rng, l, s.DeepRoomWeight);
                 var pos = SpotIn(l, room, rng, 1.2f);
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
-                var kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                var kind = RobotRoster.PickRobot(table, level, rng);
                 if (i < freshRobots.Count) kind = freshRobots[i]; // the house that introduces a kind shows it
                 // workers haul loot to the storage room: no storage room, no workers
-                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(level, rng, s.Roster);
+                for (int k = 0; k < 6 && kind == RobotKind.Worker && l.StorageRoom < 0; k++) kind = RobotRoster.PickRobot(table, level, rng);
                 if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = RobotKind.Guard;
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
             StorageWorkers(l, rng, s, candidates, storageWorkers, freshRobots.Count);
+            if (!l.ClassicEnemies) DockGuards(l, s);
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
@@ -927,6 +1030,9 @@ namespace Stealth.Level
                 if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway && !DoorRules.Always(l, d))
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
             }
+            // the new mode: the valuable rooms are guarded by traps first (their doorways get no sliding door)
+            if (!l.ClassicEnemies && !b.EveryRoomType) Wards.Place(l, doors, s.Wards, s.MovingLasersFromHouse); // (the rooms test: workers only)
+
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
             int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
             var hatch = l.HatchPosition;
@@ -1012,6 +1118,77 @@ namespace Stealth.Level
             {
                 bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
                 if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
+            }
+        }
+
+        /// <summary>
+        /// The ways up into the ducts (<see cref="DuctGrate.ClimbDir"/>): handed to the furnisher, which sets them first in
+        /// their room — a crate stack (1.4 m) right under the grate and a desk (0.92 m) along its side — checked like any
+        /// group (no overlap, the room still walkable). <see cref="DropFailedClimbs"/> after the furniture.
+        /// </summary>
+        static void PlaceClimbs(LevelLayout l, Furnisher furnisher)
+        {
+            foreach (var net in l.Vents)
+                foreach (var g in net.Grates)
+                    // (not in the rooms whose walls their own pieces need: a ward's beds, a theatre's and an X-ray room's equipment)
+                    if (g.ClimbDir >= 0)
+                        furnisher.Climbs[g.Room] = (new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z), VentPlan.ClimbSide(g.ClimbDir));
+        }
+
+        /// <summary>A climb whose crates did not fit (or were taken out by the walkability check) is no way up.</summary>
+        static void DropFailedClimbs(LevelLayout l)
+        {
+            foreach (var net in l.Vents)
+                for (int i = 0; i < net.Grates.Count; i++)
+                {
+                    var g = net.Grates[i];
+                    if (g.ClimbDir < 0) continue;
+                    var under = new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z);
+                    var desk = under + VentPlan.ClimbSide(g.ClimbDir) * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
+                    bool stack = false, table = false;
+                    foreach (var p in l.Props)
+                    {
+                        stack |= p.Kind == PropKind.CrateStack && (p.Position - under).sqrMagnitude < 0.01f;
+                        table |= p.Kind == PropKind.Desk && (p.Position - desk).sqrMagnitude < 0.01f;
+                    }
+                    if (stack && table) continue;
+                    g.ClimbDir = -1;
+                    net.Grates[i] = g;
+                }
+        }
+
+        /// <summary>
+        /// The new mode: every guard rests on a charging dock (<see cref="LevelLayout.ChargingDocks"/>; without a charging
+        /// room, where it stands) and at least <see cref="SecuritySettings.SleepingGuards"/> of them are there. Spare
+        /// docks stay empty; guards beyond the docks rest beside the last one.
+        /// </summary>
+        static void DockGuards(LevelLayout l, SecuritySettings s)
+        {
+            int guards = 0;
+            foreach (var r in l.RobotSpawns) if (r.Kind == RobotKind.Guard) guards++;
+            // (no charging room — the rooms test — no guards beyond the roster's)
+            for (; l.ChargingRoom >= 0 && guards < s.SleepingGuards; guards++)
+            {
+                var at = l.ChargingRoom >= 0 ? l.Plan.Rooms[l.ChargingRoom] : null;
+                var p = at != null ? at.Center : l.PatrolPoints.Count > 0 ? l.PatrolPoints[guards % l.PatrolPoints.Count] : l.HatchPosition;
+                l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.Guard, Floor = LevelLayout.FloorOf(p.y), Position = p, Rotation = Quaternion.identity });
+            }
+            if (l.ChargingRoom >= 0 && l.ChargingDocks.Count < guards) ChargingRooms.Docks(l, guards); // a spot for every guard
+            int dock = 0;
+            for (int i = 0; i < l.RobotSpawns.Count; i++)
+            {
+                var r = l.RobotSpawns[i];
+                if (r.Kind != RobotKind.Guard) continue;
+                if (l.ChargingDocks.Count > 0)
+                {
+                    var d = l.ChargingDocks[Mathf.Min(dock, l.ChargingDocks.Count - 1)];
+                    r.Position = d.position;
+                    r.Rotation = d.rotation;
+                    r.Floor = LevelLayout.FloorOf(d.position.y);
+                    dock++;
+                }
+                r.Docked = true;
+                l.RobotSpawns[i] = r;
             }
         }
 
