@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>).</summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the
@@ -36,6 +36,9 @@ namespace Stealth.Level
         /// <summary>The hint for this player, and whether pressing E does something now.</summary>
         public abstract string Prompt(PlayerController player, out bool available);
 
+        /// <summary>Taken by E at all just now (an open vent grate is climbed through, not used).</summary>
+        public virtual bool Usable(PlayerController player) => true;
+
         public void Configure(int index)
         {
             Index = index;
@@ -58,7 +61,7 @@ namespace Stealth.Level
             var at = player.transform.position;
             foreach (var i in All)
             {
-                if (i.Index < 0 || !i.isActiveAndEnabled) continue;
+                if (i.Index < 0 || !i.isActiveAndEnabled || !i.Usable(player)) continue;
                 var p = i.Point;
                 if (Mathf.Abs(at.y + 0.9f - p.y) > 1.7f) continue;
                 var to = p - at;

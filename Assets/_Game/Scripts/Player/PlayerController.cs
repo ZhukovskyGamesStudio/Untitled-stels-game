@@ -61,6 +61,8 @@ namespace Stealth.Player
         /// <summary>Owner-owned: Steam name or empty.</summary>
         public string DisplayName { get; private set; } = "";
         public string Nick => DisplayName.Length > 0 ? DisplayName : Loc.F("player.nick", ClientId + 1);
+        /// <summary>Who the player is across reconnects (<see cref="ISessionLauncher.LocalPlayerId"/>; the owner sets it, everyone sees it).</summary>
+        public string Identity { get; private set; } = "";
 
         public ulong ClientId { get; private set; }
         /// <summary>This peer controls the player (input, camera).</summary>
@@ -110,6 +112,13 @@ namespace Stealth.Player
         public bool IsCrouching => Crouching;
         public bool IsDown => !IsSpawned || Downed || InHatch || Invisible;
 
+        /// <summary>How deep in the laughing gas this player is: 0 clear … 1 passing out (the owner's own, the others' replicated).</summary>
+        public float GasShare { get; private set; }
+        /// <summary>The share at which the laughing starts (the same settings on every peer).</summary>
+        public float GasLaughShare => Gas.LaughAfter / Mathf.Max(0.01f, Gas.Limit);
+        /// <summary>A copy of the owner's gas share (the network twin).</summary>
+        public void ApplyGas(byte share) => GasShare = share / 255f;
+
         /// <summary>Server: cheats of the F4 panel — nothing hurts this player / robots do not perceive them.</summary>
         public bool Invulnerable { get; private set; }
         public bool Invisible { get; private set; }
@@ -133,6 +142,9 @@ namespace Stealth.Player
                 case Cheat.Invisible: Invisible = on; break;
                 case Cheat.KillRobots: gm?.KillAllRobotsServer(); break;
                 case Cheat.FillQuota: gm?.FillQuotaServer(); break;
+                default:
+                    if (cheat >= Cheat.StartHouse) gm?.StartHouseServer((Stealth.Level.HouseKind)(cheat - Cheat.StartHouse));
+                    break;
             }
         }
         /// <summary>Lying with no HP: only a teammate can lift you (lying with HP left you get up yourself).</summary>
@@ -190,6 +202,7 @@ namespace Stealth.Player
                 GameSettings.EnsureLoaded(); // and the controls
                 var nick = Session.Launcher?.LocalPlayerName ?? "";
                 DisplayName = nick.Length > 28 ? nick.Substring(0, 28) : nick;
+                Identity = Session.Launcher?.LocalPlayerId ?? "";
                 Camera.enabled = true;
                 Camera.clearFlags = CameraClearFlags.SolidColor; // the sky is drawn by the gas pass (GasView), never the engine's skybox
                 Listener.enabled = true;
@@ -206,6 +219,7 @@ namespace Stealth.Player
 
         public void Unbind()
         {
+            if (IsServer && !IsOwner) GameManager.Instance?.PlayerLeftServer(this); // keep the backpack and the spot for a reconnect
             All.Remove(this);
             IsSpawned = false;
             m_Link = null;
@@ -232,6 +246,8 @@ namespace Stealth.Player
         public Light Flashlight;
         [Tooltip("The hand holding the flashlight, seen in the first-person view while a flashlight is in the hand slot (owner only).")]
         public GameObject ViewFlashlight;
+        [Tooltip("The shelter map held open in front of the face while it is in the hand slot (every peer sees it: a thing in the world, not UI).")]
+        public GameObject HeldMap;
         /// <summary>The flashlight in the hand shines (server-decided, replicated).</summary>
         public bool FlashlightOn { get; private set; }
         float m_Drain;
@@ -288,6 +304,15 @@ namespace Stealth.Player
         /// <summary>Every peer: the beam where the holder looks.</summary>
         void UpdateFlashlightView()
         {
+            if (HeldMap != null)
+            {
+                var inv = GetComponent<PlayerInventory>();
+                int hand = inv != null ? inv.HandIndex() : -1;
+                bool show = hand >= 0 && inv.Items[hand].Shape == Items.ItemCatalog.ShelterMap && !Downed && !InHatch && UsingTerminal == null;
+                if (HeldMap.activeSelf != show) HeldMap.SetActive(show);
+                // a remote player's head does not pitch: the map follows their look up and down
+                if (show && !IsOwner) HeldMap.transform.localRotation = (m_HeldMapRot ??= HeldMap.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f);
+            }
             if (ViewFlashlight != null)
             {
                 var inv = GetComponent<PlayerInventory>();
@@ -299,7 +324,26 @@ namespace Stealth.Player
             bool on = FlashlightOn && !Downed && !InHatch;
             if (Flashlight.enabled != on) Flashlight.enabled = on;
             if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, 0f, 0f); // the head of a remote player does not pitch
+            if (!on) return;
+            // close to a surface the lamp dims (no white blown-out spot): the nearest thing in front that is not this player
+            if (m_FlashBase < 0f)
+            {
+                // the intensity as built, without the style's visual scale (LightSource writes that over the light)
+                var source = Flashlight.GetComponent<LightSource>();
+                m_FlashBase = source != null ? source.RawIntensity : Flashlight.intensity;
+            }
+            var t = Flashlight.transform;
+            float d = FlashNear;
+            int n = Physics.RaycastNonAlloc(t.position, t.forward, s_FlashHits, FlashNear, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+                if (s_FlashHits[i].distance < d && !s_FlashHits[i].collider.transform.IsChildOf(transform)) d = s_FlashHits[i].distance;
+            Flashlight.intensity = m_FlashBase * PlayerRules.FlashlightNear(d, FlashNear);
         }
+
+        Quaternion? m_HeldMapRot;              // the held map's pose as built (a remote holder's pitch is added to it)
+        const float FlashNear = 1.6f;          // closer than this the flashlight dims (metres)
+        float m_FlashBase = -1f;               // its intensity as built
+        static readonly RaycastHit[] s_FlashHits = new RaycastHit[8];
 
         /// <summary>Which hatch of the house the player sits in: 0 the entry (where the team comes up), 1 the exit (the way down).</summary>
         public int HatchIndex { get; private set; }
@@ -354,8 +398,10 @@ namespace Stealth.Player
             if (InHatch) input = new PlayerInputState { Look = input.Look };
             EnterHatchIfNeeded();
             Motor.InHatch = InHatch;
-            Motor.Seated = SeatIndex >= 0;
+            UpdateLadder(input, Time.deltaTime);
+            Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
+            IntoDuctIfJumping();
             UpdateSeat(menu);
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
@@ -540,9 +586,60 @@ namespace Stealth.Player
 
         SewerLocation m_PlacedSewer;
 
+        Vector3? m_ServerPlace;
+        float m_ServerPlaceYaw;
+
+        /// <summary>Peers: the owner's identity arrived; the server gives a player who came back their things.</summary>
+        public void ApplyIdentity(string identity)
+        {
+            if (string.IsNullOrEmpty(identity) || identity == Identity) return;
+            Identity = identity;
+            if (IsServer) GameManager.Instance?.PlayerJoinedServer(this);
+        }
+
+        /// <summary>Server: tell the owner where to stand (a reconnect).</summary>
+        public void PlaceServer(Vector3 position, float yaw)
+        {
+            if (m_Link != null) m_Link.PlaceOwner(position, yaw);
+            else PlaceFromServer(position, yaw);
+        }
+
+        /// <summary>
+        /// Owner: whether this player already stands where the current location put them (the sewer's spawn, the house's
+        /// hatch, or the server's spot after a reconnect). Until then the screen stays black (<see cref="UI.LoadingRules"/>).
+        /// </summary>
+        public bool PlacedHere
+        {
+            get
+            {
+                if (m_ServerPlace != null) return false;
+                var sewer = SewerLocation.Active;
+                if (sewer != null) return m_PlacedSewer == sewer;
+                var layout = ActiveLevel.Layout;
+                return layout != null && (m_PlacedSeed == layout.Seed || layout.PlayerSpawns.Count == 0);
+            }
+        }
+
+        /// <summary>Owner: the server's spot wins over the usual spawn, once the house or the sewer is built here.</summary>
+        public void PlaceFromServer(Vector3 position, float yaw)
+        {
+            m_ServerPlace = position;
+            m_ServerPlaceYaw = yaw;
+        }
+
         void PlaceOnLevelIfNeeded()
         {
             var sewer = SewerLocation.Active;
+            if (m_ServerPlace is Vector3 place && (sewer != null || ActiveLevel.Layout != null))
+            {
+                m_ServerPlace = null;
+                m_PlacedSewer = sewer;
+                if (ActiveLevel.Layout != null) m_PlacedSeed = ActiveLevel.Layout.Seed;
+                m_PlacedInHatch = InHatch;
+                TeleportOwner(place, Quaternion.Euler(0f, m_ServerPlaceYaw, 0f));
+                Motor.SetPitch(0f);
+                return;
+            }
             if (sewer != null && sewer != m_PlacedSewer)
             {
                 m_PlacedSewer = sewer;
@@ -606,6 +703,60 @@ namespace Stealth.Player
             Debug.Log($"[Player] Unstuck: moved to {spot}");
         }
 
+        float m_LastFeetY;
+
+        /// <summary>
+        /// Owner: a crouched jump up through an open vent grate (from the crates under it): once the feet are nearly at the
+        /// duct's floor the body is set on it, crouched (the motor keeps it so under the duct's low top).
+        /// </summary>
+        void IntoDuctIfJumping()
+        {
+            var feet = transform.position;
+            bool rising = feet.y > m_LastFeetY + 0.0005f;
+            m_LastFeetY = feet.y;
+            if (Motor.Grounded || Climbing || Downed) return;
+            var grate = VentGrate.Under(feet, Motor.IsCrouching, rising);
+            if (grate == null) return;
+            var at = grate.transform.position;
+            TeleportOwner(new Vector3(feet.x, at.y + LevelMetrics.CeilingBoard + 0.03f, feet.z), transform.rotation);
+            Motor.ForceCrouch();
+        }
+
+        /// <summary>On the ladder between the basement and the lobby right now (<see cref="ShaftLadder"/>).</summary>
+        public bool Climbing { get; private set; }
+
+        /// <summary>
+        /// Owner, every frame before the motor: the ladder. On it when walking into it facing it (or falling down the open
+        /// shaft past it); W up, S down, Jump lets go; off at the floor below, off onto the lobby's floor at the top when the
+        /// lid is open (shut, the head stops against it). While on it the motor only turns the view (it is "seated").
+        /// </summary>
+        void UpdateLadder(in PlayerInputState input, float dt)
+        {
+            var ladder = ShaftLadder.Main;
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; return; }
+            var feet = transform.position;
+            if (!Climbing)
+            {
+                var facing = transform.forward;
+                facing.y = 0f;
+                Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
+                if (!Climbing) return;
+            }
+            if (input.Jump || !ladder.InZone(feet)) { Climbing = false; return; }
+            // W climbs the way the player looks: facing away from the ladder (back to the rungs), W goes down and S up
+            var look = transform.forward;
+            look.y = 0f;
+            float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
+            m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
+            feet = transform.position;
+            if (LadderMath.OffAtTop(feet.y, ladder.TopY, ShaftHatch.IsOpen()))
+            {
+                Climbing = false;
+                TeleportOwner(ladder.TopExit, transform.rotation);
+            }
+            else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom)) Climbing = false;
+        }
+
         public void TeleportOwner(Vector3 position, Quaternion rotation)
         {
             m_Controller.enabled = false;
@@ -629,8 +780,9 @@ namespace Stealth.Player
             var layout = ActiveLevel.Layout;
             bool outside = layout != null && !layout.IsInside(transform.position);
             // Lying, watching a teammate or in god mode, the gas has nothing to do with you (no overlay, no knockout).
-            if (Downed || Invulnerable) { Gas.Reset(); return; }
+            if (Downed || Invulnerable) { Gas.Reset(); GasShare = 0f; return; }
             var effect = Gas.Tick(outside, Time.deltaTime);
+            GasShare = Gas.Share;
             if (effect == GasExposure.Effect.Laugh) EmitNoise(Gas.Settings.LaughNoise);
             else if (effect == GasExposure.Effect.Knockout)
             {
@@ -689,7 +841,7 @@ namespace Stealth.Player
             HackProgress = m_HackHeld.Of(HackTarget);
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
-            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) : null;
+            DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) ?? StorageDoorAtTerminal() : null;
             if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
             {
                 if (m_Link != null) m_Link.SendUnlockDoor(DoorTarget.Index);
@@ -702,11 +854,19 @@ namespace Stealth.Player
             UpdateStorage();
             UpdateTerminal(holdE);
             UpdateUse(holdE);
-            if (Controls.Pressed(GameAction.Gadget) && !CursorMode && HasItem(Items.ItemCatalog.Stun))
+            if (Controls.Pressed(GameAction.Gadget) && !CursorMode && m_Inventory != null && m_Inventory.Holds(Items.ItemCatalog.Stun))
             {
                 if (m_Link != null) m_Link.SendGadget();
                 else GameManager.Instance?.GadgetServer(this);
             }
+            // the storage robot: B calls it here, N sends it to the exit (once the exit room is known)
+            if (!CursorMode && !Downed)
+                foreach (var (action, command) in new[] { (GameAction.BotCall, (byte)0), (GameAction.BotExit, (byte)1) })
+                    if (Controls.Pressed(action))
+                    {
+                        if (m_Link != null) m_Link.SendBot(command);
+                        else GameManager.Instance?.BotCommandServer(this, command);
+                    }
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
@@ -771,13 +931,6 @@ namespace Stealth.Player
         public float UseProgress { get; private set; }
         readonly HoldProgress<Interactable> m_UseHeld = new();
         bool m_UseWaitRelease;
-
-        bool HasItem(byte shape)
-        {
-            if (m_Inventory == null) return false;
-            foreach (var e in m_Inventory.Items) if (e.Shape == shape) return true;
-            return false;
-        }
 
         /// <summary>Owner: press (or hold) E at a crate, the med table, the workbench, a key lock, a lever, the car.</summary>
         // ------------------------------------------------------------------ the vault's lock panels
@@ -937,6 +1090,15 @@ namespace Stealth.Player
 
         /// <summary>Locked door in reach (hold E to hack), or null.</summary>
         public AutoDoor DoorTarget { get; private set; }
+
+        /// <summary>At the door terminal, looking at it: the storage room's door, while it is locked (hold E opens it from here).</summary>
+        AutoDoor StorageDoorAtTerminal()
+        {
+            var t = SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View);
+            if (t == null || t.Kind != TerminalKind.Doors) return null;
+            var d = AutoDoor.StorageDoor;
+            return d != null && !d.TerminalOpen ? d : null; // even while a worker holds it open: unlocking it is for good
+        }
         public float DoorProgress { get; private set; }
         public float DoorShare => DoorProgress / m_Interaction.DoorHackTime;
 
@@ -1241,6 +1403,7 @@ namespace Stealth.Player
             {
                 TerminalTarget = ReviveTarget == null && HackTarget == null && DoorTarget == null && SafeTarget == null && Cracking == null && StorageTarget == null
                     ? SecurityTerminal.Near(transform.position, Hands, SecurityTerminal.Reach, View) : null;
+                if (TerminalTarget != null && TerminalTarget.Kind == TerminalKind.Doors) TerminalTarget = null; // nothing to sit at: hold E to open the door
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
                 return;
@@ -1564,7 +1727,8 @@ namespace Stealth.Player
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            target.HackServer(m_Interaction.HackDuration);
+            if (target is Enemies.Detector d && GameManager.Instance != null) GameManager.Instance.TeamHackServer(d);
+            else target.HackServer(m_Interaction.HackDuration);
         }
     }
 }

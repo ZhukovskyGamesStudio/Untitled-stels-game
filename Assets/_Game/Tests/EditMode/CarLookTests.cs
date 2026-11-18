@@ -29,6 +29,18 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheSteeringWheelTurnsTheWayTheCarTurnsAndSlower()
+        {
+            // the top of the wheel's rim (perpendicular to the column, up): goes to the driver's right (+X) in a right turn
+            var top = Vector3.Cross(CarLook.SteeringAxis, Vector3.right).normalized;
+            if (top.y < 0f) top = -top;
+            Assert.Greater((CarLook.SteeringWheel(20f, 4f) * top).x, 0.5f, "right turn: clockwise for the driver");
+            Assert.Less((CarLook.SteeringWheel(-20f, 4f) * top).x, -0.5f, "left turn: anticlockwise");
+            float full = Quaternion.Angle(Quaternion.identity, CarLook.SteeringWheel(new CarSettings().MaxSteer, new CarSettings().SteeringRatio));
+            Assert.Less(full, 180f, "full lock is less than half a turn of the wheel");
+        }
+
+        [Test]
         public void MirroringMovesTheWheelToTheOtherSideAndKeepsRotationsProper()
         {
             var root = new GameObject("Model");

@@ -28,6 +28,17 @@ namespace Stealth.Player
 
         public static bool InHand(InventoryEntry e) => e.X == HandX;
 
+        /// <summary>The belt bag being worn: an entry with this X (no cells of the backpack). It brings the belt's grid.</summary>
+        public const byte WornX = 254;
+        /// <summary>The belt's 4 x 4 grid: entries with X from here (X − BeltX0 is the belt's column).</summary>
+        public const byte BeltX0 = 100;
+        public const int BeltSize = 4;
+
+        public static bool Worn(InventoryEntry e) => e.X == WornX;
+        public static bool InBelt(InventoryEntry e) => e.X >= BeltX0 && e.X < BeltX0 + BeltSize;
+        /// <summary>Off the backpack's and the belt's grids (the hand, the worn bag).</summary>
+        static bool OffGrid(InventoryEntry e) => InHand(e) || Worn(e);
+
         readonly List<InventoryEntry> m_Items = new();
         IInventoryLink m_Link;
         PlayerController m_Player;
@@ -69,7 +80,7 @@ namespace Stealth.Player
             var set = new HashSet<Vector2Int>();
             for (int i = 0; i < m_Items.Count; i++)
             {
-                if (i == ignoreIndex || InHand(m_Items[i])) continue;
+                if (i == ignoreIndex || OffGrid(m_Items[i])) continue;
                 var e = m_Items[i];
                 foreach (var c in e.Cells) set.Add(new Vector2Int(e.X + c.x, e.Y + c.y));
             }
@@ -81,16 +92,52 @@ namespace Stealth.Player
             for (int i = 0; i < m_Items.Count; i++)
             {
                 var e = m_Items[i];
-                if (InHand(e)) continue;
+                if (OffGrid(e)) continue;
                 foreach (var c in e.Cells)
                     if (e.X + c.x == cell.x && e.Y + c.y == cell.y) return i;
             }
             return -1;
         }
 
-        public bool CanPlace(int shape, int rot, int x, int y, int ignoreIndex = -1) =>
-            x == HandX ? ItemCatalog.Holdable(shape) && HandIndex(ignoreIndex) < 0
-                       : InventoryLayout.Fits(ItemCatalog.RotatedCells(shape, rot), x, y, Occupied(ignoreIndex));
+        public bool CanPlace(int shape, int rot, int x, int y, int ignoreIndex = -1)
+        {
+            // the worn bag stays on while its belt holds something
+            if (ignoreIndex >= 0 && ignoreIndex < m_Items.Count && Worn(m_Items[ignoreIndex]) && x != WornX && BeltCount() > 0) return false;
+            if (x == HandX) return ItemCatalog.Holdable(shape) && HandIndex(ignoreIndex) < 0;
+            if (x == WornX) return shape == ItemCatalog.BeltBag && WornIndex(ignoreIndex) < 0;
+            if (x >= BeltX0 && x < BeltX0 + BeltSize)
+                return WornIndex(ignoreIndex) >= 0 && BeltFits(ItemCatalog.RotatedCells(shape, rot), x, y, Occupied(ignoreIndex));
+            return InventoryLayout.Fits(ItemCatalog.RotatedCells(shape, rot), x, y, Occupied(ignoreIndex));
+        }
+
+        /// <summary>Cells inside the belt's 4 x 4 grid (in the inventory's columns: <see cref="BeltX0"/> on) and free.</summary>
+        public static bool BeltFits(Vector2Int[] cells, int x, int y, HashSet<Vector2Int> occupied)
+        {
+            foreach (var c in cells)
+            {
+                int cx = x + c.x, cy = y + c.y;
+                if (cx < BeltX0 || cx >= BeltX0 + BeltSize || cy < 0 || cy >= BeltSize || occupied.Contains(new Vector2Int(cx, cy))) return false;
+            }
+            return true;
+        }
+
+        /// <summary>The worn belt bag (index in <see cref="Items"/>), -1 without one.</summary>
+        public int WornIndex(int ignoreIndex = -1)
+        {
+            for (int i = 0; i < m_Items.Count; i++) if (i != ignoreIndex && Worn(m_Items[i])) return i;
+            return -1;
+        }
+
+        /// <summary>A belt bag is worn: the belt's grid is there.</summary>
+        public bool HasBelt => WornIndex() >= 0;
+
+        /// <summary>How many things are in the belt.</summary>
+        public int BeltCount()
+        {
+            int n = 0;
+            foreach (var e in m_Items) if (InBelt(e)) n++;
+            return n;
+        }
 
         /// <summary>The item held in the hand slot (index in <see cref="Items"/>), -1 if the hand is empty.</summary>
         public int HandIndex(int ignoreIndex = -1)
@@ -103,10 +150,29 @@ namespace Stealth.Player
         public bool CanRecharge(int flashlight) =>
             flashlight >= 0 && flashlight < m_Items.Count && m_Items[flashlight].Shape == ItemCatalog.Flashlight && m_Items[flashlight].Color < ItemCatalog.FullCharge;
 
-        /// <summary>First free position for an item, trying all rotations. Used by tests and quick pickup.</summary>
+        /// <summary>First free position for an item, trying all rotations: the backpack, then the belt (if worn). Used by tests and quick pickup.</summary>
         public bool FindSpot(int shape, out byte x, out byte y, out byte rot)
         {
+            if (shape == ItemCatalog.BeltBag && !HasBelt) { x = WornX; y = 0; rot = 0; return true; } // a belt bag is put on
             var occupied = Occupied();
+            if (FindIn(shape, occupied, out x, out y, out rot)) return true;
+            if (!HasBelt) return false;
+            for (int r = 0; r < 4; r++)
+            {
+                var cells = ItemCatalog.RotatedCells(shape, r);
+                for (int yy = 0; yy < BeltSize; yy++)
+                    for (int xx = BeltX0; xx < BeltX0 + BeltSize; xx++)
+                        if (BeltFits(cells, xx, yy, occupied))
+                        {
+                            x = (byte)xx; y = (byte)yy; rot = (byte)r;
+                            return true;
+                        }
+            }
+            return false;
+        }
+
+        static bool FindIn(int shape, HashSet<Vector2Int> occupied, out byte x, out byte y, out byte rot)
+        {
             for (int r = 0; r < 4; r++)
             {
                 var cells = ItemCatalog.RotatedCells(shape, r);
@@ -242,6 +308,8 @@ namespace Stealth.Player
         {
             if (!CanAct || item == null) return;
             if ((item.transform.position - transform.position).magnitude > ReachDistance + 1.5f) return;
+            // a belt bag is put on (its belt's grid appears), wherever it was dropped in the backpack
+            if (item.Shape == ItemCatalog.BeltBag && !HasBelt) { x = WornX; y = 0; rot = 0; }
             if (!CanPlace(item.Shape, rot, x, y)) return;
             m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
             Changed();
@@ -258,9 +326,12 @@ namespace Stealth.Player
             Changed();
         }
 
+        /// <summary>The worn belt bag comes off only empty (its belt's things have nowhere to go).</summary>
+        bool Locked(int index) => Worn(m_Items[index]) && BeltCount() > 0;
+
         public void DropServer(int index, Vector3 position, float yaw)
         {
-            if (index < 0 || index >= m_Items.Count) return;
+            if (index < 0 || index >= m_Items.Count || Locked(index)) return;
             if ((position - transform.position).magnitude > ReachDistance + 1.5f)
                 position = transform.position + transform.forward * 0.8f;
             var e = m_Items[index];
@@ -280,14 +351,15 @@ namespace Stealth.Player
 
         /// <summary>
         /// Server: one thing dropped into the car's hopper (in the sewer) or into the entry hatch (in a house) burns into fuel
-        /// at once. Tools are not burnt; anywhere else nothing happens.
+        /// at once — tools too (a key, the stun, the speaker burn at the grey rate); anywhere else nothing happens.
         /// </summary>
         public void DepositServer(int index)
         {
-            if (index < 0 || index >= m_Items.Count || !CanAct || ItemCatalog.IsTool(m_Items[index].Shape)) return;
+            if (index < 0 || index >= m_Items.Count || !CanAct || Locked(index)) return;
             var game = GameManager.Instance;
             if (game == null || !game.CanBurnAt(transform.position)) return;
             var e = m_Items[index];
+            if (ItemCatalog.Unburnable(e.Shape)) return;
             m_Items.RemoveAt(index);
             Changed();
             game.BurnServer(GetComponent<PlayerController>(), e.Value);
@@ -363,7 +435,7 @@ namespace Stealth.Player
 
         public void StashServer(int index, byte x, byte y, byte rot)
         {
-            if (index < 0 || index >= m_Items.Count || !AtHatch(out var stash)) return;
+            if (index < 0 || index >= m_Items.Count || !AtHatch(out var stash) || Locked(index)) return;
             var e = m_Items[index];
             if (!stash.Add(e.Shape, e.Color, x, y, rot)) return;
             m_Items.RemoveAt(index);
@@ -379,17 +451,24 @@ namespace Stealth.Player
             {
                 // at the car: everything from the backpack onto its bed
                 var rng = new System.Random(m_Items.Count * 7919 + (int)(Time.time * 10f));
-                foreach (var e in m_Items)
+                // (the worn belt bag stays on)
+                bool any = false;
+                for (int i = m_Items.Count - 1; i >= 0; i--)
                 {
+                    var e = m_Items[i];
+                    if (Worn(e)) continue;
                     var spot = game.Cargo.FreeSpot(rng);
                     game.Cargo.Add(e.Shape, e.Color, spot.x, spot.y, rng.Next(360));
+                    m_Items.RemoveAt(i);
+                    any = true;
                 }
-                if (m_Items.Count > 0) { m_Items.Clear(); Changed(); }
+                if (any) Changed();
                 return;
             }
-            if (!AtHatch(out var stash) || m_Items.Count == 0) return;
-            if (stash.AddAll(m_Items, out var left) == 0) return;
-            m_Items.Clear();
+            var carried = m_Items.FindAll(e => !Worn(e));
+            if (!AtHatch(out var stash) || carried.Count == 0) return;
+            if (stash.AddAll(carried, out var left) == 0) return;
+            m_Items.RemoveAll(e => !Worn(e));
             m_Items.AddRange(left);
             Changed();
         }
@@ -407,11 +486,11 @@ namespace Stealth.Player
             if (AtHatch(out var stash)) stash.Move(from, x, y, rot);
         }
 
-        /// <summary>Server: a thing from the entry hatch's stash dropped on its burn zone becomes fuel (tools are not burnt).</summary>
+        /// <summary>Server: a thing from the entry hatch's stash dropped on its burn zone becomes fuel (tools too).</summary>
         public void SellStashedServer(InventoryEntry from)
         {
             var game = GameManager.Instance;
-            if (!AtHatch(out var stash) || game == null || stash != game.Stash || ItemCatalog.IsTool(from.Shape) || !stash.Take(from)) return;
+            if (ItemCatalog.Unburnable(from.Shape) || !AtHatch(out var stash) || game == null || stash != game.Stash || !stash.Take(from)) return;
             game.BurnServer(GetComponent<PlayerController>(), from.Value);
         }
 
@@ -425,7 +504,7 @@ namespace Stealth.Player
         public void SellWorldServer(WorldItem item)
         {
             var game = GameManager.Instance;
-            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.IsTool(item.Shape)) return;
+            if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.Unburnable(item.Shape)) return;
             int fuel = item.Value;
             Session.Despawn(item.gameObject);
             game.BurnServer(GetComponent<PlayerController>(), fuel);
@@ -441,6 +520,40 @@ namespace Stealth.Player
         }
 
         /// <summary>Server: use up one item of this shape (a key, a stun cube). False if there is none.</summary>
+        /// <summary>Server: a copy of what is carried (a player who leaves keeps it for a reconnect).</summary>
+        public List<InventoryEntry> SnapshotServer() => new(m_Items);
+
+        /// <summary>Server: a player who came back gets their things again (what does not fit is dropped at their feet).</summary>
+        public void RestoreServer(List<InventoryEntry> items)
+        {
+            foreach (var e in items)
+            {
+                if (CanPlace(e.Shape, e.Rot, e.X, e.Y)) m_Items.Add(e);
+                else if (!GiveServer(e.Shape, e.Color)) GameManager.Instance?.SpawnItemServer(e.Shape, e.Color, transform.position + Vector3.up * 0.3f, 0f);
+            }
+            Changed();
+        }
+
+        /// <summary>Whether the hand slot holds an item of this shape (keys and the stun work only from the hand).</summary>
+        public bool Holds(byte shape)
+        {
+            int h = HandIndex();
+            return h >= 0 && m_Items[h].Shape == shape;
+        }
+
+        /// <summary>Whether the backpack or the hand has an item of this shape.</summary>
+        public bool Has(byte shape) => m_Items.Exists(e => e.Shape == shape);
+
+        /// <summary>Server: use up the item in the hand if it is of this shape.</summary>
+        public bool TakeHeldServer(byte shape)
+        {
+            int h = HandIndex();
+            if (h < 0 || m_Items[h].Shape != shape) return false;
+            m_Items.RemoveAt(h);
+            Changed();
+            return true;
+        }
+
         public bool TakeServer(byte shape)
         {
             int i = m_Items.FindIndex(e => e.Shape == shape);

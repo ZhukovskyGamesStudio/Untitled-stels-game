@@ -36,9 +36,19 @@ namespace Stealth.Level
         public static void Rebuild(StyleGeometry g, StyleKit kit, GameObject holder)
         {
             Clear();
-            if (g == null || kit == null || holder == null || !g.HasArchitecture || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
+            var wallParts = ActiveLevel.Shell?.WallParts;
+            if (wallParts != null)
+                foreach (var r in wallParts)
+                    if (r != null) r.forceRenderingOff = false; // the bare wall's look until the finish takes over
+            bool vault = ActiveLevel.Layout != null && ActiveLevel.Layout.VaultRoom >= 0; // dressed in steel in every style
+            g = ShopLook.For(g, kit, ActiveLevel.Layout); // the auto repair shop dresses as one in every style
+            g = ClinicLook.For(g, kit, ActiveLevel.Layout); // and the hospital as a hospital
+            g = HomeLook.For(g, kit, ActiveLevel.Layout); // and the apartment block as one
+            if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
+            s_Kit = kit;
             var root = ActiveLevel.Root.transform;
             var batcher = new MeshBatcher(root.worldToLocalMatrix);
+            AddWallParts(batcher, wallParts, g, kit);
             foreach (var p in ArchitecturePlanner.Plan(ActiveLevel.Shell, ActiveLevel.Layout, g))
             {
                 bool finish = p.IsQuad;
@@ -68,12 +78,13 @@ namespace Stealth.Level
                         // an arch's spandrels are the wall itself: its finish, its texture continuing over the opening
                         var n = p.Rotation * Vector3.forward;
                         var right = Vector3.Cross(Vector3.up, -n);
+                        var (paper, tile) = WallOf(p.Variant, g); // the finish of the room on the arch's side
                         var wall = new WallProjection
                         {
-                            Right = right, Normal = n, Across = ArchitecturePlanner.Across(right), Tile = g.WallTile, FloorY = p.Position.y,
+                            Right = right, Normal = n, Across = ArchitecturePlanner.Across(right), Tile = tile, FloorY = p.Position.y,
                         };
                         // in the plane of the finish quads around the opening (6 mm off the wall), or the outline filters draw the step
-                        batcher.Add(chunk, part.look, g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
+                        batcher.Add(chunk, part.look, paper ?? g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
                         continue;
                     }
                     var style = MaterialFor(p.Kind, part.name, g);
@@ -90,7 +101,37 @@ namespace Stealth.Level
             MeshBatcher.Spawn(baked, holder, root, "Decor", s_Batches);
         }
 
+        /// <summary>
+        /// Parts of doors that are the wall itself (the corners round the vault's round door, <see cref="AutoDoor.WallParts"/>):
+        /// the wall finish with the wall's own texture layout, in the plane of the finish quads round the opening — the
+        /// door sits in the wall without a seam. Their own renderers (the bare wall's look) step aside.
+        /// </summary>
+        static void AddWallParts(MeshBatcher batcher, List<MeshRenderer> parts, StyleGeometry g, StyleKit kit)
+        {
+            if (parts == null) return;
+            foreach (var r in parts)
+            {
+                if (r == null || !r.TryGetComponent<MeshFilter>(out var mf) || !MeshBatcher.CanMerge(mf.sharedMesh)) continue;
+                // the vault's side of its door wall is the vault's steel, the corridor's side the style's wall
+                bool inside = r.gameObject.name == "WallBack" && kit.VaultWall != null;
+                var mat = inside ? kit.VaultWall : g.Wall;
+                if (mat == null) continue;
+                var t = r.transform;
+                var n = t.forward; // the face looks out of the wall along the part's +Z
+                var wall = new WallProjection
+                {
+                    Right = Vector3.Cross(Vector3.up, -n), Normal = n, Across = ArchitecturePlanner.Across(Vector3.Cross(Vector3.up, -n)),
+                    Tile = inside ? kit.VaultWallTile : g.WallTile, FloorY = t.position.y,
+                };
+                batcher.Add(MeshBatcher.ChunkOf(t.position), BatchLook.Of(r), mat, mf.sharedMesh, 0,
+                    Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * t.localToWorldMatrix, null, wall);
+                r.forceRenderingOff = true;
+            }
+        }
+
         static readonly Dictionary<GameObject, bool> s_Mergeable = new();
+        /// <summary>The kit of the last rebuild (its vault finishes).</summary>
+        static StyleKit s_Kit;
         static MaterialPropertyBlock s_Block;
         static readonly int BaseMapSt = Shader.PropertyToID("_BaseMap_ST");
 
@@ -130,6 +171,18 @@ namespace Stealth.Level
 
         static bool IsDecal(DecorKind k) => k is DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster;
 
+        /// <summary>
+        /// A wall finish by its variant (<see cref="DecorPiece.Variant"/>): 0 the style's wall, 1 + 2k the k-th room look's
+        /// wall, 2 + 2k its lower band; and the metres one repeat of its texture covers.
+        /// </summary>
+        static (Material, float) WallOf(int variant, StyleGeometry g)
+        {
+            int k = (variant - 1) / 2;
+            if (variant <= 0 || g.RoomLooks == null || k >= g.RoomLooks.Length) return (g.Wall, g.WallTile);
+            var look = g.RoomLooks[k];
+            return variant % 2 == 1 ? (look.Wall ?? g.Wall, look.Wall != null ? look.WallTile : g.WallTile) : (look.Lower, look.LowerTile);
+        }
+
         /// <summary>The material of a decal: its variant in the style's decay or poster list.</summary>
         static Material DecalOf(DecorPiece p, StyleGeometry g)
         {
@@ -142,6 +195,12 @@ namespace Stealth.Level
         {
             var (mat, tileSize) = p.Kind switch
             {
+                DecorKind.FloorFinish when p.Threshold => (s_Kit != null && s_Kit.Threshold != null ? s_Kit.Threshold : g.Trim, 1f),
+                DecorKind.FloorFinish when p.Vault && s_Kit != null && s_Kit.VaultFloor != null => (s_Kit.VaultFloor, s_Kit.VaultFloorTile),
+                DecorKind.WallFinish when p.Vault && s_Kit != null && s_Kit.VaultWall != null => (s_Kit.VaultWall, s_Kit.VaultWallTile),
+                DecorKind.WallFinish when p.Variant > 0 => WallOf(p.Variant, g),
+                DecorKind.CeilingFinish when p.Variant > 0 && g.RoomLooks != null && p.Variant <= g.RoomLooks.Length
+                    => (g.RoomLooks[p.Variant - 1].Ceiling, g.RoomLooks[p.Variant - 1].CeilingTile),
                 DecorKind.FloorFinish when p.Variant > 0 && g.RoomFloors != null && p.Variant <= g.RoomFloors.Length
                     => (g.RoomFloors[p.Variant - 1].Material, g.RoomFloors[p.Variant - 1].Tile),
                 DecorKind.FloorFinish => (g.Floor, g.FloorTile),

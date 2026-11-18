@@ -139,6 +139,16 @@ namespace Stealth.Net
         bool ISessionLauncher.SteamAvailable => SteamManager.Initialized;
         string ISessionLauncher.SteamStatus => SteamManager.Initialized ? Loc.F("net.steam_on", SteamManager.PersonaName) : Loc.F("net.steam_off", SteamManager.Error);
         string ISessionLauncher.LocalPlayerName => SteamManager.Initialized ? SteamManager.PersonaName : null;
+        string ISessionLauncher.LocalPlayerId
+        {
+            get
+            {
+                if (SteamManager.Initialized) return "steam:" + Steamworks.SteamUser.GetSteamID().m_SteamID;
+                const string key = "stealth.player_id";
+                if (!PlayerPrefs.HasKey(key)) PlayerPrefs.SetString(key, System.Guid.NewGuid().ToString("N"));
+                return "local:" + PlayerPrefs.GetString(key) + ":" + LocalPort; // two windows on one computer are two players
+            }
+        }
         bool ISessionLauncher.CanInviteFriends => UsingSteam && SteamLobby.Instance != null && SteamLobby.Instance.InLobby;
 
         IReadOnlyList<FriendLobby> ISessionLauncher.FriendLobbies =>

@@ -39,13 +39,67 @@ namespace Stealth.Tests
             var config = System.Environment.GetEnvironmentVariable("PLANCONFIG");
             var level = string.IsNullOrEmpty(config) ? null
                 : UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.LevelConfig>($"Assets/_Game/Data/Config/{config}/Level.asset");
+            // PLANCLASSIC=1 draws the classic generator's houses (rooms cut first, types guessed), else the room program's
+            bool classic = System.Environment.GetEnvironmentVariable("PLANCLASSIC") == "1";
             foreach (var (seed, house) in list)
-                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}.png"),
-                    Draw(level != null ? LevelGenerator.Generate(seed, house, level.Building, level.Security, 1) : LevelGenerator.Generate(seed, house)));
+                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}{(classic ? "_classic" : "")}.png"),
+                    Draw(LevelGenerator.Generate(seed, house, level != null ? level.Building : null, level != null ? level.Security : null, 1, null, classic)));
+        }
+
+        /// <summary>Logs/plans/garage_&lt;seed&gt;_&lt;house&gt;.png — the first auto repair shops of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteGaragePlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = 1 + seed % 4;
+                if (HouseKinds.Of(seed, house) != HouseKind.Garage) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"garage_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
+        }
+
+        /// <summary>Logs/plans/hospital_&lt;seed&gt;_&lt;house&gt;.png — the first hospitals of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteHospitalPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = 1 + seed % 4;
+                if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"hospital_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
+        }
+
+        /// <summary>Logs/plans/apartments_&lt;seed&gt;_&lt;house&gt;.png — the first apartment blocks of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteApartmentPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 400; seed++)
+            {
+                int house = seed % 5;
+                if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"apartments_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                n++;
+            }
         }
 
         static Color TypeColor(RoomType t) => t switch
         {
+            RoomType.FlatHall => new Color(0.85f, 0.8f, 0.7f),
+            RoomType.Living => new Color(0.95f, 0.7f, 0.5f),
+            RoomType.Bedroom => new Color(0.75f, 0.6f, 0.9f),
+            RoomType.Bathroom => new Color(0.55f, 0.85f, 0.95f),
             RoomType.Lobby => new Color(0.55f, 0.85f, 0.6f),
             RoomType.OpenSpace => new Color(0.6f, 0.75f, 0.95f),
             RoomType.Office => new Color(0.75f, 0.7f, 0.95f),
@@ -56,6 +110,14 @@ namespace Stealth.Tests
             RoomType.Restroom => new Color(0.75f, 0.9f, 0.95f),
             RoomType.Lounge => new Color(0.95f, 0.65f, 0.75f),
             RoomType.Corridor => new Color(0.9f, 0.9f, 0.88f),
+            RoomType.Workshop => new Color(0.6f, 0.62f, 0.66f),
+            RoomType.PaintBooth => new Color(0.95f, 0.45f, 0.4f),
+            RoomType.Utility => new Color(0.4f, 0.45f, 0.5f),
+            RoomType.Ward => new Color(0.7f, 0.85f, 0.95f),
+            RoomType.NurseStation => new Color(0.95f, 0.85f, 0.3f),
+            RoomType.Operating => new Color(0.4f, 0.8f, 0.6f),
+            RoomType.Imaging => new Color(0.65f, 0.5f, 0.85f),
+            RoomType.Infirmary => new Color(0.9f, 0.6f, 0.6f),
             _ => new Color(0.85f, 0.85f, 0.7f),
         };
 

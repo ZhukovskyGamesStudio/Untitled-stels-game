@@ -41,6 +41,8 @@ namespace Stealth.Game
 
         RunState m_Run = new();
         readonly List<GameObject> m_Spawned = new();
+        /// <summary>The new enemy mode: this house's time is up and its guards are off their docks for good.</summary>
+        bool m_GuardsAwake;
         IGameLink m_Link;
         bool m_IsServer;
         int m_BuiltSeed;
@@ -72,6 +74,8 @@ namespace Stealth.Game
 
         public static int DoorKey(int door) => door;
         public static int SafeKey(int safe) => 1_000_000 + safe;
+        /// <summary>The storage door held open from inside, for now (<see cref="AutoDoor.IsEscaping"/>).</summary>
+        public static int EscapeKey(int door) => 7_000_000 + door;
         /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
         public static int TerminalKey(int terminal, int use) => 2_000_000 + terminal * 16 + use;
         /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
@@ -133,13 +137,18 @@ namespace Stealth.Game
             m_IsServer = isServer;
             m_Run = new RunState(Tuning.Run.Rules);
             AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
+            AutoDoor.IsEscaping = i => IsOpened(EscapeKey(i));
             Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
             Items.Storage.IsOpened = (prop, part) => IsOpened(StorageKey(prop, part));
             SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
             HookFeatures();
             if (!isServer) return;
             // A run starts in the sewer, at the first fork (tests and -level start right in a house).
-            if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0) StartLevel(DevFlags.ForcedLevel, 0);
+            if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0)
+            {
+                m_RunSeed = 0; // a run that starts right in a house: a fresh seed
+                StartLevel(DevFlags.ForcedLevel, 0);
+            }
             else StartRunServer();
             DevFlags.ForcedLevel = 0;
         }
@@ -290,7 +299,8 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
+            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
+                LevelGenerator.Classic, info.ClassicEnemies);
             ActiveLevel.Load(layout, Art);
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
@@ -311,29 +321,29 @@ namespace Stealth.Game
             RenderSettings.reflectionIntensity = 0f;
         }
 
-        void StartLevel(int index, int lane)
+        void StartLevel(int index, int lane, int houseSeed = 0)
         {
             foreach (var obj in m_Spawned) Session.Despawn(obj);
             m_Spawned.Clear();
             foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
 
             ScentTrail.Clear();
-            // One seed per run: forced from the command line, or a fresh one when a run (house 0 or a test level) starts.
-            if (DevFlags.ForcedSeed != 0) m_RunSeed = DevFlags.ForcedSeed;
-            else if (index == DevFlags.ForcedLevel || m_RunSeed == 0) m_RunSeed = new System.Random().Next(1, int.MaxValue);
+            m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);
             lane = Mathf.Clamp(lane, 0, Route.LanesAt(index) - 1);
-            int seed = Route.Node(index, lane).Seed;
+            int seed = houseSeed != 0 ? houseSeed : Route.Node(index, lane).Seed;
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
             m_Opened.Clear();
+            m_Hacked.Clear();
             OpenedVersion++;
+            Lift = LiftState.ParkedAt(0); // a new house: the lift stands open on the ground floor
             LeaveAt = 0;
             GoAt = 0;
             ChosenLane = -1;
             Votes.Clear();
-            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed };
+            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
             BuildLocal();
             var layout = ActiveLevel.Layout;
 
@@ -343,12 +353,14 @@ namespace Stealth.Game
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
+            m_GuardsAwake = false;
             DespawnCarServer();
             UnloadCarServer();
+            SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All)
             {
                 p.ResetForLevelServer();
-                p.EnterHatchServer(0); // the team comes up into the entry hatch
+                if (!layout.HasBasement) p.EnterHatchServer(0); // the team comes up into the entry hatch (a basement: it stands down there)
             }
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
@@ -369,6 +381,7 @@ namespace Stealth.Game
                     }
             free.Sort(); // the same order on every run of the same house
             m_Hidden.Clear();
+            HideShelterMap(layout, free, parts, hideRng);
             int total = 0;
             float inStorage = Tuning.Level.Loot.InStorageChance;
             foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
@@ -397,6 +410,7 @@ namespace Stealth.Game
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
+                if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(pos, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
             }
             PostWardens(layout, wardens);
@@ -406,6 +420,33 @@ namespace Stealth.Game
             foreach (var spot in layout.LaserSpots)
                 m_Spawned.Add(Session.Spawn(LaserPrefab, spot.Position, spot.Rotation, go => go.GetComponent<LaserGate>().Configure(spot.Kind, spot.Width)));
             return total;
+        }
+
+        /// <summary>
+        /// Server, an apartment block: the shelter map into a cupboard of its flat (a wardrobe, a chest of drawers, the hall's
+        /// shoe cabinet…; the planned room's first) — it appears when that part is opened — or onto the room's floor.
+        /// </summary>
+        void HideShelterMap(LevelLayout layout, List<int> free, Dictionary<int, (Items.Storage storage, int part)> parts, System.Random rng)
+        {
+            if (layout.MapFlat < 0) return;
+            int best = -1, bestRank = -1;
+            foreach (int key in free)
+            {
+                var (storage, part) = parts[key];
+                if (storage.Index < 0 || storage.Index >= layout.Props.Count || !storage.Fits(part, ItemCatalog.ShelterMap)) continue;
+                var at = layout.Props[storage.Index].Position;
+                if (HouseFeatures.FlatAt(layout, at) != layout.MapFlat) continue;
+                var room = layout.Plan.RoomAt(at + Vector3.up * 0.3f);
+                int rank = (room != null && room.Id == layout.MapRoom ? 100 : 0) + rng.Next(50);
+                if (rank > bestRank) { bestRank = rank; best = key; }
+            }
+            if (best >= 0)
+            {
+                m_Hidden[best] = (ItemCatalog.ShelterMap, 0);
+                free.Remove(best);
+                return;
+            }
+            SpawnItemServer(ItemCatalog.ShelterMap, 0, layout.MapSpot + Vector3.up * 0.1f, rng.Next(360));
         }
 
         // ------------------------------------------------------------------ server API
@@ -443,8 +484,10 @@ namespace Stealth.Game
         public void RaiseAlarmServer(Vector3 position, float radius)
         {
             m_Run.RaiseAlarm(Session.ServerTime);
+            m_Bot?.HideServer(ActiveLevel.Layout); // the team's storage robot runs home to the basement
             foreach (var robot in RobotController.Robots)
-                if ((robot.transform.position - position).magnitude <= radius)
+                if (robot.Docked) robot.AlarmServer(position); // resting guards wake wherever they are
+                else if ((robot.transform.position - position).magnitude <= radius)
                     robot.InvestigateServer(position, true);
         }
 
@@ -464,11 +507,23 @@ namespace Stealth.Game
             if (Phase == RunPhase.Sewer) { UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
+            UpdateHacks();
             UpdateDryers();
+            UpdateStorageDoor();
+            UpdateLift();
             UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
-            if (!InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
+            bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
+            if (classic && !InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            // the new mode: when the house's time is up (the hunter's timer) the guards leave their docks for good
+            if (!classic && !m_GuardsAwake && m_Run.HunterForecast(Time.time - LevelStartTime).seconds == 0f)
+            {
+                m_GuardsAwake = true;
+                foreach (var robot in RobotController.Robots) if (robot.Docked) robot.WakeForGoodServer();
+                Banner(Loc.Pack("banner.guards_awake"));
+            }
             UpdateHunterForecast();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
@@ -598,7 +653,8 @@ namespace Stealth.Game
         void UpdateHatch()
         {
             // everyone in a hatch (either one), at least one in the exit's
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch, p.HatchIndex == 1, p.KnockedOut)));
+            // (the basement the team came in through counts as the way back: down there is "in the entry")
+            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch || InBasement(p.transform.position), p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
             if (!hidden) { LeaveAt = 0; return; }
             if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
             else if (Session.ServerTime >= LeaveAt) GoToSewerServer();
@@ -618,6 +674,7 @@ namespace Stealth.Game
             DriveUntil = 0;
             int lost = LoadCarServer();
             m_Opened.Clear(); // the house is gone; the gate is shut
+            m_Hacked.Clear();
             OpenedVersion++;
             foreach (var p in PlayerController.All)
             {
@@ -649,6 +706,8 @@ namespace Stealth.Game
             EnsureRoute(m_RunSeed);
             m_Run.BeginRun();
             m_Opened.Clear();
+            m_Hacked.Clear();
+            ForgetLeavers();
             OpenedVersion++;
             LeaveAt = 0;
             GoAt = 0;
@@ -680,8 +739,49 @@ namespace Stealth.Game
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock && !a.NeedsKey); // a key door needs its key
-            if (d == null || Vector3.Distance(d.transform.position, player.transform.position) > AutoDoor.HackReach + 1.5f) return;
+            if (d == null) return;
+            var at = player.transform.position;
+            bool byHand = Vector3.Distance(d.transform.position, at) <= AutoDoor.HackReach + 1.5f;
+            if (d.Storage)
+            {
+                // the storage room's door: from its terminal, or by hand from inside
+                bool terminal = SecurityTerminal.All.Any(t => t.Kind == TerminalKind.Doors
+                    && Vector3.Distance(Flat(t.transform.position), Flat(at)) <= SecurityTerminal.Reach + 1.5f && Mathf.Abs(t.transform.position.y - at.y) < 2f);
+                if (!terminal)
+                {
+                    // by hand from inside: open for now, so the player gets out; locked again behind them (UpdateStorageDoor)
+                    if (!byHand || !AutoDoor.IsInside(d.transform.position, d.Inward, at)) return;
+                    m_EscapeSeen = Time.time;
+                    if (m_Opened.Add(EscapeKey(door))) OpenedVersion++;
+                    return;
+                }
+            }
+            else if (!byHand) return;
             if (m_Opened.Add(DoorKey(door))) OpenedVersion++;
+        }
+
+        static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);
+
+        /// <summary>Server: last time a player was in the storage room or at its door while it was held open from inside.</summary>
+        float m_EscapeSeen;
+        /// <summary>Server: how long the storage door stays open from inside with nobody left in the room or at the door, s.</summary>
+        const float EscapeLinger = 1f;
+
+        /// <summary>Server: the storage door opened from inside locks again once no player is in the room or at the door.</summary>
+        void UpdateStorageDoor()
+        {
+            var d = AutoDoor.StorageDoor;
+            if (d == null || !IsOpened(EscapeKey(d.Index))) return;
+            var at = d.transform.position;
+            foreach (var p in PlayerController.All)
+                if (AutoDoor.AtDoor(at, p.transform.position) || AutoDoor.InRoom(at, d.Inward, d.Room, p.transform.position))
+                {
+                    m_EscapeSeen = Time.time;
+                    return;
+                }
+            if (Time.time - m_EscapeSeen < EscapeLinger) return;
+            m_Opened.Remove(EscapeKey(d.Index));
+            OpenedVersion++;
         }
 
         /// <summary>Server: a player at a hacking terminal hacks a robot / device anywhere in the house (a charge is spent).</summary>
@@ -697,7 +797,7 @@ namespace Stealth.Game
             if (uses >= Tuning.Player.Interaction.TerminalHacks) return;
             m_Opened.Add(TerminalKey(terminal, uses));
             OpenedVersion++;
-            target.HackServer(Tuning.Player.Interaction.HackDuration);
+            TeamHackServer(target);
         }
 
         /// <summary>
@@ -743,6 +843,27 @@ namespace Stealth.Game
         }
 
         /// <summary>Server: a player pressed R after a failed run.</summary>
+        int m_CheatHouses;
+
+        /// <summary>
+        /// Server, cheat (F4 panel): a house of <paramref name="kind"/> starts now, whatever is going on — in a house, in the
+        /// sewer, on the drive, after the run failed: the drive and the countdowns stop, the car's seats and the hatches empty,
+        /// everyone stands up and comes up in the new house's entry hatch (its number stays: the same depth of the run).
+        /// </summary>
+        public void StartHouseServer(HouseKind kind)
+        {
+            DriveUntil = 0;
+            GoAt = 0;
+            LeaveAt = 0;
+            Vehicles.Car.Active?.ClearSeatsServer();
+            foreach (var p in PlayerController.All) p.LeaveHatchServer();
+            int index = Mathf.Max(0, Level.Index);
+            int seed = HouseKinds.SeedOf(kind, index, LevelRandom.Mix(m_RunSeed, Level.Seed, ++m_CheatHouses));
+            if (seed == 0) return;
+            StartLevel(index, Mathf.Max(0, Level.Lane), seed);
+            Banner(Loc.Pack("banner.house", index + 1));
+        }
+
         public void RestartRunServer()
         {
             if (!m_Run.Restart()) return;

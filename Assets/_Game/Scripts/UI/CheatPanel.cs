@@ -8,7 +8,7 @@ namespace Stealth.UI
 {
     /// <summary>
     /// Cheats for testing (prefab UI/HUD, F4 — <see cref="GameAction.Cheats"/>): switch off every robot, be invulnerable or
-    /// invisible to the robots, fill the quota, jump to the hatch, see the whole map. The server carries them out
+    /// invisible to the robots, fill the quota, jump to the hatch, see the whole map, start a house of any kind right now. The server carries them out
     /// (<see cref="PlayerController.RequestCheat"/>); the panel frees the cursor while it is open.
     /// </summary>
     public class CheatPanel : MonoBehaviour
@@ -18,6 +18,8 @@ namespace Stealth.UI
 
         public GameObject Root;
         public Button KillRobots, Invulnerable, Invisible, Quota, ToHatch, RevealMap;
+        [Tooltip("Start a house of a kind now (index = HouseKind): for testing a kind without waiting for it.")]
+        public Button[] Houses = new Button[0];
 
         bool m_Invulnerable, m_Invisible;
 
@@ -34,6 +36,11 @@ namespace Stealth.UI
                 if (Me != null && layout != null) Me.TeleportOwner(layout.HatchPosition + new Vector3(1.5f, 0.05f, 0f), Me.transform.rotation);
             });
             RevealMap.onClick.AddListener(() => GameManager.Instance?.Exploration?.RevealAll());
+            for (int i = 0; i < Houses.Length; i++)
+            {
+                var kind = (HouseKind)i;
+                if (Houses[i] != null) Houses[i].onClick.AddListener(() => Me?.RequestCheat(Cheat.StartHouse + (byte)kind, true));
+            }
             Root.SetActive(false);
         }
 
@@ -48,9 +55,22 @@ namespace Stealth.UI
         /// <summary>Test hook (autopilot): open or close the panel.</summary>
         public void SetOpen(bool open) => Show(open);
 
+        /// <summary>
+        /// The toggles of the panel onto the player (owner side): whatever differs is asked for again. The panel lives in
+        /// the scene, the player object does not — after a new session or a reconnect a fresh player came without the
+        /// cheats while the panel still showed them on, and they had to be switched off and on to work.
+        /// </summary>
+        public static void Sync(PlayerController me, bool invulnerable, bool invisible)
+        {
+            if (me == null) return;
+            if (me.Invulnerable != invulnerable) me.RequestCheat(Cheat.Invulnerable, invulnerable);
+            if (me.Invisible != invisible) me.RequestCheat(Cheat.Invisible, invisible);
+        }
+
         void Update()
         {
             if (Me == null) { Show(false); return; }
+            Sync(Me, m_Invulnerable, m_Invisible);
             if (!GameMenu.IsOpen && Controls.Pressed(GameAction.Cheats)) Show(!IsOpen);
             if (GameMenu.IsOpen && IsOpen) Show(false);
             if (!IsOpen) return;

@@ -13,6 +13,6 @@ namespace Stealth.Enemies
         public float ViewDistance = 14f;
         public float ViewAngle = 50f;
         [Tooltip("Seconds to detect a standing player at mid range in a lit room.")]
-        public float DetectTime = 1.1f;
+        public float DetectTime = 2.75f;
     }
 }

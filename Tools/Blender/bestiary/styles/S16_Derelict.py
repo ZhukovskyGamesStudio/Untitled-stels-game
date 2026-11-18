@@ -268,31 +268,37 @@ def hound(L):
 
 
 def worker(L):
-    """The cargo loader: a shell chassis with a cab whose window is split by a crack, bare mast rails, the crate
-    slid askew on the forks, one headlamp out, a strap hanging."""
-    P = D.Parts()
-    D.wheels(P, L, [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)], .12, .1)
-    P.add("Body", L.shell([(.18, .27, .37, 3.0), (.3, .29, .39, 3.2), (.4, .26, .36, 3.0)], caps=.03))
-    for k, (x, y) in enumerate(((.31, .25), (-.31, .25), (.31, -.25), (-.31, -.25))):
-        P.add("Accent", L.cyl(.035, .14, (x * .8, y, .12), axis="X"))
-        P.add("Body", L.box((.1, .12, .14), (x * .62, y, .2)))
-        if k != 3:
-            P.add("Body", L.loft([(0, .07, .1, 2.8), (.1, .07, .095, 2.8)], axis="X", loc=(x * .84 - .05, y, .32), round_caps=.015))
-    P.add("Body", L.shell([(.36, .22, .15, 2.6, 0, .22), (.7, .22, .15, 2.8, 0, .22), (.92, .18, .12, 2.4, 0, .24)], caps=.05))
-    P.add("Accent", L.box((.3, .03, .18), (0, .065, .72)))
-    P.add("Eye", L.box((.12, .02, .14), (-.07, .05, .72), r=.008))
-    P.add("Eye", L.box((.1, .02, .1), (.08, .05, .7), r=.008, rot=(0, .3, 0)))
-    P.add("Accent", L.box((.02, .025, .2), (0, .048, .72), rot=(0, .5, 0), r=.004))
-    for sx in (-1, 1):
-        P.add("Accent", L.box((.05, .07, .9), (sx * .22, -.33, .76)))
-    P.add("Accent", L.box((.48, .05, .06), (0, -.33, 1.18)))
-    P.add("Accent", L.box((.5, .42, .05), (0, -.16, .93)))
-    P.add("Accent", L.box((.46, .4, .34), (-.02, -.16, 1.125), rot=(0, 0, math.radians(7))))
-    P.add("Body", [cable([(.2, -.33, 1.2), (.26, -.38, 1.0), (.22, -.36, .82)], .015)])
-    P.add("Accent", L.box((.44, .1, .1), (0, -.37, .45)))
-    P.add("Eye", L.ball(.035, (-.12, -.42, .45)))
-    P.add("Body", L.cyl(.035, .03, (.12, -.42, .45), axis="Y"))
-    return P
+    """Decommissioned cargo runner: a shell deck with one bumper hanging loose, a shell snout with one headlamp dead, a
+    shell mast with a panel torn off its side showing the rails and cables inside, a cracked panel in front, half its
+    cable chain gone, a beacon knocked askew."""
+    def deck(L, P):
+        D.worker_deck(L, P)
+        P.add("Body", [cable([(.33, .38, .3), (.36, .44, .18), (.33, .46, .08)], .012)])                  # dangling wire
+
+    def pod(L, P):
+        P.add("Body", L.shell([(.31, .23, .16, 3.0, 0, -.23), (.5, .24, .17, 3.2, 0, -.23), (.63, .2, .14, 3.0, 0, -.22)], caps=.03))
+        P.add("Accent", L.box((.42, .03, .2), (0, -.405, .47)))
+        P.add("Eye", L.ball(.03, (-.16, -.41, .4)))
+        P.add("Body", L.cyl(.032, .03, (.16, -.41, .4), axis="Y"))                                         # the dead lamp
+        D.worker_shoulders(L, P, inner=.2)
+
+    def mast(L, P):
+        shell = L.shell([(.3, .23, .15, 2.8, 0, .22), (.9, .22, .15, 2.8, 0, .22), (1.29, .19, .13, 2.6, 0, .22)], caps=.04)
+        P.add("Body", [crack(shell[0], (.07, .08, .95), size=.12, seed=3)])
+        P.add("Accent", L.box((.05, .2, .6), (-.215, .22, .75)))                                          # the torn-off side
+        for z in (.55, .75, .95):
+            P.add("Accent", L.box((.03, .03, .03), (-.24, .14, z)) + L.box((.03, .03, .03), (-.24, .3, z)))
+        P.add("Body", [cable([(-.24, .18, .5), (-.27, .2, .75), (-.24, .22, 1.0)], .014),
+                       cable([(-.24, .26, .48), (-.28, .27, .8), (-.25, .25, 1.05)], .012)])
+        P.add("Accent", L.box((.5, .34, .05), (0, .22, 1.3)))                                             # cap
+        for k in (0, 1, 2, 4, 5, 8, 9):                                                                    # the chain's survivors
+            P.add("Accent", [s.rbox((.1, .035, .055), (0, .075, .38 + k * .068), r=.005, seg=1)])
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.07, .035, (0, .25, 1.335)))
+        P.add("Eye", tilt(L.cyl(.05, .07, (0, .25, 1.39), radius2=.04), (0, .25, 1.35), (.35, .2, 0)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def turret(L):

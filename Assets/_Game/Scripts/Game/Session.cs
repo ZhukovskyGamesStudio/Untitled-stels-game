@@ -37,6 +37,8 @@ namespace Stealth.Game
         string SteamStatus { get; }
         /// <summary>Steam persona name, or null without Steam.</summary>
         string LocalPlayerName { get; }
+        /// <summary>Who this player is across reconnects: the Steam id, or an id kept on this computer.</summary>
+        string LocalPlayerId { get; }
         bool CanInviteFriends { get; }
         /// <summary>Friends' sessions of this game (Steam), refreshed by <see cref="RefreshFriendLobbies"/>.</summary>
         IReadOnlyList<FriendLobby> FriendLobbies { get; }
@@ -89,7 +91,8 @@ namespace Stealth.Game
 
     /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
     /// <summary>The test cheats of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server.</summary>
-    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota }
+    /// <summary>A cheat (F4 panel). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.</summary>
+    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, StartHouse = 32 }
 
     public interface IPlayerLink
     {
@@ -105,10 +108,15 @@ namespace Stealth.Game
         /// <summary>Owner → server: set off the stun cube from the backpack.</summary>
         void SendGadget();
 
+        /// <summary>Owner → server: a command to the team's storage robot (0: come to me, 1: go to the exit).</summary>
+        void SendBot(byte command);
+
         /// <summary>Owner → server: a cheat from the F4 panel.</summary>
         void SendCheat(Cheat cheat, bool on);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>
         void Teleport(Vector3 position, Quaternion rotation);
+        /// <summary>Server → owner: stand here (a player who came back: where they left, or by the host).</summary>
+        void PlaceOwner(Vector3 position, float yaw);
         void SendNoise(Vector3 position, float radius);
         void SendGasKnockout();
         void SendRevive(PlayerController target);

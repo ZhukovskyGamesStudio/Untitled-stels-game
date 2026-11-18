@@ -170,6 +170,8 @@ namespace Stealth.Level
         static readonly Dictionary<Mesh, Mesh> s_MeshOriginal = new();
         static readonly Dictionary<Material, Material>[] s_MatVariants = NewMaps<Material>();
         static readonly Dictionary<Material, Material> s_MatOriginal = new();
+        /// <summary>Wear levels of a material (family version → its levels); a level's material maps back to the original.</summary>
+        static readonly Dictionary<Material, Material[]> s_Wear = new();
         static readonly Dictionary<Mesh, PropReplacement>[] s_Props = NewMaps2();
         /// <summary>Models of the current style itself (its own guard, the players by department), over the family's; key = variant.</summary>
         static readonly Dictionary<int, Dictionary<Mesh, Mesh>> s_StyleMeshes = new();
@@ -209,6 +211,18 @@ namespace Stealth.Level
             return a;
         }
 
+        /// <summary>The models of the world were swapped for a style (before the furniture is merged again).</summary>
+        public static event System.Action GeometryChanged;
+
+        /// <summary>A mesh of the current style's own models (its bestiary), not the base model or a family's version of it.</summary>
+        public static bool IsOwnStyleMesh(Mesh m)
+        {
+            if (m == null) return false;
+            foreach (var map in s_StyleMeshes.Values)
+                if (map.ContainsValue(m)) return true;
+            return false;
+        }
+
         /// <summary>The family of models on screen now.</summary>
         public static ModelFamily Family => s_Family;
 
@@ -218,7 +232,9 @@ namespace Stealth.Level
             PropBatches.Clear(); // the furniture is about to change: it draws itself until merged again
             if (family != s_Family) UndoReplacements();
             s_Family = family;
+            StyleParts.ShowAll(s_Current != null && g != null ? s_Current.name : null); // things with a model of their own in a style
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
+            GeometryChanged?.Invoke(); // (furniture dressed in variants picks its own parts or the style's)
             if (!Application.isPlaying) return;
             var holder = Config != null ? Config.Batch : null;
             StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null, holder);
@@ -245,6 +261,14 @@ namespace Stealth.Level
                         s_MatVariants[(int)set.Family][set.From[i]] = set.To[i];
                         s_MatOriginal[set.To[i]] = set.From[i];
                     }
+            foreach (var w in c.Wear ?? new WearVariants[0])
+            {
+                if (w.From == null || w.To == null || w.To.Length == 0) continue;
+                s_Wear[w.From] = w.To;
+                var back = s_MatOriginal.TryGetValue(w.From, out var o) ? o : w.From;
+                foreach (var m in w.To)
+                    if (m != null) s_MatOriginal[m] = back;
+            }
             foreach (var p in c.Props ?? new PropReplacement[0])
                 if (p.Key != null && p.Prefab != null) s_Props[(int)p.Family][p.Key] = p;
             foreach (var set in c.StyleModels ?? new StyleMeshes[0])
@@ -287,9 +311,31 @@ namespace Stealth.Level
             foreach (var r in go.GetComponentsInChildren<Renderer>(true)) DressRenderer(r);
         }
 
+        /// <summary>
+        /// The robots' own make looks the same in every style (their creature models, Tools/Blender/creatures; the charging
+        /// room's pieces): no mesh, material or palette of a style on them. The spider keeps its style versions.
+        /// </summary>
+        public static bool Invariant(Renderer r)
+        {
+            var d = r.GetComponentInParent<Enemies.Detector>(true);
+            if (d != null) return d.Kind != RobotKind.Spider;
+            return r.GetComponentInParent<Enemies.LaserGate>(true) != null;
+        }
+
+        /// <summary>
+        /// The robots' creature models (Tools/Blender/creatures): the same in every style, so the editor does not collect
+        /// their style versions (the spider and its web keep theirs).
+        /// </summary>
+        public static bool Creature(string model) =>
+            model != "robot_spider" && (model.StartsWith("robot_") || model.StartsWith("sensor_") || model.StartsWith("attach_")
+                || model == "security_camera" || model == "laser_emitter" || model == "worker_lift");
+
+        /// <summary>The robots' own materials (the charging room): never recoloured by a style's palette.</summary>
+        static bool RobotMade(Material m) => m.name.StartsWith("RobotShell") || m.name.StartsWith("RobotFlesh") || m.name.StartsWith("RobotGlow");
+
         static void DressRenderer(Renderer r)
         {
-            if (r == null) return;
+            if (r == null || Invariant(r)) return;
             Load();
             LoadStyleMeshes();
             int f = (int)s_Family;
@@ -304,15 +350,29 @@ namespace Stealth.Level
             }
             var mats = r.sharedMaterials;
             bool changed = false;
+            int wear = -1;
             for (int i = 0; i < mats.Length; i++)
             {
                 var m = mats[i];
                 if (m == null) continue;
                 var original = s_MatOriginal.TryGetValue(m, out var o) ? o : m;
+                if (RobotMade(original)) continue; // the robots' own make (the charging room): the same in every style
                 var target = s_MatVariants[f].TryGetValue(original, out var v) ? v : original;
+                if (s_Wear.TryGetValue(target, out var levels))
+                {
+                    if (wear < 0) wear = WearMath.PartLevel(ObjectRoot(r.transform).position, r.name, levels.Length);
+                    target = levels[Mathf.Min(wear, levels.Length - 1)] ?? target;
+                }
                 if (target != m) { mats[i] = target; changed = true; }
             }
             if (changed) r.sharedMaterials = mats;
+        }
+
+        /// <summary>The object a renderer belongs to: the scene root's child it is under (a prop of the house), or its own root.</summary>
+        static Transform ObjectRoot(Transform t)
+        {
+            while (t.parent != null && t.parent.parent != null) t = t.parent;
+            return t;
         }
 
         /// <summary>
@@ -466,7 +526,7 @@ namespace Stealth.Level
             if (c == null) return;
             Recolor(c.Building, p?.Building);
             Recolor(c.Furniture, p?.Furniture);
-            Recolor(c.Robots, p?.Robots);
+            // (the robots keep their own colours in every style: Invariant — the spider's palette went with them)
             Recolor(c.Players, p?.Players);
             Recolor(c.Loot, p?.Loot);
         }
@@ -476,7 +536,7 @@ namespace Stealth.Level
             if (materials == null) return;
             foreach (var mat in materials)
             {
-                if (mat == null || !mat.HasProperty(BaseColorId)) continue;
+                if (mat == null || !mat.HasProperty(BaseColorId) || RobotMade(mat)) continue;
                 if (!s_Originals.TryGetValue(mat, out var orig))
                 {
                     orig = (mat.GetColor(BaseColorId), mat.HasProperty(SmoothnessId) ? mat.GetFloat(SmoothnessId) : 0f);

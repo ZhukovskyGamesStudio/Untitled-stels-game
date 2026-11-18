@@ -179,7 +179,7 @@ namespace Stealth.EditorTools
             hud.HatchLabel = Txt(R(hud.HatchMarker, "Label", Center, Center, new Vector2(0, -19), new Vector2(120, 18)), "12 m", 12, TextAnchor.MiddleCenter, new Color(0.45f, 1f, 0.5f));
 
             // Bottom left: the eye (how lit = how visible), the speaker (how loud), the hearts under them. No words.
-            var status = R(content, "Status", BottomLeft, BottomLeft, new Vector2(18, 16), new Vector2(120, 56));
+            var status = R(content, "Status", BottomLeft, BottomLeft, new Vector2(18, 16), new Vector2(130, 56));
             hud.Eye = Img(R(status, "Eye", BottomLeft, BottomLeft, new Vector2(0, 24), new Vector2(32, 32)), Color.white, Icon("eye_0"));
             hud.EyeSprites = Enumerable.Range(0, 8).Select(i => Icon($"eye_{i}")).ToArray();
             hud.Speaker = Img(R(status, "Speaker", BottomLeft, BottomLeft, new Vector2(38, 24), new Vector2(32, 32)), Color.white, Icon("noise_0"));
@@ -188,6 +188,9 @@ namespace Stealth.EditorTools
             hud.HeartEmpty = Icon("heart_empty");
             hud.Hearts = Enumerable.Range(0, Stealth.Player.HealthState.MaxHp + 1) // + the med table's extra point
                 .Select(i => Img(R(status, $"Heart{i}", BottomLeft, BottomLeft, new Vector2(2 + i * 22, 0), new Vector2(20, 20)), new Color(0.95f, 0.25f, 0.25f), hud.HeartFull)).ToArray();
+            // The team's switched-off robots: one plug per slot (lit = a robot is off), right of the speaker.
+            hud.HackSlots = Enumerable.Range(0, 4)
+                .Select(i => Img(R(status, $"Hack{i}", BottomLeft, BottomLeft, new Vector2(76 + i * 24, 30), new Vector2(22, 22)), Color.white, Icon("ret_hack"))).ToArray();
 
             // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the hunter under it.
             var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 118));

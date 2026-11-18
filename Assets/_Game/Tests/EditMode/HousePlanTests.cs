@@ -33,7 +33,10 @@ namespace Stealth.Tests
             int atriums = 0, shaped = 0;
             var areas = new List<float>();
             var roomCounts = new HashSet<int>();
-            foreach (var l in TestHouses.Sample)
+            // the office generator's variety: the sample's offices and a few more (a shop and a hospital have plans of their own)
+            var houses = TestHouses.Sample.Where(h => !HouseKinds.OwnPlan(h.Kind)).ToList();
+            for (int seed = 3; houses.Count < 7; seed++) if (!HouseKinds.OwnPlan(HouseKinds.Of(seed * 101, 2))) houses.Add(TestHouses.Get(seed * 101, 2));
+            foreach (var l in houses)
             {
                 masses.Add(l.Mass);
                 roomCounts.Add(l.Rooms.Count);
@@ -75,7 +78,8 @@ namespace Stealth.Tests
             Assert.Greater(Share(store, RoomType.Storage), Share(b, RoomType.Storage) * 2f, "a warehouse stores");
             Assert.Greater(store.RoomSizeScale, b.RoomSizeScale * 1.2f, "a warehouse has big halls");
             Assert.AreSame(b, HouseKinds.Apply(HouseKind.Office, b), "an office is the plain settings");
-            Assert.AreEqual(HouseKind.Office, HouseKinds.Of(12345, 0), "the first house is an office");
+            var first = Enumerable.Range(1, 60).Select(seed => HouseKinds.Of(seed, 0)).ToList();
+            Assert.IsTrue(first.Contains(HouseKind.Garage) && first.Contains(HouseKind.Hospital), "the first house may be a shop or a hospital too");
             var kinds = new HashSet<HouseKind>();
             for (int seed = 1; seed < 400; seed++) kinds.Add(HouseKinds.Of(seed, 3));
             Assert.Greater(kinds.Count, 3, "houses of many kinds: " + string.Join(", ", kinds));

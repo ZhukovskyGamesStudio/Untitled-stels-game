@@ -28,7 +28,7 @@ def export(filename):
     import bpy
     bpy.context.view_layer.update()
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-    meshfix.fix_objects(objs, floor=True, name=filename)
+    meshfix.fix_objects(objs, floor=True, name=filename, pinned=meshfix.moving)  # doors and drawers stay put
     path = os.path.join(g.out_dir, "Props", filename + ".fbx")
     s.export_fbx(path, objs)
     s.clear_scene()
@@ -96,18 +96,19 @@ def bar_handle(x, z, y_face, length, axis="Z", r=0.009, stand=0.022):
 # --------------------------------------------------------------------------- kitchen
 
 def model_kitchen_sink():
-    """Kitchen counter module 1.2 m: plinth, carcass, two shaker doors, a wooden worktop at 0.92 with an inset steel
-    basin (left of centre, a drainer zone on the right) and a gooseneck tap at the back."""
+    """Kitchen counter module 1.2 m: plinth, an open carcass (the basin's tub and its trap hang inside), two shaker
+    doors that open from the middle (BodyDoor0/1, each with its bar pull: Items.Storage), a wooden worktop at 0.92 with
+    an inset steel basin (left of centre, a drainer zone on the right) and a gooseneck tap at the back."""
     bx, by = -0.14, -0.02  # basin centre
     plinth = s.rbox((1.14, 0.5, 0.1), (0, 0.04, 0.05), r=0.01, seg=1)
-    carcass = s.rbox((1.2, 0.56, 0.81), (0, 0.03, 0.485), r=0.012, seg=2)
-    carcass = s.boolean(carcass, s.rbox((0.51, 0.39, 0.3), (bx, by, 0.88), r=0), "DIFFERENCE")  # room for the tub
-    doors = []
-    for x in (-0.2975, 0.2975):
+    carcass = s.cupboard(-0.6, 0.6, -0.25, 0.31, 0.082, 0.876, t=0.02, top=False)    # 2 mm under the worktop
+    carcass.append(s.rbox((1.168, 0.02, 0.05), (0, -0.237, 0.86), r=0.003, seg=1))   # front rail under the worktop
+    s.part("Body", [plinth, *carcass])
+    for i, x in enumerate((-0.2975, 0.2975)):
         d = s.rbox((0.586, 0.022, 0.73), (x, -0.257, 0.485), r=0.008, seg=2)
         shaker(d, 0.2, thickness=0.05)
-        doors.append(d)
-    s.part("Body", [plinth, carcass, *doors])
+        pull = bar_handle(0.06 if x > 0 else -0.06, 0.72, -0.268, 0.16)                  # at the meeting edges
+        s.part(f"BodyDoor{i}", [d, *pull])
 
     top = s.rbox((1.2, 0.62, 0.042), (0, 0, 0.899), r=0.01, seg=2)
     top = s.boolean(top, s.rbox((0.52, 0.4, 0.2), (bx, by, 0.9), r=0.045, seg=3, vertical_only=True), "DIFFERENCE")
@@ -127,10 +128,9 @@ def model_kitchen_sink():
     nozzle = s.rcyl(0.015, 0.03, (tx, ty - 0.17, 1.115), seg=12, r=0.003)
     lever = s.rbox((0.012, 0.09, 0.016), (tx + 0.035, ty - 0.02, 0.968), r=0.005, seg=1, rot=(math.radians(-12), 0, 0))
     hub = s.rcyl(0.014, 0.03, (tx + 0.025, ty, 0.965), axis="X", seg=10, r=0.003)
-    handles = []
-    for x in (-0.06, 0.06):
-        handles += bar_handle(x, 0.72, -0.268, 0.16)
-    s.part("Accent", [tub, drain, base, neck, nozzle, lever, hub, *handles])
+    trap = s.tube([(bx, by, 0.72), (bx, by, 0.58), (bx, by + 0.05, 0.5), (bx, by + 0.12, 0.58), (bx, 0.15, 0.6),
+                   (bx, 0.295, 0.6)], 0.02, res=1, segments_per=6)                       # the trap behind the doors
+    s.part("Accent", [tub, drain, base, neck, nozzle, lever, hub, trap])
     return export("kitchen_sink")
 
 

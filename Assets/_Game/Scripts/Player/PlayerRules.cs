@@ -172,18 +172,22 @@ namespace Stealth.Player
         public float ReviveDistance = 2.2f;
         [Tooltip("Seconds to hold E to hack.")]
         public float HackHoldTime = 1.75f;
-        [Tooltip("Seconds a hacked robot / device stays off.")]
-        public float HackDuration = 30f;
+        [Tooltip("Seconds a hacked robot / device stays off; 0 = for good (until a hack over the limit wakes it, MaxHacked).")]
+        public float HackDuration = 0f;
+        [Tooltip("Robots and devices the team can keep switched off at once: hacking one more wakes the first.")]
+        public int MaxHacked = 2;
         [Tooltip("How close you must be to hack, meters.")]
         public float HackReach = 1.9f;
         [Tooltip("Seconds to hold E to hack the lock of a door.")]
         public float DoorHackTime = 3f;
+        [Tooltip("Seconds to hold E to work a crawl way's grille loose (every vent starts shut).")]
+        public float VentGrilleTime = 2f;
         [Tooltip("Seconds between two uses of \"I'm stuck\" (it moves you to the nearest free spot).")]
         public float UnstuckCooldown = 8f;
         [Tooltip("Hacks a hacking terminal can make per house.")]
         public int TerminalHacks = 3;
         [Tooltip("Seconds to hold E at a hacking terminal to hack the robot on its screen.")]
-        public float TerminalHackTime = 3f;
+        public float TerminalHackTime = 0.5f;
     }
 
     /// <summary>
@@ -233,5 +237,13 @@ namespace Stealth.Player
         /// <summary>How far (degrees) a leg swings forward and back at this speed: wider when running, short crouched.</summary>
         public static float LegSwing(float speed, bool crouching) =>
             (crouching ? 0.6f : 1f) * Mathf.Lerp(14f, 34f, Mathf.InverseLerp(1.5f, 6f, speed));
+
+        /// <summary>
+        /// Share of a flashlight's intensity with a surface this close in front of it: light falls off with the square of
+        /// the distance, so held against a drawer the spot burned white and bloomed over the screen; closer than
+        /// <paramref name="near"/> the lamp dims by the same square, the spot stays as bright as at that distance.
+        /// </summary>
+        public static float FlashlightNear(float distance, float near) =>
+            near <= 0f ? 1f : Mathf.Clamp(distance * distance / (near * near), 0.01f, 1f);
     }
 }

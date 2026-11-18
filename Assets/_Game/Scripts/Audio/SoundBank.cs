@@ -31,6 +31,8 @@ namespace Stealth.Audio
         public AudioClip StepLight, SpiderStep;
         [Tooltip("Motor loops of the other robots: joints of legged ones, tracks, the sweeper's brush, the hunter's turbine.")]
         public AudioClip MotorServo, MotorTracks, MotorBrush, MotorTurbine;
+        [Tooltip("A guard's loops (GuardSounds): resting on its dock, walking its rounds, chasing.")]
+        public AudioClip GuardCharge, GuardPatrol, GuardChase;
 
         [Header("Items and places")]
         [Tooltip("The lure speaker's music (loop).")]
@@ -52,8 +54,18 @@ namespace Stealth.Audio
         [Tooltip("«Нарушитель устранён» — it knocked its target down and goes back to work.")]
         public AudioClip VoiceEliminated;
 
+        [Header("People")]
+        [Tooltip("A player breathing hard in the laughing gas (before the laughing starts).")]
+        public AudioClip GasBreath;
+        [Tooltip("A player laughing in the gas, ever harder: a giggle, a laugh, a helpless fit (Tools/Audio/generate_sounds.py).")]
+        public AudioClip[] GasLaugh = new AudioClip[0];
+        [Tooltip("The hostage calling to a player who sees it (Tools/Audio/generate_voices.py).")]
+        public AudioClip[] HostageVoice = new AudioClip[0];
+
         [Header("Environment")]
         public AudioClip LaserHum, DoorSlide, Alarm, OfficeHum, GasWind;
+        [Tooltip("A hinged door: the handle's click and a short creak as it opens; the latch's thud as it shuts (a steel door: the same, lower).")]
+        public AudioClip DoorOpen, DoorShut;
         [Tooltip("A restroom's hand dryer running (4 s, loud: robots come to check).")]
         public AudioClip HandDryer;
 

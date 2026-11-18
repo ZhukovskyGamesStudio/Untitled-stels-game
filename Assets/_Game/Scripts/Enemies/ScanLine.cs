@@ -25,25 +25,55 @@ namespace Stealth.Enemies
             return perp.magnitude <= radius;
         }
 
+        /// <summary>Rays per half of a laser fan (<see cref="FanRay"/>).</summary>
+        public const int FanRays = 28;
+
         /// <summary>
-        /// Does a player's capsule (feet at <paramref name="feet"/>, <paramref name="height"/> tall, radius r) touch a vertical
-        /// fan of light from <paramref name="apex"/> down to the floor along <paramref name="dir"/>? The fan reaches
-        /// <paramref name="reachA"/> along +dir and <paramref name="reachB"/> along -dir on the floor and narrows to nothing
-        /// at the apex, so it is widest at the player's lowest point: no jumping over it.
+        /// Ray <paramref name="i"/> of <paramref name="count"/> of half a laser fan, in the fan's plane (x out along the scan,
+        /// y up, the apex at the origin): uncut, the rays meet the floor <paramref name="span"/> below the apex evenly from
+        /// right under it to <paramref name="reach"/> out. The unit direction; <paramref name="length"/> = to the floor.
         /// </summary>
-        public static bool CutsFan(Vector3 apex, Vector3 dir, float floorY, float reachA, float reachB, Vector3 feet, float height, float radius = 0.35f)
+        public static Vector2 FanRay(int i, int count, float reach, float span, out float length)
         {
-            float span = apex.y - floorY;
-            if (span <= 0.01f) return false;
-            float low = Mathf.Max(feet.y, floorY), high = feet.y + height;
-            if (high < floorY || low > apex.y) return false;
+            var to = new Vector2(reach * i / Mathf.Max(1, count - 1), -Mathf.Max(0.01f, span));
+            length = to.magnitude;
+            return to / length;
+        }
+
+        /// <summary>
+        /// Does a player's capsule touch a vertical laser fan whose halves are outlined by where their rays stopped
+        /// (<paramref name="halfA"/> along +<paramref name="dir"/>, <paramref name="halfB"/> along −dir; points in the fan's
+        /// plane from the apex, x out, y up — see <see cref="FanRay"/>)? Each half is the polygon apex → its points: walls,
+        /// furniture and the floor cut it where the light stops, so nothing behind them is lit or caught. The light is
+        /// widest low down (no jumping over it).
+        /// </summary>
+        public static bool FanTouches(Vector3 apex, Vector3 dir, Vector2[] halfA, Vector2[] halfB, Vector3 feet, float height, float radius = 0.35f)
+        {
             var d = new Vector3(feet.x - apex.x, 0f, feet.z - apex.z);
             float along = Vector3.Dot(d, dir);
-            var perp = d - dir * along;
-            if (perp.magnitude > radius) return false;
-            float reach = along >= 0f ? reachA : reachB;
-            float widthAtLow = reach * Mathf.Clamp01((apex.y - low) / span);
-            return Mathf.Abs(along) - radius <= widthAtLow;
+            if ((d - dir * along).magnitude > radius) return false;
+            var half = along >= 0f ? halfA : halfB;
+            if (half == null || half.Length < 2) return false;
+            // the body's side nearest the apex, from the feet to the head: the fan narrows upwards and stops at what it hits
+            float x = Mathf.Max(0f, Mathf.Abs(along) - radius);
+            float low = feet.y - apex.y, high = low + height;
+            for (float y = low + 0.05f; y <= high + 0.001f; y += 0.15f)
+                if (Inside(half, new Vector2(x, Mathf.Min(y, high)))) return true;
+            return false;
+        }
+
+        /// <summary>The point lies in the polygon apex (origin) → <paramref name="outline"/> (even-odd rule).</summary>
+        static bool Inside(Vector2[] outline, Vector2 p)
+        {
+            bool inside = false;
+            int n = outline.Length + 1;
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                var a = i == 0 ? Vector2.zero : outline[i - 1];
+                var b = j == 0 ? Vector2.zero : outline[j - 1];
+                if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+            }
+            return inside;
         }
 
         /// <summary>Feet above the beam (jumping over a knee-high line).</summary>

@@ -26,20 +26,19 @@ namespace Stealth.Level
         public override float AimRadius => 0.8f;
         public bool Freed => Index >= 0 && IsFreed(Index);
 
-        public static bool HasKey(PlayerController player)
-        {
-            var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null) return false;
-            foreach (var e in inventory.Items) if (e.Shape == ItemCatalog.CageKey) return true;
-            return false;
-        }
+        /// <summary>The key works only from the hand.</summary>
+        public static bool HasKey(PlayerController player) =>
+            player.TryGetComponent<PlayerInventory>(out var inventory) && inventory.Holds(ItemCatalog.CageKey);
+
+        static bool Carries(PlayerController player) =>
+            player.TryGetComponent<PlayerInventory>(out var inventory) && inventory.Has(ItemCatalog.CageKey);
 
         public override string Prompt(PlayerController player, out bool available)
         {
             // with the key: free the hostage; without: ask where it is (the hostage points out the guard who carries it)
             available = !Freed;
             if (Freed) return null;
-            return HasKey(player) ? Loc.T("use.cage") : Loc.T("use.cage.ask");
+            return HasKey(player) ? Loc.T("use.cage") : Carries(player) ? Loc.T("use.cage.hand") : Loc.T("use.cage.ask");
         }
 
         void LateUpdate()

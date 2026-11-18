@@ -38,7 +38,7 @@ namespace Stealth.Level
         /// </summary>
         public static bool IsShell(Renderer r, Transform root)
         {
-            if (r == null || root == null) return false;
+            if (r == null || root == null || r.GetComponentInParent<KeepUnmerged>(true) != null) return false; // (a vent's grille comes off)
             var top = r.transform;
             while (top.parent != null && top.parent != root) top = top.parent;
             if (top.parent != root || !IsShellName(top.name)) return false;

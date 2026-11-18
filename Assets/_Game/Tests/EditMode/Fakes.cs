@@ -76,6 +76,7 @@ namespace Stealth.Tests
         public int GasKnockouts, Teleports;
 
         public void Teleport(Vector3 position, Quaternion rotation) => Teleports++;
+        public void PlaceOwner(Vector3 position, float yaw) => Teleports++;
         public void SendNoise(Vector3 position, float radius) => Noises.Add(radius);
         public void SendGasKnockout() => GasKnockouts++;
         public void SendRevive(PlayerController target) => Revives.Add(target);
@@ -104,6 +105,8 @@ namespace Stealth.Tests
         public void SendUse(Stealth.Level.UseKind kind, int index) => Uses.Add((kind, index));
         public int Gadgets;
         public void SendGadget() => Gadgets++;
+        public readonly System.Collections.Generic.List<byte> BotCommands = new();
+        public void SendBot(byte command) => BotCommands.Add(command);
         public readonly List<int> Terminals = new();
         public void SendTerminal(int terminal, Detector steered, float yaw) => Terminals.Add(terminal);
     }

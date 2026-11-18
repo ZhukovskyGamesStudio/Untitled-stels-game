@@ -13,6 +13,25 @@ namespace Stealth.Tests
     public class RouteAndLocksTests
     {
         [Test]
+        public void TheHouseBuiltIsTheOneTheTunnelShowed()
+        {
+            // the run keeps its seed on the way from the sewer to the first house (it used to draw a new one there:
+            // the panel said hospital, the car arrived at a garage)
+            const int run = 4242;
+            int seed = RunMap.SeedFor(run, 0, () => 999);
+            Assert.AreEqual(run, seed);
+            var shown = new RunMap(run);
+            var built = new RunMap(seed);
+            for (int lane = 0; lane < shown.LanesAt(0); lane++)
+            {
+                Assert.AreEqual(shown.Node(0, lane).Seed, built.Node(0, lane).Seed, $"first house, tunnel {lane}");
+                Assert.AreEqual(shown.Node(0, lane).Kind, built.Node(0, lane).Kind);
+            }
+            Assert.AreEqual(999, RunMap.SeedFor(0, 0, () => 999), "a run without a seed draws one");
+            Assert.AreEqual(7, RunMap.SeedFor(run, 7, () => 999), "-seed wins");
+        }
+
+        [Test]
         public void TheRouteStartsInTheSewerAndAlwaysBranches()
         {
             var map = new RunMap(12345);

@@ -15,7 +15,7 @@ namespace Stealth.Enemies
     /// (<see cref="Senses"/>, <see cref="Traits"/>): guard, listener, drone, thumper, hound, sorter, worker, hunter.
     /// </summary>
     [RequireComponent(typeof(NavMeshAgent))]
-    public class RobotController : Detector, IRobotBody
+    public partial class RobotController : Detector, IRobotBody
     {
         public static readonly List<RobotController> Robots = new();
 
@@ -39,7 +39,11 @@ namespace Stealth.Enemies
         public MeshRenderer CargoRenderer;
         public ItemVisuals CargoVisuals;
 
-        public RobotState State => (RobotState)Mode;
+        /// <summary>What it is doing (the replicated mode's low bits; the top bit: resting on its dock).</summary>
+        public RobotState State => (RobotState)(Mode & 0x7F);
+        /// <summary>Resting on its charging dock (every peer: the top bit of the replicated mode).</summary>
+        public bool RestingShown => (Mode & 0x80) != 0;
+        byte ModeOf(RobotState s) => (byte)((byte)s | (m_Brain != null && m_Brain.Resting ? 0x80 : 0));
         /// <summary>-1 = sees everyone; otherwise the ItemCatalog colour it reacts to.</summary>
         public sbyte ColorFilter => Variant;
 
@@ -80,7 +84,8 @@ namespace Stealth.Enemies
             m_NextStomp = Time.time + rng.Range(0.5f, Senses.SeismicPeriod);
 
             m_Brain = new RobotBrain(Senses, Traits, this, new System.Random(rng.Next()));
-            m_Brain.StateChanged += s => SetMode((byte)s);
+            m_Brain.StateChanged += s => SetMode(ModeOf(s));
+            m_LootRng = new System.Random(rng.Next());
             NoiseSystem.OnNoise += OnNoise;
             PatrolToNextPoint();
         }
@@ -98,6 +103,7 @@ namespace Stealth.Enemies
         {
             m_Brain?.Reset(Time.time);
             if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
+            EndLootErrand(); // whatever it was lifting or lowering falls in front of it
             DropCargoServer();
         }
 
@@ -114,13 +120,24 @@ namespace Stealth.Enemies
 
         protected override void OnStatusChanged() => ShowCargo();
 
+        // the carried thing's own model (a real item or a tool), under the cargo slot; null: the tinted piece shows
+        GameObject m_CargoModel;
+
         void ShowCargo()
         {
             if (CargoRenderer == null) return;
             bool has = Cargo >= 0 && CargoVisuals != null;
-            CargoRenderer.enabled = has;
+            var (shape, color) = has ? DecodeCargo(Cargo) : ((byte)0, (byte)0);
+            // the same look as the item lying on the floor (WorldItem): its model if it has one, else the tinted piece
+            var model = has && CargoVisuals.Models != null && shape < CargoVisuals.Models.Length ? CargoVisuals.Models[shape] : null;
+            if (m_CargoModel != null && (model == null || m_CargoModel.name != model.name)) { Destroy(m_CargoModel); m_CargoModel = null; }
+            if (model != null && m_CargoModel == null)
+            {
+                m_CargoModel = Instantiate(model, CargoMesh.transform);
+                m_CargoModel.name = model.name;
+            }
+            CargoRenderer.enabled = has && m_CargoModel == null;
             if (!has) return;
-            var (shape, color) = DecodeCargo(Cargo);
             CargoMesh.sharedMesh = CargoVisuals.Meshes[Mathf.Clamp(shape, 0, CargoVisuals.Meshes.Length - 1)];
             CargoRenderer.sharedMaterial = CargoVisuals.ColorMaterials[Mathf.Clamp(color, 0, CargoVisuals.ColorMaterials.Length - 1)];
             VisualStyles.Dress(CargoMesh.gameObject);
@@ -134,6 +151,17 @@ namespace Stealth.Enemies
 
         /// <summary>Server: go and check a spot (alarm, radio).</summary>
         public void InvestigateServer(Vector3 position, bool alarm) => m_Brain?.Investigate(position, alarm, Time.time);
+
+        /// <summary>Server: rests on a charging dock here until an alarm (<see cref="RobotBrain.SetDock"/>).</summary>
+        public void DockServer(Vector3 dock, Vector3 facing) => m_Brain?.SetDock(dock, facing, Time.time);
+        /// <summary>Server: an alarm somewhere in the house (a docked robot wakes and hunts).</summary>
+        public void AlarmServer(Vector3 position) => m_Brain?.Alarm(position, Time.time);
+        /// <summary>Server: the house's time is up — off its dock for good (<see cref="RobotBrain.WakeForGood"/>).</summary>
+        public void WakeForGoodServer() => m_Brain?.WakeForGood(Time.time);
+        /// <summary>Has a charging dock (a guard of the new enemy mode).</summary>
+        public bool Docked => m_Brain != null && m_Brain.Docked;
+        /// <summary>Resting on its dock right now.</summary>
+        public bool Resting => m_Brain != null && m_Brain.Resting;
 
         // ------------------------------------------------------------------ update
 
@@ -151,7 +179,8 @@ namespace Stealth.Enemies
                 m_Brain.OnSensed(Sense(), now, dt);
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
-            m_Brain.Tick(now, dt);
+            if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
+            SetMode(ModeOf(m_Brain.State)); // (resting comes and goes without a change of state)
             if (m_HasPost && State == RobotState.Patrol && Arrived)
             {
                 // a warden at its post watches the way in
@@ -383,6 +412,16 @@ namespace Stealth.Enemies
                 Audio.Sfx.At(Audio.Sfx.Bank?.SeismicThump, transform.position, 1f, Audio.Sfx.Group.Robots, LevelRandom.Shared(RandomChannel.Audio).Range(0.92f, 1.05f));
                 var anim = GetComponent<RobotAnimator>();
                 if (anim != null) anim.Stomp();
+                return;
+            }
+            if (effect >= PulseLiftFrom)
+            {
+                PlayCargoMotion(SwingKind.Lift, LiftSurface(effect)); // a lift off a table: the surface's height rides in the pulse
+                return;
+            }
+            if (effect is PulseLift or PulseLower or PulseShelve)
+            {
+                PlayCargoMotion(effect == PulseLift ? SwingKind.Pickup : effect == PulseLower ? SwingKind.PutDown : SwingKind.Shelve);
                 return;
             }
             if (effect != PulseRadio) return;

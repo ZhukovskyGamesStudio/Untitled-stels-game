@@ -97,14 +97,28 @@ namespace Stealth.EditorTools
                 s_Bank.Mark = Clip("UI/mark");
                 EditorUtility.SetDirty(s_Bank);
             }
-            if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null)
+            if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null || s_Bank.DoorOpen == null || s_Bank.DoorShut == null)
             {
                 FillLateClips(s_Bank);
+                EditorUtility.SetDirty(s_Bank);
+            }
+            if (s_Bank.GuardCharge == null || s_Bank.GuardPatrol == null || s_Bank.GuardChase == null)
+            {
+                s_Bank.GuardCharge = Clip("Robots/guard_charge");
+                s_Bank.GuardPatrol = Clip("Robots/guard_patrol");
+                s_Bank.GuardChase = Clip("Robots/guard_chase");
                 EditorUtility.SetDirty(s_Bank);
             }
             if (s_Bank.HandDryer == null)
             {
                 s_Bank.HandDryer = Clip("Environment/hand_dryer");
+                EditorUtility.SetDirty(s_Bank);
+            }
+            if (s_Bank.GasBreath == null || s_Bank.GasLaugh == null || s_Bank.GasLaugh.Length != 3 || s_Bank.HostageVoice == null || s_Bank.HostageVoice.Length != 5)
+            {
+                s_Bank.GasBreath = Clip("Player/gas_breath");
+                s_Bank.GasLaugh = Enumerable.Range(0, 3).Select(i => Clip($"Player/gas_laugh_{i}")).ToArray();
+                s_Bank.HostageVoice = new[] { "help", "key", "out", "quiet", "hurry" }.Select(n => Clip($"Voices/hostage_{n}")).ToArray();
                 EditorUtility.SetDirty(s_Bank);
             }
             return s_Bank;
@@ -115,6 +129,9 @@ namespace Stealth.EditorTools
             b.StepLight = Clip("Robots/step_light");
             b.SpiderStep = Clip("Robots/spider_step");
             b.MotorServo = Clip("Robots/motor_servo");
+            b.GuardCharge = Clip("Robots/guard_charge");
+            b.GuardPatrol = Clip("Robots/guard_patrol");
+            b.GuardChase = Clip("Robots/guard_chase");
             b.MotorTracks = Clip("Robots/motor_tracks");
             b.MotorBrush = Clip("Robots/motor_brush");
             b.MotorTurbine = Clip("Robots/motor_turbine");
@@ -131,6 +148,8 @@ namespace Stealth.EditorTools
             b.CarStop = Clip("Car/car_stop");
             b.CarHorn = Clip("Car/car_horn");
             b.CarBump = Clip("Car/car_bump");
+            b.DoorOpen = Clip("Environment/door_open");
+            b.DoorShut = Clip("Environment/door_shut");
         }
 
         /// <summary>Music, ambience, alarm, a 2D voice and a pool of 3D voices; placed in the scene.</summary>

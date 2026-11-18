@@ -332,6 +332,93 @@ def mouse(button):
     return draw
 
 
+# ------------------------------------------------------------------ route signs: the kind of house and its main job
+
+
+def _windows(g, x0, y0, x1, y1, cols, rows):
+    w, h = (x1 - x0) / cols, (y1 - y0) / rows
+    for c in range(cols):
+        for r in range(rows):
+            g.rrect((x0 + c * w + w * 0.22, y0 + r * h + h * 0.22, x0 + (c + 1) * w - w * 0.22, y0 + (r + 1) * h - h * 0.22), 0.01, on="d")
+
+
+def house_office(g):
+    g.rrect((0.24, 0.16, 0.76, 0.88), 0.03)
+    _windows(g, 0.28, 0.22, 0.72, 0.70, 3, 4)
+    g.rrect((0.44, 0.72, 0.56, 0.88), 0.01, on="d")
+
+
+def house_business(g):
+    g.rrect((0.16, 0.10, 0.50, 0.88), 0.03)
+    g.rrect((0.54, 0.34, 0.84, 0.88), 0.03)
+    _windows(g, 0.20, 0.16, 0.46, 0.82, 2, 6)
+    _windows(g, 0.58, 0.40, 0.80, 0.82, 2, 4)
+
+
+def house_datacenter(g):
+    g.rrect((0.26, 0.10, 0.74, 0.90), 0.05)
+    for i in range(4):
+        y = 0.18 + i * 0.18
+        g.rrect((0.32, y, 0.68, y + 0.11), 0.02, on="d")
+        g.ellipse((0.58, y + 0.03, 0.63, y + 0.08))
+
+
+def house_warehouse(g):
+    g.poly([(0.10, 0.44), (0.50, 0.18), (0.90, 0.44), (0.90, 0.86), (0.10, 0.86)])
+    g.rrect((0.30, 0.54, 0.70, 0.86), 0.01, on="d")
+    for i in range(3):
+        y = 0.60 + i * 0.08
+        g.line([(0.32, y), (0.68, y)], 0.025)
+
+
+def house_hq(g):
+    g.poly([(0.36, 0.30), (0.64, 0.30), (0.70, 0.88), (0.30, 0.88)])
+    g.line([(0.50, 0.30), (0.50, 0.06)], 0.04)
+    g.poly([(0.52, 0.06), (0.74, 0.11), (0.52, 0.17)])
+    _windows(g, 0.38, 0.36, 0.62, 0.80, 2, 4)
+
+
+def house_hospital(g):
+    g.rrect((0.14, 0.14, 0.86, 0.86), 0.12)
+    g.rrect((0.42, 0.26, 0.58, 0.74), 0.02, on="d")
+    g.rrect((0.26, 0.42, 0.74, 0.58), 0.02, on="d")
+
+
+def house_garage(g):
+    # a wrench across the glyph
+    g.line([(0.30, 0.72), (0.62, 0.40)], 0.13)
+    g.ellipse((0.54, 0.14, 0.88, 0.48))
+    g.poly([(0.68, 0.14), (0.86, 0.14), (0.86, 0.30), (0.74, 0.30)], on="d")
+    g.cut(mask_of(g.size, lambda m: m.poly([(0.70, 0.10), (0.92, 0.10), (0.92, 0.30), (0.74, 0.30)])))
+    g.ellipse((0.16, 0.66, 0.38, 0.88))
+    g.ellipse((0.23, 0.73, 0.31, 0.81), on="d")
+
+
+def house_apartments(g):
+    # a tall block of flats: rows of windows, the one entrance with its canopy at the bottom
+    g.rrect((0.28, 0.06, 0.72, 0.92), 0.03)
+    _windows(g, 0.32, 0.10, 0.68, 0.70, 3, 6)
+    g.rrect((0.43, 0.76, 0.57, 0.92), 0.01, on="d")
+    g.rrect((0.38, 0.72, 0.62, 0.75), 0.005, on="d")
+
+
+def job_vault(g):
+    g.rrect((0.12, 0.12, 0.88, 0.88), 0.08)
+    g.ellipse((0.24, 0.24, 0.76, 0.76), fill=False, width=0.06, on="d")
+    g.ellipse((0.43, 0.43, 0.57, 0.57), on="d")
+    for a in range(0, 360, 60):
+        r = math.radians(a)
+        g.line([(0.5 + math.cos(r) * 0.07, 0.5 + math.sin(r) * 0.07), (0.5 + math.cos(r) * 0.2, 0.5 + math.sin(r) * 0.2)], 0.04, on="d")
+
+
+def job_hostage(g):
+    g.ellipse((0.38, 0.16, 0.62, 0.40))
+    g.rrect((0.28, 0.44, 0.72, 0.90), 0.14)
+    for x in (0.22, 0.40, 0.60, 0.78):
+        g.line([(x, 0.08), (x, 0.92)], 0.05, on="d")
+    g.line([(0.14, 0.08), (0.86, 0.08)], 0.05, on="d")
+
+
 def make(name, draw, size=R, rim=0.045):
     g = Glyph(size)
     draw(g)
@@ -362,6 +449,10 @@ def main():
     }
     for name, draw in glyphs.items():
         make(name, draw)
+    for name, draw in {"house_office": house_office, "house_business": house_business, "house_datacenter": house_datacenter,
+                       "house_warehouse": house_warehouse, "house_hq": house_hq, "house_hospital": house_hospital,
+                       "house_garage": house_garage, "house_apartments": house_apartments, "job_vault": job_vault, "job_hostage": job_hostage}.items():
+        make(name, draw, size=96)
     for level in range(4):
         make(f"noise_{level}", speaker(level))
     frames = 8

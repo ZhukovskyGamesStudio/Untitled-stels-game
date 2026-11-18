@@ -32,7 +32,18 @@ namespace Stealth.Tests
             "RobotController.CargoMesh",     // only workers carry loot
             "RobotController.CargoRenderer",
             "RobotController.CargoVisuals",
+            "RobotAnimator.LiftArm",         // only workers have a lift
+            "RobotAnimator.LiftTray",
             "Blob.m_Material",               // a UI graphic: empty is Unity's default UI material
+            "AutoDoor.Swing",                // sliding doors have panels, the vault's round door a hinge instead
+            "AutoDoor.PanelA",
+            "AutoDoor.PanelB",
+            "AutoDoor.SwingB",               // only the street doors have a second leaf
+            "AutoDoor.Wheel",                // only the vault's door has a wheel to spin
+            "AutoDoor.BlockerB",             // only a door-and-a-half's narrow leaf has a blocker of its own
+            "LiftButton.Cab",                // a call button on a landing is not in the cab
+            "AutoDoor.Number",               // only a flat's entry door carries its number
+            "PropVariants.Frame",            // only shelves swap their books for a style's own model
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

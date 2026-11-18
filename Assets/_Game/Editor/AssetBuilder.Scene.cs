@@ -6,10 +6,12 @@ using Stealth.Game;
 using Stealth.Level;
 using Stealth.Net;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.EventSystems;
@@ -21,6 +23,7 @@ namespace Stealth.EditorTools
     {
         static void BuildSceneAndSession(LevelArt art, Actors actors, UiPrefabs ui, GameObject car)
         {
+            var bot = Prefab(PrefabsDir + "/Vehicles/StorageBot.prefab", BuildStorageBot);
             var session = Prefab(PrefabsDir + "/Network/Session.prefab", () =>
             {
                 var root = new GameObject("Session");
@@ -32,19 +35,21 @@ namespace Stealth.EditorTools
                 gm.RobotPrefabs = actors.Robots.ToArray();
                 gm.LaserPrefab = actors.Laser;
                 gm.CarPrefab = car;
+                gm.StorageBotPrefab = bot;
                 return root;
             });
             // fields newer than the prefab: filled without rebuilding it
             var game = session.GetComponent<GameManager>();
-            if (game.CarPrefab != car || game.RobotPrefabs == null || game.RobotPrefabs.Length != actors.Robots.Length)
+            if (game.CarPrefab != car || game.StorageBotPrefab != bot || game.RobotPrefabs == null || game.RobotPrefabs.Length != actors.Robots.Length)
             {
                 game.CarPrefab = car;
+                game.StorageBotPrefab = bot;
                 game.RobotPrefabs = actors.Robots.ToArray();
                 EditorUtility.SetDirty(session);
                 PrefabUtility.SavePrefabAsset(session);
             }
 
-            var networkPrefabs = new List<GameObject> { actors.Player, actors.Item, actors.Laser, session, car };
+            var networkPrefabs = new List<GameObject> { actors.Player, actors.Item, actors.Laser, session, car, bot };
             networkPrefabs.AddRange(actors.Robots.Where(r => r != null));
             FixNetworkHashes(networkPrefabs);
             var list = DataAsset<NetworkPrefabsList>(DataDir + "/NetworkPrefabs.asset", l =>
@@ -58,6 +63,52 @@ namespace Stealth.EditorTools
 
             if (s_Force || !File.Exists(ScenePath)) BuildScene(actors.Player, session, list, ui);
             ConfigurePlayerSettings();
+        }
+
+        /// <summary>
+        /// The team's storage robot (network prefab): the hermit crab in its crate (Tools/Blender/creatures), a server
+        /// NetworkTransform, a navmesh agent (on the server), <see cref="StorageBot"/> and its twin. No collider: the house's
+        /// robots and the players walk past it.
+        /// </summary>
+        static GameObject BuildStorageBot()
+        {
+            var root = new GameObject("StorageBot");
+            root.AddComponent<NetworkObject>();
+            var nt = root.AddComponent<NetworkTransform>();
+            nt.AuthorityMode = NetworkTransform.AuthorityModes.Server;
+            nt.SyncRotAngleX = false;
+            nt.SyncRotAngleZ = false;
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            var model = Model("robot_storage");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "RobotBody", "RobotAccent", "SensorGlow");
+            // the crate's lid (BodyLid, EyeLid) on a hinge at its back top edge: it opens while a player stands by
+            var lids = model.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.Contains("Lid")).ToArray();
+            Transform lidPivot = null;
+            if (lids.Length > 0)
+            {
+                var b = lids[0].bounds;
+                foreach (var r in lids) b.Encapsulate(r.bounds);
+                lidPivot = new GameObject("LidPivot").transform;
+                lidPivot.SetParent(model.transform, false);
+                lidPivot.position = new Vector3(b.center.x, b.min.y, b.min.z);
+                foreach (var r in lids) r.transform.SetParent(lidPivot, true);
+            }
+            var anim = root.AddComponent<StorageBotAnimator>();
+            anim.Model = model.transform;
+            anim.LidPivot = lidPivot;
+            var agent = root.AddComponent<NavMeshAgent>();
+            agent.enabled = false;
+            agent.radius = 0.4f;
+            agent.height = 0.7f;
+            agent.speed = 2.8f;
+            agent.angularSpeed = 360f;
+            agent.acceleration = 10f;
+            agent.stoppingDistance = 0.3f;
+            agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
+            root.AddComponent<StorageBot>();
+            root.AddComponent<StorageBotNet>();
+            return root;
         }
 
         static void FixNetworkHashes(IEnumerable<GameObject> prefabs)
@@ -232,6 +283,9 @@ namespace Stealth.EditorTools
             if ((options & BuildOptions.Development) == 0 && File.Exists("Builds/Windows/dev_build_stamp.txt")) File.Delete("Builds/Windows/dev_build_stamp.txt");
             // no Unity splash: the game opens with the studio's own (StudioSplash, over the menu)
             if (PlayerSettings.SplashScreen.show) { PlayerSettings.SplashScreen.show = false; PlayerSettings.SplashScreen.showUnityLogo = false; }
+            // no graphics jobs: with them the player crashed now and then at a level's start inside the engine
+            // (ShaderRuntime::Variants::ShaderVariantMonitor::FrameFinished, a race with the worker threads uploading new shader variants)
+            if (PlayerSettings.graphicsJobs) PlayerSettings.graphicsJobs = false;
             SetAppIcon();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {

@@ -36,6 +36,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheVaultDoorTurnsItsWheelBeforeItSwings()
+        {
+            float spin = 0f, swing = 0f;
+            AutoDoor.VaultStep(false, 1f, ref spin, ref swing);
+            Assert.AreEqual(0f, spin + swing, "unlocked is not opened: nothing moves");
+            int steps = Mathf.FloorToInt(AutoDoor.VaultSpinTime / 0.05f) - 1;
+            for (int i = 0; i < steps; i++) AutoDoor.VaultStep(true, 0.05f, ref spin, ref swing);
+            Assert.Greater(spin, 0.9f, "the wheel turns");
+            Assert.AreEqual(0f, swing, "the door waits for it");
+            for (int i = 0; i < 200; i++) AutoDoor.VaultStep(true, 0.05f, ref spin, ref swing);
+            Assert.AreEqual(1f, spin, 1e-4f);
+            Assert.AreEqual(1f, swing, 1e-4f, "then swings all the way");
+        }
+
+        [Test]
         public void TheVaultIsOneRoomBehindItsOwnDoorWithThreePanelsOutside()
         {
             int checkedVaults = 0;
@@ -50,7 +65,18 @@ namespace Stealth.Tests
                 behind.ExceptWith(without);
                 CollectionAssert.AreEquivalent(new[] { l.VaultRoom }, behind, $"{at}: the door is the only way into the vault, and only into it");
                 Assert.AreEqual(EdgeType.Door, plan.Openings[l.VaultDoorway].Kind, at);
+                Assert.IsTrue(HouseFeatures.OnlyWayIn(plan, l.VaultRoom, l.VaultDoorway), $"{at}: no street door, vent or slot in the vault");
+                // wide enough for the round door, clear of the wall's ends and its other openings, the door where the doorway is
+                var vo = plan.Openings[l.VaultDoorway];
+                Assert.AreEqual(LevelMetrics.VaultDoorWidth, vo.Width, 1e-4f, $"{at}: the vault's doorway fits the round door");
+                Assert.AreEqual(LevelMetrics.VaultDoorWidth, l.Doorways[l.VaultDoorway].Width, 1e-4f, at);
+                Assert.That(vo.At - vo.Width / 2f, Is.GreaterThanOrEqualTo(0.45f - 1e-4f), at);
+                Assert.That(vo.At + vo.Width / 2f, Is.LessThanOrEqualTo(plan.Walls[vo.Wall].Length - 0.45f + 1e-4f), at);
+                for (int k = 0; k < plan.Openings.Count; k++)
+                    if (k != l.VaultDoorway && plan.Openings[k].Wall == vo.Wall)
+                        Assert.That(Mathf.Abs(plan.Openings[k].At - vo.At), Is.GreaterThanOrEqualTo((plan.Openings[k].Width + vo.Width) / 2f), $"{at}: no opening in the vault's wall");
                 Assert.That(l.VaultDoor, Is.InRange(0, l.AutoDoors.Count - 1), $"{at}: the vault's door is a door");
+                Assert.Less((l.AutoDoors[l.VaultDoor].position - l.Doorways[l.VaultDoorway].Position).sqrMagnitude, 0.01f, $"{at}: the door stands in its doorway");
                 Assert.IsFalse(l.LockedDoors.Contains(l.VaultDoor), $"{at}: not a lock to hack: the panels open it");
                 Assert.IsFalse(l.KeyDoors.Any(k => k.Door == l.VaultDoor || k.Rooms.Contains(l.VaultRoom)), $"{at}: no key door there");
 

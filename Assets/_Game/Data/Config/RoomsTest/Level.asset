@@ -52,77 +52,44 @@ MonoBehaviour:
     CornerCutChance: 0.3
     CorridorChance: 0
     CrossCorridorChance: 1
+    LinkedChance: 1
+    LinkedCorridorShare: 0.75
+    EveryRoomType: 1
     RoomSizeScale: 1.4
     MassWeights: 010000000000000000000000000000000000000000000000i
     AnnexChance: 0
-    RoomCountMin: 3
-    RoomCountMax: 4
+    RoomCountMin: 0
+    RoomCountMax: 0
     WindowsMin: 0
     WindowsMax: 2
-    RoomAreaMin: 30
-    RoomAreaMax: 200
+    RoomAreaMin: 0
+    RoomAreaMax: 0
     MinCorridors: 1
     AutoDoorChance: 0.45
     LockedDoorChance: 0.35
     LockedDoorsFromHouse: 1
   Security:
-    Enemies: 0
+    Enemies: 1
     Robots: 1
     RobotsPerHouse: 0
     RobotsPerExtraFloor: 0
-    Devices: 1
+    Devices: 0
     DevicesPerHouse: 0
-    Cameras: 1
+    Cameras: 0
     CamerasPerHouse: 0
-    Lasers: 1
+    Lasers: 0
     LasersPerHouse: 0
     TeamRoomsPerExtraRobot: 10
     TeamRoomsPerExtraDevice: 15
     MovingLasersFromHouse: 2
-    CameraTerminals: 1
-    HackTerminals: 1
+    CameraTerminals: 0
+    HackTerminals: 0
     Roster:
       Robots:
-      - Kind: 0
-        MinLevel: 0
-        Weight: 5
-      - Kind: 1
-        MinLevel: 0
-        Weight: 3
       - Kind: 9
         MinLevel: 0
-        Weight: 2
-      - Kind: 4
-        MinLevel: 0
-        Weight: 1.5
-      - Kind: 2
-        MinLevel: 1
-        Weight: 2
-      - Kind: 3
-        MinLevel: 1
-        Weight: 2
-      - Kind: 6
-        MinLevel: 2
-        Weight: 2
-      - Kind: 8
-        MinLevel: 2
-        Weight: 1.5
-      - Kind: 5
-        MinLevel: 2
-        Weight: 1.5
-      - Kind: 7
-        MinLevel: 3
-        Weight: 2
-      Devices:
-      - Kind: 13
-        MinLevel: 0
-        Weight: 2
-      - Kind: 12
-        MinLevel: 1
-        Weight: 2
-      - Kind: 11
-        MinLevel: 1
-        Weight: 1.5
+        Weight: 1
+      Devices: []
   Loot:
     BaseItems: 6
     Table:
@@ -142,3 +109,7 @@ MonoBehaviour:
     KeyDoors: 0
     Gadgets: 0
     ObjectivesFromHouse: 999
+    StorageChance: 1
+    Wardens: 0
+    WardensPerHouse: 0
+    ExtraLures: 0

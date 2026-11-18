@@ -19,9 +19,35 @@ namespace Stealth.Tests
                 foreach (var (prop, _) in l.Terminals)
                 {
                     Assert.AreEqual(PropKind.Terminal, l.Props[prop].Kind);
-                    Assert.Greater((l.Props[prop].Position - l.HatchPosition).magnitude, 7.5f, "not in the lobby");
+                    Assert.AreNotEqual(l.LobbyRoom, l.Plan.RoomAt(l.Props[prop].Position + Vector3.up * 0.3f)?.Id ?? -1, $"seed {seed}: not in the lobby");
                 }
             }
+        }
+
+        [Test]
+        public void TheRobotTerminalsStandInTheControlRoom()
+        {
+            int houses = 0, inRoom = 0;
+            var why = new System.Text.StringBuilder();
+            foreach (var l in TestHouses.Sample)
+            {
+                if (!l.Rooms.Any(r => r.Type == RoomType.ControlRoom)) continue;
+                houses++;
+                var robots = l.Terminals.Where(t => t.kind is TerminalKind.Hacking or TerminalKind.Cameras).ToList();
+                if (robots.Count > 0 && robots.All(t => l.Plan.RoomAt(l.Props[t.prop].Position + Vector3.up * 0.3f)?.Type == RoomType.ControlRoom)) inRoom++;
+                else
+                {
+                    var room = l.Rooms.First(r => r.Type == RoomType.ControlRoom);
+                    why.Append($" [seed {l.Seed}: room {room.Area:0} m², {(room.Center - l.HatchPosition).magnitude:0.0} m from the hatch, terminals in " +
+                               string.Join("/", robots.Select(t => l.Plan.RoomAt(l.Props[t.prop].Position + Vector3.up * 0.3f)?.Type.ToString() ?? "?")) +
+                               $", its props: {string.Join(",", l.Props.Where(p => l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == room.Id).Select(p => p.Kind))}]");
+                }
+                // no idle console left anywhere: every terminal prop is a working terminal
+                for (int i = 0; i < l.Props.Count; i++)
+                    if (l.Props[i].Kind == PropKind.Terminal) Assert.IsTrue(l.Terminals.Exists(t => t.prop == i), $"seed {l.Seed}: an idle console");
+            }
+            Assert.Greater(houses, 0, "houses have a control room");
+            Assert.GreaterOrEqual(inRoom, houses * 3 / 4, $"the consoles are in the control room ({inRoom} of {houses}):{why}");
         }
 
         [Test]
@@ -71,7 +97,7 @@ namespace Stealth.Tests
         {
             foreach (var l in TestHouses.Sample)
             {
-                foreach (var p in l.PlayerSpawns) Assert.IsNotNull(l.RoomAt(p), $"spawn {p}");
+                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.BasementOrigin, p + Vector3.up * 0.5f), $"spawn {p}: the team arrives in the basement");
                 foreach (var p in l.ItemSpots) Assert.IsTrue(l.IsInside(p), $"item {p}");
                 foreach (var r in l.RobotSpawns) Assert.IsTrue(l.IsInside(r.Position), $"robot {r.Kind} {r.Position}");
                 foreach (var p in l.PatrolPoints) Assert.IsNotNull(l.RoomAt(p), $"patrol point {p}");
@@ -190,9 +216,11 @@ namespace Stealth.Tests
             foreach (var l in TestHouses.Sample.Append(TestHouses.Get(42, 2, 4)))
                     {
                         int seed = l.Seed, level = l.LevelIndex, players = l.Players;
+                        // the exit's hatch, and the lid over the shaft down to the basement the team arrives in (its manhole is built there)
                         var hatches = l.Props.Where(p => p.Kind == PropKind.Hatch).ToList();
                         string at = $"seed {seed} house {level} players {players}";
-                        if (hatches.Count != 2) problems.Add($"{at}: {hatches.Count} hatches");
+                        if (hatches.Count != 1) problems.Add($"{at}: {hatches.Count} hatches");
+                        if (l.Props.Count(p => p.Kind == PropKind.ShaftHatch) != 1) problems.Add($"{at}: no shaft to the basement");
                         if (!hatches.Any(h => (h.Position - l.ExitHatchPosition).sqrMagnitude < 0.01f)) problems.Add($"{at}: no hatch at the exit");
                         if ((l.ExitHatchPosition - l.HatchPosition).magnitude < 6f) problems.Add($"{at}: exit {(l.ExitHatchPosition - l.HatchPosition).magnitude:0.0} m from the entry");
                         var room = l.RoomAt(l.ExitHatchPosition);

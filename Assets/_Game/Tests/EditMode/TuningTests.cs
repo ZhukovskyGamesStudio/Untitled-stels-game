@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Stealth.Configs;
@@ -74,18 +75,26 @@ namespace Stealth.Tests
         [Test]
         public void BuildingFollowsItsSettings()
         {
-            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentChance = 0f, AutoDoorChance = 0f };
-            var l = LevelGenerator.Generate(5, 0, b);
+            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentsPerRoom = 0f, AutoDoorChance = 0f };
+            int seed0 = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 0) == HouseKind.Office); // an office: a hospital and a shop choose their floors
+            var l = LevelGenerator.Generate(seed0, 0, b);
             Assert.AreEqual(4, l.Floors);
             Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
             Assert.IsFalse(l.Doorways.Any(d => d.Kind == EdgeType.Vent), "no vents");
-            Assert.AreEqual(l.KeyDoors.Count, l.AutoDoors.Count, "only the key doors");
+            // no chance of a door: only the doors a doorway always has (toilets, the plant room…), the key doors, the vault's and the storage room's
+            var must = new HashSet<Vector3>(l.Doorways.Where(d => DoorRules.Always(l, d)).Select(d => d.Position));
+            foreach (var k in l.KeyDoors) must.Add(l.AutoDoors[k.Door].position);
+            if (l.VaultDoor >= 0) must.Add(l.AutoDoors[l.VaultDoor].position);
+            if (l.StorageDoor >= 0) must.Add(l.AutoDoors[l.StorageDoor].position);
+            CollectionAssert.AreEquivalent(must, l.AutoDoors.Select(p => p.position), "only the doors that must be there");
 
             var onlyServers = new BuildingSettings { RoomWeights = new[] { new RoomWeight(RoomType.Server, 1) } };
             // an office (a hospital and a garage have programs of their own)
             int officeSeed = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 1) == HouseKind.Office);
             var s = LevelGenerator.Generate(officeSeed, 1, onlyServers);
-            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall, room.Type.ToString());
+            // the locked storage room comes from the house's features, not from the weights
+            // (the plant room off the lobby is one of them, and the robots' charging room, taken over)
+            foreach (var room in s.Rooms) Assert.IsTrue(room.Type is RoomType.Server or RoomType.Lobby or RoomType.Corridor or RoomType.Hall or RoomType.Storage or RoomType.Utility or RoomType.ChargingStation, room.Type.ToString());
         }
 
         [Test]
@@ -102,13 +111,15 @@ namespace Stealth.Tests
         [Test]
         public void SecurityCountsAndRosterFollowTheSettings()
         {
-            var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0 };
+            var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0,
+                SleepingGuards = 0, Wards = new WardSettings { Rooms = 0, RoomsPerHouse = 0, MaxRooms = 0 } };
             var l = LevelGenerator.Generate(9, 1, null, calm);
-            Assert.AreEqual(0, l.RobotSpawns.Count(r => r.Kind != RobotKind.Warden), "only wardens (HouseFeatures)");
+            // only wardens (HouseFeatures, the old mode) and the traps of the vault or the hidden room (Wards, they are always guarded)
+            Assert.AreEqual(0, l.RobotSpawns.Count(r => r.Kind != RobotKind.Warden && !l.WardedRooms.Contains(l.Plan.RoomAt(new Vector3(r.Position.x, LevelLayout.FloorY(r.Floor) + 0.3f, r.Position.z))?.Id ?? -1)), "only wardens and wards");
             Assert.AreEqual(0, l.CameraSpots.Count);
             Assert.AreEqual(0, l.LaserSpots.Count);
 
-            var drones = new SecuritySettings { Roster = new RosterSettings { Robots = new[] { new RosterEntry(RobotKind.Drone, 0, 1f) } } };
+            var drones = new SecuritySettings { SleepingGuards = 0, Roster = new RosterSettings { Robots = new[] { new RosterEntry(RobotKind.Drone, 0, 1f) } } };
             var d = LevelGenerator.Generate(9, 0, null, drones);
             foreach (var spawn in d.RobotSpawns.Where(s => !RobotRoster.IsDevice(s.Kind) && s.Kind != RobotKind.Warden)) Assert.AreEqual(RobotKind.Drone, spawn.Kind);
         }

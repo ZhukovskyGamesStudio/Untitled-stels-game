@@ -9,19 +9,39 @@ namespace Stealth.Level
     /// </summary>
     public class Hatch : MonoBehaviour
     {
-        public const float UseDistance = 3.2f;
+        public const float UseDistance = 1.6f; // standing at its rim, not across the room
 
         [Tooltip("The lid on its hinge: it swings open while someone hides inside.")]
         public Transform Lid;
+        [Tooltip("The glowing ring and the lamp on the post: blue at the entry, green at the exit (the map's colours).")]
+        public Renderer[] Glow;
+
+        public static readonly Color EntryColor = new(0.3f, 0.6f, 1f), ExitColor = new(0.3f, 1f, 0.4f);
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
 
         float m_Open;
+        int m_Painted = -1;
 
         void Update()
         {
-            if (Lid == null) return;
-            bool someone = false;
             var layout = ActiveLevel.Layout;
             int mine = layout != null && (transform.position - layout.ExitHatchPosition).sqrMagnitude < 1f ? 1 : 0;
+            if (mine != m_Painted && Glow != null)
+            {
+                m_Painted = mine;
+                var block = new MaterialPropertyBlock();
+                var c = mine == 1 ? ExitColor : EntryColor;
+                foreach (var r in Glow)
+                {
+                    if (r == null) continue;
+                    r.GetPropertyBlock(block);
+                    block.SetColor(BaseColorId, c);
+                    block.SetColor(EmissionId, c * 2.4f);
+                    r.SetPropertyBlock(block);
+                }
+            }
+            if (Lid == null) return;
+            bool someone = false;
             foreach (var p in Stealth.Player.PlayerController.All) someone |= p.InHatch && p.HatchIndex == mine;
             m_Open = Mathf.MoveTowards(m_Open, someone ? 1f : 0f, Time.deltaTime * 2.5f);
             Lid.localRotation = Quaternion.Euler(0f, 0f, -Mathf.SmoothStep(0f, 105f, m_Open));
@@ -38,14 +58,17 @@ namespace Stealth.Level
             var layout = ActiveLevel.Layout;
             if (layout == null) return -1;
             if (IsNear(position, layout.ExitHatchPosition)) return 1;
-            return IsNear(position, layout.HatchPosition) ? 0 : -1;
+            return !layout.HasBasement && IsNear(position, layout.HatchPosition) ? 0 : -1; // (a basement: no entry hatch to sit in)
         }
 
         public static Vector3 PositionOf(int hatch)
         {
             var layout = ActiveLevel.Layout;
-            return layout == null ? Vector3.zero : hatch == 1 ? layout.ExitHatchPosition : layout.HatchPosition;
+            return layout == null ? Vector3.zero : hatch == 1 ? layout.ExitHatchPosition : Entry(layout);
         }
+
+        /// <summary>The entry hatch: the manhole in the basement's floor (a house without one: the lobby's middle).</summary>
+        public static Vector3 Entry(LevelLayout layout) => layout.HasBasement ? layout.EntryHatch : layout.HatchPosition;
 
         /// <summary>Close to the hatch and on its floor — not right above it on the floor upstairs (pure).</summary>
         public static bool IsNear(Vector3 position, Vector3 hatch)

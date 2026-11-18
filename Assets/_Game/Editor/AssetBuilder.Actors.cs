@@ -32,7 +32,7 @@ namespace Stealth.EditorTools
             s_StompRipple = Prefab(PrefabsDir + "/FX/StompRipple.prefab", BuildStompRipple).GetComponent<RadioRipple>();
             var visuals = DataAsset<ItemVisuals>(DataDir + "/ItemVisuals.asset", v =>
             {
-                v.Meshes = ItemCatalog.Shapes.Select(s => AssetDatabase.LoadAllAssetsAtPath(ModelPath(s.Id == "cagekey" ? "item_key" : s.Id == "speaker" ? "item_domino" : $"item_{s.Id}")).OfType<Mesh>().First()).ToArray();
+                v.Meshes = ItemCatalog.Shapes.Select(s => ItemPieceMesh(s.Id)).ToArray();
             });
             // One material per configured colour (ItemsConfig can grow).
             visuals.ColorMaterials = Enumerable.Range(0, ItemCatalog.Colors.Length).Select(i => M($"Item_{i}")).ToArray();
@@ -61,6 +61,7 @@ namespace Stealth.EditorTools
                     anim.Bob = 0.06f;
                     s.ViewDistance = 13f; s.ViewAngle = 100f; // deaf: the first houses are full of guards
                     t.PatrolSpeed = 1.8f; t.InvestigateSpeed = 2.8f; t.ChaseSpeed = 4f;
+                    t.PatrolWaitMin = 6.25f; t.PatrolWaitMax = 12.5f; // stands at a point long enough to be read and slipped past
                 });
                 // what a guard may carry (the hostage's cage key) hangs at its belt behind, off to one side — the lower edge of
                 // the torso (it starts at 1.5 m over the legs), where a player sneaking up sees it
@@ -71,6 +72,20 @@ namespace Stealth.EditorTools
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;
                 rc.CargoVisuals = visuals;
+                // no motor hum of the old guard: its own voice says what it does (GuardSounds)
+                foreach (var loop in go.GetComponents<Stealth.Audio.LoopSound>())
+                {
+                    if (loop.Source != null) Object.DestroyImmediate(loop.Source, true);
+                    Object.DestroyImmediate(loop, true);
+                }
+                // its own voice: charging on its dock, walking its rounds, chasing (GuardSounds)
+                var voice = Child(go.transform, "GuardVoice", new Vector3(0f, 1.6f, 0f));
+                var gs = go.AddComponent<Stealth.Audio.GuardSounds>();
+                gs.Source = voice.AddComponent<AudioSource>();
+                gs.Source.playOnAwake = false;
+                gs.Charging = s_Bank.GuardCharge;
+                gs.Patrolling = s_Bank.GuardPatrol;
+                gs.Chasing = s_Bank.GuardChase;
                 return go;
             });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
@@ -114,14 +129,35 @@ namespace Stealth.EditorTools
                     t.CanUseStairs = false; // wheels
                     t.PatrolSpeed = 1.6f; t.InvestigateSpeed = 1.8f; t.ChaseSpeed = 1.8f;
                     t.CargoChance = 0.6f;   // carries loot on its tray: hack it and it drops it
+                    t.MovesLoot = true;     // lifts loot lying on the floor onto its tray, sets it down elsewhere
                 });
-                // The tray on top of the box it carries (model: box at 1.15 m, 0.4 high).
+                // The lift (Tools/Blender/worker_lift.py): arms on a pivot at their hinge, the tray on a pivot at the arms'
+                // end pin; what it carries lies on the tray. RobotAnimator swings them (CargoMotion).
                 var rc = go.GetComponent<RobotController>();
-                var cargo = Child(go.transform, "Cargo", new Vector3(0f, 1.36f, 0.15f));
+                var anim = go.GetComponent<RobotAnimator>();
+                var lift = Model("worker_lift");
+                lift.name = "Lift";
+                // under the animated body: it leans and sags with it (the poses are the robot's own: the body sits at its origin)
+                lift.transform.SetParent(anim.Model != null ? anim.Model : go.transform, false);
+                Paint(lift, "WorkerBody", "RobotAccent", "SensorGlow");
+                var armPivot = Child(lift.transform, "LiftArmPivot", CargoMotion.Hinge);
+                var trayPivot = Child(lift.transform, "LiftTrayPivot", CargoMotion.PinRest);
+                Find(lift, "AccentLiftArm").SetParent(armPivot.transform, true);
+                Find(lift, "BodyLiftTray").SetParent(trayPivot.transform, true);
+                anim.LiftArm = armPivot.transform;
+                anim.LiftTray = trayPivot.transform;
+                var cargo = Child(trayPivot.transform, "Cargo", new Vector3(0f, CargoMotion.OnTray, 0f));
                 rc.CargoMesh = cargo.AddComponent<MeshFilter>();
                 rc.CargoRenderer = cargo.AddComponent<MeshRenderer>();
                 rc.CargoRenderer.enabled = false;
                 rc.CargoVisuals = visuals;
+                // the microphones stand on the mast's cap (the booms swing past the sides of the pod where the usual seat is):
+                // SensorRig casts down from these spots onto the body of the current style
+                var rig = go.GetComponent<SensorRig>();
+                if (rig != null && rig.Microphones != null)
+                    for (int i = 0; i < rig.Microphones.Length; i++)
+                        if (rig.Microphones[i] != null)
+                            rig.Microphones[i].transform.localPosition = new Vector3(i == 0 ? -0.17f : 0.17f, 0.55f, -0.25f);
                 return go;
             });
             Robot(RobotKind.Sweeper, RobotPrefabs + "/RobotSweeper.prefab", () =>
@@ -156,12 +192,20 @@ namespace Stealth.EditorTools
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
-            // one wire of the spider's web: a thin glowing fibre a unit long along +Z (scaled to each wire), no collider, no shadow
+            // one metre of the spider's web along +Z (scaled to each wire), threads as geometry in three variants (Web0..2,
+            // Tools/Blender/web.py); SpiderBot lays pieces end to end and shows one variant each; no collider, no shadow
             var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
             {
                 var go = new GameObject("SpiderStrand");
-                var wire = Cube(go.transform, "Wire", new Vector3(0f, 0f, 0.5f), new Vector3(0.014f, 0.014f, 1f), M("Web"), false);
-                wire.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                var model = Model("web_piece");
+                model.transform.SetParent(go.transform, false);
+                var mat = WebMaterial();
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    r.sharedMaterial = mat;
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+                foreach (var c in model.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
                 return go;
             });
             Robot(RobotKind.Spider, RobotPrefabs + "/RobotSpider.prefab", () => Device<SpiderBot>("RobotSpider", "robot_spider", "SpiderBody", true, true, (root, s) =>
@@ -172,7 +216,6 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Vacuum, RobotPrefabs + "/RobotVacuum.prefab", () => Device<CeilingVacuum>("RobotVacuum", "robot_vacuum", "VacuumBody", true, true, (root, v) =>
             {
                 v.Profile = Profile<VacuumProfile>("RobotVacuum", p => p.ForgetRate = 0.6f);
-                v.Line = Beam(root, "ScanLine", 0.03f);
                 v.FanARenderer = LaserFan(root, "LaserFanA");
                 v.FanBRenderer = LaserFan(root, "LaserFanB");
                 v.FanA = v.FanARenderer.transform;
@@ -300,6 +343,22 @@ namespace Stealth.EditorTools
                 r.receiveShadows = false;
             }
             view.SetActive(false);
+            // the shelter map held open in front of the face (Tools/Blender/apartments.py held_map): the owner sees it in
+            // the view, the others see it in front of the player — a thing in the world, not UI
+            MapMaterials();
+            var held = Model("held_map");
+            held.name = "HeldMap";
+            held.transform.SetParent(head.transform, false);
+            held.transform.localPosition = new Vector3(0f, -0.2f, 0.42f);
+            foreach (var r in held.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = M(n.StartsWith("AccentSleeve") ? "ViewSleeve" : n.StartsWith("AccentHand") ? "PlayerAccent"
+                    : n.StartsWith("Trim") ? "MapInk" : "MapPaper");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            held.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
                 new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
@@ -318,6 +377,7 @@ namespace Stealth.EditorTools
             pc.Listener = listener;
             pc.Flashlight = beam;
             pc.ViewFlashlight = view;
+            pc.HeldMap = held;
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);
@@ -443,11 +503,9 @@ namespace Stealth.EditorTools
                 return go;
             }
             rig.Eyes = new[] { Mount("attach_eye", "SensorEye", eye + new Vector3(0, 0, 0.08f), Quaternion.Euler(rc.Profile.Senses.EyePitch, 0, 0)) };
-            rig.Microphones = new[]
-            {
-                Mount("attach_mic", "SensorMicL", eye + new Vector3(-side, 0.05f, -0.1f), Quaternion.Euler(0, 0, 15f)),
-                Mount("attach_mic", "SensorMicR", eye + new Vector3(side, 0.05f, -0.1f), Quaternion.Euler(0, 0, -15f)),
-            };
+            // no microphone stalks: from behind the two of them read as an odd pair of discs on the robot's back (playtest);
+            // what a robot hears is in its description (RobotInfo)
+            rig.Microphones = new GameObject[0];
             rig.GroundProbes = new[]
             {
                 Mount("attach_seismic", "SensorGroundL", new Vector3(-side, 0, radius + 0.1f), Quaternion.identity),

@@ -13,6 +13,8 @@ namespace Stealth.Level
     {
         [Tooltip("The panel's screen: red while locked, green once solved.")]
         public Renderer Screen;
+        [Tooltip("The panel's face per minigame (Dial, Switches, Sequence): only its own shows.")]
+        public GameObject[] Faces;
 
         /// <summary>Which locks the team has solved (set by the game).</summary>
         public static System.Func<int, bool> IsSolved = _ => false;
@@ -37,6 +39,9 @@ namespace Stealth.Level
 
         void LateUpdate()
         {
+            if (Faces != null)
+                for (int i = 0; i < Faces.Length; i++)
+                    if (Faces[i] != null && Faces[i].activeSelf != (i == (int)Game)) Faces[i].SetActive(i == (int)Game);
             int state = Solved ? 1 : 0;
             if (state == m_Shown || Screen == null) return;
             m_Shown = state;

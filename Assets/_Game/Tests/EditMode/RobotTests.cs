@@ -121,21 +121,39 @@ namespace Stealth.Tests
             Assert.IsTrue(MeshRay.Cast(new Vector3(0f, 0f, 0f), Vector3.up, v, t, out h) && Mathf.Abs(h - 0.5f) < 1e-4f, "from inside: either side counts");
         }
 
+        /// <summary>Half a fan 2.9 m over the floor reaching 3 m, its rays stopped by the floor and by a wall at <paramref name="wall"/> m.</summary>
+        static Vector2[] Half(float wall = float.MaxValue)
+        {
+            var half = new Vector2[ScanLine.FanRays];
+            for (int i = 0; i < half.Length; i++)
+            {
+                var r = ScanLine.FanRay(i, half.Length, 3f, 2.9f, out float length);
+                float stop = r.x > 1e-4f ? Mathf.Min(length, wall / r.x) : length;
+                half[i] = r * stop;
+            }
+            return half;
+        }
+
         [Test]
-        public void TheCeilingFanCannotBeJumped()
+        public void TheCeilingFanCannotBeJumpedAndStopsAtWalls()
         {
             var apex = new Vector3(0f, 2.9f, 0f);
             var dir = Vector3.forward;
+            var open = Half();
             // standing in the sheet, 2 m out: caught; jumping there: still caught (the body is in the light)
-            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.1f, 0f, 2f), 1.8f));
-            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.1f, 0.8f, 2f), 1.8f), "in the air");
-            Assert.IsTrue(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 0f, -2.5f), 1.1f), "both halves");
-            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0.6f, 0f, 2f), 1.8f), "beside the sheet");
-            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 0f, 3.6f), 1.8f), "beyond its foot");
-            // a wall cut this half short
-            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 1f, 3f, new Vector3(0f, 0f, 2f), 1.8f), "behind the wall");
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0.1f, 0f, 2f), 1.8f));
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0.1f, 0.8f, 2f), 1.8f), "in the air");
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0f, 0f, -2.5f), 1.1f), "both halves");
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0f, 0f, 0f), 1.8f), "right under the lens");
+            Assert.IsFalse(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0.6f, 0f, 2f), 1.8f), "beside the sheet");
+            Assert.IsFalse(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0f, 0f, 3.6f), 1.8f), "beyond its foot");
             // the fan narrows upwards: high up (on a shelf) the edge is closer
-            Assert.IsFalse(ScanLine.CutsFan(apex, dir, 0f, 3f, 3f, new Vector3(0f, 2f, 2.5f), 0.8f), "above its slope");
+            Assert.IsFalse(ScanLine.FanTouches(apex, dir, open, open, new Vector3(0f, 2f, 2.5f), 0.8f), "above its slope");
+            // a wall 1 m out: nothing behind it is lit, the part in front of it all is (the old cut shrank the whole fan)
+            var cut = Half(1f);
+            Assert.IsFalse(ScanLine.FanTouches(apex, dir, cut, open, new Vector3(0f, 0f, 1.6f), 1.8f), "behind the wall");
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, cut, open, new Vector3(0f, 0f, 0.5f), 1.8f), "in front of it, low");
+            Assert.IsTrue(ScanLine.FanTouches(apex, dir, cut, open, new Vector3(0f, 0f, -2.5f), 1.1f), "the other half is whole");
         }
 
         [Test]

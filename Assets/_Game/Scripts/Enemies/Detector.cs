@@ -57,7 +57,7 @@ namespace Stealth.Enemies
         public static readonly List<Detector> All = new();
 
         /// <summary>One-shot effects shown on every peer (see <see cref="Pulse"/>).</summary>
-        protected const byte PulseRadio = 1, PulseShot = 2, PulseStomp = 3;
+        protected const byte PulseRadio = 1, PulseShot = 2, PulseStomp = 3, PulseLift = 4, PulseLower = 5, PulseShelve = 6;
 
         [Header("Detector")]
         public RobotKind Kind;
@@ -226,14 +226,24 @@ namespace Stealth.Enemies
 
         public bool ReachableFrom(Vector3 hands) => Perception.ReachClear(hands, Position, transform);
 
+        /// <summary>Server: off for <paramref name="seconds"/> (0 or less: for good, until <see cref="WakeServer"/>); never shortens a longer hack.</summary>
         public void HackServer(float seconds)
         {
             if (!IsServer) return;
-            m_HackedUntil = Time.time + seconds;
+            float until = seconds > 0f ? Time.time + seconds : float.PositiveInfinity;
+            m_HackedUntil = m_State.Hacked ? Mathf.Max(m_HackedUntil, until) : until;
             m_State.Hacked = true;
             ReportAwarenessServer(0f, null);
             OnHackedServer();
             RefreshStatus();
+        }
+
+        /// <summary>Server: a hacked robot / device switches back on now (a hack over the team's limit woke it).</summary>
+        public void WakeServer()
+        {
+            if (!IsServer || !m_State.Hacked) return;
+            m_HackedUntil = Time.time;
+            UpdateHackServer();
         }
 
         /// <summary>Server: forget the current target / suspicion.</summary>

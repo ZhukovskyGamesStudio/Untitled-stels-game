@@ -17,7 +17,30 @@ namespace Stealth.EditorTools
         static Material M(string name) =>
             s_Mats.TryGetValue(name, out var m) ? m : throw new KeyNotFoundException($"Material {name} is not registered in BuildMaterials");
 
-        /// <summary>Loads or creates Art/Materials/<paramref name="category"/>/<paramref name="name"/>.mat.</summary>
+        /// <summary>The spider's web threads (Tools/Blender/web.py): pale silk with a faint glow.</summary>
+        static Material WebMaterial()
+        {
+            // the threads are geometry (Tools/Blender/web.py): opaque silk with a faint glow, so a careful player sees them
+            // in a dark room. (An alpha card of hair-thin threads read as a milky sheet: its mipmaps blend threads and air.)
+            var mat = M("Web");
+            mat.SetTexture("_BaseMap", null);
+            mat.SetTexture("_EmissionMap", null);
+            mat.SetColor("_BaseColor", new Color(0.86f, 0.92f, 0.95f, 1f));
+            mat.SetColor("_EmissionColor", new Color(0.55f, 0.85f, 1f) * 1.2f);
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
+            mat.SetFloat("_Surface", 0f);
+            mat.SetOverrideTag("RenderType", "Opaque");
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.Zero);
+            mat.SetFloat("_ZWrite", 1f);
+            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
+            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = -1;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         static Material Mat(string category, string name, Color color, Color? emission = null, bool unlit = false, float smoothness = 0.25f)
         {
             var dir = $"{MaterialsDir}/{category}";
@@ -142,6 +165,48 @@ namespace Stealth.EditorTools
             // the themed rooms' furniture (AssetBuilder.Rooms)
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);
+            Mat(props, "Gold", new Color(1f, 0.76f, 0.22f), smoothness: 0.8f); // the vault's bars, the padlocks
+            // the auto repair shop: customers' cars in glossy paint, tinted glass, the shop's red tools and yellow safety paint
+            Mat(props, "CarRed", new Color(0.55f, 0.06f, 0.05f), smoothness: 0.82f);
+            Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
+            Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
+            Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
+            Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
+            Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors
+            Mat(props, "ClinicDoor", new Color(0.72f, 0.82f, 0.86f), smoothness: 0.5f); // the hospital's washable laminate doors
+            Mat(props, "FlatDoor", new Color(0.36f, 0.24f, 0.18f), smoothness: 0.35f); // a flat's entry door: brown padding / steel
+            Mat(props, "FlatDoorTrim", new Color(0.72f, 0.6f, 0.34f), smoothness: 0.65f); // its brass number, peephole and handle
+            Mat(props, "WoodDoor", new Color(0.62f, 0.45f, 0.3f), smoothness: 0.45f);     // the thin wooden doors between rooms: lacquered oak
+            Mat(props, "EntranceSteel", new Color(0.2f, 0.27f, 0.24f), smoothness: 0.4f); // the apartment block's street door: hammered green paint
+            Mat(props, "ClinicFrame", new Color(0.86f, 0.88f, 0.88f), smoothness: 0.45f); // the hospital's painted steel door frames
+            Mat(props, "LiftSteel", new Color(0.6f, 0.62f, 0.64f), smoothness: 0.72f);    // the lift: brushed steel doors, portal and cab walls
+            Mat(props, "LiftFloor", new Color(0.16f, 0.15f, 0.15f), smoothness: 0.3f);    // the cab's floor
+            // the variants (PropVariants): book covers and their pages, garments
+            Mat(props, "BookRed", new Color(0.55f, 0.12f, 0.1f), smoothness: 0.3f);
+            Mat(props, "BookBlue", new Color(0.14f, 0.24f, 0.48f), smoothness: 0.3f);
+            Mat(props, "BookGreen", new Color(0.16f, 0.36f, 0.2f), smoothness: 0.3f);
+            Mat(props, "BookOchre", new Color(0.72f, 0.55f, 0.18f), smoothness: 0.3f);
+            Mat(props, "BookBrown", new Color(0.38f, 0.24f, 0.14f), smoothness: 0.3f);
+            Mat(props, "BookBlack", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.35f);
+            Mat(props, "BookCream", new Color(0.86f, 0.82f, 0.7f), smoothness: 0.25f);
+            Mat(props, "BookTeal", new Color(0.12f, 0.42f, 0.44f), smoothness: 0.3f);
+            Mat(props, "BookPages", new Color(0.93f, 0.9f, 0.82f), smoothness: 0.1f);
+            Mat(props, "ClothNavy", new Color(0.12f, 0.15f, 0.28f), smoothness: 0.08f);
+            Mat(props, "ClothGrey", new Color(0.42f, 0.43f, 0.45f), smoothness: 0.08f);
+            Mat(props, "ClothBeige", new Color(0.7f, 0.62f, 0.48f), smoothness: 0.08f);
+            Mat(props, "ClothBlack", new Color(0.09f, 0.09f, 0.1f), smoothness: 0.1f);
+            Mat(props, "ClothRed", new Color(0.5f, 0.1f, 0.1f), smoothness: 0.08f);
+            Mat(props, "ClothOlive", new Color(0.32f, 0.34f, 0.18f), smoothness: 0.08f);
+            Mat(props, "ClothBrown", new Color(0.36f, 0.22f, 0.13f), smoothness: 0.12f);
+            Mat(props, "ClothDenim", new Color(0.24f, 0.34f, 0.5f), smoothness: 0.08f);
+            Mat(props, "MedicalBlue", new Color(0.22f, 0.45f, 0.66f), smoothness: 0.4f);   // mattresses, carts, seats
+            Mat(props, "SurgicalGreen", new Color(0.2f, 0.46f, 0.4f), smoothness: 0.15f);  // drapes
+            Mat(props, "Curtain", new Color(0.62f, 0.78f, 0.8f), smoothness: 0.05f);       // the beds' privacy curtains
+            // what the robots built themselves (the charging room): a dark glossy shell, a ribbed flesh-like sheath, an acid glow
+            Mat(props, "RobotShell", new Color(0.08f, 0.09f, 0.12f), smoothness: 0.85f);
+            Mat(props, "RobotFlesh", new Color(0.42f, 0.2f, 0.3f), smoothness: 0.55f);
+            Mat(props, "RobotGlow", new Color(0.3f, 1f, 0.6f), new Color(0.6f, 2.6f, 1.3f));
             // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
             Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
 

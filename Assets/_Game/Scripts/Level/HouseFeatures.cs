@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>The three kinds of place a house can be; each has its own point of interest.</summary>
-    public enum Location : byte { Office, Hospital, Garage }
+    public enum Location : byte { Office, Hospital, Garage, Apartments }
 
     /// <summary>
     /// A warden's post (<see cref="RobotKind.Warden"/>): in front of the only doorway of a loot room, walking a few steps
@@ -75,13 +75,26 @@ namespace Stealth.Level
         public Vector2 VaultArea = new(8f, 45f);
         [Tooltip("The hostage's room: at least this many m² (the cage stands in its middle).")]
         public float HostageMinArea = 14f;
+
+        [Header("Storage room (locked; opens from its terminal or from inside; workers haul loot to it)")]
+        [Tooltip("Chance that a house has a storage room. Only then do workers come (they haul loot there).")]
+        [Range(0f, 1f)] public float StorageChance = 0.6f;
+        [Tooltip("From which house (0 = the first).")]
+        public int StorageFromHouse = 0;
+        [Tooltip("The door terminal stands at least this far from the storage room's door, metres (closer if no desk is that far).")]
+        public float StorageTerminalDistance = 10f;
+        [Tooltip("Spots on the floor of the pile where workers leave loot (and where the pile's first loot lies).")]
+        public int StoragePileSpots = 6;
+        [Tooltip("At least this many of the house's robots are workers when it has a storage room (if workers are on the roster yet).")]
+        public int StorageWorkers = 1;
     }
 
     /// <summary>
     /// The special places of a house (pure, from the seed; each with its own random stream so the rest of the house does
     /// not shift): a hidden room behind illusion walls, key doors that close off a part of the house, searchable crates,
     /// wardens in front of loot rooms with lure speakers around them, and the location's point of interest (the robot
-    /// programming console in an office, the med table in a hospital, the workbench in a garage).
+    /// programming console in an office, the med table in a hospital, the workbench in a garage; an apartment block has none —
+    /// its find is the shelter map).
     /// </summary>
     public static class HouseFeatures
     {
@@ -89,18 +102,56 @@ namespace Stealth.Level
         {
             HouseKind.Hospital => Location.Hospital,
             HouseKind.Garage => Location.Garage,
+            HouseKind.Apartments => Location.Apartments,
             _ => Location.Office,
         };
 
-        public static PropKind PointOfInterestKind(Location location) => location switch
+        /// <summary>The location's point of interest; none in an apartment block (its own find is the shelter map).</summary>
+        public static PropKind? PointOfInterestKind(Location location) => location switch
         {
             Location.Hospital => PropKind.MedTable,
             Location.Garage => PropKind.Workbench,
+            Location.Apartments => null,
             _ => PropKind.Programmer,
         };
 
+        /// <summary>
+        /// The apartment block's find: the map to the survivors' shelter, hidden in one flat above the ground floor (its own
+        /// stream of the house's seed: every peer agrees). The server puts it in a cupboard, wardrobe or chest of drawers of
+        /// that flat (the bedroom's first); with none that holds it, it lies in the bedroom (or the living room) at <see cref="LevelLayout.MapSpot"/>.
+        /// </summary>
+        public static void PlanShelterMap(LevelLayout l)
+        {
+            l.MapFlat = l.MapRoom = -1;
+            if (l.Kind != HouseKind.Apartments) return;
+            var flats = new SortedSet<int>();
+            foreach (var r in l.Rooms) if (r.Flat >= 0 && (r.Floor > 0 || l.Floors == 1)) flats.Add(r.Flat);
+            if (flats.Count == 0) return;
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x3A9E, 0));
+            int pick = rng.Next(flats.Count), k = 0;
+            foreach (int f in flats) { if (k++ == pick) { l.MapFlat = f; break; } }
+            PlanRoom best = null;
+            foreach (var r in l.Rooms)
+            {
+                if (r.Flat != l.MapFlat) continue;
+                int rank = r.Type switch { RoomType.Bedroom => 3, RoomType.Living => 2, RoomType.Kitchen => 1, _ => 0 };
+                int bestRank = best == null ? -1 : best.Type switch { RoomType.Bedroom => 3, RoomType.Living => 2, RoomType.Kitchen => 1, _ => 0 };
+                if (rank > bestRank) best = r;
+            }
+            if (best == null) return;
+            l.MapRoom = best.Id;
+            l.MapSpot = best.Center;
+        }
+
+        /// <summary>The flat (−1: none) a piece of furniture of the house stands in.</summary>
+        public static int FlatAt(LevelLayout l, Vector3 position)
+        {
+            var r = l.Plan.RoomAt(position + Vector3.up * 0.3f);
+            return r != null ? r.Flat : -1;
+        }
+
         static bool PlayerPasses(EdgeType k) => k != EdgeType.Wall;
-        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open;
+        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach;
 
         /// <summary>
         /// Rooms reached from <paramref name="start"/> through the openings (players: every kind; robots: doors and open
@@ -171,7 +222,7 @@ namespace Stealth.Level
             var candidates = new List<PlanRoom>();
             foreach (var r in plan.Rooms)
             {
-                if (r.Id == l.LobbyRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
+                if (r.Id == l.LobbyRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage) continue;
                 if (r.Area < s.HiddenRoomMinArea || r.Area > s.HiddenRoomMaxArea || HasStair(l, r.Id)) continue;
                 bool enclosed = true;
                 int walls = 0;
@@ -180,6 +231,7 @@ namespace Stealth.Level
                     if (w.RoomA != r.Id && w.RoomB != r.Id) continue;
                     int other = w.RoomA == r.Id ? w.RoomB : w.RoomA;
                     if (w.Exterior || w.Railing || other < 0) { enclosed = false; break; }
+                    if (plan.Rooms[other].Type == RoomType.Storage) { enclosed = false; break; } // no second way into the storage room
                     walls++;
                 }
                 if (enclosed && walls > 0) candidates.Add(r);
@@ -253,6 +305,7 @@ namespace Stealth.Level
                 behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
                 if (behind.Count == 0 || behind.Count > s.KeyRegionRooms || behind.Contains(l.LobbyRoom) || behind.Overlaps(taken)) continue;
                 if (i == l.VaultDoorway || (l.VaultRoom >= 0 && behind.Contains(l.VaultRoom))) continue; // the vault has a lock of its own
+                if (i == l.StorageDoorway || (l.StorageRoom >= 0 && behind.Contains(l.StorageRoom))) continue; // so has the storage room
                 // no room two storeys high behind it: from a gallery above a player drops in past the door — and is shut in
                 bool atrium = false;
                 foreach (int r in behind) atrium |= plan.Rooms[r].Levels > 1;
@@ -265,6 +318,13 @@ namespace Stealth.Level
                         && (r.Center - d.Position).magnitude >= s.KeyMinDistance)
                         keyRooms.Add(r);
                 if (keyRooms.Count == 0) continue;
+                // deeper in than the door: the team goes past the locked door, further in, and back (RoomDepth)
+                int nearSteps = int.MaxValue;
+                if (l.RoomSteps != null)
+                    foreach (int side in new[] { d.RoomA, d.RoomB })
+                        if (side >= 0 && side < l.RoomSteps.Length && !behind.Contains(side)) nearSteps = l.RoomSteps[side];
+                var deeper = keyRooms.FindAll(r => nearSteps != int.MaxValue && l.RoomSteps[r.Id] > nearSteps);
+                if (deeper.Count > 0) keyRooms = deeper;
                 var keyRoom = keyRooms[rng.Next(keyRooms.Count)];
                 var key = keyRoom.Center + Vector3.up * 0.02f;
                 for (int k = 0; k < l.ItemSpots.Count; k++)
@@ -334,7 +394,84 @@ namespace Stealth.Level
 
         static bool Plain(LevelLayout l, PlanRoom r) =>
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
-            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby) && !HasStair(l, r.Id);
+            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility or RoomType.Operating or RoomType.Imaging or RoomType.NurseStation) && !HasStair(l, r.Id);
+
+        /// <summary>
+        /// Makes the vault's doorway wide enough for the round bank door (<see cref="LevelMetrics.VaultDoorWidth"/>):
+        /// where it is, or slid along its wall as little as possible — clear of the wall's ends, its other openings and the
+        /// stairs on both sides. False (nothing changed) when the wall has no such place.
+        /// </summary>
+        public static bool WidenVaultDoorway(LevelLayout l, int opening) => WidenDoorway(l, opening, LevelMetrics.VaultDoorWidth);
+
+        /// <summary>
+        /// Makes a doorway <paramref name="width"/> wide (nominal): where it is, or slid along its wall as little as possible —
+        /// clear of the wall's ends, its other openings and the stairs on both sides. False (nothing changed) when the wall has no such place.
+        /// </summary>
+        public static bool WidenDoorway(LevelLayout l, int opening, float width)
+        {
+            const float margin = 0.45f;
+            var plan = l.Plan;
+            var o = plan.Openings[opening];
+            var w = plan.Walls[o.Wall];
+            if (w.Railing || w.Shaped) return false;
+            float lo = margin + width / 2f, hi = w.Length - margin - width / 2f;
+            if (lo > hi) return false;
+            var tries = new List<float>();
+            float at0 = Mathf.Clamp(o.At, lo, hi);
+            for (float step = 0f; step <= hi - lo + 0.001f; step += HousePlan.Res)
+            {
+                if (at0 + step <= hi + 0.001f) tries.Add(at0 + step);
+                if (step > 0f && at0 - step >= lo - 0.001f) tries.Add(at0 - step);
+            }
+            var dir = w.Dir;
+            var n = new Vector2(-dir.y, dir.x);
+            foreach (float at in tries)
+            {
+                bool free = true;
+                for (int k = 0; k < plan.Openings.Count && free; k++)
+                {
+                    var p = plan.Openings[k];
+                    if (k == opening || p.Wall != o.Wall) continue;
+                    if (p.Kind == EdgeType.Open || Mathf.Abs(p.At - at) < (p.Width + width) / 2f + margin) free = false;
+                }
+                // the way through stays clear of the stairs on both sides
+                for (int k = 0; k < l.Stairs.Count && free; k++)
+                {
+                    var st = l.Stairs[k];
+                    if (st.Floor != w.Floor && st.Floor + 1 != w.Floor) continue;
+                    var area = PlanGenerator.StairArea(st, 0.1f);
+                    for (float u = -width / 2f; u <= width / 2f + 0.001f && free; u += HousePlan.Res)
+                        foreach (float side in new[] { -1f, 1f })
+                            if (area.Contains(w.At(at + u) + n * (side * 0.8f))) free = false;
+                }
+                if (!free) continue;
+                o.At = at;
+                o.Width = width;
+                plan.Openings[opening] = o;
+                var d = l.Doorways[opening];
+                var p3 = w.At(at);
+                d.Position = new Vector3(p3.x, d.Position.y, p3.y);
+                d.Width = width;
+                l.Doorways[opening] = d;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The room has no opening but <paramref name="door"/>: no street door, vent or slot of its own (the reach test
+        /// ignores the outside, so a vault with a door to the street passed it).
+        /// </summary>
+        public static bool OnlyWayIn(HousePlan plan, int room, int door)
+        {
+            for (int k = 0; k < plan.Openings.Count; k++)
+            {
+                if (k == door) continue;
+                var w = plan.Walls[plan.Openings[k].Wall];
+                if (w.RoomA == room || w.RoomB == room) return false;
+            }
+            return true;
+        }
 
         static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
         {
@@ -356,11 +493,18 @@ namespace Stealth.Level
                 int v = 0;
                 foreach (int id in behind) v = id;
                 var room = plan.Rooms[v];
-                if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y) continue;
+                if (!Plain(l, room) || room.Area < s.VaultArea.x || room.Area > s.VaultArea.y || !OnlyWayIn(plan, v, i)) continue;
                 var w = plan.Walls[plan.Openings[i].Wall];
                 int outside = w.RoomA == v ? w.RoomB : w.RoomA;
+                var (oldOpening, oldDoorway) = (plan.Openings[i], l.Doorways[i]);
+                if (!WidenVaultDoorway(l, i)) continue;
                 var consoles = ConsolePlaces(l, v, outside);
-                if (consoles.Count < 3) continue;
+                if (consoles.Count < 3)
+                {
+                    plan.Openings[i] = oldOpening;
+                    l.Doorways[i] = oldDoorway;
+                    continue;
+                }
                 l.VaultRoom = v;
                 l.VaultDoorway = i;
                 foreach (var c in consoles)
@@ -558,7 +702,9 @@ namespace Stealth.Level
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0xC7A7, 0));
             var options = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack) options.Add(i);
+                if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack
+                    && (l.StorageRoom < 0 || l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.StorageRoom)) // the storage room's shelves take the workers' loot
+                    options.Add(i);
             // a house without a store room: a cabinet or a locker stands in (every house has something to search)
             if (options.Count == 0)
                 for (int i = 0; i < l.Props.Count; i++)
@@ -580,22 +726,39 @@ namespace Stealth.Level
 
         /// <summary>
         /// The location's own place: a meeting table, a reception desk or a kitchen counter (big enough to stand in for it)
-        /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage). After the furniture.
+        /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage); an apartment block
+        /// has no such place (its find is the shelter map). After the furniture.
         /// </summary>
         public static void PointOfInterest(LevelLayout l)
         {
-            var kind = PointOfInterestKind(LocationOf(l.Kind));
+            if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x9017, 0));
             // a big piece of furniture with nothing standing on it stands in for the 2 m console / table / bench (not a desk
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the
             // place — the place shrinks to its footprint
             var need = Furnisher.FootprintOf(kind);
-            foreach (var wanted in new[] { PropKind.MeetingTable, PropKind.PingPongTable, PropKind.ReceptionDesk, PropKind.Sofa, PropKind.Shelf,
-                         PropKind.PoolTable, PropKind.ReadingTable, PropKind.ConsoleDesk, PropKind.LabBench, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball })
+            // the place is tall (Furnisher.Tall): never where it would stand in front of a window (a low piece may have)
+            var windows = LevelBuilder.WindowSpots(l);
+            bool AtWindow(Vector3 p)
+            {
+                foreach (var (w, _) in windows)
+                    if (LevelLayout.FloorOf(w.y) == LevelLayout.FloorOf(p.y + 0.1f) && new Vector2(w.x - p.x, w.z - p.z).magnitude < Mathf.Max(need.width, need.height) / 2f + 1.2f) return true;
+                return false;
+            }
+            // away from the hatch where the house allows it; a small first house has no "far"
+            foreach (float away in new[] { 6f, 2.5f })
+            // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
+            foreach (var wanted in new[] { PropKind.PingPongTable, PropKind.PoolTable, PropKind.SectionalSofa, PropKind.AirHockey, PropKind.ReceptionDesk,
+                         PropKind.Sofa, PropKind.StudioCouch, PropKind.Daybed, PropKind.BenchIsland, PropKind.MeetingTable, PropKind.ConferenceTable,
+                         PropKind.Shelf, PropKind.MetalShelving,
+                         PropKind.PokerTable, PropKind.ReadingTable, PropKind.DiningTable, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.LabBench,
+                         PropKind.RobotTable, PropKind.WorkTable, PropKind.BarCounter, PropKind.MixingDesk, PropKind.Foosball, PropKind.Credenza,
+                         PropKind.AvCredenza, PropKind.HallBench, PropKind.DoctorDesk, PropKind.TireRack, PropKind.PaintRack })
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)
-                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > 6f) options.Add(i);
+                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away
+                        && (!Furnisher.Tall.Contains(kind) || !AtWindow(l.Props[i].Position))) options.Add(i);
                 if (options.Count == 0) continue;
                 int pick = options[rng.Next(options.Count)];
                 var p = l.Props[pick];
@@ -640,7 +803,7 @@ namespace Stealth.Level
                 {
                     var d = l.Doorways[i];
                     if (d.RoomA != r.Id && d.RoomB != r.Id) continue;
-                    if (d.Kind is EdgeType.Door or EdgeType.Open) { only = i; count++; }
+                    if (d.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) { only = i; count++; }
                 }
                 if (count != 1) continue;
                 var door = l.Doorways[only];

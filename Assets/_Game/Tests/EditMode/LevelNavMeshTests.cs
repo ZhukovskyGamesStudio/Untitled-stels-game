@@ -9,11 +9,20 @@ using UnityEngine.AI;
 namespace Stealth.Tests
 {
     /// <summary>Builds real level geometry in the editor, bakes the navmesh and checks paths between floors.</summary>
+    [TestFixture(99991, 4)] // a hospital
+    [TestFixture(7, 1)]     // an auto repair shop: the hall, its cars and lifts, the gallery
+    [TestFixture(12, 2)]    // an apartment block: the flats off the landings, the stacked stairwell
     public class LevelNavMeshTests
     {
         // one shared house, built and baked once for the fixture: every test only asks the navmesh
-        const int Seed = 99991, Level = 4;
+        readonly int Seed, Level;
         LevelLayout m_Layout;
+
+        public LevelNavMeshTests(int seed, int level)
+        {
+            Seed = seed;
+            Level = level;
+        }
 
         [OneTimeSetUp]
         public void Build()
@@ -39,15 +48,33 @@ namespace Stealth.Tests
             return NavMesh.CalculatePath(a.position, b.position, areaMask, path) && path.status == NavMeshPathStatus.PathComplete;
         }
 
+        /// <summary>The room's floor clear of furniture, nearest to <paramref name="p"/> first.</summary>
+        System.Collections.Generic.IEnumerable<Vector3> OpenFloor(PlanRoom r, Vector3 p)
+        {
+            var cells = new System.Collections.Generic.List<Vector3>();
+            for (float x = r.Bounds.xMin + 0.5f; x < r.Bounds.xMax - 0.4f; x += 0.5f)
+                for (float z = r.Bounds.yMin + 0.5f; z < r.Bounds.yMax - 0.4f; z += 0.5f)
+                {
+                    var q = new Vector3(x, p.y, z);
+                    if (m_Layout.Plan.SpaceAt(r.Floor, new Vector2(x, z)) == r.Id && Stealth.Items.LootPlanner.ClearOfFurniture(m_Layout, q, r.Floor, 0.3f)) cells.Add(q);
+                }
+            return cells.OrderBy(q => (q - p).sqrMagnitude);
+        }
+
         [Test]
         public void EveryFloorIsReachableFromTheHatchByStairs()
         {
-            const int seed = Seed;
+            int seed = Seed;
             foreach (var r in m_Layout.Rooms)
                 if (r.Id != m_Layout.HiddenRoom) // robots never get into the hidden room
                 {
                     // the exit hatch stands in the middle of its room: walk up to it
                     var target = (r.Center - m_Layout.ExitHatchPosition).sqrMagnitude < 0.1f ? r.Center + new Vector3(1.6f, 0f, 0f) : r.Center;
+                    // a piece standing on the middle (the hostage's cage, a table): any open floor of the room will do
+                    // (a strip walled in behind such a piece is a pocket nobody needs, not a room out of reach)
+                    if (!Stealth.Items.LootPlanner.ClearOfFurniture(m_Layout, target, r.Floor, 0.3f))
+                        foreach (var q in OpenFloor(r, target))
+                            if (Reach(m_Layout.HatchPosition, q, NavMesh.AllAreas)) { target = q; break; }
                     Assert.IsTrue(Reach(m_Layout.HatchPosition, target, NavMesh.AllAreas), $"seed {seed}: {r.Type} ({r.Shape}, {r.Area:0} m²) on floor {r.Floor} at {r.Center}" +
                         $" (exit hatch {(r.Center - m_Layout.ExitHatchPosition).magnitude:0.0} m away, hidden {m_Layout.HiddenRoom}, key rooms {string.Join(",", m_Layout.KeyDoors.SelectMany(k => k.Rooms))}, room {r.Id}, POI {m_Layout.PointOfInterest})");
                 }
@@ -65,12 +92,12 @@ namespace Stealth.Tests
         [Test]
         public void RobotsCannotUseVents()
         {
-            const int seed = Seed;
+            int seed = Seed;
             int checkedVents = 0;
             foreach (var d in m_Layout.Doorways)
                     {
                         var edge = d.Kind;
-                        if (edge != EdgeType.Vent && edge != EdgeType.Squeeze) continue; // crawl vents and narrow slots are for players only
+                        if (edge is not (EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow)) continue; // crawl vents, slots, holes, inner windows: players only
                         // Points right on both sides of the opening.
                         var across = d.Rotation * Vector3.forward;
                         var a = d.Position - across * 0.8f;
@@ -85,13 +112,13 @@ namespace Stealth.Tests
                         Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots get through the {edge} at {at} floor {f}");
                         checkedVents++;
                     }
-            Assert.Greater(checkedVents, 0, "the level has vents");
+            if (m_Layout.Kind != HouseKind.Apartments) Assert.Greater(checkedVents, 0, "the level has vents"); // (a block of flats has none)
         }
 
         [Test]
         public void ItemSpotsAreOnTheNavMeshOrFurniture()
         {
-            const int seed = Seed;
+            int seed = Seed;
             foreach (var spot in m_Layout.ItemSpots)
             {
                 // Spots on desks / shelves are above the floor: there must be walkable floor of the same storey nearby.

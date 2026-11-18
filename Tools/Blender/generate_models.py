@@ -130,7 +130,7 @@ def merge(name, parts):
 def export(filename):
     bpy.ops.object.select_all(action="SELECT")
     meshfix.fix_objects(list(bpy.context.selected_objects), floor=category(filename) in ("Props", "Items", "Level"),
-                        name=filename)
+                        name=filename, pinned=meshfix.moving)
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:
             poly.use_smooth = False
@@ -375,7 +375,18 @@ def model_plant():
 
 
 def model_kitchen_counter():
-    merge("Body", [box((2.4, 0.65, 0.88), (0, 0, 0.44))])
+    """Kitchen base cupboards 2.4 x 0.65 under a worktop at 0.93 with a microwave on it: an open carcass (a divider in
+    the middle, a shelf) on a kick plinth and four doors that swing open in two pairs from their meeting edges
+    (BodyDoor0..3, each with its pull: Items.Storage)."""
+    merge("Body", [box((0.03, 0.63, 0.89), (x, 0.01, 0.445)) for x in (-1.185, 1.185)]      # sides (into the worktop), front edge y -0.305
+          + [box((2.344, 0.6, 0.098), (0, 0.025, 0.051)),                                    # plinth and bottom
+             box((2.344, 0.03, 0.776), (0, 0.307, 0.488)),                                   # back
+             box((0.03, 0.601, 0.776), (0, -0.0005, 0.488)),                               # divider
+             box((2.344, 0.55, 0.015), (0, 0.03, 0.46))])                                    # shelf
+    for i, x in enumerate((-0.9, -0.3, 0.3, 0.9)):
+        hx = x + (0.2 if i % 2 == 0 else -0.2)                                              # pull at the meeting edge
+        merge(f"BodyDoor{i}", [box((0.592, 0.022, 0.774), (x, -0.314, 0.488)),
+                               box((0.14, 0.025, 0.02), (hx, -0.332, 0.8))])
     merge("Accent", [box((2.44, 0.7, 0.05), (0, 0, 0.905))])
     merge("Eye", [box((0.5, 0.45, 0.32), (0.7, 0, 1.09))])         # microwave
     export("kitchen_counter")
@@ -461,8 +472,21 @@ def model_printer():
 
 
 def model_fridge():
-    merge("Body", [box((0.7, 0.7, 1.8), (0, 0, 0.9))])
-    merge("Accent", [box((0.04, 0.05, 0.5), (0.28, -0.37, 1.35)), box((0.04, 0.05, 0.35), (0.28, -0.37, 0.6)), box((0.7, 0.02, 0.02), (0, -0.351, 1.05))])
+    """Fridge-freezer 0.7 x 0.7 x 1.8: a hollow cabinet (a divider at 1.05, shelves) and two doors that swing open
+    (BodyDoor0 the fridge below, BodyDoor1 the freezer above), each with its bar handle; door bins on the fridge door.
+    A lone door hangs on its Blender +X edge (Items.StorageMath.Hinge; Unity mirrors X), so the handles are at -X."""
+    # boards between the sides stop 2 mm short of the outer faces: no two faces share a plane (meshfix would grow them)
+    merge("Body", [box((0.04, 0.65, 1.8), (x, 0.025, 0.9)) for x in (-0.33, 0.33)]           # sides, front edge y -0.3
+          + [box((0.624, 0.645, 0.038), (0, 0.0255, 1.779)),                                 # top
+             box((0.624, 0.645, 0.078), (0, 0.0255, 0.041)),                                 # bottom
+             box((0.624, 0.038, 1.71), (0, 0.327, 0.915)),                                   # back
+             box((0.624, 0.62, 0.04), (0, 0.016, 1.05))]                                     # fridge / freezer divider
+          + [box((0.624, 0.55, 0.015), (0, 0.05, z)) for z in (0.42, 0.74, 1.42)])           # shelves
+    merge("BodyDoor0", [box((0.696, 0.052, 1.035), (0, -0.324, 0.5275)),                    # fridge door
+                        box((0.04, 0.06, 0.35), (-0.28, -0.365, 0.6))]                       # handle, 15 mm into the door
+          + [box((0.54, 0.05, 0.08), (0, -0.278, z)) for z in (0.3, 0.62)])                  # door bins (inside)
+    merge("BodyDoor1", [box((0.696, 0.052, 0.74), (0, -0.324, 1.425)),                      # freezer door
+                        box((0.04, 0.06, 0.5), (-0.28, -0.365, 1.35))])
     export("fridge")
 
 
@@ -493,8 +517,16 @@ def model_coffee_table():
 
 
 def model_tv_stand():
-    """Low cabinet with a big screen on it, 1.4 wide."""
-    merge("Body", [box((1.4, 0.4, 0.5), (0, 0, 0.25))])
+    """Low cabinet with a big screen on it, 1.4 wide: an open carcass with a divider and two inset doors that open from
+    the middle (BodyDoor0..1, each with its pull: Items.Storage)."""
+    merge("Body", [box((1.4, 0.4, 0.03), (0, 0, 0.485)),                                     # top
+                   box((0.03, 0.4, 0.472), (-0.685, 0, 0.236)), box((0.03, 0.4, 0.472), (0.685, 0, 0.236)),  # sides
+                   box((1.344, 0.4, 0.06), (0, 0, 0.03)),                                    # plinth
+                   box((1.344, 0.02, 0.412), (0, 0.188, 0.265)),                             # back
+                   box((0.02, 0.35, 0.412), (0, 0.01, 0.265))])                              # divider
+    for i, sx in enumerate((-1, 1)):
+        merge(f"BodyDoor{i}", [box((0.666, 0.02, 0.404), (sx * 0.335, -0.18, 0.266)),          # inset door
+                               box((0.02, 0.02, 0.12), (sx * 0.05, -0.189, 0.3))])            # pull at the meeting edge
     merge("Accent", [box((1.36, 0.06, 0.8), (0, 0.08, 1.05)), box((0.3, 0.2, 0.05), (0, 0.08, 0.525)), box((0.06, 0.06, 0.15), (0, 0.1, 0.6))])
     merge("Eye", [box((1.28, 0.02, 0.72), (0, 0.045, 1.05))])
     export("tv_stand")
@@ -601,6 +633,10 @@ SHAPES = {
     "shovel": [(0, 0), (0, 1), (0, 2), (0, 3)],                    # the shovel's piece in grids and the cart (ItemCatalog.Shovel, 1 x 4)
     "flashlight": [(0, 0), (0, 1), (0, 2)],                       # ItemCatalog.Flashlight (1 x 3)
     "battery": [(0, 0)],                                          # ItemCatalog.Battery
+    "book": [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)],      # book, shape 16 (2 x 3)
+    "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
+    "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
+    "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
 }
 
 

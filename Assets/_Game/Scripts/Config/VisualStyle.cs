@@ -41,7 +41,8 @@ namespace Stealth.Configs
     public enum StairChoice { Auto, Concrete, Wood, Steel, Glass }
 
     /// <summary>What hangs under the ceiling.</summary>
-    public enum CeilingKind { None, Beams, IBeams, Coffers, Trays }
+    // (beams, I-beams and coffers, 1–3, are gone: they kept ending in the middle of rooms — playtest; Trays keeps its saved value)
+    public enum CeilingKind { None = 0, Trays = 4 }
 
     /// <summary>A kind of room with a floor of its own in a style (<see cref="StyleGeometry.RoomFloors"/>).</summary>
     [Serializable]
@@ -50,6 +51,24 @@ namespace Stealth.Configs
         public Stealth.Level.RoomType Room;
         public Material Material;
         [Tooltip("Metres covered by one repeat of its texture")] public float Tile;
+    }
+
+    /// <summary>
+    /// A kind of room dressed its own way in a style (<see cref="StyleGeometry.RoomLooks"/>): tiles up to some height in the
+    /// restrooms and the kitchen, padding in the gym, paint instead of the style's wallpaper, a plain or acoustic ceiling.
+    /// </summary>
+    [Serializable]
+    public struct RoomLook
+    {
+        public Stealth.Level.RoomType Room;
+        [Tooltip("The walls' finish (null = the style's)")] public Material Wall;
+        [Tooltip("Metres covered by one repeat of its texture")] public float WallTile;
+        [Tooltip("From the floor up to LowerHeight: tiles, padding (null = none)")] public Material Lower;
+        public float LowerTile;
+        public float LowerHeight;
+        [Tooltip("No panels and chair rail of the style (and no skirting under tiles): plain walls")] public bool Plain;
+        [Tooltip("A ceiling of its own (null = the style's); the style's beams or coffers are left out there")] public Material Ceiling;
+        public float CeilingTile;
     }
 
     /// <summary>
@@ -96,6 +115,8 @@ namespace Stealth.Configs
         public RoomFloor[] RoomFloors = new RoomFloor[0];
         public Material Wall;
         [Tooltip("Metres covered by one repeat of the wall texture")] public float WallTile = 1f;
+        [Tooltip("Walls and ceilings of their own in some kinds of rooms (tiles in restrooms and kitchens, padding in the gym…)")]
+        public RoomLook[] RoomLooks = new RoomLook[0];
         [Tooltip("Baseboards, cornices, rails, casings")] public Material Trim;
         [Tooltip("The boards of the wall panels")] public Material Panel;
         public Material Column;
@@ -113,6 +134,18 @@ namespace Stealth.Configs
                 if (RoomFloors[i].Room == room && RoomFloors[i].Material != null) return i;
             return -1;
         }
+
+        /// <summary>The index in <see cref="RoomLooks"/> of a room type's own look, or −1.</summary>
+        public int RoomLookOf(Stealth.Level.RoomType room)
+        {
+            if (RoomLooks == null) return -1;
+            for (int i = 0; i < RoomLooks.Length; i++)
+                if (RoomLooks[i].Room == room) return i;
+            return -1;
+        }
+
+        /// <summary>A copy (the arrays shared until replaced): a house kind dresses itself on top of the style (Level.ShopLook).</summary>
+        public StyleGeometry Clone() => (StyleGeometry)MemberwiseClone();
 
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
                                        Doors != DoorTrim.None || Ceiling != CeilingKind.None || Floor != null || Wall != null ||
@@ -228,11 +261,11 @@ namespace Stealth.Configs
         public Cubemap Sky;
         [Tooltip("How bright the sky looks")] public float SkyExposure = 1f;
         [Tooltip("How thick the gas looks where it is full, per metre (0.03: half gone ~25 m into it; 1.6: nothing seen 2 m into it)")]
-        public float GasDensity = 0.03f;
+        public float GasDensity = 0.07f;
         [Tooltip("How far the sky panorama is, metres: the gas between the eye and it veils it (shorter = the world outside shows more)")]
         public float SkyDistance = 70f;
         [Tooltip("Metres from the outer walls over which the gas thickens from none to full (it looks pushed away from the house)")]
-        public float GasClear = 15f;
+        public float GasClear = 10f;
         [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 2.5f;
         [Tooltip("Above that it thins out over this many metres (exponentially): the sky shows overhead and from upper floors")]
         public float GasFalloff = 2.5f;

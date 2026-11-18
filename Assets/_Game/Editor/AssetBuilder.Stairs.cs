@@ -325,6 +325,136 @@ namespace Stealth.EditorTools
             return StairMesh("stair_glass", k);
         }
 
+        // ------------------------------------------------------------------ the stacked stairwell (the apartment block)
+
+        const float STk = StairGeometry.StackedThickness;
+        /// <summary>The stairwell's walls on both sides of the flights: the looks reach them (the colliders keep to the lanes).</summary>
+        const float WallA = 0.04f, WallB = SSize - 0.04f;
+
+        /// <summary>The underside line of the lower flight (it climbs towards −u): through the lower front corners of its blocks.</summary>
+        static float SoffitA(float u) => LineA(u) - STk;
+        static float SoffitB(float u) => LineB(u) - STk;
+
+        /// <summary>
+        /// The thin body of a stacked flight pair: blocks under the treads (as thick as the colliders), a sloping soffit plate
+        /// under each flight, the half landing slab, the lips of the floor's landing where the flights meet it.
+        /// </summary>
+        static void StackedBody(MeshKit k, int sub, float topInset)
+        {
+            for (int i = 0; i < SSteps; i++) { var (u0, u1) = StepA(i); k.Span(sub, u0, u1, Mathf.Max(0f, TreadA(i) - STk), TreadA(i) - topInset, WallA, A1); }
+            for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(sub, u0, u1, TreadB(j) - STk, TreadB(j) - topInset, B0, WallB); }
+            k.Span(sub, 0.04f, SLand, SHalf - STk, SHalf - topInset, WallA, WallB);
+            Soffit(k, sub, SStart, SoffitA(SStart), SLand, SoffitA(SLand), WallA, A1);
+            Soffit(k, sub, SLand, SoffitB(SLand), SStart, SoffitB(SStart), B0, WallB);
+            // the floor's landing over the stairwell's open strip upstairs (lane B: where the flight arrives, lane A: where the next one starts)
+            k.Span(sub, SStart, SSize, SH - 0.25f, SH - topInset, WallA, WallB);
+        }
+
+        /// <summary>A sloping plate 0.1 m thick under a flight, its top along the line from (u0, y0) to (u1, y1).</summary>
+        static void Soffit(MeshKit k, int sub, float u0, float y0, float u1, float y1, float v0, float v1)
+        {
+            var a = new Vector3(u0, y0, (v0 + v1) / 2f);
+            var b = new Vector3(u1, y1, (v0 + v1) / 2f);
+            var d = b - a;
+            var q = Quaternion.FromToRotation(Vector3.right, d.normalized);
+            k.Box(sub, (a + b) / 2f + q * new Vector3(0f, -0.05f, 0f), new Vector3(d.magnitude, 0.1f, v1 - v0), q);
+        }
+
+        /// <summary>Tread caps on the stacked flights and their landing.</summary>
+        static void StackedTreads(MeshKit k, int sub, float thick, float nose)
+        {
+            for (int i = 0; i < SSteps; i++) { var (u0, u1) = StepA(i); k.Span(sub, u0, u1 + nose, TreadA(i) - thick, TreadA(i), WallA, A1); }
+            for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(sub, u0 - nose, u1, TreadB(j) - thick, TreadB(j), B0, WallB); }
+            k.Span(sub, 0.04f, SLand, SHalf - thick, SHalf, WallA, WallB);
+            k.Span(sub, SStart, SSize, SH - thick, SH, WallA, WallB);
+        }
+
+        /// <summary>Handrails 0.9 m over both flights: along the divider and along the walls (on brackets).</summary>
+        static void StackedRails(MeshKit k, int sub, float w, bool round, int bracketSub)
+        {
+            void Rail(Vector3 a, Vector3 b)
+            {
+                if (round) k.Tube(sub, a, b, w / 2f); else k.Bar(sub, a, b, w, w);
+            }
+            float uA0 = SStart + 0.05f, uA1 = DividerU, uB0 = DividerU, uB1 = SStart + 0.05f;
+            Rail(new Vector3(uA0, LineA(uA0) + 0.9f, A1 - 0.05f), new Vector3(uA1, LineA(uA1) + 0.9f, A1 - 0.05f));
+            Rail(new Vector3(uB0, LineB(uB0) + 0.9f, B0 + 0.05f), new Vector3(uB1, LineB(uB1) + 0.9f, B0 + 0.05f));
+            // the wall side: the rail on a bracket every metre
+            float a0 = SStart, a1 = SLand + SRun;
+            Rail(new Vector3(a0, LineA(a0) + 0.9f, WallA + 0.07f), new Vector3(a1, LineA(a1) + 0.9f, WallA + 0.07f));
+            Rail(new Vector3(a1, LineB(a1) + 0.9f, WallB - 0.07f), new Vector3(a0, LineB(a0) + 0.9f, WallB - 0.07f));
+            for (float u = SLand + SRun + 0.3f; u < SStart; u += 1f)
+            {
+                k.Span(bracketSub, u - 0.015f, u + 0.015f, LineA(u) + 0.86f, LineA(u) + 0.9f, WallA, WallA + 0.07f);
+                k.Span(bracketSub, u - 0.015f, u + 0.015f, LineB(u) + 0.86f, LineB(u) + 0.9f, WallB - 0.07f, WallB);
+            }
+        }
+
+        static Mesh StackedConcrete()
+        {
+            var k = new MeshKit(3); // 0 concrete, 1 treads, 2 trim (rails)
+            StackedBody(k, 0, 0.03f);
+            StackedTreads(k, 1, 0.03f, 0.03f);
+            k.Span(0, DividerU, SStart, 0f, SH, A1, B0); // the spine wall, floor to floor
+            StackedRails(k, 2, 0.05f, false, 2);
+            return StairMesh("stair_stacked_concrete", k);
+        }
+
+        static Mesh StackedWood()
+        {
+            var k = new MeshKit(4); // 0 painted, 1 treads, 2 dark wood (handrails), 3 wood (stringers, brackets)
+            StackedBody(k, 0, 0.04f);
+            StackedTreads(k, 1, 0.04f, 0.035f);
+            k.Span(0, DividerU, SStart, 0f, SH, A1, B0);
+            // stringer boards along the divider on both flights
+            Soffit(k, 3, SStart, LineA(SStart) - 0.05f + 0.1f, DividerU, LineA(DividerU) - 0.05f + 0.1f, A1 - 0.03f, A1);
+            Soffit(k, 3, DividerU, LineB(DividerU) - 0.05f + 0.1f, SStart, LineB(SStart) - 0.05f + 0.1f, B0, B0 + 0.03f);
+            StackedRails(k, 2, 0.07f, false, 3);
+            return StairMesh("stair_stacked_wood", k);
+        }
+
+        static Mesh StackedSteel()
+        {
+            var k = new MeshKit(3); // 0 steel plate, 1 painted steel (stringers, rails, frame), 2 mesh bars
+            for (int i = 0; i < SSteps; i++) { var (u0, u1) = StepA(i); k.Span(0, u0, u1 + 0.02f, TreadA(i) - 0.04f, TreadA(i), WallA, A1); }
+            for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(0, u0 - 0.02f, u1, TreadB(j) - 0.04f, TreadB(j), B0, WallB); }
+            k.Span(0, 0.04f, SLand, SHalf - 0.06f, SHalf, WallA, WallB);
+            k.Span(0, SStart, SSize, SH - 0.06f, SH, WallA, WallB);
+            // channel stringers under both edges of both flights, a beam under the landing
+            foreach (float v in new[] { WallA + 0.05f, A1 - 0.03f })
+                k.Bar(1, new Vector3(SStart + 0.05f, -0.1f, v), new Vector3(SLand - 0.02f, SHalf - 0.14f, v), 0.05f, 0.22f);
+            foreach (float v in new[] { B0 + 0.03f, WallB - 0.05f })
+                k.Bar(1, new Vector3(SLand - 0.02f, SHalf - 0.14f, v), new Vector3(SStart + 0.05f, SH - 0.14f, v), 0.05f, 0.22f);
+            k.Span(1, SLand - 0.12f, SLand, SHalf - 0.26f, SHalf - 0.06f, WallA, WallB);
+            // the divider: a steel frame of mesh bars, floor to floor
+            k.Span(1, DividerU, SStart, 0f, 0.06f, A1, B0);
+            k.Span(1, DividerU, SStart, SH - 0.06f, SH, A1, B0);
+            for (float u = DividerU + 0.03f; u < SStart; u += 0.1f) k.Span(2, u - 0.008f, u + 0.008f, 0.06f, SH - 0.06f, A1 + 0.04f, B0 - 0.04f);
+            StackedRails(k, 1, 0.045f, true, 1);
+            return StairMesh("stair_stacked_steel", k);
+        }
+
+        static Mesh StackedGlass()
+        {
+            var k = new MeshKit(3); // 0 white stone, 1 glass, 2 steel caps
+            StackedBody(k, 0, 0f);
+            // the divider: a glass wall in a thin steel frame, floor to floor
+            k.Span(1, DividerU, SStart, 0.04f, SH - 0.04f, (A1 + B0) / 2f - 0.01f, (A1 + B0) / 2f + 0.01f);
+            k.Span(2, DividerU, SStart, 0f, 0.04f, A1, B0);
+            k.Span(2, DividerU, SStart, SH - 0.04f, SH, A1, B0);
+            StackedRails(k, 2, 0.045f, true, 2);
+            return StairMesh("stair_stacked_glass", k);
+        }
+
+        /// <summary>The stacked looks in <see cref="StairStyle"/> order, their submeshes in the same roles as <see cref="StairLooks"/>.</summary>
+        static (Mesh mesh, Material[] mats)[] StackedLooks() => new[]
+        {
+            (StackedConcrete(), new[] { M("Wall"), M("Floor"), M("DoorFrame") }),
+            (StackedWood(), new[] { M("Ceiling"), M("Wood"), M("DoorFrame"), M("Wood") }),
+            (StackedSteel(), new[] { M("Metal"), M("PropBody"), M("Metal") }),
+            (StackedGlass(), new[] { M("Ceiling"), M("StairGlass"), M("Metal") }),
+        };
+
         static Mesh StairMesh(string name, MeshKit kit)
         {
             EnsureFolder(StairMeshDir);
@@ -407,14 +537,14 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>Every look under the staircase (inactive), and the component that shows the one that fits.</summary>
-        static void AddStairLooks(GameObject root, bool mirrored)
+        static void AddStairLooks(GameObject root, bool mirrored, bool stacked = false)
         {
             var look = root.AddComponent<StairLook>();
             look.Blocks = root.GetComponentsInChildren<Renderer>(true);
             var holder = new GameObject("Looks").transform;
             holder.SetParent(root.transform, false);
             if (mirrored) holder.localScale = new Vector3(-1f, 1f, 1f); // the mirrored frame flips u
-            var looks = StairLooks();
+            var looks = stacked ? StackedLooks() : StairLooks();
             look.Variants = new GameObject[looks.Length];
             for (int i = 0; i < looks.Length; i++)
             {

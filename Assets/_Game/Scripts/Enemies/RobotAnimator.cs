@@ -74,9 +74,51 @@ namespace Stealth.Enemies
         float m_Seed, m_LastYaw, m_TurnRate;
         float m_Recoil, m_Stomp, m_Slump, m_EyeYaw;
         RobotState m_LastState;
+        CapsuleCollider m_Capsule;
+        float m_CapBottom, m_CapTop, m_CapSlump = -1f;
 
         /// <summary>Seismic stomp (every peer, from the network pulse): the body dips, the floor probes punch.</summary>
         public void Stomp() => m_Stomp = 1f;
+
+        [Tooltip("Worker: the pivot of the lift's arms, at their hinge on the body (CargoMotion).")]
+        public Transform LiftArm;
+        [Tooltip("Worker: the pivot of the lift's tray, at the arms' end pin; carried loot is its child.")]
+        public Transform LiftTray;
+
+        // one down-and-up swing of the worker's lift (CargoMotion), from the network pulse
+        float m_SwingT = -1f, m_SwingTime = 1f, m_Bow, m_Dip;
+        SwingKind m_Swing;
+        float m_Surface;
+
+        /// <summary>Every peer: the lift swings down and back up in <paramref name="seconds"/> (picking up, setting down, shelving).</summary>
+        public void HandleCargo(SwingKind kind, float seconds, float surface = -1f)
+        {
+            if (LiftArm == null || LiftTray == null) return;
+            m_Swing = kind;
+            m_Surface = surface >= 0f ? surface : CargoMotion.Surface(kind);
+            m_SwingTime = Mathf.Max(seconds, 0.1f);
+            m_SwingT = 0f;
+        }
+
+        void AnimateLift(float dt)
+        {
+            m_Bow = m_Dip = 0f;
+            if (LiftArm == null || LiftTray == null || m_SwingT < 0f) return;
+            float before = m_SwingT;
+            m_SwingT = Mathf.Min(m_SwingT + dt / m_SwingTime, 1f);
+            var pose = CargoMotion.At(m_SwingT, m_Swing, m_Surface);
+            LiftArm.localRotation = Quaternion.Euler(pose.Arm, 0f, 0f);
+            LiftTray.localPosition = pose.Tray; // the tray stays level
+            // the loot stays put on the floor while the tray slides under it / out from under it
+            var cargo = m_Robot != null && m_Robot.CargoMesh != null ? m_Robot.CargoMesh.transform : null;
+            if (cargo != null && cargo.parent == LiftTray)
+                cargo.localPosition = new Vector3(0f, CargoMotion.OnTray, m_SwingT >= 1f ? 0f : CargoMotion.CargoAhead(m_SwingT, m_Swing));
+            m_Bow = pose.Bow;
+            m_Dip = pose.Dip;
+            if (CargoMotion.Touched(before, m_SwingT))
+                Audio.Sfx.At(m_Swing is SwingKind.Pickup or SwingKind.Lift ? Audio.Sfx.Bank?.Pickup : Audio.Sfx.Bank?.Drop, LiftTray.position, 0.8f, Audio.Sfx.Group.Robots);
+            if (m_SwingT >= 1f) m_SwingT = -1f;
+        }
 
         void Awake()
         {
@@ -93,6 +135,12 @@ namespace Stealth.Enemies
                 if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
                 else if (t.name.StartsWith("AccentWheel")) m_Wheels.Add(t);
                 else if (t.name.StartsWith("AccentLeg") && !IsJointedLeg(t.name)) m_Legs.Add((t, m_Legs.Count % 2 == 0 ? 0f : Mathf.PI));
+            }
+            m_Capsule = GetComponent<CapsuleCollider>();
+            if (m_Capsule != null)
+            {
+                m_CapBottom = m_Capsule.center.y - m_Capsule.height * 0.5f;
+                m_CapTop = m_Capsule.center.y + m_Capsule.height * 0.5f;
             }
             m_LastPos = transform.position;
             m_LastYaw = transform.eulerAngles.y;
@@ -128,6 +176,7 @@ namespace Stealth.Enemies
             m_Stomp = Mathf.MoveTowards(m_Stomp, 0f, dt * 3.5f);
             m_Slump = Mathf.MoveTowards(m_Slump, hacked ? 1f : 0f, dt * (hacked ? 1.5f : 3f));
 
+            FitCapsule();
             float power = 1f - m_Slump; // a hacked robot winds down: rotors, wheels and legs stop
             foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * Mathf.Max(power, 0.05f), 0f, Space.Self);
             foreach (var w in m_Wheels) w.Rotate(m_Speed / 0.12f * Mathf.Rad2Deg * dt, 0f, 0f, Space.Self);
@@ -136,6 +185,7 @@ namespace Stealth.Enemies
                 leg.localRotation = Quaternion.Euler(Mathf.Sin(m_Phase + phase) * swing, 0f, 0f);
 
             AnimateSensors(dt, hacked, state);
+            AnimateLift(dt);
             // Devices (turret, spider, vacuum…) move their bodies themselves; only mobile robots get the body motion.
             if (Model == null || m_Robot == null) return;
 
@@ -153,12 +203,27 @@ namespace Stealth.Enemies
             // Ground robots: lean into speed and turns, startle back when they spot someone, sag when hacked,
             // breathe a little when standing, dip on a seismic stomp.
             bool chasing = state == RobotState.Chase;
-            float pitch = Mathf.Clamp(local.z, -3f, 6f) * (chasing ? 1.6f : 0.9f) - m_Recoil * 10f + m_Slump * 14f;
+            float pitch = Mathf.Clamp(local.z, -3f, 6f) * (chasing ? 1.6f : 0.9f) - m_Recoil * 10f + m_Slump * 14f + m_Bow * CargoMotion.BowAngle;
             float roll = Mathf.Clamp(-m_TurnRate * 0.03f, -7f, 7f) * Mathf.Clamp01(m_Speed);
             Model.localRotation = m_ModelRest * Quaternion.Euler(pitch, 0f, roll);
             float bob = Bob > 0f ? Mathf.Abs(Mathf.Sin(m_Phase)) * Bob * Mathf.Clamp01(m_Speed / 2f) : 0f;
             float breathe = Mathf.Sin(t * 1.6f) * 0.012f * (1f - Mathf.Clamp01(m_Speed)) * power;
-            Model.localPosition = m_ModelBase + Vector3.up * (bob + breathe + m_Recoil * 0.06f - m_Stomp * 0.14f - m_Slump * 0.08f);
+            Model.localPosition = m_ModelBase + Vector3.up * (bob + breathe + m_Recoil * 0.06f - m_Stomp * 0.14f - m_Slump * 0.08f - m_Dip);
+        }
+
+        /// <summary>
+        /// The body stays solid where it is seen: a hacked robot slumps (a flyer drops to the floor), so its collider follows
+        /// the slumped body down to the floor — nobody walks or crouches through a switched-off robot.
+        /// </summary>
+        void FitCapsule()
+        {
+            if (m_Capsule == null || m_Robot == null || Mathf.Approximately(m_Slump, m_CapSlump)) return;
+            m_CapSlump = m_Slump;
+            float top = m_CapTop - m_Slump * (Lean > 0f ? 0.6f : 0.08f);
+            float bottom = Mathf.Lerp(m_CapBottom, 0f, m_Slump);
+            float height = Mathf.Max(top - bottom, m_Capsule.radius * 2f);
+            m_Capsule.height = height;
+            m_Capsule.center = new Vector3(m_Capsule.center.x, bottom + height * 0.5f, m_Capsule.center.z);
         }
 
         /// <summary>

@@ -14,6 +14,17 @@ namespace Stealth.Tests
         static PromptContext Idle => new() { Playing = true };
 
         [Test]
+        public void TheScreenStaysBlackUntilThePlayerStandsInPlace()
+        {
+            Assert.IsTrue(LoadingRules.StillLoading(hasPlayer: false, placed: false, inSewer: false, carHere: false, waited: 0f), "no player yet");
+            Assert.IsTrue(LoadingRules.StillLoading(true, placed: false, inSewer: true, carHere: true, waited: 0.5f), "still at the network's spawn point");
+            Assert.IsTrue(LoadingRules.StillLoading(true, true, inSewer: true, carHere: false, waited: 0.5f), "the sewer without its car");
+            Assert.IsFalse(LoadingRules.StillLoading(true, true, inSewer: true, carHere: true, waited: 0.5f), "in place by the car: open");
+            Assert.IsFalse(LoadingRules.StillLoading(true, true, inSewer: false, carHere: false, waited: 0.5f), "a house needs no car");
+            Assert.IsFalse(LoadingRules.StillLoading(false, false, true, false, LoadingRules.GiveUp + 0.1f), "a lost message never leaves it black");
+        }
+
+        [Test]
         public void StyleBannersReplaceEachOther()
         {
             var q = new BannerQueue();

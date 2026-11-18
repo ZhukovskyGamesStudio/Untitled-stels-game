@@ -26,20 +26,61 @@ namespace Stealth.Level
         public GameObject FloorSlab;
         public GameObject Roof;
         public GameObject OutsideGround;
+        [Tooltip("The land round the house to the horizon (looks only): flat in the middle, mounds, rubble, far ridges")]
+        public GameObject OutsideTerrain;
         public GameObject Fence;
+        [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
+        public GameObject CityPiece;
+        public Material[] CityMaterials = new Material[0];
+        [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
+        public Material[] UtilityMaterials = new Material[0];
+        [Tooltip("A plain steel door-and-a-half on hinges (the shop, the plant room, storerooms): a louvre at the bottom, a wired-glass slot")] public GameObject ShopDoor;
+        [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
+        [Tooltip("The hospital's door-and-a-half on hinges: pale laminate, a vision slot, a steel kick plate")] public GameObject ClinicDoor;
+        [Tooltip("The hospital's double doors with round windows that swing both ways (corridors, theatres)")] public GameObject ClinicSwingDoor;
+        [Tooltip("A flat's entry door off the apartment block's landing: a padded steel door-and-a-half with a peephole and a number, opening out")] public GameObject FlatDoor;
+        [Tooltip("A narrow wooden door-and-a-half (a flat's bathroom, LevelMetrics.NarrowDoorWidth)")] public GameObject NarrowDoor;
+        [Tooltip("The thin wooden door-and-a-half between rooms: panelled leaves on hinges")] public GameObject WoodDoor;
+        [Tooltip("Double wooden doors with glazed panels (big rooms, a flat's living room)")] public GameObject WoodDoubleDoor;
+        [Tooltip("The apartment block's street door: thick steel, an intercom, a closer, opening out")] public GameObject EntranceDoor;
+        [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
+        [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
+        public GameObject LightSwitch;
+        [Tooltip("A grate in a room's ceiling: the way into the crawl ducts (VentPlan).")]
+        public GameObject VentGrate;
+        [Tooltip("The lid over the shaft in the lobby (ShaftHatch), with the ladder's top under it (ShaftLadder).")]
+        public GameObject ShaftHatch;
+        [Tooltip("The ladder's foot in the basement (ShaftLadder).")]
+        public GameObject ShaftLadder;
+        [Tooltip("A navmesh link up the shaft (the storage robot climbs the ladder while the lid is open).")]
+        public GameObject ShaftLink;
+        public GameObject CityLamp;
 
         [Header("Pieces")]
         public GameObject Stairs;
         public GameObject StairsMirrored;
+        [Tooltip("A stairwell's flight stacked floor over floor (the apartment block, Stair.Stacked): thin flights, the floor's landing open.")]
+        public GameObject StairsStacked, StairsStackedMirrored;
         public GameObject VentFrame;
         [Tooltip("A vent under the ceiling with the crate stacks under it on both sides.")]
         public GameObject HighVentFrame;
         [Tooltip("Frame of a narrow slot in a wall, with the navmesh volume that keeps robots out.")]
         public GameObject SqueezeFrame;
+        [Tooltip("The broken edges and rubble of a breach (a stretch of wall knocked out; no colliders).")]
+        public GameObject BreachFrame;
+        [Tooltip("The broken edges and rubble of a hole at the floor, with the navmesh volume that keeps robots out.")]
+        public GameObject HoleFrame;
+        [Tooltip("The frame of a window between rooms, its glass gone (no colliders: the wall pieces are the sill and the head).")]
+        public GameObject InnerWindowFrame;
         [Tooltip("One bay of a gallery railing in every staircase look (StairLook picks one).")]
         public GameObject RailingBay;
         [Tooltip("An invisible box collider, stretched along a railing.")]
         public GameObject RailingBlock;
+        [Tooltip("A balcony of the apartment block: the slab and the parapet outside the facade (+Z out of the house).")]
+        public GameObject Balcony;
+        [Tooltip("The apartment block's lift: its doors on a landing (with the call button) and its cab.")]
+        public GameObject LiftDoor, LiftCab;
+        [Tooltip("The office's glass sliding door (server rooms, labs, control rooms: DoorKind.Slide).")]
         public GameObject AutoDoor;
         public GameObject RoomLight;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
@@ -97,6 +138,28 @@ namespace Stealth.Level
         public GameObject IllusionBlock;
         [Tooltip("The house's main job: a lock panel of the vault on a wall (VaultConsole), the hostage's cage (Cage), the vault door's lamps (VaultPanel).")]
         public GameObject VaultConsole, Cage, VaultPanel;
+        [Tooltip("The vault's round bank door (an AutoDoor that swings), and the heavy doors in the facade.")]
+        public GameObject VaultDoor, ExteriorDoor;
+
+        /// <summary>The prefab of a door kind (<see cref="DoorRules"/>); a narrow doorway's wooden door is the narrow one. Missing: the sliding door.</summary>
+        public GameObject Door(DoorKind kind, bool narrow)
+        {
+            var go = kind switch
+            {
+                DoorKind.Wood => narrow ? NarrowDoor : WoodDoor,
+                DoorKind.WoodDouble => narrow ? NarrowDoor : WoodDoubleDoor,
+                DoorKind.Entry => FlatDoor,
+                DoorKind.Entrance => EntranceDoor,
+                DoorKind.Steel => ShopDoor,
+                DoorKind.Clinic => ClinicDoor,
+                DoorKind.ClinicSwing => ClinicSwingDoor,
+                DoorKind.Storage => StorageDoor,
+                DoorKind.Vehicle => VehicleDoor,
+                DoorKind.Vault => VaultDoor,
+                _ => AutoDoor,
+            };
+            return go != null ? go : AutoDoor;
+        }
         [Tooltip("The furniture of the themed rooms (gym, library, kitchen run, restrooms…), by kind.")]
         public PropPrefab[] RoomProps = new PropPrefab[0];
 
@@ -110,6 +173,7 @@ namespace Stealth.Level
             PropKind.Plant => Plant,
             PropKind.KitchenCounter => KitchenCounter,
             PropKind.Hatch => Hatch,
+            PropKind.ShaftHatch => ShaftHatch,
             PropKind.Shelf => Shelf,
             PropKind.Boxes => Boxes,
             PropKind.WaterCooler => WaterCooler,

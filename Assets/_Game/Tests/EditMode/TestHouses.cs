@@ -16,15 +16,28 @@ namespace Stealth.Tests
         public static LevelLayout Get(int seed, int level, int players = 1)
         {
             var key = (seed, level, players);
-            if (!s_Cache.TryGetValue(key, out var l)) s_Cache[key] = l = LevelGenerator.Generate(seed, level, players: players);
+            if (!s_Cache.TryGetValue(key, out var l))
+            {
+                s_Cache[key] = l = LevelGenerator.Generate(seed, level, players: players);
+                s_Removed[key] = Furnisher.LastRemoved;
+            }
             return l;
+        }
+
+        static readonly Dictionary<(int seed, int level, int players), int> s_Removed = new();
+
+        /// <summary>Furniture groups the final walkability check took out of that house (<see cref="Furnisher.LastRemoved"/> when it was generated).</summary>
+        public static int Removed(int seed, int level, int players = 1)
+        {
+            Get(seed, level, players);
+            return s_Removed[(seed, level, players)];
         }
 
         /// <summary>
         /// The seeds and houses of <see cref="Sample"/>: different masses, kinds and sizes, the first house to a deep one.
-        /// 123456789/2 once lost its whole top floor (a stair's approach walled off by furniture); 17/2 has a rotunda.
+        /// 123456789/2 once lost its whole top floor (a stair's approach walled off by furniture); 17/3 has a rotunda (the first houses are small and plain now).
         /// </summary>
-        public static readonly (int seed, int level)[] SampleKeys = { (1, 0), (7, 1), (42, 2), (1337, 3), (99991, 4), (123456789, 2), (17, 2) };
+        public static readonly (int seed, int level)[] SampleKeys = { (1, 0), (7, 1), (42, 2), (1337, 3), (99991, 4), (123456789, 2), (17, 3) };
 
         /// <summary>Seven different houses (see <see cref="SampleKeys"/>), generated once for the whole run.</summary>
         public static IEnumerable<LevelLayout> Sample

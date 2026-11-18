@@ -18,6 +18,14 @@ namespace Stealth.Game
         public static int CrateKey(int prop) => 3_000_000 + prop;
         public static int MedKey(ulong client) => 4_000_000 + (int)(client % 1_000_000);
         public static int DryerKey(int prop) => 8_000_000 + prop;
+        /// <summary>A room whose lights a player switched (from how the house started).</summary>
+        public static int LightsKey(int room) => 9_200_000 + room;
+        /// <summary>A crawl way (a vent in a wall) whose grille the team took off (doorway index): open for good this house.</summary>
+        public static int CrawlKey(int doorway) => 9_500_000 + doorway;
+        /// <summary>A shut vent grate whose lid was taken off with a screwdriver (by the grate's index).</summary>
+        public static int VentKey(int grate) => 9_400_000 + grate;
+        /// <summary>The lid over the shaft to the basement is open.</summary>
+        public const int ShaftKey = 9_300_000;
 
         /// <summary>Server: the hand dryers running and until when (server time).</summary>
         readonly Dictionary<int, double> m_Dryers = new();
@@ -33,8 +41,13 @@ namespace Stealth.Game
             SearchCrate.IsSearched = i => IsOpened(CrateKey(i));
             MedTable.UsedBy = c => IsOpened(MedKey(c));
             HandDryer.IsRunning = i => IsOpened(DryerKey(i));
+            LightSwitch.IsSwitched = RoomLight.IsSwitched = r => IsOpened(LightsKey(r));
+            VentGrille.IsOpen = i => IsOpened(CrawlKey(i));
+            ShaftHatch.IsOpen = () => IsOpened(ShaftKey);
+            VentGrate.IsUnscrewed = i => IsOpened(VentKey(i));
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
+            HookLift();
         }
 
         /// <summary>What a crate holds (the same on every call: from the house's seed and the crate).</summary>
@@ -46,7 +59,10 @@ namespace Stealth.Game
             var list = new List<(byte, byte)>();
             for (int i = 0; i < count; i++)
             {
+                // only what lies inside the crate (a shovel is longer than the crate: drawn again)
                 byte shape = ItemCatalog.LootShape(rng);
+                for (int tries = 0; tries < 8 && ItemCatalog.ModelSize(shape).x > SearchCrate.InsideLength; tries++) shape = ItemCatalog.LootShape(rng);
+                if (ItemCatalog.ModelSize(shape).x > SearchCrate.InsideLength) shape = ItemCatalog.Battery;
                 list.Add((shape, ItemCatalog.FreshColor(shape, ItemCatalog.RandomColor(rng, bonus))));
             }
             return list;
@@ -105,10 +121,46 @@ namespace Stealth.Game
                 case UseKind.Workbench: CraftServer(player); break;
                 case UseKind.KeyDoor: UnlockWithKeyServer(player, index); break;
                 case UseKind.VaultConsole: SolveConsoleServer(player, index); break;
+                case UseKind.VaultDoor: OpenVaultServer(index); break;
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
+                case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
+                case UseKind.LiftCall: LiftServer(player, index, false); break;
+                case UseKind.LiftFloor: LiftServer(player, index, true); break;
+                case UseKind.VentGrille:
+                    if (Phase == RunPhase.Playing && m_Opened.Add(CrawlKey(index))) OpenedVersion++;
+                    break;
+                case UseKind.ShaftHatch: ToggleShaftServer(); break;
+                case UseKind.VentGrate: UnscrewServer(player, index); break;
                 default: UseSewerServer(player, kind, index); break;
             }
+        }
+
+        /// <summary>Server: a player with a screwdriver in hand takes the lid off a shut vent grate (for good, for everyone).</summary>
+        void UnscrewServer(PlayerController player, int grate)
+        {
+            if (Phase != RunPhase.Playing || grate < 0 || IsOpened(VentKey(grate))) return;
+            var inv = player.GetComponent<PlayerInventory>();
+            if (inv == null || !inv.Holds(ItemCatalog.Screwdriver)) return;
+            m_Opened.Add(VentKey(grate));
+            OpenedVersion++;
+            Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, player.transform.position + Vector3.up * 2f, 0.8f, Audio.Sfx.Group.Items);
+        }
+
+        /// <summary>Server: the lid over the shaft to the basement opens (or shuts) for everyone.</summary>
+        void ToggleShaftServer()
+        {
+            if (Phase != RunPhase.Playing) return;
+            if (!m_Opened.Remove(ShaftKey)) m_Opened.Add(ShaftKey);
+            OpenedVersion++;
+        }
+
+        /// <summary>Server: a room's ceiling lights go off (or on, in a room that started dark) for everyone.</summary>
+        void SwitchLightsServer(int room)
+        {
+            if (Phase != RunPhase.Playing || room < 0) return;
+            if (!m_Opened.Remove(LightsKey(room))) m_Opened.Add(LightsKey(room));
+            OpenedVersion++;
         }
 
         /// <summary>Server: a hand dryer roars for a few seconds — robots with ears around come to check (a lure on the wall).</summary>
@@ -141,10 +193,12 @@ namespace Stealth.Game
             m_Opened.Add(CrateKey(prop));
             OpenedVersion++;
             var items = CrateContents(l, prop, Gadgets, Tuning.Level.Loot);
+            // inside the crate, on its floor: rows front to back, layers up (lengthwise, along the crate)
             for (int i = 0; i < items.Count; i++)
             {
-                var at = crate.position + crate.forward * 0.75f + crate.right * ((i - (items.Count - 1) / 2f) * 0.32f) + Vector3.up * 0.05f;
-                SpawnItemServer(items[i].shape, items[i].color, at, crate.eulerAngles.y + i * 35f);
+                var local = SearchCrate.SlotInside(i);
+                var at = crate.TransformPoint(local);
+                SpawnItemServer(items[i].shape, items[i].color, at, crate.eulerAngles.y);
             }
         }
 
@@ -170,17 +224,17 @@ namespace Stealth.Game
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null || IsOpened(DoorKey(door)) || !l.KeyDoors.Any(k => k.Door == door)) return;
             var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null || !inventory.TakeServer(ItemCatalog.Key)) return;
+            if (inventory == null || !inventory.TakeHeldServer(ItemCatalog.Key)) return;
             m_Opened.Add(DoorKey(door));
             OpenedVersion++;
         }
 
-        /// <summary>Server: a player sets off a stun cube from the backpack — every robot and camera of the house freezes.</summary>
+        /// <summary>Server: a player sets off the stun cube in the hand — every robot and camera of the house freezes.</summary>
         public void GadgetServer(PlayerController player)
         {
             if (player == null || player.Downed || Phase != RunPhase.Playing) return;
             var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null || !inventory.TakeServer(ItemCatalog.Stun)) return;
+            if (inventory == null || !inventory.TakeHeldServer(ItemCatalog.Stun)) return;
             float seconds = Gadgets.StunDuration;
             foreach (var d in Detector.All.ToArray()) d.HackServer(seconds);
             StunnedUntil = Session.ServerTime + seconds;

@@ -14,8 +14,10 @@ namespace Stealth.Net
         public int Index;
         public byte Players;
         public byte Lane;
+        public byte ClassicEnemies;
         public int RunSeed;
-        public bool Equals(NetLevelInfo o) => Seed == o.Seed && Index == o.Index && Players == o.Players && Lane == o.Lane && RunSeed == o.RunSeed;
+        public bool Equals(NetLevelInfo o) => Seed == o.Seed && Index == o.Index && Players == o.Players && Lane == o.Lane && RunSeed == o.RunSeed
+            && ClassicEnemies == o.ClassicEnemies;
     }
 
     /// <summary>Wire format of a vote for the next house.</summary>
@@ -24,6 +26,16 @@ namespace Stealth.Net
         public ulong Client;
         public byte Lane;
         public bool Equals(NetVote o) => Client == o.Client && Lane == o.Lane;
+    }
+
+    /// <summary>The lift's state in one variable (its parts never arrive one without the others).</summary>
+    public struct NetLift : INetworkSerializeByMemcpy, IEquatable<NetLift>
+    {
+        public sbyte From, To;
+        public double Start;
+        public bool Equals(NetLift o) => From == o.From && To == o.To && Start.Equals(o.Start);
+        public static NetLift Of(Stealth.Level.LiftState s) => new() { From = (sbyte)s.From, To = (sbyte)s.To, Start = s.Start };
+        public Stealth.Level.LiftState State => new() { From = From, To = To, Start = Start };
     }
 
     /// <summary>
@@ -52,6 +64,7 @@ namespace Stealth.Net
         NetworkList<NetInventoryEntry> m_Stash, m_ExitStash;
         NetworkList<ulong> m_Cargo;
         readonly NetworkVariable<double> m_DriveUntil = new(), m_StunnedUntil = new();
+        readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
         /// <summary>What the team has seen of the house: [0] = the house seed, then the bits of <see cref="Stealth.Level.ExplorationMap"/>.</summary>
         NetworkList<ulong> m_Explored;
@@ -102,6 +115,8 @@ namespace Stealth.Net
             PullCargo();
             m_DriveUntil.OnValueChanged += (_, v) => m_Game.DriveUntil = v;
             m_Game.DriveUntil = m_DriveUntil.Value;
+            m_Lift.OnValueChanged += (_, v) => m_Game.Lift = v.State;
+            m_Game.Lift = m_Lift.Value.State;
             m_StunnedUntil.OnValueChanged += (_, v) => m_Game.ApplyStun(v);
             m_Explored.OnListChanged += _ => PullExplored();
         }
@@ -119,6 +134,7 @@ namespace Stealth.Net
             {
                 Seed = m_Game.Level.Seed, Index = m_Game.Level.Index, Players = (byte)Mathf.Clamp(m_Game.Level.Players, 0, 255),
                 Lane = (byte)Mathf.Clamp(m_Game.Level.Lane, 0, 255), RunSeed = m_Game.Level.RunSeed,
+                ClassicEnemies = (byte)(m_Game.Level.ClassicEnemies ? 1 : 0),
             });
             NetSync.Set(m_Quota, m_Game.Quota);
             NetSync.Set(m_Collected, m_Game.Collected);
@@ -165,6 +181,7 @@ namespace Stealth.Net
             }
             NetSync.Set(m_DriveUntil, m_Game.DriveUntil);
             NetSync.Set(m_StunnedUntil, m_Game.StunnedUntil);
+            NetSync.Set(m_Lift, NetLift.Of(m_Game.Lift));
         }
 
         /// <summary>Sends only the changed chunks, a few times a second; a new house resends the whole list.</summary>
@@ -231,7 +248,7 @@ namespace Stealth.Net
         void Pull()
         {
             var l = m_Level.Value;
-            m_Game.ApplyReplicated(new LevelInfo { Seed = l.Seed, Index = l.Index, Players = l.Players, Lane = l.Lane, RunSeed = l.RunSeed },
+            m_Game.ApplyReplicated(new LevelInfo { Seed = l.Seed, Index = l.Index, Players = l.Players, Lane = l.Lane, RunSeed = l.RunSeed, ClassicEnemies = l.ClassicEnemies != 0 },
                 m_Quota.Value, m_Collected.Value, m_RunTotal.Value, m_Phase.Value, m_AlarmUntil.Value, m_LeaveAt.Value, m_GoAt.Value, m_Chosen.Value);
             PullExplored(); // the house may have just been built
         }

@@ -103,6 +103,16 @@ namespace Stealth.EditorTools
             Mat("Wall_Hatch", new Color(0.78f, 0.78f, 0.76f), "hatch", 0.1f);
             Mat("Wall_Panels", new Color(0.96f, 0.97f, 0.99f), "panels", 0.35f);
             Mat("Wall_Circuit", new Color(0.24f, 0.24f, 0.3f), "circuit", 0.5f, 0f, "circuit_glow", new Color(0.15f, 1.3f, 1.5f));
+            // the themed rooms' walls and ceilings (StyleGeometry.RoomLooks): tiles, paint, padding, plain and acoustic ceilings
+            Mat("Wall_TilesWhite", new Color(0.93f, 0.95f, 0.96f), "smalltiles", 0.65f);
+            Mat("Wall_TilesMint", new Color(0.7f, 0.85f, 0.8f), "smalltiles", 0.6f);
+            Mat("Wall_TilesCream", new Color(0.95f, 0.89f, 0.76f), "smalltiles", 0.6f);
+            Mat("Wall_PaintWhite", new Color(0.9f, 0.91f, 0.9f), "plaster", 0.15f);
+            Mat("Wall_Concrete", new Color(0.7f, 0.7f, 0.68f), "concrete", 0.1f);
+            Mat("Wall_Padding", new Color(0.2f, 0.32f, 0.52f), "panels", 0.2f);
+            Mat("Ceiling_Plain", new Color(0.93f, 0.93f, 0.91f), "plaster", 0.1f);
+            Mat("Ceiling_Acoustic", new Color(0.9f, 0.9f, 0.87f), "panels", 0.1f);
+            Mat("Ceiling_Concrete", new Color(0.6f, 0.6f, 0.6f), "concrete", 0.1f);
             // trims and parts
             Mat("Trim_WoodDark", new Color(0.24f, 0.14f, 0.08f), null, 0.45f);
             Mat("Trim_WoodMid", new Color(0.46f, 0.3f, 0.18f), null, 0.35f);
@@ -118,6 +128,39 @@ namespace Stealth.EditorTools
             Mat("Pipe_Green", new Color(0.24f, 0.36f, 0.28f), null, 0.4f, 0.3f);
             Mat("Panel_WoodDark", new Color(0.3f, 0.18f, 0.1f), "boards", 0.4f);
             Mat("Panel_PaleBlue", new Color(0.66f, 0.74f, 0.84f), null, 0.3f);
+            // the bank vault in every style: brushed steel panels, a clean steel floor plate
+            Mat("Vault_Wall", new Color(0.74f, 0.76f, 0.8f), "vaultsteel", 0.6f, 0.35f);
+            Mat("Vault_Floor", new Color(0.6f, 0.62f, 0.65f), "diamondplate", 0.5f, 0.35f);
+            // the auto repair shop (Level.ShopLook): painted block, a blue-grey band, epoxy, a metal deck; the paint booth
+            Mat("Shop_Wall", new Color(0.86f, 0.87f, 0.85f), "blockwall", 0.2f);
+            Mat("Shop_WallLower", new Color(0.32f, 0.37f, 0.44f), "blockwall", 0.3f);
+            Mat("Shop_Floor", new Color(0.62f, 0.64f, 0.66f), "epoxy", 0.55f);
+            Mat("Shop_Ceiling", new Color(0.62f, 0.64f, 0.66f), "corrugated", 0.4f, 0.5f);
+            Mat("Booth_Wall", new Color(0.97f, 0.97f, 0.96f), "boothwall", 0.15f);
+            Mat("Booth_Floor", new Color(0.55f, 0.57f, 0.6f), "grating", 0.45f, 0.6f);
+            Mat("Booth_Ceiling", new Color(0.98f, 0.98f, 0.97f), "boothwall", 0.1f);
+            // the hospital (Level.ClinicLook)
+            Mat("Clinic_Wall", new Color(0.84f, 0.92f, 0.9f), "plaster", 0.3f);
+            Mat("Clinic_WardWall", new Color(0.95f, 0.9f, 0.82f), "plaster", 0.3f);
+            Mat("Clinic_Guard", new Color(0.6f, 0.71f, 0.78f), "panels", 0.5f);
+            Mat("Clinic_Ceiling", new Color(0.95f, 0.95f, 0.93f), "panels", 0.1f);
+            Mat("Clinic_Floor", new Color(0.8f, 0.84f, 0.86f), "vinyl", 0.5f);
+            Mat("Theatre_Wall", new Color(0.9f, 0.96f, 0.93f), "panels", 0.45f);
+            Mat("Theatre_Floor", new Color(0.55f, 0.7f, 0.65f), "vinyl", 0.6f);
+            // the apartment block (Level.HomeLook)
+            Mat("Home_Wallpaper", new Color(0.86f, 0.76f, 0.6f), "damask", 0.15f);
+            Mat("Home_WallpaperBed", new Color(0.72f, 0.76f, 0.84f), "damask", 0.15f);
+            Mat("Home_WallpaperHall", new Color(0.62f, 0.5f, 0.4f), "damask", 0.15f);
+            Mat("Home_Parquet", new Color(0.62f, 0.42f, 0.26f), "parquet", 0.35f);
+            Mat("Home_Ceiling", new Color(0.94f, 0.93f, 0.9f), "plaster", 0.05f);
+            Mat("Home_KitchenWall", new Color(0.9f, 0.88f, 0.76f), "plaster", 0.25f);
+            Mat("Home_KitchenTile", new Color(0.86f, 0.9f, 0.88f), "smalltiles", 0.6f);
+            Mat("Home_KitchenFloor", new Color(0.72f, 0.62f, 0.5f), "checker", 0.4f);
+            Mat("Home_BathTile", new Color(0.82f, 0.9f, 0.93f), "smalltiles", 0.65f);
+            Mat("Home_BathFloor", new Color(0.55f, 0.6f, 0.62f), "smalltiles", 0.5f);
+            Mat("Home_StairWall", new Color(0.9f, 0.9f, 0.86f), "plaster", 0.1f);
+            Mat("Home_StairLower", new Color(0.32f, 0.5f, 0.45f), "plaster", 0.55f);
+            Mat("Home_StairFloor", new Color(0.55f, 0.42f, 0.34f), "gridtiles", 0.35f);
             Mat("Glow_White", Color.white, null, 0.5f, 0f, null, new Color(2.4f, 2.6f, 2.8f));
             Mat("Glow_Cyan", new Color(0.2f, 1f, 1f), null, 0.5f, 0f, null, new Color(0.3f, 2.6f, 3f));
             Mat("Glow_DimCyan", new Color(0.1f, 0.5f, 0.5f), null, 0.5f, 0f, null, new Color(0.1f, 0.9f, 1.05f)); // dying electronics (S16_Derelict)
@@ -157,6 +200,38 @@ namespace Stealth.EditorTools
                 AssetDatabase.CreateAsset(kit, asset);
             }
             kit.Family = family;
+            kit.VaultWall = K("Vault_Wall");
+            kit.VaultFloor = K("Vault_Floor");
+            kit.VaultWallTile = 2f;
+            kit.VaultFloorTile = 1f;
+            kit.Threshold = K("Trim_Brass");
+            kit.ShopWall = K("Shop_Wall");
+            kit.ShopWallLower = K("Shop_WallLower");
+            kit.ShopFloor = K("Shop_Floor");
+            kit.ShopCeiling = K("Shop_Ceiling");
+            kit.BoothWall = K("Booth_Wall");
+            kit.BoothFloor = K("Booth_Floor");
+            kit.BoothCeiling = K("Booth_Ceiling");
+            kit.ClinicWall = K("Clinic_Wall");
+            kit.ClinicWardWall = K("Clinic_WardWall");
+            kit.ClinicGuard = K("Clinic_Guard");
+            kit.ClinicCeiling = K("Clinic_Ceiling");
+            kit.ClinicFloor = K("Clinic_Floor");
+            kit.TheatreWall = K("Theatre_Wall");
+            kit.TheatreFloor = K("Theatre_Floor");
+            kit.HomeWallpaper = K("Home_Wallpaper");
+            kit.HomeWallpaperBed = K("Home_WallpaperBed");
+            kit.HomeWallpaperHall = K("Home_WallpaperHall");
+            kit.HomeParquet = K("Home_Parquet");
+            kit.HomeCeiling = K("Home_Ceiling");
+            kit.HomeKitchenWall = K("Home_KitchenWall");
+            kit.HomeKitchenTile = K("Home_KitchenTile");
+            kit.HomeKitchenFloor = K("Home_KitchenFloor");
+            kit.HomeBathTile = K("Home_BathTile");
+            kit.HomeBathFloor = K("Home_BathFloor");
+            kit.HomeStairWall = K("Home_StairWall");
+            kit.HomeStairLower = K("Home_StairLower");
+            kit.HomeStairFloor = K("Home_StairFloor");
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)
@@ -218,6 +293,7 @@ namespace Stealth.EditorTools
                     var file = Path.GetFileNameWithoutExtension(path);
                     int cut = file.LastIndexOf("__", System.StringComparison.Ordinal);
                     if (cut < 0) continue;
+                    if (Level.VisualStyles.Creature(file.Substring(0, cut))) continue; // the robots look the same in every style (VisualStyles.Invariant)
                     string original;
                     try { original = ModelPath(file.Substring(0, cut)); }
                     catch (FileNotFoundException) { continue; }

@@ -90,9 +90,17 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(0.6f);
                 Log($"panel {c.Index}: solved {c.Solved}, vault {gm.VaultSolved}/{l.VaultConsoles.Count}");
             }
+            // unlocked, still shut: E at the wheel spins it, then the door swings in
+            LookFrom(door.transform.position + outside * 1.6f + Vector3.up * 0.05f, door.transform.position + Vector3.up * 1.15f);
+            yield return new WaitForSeconds(0.6f);
+            Log($"vault: unlocked {!door.Locked}, still shut {door.OpenAmount < 0.05f}, prompt '{Me.UsePrompt}'");
+            yield return PressKey(Key.E);
+            yield return new WaitForSeconds(0.9f);
+            yield return Shot("vault_wheel_turning");
+            yield return new WaitForSeconds(AutoDoor.VaultSpinTime + AutoDoor.VaultSwingTime);
             LookFrom(door.transform.position + outside * 3f + Vector3.up * 0.05f, door.transform.position + Vector3.up * 2f);
             yield return new WaitForSeconds(0.8f);
-            Log($"vault: door locked {door.Locked}, job done {gm.ObjectiveDone} -> {(gm.ObjectiveDone && !door.Locked ? "OPENED" : "FAIL")}");
+            Log($"vault: door locked {door.Locked}, open {door.OpenAmount:0.00} -> {(!door.Locked && door.OpenAmount > 0.95f ? "OPENED" : "FAIL")}");
             yield return Shot("vault_door_open");
             var room = l.Plan.Rooms[l.VaultRoom];
             LookFrom(door.transform.position - outside * 0.9f + Vector3.up * 0.05f, room.Center + Vector3.up * 0.2f);

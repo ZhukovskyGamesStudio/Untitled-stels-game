@@ -90,6 +90,8 @@ namespace Stealth.UI
         public Sprite[] SpeakerSprites;
         public Image[] Hearts;
         public Sprite HeartFull, HeartEmpty;
+        [Tooltip("The team's hack slots, bottom left: lit = a robot / device is switched off.")]
+        public Image[] HackSlots;
 
         [Header("Panels")]
         public Text HouseLabel;
@@ -187,6 +189,8 @@ namespace Stealth.UI
             }
             var me = PlayerController.Local;
             bool active = gm != null && me != null;
+            if (gm != null) ShowLoadingFade(gm, me); // black from the first frame of a session until the player stands in place
+            else { m_Fade = 1f; m_LoadingSince = -1f; m_LoadedFor = int.MinValue; if (LoadingFade != null) Ui.Show(LoadingFade, false); }
             Ui.Show(Content, active);
             if (!active) return;
 
@@ -205,7 +209,6 @@ namespace Stealth.UI
             ShowOverlays(gm, me, now);
             ShowHatch(gm, me);
             ShowRouteCountdown(gm);
-            ShowLoadingFade(gm);
             ShowDetection(me, now);
             ShowRobotIcons(me);
             ShowReticle();
@@ -216,6 +219,7 @@ namespace Stealth.UI
             ShowQuota(gm, now);
             ShowHatchMarker(gm, me);
             ShowHealth(me);
+            ShowHackSlots(gm);
             ShowTeam(me, now);
             ShowCallouts(gm, me, now);
             ShowMaps(gm, me);
@@ -234,16 +238,30 @@ namespace Stealth.UI
             RunOverRestart.text = Loc.F("hud.restart", Controls.Label(GameAction.Restart));
         }
 
-        float m_Fade;
+        float m_Fade = 1f, m_LoadingSince = -1f;
+        int m_LoadedFor = int.MinValue; // the location (sewer instance / house seed) that already opened
 
         /// <summary>
         /// The drive to the next house ends in black: it comes up in the last moments of the drive scene, holds while the
-        /// house is built and lifts once it stands (the drive scene is gone).
+        /// house is built and lifts once it stands (the drive scene is gone). A location being set up (a new session, the
+        /// sewer, a house) is black at once and opens only when the player stands in place (<see cref="LoadingRules"/>).
         /// </summary>
-        void ShowLoadingFade(GameManager gm)
+        void ShowLoadingFade(GameManager gm, PlayerController me)
         {
             if (LoadingFade == null) return;
-            bool black = (gm.DriveUntil > 0 && Session.ServerTime > gm.DriveUntil - 0.7) || (gm.DriveUntil <= 0 && DriveScene.Active != null);
+            var sewer = SewerLocation.Active;
+            int here = sewer != null ? sewer.GetHashCode() : ActiveLevel.Layout != null ? ActiveLevel.Layout.Seed : 0;
+            bool loading = false;
+            bool driving = gm.DriveUntil > 0 || DriveScene.Active != null; // the drive scene is the show (and its own fade)
+            if (here != m_LoadedFor && !driving)
+            {
+                if (m_LoadingSince < 0f) m_LoadingSince = Time.unscaledTime;
+                loading = LoadingRules.StillLoading(me != null, me != null && me.PlacedHere, sewer != null, Vehicles.Car.Active != null,
+                    Time.unscaledTime - m_LoadingSince);
+                if (!loading) { m_LoadedFor = here; m_LoadingSince = -1f; }
+            }
+            if (loading) m_Fade = 1f; // no fade in: the jump must never be seen
+            bool black = loading || (gm.DriveUntil > 0 && Session.ServerTime > gm.DriveUntil - 0.7) || (gm.DriveUntil <= 0 && DriveScene.Active != null);
             m_Fade = Mathf.MoveTowards(m_Fade, black ? 1f : 0f, Time.unscaledDeltaTime / (black ? 0.6f : 0.9f));
             Ui.Show(LoadingFade, m_Fade > 0.001f);
             if (m_Fade > 0.001f) LoadingFade.color = new Color(0f, 0f, 0f, m_Fade);
@@ -436,7 +454,7 @@ namespace Stealth.UI
                 UseProgress = me.UseProgress,
                 Driving = me.SeatIndex == 0,
                 Passenger = me.SeatIndex > 0,
-                HasStun = inventory.Items.Any(i => i.Shape == ItemCatalog.Stun),
+                HasStun = inventory.Holds(ItemCatalog.Stun),
                 HandUse = HandUse(me, inventory),
                 HoverItem = hover != null,
                 BigMap = m_BigMapOpen,
@@ -758,6 +776,22 @@ namespace Stealth.UI
             var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
             HatchDiamond.color = c;
             Ui.Set(HatchLabel, Loc.F("hud.metres", Vector3.Distance(me.transform.position, exit)), c);
+        }
+
+        /// <summary>How many of the team's hack slots are in use (a hack over the limit wakes the first robot).</summary>
+        void ShowHackSlots(GameManager gm)
+        {
+            if (HackSlots == null) return;
+            bool house = gm != null && gm.Phase == RunPhase.Playing;
+            int used = house ? gm.HackedCount : 0, max = house ? gm.MaxHacked : 0;
+            for (int i = 0; i < HackSlots.Length; i++)
+            {
+                bool shown = i < max;
+                Ui.Show(HackSlots[i], shown);
+                if (!shown) continue;
+                var color = i < used ? new Color(0.35f, 0.9f, 1f, 1f) : new Color(1f, 1f, 1f, 0.3f);
+                if (HackSlots[i].color != color) HackSlots[i].color = color;
+            }
         }
 
         /// <summary>Hearts: two as a rule, the third (gold) only while the med table's extra point is there.</summary>

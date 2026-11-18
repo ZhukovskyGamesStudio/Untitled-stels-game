@@ -13,14 +13,14 @@ namespace Stealth.Tests
         static readonly Vector4 House = new(10f, 10f, 5f, 5f); // a 10 x 10 m house around (10, 10)
 
         [Test]
-        public void TheGasThickensLinearlyOverFifteenMetresFromTheWalls()
+        public void TheGasThickensLinearlyOverTenMetresFromTheWalls()
         {
             var w = new StyleWorld();
-            Assert.AreEqual(15f, w.GasClear, "the gas looks pushed 15 m away from the house");
+            Assert.AreEqual(10f, w.GasClear, "the street's fog thickens over 10 m from the house");
             Assert.AreEqual(0f, GasView.Density(new Vector3(10f, 1f, 10f), House, w), "none inside");
             Assert.AreEqual(0f, GasView.Density(new Vector3(15f, 1f, 10f), House, w), "none at the wall");
-            Assert.AreEqual(w.GasDensity * 0.5f, GasView.Density(new Vector3(22.5f, 1f, 10f), House, w), 1e-4f, "half way: half");
-            Assert.AreEqual(w.GasDensity, GasView.Density(new Vector3(30f, 1f, 10f), House, w), 1e-4f, "full 15 m out");
+            Assert.AreEqual(w.GasDensity * 0.5f, GasView.Density(new Vector3(20f, 1f, 10f), House, w), 1e-4f, "half way: half");
+            Assert.AreEqual(w.GasDensity, GasView.Density(new Vector3(25f, 1f, 10f), House, w), 1e-4f, "full 10 m out");
             Assert.AreEqual(w.GasDensity, GasView.Density(new Vector3(60f, 1f, 60f), House, w), 1e-4f, "full far away");
         }
 

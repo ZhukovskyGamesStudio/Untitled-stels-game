@@ -3,8 +3,9 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// Marks a part of a prop that changes while the house is played (a cage's door, the hostage): the furniture merge
-    /// (<see cref="PropBatches"/>) leaves its renderers alone, so hiding it really hides it.
+    /// Marks a part that changes while the house is played (a cage's door, the hostage, a vent's grille, the lift's doors
+    /// and cab): neither the furniture and shell merge (<see cref="PropBatches"/>) nor static batching
+    /// (<see cref="LevelBuilder.KeepsMoving"/>) touch its renderers, so moving or hiding it really moves or hides it.
     /// </summary>
     public class KeepUnmerged : MonoBehaviour
     {

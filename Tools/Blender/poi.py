@@ -441,10 +441,18 @@ CRATE_HINGE = (0.0, 0.30, 0.50)
 def model_crate():
     """Storage crate 0.8 x 0.6 x 0.6: a ribbed box with corner caps, side grips and front latches; the lid is its own
     object (AccentLid) with the origin on the hinge line at the back edge where the lid meets the box (+Y), so it
-    swings open around X (negative angle about +X in Blender lifts the front)."""
-    shell = s.rbox((0.78, 0.58, 0.5), (0, 0, 0.25), r=0.025, seg=3)
-    ribs = [s.rbox((0.8, 0.6, 0.045), (0, 0, z), r=0.015, seg=2) for z in (0.06, 0.44)]
-    s.part("Body", [shell, *ribs])
+    swings open around X (negative angle about +X in Blender lifts the front). The box is hollow (a floor and four
+    walls, 3 cm steel): what was inside lies on its floor when the lid opens (GameManager.SearchCrateServer)."""
+    t = 0.03
+    shell = [s.rbox((0.78, 0.58, 0.05), (0, 0, 0.025), r=0.02, seg=2)]                          # the floor
+    shell += [s.rbox((t, 0.58, 0.5), (x * (0.39 - t / 2), 0, 0.25), r=0.012, seg=2) for x in (-1, 1)]
+    shell += [s.rbox((0.78 - 2 * t, t, 0.5), (0, y * (0.29 - t / 2), 0.25), r=0.012, seg=2) for y in (-1, 1)]
+    # the ribs: bands round the outside of the walls, not slabs through the inside
+    ribs = []
+    for z in (0.06, 0.44):
+        ribs += [s.rbox((0.02, 0.6, 0.045), (x * 0.39, 0, z), r=0.008, seg=1) for x in (-1, 1)]
+        ribs += [s.rbox((0.8, 0.02, 0.045), (0, y * 0.29, z), r=0.008, seg=1) for y in (-1, 1)]
+    s.part("Body", [*shell, *ribs])
 
     caps = [s.rbox((0.09, 0.09, 0.12), (x * 0.36, y * 0.26, 0.06), r=0.02, seg=2) for x in (-1, 1) for y in (-1, 1)]
     grips = []
@@ -629,6 +637,132 @@ def model_item_battery_model():
     return export("item_battery_model")
 
 
+# --------------------------------------------------------------------------- book, tins, screwdriver, belt bag
+
+def model_item_book_model():
+    """A hardback lying flat, 0.24 x 0.17, 0.04 thick: two cover boards and a rounded spine (at -Y) with two raised
+    bands, the page block inset between the boards (page lines on its edges), a title label on the front cover."""
+    boards = [s.rbox((0.24, 0.16, 0.0045), (0, 0.005, z), r=0.0018, seg=2) for z in (0.00225, 0.03775)]
+    spine = s.rbox((0.24, 0.02, 0.04), (0, -0.075, 0.02), r=0.009, seg=3)
+    bands = [s.rbox((0.007, 0.012, 0.034), (x, -0.0795, 0.02), r=0.003, seg=2) for x in (-0.085, 0.085)]
+    s.part("Body", [*boards, spine, *bands])
+    pages = s.rbox((0.232, 0.15, 0.033), (0, 0.004, 0.02), r=0.0015, seg=1)
+    for z in (0.011, 0.0165, 0.0235, 0.029):
+        s.groove(pages, "Z", z, width=0.0012, depth=0.0006)
+    s.part("Accent", [pages])
+    s.part("AccentLabel", [s.rbox((0.13, 0.08, 0.002), (0.01, 0.012, 0.0405), r=0.0008, seg=1)])
+    return export("item_book_model")
+
+
+def _tin(length, turn):
+    """One food tin standing on its base along Z, centred on the axis: a steel shell with thin rolled rims, a paper
+    label over nearly all its height, a ring pull on the lid. Returns (steel, label) bmesh lists."""
+    L = length
+    shell = s.lathe([(0.0, 0.0), (0.036, 0.0), (0.039, 0.0015), (0.0397, 0.0042), (0.0386, 0.0065), (0.0386, L - 0.0065),
+                     (0.0397, L - 0.0042), (0.039, L - 0.0015), (0.036, L - 0.0002), (0.0, L - 0.0002)], seg=24)
+    label = s.rcyl(0.0392, L - 0.017, (0, 0, L / 2), seg=24, r=0.0005, bevel_seg=1)
+    pull = ring(0.011, 0.0075, 0.0018, (0.012 * math.cos(turn), 0.012 * math.sin(turn), L + 0.0004), seg=12, r=0.0006)
+    rivet = s.rcyl(0.004, 0.0018, (0, 0, L + 0.0003), seg=8, r=0.0005)        # the rivet the ring hangs on
+    return [shell, pull, rivet], [label]
+
+
+def model_item_cans_model():
+    """Canned food: one tin standing (0.08 across, 0.11 tall) and one lying beside it on its side, lid to the front;
+    steel shells with rims and ring pulls (Accent), paper labels (Body)."""
+    steel, labels = _tin(0.11, 0.6)
+    for b in steel + labels:
+        s.place(b, (-0.0405, 0, 0))
+    lying_steel, lying_labels = _tin(0.1, 2.0)
+    for b in lying_steel + lying_labels:                    # on its side: its axis along Y, the lid at -Y
+        s.place(b, (0.039, 0.05, 0.04), rot=(math.pi / 2, 0, 0))
+    s.part("Body", labels + lying_labels)
+    s.part("Accent", steel + lying_steel)
+    return export("item_cans_model")
+
+
+def model_item_screwdriver_model():
+    """A flat screwdriver lying along X, 0.23 m: a fluted plastic handle (Body) with a domed butt at -X, a steel
+    bolster, shaft and flat blade tip at +X (Accent)."""
+    h = 0.0175                                              # the handle's axis: its widest ring rests on the floor
+    x0 = -0.115
+    handle = s.lathe([(0.0, 0.0), (0.008, 0.0006), (0.0135, 0.003), (0.0165, 0.008), (0.0175, 0.016), (0.0168, 0.04),
+                      (0.0162, 0.058), (0.0168, 0.07), (0.0158, 0.08), (0.0118, 0.09), (0.0098, 0.098), (0.0098, 0.104),
+                      (0.0, 0.1042)], seg=36, axis="X", loc=(x0, 0, h))
+    for v in handle.verts:                                  # six deep flutes along the grip, fading out at both ends
+        t = (v.co.x - x0) / 0.104
+        if 0.06 < t < 0.84:
+            ang = math.atan2(v.co.z - h, v.co.y)
+            k = 1 - 0.16 * max(0.0, math.cos(6 * ang + math.pi)) ** 1.5 * math.sin(math.pi * (t - 0.06) / 0.78) ** 0.6
+            v.co.y *= k
+            v.co.z = h + (v.co.z - h) * k
+    s.part("Body", [handle])
+    bolster = s.rcyl(0.0085, 0.012, (x0 + 0.106, 0, h), axis="X", seg=20, r=0.0015, radius2=0.0048)
+    shaft = s.rcyl(0.0034, 0.12, (x0 + 0.165, 0, h), axis="X", seg=14, r=0.0006)       # 0.105 .. 0.225 from the end
+    tip = s.loft([(0.0, 0.0034, 0.0034, 2.0), (0.006, 0.0016, 0.0036, 3.0), (0.011, 0.0007, 0.0034, 4.0)],
+                 seg=14, axis="X", loc=(x0 + 0.219, 0, h))
+    s.part("Accent", [bolster, shaft, tip])
+    return export("item_screwdriver_model")
+
+
+BAG_RINGS = [(-0.119, 0.0, 0.0), (-0.116, 0.014, 0.026), (-0.108, 0.025, 0.046), (-0.092, 0.032, 0.058),
+             (-0.06, 0.036, 0.066), (0.0, 0.037, 0.069)]   # (x, half height, half width) of the pouch, mirrored at +X
+
+
+def _bag_ring(x):
+    """The pouch's (half height, half width) at x, as the loft joins its rings (straight between them)."""
+    rings = BAG_RINGS + [(-r[0], r[1], r[2]) for r in reversed(BAG_RINGS[:-1])]
+    for (xa, ha, wa), (xb, hb, wb) in zip(rings, rings[1:]):
+        if xa <= x <= xb:
+            f = (x - xa) / (xb - xa)
+            return ha + (hb - ha) * f, wa + (wb - wa) * f
+    return 0.0, 0.0
+
+
+def _pillow(rings, n, z0, y0=0.0, seg=32):
+    """A soft pouch along X from (x, half height, half width) rings: superellipse sections, flat bottom at z0."""
+    loft_rings = [(x, hz, wy, n, -(z0 + hz), y0) for x, hz, wy in rings]
+    bm = s.loft(loft_rings, seg=seg)
+    return s.place(bm, rot=(0, math.pi / 2, 0))             # local z -> world x, local x -> world -z (offset above)
+
+
+def model_item_beltbag_model():
+    """A bum bag lying on its back, 0.26 x 0.14, 0.08 high: a soft pouch with a front pocket on top (Body), its strap
+    folded under it and out round both ends with a buckle at +X (Accent), zips with pulls (AccentZip)."""
+    n = 2.6
+    rings = BAG_RINGS + [(-r[0], r[1], r[2]) for r in reversed(BAG_RINGS[:-1])]
+    bag = _pillow(rings, n, 0.002, seg=36)
+    pocket_rings = [(-0.082, 0.0, 0.0), (-0.078, 0.008, 0.028), (-0.066, 0.013, 0.042), (0.0, 0.015, 0.047),
+                    (0.066, 0.013, 0.042), (0.078, 0.008, 0.028), (0.082, 0.0, 0.0)]
+    pocket = _pillow(pocket_rings, 2.6, 0.048, y0=-0.012, seg=28)
+    s.part("Body", [bag, pocket])
+    # the strap: under the bag and out round both ends, back into the bag's sides at mid height
+    path = [(-0.09, 0.032), (-0.114, 0.032), (-0.122, 0.029), (-0.127, 0.019), (-0.125, 0.008), (-0.117, 0.0015),
+            (-0.05, 0.0015), (0.05, 0.0015), (0.117, 0.0015), (0.125, 0.008), (0.127, 0.019), (0.122, 0.029),
+            (0.114, 0.032), (0.09, 0.032)]
+    strap = sweep_rect(path, 0.0, 0.034, 0.003, r=0.001)
+    s.place(strap, rot=(0, 0, -math.pi / 2))
+    buckle = [s.rbox((0.008, 0.042, 0.024), (0.1275, 0, 0.018), r=0.0025, seg=2),
+              s.rbox((0.004, 0.03, 0.016), (0.1315, 0, 0.018), r=0.0012, seg=1)]
+    s.part("Accent", [strap, *buckle])
+
+    def on_surface(x, ang, hz, wy, z0, y0, proud=0.0004):
+        c, sn = math.cos(ang), math.sin(ang)
+        y = y0 + (wy + proud) * math.copysign(abs(c) ** (2 / n), c)
+        z = z0 + hz + (hz + proud) * abs(sn) ** (2 / n)
+        return (x, y, z)
+
+    # main zip along the back top edge, the pocket zip along the pocket's back edge; a pull on each
+    zp = [on_surface(x, math.radians(55), *_bag_ring(x), 0.002, 0.0) for x in [-0.092 + 0.184 * k / 8 for k in range(9)]]
+    zip_main = s.tube(zp, 0.0022, res=1, segments_per=2)
+    pz = [on_surface(x, math.radians(60), 0.015 if abs(x) < 0.066 else 0.013 - (abs(x) - 0.066) * 0.4, 0.047 if abs(x) < 0.066
+                     else 0.042, 0.048, -0.012) for x in [-0.07 + 0.14 * k / 6 for k in range(7)]]
+    zip_pocket = s.tube(pz, 0.002, res=1, segments_per=2)
+    pulls = [s.rbox((0.018, 0.006, 0.0024), (pz[5][0] + 0.004, pz[5][1] - 0.004, pz[5][2] + 0.0005), r=0.0009, seg=1),
+             s.rbox((0.018, 0.006, 0.0024), (zp[6][0] + 0.004, zp[6][1] - 0.004, zp[6][2] + 0.0005), r=0.0009, seg=1)]
+    s.part("AccentZip", [zip_main, zip_pocket, *pulls])
+    return export("item_beltbag_model")
+
+
 # --------------------------------------------------------------------------- the first-person hand with the flashlight
 
 def model_view_flashlight():
@@ -678,6 +812,10 @@ MODELS = {
     "item_shovel_model": model_item_shovel_model,
     "item_flashlight_model": model_item_flashlight_model,
     "item_battery_model": model_item_battery_model,
+    "item_book_model": model_item_book_model,
+    "item_cans_model": model_item_cans_model,
+    "item_screwdriver_model": model_item_screwdriver_model,
+    "item_beltbag_model": model_item_beltbag_model,
     "view_flashlight": model_view_flashlight,
 }
 

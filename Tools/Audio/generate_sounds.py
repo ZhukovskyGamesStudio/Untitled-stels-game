@@ -436,6 +436,57 @@ def motor_servo(length):
     return loop(render, length)
 
 
+def guard_charge(length):
+    """Loop: a guard resting on its charging dock: a deep mains hum that breathes slowly, sparks crackling now and then."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        breath = 0.6 + 0.4 * np.sin(2 * np.pi * 0.25 * t)
+        hum = (np.sin(2 * np.pi * 50 * t) + 0.6 * np.sin(2 * np.pi * 100 * t) + 0.25 * np.sin(2 * np.pi * 150 * t)) * 0.25 * breath
+        rng = np.random.default_rng(31)
+        sparks = np.zeros_like(t)
+        for k in range(int(L * 3)):
+            i = int(rng.uniform(0, L) * SR)
+            n = int(0.02 * SR)
+            if i + n < len(sparks):
+                sparks[i:i + n] += highpass(rng.normal(0, 1, n), 2500) * np.linspace(1, 0, n) * 0.35
+        coil = bandpass(noise(d), 300, 900) * 0.06 * breath
+        return hum + sparks + coil
+    return loop(render, length)
+
+
+def guard_patrol(length):
+    """Loop: a guard walking its rounds: a low organic purr (the creature it imitates) and a dry chitter of mandibles."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        purr = lowpass(signal.sawtooth(2 * np.pi * (34 + 3 * np.sin(2 * np.pi * 0.6 * t)) * t), 220) * (0.5 + 0.5 * np.sin(2 * np.pi * 9 * t) ** 2) * 0.35
+        rng = np.random.default_rng(32)
+        chitter = np.zeros_like(t)
+        at_ = 0.0
+        while at_ < L:
+            at_ += rng.uniform(0.35, 1.1)
+            for j in range(rng.integers(3, 7)):
+                i = int((at_ + j * 0.035) * SR)
+                n = int(0.012 * SR)
+                if i + n < len(chitter):
+                    chitter[i:i + n] += bandpass(rng.normal(0, 1, n), 1800, 4200) * np.linspace(1, 0, n) * 0.45
+        return purr + chitter
+    return loop(render, length)
+
+
+def guard_chase(length):
+    """Loop: a guard on the hunt: a fast aggressive warble over a racing pulse — heard from afar, it means run."""
+    def render(L):
+        d = L + 0.2
+        t = t_axis(d)
+        warble = np.sin(2 * np.pi * (480 + 160 * np.sin(2 * np.pi * 7 * t)) * t) * 0.22
+        pulse = lowpass(signal.square(2 * np.pi * 4 * t), 400) * lowpass(signal.sawtooth(2 * np.pi * 58 * t), 500) * 0.3
+        grit = bandpass(noise(d), 900, 2600) * (0.5 + 0.5 * signal.square(2 * np.pi * 8 * t)) * 0.12
+        return warble + pulse + grit
+    return loop(render, length)
+
+
 def motor_tracks(length):
     """Loop: heavy tracks: a low growl with the clatter of the links."""
     def render(L):
@@ -610,6 +661,26 @@ def unlock():
     return fade(mix(at(click(), 0.0, d), at(click(), 0.12, d), clunk))
 
 
+def door_open():
+    """A hinged door opening: the handle's latch clicks back, then a short dry creak of the hinges and the air it moves."""
+    d = 0.6
+    latch = at(highpass(noise(0.03), 1800) * env(int(0.03 * SR), 0.0005, 0.012, curve=6) * 0.8, 0.0, d)
+    t = t_axis(0.38)
+    creak = np.sin(2 * np.pi * (310 + 90 * np.sin(2 * np.pi * 7 * t)) * t) * (0.5 + 0.5 * (rng.uniform(0, 1, len(t)) > 0.7))
+    creak = bandpass(creak, 250, 1600) * env(len(t), 0.06, 0.3, curve=2) * 0.18
+    swish = bandpass(noise(0.45), 200, 900) * env(int(0.45 * SR), 0.12, 0.3, curve=2) * 0.25
+    return fade(mix(latch, at(creak, 0.05, d), at(swish, 0.06, d)), 0.002, 0.05)
+
+
+def door_shut():
+    """A hinged door shutting: a soft thud of the leaf on its frame and the latch snapping in."""
+    d = 0.45
+    thud = lowpass(noise(0.2), 260) * env(int(0.2 * SR), 0.002, 0.09) * 0.9
+    body = lowpass(sine(85, 0.2), 300) * env(int(0.2 * SR), 0.002, 0.1) * 0.5
+    latch = at(highpass(noise(0.025), 2200) * env(int(0.025 * SR), 0.0005, 0.01, curve=6) * 0.6, 0.03, d)
+    return fade(mix(at(thud, 0.0, d), at(body, 0.0, d), latch), 0.001, 0.05)
+
+
 # --------------------------------------------------------------------------- environment
 
 def alarm(length):
@@ -766,6 +837,59 @@ def music_chase():
 
 # --------------------------------------------------------------------------- main
 
+# --------------------------------------------------------------------------- the laughing gas
+
+def _formants(src, formants):
+    """A voiced source through vowel formants (centre Hz, bandwidth Hz, gain)."""
+    return sum(bandpass(src, max(60, f - bw / 2), f + bw / 2, 2) * g for f, bw, g in formants)
+
+
+def _ha(f0, dur, loud=1.0, breathy=0.3, gen=None):
+    """One "ha" of a laugh: a puff of breath (h), then a voiced /a/ with the pitch falling a little."""
+    gen = gen or rng
+    h = int(0.035 * SR)
+    puff = bandpass(gen.uniform(-1, 1, h), 600, 3500) * env(h, 0.005, 0.03) * 0.6
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    f = f0 * (1.0 - 0.18 * t / dur) * (1 + 0.012 * np.sin(2 * np.pi * 6.5 * t))
+    phase = np.cumsum(f) / SR
+    pulses = 2 * (phase % 1.0) - 1.0                          # a saw of glottal pulses
+    voiced = _formants(pulses, [(780, 160, 1.0), (1250, 200, 0.55), (2600, 300, 0.25), (3400, 400, 0.1)])
+    voiced = voiced / (np.max(np.abs(voiced)) + 1e-9)
+    air = bandpass(gen.uniform(-1, 1, n), 700, 4000) * breathy
+    syll = (voiced * (1 - breathy * 0.5) + air) * env(n, 0.012, dur * 0.9, curve=2.5)
+    return np.concatenate([puff, syll]) * loud
+
+
+def gas_breath():
+    """Heavy breathing in the gas: a strained inhale through the teeth, a long tired exhale with a little groan."""
+    gen = np.random.default_rng(71)
+    i = int(0.75 * SR)
+    inhale = bandpass(gen.uniform(-1, 1, i), 900, 4200) * np.linspace(0.2, 1.0, i) ** 1.5 * env(i, 0.25, 0.75, curve=1.5) * 0.55
+    e = int(1.0 * SR)
+    t = np.arange(e) / SR
+    exhale = bandpass(gen.uniform(-1, 1, e), 300, 1800) * env(e, 0.04, 1.0, curve=2.2)
+    groan = _formants(2 * ((np.cumsum(np.full(e, 118.0) * (1 - 0.1 * t)) / SR) % 1.0) - 1, [(600, 150, 1.0), (1000, 200, 0.4)])
+    groan = groan / (np.max(np.abs(groan)) + 1e-9) * env(e, 0.06, 0.6, curve=2.5) * 0.25
+    return fade(np.concatenate([inhale, silence(0.08), exhale + groan, silence(0.12)]))
+
+
+def gas_laugh(level):
+    """A laugh, ever harder: 0 a nervous giggle (three high "hee"s), 1 a laugh, 2 a helpless fit with a wheezing gasp."""
+    gen = np.random.default_rng(80 + level)
+    count, f0, gap, loud, breathy = [(3, 330, 0.07, 0.6, 0.45), (5, 250, 0.06, 0.85, 0.35), (9, 225, 0.045, 1.0, 0.3)][level]
+    parts = []
+    for k in range(count):
+        dur = 0.13 + gen.uniform(0, 0.04) + (0.06 if k == 0 else 0.0)
+        parts.append(_ha(f0 * (1.0 - 0.05 * k / count) * (1 + gen.uniform(-0.04, 0.04)), dur, loud * (1.0 - 0.35 * k / count), breathy, gen))
+        parts.append(silence(gap + gen.uniform(0, 0.03)))
+    if level == 2:
+        w = int(0.55 * SR)
+        wheeze = bandpass(gen.uniform(-1, 1, w), 1200, 5000) * np.linspace(0.3, 1.0, w) * env(w, 0.3, 0.55, curve=1.4) * 0.5
+        parts += [silence(0.06), wheeze]
+    return fade(np.concatenate(parts))
+
+
 def main():
     out = sys.argv[-1] if len(sys.argv) > 1 and not sys.argv[-1].endswith(".py") else "Assets/_Game/Art/Audio"
     P = lambda cat, name: os.path.join(out, cat, name + ".wav")
@@ -816,6 +940,9 @@ def main():
     write(P("Robots", "seismic_thump"), seismic_thump(), 0.9)
     write(P("Robots", "camera_beep"), camera_beep(), 0.6)
     write(P("Robots", "motor_servo"), motor_servo(2.0), 0.6)
+    write(P("Robots", "guard_charge"), guard_charge(4.0), 0.5)
+    write(P("Robots", "guard_patrol"), guard_patrol(4.0), 0.55)
+    write(P("Robots", "guard_chase"), guard_chase(2.0), 0.6)
     write(P("Robots", "motor_tracks"), motor_tracks(2.0), 0.7)
     write(P("Robots", "motor_brush"), motor_brush(2.0), 0.6)
     write(P("Robots", "motor_turbine"), motor_turbine(2.0), 0.7)
@@ -834,6 +961,11 @@ def main():
     write(P("Car", "car_horn"), car_horn(), 0.7)
     write(P("Car", "car_bump"), car_bump(), 0.7)
     write(P("Environment", "gate_open"), gate_open(), 0.8)
+    write(P("Player", "gas_breath"), gas_breath(), 0.7)
+    for level in range(3):
+        write(P("Player", f"gas_laugh_{level}"), gas_laugh(level), 0.8)
+    write(P("Environment", "door_open"), door_open(), 0.6)
+    write(P("Environment", "door_shut"), door_shut(), 0.7)
 
 
 if __name__ == "__main__":

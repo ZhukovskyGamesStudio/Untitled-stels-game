@@ -7,26 +7,43 @@ namespace Stealth.Level
     /// Office, Business, DataCenter, Warehouse and Headquarters are offices of different character (location
     /// <see cref="Location.Office"/>); Hospital and Garage are locations of their own (<see cref="HouseFeatures.LocationOf"/>).
     /// </summary>
-    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage }
+    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage, Apartments }
 
     /// <summary>
     /// House kinds (pure): which one a house is (from its seed: every peer and the route panel agree without sending
     /// anything) and what it does to the building settings — room mix, room sizes, corridors, atriums, rotundas,
-    /// cut corners, darkness. The first house is always an office.
+    /// cut corners, darkness. Any house may be any kind, the first too (its size and its guards come from its number).
     /// </summary>
     public static class HouseKinds
     {
         public static HouseKind Of(int seed, int house)
         {
-            if (house <= 0) return HouseKind.Office;
             var rng = new System.Random(LevelRandom.Mix(seed, 0x4B1D, 0));
             int roll = rng.Next(100);
-            // a third each: an office (of some character), a hospital, a garage
-            if (roll >= 67) return HouseKind.Garage;
-            if (roll >= 34) return HouseKind.Hospital;
+            // a quarter each: an office (of some character), a hospital, a garage, an apartment block
+            if (roll >= 75) return HouseKind.Apartments;
+            if (roll >= 50) return HouseKind.Garage;
+            if (roll >= 25) return HouseKind.Hospital;
             int office = rng.Next(100);
             return office < 34 ? HouseKind.Office : office < 52 ? HouseKind.Business : office < 68 ? HouseKind.DataCenter
                  : office < 84 ? HouseKind.Warehouse : HouseKind.Headquarters;
+        }
+
+        /// <summary>A location with a plan of its own (the hospital, the repair shop, the apartment block): not the office generator's rooms and zones.</summary>
+        public static bool OwnPlan(HouseKind kind) => kind is HouseKind.Hospital or HouseKind.Garage or HouseKind.Apartments;
+
+        /// <summary>
+        /// A house seed whose house number <paramref name="house"/> is of <paramref name="kind"/> (pure; the n-th one from
+        /// <paramref name="from"/> on: a cheat starting "a house of this kind" gets a different one each time).
+        /// </summary>
+        public static int SeedOf(HouseKind kind, int house, int from)
+        {
+            for (int k = 0; k < 100000; k++)
+            {
+                int seed = LevelRandom.Mix(from, 0x5EED, k) & 0x7fffffff;
+                if (seed != 0 && Of(seed, house) == kind) return seed;
+            }
+            return 0;
         }
 
         /// <summary>The kind's name for the player (table <c>house.kind.&lt;kind&gt;</c>).</summary>
@@ -68,13 +85,25 @@ namespace Stealth.Level
                 HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f,
                     RoomType.Library => 2f, RoomType.ControlRoom => 1.5f, RoomType.Studio => 1.5f, _ => 1f },
                 // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
-                HouseKind.Hospital => t switch { RoomType.Office => 2.4f, RoomType.Restroom => 2.2f, RoomType.Lounge => 1.6f, RoomType.Storage => 1.4f, RoomType.OpenSpace => 0.4f, RoomType.Server => 0.3f,
-                    RoomType.Infirmary => 3f, RoomType.LockerRoom => 1.5f, RoomType.Lab => 1.5f, RoomType.GameRoom => 0.3f, RoomType.Studio => 0.2f, _ => 1f },
-                // big repair bays and parts stores, a small office and a break room
-                HouseKind.Garage => t switch { RoomType.Storage => 5f, RoomType.Kitchen => 0.8f, RoomType.OpenSpace => 0.4f, RoomType.Meeting => 0.5f, RoomType.Server => 0.2f,
-                    RoomType.Lab => 2.5f, RoomType.LockerRoom => 2f, RoomType.Library => 0.2f, RoomType.Studio => 0.2f, _ => 1f },
+                // the hospital's own plan lays out the wards, the station, the theatres and imaging (PlanGenerator.Hospital); what
+                // is left over: examination rooms, doctors' offices, toilets, stores, the lab, the staff's rooms
+                HouseKind.Hospital => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Infirmary => 2f, RoomType.Storage => 1f,
+                    RoomType.LockerRoom => 1f, RoomType.Lab => 1f, RoomType.Kitchen => 1f, RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, _ => 0f },
+                // the shop's own plan lays out the hall, the booth and the block (PlanGenerator.Garage); what is left over is
+                // the service office, the toilets, the mechanics' locker room and break room, a waiting lounge, the robots' room
+                HouseKind.Garage => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Kitchen => 1f, RoomType.LockerRoom => 1.4f,
+                    RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, RoomType.Storage => 1f, _ => 0f },
+                // the block's own plan lays out every flat (PlanGenerator.Apartments): the program only says whether it has a store
+                HouseKind.Apartments => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, _ => 0f },
                 _ => 1f,
             };
+            if (b.RoomTypeRules != null)
+            {
+                var rules = (RoomRule[])b.RoomTypeRules.Clone();
+                for (int i = 0; i < rules.Length; i++)
+                    if (Mul(rules[i].Room) >= 2f) { rules[i].PerFloor = 0; rules[i].PerHouse = 0; }
+                s.RoomTypeRules = rules;
+            }
             var weights = new RoomWeight[b.RoomWeights.Length];
             for (int i = 0; i < weights.Length; i++)
                 weights[i] = new RoomWeight(b.RoomWeights[i].Room, Mathf.RoundToInt(b.RoomWeights[i].Weight * Mul(b.RoomWeights[i].Room)));
@@ -107,17 +136,35 @@ namespace Stealth.Level
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;
                     break;
                 case HouseKind.Hospital:
-                    s.CorridorChance = 1f;
-                    s.AtriumChance = b.AtriumChance * 0.5f;
-                    s.RotundaChance = b.RotundaChance * 0.4f;
-                    s.RoomSizeScale = b.RoomSizeScale * 0.9f;
+                    // a slab: the corridor down its length, rooms on both sides; two or three floors (the theatres on top)
+                    if (b.EveryRoomType) { s.CorridorChance = 1f; break; }
+                    s.Hospital = true;
+                    s.FloorsPerHouse = new[] { 2, 2, 3, 3, 3 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
+                    s.RotundaChance = 0f;
+                    s.CornerCutChance = 0f;
+                    break;
+                case HouseKind.Apartments:
+                    // one entrance, one stairwell, a few flats a floor: more storeys than any other house
+                    if (b.EveryRoomType) break;
+                    s.Apartments = true;
+                    s.FloorsPerHouse = new[] { 4, 4, 5, 5, 6 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
+                    s.RotundaChance = 0f;
+                    s.CornerCutChance = 0f;
                     break;
                 case HouseKind.Garage:
-                    s.CorridorChance = b.CorridorChance * 0.3f;
-                    s.AtriumChance = b.AtriumChance * 0.4f;
+                    // a box of a building: the hall two storeys high, the block beside it two floors, square rooms (not in the
+                    // rooms test: a house of every room type keeps its program)
+                    if (b.EveryRoomType) break;
+                    s.Garage = true;
+                    s.FloorsPerHouse = new[] { 2 };
+                    s.LinkedChance = 0f;
+                    s.AtriumChance = 0f;
                     s.RotundaChance = 0f;
-                    s.CornerCutChance = b.CornerCutChance * 0.2f;
-                    s.RoomSizeScale = b.RoomSizeScale * 1.8f;
+                    s.CornerCutChance = 0f;
                     s.DarkChance = b.DarkChance + 0.08f;
                     break;
             }

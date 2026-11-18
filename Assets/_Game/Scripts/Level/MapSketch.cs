@@ -190,7 +190,7 @@ namespace Stealth.Level
                     float o0 = o.At - half, o1 = o.At + half;
                     if (o1 <= from || o0 >= b) continue;
                     Strip(output, part, w, from, Mathf.Max(from, o0), width);
-                    Strip(output, o.Kind is EdgeType.Vent or EdgeType.Squeeze ? MapPart.Vent : MapPart.Door, w, Mathf.Max(a, o0), Mathf.Min(b, o1), GapWidth);
+                    Strip(output, o.Kind is EdgeType.Vent or EdgeType.Squeeze or EdgeType.Hole or EdgeType.InnerWindow ? MapPart.Vent : MapPart.Door, w, Mathf.Max(a, o0), Mathf.Min(b, o1), GapWidth);
                     from = Mathf.Min(b, o1);
                 }
                 Strip(output, part, w, from, b, width);

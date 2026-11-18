@@ -288,31 +288,41 @@ def listener(L):
 
 
 def worker(L):
-    """Printer porter: an inkjet printer on skate wheels, its paper tray sticking up at the back, a telescopic lift in
-    front carrying a milk crate of VHS tapes, the status lamp under the fork."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", L.wheel(c, .12, .1))
-        P.add("Accent", L.rod((c[0] * .7, c[1], .12), (c[0] * .95, c[1], .12), .03))
-    P.add("Body", pbox((.5, .62, .1), (0, 0, .16)))
-    P.add("Body", pbox((.56, .5, .3), (0, .08, .36), r=.05))
-    P.add("Accent", pbox((.42, .03, .03), (0, -.17, .46), r=.01))
-    P.add("Accent", pbox((.46, .03, .38), (0, .35, .66), r=.015, rot=(-.35, 0, 0)))
-    P.add("Body", pbox((.4, .03, .3), (0, .345, .7), r=.008, rot=(-.35, 0, 0)))
-    for sx in (-1, 1):
-        P.add("Body", pbox((.06, .2, .08), (sx * .22, -.24, .3), r=.02))
-        b, a = tele((sx * .22, -.33, .22), (sx * .22, -.33, .98), .032, .025, 2)
-        P.add("Body", b).add("Accent", a)
-        P.add("Accent", L.cyl(.025, .04, (sx * .1, -.17, .46), axis="Y"))
-    P.add("Body", pbox((.47, .09, .1), (0, -.35, .5), r=.025))
-    P.add("Eye", pbox((.26, .02, .045), (0, -.4, .5), r=.01))
-    P.add("Accent", pbox((.52, .44, .03), (0, -.15, .955), r=.01))
-    P.add("Accent", pbox((.5, .42, .3), (0, -.15, 1.12), r=.04))
-    P.add("Accent", pbox((.52, .44, .04), (0, -.15, 1.27), r=.015))
-    for k, x in enumerate((-.14, -.04, .06, .16)):
-        P.add("Body", pbox((.035, .2, .14), (x, -.15, 1.31 - (k % 2) * .03), r=.008))
-    return P
+    """Hi-fi dolly: a rounded plastic deck on skate wheels with rubber bumpers, a camcorder-body snout with a red REC
+    dot, a hi-fi tower for a mast — tape deck, two speaker cones, a flip-out LCD on its side — and a big REC lamp on
+    top; the tray rests on a moulded bracket."""
+    def deck(L, P):
+        P.add("Body", pbox((.5, .74, .16), (0, 0, .21)))
+        P.add("Body", pbox((.68, .8, .06), (0, 0, .29), r=.03))
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Accent", L.rod((x * .7, y, .12), (x * .95, y, .12), .03))
+        for y in (-.41, .41):
+            P.add("Accent", pbox((.66, .08, .12), (0, y, .21), r=.04))
+
+    def pod(L, P):
+        P.add("Body", pbox((.46, .32, .29), (0, -.22, .46), r=.06))
+        P.add("Accent", pbox((.4, .03, .05), (0, -.38, .36), r=.012))                                # grille strip
+        P.add("Eye", pbox((.06, .02, .03), (-.15, -.39, .36), r=.008) + pbox((.06, .02, .03), (.15, -.39, .36), r=.008))
+        P.add("Eye", L.ball(.022, (.17, -.37, .58)))                                                 # REC dot
+        D.worker_shoulders(L, P, inner=.2)
+
+    def mast(L, P):
+        P.add("Body", pbox((.42, .26, .98), (0, .22, .8), r=.05))                                    # the tower
+        P.add("Accent", pbox((.34, .03, .1), (0, .095, 1.12), r=.01))                                # tape deck
+        P.add("Body", pbox((.24, .02, .05), (0, .082, 1.12), r=.008))                                # its door
+        for z in (.5, .82):
+            sur, cone = speaker(.1, (0, .1, z))
+            P.add("Accent", sur).add("Body", cone)
+        P.add("Accent", pbox((.03, .06, .06), (.225, .17, 1.05), r=.01))                             # LCD hinge
+        P.add("Accent", pbox((.02, .2, .15), (.245, .24, 1.05), r=.012))                             # flip-out LCD
+        P.add("Eye", pbox((.006, .16, .11), (.257, .24, 1.05), r=.003))
+        P.add("Accent", pbox((.44, .28, .04), (0, .22, 1.3), r=.015))                                # top cap
+
+    def beacon(L, P):
+        P.add("Accent", L.cyl(.07, .03, (0, .25, 1.33)))
+        P.add("Eye", L.ball(.06, (0, .25, 1.37)))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon)
 
 
 def sweeper(L):

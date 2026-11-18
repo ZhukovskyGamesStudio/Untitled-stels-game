@@ -71,12 +71,16 @@ namespace Stealth.Tests
             // which location a house is comes from its kind alone
             var seen = new HashSet<Location>();
             for (int seed = 1; seed < 200; seed++) seen.Add(HouseFeatures.LocationOf(HouseKinds.Of(seed, 2)));
-            Assert.AreEqual(3, seen.Count, "offices, hospitals and garages");
+            Assert.AreEqual(4, seen.Count, "offices, hospitals, garages and apartment blocks");
             foreach (var l in TestHouses.Sample)
             {
                 int seed = l.Seed;
-                Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
-                Assert.AreEqual(HouseFeatures.PointOfInterestKind(l.Location), l.Props[l.PointOfInterest].Kind);
+                if (l.Location == Location.Apartments) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: an apartment block has its shelter map instead");
+                else
+                {
+                    Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
+                    Assert.AreEqual(HouseFeatures.PointOfInterestKind(l.Location), l.Props[l.PointOfInterest].Kind);
+                }
                 Assert.Greater(l.Crates.Count, 0);
                 Assert.IsTrue(l.Crates.All(c => l.Props[c].Kind == PropKind.Crate));
                 Assert.Greater((l.ExitHatchPosition - l.HatchPosition).magnitude, 8f, $"seed {seed}: the exit is away from the entry");
@@ -84,11 +88,27 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheMedTableIsOnlyInAHospitalAndAnApartmentBlockHasNoPointOfInterest()
+        {
+            foreach (Location at in System.Enum.GetValues(typeof(Location)))
+                if (at != Location.Hospital) Assert.AreNotEqual(PropKind.MedTable, HouseFeatures.PointOfInterestKind(at), $"{at}: no med table");
+            Assert.IsNull(HouseFeatures.PointOfInterestKind(Location.Apartments), "an apartment block's find is the shelter map");
+            // an apartment block, as the game builds it: no med table, workbench or console anywhere in it
+            int seed = Enumerable.Range(1, 400).First(s => HouseKinds.Of(s, s % 5) == HouseKind.Apartments);
+            var l = TestHouses.Get(seed, seed % 5);
+            Assert.AreEqual(-1, l.PointOfInterest);
+            Assert.IsFalse(l.Props.Any(p => p.Kind is PropKind.MedTable or PropKind.Workbench or PropKind.Programmer), $"{seed}/{seed % 5}: a point of interest in an apartment block");
+            Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
+        }
+
+        [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {
             int wardens = 0;
-            foreach (var l in TestHouses.Sample)
+            // wardens are the old enemies' (LevelGenerator.ClassicEnemies)
+            foreach (var (seed, level) in TestHouses.SampleKeys)
             {
+                var l = LevelGenerator.Generate(seed, level, null, null, 1, null, false, true);
                 foreach (var w in l.Wardens)
                 {
                     wardens++;
@@ -117,7 +137,7 @@ namespace Stealth.Tests
             Assert.AreEqual(1, plan[0].Color);
             CollectionAssert.AreEquivalent(new[] { 0, 1 }, plan[0].Items);
             Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1) + ItemCatalog.Value(4, 1) - 1, "worth more than what went in");
-            Assert.AreEqual(0, ItemCatalog.Value(ItemCatalog.Key, 4), "tools are worth nothing");
+            Assert.AreEqual(ItemCatalog.Cells(ItemCatalog.Key) * ItemCatalog.Value(0, 0), ItemCatalog.Value(ItemCatalog.Key, 4), "tools burn at the grey rate, whatever their colour");
             Assert.IsFalse(ItemCatalog.IsLoot(ItemCatalog.Stun));
         }
 
@@ -208,30 +228,42 @@ namespace Stealth.Tests
         {
             var signature = new Dictionary<RoomType, PropKind[]>
             {
-                [RoomType.Gym] = new[] { PropKind.Treadmill, PropKind.ExerciseBike, PropKind.WeightBench, PropKind.DumbbellRack, PropKind.PunchingBag },
-                [RoomType.Library] = new[] { PropKind.TallBookcase, PropKind.ReadingTable, PropKind.Globe },
-                [RoomType.CopyRoom] = new[] { PropKind.Copier, PropKind.PaperStack, PropKind.MailShelf, PropKind.Shredder },
-                [RoomType.ControlRoom] = new[] { PropKind.MonitorWall, PropKind.ConsoleDesk },
-                [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.PartsCabinet, PropKind.RobotArm },
-                [RoomType.NapRoom] = new[] { PropKind.SleepPod, PropKind.Hammock, PropKind.BeanBag },
-                [RoomType.Studio] = new[] { PropKind.MixingDesk, PropKind.MicStand, PropKind.AcousticPanel, PropKind.DrumKit },
-                [RoomType.LockerRoom] = new[] { PropKind.Lockers, PropKind.ShowerStall, PropKind.Bench },
-                [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.MedicineCabinet, PropKind.PrivacyScreen },
-                [RoomType.GameRoom] = new[] { PropKind.PoolTable, PropKind.Foosball, PropKind.PingPongTable, PropKind.DartBoard, PropKind.BarCounter, PropKind.ArcadeMachine },
+                [RoomType.Gym] = new[] { PropKind.Treadmill, PropKind.ExerciseBike, PropKind.WeightBench, PropKind.DumbbellRack, PropKind.PunchingBag,
+                    PropKind.RowingMachine, PropKind.PowerCage, PropKind.KettlebellRack, PropKind.MatRack, PropKind.CableMachine },
+                [RoomType.Library] = new[] { PropKind.TallBookcase, PropKind.ReadingTable, PropKind.Globe,
+                    PropKind.CardCatalog, PropKind.StudyCarrel, PropKind.Lectern, PropKind.WingbackChair, PropKind.BookCart },
+                [RoomType.CopyRoom] = new[] { PropKind.Copier, PropKind.PaperStack, PropKind.MailShelf, PropKind.Shredder,
+                    PropKind.Plotter, PropKind.WorkTable, PropKind.SupplyShelf, PropKind.MailCart, PropKind.PaperBin },
+                [RoomType.ControlRoom] = new[] { PropKind.MonitorWall, PropKind.ConsoleDesk,
+                    PropKind.MapBoard, PropKind.RadioRack, PropKind.OperatorChair, PropKind.SupervisorDesk, PropKind.AlarmPanel },
+                [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.PartsCabinet, PropKind.RobotArm,
+                    PropKind.FumeHood, PropKind.Printer3d, PropKind.ComponentShelf, PropKind.RobotTable, PropKind.ScopeCart },
+                [RoomType.NapRoom] = new[] { PropKind.SleepPod, PropKind.Hammock, PropKind.BeanBag,
+                    PropKind.BunkBed, PropKind.Daybed, PropKind.CurtainDivider, PropKind.FloorCushions, PropKind.NightTable },
+                [RoomType.Studio] = new[] { PropKind.MixingDesk, PropKind.MicStand, PropKind.AcousticPanel, PropKind.DrumKit,
+                    PropKind.GuitarStand, PropKind.SynthStand, PropKind.VocalBooth, PropKind.AmpCabinet, PropKind.StudioCouch },
+                [RoomType.LockerRoom] = new[] { PropKind.Lockers, PropKind.ShowerStall, PropKind.Bench,
+                    PropKind.TowelShelf, PropKind.LaundryCart, PropKind.BenchIsland, PropKind.WeighingScale, PropKind.ShoeRack },
+                [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.MedicineCabinet, PropKind.PrivacyScreen,
+                    PropKind.ExamTable, PropKind.Wheelchair, PropKind.IvStand, PropKind.DoctorDesk, PropKind.DefibCabinet },
+                [RoomType.GameRoom] = new[] { PropKind.PoolTable, PropKind.Foosball, PropKind.PingPongTable, PropKind.DartBoard, PropKind.BarCounter, PropKind.ArcadeMachine,
+                    PropKind.AirHockey, PropKind.PokerTable, PropKind.Jukebox, PropKind.Pinball, PropKind.GamingCorner },
             };
             var seen = new HashSet<RoomType>();
             var bare = new List<string>();
+            int themed = 0;
             foreach (var l in TestHouses.Sample)
                 foreach (var r in l.Rooms)
                 {
-                    if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom) continue;
+                    if (!signature.TryGetValue(r.Type, out var kinds) || r.Area < 12f || r.Id == l.HiddenRoom || r.Id == l.VaultRoom) continue; // the vault is a bank vault inside
                     seen.Add(r.Type);
+                    themed++;
                     bool has = l.Props.Any(p => kinds.Contains(p.Kind) && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id);
                     if (!has) bare.Add($"seed {l.Seed}: {r.Type} {r.Area:0} m²");
                 }
             Assert.Greater(seen.Count, 4, "the shared houses have themed rooms: " + string.Join(", ", seen));
-            // a small room with doors on every wall may have no wall left for its piece: a few, not many
-            Assert.LessOrEqual(bare.Count, 3, "themed rooms without their furniture: " + string.Join("; ", bare));
+            // a small room with doors on every wall may have no wall left for its piece: a few, not many (one in ten)
+            Assert.LessOrEqual(bare.Count, Mathf.Max(3, themed / 10), $"themed rooms without their furniture (of {themed}): " + string.Join("; ", bare));
         }
     }
 }

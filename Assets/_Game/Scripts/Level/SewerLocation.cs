@@ -29,12 +29,21 @@ namespace Stealth.Level
             public Stealth.UI.RouteSignView Sign;
             [Tooltip("Lamps inside and the zone on the floor: shown only when the tunnel is open.")]
             public GameObject Lamp;
+            [Tooltip("Bricks in the mouth when it leads nowhere (the bars stay behind them as the stop).")]
+            public GameObject Plug;
         }
 
         [Header("Kit (Tools/Blender/sewer.py)")]
         [Tooltip("Straight 6 m segments, one per variant.")]
         public GameObject[] Segments;
         public GameObject Cap, Hub, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
+        [Tooltip("Bricks that fill a mouth of the hall leading nowhere this time.")]
+        public GameObject Plug;
+        [Tooltip("An invisible wall across the tunnel behind the car: the way back (where the car came from) is seen, not walked.")]
+        public GameObject BackWall;
+
+        /// <summary>How many segments of the way back are seen behind the car (past the invisible wall), then the cap.</summary>
+        public const int BackSegments = 7;
         [Tooltip("The gate across the tunnel: frame, shutter, lever (SewerGate).")]
         public SewerGate GatePrefab;
         [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
@@ -52,9 +61,10 @@ namespace Stealth.Level
         public Pose CarSpot;
 
         /// <summary>The car inside a tunnel this far past its mouth (and up to this deep) chooses it.</summary>
-        public const float VoteFrom = 3.0f, VoteTo = 11.5f, VoteHalfWidth = 2.2f;
-        /// <summary>The invisible wall in every tunnel, metres past its mouth (the tunnel itself goes on into the dark).</summary>
-        public const float StopAt = 12.5f;
+        public const float VoteFrom = 3.0f, VoteTo = 90f, VoteHalfWidth = 2.2f;
+        /// <summary>The invisible wall in every tunnel, metres past its mouth (the tunnel itself goes on into the dark): far
+        /// enough to drive off into the tunnel while the departure counts down.</summary>
+        public const float StopAt = 95f;
 
         public SewerPlan Plan { get; private set; }
 
@@ -84,7 +94,26 @@ namespace Stealth.Level
         public void Build(SewerPlan plan)
         {
             Plan = plan;
-            Put(Cap, "Cap", Vector3.zero);
+            // the way the car came from: a long tunnel behind it, dimly lit, closed by an invisible wall where the sewer starts
+            Put(BackWall, "BackWall", Vector3.zero);
+            for (int i = 1; i <= BackSegments; i++)
+            {
+                float bx = -i * SewerPlan.SegmentLength;
+                if (Segments != null && Segments.Length > 0) Put(Segments[(i * 3 + plan.Segments.Count) % Segments.Length], $"BackSegment{i}", new Vector3(bx, 0f, 0f));
+                if (i % 2 == 1 && i < BackSegments)
+                {
+                    int side = i % 4 == 1 ? 1 : -1;
+                    var lamp = Put(Lamp, $"BackLamp{i}", new Vector3(bx + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                    if (lamp != null)
+                        foreach (var l in lamp.GetComponentsInChildren<Light>())
+                        {
+                            l.color = plan.LampColor;
+                            l.intensity = plan.LampIntensity * 0.45f; // fading into the distance
+                            l.range = 11f;
+                        }
+                }
+            }
+            Put(Cap, "Cap", new Vector3(-BackSegments * SewerPlan.SegmentLength, 0f, 0f));
             for (int i = 0; i < plan.Segments.Count; i++)
             {
                 var s = plan.Segments[i];
@@ -140,19 +169,28 @@ namespace Stealth.Level
 
             // the hall and the three tunnels; lamps on its long walls
             Put(Hub, "Hub", new Vector3(plan.HubX, 0f, 0f));
-            foreach (var (x, side) in new[] { (6f, 1), (6f, -1), (11.5f, 1), (11.5f, -1) })
+            foreach (var (x, side) in new[] { (6f, 1), (6f, -1), (14.2f, 1), (14.2f, -1) }) // clear of the side mouths (x 7.7..12.3)
             {
                 var lamp = Put(Lamp, "HubLamp", new Vector3(plan.HubX + x, 3.1f, side * 7.9f), side > 0 ? 90f : -90f);
                 if (lamp != null) foreach (var l in lamp.GetComponentsInChildren<Light>()) { l.color = plan.LampColor; l.intensity = plan.LampIntensity; l.range = 14f; }
             }
+            // the three tunnels at their mouths; the mouths no tunnel takes are bricked up
+            for (int m = 0; m < SewerPlan.Mouths.Length; m++)
+                if (System.Array.IndexOf(plan.TunnelMouths, m) < 0 && Plug != null)
+                {
+                    var plug = Put(Plug, $"Plug{m}", new Vector3(plan.HubX, 0f, 0f) + SewerPlan.Mouths[m].position);
+                    plug.transform.localRotation = SewerPlan.Mouths[m].rotation;
+                }
             Branches = new Branch[SewerBranches.Count];
             for (int i = 0; i < SewerBranches.Count; i++)
             {
-                var at = new Vector3(plan.End, 0f, SewerPlan.BranchZ[i]);
+                var mouth = SewerPlan.Mouths[plan.TunnelMouths[i]];
+                var at = new Vector3(plan.HubX, 0f, 0f) + mouth.position;
                 if (BranchPrefab == null) continue;
                 var b = Instantiate(BranchPrefab, transform);
                 b.name = $"Branch{i}";
                 b.transform.localPosition = at; // +X leads into it
+                b.transform.localRotation = mouth.rotation;
                 Stealth.UI.RouteSignView sign = null;
                 if (SignPrefab != null)
                 {
@@ -160,9 +198,9 @@ namespace Stealth.Level
                     sign.name = $"Sign{i}";
                     // over the mouth, 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth),
                     // its face to the hall (a world-space canvas reads along its +Z: into the tunnel), tipped down a little
-                    sign.transform.SetLocalPositionAndRotation(at + new Vector3(-SignOffWall, 4.4f, 0f), Quaternion.Euler(-12f, 90f, 0f));
+                    sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * new Vector3(-SignOffWall, 4.4f, 0f), mouth.rotation * Quaternion.Euler(-12f, 90f, 0f));
                 }
-                Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen };
+                Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen, Plug = b.Plug };
             }
             var water = Put(Flooding, "FloodWater", new Vector3(plan.End / 2f, -0.6f, 0f));
             if (water != null)
@@ -259,6 +297,7 @@ namespace Stealth.Level
                 bool open = SewerBranches.WayOf(i, ways) >= 0;
                 var b = Branches[i];
                 if (b.Grate != null) b.Grate.SetActive(!open);
+                if (b.Plug != null) b.Plug.SetActive(!open); // a way that leads nowhere is bricked up: only the ways on show
                 if (b.Sign != null) b.Sign.gameObject.SetActive(open);
                 if (b.Lamp != null) b.Lamp.SetActive(open);
             }

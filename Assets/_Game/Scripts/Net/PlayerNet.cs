@@ -22,11 +22,13 @@ namespace Stealth.Net
         readonly NetworkVariable<bool> m_Flashlight = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<byte> m_Gas = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        readonly NetworkVariable<FixedString64Bytes> m_Identity = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         PlayerController m_Player;
         NetworkTransform m_Transform;
-        string m_PushedName;
+        string m_PushedName, m_PushedIdentity;
 
         void Awake()
         {
@@ -45,7 +47,10 @@ namespace Stealth.Net
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
+            m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
+            m_Gas.OnValueChanged += (_, now) => { if (!IsOwner) m_Player.ApplyGas(now); };
             PushState();
+            if (!IsOwner) m_Player.ApplyIdentity(m_Identity.Value.ToString());
             Pull();
         }
 
@@ -69,6 +74,12 @@ namespace Stealth.Net
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
             NetSync.Set(m_LookPitch, m_Player.LookPitch);
+            NetSync.Set(m_Gas, (byte)Mathf.RoundToInt(Mathf.Clamp01(m_Player.GasShare) * 255f));
+            if (m_PushedIdentity != m_Player.Identity)
+            {
+                m_PushedIdentity = m_Player.Identity;
+                m_Identity.Value = new FixedString64Bytes(m_PushedIdentity ?? "");
+            }
             if (m_PushedName == m_Player.DisplayName) return;
             m_PushedName = m_Player.DisplayName;
             m_Name.Value = new FixedString32Bytes(m_PushedName);
@@ -86,6 +97,11 @@ namespace Stealth.Net
         {
             if (m_Transform != null && m_Transform.IsSpawned) m_Transform.Teleport(position, rotation, transform.localScale);
         }
+
+        public void PlaceOwner(Vector3 position, float yaw) => PlaceRpc(position, yaw);
+
+        [Rpc(SendTo.Owner)]
+        void PlaceRpc(Vector3 position, float yaw) => m_Player.PlaceFromServer(position, yaw);
 
         public void SendNoise(Vector3 position, float radius) => NoiseRpc(position, radius);
         public void SendGasKnockout() => GasKnockoutRpc();
@@ -115,6 +131,10 @@ namespace Stealth.Net
         public void SendCheat(Cheat cheat, bool on) => CheatRpc((byte)cheat, on);
         public void SendUse(Stealth.Level.UseKind kind, int index) => UseRpc((byte)kind, index);
         public void SendGadget() => GadgetRpc();
+        public void SendBot(byte command) => BotRpc(command);
+
+        [Rpc(SendTo.Server)]
+        void BotRpc(byte command) => GameManager.Instance?.BotCommandServer(m_Player, command);
 
         [Rpc(SendTo.Server)]
         void UseRpc(byte kind, int index) => GameManager.Instance?.UseServer(m_Player, (Stealth.Level.UseKind)kind, index);

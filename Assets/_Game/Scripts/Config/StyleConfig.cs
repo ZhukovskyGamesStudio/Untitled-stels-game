@@ -25,6 +25,8 @@ namespace Stealth.Configs
         public StyleKit[] Kits = new StyleKit[0];
         public MeshVariants[] Meshes = new MeshVariants[0];
         public MaterialVariants[] Materials = new MaterialVariants[0];
+        [Tooltip("Wear levels of a material (derelict painted metal): each object takes one")]
+        public WearVariants[] Wear = new WearVariants[0];
         public PropReplacement[] Props = new PropReplacement[0];
         [Tooltip("Models designed for one style (Art/Models/Styles/PerStyle/<style>, Styles/Players)")]
         public StyleMeshes[] StyleModels = new StyleMeshes[0];

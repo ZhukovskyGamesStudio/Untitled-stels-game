@@ -396,27 +396,39 @@ def listener(L):
 
 
 def worker(L):
-    """An open box-frame cart; a lift mast of two beams carries the crate (drawn with its edges) over the nose."""
-    P = D.Parts()
-    W = [(.31, .25, .12), (-.31, .25, .12), (.31, -.25, .12), (-.31, -.25, .12)]
-    for i, c in enumerate(W):
-        P.add(f"AccentWheel{i}", circle_wheel(c, .12, .1))
-        P.add("Body", beam((c[0] * .78, c[1], .12), (c[0] * 1.0, c[1], .12), w=.04))
-    frame_box(P, (.5, .66, .2), (0, .03, .26))
-    P.add("Body", [s.rbox((.52, .68, .03), (0, .03, .36), r=.006, seg=1)])
-    # cab: an upright triangle frame at the back
-    for sx in (-1, 1):
-        P.add("Body", beam((sx * .2, .36, .36), (sx * .2, .36, .9)) + beam((sx * .2, .36, .9), (sx * .2, .0, .36)))
-    P.add("Body", beam((-.2, .36, .9), (.2, .36, .9)))
-    for sx in (-1, 1):
-        P.add("Body", beam((sx * .23, -.33, .2), (sx * .23, -.33, 1.42)))
-    P.add("Body", beam((-.23, -.33, 1.42), (.23, -.33, 1.42)))
-    P.add("Accent", [s.rbox((.5, .44, .04), (0, -.15, .93), r=.006, seg=1)])
-    P.add("Accent", [s.rbox((.42, .38, .34), (0, -.15, 1.13), r=.008, seg=1)])
-    frame_box(P, (.44, .4, .36), (0, -.15, 1.13), w=.035)
-    P.add("Body", [s.rbox((.3, .04, .14), (0, -.345, .45), r=.006, seg=1)])
-    crosshair(P, (0, -.375, .45), .06)
-    return P
+    """Drafting porter: an open box-frame deck on compass wheels, a framed snout with two crosshair lamps, an open
+    lattice tower for a mast with diagonal braces and a glowing dimension line up its front, a compass circle on a
+    post for a beacon; the tray rests on a drawn bracket."""
+    def deck(L, P):
+        frame_box(P, (.5, .7, .14), (0, 0, .21))
+        P.add("Body", [s.rbox((.68, .78, .03), (0, 0, .305), r=.006, seg=1)])
+        for x, y, _ in D.WORKER_WHEELS:
+            P.add("Body", beam((x * .78, y, .12), (x * 1.0, y, .12), w=.04))
+        for y in (-.41, .41):
+            P.add("Accent", beam((-.32, y, .2), (.32, y, .2), w=.05))
+            for sx in (-1, 1):
+                P.add("Accent", beam((sx * .25, y * .85, .2), (sx * .25, y, .2), w=.04))
+
+    def pod(L, P):
+        frame_box(P, (.42, .28, .26), (0, -.23, .46), w=.05)
+        P.add("Accent", [s.rbox((.4, .02, .24), (0, -.37, .46), r=.004, seg=1)])                          # drawn face panel
+        for sx in (-1, 1):
+            crosshair(P, (sx * .15, -.385, .38), .045)
+        D.worker_shoulders(L, P, inner=.19)
+
+    def mast(L, P):
+        frame_box(P, (.38, .24, .96), (0, .22, .81), w=.05)
+        for sx in (-1, 1):
+            P.add("Body", beam((sx * .19, .1, .38), (sx * .19, .34, .82), w=.03) + beam((sx * .19, .34, .82), (sx * .19, .1, 1.24), w=.03))
+        P.add("Accent", [s.rbox((.3, .02, .9), (0, .225, .81), r=.004, seg=1)])                           # inner panel
+        dim_line(P, (0, .085, .36), (0, .085, 1.24))
+        P.add("Body", [s.rbox((.44, .3, .03), (0, .22, 1.305), r=.006, seg=1)])
+
+    def beacon(L, P):
+        P.add("Body", beam((0, .25, 1.31), (0, .25, 1.36), w=.03))
+        P.add("Eye", ring(.04, .065, .02, (0, .25, 1.42), axis="Y"))
+
+    return D.worker(L, deck=deck, pod=pod, mast=mast, beacon=beacon, wheel=circle_wheel)
 
 
 def sweeper(L):

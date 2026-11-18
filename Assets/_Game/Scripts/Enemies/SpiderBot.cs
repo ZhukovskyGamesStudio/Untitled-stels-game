@@ -85,9 +85,20 @@ namespace Stealth.Enemies
             var parent = ActiveLevel.Root != null ? ActiveLevel.Root.transform : null;
             foreach (var w in m_Web)
             {
-                var view = Instantiate(Strand, w.A, Quaternion.LookRotation(w.B - w.A), parent);
-                view.transform.localScale = new Vector3(1f, 1f, (w.B - w.A).magnitude);
-                m_WebViews.Add(view);
+                // pieces of cobweb about a metre long, end to end along the wire (every other one flipped: not a pattern)
+                float length = (w.B - w.A).magnitude;
+                int pieces = Mathf.Max(1, Mathf.RoundToInt(length));
+                var dir = (w.B - w.A) / length;
+                for (int k = 0; k < pieces; k++)
+                {
+                    var view = Instantiate(Strand, w.A + dir * (length * k / pieces), Quaternion.LookRotation(dir), parent);
+                    view.transform.localScale = new Vector3(1f, k % 2 == 0 ? 1f : -1f, length / pieces);
+                    // one of its variants (an orb, two small orbs, a tangle), the same on every peer
+                    var variants = view.GetComponentsInChildren<MeshRenderer>(true);
+                    int show = variants.Length > 0 ? (rng.Next(variants.Length)) : -1;
+                    for (int v = 0; v < variants.Length; v++) variants[v].enabled = v == show;
+                    m_WebViews.Add(view);
+                }
             }
         }
 

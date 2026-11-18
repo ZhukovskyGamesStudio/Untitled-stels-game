@@ -292,10 +292,64 @@ namespace Stealth.EditorTools
                     EditorUtility.SetDirty(m);
                     to.Add(m);
                 }
-                sets.Add(new MaterialVariants { Family = f, From = originals, To = to.ToArray() });
+                var from = originals.ToList();
+                // the derelict complex has no power: every screen is dead dark glass, not a glowing panel
+                var screen = AssetDatabase.LoadAssetAtPath<Material>($"{Root}/Art/Materials/Props/PropScreen.mat");
+                if (f == ModelFamily.Derelict && screen != null && K("Dr_Glass") != null) { from.Add(screen); to.Add(K("Dr_Glass")); }
+                sets.Add(new MaterialVariants { Family = f, From = from.ToArray(), To = to.ToArray() });
             }
             AssetDatabase.SaveAssets();
             return sets.ToArray();
+        }
+
+        /// <summary>How each wear level tiles (UVs are metres): one tile per ~2 m, so rust patches never repeat on one piece.</summary>
+        static readonly float[] WearTiling = { 0.5f, 0.5f, 0.45f, 0.45f, 0.4f };
+
+        /// <summary>
+        /// Wear levels of the derelict painted metal (Art/Textures/Derelict/dr_painted_metal_w0..w4, clean to rotten): a copy
+        /// of every material that wears that paint — the family versions and the kit's Dr_PaintedMetal — per level.
+        /// </summary>
+        static WearVariants[] BuildWearVariants(MaterialVariants[] sets)
+        {
+            var paint = Tex($"{DerelictTextures}/dr_painted_metal/albedo.jpg");
+            if (paint == null || Tex($"{DerelictTextures}/dr_painted_metal_w0/albedo.jpg") == null) return new WearVariants[0];
+            var bases = sets.Where(s => s.Family == ModelFamily.Derelict).SelectMany(s => s.To)
+                .Append(K("Dr_PaintedMetal"))
+                .Where(m => m != null && m.GetTexture("_BaseMap") == paint).Distinct().ToList();
+            string dir = $"{FamilyMaterialsDir}/Derelict/Wear";
+            EnsureFolder(dir);
+            var list = new List<WearVariants>();
+            foreach (var b in bases)
+            {
+                var to = new Material[WearTiling.Length];
+                for (int k = 0; k < to.Length; k++)
+                {
+                    var m = LitAsset($"{dir}/{b.name}_W{k}.mat");
+                    m.CopyPropertiesFromMaterial(b);
+                    m.shaderKeywords = b.shaderKeywords;
+                    string folder = $"{DerelictTextures}/dr_painted_metal_w{k}";
+                    m.SetTexture("_BaseMap", Tex($"{folder}/albedo.jpg"));
+                    m.SetTexture("_BumpMap", Tex($"{folder}/normal.jpg"));
+                    var mask = Tex($"{folder}/mask.png");
+                    m.SetTexture("_MetallicGlossMap", mask);
+                    m.SetTexture("_OcclusionMap", mask);
+                    // one tile of paint and rust covers ~2 m (its patches do not repeat across a door or a cabinet);
+                    // the fine grain is the detail map, ~3 tiles a metre
+                    m.SetTextureScale("_BaseMap", Vector2.one * WearTiling[k]);
+                    var detail = $"{DerelictTextures}/dr_paint_detail";
+                    m.SetTexture("_DetailAlbedoMap", Tex($"{detail}/albedo.jpg"));
+                    m.SetTextureScale("_DetailAlbedoMap", Vector2.one * 3f);
+                    m.SetFloat("_DetailAlbedoMapScale", 1f);
+                    m.SetTexture("_DetailNormalMap", Tex($"{detail}/normal.jpg"));
+                    m.SetFloat("_DetailNormalMapScale", 0.8f);
+                    m.EnableKeyword("_DETAIL_MULX2");
+                    EditorUtility.SetDirty(m);
+                    to[k] = m;
+                }
+                list.Add(new WearVariants { From = b, To = to });
+            }
+            AssetDatabase.SaveAssets();
+            return list.ToArray();
         }
 
         static Color Saturate(Color c, float k, float bright = 1f)
@@ -352,13 +406,19 @@ namespace Stealth.EditorTools
                     break;
                 case ModelFamily.Derelict:
                     // everything is industrial now: wood becomes painted steel, fabric cracked vinyl, plastic yellowed composite
+                    // the bare wall (posts at the joints of bent walls, where no finish goes), window frames and blinds:
+                    // dark painted steel, not the plain look's white
+                    if (n is "Wall" or "WindowFrame") { SetPbr(m, $"{DerelictTextures}/dr_painted_metal", new Color(0.75f, 0.75f, 0.75f), 1f, 1.5f); break; }
+                    if (n == "Blinds") { SetPbr(m, $"{DerelictTextures}/dr_painted_metal", new Color(0.6f, 0.6f, 0.58f), 1f, 2f); break; }
+                    // the ground outside: dark mud with gravel and broken concrete (the yard and the land to the horizon)
+                    if (n == "OutsideGround") { SetPbr(m, $"{DerelictTextures}/dr_earth", Color.white, 1f, 0.25f); break; }
                     if (structure) break;
                     if (player) { m.SetFloat("_Smoothness", 0.3f); break; }
                     if (fabric) SetPbr(m, $"{DerelictTextures}/dr_vinyl", Saturate(c, 0.4f, 1.6f), 1f, 2f);
                     else if (pot) SetPbr(m, $"{DerelictTextures}/dr_composite", Color.white, 1f, 2f);
                     else if (metal) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Saturate(c, 0.3f, 1.8f), 1f, 1.5f);
                     else if (wood) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Color.white, 1f, 1.5f);
-                    else if (painted) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Saturate(c, 0.35f, 1.7f), 1f, 0.6f); // doors: one patch pattern, not a grid
+                    else if (painted) SetPbr(m, $"{DerelictTextures}/dr_painted_metal", Saturate(c, 0.35f, 1.7f), 1f, n == "Door" ? 1.4f : 0.6f); // doors: the paint as fine as on the walls
                     else SetPbr(m, $"{DerelictTextures}/dr_composite", Saturate(c, 0.3f, 1.5f), 1f, 2f);
                     break;
             }
@@ -458,7 +518,11 @@ namespace Stealth.EditorTools
                 var ob = BoundsOf(AssetDatabase.LoadAssetAtPath<GameObject>(ourPath), skipGlow: true);
                 var nb = BoundsOf(prefab);
                 // modelled to our model's size: only a small correction, never noticeably larger than the original
-                var s = new Vector3(Mathf.Min(1.05f, ob.size.x / nb.size.x), Mathf.Min(1.05f, ob.size.y / nb.size.y), Mathf.Min(1.05f, ob.size.z / nb.size.z));
+                // ...but never squashed in height: a derelict desk or table is taller than ours only by what stands on it
+                // (a CRT, binders), and it is built to the game's heights (derelict_props.DESK_TOP_NEW) — squashing it
+                // lowered the desk top to 0.6 m and flattened the monitor
+                float sy = nb.size.y > ob.size.y * 1.05f ? 1f : Mathf.Min(1.05f, ob.size.y / nb.size.y);
+                var s = new Vector3(Mathf.Min(1.05f, ob.size.x / nb.size.x), sy, Mathf.Min(1.05f, ob.size.z / nb.size.z));
                 var pos = new Vector3(ob.center.x - nb.center.x * s.x, ob.min.y - nb.min.y * s.y, ob.center.z - nb.center.z * s.z);
                 bool ownScreens = prefab.GetComponentsInChildren<MeshRenderer>(true).Any(r => r.name.StartsWith("Screen") || r.name.StartsWith("Glass"));
                 list.Add(new PropReplacement { Family = ModelFamily.Derelict, Key = key, Prefab = prefab, Position = pos, Scale = s, HideGlow = ownScreens });
