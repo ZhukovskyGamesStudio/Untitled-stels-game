@@ -45,6 +45,8 @@ namespace Stealth.Level
         public int Depth;
         /// <summary>The apartment block: the flat the room belongs to (−1: the landing, the stairs, any room of another house).</summary>
         public int Flat = -1;
+        /// <summary>Its type is decided for a reason of its own (the exit hatch's wet room): rule enforcement and zoning leave it.</summary>
+        public bool Kept;
     }
 
     /// <summary>

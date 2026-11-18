@@ -73,7 +73,7 @@ namespace Stealth.Level
                 var w = plan.Walls[o.Wall];
                 if (o.Kind != EdgeType.Door || w.Exterior || (w.RoomA != room && w.RoomB != room) || i == l.VaultDoorway) continue;
                 var behind = new HashSet<int>(all);
-                behind.ExceptWith(HouseFeatures.Reach(plan, l.Stairs, l.LobbyRoom, true, i));
+                behind.ExceptWith(new RoomGraph(plan, l.Stairs, Passage.Players).Reach(l.LobbyRoom, i));
                 if (behind.Count == 1 && behind.Contains(room)) return i;
             }
             return -1;
@@ -82,8 +82,8 @@ namespace Stealth.Level
         static bool Fits(LevelLayout l, PlanRoom r, in RoomRule rule)
         {
             if (r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Id == l.VaultRoom || r.Levels != 1) return false;
-            if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) return false;
-            if (l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id == r.Id) return false;
+            if (RoomTraits.Circulation(r.Type)) return false;
+            if (l.ExitRoom == r.Id) return false;
             foreach (var st in l.Stairs) if (st.Room == r.Id || st.RoomAbove == r.Id) return false;
             float aspect = Mathf.Max(r.Bounds.width, r.Bounds.height) / Mathf.Max(0.5f, Mathf.Min(r.Bounds.width, r.Bounds.height));
             return RoomRules.Fits(rule, r.Area, aspect, float.MaxValue, upTo: false);
@@ -97,18 +97,9 @@ namespace Stealth.Level
         public static void Finish(LevelLayout l, FeatureSettings s)
         {
             if (l.StorageRoom < 0 || s == null) return;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x5702, 1));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.StorageRoom, 1));
             var d = l.Doorways[l.StorageDoorway];
-            int door = -1;
-            for (int k = 0; k < l.AutoDoors.Count; k++)
-                if ((l.AutoDoors[k].position - d.Position).sqrMagnitude < 0.1f) { door = k; break; }
-            if (door < 0)
-            {
-                l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
-                door = l.AutoDoors.Count - 1;
-            }
-            l.LockedDoors.Remove(door);
-            l.LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
+            int door = l.EnsureDoor(d);
             l.StorageDoor = door;
 
             // the pile: open floor in the room's middle
@@ -128,7 +119,7 @@ namespace Stealth.Level
                 if (p.Kind is not (PropKind.Desk or PropKind.WorkTable or PropKind.ExecutiveDesk or PropKind.Credenza or PropKind.ToolChest or PropKind.Cabinet) || l.IsClimbPiece(p.Position)) continue; // (no lamp on it: LevelGenerator.LampOn) // (a shop has few desks: a bench of the workshop)
                 if (l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == room.Id) continue;
                 if (LevelGenerator.LampOn(l, i)) continue;
-                if ((p.Position - l.HatchPosition).magnitude <= 7.5f) continue; // like the other terminals: not in the lobby
+                if ((p.Position - l.HatchPosition).magnitude <= LevelGenerator.HatchClear) continue; // like the other terminals: not in the lobby
                 float dist = (p.Position - d.Position).magnitude + Mathf.Abs(p.Position.y - d.Position.y) * 2f;
                 // far enough: any of them (by chance); none far enough: the farthest
                 float score = dist >= s.StorageTerminalDistance ? 1000f + (float)rng.NextDouble() * 100f : dist;

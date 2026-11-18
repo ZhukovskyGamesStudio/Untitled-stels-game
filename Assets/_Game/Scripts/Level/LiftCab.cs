@@ -21,9 +21,6 @@ namespace Stealth.Level
 
         /// <summary>The cab of this house, or null (no lift).</summary>
         public static LiftCab Current { get; private set; }
-        /// <summary>The lift's state and the server's clock (set by the game; without it: parked on the ground floor).</summary>
-        public static System.Func<LiftState> State = () => LiftState.ParkedAt(0);
-        public static System.Func<double> Now = () => Time.timeAsDouble;
 
         static float FloorTime => Configs.Tuning.Level.Building.LiftFloorTime;
         static float DoorTime => Configs.Tuning.Level.Building.LiftDoorTime;
@@ -43,7 +40,7 @@ namespace Stealth.Level
         }
 
         /// <summary>The cab's floor height above the ground floor now, metres.</summary>
-        public float CabHeight => LiftRules.CabFloor(State(), Now(), FloorTime, DoorTime) * LevelMetrics.FloorHeight;
+        public float CabHeight => LiftRules.CabFloor(World.State.Lift, World.State.Now, FloorTime, DoorTime) * LevelMetrics.FloorHeight;
 
         /// <summary>A point inside the cab (on its floor, under its ceiling).</summary>
         public bool Holds(Vector3 p)
@@ -57,8 +54,8 @@ namespace Stealth.Level
         public static float CarryAt(Vector3 p, float dt)
         {
             if (Current == null || !Current.Holds(p)) return 0f;
-            double now = Now();
-            return LiftRules.Carry(State(), now - dt, now, FloorTime, DoorTime);
+            double now = World.State.Now;
+            return LiftRules.Carry(World.State.Lift, now - dt, now, FloorTime, DoorTime);
         }
 
         void OnEnable() => Current = this;

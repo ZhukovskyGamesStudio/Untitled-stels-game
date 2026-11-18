@@ -126,7 +126,7 @@ namespace Stealth.Game
         Car SpawnBasementCarServer(LevelLayout layout, bool rolling)
         {
             DespawnCarServer();
-            if (CarPrefab == null || layout == null || !layout.HasBasement) return null;
+            if (CarPrefab == null || layout == null) return null;
             var pose = rolling ? Basement.RollPose(layout.Cellar, Basement.RollTime, out _) : Basement.CarPose(layout.Cellar);
             m_Car = Session.Spawn(CarPrefab, pose.position, pose.rotation);
             return m_Car != null ? m_Car.GetComponent<Car>() : null;
@@ -141,7 +141,7 @@ namespace Stealth.Game
             pose = default;
             speed = 0f;
             var l = ActiveLevel.Layout;
-            if (DriveUntil <= 0 || ArriveAt <= 0 || Phase != RunPhase.Playing || l == null || !l.HasBasement) return false;
+            if (DriveUntil <= 0 || ArriveAt <= 0 || Phase != RunPhase.Playing || l == null) return false;
             pose = Basement.RollPose(l.Cellar, (float)(ArriveAt - Session.ServerTime), out speed);
             return true;
         }

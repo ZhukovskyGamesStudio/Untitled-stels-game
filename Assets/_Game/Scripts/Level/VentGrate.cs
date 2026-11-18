@@ -30,11 +30,9 @@ namespace Stealth.Level
         /// <summary>Its lid was screwed shut when the house was built.</summary>
         public bool Closed { get; private set; }
 
-        /// <summary>A shut lid taken off (set by the game: the server's word, by the grate's index).</summary>
-        public static System.Func<int, bool> IsUnscrewed = _ => false;
 
         /// <summary>Open: never shut, or its lid taken off with a screwdriver.</summary>
-        public bool Open => !Closed || IsUnscrewed(Index);
+        public bool Open => !Closed || World.IsOpened(OpenKeys.Vent(Index));
 
         /// <summary>Only a shut grate is used (E with a screwdriver in hand): an open one is climbed through, no key.</summary>
         public override bool Usable(PlayerController player) => !Open;
@@ -92,7 +90,7 @@ namespace Stealth.Level
             return null;
         }
 
-        float m_Open;
+        OpenTween m_Open;
 
         void Update()
         {
@@ -101,8 +99,8 @@ namespace Stealth.Level
             // open: a hole (nothing to stand on); shut: floor in the duct, ceiling below
             if (m_Floor != null && m_Floor.enabled == open) m_Floor.enabled = !open;
             if (Lid == null) return;
-            m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime * 3f);
-            Lid.localRotation = Quaternion.Euler(m_Open * 85f, 0f, 0f);
+            m_Open.Step(open, Time.deltaTime, 1f / 3f);
+            Lid.localRotation = Quaternion.Euler(m_Open.Value * 85f, 0f, 0f);
         }
     }
 }

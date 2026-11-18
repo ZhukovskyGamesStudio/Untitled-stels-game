@@ -24,6 +24,19 @@ namespace Stealth.Net
         {
             if (!EqualityComparer<T>.Default.Equals(variable.Value, value)) variable.Value = value;
         }
+
+        /// <summary>
+        /// Resends a whole list when its source changed (its <paramref name="version"/> is not the one last pushed): cleared
+        /// and filled again from <paramref name="items"/>.
+        /// </summary>
+        public static void SetList<TItem, TNet>(NetworkList<TNet> list, ref int pushed, int version, IEnumerable<TItem> items, Func<TItem, TNet> convert)
+            where TNet : unmanaged, IEquatable<TNet>
+        {
+            if (pushed == version) return;
+            pushed = version;
+            list.Clear();
+            foreach (var item in items) list.Add(convert(item));
+        }
     }
 
     /// <summary><see cref="ISessionBackend"/> on top of Netcode for GameObjects.</summary>

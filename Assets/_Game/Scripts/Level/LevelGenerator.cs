@@ -318,7 +318,7 @@ namespace Stealth.Level
     public static class LevelGenerator
     {
         /// <summary>Where generation time goes (milliseconds, summed over calls): for tuning, not for the game.</summary>
-        public static class Timing { public static long Plan, Check, Furnish, Walk, Grid, Flood, Reach, Barrier, Rounds; public static void Reset() => Plan = Check = Furnish = Walk = Grid = Flood = Reach = Barrier = Rounds = 0; }
+        public static class Timing { [System.ThreadStatic] public static long Plan, Check, Furnish, Walk, Grid, Flood, Reach, Barrier, Rounds; public static void Reset() => Plan = Check = Furnish = Walk = Grid = Flood = Reach = Barrier = Rounds = 0; }
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
         /// <summary>
@@ -352,7 +352,7 @@ namespace Stealth.Level
             // then laid out to hold them. A storage room (it brings the workers) is decided here, from the house's own stream.
             float roomArea = building.RoomsFor(levelIndex, players) * 100f * PlanGenerator.RoomShareOfArea;
             bool storage = building.EveryRoomType || (features.StorageChance > 0f && levelIndex >= features.StorageFromHouse
-                && new System.Random(LevelRandom.Mix(seed, 0x5702, 0)).NextDouble() < features.StorageChance);
+                && new System.Random(LevelRandom.Mix(seed, Salt.StorageRoom, 0)).NextDouble() < features.StorageChance);
             // Generate and check: a plan where some room cannot be walked to (a doorway that did not fit, a sealed
             // corner) is thrown away and the next variant of the same house is drawn (deterministic: attempt by attempt).
             LevelLayout l = null;
@@ -361,7 +361,7 @@ namespace Stealth.Level
             int attempts = building.HasRoomLimits ? 64 : 16;
             for (int attempt = 0; attempt < attempts; attempt++)
             {
-                int planSeed = attempt == 0 ? seed : LevelRandom.Mix(seed, 0xBAD, attempt);
+                int planSeed = attempt == 0 ? seed : LevelRandom.Mix(seed, Salt.PlanAttempt, attempt);
                 var o = classic
                     ? PlanGenerator.GenerateClassic(planSeed, levelIndex, floors, building.RoomsFor(levelIndex, players) * 100f, building)
                     : PlanGenerator.Generate(planSeed, levelIndex, floors, RoomProgram.Make(planSeed, floors, roomArea, building, storage), building);
@@ -376,6 +376,7 @@ namespace Stealth.Level
                     LobbyRoom = o.Lobby,
                     Mass = o.Mass,
                     Kind = kind,
+                    OwnPlan = building.Garage || building.Hospital || building.Apartments,
                     PlanAttempt = attempt,
                 };
                 l.Stairs.AddRange(o.Stairs);
@@ -424,7 +425,7 @@ namespace Stealth.Level
             var lobby = l.Lobby;
             l.HatchPosition = EntryHatch(l);
             var entryRoom = l.Plan.RoomAt(l.HatchPosition + Vector3.up * 0.3f) ?? lobby;
-            var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, 0xF0E, 0)));
+            var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, Salt.Furniture, 0)));
             if (checker != null) furnisher.ShareWalk(checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
             // the shaft down to the basement the team arrives in (Basement): its lid where the entry hatch was, in the plant
@@ -432,11 +433,13 @@ namespace Stealth.Level
             // (the lid's hinge away from the side a climber steps off to; the basement's tunnel runs under the house)
             l.ShaftExit = ShaftExit(l.HatchPosition, entryRoom.Center);
             furnisher.Put(entryRoom, PropKind.ShaftHatch, l.HatchPosition, Mathf.Atan2(l.ShaftExit.x, l.ShaftExit.z) * Mathf.Rad2Deg);
-            l.HasBasement = true;
             l.BasementYaw = Basement.YawUnder(l.HatchPosition, new Rect(0f, 0f, l.SizeX, l.SizeZ));
             l.BasementOrigin = Basement.Frame(l.HatchPosition, l.BasementYaw).Origin;
             l.EntryHatch = Basement.StashSpot(l.Cellar); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
+            exit.Kept = exit.Id != l.LobbyRoom; // the wet room it was chosen for stays one
+            l.ExitRoom = exit.Id;
+            l.EntryRoom = entryRoom.Id;
             l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
@@ -457,7 +460,7 @@ namespace Stealth.Level
             StorageRooms.Plan(l, features, storage);
             EnsureControlRoom(l, building);
             // the robots' charging room: a tech room they took over (every house has one; the guards rest there)
-            if (!building.EveryRoomType) ChargingRooms.Convert(l, l.ExitHatchPosition); // (the rooms test keeps every type)
+            if (!building.EveryRoomType) ChargingRooms.Convert(l); // (the rooms test keeps every type)
 
             // the crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
             // within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to)
@@ -482,7 +485,11 @@ namespace Stealth.Level
                 PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
                 PlaceTerminals(l, security);
             }
-            else IdleConsoles(l);
+            else
+            {
+                IdleConsoles(l);
+                OwnDoors(l); // a quiet house (the rooms test) still has its flats' and bathrooms' doors
+            }
             StorageRooms.Finish(l, features);
             HouseFeatures.KeyDoors(l, features);
             HouseFeatures.Crates(l, features);
@@ -508,7 +515,7 @@ namespace Stealth.Level
         static void RaiseVents(LevelLayout l, BuildingSettings b)
         {
             var plan = l.Plan;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x4856, l.PlanAttempt));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.RaisedVents, l.PlanAttempt));
             for (int i = 0; i < plan.Openings.Count; i++)
             {
                 var o = plan.Openings[i];
@@ -593,22 +600,21 @@ namespace Stealth.Level
         static PlanRoom ExitRoom(LevelLayout l)
         {
             // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
-            var reach = VoidReach(l, l.LobbyRoom);
-            if (l.Kind == HouseKind.Garage)
+            var reach = VentPlan.VoidReach(l, l.LobbyRoom);
+            if (l.PlanKind == HouseKind.Garage)
                 foreach (var r in l.Rooms)
-                    if (r.Type == RoomType.Workshop && r.Floor == 0 && Ducted(l, r, reach)) return r;
+                    if (r.Type == RoomType.Workshop && r.Floor == 0 && VentPlan.CanReach(l, r, reach)) return r;
             PlanRoom best = null, wet = null;
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
             {
-                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Type is RoomType.Corridor or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility or RoomType.Operating or RoomType.Imaging
-                    or RoomType.NurseStation || r.Area < 10f) continue; // (the booth: its car; the theatres, imaging and the station: their equipment)
+                if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || RoomTraits.FloorTaken(r.Type) || r.Area < 10f) continue; // (the booth: its car; the theatres, imaging and the station: their equipment)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
                 if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;
-                if (!Ducted(l, r, reach)) continue;
+                if (!VentPlan.CanReach(l, r, reach)) continue;
                 if (d > far) { far = d; best = r; }
-                if (r.Type is RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom && d > farWet) { farWet = d; wet = r; }
+                if (RoomTraits.Wet(r.Type) && r.Type != RoomType.Bathroom && d > farWet) { farWet = d; wet = r; }
             }
             if (wet != null && farWet >= far * 0.6f && farWet > 8.5f) return wet;
             return best ?? l.Lobby;
@@ -717,68 +723,6 @@ namespace Stealth.Level
             return false;
         }
 
-        /// <summary>
-        /// The duct cells of the ground floor's void a duct from <paramref name="room"/> can get to (a double-height hall or a
-        /// stair hole may cut the void in parts): the exit room must be in the lobby's part.
-        /// </summary>
-        static HashSet<Vector2Int> VoidReach(LevelLayout l, int room)
-        {
-            var seen = new HashSet<Vector2Int>();
-            var queue = new Queue<Vector2Int>();
-            int nx = l.Plan.NX / 2, nz = l.Plan.NZ / 2;
-            for (int x = 0; x < nx; x++)
-                for (int z = 0; z < nz; z++)
-                {
-                    var c = new Vector2Int(x, z);
-                    if (l.Plan.SpaceAt(0, new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) == room && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
-                }
-            if (seen.Count == 0)
-            {
-                // an atrium lobby has no ceiling: the ducts start from the rooms around it (VentPlan.Arrival)
-                var around = l.Plan.Rooms[room].Bounds;
-                around.min -= Vector2.one * 3f;
-                around.max += Vector2.one * 3f;
-                for (int x = 0; x < nx; x++)
-                    for (int z = 0; z < nz; z++)
-                    {
-                        var c = new Vector2Int(x, z);
-                        if (around.Contains(new Vector2((x + 0.5f) * VentPlan.Res, (z + 0.5f) * VentPlan.Res)) && VentPlan.Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
-                    }
-            }
-            var dirs = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
-            while (queue.Count > 0)
-            {
-                var c = queue.Dequeue();
-                foreach (var d in dirs)
-                {
-                    var n = c + d;
-                    if (n.x < 0 || n.y < 0 || n.x >= nx || n.y >= nz || seen.Contains(n) || !VentPlan.Allowed(l, 0, n)) continue;
-                    seen.Add(n);
-                    queue.Enqueue(n);
-                }
-            }
-            return seen;
-        }
-
-        /// <summary>A duct can come down into the room: one storey high, and some cell of it has the void over it.</summary>
-        static bool Ducted(LevelLayout l, PlanRoom r, HashSet<Vector2Int> reach)
-        {
-            if (r.Levels != 1) return false;
-            var b = r.Bounds;
-            for (int x = Mathf.FloorToInt(b.xMin / VentPlan.Res); x * VentPlan.Res < b.xMax; x++)
-                for (int z = Mathf.FloorToInt(b.yMin / VentPlan.Res); z * VentPlan.Res < b.yMax; z++)
-                {
-                    var c = new Vector2Int(x, z);
-                    if (!reach.Contains(c)) continue;
-                    bool own = true;
-                    for (int px = x * 2; px <= x * 2 + 1 && own; px++)
-                        for (int pz = z * 2; pz <= z * 2 + 1 && own; pz++)
-                            own = l.Plan.SpaceAt(r.Floor, HousePlan.CellCenter(px, pz)) == r.Id;
-                    if (own) return true;
-                }
-            return false;
-        }
-
         /// <summary>Patrol points: the middle of every room, and in big rooms the middles of the parts they were made of.</summary>
         static void Patrols(LevelLayout l)
         {
@@ -832,6 +776,11 @@ namespace Stealth.Level
 
         /// <summary>Fixed devices keep this far from the hatch on the ground floor (players start there).</summary>
         const float MinDeviceDistanceToHatch = 12.5f;
+        /// <summary>
+        /// Round the shaft the team climbs up by: no locked door, laser, terminal or spare desk this close (the way in stays
+        /// open), and no camera over the team's heads this close.
+        /// </summary>
+        public const float HatchClear = 7.5f, HatchUnwatched = 9f;
 
         /// <summary>A random free point of a room near its middle (on its floor, not on a staircase).</summary>
         static Vector3 SpotIn(LevelLayout l, PlanRoom r, System.Random rng, float spread)
@@ -907,7 +856,7 @@ namespace Stealth.Level
             foreach (var w in b.RoomWeights) wanted |= w.Room == RoomType.ControlRoom && w.Weight > 0;
             if (!wanted) return;
             foreach (var r in l.Rooms) if (r.Type == RoomType.ControlRoom) return;
-            int exit = l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            int exit = l.ExitRoom;
             PlanRoom best = null;
             foreach (var r in l.Rooms)
             {
@@ -942,8 +891,8 @@ namespace Stealth.Level
                 if (l.Props[i].Kind == PropKind.Terminal && !l.Terminals.Exists(t => t.prop == i) && !consoles.Contains(i)) leftover.Add(i);
             var desks = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
-                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > 7.5f && !LampOn(l, i) && !l.IsClimbPiece(l.Props[i].Position)) desks.Add(i);
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E41, 0));
+                if (l.Props[i].Kind == PropKind.Desk && (l.Props[i].Position - l.HatchPosition).magnitude > HatchClear && !LampOn(l, i) && !l.IsClimbPiece(l.Props[i].Position)) desks.Add(i);
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Terminals, 0));
             var want = new List<TerminalKind>();
             // the hacking terminal first: with a single console in the control room, it is the one there
             for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
@@ -1110,7 +1059,7 @@ namespace Stealth.Level
                 var room = candidates[rng.Next(candidates.Count)];
                 if (!used.Add(room.Id)) { i--; continue; }
                 var (c, inward) = CornerOf(l, room, rng, 0.45f);
-                if (room.Floor == 0 && Vector3.Distance(c, l.HatchPosition) < 9f) continue; // not over the team's heads
+                if (room.Floor == 0 && Vector3.Distance(c, l.HatchPosition) < HatchUnwatched) continue; // not over the team's heads
                 var pos = c + Vector3.up * (WallHeight - 0.3f);
                 l.CameraSpots.Add(new Pose(pos, Quaternion.LookRotation(inward)));
             }
@@ -1121,7 +1070,7 @@ namespace Stealth.Level
                 int idx = rng.Next(doors.Count);
                 var spot = doors[idx];
                 doors.RemoveAt(idx);
-                if ((spot.Position - l.HatchPosition).magnitude < 7.5f) continue; // keep the lobby doorways free
+                if ((spot.Position - l.HatchPosition).magnitude < HatchClear) continue; // keep the lobby doorways free
                 spot.Kind = (LaserPattern)rng.Next(level >= s.MovingLasersFromHouse ? 3 : 2);
                 l.LaserSpots.Add(spot);
             }
@@ -1129,24 +1078,30 @@ namespace Stealth.Level
             // a flat's entry, a bathroom, a toilet, a bedroom and the plant room always have theirs.
             foreach (var d in doors)
                 if (rng.NextDouble() < DoorRules.Chance(l, DoorRules.DoorwayAt(l, d.Position), b.AutoDoorChance)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
-            foreach (var d in l.Doorways)
-                if (DoorRules.Always(l, d)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
-            // the paint booth's sliding door (wide enough for a car), never locked
-            if (l.BoothDoorway >= 0)
-            {
-                var bd = l.Doorways[l.BoothDoorway];
-                l.BoothDoor = l.AutoDoors.Count;
-                l.AutoDoors.Add(new Pose(bd.Position, bd.Rotation));
-            }
+            OwnDoors(l);
 
             // Some of them are locked (own stream: the rest of the house does not shift). Never next to the lobby.
             if (level < b.LockedDoorsFromHouse) return;
-            var locks = new System.Random(LevelRandom.Mix(l.Seed, 0x10C4, 0));
+            var locks = new System.Random(LevelRandom.Mix(l.Seed, Salt.Locks, 0));
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
-                bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < 7.5f;
+                bool lobby = (l.AutoDoors[i].position - l.HatchPosition).magnitude < HatchClear;
                 if (locks.NextDouble() < b.LockedDoorChance && !lobby && i != l.BoothDoor) l.LockedDoors.Add(i);
             }
+        }
+
+        /// <summary>
+        /// The doors every house has, guarded or not: a flat's entry, a bathroom, a toilet, a bedroom, the plant room
+        /// (<see cref="DoorRules.Always"/>), and the paint booth's sliding door (wide enough for a car, never locked).
+        /// </summary>
+        static void OwnDoors(LevelLayout l)
+        {
+            foreach (var d in l.Doorways)
+                if (DoorRules.Always(l, d)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+            if (l.BoothDoorway < 0) return;
+            var bd = l.Doorways[l.BoothDoorway];
+            l.BoothDoor = l.AutoDoors.Count;
+            l.AutoDoors.Add(new Pose(bd.Position, bd.Rotation));
         }
 
         /// <summary>

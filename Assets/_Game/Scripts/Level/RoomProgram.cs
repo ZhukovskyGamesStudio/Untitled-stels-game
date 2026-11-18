@@ -58,7 +58,7 @@ namespace Stealth.Level
         public static RoomProgram Make(int seed, int floors, float roomArea, BuildingSettings b, bool storage)
         {
             var p = new RoomProgram(floors);
-            var rng = new System.Random(LevelRandom.Mix(seed, 0x9206, 0));
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.Program, 0));
             var rules = b.RoomTypeRules;
             int next = 0;
             var house = new Dictionary<RoomType, int>();

@@ -48,7 +48,7 @@ namespace Stealth.Level
         }
 
         /// <summary>Capped and zoned (an atrium is capped too, but keeps its place: its type was chosen for the void).</summary>
-        static bool Movable(PlanRoom r) => r.Type is not (RoomType.Lobby or RoomType.Hall or RoomType.Corridor or RoomType.Storage)
+        static bool Movable(PlanRoom r) => !r.Kept && r.Type is not (RoomType.Lobby or RoomType.Hall or RoomType.Corridor or RoomType.Storage)
             && !RoomRules.Planned(r.Type); // the locations' own rooms: laid out where they belong
 
         /// <summary>The room touches a stair hall or lies close to a staircase on its floor.</summary>
@@ -142,7 +142,7 @@ namespace Stealth.Level
             // the rooms that keep their type (an atrium) count first: the movable ones make way for them
             foreach (var r in plan.Rooms)
             {
-                if (info.ContainsKey(r.Id) || r.Type is RoomType.Lobby or RoomType.Hall or RoomType.Corridor) continue;
+                if (info.ContainsKey(r.Id) || RoomTraits.Circulation(r.Type)) continue;
                 house[r.Type] = (house.TryGetValue(r.Type, out var hk) ? hk : 0) + 1;
                 floor[(r.Floor, r.Type)] = (floor.TryGetValue((r.Floor, r.Type), out var fk) ? fk : 0) + 1;
             }

@@ -41,6 +41,9 @@ namespace Stealth.Player
 
         readonly List<InventoryEntry> m_Items = new();
         IInventoryLink m_Link;
+        IInventoryLink m_Offline;
+        /// <summary>Where the owner's requests go: the network twin, or (no twin) straight to the server side.</summary>
+        IInventoryLink Link => m_Link ?? (m_Offline ??= new OfflineInventoryLink(this));
         PlayerController m_Player;
 
         public IReadOnlyList<InventoryEntry> Items => m_Items;
@@ -192,14 +195,12 @@ namespace Stealth.Player
 
         public void RequestPickup(WorldItem item, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestPickup(item, x, y, rot);
-            else PickupServer(item, x, y, rot);
+            Link.RequestPickup(item, x, y, rot);
         }
 
         public void RequestTakeCargo(Vehicles.CargoItem item, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestTakeCargo(item.Pack(), x, y, rot);
-            else TakeCargoServer(item, x, y, rot);
+            Link.RequestTakeCargo(item.Pack(), x, y, rot);
         }
 
         /// <summary>Server: a thing from the car's bed into this cell (standing at the car in the sewer).</summary>
@@ -219,83 +220,70 @@ namespace Stealth.Player
 
         public void RequestMove(int index, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestMove(index, x, y, rot);
-            else MoveServer(index, x, y, rot);
+            Link.RequestMove(index, x, y, rot);
         }
 
         public void RequestDrop(int index, Vector3 position, float yaw)
         {
-            if (m_Link != null) m_Link.RequestDrop(index, position, yaw);
-            else DropServer(index, position, yaw);
+            Link.RequestDrop(index, position, yaw);
         }
 
         public void RequestDeposit(int index)
         {
-            if (m_Link != null) m_Link.RequestDeposit(index);
-            else DepositServer(index);
+            Link.RequestDeposit(index);
         }
 
         public void RequestStash(int index, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestStash(index, x, y, rot);
-            else StashServer(index, x, y, rot);
+            Link.RequestStash(index, x, y, rot);
         }
 
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestUnstash(from, x, y, rot);
-            else UnstashServer(from, x, y, rot);
+            Link.RequestUnstash(from, x, y, rot);
         }
 
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestStashMove(from, x, y, rot);
-            else StashMoveServer(from, x, y, rot);
+            Link.RequestStashMove(from, x, y, rot);
         }
 
         public void RequestSellStashed(InventoryEntry from)
         {
-            if (m_Link != null) m_Link.RequestSellStashed(from);
-            else SellStashedServer(from);
+            Link.RequestSellStashed(from);
         }
 
         public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot)
         {
-            if (m_Link != null) m_Link.RequestStashWorld(item, x, y, rot);
-            else StashWorldServer(item, x, y, rot);
+            Link.RequestStashWorld(item, x, y, rot);
         }
 
         public void RequestSellWorld(WorldItem item)
         {
-            if (m_Link != null) m_Link.RequestSellWorld(item);
-            else SellWorldServer(item);
+            Link.RequestSellWorld(item);
         }
 
         public void RequestStashAll()
         {
-            if (m_Link != null) m_Link.RequestStashAll();
-            else StashAllServer();
+            Link.RequestStashAll();
         }
 
         /// <summary>A battery from the backpack onto a flashlight: the flashlight is full again, the battery is used up.</summary>
         public void RequestRecharge(int battery, int flashlight)
         {
-            if (m_Link != null) m_Link.RequestRecharge(battery, flashlight);
-            else RechargeServer(battery, flashlight);
+            Link.RequestRecharge(battery, flashlight);
         }
 
         /// <summary>A battery lying in the world dragged onto a flashlight.</summary>
         public void RequestRechargeWorld(WorldItem battery, int flashlight)
         {
-            if (m_Link != null) m_Link.RequestRechargeWorld(battery, flashlight);
-            else RechargeWorldServer(battery, flashlight);
+            Link.RequestRechargeWorld(battery, flashlight);
         }
 
         /// <summary>An item of the team stash dropped into the world (like from the backpack).</summary>
         public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw)
         {
-            if (m_Link != null) m_Link.RequestDropStashed(from, position, yaw);
-            else DropStashedServer(from, position, yaw);
+            Link.RequestDropStashed(from, position, yaw);
         }
 
         // ------------------------------------------------------------------ server
@@ -307,7 +295,7 @@ namespace Stealth.Player
         public void PickupServer(WorldItem item, byte x, byte y, byte rot)
         {
             if (!CanAct || item == null) return;
-            if ((item.transform.position - transform.position).magnitude > ReachDistance + 1.5f) return;
+            if (!ServerReach.Within(transform.position, item.transform.position, ReachDistance)) return;
             // a belt bag is put on (its belt's grid appears), wherever it was dropped in the backpack
             if (item.Shape == ItemCatalog.BeltBag && !HasBelt) { x = WornX; y = 0; rot = 0; }
             if (!CanPlace(item.Shape, rot, x, y)) return;
@@ -332,7 +320,7 @@ namespace Stealth.Player
         public void DropServer(int index, Vector3 position, float yaw)
         {
             if (index < 0 || index >= m_Items.Count || Locked(index)) return;
-            if ((position - transform.position).magnitude > ReachDistance + 1.5f)
+            if (!ServerReach.Within(transform.position, position, ReachDistance))
                 position = transform.position + transform.forward * 0.8f;
             var e = m_Items[index];
             m_Items.RemoveAt(index);
@@ -401,7 +389,7 @@ namespace Stealth.Player
         public void DropStashedServer(InventoryEntry from, Vector3 position, float yaw)
         {
             if (!AtHatch(out var stash) || stash.IndexOf(from) < 0) return;
-            if ((position - transform.position).magnitude > ReachDistance + 1.5f)
+            if (!ServerReach.Within(transform.position, position, ReachDistance))
                 position = transform.position + transform.forward * 0.8f;
             stash.Take(from);
             GameManager.Instance?.SpawnItemServer(from.Shape, from.Color, position, yaw);
@@ -431,7 +419,7 @@ namespace Stealth.Player
             return fuel;
         }
 
-        bool InReach(WorldItem item) => item != null && (item.transform.position - transform.position).magnitude <= ReachDistance + 1.5f;
+        bool InReach(WorldItem item) => item != null && ServerReach.Within(transform.position, item.transform.position, ReachDistance);
 
         public void StashServer(int index, byte x, byte y, byte rot)
         {

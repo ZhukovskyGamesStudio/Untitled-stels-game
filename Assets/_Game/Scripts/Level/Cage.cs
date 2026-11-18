@@ -17,14 +17,12 @@ namespace Stealth.Level
         [Tooltip("The person inside (gone once freed).")]
         public GameObject Hostage;
 
-        /// <summary>Which cages are open (set by the game; by prop index).</summary>
-        public static System.Func<int, bool> IsFreed = _ => false;
 
         public override UseKind Kind => UseKind.Cage;
         public override float Reach => 2.2f;
         public override Vector3 Point => transform.position + transform.forward * (HouseFeatures.CageSize / 2f + 0.05f) + Vector3.up * 1.1f;
         public override float AimRadius => 0.8f;
-        public bool Freed => Index >= 0 && IsFreed(Index);
+        public bool Freed => Index >= 0 && World.IsOpened(OpenKeys.CageOpen(Index));
 
         /// <summary>The key works only from the hand.</summary>
         public static bool HasKey(PlayerController player) =>

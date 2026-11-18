@@ -840,7 +840,7 @@ namespace Stealth.Level
             {
                 if (x < 0 || z < 0 || x >= nx || z >= nz) return false;
                 int o = owner[x, z];
-                return o >= 0 && o < regions.Count && regions[o].Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby;
+                return o >= 0 && o < regions.Count && RoomTraits.Circulation(regions[o].Type);
             }
             int w = 0, e = 0, s = 0, n = 0;
             for (int z = r.yMin; z < r.yMax; z++) { if (Circ(r.xMin - 1, z)) w++; if (Circ(r.xMax, z)) e++; }
@@ -1766,7 +1766,7 @@ namespace Stealth.Level
             return w > 0f ? EdgeType.InnerWindow : EdgeType.Door;
         }
 
-        static bool IsCirculation(HousePlan plan, int room) => plan.Rooms[room].Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby;
+        static bool IsCirculation(HousePlan plan, int room) => RoomTraits.Circulation(plan.Rooms[room].Type);
 
         static void Link(Dictionary<int, List<int>> links, int a, int b)
         {
@@ -1795,9 +1795,7 @@ namespace Stealth.Level
 
         static bool IsStorage(HousePlan plan, (int, int) key) => OneDoor(plan.Rooms[key.Item1].Type) || OneDoor(plan.Rooms[key.Item2].Type);
 
-        /// <summary>A room with a single door, a dead end: the storage room (it is locked), the shop's paint booth (sealed).</summary>
-        static bool OneDoor(RoomType t) => t is RoomType.Storage or RoomType.PaintBooth or RoomType.Utility
-            or RoomType.Ward or RoomType.NurseStation or RoomType.Operating or RoomType.Imaging; // (the hospital's: one way in, off the corridor)
+        static bool OneDoor(RoomType t) => RoomTraits.OneDoor(t);
 
         /// <summary>The door a one-door room should have: the paint booth's into the workshop, the plant room's into the lobby.</summary>
         static bool OwnDoor(HousePlan plan, (int, int) key) =>

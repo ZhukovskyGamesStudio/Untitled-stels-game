@@ -162,9 +162,7 @@ namespace Stealth.Level
             // (with a hole where the shaft goes down to the basement: four pieces round it)
             float gy = CityPlan.RoadTop - 0.06f;
             var ground = Rect.MinMaxRect(W / 2 - (W + far) / 2, H / 2 - (H + far) / 2, W / 2 + (W + far) / 2, H / 2 + (H + far) / 2);
-            var shaftHole = l.HasBasement
-                ? new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) }
-                : null;
+            var shaftHole = new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) };
             foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, shaftHole))
                 Block(m_Art.OutsideGround, "OutsideGround", new Vector3((a.x + b.x) / 2f, gy, (a.y + b.y) / 2f), new Vector3(b.x - a.x, 0.1f, b.y - a.y));
             // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
@@ -260,7 +258,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
-                if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, 0x7A21, i)); // its coats, its books
+                if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind);
@@ -315,7 +313,7 @@ namespace Stealth.Level
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
-            if (f == 0 && m_Layout.HasBasement) // the shaft down to the basement
+            if (f == 0) // the shaft down to the basement
                 holes.Add(new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
             bool Solid(int x, int z)
             {
@@ -368,7 +366,7 @@ namespace Stealth.Level
         /// </summary>
         void BuildBasement()
         {
-            if (!m_Layout.HasBasement || m_Art.Sewer == null) return;
+            if (m_Art.Sewer == null) return;
             var kit = m_Art.Sewer.GetComponent<SewerLocation>();
             if (kit == null || kit.Segments == null || kit.Segments.Length == 0) return;
             var frame = m_Layout.Cellar;
@@ -730,7 +728,7 @@ namespace Stealth.Level
                     var street = DoorRules.StreetKind(m_Layout);
                     var prefab = street.HasValue ? m_Art.Door(street.Value, false) : m_Art.ExteriorDoor;
                     var go = Place(prefab != null ? prefab : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
-                    if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, 0xD00E, index * 31 + cut.opening) & 1) == 1)
+                    if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, Salt.StreetDoors, index * 31 + cut.opening) & 1) == 1)
                         exit.HingeRight();
                 }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
@@ -915,7 +913,7 @@ namespace Stealth.Level
             Block(m_Art.RailingBlock, "Railing", centre, new Vector3(RailingThickness, RailingHeight, len), rot);
             int bays = Mathf.Max(1, Mathf.CeilToInt(len / 1.25f));
             var bayRot = Quaternion.LookRotation(Vector3.Cross(d, Vector3.up)); // local X along the railing
-            int seed = LevelRandom.Mix(m_Layout.Seed, 0x57A1, 7); // one look for every railing of the house
+            int seed = LevelRandom.Mix(m_Layout.Seed, Salt.Railings, 7); // one look for every railing of the house
             for (int i = 0; i < bays; i++)
             {
                 var go = Place(m_Art.RailingBay, "RailingBay", a + d * (len * (i + 0.5f) / bays), bayRot);
@@ -971,7 +969,7 @@ namespace Stealth.Level
             var go = Place(prefab, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
-                look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
+                look.Configure(LevelRandom.Mix(m_Layout.Seed, Salt.StairLooks, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
         }
 
         /// <summary>The house's services (<see cref="UtilityPlan"/>: ducts, pipes, panels, sockets): one mesh, a submesh per material.</summary>

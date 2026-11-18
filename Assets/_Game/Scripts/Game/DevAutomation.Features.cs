@@ -64,7 +64,7 @@ namespace Stealth.Game
                 yield return new WaitForSeconds(0.8f);
                 LookAtFrom(new Pose(Front(p, 2.0f), Quaternion.identity), p.Position + Vector3.up * 0.4f);
                 yield return new WaitForSeconds(0.3f);
-                Log($"crate: items {before} -> {WorldItem.All.Count}, searched {SearchCrate.IsSearched(c)}");
+                Log($"crate: items {before} -> {WorldItem.All.Count}, searched {World.IsOpened(OpenKeys.Crate(c))}");
                 yield return Shot("02_crate_searched");
             }
 

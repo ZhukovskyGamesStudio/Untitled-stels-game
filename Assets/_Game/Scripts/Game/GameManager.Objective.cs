@@ -16,12 +16,6 @@ namespace Stealth.Game
     /// </summary>
     public partial class GameManager
     {
-        public static int ConsoleKey(int console) => 5_000_000 + console;
-        public static int CageOpenKey(int prop) => 6_000_000 + prop;
-        /// <summary>Stages of the job (in <see cref="IsOpened"/>, replicated): the vault seen, somebody inside it; the hostage spoken to, its key in hand.</summary>
-        public const int VaultFoundKey = 9_000_001, VaultEnteredKey = 9_000_002, CageFoundKey = 9_000_003, CageKeyHeldKey = 9_000_004;
-        /// <summary>A player has opened the unlocked vault door (its wheel spun, it swung in).</summary>
-        public const int VaultOpenKey = 9_000_005;
 
         /// <summary>How long the hostage's pointing marks the guard with the key, seconds.</summary>
         const float KeyCarrierMark = 90f;
@@ -36,10 +30,10 @@ namespace Stealth.Game
                 return new UI.ObjectiveState
                 {
                     Kind = l.Objective,
-                    Found = l.Objective == ObjectiveKind.Vault ? IsOpened(VaultFoundKey) || VaultSolved > 0 : IsOpened(CageFoundKey),
+                    Found = l.Objective == ObjectiveKind.Vault ? IsOpened(OpenKeys.Stage(JobStage.VaultFound)) || VaultSolved > 0 : IsOpened(OpenKeys.Stage(JobStage.CageFound)),
                     Solved = VaultSolved,
                     Locks = l.VaultConsoles.Count,
-                    KeyHeld = IsOpened(CageKeyHeldKey),
+                    KeyHeld = IsOpened(OpenKeys.Stage(JobStage.CageKeyHeld)),
                     Done = ObjectiveDone,
                 };
             }
@@ -55,7 +49,7 @@ namespace Stealth.Game
                 var l = ActiveLevel.Layout;
                 if (l == null || l.Objective != ObjectiveKind.Vault) return 0;
                 int n = 0;
-                for (int i = 0; i < l.VaultConsoles.Count; i++) if (IsOpened(ConsoleKey(i))) n++;
+                for (int i = 0; i < l.VaultConsoles.Count; i++) if (IsOpened(OpenKeys.Console(i))) n++;
                 return n;
             }
         }
@@ -69,20 +63,13 @@ namespace Stealth.Game
                 if (l == null) return false;
                 return l.Objective switch
                 {
-                    ObjectiveKind.Vault => IsOpened(VaultEnteredKey),
-                    ObjectiveKind.Hostage => l.Cage >= 0 && IsOpened(CageOpenKey(l.Cage)),
+                    ObjectiveKind.Vault => IsOpened(OpenKeys.Stage(JobStage.VaultEntered)),
+                    ObjectiveKind.Hostage => l.Cage >= 0 && IsOpened(OpenKeys.CageOpen(l.Cage)),
                     _ => false,
                 };
             }
         }
 
-        void HookObjective()
-        {
-            VaultConsole.IsSolved = i => IsOpened(ConsoleKey(i));
-            VaultPanel.Solved = () => VaultSolved;
-            AutoDoor.IsSwungOpen = i => ActiveLevel.Layout != null && i >= 0 && i == ActiveLevel.Layout.VaultDoor && IsOpened(VaultOpenKey);
-            Cage.IsFreed = i => IsOpened(CageOpenKey(i));
-        }
 
         /// <summary>Server: the vault's treasure (not part of the quota: the job is optional); the cage's key if no robot carries it.</summary>
         void SpawnObjective(LevelLayout l)
@@ -91,7 +78,7 @@ namespace Stealth.Game
                 SpawnItemServer(ItemCatalog.CageKey, 4, l.CageKeySpot + Vector3.up * 0.05f, 0f); // no robot to carry it
             if (l.Objective != ObjectiveKind.Vault) return;
             var s = Objectives;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, 2));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.VaultTreasure, 2));
             for (int i = 0; i < Mathf.Min(s.VaultTreasure, l.VaultTreasure.Count); i++)
             {
                 byte shape = ItemCatalog.LootShape(rng);
@@ -112,8 +99,8 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Vault || console < 0 || console >= l.VaultConsoles.Count
-                || IsOpened(ConsoleKey(console))) return;
-            m_Opened.Add(ConsoleKey(console));
+                || IsOpened(OpenKeys.Console(console))) return;
+            m_Opened.Add(OpenKeys.Console(console));
             OpenedVersion++;
             int solved = VaultSolved;
             if (solved < l.VaultConsoles.Count)
@@ -121,7 +108,7 @@ namespace Stealth.Game
                 Banner(Loc.Pack("banner.vault_lock", player.Nick, solved, l.VaultConsoles.Count));
                 return;
             }
-            m_Opened.Add(DoorKey(l.VaultDoor));
+            m_Opened.Add(OpenKeys.Door(l.VaultDoor));
             OpenedVersion++;
             Banner(Loc.Pack("banner.vault_unlocked"));
         }
@@ -131,8 +118,8 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Vault || door != l.VaultDoor
-                || !IsOpened(DoorKey(door)) || IsOpened(VaultOpenKey)) return;
-            m_Opened.Add(VaultOpenKey);
+                || !IsOpened(OpenKeys.Door(door)) || IsOpened(OpenKeys.Stage(JobStage.VaultOpen))) return;
+            m_Opened.Add(OpenKeys.Stage(JobStage.VaultOpen));
             OpenedVersion++;
         }
 
@@ -146,16 +133,16 @@ namespace Stealth.Game
             if (l == null || l.Objective == ObjectiveKind.None) return;
             if (l.Objective == ObjectiveKind.Vault)
             {
-                if (!IsOpened(VaultFoundKey) && l.VaultDoorway >= 0 && Exploration != null)
+                if (!IsOpened(OpenKeys.Stage(JobStage.VaultFound)) && l.VaultDoorway >= 0 && Exploration != null)
                 {
                     var d = l.Doorways[l.VaultDoorway].Position;
-                    if (MapSketch.AnyRevealed(Exploration, LevelLayout.FloorOf(d.y), new Rect(d.x - 0.75f, d.z - 0.75f, 1.5f, 1.5f))) SetStage(VaultFoundKey, true);
+                    if (MapSketch.AnyRevealed(Exploration, LevelLayout.FloorOf(d.y), new Rect(d.x - 0.75f, d.z - 0.75f, 1.5f, 1.5f))) SetStage(OpenKeys.Stage(JobStage.VaultFound), true);
                 }
-                if (!IsOpened(VaultEnteredKey) && l.VaultDoor >= 0 && IsOpened(VaultOpenKey))
+                if (!IsOpened(OpenKeys.Stage(JobStage.VaultEntered)) && l.VaultDoor >= 0 && IsOpened(OpenKeys.Stage(JobStage.VaultOpen)))
                     foreach (var p in PlayerController.All)
                         if (!p.Downed && l.Plan.RoomAt(p.transform.position + Vector3.up * 0.3f)?.Id == l.VaultRoom)
                         {
-                            SetStage(VaultEnteredKey, true);
+                            SetStage(OpenKeys.Stage(JobStage.VaultEntered), true);
                             Banner(Loc.Pack("banner.vault_entered", p.Nick));
                             break;
                         }
@@ -164,7 +151,7 @@ namespace Stealth.Game
             bool held = false;
             foreach (var p in PlayerController.All)
                 if (Cage.HasKey(p)) { held = true; break; }
-            SetStage(CageKeyHeldKey, held && !ObjectiveDone);
+            SetStage(OpenKeys.Stage(JobStage.CageKeyHeld), held && !ObjectiveDone);
         }
 
         void SetStage(int key, bool on)
@@ -181,18 +168,18 @@ namespace Stealth.Game
         void FreeHostageServer(PlayerController player, int prop)
         {
             var l = ActiveLevel.Layout;
-            if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Hostage || prop != l.Cage || IsOpened(CageOpenKey(prop))) return;
+            if (Phase != RunPhase.Playing || l == null || l.Objective != ObjectiveKind.Hostage || prop != l.Cage || IsOpened(OpenKeys.CageOpen(prop))) return;
             var inventory = player.GetComponent<PlayerInventory>();
             if (inventory == null) return;
             if (!inventory.TakeHeldServer(ItemCatalog.CageKey))
             {
                 if (inventory.Has(ItemCatalog.CageKey)) return; // in the backpack: take it in hand first
-                SetStage(CageFoundKey, true);
+                SetStage(OpenKeys.Stage(JobStage.CageFound), true);
                 PointOutKeyServer(player);
                 return;
             }
-            SetStage(CageFoundKey, true);
-            m_Opened.Add(CageOpenKey(prop));
+            SetStage(OpenKeys.Stage(JobStage.CageFound), true);
+            m_Opened.Add(OpenKeys.CageOpen(prop));
             OpenedVersion++;
             var cage = Interactable.All.FirstOrDefault(i => i.Kind == UseKind.Cage && i.Index == prop);
             var at = cage != null ? cage.transform.position + cage.transform.forward * (HouseFeatures.CageSize / 2f + 0.5f) : l.Props[prop].Position;
@@ -208,15 +195,13 @@ namespace Stealth.Game
             if (carrier != null)
             {
                 carrier.MarkServer(Session.ServerTimeF + KeyCarrierMark);
-                if (m_Link != null) m_Link.BroadcastPing(player.ClientId, PingKind.Enemy, carrier.Position, carrier.NetId);
-                else ReceivePing(player.ClientId, PingKind.Enemy, carrier.Position, carrier.NetId);
+                Link.BroadcastPing(player.ClientId, PingKind.Enemy, carrier.Position, carrier.NetId);
                 Banner(Loc.Pack("banner.hostage_points"));
                 return;
             }
             var key = WorldItem.All.FirstOrDefault(i => i.Shape == ItemCatalog.CageKey);
             if (key == null) return;
-            if (m_Link != null) m_Link.BroadcastPing(player.ClientId, PingKind.Thing, key.transform.position, 0);
-            else ReceivePing(player.ClientId, PingKind.Thing, key.transform.position, 0);
+            Link.BroadcastPing(player.ClientId, PingKind.Thing, key.transform.position, 0);
             Banner(Loc.Pack("banner.hostage_points"));
         }
     }

@@ -6,7 +6,7 @@ namespace Stealth.Level
     /// <summary>
     /// The wheel of the vault's round door (on the VaultDoor prefab): once the three lock panels have unlocked the door, a
     /// player opens it with E — the wheel spins the bolts back, then the door swings into the vault
-    /// (<see cref="AutoDoor.IsSwungOpen"/>, <see cref="Game.GameManager.UseServer"/>). While it is locked the crosshair
+    /// (<see cref="AutoDoor.SwungOpen"/>, <see cref="Game.GameManager.UseServer"/>). While it is locked the crosshair
     /// shows the wheel dim.
     /// </summary>
     public class VaultHandle : Interactable
@@ -21,15 +21,15 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            available = Door != null && !Door.Locked && !AutoDoor.IsSwungOpen(Door.Index);
-            if (Door == null || AutoDoor.IsSwungOpen(Door.Index)) return null;
+            available = Door != null && !Door.Locked && !Door.SwungOpen;
+            if (Door == null || Door.SwungOpen) return null;
             return available ? Loc.T("use.vault_door") : Loc.T("use.vault_door.locked");
         }
 
         void LateUpdate()
         {
             // the door's index arrives with the level; an opened door needs no hint
-            int index = Door != null && Door.Vault && !AutoDoor.IsSwungOpen(Door.Index) ? Door.Index : -1;
+            int index = Door != null && Door.Vault && !Door.SwungOpen ? Door.Index : -1;
             if (Index != index) Index = index;
         }
     }

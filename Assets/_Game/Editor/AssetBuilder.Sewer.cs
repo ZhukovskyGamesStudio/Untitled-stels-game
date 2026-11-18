@@ -137,12 +137,8 @@ namespace Stealth.EditorTools
             });
             var car = Prefab($"{PrefabsDir}/Vehicles/Car.prefab", () => BuildCar(piece.GetComponent<CargoPiece>()));
 
-            if (art.Sewer != sewer || art.DriveScene != drive)
-            {
-                art.Sewer = sewer;
-                art.DriveScene = drive;
-                EditorUtility.SetDirty(art);
-            }
+            Link(art, ref art.Sewer, sewer);
+            Link(art, ref art.DriveScene, drive);
             return car;
         }
 

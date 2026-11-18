@@ -9,7 +9,7 @@ namespace Stealth.Items
     /// cabinet, parts cabinet, mail cabinet): drawers slide out, doors swing open on their hinges — every part on its own
     /// (look at it, press E). The parts are the model's
     /// children named <c>BodyDrawer{n}</c> / <c>BodyDoor{n}</c>; where they move is worked out from their meshes, so every
-    /// model family works. The server keeps which parts are open (<see cref="IsOpened"/>, replicated with the house's
+    /// model family works. The server keeps which parts are open (<see cref="World"/>, replicated with the house's
     /// opened set) and what loot is hidden behind them; every peer only animates. Moving parts stay out of the merged
     /// furniture (they carry a property block).
     /// </summary>
@@ -17,8 +17,6 @@ namespace Stealth.Items
     {
         public static readonly List<Storage> All = new();
 
-        /// <summary>Which parts are open now (set by the game: prop index, part index).</summary>
-        public static System.Func<int, int, bool> IsOpened = (_, _) => false;
 
         /// <summary>Index in <see cref="LevelLayout.Props"/>: the same on every peer, names the furniture in requests.</summary>
         public int Index { get; private set; } = -1;
@@ -99,7 +97,7 @@ namespace Stealth.Items
             for (int i = 0; i < m_Parts.Count; i++)
             {
                 var p = m_Parts[i];
-                float target = IsOpened(Index, i) ? 1f : 0f;
+                float target = World.IsOpened(OpenKeys.Storage(Index, i)) ? 1f : 0f;
                 if (Mathf.Approximately(p.T01, target)) continue;
                 p.T01 = Mathf.MoveTowards(p.T01, target, Time.deltaTime / StorageMath.OpenSeconds);
                 Pose(p, StorageMath.Ease(p.T01));
@@ -118,7 +116,7 @@ namespace Stealth.Items
             p.T.SetPositionAndRotation(p.Hinge + turn * (p.ClosedPos - p.Hinge), turn * p.ClosedRot);
         }
 
-        public bool IsOpen(int part) => Index >= 0 && IsOpened(Index, part);
+        public bool IsOpen(int part) => Index >= 0 && World.IsOpened(OpenKeys.Storage(Index, part));
 
         /// <summary>The part a collider belongs to; the carcass itself gives the part closest to <paramref name="point"/>.</summary>
         public int PartOf(Collider c, Vector3 point)

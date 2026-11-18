@@ -16,15 +16,13 @@ namespace Stealth.Level
         [Tooltip("The panel's face per minigame (Dial, Switches, Sequence): only its own shows.")]
         public GameObject[] Faces;
 
-        /// <summary>Which locks the team has solved (set by the game).</summary>
-        public static System.Func<int, bool> IsSolved = _ => false;
 
         public override UseKind Kind => UseKind.VaultConsole;
         public override float Reach => 2.0f;
         public override Vector3 Point => transform.position + transform.forward * 0.08f;
         public override float AimRadius => 0.4f;
         public VaultGame Game => (VaultGame)Mathf.Clamp(Index, 0, 2);
-        public bool Solved => Index >= 0 && IsSolved(Index);
+        public bool Solved => Index >= 0 && World.IsOpened(OpenKeys.Console(Index));
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly Color Locked = new(1f, 0.15f, 0.08f), Open = new(0.2f, 1f, 0.35f);

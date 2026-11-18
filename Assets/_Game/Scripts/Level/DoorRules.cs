@@ -70,7 +70,7 @@ namespace Stealth.Level
         /// <summary>A flat's entry: its hallway onto the landing.</summary>
         public static bool IsFlatEntry(LevelLayout l, Doorway d)
         {
-            if (l.Kind != HouseKind.Apartments || d.RoomA < 0 || d.RoomB < 0) return false;
+            if (l.PlanKind != HouseKind.Apartments || d.RoomA < 0 || d.RoomB < 0) return false;
             var a = l.Plan.Rooms[d.RoomA].Type;
             var b = l.Plan.Rooms[d.RoomB].Type;
             return (a == RoomType.FlatHall && b == RoomType.Corridor) || (b == RoomType.FlatHall && a == RoomType.Corridor);
@@ -90,9 +90,9 @@ namespace Stealth.Level
         public static float Chance(LevelLayout l, Doorway d, float chance)
         {
             if (Always(l, d)) return 1f;
-            if (l.Kind == HouseKind.Apartments && d.RoomA >= 0 && d.RoomB >= 0
+            if (l.PlanKind == HouseKind.Apartments && d.RoomA >= 0 && d.RoomB >= 0
                 && (l.Plan.Rooms[d.RoomA].Flat >= 0 || l.Plan.Rooms[d.RoomB].Flat >= 0)) return Mathf.Max(chance, 0.75f);
-            if (l.Kind == HouseKind.Hospital) return Mathf.Max(chance, 0.6f); // wards, theatres and the corridor's swing doors
+            if (l.PlanKind == HouseKind.Hospital) return Mathf.Max(chance, 0.6f); // wards, theatres and the corridor's swing doors
             return chance;
         }
 

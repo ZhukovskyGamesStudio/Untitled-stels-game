@@ -52,13 +52,13 @@ namespace Stealth.Level
 
         public static bool IsNear(Vector3 position) => IndexNear(position) >= 0;
 
-        /// <summary>0 near the entry hatch, 1 near the exit, −1 near neither.</summary>
+        /// <summary>1 near the exit hatch, −1 elsewhere (the way in is the basement: no entry hatch to sit in; index 0 is kept for it).</summary>
         public static int IndexNear(Vector3 position)
         {
             var layout = ActiveLevel.Layout;
             if (layout == null) return -1;
             if (IsNear(position, layout.ExitHatchPosition)) return 1;
-            return !layout.HasBasement && IsNear(position, layout.HatchPosition) ? 0 : -1; // (a basement: no entry hatch to sit in)
+            return -1;
         }
 
         public static Vector3 PositionOf(int hatch)
@@ -67,8 +67,8 @@ namespace Stealth.Level
             return layout == null ? Vector3.zero : hatch == 1 ? layout.ExitHatchPosition : Entry(layout);
         }
 
-        /// <summary>The entry hatch: the manhole in the basement's floor (a house without one: the lobby's middle).</summary>
-        public static Vector3 Entry(LevelLayout layout) => layout.HasBasement ? layout.EntryHatch : layout.HatchPosition;
+        /// <summary>The way in: where the team's stash is kept down in the basement.</summary>
+        public static Vector3 Entry(LevelLayout layout) => layout.EntryHatch;
 
         /// <summary>Close to the hatch and on its floor — not right above it on the floor upstairs (pure).</summary>
         public static bool IsNear(Vector3 position, Vector3 hatch)

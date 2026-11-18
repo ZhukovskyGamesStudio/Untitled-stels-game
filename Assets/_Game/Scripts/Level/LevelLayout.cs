@@ -200,21 +200,27 @@ namespace Stealth.Level
         public string Mass = "";
         /// <summary>Which variant of the plan was taken (0 = the first; more when earlier ones failed the walk check).</summary>
         public int PlanAttempt;
-        /// <summary>What kind of building this is (office, business centre, data centre, warehouse, headquarters).</summary>
+        /// <summary>What kind of building this is (an office of some character, the hospital, the repair shop, the flats): its name, its feature.</summary>
         public HouseKind Kind;
+        /// <summary>The location's own plan laid the house out (<see cref="HouseKinds.OwnPlan"/>; not under the rooms test's every-type plan).</summary>
+        public bool OwnPlan;
+        /// <summary>
+        /// The kind the house is built and dressed as: its <see cref="Kind"/>, or an office where a location's own plan was
+        /// not used (the rooms test) — the one source the plan-shaped rules ask (looks, doors, furniture by kind).
+        /// </summary>
+        public HouseKind PlanKind => OwnPlan || !HouseKinds.OwnPlan(Kind) ? Kind : HouseKind.Office;
         /// <summary>The lobby (plan room id): the hatch is in it.</summary>
         public int LobbyRoom;
         public readonly List<Stair> Stairs = new();
         /// <summary>Every opening of the plan as a pose (doors between rooms, exterior doors, vents, slots, open passages).</summary>
         public readonly List<Doorway> Doorways = new();
-        /// <summary>The entry hatch (in the lobby): the team comes up here from the car.</summary>
+        /// <summary>The mouth of the shaft up from the basement (the plant room's corner, else the lobby's): the team climbs up here.</summary>
         public Vector3 HatchPosition;
         /// <summary>
         /// The basement the team arrives in (<see cref="Basement"/>): its frame's origin under the lobby, and where the team's
         /// stash is kept down there (<see cref="EntryHatch"/>; no hatch: the whole basement is the way back for the leave
         /// rule). <see cref="HatchPosition"/> is the shaft's mouth in the lobby (the generator keeps things away from it).
         /// </summary>
-        public bool HasBasement;
         public Vector3 BasementOrigin, EntryHatch;
         /// <summary>The basement's turn (a multiple of 90°: its tunnel runs under the house) and the side of the shaft a climber steps off to (flat, unit).</summary>
         public float BasementYaw;
@@ -223,12 +229,42 @@ namespace Stealth.Level
         public BasementFrame Cellar => new(BasementOrigin, BasementYaw);
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
+        int m_ExitRoom = -1, m_EntryRoom = -1;
+        /// <summary>The exit hatch's room (chosen once by the generator; its type is kept: <see cref="PlanRoom.Kept"/>), −1 = none.</summary>
+        public int ExitRoom
+        {
+            get => m_ExitRoom >= 0 ? m_ExitRoom : Plan?.RoomAt(ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            set => m_ExitRoom = value;
+        }
+        /// <summary>The room the shaft down to the basement opens in (the plant room, else the lobby), −1 = none.</summary>
+        public int EntryRoom
+        {
+            get => m_EntryRoom >= 0 ? m_EntryRoom : Plan?.RoomAt(HatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            set => m_EntryRoom = value;
+        }
         public readonly List<Vector3> PlayerSpawns = new();
         public readonly List<Vector3> ItemSpots = new();
         public readonly List<Vector3> PatrolPoints = new();
         public readonly List<Pose> CameraSpots = new();
         public readonly List<LaserSpot> LaserSpots = new();
         public readonly List<Pose> AutoDoors = new(); // doors in doorways (local X along the wall)
+
+        /// <summary>
+        /// The door in this doorway (one is put there if it has none), never locked for hacking and with no laser in it:
+        /// a door of its own (the vault's, the storage room's, a key door). Its index in <see cref="AutoDoors"/>.
+        /// </summary>
+        public int EnsureDoor(Doorway d)
+        {
+            int door = AutoDoors.FindIndex(p => (p.position - d.Position).sqrMagnitude < 0.1f);
+            if (door < 0)
+            {
+                AutoDoors.Add(new Pose(d.Position, d.Rotation));
+                door = AutoDoors.Count - 1;
+            }
+            LockedDoors.Remove(door);
+            LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
+            return door;
+        }
         /// <summary>Each door's kind, the way it opens and its hinges (<see cref="DoorRules.Plan"/>; parallel to <see cref="AutoDoors"/>).</summary>
         public readonly List<DoorSpec> DoorLooks = new();
         /// <summary>Indices into <see cref="AutoDoors"/> that are locked: players hack them open, robots pass.</summary>
@@ -412,7 +448,7 @@ namespace Stealth.Level
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
         public bool IsInside(Vector3 p)
         {
-            if (HasBasement && Basement.Contains(Cellar, p)) return true;
+            if (Basement.Contains(Cellar, p)) return true;
             if (Plan == null) return false;
             if (Plan.IsInside(new Vector2(p.x, p.z))) return true;
             // a balcony is the house's too: no gas up there

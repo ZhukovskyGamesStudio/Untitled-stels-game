@@ -75,7 +75,7 @@ namespace Stealth.Level
         /// <summary>The sewer after house <paramref name="depth"/> (−1 = the start of the run: no gate, no exit ladder).</summary>
         public static SewerPlan Make(int runSeed, int depth)
         {
-            var rng = new System.Random(LevelRandom.Mix(runSeed, 0x5E3E, depth + 7));
+            var rng = new System.Random(LevelRandom.Mix(runSeed, Salt.Sewer, depth + 7));
             var p = new SewerPlan
             {
                 LampColor = Palette[rng.Next(Palette.Length)],

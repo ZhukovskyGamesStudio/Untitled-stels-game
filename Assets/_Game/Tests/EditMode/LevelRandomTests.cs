@@ -47,7 +47,21 @@ namespace Stealth.Tests
                     $"{path}: use LevelRandom instead of UnityEngine.Random");
                 Assert.IsFalse(text.Contains("new System.Random()") && !path.EndsWith("GameManager.cs"),
                     $"{path}: an unseeded System.Random (only the run seed itself may be fresh)");
+                Assert.IsFalse(System.Text.RegularExpressions.Regex.IsMatch(text, @"Mix\([^;]*?,\s*0x[0-9A-Fa-f]+\s*,"),
+                    $"{path}: a bare salt in LevelRandom.Mix — name it in Salt (two streams must never share one)");
             }
+        }
+
+        /// <summary>Every named salt is its own, and none is a channel (two streams with one salt draw the same numbers).</summary>
+        [Test]
+        public void SaltsAreDistinct()
+        {
+            var salts = typeof(Salt).GetFields().Where(f => f.IsLiteral).Select(f => (f.Name, Value: (int)f.GetRawConstantValue())).ToList();
+            Assert.Greater(salts.Count, 30);
+            foreach (var group in salts.GroupBy(s => s.Value))
+                Assert.AreEqual(1, group.Count(), "one salt for " + string.Join(", ", group.Select(s => s.Name)));
+            var channels = System.Enum.GetValues(typeof(RandomChannel)).Cast<int>().ToHashSet();
+            foreach (var s in salts) Assert.IsFalse(channels.Contains(s.Value), $"{s.Name} is a channel's number");
         }
     }
 }

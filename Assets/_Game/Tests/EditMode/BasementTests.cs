@@ -23,7 +23,6 @@ namespace Stealth.Tests
             foreach (var l in TestHouses.Sample)
             {
                 string name = $"seed {l.Seed}/{l.LevelIndex}";
-                Assert.IsTrue(l.HasBasement, name);
                 var f = l.Cellar;
                 Assert.AreEqual(0f, Mathf.Repeat(l.BasementYaw, 90f), 1e-4f, $"{name}: the tunnel runs along the plan's axes");
                 Assert.AreEqual(l.HatchPosition.y - Basement.Depth, f.Origin.y, 1e-4f);

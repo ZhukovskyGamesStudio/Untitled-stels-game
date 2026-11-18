@@ -21,8 +21,6 @@ namespace Stealth.Level
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly Color AlarmColor = new(1f, 0.15f, 0.1f);
 
-        /// <summary>Whether a room's lights were switched from how the house started (room id; set by the game, <see cref="LightSwitch"/>).</summary>
-        public static System.Func<int, bool> IsSwitched = _ => false;
 
         Light m_Light;
         Color m_BaseColor, m_LitColor;
@@ -59,7 +57,7 @@ namespace Stealth.Level
             float k = Flicker ? LightMath.Flicker(Time.time + Seed) : 1f;
             var gm = GameManager.Instance;
             bool alarm = gm != null && gm.AlarmActive;
-            bool switched = m_Room >= 0 && IsSwitched(m_Room);
+            bool switched = m_Room >= 0 && World.IsOpened(OpenKeys.Lights(m_Room));
             var own = switched ? m_LitColor : m_BaseColor;
             float ownIntensity = !switched ? m_BaseIntensity : LightMath.SwitchedOn(m_Dark, true) ? m_LitIntensity : 0f;
             var color = alarm ? Color.Lerp(own, AlarmColor, 0.8f) : own;

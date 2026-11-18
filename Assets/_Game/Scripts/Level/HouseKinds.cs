@@ -18,7 +18,7 @@ namespace Stealth.Level
     {
         public static HouseKind Of(int seed, int house)
         {
-            var rng = new System.Random(LevelRandom.Mix(seed, 0x4B1D, 0));
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.HouseKind, 0));
             int roll = rng.Next(100);
             // a quarter each: an office (of some character), a hospital, a garage, an apartment block
             if (roll >= 75) return HouseKind.Apartments;
@@ -40,7 +40,7 @@ namespace Stealth.Level
         {
             for (int k = 0; k < 100000; k++)
             {
-                int seed = LevelRandom.Mix(from, 0x5EED, k) & 0x7fffffff;
+                int seed = LevelRandom.Mix(from, Salt.HouseKindSeed, k) & 0x7fffffff;
                 if (seed != 0 && Of(seed, house) == kind) return seed;
             }
             return 0;
@@ -60,7 +60,7 @@ namespace Stealth.Level
         /// </summary>
         public static string Title(int seed, HouseKind kind)
         {
-            var rng = new System.Random(LevelRandom.Mix(seed, 0x4E41, 1));
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.HouseTitle, 1));
             string[] forms = List("house.forms"), starts = List("house.name_starts"), ends = List("house.name_ends");
             string form = forms[rng.Next(forms.Length)];
             int start = rng.Next(starts.Length);

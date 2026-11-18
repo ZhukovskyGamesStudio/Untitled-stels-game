@@ -136,6 +136,25 @@ namespace Stealth.EditorTools
             return false;
         }
 
+        /// <summary>
+        /// Points a field of an asset at what was just built (a field newer than the asset gets filled; nothing else is
+        /// touched): the one line a new <see cref="LevelArt"/> field needs.
+        /// </summary>
+        static void Link<T>(Object asset, ref T field, T value) where T : Object
+        {
+            if (field == value) return;
+            field = value;
+            EditorUtility.SetDirty(asset);
+        }
+
+        /// <summary><see cref="Link{T}"/> for an array of assets (compared item by item).</summary>
+        static void LinkAll<T>(Object asset, ref T[] field, T[] value) where T : Object
+        {
+            if (field != null && value != null && System.Linq.Enumerable.SequenceEqual(field, value)) return;
+            field = value;
+            EditorUtility.SetDirty(asset);
+        }
+
         /// <summary>Loads or creates a ScriptableObject; <paramref name="fill"/> runs on creation and in overwrite mode.</summary>
         static T DataAsset<T>(string path, Action<T> fill) where T : ScriptableObject
         {

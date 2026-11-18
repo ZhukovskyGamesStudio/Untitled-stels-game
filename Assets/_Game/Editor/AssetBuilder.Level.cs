@@ -242,42 +242,29 @@ namespace Stealth.EditorTools
                 art.WashBasin = pWashBasin;
                 art.VendingMachine = pVendingMachine;
             });
-            if (levelArt.HighVentFrame != highVent || levelArt.RailingBay != railingBay || levelArt.RailingBlock != railingBlock || levelArt.OutsideTerrain != terrain
-                || levelArt.BreachFrame != breach || levelArt.HoleFrame != hole || levelArt.InnerWindowFrame != innerWindow)
-            {
-                // fields newer than the asset: filled without overwriting the rest
-                levelArt.BreachFrame = breach;
-                levelArt.HoleFrame = hole;
-                levelArt.InnerWindowFrame = innerWindow;
-                levelArt.HighVentFrame = highVent;
-                levelArt.RailingBay = railingBay;
-                levelArt.RailingBlock = railingBlock;
-                levelArt.OutsideTerrain = terrain;
-                EditorUtility.SetDirty(levelArt);
-            }
-            if (levelArt.ShopDoor != shopDoor || levelArt.VehicleDoor != vehicleDoor || levelArt.ClinicDoor != clinicDoor || levelArt.StorageDoor != storageDoor
-                || levelArt.FlatDoor != flatDoor || levelArt.StairsStacked != stairsStacked || levelArt.StairsStackedMirrored != stairsStackedMirrored
-                || levelArt.NarrowDoor != narrowDoor || levelArt.WoodDoor != woodDoor || levelArt.WoodDoubleDoor != woodDoubleDoor
-                || levelArt.EntranceDoor != entranceDoor || levelArt.ClinicSwingDoor != clinicSwingDoor
-                || levelArt.LiftDoor != liftDoor || levelArt.LiftCab != liftCab || levelArt.Balcony != balcony)
-            {
-                levelArt.Balcony = balcony;
-                levelArt.LiftDoor = liftDoor;
-                levelArt.LiftCab = liftCab;
-                levelArt.WoodDoor = woodDoor;
-                levelArt.WoodDoubleDoor = woodDoubleDoor;
-                levelArt.EntranceDoor = entranceDoor;
-                levelArt.ClinicSwingDoor = clinicSwingDoor;
-                levelArt.NarrowDoor = narrowDoor;
-                levelArt.StairsStacked = stairsStacked;
-                levelArt.StairsStackedMirrored = stairsStackedMirrored;
-                levelArt.FlatDoor = flatDoor;
-                levelArt.ShopDoor = shopDoor;
-                levelArt.VehicleDoor = vehicleDoor;
-                levelArt.ClinicDoor = clinicDoor;
-                levelArt.StorageDoor = storageDoor;
-                EditorUtility.SetDirty(levelArt);
-            }
+            // fields newer than the asset: filled without overwriting the rest
+            Link(levelArt, ref levelArt.BreachFrame, breach);
+            Link(levelArt, ref levelArt.HoleFrame, hole);
+            Link(levelArt, ref levelArt.InnerWindowFrame, innerWindow);
+            Link(levelArt, ref levelArt.HighVentFrame, highVent);
+            Link(levelArt, ref levelArt.RailingBay, railingBay);
+            Link(levelArt, ref levelArt.RailingBlock, railingBlock);
+            Link(levelArt, ref levelArt.OutsideTerrain, terrain);
+            Link(levelArt, ref levelArt.Balcony, balcony);
+            Link(levelArt, ref levelArt.LiftDoor, liftDoor);
+            Link(levelArt, ref levelArt.LiftCab, liftCab);
+            Link(levelArt, ref levelArt.WoodDoor, woodDoor);
+            Link(levelArt, ref levelArt.WoodDoubleDoor, woodDoubleDoor);
+            Link(levelArt, ref levelArt.EntranceDoor, entranceDoor);
+            Link(levelArt, ref levelArt.ClinicSwingDoor, clinicSwingDoor);
+            Link(levelArt, ref levelArt.NarrowDoor, narrowDoor);
+            Link(levelArt, ref levelArt.StairsStacked, stairsStacked);
+            Link(levelArt, ref levelArt.StairsStackedMirrored, stairsStackedMirrored);
+            Link(levelArt, ref levelArt.FlatDoor, flatDoor);
+            Link(levelArt, ref levelArt.ShopDoor, shopDoor);
+            Link(levelArt, ref levelArt.VehicleDoor, vehicleDoor);
+            Link(levelArt, ref levelArt.ClinicDoor, clinicDoor);
+            Link(levelArt, ref levelArt.StorageDoor, storageDoor);
             BuildFeatureArt(levelArt);
             BuildCityArt(levelArt);
             BuildRoomProps(levelArt);
@@ -452,6 +439,18 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// What stops people in a shut doorway (<see cref="AutoDoor.Blocker"/>): a box standing on the floor, centred at
+        /// <paramref name="x"/> along the wall and <paramref name="z"/> across it; the door turns it off while open.
+        /// </summary>
+        static BoxCollider DoorBlocker(GameObject root, float x, float z, float width, float height, float depth)
+        {
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(x, height / 2f, z);
+            box.size = new Vector3(width, height, depth);
+            return box;
+        }
+
         /// <summary>The frame of a window between rooms without its glass (Tools/Blender/ruins.py), along local X, no collider.</summary>
         static GameObject BuildInnerWindowFrame()
         {
@@ -520,10 +519,7 @@ namespace Stealth.EditorTools
             }
             door.PanelA = Leaf("PanelA", leafModel, -w / 4f, 0f);
             door.PanelB = Leaf("PanelB", leafModel + "_b", w / 4f, 180f); // its texture shifted: the halves do not mirror
-            var blocker = root.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0, h / 2f, 0);
-            blocker.size = new Vector3(w, h, 0.1f);
-            door.Blocker = blocker;
+            door.Blocker = DoorBlocker(root, 0f, 0f, w, h, 0.1f);
             // Lock lamps above the door on both sides: red while locked, green once hacked (hidden on doors without a lock).
             if (!sign)
                 door.LockLamps = new Renderer[]
@@ -716,21 +712,11 @@ namespace Stealth.EditorTools
             // blockers: the whole opening for twin leaves; a door-and-a-half's main and narrow leaves apart
             float bz = both ? 0f : hingeZ - t / 2f;
             float seam = -edge + mainW;
-            var blocker = root.AddComponent<BoxCollider>();
-            door.Blocker = blocker;
-            if (twin)
-            {
-                blocker.center = new Vector3(0f, height / 2f, bz);
-                blocker.size = new Vector3(clear, height, 0.1f);
-            }
+            if (twin) door.Blocker = DoorBlocker(root, 0f, bz, clear, height, 0.1f);
             else
             {
-                blocker.center = new Vector3((-clear / 2f + seam) / 2f, height / 2f, bz);
-                blocker.size = new Vector3(seam + clear / 2f, height, 0.1f);
-                var b2 = root.AddComponent<BoxCollider>();
-                b2.center = new Vector3((seam + clear / 2f) / 2f, height / 2f, bz);
-                b2.size = new Vector3(clear / 2f - seam, height, 0.1f);
-                door.BlockerB = b2;
+                door.Blocker = DoorBlocker(root, (-clear / 2f + seam) / 2f, bz, seam + clear / 2f, height, 0.1f);
+                door.BlockerB = DoorBlocker(root, (seam + clear / 2f) / 2f, bz, clear / 2f - seam, height, 0.1f);
             }
             DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t);
             Muffles(root, SoundMaterial.Door); // only while closed: the blockers are off when open
@@ -782,10 +768,7 @@ namespace Stealth.EditorTools
             }
             door.PanelA = Panel("PanelA", -clear / 4f);
             door.PanelB = Panel("PanelB", clear / 4f);
-            var blocker = root.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0f, h / 2f, 0.02f);
-            blocker.size = new Vector3(clear, h, 0.08f);
-            door.Blocker = blocker;
+            door.Blocker = DoorBlocker(root, 0f, 0.02f, clear, h, 0.08f);
             // the call button on a plate on the landing's face, beside the portal
             float bx = clear / 2f + casing + 0.16f;
             Cube(root.transform, "CallPlate", new Vector3(bx, 1.1f, face + 0.006f), new Vector3(0.09f, 0.16f, 0.012f), steel, false);

@@ -11,7 +11,6 @@ namespace Stealth.Game
     /// </summary>
     public partial class GameManager
     {
-        public static int HackSlotKey(int slot) => 9_100_000 + slot;
 
         readonly List<Detector> m_Hacked = new();
 
@@ -21,7 +20,7 @@ namespace Stealth.Game
             get
             {
                 int n = 0;
-                while (IsOpened(HackSlotKey(n))) n++;
+                while (IsOpened(OpenKeys.HackSlot(n))) n++;
                 return n;
             }
         }
@@ -57,9 +56,9 @@ namespace Stealth.Game
             bool changed = false;
             for (int i = 0; i < 8; i++)
             {
-                bool on = i < m_Hacked.Count, was = m_Opened.Contains(HackSlotKey(i));
+                bool on = i < m_Hacked.Count, was = m_Opened.Contains(OpenKeys.HackSlot(i));
                 if (on == was) continue;
-                if (on) m_Opened.Add(HackSlotKey(i)); else m_Opened.Remove(HackSlotKey(i));
+                if (on) m_Opened.Add(OpenKeys.HackSlot(i)); else m_Opened.Remove(OpenKeys.HackSlot(i));
                 changed = true;
             }
             if (changed) OpenedVersion++;

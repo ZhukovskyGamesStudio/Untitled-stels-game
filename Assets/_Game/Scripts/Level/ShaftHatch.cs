@@ -5,7 +5,7 @@ namespace Stealth.Level
 {
     /// <summary>
     /// The lid over the shaft in the lobby's floor (prefab Level/ShaftHatch), the way down to the basement the team arrives
-    /// in (<see cref="Basement"/>). E opens or closes it for everyone (the server keeps it: <see cref="IsOpen"/>, a key in
+    /// in (<see cref="Basement"/>). E opens or closes it for everyone (the server keeps it: <see cref="World"/>, a key in
     /// GameManager.Opened); closed it is floor to walk on, open it swings up on its hinge and the ladder below is free
     /// (<see cref="ShaftLadder"/>).
     /// </summary>
@@ -20,8 +20,6 @@ namespace Stealth.Level
         [System.NonSerialized] public Unity.AI.Navigation.NavMeshLink Link;
         public const float OpenAngle = -105f, SwingTime = 0.6f;
 
-        /// <summary>The lid is open (set by the game: the server's word).</summary>
-        public static System.Func<bool> IsOpen = () => false;
 
         public override UseKind Kind => UseKind.ShaftHatch;
         /// <summary>The lid's middle: looking anywhere at it (from the lobby or from the ladder under it) takes it.</summary>
@@ -31,21 +29,18 @@ namespace Stealth.Level
         public override string Prompt(PlayerController player, out bool available)
         {
             available = true;
-            return Loc.T(IsOpen() ? "use.shaft_close" : "use.shaft_open");
+            return Loc.T(World.IsOpened(OpenKeys.Shaft) ? "use.shaft_close" : "use.shaft_open");
         }
 
-        float m_Open;
+        OpenTween m_Open;
 
         void Update()
         {
             if (Lid == null) return;
-            bool open = IsOpen();
-            float before = m_Open;
-            m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / SwingTime);
-            if (!Mathf.Approximately(before, m_Open) && (m_Open == 0f || m_Open == 1f))
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.DoorSlide : null, transform.position, 0.8f, Audio.Sfx.Group.Items, open ? 0.7f : 0.6f);
-            Lid.localRotation = Quaternion.Euler(Mathf.SmoothStep(0f, 1f, m_Open) * OpenAngle, 0f, 0f);
-            if (LidCollider != null) LidCollider.enabled = m_Open < 0.1f;
+            bool open = World.IsOpened(OpenKeys.Shaft);
+            if (m_Open.Step(open, Time.deltaTime, SwingTime) != OpenMove.None) DoorSounds.Play(DoorSound.Heavy, transform.position, open);
+            Lid.localRotation = Quaternion.Euler(m_Open.Smooth * OpenAngle, 0f, 0f);
+            if (LidCollider != null) LidCollider.enabled = m_Open.Value < 0.1f;
             if (Link != null && Link.activated != open) Link.activated = open;
         }
     }

@@ -31,7 +31,7 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            available = !SewerGate.IsOpen();
+            available = !World.IsOpened(OpenKeys.Gate);
             return available ? Loc.T("use.lever") : null;
         }
     }

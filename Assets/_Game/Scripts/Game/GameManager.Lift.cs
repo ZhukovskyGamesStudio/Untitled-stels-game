@@ -18,11 +18,6 @@ namespace Stealth.Game
 
         static BuildingSettings LiftTimes => Tuning.Level.Building;
 
-        void HookLift()
-        {
-            LiftCab.State = () => Lift;
-            LiftCab.Now = () => Session.ServerTime;
-        }
 
         /// <summary>Server: someone pressed a call button (<paramref name="cab"/> false) or a floor button in the cab.</summary>
         void LiftServer(PlayerController player, int floor, bool cab)
