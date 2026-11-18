@@ -114,7 +114,7 @@ namespace Stealth.Game
                 }
                 else legs.Clear();
             }
-            legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = Basement.StashSpot(l.BasementOrigin), Room = -1 });
+            legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = Basement.StashSpot(l.Cellar), Room = -1 });
             GameManager.Instance?.OpenShaftServer(); // it pushes the lid open on its way down
             Begin(legs, BotMode.Hiding, BotMode.Waiting);
         }
@@ -142,7 +142,7 @@ namespace Stealth.Game
             return true;
         }
 
-        bool InBasement(LevelLayout l) => l.HasBasement && Basement.Contains(l.BasementOrigin, transform.position);
+        bool InBasement(LevelLayout l) => l.HasBasement && Basement.Contains(l.Cellar, transform.position);
 
         void Begin(List<BotLeg> legs, BotMode mode, BotMode after)
         {

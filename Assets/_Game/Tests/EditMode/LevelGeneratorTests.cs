@@ -97,7 +97,7 @@ namespace Stealth.Tests
         {
             foreach (var l in TestHouses.Sample)
             {
-                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.BasementOrigin, p + Vector3.up * 0.5f), $"spawn {p}: the team arrives in the basement");
+                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.Cellar, p + Vector3.up * 0.5f), $"spawn {p}: the team arrives in the basement");
                 foreach (var p in l.ItemSpots) Assert.IsTrue(l.IsInside(p), $"item {p}");
                 foreach (var r in l.RobotSpawns) Assert.IsTrue(l.IsInside(r.Position), $"robot {r.Kind} {r.Position}");
                 foreach (var p in l.PatrolPoints) Assert.IsNotNull(l.RoomAt(p), $"patrol point {p}");

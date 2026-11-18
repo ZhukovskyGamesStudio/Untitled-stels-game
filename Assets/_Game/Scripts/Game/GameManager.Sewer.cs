@@ -51,7 +51,7 @@ namespace Stealth.Game
 
         /// <summary>At the team's way in: at the entry hatch of a house without a basement (with one, the stash rides in the storage robot).</summary>
         static bool AtEntry(LevelLayout l, Vector3 position) =>
-            !l.HasBasement ? Hatch.IsNear(position, l.HatchPosition) : StorageBot.Active == null && Basement.Contains(l.BasementOrigin, position);
+            !l.HasBasement ? Hatch.IsNear(position, l.HatchPosition) : StorageBot.Active == null && Basement.Contains(l.Cellar, position);
 
         /// <summary>Next to the storage robot (its stash in reach).</summary>
         static bool AtBot(Vector3 position)
@@ -68,7 +68,7 @@ namespace Stealth.Game
         void SpawnStorageBotServer(LevelLayout l)
         {
             if (StorageBotPrefab == null || !l.HasBasement) return;
-            var at = Basement.StashSpot(l.BasementOrigin);
+            var at = Basement.StashSpot(l.Cellar);
             var go = Session.Spawn(StorageBotPrefab, at, Quaternion.LookRotation(Vector3.left));
             m_Spawned.Add(go);
             m_Bot = go.GetComponent<StorageBot>();
@@ -121,7 +121,7 @@ namespace Stealth.Game
         public static bool InBasement(Vector3 position)
         {
             var l = ActiveLevel.Layout;
-            return l != null && l.HasBasement && Basement.Contains(l.BasementOrigin, position);
+            return l != null && l.HasBasement && Basement.Contains(l.Cellar, position);
         }
 
         /// <summary>Where the stash board of the hatch near this player hangs.</summary>
@@ -262,7 +262,7 @@ namespace Stealth.Game
         {
             if (DriveUntil > 0)
             {
-                if (Session.ServerTime >= DriveUntil) ArriveServer();
+                UpdateDriveServer();
                 return;
             }
             var sewer = SewerLocation.Active;
@@ -321,17 +321,13 @@ namespace Stealth.Game
         {
             GoAt = 0;
             if (m_Run.Advance() != RunState.Exit.NextLevel) return;
-            // the team stays in its seats: the drive scene starts from their eyes in the cab (out on arrival)
-            DriveUntil = Session.ServerTime + m_Run.Settings.DriveTime;
-        }
-
-        void ArriveServer()
-        {
-            DriveUntil = 0;
-            Car.Active?.ClearSeatsServer();
-            int next = Level.Index + 1, lane = ChosenLane;
-            StartLevel(next, lane);
-            Banner(Loc.Pack("banner.house", next + 1));
+            // the team stays in its seats: the drive scene starts from their eyes in the cab, the house is built meanwhile, and
+            // they arrive in the same seats in its basement (GameManager.Arrival)
+            m_DepartedAt = Session.ServerTime;
+            var car = Car.Active;
+            for (int seat = 0; seat < Car.SeatCount; seat++) m_RideSeats[seat] = car != null ? car.OccupantOf(seat) : Car.Nobody;
+            DriveUntil = m_DepartedAt + m_Run.Settings.DriveTime; // (provisional: the cut comes once the house stands)
+            ArriveAt = 0;
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Stealth.Configs;
@@ -203,6 +204,8 @@ namespace Stealth.Game
         /// <summary>Every peer: build the sewer when the run is there, take it away when a house starts, flood it when the run ends there.</summary>
         void SyncLocation()
         {
+            // on the drive the sewer stays as it is behind the drive scene (the next house is on its way)
+            if (Phase == RunPhase.Sewer && DriveUntil > 0 && m_Sewer != null) return;
             // a new run after the water rose (or another run's sewer): built afresh, dry
             if (Phase == RunPhase.Sewer && m_Sewer != null && (m_Sewer.Flooded || m_SewerFor != (Level.RunSeed, Level.Index))) LeaveSewerLocal();
             if (Phase == RunPhase.Sewer && m_Sewer == null) EnterSewerLocal();
@@ -239,25 +242,6 @@ namespace Stealth.Game
 
         GameObject m_DriveScene;
         (int seed, int depth) m_SewerFor;
-        float m_DriveEndAt = -1f;
-
-        /// <summary>Every peer: the drive scene from the departure until the next house stands (under the black of the fade).</summary>
-        void UpdateDriveScene()
-        {
-            if (DriveUntil > 0 && m_DriveScene == null && Art != null && Art.DriveScene != null)
-            {
-                m_DriveScene = Instantiate(Art.DriveScene, new Vector3(0f, -400f, 0f), Quaternion.identity);
-                m_DriveEndAt = -1f;
-                BeginDriveScene(m_DriveScene.GetComponent<DriveScene>());
-            }
-            if (m_DriveScene == null || DriveUntil > 0 || Phase != RunPhase.Playing || ActiveLevel.Layout == null) return;
-            if (m_DriveEndAt < 0f) m_DriveEndAt = Time.time + 0.5f; // the house is there: a moment of black, then fade in on it
-            else if (Time.time >= m_DriveEndAt)
-            {
-                Destroy(m_DriveScene);
-                m_DriveScene = null;
-            }
-        }
 
         /// <summary>The drive starts from where this player's eyes are in the car (the scene glides out to its side view).</summary>
         static void BeginDriveScene(DriveScene scene)
@@ -289,19 +273,22 @@ namespace Stealth.Game
 
         // ------------------------------------------------------------------ level lifecycle
 
-        void BuildLocal()
+        /// <summary>
+        /// Every peer: builds the house of <paramref name="info"/> (its layout from the background generation when it is
+        /// the house the drive went to, else generated now), a piece per step.
+        /// </summary>
+        IEnumerator BuildLocalSteps(LevelInfo info)
         {
-            var info = Level;
-            if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
+            if (info.Seed == 0 || info.Seed == m_BuiltSeed) yield break;
             m_BuiltSeed = info.Seed;
             LeaveSewerLocal();
             // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
+            var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
                 LevelGenerator.Classic, info.ClassicEnemies);
-            ActiveLevel.Load(layout, Art);
+            foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
             ApplyAtmosphere();
@@ -323,10 +310,18 @@ namespace Stealth.Game
 
         void StartLevel(int index, int lane, int houseSeed = 0)
         {
-            foreach (var obj in m_Spawned) Session.Despawn(obj);
-            m_Spawned.Clear();
-            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
+            var all = StartLevelSteps(index, lane, houseSeed, false);
+            while (all.MoveNext()) { }
+        }
 
+        /// <summary>
+        /// Server: a house starts — built (a piece per step when <paramref name="arriving"/>: the drive scene is on), its
+        /// content spawned, the team's car in its basement. Arriving, the team rides in in the seats it left in
+        /// (<see cref="ArriveCarServer"/>); else everyone stands up in the basement and the car stands at the gate. The house's
+        /// info and the phase go out together in the last step (a client builds it when it hears of it).
+        /// </summary>
+        IEnumerator StartLevelSteps(int index, int lane, int houseSeed, bool arriving)
+        {
             ScentTrail.Clear();
             m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
@@ -335,6 +330,19 @@ namespace Stealth.Game
             int seed = houseSeed != 0 ? houseSeed : Route.Node(index, lane).Seed;
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
+            var info = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
+            if (!arriving) m_Prepared = null; // (a house started some other way: nothing generated for it)
+            var build = BuildLocalSteps(info);
+            while (build.MoveNext()) if (arriving) yield return null;
+            var layout = ActiveLevel.Layout;
+
+            // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
+            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
+            if (arriving) yield return null;
+
+            foreach (var obj in m_Spawned) Session.Despawn(obj);
+            m_Spawned.Clear();
+            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
             m_Opened.Clear();
             m_Hacked.Clear();
             OpenedVersion++;
@@ -343,18 +351,11 @@ namespace Stealth.Game
             GoAt = 0;
             ChosenLane = -1;
             Votes.Clear();
-            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
-            BuildLocal();
-            var layout = ActiveLevel.Layout;
-
-            // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
-            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
-
+            Level = info;
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             m_GuardsAwake = false;
-            DespawnCarServer();
             UnloadCarServer();
             SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All)
@@ -362,6 +363,8 @@ namespace Stealth.Game
                 p.ResetForLevelServer();
                 if (!layout.HasBasement) p.EnterHatchServer(0); // the team comes up into the entry hatch (a basement: it stands down there)
             }
+            if (arriving) ArriveCarServer(layout);
+            else SpawnBasementCarServer(layout, false);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
@@ -498,8 +501,14 @@ namespace Stealth.Game
         {
             Pings.Expire(Time.time);
             RevealMap();
+            PrepareNextHouse();
             UpdateDriveScene();
             if (!m_IsServer) return;
+            if (DriveUntil > 0 && Phase == RunPhase.Playing && !m_Arriving && Session.ServerTime >= ArriveAt)
+            {
+                DriveUntil = 0; // the car stands at the gate: the team gets out
+                Banner(Loc.Pack("banner.house", Level.Index + 1));
+            }
             if (m_Run.SetPlayers(TeamSize))
                 Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
             foreach (var p in PlayerController.All)
@@ -717,6 +726,7 @@ namespace Stealth.Game
             Cargo.Clear();
             Stash.Clear();
             ExitStash.Clear();
+            CancelArrival();
             DriveUntil = 0;
             m_Opened.Add(GateKey); // the start of the run: no gate to open
             OpenedVersion++;
@@ -852,6 +862,7 @@ namespace Stealth.Game
         /// </summary>
         public void StartHouseServer(HouseKind kind)
         {
+            CancelArrival();
             DriveUntil = 0;
             GoAt = 0;
             LeaveAt = 0;

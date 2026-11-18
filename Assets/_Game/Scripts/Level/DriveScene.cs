@@ -11,7 +11,10 @@ namespace Stealth.Level
     /// there (the screen fades through black, <see cref="Stealth.UI.GameHUD"/>).
     /// It does not cut in: its camera starts where the player's eyes are in the car (<see cref="Begin"/> — the same cab,
     /// the same lens), leaves through the side window and settles ahead of the car by the walkway, looking back at it as
-    /// the tunnel rushes by, swaying slowly; it never leaves the tunnel.
+    /// the tunnel rushes by, swaying slowly; it never leaves the tunnel. Nor does it cut out: once the house stands the
+    /// camera glides back the same way into the player's eyes in the real car (<see cref="Return"/>, <see cref="ReturnTo"/>)
+    /// while the car slows to the speed the real one rolls into the basement at, and there the game takes the scene away.
+    /// The player's own camera is off meanwhile (the house is being built behind it).
     /// </summary>
     public class DriveScene : MonoBehaviour
     {
@@ -44,6 +47,9 @@ namespace Stealth.Level
         bool m_Glide;
         GameObject m_Mine;
         readonly List<GameObject> m_Riders = new();
+        Camera m_PlayerCamera;
+        bool m_Returning, m_EyeKnown;
+        float m_ReturnStart, m_ReturnTime = 1f, m_ReturnFrom, m_ReturnTo;
 
         /// <summary>Someone in the car: what they look like now (cloned) and where they sit, in the car's own space.</summary>
         public struct Rider
@@ -57,6 +63,9 @@ namespace Stealth.Level
         void Awake()
         {
             Active = this;
+            // the player's own camera rests: the scene's draws the whole screen, and the next house is put up behind it
+            var me = Player.PlayerController.Local;
+            if (me != null && me.Camera != null && me.Camera.enabled) { m_PlayerCamera = me.Camera; m_PlayerCamera.enabled = false; }
             for (int i = 0; i < Count && Segments != null && Segments.Length > 0; i++)
             {
                 var s = Instantiate(Segments[(i * 7 + 3) % Segments.Length], transform);
@@ -126,11 +135,46 @@ namespace Stealth.Level
                 rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; // the owner's own body was a shadow only
             }
             m_Riders.Add(copy);
-            if (r.Mine && m_Glide) { m_Mine = copy; copy.SetActive(false); }
+            if (r.Mine) { m_Mine = copy; copy.SetActive(!m_Glide); }
         }
 
-        /// <summary>0..1 of the glide (linear in time; the path eases its two legs itself).</summary>
-        public float Glide => m_Started < 0f || !m_Glide ? 1f : Mathf.Clamp01((Time.time - m_Started) / GlideTime);
+        /// <summary>0..1 of the glide (linear in time; the path eases its two legs itself): out of the cab, and back in on the return.</summary>
+        public float Glide => m_Returning ? 1f - ReturnShare : m_Started < 0f || !m_Glide ? 1f : Mathf.Clamp01((Time.time - m_Started) / GlideTime);
+
+        float ReturnShare => Mathf.Clamp01((Time.time - m_ReturnStart) / m_ReturnTime);
+
+        /// <summary>The camera is gliding back into the player's eyes (<see cref="Return"/>).</summary>
+        public bool Returning => m_Returning;
+        /// <summary>Back in the eyes (or, for a player not in the car, the return's time is up): the scene can go.</summary>
+        public bool Returned => m_Returning && ReturnShare >= 1f;
+
+        /// <summary>
+        /// The house stands: the camera glides back into the cab over <paramref name="seconds"/> while the car slows to
+        /// <paramref name="speed"/> (the real car's, rolling into the basement). Where the eyes are comes every frame (<see cref="ReturnTo"/>).
+        /// </summary>
+        public void Return(float seconds, float speed)
+        {
+            if (m_Returning) return;
+            m_Returning = true;
+            m_ReturnStart = Time.time;
+            m_ReturnTime = Mathf.Max(0.1f, seconds);
+            m_ReturnFrom = m_Speed;
+            m_ReturnTo = Mathf.Min(speed, Speed);
+        }
+
+        /// <summary>
+        /// Where the player's eyes are now in the real car (its own space, null: not in the car — the scene holds its view),
+        /// and their lens: the return glides there, so it ends exactly on the player's own view.
+        /// </summary>
+        public void ReturnTo(Pose? eyeInCar, float fov, float near)
+        {
+            m_EyeKnown = eyeInCar.HasValue && Camera != null && m_Car != null;
+            if (!m_EyeKnown) { m_Glide = false; return; }
+            m_Glide = true;
+            m_EyeInCar = eyeInCar.Value;
+            m_FromFov = fov;
+            m_FromNear = Mathf.Min(near, m_ToNear);
+        }
 
         /// <summary>Where the camera settles, in the scene's space: ahead of the car, by the right walkway, eye height.</summary>
         static readonly Vector3 View = new(CarAt.x + 4.6f, 1.45f, 2.35f);
@@ -170,7 +214,10 @@ namespace Stealth.Level
         void OnDestroy()
         {
             if (Active == this) Active = null;
+            if (m_PlayerCamera != null) m_PlayerCamera.enabled = true;
         }
+
+        float m_Speed;
 
         void Update()
         {
@@ -178,6 +225,8 @@ namespace Stealth.Level
             // from the sewer's speed up to the drive's (the engine follows)
             float up = m_Started < 0f ? 1f : Mathf.Clamp01((Time.time - m_Started) / Mathf.Max(0.01f, SpeedUpTime));
             float speed = Mathf.Lerp(m_FromSpeed, Speed, up * up * (3f - 2f * up));
+            if (m_Returning) speed = Mathf.Lerp(m_ReturnFrom, m_ReturnTo, Ease(ReturnShare)); // braking to the real car's roll
+            m_Speed = speed;
             if (Engine != null && Engine.isPlaying)
             {
                 Engine.pitch = Mathf.Lerp(0.9f, 1.55f, speed / Mathf.Max(0.01f, Speed));
@@ -203,7 +252,8 @@ namespace Stealth.Level
             m_Car.localRotation = Quaternion.Euler(pitch * k, 90f, 0f);
             foreach (var w in m_Wheels) w.Rotate(speed * dt / 0.42f * Mathf.Rad2Deg, 0f, 0f, Space.Self);
             if (Camera != null) Place(Glide);
-            if (m_Mine != null && !m_Mine.activeSelf && Glide >= 0.22f) m_Mine.SetActive(true); // the camera has left the cab
+            // the camera out of the cab: the player's own body sits there; back in their head: it goes
+            if (m_Mine != null && m_Glide && m_Mine.activeSelf != (Glide >= 0.22f)) m_Mine.SetActive(Glide >= 0.22f);
             if (Camera != null)
             {
                 // far down the tunnel: the sewer's haze, like the player's own camera (never Unity's default blue)

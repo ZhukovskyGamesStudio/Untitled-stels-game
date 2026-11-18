@@ -12,6 +12,8 @@ namespace Stealth.Level
         /// <summary>A lamp on the wall (+1 the left wall, −1 the right, 0 none) and whether it is broken (flickers).</summary>
         public int LampSide;
         public bool LampBroken;
+        /// <summary>The kit's segment with the alcove (its shaft up to the house the team came in through, the lid shut) instead of a variant.</summary>
+        public bool Alcove;
         /// <summary>Junk on the walkways: barrels and crates (x along, side ±1).</summary>
         public List<(float x, int side, bool barrel)> Junk;
     }
@@ -51,7 +53,7 @@ namespace Stealth.Level
         public readonly List<SewerSegment> Segments = new();
         /// <summary>The gate between the car and the exit's stretch (x), or −1: no gate (the run's first sewer).</summary>
         public float GateX = -1f;
-        /// <summary>Where the car waits (x, on the road, facing +X) and the ladder of the hatch the team came in through.</summary>
+        /// <summary>Where the car waits (x, on the road, facing +X) and the middle of the alcove beside it (the shaft up to the house the team came in through).</summary>
         public float CarX, EntryLadderX = -1f;
         /// <summary>The ladder from the house's exit (x; on the left walkway), −1 = none: the team starts at the car.</summary>
         public float ExitLadderX = -1f;
@@ -102,7 +104,17 @@ namespace Stealth.Level
                 x += SegmentLength;
             }
             for (int i = 0; i < behind; i++) Add();
-            p.EntryLadderX = afterHouse ? SegmentLength * (behind - 1) - 1.5f : -1f;
+            if (afterHouse)
+            {
+                // the car stopped where it stopped in the house's basement (Basement): beside the alcove whose ladder the team
+                // climbed — its lid is shut now, there is no way back up
+                var alcove = p.Segments[behind - 1];
+                alcove.Alcove = true;
+                alcove.LampSide = -1;
+                alcove.Junk.RemoveAll(j => j.side > 0);
+                p.Segments[behind - 1] = alcove;
+            }
+            p.EntryLadderX = afterHouse ? SegmentLength * (behind - 1) + 3f : -1f;
             p.CarX = SegmentLength * behind - 4.2f; // its nose a little before the gate
             if (afterHouse) p.GateX = x;
             for (int i = 0; i < ahead; i++) Add();

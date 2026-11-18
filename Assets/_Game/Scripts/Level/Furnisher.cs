@@ -857,11 +857,15 @@ namespace Stealth.Level
         /// stay out of reach, the furniture groups that wall them off go (with their loot), until everything is reachable.
         /// </summary>
         /// <summary>Furniture groups the last walkability check took out (for tests and logs).</summary>
-        public static int LastRemoved { get; private set; }
-        public static int LastDroppedItems { get; private set; }
-        public static readonly List<string> LastNotes = new();
+        /// (Per thread: the next house is generated in the background during the drive while the main thread may generate a preview.)
+        public static int LastRemoved { get => s_LastRemoved; private set => s_LastRemoved = value; }
+        public static int LastDroppedItems { get => s_LastDropped; private set => s_LastDropped = value; }
+        public static List<string> LastNotes => s_LastNotes ??= new List<string>();
         /// <summary>The pieces the last walkability check took out (for the space audit and tests).</summary>
-        public static readonly List<(PropKind kind, Vector3 pos)> LastCut = new();
+        public static List<(PropKind kind, Vector3 pos)> LastCut => s_LastCut ??= new List<(PropKind, Vector3)>();
+        [System.ThreadStatic] static int s_LastRemoved, s_LastDropped;
+        [System.ThreadStatic] static List<string> s_LastNotes;
+        [System.ThreadStatic] static List<(PropKind, Vector3)> s_LastCut;
 
         /// <summary>Rooms whose middle cannot be walked to from the hatch (walls, doorways, stairs, furniture placed so far).</summary>
         public List<PlanRoom> Unreached()

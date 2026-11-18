@@ -63,7 +63,7 @@ namespace Stealth.Net
         readonly List<KeyValuePair<ulong, int>> m_VoteBuffer = new();
         NetworkList<NetInventoryEntry> m_Stash, m_ExitStash;
         NetworkList<ulong> m_Cargo;
-        readonly NetworkVariable<double> m_DriveUntil = new(), m_StunnedUntil = new();
+        readonly NetworkVariable<double> m_DriveUntil = new(), m_ArriveAt = new(), m_StunnedUntil = new();
         readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
         /// <summary>What the team has seen of the house: [0] = the house seed, then the bits of <see cref="Stealth.Level.ExplorationMap"/>.</summary>
@@ -115,6 +115,8 @@ namespace Stealth.Net
             PullCargo();
             m_DriveUntil.OnValueChanged += (_, v) => m_Game.DriveUntil = v;
             m_Game.DriveUntil = m_DriveUntil.Value;
+            m_ArriveAt.OnValueChanged += (_, v) => m_Game.ArriveAt = v;
+            m_Game.ArriveAt = m_ArriveAt.Value;
             m_Lift.OnValueChanged += (_, v) => m_Game.Lift = v.State;
             m_Game.Lift = m_Lift.Value.State;
             m_StunnedUntil.OnValueChanged += (_, v) => m_Game.ApplyStun(v);
@@ -180,6 +182,7 @@ namespace Stealth.Net
                 foreach (var c in m_Game.Cargo.Items) m_Cargo.Add(c.Pack());
             }
             NetSync.Set(m_DriveUntil, m_Game.DriveUntil);
+            NetSync.Set(m_ArriveAt, m_Game.ArriveAt);
             NetSync.Set(m_StunnedUntil, m_Game.StunnedUntil);
             NetSync.Set(m_Lift, NetLift.Of(m_Game.Lift));
         }

@@ -37,6 +37,8 @@ namespace Stealth.Level
         [Tooltip("Straight 6 m segments, one per variant.")]
         public GameObject[] Segments;
         public GameObject Cap, Hub, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
+        [Tooltip("The segment with the alcove beside the car: a ladder up a shaft to the lid of the house's floor (shut from below here).")]
+        public GameObject Alcove;
         [Tooltip("Bricks that fill a mouth of the hall leading nowhere this time.")]
         public GameObject Plug;
         [Tooltip("An invisible wall across the tunnel behind the car: the way back (where the car came from) is seen, not walked.")]
@@ -117,7 +119,8 @@ namespace Stealth.Level
             for (int i = 0; i < plan.Segments.Count; i++)
             {
                 var s = plan.Segments[i];
-                if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
+                if (s.Alcove && Alcove != null) Put(Alcove, $"Segment{i}", new Vector3(s.X, 0f, 0f)); // its lid shut: no ladder to climb here
+                else if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
                 if (s.LampSide != 0)
                 {
                     var lamp = Put(Lamp, $"Lamp{i}", new Vector3(s.X + SewerPlan.SegmentLength / 2f, 2.3f, s.LampSide * 3.55f), s.LampSide > 0 ? 90f : -90f);
@@ -133,12 +136,6 @@ namespace Stealth.Level
                     Put(barrel ? Barrel : Crate, "Junk", new Vector3(x, 0.15f, side * (SewerPlan.WalkwayZ + 0.1f)), x * 47f);
             }
 
-            // the car's stretch: the ladder up to the hatch the team came in through
-            if (plan.EntryLadderX >= 0f)
-            {
-                Put(Ladder, "EntryLadder", new Vector3(plan.EntryLadderX, 0.15f, -3.45f), 180f);
-                Put(Manhole, "EntryManhole", new Vector3(plan.EntryLadderX, 4.15f, -3.2f));
-            }
             CarSpot = new Pose(transform.TransformPoint(new Vector3(plan.CarX, 0.05f, -0.4f)), transform.rotation * Quaternion.Euler(0f, 90f, 0f)); // facing +X
 
             if (plan.GateX >= 0f && GatePrefab != null)

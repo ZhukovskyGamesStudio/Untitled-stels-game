@@ -216,6 +216,11 @@ namespace Stealth.Level
         /// </summary>
         public bool HasBasement;
         public Vector3 BasementOrigin, EntryHatch;
+        /// <summary>The basement's turn (a multiple of 90°: its tunnel runs under the house) and the side of the shaft a climber steps off to (flat, unit).</summary>
+        public float BasementYaw;
+        public Vector3 ShaftExit = Vector3.forward;
+        /// <summary>The basement's frame (<see cref="Basement"/>).</summary>
+        public BasementFrame Cellar => new(BasementOrigin, BasementYaw);
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
         public readonly List<Vector3> PlayerSpawns = new();
@@ -407,7 +412,7 @@ namespace Stealth.Level
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
         public bool IsInside(Vector3 p)
         {
-            if (HasBasement && Basement.Contains(BasementOrigin, p)) return true;
+            if (HasBasement && Basement.Contains(Cellar, p)) return true;
             if (Plan == null) return false;
             if (Plan.IsInside(new Vector2(p.x, p.z))) return true;
             // a balcony is the house's too: no gas up there

@@ -652,8 +652,16 @@ namespace Stealth.Player
                 return;
             }
             var layout = ActiveLevel.Layout;
-            if (layout == null || layout.Seed == m_PlacedSeed || layout.PlayerSpawns.Count == 0) return;
+            if (layout == null || !ActiveLevel.Ready || layout.Seed == m_PlacedSeed || layout.PlayerSpawns.Count == 0) return;
             m_PlacedSeed = layout.Seed;
+            if (SeatIndex >= 0)
+            {
+                // arriving in the car: the seat holds us, rolling in with it
+                m_PlacedInHatch = false;
+                Motor.Stamina.Refill();
+                Gas.Reset();
+                return;
+            }
             var spawn = layout.PlayerSpawns[(int)(ClientId % (ulong)layout.PlayerSpawns.Count)];
             var toHatch = layout.HatchPosition - spawn;
             toHatch.y = 0;

@@ -429,16 +429,19 @@ namespace Stealth.Level
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
             // the shaft down to the basement the team arrives in (Basement): its lid where the entry hatch was, in the plant
             // room's corner (the building's drain leaves for the sewer there), the lobby's where a house has no plant room
-            furnisher.Put(entryRoom, PropKind.ShaftHatch, l.HatchPosition, 0f);
+            // (the lid's hinge away from the side a climber steps off to; the basement's tunnel runs under the house)
+            l.ShaftExit = ShaftExit(l.HatchPosition, entryRoom.Center);
+            furnisher.Put(entryRoom, PropKind.ShaftHatch, l.HatchPosition, Mathf.Atan2(l.ShaftExit.x, l.ShaftExit.z) * Mathf.Rad2Deg);
             l.HasBasement = true;
-            l.BasementOrigin = Basement.Origin(l.HatchPosition);
-            l.EntryHatch = Basement.StashSpot(l.BasementOrigin); // no hatch down there: where the team's stash is kept
+            l.BasementYaw = Basement.YawUnder(l.HatchPosition, new Rect(0f, 0f, l.SizeX, l.SizeZ));
+            l.BasementOrigin = Basement.Frame(l.HatchPosition, l.BasementYaw).Origin;
+            l.EntryHatch = Basement.StashSpot(l.Cellar); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
             l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
-            l.PlayerSpawns.AddRange(Basement.Spawns(l.BasementOrigin));
+            l.PlayerSpawns.AddRange(Basement.Spawns(l.Cellar));
 
             // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
             // (the apartment block: every room is its flat's, where its plan has it — a kitchen in every flat)
@@ -614,9 +617,34 @@ namespace Stealth.Level
         /// <summary>The entry hatch: in the plant room's corner (the lobby's, where a house has no plant room).</summary>
         static Vector3 EntryHatch(LevelLayout l)
         {
+            PlanRoom room = l.Lobby;
             foreach (var r in l.Rooms)
-                if (r.Type == RoomType.Utility && r.Floor == 0) return HatchCorner(l, r, null);
-            return HatchCorner(l, l.Lobby, null);
+                if (r.Type == RoomType.Utility && r.Floor == 0) { room = r; break; }
+            return OnCells(HatchCorner(l, room, null), room.Center);
+        }
+
+        /// <summary>
+        /// The shaft's middle on a plan cell's middle, the nearer one towards the room's middle: its hole in the floor is
+        /// exactly 3 × 3 cells (the slab is cut by cells) and the lid's frame lies right round it.
+        /// </summary>
+        public static Vector3 OnCells(Vector3 p, Vector3 toward)
+        {
+            float Snap(float v, float t)
+            {
+                const float res = HousePlan.Res;
+                float lo = Mathf.Floor(v / res) * res + res / 2f;
+                if (lo > v + 1e-4f) lo -= res;
+                float hi = lo + res;
+                return Mathf.Abs(t - hi) < Mathf.Abs(t - lo) ? hi : lo;
+            }
+            return new Vector3(Snap(p.x, toward.x), p.y, Snap(p.z, toward.z));
+        }
+
+        /// <summary>The side of the shaft a climber steps off to: the axis towards the room's middle (away from its walls).</summary>
+        public static Vector3 ShaftExit(Vector3 shaft, Vector3 roomCenter)
+        {
+            var to = roomCenter - shaft;
+            return Mathf.Abs(to.x) > Mathf.Abs(to.z) ? new Vector3(Mathf.Sign(to.x), 0f, 0f) : new Vector3(0f, 0f, to.z >= 0f ? 1f : -1f);
         }
 
         /// <summary>The corner of a room's back wall (away from the street, z = 0: the workshop's bays are there) farthest from the entry hatch.</summary>

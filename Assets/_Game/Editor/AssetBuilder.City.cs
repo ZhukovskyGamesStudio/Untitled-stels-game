@@ -167,20 +167,23 @@ namespace Stealth.EditorTools
             var shaftHatch = Prefab($"{LevelPrefabs}/ShaftHatch.prefab", () =>
             {
                 var go = new GameObject("ShaftHatch");
-                float half = Basement.ShaftHalf + 0.1f;
+                // the frame lies on the floor right round the hole (its inner edge at the hole's: 3 × 3 plan cells), the lid
+                // rests on its inner lip; the hinge along the frame's −Z bar
+                float half = Basement.ShaftHalf, bar = 0.12f, lip = 0.03f;
                 foreach (var (c, sz) in new[]
                          {
-                             (new Vector3(0f, 0.01f, -half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)), (new Vector3(0f, 0.01f, half), new Vector3(2 * half + 0.12f, 0.03f, 0.12f)),
-                             (new Vector3(-half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)), (new Vector3(half, 0.01f, 0f), new Vector3(0.12f, 0.03f, 2 * half)),
+                             (new Vector3(0f, 0.012f, -half - bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)), (new Vector3(0f, 0.012f, half + bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)),
+                             (new Vector3(-half - bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)), (new Vector3(half + bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)),
                          })
                     Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Warning], collider: false);
                 var lid = new GameObject("Lid").transform;
                 lid.SetParent(go.transform, false);
-                lid.localPosition = new Vector3(0f, 0.03f, -half);
-                var plate = Cube(lid, "Plate", new Vector3(0f, 0.02f, half), new Vector3(2 * half - 0.04f, 0.05f, 2 * half - 0.04f), util[(int)UtilitySlot.Panel], collider: true);
+                lid.localPosition = new Vector3(0f, 0.024f, -half - lip);
+                float side = 2 * half + 2 * lip;
+                var plate = Cube(lid, "Plate", new Vector3(0f, 0.02f, side / 2f), new Vector3(side, 0.04f, side), util[(int)UtilitySlot.Panel], collider: true);
                 for (int i = 0; i < 5; i++)
-                    Cube(lid, "Rib", new Vector3(0f, 0.055f, 0.2f + i * (2 * half - 0.4f) / 4f), new Vector3(2 * half - 0.2f, 0.02f, 0.04f), util[(int)UtilitySlot.Dark], collider: false);
-                Cube(lid, "Handle", new Vector3(0f, 0.08f, 2 * half - 0.12f), new Vector3(0.3f, 0.04f, 0.04f), util[(int)UtilitySlot.Warning], collider: false);
+                    Cube(lid, "Rib", new Vector3(0f, 0.05f, 0.2f + i * (side - 0.4f) / 4f), new Vector3(side - 0.2f, 0.02f, 0.04f), util[(int)UtilitySlot.Dark], collider: false);
+                Cube(lid, "Handle", new Vector3(0f, 0.075f, side - 0.12f), new Vector3(0.3f, 0.04f, 0.04f), util[(int)UtilitySlot.Warning], collider: false);
                 go.AddComponent<KeepUnmerged>(); // the lid moves: never baked into the furniture's merged mesh (it would stay shut there)
                 var h = go.AddComponent<ShaftHatch>();
                 h.Lid = lid;

@@ -69,6 +69,9 @@ namespace Stealth.Vehicles
         float m_Spin, m_Distance, m_Grind, m_RemoteSpeed, m_RemoteSteer;
         Vector3 m_LastPos;
         float m_LastYaw;
+        Pose m_RollPose;
+        float m_RollSpeed;
+        bool m_Rolling;
         bool m_WasEngine;
         int m_CargoShown = -1;
         readonly List<CargoPiece> m_Pieces = new();
@@ -215,7 +218,9 @@ namespace Stealth.Vehicles
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
             bool away = Level.DriveScene.Active != null; // the drive scene shows the car now: this one waits, silent
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !away;
+            // arriving: the car rolls in down the basement's tunnel to the gate by the server's clock, nobody steers it
+            bool rolling = m_Rolling = GameManager.Instance != null && GameManager.Instance.Rolling(out m_RollPose, out m_RollSpeed);
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !away && !rolling;
             m_Input = drive
                 ? new CarInput
                 {
@@ -224,11 +229,15 @@ namespace Stealth.Vehicles
                     Brake = Controls.Held(GameAction.Jump),
                 }
                 : new CarInput { Brake = !EngineOn };
-            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning) && !away) m_Input = forced;
+            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning) && !away && !rolling) m_Input = forced;
             if (drive && Controls.Pressed(GameAction.Horn)) Horn();
 
-
-            if (HasAuthority) Simulate(dt);
+            if (HasAuthority && rolling)
+            {
+                transform.SetPositionAndRotation(m_RollPose.position, m_RollPose.rotation);
+                m_Physics.Speed = m_RollSpeed;
+            }
+            else if (HasAuthority) Simulate(dt);
             else
             {
                 var delta = transform.position - m_LastPos;
@@ -399,14 +408,16 @@ namespace Stealth.Vehicles
             if (EngineOn != m_WasEngine)
             {
                 m_WasEngine = EngineOn;
-                Sfx.At(EngineOn ? Sfx.Bank?.CarStart : Sfx.Bank?.CarStop, transform.position + transform.forward * 1.5f, 1f, Sfx.Group.Items);
+                if (!m_Rolling) // (arriving, the engine has been running all the way)
+                    Sfx.At(EngineOn ? Sfx.Bank?.CarStart : Sfx.Bank?.CarStop, transform.position + transform.forward * 1.5f, 1f, Sfx.Group.Items);
             }
             if (Engine == null) return;
             if (Engine.clip == null && Sfx.Bank != null) { Engine.clip = Sfx.Bank.CarEngine; if (Engine.clip != null) Engine.Play(); }
             float revs = Mathf.Clamp01(Mathf.Abs(Speed) / Mathf.Max(1f, m_Physics.Settings.MaxSpeed));
             float target = EngineOn && Level.DriveScene.Active == null ? 0.55f + 0.35f * revs : 0f;
             float muffle = AudioDirector.Instance != null ? AudioDirector.Instance.Muffle(transform.position) : 1f;
-            Engine.volume = Mathf.MoveTowards(Engine.volume, target * muffle, Time.deltaTime * 1.5f);
+            // rolling in after the drive: the engine goes on at once where the drive scene's left off
+            Engine.volume = m_Rolling ? target * muffle : Mathf.MoveTowards(Engine.volume, target * muffle, Time.deltaTime * 1.5f);
             Engine.pitch = Mathf.Lerp(Engine.pitch, 0.8f + revs * 1.1f + Mathf.Abs(m_Input.Throttle) * 0.15f, 1f - Mathf.Exp(-5f * Time.deltaTime));
         }
 
