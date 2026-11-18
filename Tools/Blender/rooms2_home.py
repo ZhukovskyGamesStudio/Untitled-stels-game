@@ -34,7 +34,7 @@ def export(filename):
     import bpy
     bpy.context.view_layer.update()
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-    meshfix.fix_objects(objs, floor=True, name=filename)
+    meshfix.fix_objects(objs, floor=True, name=filename, pinned=meshfix.moving)  # doors and drawers stay put
     path = os.path.join(g.out_dir, "Props", filename + ".fbx")
     s.export_fbx(path, objs)
     s.clear_scene()
@@ -147,21 +147,29 @@ def model_kitchen_island():
 
 
 def model_dishwasher():
-    """Built-in dishwasher module 0.6 x 0.62, worktop at 0.92: a carcass with a steel front door (a pull recess bar
-    across its top), a dark control strip with buttons and a little display, a recessed kick plinth."""
-    carcass = s.rbox((0.594, 0.57, 0.81), (0, 0.025, 0.485), r=0.008, seg=1)
+    """Built-in dishwasher module 0.6 x 0.62, worktop at 0.92: a hollow carcass, a dark control strip with buttons and
+    a little display, a recessed kick plinth; the front pulls out like a drawer (BodyDrawer0: Items.Storage moves
+    drawers straight out, a drop-down door is not one of its motions) with its pull bar and two dish baskets - plates
+    below, cups above - so the opened machine shows its load."""
+    carcass = s.cupboard(-0.297, 0.297, -0.258, 0.31, 0.08, 0.89, t=0.016)
     strip = s.rbox((0.58, 0.024, 0.08), (0, -0.264, 0.83), r=0.006, seg=2)
     buttons = [s.rcyl(0.009, 0.01, (x, -0.277, 0.83), axis="Y", seg=10, r=0.002, bevel_seg=1)
                for x in (0.1, 0.14, 0.18, 0.22)]
-    s.part("Body", [carcass, strip, *buttons])
+    s.part("Body", [*carcass, strip, *buttons])
     top = s.rbox((0.6, 0.62, 0.04), (0, 0, 0.9), r=0.008, seg=2)
     s.part("Trim", [top])
     door = s.rbox((0.58, 0.022, 0.68), (0, -0.27, 0.445), r=0.008, seg=2)
     s.groove(door, "Z", 0.27, 0.008, 0.003)
     handle = bar_handle(0, 0.735, -0.28, 0.42, axis="X", r=0.008, stand=0.014)
+    load = s.tray(-0.26, 0.26, -0.262, 0.27, 0.13, 0.14, t=0.008) + s.tray(-0.26, 0.26, -0.262, 0.27, 0.5, 0.1, t=0.008)
+    load += [s.rcyl(0.1, 0.012, (x, 0.0, 0.235), axis="X", seg=20, r=0.003, bevel_seg=1)
+             for x in (-0.16, -0.08, 0.0, 0.08, 0.16)]                                      # plates on edge
+    load += [s.rcyl(0.04, 0.09, (x, y, 0.552), seg=14, r=0.004, bevel_seg=1)
+             for x in (-0.15, 0.0, 0.15) for y in (-0.1, 0.12)]                             # cups upside down
+    s.part("BodyDrawer0", [door, *handle, *load])
     plinth = s.rbox((0.58, 0.5, 0.11), (0, 0.04, 0.055), r=0.006, seg=1)
     feet = [s.rcyl(0.018, 0.012, (x, -0.2, 0.006), seg=10, r=0.003, bevel_seg=1) for x in (-0.24, 0.24)]
-    s.part("Accent", [door, *handle, plinth, *feet])
+    s.part("Accent", [plinth, *feet])
     display = s.rbox((0.09, 0.008, 0.026), (-0.17, -0.276, 0.83), r=0.003, seg=1)
     s.part("Eye", [display])
     return export("dishwasher")
@@ -227,18 +235,21 @@ def model_pantry_cabinet():
 # --------------------------------------------------------------------------- restroom
 
 def model_double_sink():
-    """Double vanity 1.4 x 0.56, counter at 0.85: a cabinet with four shaker doors and knobs on a recessed plinth, a
-    stone counter with an upstand, two vessel basins with tall taps, and one long framed mirror on the wall above
+    """Double vanity 1.4 x 0.56, counter at 0.85: an open cabinet (a divider, a shelf) on a recessed plinth with four
+    shaker doors that open in two pairs from their meeting edges (BodyDoor0..3, knobs in them: Items.Storage), a stone
+    counter with an upstand, two vessel basins with tall taps, and one long framed mirror on the wall above
     (1.1..1.9, glass Eye)."""
-    cab = s.rbox((1.36, 0.5, 0.72), (0, 0.025, 0.47), r=0.01, seg=2)
+    cab = s.cupboard(-0.68, 0.68, -0.225, 0.275, 0.11, 0.83, t=0.018, top=False, dividers=(0.0,), shelves=(0.42,))
     plinth = s.rbox((1.32, 0.44, 0.12), (0, 0.04, 0.06), r=0.006, seg=1)
-    doors = []
-    for x in (-0.5, -0.17, 0.17, 0.5):
+    for i, x in enumerate((-0.5, -0.17, 0.17, 0.5)):
         d = s.rbox((0.32, 0.02, 0.64), (x, -0.226, 0.47), r=0.008, seg=2)
         panel(d, (0, -1, 0), 0.1, thickness=0.04)
-        doors.append(d)
+        kx = x + (0.12 if x in (-0.5, 0.17) else -0.12)                                    # knob at the meeting edge
+        knob = [s.rcyl(0.016, 0.014, (kx, -0.248, 0.7), axis="Y", seg=12, r=0.005, bevel_seg=1),
+                s.rcyl(0.007, 0.016, (kx, -0.238, 0.7), axis="Y", seg=8, r=0.002, bevel_seg=1)]
+        s.part(f"BodyDoor{i}", [d, *knob])
     basins = [bowl(0.2, 0.16, 0.848, 0.12, wall=0.01, seg=20, loc=(x, -0.02)) for x in (-0.36, 0.36)]
-    s.part("Body", [cab, plinth, *doors, *basins])
+    s.part("Body", [*cab, plinth, *basins])
     counter = s.rbox((1.4, 0.56, 0.04), (0, 0, 0.83), r=0.01, seg=2)
     upstand = s.rbox((1.396, 0.02, 0.28), (0, 0.269, 0.975), r=0.006, seg=1)  # splashback up to the mirror
     s.groove(upstand, "Z", 0.975, 0.006, 0.003)
@@ -252,10 +263,6 @@ def model_double_sink():
         acc.append(s.rcyl(0.015, 0.025, (x, 0.08, 1.04), seg=12, r=0.003, bevel_seg=1))
         acc.append(s.rbox((0.012, 0.07, 0.014), (x + 0.03, 0.2, 0.95), r=0.005, seg=1, rot=(-20 * DEG, 0, 0)))
         acc.append(s.rcyl(0.014, 0.03, (x + 0.02, 0.2, 0.95), axis="X", seg=10, r=0.003, bevel_seg=1))
-    for x in (-0.5, -0.17, 0.17, 0.5):
-        kx = x + (0.12 if x in (-0.5, 0.17) else -0.12)
-        acc.append(s.rcyl(0.016, 0.014, (kx, -0.248, 0.7), axis="Y", seg=12, r=0.005, bevel_seg=1))
-        acc.append(s.rcyl(0.007, 0.016, (kx, -0.238, 0.7), axis="Y", seg=8, r=0.002, bevel_seg=1))
     acc.append(frame((1.3, 0.024, 0.8), (0, 0.268, 1.5), 0.035, r=0.008, seg=1))
     s.part("Accent", acc)
     glass = s.rbox((1.245, 0.008, 0.745), (0, 0.256, 1.5), r=0.003, seg=1)

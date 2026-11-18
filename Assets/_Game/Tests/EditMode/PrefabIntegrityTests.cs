@@ -40,6 +40,10 @@ namespace Stealth.Tests
             "AutoDoor.PanelB",
             "AutoDoor.SwingB",               // only the street doors have a second leaf
             "AutoDoor.Wheel",                // only the vault's door has a wheel to spin
+            "AutoDoor.BlockerB",             // only a door-and-a-half's narrow leaf has a blocker of its own
+            "LiftButton.Cab",                // a call button on a landing is not in the cab
+            "AutoDoor.Number",               // only a flat's entry door carries its number
+            "PropVariants.Frame",            // only shelves swap their books for a style's own model
         };
 
         static IEnumerable<string> AllPrefabPaths() =>

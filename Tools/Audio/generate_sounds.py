@@ -610,6 +610,26 @@ def unlock():
     return fade(mix(at(click(), 0.0, d), at(click(), 0.12, d), clunk))
 
 
+def door_open():
+    """A hinged door opening: the handle's latch clicks back, then a short dry creak of the hinges and the air it moves."""
+    d = 0.6
+    latch = at(highpass(noise(0.03), 1800) * env(int(0.03 * SR), 0.0005, 0.012, curve=6) * 0.8, 0.0, d)
+    t = t_axis(0.38)
+    creak = np.sin(2 * np.pi * (310 + 90 * np.sin(2 * np.pi * 7 * t)) * t) * (0.5 + 0.5 * (rng.uniform(0, 1, len(t)) > 0.7))
+    creak = bandpass(creak, 250, 1600) * env(len(t), 0.06, 0.3, curve=2) * 0.18
+    swish = bandpass(noise(0.45), 200, 900) * env(int(0.45 * SR), 0.12, 0.3, curve=2) * 0.25
+    return fade(mix(latch, at(creak, 0.05, d), at(swish, 0.06, d)), 0.002, 0.05)
+
+
+def door_shut():
+    """A hinged door shutting: a soft thud of the leaf on its frame and the latch snapping in."""
+    d = 0.45
+    thud = lowpass(noise(0.2), 260) * env(int(0.2 * SR), 0.002, 0.09) * 0.9
+    body = lowpass(sine(85, 0.2), 300) * env(int(0.2 * SR), 0.002, 0.1) * 0.5
+    latch = at(highpass(noise(0.025), 2200) * env(int(0.025 * SR), 0.0005, 0.01, curve=6) * 0.6, 0.03, d)
+    return fade(mix(at(thud, 0.0, d), at(body, 0.0, d), latch), 0.001, 0.05)
+
+
 # --------------------------------------------------------------------------- environment
 
 def alarm(length):
@@ -890,6 +910,8 @@ def main():
     write(P("Player", "gas_breath"), gas_breath(), 0.7)
     for level in range(3):
         write(P("Player", f"gas_laugh_{level}"), gas_laugh(level), 0.8)
+    write(P("Environment", "door_open"), door_open(), 0.6)
+    write(P("Environment", "door_shut"), door_shut(), 0.7)
 
 
 if __name__ == "__main__":

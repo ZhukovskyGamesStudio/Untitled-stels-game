@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Stealth.Configs;
@@ -80,7 +81,12 @@ namespace Stealth.Tests
             Assert.AreEqual(4, l.Floors);
             Assert.That(l.RoomUnits / l.Floors, Is.InRange(2.5f, 6f), "a small house (4 rooms' worth per floor)");
             Assert.IsFalse(l.Doorways.Any(d => d.Kind == EdgeType.Vent), "no vents");
-            Assert.AreEqual(l.KeyDoors.Count + (l.VaultDoor >= 0 ? 1 : 0) + (l.StorageDoor >= 0 ? 1 : 0), l.AutoDoors.Count, "only the key doors (and the vault's and the storage room's, when the house has them)");
+            // no chance of a door: only the doors a doorway always has (toilets, the plant room…), the key doors, the vault's and the storage room's
+            var must = new HashSet<Vector3>(l.Doorways.Where(d => DoorRules.Always(l, d)).Select(d => d.Position));
+            foreach (var k in l.KeyDoors) must.Add(l.AutoDoors[k.Door].position);
+            if (l.VaultDoor >= 0) must.Add(l.AutoDoors[l.VaultDoor].position);
+            if (l.StorageDoor >= 0) must.Add(l.AutoDoors[l.StorageDoor].position);
+            CollectionAssert.AreEquivalent(must, l.AutoDoors.Select(p => p.position), "only the doors that must be there");
 
             var onlyServers = new BuildingSettings { RoomWeights = new[] { new RoomWeight(RoomType.Server, 1) } };
             // an office (a hospital and a garage have programs of their own)

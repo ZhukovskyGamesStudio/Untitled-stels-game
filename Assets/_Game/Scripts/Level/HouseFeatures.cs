@@ -93,7 +93,8 @@ namespace Stealth.Level
     /// The special places of a house (pure, from the seed; each with its own random stream so the rest of the house does
     /// not shift): a hidden room behind illusion walls, key doors that close off a part of the house, searchable crates,
     /// wardens in front of loot rooms with lure speakers around them, and the location's point of interest (the robot
-    /// programming console in an office, the med table in a hospital, the workbench in a garage).
+    /// programming console in an office, the med table in a hospital, the workbench in a garage; an apartment block has none —
+    /// its find is the shelter map).
     /// </summary>
     public static class HouseFeatures
     {
@@ -105,11 +106,12 @@ namespace Stealth.Level
             _ => Location.Office,
         };
 
-        public static PropKind PointOfInterestKind(Location location) => location switch
+        /// <summary>The location's point of interest; none in an apartment block (its own find is the shelter map).</summary>
+        public static PropKind? PointOfInterestKind(Location location) => location switch
         {
             Location.Hospital => PropKind.MedTable,
             Location.Garage => PropKind.Workbench,
-            Location.Apartments => PropKind.MedTable, // the survivors' first-aid corner in a flat
+            Location.Apartments => null,
             _ => PropKind.Programmer,
         };
 
@@ -724,11 +726,12 @@ namespace Stealth.Level
 
         /// <summary>
         /// The location's own place: a meeting table, a reception desk or a kitchen counter (big enough to stand in for it)
-        /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage). After the furniture.
+        /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage); an apartment block
+        /// has no such place (its find is the shelter map). After the furniture.
         /// </summary>
         public static void PointOfInterest(LevelLayout l)
         {
-            var kind = PointOfInterestKind(LocationOf(l.Kind));
+            if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
             var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x9017, 0));
             // a big piece of furniture with nothing standing on it stands in for the 2 m console / table / bench (not a desk
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the

@@ -40,7 +40,7 @@ namespace Stealth.Tests
             // ducts run between the doors' tops and the ceiling
             foreach (var p in parts.Where(p => p.Slot == UtilitySlot.Duct))
             {
-                float y = p.Center.y - LevelLayout.FloorY(LevelLayout.FloorOf(p.Center.y));
+                float y = p.Center.y - LevelLayout.FloorY(LevelLayout.FloorOf(p.Center.y - 1.5f)); // (the duct is near the ceiling: its floor from below)
                 Assert.That(y - p.Size.y / 2f, Is.GreaterThan(LevelMetrics.DoorHeight), "over the doors");
                 Assert.That(y + p.Size.y / 2f, Is.LessThanOrEqualTo(LevelMetrics.WallHeight + 1e-3f), "under the ceiling");
             }

@@ -142,6 +142,9 @@ namespace Stealth.Player
                 case Cheat.Invisible: Invisible = on; break;
                 case Cheat.KillRobots: gm?.KillAllRobotsServer(); break;
                 case Cheat.FillQuota: gm?.FillQuotaServer(); break;
+                default:
+                    if (cheat >= Cheat.StartHouse) gm?.StartHouseServer((Stealth.Level.HouseKind)(cheat - Cheat.StartHouse));
+                    break;
             }
         }
         /// <summary>Lying with no HP: only a teammate can lift you (lying with HP left you get up yourself).</summary>

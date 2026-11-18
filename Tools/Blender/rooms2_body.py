@@ -30,7 +30,7 @@ def export(filename):
     import bpy
     bpy.context.view_layer.update()
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-    meshfix.fix_objects(objs, floor=True, name=filename)
+    meshfix.fix_objects(objs, floor=True, name=filename, pinned=meshfix.moving)  # doors and drawers stay put
     lo = Vector((1e9, 1e9, 1e9))
     hi = Vector((-1e9, -1e9, -1e9))
     tris = 0
@@ -908,21 +908,24 @@ def model_floor_cushions():
 
 
 def model_night_table():
-    """Bedside table 0.5 x 0.44: a carcass on tapered legs with a drawer and an open niche, a top, a little lamp with
-    a glowing shade and a book."""
+    """Bedside table 0.5 x 0.44: a carcass on tapered legs with a drawer that slides out (BodyDrawer0: a box behind
+    its front, the knob in it: Items.Storage) and an open niche, a top, a little lamp with a glowing shade and a book."""
     body = [s.rbox((0.5, 0.44, 0.025), (0, 0, 0.3875), r=0.008, seg=2)]                    # top
     cab = s.rbox((0.46, 0.4, 0.26), (0, 0.01, 0.255), r=0.01, seg=2)
     cab = s.boolean(cab, s.rbox((0.4, 0.36, 0.1), (0, -0.04, 0.185), r=0.008, seg=1), "DIFFERENCE")  # niche
+    cab = s.boolean(cab, s.rbox((0.4, 0.37, 0.115), (0, -0.015, 0.3125), r=0.006, seg=1), "DIFFERENCE")  # drawer bay
     s.bevel_edges(cab, 0.003, 1, angle=50)
     body.append(cab)
-    body.append(s.rbox((0.42, 0.02, 0.1), (0, -0.192, 0.315), r=0.006, seg=2))             # drawer front
+    drawer = [s.rbox((0.42, 0.02, 0.1), (0, -0.192, 0.315), r=0.006, seg=2)]               # drawer front
+    drawer += s.tray(-0.185, 0.185, -0.186, 0.15, 0.262, 0.08, t=0.01)
+    drawer.append(s.ball(0.014, (0, -0.205, 0.315), seg=12))                                # knob
+    s.part("BodyDrawer0", drawer)
     for x in (-0.2, 0.2):
         for y in (-0.16, 0.18):
             body.append(s.rbox((0.026, 0.026, 0.14), (x, y, 0.07), r=0.005, seg=1, taper=(1.4, 1.4)))
     s.part("Body", body)
-    acc = [s.ball(0.014, (0, -0.205, 0.315), seg=12)]                                        # knob
-    acc.append(s.lathe([(0.0, 0.398), (0.055, 0.398), (0.058, 0.405), (0.05, 0.42), (0.016, 0.428), (0.0, 0.43)],
-                       seg=20, loc=(0.11, 0.06, 0)))                                         # lamp base
+    acc = [s.lathe([(0.0, 0.398), (0.055, 0.398), (0.058, 0.405), (0.05, 0.42), (0.016, 0.428), (0.0, 0.43)],
+                   seg=20, loc=(0.11, 0.06, 0))]                                             # lamp base
     acc.append(s.rcyl(0.008, 0.1, (0.11, 0.06, 0.475), seg=10, r=0.002, bevel_seg=1))       # stem
     acc.append(s.rbox((0.15, 0.21, 0.035), (-0.1, -0.02, 0.416), r=0.004, seg=1, rot=(0, 0, 0.25)))  # book
     s.part("Accent", acc)

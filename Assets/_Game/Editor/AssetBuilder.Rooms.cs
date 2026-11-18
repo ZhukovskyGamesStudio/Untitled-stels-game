@@ -214,7 +214,7 @@ namespace Stealth.EditorTools
             (PropKind.BathVanity, "bath_vanity", "Ceiling", "PropAccent", "Metal", "PropScreen"),
             (PropKind.WashingMachine, "washing_machine", "Ceiling", "PropAccent", "Metal", "PropScreen"),
             (PropKind.ShoeCabinet, "shoe_cabinet", "Wood", "Fabric", "Metal", "PropScreen"),
-            (PropKind.HallHooks, "hall_hooks", "Wood", "Fabric", "Metal", "PropScreen"),
+            (PropKind.HallHooks, "hall_hooks_bare", "Wood", "Metal", "Metal", "PropScreen"), // Tools/Blender/variants.py: garments on its hooks (PropVariants)
             (PropKind.Mailboxes, "mailboxes", "PropBody", "PropAccent", "Metal", "PropScreen"),
             (PropKind.ElevatorDoors, "elevator_doors", "Metal", "PropBody", "Metal", "LampBulb"),
         };
@@ -226,7 +226,10 @@ namespace Stealth.EditorTools
 
         /// <summary>Cupboards whose doors open (Items.Storage, models with BodyDoor{n} parts): loot may hide behind them.</summary>
         static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet,
-            PropKind.Wardrobe, PropKind.Dresser, PropKind.ShoeCabinet };
+            PropKind.Wardrobe, PropKind.Dresser, PropKind.ShoeCabinet,
+            // every little door opens: the sink and vanity cupboards, the dishwasher, sideboards, drawers of desks and night tables
+            PropKind.KitchenSink, PropKind.BathVanity, PropKind.Dishwasher, PropKind.DoubleSink, PropKind.Credenza, PropKind.AvCredenza,
+            PropKind.FilingCabinet, PropKind.FilePedestal, PropKind.ExecutiveDesk, PropKind.NightTable };
 
         /// <summary>Prefabs of the themed rooms' furniture whose models exist, into <see cref="LevelArt.RoomProps"/>.</summary>
         static void BuildRoomProps(LevelArt art)
@@ -242,6 +245,8 @@ namespace Stealth.EditorTools
                     PaintTrim(go, trim);
                     if (kind == PropKind.HandDryer) DressDryer(go);
                     if (Opens.Contains(kind)) go.AddComponent<Stealth.Items.Storage>();
+                    if (kind == PropKind.TallBookcase) ShelfBooks(go); // its books differ every time
+                    if (kind == PropKind.HallHooks) HookGarments(go, "hall_hooks_bare");
                     return go;
                 });
                 list.Add(new PropPrefab { Kind = kind, Prefab = prefab });

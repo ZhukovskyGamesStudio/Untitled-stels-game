@@ -211,6 +211,18 @@ namespace Stealth.Level
             return a;
         }
 
+        /// <summary>The models of the world were swapped for a style (before the furniture is merged again).</summary>
+        public static event System.Action GeometryChanged;
+
+        /// <summary>A mesh of the current style's own models (its bestiary), not the base model or a family's version of it.</summary>
+        public static bool IsOwnStyleMesh(Mesh m)
+        {
+            if (m == null) return false;
+            foreach (var map in s_StyleMeshes.Values)
+                if (map.ContainsValue(m)) return true;
+            return false;
+        }
+
         /// <summary>The family of models on screen now.</summary>
         public static ModelFamily Family => s_Family;
 
@@ -222,6 +234,7 @@ namespace Stealth.Level
             s_Family = family;
             StyleParts.ShowAll(s_Current != null && g != null ? s_Current.name : null); // things with a model of their own in a style
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
+            GeometryChanged?.Invoke(); // (furniture dressed in variants picks its own parts or the style's)
             if (!Application.isPlaying) return;
             var holder = Config != null ? Config.Batch : null;
             StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null, holder);

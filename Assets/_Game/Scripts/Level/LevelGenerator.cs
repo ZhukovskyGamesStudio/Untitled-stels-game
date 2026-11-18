@@ -181,7 +181,7 @@ namespace Stealth.Level
             return new System.Random(LevelRandom.Mix(seed, (int)RandomChannel.Windows, 0)).Next(lo, WindowsMax + 1);
         }
 
-        [Tooltip("Chance of a sliding door in a doorway without a laser.")]
+        [Tooltip("Chance of a door in a doorway without a laser (DoorRules.Chance: more in flats and the hospital; some doorways always have one).")]
         public float AutoDoorChance = 0.45f;
         [Tooltip("Chance that a sliding door is locked: players must hack it (robots have the key).")]
         public float LockedDoorChance = 0.35f;
@@ -207,6 +207,15 @@ namespace Stealth.Level
         /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
         /// </summary>
         [System.NonSerialized] public bool Apartments;
+
+        [Tooltip("The apartment block: chance of a lift when it has fewer storeys than LiftAlwaysFrom.")]
+        public float LiftChance = 0.5f;
+        [Tooltip("The apartment block: from this many storeys it always has a lift.")]
+        public int LiftAlwaysFrom = 6;
+        [Tooltip("The lift: seconds the cab takes per floor.")]
+        public float LiftFloorTime = 1.8f;
+        [Tooltip("The lift: seconds its doors take to close or to open.")]
+        public float LiftDoorTime = 0.9f;
 
         public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
 
@@ -444,6 +453,7 @@ namespace Stealth.Level
             if (security.Enemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either
             HouseFeatures.FinishObjective(l);
             HouseFeatures.PlanShelterMap(l);
+            DoorRules.Plan(l); // every door's kind, the way it opens and its hinges, round the furniture now there
 
             float height = floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));
@@ -913,7 +923,8 @@ namespace Stealth.Level
             for (int i = 0; i < l.Doorways.Count; i++)
             {
                 var d = l.Doorways[i];
-                if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway) // (the paint booth's: its big door, nothing in the way)
+                // (the paint booth's: its big door, nothing in the way; a flat's entry, a bathroom…: their doors, below)
+                if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway && !DoorRules.Always(l, d))
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
             }
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
@@ -980,9 +991,12 @@ namespace Stealth.Level
                 spot.Kind = (LaserPattern)rng.Next(level >= s.MovingLasersFromHouse ? 3 : 2);
                 l.LaserSpots.Add(spot);
             }
-            // Sliding doors in some of the remaining doorways (never together with a laser).
+            // Doors in some of the remaining doorways (never together with a laser), more of them in flats and the hospital;
+            // a flat's entry, a bathroom, a toilet, a bedroom and the plant room always have theirs.
             foreach (var d in doors)
-                if (rng.NextDouble() < b.AutoDoorChance) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+                if (rng.NextDouble() < DoorRules.Chance(l, DoorRules.DoorwayAt(l, d.Position), b.AutoDoorChance)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
+            foreach (var d in l.Doorways)
+                if (DoorRules.Always(l, d)) l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
             // the paint booth's sliding door (wide enough for a car), never locked
             if (l.BoothDoorway >= 0)
             {

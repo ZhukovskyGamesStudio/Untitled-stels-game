@@ -214,6 +214,8 @@ namespace Stealth.UI
             Level.UseKind.Cage => ReticleIcon.Key,
             Level.UseKind.HandDryer => ReticleIcon.Hand,
             Level.UseKind.LightSwitch => ReticleIcon.Hand,
+            Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
+            Level.UseKind.VentGrille => ReticleIcon.Hack,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
             _ => ReticleIcon.Dot,
         };

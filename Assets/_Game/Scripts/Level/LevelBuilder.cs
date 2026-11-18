@@ -152,18 +152,17 @@ namespace Stealth.Level
                 var rot = d.rotation;
                 if (vault && l.VaultRoom >= 0 && Vector3.Dot(l.Plan.Rooms[l.VaultRoom].Center - d.position, d.rotation * Vector3.forward) < 0f)
                     rot *= Quaternion.Euler(0f, 180f, 0f); // the round door's +Z into the vault
-                // the shop's doors are steel; its paint booth's is wide, for a car
-                bool shop = l.Kind == HouseKind.Garage;
-                var prefab = vault ? m_Art.VaultDoor
-                    : i == l.StorageDoor && StorageRooms.Locked(l) && m_Art.StorageDoor != null ? m_Art.StorageDoor
-                    : i == l.BoothDoor && m_Art.VehicleDoor != null ? m_Art.VehicleDoor
-                    : shop && m_Art.ShopDoor != null ? m_Art.ShopDoor
-                    : l.Kind == HouseKind.Hospital && m_Art.ClinicDoor != null ? m_Art.ClinicDoor
-                    : l.FlatEntry(i) && m_Art.FlatDoor != null ? m_Art.FlatDoor
-                    : l.DoorWidthOf(i) < LevelMetrics.DoorWidth - 0.01f && m_Art.NarrowDoor != null ? m_Art.NarrowDoor : m_Art.AutoDoor;
-                var door = Place(prefab, vault ? "VaultDoor" : "AutoDoor", d.position, rot).GetComponent<AutoDoor>();
+                // the kind of door (DoorRules: wood between rooms, a flat's padded steel, the hospital's laminate, glass sliding
+                // doors where the tech is…), which way it opens (a hinged door's prefab opens to its +Z) and the hinges' jamb
+                var spec = DoorRules.Of(l, i);
+                bool hinged = DoorRules.Hinged(spec.Kind);
+                if (hinged && spec.Back) rot *= Quaternion.Euler(0f, 180f, 0f);
+                var prefab = vault ? m_Art.VaultDoor : m_Art.Door(spec.Kind, l.DoorWidthOf(i) < LevelMetrics.DoorWidth - 0.01f);
+                var door = Place(prefab, vault ? "VaultDoor" : $"Door{spec.Kind}", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
+                    if (hinged && spec.HingeRight) door.HingeRight();
+                    if (door.Number != null) door.Number.text = FlatNumber(l, i);
                     bool keyed = false;
                     foreach (var k in l.KeyDoors) keyed |= k.Door == i;
                     bool storage = i == l.StorageDoor && StorageRooms.Locked(l);
@@ -213,6 +212,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
+                if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, 0x7A21, i)); // its coats, its books
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind);
@@ -265,6 +265,7 @@ namespace Stealth.Level
             var plan = m_Plan;
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
+            if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -485,8 +486,9 @@ namespace Stealth.Level
                 }
                 bool vent = o.Kind == EdgeType.Vent, squeeze = o.Kind == EdgeType.Squeeze;
                 bool breach = o.Kind == EdgeType.Breach, hole = o.Kind == EdgeType.Hole, window = o.Kind == EdgeType.InnerWindow;
-                bool vault = IsVaultDoorway(index, o), booth = IsBoothDoorway(index, o);
-                float clear = LevelMetrics.ClearWidth(vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth
+                bool vault = IsVaultDoorway(index, o) || o.Kind == EdgeType.Lift, booth = IsBoothDoorway(index, o); // (the lift's portal, like the vault's ring: its own frame)
+                bool lift = o.Kind == EdgeType.Lift;
+                float clear = LevelMetrics.ClearWidth(lift ? LevelMetrics.LiftDoorWidth : vault ? LevelMetrics.VaultDoorWidth : booth ? LevelMetrics.VehicleDoorWidth
                     : o.Kind == EdgeType.Door && o.Width > 0.5f && o.Width < LevelMetrics.DoorWidth - 0.01f ? o.Width : LevelMetrics.OpeningWidth(o.Kind));
                 float o0 = o.At - clear / 2f, o1 = o.At + clear / 2f;
                 float sill = window ? LevelMetrics.InnerWindowSill : o.High ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
@@ -510,24 +512,100 @@ namespace Stealth.Level
                     Squeeze = squeeze || breach || hole, Vault = vault, Floor = m_Floor });
                 // The vent frame and the exit sign are modelled along local X; turn them to the wall direction.
                 var along = Quaternion.LookRotation(new Vector3(-d3.z, 0, d3.x));
-                if (vent) Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
+                if (lift) PlaceLiftDoor(mid, d3, inner);
+                else if (vent)
+                {
+                    // shut by its grille until someone works it loose (the grille knows its doorway)
+                    var frame = Place(o.High && m_Art.HighVentFrame != null ? m_Art.HighVentFrame : m_Art.VentFrame, "VentFrame", mid, along);
+                    if (frame.TryGetComponent<VentGrille>(out var grille)) grille.Configure(DoorwayIndex(mid));
+                }
                 else if (window) { if (m_Art.InnerWindowFrame != null) Place(m_Art.InnerWindowFrame, "InnerWindow", mid, along); }
                 else if (breach) { if (m_Art.BreachFrame != null) Place(m_Art.BreachFrame, "Breach", mid, along); }
                 else if (hole) { if (m_Art.HoleFrame != null) Place(m_Art.HoleFrame, "Hole", mid, along); }
                 else if (w.Exterior)
                 {
-                    // the street door's +Z out of the house: its leaves swing outwards
+                    // the street door's +Z out of the house: its leaves swing outwards (the apartment block's: thick steel with an
+                    // intercom, the shop's: steel, else glass leaves); a door-and-a-half's hinges on either jamb, by the house's seed
                     var outward = inner.Count > 0 ? -inner[0] : along * Vector3.forward;
-                    Place(m_Art.ExteriorDoor != null ? m_Art.ExteriorDoor : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
+                    if (m_Floor > 0)
+                    {
+                        // a balcony's door (glazed leaves opening into the room) and the balcony outside
+                        if (m_Art.WoodDoubleDoor != null) Place(m_Art.WoodDoubleDoor, "BalconyDoor", mid, Quaternion.LookRotation(-outward));
+                        if (m_Art.Balcony != null) Place(m_Art.Balcony, "Balcony", mid + outward * (LevelMetrics.WallThickness / 2f), Quaternion.LookRotation(outward));
+                        from = o1;
+                        cornerA = false;
+                        continue;
+                    }
+                    var street = DoorRules.StreetKind(m_Layout);
+                    var prefab = street.HasValue ? m_Art.Door(street.Value, false) : m_Art.ExteriorDoor;
+                    var go = Place(prefab != null ? prefab : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
+                    if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, 0xD00E, index * 31 + cut.opening) & 1) == 1)
+                        exit.HingeRight();
                 }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
-                else if (m_Art.ExitSign != null && !vault) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
+                else if (m_Art.ExitSign != null && !vault && OnEscapeRoute(w)) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
                 from = o1;
                 cornerA = false;
             }
             WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height);
             RecordFaces(a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height, w.Exterior, inner, cornerA, !jointB,
                 jointA && from <= t / 2f + 0.001f, jointB);
+        }
+
+        /// <summary>The doorway (index in <see cref="LevelLayout.Doorways"/>) whose opening is at <paramref name="at"/> on this floor.</summary>
+        int DoorwayIndex(Vector3 at)
+        {
+            for (int i = 0; i < m_Layout.Doorways.Count; i++)
+            {
+                var d = m_Layout.Doorways[i];
+                if (d.Floor == m_Floor && new Vector2(d.Position.x - at.x, d.Position.z - at.z).sqrMagnitude < 0.01f) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// The number of the flat a door opens (its rooms' flat, counted from 1 on the ground floor up, as on a real block's
+        /// doors), or empty for any other door.
+        /// </summary>
+        static string FlatNumber(LevelLayout l, int door)
+        {
+            var d = DoorRules.DoorwayAt(l, l.AutoDoors[door].position);
+            foreach (int id in new[] { d.RoomA, d.RoomB })
+                if (id >= 0 && l.Plan.Rooms[id].Flat >= 0) return (l.Plan.Rooms[id].Flat + 1).ToString();
+            return "";
+        }
+
+        /// <summary>
+        /// An exit sign goes only over the doorways on the way out, as in a real building: into a stairwell (the evacuation
+        /// route) and from the lobby onto the corridors leading to the street door — not over every room's door.
+        /// </summary>
+        bool OnEscapeRoute(PlanWall w)
+        {
+            RoomType? Type(int id) => id >= 0 && id < m_Plan.Rooms.Count ? m_Plan.Rooms[id].Type : null;
+            var a = Type(w.RoomA);
+            var b = Type(w.RoomB);
+            if (a == RoomType.Hall || b == RoomType.Hall) return true;
+            return (a == RoomType.Lobby && b == RoomType.Corridor) || (b == RoomType.Lobby && a == RoomType.Corridor);
+        }
+
+        /// <summary>
+        /// The lift's doors on this floor's landing (+Z out onto the landing, the room's side of the wall) and, on the ground
+        /// floor, the cab in the well behind them (+Z towards the landings).
+        /// </summary>
+        void PlaceLiftDoor(Vector3 mid, Vector3 along, List<Vector3> inner)
+        {
+            var landing = inner.Count > 0 ? inner[0] : Quaternion.Euler(0f, -90f, 0f) * along;
+            if (m_Art.LiftDoor != null)
+                Place(m_Art.LiftDoor, $"LiftDoor{m_Floor}", mid, Quaternion.LookRotation(landing)).GetComponent<LiftDoor>()?.Configure(m_Floor);
+            if (m_Floor != 0 || m_Art.LiftCab == null) return;
+            var cab = m_Art.LiftCab.GetComponent<LiftCab>();
+            float half = cab != null ? cab.HalfSize.y : 1.05f;
+            // the cab's front a few centimetres off the shaft's wall, its middle in the well across
+            var well = m_Layout.LiftWell;
+            var at = new Vector3(well.center.x, 0f, well.center.y);
+            var front = mid - landing * (LevelMetrics.WallThickness / 2f + 0.03f + half);
+            at += Vector3.Project(front - at, landing);
+            Place(m_Art.LiftCab, "LiftCab", at, Quaternion.LookRotation(landing)).GetComponent<LiftCab>()?.Configure(m_Layout.Floors);
         }
 
         /// <summary>
@@ -889,12 +967,18 @@ namespace Stealth.Level
         }
 
         /// <summary>Static batching of everything that never moves (walls, slabs, stairs, windows). Doors stay dynamic.</summary>
+        /// <summary>
+        /// A renderer that moves or changes while the house is played (a door's leaves, the lift's doors and cab, a vent's
+        /// grille, a cage's door): never batched — a batched mesh stays where it was merged, whatever its transform does.
+        /// </summary>
+        public static bool KeepsMoving(Renderer r) => r.GetComponentInParent<AutoDoor>(true) != null || r.GetComponentInParent<KeepUnmerged>(true) != null;
+
         static void CombineStatic(GameObject root)
         {
             var list = new List<GameObject>();
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
             {
-                if (r.GetComponentInParent<AutoDoor>() != null) continue;
+                if (KeepsMoving(r)) continue;
                 // the unchanging shell is merged per room cell instead (PropBatches): static batching would keep each renderer
                 if (PropBatches.IsShell(r, root.transform) && MeshBatcher.CanMerge(r, out _)) continue;
                 list.Add(r.gameObject);

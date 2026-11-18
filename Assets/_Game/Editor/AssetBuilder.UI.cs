@@ -473,10 +473,10 @@ namespace Stealth.EditorTools
             holder.gameObject.AddComponent<Canvas>();
             holder.gameObject.AddComponent<GraphicRaycaster>();
             var panel = holder.gameObject.AddComponent<CheatPanel>();
-            var root = R(holder, "Panel", Center, Center, new Vector2(0, 0), new Vector2(420, 360));
+            var root = R(holder, "Panel", Center, Center, new Vector2(0, 0), new Vector2(820, 420));
             Img(root, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
             panel.Root = root.gameObject;
-            var col = Column(root, "Column", new Vector2(0, -14), 380, 8f);
+            var col = Column(root, "Column", new Vector2(-200, -14), 380, 8f);
             ColumnText(col, "Title", L("cheats.title"), 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
             panel.KillRobots = ButtonIn(e, col, "KillRobots", L("cheats.kill_robots"), 36);
             panel.Invulnerable = ButtonIn(e, col, "Invulnerable", "", 36);
@@ -484,6 +484,11 @@ namespace Stealth.EditorTools
             panel.Quota = ButtonIn(e, col, "Quota", L("cheats.quota"), 36);
             panel.ToHatch = ButtonIn(e, col, "ToHatch", L("cheats.to_hatch"), 36);
             panel.RevealMap = ButtonIn(e, col, "RevealMap", L("cheats.reveal_map"), 36);
+            // the second column: start a house of any kind right now (one button per HouseKind, in its order)
+            var houses = Column(root, "Houses", new Vector2(200, -14), 380, 6f);
+            ColumnText(houses, "Title", L("cheats.start_house"), 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
+            panel.Houses = System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Cast<Stealth.Level.HouseKind>()
+                .Select(k => ButtonIn(e, houses, "House" + k, L(Stealth.Level.HouseKinds.NameKey(k)), 34)).ToArray();
             root.gameObject.SetActive(false);
         }
 

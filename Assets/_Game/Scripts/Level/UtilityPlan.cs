@@ -48,7 +48,7 @@ namespace Stealth.Level
     {
         const float T = LevelMetrics.WallThickness;
         /// <summary>The duct's underside and top over the floor, metres: under the ceiling, over the doors.</summary>
-        public const float DuctBottom = 2.36f, DuctTop = 2.64f;
+        public const float DuctBottom = 2.68f, DuctTop = 2.92f; // close under the ceiling (3 m): a short hanger, nothing hangs low over heads
         const float DuctWidth = 0.4f, DuctOff = 0.25f; // its inner side this far from the wall's face
         const float SocketY = 0.3f, SwitchY = 1.05f, PipeRunY = 2.6f;
 
@@ -259,13 +259,16 @@ namespace Stealth.Level
             {
                 if (o.Vent || o.Squeeze || o.Vault) continue;
                 var n = new Vector3(-o.Along.z, 0f, o.Along.x);
+                // by the door's handle (DoorRules.HandleWay), not behind the open leaf; without a hinged door: along the wall
+                var handle = DoorRules.HandleWay(l, new Vector3(o.Center.x, LevelLayout.FloorY(o.Floor), o.Center.z));
+                var way = handle.sqrMagnitude > 0.5f ? handle : o.Along;
                 foreach (float s in new[] { 1f, -1f })
                 {
                     var side = n * s;
                     var room = l.Plan.RoomAt(o.Center + side * 0.6f + Vector3.up * 0.5f);
                     if (room == null || room.Id == l.VaultRoom || room.Type is RoomType.Corridor) continue;
                     // on the wall beside the doorway, inside the room: the frame takes ~0.17 m of wall beside the opening
-                    var at = o.Center + o.Along * (o.Width / 2f + 0.28f) + side * (T / 2f);
+                    var at = o.Center + way * (o.Width / 2f + 0.28f) + side * (T / 2f);
                     if (l.Plan.RoomAt(at + side * 0.3f + Vector3.up * 0.5f) != room) continue;
                     bool free = true;
                     foreach (var other in shell.Openings)

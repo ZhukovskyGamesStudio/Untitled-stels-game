@@ -318,7 +318,7 @@ namespace Stealth.Game
             RenderSettings.reflectionIntensity = 0f;
         }
 
-        void StartLevel(int index, int lane)
+        void StartLevel(int index, int lane, int houseSeed = 0)
         {
             foreach (var obj in m_Spawned) Session.Despawn(obj);
             m_Spawned.Clear();
@@ -329,12 +329,13 @@ namespace Stealth.Game
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);
             lane = Mathf.Clamp(lane, 0, Route.LanesAt(index) - 1);
-            int seed = Route.Node(index, lane).Seed;
+            int seed = houseSeed != 0 ? houseSeed : Route.Node(index, lane).Seed;
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
             m_Opened.Clear();
             m_Hacked.Clear();
             OpenedVersion++;
+            Lift = LiftState.ParkedAt(0); // a new house: the lift stands open on the ground floor
             LeaveAt = 0;
             GoAt = 0;
             ChosenLane = -1;
@@ -501,6 +502,7 @@ namespace Stealth.Game
             UpdateHacks();
             UpdateDryers();
             UpdateStorageDoor();
+            UpdateLift();
             UpdateObjective();
             UpdateHatch();
             if (Phase != RunPhase.Playing) return;
@@ -823,6 +825,27 @@ namespace Stealth.Game
         }
 
         /// <summary>Server: a player pressed R after a failed run.</summary>
+        int m_CheatHouses;
+
+        /// <summary>
+        /// Server, cheat (F4 panel): a house of <paramref name="kind"/> starts now, whatever is going on — in a house, in the
+        /// sewer, on the drive, after the run failed: the drive and the countdowns stop, the car's seats and the hatches empty,
+        /// everyone stands up and comes up in the new house's entry hatch (its number stays: the same depth of the run).
+        /// </summary>
+        public void StartHouseServer(HouseKind kind)
+        {
+            DriveUntil = 0;
+            GoAt = 0;
+            LeaveAt = 0;
+            Vehicles.Car.Active?.ClearSeatsServer();
+            foreach (var p in PlayerController.All) p.LeaveHatchServer();
+            int index = Mathf.Max(0, Level.Index);
+            int seed = HouseKinds.SeedOf(kind, index, LevelRandom.Mix(m_RunSeed, Level.Seed, ++m_CheatHouses));
+            if (seed == 0) return;
+            StartLevel(index, Mathf.Max(0, Level.Lane), seed);
+            Banner(Loc.Pack("banner.house", index + 1));
+        }
+
         public void RestartRunServer()
         {
             if (!m_Run.Restart()) return;

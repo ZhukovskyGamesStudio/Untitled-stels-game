@@ -20,6 +20,8 @@ namespace Stealth.Game
         public static int DryerKey(int prop) => 8_000_000 + prop;
         /// <summary>A room whose lights a player switched (from how the house started).</summary>
         public static int LightsKey(int room) => 9_200_000 + room;
+        /// <summary>A crawl way whose grille the team took off (doorway index): open for good this house.</summary>
+        public static int VentKey(int doorway) => 9_300_000 + doorway;
 
         /// <summary>Server: the hand dryers running and until when (server time).</summary>
         readonly Dictionary<int, double> m_Dryers = new();
@@ -36,8 +38,10 @@ namespace Stealth.Game
             MedTable.UsedBy = c => IsOpened(MedKey(c));
             HandDryer.IsRunning = i => IsOpened(DryerKey(i));
             LightSwitch.IsSwitched = RoomLight.IsSwitched = r => IsOpened(LightsKey(r));
+            VentGrille.IsOpen = i => IsOpened(VentKey(i));
             SewerGate.IsOpen = () => GateOpen;
             HookObjective();
+            HookLift();
         }
 
         /// <summary>What a crate holds (the same on every call: from the house's seed and the crate).</summary>
@@ -115,6 +119,11 @@ namespace Stealth.Game
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
+                case UseKind.LiftCall: LiftServer(player, index, false); break;
+                case UseKind.LiftFloor: LiftServer(player, index, true); break;
+                case UseKind.VentGrille:
+                    if (Phase == RunPhase.Playing && m_Opened.Add(VentKey(index))) OpenedVersion++;
+                    break;
                 default: UseSewerServer(player, kind, index); break;
             }
         }

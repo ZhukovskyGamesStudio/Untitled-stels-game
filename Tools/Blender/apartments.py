@@ -254,16 +254,17 @@ def model_home_toilet():
 
 
 def model_bath_vanity():
-    """Sink cabinet 0.6 x 0.46 x 0.85: a cabinet on a set-back plinth with two small doors and knobs (modelled, not
-    opening), a ceramic basin top with a real bowl, a single-lever tap and a drain (Trim); a back splash board up to a
-    mirror cabinet on the wall at 1.2..1.9 (Body, mirror face Trim), back flush with +Y."""
-    cab = s.rbox((0.58, 0.415, 0.72), (0, 0.0175, 0.46), r=0.008, seg=2)
+    """Sink cabinet 0.6 x 0.46 x 0.85: an open cabinet on a set-back plinth (the trap inside) with two small doors that
+    open from the middle (BodyDoor0/1, knobs at the meeting edges), a ceramic basin top with a real bowl, a single-lever
+    tap and a drain (Trim); a back splash board up to a mirror cabinet on the wall at 1.2..1.9 (Body, mirror face Trim;
+    it does not open: the mirror is its own material), back flush with +Y."""
+    cab = s.cupboard(-0.29, 0.29, -0.19, 0.225, 0.098, 0.82, t=0.018, top=False)
+    cab.append(s.rbox((0.562, 0.38, 0.018), (0, 0.02, 0.722), r=0.003, seg=1))            # the inside's ceiling
     plinth = s.rbox((0.54, 0.38, 0.1), (0, 0.03, 0.05), r=0.004, seg=1)
-    doors = []
-    for x in (-0.143, 0.143):
+    for i, x in enumerate((-0.143, 0.143)):
         d = s.rbox((0.282, 0.018, 0.605), (x, -0.196, 0.4225), r=0.006, seg=2)
         panel(d, (0, -1, 0), 0.08, thickness=0.035, depth=-0.004)
-        doors.append(d)
+        s.part(f"BodyDoor{i}", [d, *knob(0.04 if x > 0 else -0.04, -0.205, 0.66, r=0.012)])
     basin = s.rbox((0.6, 0.46, 0.12), (0, 0.0, 0.79), r=0.02, seg=3)
     basin = s.boolean(basin, s.loft([(0.76, 0.14, 0.09, 2.5, 0, -0.03), (0.79, 0.2, 0.135, 3, 0, -0.03),
                                      (0.9, 0.228, 0.158, 3.5, 0, -0.03)], seg=32), "DIFFERENCE")
@@ -271,10 +272,10 @@ def model_bath_vanity():
     splash = s.rbox((0.592, 0.012, 0.42), (0, 0.223, 1.0), r=0.004, seg=1)
     mirror_cab = s.rbox((0.6, 0.13, 0.7), (0, 0.165, 1.55), r=0.012, seg=2)
     shelf = s.rbox((0.56, 0.06, 0.018), (0, 0.075, 1.195), r=0.005, seg=1)       # the little shelf under the mirror
-    s.part("Body", [cab, plinth, *doors, basin, splash, mirror_cab, shelf])
+    s.part("Body", [*cab, plinth, basin, splash, mirror_cab, shelf])
     trim = [s.rbox((0.556, 0.006, 0.62), (0, 0.098, 1.56), r=0.003, seg=1)]                 # the mirror face
-    for x in (-0.04, 0.04):
-        trim += knob(x, -0.205, 0.66, r=0.012)
+    trim.append(s.tube([(0, -0.03, 0.735), (0, -0.03, 0.58), (0, 0.03, 0.52), (0, 0.09, 0.58), (0, 0.12, 0.6),
+                        (0, 0.215, 0.6)], 0.016, res=1, segments_per=6))                    # the trap inside
     trim.append(s.lathe([(0.0, 0.847), (0.024, 0.847), (0.022, 0.86), (0.018, 0.94), (0.0, 0.945)], seg=16,
                         loc=(0, 0.175, 0)))                                                  # tap body
     trim.append(s.tube([(0, 0.17, 0.925), (0, 0.11, 0.93), (0, 0.075, 0.905)], 0.01, res=2, segments_per=6))

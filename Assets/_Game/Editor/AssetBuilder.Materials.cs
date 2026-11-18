@@ -177,6 +177,29 @@ namespace Stealth.EditorTools
             Mat(props, "ClinicDoor", new Color(0.72f, 0.82f, 0.86f), smoothness: 0.5f); // the hospital's washable laminate doors
             Mat(props, "FlatDoor", new Color(0.36f, 0.24f, 0.18f), smoothness: 0.35f); // a flat's entry door: brown padding / steel
             Mat(props, "FlatDoorTrim", new Color(0.72f, 0.6f, 0.34f), smoothness: 0.65f); // its brass number, peephole and handle
+            Mat(props, "WoodDoor", new Color(0.62f, 0.45f, 0.3f), smoothness: 0.45f);     // the thin wooden doors between rooms: lacquered oak
+            Mat(props, "EntranceSteel", new Color(0.2f, 0.27f, 0.24f), smoothness: 0.4f); // the apartment block's street door: hammered green paint
+            Mat(props, "ClinicFrame", new Color(0.86f, 0.88f, 0.88f), smoothness: 0.45f); // the hospital's painted steel door frames
+            Mat(props, "LiftSteel", new Color(0.6f, 0.62f, 0.64f), smoothness: 0.72f);    // the lift: brushed steel doors, portal and cab walls
+            Mat(props, "LiftFloor", new Color(0.16f, 0.15f, 0.15f), smoothness: 0.3f);    // the cab's floor
+            // the variants (PropVariants): book covers and their pages, garments
+            Mat(props, "BookRed", new Color(0.55f, 0.12f, 0.1f), smoothness: 0.3f);
+            Mat(props, "BookBlue", new Color(0.14f, 0.24f, 0.48f), smoothness: 0.3f);
+            Mat(props, "BookGreen", new Color(0.16f, 0.36f, 0.2f), smoothness: 0.3f);
+            Mat(props, "BookOchre", new Color(0.72f, 0.55f, 0.18f), smoothness: 0.3f);
+            Mat(props, "BookBrown", new Color(0.38f, 0.24f, 0.14f), smoothness: 0.3f);
+            Mat(props, "BookBlack", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.35f);
+            Mat(props, "BookCream", new Color(0.86f, 0.82f, 0.7f), smoothness: 0.25f);
+            Mat(props, "BookTeal", new Color(0.12f, 0.42f, 0.44f), smoothness: 0.3f);
+            Mat(props, "BookPages", new Color(0.93f, 0.9f, 0.82f), smoothness: 0.1f);
+            Mat(props, "ClothNavy", new Color(0.12f, 0.15f, 0.28f), smoothness: 0.08f);
+            Mat(props, "ClothGrey", new Color(0.42f, 0.43f, 0.45f), smoothness: 0.08f);
+            Mat(props, "ClothBeige", new Color(0.7f, 0.62f, 0.48f), smoothness: 0.08f);
+            Mat(props, "ClothBlack", new Color(0.09f, 0.09f, 0.1f), smoothness: 0.1f);
+            Mat(props, "ClothRed", new Color(0.5f, 0.1f, 0.1f), smoothness: 0.08f);
+            Mat(props, "ClothOlive", new Color(0.32f, 0.34f, 0.18f), smoothness: 0.08f);
+            Mat(props, "ClothBrown", new Color(0.36f, 0.22f, 0.13f), smoothness: 0.12f);
+            Mat(props, "ClothDenim", new Color(0.24f, 0.34f, 0.5f), smoothness: 0.08f);
             Mat(props, "MedicalBlue", new Color(0.22f, 0.45f, 0.66f), smoothness: 0.4f);   // mattresses, carts, seats
             Mat(props, "SurgicalGreen", new Color(0.2f, 0.46f, 0.4f), smoothness: 0.15f);  // drapes
             Mat(props, "Curtain", new Color(0.62f, 0.78f, 0.8f), smoothness: 0.05f);       // the beds' privacy curtains

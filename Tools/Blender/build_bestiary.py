@@ -42,7 +42,7 @@ LEVEL = ("hatch", "window", "ceiling_lamp", "exit_sign")
 
 # Furniture that opens in the game (drawers and doors are separate moving parts, Items.Storage): every style shows its
 # model family's version, which has those parts; the designs here are single closed bodies and are not built.
-OPENING = ("cabinet", "lockers")
+OPENING = ("cabinet", "lockers", "fridge", "kitchen_counter", "tv_stand")
 
 
 def category(name):

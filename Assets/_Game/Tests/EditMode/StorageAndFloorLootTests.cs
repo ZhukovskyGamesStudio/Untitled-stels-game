@@ -32,7 +32,8 @@ namespace Stealth.Tests
                 }
             }
             Assert.That(floor, Is.GreaterThan(all / 10), $"{floor} of {all} on the floor");
-            Assert.That(floor, Is.LessThan(all / 2), $"{floor} of {all} on the floor");
+            // (the apartment block's real-sized flats have fewer tables and shelves: more of their loot lies on the floor)
+            Assert.That(floor, Is.LessThan(all * 3 / 5), $"{floor} of {all} on the floor");
         }
 
         [Test]

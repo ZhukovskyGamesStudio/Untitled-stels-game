@@ -20,6 +20,8 @@ namespace Stealth.Level
         public const float VaultDoorWidth = 2.6f;
         /// <summary>The auto repair shop's paint booth door, nominal (a car drives through it: 1.9 m wide with its mirrors).</summary>
         public const float VehicleDoorWidth = 3.4f;
+        /// <summary>The lift's doorway on a landing, nominal (clear 1.1 m: its two sliding panels).</summary>
+        public const float LiftDoorWidth = 1.3f;
         public const float VentWidth = 1.2f;  // nominal; the clear opening is 1.0 m (see ClearWidth)
         // A vent is a duct through the wall: its floor is a sill above the room's floor (a step for a player, a wall for a robot),
         // the clear height above the sill fits the crouched capsule (1.1 m) + the step-up probe (0.35); standing 1.8 m does not fit.
@@ -66,6 +68,7 @@ namespace Stealth.Level
             EdgeType.Breach => BreachWidth,
             EdgeType.Hole => HoleWidth,
             EdgeType.InnerWindow => InnerWindowWidth,
+            EdgeType.Lift => LiftDoorWidth,
             _ => DoorWidth,
         };
 

@@ -180,6 +180,8 @@ namespace Stealth.Player
         public float HackReach = 1.9f;
         [Tooltip("Seconds to hold E to hack the lock of a door.")]
         public float DoorHackTime = 3f;
+        [Tooltip("Seconds to hold E to work a crawl way's grille loose (every vent starts shut).")]
+        public float VentGrilleTime = 2f;
         [Tooltip("Seconds between two uses of \"I'm stuck\" (it moves you to the nearest free spot).")]
         public float UnstuckCooldown = 8f;
         [Tooltip("Hacks a hacking terminal can make per house.")]

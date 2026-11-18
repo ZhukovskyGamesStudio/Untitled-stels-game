@@ -174,7 +174,7 @@ def export(filename):
     smooth = family in ("toy", "clean", "realistic", "derelict")
     bpy.ops.object.select_all(action="SELECT")
     meshfix.fix_objects(list(bpy.context.selected_objects), floor=g.category(filename) in ("Props", "Items", "Level"),
-                        name=f"{filename}__{family}")
+                        name=f"{filename}__{family}", pinned=meshfix.moving)
     for obj in bpy.context.selected_objects:
         for poly in obj.data.polygons:
             poly.use_smooth = smooth

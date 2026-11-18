@@ -32,6 +32,20 @@ namespace Stealth.Level
         /// <summary>A location with a plan of its own (the hospital, the repair shop, the apartment block): not the office generator's rooms and zones.</summary>
         public static bool OwnPlan(HouseKind kind) => kind is HouseKind.Hospital or HouseKind.Garage or HouseKind.Apartments;
 
+        /// <summary>
+        /// A house seed whose house number <paramref name="house"/> is of <paramref name="kind"/> (pure; the n-th one from
+        /// <paramref name="from"/> on: a cheat starting "a house of this kind" gets a different one each time).
+        /// </summary>
+        public static int SeedOf(HouseKind kind, int house, int from)
+        {
+            for (int k = 0; k < 100000; k++)
+            {
+                int seed = LevelRandom.Mix(from, 0x5EED, k) & 0x7fffffff;
+                if (seed != 0 && Of(seed, house) == kind) return seed;
+            }
+            return 0;
+        }
+
         /// <summary>The kind's name for the player (table <c>house.kind.&lt;kind&gt;</c>).</summary>
         public static string Name(HouseKind kind) => Loc.T(NameKey(kind));
 

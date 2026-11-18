@@ -182,7 +182,7 @@ namespace Stealth.Level
                             int f = plan.Rooms[r].Floor;
                             if (plan.KindAt(f, x, z) != CellKind.Room || plan.IdAt(f, x, z) != r) continue;
                             foreach (var d in Dirs4)
-                                if (plan.KindAt(f, x + d.x, z + d.y) == CellKind.Pocket) unshape.Add(plan.IdAt(f, x + d.x, z + d.y));
+                                if (plan.KindAt(f, x + d.x, z + d.y) == CellKind.Pocket && plan.IdAt(f, x + d.x, z + d.y) >= 0) unshape.Add(plan.IdAt(f, x + d.x, z + d.y)); // (a shaft is nobody's pocket)
                         }
                 if (unshape.Count == 0) break;
                 foreach (int r in unshape) Unshape(plan, plan.Rooms[r]);
@@ -1528,6 +1528,10 @@ namespace Stealth.Level
                 stairZones.Add((s.Floor, area));
                 stairZones.Add((s.Floor + 1, area));
             }
+            // the apartment block's stairs stand one above the other: every floor keeps clear of them alike, so the typical
+            // floors (the top one, without a flight up, too) draw the same doors
+            if (c.Apartments != null && o.Stairs.Count > 0)
+                for (int f = 0; f < plan.Floors; f++) stairZones.Add((f, StairArea(o.Stairs[0], 0.35f)));
 
             for (int f = 0; f < plan.Floors; f++)
             {
@@ -1686,9 +1690,11 @@ namespace Stealth.Level
                 Place(EdgeType.Squeeze, b.SqueezesPerRoom, slots);
             }
 
-            // The apartment block: its one entrance, from the lobby onto the street (no other way out).
+            // The apartment block: its one entrance, from the lobby onto the street (no other way out); its lift's doorways.
             if (c.Apartments != null)
             {
+                LiftDoorways(c);
+                Balconies(c);
                 for (int i = 0; i < plan.Walls.Count; i++)
                 {
                     var w = plan.Walls[i];

@@ -203,6 +203,15 @@ namespace Stealth.Player
             // stays inside the skin width and isGrounded starts flickering.
             if (grounded && !jumpedNow && m_Velocity.y <= 0f) step.y = Mathf.Min(step.y, -0.03f);
             if (Seated) { m_Velocity = Vector3.zero; step = Vector3.zero; }
+            // standing in the lift's cab: carried up or down with it (the cab's floor moves under the controller)
+            float carry = Seated ? 0f : Level.LiftCab.CarryAt(transform.position, dt);
+            if (carry != 0f && m_Controller.enabled)
+            {
+                m_Controller.enabled = false;
+                transform.position += Vector3.up * carry;
+                m_Controller.enabled = true;
+                if (m_Velocity.y < 0f) m_Velocity.y = -2f;
+            }
             var flags = Seated || !m_Controller.enabled ? CollisionFlags.None : m_Controller.Move(step);
             if ((flags & CollisionFlags.Above) != 0 && m_Velocity.y > 0f) m_Velocity.y = 0f;
 

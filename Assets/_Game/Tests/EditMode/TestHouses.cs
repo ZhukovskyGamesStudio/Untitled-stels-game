@@ -16,8 +16,21 @@ namespace Stealth.Tests
         public static LevelLayout Get(int seed, int level, int players = 1)
         {
             var key = (seed, level, players);
-            if (!s_Cache.TryGetValue(key, out var l)) s_Cache[key] = l = LevelGenerator.Generate(seed, level, players: players);
+            if (!s_Cache.TryGetValue(key, out var l))
+            {
+                s_Cache[key] = l = LevelGenerator.Generate(seed, level, players: players);
+                s_Removed[key] = Furnisher.LastRemoved;
+            }
             return l;
+        }
+
+        static readonly Dictionary<(int seed, int level, int players), int> s_Removed = new();
+
+        /// <summary>Furniture groups the final walkability check took out of that house (<see cref="Furnisher.LastRemoved"/> when it was generated).</summary>
+        public static int Removed(int seed, int level, int players = 1)
+        {
+            Get(seed, level, players);
+            return s_Removed[(seed, level, players)];
         }
 
         /// <summary>

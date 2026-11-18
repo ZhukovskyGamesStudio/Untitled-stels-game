@@ -52,7 +52,7 @@ namespace Stealth.Level
         public bool Vent, Exterior;
         /// <summary>A narrow slot with its own frame on both faces (Level/SqueezeFrame): no door trim of the style.</summary>
         public bool Squeeze;
-        /// <summary>The vault's round door: its own steel ring and wall corners, no trim, no reveals.</summary>
+        /// <summary>The vault's round door or the lift's doorway: their own steel ring / portal, no trim, no reveals of the style.</summary>
         public bool Vault;
         public int Floor;
     }

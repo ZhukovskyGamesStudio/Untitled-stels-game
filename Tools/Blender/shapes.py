@@ -312,6 +312,43 @@ def grille(center, width, height, n=5, bar=0.012, proud=0.01, axis="-Y", frame=0
     return parts
 
 
+def cupboard(x0, x1, y0, y1, z0, z1, t=0.018, back_t=0.012, top=True, bottom=True, dividers=(), shelves=(),
+             r=0.003):
+    """The hollow behind opening doors and drawers (Items.Storage): an open-fronted carcass filling the box
+    x0..x1, y0 (front edge) .. y1 (back), z0..z1 — two sides, a top and a bottom between them, a back panel, upright
+    dividers at x = dividers and shelves at z = shelves. Inner boards sit 3 mm behind the front edge and run 4 mm into
+    the boards they meet (overlap by volume, never face to face). Returns a list of bmeshes."""
+    xi0, xi1 = x0 + t - 0.004, x1 - t + 0.004            # inner boards run into the sides
+    zb0 = z0 + t - 0.004 if bottom else z0
+    zt1 = z1 - t + 0.004 if top else z1
+    yf = y0 + 0.003                                      # inner boards' front edge
+    out = [rbox((t, y1 - y0, z1 - z0), (x, (y0 + y1) / 2, (z0 + z1) / 2), r=r, seg=1)
+           for x in (x0 + t / 2, x1 - t / 2)]
+    if top:
+        out.append(rbox((xi1 - xi0, y1 - yf, t), ((xi0 + xi1) / 2, (yf + y1) / 2, z1 - t / 2), r=r, seg=1))
+    if bottom:
+        out.append(rbox((xi1 - xi0, y1 - yf, t), ((xi0 + xi1) / 2, (yf + y1) / 2, z0 + t / 2), r=r, seg=1))
+    out.append(rbox((xi1 - xi0, back_t, zt1 - zb0), ((xi0 + xi1) / 2, y1 - back_t / 2 - 0.002, (zb0 + zt1) / 2),
+                    r=min(r, 0.002), seg=1))
+    for x in dividers:
+        out.append(rbox((t, y1 - back_t - yf, zt1 - zb0 - 0.004), (x, (yf + y1 - back_t) / 2, (zb0 + zt1) / 2), r=r,
+                        seg=1))
+    for z in shelves:
+        out.append(rbox((xi1 - xi0, y1 - back_t - yf - 0.02, t), ((xi0 + xi1) / 2, (yf + 0.02 + y1 - back_t) / 2, z),
+                        r=r, seg=1))
+    return out
+
+
+def tray(x0, x1, y0, y1, z0, height, t=0.012, r=0.002):
+    """The box of a drawer behind its front: a bottom at z0, two sides and a back, `height` tall, filling x0..x1 and
+    y0 (just behind the front) .. y1. The front (with its handle) is the caller's; put all of it in one BodyDrawer{n}."""
+    xi0, xi1 = x0 + t - 0.004, x1 - t + 0.004
+    return [rbox((xi1 - xi0, y1 - y0 - 0.004, t), ((xi0 + xi1) / 2, (y0 + y1) / 2, z0 + t / 2), r=r, seg=1),
+            rbox((xi1 - xi0, t, height - 0.004), ((xi0 + xi1) / 2, y1 - t / 2 - 0.002, z0 + height / 2), r=r, seg=1),
+            rbox((t, y1 - y0, height - 0.002), (x0 + t / 2, (y0 + y1) / 2, z0 + 0.001 + height / 2), r=r, seg=1),
+            rbox((t, y1 - y0, height - 0.002), (x1 - t / 2, (y0 + y1) / 2, z0 + 0.001 + height / 2), r=r, seg=1)]
+
+
 # --------------------------------------------------------------------------- modifiers through temporary objects
 
 def _temp_object(bm, name="_tmp"):

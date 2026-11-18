@@ -8,7 +8,7 @@ namespace Stealth.UI
 {
     /// <summary>
     /// Cheats for testing (prefab UI/HUD, F4 — <see cref="GameAction.Cheats"/>): switch off every robot, be invulnerable or
-    /// invisible to the robots, fill the quota, jump to the hatch, see the whole map. The server carries them out
+    /// invisible to the robots, fill the quota, jump to the hatch, see the whole map, start a house of any kind right now. The server carries them out
     /// (<see cref="PlayerController.RequestCheat"/>); the panel frees the cursor while it is open.
     /// </summary>
     public class CheatPanel : MonoBehaviour
@@ -18,6 +18,8 @@ namespace Stealth.UI
 
         public GameObject Root;
         public Button KillRobots, Invulnerable, Invisible, Quota, ToHatch, RevealMap;
+        [Tooltip("Start a house of a kind now (index = HouseKind): for testing a kind without waiting for it.")]
+        public Button[] Houses = new Button[0];
 
         bool m_Invulnerable, m_Invisible;
 
@@ -34,6 +36,11 @@ namespace Stealth.UI
                 if (Me != null && layout != null) Me.TeleportOwner(layout.HatchPosition + new Vector3(1.5f, 0.05f, 0f), Me.transform.rotation);
             });
             RevealMap.onClick.AddListener(() => GameManager.Instance?.Exploration?.RevealAll());
+            for (int i = 0; i < Houses.Length; i++)
+            {
+                var kind = (HouseKind)i;
+                if (Houses[i] != null) Houses[i].onClick.AddListener(() => Me?.RequestCheat(Cheat.StartHouse + (byte)kind, true));
+            }
             Root.SetActive(false);
         }
 

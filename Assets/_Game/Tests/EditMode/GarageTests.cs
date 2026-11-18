@@ -136,5 +136,29 @@ namespace Stealth.Tests
             Assert.IsFalse(office.Rooms.Any(r => r.Type is RoomType.Workshop or RoomType.PaintBooth), "the shop's rooms stay in the shop");
             Assert.AreNotEqual("garage", office.Mass);
         }
+
+        /// <summary>
+        /// The checks while furnishing let in only what the whole-house pass keeps. 31676/0 and 31680/4 have the hostage's
+        /// cage in the middle of an office: the room's check started its flood under the cage, dropped every doorway and
+        /// let anything in, and the final pass took out 8 and 12 groups (bays' gear across the wall, the storage room).
+        /// </summary>
+        [Test]
+        public void TheFinalWalkabilityCheckHasLittleToTakeOut()
+        {
+            var keys = Garages().Select(l => (l.Seed, l.LevelIndex, l.Players)).ToList();
+            keys.Add((31676, 0, 2));
+            keys.Add((31680, 4, 2));
+            int removed = 0;
+            var notes = new List<string>();
+            foreach (var (seed, house, players) in keys)
+            {
+                var l = TestHouses.Get(seed, house, players);
+                Assert.AreEqual(HouseKind.Garage, l.Kind, $"{seed}/{house}");
+                int cut = TestHouses.Removed(seed, house, players);
+                removed += cut;
+                if (cut > 0) notes.Add($"{seed}/{house}: {cut}");
+            }
+            Assert.That(removed, Is.LessThanOrEqualTo(keys.Count / 2), $"groups taken out: {string.Join(", ", notes)}");
+        }
     }
 }

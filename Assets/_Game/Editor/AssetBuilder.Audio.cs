@@ -97,7 +97,7 @@ namespace Stealth.EditorTools
                 s_Bank.Mark = Clip("UI/mark");
                 EditorUtility.SetDirty(s_Bank);
             }
-            if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null)
+            if (s_Bank.CarEngine == null || s_Bank.SpiderStep == null || s_Bank.DoorOpen == null || s_Bank.DoorShut == null)
             {
                 FillLateClips(s_Bank);
                 EditorUtility.SetDirty(s_Bank);
@@ -138,6 +138,8 @@ namespace Stealth.EditorTools
             b.CarStop = Clip("Car/car_stop");
             b.CarHorn = Clip("Car/car_horn");
             b.CarBump = Clip("Car/car_bump");
+            b.DoorOpen = Clip("Environment/door_open");
+            b.DoorShut = Clip("Environment/door_shut");
         }
 
         /// <summary>Music, ambience, alarm, a 2D voice and a pool of 3D voices; placed in the scene.</summary>

@@ -70,6 +70,32 @@ namespace Stealth.Level
         public bool Separates(int a, int b) => (RoomA == a && RoomB == b) || (RoomA == b && RoomB == a);
     }
 
+    /// <summary>
+    /// A balcony of the apartment block (floors above the ground, one above the other): a slab outside the facade in front of
+    /// its door (an exterior <see cref="EdgeType.Door"/> opening), <see cref="Length"/> along the wall, <see cref="Depth"/> out.
+    /// </summary>
+    public struct PlanBalcony
+    {
+        public int Floor;
+        /// <summary>Where its door is, on the wall's centre line (world x, z).</summary>
+        public Vector2 Center;
+        /// <summary>Out of the house (unit, x/z).</summary>
+        public Vector2 Out;
+        public float Length, Depth;
+
+        /// <summary>The balcony's floor in the world (x, z): from the wall's outer face out.</summary>
+        public Rect Area
+        {
+            get
+            {
+                var along = new Vector2(-Out.y, Out.x);
+                var a = Center + Out * (LevelMetrics.WallThickness / 2f) - along * (Length / 2f);
+                var b = Center + Out * (LevelMetrics.WallThickness / 2f + Depth) + along * (Length / 2f);
+                return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            }
+        }
+    }
+
     /// <summary>A doorway, an open passage, a vent or a slot cut into a wall.</summary>
     public struct PlanOpening
     {
@@ -146,6 +172,15 @@ namespace Stealth.Level
             var k = KindAt(f, c.x, c.y);
             return k == CellKind.Room || k == CellKind.Void ? IdAt(f, c.x, c.y) : -1;
         }
+
+        /// <summary>
+        /// The apartment block's lift (width 0: none): the well its cab rides in, cells, the same on every floor — the front
+        /// of a sealed shaft (pocket cells) with its doorway (<see cref="EdgeType.Lift"/>) onto the landing on each floor.
+        /// </summary>
+        public RectInt LiftWell;
+        public bool HasLift => LiftWell.width > 0;
+        /// <summary>The apartment block's balconies (floors above the ground).</summary>
+        public readonly List<PlanBalcony> Balconies = new();
 
         public bool IsFloor(int f, Vector2 p)
         {

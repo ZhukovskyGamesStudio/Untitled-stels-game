@@ -42,7 +42,7 @@ namespace Stealth.Level
             [PropKind.TvStand] = Rect.MinMaxRect(-0.7f, -0.2f, 0.7f, 0.2f),
             [PropKind.ReceptionDesk] = Rect.MinMaxRect(-1.25f, -0.4f, 1.25f, 0.48f),
             [PropKind.TrashBin] = Rect.MinMaxRect(-0.19f, -0.2f, 0.19f, 0.2f),
-            [PropKind.CoatRack] = Rect.MinMaxRect(-0.29f, -0.26f, 0.26f, 0.26f),
+            [PropKind.CoatRack] = Rect.MinMaxRect(-0.42f, -0.42f, 0.42f, 0.42f), // with its coats on (PropVariants)
             [PropKind.Lockers] = Rect.MinMaxRect(-0.5f, -0.25f, 0.5f, 0.28f),
             [PropKind.Pallet] = Rect.MinMaxRect(-0.6f, -0.5f, 0.6f, 0.5f),
             [PropKind.WashBasin] = Rect.MinMaxRect(-0.8f, -0.26f, 0.8f, 0.25f),
@@ -498,7 +498,8 @@ namespace Stealth.Level
         }
 
         /// <summary>The footprint of a model at a pose, as a world rect (yaws are multiples of 90°, near enough).</summary>
-        static Rect FootAt(PropKind k, Vector3 p, float yaw)
+        /// <summary>A placed prop's footprint in the world (x/z, its rotation's bounding box).</summary>
+        public static Rect FootAt(PropKind k, Vector3 p, float yaw)
         {
             var r = Foot.TryGetValue(k, out var f) ? f : Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f);
             var q = Quaternion.Euler(0, yaw, 0);
@@ -715,9 +716,10 @@ namespace Stealth.Level
                         m_WBare[z * m_WNX + x] = false;
             }
             m_WTargets.Clear();
+            Stamp(null); // the targets are cells a walker can stand on now (with the hatch, the vents' desks, the cage)
             void Target(Vector3 p, int reach = 4)
             {
-                // the free cell nearest to the spot, within 1 m (a stair's end: 1.5 m, as the whole-house pass links it)
+                // the free cell nearest to the spot, within 1 m (a stair's end and the middle: 1.5 m, as the whole-house pass has them)
                 int best = -1;
                 float bestD = reach * WalkCell;
                 int px = Mathf.FloorToInt(p.x / WalkCell) - m_WX, pz = Mathf.FloorToInt(p.z / WalkCell) - m_WZ;
@@ -725,13 +727,13 @@ namespace Stealth.Level
                     for (int dx = -reach; dx <= reach; dx++)
                     {
                         int x = px + dx, z = pz + dz;
-                        if (x < 0 || z < 0 || x >= m_WNX || z >= m_WNZ || !m_WBare[z * m_WNX + x]) continue;
+                        if (x < 0 || z < 0 || x >= m_WNX || z >= m_WNZ || !m_WFree[z * m_WNX + x]) continue;
                         float d = new Vector2((m_WX + x + 0.5f) * WalkCell - p.x, (m_WZ + z + 0.5f) * WalkCell - p.z).magnitude;
                         if (d < bestD) { bestD = d; best = z * m_WNX + x; }
                     }
                 if (best >= 0 && !m_WTargets.Contains(best)) m_WTargets.Add(best);
             }
-            if (!MiddleIsFurniture(room)) Target(room.Center);
+            if (!MiddleIsFurniture(room)) Target(room.Center, 6); // as Walk.Reached: the free cell nearest the middle within 1.5 m
             foreach (var d in m_L.Doorways)
             {
                 if (d.Floor != room.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open or EdgeType.Breach)) continue;
@@ -748,21 +750,13 @@ namespace Stealth.Level
                 if (s.Floor == room.Floor && InRoom(room.Floor, room.Id, bottom.x, bottom.z)) Target(bottom, 6);
                 if (s.Floor + 1 == room.Floor && InRoom(room.Floor, room.Id, top.x, top.z)) Target(top, 6);
             }
-            // what the furniture already there (desks under vents, the hatch) leaves linked is the baseline
-            Linked(null, m_WTargets);
+            Baseline();
         }
 
-        /// <summary>
-        /// Floods the room's free cells around its furniture (plus <paramref name="more"/>) from the first target; true
-        /// when every target of <paramref name="keep"/> is reached. Without <paramref name="more"/> (the baseline) the
-        /// targets it does not reach are dropped from the list.
-        /// </summary>
-        bool Linked(List<Rect> more, List<int> keep)
+        /// <summary>The room's free cells around the furniture already placed (plus <paramref name="more"/>), into m_WFree.</summary>
+        void Stamp(List<Rect> more)
         {
-            if (m_WTargets.Count < 2) return true;
-            int n = m_WNX * m_WNZ;
-            System.Array.Copy(m_WBare, m_WFree, n);
-            System.Array.Clear(m_WSeen, 0, n);
+            System.Array.Copy(m_WBare, m_WFree, m_WNX * m_WNZ);
             m_WRects.Clear();
             m_Solid[m_WalkRoom.Floor].Query(Grow(m_WalkRoom.Bounds, 1f), m_WRects);
             if (more != null) m_WRects.AddRange(more);
@@ -775,31 +769,62 @@ namespace Stealth.Level
                     for (int x = x0; x <= x1; x++)
                         m_WFree[z * m_WNX + x] = false;
             }
-            int start = m_WTargets[0];
-            if (m_WFree[start])
+        }
+
+        /// <summary>The free cells of m_WFree reached from <paramref name="start"/>, into m_WSeen.</summary>
+        void Flood(int start)
+        {
+            System.Array.Clear(m_WSeen, 0, m_WNX * m_WNZ);
+            if (!m_WFree[start]) return;
+            m_WStack.Clear();
+            m_WStack.Add(start);
+            m_WSeen[start] = true;
+            while (m_WStack.Count > 0)
             {
-                m_WStack.Clear();
-                m_WStack.Add(start);
-                m_WSeen[start] = true;
-                while (m_WStack.Count > 0)
-                {
-                    int i = m_WStack[m_WStack.Count - 1];
-                    m_WStack.RemoveAt(m_WStack.Count - 1);
-                    int x = i % m_WNX, z = i / m_WNX;
-                    if (x > 0 && m_WFree[i - 1] && !m_WSeen[i - 1]) { m_WSeen[i - 1] = true; m_WStack.Add(i - 1); }
-                    if (x < m_WNX - 1 && m_WFree[i + 1] && !m_WSeen[i + 1]) { m_WSeen[i + 1] = true; m_WStack.Add(i + 1); }
-                    if (z > 0 && m_WFree[i - m_WNX] && !m_WSeen[i - m_WNX]) { m_WSeen[i - m_WNX] = true; m_WStack.Add(i - m_WNX); }
-                    if (z < m_WNZ - 1 && m_WFree[i + m_WNX] && !m_WSeen[i + m_WNX]) { m_WSeen[i + m_WNX] = true; m_WStack.Add(i + m_WNX); }
-                }
+                int i = m_WStack[m_WStack.Count - 1];
+                m_WStack.RemoveAt(m_WStack.Count - 1);
+                int x = i % m_WNX, z = i / m_WNX;
+                if (x > 0 && m_WFree[i - 1] && !m_WSeen[i - 1]) { m_WSeen[i - 1] = true; m_WStack.Add(i - 1); }
+                if (x < m_WNX - 1 && m_WFree[i + 1] && !m_WSeen[i + 1]) { m_WSeen[i + 1] = true; m_WStack.Add(i + 1); }
+                if (z > 0 && m_WFree[i - m_WNX] && !m_WSeen[i - m_WNX]) { m_WSeen[i - m_WNX] = true; m_WStack.Add(i - m_WNX); }
+                if (z < m_WNZ - 1 && m_WFree[i + m_WNX] && !m_WSeen[i + m_WNX]) { m_WSeen[i + m_WNX] = true; m_WStack.Add(i + m_WNX); }
             }
-            bool all = true;
-            for (int k = keep.Count - 1; k >= 1; k--)
-                if (!m_WSeen[keep[k]])
-                {
-                    all = false;
-                    if (more == null) keep.RemoveAt(k);
-                }
-            return all && (more == null || m_WFree[start]);
+        }
+
+        /// <summary>
+        /// The baseline: of the targets, the biggest set the furniture already there (the hatch, desks under vents, the
+        /// hostage's cage) leaves linked is what every group must keep linked; the others are dropped. Flooding only from the
+        /// first target let a cage over the room's middle drop every doorway: then nothing in that room was checked at all
+        /// and the whole-house pass took out a dozen groups round it.
+        /// </summary>
+        void Baseline()
+        {
+            Stamp(null);
+            m_WTargets.RemoveAll(t => !m_WFree[t]);
+            if (m_WTargets.Count < 2) return;
+            int best = 0, bestCount = 0;
+            for (int k = 0; k < m_WTargets.Count && bestCount < m_WTargets.Count; k++)
+            {
+                Flood(m_WTargets[k]);
+                int count = 0;
+                foreach (int t in m_WTargets) if (m_WSeen[t]) count++;
+                if (count > bestCount) { bestCount = count; best = k; }
+            }
+            Flood(m_WTargets[best]);
+            int first = m_WTargets[best];
+            m_WTargets.RemoveAll(t => !m_WSeen[t]);
+            m_WTargets.Remove(first);
+            m_WTargets.Insert(0, first);
+        }
+
+        /// <summary>With <paramref name="more"/> footprints added, every target is still reached from the first.</summary>
+        bool Linked(List<Rect> more, List<int> keep)
+        {
+            if (keep.Count < 2) return true;
+            Stamp(more);
+            Flood(keep[0]);
+            foreach (int t in keep) if (!m_WSeen[t]) return false;
+            return true;
         }
 
         /// <summary>
@@ -1507,6 +1532,7 @@ namespace Stealth.Level
         void Anchor(PlanRoom room)
         {
             if (room.Type == RoomType.Lobby && m_L.Kind == HouseKind.Hospital) { Anchor(room, 0, 2, false); return; } // the waiting area's rows of seats
+            if (room.Type == RoomType.Lobby && m_L.Kind == HouseKind.Apartments) { Anchor(room, 2, 3, false, 0.6f); return; } // the entrance hall's mailboxes
             if (room.Type < RoomType.Gym && room.Type is not (RoomType.Kitchen or RoomType.Restroom)) return;
             if (room.Type == RoomType.Restroom)
             {
@@ -1779,6 +1805,7 @@ namespace Stealth.Level
                 case (RoomType.LockerRoom, 2): return Out(PropKind.Bench, 0.3f, 1.65f);
                 case (RoomType.Lobby, 0): return Row(f, b, PropKind.WaitingSeats, 2, 2.5f);
                 case (RoomType.Lobby, 1): return Single(PropKind.WaitingSeats, 2.5f);
+                case (RoomType.Lobby, 2): { b.Add(PropKind.Mailboxes, f.P(0, BackOf(PropKind.Mailboxes)), f.Face, solid: false); return 1.25f; } // on the wall
                 case (RoomType.Ward, 0):
                 case (RoomType.Ward, 1):
                 {
@@ -2496,15 +2523,14 @@ namespace Stealth.Level
                 case RoomType.FlatHall:
                     if (roll < 45) return Single(PropKind.Wardrobe, 1.25f);
                     if (roll < 70) return Single(PropKind.UmbrellaStand, 0.35f);
-                    return Single(PropKind.CoatRack, 0.6f);
+                    return Single(PropKind.CoatRack, 0.9f);
                 case RoomType.Bathroom:
                     if (roll < 60) return Single(PropKind.WashingMachine, 0.65f);
                     return Single(PropKind.SanitaryBin, 0.35f);
                 case RoomType.Corridor when m_L.Kind == HouseKind.Apartments:
-                    // the landing: the lift beside the stairs, a notice board, the fire hose cabinet
-                    if (roll < 40) return Single(PropKind.ElevatorDoors, 1.35f); // flat against the wall, from the floor
-                    if (roll < 65) return Hung(PropKind.NoticeBoard, 1.25f);
-                    if (roll < 85) return Hung(PropKind.FireCabinet, 0.45f);
+                    // the landing: a notice board, the fire hose cabinet (the lift is a real one now: PlanGenerator.LiftDoorways)
+                    if (roll < 50) return Hung(PropKind.NoticeBoard, 1.25f);
+                    if (roll < 80) return Hung(PropKind.FireCabinet, 0.45f);
                     return Single(PropKind.Plant, 0.75f);
                 case RoomType.Lobby when m_L.Kind == HouseKind.Apartments:
                     // the entrance hall: the mailboxes, the notice board, a bench and a plant
@@ -2531,7 +2557,7 @@ namespace Stealth.Level
                 case RoomType.Hall:
                     if (roll < 26) return Single(PropKind.Plant, 0.75f); // stair halls stay clear (no vending machines: they look like ATMs)
                     if (roll < 34) return Single(PropKind.WaterCooler, 0.4f);
-                    if (roll < 40) return Single(PropKind.CoatRack, 0.6f);
+                    if (roll < 40) return Single(PropKind.CoatRack, 0.9f);
                     if (roll < 46) return Single(PropKind.Armchair, 0.9f);
                     if (roll < 58) { Single(PropKind.DisplayCase, 1.05f); return Clock(1.05f); }
                     if (roll < 72) { Single(PropKind.HallBench, 1.85f); if (Chance(0.4)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.HallBench), 0.455f)); return 1.85f; }
@@ -2562,7 +2588,7 @@ namespace Stealth.Level
                     if (roll < 30) { b.Add(PropKind.Lockers, f.P(-0.525f, BackOf(PropKind.Lockers)), f.Face); b.Add(PropKind.Lockers, f.P(0.525f, BackOf(PropKind.Lockers)), f.Face); return 2.1f; }
                     if (roll < 40) return Single(PropKind.Plant, 0.75f);                  // no vending machines
                     if (roll < 48) return Single(PropKind.Lockers, 1.05f);                 // lockers to open instead of a plant
-                    if (roll < 54) return Single(PropKind.CoatRack, 0.6f);
+                    if (roll < 54) return Single(PropKind.CoatRack, 0.9f);
                     if (roll < 60) return Single(PropKind.FloorLamp, 0.45f);
                     if (roll < 70) return Single(PropKind.LogoTotem, 0.85f);
                     if (roll < 80) return Row(f, b, PropKind.InfoKiosk, 2, 0.7f);

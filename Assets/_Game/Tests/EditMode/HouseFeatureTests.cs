@@ -75,12 +75,30 @@ namespace Stealth.Tests
             foreach (var l in TestHouses.Sample)
             {
                 int seed = l.Seed;
-                Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
-                Assert.AreEqual(HouseFeatures.PointOfInterestKind(l.Location), l.Props[l.PointOfInterest].Kind);
+                if (l.Location == Location.Apartments) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: an apartment block has its shelter map instead");
+                else
+                {
+                    Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
+                    Assert.AreEqual(HouseFeatures.PointOfInterestKind(l.Location), l.Props[l.PointOfInterest].Kind);
+                }
                 Assert.Greater(l.Crates.Count, 0);
                 Assert.IsTrue(l.Crates.All(c => l.Props[c].Kind == PropKind.Crate));
                 Assert.Greater((l.ExitHatchPosition - l.HatchPosition).magnitude, 8f, $"seed {seed}: the exit is away from the entry");
             }
+        }
+
+        [Test]
+        public void TheMedTableIsOnlyInAHospitalAndAnApartmentBlockHasNoPointOfInterest()
+        {
+            foreach (Location at in System.Enum.GetValues(typeof(Location)))
+                if (at != Location.Hospital) Assert.AreNotEqual(PropKind.MedTable, HouseFeatures.PointOfInterestKind(at), $"{at}: no med table");
+            Assert.IsNull(HouseFeatures.PointOfInterestKind(Location.Apartments), "an apartment block's find is the shelter map");
+            // an apartment block, as the game builds it: no med table, workbench or console anywhere in it
+            int seed = Enumerable.Range(1, 400).First(s => HouseKinds.Of(s, s % 5) == HouseKind.Apartments);
+            var l = TestHouses.Get(seed, seed % 5);
+            Assert.AreEqual(-1, l.PointOfInterest);
+            Assert.IsFalse(l.Props.Any(p => p.Kind is PropKind.MedTable or PropKind.Workbench or PropKind.Programmer), $"{seed}/{seed % 5}: a point of interest in an apartment block");
+            Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
         }
 
         [Test]

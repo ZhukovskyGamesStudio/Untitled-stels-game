@@ -24,7 +24,8 @@ namespace Stealth.Level
     /// the floor, players crawl through (robots do not fit); InnerWindow: a window between rooms without glass, players
     /// climb through (robots do not), everyone sees and hears through it.
     /// </summary>
-    public enum EdgeType { Wall, Door, Open, Vent, Squeeze, Illusion, Breach, Hole, InnerWindow }
+    /// Lift = the doorway of the apartment block's lift on a landing (its sliding doors open only where the cab stands).
+    public enum EdgeType { Wall, Door, Open, Vent, Squeeze, Illusion, Breach, Hole, InnerWindow, Lift }
     public enum PropKind { Desk, Chair, ServerRack, Cabinet, MeetingTable, Plant, KitchenCounter, Hatch, Shelf, Boxes, WaterCooler, Whiteboard, Sofa, ToiletStall,
         Partition, Bookshelf, Printer, Fridge, CoffeeMachine, RoundTable, Armchair, CoffeeTable, TvStand, ReceptionDesk,
         TrashBin, CoatRack, Lockers, Pallet, WashBasin, VendingMachine, DeskLamp, FloorLamp,
@@ -207,7 +208,9 @@ namespace Stealth.Level
         public readonly List<Vector3> PatrolPoints = new();
         public readonly List<Pose> CameraSpots = new();
         public readonly List<LaserSpot> LaserSpots = new();
-        public readonly List<Pose> AutoDoors = new(); // sliding doors in doorways (local X along the wall)
+        public readonly List<Pose> AutoDoors = new(); // doors in doorways (local X along the wall)
+        /// <summary>Each door's kind, the way it opens and its hinges (<see cref="DoorRules.Plan"/>; parallel to <see cref="AutoDoors"/>).</summary>
+        public readonly List<DoorSpec> DoorLooks = new();
         /// <summary>Indices into <see cref="AutoDoors"/> that are locked: players hack them open, robots pass.</summary>
         public readonly HashSet<int> LockedDoors = new();
         /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
@@ -327,6 +330,14 @@ namespace Stealth.Level
 
         public static int FloorOf(float y) => Mathf.Max(0, Mathf.FloorToInt((y + 0.75f) / LevelMetrics.FloorHeight));
 
+        /// <summary>The apartment block has a lift (<see cref="HousePlan.LiftWell"/>): its cab, a doorway on every landing.</summary>
+        public bool HasLift => Plan != null && Plan.HasLift;
+
+        /// <summary>The lift's well in the world (x, z), the same on every floor.</summary>
+        public Rect LiftWell => HasLift
+            ? new Rect(Plan.LiftWell.xMin * HousePlan.Res, Plan.LiftWell.yMin * HousePlan.Res, Plan.LiftWell.width * HousePlan.Res, Plan.LiftWell.height * HousePlan.Res)
+            : default;
+
         /// <summary>The room at <paramref name="p"/> (its floor from p.y), or null between rooms / outside.</summary>
         public PlanRoom RoomAt(Vector3 p) => Plan?.RoomAt(p);
 
@@ -361,7 +372,15 @@ namespace Stealth.Level
         }
 
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
-        public bool IsInside(Vector3 p) => Plan != null && Plan.IsInside(new Vector2(p.x, p.z));
+        public bool IsInside(Vector3 p)
+        {
+            if (Plan == null) return false;
+            if (Plan.IsInside(new Vector2(p.x, p.z))) return true;
+            // a balcony is the house's too: no gas up there
+            foreach (var b in Plan.Balconies)
+                if (b.Area.Contains(new Vector2(p.x, p.z)) && Mathf.Abs(p.y - FloorY(b.Floor) - 1f) < 1.6f) return true;
+            return false;
+        }
 
         /// <summary>
         /// Two points see and hear each other across floors only through a void (an atrium): every floor boundary the

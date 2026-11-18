@@ -32,7 +32,7 @@ def export(filename):
     import bpy
     bpy.context.view_layer.update()
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
-    meshfix.fix_objects(objs, floor=True, name=filename)
+    meshfix.fix_objects(objs, floor=True, name=filename, pinned=meshfix.moving)  # doors and drawers stay put
     path = os.path.join(g.out_dir, "Props", filename + ".fbx")
     s.export_fbx(path, objs)
     s.clear_scene()
@@ -382,16 +382,20 @@ def model_mobile_whiteboard():
 
 
 def model_file_pedestal():
-    """Under-desk mobile pedestal: a carcass on four casters, a pencil drawer, a box drawer and a file drawer, each
-    with a bar pull, a lock at the top right."""
-    body = [s.rbox((0.4, 0.535, 0.565), (0, 0.0125, 0.3325), r=0.01, seg=2)]
+    """Under-desk mobile pedestal: an open carcass on four casters and three drawers that slide out (BodyDrawer0 the
+    file drawer at the bottom, 1 the box drawer, 2 the pencil drawer with the lock at the top right; each a box behind
+    its front with its bar pull: Items.Storage)."""
+    body = s.cupboard(-0.2, 0.2, -0.253, 0.28, 0.05, 0.615, t=0.016)
+    body += [s.rbox((0.376, 0.47, 0.008), (0, 0.02, z), r=0.002, seg=1) for z in (0.49, 0.33)]   # runners
     acc = []
-    fronts = ((0.605, 0.495), (0.485, 0.335), (0.325, 0.06))
-    for top, bot in fronts:
+    fronts = ((0.325, 0.06, 0.22), (0.485, 0.335, 0.11), (0.605, 0.495, 0.07))
+    for k, (top, bot, h) in enumerate(fronts):
         d = s.rbox((0.39, 0.02, top - bot), (0, -0.265, (top + bot) / 2), r=0.006, seg=2)
-        body.append(d)
-        acc += bar_handle(0, top - 0.035, -0.275, 0.16, r=0.006, stand=0.012)
-    acc.append(s.rcyl(0.011, 0.016, (0.15, -0.278, 0.575), axis="Y", seg=12, r=0.003, bevel_seg=1))
+        drawer = [d, *bar_handle(0, top - 0.035, -0.275, 0.16, r=0.006, stand=0.012)]
+        drawer += s.tray(-0.17, 0.17, -0.259, 0.2, bot + 0.012, h, t=0.01)
+        if k == 2:
+            drawer.append(s.rcyl(0.011, 0.016, (0.15, -0.278, 0.575), axis="Y", seg=12, r=0.003, bevel_seg=1))
+        s.part(f"BodyDrawer{k}", drawer)
     for x in (-0.15, 0.15):
         for y in (-0.2, 0.2):
             st, wh = caster(x, y, 0.055, wheel_r=0.022, axis="X")
@@ -428,20 +432,26 @@ def model_sofa_pod():
 # --------------------------------------------------------------------------- office
 
 def model_executive_desk():
-    """Executive desk 1.8 x 0.9: two drawer pedestals on dark plinths, a modesty panel at the back, a thick top with a
-    seam and a leather inlay, bar pulls, and a banker's-style desk lamp at the back left."""
+    """Executive desk 1.8 x 0.9: two open drawer pedestals on dark plinths with three drawers each that slide out
+    (BodyDrawer0..2 left, 3..5 right, bottom to top; each a box behind its shaker front with its bar pull:
+    Items.Storage), a modesty panel at the back, a thick top with a seam and a leather inlay, and a banker's-style desk
+    lamp at the back left."""
     body = [s.rbox((1.8, 0.9, 0.045), (0, 0, 0.7375), r=0.012, seg=2)]
     s.groove(body[0], "Z", 0.735, 0.006, 0.003)
     acc = []
+    k = 0
     for sx in (-1, 1):
         x = sx * 0.66
-        body.append(s.rbox((0.46, 0.8, 0.68), (x, 0, 0.385), r=0.01, seg=2))
+        body += s.cupboard(x - 0.23, x + 0.23, -0.4, 0.4, 0.045, 0.725, t=0.018)
+        body += [s.rbox((0.432, 0.7, 0.008), (x, 0.0, z), r=0.002, seg=1) for z in (0.545, 0.385)]   # runners
         acc.append(s.rbox((0.42, 0.74, 0.05), (x, 0, 0.025), r=0.006, seg=1))
-        for top, bot in ((0.7, 0.55), (0.54, 0.39), (0.38, 0.06)):
+        for top, bot, h in ((0.38, 0.06, 0.25), (0.54, 0.39, 0.1), (0.7, 0.55, 0.1)):
             d = s.rbox((0.43, 0.02, top - bot - 0.01), (x, -0.405, (top + bot) / 2), r=0.006, seg=2)
             shaker(d, 0.02, thickness=0.025, depth=-0.004)
-            body.append(d)
-            acc += bar_handle(x, top - 0.045, -0.415, 0.16, r=0.007, stand=0.016)
+            drawer = [d, *bar_handle(x, top - 0.045, -0.415, 0.16, r=0.007, stand=0.016)]
+            drawer += s.tray(x - 0.2, x + 0.2, -0.399, 0.25, bot + 0.012, h, t=0.01)
+            s.part(f"BodyDrawer{k}", drawer)
+            k += 1
     body.append(s.rbox((0.88, 0.03, 0.45), (0, 0.33, 0.49), r=0.006, seg=1))
     s.part("Body", body)
     s.part("Trim", [s.rbox((1.0, 0.52, 0.006), (0, -0.02, 0.761), r=0.003, seg=1)])
@@ -456,34 +466,39 @@ def model_executive_desk():
 
 
 def model_filing_cabinet():
-    """Four-drawer steel filing cabinet: a carcass on a recessed plinth, four drawer fronts with bar pulls and label
-    holders, a lock in the top drawer."""
-    body = [s.rbox((0.46, 0.555, 1.27), (0, 0.0225, 0.665), r=0.01, seg=2)]
+    """Four-drawer steel filing cabinet: an open carcass with runners on a recessed plinth and four drawers that slide
+    out (BodyDrawer0 bottom .. 3 top: a box behind each front with its bar pull and label holder, the lock in the top
+    one: Items.Storage)."""
+    body = s.cupboard(-0.23, 0.23, -0.258, 0.3, 0.03, 1.3, t=0.018)
     acc = [s.rbox((0.42, 0.5, 0.04), (0, 0.02, 0.02), r=0.006, seg=1)]
     for k in range(4):
         bot = 0.05 + k * 0.31
         top = bot + 0.296
+        if k:
+            body.append(s.rbox((0.432, 0.5, 0.01), (0, 0.03, bot - 0.007), r=0.002, seg=1))   # runner
         d = s.rbox((0.43, 0.02, top - bot), (0, -0.265, (top + bot) / 2), r=0.007, seg=2)
-        body.append(d)
-        acc += bar_handle(0, top - 0.06, -0.275, 0.18, r=0.008, stand=0.016)
-        acc.append(frame((0.1, 0.008, 0.04), (0, -0.276, top - 0.11), 0.008, r=0.002, seg=1))
-    acc.append(s.rcyl(0.012, 0.016, (0.16, -0.278, 1.25), axis="Y", seg=12, r=0.003, bevel_seg=1))
+        drawer = [d, *bar_handle(0, top - 0.06, -0.275, 0.18, r=0.008, stand=0.016)]
+        drawer.append(frame((0.1, 0.008, 0.04), (0, -0.276, top - 0.11), 0.008, r=0.002, seg=1))
+        drawer += s.tray(-0.195, 0.195, -0.259, 0.21, bot + 0.015, 0.22, t=0.01)
+        if k == 3:
+            drawer.append(s.rcyl(0.012, 0.016, (0.16, -0.278, 1.25), axis="Y", seg=12, r=0.003, bevel_seg=1))
+        s.part(f"BodyDrawer{k}", drawer)
     s.part("Body", body)
     s.part("Accent", acc)
     return export("filing_cabinet")
 
 
 def model_credenza():
-    """Low sideboard 1.6 m on four tapered legs: a carcass with four shaker doors and vertical pulls, a wooden top."""
-    body = [s.rbox((1.58, 0.44, 0.6), (0, 0.01, 0.42), r=0.01, seg=2)]
+    """Low sideboard 1.6 m on four tapered legs: an open carcass (a divider, a shelf) with four shaker doors that open
+    in two pairs from their meeting edges (BodyDoor0..3, vertical pulls in them: Items.Storage), a wooden top."""
+    body = s.cupboard(-0.79, 0.79, -0.21, 0.23, 0.12, 0.72, t=0.02, dividers=(0.0,), shelves=(0.42,))
     acc = []
     for k in range(4):
         x = -0.594 + k * 0.396
         d = s.rbox((0.388, 0.02, 0.56), (x, -0.218, 0.42), r=0.006, seg=2)
         shaker(d, 0.05, thickness=0.035)
-        body.append(d)
         px = x + (0.15 if k % 2 == 0 else -0.15)
-        acc += bar_handle(px, 0.55, -0.228, 0.12, axis="Z", r=0.006, stand=0.014)
+        s.part(f"BodyDoor{k}", [d, *bar_handle(px, 0.55, -0.228, 0.12, axis="Z", r=0.006, stand=0.014)])
     for x in (-0.72, 0.72):
         for y in (-0.15, 0.17):
             acc.append(s.rcyl(0.016, 0.135, (x, y, 0.0675), seg=12, r=0.003, bevel_seg=1, radius2=0.022))
@@ -624,18 +639,19 @@ def model_flipchart():
 
 
 def model_av_credenza():
-    """Low AV cabinet: a carcass on a dark plinth with two doors and an open centre bay holding two rack units with
-    status LEDs, a wooden top, a round conference speakerphone with a light ring on top."""
-    carcass = s.rbox((1.58, 0.47, 0.66), (0, 0.005, 0.4), r=0.01, seg=2)
-    carcass = s.boolean(carcass, s.rbox((0.52, 0.44, 0.48), (0, -0.2, 0.42), r=0), "DIFFERENCE")
-    s.bevel_edges(carcass, 0.004, 1, angle=50)
-    body = [carcass]
+    """Low AV cabinet: an open carcass on a dark plinth with two doors (BodyDoor0/1: Items.Storage swings a lone door
+    on its Blender +X edge - Unity mirrors X - so the left door's pull is at its outer edge, the right one's at the bay)
+    and an open centre bay holding two rack units with status LEDs, a wooden top, a round conference speakerphone with
+    a light ring on top."""
+    body = s.cupboard(-0.79, 0.79, -0.23, 0.24, 0.07, 0.73, t=0.02, dividers=(-0.27, 0.27))
+    body.append(s.rbox((0.53, 0.465, 0.108), (0, 0.004, 0.126), r=0.004, seg=1))            # the bay's raised floor
+    body.append(s.rbox((0.53, 0.02, 0.545), (0, 0.025, 0.4425), r=0.003, seg=1))            # the bay's back
     acc = [s.rbox((1.5, 0.4, 0.08), (0, 0, 0.04), r=0.006, seg=1)]
-    for sx in (-1, 1):
+    for i, sx in enumerate((-1, 1)):
         d = s.rbox((0.5, 0.02, 0.6), (sx * 0.52, -0.235, 0.41), r=0.006, seg=2)
         shaker(d, 0.05, thickness=0.035)
-        body.append(d)
-        acc += bar_handle(sx * 0.3, 0.41, -0.245, 0.14, axis="Z", r=0.006, stand=0.014)
+        pull = bar_handle(0.3 if sx > 0 else -0.74, 0.41, -0.245, 0.14, axis="Z", r=0.006, stand=0.014)
+        s.part(f"BodyDoor{i}", [d, *pull])
     eye = []
     for z, h, w in ((0.212, 0.09, 0.46), (0.292, 0.08, 0.44)):
         acc.append(s.rbox((w, 0.22, h), (0, -0.09, z), r=0.006, seg=1))

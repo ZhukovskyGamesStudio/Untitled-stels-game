@@ -112,7 +112,7 @@ namespace Stealth.Tests
                         Assert.IsTrue(path.status != NavMeshPathStatus.PathComplete || len > 3f, $"seed {seed}: robots get through the {edge} at {at} floor {f}");
                         checkedVents++;
                     }
-            Assert.Greater(checkedVents, 0, "the level has vents");
+            if (m_Layout.Kind != HouseKind.Apartments) Assert.Greater(checkedVents, 0, "the level has vents"); // (a block of flats has none)
         }
 
         [Test]

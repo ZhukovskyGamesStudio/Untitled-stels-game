@@ -91,7 +91,8 @@ namespace Stealth.Game
 
     /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
     /// <summary>The test cheats of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server.</summary>
-    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota }
+    /// <summary>A cheat (F4 panel). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.</summary>
+    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, StartHouse = 32 }
 
     public interface IPlayerLink
     {
