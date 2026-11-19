@@ -319,12 +319,10 @@ namespace Stealth.Game
         {
             GoAt = 0;
             if (m_Run.Advance() != RunState.Exit.NextLevel) return;
-            // the team stays in its seats: the drive scene starts from their eyes in the cab, the house is built meanwhile, and
-            // they arrive in the same seats in its basement (GameManager.Arrival)
-            m_DepartedAt = Session.ServerTime;
-            var car = Car.Active;
-            for (int seat = 0; seat < Car.SeatCount; seat++) m_RideSeats[seat] = car != null ? car.OccupantOf(seat) : Car.Nobody;
-            DriveUntil = m_DepartedAt + m_Run.Settings.DriveTime; // (provisional: the cut comes once the house stands)
+            // the team stays in its seats: the car drives on down the tunnel to the next house's basement while the house is
+            // built (GameManager.Arrival)
+            DepartCarServer(Car.Active);
+            DriveUntil = DepartAt + m_Run.Settings.DriveTime; // (provisional: the change into the basement is set once the house stands)
             ArriveAt = 0;
         }
     }

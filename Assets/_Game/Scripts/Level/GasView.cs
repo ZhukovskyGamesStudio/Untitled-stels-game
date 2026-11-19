@@ -32,6 +32,7 @@ namespace Stealth.Level
             float qx = Mathf.Max(Mathf.Abs(p.x - box.x) - box.z, 0f);
             float qz = Mathf.Max(Mathf.Abs(p.z - box.y) - box.w, 0f);
             float ramp = Mathf.Clamp01(Mathf.Sqrt(qx * qx + qz * qz) / Mathf.Max(w.GasClear, 0.01f));
+            if (p.y < groundY + LevelLayout.Underground) return 0f; // underground: the basement's tunnels, the sewer
             float above = Mathf.Max(p.y - groundY - w.GasLayer, 0f);
             return w.GasDensity * ramp * Mathf.Exp(-above / Mathf.Max(w.GasFalloff, 0.01f));
         }

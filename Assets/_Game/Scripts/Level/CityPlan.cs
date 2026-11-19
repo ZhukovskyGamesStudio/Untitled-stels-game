@@ -289,6 +289,136 @@ namespace Stealth.Level
                 float x = Range(rng, b.min.x + 1f, b.max.x - 1f - w), z = Range(rng, b.min.z + 1f, b.max.z - 1f - d);
                 c.Boxes.Add(new CityBox(new Vector3(x, h, z), new Vector3(x + w, h + Range(rng, 1.8f, 3f), z + d), CitySlot.Roof, CitySlot.Roof));
             }
+            Details(c, rng, e, b, f, facade, trim, storeys, h);
+        }
+
+        /// <summary>Where the windows of a facade texture are in its storey-square cell: x0, y0, x1, y1 in 0..1 (Tools/Art/generate_city.py).</summary>
+        static Vector4 WindowOf(CitySlot facade) => facade switch
+        {
+            CitySlot.FacadeA => new Vector4(0.18f, 0.3f, 0.82f, 0.82f),
+            CitySlot.FacadeB => new Vector4(0.25f, 0.28f, 0.75f, 0.8f),
+            _ => new Vector4(0.04f, 0.12f, 0.96f, 0.94f),
+        };
+
+        /// <summary>
+        /// The relief a flat textured box lacked (seen from the house's windows it read as low poly): on the windows the
+        /// texture draws (they line up: both count from the pavement and along the world's axes, AddFaces) frames, sills and
+        /// hoods on the plain and brick fronts, mullions on the glass ones; drainpipes at the front corners, a fire escape
+        /// on a brick side, shop awnings over the ground floor, machines, vents, masts and a water tank on the roof.
+        /// </summary>
+        static void Details(City c, System.Random rng, Edge e, Bounds b, float f, CitySlot facade, CitySlot trim, int storeys, float h)
+        {
+            var win = WindowOf(facade);
+            bool glass = facade == CitySlot.FacadeC;
+            var front = new Vector3(e.V.x, 0f, e.V.y) * f; // out of the street front
+            foreach (var n in new[] { Vector3.right, Vector3.left, Vector3.forward, Vector3.back })
+            {
+                bool alongX = Mathf.Abs(n.z) > 0.5f;
+                var right = Vector3.Cross(Vector3.up, -n);
+                float s = alongX ? right.x : right.z;                  // the texture's u = s * the world coordinate along the face
+                float lo = alongX ? b.min.x : b.min.z, hi = alongX ? b.max.x : b.max.z;
+                float nSign = alongX ? n.z : n.x;
+                float plane = nSign > 0 ? (alongX ? b.max.z : b.max.x) : (alongX ? b.min.z : b.min.x);
+                // a box on the face: along a0..a1 (world), o0..o1 out of it, y0..y1
+                void On(float a0, float a1, float o0, float o1, float y0, float y1, CitySlot slot)
+                {
+                    float p0 = plane + nSign * o0, p1 = plane + nSign * o1;
+                    var min = alongX ? new Vector3(a0, y0, Mathf.Min(p0, p1)) : new Vector3(Mathf.Min(p0, p1), y0, a0);
+                    var max = alongX ? new Vector3(a1, y1, Mathf.Max(p0, p1)) : new Vector3(Mathf.Max(p0, p1), y1, a1);
+                    c.Boxes.Add(new CityBox(min, max, slot, slot));
+                }
+                float tlo = Mathf.Min(s * lo, s * hi), thi = Mathf.Max(s * lo, s * hi);
+                for (int k = Mathf.CeilToInt(tlo / Storey); (k + 1) * Storey <= thi + 0.01f; k++)
+                {
+                    float t0 = (k + win.x) * Storey, t1 = (k + win.z) * Storey;
+                    float a0 = Mathf.Min(s * t0, s * t1), a1 = Mathf.Max(s * t0, s * t1);
+                    if (a0 < lo + 0.15f || a1 > hi - 0.15f) continue;
+                    for (int y = 1; y < storeys; y++)
+                    {
+                        float sill = (y + win.y) * Storey, top = (y + win.w) * Storey;
+                        if (glass)
+                        {
+                            // the curtain wall's mullions between the panes (the bands are its transoms)
+                            float m = s > 0 ? a0 : a1;
+                            On(m - 0.06f, m + 0.06f, 0f, 0.1f, y * Storey, (y + 1) * Storey, CitySlot.Metal);
+                            continue;
+                        }
+                        On(a0 - 0.08f, a1 + 0.08f, 0f, 0.14f, sill - 0.07f, sill, trim);              // the sill
+                        On(a0 - 0.06f, a0, 0f, 0.09f, sill, top, trim);                               // the reveal's jambs
+                        On(a1, a1 + 0.06f, 0f, 0.09f, sill, top, trim);
+                        On((a0 + a1) / 2f - 0.03f, (a0 + a1) / 2f + 0.03f, 0f, 0.04f, sill, top, CitySlot.Metal); // the casement's middle bar
+                        if (facade == CitySlot.FacadeB) On(a0 - 0.12f, a1 + 0.12f, 0f, 0.12f, top, top + 0.16f, trim); // a brick hood over it
+                        else On(a0 - 0.04f, a1 + 0.04f, 0f, 0.09f, top, top + 0.06f, trim);
+                    }
+                }
+                bool isFront = Vector3.Dot(n, front) > 0.5f;
+                if (isFront && !glass)
+                    foreach (float a in new[] { lo + 0.12f, hi - 0.12f })                                // drainpipes down the front's corners
+                    {
+                        On(a - 0.06f, a + 0.06f, 0.1f, 0.22f, WalkTop, h - 0.15f, CitySlot.Metal);
+                        On(a - 0.1f, a + 0.1f, 0.05f, 0.26f, h - 0.35f, h - 0.15f, CitySlot.Metal);     // the hopper under the gutter
+                    }
+                if (isFront && storeys >= 2 && rng.NextDouble() < (glass ? 0.7 : 0.45))
+                {
+                    // shops: an awning over the ground floor's windows, a sign board over it
+                    var paint = (CitySlot)((int)CitySlot.CarRed + rng.Next(3));
+                    float span = Mathf.Min(hi - lo - 4f, Range(rng, 4f, 9f));
+                    if (span > 2f)
+                    {
+                        float a = Range(rng, lo + 0.6f, hi - 0.6f - span);
+                        On(a, a + span, 0.1f, 1.3f, 2.95f, 3.08f, paint);
+                        On(a, a + span, 1.22f, 1.3f, 2.65f, 3.08f, paint);
+                        On(a + 0.4f, a + span - 0.4f, 0.1f, 0.2f, 3.25f, 3.85f, rng.NextDouble() < 0.5 ? CitySlot.LampGlow : CitySlot.Plinth);
+                    }
+                }
+                bool side = Mathf.Abs(Vector3.Dot(n, front)) < 0.5f;
+                if (side && facade == CitySlot.FacadeB && storeys >= 3 && hi - lo > 6f && rng.NextDouble() < 0.5)
+                {
+                    // a fire escape: a landing per storey with a rail, ladders between them (from the first floor up: none at the ground)
+                    float a = Range(rng, lo + 1f, hi - 4f);
+                    for (int y = 1; y < storeys; y++)
+                    {
+                        float fy = y * Storey + 0.05f;
+                        On(a, a + 3f, 0f, 1.1f, fy, fy + 0.06f, CitySlot.Metal);
+                        On(a, a + 3f, 1.05f, 1.1f, fy + 0.06f, fy + 1f, CitySlot.Metal);
+                        On(a, a + 3f, 0.6f, 1.1f, fy + 0.94f, fy + 1f, CitySlot.Metal);
+                        if (y + 1 < storeys)
+                            foreach (float r in new[] { a + 2.2f, a + 2.85f })
+                                On(r - 0.025f, r + 0.025f, 0.3f, 0.36f, fy, fy + Storey, CitySlot.Metal);
+                    }
+                }
+            }
+            // the roof: machines, vents, a mast
+            int things = rng.Next(2, 6);
+            for (int i = 0; i < things && b.size.x > 4f && b.size.z > 4f; i++)
+            {
+                float x = Range(rng, b.min.x + 0.8f, b.max.x - 1.8f), z = Range(rng, b.min.z + 0.8f, b.max.z - 1.8f);
+                switch (rng.Next(3))
+                {
+                    case 0: // an air-conditioning unit, a fan's grille on top
+                        c.Boxes.Add(new CityBox(new Vector3(x, h, z), new Vector3(x + 1.2f, h + 0.9f, z + 0.8f), CitySlot.Metal, CitySlot.Metal));
+                        c.Boxes.Add(new CityBox(new Vector3(x + 0.2f, h + 0.9f, z + 0.15f), new Vector3(x + 0.7f, h + 0.95f, z + 0.65f), CitySlot.Tyre, CitySlot.Tyre));
+                        break;
+                    case 1: // a vent stack with a cap
+                        c.Boxes.Add(new CityBox(new Vector3(x, h, z), new Vector3(x + 0.35f, h + 1.3f, z + 0.35f), CitySlot.Metal, CitySlot.Metal));
+                        c.Boxes.Add(new CityBox(new Vector3(x - 0.08f, h + 1.3f, z - 0.08f), new Vector3(x + 0.43f, h + 1.38f, z + 0.43f), CitySlot.Metal, CitySlot.Metal));
+                        break;
+                    default: // a mast with two arms
+                        c.Boxes.Add(new CityBox(new Vector3(x, h, z), new Vector3(x + 0.07f, h + Range(rng, 2.5f, 4.5f), z + 0.07f), CitySlot.Metal, CitySlot.Metal));
+                        c.Boxes.Add(new CityBox(new Vector3(x - 0.5f, h + 2f, z + 0.02f), new Vector3(x + 0.57f, h + 2.04f, z + 0.05f), CitySlot.Metal, CitySlot.Metal));
+                        c.Boxes.Add(new CityBox(new Vector3(x + 0.02f, h + 1.6f, z - 0.4f), new Vector3(x + 0.05f, h + 1.64f, z + 0.47f), CitySlot.Metal, CitySlot.Metal));
+                        break;
+                }
+            }
+            if (storeys >= 6 && b.size.x > 7f && b.size.z > 7f && rng.NextDouble() < 0.5)
+            {
+                // a water tank on a frame of legs
+                float x = Range(rng, b.min.x + 1.5f, b.max.x - 4f), z = Range(rng, b.min.z + 1.5f, b.max.z - 4f);
+                foreach (var (dx, dz) in new[] { (0f, 0f), (2.2f, 0f), (0f, 2.2f), (2.2f, 2.2f) })
+                    c.Boxes.Add(new CityBox(new Vector3(x + dx, h, z + dz), new Vector3(x + dx + 0.15f, h + 1.6f, z + dz + 0.15f), CitySlot.Metal, CitySlot.Metal));
+                c.Boxes.Add(new CityBox(new Vector3(x - 0.1f, h + 1.6f, z - 0.1f), new Vector3(x + 2.45f, h + 3.8f, z + 2.45f), CitySlot.Bark, CitySlot.Roof));
+                c.Boxes.Add(new CityBox(new Vector3(x + 0.2f, h + 3.8f, z + 0.2f), new Vector3(x + 2.15f, h + 4.1f, z + 2.15f), CitySlot.Roof, CitySlot.Roof));
+            }
         }
 
         /// <summary>Buildings side by side along u0..u1 from the building line <paramref name="v0"/>, deeper along <paramref name="dir"/>.</summary>
@@ -425,6 +555,24 @@ namespace Stealth.Level
         /// <see cref="CityBox.Top"/>; no bottom) to shared vertex lists. Texture coordinates are world metres over the slot's
         /// <see cref="Tile"/>, so neighbouring faces continue each other and facades start at the ground.
         /// </summary>
+        /// <summary>
+        /// Cuts <paramref name="hole"/> (on the ground) out of every box under it: the shaft down to the basement goes through
+        /// the asphalt laid under the whole block (its top seen from the lobby was a black plate over the shaft).
+        /// </summary>
+        public static void CutHole(City c, Rect hole)
+        {
+            for (int i = c.Boxes.Count - 1; i >= 0; i--)
+            {
+                var b = c.Boxes[i];
+                var min = b.Center - b.Size / 2f;
+                var max = b.Center + b.Size / 2f;
+                if (max.x <= hole.xMin || min.x >= hole.xMax || max.z <= hole.yMin || min.z >= hole.yMax) continue;
+                c.Boxes.RemoveAt(i);
+                foreach (var (a, z) in ArchitecturePlanner.CutHoles(new Vector2(min.x, min.z), new Vector2(max.x, max.z), new List<Rect> { hole }))
+                    c.Boxes.Add(new CityBox(new Vector3(a.x, min.y, a.y), new Vector3(z.x, max.y, z.y), b.Sides, b.Top));
+            }
+        }
+
         public static void AddFaces(CityBox b, List<Vector3> verts, List<Vector3> normals, List<Vector2> uvs, List<int>[] tris)
         {
             var min = b.Center - b.Size / 2f;

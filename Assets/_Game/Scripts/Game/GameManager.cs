@@ -197,8 +197,8 @@ namespace Stealth.Game
         /// <summary>Every peer: build the sewer when the run is there, take it away when a house starts, flood it when the run ends there.</summary>
         void SyncLocation()
         {
-            // on the drive the sewer stays as it is behind the drive scene (the next house is on its way)
-            if (Phase == RunPhase.Sewer && DriveUntil > 0 && m_Sewer != null) return;
+            // on the drive the sewer stays as it is (the next house goes up meanwhile; UpdateDrive takes it away behind the car)
+            if (DriveUntil > 0 && m_Sewer != null && Phase is RunPhase.Sewer or RunPhase.Playing) { if (Phase == RunPhase.Playing && ActiveLevel.Layout == null) BuildLocal(); return; }
             // a new run after the water rose (or another run's sewer): built afresh, dry
             if (Phase == RunPhase.Sewer && m_Sewer != null && (m_Sewer.Flooded || m_SewerFor != (Level.RunSeed, Level.Index))) LeaveSewerLocal();
             if (Phase == RunPhase.Sewer && m_Sewer == null) EnterSewerLocal();
@@ -219,7 +219,7 @@ namespace Stealth.Game
             Exploration = null;
             Pings.Clear();
             if (Art.Sewer == null) { Debug.LogError("[Game] LevelArt has no sewer"); return; }
-            m_Sewer = Instantiate(Art.Sewer).GetComponent<SewerLocation>();
+            m_Sewer = Instantiate(Art.Sewer, SewerLocation.Origin, Quaternion.identity).GetComponent<SewerLocation>();
             m_Sewer.Build(SewerPlan.Make(Level.RunSeed, Level.Index));
             m_SewerFor = (Level.RunSeed, Level.Index);
             ApplyAtmosphere();
@@ -233,36 +233,7 @@ namespace Stealth.Game
             m_Sewer = null;
         }
 
-        GameObject m_DriveScene;
         (int seed, int depth) m_SewerFor;
-
-        /// <summary>The drive starts from where this player's eyes are in the car (the scene glides out to its side view).</summary>
-        static void BeginDriveScene(DriveScene scene)
-        {
-            if (scene == null) return;
-            var me = PlayerController.Local;
-            var car = Vehicles.Car.Active;
-            if (me == null || me.Camera == null || car == null) { scene.Begin(null, 60f, 0.05f, 0f); return; }
-            var eye = me.Camera.transform;
-            var local = car.transform.InverseTransformPoint(eye.position);
-            // at the car (in a seat or beside it): from the eyes; far from it: straight into the side view
-            Pose? inCar = local.magnitude < 8f ? new Pose(local, Quaternion.Inverse(car.transform.rotation) * eye.rotation) : null;
-            // the team rides along: everyone in a seat, as they look now (the driver at the wheel)
-            var riders = new List<DriveScene.Rider>();
-            var back = Quaternion.Inverse(car.transform.rotation);
-            for (int seat = 0; seat < Vehicles.Car.SeatCount; seat++)
-            {
-                var p = PlayerController.Find(car.OccupantOf(seat));
-                if (p == null || p.Visual == null) continue;
-                riders.Add(new DriveScene.Rider
-                {
-                    Visual = p.Visual,
-                    InCar = new Pose(car.transform.InverseTransformPoint(p.Visual.position), back * p.Visual.rotation),
-                    Mine = p == me,
-                });
-            }
-            scene.Begin(inCar, me.Camera.fieldOfView, me.Camera.nearClipPlane, car.Speed, riders);
-        }
 
         // ------------------------------------------------------------------ level lifecycle
 
@@ -274,7 +245,7 @@ namespace Stealth.Game
         {
             if (info.Seed == 0 || info.Seed == m_BuiltSeed) yield break;
             m_BuiltSeed = info.Seed;
-            LeaveSewerLocal();
+            if (DriveUntil <= 0) LeaveSewerLocal(); // (on the drive the car is still in it: UpdateDrive takes it away)
             // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
@@ -349,11 +320,12 @@ namespace Stealth.Game
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             m_GuardsAwake = false;
-            UnloadCarServer();
+            if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
+            else UnloadCarServer();
             SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All) p.ResetForLevelServer(); // (the team arrives down in the basement)
             if (arriving) ArriveCarServer(layout);
-            else SpawnBasementCarServer(layout, false);
+            else SpawnBasementCarServer(layout);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
@@ -491,11 +463,12 @@ namespace Stealth.Game
             Pings.Expire(Time.time);
             RevealMap();
             PrepareNextHouse();
-            UpdateDriveScene();
+            UpdateDrive();
             if (!m_IsServer) return;
             if (DriveUntil > 0 && Phase == RunPhase.Playing && !m_Arriving && Session.ServerTime >= ArriveAt)
             {
                 DriveUntil = 0; // the car stands at the gate: the team gets out
+                UnloadCarServer();
                 Banner(Loc.Pack("banner.house", Level.Index + 1));
             }
             if (m_Run.SetPlayers(TeamSize))
@@ -542,6 +515,7 @@ namespace Stealth.Game
             {
                 if (!m_IsServer && p != PlayerController.Local) continue;
                 var eye = p.Camera != null && p.IsOwner ? p.Camera.transform.position : p.transform.position + Vector3.up * p.Height * 0.9f;
+                if (eye.y < LevelLayout.Underground) continue; // down in the basement or the sewer: the house's floor is not seen through
                 map.RevealAround(eye, radius, Tuning.Player.Team.OutsideRevealRadius);
             }
         }

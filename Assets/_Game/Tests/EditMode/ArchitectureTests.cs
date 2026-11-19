@@ -275,17 +275,23 @@ namespace Stealth.Tests
             {
                 var right = p.Rotation * Vector3.right;
                 var corner = p.Position - right * (p.Scale.x / 2f) - Vector3.up * (p.Scale.y / 2f); // the quad's uv (0, 0)
-                bool reveal = Mathf.Abs(Mathf.Abs(p.Surface.x) - LevelMetrics.WallThickness) < 1e-3f && p.Scale.x < LevelMetrics.WallThickness + 1e-3f;
+                bool reveal = p.Scale.x < LevelMetrics.WallThickness + 1e-3f; // a reveal is at most the wall's thickness (a door's: to its leaf, half of it)
                 // a face: its normal is the wall's; a reveal (across the wall's thickness): the wall runs along its normal
+                // (a sliver of face as wide as the wall is thick reads either way: either must fit)
                 var normal = -(p.Rotation * Vector3.forward);
-                var wallRight = reveal ? normal : right;
-                var wall = new WallProjection
+                Vector2 UvAs(bool asReveal)
                 {
-                    Right = wallRight, Normal = Vector3.Cross(wallRight, Vector3.up), Across = ArchitecturePlanner.Across(wallRight),
-                    Tile = g.WallTile, FloorY = corner.y - p.Surface.w,
-                };
-                var uv = MeshBatcher.Project(wall, corner, normal);
-                Assert.AreEqual(p.Surface.z / g.WallTile, uv.x, 1e-3f, reveal ? "across the wall, like the arch's soffit" : "along the wall");
+                    var wallRight = asReveal ? normal : right;
+                    var wall = new WallProjection
+                    {
+                        Right = wallRight, Normal = Vector3.Cross(wallRight, Vector3.up), Across = ArchitecturePlanner.Across(wallRight),
+                        Tile = g.WallTile, FloorY = corner.y - p.Surface.w,
+                    };
+                    return MeshBatcher.Project(wall, corner, normal);
+                }
+                var uv = UvAs(reveal);
+                if (reveal && Mathf.Abs(uv.x - p.Surface.z / g.WallTile) > 1e-3f) uv = UvAs(false);
+                Assert.AreEqual(p.Surface.z / g.WallTile, uv.x, 1e-3f, (reveal ? "across the wall, like the arch's soffit" : "along the wall") + $" at {p.Position} yaw {p.Rotation.eulerAngles.y} scale {p.Scale} surface {p.Surface} variant {p.Variant}");
                 Assert.AreEqual(p.Surface.w / g.WallTile, uv.y, 1e-3f, "up the wall");
                 n++;
             }

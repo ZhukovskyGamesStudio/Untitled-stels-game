@@ -16,7 +16,8 @@ float GasDensity(float3 p)
     float2 q = max(abs(p.xz - _GasBox.xy) - _GasBox.zw, 0.0);
     float ramp = saturate(length(q) / max(_GasParams.y, 0.01));
     float above = max(p.y - _GasColor.a - _GasParams.z, 0.0);
-    return _GasParams.x * ramp * exp(-above / max(_GasParams.w, 0.01));
+    float street = step(_GasColor.a - 1.5, p.y); // none underground (LevelLayout.Underground): the basement's tunnels, the sewer
+    return _GasParams.x * ramp * street * exp(-above / max(_GasParams.w, 0.01));
 }
 
 // Optical depth along a ray of length len: steps grow with the distance (fine near the eye), jittered per pixel.

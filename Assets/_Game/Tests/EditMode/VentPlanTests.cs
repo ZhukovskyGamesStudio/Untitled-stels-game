@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using Stealth.Configs;
 using Stealth.Level;
 using UnityEngine;
 
@@ -90,6 +91,60 @@ namespace Stealth.Tests
             Assert.AreEqual(15f, area, 1e-4f);
             foreach (var (a, b) in pieces) Assert.IsFalse(new Rect(a, b - a).Overlaps(new Rect(1.001f, 1.001f, 0.998f, 0.998f)), "a piece over the hole");
             Assert.AreEqual(1, ArchitecturePlanner.CutHoles(Vector2.zero, Vector2.one, new List<Rect> { new Rect(5f, 5f, 1f, 1f) }).Count, "a hole elsewhere leaves it whole");
+        }
+
+        [Test]
+        public void NoGrateCutsIntoACeilingLamp()
+        {
+            foreach (var l in Houses())
+                foreach (var net in l.Vents)
+                    foreach (var g in net.Grates)
+                    {
+                        var room = l.Plan.Rooms[g.Room];
+                        Assert.IsFalse(VentPlan.ClashesLamp(g.Cell, LevelBuilder.LightSpots(l, room)), $"seed {l.Seed}: the grate in {room.Type} on floor {net.Floor} touches a lamp");
+                    }
+        }
+
+        [Test]
+        public void NothingHidesAGrate()
+        {
+            // a ceiling of its own goes round the grates (as the style's does), so does the corridors' duct
+            var ceiling = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            var g = new StyleGeometry
+            {
+                RoomLooks = new[] { RoomType.Office, RoomType.Corridor, RoomType.Meeting, RoomType.Restroom, RoomType.Kitchen }
+                    .Select(t => new RoomLook { Room = t, Ceiling = ceiling, CeilingTile = 1f }).ToArray(),
+            };
+            try
+            {
+                foreach (var l in Houses().Take(6))
+                {
+                    var shell = new LevelShell();
+                    var holes = new List<(Rect hole, float y)>();
+                    foreach (var net in l.Vents)
+                        foreach (var grate in net.Grates)
+                        {
+                            var h = new Rect(grate.Cell.x * VentPlan.Res, grate.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res);
+                            shell.CeilingHoles.Add(h);
+                            holes.Add((new Rect(h.x + 0.02f, h.y + 0.02f, h.width - 0.04f, h.height - 0.04f), grate.Position.y));
+                        }
+                    foreach (var piece in ArchitecturePlanner.Plan(shell, l, g))
+                    {
+                        if (piece.Kind != DecorKind.CeilingFinish) continue;
+                        var r = new Rect(piece.Position.x - piece.Scale.x / 2f, piece.Position.z - piece.Scale.y / 2f, piece.Scale.x, piece.Scale.y);
+                        foreach (var (h, y) in holes)
+                            Assert.IsFalse(Mathf.Abs(piece.Position.y - y) < 0.1f && r.Overlaps(h), $"seed {l.Seed}: a ceiling over the grate at {h.center}");
+                    }
+                    foreach (var part in UtilityPlan.Make(l, shell))
+                    {
+                        if (part.Slot != UtilitySlot.Duct) continue;
+                        var r = new Rect(part.Center.x - part.Size.x / 2f, part.Center.z - part.Size.z / 2f, part.Size.x, part.Size.z);
+                        foreach (var (h, y) in holes)
+                            Assert.IsFalse(Mathf.Abs(part.Center.y - y) < 0.5f && r.Overlaps(h), $"seed {l.Seed}: a duct under the grate at {h.center}");
+                    }
+                }
+            }
+            finally { Object.DestroyImmediate(ceiling); }
         }
 
         [Test]

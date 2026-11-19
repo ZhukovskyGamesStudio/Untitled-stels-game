@@ -198,7 +198,7 @@ namespace Stealth.UI
             m_Hit.Update(Time.deltaTime);
             m_Banners.Update(now);
             m_Gain.Observe(gm.Collected, now);
-            bool driveScene = DriveScene.Active != null; // the drive scene speaks for itself
+            bool driveScene = gm.DriveUntil > 0; // the drive on to the next house speaks for itself
             if (ContentGroup != null) ContentGroup.alpha = Mathf.MoveTowards(ContentGroup.alpha, driveScene ? 0f : 1f, Time.deltaTime * 2.5f);
             var context = BuildContext(gm, me);
             CurrentReticle = driveScene ? Reticle.Hidden : ReticleRules.Choose(context);
@@ -253,7 +253,7 @@ namespace Stealth.UI
             var sewer = SewerLocation.Active;
             int here = sewer != null ? sewer.GetHashCode() : ActiveLevel.Layout != null ? ActiveLevel.Layout.Seed : 0;
             bool loading = false;
-            bool driving = gm.DriveUntil > 0 || DriveScene.Active != null; // the drive scene is the show
+            bool driving = gm.DriveUntil > 0; // the drive is the show
             if (driving)
             {
                 if (me != null && me.PlacedHere) m_LoadedFor = here;

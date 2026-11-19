@@ -89,8 +89,6 @@ namespace Stealth.Level
         public GameObject ExitSign;
         [Tooltip("The sewer between houses: the team sells, pays the quota and votes for the next house there.")]
         public GameObject Sewer;
-        [Tooltip("The drive to the next house: the car in a tunnel seen from the side, while the house is built.")]
-        public GameObject DriveScene;
 
         [Header("Props")]
         public GameObject Desk;

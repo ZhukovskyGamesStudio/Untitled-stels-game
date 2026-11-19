@@ -63,6 +63,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheShaftGoesThroughTheAsphalt()
+        {
+            // the asphalt lies under the whole block, the house too: the shaft to the basement is cut out of it (from the lobby
+            // its top was a black plate over the shaft)
+            var city = CityPlan.Make(House, 0, 3, 7);
+            var hole = new Rect(4.25f, 3.25f, 1.5f, 1.5f);
+            float before = city.Boxes.Where(b => b.Center.y < 0f).Sum(b => b.Size.x * b.Size.z);
+            CityPlan.CutHole(city, hole);
+            foreach (var b in city.Boxes)
+                Assert.IsFalse(new Rect(b.Center.x - b.Size.x / 2f, b.Center.z - b.Size.z / 2f, b.Size.x, b.Size.z).Overlaps(new Rect(hole.x + 0.01f, hole.y + 0.01f, 1.48f, 1.48f)), "a box over the shaft");
+            float after = city.Boxes.Where(b => b.Center.y < 0f).Sum(b => b.Size.x * b.Size.z);
+            Assert.AreEqual(before - 1.5f * 1.5f, after, 0.5f, "only the shaft's hole is cut (out of the asphalt under the house)");
+        }
+
+        [Test]
         public void TheFrontIsTheSideNearestTheLobby()
         {
             Assert.AreEqual(0, CityPlan.SideNearest(House, new Vector2(17f, 3f)));

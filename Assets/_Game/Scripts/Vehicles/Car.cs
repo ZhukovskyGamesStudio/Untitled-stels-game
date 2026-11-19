@@ -23,6 +23,7 @@ namespace Stealth.Vehicles
     /// sees it move and spin its wheels. The server decides who sits where (<see cref="SitServer"/>); a car driven into a
     /// tunnel of the sewer chooses the way on.
     /// </summary>
+    [DefaultExecutionOrder(-20)] // the car moves before the players seated in it are put on their seats
     public class Car : MonoBehaviour
     {
         public static Car Active { get; private set; }
@@ -69,9 +70,13 @@ namespace Stealth.Vehicles
         float m_Spin, m_Distance, m_Grind, m_RemoteSpeed, m_RemoteSteer;
         Vector3 m_LastPos;
         float m_LastYaw;
-        Pose m_RollPose;
-        float m_RollSpeed;
-        bool m_Rolling;
+        Pose m_DrivePose;
+        float m_DriveSpeed;
+        bool m_Scripted;
+        // the drive takes over from where this peer saw the car (the server's start lags the driver's a little): eased out
+        Vector3 m_DriveOffset;
+        Quaternion m_DriveTurn = Quaternion.identity;
+        float m_DriveSince;
         bool m_WasEngine;
         int m_CargoShown = -1;
         readonly List<CargoPiece> m_Pieces = new();
@@ -86,6 +91,8 @@ namespace Stealth.Vehicles
         public IReadOnlyList<ulong> Occupants => m_Occupants;
         public ulong Driver => m_Occupants[0];
         public bool EngineOn => Driver != Nobody;
+        /// <summary>On the drive to the next house: moved by the clock (Level.DrivePath), not by a driver.</summary>
+        public bool Scripted => m_Scripted;
         public float Speed => HasAuthority ? m_Physics.Speed : m_RemoteSpeed;
         public float SteerAngle => HasAuthority ? m_Physics.SteerAngle : m_RemoteSteer;
         /// <summary>How much the car turned since the last frame (seated players turn with it), degrees.</summary>
@@ -217,10 +224,23 @@ namespace Stealth.Vehicles
         {
             float dt = Time.deltaTime;
             if (dt <= 0f) return;
-            bool away = Level.DriveScene.Active != null; // the drive scene shows the car now: this one waits, silent
-            // arriving: the car rolls in down the basement's tunnel to the gate by the server's clock, nobody steers it
-            bool rolling = m_Rolling = GameManager.Instance != null && GameManager.Instance.Rolling(out m_RollPose, out m_RollSpeed);
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !away && !rolling;
+            // the drive on to the next house: every peer moves the car by the server's clock (Level.DrivePath), nobody steers it
+            bool was = m_Scripted;
+            bool scripted = m_Scripted = GameManager.Instance != null && GameManager.Instance.Driving(out m_DrivePose, out m_DriveSpeed, out _);
+            if (scripted && !was)
+            {
+                m_DriveSince = Time.time;
+                m_DriveOffset = transform.position - m_DrivePose.position;
+                m_DriveTurn = transform.rotation * Quaternion.Inverse(m_DrivePose.rotation);
+                if (m_DriveOffset.magnitude > 4f) { m_DriveOffset = Vector3.zero; m_DriveTurn = Quaternion.identity; } // (far off: no glide)
+            }
+            if (scripted)
+            {
+                float k = 1f - Mathf.Clamp01((Time.time - m_DriveSince) / 1.2f);
+                k = k * k * (3f - 2f * k);
+                m_DrivePose = new Pose(m_DrivePose.position + m_DriveOffset * k, Quaternion.Slerp(Quaternion.identity, m_DriveTurn, k) * m_DrivePose.rotation);
+            }
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !scripted;
             m_Input = drive
                 ? new CarInput
                 {
@@ -229,13 +249,15 @@ namespace Stealth.Vehicles
                     Brake = Controls.Held(GameAction.Jump),
                 }
                 : new CarInput { Brake = !EngineOn };
-            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning) && !away && !rolling) m_Input = forced;
+            if (DevFlags.CarInput is CarInput forced && (LocalDriver || !Session.IsRunning) && !scripted) m_Input = forced;
             if (drive && Controls.Pressed(GameAction.Horn)) Horn();
 
-            if (HasAuthority && rolling)
+            if (scripted)
             {
-                transform.SetPositionAndRotation(m_RollPose.position, m_RollPose.rotation);
-                m_Physics.Speed = m_RollSpeed;
+                transform.SetPositionAndRotation(m_DrivePose.position, m_DrivePose.rotation);
+                m_Physics.Speed = m_DriveSpeed;
+                m_RemoteSpeed = m_DriveSpeed;
+                m_RemoteSteer = 0f;
             }
             else if (HasAuthority) Simulate(dt);
             else
@@ -254,6 +276,12 @@ namespace Stealth.Vehicles
             Animate(dt);
             Sound();
             ShowCargo();
+        }
+
+        /// <summary>On the drive the pose is the clock's on every peer, whatever the network's transform set meanwhile.</summary>
+        void LateUpdate()
+        {
+            if (m_Scripted) transform.SetPositionAndRotation(m_DrivePose.position, m_DrivePose.rotation);
         }
 
         /// <summary>The driver's peer moves the car: the bicycle model, stopped by walls, kept on the floor.</summary>
@@ -399,7 +427,7 @@ namespace Stealth.Vehicles
                 Body.localPosition = Vector3.Lerp(Body.localPosition, m_BodyRest + Vector3.up * bounce, 1f - Mathf.Exp(-20f * dt));
                 Body.localRotation = Quaternion.Slerp(Body.localRotation, Quaternion.Euler(pitch, 0f, -roll), 1f - Mathf.Exp(-6f * dt));
             }
-            bool lights = EngineOn;
+            bool lights = EngineOn || m_Scripted;
             if (Headlights != null) foreach (var l in Headlights) if (l != null && l.enabled != lights) l.enabled = lights;
         }
 
@@ -408,16 +436,15 @@ namespace Stealth.Vehicles
             if (EngineOn != m_WasEngine)
             {
                 m_WasEngine = EngineOn;
-                if (!m_Rolling) // (arriving, the engine has been running all the way)
+                if (!m_Scripted) // (arriving, the engine has been running all the way)
                     Sfx.At(EngineOn ? Sfx.Bank?.CarStart : Sfx.Bank?.CarStop, transform.position + transform.forward * 1.5f, 1f, Sfx.Group.Items);
             }
             if (Engine == null) return;
             if (Engine.clip == null && Sfx.Bank != null) { Engine.clip = Sfx.Bank.CarEngine; if (Engine.clip != null) Engine.Play(); }
             float revs = Mathf.Clamp01(Mathf.Abs(Speed) / Mathf.Max(1f, m_Physics.Settings.MaxSpeed));
-            float target = EngineOn && Level.DriveScene.Active == null ? 0.55f + 0.35f * revs : 0f;
+            float target = EngineOn || m_Scripted ? 0.55f + 0.35f * revs : 0f;
             float muffle = AudioDirector.Instance != null ? AudioDirector.Instance.Muffle(transform.position) : 1f;
-            // rolling in after the drive: the engine goes on at once where the drive scene's left off
-            Engine.volume = m_Rolling ? target * muffle : Mathf.MoveTowards(Engine.volume, target * muffle, Time.deltaTime * 1.5f);
+            Engine.volume = Mathf.MoveTowards(Engine.volume, target * muffle, Time.deltaTime * 1.5f);
             Engine.pitch = Mathf.Lerp(Engine.pitch, 0.8f + revs * 1.1f + Mathf.Abs(m_Input.Throttle) * 0.15f, 1f - Mathf.Exp(-5f * Time.deltaTime));
         }
 

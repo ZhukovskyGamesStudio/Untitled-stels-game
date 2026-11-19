@@ -445,9 +445,13 @@ namespace Stealth.Level
             return r != null && r.Dark;
         }
 
+        /// <summary>Below this height a point is underground (the basement and its tunnels, the sewer): never in the street's gas, never on the map.</summary>
+        public const float Underground = -1.5f;
+
         /// <summary>Inside the building footprint (gas is everywhere else, a courtyard too).</summary>
         public bool IsInside(Vector3 p)
         {
+            if (p.y < Underground) return true; // the basement, its tunnels and the sewer under it: no gas down there
             if (Basement.Contains(Cellar, p)) return true;
             if (Plan == null) return false;
             if (Plan.IsInside(new Vector2(p.x, p.z))) return true;

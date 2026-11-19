@@ -30,9 +30,11 @@ namespace Stealth.Tests
             var w = new StyleWorld();
             var far = new Vector3(60f, 0f, 10f);
             float low = GasView.Density(far + Vector3.up * 1.7f, House, w);
-            float high = GasView.Density(far + Vector3.up * 15f, House, w);
+            float roofs = GasView.Density(far + Vector3.up * 7f, House, w);
+            float high = GasView.Density(far + Vector3.up * 30f, House, w);
             Assert.AreEqual(w.GasDensity, low, 1e-4f, "eye height is in the full gas");
-            Assert.Less(high, low * 0.01f, "15 m up it is almost clear");
+            Assert.AreEqual(w.GasDensity, roofs, 1e-4f, "so are the neighbours' lower floors: nothing far stands out of it");
+            Assert.Less(high, low * 0.01f, "30 m up it is almost clear");
         }
 
         [Test]

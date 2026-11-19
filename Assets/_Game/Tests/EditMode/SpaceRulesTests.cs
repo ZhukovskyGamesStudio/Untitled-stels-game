@@ -52,6 +52,19 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void NoStaircaseStandsBeforeAWindow()
+        {
+            foreach (var l in TestHouses.Sample)
+                foreach (var (pos, yaw, _, _) in LevelBuilder.WindowCuts(l))
+                {
+                    var q = Quaternion.Euler(0f, yaw, 0f);
+                    int floor = LevelLayout.FloorOf(pos.y - LevelMetrics.WindowCenterY + 0.3f);
+                    foreach (float u in new[] { -LevelMetrics.WindowWidth / 2f, 0f, LevelMetrics.WindowWidth / 2f })
+                        Assert.IsFalse(l.NearStair(floor, pos + q * new Vector3(u, 0f, 0.3f), 0.1f), $"seed {l.Seed}: a staircase before the window at {pos}");
+                }
+        }
+
+        [Test]
         public void RestroomsVaultsAndChangingRoomsHaveNoWindows()
         {
             foreach (var l in TestHouses.Sample)

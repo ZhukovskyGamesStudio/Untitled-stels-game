@@ -10,7 +10,7 @@ namespace Stealth.Tests
     /// <summary>
     /// The team arrives in a basement (Basement): the stretch of the sewer where its car stopped — the way back behind an
     /// invisible wall, the car before the shut gate, a ladder in an alcove beside it climbing a shaft to the lid in the
-    /// plant room's floor. The shaft's hole is exactly the lid's; the car rolls in and stops; the basement is inside (no gas).
+    /// plant room's floor. The shaft's hole is exactly the lid's; the car drives in down its approach (DrivePath) and stops; the basement is inside (no gas).
     /// </summary>
     public class BasementTests
     {
@@ -88,33 +88,82 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheCarRollsInAndStopsBeforeTheGate()
+        public void TheCarDrivesDownTheApproachAndStopsBeforeTheGate()
         {
-            Assert.AreEqual(Basement.RollDistance, Basement.RollBehind(Basement.RollTime, out float start), 1e-4f);
-            Assert.AreEqual(Basement.RollSpeed, start, 1e-4f, "it comes in at the drive scene's last speed");
-            Assert.AreEqual(Basement.RollDistance, Basement.RollBehind(100f, out _), 1e-4f, "before the roll: at its start");
-            Assert.AreEqual(0f, Basement.RollBehind(0f, out float stopped), 1e-4f);
-            Assert.AreEqual(0f, stopped, "and it stands");
+            // braking evenly to the stop from cruising
+            Assert.AreEqual(0f, DrivePath.ToGo(0f, out float stopped), 1e-4f);
+            Assert.AreEqual(0f, stopped, 1e-4f);
+            Assert.AreEqual(DrivePath.BrakeDistance, DrivePath.ToGo(DrivePath.Brake, out float cruising), 1e-4f);
+            Assert.AreEqual(DrivePath.Cruise, cruising, 1e-4f);
             float last = float.MaxValue, lastSpeed = float.MaxValue;
-            for (float left = Basement.RollTime; left >= 0f; left -= 0.1f)
+            for (float left = 12f; left >= 0f; left -= 0.1f)
             {
-                float behind = Basement.RollBehind(left, out float speed);
+                float behind = DrivePath.ToGo(left, out float speed);
                 Assert.LessOrEqual(behind, last + 1e-5f, "never backwards");
-                Assert.LessOrEqual(speed, lastSpeed + 1e-5f, "braking all the way");
+                Assert.LessOrEqual(speed, lastSpeed + 1e-5f, "never faster nearer the stop");
                 last = behind;
                 lastSpeed = speed;
             }
+            // it changes tunnels in the approach, well behind the basement (the haze hides the basement from there)
+            Assert.AreEqual(DrivePath.SwapX, DrivePath.InBasement(DrivePath.SwapLead, out _).position.x, 1e-3f);
+            Assert.Less(DrivePath.SwapX, -Basement.BackSegments * SewerPlan.SegmentLength - 15f, "past the static back stretch: in the approach's tunnel");
             var f = Basement.Frame(new Vector3(10f, 0f, 10f), 90f);
-            var from = f.ToLocal(Basement.RollPose(f, Basement.RollTime, out _).position);
-            Assert.Greater(from.x, 2.7f, "it starts with its tail in front of the invisible wall");
             var stop = f.ToLocal(Basement.CarPose(f).position);
+            Assert.AreEqual(stop.x, DrivePath.InBasement(0f, out _).position.x, 1e-4f, "it stops where the car stands");
             Assert.Less(stop.x + 2.8f, Basement.GateX - 0.35f, "its nose stops before the gate's frame");
             Assert.Less(Mathf.Abs(stop.x - Basement.AlcoveX), 2f, "the alcove right beside it");
             Assert.Greater(Vector3.Dot(Basement.CarPose(f).rotation * Vector3.forward, f.Dir(Vector3.right)), 0.99f, "facing the gate");
-            // the cut comes after the drive's own length and late enough for everyone to build the house and glide back
-            Assert.AreEqual(16.5, Arrival.CutAt(10.0, 12.0, 6.5f), 1e-6);
-            Assert.AreEqual(10.0 + 6.5 + 100.0, Arrival.CutAt(110.0, 11.0, 6.5f), 1e-6);
-            Assert.GreaterOrEqual(Arrival.CutAt(0.0, 20.0, 6.5f), 20.0 + Arrival.ClientSlack + Arrival.GlideBack);
+            // the change comes after the drive's own length and late enough for everyone to build the house
+            Assert.AreEqual(16.5, Arrival.SwapAt(10.0, 12.0, 6.5f), 1e-6);
+            Assert.AreEqual(11.0 + Arrival.ClientSlack, Arrival.SwapAt(0.0, 11.0, 6.5f), 1e-6);
+        }
+
+        [Test]
+        public void TheDriveLeavesTheTunnelFromWhereTheCarStood()
+        {
+            var from = new Vector3(40f, 0.3f, 1.2f); // x, heading, z
+            var start = DrivePath.InBranch(from, 2f, 0f, out float v0);
+            Assert.AreEqual(40f, start.position.x, 1e-4f);
+            Assert.AreEqual(1.2f, start.position.z, 1e-4f);
+            Assert.AreEqual(2f, v0, 1e-4f);
+            Assert.Greater(Vector3.Dot(start.rotation * Vector3.forward, new Vector3(Mathf.Cos(0.3f), 0f, Mathf.Sin(0.3f))), 0.999f, "heading as it stood");
+            var settled = DrivePath.InBranch(from, 2f, DrivePath.Settle + 1f, out float v);
+            Assert.AreEqual(DrivePath.Lane, settled.position.z, 1e-4f, "in the lane");
+            Assert.Greater(Vector3.Dot(settled.rotation * Vector3.forward, Vector3.right), 0.999f, "straight along the tunnel");
+            float x = start.position.x;
+            for (float t = 0.1f; t < 10f; t += 0.1f)
+            {
+                var p = DrivePath.InBranch(from, 2f, t, out _).position;
+                Assert.Greater(p.x, x, "always on");
+                Assert.LessOrEqual(Mathf.Abs(p.z), 1.2f + 1e-4f, "never further out than it stood: inside the branch and through its reducer");
+                x = p.x;
+            }
+        }
+
+        [Test]
+        public void TheCarChangesTunnelsAtTheSamePlaceOfThePattern([Values(5f, 40f, 88f)] float x0, [Values(0f, 4f)] float v0, [Values(0.0, 7.3, 30.0)] double late)
+        {
+            double departed = 100.0;
+            var from = new Vector3(x0, 0f, 0.8f);
+            double arrive = DrivePath.ArriveAtFor(departed, from, v0, departed + 9.0 + late);
+            Assert.GreaterOrEqual(arrive, departed + 9.0 + late - 1e-6);
+            double swap = arrive - DrivePath.SwapLead;
+            float branchX = DrivePath.BranchXAt(departed, from, v0, arrive);
+            Assert.GreaterOrEqual(branchX, DrivePath.TunnelFrom + DrivePath.ClearOfBranch - 1e-3f, "far past the branch: all round, only the endless tunnel");
+            Assert.AreEqual(DrivePath.Cruise, DrivePath.SpeedAt((float)(swap - departed), v0), 1e-4f, "cruising in both");
+            // the same place of the pattern in both tunnels, the same speed: nothing changes on screen
+            float sewerU = branchX - DrivePath.TunnelFrom, basementU = DrivePath.InBasement(DrivePath.SwapLead, out float speed).position.x;
+            float off = Mathf.Repeat(sewerU - basementU, DrivePath.Pattern);
+            Assert.That(off < 0.02f || off > DrivePath.Pattern - 0.02f, $"pattern offset {off}");
+            Assert.AreEqual(DrivePath.Cruise, speed, 1e-4f);
+            Assert.AreEqual(DrivePath.Lane, DrivePath.InBranch(from, v0, (float)(swap - departed), out _).position.z, 1e-4f);
+            Assert.AreEqual(DrivePath.Lane, DrivePath.InBasement(DrivePath.SwapLead, out _).position.z, 1e-4f);
+            // the pattern itself: variant and lamp side by segment, the same for k and k ± 2
+            for (int k = -9; k < 9; k++)
+            {
+                Assert.AreEqual(DrivePath.VariantOf(k), DrivePath.VariantOf(k + 2));
+                Assert.AreEqual(DrivePath.LampSideOf(k), -DrivePath.LampSideOf(k + 1));
+            }
         }
 
         [Test]

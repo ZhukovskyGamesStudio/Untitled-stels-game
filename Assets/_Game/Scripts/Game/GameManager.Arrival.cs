@@ -9,33 +9,37 @@ using UnityEngine;
 namespace Stealth.Game
 {
     /// <summary>
-    /// The arrival at the next house, with no black screen (<see cref="Arrival"/> has the timings). The car drives off
-    /// (<see cref="DepartServer"/>): every peer shows the drive scene and, at once, starts generating the house the car
-    /// goes to on a worker thread — every peer can tell which one (the route's lane the car took). Once the camera has
-    /// settled in its side view the server puts the house up a piece a frame (<see cref="StartLevelSteps"/>), its content,
-    /// and the team's car in the basement with everyone back in the seat they rode in; then it says when the camera is
-    /// back in the eyes (<see cref="DriveUntil"/>, the cut) and when the car stops at the gate (<see cref="ArriveAt"/>).
-    /// The other peers build the same house as soon as they hear of it. Each peer's drive scene glides back into its
-    /// player's eyes, in step with the real car that rolls in down the basement's tunnel; there the scene ends.
+    /// The arrival at the next house, in one unbroken drive of the real car with the team in its seats
+    /// (<see cref="DrivePath"/>). The car drives off down the tunnel it was chosen in (<see cref="DepartServer"/>): every
+    /// peer moves it by the server's clock and keeps the endless tunnel round it, and at once starts generating the house
+    /// the car goes to on a worker thread — every peer can tell which one (the route's lane the car took). The sewer stays
+    /// where it is (deep under the house, <see cref="SewerLocation.Origin"/>) while the server puts the house up a piece a
+    /// frame (<see cref="StartLevelSteps"/>) and then says when the car changes into the basement's approach
+    /// (<see cref="DriveUntil"/>, at the same place of the tunnel's pattern: nothing changes on screen) and when it stops
+    /// beside the alcove (<see cref="ArriveAt"/>). The other peers build the same house as soon as they hear of it; each
+    /// takes its sewer away once its car is in the basement.
     /// </summary>
     public partial class GameManager
     {
-        /// <summary>Server time the car stops at the gate in the new house's basement (the roll-in ends), replicated.</summary>
+        /// <summary>Server time the car stops beside the alcove in the new house's basement, replicated.</summary>
         public double ArriveAt { get; set; }
+        /// <summary>Server time the car drove off, replicated.</summary>
+        public double DepartAt { get; set; }
+        /// <summary>Where the car drove off from in its tunnel (x, heading in radians, z: the tunnel's frame) and how fast (w), replicated.</summary>
+        public Vector4 DriveFrom { get; set; }
+        /// <summary>The tunnel the car drove off down (<see cref="SewerLocation.BranchFrame"/>), replicated; −1 none.</summary>
+        public int DriveBranch { get; set; } = -1;
 
         // the next house generated in the background during the drive (every peer predicts it the same way)
         LevelInfo m_PreparedFor;
         Task<LevelLayout> m_Prepared;
-        double m_DepartedAt;
-        readonly ulong[] m_RideSeats = { Car.Nobody, Car.Nobody, Car.Nobody, Car.Nobody };
         /// <summary>Server: the house is being put up (over several frames).</summary>
         bool m_Arriving;
         /// <summary>A client: its house is being put up (over several frames), and which house.</summary>
         Coroutine m_LocalBuild;
         LevelInfo m_LocalFor;
         Coroutine m_ArriveRoutine;
-        /// <summary>This peer: the drive scene of this drive is over (the house's own camera is on).</summary>
-        bool m_DriveCut;
+        DriveTunnel m_Approach;
 
         /// <summary>The house the car drives to, as every peer can tell it: the next column, the lane the car took.</summary>
         LevelInfo PredictNext()
@@ -79,11 +83,11 @@ namespace Stealth.Game
             catch (System.Exception) { return null; }
         }
 
-        /// <summary>Server, on the drive: the camera has settled and the next house is generated — put it up now.</summary>
+        /// <summary>Server, on the drive: the next house is generated — put it up now.</summary>
         void UpdateDriveServer()
         {
-            if (m_Arriving || Session.ServerTime < m_DepartedAt + Arrival.BuildAfter) return;
-            if (m_Prepared != null && !m_Prepared.IsCompleted && Session.ServerTime < m_DepartedAt + Arrival.GiveUpWaiting) return;
+            if (m_Arriving || Session.ServerTime < DepartAt + Arrival.BuildAfter) return;
+            if (m_Prepared != null && !m_Prepared.IsCompleted && Session.ServerTime < DepartAt + Arrival.GiveUpWaiting) return;
             m_Arriving = true;
             m_ArriveRoutine = StartCoroutine(ArriveRoutine());
         }
@@ -96,6 +100,7 @@ namespace Stealth.Game
             m_Arriving = false;
             m_Prepared = null;
             ArriveAt = 0;
+            DriveBranch = -1;
         }
 
         IEnumerator ArriveRoutine()
@@ -107,46 +112,107 @@ namespace Stealth.Game
             m_ArriveRoutine = null;
         }
 
-        /// <summary>Server, the house stands: the car in its basement, rolling in with everyone back in the seat they rode in.</summary>
-        void ArriveCarServer(LevelLayout layout)
+        /// <summary>Server: the car drives off down the tunnel it stands in, from where it stands.</summary>
+        void DepartCarServer(Car car)
         {
-            var car = SpawnBasementCarServer(layout, true);
-            if (car != null)
-                for (int seat = 0; seat < Car.SeatCount; seat++)
-                {
-                    var p = PlayerController.Find(m_RideSeats[seat]);
-                    if (p != null) car.SitServer(p, seat);
-                }
-            double cut = Arrival.CutAt(m_DepartedAt, Session.ServerTime, m_Run.Settings.DriveTime);
-            DriveUntil = cut;
-            ArriveAt = cut + Basement.RollTime;
+            var sewer = SewerLocation.Active;
+            int branch = sewer != null && car != null ? sewer.BranchAt(car.transform.position) : -1;
+            var frame = sewer != null ? sewer.BranchFrame(branch) : null;
+            DepartAt = Session.ServerTime;
+            DriveBranch = frame != null ? branch : -1;
+            if (frame == null) return;
+            var local = frame.InverseTransformPoint(car.transform.position);
+            var forward = frame.InverseTransformDirection(car.transform.forward);
+            float heading = Mathf.Atan2(forward.z, forward.x);
+            DriveFrom = new Vector4(local.x, heading, local.z, Mathf.Max(0f, car.Speed));
         }
 
-        /// <summary>Server: the team's car in the basement — at the start of its roll in (arriving) or standing at the gate.</summary>
-        Car SpawnBasementCarServer(LevelLayout layout, bool rolling)
+        /// <summary>
+        /// Server, the house stands: when the car changes into the basement's approach and when it stops (the same place of
+        /// the pattern in both tunnels, late enough for every peer to have built the house).
+        /// </summary>
+        void ArriveCarServer(LevelLayout layout)
+        {
+            if (DriveBranch < 0 || Car.Active == null)
+            {
+                // nothing drove (the car was missing): it stands in the basement
+                SpawnBasementCarServer(layout);
+                DriveUntil = 0;
+                return;
+            }
+            double swap = Arrival.SwapAt(DepartAt, Session.ServerTime, m_Run.Settings.DriveTime);
+            ArriveAt = DrivePath.ArriveAtFor(DepartAt, From3, DriveFrom.w, swap + DrivePath.SwapLead);
+            DriveUntil = ArriveAt - DrivePath.SwapLead;
+        }
+
+        Vector3 From3 => new(DriveFrom.x, DriveFrom.y, DriveFrom.z);
+
+        /// <summary>Server: the team's car standing beside the alcove in the basement (a house started without a drive).</summary>
+        Car SpawnBasementCarServer(LevelLayout layout)
         {
             DespawnCarServer();
             if (CarPrefab == null || layout == null) return null;
-            var pose = rolling ? Basement.RollPose(layout.Cellar, Basement.RollTime, out _) : Basement.CarPose(layout.Cellar);
+            var pose = Basement.CarPose(layout.Cellar);
             m_Car = Session.Spawn(CarPrefab, pose.position, pose.rotation);
             return m_Car != null ? m_Car.GetComponent<Car>() : null;
         }
 
         /// <summary>
-        /// Every peer: the car rolling in down the basement's tunnel to the gate (the drive's last seconds): where it is now and
-        /// how fast it goes. False when it is not rolling (the driver has it).
+        /// Every peer: the car on its drive — where it is now and how fast it goes, and whether it is in the basement's
+        /// approach yet (else in the sewer's tunnel). False when it is not driving (a driver has it, or it stands).
         /// </summary>
-        public bool Rolling(out Pose pose, out float speed)
+        public bool Driving(out Pose pose, out float speed, out bool basement)
         {
             pose = default;
             speed = 0f;
+            basement = false;
+            if (DriveUntil <= 0 || DriveBranch < 0 || DepartAt <= 0) return false;
+            double now = Session.ServerTime;
             var l = ActiveLevel.Layout;
-            if (DriveUntil <= 0 || ArriveAt <= 0 || Phase != RunPhase.Playing || l == null) return false;
-            pose = Basement.RollPose(l.Cellar, (float)(ArriveAt - Session.ServerTime), out speed);
+            if (ArriveAt > 0 && now >= DriveUntil && l != null && ActiveLevel.Ready && l.Seed == Level.Seed)
+            {
+                var at = DrivePath.InBasement((float)(ArriveAt - now), out speed);
+                pose = new Pose(l.Cellar.ToWorld(at.position), l.Cellar.Rotation * at.rotation);
+                basement = true;
+                return true;
+            }
+            var frame = m_Sewer != null ? m_Sewer.BranchFrame(DriveBranch) : null;
+            if (frame == null) return false;
+            var p = DrivePath.InBranch(From3, DriveFrom.w, (float)(now - DepartAt), out speed);
+            pose = new Pose(frame.TransformPoint(p.position), frame.rotation * p.rotation);
             return true;
         }
 
-        /// <summary>A client: the house it heard of is put up a piece a frame while the drive scene goes on (else at once).</summary>
+        /// <summary>
+        /// Every peer, on the drive: the endless tunnel round the car (in the sewer after the branch's reducer; in the
+        /// basement its approach, put round where the car will come before it does), and the sewer taken away once the
+        /// car is in the basement.
+        /// </summary>
+        void UpdateDrive()
+        {
+            if (DriveUntil <= 0 || DriveBranch < 0)
+            {
+                if (m_Approach != null) m_Approach.Clear();
+                m_Approach = null;
+                return;
+            }
+            if (!Driving(out var pose, out _, out bool basement)) return;
+            var l = ActiveLevel.Layout;
+            if (m_Approach == null && l != null && ActiveLevel.Ready && ActiveLevel.Root != null)
+                m_Approach = ActiveLevel.Root.GetComponentInChildren<DriveTunnel>();
+            if (basement)
+            {
+                m_Approach?.Follow(l.Cellar.ToLocal(pose.position).x);
+                if (m_Sewer != null && Session.ServerTime > DriveUntil + 1.0) LeaveSewerLocal(); // out of sight behind the car
+                return;
+            }
+            var frame = m_Sewer.BranchFrame(DriveBranch);
+            m_Sewer.FollowDrive(DriveBranch, frame.InverseTransformPoint(pose.position).x);
+            if (m_Approach != null && ArriveAt > 0 && l != null && l.Seed == Level.Seed)
+                m_Approach.Follow(DrivePath.InBasement((float)(ArriveAt - Session.ServerTime), out _).position.x);
+        }
+
+        /// <summary>A client: the house it heard of is put up a piece a frame during the drive (else at once).</summary>
         void BuildLocal()
         {
             if (m_LocalBuild != null)
@@ -156,7 +222,7 @@ namespace Stealth.Game
                 m_LocalBuild = null;
                 m_BuiltSeed = 0;
             }
-            bool spread = Application.isPlaying && (DriveUntil > 0 || DriveScene.Active != null);
+            bool spread = Application.isPlaying && DriveUntil > 0;
             if (!spread)
             {
                 var all = BuildLocalSteps(Level);
@@ -173,71 +239,20 @@ namespace Stealth.Game
             while (steps.MoveNext()) yield return null;
             m_LocalBuild = null;
         }
-
-        /// <summary>
-        /// Every peer, the drive scene: up from the departure; once this peer's house stands and the cut comes near, its
-        /// camera glides back into the player's eyes in the real car (rolling in down the basement), and there it ends.
-        /// </summary>
-        void UpdateDriveScene()
-        {
-            if (DriveUntil <= 0)
-            {
-                m_DriveCut = false;
-                // a house started some other way (the cheat): no scene left over
-                if (m_DriveScene != null && Phase != RunPhase.Sewer) EndDriveScene();
-                return;
-            }
-            if (m_DriveScene == null)
-            {
-                if (!m_DriveCut && Phase == RunPhase.Sewer && Art != null && Art.DriveScene != null)
-                {
-                    m_DriveScene = Instantiate(Art.DriveScene, new Vector3(0f, -400f, 0f), Quaternion.identity);
-                    BeginDriveScene(m_DriveScene.GetComponent<DriveScene>());
-                }
-                return;
-            }
-            var scene = m_DriveScene.GetComponent<DriveScene>();
-            bool built = Phase == RunPhase.Playing && ActiveLevel.Ready && ActiveLevel.Layout != null && ActiveLevel.Layout.Seed == Level.Seed && Car.Active != null;
-            if (scene == null || !built) return;
-            double left = DriveUntil - Session.ServerTime;
-            if (!scene.Returning && left <= Arrival.GlideBack) scene.Return(Mathf.Max(Arrival.MinGlideBack, (float)left), Basement.RollSpeed);
-            if (!scene.Returning) return;
-            var me = PlayerController.Local;
-            var car = Car.Active;
-            Pose? eye = null;
-            if (me != null && me.Camera != null && me.SeatIndex >= 0)
-            {
-                var cam = me.Camera.transform;
-                eye = new Pose(car.transform.InverseTransformPoint(cam.position), Quaternion.Inverse(car.transform.rotation) * cam.rotation);
-            }
-            scene.ReturnTo(eye, me != null && me.Camera != null ? me.Camera.fieldOfView : 60f, me != null && me.Camera != null ? me.Camera.nearClipPlane : 0.05f);
-            if (!scene.Returned) return;
-            EndDriveScene();
-            me?.Motor?.AddTrauma(0.12f); // the car bumps onto the basement's grate: the eyes are its own again
-        }
-
-        void EndDriveScene()
-        {
-            if (m_DriveScene != null) Destroy(m_DriveScene);
-            m_DriveScene = null;
-            m_DriveCut = true;
-        }
     }
 
-    /// <summary>The arrival's timings (pure): when the house is built, when the camera is back in the eyes, when the car stops.</summary>
+    /// <summary>The arrival's timings (pure): when the house is built and the earliest the car may change into its basement.</summary>
     public static class Arrival
     {
-        /// <summary>The server puts the house up this long after the departure: the camera has glided out to its side view (DriveScene.GlideTime).</summary>
-        public const float BuildAfter = 3.4f;
+        /// <summary>The server puts the house up this long after the departure (the car is under way).</summary>
+        public const float BuildAfter = 1f;
         /// <summary>The longest the server waits for the background generation after the departure before it generates the house itself.</summary>
         public const float GiveUpWaiting = 15f;
         /// <summary>Seconds the other peers get to build the house after the server has.</summary>
-        public const float ClientSlack = 1.5f;
-        /// <summary>The camera's glide back into the eyes, and the shortest one (a peer that built its house late).</summary>
-        public const float GlideBack = 2.6f, MinGlideBack = 0.9f;
+        public const float ClientSlack = 2.5f;
 
-        /// <summary>The cut: no sooner than the drive's own length, and late enough for every peer to build the house and glide back.</summary>
-        public static double CutAt(double departed, double built, float driveTime) =>
-            System.Math.Max(departed + driveTime, built + ClientSlack + GlideBack);
+        /// <summary>The earliest change into the basement: no sooner than the drive's own length, late enough for every peer to build the house.</summary>
+        public static double SwapAt(double departed, double built, float driveTime) =>
+            System.Math.Max(departed + driveTime, built + ClientSlack);
     }
 }

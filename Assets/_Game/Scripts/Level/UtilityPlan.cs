@@ -135,6 +135,13 @@ namespace Stealth.Level
                         float off = alongX ? o.Center.z : o.Center.x, at = alongX ? o.Center.x : o.Center.z;
                         if (Mathf.Abs(off - edge) < 0.3f) cuts.Add((at - o.Width / 2f - 0.3f, at + o.Width / 2f + 0.3f));
                     }
+                    // and so do the grates in the ceiling (a duct along under a grate hid the way up)
+                    foreach (var g in ArchitecturePlanner.GratesOf(l, room))
+                    {
+                        var square = new Rect(g.x - VentPlan.Res / 2f - 0.1f, g.y - VentPlan.Res / 2f - 0.1f, VentPlan.Res + 0.2f, VentPlan.Res + 0.2f);
+                        float at = alongX ? g.x : g.y;
+                        if (square.Overlaps(line)) cuts.Add((at - VentPlan.Res / 2f - 0.2f, at + VentPlan.Res / 2f + 0.2f));
+                    }
                     cuts.Sort();
                     float from = a;
                     foreach (var (c0, c1) in cuts) { DuctRun(parts, alongX, side, from, Mathf.Min(b, c0), y0); from = Mathf.Max(from, c1); }

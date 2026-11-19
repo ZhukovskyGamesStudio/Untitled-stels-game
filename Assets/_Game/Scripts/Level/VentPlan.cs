@@ -165,6 +165,28 @@ namespace Stealth.Level
         /// <summary>The crate stack under the grate and the desk beside it: half their depth, the gap between them.</summary>
         public const float StackHalf = 0.39f, DeskHalf = 0.4f;
 
+        /// <summary>Half a ceiling lamp's fixture (two panels, 1.24 × 1.28 m) and the gap a grate keeps from it.</summary>
+        public const float LampHalf = 0.65f, LampGap = 0.15f;
+
+        /// <summary>How far the nearest lamp hangs from the middle of cell <paramref name="c"/> (the larger of the two distances along the axes).</summary>
+        public static float LampDistance(Vector2Int c, List<Vector2> lamps)
+        {
+            var m = new Vector2((c.x + 0.5f) * Res, (c.y + 0.5f) * Res);
+            float best = float.MaxValue;
+            foreach (var p in lamps) best = Mathf.Min(best, Mathf.Max(Mathf.Abs(p.x - m.x), Mathf.Abs(p.y - m.y)));
+            return best;
+        }
+
+        /// <summary>The grate in cell <paramref name="c"/> would cut into (or touch) a ceiling lamp hanging at one of <paramref name="lamps"/>.</summary>
+        public static bool ClashesLamp(Vector2Int c, List<Vector2> lamps)
+        {
+            var m = new Vector2((c.x + 0.5f) * Res, (c.y + 0.5f) * Res);
+            float reach = Res / 2f + LampHalf + LampGap;
+            foreach (var p in lamps)
+                if (Mathf.Abs(p.x - m.x) < reach && Mathf.Abs(p.y - m.y) < reach) return true;
+            return false;
+        }
+
         /// <summary>
         /// A climb fits under a grate at <paramref name="c"/> with its desk on side <paramref name="dir"/>: the stack, the
         /// desk and an aisle in front of the desk all on the room's floor, away from its doors.
@@ -225,6 +247,12 @@ namespace Stealth.Level
                 for (int z = 0; z < nz; z++)
                     allowed[x, z] = Allowed(l, f, new Vector2Int(x, z));
 
+            // the ceiling lamps of this storey: a grate never cuts into one (lamps hang where LevelBuilder.LightSpots says)
+            var lamps = new List<Vector2>();
+            foreach (var r in plan.Rooms)
+                if (r.Floor + r.Levels - 1 == f) lamps.AddRange(LevelBuilder.LightSpots(l, r));
+            bool Lit(Vector2Int c) => ClashesLamp(c, lamps);
+
             // a grate per room: a cell well inside the room (all round it the same room), nearest its middle
             var grates = new Dictionary<int, Vector2Int>();
             var rooms = new List<PlanRoom>();
@@ -248,7 +276,7 @@ namespace Stealth.Level
                             {
                                 if (!ClimbFits(l, f, r, m, dir)) continue;
                                 float score = (float)climbRng.NextDouble() - (m - new Vector2(r.Center.x, r.Center.z)).magnitude * 0.05f;
-                                if (score > far) { far = score; best = c; climbs[r.Id] = dir; }
+                                if (score > far && !Lit(c)) { far = score; best = c; climbs[r.Id] = dir; }
                             }
                         }
                 }
@@ -273,6 +301,11 @@ namespace Stealth.Level
                             if (pass == 0 ? !Inside(plan, f, r.Id, c) : !Own(plan, f, r.Id, c)) continue;
                             var m = new Vector2((x + 0.5f) * Res, (z + 0.5f) * Res);
                             float d = (m - centre).sqrMagnitude + (float)rng.NextDouble() * 0.5f;
+                            if (Lit(c)) // clear of the lamps (a narrow room may have no such cell: then the lamp moves aside, LevelBuilder.LightSpots)
+                            {
+                                if (pass == 0) continue;
+                                d += 1000f - 100f * LampDistance(c, lamps); // as far from the lamp as it gets: room for the lamp to move aside
+                            }
                             if (d < bestD) { bestD = d; best = c; }
                         }
                 if (best is Vector2Int g) { grates[r.Id] = g; rooms.Add(r); }
