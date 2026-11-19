@@ -47,6 +47,7 @@ Shader "Stealth/StyleScreen"
             float4 _StyMapC;         // gradient map: light
             float4 _StyGrid;         // x grid paper strength, y cell size px at 720p
             float4 _StyGridColor;
+            float _StyDark;          // 1 underground: ink lines fade where nothing is lit (the dark is dark)
 
             float Luma(float3 c) { return dot(c, float3(0.2126, 0.7152, 0.0722)); }
 
@@ -206,6 +207,7 @@ Shader "Stealth/StyleScreen"
                     float2 step = max(1, _StyOutline.y * scale) * px;
                     if (block > 1.01) step = cellPx;
                     float e = Edge(suv, step) * GasVeil(suv);
+                    e *= lerp(1, smoothstep(0.012, 0.09, Luma(g)), _StyDark);
                     if (_StyGlow.x > 0)
                     {
                         float halo = Edge(suv, step * 3) * 0.45;

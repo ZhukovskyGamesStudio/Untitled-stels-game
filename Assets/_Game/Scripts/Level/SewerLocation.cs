@@ -10,7 +10,8 @@ namespace Stealth.Level
     /// <see cref="SewerPlan"/> (the same on every peer: the run's seed and the depth): a closed end, the stretch where
     /// the team's car waits under the hatch it came in through, a gate (opened with a lever on the far side), the stretch
     /// the house's exit drops into, and the hall where three tunnels lead on to the next houses (<see cref="Branches"/>:
-    /// left, middle, right). The team drives the car into a tunnel to choose it; tunnels that lead nowhere are barred.
+    /// left, middle, right; the hall's shape and where its mouths are come from the plan too: <see cref="SewerHall"/>, built
+    /// from the kit's tiles by <see cref="HallKits"/>). The team drives the car into a tunnel to choose it; tunnels that lead nowhere are barred.
     /// The road is a steel grate over the water. Nothing in it is networked except the car. If the run ends here, the
     /// water rises (<see cref="Flood"/>).
     /// </summary>
@@ -36,9 +37,31 @@ namespace Stealth.Level
         [Header("Kit (Tools/Blender/sewer.py)")]
         [Tooltip("Straight 6 m segments, one per variant.")]
         public GameObject[] Segments;
-        public GameObject Cap, Hub, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
+        public GameObject Cap, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
         [Tooltip("The segment with the alcove beside the car: a ladder up a shaft to the lid of the house's floor (shut from below here).")]
         public GameObject Alcove;
+        [Serializable]
+        public class HallKit
+        {
+            [Tooltip("A cell's groin vault (8 x 8 m), centred on the cell.")]
+            public GameObject Vault;
+            [Tooltip("A plain wall on a side of a cell (the frame of a side: SewerHall.Frame, +X out of the hall).")]
+            public GameObject Wall;
+            [Tooltip("A wall with a mouth of the branch's profile: a tunnel or a plug starts at its outer face.")]
+            public GameObject Mouth;
+            [Tooltip("The wall the sewer's tunnel comes in through, with its walkways and road running through it.")]
+            public GameObject Entry;
+            [Tooltip("A column at a corner of the cells (half in the wall on the hall's boundary).")]
+            public GameObject Column;
+            [Tooltip("A stone arch between two cells, column to column (spans its local Z).")]
+            public GameObject Arch;
+        }
+
+        [Header("The hall (SewerHall; Tools/Blender/sewer.py kit_hall)")]
+        [Tooltip("A cell's floor: the grate road over the water, its beams and the bed.")]
+        public GameObject HallFloor;
+        [Tooltip("The hall's pieces of each height (SewerHall.Springing): low, high.")]
+        public HallKit[] HallKits = Array.Empty<HallKit>();
         [Tooltip("Bricks that fill a mouth of the hall leading nowhere this time.")]
         public GameObject Plug;
         [Tooltip("An invisible wall across the tunnel behind the car: the way back (where the car came from) is seen, not walked.")]
@@ -204,25 +227,18 @@ namespace Stealth.Level
                 Put(Manhole, "ExitManhole", new Vector3(plan.ExitLadderX, 4.15f, 3.2f));
             }
 
-            // the hall and the three tunnels; lamps on its long walls
-            Put(Hub, "Hub", new Vector3(plan.HubX, 0f, 0f));
-            foreach (var (x, side) in new[] { (6f, 1), (6f, -1), (14.2f, 1), (14.2f, -1) }) // clear of the side mouths (x 7.7..12.3)
-            {
-                var lamp = Put(Lamp, "HubLamp", new Vector3(plan.HubX + x, 3.1f, side * 7.9f), side > 0 ? 90f : -90f);
-                if (lamp != null) foreach (var l in lamp.GetComponentsInChildren<Light>()) { l.color = plan.LampColor; l.intensity = plan.LampIntensity; l.range = 14f; }
-            }
+            // the hall: its cells (floor and vault), walls (plain, the way in, the mouths), columns, arches, lamps
+            BuildHall(plan);
             // the three tunnels at their mouths; the mouths no tunnel takes are bricked up
-            for (int m = 0; m < SewerPlan.Mouths.Length; m++)
-                if (System.Array.IndexOf(plan.TunnelMouths, m) < 0 && Plug != null)
-                {
-                    var plug = Put(Plug, $"Plug{m}", new Vector3(plan.HubX, 0f, 0f) + SewerPlan.Mouths[m].position);
-                    plug.transform.localRotation = SewerPlan.Mouths[m].rotation;
-                }
+            var hub = new Vector3(plan.HubX, 0f, 0f);
+            for (int m = 0; m < plan.Mouths.Length; m++)
+                if (Array.IndexOf(plan.TunnelMouths, m) < 0 && Plug != null)
+                    PutAt(Plug, $"Plug{m}", hub + plan.Mouths[m].position, plan.Mouths[m].rotation);
             Branches = new Branch[SewerBranches.Count];
             for (int i = 0; i < SewerBranches.Count; i++)
             {
-                var mouth = SewerPlan.Mouths[plan.TunnelMouths[i]];
-                var at = new Vector3(plan.HubX, 0f, 0f) + mouth.position;
+                var mouth = plan.Mouths[plan.TunnelMouths[i]];
+                var at = hub + mouth.position;
                 if (BranchPrefab == null) continue;
                 var b = Instantiate(BranchPrefab, transform);
                 b.name = $"Branch{i}";
@@ -240,12 +256,56 @@ namespace Stealth.Level
                 }
                 Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen, Plug = b.Plug };
             }
-            var water = Put(Flooding, "FloodWater", new Vector3(plan.End / 2f, -0.6f, 0f));
+            // the water that rises if the run ends here: under the whole sewer and the hall
+            float z0 = Mathf.Min(-10f, plan.Hall.MinZ - 2f), z1 = Mathf.Max(10f, plan.Hall.MaxZ + 2f);
+            var water = Put(Flooding, "FloodWater", new Vector3(plan.End / 2f, -0.6f, (z0 + z1) / 2f));
             if (water != null)
             {
-                water.transform.localScale = new Vector3(plan.End + 40f, 1f, 20f);
+                water.transform.localScale = new Vector3(plan.End + 40f, 1f, z1 - z0);
                 Water = water.transform;
                 m_WaterBase = Water.localPosition.y;
+            }
+        }
+
+        GameObject PutAt(GameObject prefab, string name, Vector3 at, Quaternion rotation)
+        {
+            if (prefab == null) return null;
+            var go = Instantiate(prefab, transform);
+            go.name = name;
+            go.transform.SetLocalPositionAndRotation(at, rotation);
+            return go;
+        }
+
+        /// <summary>The hall of the plan from the kit's tiles (SewerHall: hall-local from the plan's HubX).</summary>
+        void BuildHall(SewerPlan plan)
+        {
+            var hall = plan.Hall;
+            var hub = new Vector3(plan.HubX, 0f, 0f);
+            var kit = HallKits != null && HallKits.Length > 0 ? HallKits[Mathf.Clamp(hall.Height, 0, HallKits.Length - 1)] : null;
+            foreach (var c in hall.Ordered)
+            {
+                var at = hub + SewerHall.CellCentre(c);
+                Put(HallFloor, $"HallFloor{c.x}_{c.y}", at);
+                if (kit != null) Put(kit.Vault, $"HallVault{c.x}_{c.y}", at);
+            }
+            if (kit == null) return;
+            foreach (var e in hall.Edges)
+            {
+                var piece = e.Kind switch { HallSide.Entry => kit.Entry, HallSide.Mouth => kit.Mouth, _ => kit.Wall };
+                PutAt(piece, $"Hall{e.Kind}{e.Cell.x}_{e.Cell.y}_{e.Out.x}_{e.Out.y}", hub + e.Frame.position, e.Frame.rotation);
+            }
+            foreach (var v in hall.Columns) Put(kit.Column, $"HallColumn{v.x}_{v.y}", hub + SewerHall.Corner(v));
+            for (int i = 0; i < hall.Arches.Count; i++) PutAt(kit.Arch, $"HallArch{i}", hub + hall.Arches[i].position, hall.Arches[i].rotation);
+            for (int i = 0; i < hall.Lamps.Count; i++)
+            {
+                var lamp = PutAt(Lamp, $"HallLamp{i}", hub + hall.Lamps[i].position, hall.Lamps[i].rotation);
+                if (lamp != null)
+                    foreach (var l in lamp.GetComponentsInChildren<Light>())
+                    {
+                        l.color = plan.LampColor;
+                        l.intensity = plan.LampIntensity;
+                        l.range = 14f;
+                    }
             }
         }
 

@@ -429,7 +429,7 @@ namespace Stealth.Vehicles
                 Body.localPosition = Vector3.Lerp(Body.localPosition, m_BodyRest + Vector3.up * bounce, 1f - Mathf.Exp(-20f * dt));
                 Body.localRotation = Quaternion.Slerp(Body.localRotation, Quaternion.Euler(pitch, 0f, -roll), 1f - Mathf.Exp(-6f * dt));
             }
-            bool lights = EngineOn || m_Scripted;
+            const bool lights = true; // high beams on all the time: the sewer is pitch dark
             if (Headlights != null) foreach (var l in Headlights) if (l != null && l.enabled != lights) l.enabled = lights;
         }
 

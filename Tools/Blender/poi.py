@@ -798,7 +798,36 @@ def model_view_flashlight():
     return export("view_flashlight")
 
 
+def _view_hand():
+    """The right hand closed round a grip along -Y (its axis through the origin, 0.017 m thick) and the forearm in its
+    sleeve going off to the bottom right: Body = skin, AccentSleeve = the sleeve (shared by the flashlight and the grip)."""
+    import math as m
+    fingers = []
+    for k in range(4):
+        y = 0.035 - k * 0.022
+        pts = [(0.03 + 0.012 * m.cos(a), y, 0.03 * m.sin(a)) if a > 2.6 else (0.031 * m.cos(a), y, 0.031 * m.sin(a))
+               for a in [m.radians(d) for d in (40, 0, -40, -90, -140, -185)]]
+        fingers.append(s.tube(pts, 0.0095 - 0.0008 * k, res=2, segments_per=4))
+    palm = s.rbox((0.04, 0.095, 0.075), (0.042, 0.0, -0.004), r=0.018, seg=3)
+    thumb = s.tube([(0.035, 0.03, 0.028), (0.018, 0.0, 0.034), (0.002, -0.03, 0.03)], 0.011, res=2, segments_per=4)
+    wrist = s.rcyl(0.032, 0.06, (0.05, 0.075, -0.012), axis="Y", seg=20, r=0.01, rot=(m.radians(8), 0, m.radians(-12)))
+    forearm = s.tube([(0.052, 0.09, -0.014), (0.085, 0.22, -0.05), (0.12, 0.38, -0.09)], 0.034, res=5, segments_per=6,
+                     radii=[1.0, 1.15, 1.3])
+    s.part("Body", [*fingers, palm, thumb, wrist, forearm])
+    sleeve = s.tube([(0.095, 0.25, -0.058), (0.13, 0.42, -0.1)], 0.048, res=5, segments_per=4)
+    cuff = s.tube([(0.088, 0.235, -0.054), (0.096, 0.26, -0.06)], 0.05, res=5, segments_per=2)
+    s.part("AccentSleeve", [sleeve, cuff])
+
+
+def model_view_grip():
+    """The hand alone, closed round whatever the hand slot holds (PlayerController.HeldHand): the thing is put in the fist
+    in Unity (ItemCatalog.HeldPoseOf), its grip on the origin, pointing along -Y (the view's forward)."""
+    _view_hand()
+    return export("view_grip")
+
+
 MODELS = {
+    "view_grip": model_view_grip,
     "item_diamond": model_item_diamond,
     "item_key": model_item_key,
     "item_stun": model_item_stun,

@@ -22,6 +22,12 @@ namespace Stealth.Level
         /// <summary>The headroom in a duct: a crouched player (1.1 m) fits, a robot (2 m) does not.</summary>
         public const float VoidHeight = SlabThickness - CeilingBoard - DeckThickness;
         public const float WallThickness = 0.3f;
+        /// <summary>
+        /// A corner motion sensor's place from the corner of the walls' axes, along each axis: its back plate (0.16 m wide,
+        /// 0.08 m deep, turned 45°) touches both wall faces — the inner corner is half a wall in, the plate's middle 0.08 m
+        /// out of it along the diagonal, the sensor's origin (its front) 0.08 m further.
+        /// </summary>
+        public const float SensorCornerInset = WallThickness / 2f + (0.08f + 0.08f) * 0.70710678f;
         /// <summary>What the jambs of an opening take from its nominal width (half the old 0.2 m wall a side): doors, vents
         /// and slots keep their clear sizes whatever the walls' thickness.</summary>
         public const float OpeningInset = 0.2f;

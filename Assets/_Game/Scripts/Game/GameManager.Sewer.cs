@@ -25,7 +25,7 @@ namespace Stealth.Game
 
         /// <summary>What lies in the car's bed (the whole run, replicated).</summary>
         public Cargo Cargo { get; } = new();
-        /// <summary>The car's shredder: things thrown into its hopper, chewed one after another into fuel (replicated).</summary>
+        /// <summary>The car's shredder: things thrown into its hopper heap up and are torn up a few at a time into fuel (replicated).</summary>
         public Shredder Shredder { get; } = new();
         readonly List<(byte shape, byte color)> m_Chewed = new();
         int m_ChewFuel;

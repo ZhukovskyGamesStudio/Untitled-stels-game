@@ -22,31 +22,22 @@ namespace Stealth.Level
     /// The sewer between two houses, from the run's seed and the depth (pure, unit tested): a closed end, the stretch
     /// where the car waits under the hatch the team came in through, a gate, the stretch the house's exit drops into,
     /// and the hall where three tunnels lead on. Lengths, segment variants, lamps, their colour and junk differ every
-    /// time, so every stretch feels like another part of the sewer. Along Unity +X; the walkways at z = ±3.1.
+    /// time, so every stretch feels like another part of the sewer, and so does the hall's shape (<see cref="SewerHall"/>).
+    /// Along Unity +X; the walkways at z = ±3.1.
     /// </summary>
     public sealed class SewerPlan
     {
         public const float SegmentLength = 6f;
         public const int Variants = 4;
-        public const float HubLength = 16f;
-        /// <summary>The kit's hall: the tunnels leave its far end at these z (left, middle, right when driving +X).</summary>
-        public static readonly float[] BranchZ = { 5.5f, 0f, -5.5f };
-
         /// <summary>
-        /// The hall's five mouths (Tools/Blender/sewer.py kit_hub), hall-local: three in its end wall, one in each long
-        /// wall; a branch tunnel (or a brick plug) at a mouth runs along the pose's +X.
+        /// The hall where the ways on leave (<see cref="SewerHall"/>: its shape, the mouths, the tunnels' mouths),
+        /// hall-local from <see cref="HubX"/>; a branch tunnel (or a brick plug) at a mouth runs along the pose's +X.
         /// </summary>
-        public static readonly Pose[] Mouths =
-        {
-            new(new Vector3(HubLength, 0f, 5.5f), Quaternion.identity),
-            new(new Vector3(HubLength, 0f, 0f), Quaternion.identity),
-            new(new Vector3(HubLength, 0f, -5.5f), Quaternion.identity),
-            new(new Vector3(10f, 0f, 8.6f), Quaternion.Euler(0f, -90f, 0f)),
-            new(new Vector3(10f, 0f, -8.6f), Quaternion.Euler(0f, 90f, 0f)),
-        };
-
-        /// <summary>Which mouth each of the three tunnels (SewerBranches) leaves the hall by; the other two are bricked up.</summary>
-        public readonly int[] TunnelMouths = { 0, 1, 2 };
+        public SewerHall Hall;
+        /// <summary>The hall's mouths, hall-local (+X leads into the tunnel or the plug).</summary>
+        public Pose[] Mouths => Hall.Mouths;
+        /// <summary>Which mouth each of the three tunnels (SewerBranches: left, middle, right) leaves the hall by; the others are bricked up.</summary>
+        public int[] TunnelMouths => Hall.Tunnels;
         /// <summary>Walkways: z of their middle (left, right).</summary>
         public const float WalkwayZ = 3.1f;
 
@@ -70,7 +61,8 @@ namespace Stealth.Level
             new(1f, 0.62f, 0.35f),  // amber
         };
 
-        public float End => HubX + HubLength;
+        /// <summary>The far end of the hall (its farthest wall, outer face), along +X.</summary>
+        public float End => HubX + Hall.MaxX;
 
         /// <summary>The sewer after house <paramref name="depth"/> (−1 = the start of the run: no gate, no exit ladder).</summary>
         public static SewerPlan Make(int runSeed, int depth)
@@ -120,10 +112,8 @@ namespace Stealth.Level
             for (int i = 0; i < ahead; i++) Add();
             p.ExitLadderX = afterHouse ? p.GateX + SegmentLength * 0.5f + (float)rng.NextDouble() * SegmentLength * (ahead - 1) : -1f;
             p.HubX = x;
-            // the ways on leave the hall wherever this stretch of sewer has them: ahead, to the sides, or both
-            var mouths = new List<int> { 0, 1, 2, 3, 4 };
-            for (int i = mouths.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (mouths[i], mouths[j]) = (mouths[j], mouths[i]); }
-            for (int i = 0; i < 3; i++) p.TunnelMouths[i] = mouths[i];
+            // the hall's shape and its ways on: a stream of its own (the rolls above stay where they were)
+            p.Hall = SewerHall.Make(new System.Random(LevelRandom.Mix(runSeed, Salt.SewerHall, depth + 7)));
             return p;
         }
     }

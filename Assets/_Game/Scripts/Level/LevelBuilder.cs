@@ -1094,6 +1094,7 @@ namespace Stealth.Level
             var tris = new List<int>[slots];
             for (int i = 0; i < slots; i++) tris[i] = new List<int>();
             foreach (var b in city.Boxes) CityPlan.AddFaces(b, verts, normals, uvs, tris);
+            AddCityModels(city, verts, normals, uvs, tris);
             var mesh = new Mesh { name = "City", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(verts);
             mesh.SetNormals(normals);
@@ -1111,6 +1112,35 @@ namespace Stealth.Level
             go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
             if (m_Art.CityLamp != null)
                 foreach (var p in city.Lamps) Place(m_Art.CityLamp, "CityLamp", p, Quaternion.identity);
+        }
+
+        /// <summary>
+        /// Every placed city model (<see cref="City.Props"/>: street furniture, cars, trees, the facades' kit) into the city's
+        /// vertex lists: each part of its <see cref="CityMesh"/> posed and drawn with its slot (Livery / Pane from the copy).
+        /// The models' meshes are read once per build.
+        /// </summary>
+        void AddCityModels(City city, List<Vector3> verts, List<Vector3> normals, List<Vector2> uvs, List<int>[] tris)
+        {
+            if (m_Art.CityMeshes == null || m_Art.CityMeshes.Length == 0) return;
+            var models = new Dictionary<CityPropKind, CityMesh>();
+            foreach (var m in m_Art.CityMeshes)
+                if (m != null && m.Meshes != null) models[m.Kind] = m;
+            var cache = new Dictionary<Mesh, (Vector3[] v, Vector3[] n, int[] t)>();
+            foreach (var p in city.Props)
+            {
+                if (!models.TryGetValue(p.Kind, out var model)) continue;
+                var pose = p.Pose;
+                for (int i = 0; i < model.Meshes.Length; i++)
+                {
+                    var mesh = model.Meshes[i];
+                    if (mesh == null) continue;
+                    if (!cache.TryGetValue(mesh, out var data))
+                        cache[mesh] = data = (mesh.vertices, mesh.normals, mesh.triangles);
+                    var slot = CityPlan.Resolve(i < model.Slots.Length ? model.Slots[i] : CitySlot.Metal, p);
+                    var local = i < model.Locals.Length ? model.Locals[i] : Matrix4x4.identity;
+                    CityPlan.AddModel(data.v, data.n, data.t, pose * local, slot, verts, normals, uvs, tris);
+                }
+            }
         }
 
         /// <summary>

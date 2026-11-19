@@ -1113,26 +1113,45 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// The exit hatch, in the look of the entry's shaft lid (ShaftHatch): a square steel frame in the floor with a yellow
+        /// rim, a dark pit inside it, a ribbed steel lid on a hinge along the +X bar (it swings up while someone hides in the
+        /// hatch, <see cref="Hatch"/>), a handle at its free edge; four corner lamps show its colour (the exit's green).
+        /// </summary>
         static GameObject BuildHatch()
         {
-            var hatch = PropObject("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing", collider: false);
-            // The lid (disc and bars) on a hinge at its edge: it swings up while someone hides in the hatch.
-            var hinge = Child(hatch.transform, "LidHinge", new Vector3(0.75f, 0.03f, 0f));
-            foreach (var part in hatch.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
-                if (part.name.StartsWith("Body") || part.name.StartsWith("Accent")) part.SetParent(hinge.transform, true);
+            Material Util(string name) => AssetDatabase.LoadAssetAtPath<Material>($"{CityMaterialsDir}/{name}.mat") ?? M("Metal");
+            Material warning = Util("UtilWarning"), panel = Util("UtilPanel"), dark = Util("UtilDark");
+            var hatch = new GameObject("Hatch");
+            const float half = 0.6f, bar = 0.1f, lip = 0.03f;
+            Cube(hatch.transform, "Pit", new Vector3(0f, 0.003f, 0f), new Vector3(2 * half, 0.006f, 2 * half), dark, false);
+            foreach (var (c, sz) in new[]
+                     {
+                         (new Vector3(0f, 0.012f, -half - bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)), (new Vector3(0f, 0.012f, half + bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)),
+                         (new Vector3(-half - bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)), (new Vector3(half + bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)),
+                     })
+                Cube(hatch.transform, "Frame", c, sz, warning, false);
+            // the lid on its hinge along the +X bar: it lifts its −X edge up and over
+            var hinge = Child(hatch.transform, "LidHinge", new Vector3(half + lip, 0.024f, 0f));
+            float side = 2 * half + 2 * lip;
+            Cube(hinge.transform, "Plate", new Vector3(-side / 2f, 0.02f, 0f), new Vector3(side, 0.04f, side), panel, false);
+            for (int i = 0; i < 4; i++)
+                Cube(hinge.transform, "Rib", new Vector3(-0.2f - i * (side - 0.4f) / 3f, 0.05f, 0f), new Vector3(0.04f, 0.02f, side - 0.2f), dark, false);
+            Cube(hinge.transform, "Handle", new Vector3(-side + 0.12f, 0.075f, 0f), new Vector3(0.04f, 0.04f, 0.3f), warning, false);
+            for (int k = 0; k < 2; k++)
+                Cube(hinge.transform, "Knuckle", new Vector3(0f, 0.02f, (k * 2 - 1) * (half - 0.15f)), new Vector3(0.05f, 0.05f, 0.16f), dark, false);
             var h = hatch.AddComponent<Hatch>();
             h.Lid = hinge.transform;
-            var b = LocalBounds(hatch);
-            // a post at the rim with a lamp on top: the hatch's colour (entry blue — the tank's filler, exit green — the way down)
-            Cube(hatch.transform, "MarkPost", new Vector3(0f, 0.65f, -0.85f), new Vector3(0.07f, 1.3f, 0.07f), M("Metal"), false);
-            Cube(hatch.transform, "EyeMarkLamp", new Vector3(0f, 1.36f, -0.85f), new Vector3(0.2f, 0.14f, 0.2f), M("HatchRing"), false);
+            // corner lamps in the frame: the hatch's colour (exit green — the way down)
+            foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+                Cube(hatch.transform, "EyeMarkLamp", new Vector3(x * (half + bar / 2f), 0.03f, z * (half + bar / 2f)), new Vector3(0.07f, 0.02f, 0.07f), M("HatchRing"), false);
             h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
             hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
             var box = hatch.AddComponent<BoxCollider>();
             // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
             // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it
-            box.size = new Vector3(b.size.x, 0.08f, b.size.z);
-            box.center = new Vector3(b.center.x, 0.04f, b.center.z);
+            box.size = new Vector3(2 * (half + bar), 0.08f, 2 * (half + bar));
+            box.center = new Vector3(0f, 0.04f, 0f);
             return hatch;
         }
 

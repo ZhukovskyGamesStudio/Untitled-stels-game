@@ -4,40 +4,46 @@ using Stealth.Vehicles;
 
 namespace Stealth.Tests
 {
-    /// <summary>The car's shredder: things thrown in pile up, fall in, are chewed one after another, and only then are fuel.</summary>
+    /// <summary>The car's shredder: a heap in the mouth, the shafts tear several things at once, each is fuel only when torn up.</summary>
     public class ShredderTests
     {
         [Test]
-        public void ThingsAreChewedOneAfterAnotherAndOnlyThenAreFuel()
+        public void TheShaftsTearSeveralAtOnceAndTheHeapWaits()
         {
             var s = new Shredder();
             var done = new List<(byte, byte)>();
-            s.Add(1, 2, 10.0);
-            s.Add(3, 4, 10.0);
-            s.Add(5, 0, 10.0);
-            Assert.AreEqual(3, s.Pile.Count, "a heap thrown in at once");
-            Assert.Less(s.Progress(10.0), 0f, "the first is still falling in");
-            Assert.AreEqual(0, s.Tick(10.0 + Shredder.FallTime + Shredder.ChewTime * 0.5, done), "half chewed: no fuel yet");
-            Assert.AreEqual(1, s.Tick(10.0 + Shredder.FallTime + Shredder.ChewTime + 0.01, done), "the first is gone");
-            Assert.AreEqual(((byte)1, (byte)2), done[0], "the very thing thrown in first");
-            Assert.AreEqual(2, s.Tick(10.0 + Shredder.FallTime + Shredder.ChewTime * 3 + 0.01, done), "late: the rest come out together");
+            for (byte i = 0; i < 5; i++) s.Add(i, 1, 10.0);
+            Assert.AreEqual(5, s.Pile.Count, "a heap thrown in at once");
+            double land = 10.0 + Shredder.FallTime;
+            int chewing = 0;
+            foreach (var p in s.Pile) if (Shredder.Progress(p, land + 0.01) >= 0f) chewing++;
+            Assert.AreEqual(Shredder.Lanes, chewing, "the shafts take as many as they have lanes; the rest wait on the heap");
+            Assert.AreEqual(0, s.Tick(land + Shredder.ChewTime * 0.5, done), "half torn: no fuel yet");
+            Assert.AreEqual(Shredder.Lanes, s.Tick(land + Shredder.ChewTime + 0.01, done), "the first lanes' worth are gone together");
+            Assert.AreEqual(((byte)0, (byte)1), done[0], "the very things thrown in first");
+            Assert.AreEqual(2, s.Tick(land + Shredder.ChewTime * 2 + 0.01, done), "the heap settled onto the free shafts");
             Assert.IsFalse(s.Busy);
             s.Add(7, 1, 100.0);
-            Assert.AreEqual(100.0 + Shredder.FallTime, s.Started, 1e-9, "an empty mouth starts on a new thing once it has fallen");
+            Assert.AreEqual(100.0 + Shredder.FallTime, s.Pile[0].Start, 1e-9, "empty shafts take a new thing once it has landed");
         }
 
         [Test]
-        public void ThePileTravelsPackedAndKeepsItsClock()
+        public void TheHeapTravelsPackedWithItsStarts()
         {
             var s = new Shredder();
-            s.Add(9, 3, 5.0);
-            s.Add(2, 1, 5.0);
+            for (byte i = 0; i < 4; i++) s.Add((byte)(9 - i), i, 5.0 + i * 0.1);
+            double baseTime = s.Started;
             var packed = new List<ulong>();
-            foreach (var item in s.Pile) packed.Add(Shredder.Pack(item));
+            foreach (var p in s.Pile) packed.Add(Shredder.Pack(p, baseTime));
             var peer = new Shredder();
-            peer.ApplyReplicated(packed, s.Started);
-            CollectionAssert.AreEqual(s.Pile, peer.Pile);
-            Assert.AreEqual(s.Progress(6.0), peer.Progress(6.0), 1e-6f);
+            peer.ApplyReplicated(packed, baseTime);
+            Assert.AreEqual(s.Pile.Count, peer.Pile.Count);
+            for (int i = 0; i < s.Pile.Count; i++)
+            {
+                Assert.AreEqual(s.Pile[i].Shape, peer.Pile[i].Shape);
+                Assert.AreEqual(s.Pile[i].Color, peer.Pile[i].Color);
+                Assert.AreEqual(s.Pile[i].Start, peer.Pile[i].Start, 0.001, "the schedule survives the wire");
+            }
         }
     }
 }

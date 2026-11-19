@@ -22,6 +22,8 @@ namespace Stealth.Player
         public GameObject HeldMap;
         [Tooltip("Anything else in the hand slot (not the flashlight, not the map: they have their own), shown low in front of the view; every peer sees it. Its parent is the anchor that is shown and hidden.")]
         public MeshFilter HeldThing;
+        [Tooltip("The right hand closed round what it holds, in the first-person view (owner only; a child of the held thing's anchor, its fist at the anchor).")]
+        public GameObject HeldHand;
         [Tooltip("The items' meshes, colours and models (Data/ItemVisuals).")]
         public Items.ItemVisuals Visuals;
         /// <summary>The flashlight in the hand shines (server-decided, replicated).</summary>
@@ -80,8 +82,10 @@ namespace Stealth.Player
         GameObject m_HeldModel;
         Quaternion? m_HeldRot;
 
-        /// <summary>The longest side of a thing shown in the hand, metres (a shovel shrinks, a coin grows).</summary>
-        const float HeldSize = 0.24f;
+        /// <summary>A mesh with no bounds is taken as this big, metres.</summary>
+        const float HeldSize = 0.12f;
+        /// <summary>The top of the closed fist over the anchor (the grip's axis), metres: a compact thing rests there.</summary>
+        const float FistTop = 0.035f;
 
         /// <summary>
         /// Every peer: what the hand slot holds is in the hand — its own model if it has one (a key, the speaker, the
@@ -101,6 +105,7 @@ namespace Stealth.Player
             }
             bool show = shape >= 0;
             if (anchor.activeSelf != show) anchor.SetActive(show);
+            if (HeldHand != null && HeldHand.activeSelf != (show && IsOwner)) HeldHand.SetActive(show && IsOwner);
             if (!show) return;
             if (shape != m_HeldShape || color != m_HeldColor) ShowHeld(shape, color);
             // a remote player's head does not pitch: the thing follows their look up and down
@@ -140,10 +145,25 @@ namespace Stealth.Player
                 }
                 b = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, Vector3.one * HeldSize);
             }
+            // in the fist the right way round: a long thing points ahead along the anchor's +Z (its held end in the fist,
+            // turned about that way), a compact one rests on the closed fingers
+            var pose = Items.ItemCatalog.HeldPoseOf(shape);
             float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
-            float scale = longest > 1e-3f ? HeldSize / longest : 1f;
-            HeldThing.transform.localScale = Vector3.one * scale;
-            HeldThing.transform.localPosition = -b.center * scale;
+            float scale = longest > 1e-3f ? pose.Length / longest : 1f;
+            var t = HeldThing.transform;
+            t.localScale = Vector3.one * scale;
+            if (pose.Compact)
+            {
+                t.localRotation = Quaternion.Euler(0f, -90f, 0f);
+                t.localPosition = new Vector3(0f, FistTop + b.size.y * scale * 0.5f, 0f) - t.localRotation * (b.center * scale);
+            }
+            else
+            {
+                // model X (its length) onto +Z: yaw −90 when +X is ahead, +90 when −X is
+                t.localRotation = Quaternion.Euler(0f, 0f, pose.Roll) * Quaternion.Euler(0f, pose.Forward > 0f ? -90f : 90f, 0f);
+                var grip = new Vector3(b.center.x - pose.Forward * b.size.x * (0.5f - pose.Grip), b.center.y, b.center.z); // model space
+                t.localPosition = -(t.localRotation * (grip * scale));
+            }
             VisualStyles.Dress(HeldThing.gameObject);
         }
 

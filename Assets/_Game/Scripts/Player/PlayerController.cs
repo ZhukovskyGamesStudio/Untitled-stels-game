@@ -313,6 +313,11 @@ namespace Stealth.Player
         }
 
         /// <summary>Dark haze indoors (it only takes the distance away, it does not light anything), the gas fog outside.</summary>
+        /// <summary>Underground: the haze's least density, and how much of the style's ambient light is left.</summary>
+        const float UndergroundFog = 0.085f, UndergroundAmbient = 0.15f;
+        static readonly int StyDarkId = Shader.PropertyToID("_StyDark");
+        bool m_AmbientDimmed;
+
         void UpdateFog()
         {
             var layout = ActiveLevel.Layout;
@@ -323,11 +328,21 @@ namespace Stealth.Player
                 GasView.Hide();
                 if (layout == null && SewerLocation.Active == null) return;
                 var a = VisualStyles.World;
-                // a thick dark haze: the far tunnel sinks into black whatever the style's indoor haze looks like
-                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, Mathf.Max(0.05f, a.IndoorFogDensity * 2.2f), Time.deltaTime * 3f);
-                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog * 0.3f, Time.deltaTime * 4f);
+                // a thick black haze: the far tunnel sinks into black whatever the style's indoor haze looks like; the style's
+                // own ambient (the picture's, not gameplay's) all but gone, and the ink lines fade where nothing is lit
+                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, Mathf.Max(UndergroundFog, a.IndoorFogDensity * 3f), Time.deltaTime * 3f);
+                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog * 0.1f, Time.deltaTime * 4f);
+                RenderSettings.ambientLight = Color.Lerp(RenderSettings.ambientLight, VisualStyles.StyleAmbient * UndergroundAmbient, Time.deltaTime * 4f);
+                Shader.SetGlobalFloat(StyDarkId, 1f);
+                m_AmbientDimmed = true;
                 Camera.backgroundColor = RenderSettings.fogColor;
                 return;
+            }
+            if (m_AmbientDimmed)
+            {
+                m_AmbientDimmed = false;
+                RenderSettings.ambientLight = VisualStyles.StyleAmbient;
+                Shader.SetGlobalFloat(StyDarkId, 0f);
             }
             // The engine's fog is only the dark haze, inside and out. The gas is drawn in the world by the gas pass
             // (GasView): none at the walls, full 15 m out (lose sight of the house and you are lost), the sky above it.
@@ -341,15 +356,29 @@ namespace Stealth.Player
 
         bool m_PlacedInHatch;
 
-        /// <summary>Owner: the server let us into the hatch — stand in its middle (and leave it where we are when climbing out).</summary>
+        float m_HatchGlideUntil;
+
+        /// <summary>
+        /// Owner: the server let us into the hatch — slide down into its middle (no jump: the body moves there over a moment,
+        /// and the model sinks, <see cref="HatchDepth"/>); climbing out leaves us where we are.
+        /// </summary>
         void EnterHatchIfNeeded()
         {
-            if (InHatch == m_PlacedInHatch) return;
-            m_PlacedInHatch = InHatch;
-            var layout = ActiveLevel.Layout;
-            if (!InHatch || layout == null) return;
-            TeleportOwner(Hatch.PositionOf(HatchIndex) + Vector3.up * 0.05f, transform.rotation);
+            if (InHatch != m_PlacedInHatch)
+            {
+                m_PlacedInHatch = InHatch;
+                m_HatchGlideUntil = InHatch ? Time.time + 1.5f : 0f;
+            }
+            if (!InHatch || ActiveLevel.Layout == null || Time.time > m_HatchGlideUntil) return;
+            var target = Hatch.PositionOf(HatchIndex) + Vector3.up * 0.05f;
+            var away = target - transform.position;
+            away.y = 0f;
+            if (away.magnitude < 0.02f) { m_HatchGlideUntil = 0f; return; }
+            m_Controller.Move(Vector3.ClampMagnitude(away, HatchGlideSpeed * Time.deltaTime));
         }
+
+        /// <summary>How fast a body slides into a hatch's middle, metres a second.</summary>
+        const float HatchGlideSpeed = 2.5f;
 
         void UpdateNoise()
         {

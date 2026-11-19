@@ -7,124 +7,194 @@ using UnityEngine;
 namespace Stealth.Vehicles
 {
     /// <summary>
-    /// The shredder on the car's hood, seen (every peer, by the server's clock: <see cref="Shredder"/>): the very things thrown
-    /// in heap up in the hopper's mouth — a new one drops onto the pile — and the first one goes under the blades: it shakes,
-    /// spins, sinks and shrinks away while chips fly and the blades whine (the car spins them fast meanwhile,
-    /// <see cref="Car.Grinding"/>); a gulp when it is gone and its fuel is in the tank.
+    /// The shredder on the car's hood, seen (every peer, by the server's clock: <see cref="Shredder"/>), like a twin-shaft
+    /// shredder: the very things thrown in — at their own size — land on a heap in the hopper's mouth, the ones at the bottom
+    /// are grabbed by the shafts (up to <see cref="Shredder.Lanes"/> at once): they shudder, tip over and are pulled down
+    /// into the funnel while chips of their colour fly up, and the heap settles down onto the shafts as they free up. A
+    /// crunch as the shafts take a thing, a burst of fragments and a gulp when it is gone and its fuel is in the tank; the
+    /// shafts spin fast meanwhile (<see cref="Car.Grinding"/>).
     /// </summary>
     public class CarShredder : MonoBehaviour
     {
-        [Tooltip("The hopper's mouth: the pile sits on it, the blades are under it.")]
+        [Tooltip("The hopper's mouth: the heap sits on it, the shafts are under it.")]
         public Transform Mouth;
         [Tooltip("A thing's look (the bed's piece prefab: mesh, colour or a tool's own model).")]
         public CargoPiece PiecePrefab;
         public ItemVisuals Visuals;
-        [Tooltip("Chips flying out of the mouth while the blades chew.")]
+        [Tooltip("Chips and fragments flying out of the mouth (emitted by hand, each in the colour of what is torn).")]
         public ParticleSystem Chips;
         public Car Car;
 
-        /// <summary>A thing in the mouth is at most this long (a shovel goes in shrunk), metres.</summary>
-        const float Fit = 0.32f;
+        /// <summary>How deep the shafts pull a thing below the mouth before it is gone, metres (out of sight in the funnel).</summary>
+        const float PullDepth = 0.6f;
+        /// <summary>Where on the mouth the shafts take things: the bottom of the heap (mouth-local, metres).</summary>
+        static readonly Vector3[] LaneSpots = { new(-0.1f, 0.02f, 0.04f), new(0.1f, 0.02f, -0.02f), new(0f, 0.02f, -0.1f) };
 
-        readonly List<CargoPiece> m_Shown = new();
-        readonly List<float> m_Arrived = new();
-        int m_LastCount, m_LastVersion = -1;
-        (byte, byte) m_LastFirst = (255, 255);
+        class Shown
+        {
+            public CargoPiece Piece;
+            public byte Shape, Color;
+            public double Start;
+            public Vector3 Pos;          // mouth-local, eased towards its place
+            public Quaternion Spin;      // its tumble on the heap
+            public bool Taken;           // the shafts have it (crunch played)
+            public Color Tint;
+        }
+
+        readonly List<Shown> m_Shown = new();
+        readonly Stack<CargoPiece> m_Spare = new();
+        int m_LastVersion = -1;
+        float m_ChipDebt;
 
         void Update()
         {
             var gm = GameManager.Instance;
             if (gm == null || Mouth == null || PiecePrefab == null) return;
             var shredder = gm.Shredder;
-            var pile = shredder.Pile;
+            if (shredder.Version != m_LastVersion) Sync(shredder);
             double now = Session.ServerTime;
-            if (shredder.Version != m_LastVersion) Sync(pile);
-            float progress = shredder.Progress(now);
-            bool chewing = pile.Count > 0 && progress >= 0f;
-            if (Car != null) Car.Grinding = pile.Count > 0;
-            if (Chips != null)
-            {
-                var e = Chips.emission;
-                e.rateOverTime = chewing ? 70f : 0f;
-            }
-            var up = Mouth.up;
+            if (Car != null) Car.Grinding = shredder.Busy;
+            float dt = Time.deltaTime;
+
+            // the heap: waiting things in the order thrown in, layered over the shafts; the taken ones on their lanes
+            int waiting = 0, lane = 0, chewing = 0;
             for (int i = 0; i < m_Shown.Count; i++)
             {
-                var piece = m_Shown[i];
-                var t = piece.transform;
-                float drop = Mathf.Clamp01((Time.time - m_Arrived[i]) / Shredder.FallTime);
-                drop = 1f - (1f - drop) * (1f - drop);
-                float rest = 0.08f + 0.11f * i;                                   // its place on the pile
-                var wobble = new Vector3(Mathf.Sin(Time.time * 7f + i * 2.1f), 0f, Mathf.Cos(Time.time * 5.3f + i)) * 0.012f;
-                float scale = piece.FitScale;
-                if (i == 0 && chewing)
+                var s = m_Shown[i];
+                float progress = Shredder.Progress(new Shredder.Piece { Start = s.Start }, now);
+                var t = s.Piece.transform;
+                Vector3 place;
+                Quaternion turn;
+                if (progress >= 0f)
                 {
-                    // under the blades: shaking, spinning, sinking, shrinking away
-                    float shake = Mathf.Sin(Time.time * 55f) * 0.012f * (1f - progress);
-                    t.position = Mouth.position + up * Mathf.Lerp(rest, -0.12f, progress) + Mouth.right * shake + wobble;
-                    t.rotation = Mouth.rotation * Quaternion.Euler(progress * 90f, progress * 540f + i * 40f, Mathf.Sin(Time.time * 31f) * 12f * (1f - progress));
-                    t.localScale = Vector3.one * scale * Mathf.Lerp(1f, 0.15f, progress * progress);
+                    chewing++;
+                    if (!s.Taken)
+                    {
+                        s.Taken = true;
+                        Sfx.At(Sfx.Bank?.Grind, Mouth.position, 0.9f, Sfx.Group.Items, 0.9f + 0.05f * (lane % 3));
+                    }
+                    // grabbed by the teeth: it shudders, tips over towards the shafts and is pulled down out of sight
+                    var spot = LaneSpots[lane++ % LaneSpots.Length];
+                    float pull = Mathf.SmoothStep(0f, 1f, progress);
+                    var shake = new Vector3(Mathf.Sin(Time.time * 47f + i), Mathf.Sin(Time.time * 61f + i * 1.7f), Mathf.Sin(Time.time * 53f + i * 2.3f)) * 0.02f * (1f - progress * 0.5f);
+                    place = spot + Vector3.down * (pull * PullDepth) + shake;
+                    turn = Quaternion.Euler(progress * 70f + Mathf.Sin(Time.time * 37f + i) * 8f, i * 67f, Mathf.Sin(Time.time * 29f + i) * 10f) * s.Spin;
+                    s.Pos = Vector3.Lerp(s.Pos, place, 1f - Mathf.Exp(-14f * dt));
+                    s.Piece.gameObject.SetActive(progress < 0.98f);
                 }
                 else
                 {
-                    t.position = Mouth.position + up * Mathf.Lerp(rest + 0.9f, rest, drop) + wobble;
-                    t.rotation = Mouth.rotation * Quaternion.Euler(i * 23f, i * 67f, i * 11f);
-                    t.localScale = Vector3.one * scale;
+                    // waiting on the heap: layers over the shafts, settling down as the things under it go
+                    int k = waiting++;
+                    float a = k * 2.399f;                       // golden angle: spread round the mouth
+                    float r = k == 0 ? 0.05f : 0.16f;
+                    place = new Vector3(Mathf.Cos(a) * r, 0.1f + 0.11f * (k / 3 + (k % 3) * 0.3f), Mathf.Sin(a) * r);
+                    turn = s.Spin;
+                    // landing: from above the mouth, it falls onto the heap
+                    s.Pos = Vector3.Lerp(s.Pos, place, 1f - Mathf.Exp(-9f * dt));
+                    s.Piece.gameObject.SetActive(true);
+                }
+                t.position = Mouth.TransformPoint(s.Pos);
+                t.rotation = Mouth.rotation * turn;
+            }
+
+            // chips: by hand, in the colour of what is being torn
+            if (Chips != null && chewing > 0)
+            {
+                m_ChipDebt += dt * 45f * chewing;
+                var emit = new ParticleSystem.EmitParams();
+                while (m_ChipDebt >= 1f)
+                {
+                    m_ChipDebt -= 1f;
+                    var s = PickChewing(now);
+                    if (s == null) break;
+                    emit.startColor = Vary(s.Tint);
+                    Chips.Emit(emit, 1);
                 }
             }
+            else m_ChipDebt = 0f;
         }
 
-        /// <summary>The pile changed: a piece per thing (new ones fall in), a crunch when the next goes under, a gulp when one is gone.</summary>
-        void Sync(IReadOnlyList<(byte shape, byte color)> pile)
+        Shown PickChewing(double now)
         {
-            var gm = GameManager.Instance;
-            m_LastVersion = gm.Shredder.Version;
-            // gone from the front: those were chewed up
-            int eaten = 0;
-            while (m_Shown.Count > 0 && eaten < m_LastCount && (m_Shown.Count > pile.Count || !Same(m_Shown[0], pile, 0)))
+            int n = 0;
+            foreach (var s in m_Shown) if (s.Taken) n++;
+            if (n == 0) return null;
+            int k = (int)(Time.frameCount * 7 + m_ChipDebt * 13) % n;
+            foreach (var s in m_Shown)
+                if (s.Taken && k-- == 0) return s;
+            return null;
+        }
+
+        static Color Vary(Color c)
+        {
+            float v = 0.75f + 0.5f * Mathf.Repeat(Time.time * 17.3f, 1f);
+            return new Color(Mathf.Clamp01(c.r * v), Mathf.Clamp01(c.g * v), Mathf.Clamp01(c.b * v), 1f);
+        }
+
+        /// <summary>The heap changed: a piece per thing (new ones drop in from above); those gone burst into fragments with a gulp.</summary>
+        void Sync(Shredder shredder)
+        {
+            m_LastVersion = shredder.Version;
+            var pile = shredder.Pile;
+            var keep = new bool[m_Shown.Count];
+            var next = new List<Shown>(pile.Count);
+            int dropped = 0;
+            foreach (var p in pile)
             {
-                Recycle(m_Shown[0]);
-                m_Shown.RemoveAt(0);
-                m_Arrived.RemoveAt(0);
-                eaten++;
-            }
-            if (eaten > 0) Sfx.At(Sfx.Bank?.FuelGulp, Mouth.position, 0.8f, Sfx.Group.Items);
-            while (m_Shown.Count > pile.Count) { Recycle(m_Shown[^1]); m_Shown.RemoveAt(m_Shown.Count - 1); m_Arrived.RemoveAt(m_Arrived.Count - 1); }
-            for (int i = 0; i < pile.Count; i++)
-            {
-                if (i < m_Shown.Count)
+                int found = -1;
+                for (int i = 0; i < m_Shown.Count; i++)
+                    if (!keep[i] && m_Shown[i].Shape == p.Shape && m_Shown[i].Color == p.Color && System.Math.Abs(m_Shown[i].Start - p.Start) < 0.01) { found = i; break; }
+                if (found >= 0)
                 {
-                    if (!Same(m_Shown[i], pile, i)) Dress(m_Shown[i], pile[i]);
+                    keep[found] = true;
+                    next.Add(m_Shown[found]);
                     continue;
                 }
                 var piece = Take();
-                Dress(piece, pile[i]);
-                m_Shown.Add(piece);
-                m_Arrived.Add(Time.time + 0.06f * (i - m_LastCount)); // a heap thrown in lands one after another
+                piece.Show(-1, new CargoItem { Shape = p.Shape, Color = p.Color }, Visuals);
+                int seed = p.Shape * 31 + p.Color * 7 + next.Count * 13;
+                next.Add(new Shown
+                {
+                    Piece = piece, Shape = p.Shape, Color = p.Color, Start = p.Start,
+                    Pos = new Vector3(0f, 0.9f + 0.15f * dropped++, 0f),
+                    Spin = Quaternion.Euler(seed * 23 % 360, seed * 67 % 360, seed * 11 % 360),
+                    Tint = TintOf(p.Shape, p.Color),
+                });
             }
-            m_LastCount = pile.Count;
-            var first = pile.Count > 0 ? pile[0] : ((byte)255, (byte)255);
-            if (pile.Count > 0 && (eaten > 0 || first != m_LastFirst)) Sfx.At(Sfx.Bank?.Grind, Mouth.position, 0.9f, Sfx.Group.Items);
-            m_LastFirst = first;
+            for (int i = 0; i < m_Shown.Count; i++)
+            {
+                if (keep[i]) continue;
+                var gone = m_Shown[i];
+                if (gone.Taken)
+                {
+                    // torn up: a burst of fragments of its colour and a gulp
+                    if (Chips != null)
+                    {
+                        var emit = new ParticleSystem.EmitParams();
+                        for (int k = 0; k < 18; k++) { emit.startColor = Vary(gone.Tint); emit.startSize = 0.035f + 0.005f * (k % 9); Chips.Emit(emit, 1); }
+                    }
+                    Sfx.At(Sfx.Bank?.FuelGulp, Mouth.position, 0.8f, Sfx.Group.Items);
+                }
+                Recycle(gone.Piece);
+            }
+            m_Shown.Clear();
+            m_Shown.AddRange(next);
         }
 
-        bool Same(CargoPiece p, IReadOnlyList<(byte shape, byte color)> pile, int i) =>
-            i < pile.Count && p.Item.Shape == pile[i].shape && p.Item.Color == pile[i].color;
-
-        void Dress(CargoPiece p, (byte shape, byte color) item)
+        /// <summary>The colour its chips fly in: the loot's colour, a tool's grey.</summary>
+        Color TintOf(byte shape, byte color)
         {
-            p.Show(-1, new CargoItem { Shape = item.shape, Color = item.color }, Visuals);
-            var size = ItemCatalog.ModelSize(item.shape);
-            float longest = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
-            p.FitScale = longest > Fit ? Fit / longest : 1f;
+            bool model = Visuals != null && Visuals.Models != null && shape < Visuals.Models.Length && Visuals.Models[shape] != null;
+            if (model || ItemCatalog.IsTool(shape) || ItemCatalog.Colors.Length == 0) return new Color(0.55f, 0.55f, 0.53f);
+            return ItemCatalog.Colors[Mathf.Clamp(color, 0, ItemCatalog.Colors.Length - 1)].Color;
         }
-
-        readonly Stack<CargoPiece> m_Spare = new();
 
         CargoPiece Take()
         {
             var p = m_Spare.Count > 0 ? m_Spare.Pop() : Instantiate(PiecePrefab, transform);
             p.gameObject.SetActive(true);
+            p.transform.localScale = Vector3.one; // at its own size
             foreach (var c in p.GetComponentsInChildren<Collider>(true)) c.enabled = false; // only to look at: not picked up from the hopper
             return p;
         }

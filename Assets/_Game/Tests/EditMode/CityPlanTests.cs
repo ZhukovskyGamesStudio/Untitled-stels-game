@@ -87,6 +87,164 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheCityIsTheSameFromTheSameSeed([Values(0, 3)] int front)
+        {
+            var a = CityPlan.Make(House, front, 3, 42);
+            var b = CityPlan.Make(House, front, 3, 42);
+            Assert.AreEqual(a.Props.Count, b.Props.Count);
+            for (int i = 0; i < a.Props.Count; i += 7)
+            {
+                Assert.AreEqual(a.Props[i].Kind, b.Props[i].Kind);
+                Assert.AreEqual(a.Props[i].Position, b.Props[i].Position);
+                Assert.AreEqual(a.Props[i].Pane, b.Props[i].Pane);
+            }
+        }
+
+        [Test]
+        public void ModelsStandOutsideTheHouse([Values(0, 1, 2, 3)] int front, [Values(7, 42)] int seed)
+        {
+            var city = CityPlan.Make(House, front, 3, seed);
+            Assert.Greater(city.Props.Count, 200, "a street full of things");
+            foreach (var p in city.Props)
+            {
+                var spot = new Rect(p.Position.x - 0.01f, p.Position.z - 0.01f, 0.02f, 0.02f);
+                // a tree's crown reaches out 2 m over the pavement: it must not reach the house's windows
+                float keep = p.Kind is CityPropKind.TreeA or CityPropKind.TreeB or CityPropKind.TreeC ? 2.2f : p.Kind == CityPropKind.Kerb ? 0f : 0.3f;
+                Assert.GreaterOrEqual(CityPlan.Gap(spot, House), keep - 0.02f, $"front {front}, seed {seed}: {p.Kind} at {p.Position} is in or against the house");
+            }
+        }
+
+        [Test]
+        public void StreetFurnitureStandsOnThePavementAndCarsByTheKerb([Values(0, 1, 2, 3)] int front)
+        {
+            var city = CityPlan.Make(House, front, 3, 7);
+            var ground = city.Ground.Select(Flat).ToList();
+            bool OnGround(Vector3 p) => ground.Any(g => g.Contains(new Vector2(p.x, p.z)));
+            var along = front % 2 == 0 ? Vector3.right : Vector3.forward;
+            int cars = 0;
+            foreach (var p in city.Props)
+            {
+                if (CityPlan.OnPavement(p.Kind))
+                {
+                    Assert.AreEqual(CityPlan.WalkTop, p.Position.y, 1e-4f, $"{p.Kind} at {p.Position}: on the pavement's top");
+                    Assert.IsTrue(OnGround(p.Position), $"front {front}: {p.Kind} at {p.Position} stands in the road");
+                }
+                else if (CityPlan.IsCar(p.Kind))
+                {
+                    cars++;
+                    Assert.AreEqual(CityPlan.RoadTop, p.Position.y, 1e-4f, $"{p.Kind} at {p.Position}: on the road");
+                    Assert.IsFalse(OnGround(p.Position), $"front {front}: a car parked on the pavement at {p.Position}");
+                    float kerb = ground.Min(g => CityPlan.Gap(new Rect(p.Position.x, p.Position.z, 0f, 0f), g));
+                    Assert.That(kerb, Is.InRange(1.0f, 1.2f), $"front {front}: a car at {p.Position} is {kerb} m from the kerb");
+                    // it lies along the street: its front looks along the house's front
+                    Assert.AreEqual(1f, Mathf.Abs(Vector3.Dot(p.Forward, along)), 1e-3f, $"{p.Kind} at {p.Position} stands across the street");
+                }
+            }
+            Assert.Greater(cars, 8, "cars along both kerbs");
+        }
+
+        [Test]
+        public void WhatPlayersCanReachIsSolid([Values(0, 1)] int front)
+        {
+            // inside the yard every lamp, tree, bench, bin, car… has a solid round its spot
+            var city = CityPlan.Make(House, front, 3, 7);
+            var reach = new Rect(House.xMin - CityPlan.Yard, House.yMin - CityPlan.Yard, House.width + 2f * CityPlan.Yard, House.height + 2f * CityPlan.Yard);
+            int seen = 0;
+            foreach (var p in city.Props)
+            {
+                if (!(CityPlan.OnPavement(p.Kind) || CityPlan.IsCar(p.Kind)) || !reach.Contains(new Vector2(p.Position.x, p.Position.z))) continue;
+                seen++;
+                Assert.IsTrue(city.Solids.Any(s => Flat(s).Contains(new Vector2(p.Position.x, p.Position.z))), $"front {front}: {p.Kind} at {p.Position} has no collider");
+            }
+            Assert.Greater(seen, 5);
+        }
+
+        [Test]
+        public void TheFacadeKitHangsOnTheBuildingsAndKeepsToItsBudget([Values(0, 2)] int front, [Values(7, 42)] int seed)
+        {
+            var city = CityPlan.Make(House, front, 3, seed);
+            var buildings = city.Boxes.Where(IsBuilding).Select(b => b.Bounds).ToList();
+            var walls = new[] { CityPropKind.WindowA, CityPropKind.WindowB, CityPropKind.CurtainBay, CityPropKind.Shopfront, CityPropKind.Entrance };
+            var kit = city.Props.Where(p => walls.Contains(p.Kind)).ToList();
+            Assert.Greater(kit.Count, 40, "windows, shop fronts and entrances on the buildings near the house");
+            Assert.Less(kit.Count, 1100, "the windows' budget (each ~750 triangles in one merged mesh)");
+            Assert.IsTrue(kit.Any(p => p.Pane == CitySlot.WindowLit) && kit.Any(p => p.Pane == CitySlot.WindowDark), "some lit, some dark");
+            foreach (var p in kit)
+                Assert.IsTrue(buildings.Any(b => OnFace(b, p.Position, p.Forward)), $"front {front}, seed {seed}: {p.Kind} at {p.Position} hangs on no building's wall");
+            Assert.IsTrue(city.Props.Any(p => p.Kind == CityPropKind.Cornice) && city.Props.Any(p => p.Kind == CityPropKind.Coping), "the roofs' edges");
+        }
+
+        /// <summary>On the plane of a building's side (or the plinth's 8 cm in front of it), within its length, its front out of the wall.</summary>
+        static bool OnFace(Bounds b, Vector3 p, Vector3 forward)
+        {
+            if (p.y < b.min.y - 0.01f || p.y > b.max.y) return false;
+            for (int axis = 0; axis < 3; axis += 2)
+            {
+                float f = forward[axis];
+                if (Mathf.Abs(f) < 0.99f) continue;
+                float plane = f > 0 ? b.max[axis] : b.min[axis];
+                float off = (p[axis] - plane) * Mathf.Sign(f);
+                int other = 2 - axis;
+                return off > -0.01f && off < 0.1f && p[other] > b.min[other] && p[other] < b.max[other];
+            }
+            return false;
+        }
+
+        [Test]
+        public void ModelFilesAreSnakeCase()
+        {
+            Assert.AreEqual("city_curtain_bay", CityPlan.ModelFile(CityPropKind.CurtainBay));
+            Assert.AreEqual("city_window_a", CityPlan.ModelFile(CityPropKind.WindowA));
+            Assert.AreEqual("city_roof_ac", CityPlan.ModelFile(CityPropKind.RoofAc));
+        }
+
+        [Test]
+        public void LiveryAndPaneComeFromTheCopy()
+        {
+            var p = new CityProp(CityPropKind.Sedan, Vector3.zero, 0f, Vector3.one, CitySlot.CarBlue, CitySlot.WindowLit);
+            Assert.AreEqual(CitySlot.CarBlue, CityPlan.Resolve(CitySlot.Livery, p));
+            Assert.AreEqual(CitySlot.WindowLit, CityPlan.Resolve(CitySlot.Pane, p));
+            Assert.AreEqual(CitySlot.Tyre, CityPlan.Resolve(CitySlot.Tyre, p));
+        }
+
+        [Test]
+        public void ModelsArePosedStretchedAndStillFaceOut()
+        {
+            // one triangle facing +z (clockwise seen from +z)
+            var v = new[] { new Vector3(0f, 0f, 0f), new Vector3(1f, 0f, 0f), new Vector3(0f, 1f, 0f) };
+            var n = new[] { Vector3.forward, Vector3.forward, Vector3.forward };
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = Enumerable.Range(0, System.Enum.GetValues(typeof(CitySlot)).Length).Select(_ => new List<int>()).ToArray();
+            var pose = new CityProp(CityPropKind.Band, new Vector3(5f, 2f, 0f), 90f, new Vector3(3f, 1f, 1f)).Pose; // stretched 3x, turned to face +x
+            CityPlan.AddModel(v, n, new[] { 0, 1, 2 }, pose, CitySlot.Stone, verts, normals, uvs, tris);
+            Assert.That(Vector3.Distance(Vector3.right, normals[0]), Is.LessThan(1e-4f), "the normal turns with the model");
+            Assert.That(Vector3.Distance(new Vector3(5f, 2f, -3f), verts[1]), Is.LessThan(1e-4f), "stretched along its x, which now runs along -z");
+            var t = tris[(int)CitySlot.Stone];
+            Assert.Greater(Vector3.Dot(Vector3.Cross(verts[t[1]] - verts[t[0]], verts[t[2]] - verts[t[0]]), normals[0]), 0f, "still wound to face out");
+            Assert.That(Vector2.Distance(new Vector2(-3f, 2f), uvs[1]), Is.LessThan(1e-4f), "texture in world metres (z, y on a face looking along x)");
+            // a mirroring pose turns the triangle round
+            CityPlan.AddModel(v, n, new[] { 0, 1, 2 }, Matrix4x4.Scale(new Vector3(-1f, 1f, 1f)), CitySlot.Metal, verts, normals, uvs, tris);
+            var m = tris[(int)CitySlot.Metal];
+            Assert.Greater(Vector3.Dot(Vector3.Cross(verts[m[1]] - verts[m[0]], verts[m[2]] - verts[m[0]]), normals[m[0]]), 0f, "mirrored, still facing out");
+        }
+
+        [Test]
+        public void AFloatingBoxHasABottom()
+        {
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = Enumerable.Range(0, System.Enum.GetValues(typeof(CitySlot)).Length).Select(_ => new List<int>()).ToArray();
+            CityPlan.AddFaces(new CityBox(new Vector3(0f, 2f, 0f), new Vector3(1f, 2.2f, 1f), CitySlot.Metal, CitySlot.Metal), verts, normals, uvs, tris);
+            var t = tris[(int)CitySlot.Metal];
+            Assert.AreEqual(6 * 6, t.Count, "four sides, a top and a bottom: seen from under it, it is not hollow");
+            for (int i = 0; i < t.Count; i += 3)
+                Assert.Greater(Vector3.Dot(Vector3.Cross(verts[t[i + 1]] - verts[t[i]], verts[t[i + 2]] - verts[t[i]]), normals[t[i]]), 0f);
+        }
+
+        [Test]
         public void FacesAreWoundOutwards()
         {
             var verts = new List<Vector3>();

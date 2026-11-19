@@ -334,6 +334,7 @@ namespace Stealth.EditorTools
             view.transform.SetParent(head.transform, false);
             view.transform.localPosition = new Vector3(0.16f, -0.2f, 0.3f);
             view.transform.localRotation = Quaternion.Euler(-4f, -6f, 0f);
+            view.transform.localScale = new Vector3(-1f, 1f, 1f); // the import mirrors Blender's X: mirrored back it is the right hand
             foreach (var r in view.GetComponentsInChildren<MeshRenderer>(true))
             {
                 string n = r.gameObject.name;
@@ -360,13 +361,26 @@ namespace Stealth.EditorTools
             }
             held.SetActive(false);
             // anything else held in the hand (PlayerController.HeldThing): its mesh or model, sized to the hand, low right in the view
-            var holder = Child(head.transform, "HeldAnchor", new Vector3(0.2f, -0.24f, 0.42f));
-            holder.transform.localRotation = Quaternion.Euler(8f, -18f, 0f);
+            // where the flashlight's hand is: the fist's grip on the anchor, pointing ahead (+Z)
+            var holder = Child(head.transform, "HeldAnchor", new Vector3(0.16f, -0.2f, 0.3f));
+            holder.transform.localRotation = Quaternion.Euler(-4f, -6f, 0f);
             var thing = Child(holder.transform, "HeldThing", Vector3.zero);
             var thingMesh = thing.AddComponent<MeshFilter>();
             var thingRenderer = thing.AddComponent<MeshRenderer>();
             thingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             thingRenderer.receiveShadows = false;
+            // the right hand closed round it (Tools/Blender/poi.py view_grip; only its owner sees it)
+            var grip = Model("view_grip");
+            grip.name = "HeldHand";
+            grip.transform.SetParent(holder.transform, false);
+            grip.transform.localScale = new Vector3(-1f, 1f, 1f);
+            foreach (var r in grip.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                r.sharedMaterial = M(r.gameObject.name.StartsWith("AccentSleeve") ? "ViewSleeve" : "PlayerAccent");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            grip.SetActive(false);
             holder.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
@@ -388,6 +402,7 @@ namespace Stealth.EditorTools
             pc.ViewFlashlight = view;
             pc.HeldMap = held;
             pc.HeldThing = thingMesh;
+            pc.HeldHand = grip;
             pc.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;

@@ -285,6 +285,36 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void MotionSensorsSitFlushInTheirCorners()
+        {
+            int seen = 0;
+            foreach (var (seed, level) in new[] { (7, 1), (42, 3), (3, 5), (11, 4) })
+            {
+                var l = TestHouses.Get(seed, level);
+                foreach (var r in l.RobotSpawns)
+                {
+                    if (r.Kind != RobotKind.MotionSensor) continue;
+                    var floor = r.Position - Vector3.up * 2.2f;
+                    var room = l.Plan.RoomAt(floor + Vector3.up * 0.3f);
+                    Assert.IsNotNull(room, $"seed {seed}: a sensor out of any room");
+                    var b = room.Bounds;
+                    bool flush = false;
+                    foreach (var cx in new[] { b.xMin, b.xMax })
+                        foreach (var cz in new[] { b.yMin, b.yMax })
+                        {
+                            var off = new Vector2(r.Position.x - cx, r.Position.z - cz);
+                            if (Mathf.Abs(Mathf.Abs(off.x) - LevelMetrics.SensorCornerInset) > 0.02f || Mathf.Abs(Mathf.Abs(off.y) - LevelMetrics.SensorCornerInset) > 0.02f) continue;
+                            var diagonal = new Vector3(off.x, 0f, off.y).normalized;   // from the corner into the room
+                            flush |= Vector3.Dot(r.Rotation * Vector3.forward, diagonal) > 0.99f;
+                        }
+                    Assert.IsTrue(flush, $"seed {seed}: the sensor at {r.Position} floats off its corner");
+                    seen++;
+                }
+            }
+            Assert.Greater(seen, 0, "some sensor in these houses");
+        }
+
+        [Test]
         public void CargoPacksShapeAndColour()
         {
             for (byte shape = 0; shape < 8; shape++)

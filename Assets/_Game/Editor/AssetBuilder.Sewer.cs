@@ -29,7 +29,17 @@ namespace Stealth.EditorTools
             var segments = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}.prefab", () => KitPiece($"sewer_seg_{i}", true, KitYaw))).ToArray();
             var cuts = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}Cut.prefab", () => KitPiece($"sewer_seg_{i}_cut", false))).ToArray();
             var cap = Prefab($"{SewerKit}/Cap.prefab", () => KitPiece("sewer_cap", true, KitYaw));
-            var hub = Prefab($"{SewerKit}/Hub.prefab", () => KitPiece("sewer_hub", true, KitYaw));
+            // the hall's tiles (sewer.py kit_hall): SewerHall lays them out, different every time
+            var hallFloor = Prefab($"{SewerKit}/HallFloor.prefab", () => KitPiece("sewer_hall_floor", true, KitYaw));
+            var hallKits = Enumerable.Range(0, SewerHall.Heights).Select(h => new SewerLocation.HallKit
+            {
+                Vault = Prefab($"{SewerKit}/HallVault{h}.prefab", () => KitPiece($"sewer_hall_vault_{h}", true, KitYaw)),
+                Wall = Prefab($"{SewerKit}/HallWall{h}.prefab", () => KitPiece($"sewer_hall_wall_{h}", true, KitYaw)),
+                Mouth = Prefab($"{SewerKit}/HallMouth{h}.prefab", () => KitPiece($"sewer_hall_mouth_{h}", true, KitYaw)),
+                Entry = Prefab($"{SewerKit}/HallEntry{h}.prefab", () => KitPiece($"sewer_hall_entry_{h}", true, KitYaw)),
+                Column = Prefab($"{SewerKit}/HallColumn{h}.prefab", () => KitPiece($"sewer_hall_column_{h}", true, KitYaw)),
+                Arch = Prefab($"{SewerKit}/HallArch{h}.prefab", () => KitPiece($"sewer_hall_arch_{h}", false, KitYaw)),
+            }).ToArray();
             var plug = Prefab($"{SewerKit}/Plug.prefab", () => KitPiece("sewer_plug", true, KitYaw));
             var lamp = Prefab($"{SewerKit}/Lamp.prefab", () =>
             {
@@ -104,7 +114,8 @@ namespace Stealth.EditorTools
                 loc.BackWall = backWall;
                 loc.Reducer = reducer;
                 loc.Tunnel = tunnel.GetComponent<DriveTunnel>();
-                loc.Hub = hub;
+                loc.HallFloor = hallFloor;
+                loc.HallKits = hallKits;
                 loc.Plug = plug;
                 loc.Lamp = lamp;
                 loc.Barrel = barrel;
@@ -464,10 +475,11 @@ namespace Stealth.EditorTools
             car.Headlights = new[]
             {
                 // at the model's head lamps (car.py head_lights: x ±0.70, 0.92 up, nose at z 2.35), just ahead of the bumper
-                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 9f, 24f),
-                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 9f, 24f),
+                // high beams: a long narrow throw down the tunnel, always on
+                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
+                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
             };
-            foreach (var l in car.Headlights) { l.spotAngle = 70f; l.innerSpotAngle = 40f; }
+            foreach (var l in car.Headlights) { l.spotAngle = 42f; l.innerSpotAngle = 18f; }
             var engine = root.AddComponent<AudioSource>();
             engine.clip = s_Bank != null ? s_Bank.CarEngine : null;
             engine.loop = true;

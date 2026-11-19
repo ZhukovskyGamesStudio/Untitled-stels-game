@@ -682,6 +682,9 @@ namespace Stealth.Level
         /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage); an apartment block
         /// has no such place (its find is the shelter map). After the furniture.
         /// </summary>
+        /// <summary>The smallest the point of interest is made to fit a piece's place, while a bigger piece is to be had.</summary>
+        public const float MinPointScale = 0.85f;
+
         public static void PointOfInterest(LevelLayout l)
         {
             if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
@@ -698,7 +701,9 @@ namespace Stealth.Level
                     if (LevelLayout.FloorOf(w.y) == LevelLayout.FloorOf(p.y + 0.1f) && new Vector2(w.x - p.x, w.z - p.z).magnitude < Mathf.Max(need.width, need.height) / 2f + 1.2f) return true;
                 return false;
             }
-            // away from the hatch where the house allows it; a small first house has no "far"
+            // big enough first (a sofa's or a shelf's footprint shrank the medical table to a toy): at most a little smaller
+            // than the place, then away from the hatch where the house allows it (a small first house has no "far")
+            foreach (float least in new[] { MinPointScale, 0f })
             foreach (float away in new[] { 6f, 2.5f })
             // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
             foreach (var wanted in new[] { PropKind.PingPongTable, PropKind.PoolTable, PropKind.SectionalSofa, PropKind.AirHockey, PropKind.ReceptionDesk,
@@ -712,7 +717,8 @@ namespace Stealth.Level
                 for (int i = 0; i < l.Props.Count; i++)
                     if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away
                         && (!Furnisher.Tall.Contains(kind) || !AtWindow(l.Props[i].Position))) options.Add(i);
-                if (options.Count == 0) continue;
+                var room = Furnisher.FootprintOf(wanted);
+                if (options.Count == 0 || Mathf.Min(1f, room.width / need.width, room.height / need.height) < least) continue;
                 int pick = options[rng.Next(options.Count)];
                 var p = l.Props[pick];
                 var have = Furnisher.FootprintOf(wanted);

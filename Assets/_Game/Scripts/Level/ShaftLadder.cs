@@ -79,6 +79,22 @@ namespace Stealth.Level
         /// <summary>Off at the top: high enough and the lid open (it steps onto the floor).</summary>
         public static bool OffAtTop(float y, float top, bool lidOpen) => lidOpen && y >= top - 0.35f;
 
+        /// <summary>How high over the lobby's floor the feet rise before stepping off the top, metres (over the rim and the lid's frame).</summary>
+        public const float OverRim = 0.25f;
+
+        /// <summary>
+        /// Climbing out at the top, one frame: first up until the feet are <see cref="OverRim"/> over the floor, then across onto
+        /// it (to <paramref name="exit"/>) — the body moves there, it is never put there. Zero once out.
+        /// </summary>
+        public static Vector3 ClimbOut(Vector3 feet, Vector3 exit, float dt)
+        {
+            float rise = exit.y + OverRim - feet.y;
+            if (rise > 0.005f) return Vector3.up * Mathf.Min(rise, Speed * dt);
+            var across = new Vector3(exit.x - feet.x, 0f, exit.z - feet.z);
+            if (across.magnitude < 0.05f) return Vector3.zero;
+            return Vector3.ClampMagnitude(across, Speed * 1.2f * dt);
+        }
+
         /// <summary>Off at the bottom: going down and standing on the floor.</summary>
         public static bool OffAtBottom(float forward, bool grounded, float y, float bottom) => forward < -0.1f && grounded && y < bottom + 0.3f;
     }

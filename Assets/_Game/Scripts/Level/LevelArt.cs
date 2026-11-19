@@ -11,6 +11,19 @@ namespace Stealth.Level
     }
 
     /// <summary>
+    /// A city model (<see cref="CityPropKind"/>, Tools/Blender/street.py): its parts, the slot each is drawn with and where
+    /// each sits in the model. The level builder merges every placed copy into the city's one mesh (no objects, no renderers).
+    /// </summary>
+    [System.Serializable]
+    public class CityMesh
+    {
+        public CityPropKind Kind;
+        public Mesh[] Meshes = new Mesh[0];
+        public CitySlot[] Slots = new CitySlot[0];
+        public Matrix4x4[] Locals = new Matrix4x4[0];
+    }
+
+    /// <summary>
     /// Every prefab the level builder instantiates. Created by the asset builder (Stealth / Build Prototype Assets),
     /// then freely editable: swap a prefab here to restyle the whole office.
     /// </summary>
@@ -32,6 +45,8 @@ namespace Stealth.Level
         [Tooltip("The city round the yard (CityPlan): the object its merged mesh is drawn with, the materials by CitySlot, a street lamp's light.")]
         public GameObject CityPiece;
         public Material[] CityMaterials = new Material[0];
+        [Tooltip("The city's models (CityPropKind, Tools/Blender/street.py): street furniture, cars, trees, the facades' kit; merged into the city's mesh.")]
+        public CityMesh[] CityMeshes = new CityMesh[0];
         [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
         public Material[] UtilityMaterials = new Material[0];
         [Tooltip("A plain steel door-and-a-half on hinges (the shop, the plant room, storerooms): a louvre at the bottom, a wired-glass slot")] public GameObject ShopDoor;

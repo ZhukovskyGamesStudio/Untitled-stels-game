@@ -4,8 +4,9 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// A charging dock of the robots' charging room (prefab Props/ChargingDock): its glowing parts breathe slowly while it is
-    /// free, and with a robot resting on it they pulse like charge flowing in — a wave running up again and again. Visual
+    /// A charging dock of the robots' charging room (prefab Props/ChargingDock): its glowing parts stay dim and still while it
+    /// is free, and with a robot resting on it (on its own stand, <see cref="ChargingRooms.DockStandOff"/> in front — not
+    /// one on the next dock) they pulse like charge flowing in — a wave running up again and again. Visual
     /// only, every peer (a resting robot is replicated: <see cref="RobotController.RestingShown"/>). Its glowing parts carry
     /// a property block, which keeps them out of the merged furniture.
     /// </summary>
@@ -44,9 +45,15 @@ namespace Stealth.Level
             }
         }
 
-        /// <summary>The glow's strength (pure): a slow breath while free, a rising pulse while a robot charges.</summary>
+        /// <summary>The glow's strength (pure): dim and still while free, a rising pulse while a robot charges.</summary>
         public static float Strength(float time, bool charging) =>
-            charging ? 0.55f + 0.9f * Mathf.Pow(Mathf.Repeat(time * 0.9f, 1f), 2f) : 0.25f + 0.1f * Mathf.Sin(time * 1.3f);
+            charging ? 0.55f + 0.9f * Mathf.Pow(Mathf.Repeat(time * 0.9f, 1f), 2f) : Idle;
+
+        /// <summary>A free dock's glow, of its full strength.</summary>
+        public const float Idle = 0.2f;
+
+        /// <summary>How near its stand a resting robot counts as charging on this dock, metres (docks stand ≥ 1 m apart).</summary>
+        const float OnStand = 0.4f;
 
         void Update()
         {
@@ -55,8 +62,14 @@ namespace Stealth.Level
             {
                 m_NextLook = Time.time + 0.5f;
                 m_Busy = false;
+                var stand = transform.position + transform.forward * ChargingRooms.DockStandOff;
                 foreach (var r in RobotController.Robots)
-                    if (r != null && r.RestingShown && (r.transform.position - transform.position).sqrMagnitude < 1.6f * 1.6f) { m_Busy = true; break; }
+                {
+                    if (r == null || !r.RestingShown) continue;
+                    var d = r.transform.position - stand;
+                    d.y = 0f;
+                    if (d.sqrMagnitude < OnStand * OnStand) { m_Busy = true; break; }
+                }
             }
             m_Charge = Mathf.MoveTowards(m_Charge, m_Busy ? 1f : 0f, Time.deltaTime * 2f);
             float k = Mathf.Lerp(Strength(Time.time, false), Strength(Time.time, true), m_Charge);

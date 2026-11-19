@@ -275,7 +275,7 @@ namespace Stealth.Level
             foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
             var bot = Stealth.Game.StorageBot.Active; // the team's storage robot walks through doors like a robot (a locked one too)
             if (bot != null && !bot.InDuct) s_Agents.Add(bot.transform.position);
-            ShowLock(locked);
+            ShowLock(locked, Swing == null || m_Open.Value < 0.03f); // a hinged leaf swung open (a robot went through) takes no padlock in the air with it
             var here = transform.position;
             bool open = ShouldOpen(here, s_Agents);
             bool openB = open;
@@ -325,18 +325,20 @@ namespace Stealth.Level
             Blocker.enabled = m_Open.Value < 0.15f;
         }
 
-        void ShowLock(bool locked)
+        /// <summary>The lock's look: padlocks while a hackable lock holds the door and its hinged leaf is <paramref name="shut"/>, lamps' colour.</summary>
+        void ShowLock(bool locked, bool shut)
         {
-            int state = !HasLock ? 0 : locked ? 1 : 2;
+            int state = !HasLock ? 0 : locked ? (shut ? 1 : 3) : 2;
             if (state == m_ShownLock) return;
+            bool lampsSame = (state == 1 && m_ShownLock == 3) || (state == 3 && m_ShownLock == 1);
             m_ShownLock = state;
             if (Padlocks != null)
             {
-                bool padlock = locked && !NeedsKey; // a key door has its key panels, the vault its lamps
+                bool padlock = locked && shut && !NeedsKey; // a key door has its key panels, the vault its lamps
                 foreach (var p in Padlocks)
                     if (p != null && p.gameObject.activeSelf != padlock) p.gameObject.SetActive(padlock);
             }
-            if (LockLamps == null) return;
+            if (LockLamps == null || lampsSame) return;
             m_Block ??= new MaterialPropertyBlock();
             var c = locked ? (NeedsKey ? KeyColor : LockedColor) : OpenColor;
             foreach (var r in LockLamps)

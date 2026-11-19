@@ -65,15 +65,23 @@ namespace Stealth.Player
         /// Owner: the sound of the hands at work while E is held — keys tapped hacking a robot, a pick ticking in a lock, a
         /// screwdriver's ratchet at a grille (the end of it has its own sound: the robot's, the lock's, the grille's).
         /// </summary>
+        Vector3 m_WorkWas;
+
         void WorkSounds()
         {
             var bank = Audio.Sfx.Bank;
+            // only while the work goes on: a hold's progress is kept when E is let go (and shown when aiming at it again),
+            // so it is the progress growing this frame that sounds, not its being there
+            float hack = HackTarget != null ? HackProgress : 0f, pick = DoorTarget != null ? DoorProgress : 0f;
+            float screw = UseTarget != null && UseTarget.Kind is UseKind.VentGrille or UseKind.VentGrate ? UseProgress : 0f;
+            bool hacking = hack > m_WorkWas.x, picking = pick > m_WorkWas.y, screwing = screw > m_WorkWas.z;
+            m_WorkWas = new Vector3(hack, pick, screw);
             if (bank == null || Time.time < m_NextWorkTick) return;
             AudioClip clip = null;
             float gap = 0.3f;
-            if (HackTarget != null && HackProgress > 0f) { clip = bank.WorkHack; gap = 0.22f; }
-            else if (DoorTarget != null && DoorProgress > 0f) { clip = bank.WorkPick; gap = 0.16f; }
-            else if (UseTarget != null && UseProgress > 0f && UseTarget.Kind is UseKind.VentGrille or UseKind.VentGrate) { clip = bank.WorkScrew; gap = 0.3f; }
+            if (hacking) { clip = bank.WorkHack; gap = 0.22f; }
+            else if (picking) { clip = bank.WorkPick; gap = 0.16f; }
+            else if (screwing) { clip = bank.WorkScrew; gap = 0.3f; }
             if (clip == null) return;
             m_NextWorkTick = Time.time + gap * Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.85f, 1.15f);
             Audio.Sfx.At(clip, Hands, 0.7f, Audio.Sfx.Group.Items, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.93f, 1.07f));

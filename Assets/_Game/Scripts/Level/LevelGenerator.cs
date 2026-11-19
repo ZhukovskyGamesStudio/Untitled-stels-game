@@ -1147,7 +1147,7 @@ namespace Stealth.Level
                     {
                         case RobotKind.MotionSensor:
                         {
-                            var (c, inward) = CornerOf(l, room, rng, 0.2f);
+                            var (c, inward) = CornerOf(l, room, rng, LevelMetrics.SensorCornerInset); // flush in the corner
                             pos = c + Vector3.up * 2.2f;
                             rot = Quaternion.LookRotation(inward);
                             break;

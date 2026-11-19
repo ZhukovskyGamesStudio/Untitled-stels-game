@@ -527,6 +527,9 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ air
 
+        /// <summary>The ambient light the style sets (the picture only; gameplay uses <see cref="GameplayAmbient"/>): dimmed underground by the player's view.</summary>
+        public static Color StyleAmbient => s_Current != null ? World.Ambient : s_BaseAmbient;
+
         static void ApplyWorld(StyleWorld w)
         {
             RenderSettings.ambientMode = AmbientMode.Flat;

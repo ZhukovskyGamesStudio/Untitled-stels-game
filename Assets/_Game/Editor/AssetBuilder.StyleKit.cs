@@ -122,6 +122,7 @@ namespace Stealth.EditorTools
             Mat("Trim_Metal", new Color(0.42f, 0.44f, 0.47f), null, 0.5f, 0.8f);
             Mat("Trim_Rust", new Color(0.42f, 0.27f, 0.17f), null, 0.3f, 0.4f);
             Mat("Trim_Brass", new Color(0.78f, 0.62f, 0.32f), null, 0.6f, 1f);
+            Mat("Threshold", new Color(0.3f, 0.29f, 0.27f), null, 0.12f); // a worn, dull strip: nobody looks at it
             Mat("Trim_Black", new Color(0.07f, 0.07f, 0.08f), null, 0.4f);
             Mat("Trim_Toon", new Color(0.98f, 0.55f, 0.22f), null, 0.2f);
             Mat("Trim_Olive", new Color(0.32f, 0.3f, 0.2f), null, 0.2f);
@@ -204,7 +205,7 @@ namespace Stealth.EditorTools
             kit.VaultFloor = K("Vault_Floor");
             kit.VaultWallTile = 2f;
             kit.VaultFloorTile = 1f;
-            kit.Threshold = K("Trim_Brass");
+            kit.Threshold = K("Threshold");
             kit.ShopWall = K("Shop_Wall");
             kit.ShopWallLower = K("Shop_WallLower");
             kit.ShopFloor = K("Shop_Floor");

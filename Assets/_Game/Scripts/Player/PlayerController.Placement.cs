@@ -163,7 +163,7 @@ namespace Stealth.Player
         void UpdateLadder(in PlayerInputState input, float dt)
         {
             var ladder = ShaftLadder.Main;
-            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; return; }
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; return; }
             var feet = transform.position;
             if (!Climbing)
             {
@@ -172,6 +172,18 @@ namespace Stealth.Player
                 Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
                 if (!Climbing) return;
             }
+            if (m_ClimbingOut)
+            {
+                // over the top: the body rises above the rim and moves onto the lobby's floor, step by step (no jump)
+                var step = LadderMath.ClimbOut(feet, ladder.TopExit, dt);
+                m_Controller.Move(step);
+                if (step.sqrMagnitude < 1e-8f || (transform.position - feet).sqrMagnitude < 1e-8f && Time.time > m_ClimbOutSince + 1.5f)
+                {
+                    Climbing = false;
+                    m_ClimbingOut = false;
+                }
+                return;
+            }
             if (input.Jump || !ladder.InZone(feet)) { Climbing = false; return; }
             // W climbs the way the player looks: facing away from the ladder (back to the rungs), W goes down and S up
             var look = transform.forward;
@@ -179,13 +191,16 @@ namespace Stealth.Player
             float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
             m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
             feet = transform.position;
-            if (LadderMath.OffAtTop(feet.y, ladder.TopY, World.IsOpened(OpenKeys.Shaft)))
+            if (climb > 0.1f && LadderMath.OffAtTop(feet.y, ladder.TopY, World.IsOpened(OpenKeys.Shaft)))
             {
-                Climbing = false;
-                TeleportOwner(ladder.TopExit, transform.rotation);
+                m_ClimbingOut = true;
+                m_ClimbOutSince = Time.time;
             }
             else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom)) Climbing = false;
         }
+
+        bool m_ClimbingOut;
+        float m_ClimbOutSince;
 
         public void TeleportOwner(Vector3 position, Quaternion rotation)
         {

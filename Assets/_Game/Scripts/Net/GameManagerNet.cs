@@ -171,8 +171,9 @@ namespace Stealth.Net
             NetSync.SetList(m_Stash, ref m_PushedStash, m_Game.Stash.Version, m_Game.Stash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_ExitStash, ref m_PushedExitStash, m_Game.ExitStash.Version, m_Game.ExitStash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_Cargo, ref m_PushedCargo, m_Game.Cargo.Version, m_Game.Cargo.Items, c => c.Pack());
-            NetSync.Set(m_ShredStart, m_Game.Shredder.Started);
-            NetSync.SetList(m_Shred, ref m_PushedShred, m_Game.Shredder.Version, m_Game.Shredder.Pile, Stealth.Vehicles.Shredder.Pack);
+            double shredBase = m_Game.Shredder.Started; // the starts go as offsets from the heap's earliest
+            NetSync.Set(m_ShredStart, shredBase);
+            NetSync.SetList(m_Shred, ref m_PushedShred, m_Game.Shredder.Version, m_Game.Shredder.Pile, p => Stealth.Vehicles.Shredder.Pack(p, shredBase));
             NetSync.Set(m_DepartAt, m_Game.DepartAt);
             NetSync.Set(m_DriveFrom, m_Game.DriveFrom);
             NetSync.Set(m_DriveBranch, (sbyte)Mathf.Clamp(m_Game.DriveBranch, -1, 127));

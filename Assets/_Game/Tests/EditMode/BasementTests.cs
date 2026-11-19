@@ -259,6 +259,27 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void OverTheTopTheClimberMovesOutNeverJumps()
+        {
+            var exit = new Vector3(2f, 5f, 0f);
+            var feet = new Vector3(0f, 4.7f, 0f);
+            float dt = 0.02f, longest = 0f;
+            int frames = 0;
+            for (; frames < 500; frames++)
+            {
+                var step = LadderMath.ClimbOut(feet, exit, dt);
+                if (step == Vector3.zero) break;
+                Assert.IsTrue(step.y <= 0f || new Vector2(step.x, step.z).magnitude < 1e-6f, "first up, then across: never through the rim");
+                longest = Mathf.Max(longest, step.magnitude);
+                feet += step;
+            }
+            Assert.Less(frames, 500, "it gets out");
+            Assert.Less(new Vector2(feet.x - exit.x, feet.z - exit.z).magnitude, 0.06f, "onto the floor by the shaft");
+            Assert.GreaterOrEqual(feet.y, exit.y, "over the floor, not in it");
+            Assert.LessOrEqual(longest, LadderMath.Speed * 1.2f * dt + 1e-5f, "a climb, not a teleport");
+        }
+
+        [Test]
         public void TheSewerAfterAHouseShowsTheSameAlcoveShut()
         {
             var start = SewerPlan.Make(5, -1);

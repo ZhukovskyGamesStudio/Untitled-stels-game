@@ -206,6 +206,30 @@ namespace Stealth.Items
             return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
         }
 
+        /// <summary>
+        /// How a thing sits in the hand (in the view and in front of a teammate): <see cref="Length"/> its longest side there,
+        /// metres; <see cref="Forward"/> which end of its model's X (as imported: Blender's X is mirrored) points ahead — +1,
+        /// −1, or 0 for a compact thing held in the palm; <see cref="Grip"/> where along it the fist closes, a share of its
+        /// length from the held end; <see cref="Roll"/> degrees about the way it points (a key's flat face to the side).
+        /// </summary>
+        public readonly struct HeldPose
+        {
+            public readonly float Length, Forward, Grip, Roll;
+            public HeldPose(float length, float forward, float grip, float roll) { Length = length; Forward = forward; Grip = grip; Roll = roll; }
+            public bool Compact => Forward == 0f;
+        }
+
+        /// <summary>The way each thing is held: keys bow in the fist, blade ahead; the screwdriver by its handle, tip ahead; the rest in the palm.</summary>
+        public static HeldPose HeldPoseOf(int shape)
+        {
+            if (shape == Key) return new HeldPose(0.13f, 1f, 0.12f, 75f);        // blade at +X (the bow at −X)
+            if (shape == CageKey) return new HeldPose(0.2f, 1f, 0.1f, 75f);      // the bit at +X, the trefoil bow at −X
+            if (shape == Screwdriver) return new HeldPose(0.23f, -1f, 0.24f, 0f); // the handle at +X, the blade at −X
+            if (shape == Battery) return new HeldPose(0.07f, 0f, 0f, 0f);
+            if (shape == Stun) return new HeldPose(0.13f, 0f, 0f, 0f);
+            return new HeldPose(0.12f, 0f, 0f, 0f);
+        }
+
         /// <summary>A drawer (0.8 m wide inside) holds it lying flat.</summary>
         public static bool FitsInDrawer(int shape) => ModelSize(shape).x <= 0.8f;
 

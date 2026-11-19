@@ -27,7 +27,8 @@ namespace Stealth.Game
             Log($"start: phase {gm.Phase}, sewer {sewer != null}, car {car != null}, ways {string.Join(",", gm.RouteOptions)}, fuel {gm.Collected}/{gm.Quota}, gate open {gm.GateOpen}");
             if (gm.Phase != RunPhase.Sewer || sewer == null || car == null) { Log("FAIL: the run does not start in the sewer at the car"); yield break; }
             var plan = sewer.Plan;
-            Log($"plan: {plan.Segments.Count} segments ({string.Join("", plan.Segments.Select(s => s.Variant))}), hub at {plan.HubX:0}, lamps {plan.LampColor}");
+            Log($"plan: {plan.Segments.Count} segments ({string.Join("", plan.Segments.Select(s => s.Variant))}), hub at {plan.HubX:0}, lamps {plan.LampColor}, " +
+                $"hall {plan.Hall.Form} of {plan.Hall.Cells.Count} cells, height {plan.Hall.Height}, {plan.Mouths.Length} mouths");
 
             // the car from the side and from behind
             var c = car.transform.position;
@@ -179,7 +180,7 @@ namespace Stealth.Game
             while (Time.time - t0 < 25f && sewer.BranchAt(car.transform.position) != tunnel)
             {
                 // aim at the mouth first (lined up), then into the tunnel
-                var aim = (car.transform.position - mouth.position).x < -6f ? mouth.position - mouth.right * 4f : goal;
+                var aim = Vector3.Dot(car.transform.position - mouth.position, mouth.right) < -6f ? mouth.position - mouth.right * 4f : goal;
                 var to = Flat(aim - car.transform.position);
                 float angle = Vector3.SignedAngle(Flat(car.transform.forward), to, Vector3.up);
                 DevFlags.CarInput = new CarInput { Throttle = 0.7f, Steer = Mathf.Clamp(angle / 25f, -1f, 1f) };
