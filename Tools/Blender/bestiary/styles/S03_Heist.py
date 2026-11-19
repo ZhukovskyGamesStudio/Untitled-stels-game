@@ -817,7 +817,7 @@ def toilet_stall(L):
     for x in (-.51, .51):
         P.add("Body", L.slab((.03, 1.5, 1.99), (x, 0, .995)))
     P.add("Body", L.slab((1.05, .03, 1.99), (0, .76, .995)))
-    P.add("Body", L.slab((1.05, .05, .08), (0, -.72, 1.95)))
+    P.add("Body", L.slab((1.03, .05, .075), (0, -.72, 1.9475)))   # the rail ends inside the panels, under their tops (shared planes flickered)
     P.add("Accent", L.slab((.4, .5, .3), (0, .5, .45)) + L.slab((.2, .04, .14), (0, .74, .95)))
     return P
 

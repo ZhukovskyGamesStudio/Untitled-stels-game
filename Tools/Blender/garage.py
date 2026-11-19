@@ -161,9 +161,11 @@ def sedan(p, hood_open=False, wheels=True):
         for hy in (-0.55, 0.42):
             p.add("Trim", s.rbox((0.02, 0.14, 0.025), (sx * 0.895, hy, 0.78), r=0.008))
     # lamps: headlights glow, tail lights in the dark trim
+    # (out of the body's skin: the front face is at yf + 0.03 at the lamps' height, the back at yr - 0.03 — they sat 10 and
+    # 5 cm inside it, no car showed its lights)
     for sx in (-1, 1):
-        p.add("Eye", s.rbox((0.34, 0.06, 0.1), (sx * 0.6, yf + 0.13, 0.69), r=0.03))
-        p.add("Accent", s.rbox((0.32, 0.05, 0.1), (sx * 0.62, yr - 0.07, 0.75), r=0.02))
+        p.add("Eye", s.rbox((0.34, 0.06, 0.1), (sx * 0.6, yf + 0.035, 0.69), r=0.03))
+        p.add("Accent", s.rbox((0.32, 0.05, 0.1), (sx * 0.62, yr - 0.015, 0.75), r=0.02))
     if wheels:
         for wy in (-WHEELBASE / 2, WHEELBASE / 2):
             for sx in (-1, 1):

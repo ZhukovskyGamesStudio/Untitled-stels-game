@@ -171,6 +171,9 @@ namespace Stealth.EditorTools
             Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
             Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
             Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            Mat(props, "DoorGlass", new Color(0.58f, 0.68f, 0.72f), smoothness: 0.9f);      // satin glass of the sliding doors (opaque)
+            Mat(props, "DoorFrameAlu", new Color(0.7f, 0.72f, 0.74f), smoothness: 0.6f);    // their anodised frames
+            Mat(props, "DoorSeal", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.2f);       // the rubber on the meeting edge
             Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
             Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
             Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors

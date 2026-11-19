@@ -495,7 +495,7 @@ namespace Stealth.EditorTools
         /// Sliding door: two panels and a blocker collider (enabled only while closed). Ignored by the navmesh:
         /// robots plan through doorways and the door opens when they arrive.
         /// </summary>
-        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "Door");
+        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "DoorFrameAlu", accent: "DoorSeal");
 
         /// <summary>
         /// A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.
@@ -505,6 +505,7 @@ namespace Stealth.EditorTools
         /// </summary>
         static GameObject BuildAutoDoor(string name, float width, string paint, string leafModel = "door_leaf", string accent = null, bool sign = false)
         {
+            bool glass = name == "AutoDoor"; // (the vehicle door keeps the leaf's panes in its steel)
             var root = new GameObject(name);
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
             float h = LevelMetrics.DoorHeight - 0.02f, w = width;
@@ -522,7 +523,11 @@ namespace Stealth.EditorTools
                 leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
                 leaf.transform.localScale = new Vector3(stretch, 1f, 1f);
                 Paint(leaf, paint, accent ?? paint, paint);
-                foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
+                foreach (var r in leaf.GetComponentsInChildren<Renderer>())
+                {
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    if (glass && r.gameObject.name.StartsWith("Glass")) r.sharedMaterial = M("DoorGlass"); // the sliding glass door's satin panes
+                }
                 return leaf.transform;
             }
             door.PanelA = Leaf("PanelA", leafModel, -w / 4f, 0f);

@@ -534,7 +534,10 @@ def model_tv_stand():
 
 def model_reception_desk():
     """Front counter 2.4 x 0.8: high front panel towards the visitor (-Y), work top behind."""
-    merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.08, 0.8, 1.1), (-1.16, 0, 0.55)), box((0.08, 0.8, 1.1), (1.16, 0, 0.55))])
+    # the sides start inside the front panel, a hair within its outline: flush with it, their faces met its in one plane
+    # (the styles' bevels made them flicker)
+    merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.078, 0.73, 1.096), (-1.159, 0.035, 0.548)),
+                   box((0.078, 0.73, 1.096), (1.159, 0.035, 0.548))])
     merge("Accent", [box((2.5, 0.3, 0.04), (0, -0.33, 1.12)), box((2.3, 0.7, 0.04), (0, 0.02, 0.74))])
     merge("Eye", [box((0.62, 0.05, 0.4), (0.4, 0.15, 1.0)), box((0.07, 0.07, 0.2), (0.4, 0.2, 0.84))])
     raise_top(0.76, DESK_TOP_NEW)  # the work top at the office desk's height

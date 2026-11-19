@@ -95,7 +95,8 @@ def box(size, loc, rot_z=0.0):
         # neglect: every part sits a little askew (deterministic by its position)
         h = math.sin(loc[0] * 12.9898 + loc[1] * 78.233 + loc[2] * 37.719) * 43758.5453
         h -= math.floor(h)
-        tilt = (h - 0.5) * math.radians(2.4) if max(size) < 1.2 else 0.0
+        # (not a loot piece: its cells and the bridges between them, tilted each its own way, cut into each other and flickered)
+        tilt = (h - 0.5) * math.radians(2.4) if max(size) < 1.2 and not BUILDING_ITEMS[0] else 0.0
         bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(tilt, 3, "X" if h > 0.5 else "Y"), verts=bm.verts)
     if rot_z:
         bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(rot_z, 3, "Z"), verts=bm.verts)
@@ -195,6 +196,8 @@ def export(filename):
     g.clear_scene()
 
 
+BUILDING_ITEMS = [False]  # the loot pieces are being built (no askew parts)
+
 for mod in (g, r):
     mod.box, mod.cylinder, mod.sphere, mod.merge, mod.export = box, cylinder, sphere, merge, export
 
@@ -205,6 +208,8 @@ ROBOT_FUNCS = [r.drone, r.spider, r.vacuum, r.turret, r.thumper, r.hound, r.sort
 for family in FAMILIES:
     g.clear_scene()
     for fn in MODEL_FUNCS + ROBOT_FUNCS:
+        BUILDING_ITEMS[0] = fn.__name__ == "model_items"
         fn()
+    BUILDING_ITEMS[0] = False
     print("FAMILY DONE", family)
 print("DONE")
