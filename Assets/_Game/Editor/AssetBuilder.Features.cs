@@ -73,7 +73,7 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("VaultConsole");
             // The lamp over the panel: red until solved, then green.
-            Cube(root.transform, "LampBase", new Vector3(0f, 0.36f, 0.02f), new Vector3(0.2f, 0.08f, 0.04f), M("Metal"), false);
+            ChamferBox(root.transform, "LampBase", new Vector3(0f, 0.36f, 0.02f), new Vector3(0.2f, 0.08f, 0.04f), M("Metal"));
             var screen = Cube(root.transform, "EyeScreen", new Vector3(0f, 0.36f, 0.045f), new Vector3(0.16f, 0.05f, 0.012f), M("LockLamp"), false);
             var console = root.AddComponent<VaultConsole>();
             console.Screen = screen.GetComponent<Renderer>();
@@ -283,16 +283,16 @@ namespace Stealth.EditorTools
             float depth = wall + 2f * proud;
             foreach (float side in new[] { -1f, 1f })
             {
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), steel, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), steel);
                 foreach (float face in new[] { -1f, 1f })
-                    Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
-                        new Vector3(casing, height + casing - lining, casingDepth), steel, false);
+                    ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
+                        new Vector3(casing, height + casing - lining, casingDepth), steel);
             }
-            Cube(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), steel, false);
+            ChamferBox(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), steel);
             foreach (float face in new[] { -1f, 1f })
-                Cube(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
-                    new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
-            Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("PropAccent"), false);
+                ChamferBox(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
+                    new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel);
+            ChamferBox(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("PropAccent"));
             // the leaves: hinged at the inner edges of the jambs, against the outer face, their glass and handles as modelled
             // (0.9 x 2.28 x 0.09) scaled to the opening; turned so the push bar faces in and the pull handle out at the meeting stiles
             float leafW = (clear - 2f * lining) / 2f, leafH = height - lining - 0.01f, hingeZ = wall / 2f + proud - 0.05f;

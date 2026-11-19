@@ -42,11 +42,11 @@ namespace Stealth.EditorTools
             var lightSwitch = Prefab($"{LevelPrefabs}/LightSwitch.prefab", () =>
             {
                 var go = new GameObject("LightSwitch");
-                Cube(go.transform, "Plate", new Vector3(0f, 0f, 0.006f), new Vector3(0.085f, 0.125f, 0.012f), util[(int)UtilitySlot.Plate], collider: false);
+                ChamferBox(go.transform, "Plate", new Vector3(0f, 0f, 0.006f), new Vector3(0.085f, 0.125f, 0.012f), util[(int)UtilitySlot.Plate], 0.003f);
                 var rocker = new GameObject("Rocker").transform;
                 rocker.SetParent(go.transform, false);
                 rocker.localPosition = new Vector3(0f, 0f, 0.012f);
-                Cube(rocker, "Key", new Vector3(0f, 0f, 0.005f), new Vector3(0.036f, 0.064f, 0.01f), util[(int)UtilitySlot.Plate], collider: false);
+                ChamferBox(rocker, "Key", new Vector3(0f, 0f, 0.005f), new Vector3(0.036f, 0.064f, 0.01f), util[(int)UtilitySlot.Plate], 0.0025f);
                 var glow = Cube(rocker, "Led", new Vector3(0f, -0.022f, 0.0105f), new Vector3(0.008f, 0.008f, 0.002f), led, collider: false);
                 var s = go.AddComponent<LightSwitch>();
                 s.Rocker = rocker;

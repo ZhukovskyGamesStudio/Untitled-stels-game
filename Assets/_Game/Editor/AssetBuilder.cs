@@ -205,6 +205,103 @@ namespace Stealth.EditorTools
             return go;
         }
 
+        /// <summary>
+        /// Like <see cref="Cube"/> without a collider, but a box with its edges chamfered (<paramref name="chamfer"/> m): door
+        /// linings, casings and lamp housings read as made things, not as the raw cube's knife edges. The mesh is built
+        /// here, once per size, and saved under Art/Models/Generated (no runtime geometry).
+        /// </summary>
+        static GameObject ChamferBox(Transform parent, string name, Vector3 center, Vector3 size, Material mat, float chamfer = 0.006f)
+        {
+            var go = new GameObject(name);
+            if (parent != null) go.transform.SetParent(parent, false);
+            go.transform.localPosition = center;
+            go.AddComponent<MeshFilter>().sharedMesh = ChamferMesh(size, Mathf.Min(chamfer, Mathf.Min(size.x, Mathf.Min(size.y, size.z)) * 0.3f));
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return go;
+        }
+
+        const string GeneratedDir = ModelsDir + "/Generated";
+
+        /// <summary>A chamfered box mesh of this size (flat faces, chamfer strips and corner triangles; UVs in metres), cached as an asset.</summary>
+        static Mesh ChamferMesh(Vector3 size, float c)
+        {
+            string key = $"box_{size.x:0.###}x{size.y:0.###}x{size.z:0.###}_{c:0.####}".Replace(',', '.');
+            string path = $"{GeneratedDir}/{key}.asset";
+            var have = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (have != null && !s_Force) return have;
+            Vector3 h = size / 2f;
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            void Poly(Vector3 normal, params Vector3[] p)
+            {
+                int b = verts.Count;
+                verts.AddRange(p);
+                // fan, wound so the face looks along its normal
+                // Unity's face normal is Cross(p1 − p0, p2 − p0) (left-handed, clockwise front): reverse when it points inwards
+                bool flip = Vector3.Dot(Vector3.Cross(p[1] - p[0], p[2] - p[0]), normal) < 0f;
+                for (int i = 1; i + 1 < p.Length; i++)
+                {
+                    if (flip) { tris.Add(b); tris.Add(b + i + 1); tris.Add(b + i); }
+                    else { tris.Add(b); tris.Add(b + i); tris.Add(b + i + 1); }
+                }
+            }
+            Vector3 V(int a, float va, int b, float vb, int k, float vk)
+            {
+                var v = Vector3.zero;
+                v[a] = va; v[b] = vb; v[k] = vk;
+                return v;
+            }
+            for (int a = 0; a < 3; a++)
+            {
+                int b = (a + 1) % 3, k = (a + 2) % 3;
+                foreach (float sa in new[] { -1f, 1f })
+                {
+                    // the face
+                    var n = Vector3.zero; n[a] = sa;
+                    Poly(n, V(a, sa * h[a], b, -(h[b] - c), k, -(h[k] - c)), V(a, sa * h[a], b, h[b] - c, k, -(h[k] - c)),
+                        V(a, sa * h[a], b, h[b] - c, k, h[k] - c), V(a, sa * h[a], b, -(h[b] - c), k, h[k] - c));
+                    // the chamfer strips between this face and the next axis's faces (each edge once)
+                    foreach (float sb in new[] { -1f, 1f })
+                    {
+                        var en = Vector3.zero; en[a] = sa; en[b] = sb;
+                        Poly(en.normalized, V(a, sa * h[a], b, sb * (h[b] - c), k, -(h[k] - c)), V(a, sa * (h[a] - c), b, sb * h[b], k, -(h[k] - c)),
+                            V(a, sa * (h[a] - c), b, sb * h[b], k, h[k] - c), V(a, sa * h[a], b, sb * (h[b] - c), k, h[k] - c));
+                    }
+                }
+            }
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sy in new[] { -1f, 1f })
+                    foreach (float sz in new[] { -1f, 1f })
+                        Poly(new Vector3(sx, sy, sz).normalized, new Vector3(sx * h.x, sy * (h.y - c), sz * (h.z - c)),
+                            new Vector3(sx * (h.x - c), sy * h.y, sz * (h.z - c)), new Vector3(sx * (h.x - c), sy * (h.y - c), sz * h.z));
+            var uvs = new List<Vector2>(new Vector2[verts.Count]); // box-projected, in metres, by each vertex's normal (below)
+            var mesh = have != null ? have : new Mesh();
+            mesh.Clear();
+            mesh.name = key;
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            var normals = mesh.normals;
+            for (int i = 0; i < verts.Count; i++)
+            {
+                var an = new Vector3(Mathf.Abs(normals[i].x), Mathf.Abs(normals[i].y), Mathf.Abs(normals[i].z));
+                var v = verts[i] + h;
+                uvs[i] = an.x >= an.y && an.x >= an.z ? new Vector2(v.z, v.y) : an.y >= an.z ? new Vector2(v.x, v.z) : new Vector2(v.x, v.y);
+            }
+            mesh.SetUVs(0, uvs);
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
+            if (have == null)
+            {
+                EnsureFolder(GeneratedDir);
+                AssetDatabase.CreateAsset(mesh, path);
+            }
+            else EditorUtility.SetDirty(mesh);
+            return mesh;
+        }
+
         static void SetLayerRecursive(GameObject go, int layer)
         {
             foreach (var t in go.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;

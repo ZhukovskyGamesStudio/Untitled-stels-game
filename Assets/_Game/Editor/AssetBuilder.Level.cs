@@ -466,9 +466,9 @@ namespace Stealth.EditorTools
             float w = LevelMetrics.ClearWidth(LevelMetrics.SqueezeWidth), h = LevelMetrics.DoorHeight;
             foreach (float z in new[] { LevelMetrics.WallThickness / 2f + 0.02f, -(LevelMetrics.WallThickness / 2f + 0.02f) })
             {
-                Cube(root.transform, "Top", new Vector3(0, h, z), new Vector3(w + 0.12f, 0.06f, 0.04f), M("DoorFrame"), false);
-                Cube(root.transform, "Left", new Vector3(-w / 2f - 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
-                Cube(root.transform, "Right", new Vector3(w / 2f + 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
+                ChamferBox(root.transform, "Top", new Vector3(0, h, z), new Vector3(w + 0.12f, 0.06f, 0.04f), M("DoorFrame"));
+                ChamferBox(root.transform, "Left", new Vector3(-w / 2f - 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"));
+                ChamferBox(root.transform, "Right", new Vector3(w / 2f + 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"));
             }
             var block = root.AddComponent<NavMeshModifierVolume>();
             block.center = new Vector3(0f, 1.2f, 0f);
@@ -523,8 +523,8 @@ namespace Stealth.EditorTools
             if (!sign)
                 door.LockLamps = new Renderer[]
                 {
-                    Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-                    Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                    ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
+                    ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
                 };
             else
             {
@@ -533,7 +533,7 @@ namespace Stealth.EditorTools
                 foreach (float side in new[] { 1f, -1f })
                 {
                     // the sign: a steel housing on the wall over the door, its whole face lit
-                    Cube(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"), false);
+                    ChamferBox(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"));
                     lamps.Add(Cube(root.transform, side > 0 ? "SignLampA" : "SignLampB", new Vector3(0f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.96f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
                     // a band across each leaf, on the leaf (it slides with it), in front of its frame
                     foreach (var panel in new[] { door.PanelA, door.PanelB })
@@ -547,7 +547,7 @@ namespace Stealth.EditorTools
             {
                 var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(0f, 1.2f, side * 0.032f)).transform;
                 holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                ChamferBox(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), 0.004f);
                 var lockModel = Model("padlock");
                 lockModel.transform.SetParent(holder, false);
                 lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
@@ -605,19 +605,19 @@ namespace Stealth.EditorTools
             var fm = M(frame);
             float depth = wall + 0.01f;
             foreach (float side in new[] { -1f, 1f })
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), fm, false);
-            Cube(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), fm, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), fm);
+            ChamferBox(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), fm);
             if (exterior)
             {
                 const float casing = 0.12f, casingDepth = 0.03f;
                 foreach (float side in new[] { -1f, 1f })
                     foreach (float face in new[] { -1f, 1f })
-                        Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
-                            new Vector3(casing, height + casing - lining, casingDepth), fm, false);
+                        ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
+                            new Vector3(casing, height + casing - lining, casingDepth), fm);
                 foreach (float face in new[] { -1f, 1f })
-                    Cube(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
-                        new Vector3(clear + 2f * (casing - lining), casing, casingDepth), fm, false);
-                Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("Metal"), false);
+                    ChamferBox(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
+                        new Vector3(clear + 2f * (casing - lining), casing, casingDepth), fm);
+                ChamferBox(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("Metal"));
             }
             foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
 
@@ -677,7 +677,7 @@ namespace Stealth.EditorTools
                             break;
                         case DoorKind.ClinicSwing:
                             foreach (float f in new[] { faceF + 0.003f, faceB - 0.003f })
-                                Cube(hinge, "PushPlate", new Vector3(w - 0.12f, 1.25f, f), new Vector3(0.1f, 0.3f, 0.006f), M("Metal"), false);
+                                ChamferBox(hinge, "PushPlate", new Vector3(w - 0.12f, 1.25f, f), new Vector3(0.1f, 0.3f, 0.006f), M("Metal"), 0.002f);
                             break;
                     }
                 }
@@ -740,12 +740,12 @@ namespace Stealth.EditorTools
             float face = wall / 2f;
             foreach (float side in new[] { -1f, 1f })
             {
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), h / 2f, 0f), new Vector3(lining, h, wall + 0.01f), steel, false);
-                Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (h + casing - lining) / 2f, face + casingDepth / 2f),
-                    new Vector3(casing, h + casing - lining, casingDepth), steel, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), h / 2f, 0f), new Vector3(lining, h, wall + 0.01f), steel);
+                ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (h + casing - lining) / 2f, face + casingDepth / 2f),
+                    new Vector3(casing, h + casing - lining, casingDepth), steel);
             }
-            Cube(root.transform, "Head", new Vector3(0f, h - lining / 2f, 0f), new Vector3(clear, lining, wall + 0.01f), steel, false);
-            Cube(root.transform, "CasingHead", new Vector3(0f, h - lining + casing / 2f, face + casingDepth / 2f), new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
+            ChamferBox(root.transform, "Head", new Vector3(0f, h - lining / 2f, 0f), new Vector3(clear, lining, wall + 0.01f), steel);
+            ChamferBox(root.transform, "CasingHead", new Vector3(0f, h - lining + casing / 2f, face + casingDepth / 2f), new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel);
             // the indicator over the portal: a housing, the lamp in the middle and an arrow lamp either side
             float iy = h + casing + 0.12f;
             // (Tools/Blender/lift_parts.py lift_indicator: a bevelled housing with a dark glass face, real arrows)
@@ -936,15 +936,15 @@ namespace Stealth.EditorTools
         {
             door.LockLamps = new Renderer[]
             {
-                Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-                Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
+                ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
             };
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
             door.Padlocks = new[] { 1f, -1f }.Select(side =>
             {
                 var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(seam, 1.2f, side > 0 ? front : back)).transform;
                 holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                ChamferBox(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), 0.004f);
                 var lockModel = Model("padlock");
                 lockModel.transform.SetParent(holder, false);
                 lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
