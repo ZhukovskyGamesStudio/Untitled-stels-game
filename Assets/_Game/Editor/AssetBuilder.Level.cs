@@ -115,7 +115,7 @@ namespace Stealth.EditorTools
             var pLockers = Prefab(p + "Lockers.prefab", () =>
             {
                 var go = PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent");
-                go.AddComponent<Stealth.Items.Storage>(); // the doors swing open (BodyDoor0..2)
+                go.AddComponent<Stealth.Items.Storage>().Individual = true; // the doors swing open (BodyDoor0..2)
                 return go;
             });
             var pPallet = Prefab(p + "Pallet.prefab", () => PropObject("Pallet", "pallet", "Cardboard", "Wood", "Wood"));

@@ -17,6 +17,9 @@ namespace Stealth.Items
     {
         public static readonly List<Storage> All = new();
 
+        [Tooltip("Every door is a compartment of its own (staff lockers): all hinged on the same side, no pairs opening from the middle")]
+        public bool Individual;
+
 
         /// <summary>Index in <see cref="LevelLayout.Props"/>: the same on every peer, names the furniture in requests.</summary>
         public int Index { get; private set; } = -1;
@@ -59,6 +62,13 @@ namespace Stealth.Items
                 found[k] = t;
                 Drawers = drawer;
             }
+            // a part of another material that belongs to a door or drawer (TrimDoor2: the mirror on the bathroom cabinet's door)
+            // rides on it: under it in the hierarchy, so it moves with it
+            foreach (var t in GetComponentsInChildren<Transform>(true))
+            {
+                if (!Follows(t.name, Drawers ? "Drawer" : "Door", out int k) || !found.TryGetValue(k, out var part) || t == part || t.IsChildOf(part)) continue;
+                t.SetParent(part, true);
+            }
             foreach (var t in found.Values) m_Parts.Add(new Part { T = t, Colliders = t.GetComponentsInChildren<Collider>(true) });
         }
 
@@ -80,7 +90,7 @@ namespace Stealth.Items
                 p.ClosedPos = p.T.position;
                 p.ClosedRot = p.T.rotation;
                 p.Closed = closed[i];
-                p.RightHinge = !Drawers && rightHinged[i];
+                p.RightHinge = !Drawers && !Individual && rightHinged[i];
                 p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward, p.RightHinge);
                 p.Tween = default;
                 p.Posed = false;
@@ -154,6 +164,15 @@ namespace Stealth.Items
         /// <summary>An item of this shape fits behind this part (a shovel stands only in a tall compartment).</summary>
         public bool Fits(int part, int shape) =>
             part >= 0 && part < m_Parts.Count && StorageMath.Fits(ItemCatalog.ModelSize(shape), m_Parts[part].Closed, transform.forward, m_Depth, Drawers);
+
+        /// <summary>A part named <c>&lt;Role&gt;Door{k}</c> (not the door itself, <c>BodyDoor{k}</c>) belongs to door k.</summary>
+        public static bool Follows(string name, string what, out int k)
+        {
+            k = -1;
+            int at = name.IndexOf(what, System.StringComparison.Ordinal);
+            if (at <= 0 || name.StartsWith("Body" + what)) return false;
+            return int.TryParse(name.Substring(at + what.Length), out k);
+        }
 
         static Bounds WorldBounds(Transform t)
         {

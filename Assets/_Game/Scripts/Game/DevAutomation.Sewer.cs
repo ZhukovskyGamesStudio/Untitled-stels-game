@@ -195,18 +195,15 @@ namespace Stealth.Game
             yield return Shot("05b_before_departure"); // the last frame of the sewer, from the driver's seat
             while (gm.DriveUntil <= 0 && gm.Phase == RunPhase.Sewer && Time.time - tw < 10f) yield return null;
             DevFlags.CarInput = null;
-            // the drive scene glides out of the cab to the side view: frames along the way
-            while (DriveScene.Active == null && Time.time - tw < 12f) yield return null;
-            var drive = DriveScene.Active;
+            // the drive on: the real car down the tunnel, then into the basement's approach unseen (Level.DrivePath)
             float g0 = Time.time;
-            yield return Shot("06a_glide_start");
-            foreach (float at in new[] { 0.6f, 1.3f, 2.0f, drive != null ? drive.GlideTime + 0.4f : 3f })
+            foreach (float at in new[] { 1f, 4f, 8f })
             {
                 while (Time.time - g0 < at) yield return null;
-                Log($"glide at {at:0.0} s: {(drive != null ? drive.Glide : -1f):0.00}, fov {(drive != null ? drive.Camera.fieldOfView : 0f):0}");
-                yield return Shot($"06_glide_{Mathf.RoundToInt(at * 10f):00}"); // tenths of a second: no locale comma in the name
+                bool driving = gm.Driving(out var pose, out float speed, out bool basement);
+                Log($"drive at {at:0} s: driving {driving}, {speed:0.0} m/s, in the basement {basement}, at {pose.position}");
+                yield return Shot($"06_drive_{Mathf.RoundToInt(at):00}");
             }
-            Log($"drive scene: until {gm.DriveUntil - Session.ServerTime:0.0} s, shown {DriveScene.Active != null}");
             tw = Time.time;
             while (gm.Phase != RunPhase.Playing && Time.time - tw < 15f) yield return null;
             yield return new WaitForSeconds(2f);

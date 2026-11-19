@@ -378,8 +378,23 @@ namespace Stealth.Level
             // the way the car came by: seen, never walked or driven (the invisible wall across the tunnel), then a cap far in the dark
             var back = Put(kit.BackWall, "BasementBackWall", Vector3.zero);
             if (back != null) back.transform.localScale = new Vector3(1f, 0.75f, 1f); // up to the vault (4.5 m), not through the house's floor
-            for (int i = 1; i <= Basement.BackSegments; i++) Put(Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
-            Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
+            // (in the drive's pattern, DrivePath: the car arrives down this way from the endless tunnel, which carries on past
+            // the cap while it arrives — the cap is hidden then)
+            var pattern = kit.Tunnel != null && kit.Tunnel.Segments != null && kit.Tunnel.Segments.Length > 0 ? kit.Tunnel : null;
+            for (int i = 1; i <= Basement.BackSegments; i++)
+            {
+                Put(pattern != null ? pattern.Segments[DrivePath.VariantOf(-i) % pattern.Segments.Length] : Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
+                int side = DrivePath.LampSideOf(-i);
+                var lamp = Put(kit.Lamp, $"BasementBackLamp{i}", new Vector3(-i * seg + seg / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) light.color = DriveTunnel.LampColor;
+            }
+            var cap = Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
+            if (pattern != null)
+            {
+                var approach = Put(pattern.gameObject, "BasementApproach", Vector3.zero).GetComponent<DriveTunnel>();
+                approach.To = -Basement.BackSegments - 1;
+                approach.HideWhileFollowing = cap;
+            }
             // the car's stretch; its last segment has the alcove with the shaft and the ladder (its lid from below is the sewer's: here the real one is in the floor)
             for (int i = 0; i < Basement.CarSegments; i++)
             {
@@ -414,8 +429,6 @@ namespace Stealth.Level
             Lamp("BasementLamp", seg * 0.5f, 1, 1.5f, 12f);
             Lamp("BasementLamp", seg * 1.5f, -1, 1.5f, 12f);
             Lamp("BasementLamp", Basement.AlcoveX, -1, 1.5f, 12f);
-            Lamp("BasementLamp", -seg * 0.5f, 1, 0.6f, 11f);
-            Lamp("BasementLamp", -seg * 2.5f, -1, 0.35f, 10f);
             // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
             var shaft = m_Layout.HatchPosition;
             var path = Basement.ClimbPath(frame, shaft, m_Layout.ShaftExit);
@@ -958,6 +971,39 @@ namespace Stealth.Level
                     if (!hole) list.Add(p);
                 }
             if (list.Count == 0) list.Add(new Vector2(r.Center.x, r.Center.z));
+            // a duct grate that found no cell clear of the lamps (a narrow room): the lamp moves aside along the room
+            var grates = new List<Vector2Int>();
+            foreach (var net in l.Vents)
+                if (net.Floor == r.Floor + r.Levels - 1)
+                    foreach (var g in net.Grates)
+                        if (g.Room == r.Id) grates.Add(g.Cell);
+            for (int i = 0; i < list.Count && grates.Count > 0; i++)
+            {
+                bool Clear(Vector2 p)
+                {
+                    foreach (var c in grates) if (VentPlan.ClashesLamp(c, new List<Vector2> { p })) return false;
+                    return true;
+                }
+                if (Clear(list[i])) continue;
+                for (int s = 1; s <= 12; s++)
+                {
+                    float step = (s + 1) / 2 * 0.25f * (s % 2 == 0 ? -1f : 1f);
+                    bool moved = false;
+                    foreach (var dir in new[] { Vector2.right, Vector2.up, new Vector2(1f, 1f), new Vector2(1f, -1f) })
+                    {
+                        var p = list[i] + dir * step;
+                        var p3 = new Vector3(p.x, LevelLayout.FloorY(r.Floor), p.y);
+                        bool inside = l.Plan.RoomAt(p3) == r;
+                        foreach (var (cx, cz) in new[] { (1f, 1f), (1f, -1f), (-1f, 1f), (-1f, -1f) })
+                            inside &= l.Plan.RoomAt(p3 + new Vector3(cx * VentPlan.LampHalf, 0f, cz * VentPlan.LampHalf)) == r;
+                        if (!Clear(p) || !inside) continue;
+                        list[i] = p;
+                        moved = true;
+                        break;
+                    }
+                    if (moved) break;
+                }
+            }
             return list;
         }
 
@@ -1033,6 +1079,8 @@ namespace Stealth.Level
                 city.Boxes.Add(box);
                 city.Ground.Add(box.Bounds);
             }
+            // the shaft down to the basement goes through the asphalt under the block
+            CityPlan.CutHole(city, new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
             // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
             var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
             foreach (var b in city.Ground)
@@ -1119,6 +1167,14 @@ namespace Stealth.Level
                     var inside = HousePlan.CellOf(p + n * (HousePlan.Res * 0.5f));
                     var ik = plan.KindAt(w.Floor, inside.x, inside.y);
                     if (ik != CellKind.Room && ik != CellKind.Void) continue;
+                    // never behind a staircase (its flights and balusters stood across the glass)
+                    bool stair = false;
+                    foreach (float u in new[] { -LevelMetrics.WindowWidth / 2f, 0f, LevelMetrics.WindowWidth / 2f })
+                    {
+                        var q = p + d * u + n * 0.3f;
+                        stair |= l.NearStair(w.Floor, new Vector3(q.x, 0f, q.y), 0.2f);
+                    }
+                    if (stair) continue;
                     // nobody looks into a restroom, a changing room or the vault from the street
                     if (ik == CellKind.Room)
                     {

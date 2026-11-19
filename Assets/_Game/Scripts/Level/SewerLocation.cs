@@ -43,6 +43,13 @@ namespace Stealth.Level
         public GameObject Plug;
         [Tooltip("An invisible wall across the tunnel behind the car: the way back (where the car came from) is seen, not walked.")]
         public GameObject BackWall;
+        [Tooltip("Where a branch opens into the kit's wide tunnel again: the drive on to the next house (DrivePath.ReducerX).")]
+        public GameObject Reducer;
+        [Tooltip("The endless tunnel of the drive (DriveTunnel), here after the reducer, in the basement its approach.")]
+        public DriveTunnel Tunnel;
+
+        /// <summary>The sewer stands this deep under the house: the next house goes up during the drive while the sewer is still there.</summary>
+        public static readonly Vector3 Origin = new(0f, -60f, 0f);
 
         /// <summary>How many segments of the way back are seen behind the car (past the invisible wall), then the cap.</summary>
         public const int BackSegments = 7;
@@ -79,6 +86,39 @@ namespace Stealth.Level
         void OnDestroy()
         {
             if (Active == this) Active = null;
+        }
+
+        // ------------------------------------------------------------------ the drive on
+
+        int m_DriveBranch = -1;
+        DriveTunnel m_Drive;
+
+        /// <summary>A tunnel's frame (its mouth: +X leads into it), or null.</summary>
+        public Transform BranchFrame(int branch) => branch >= 0 && branch < Branches.Length ? Branches[branch].Mouth : null;
+
+        /// <summary>
+        /// The car drives on down tunnel <paramref name="branch"/> (<see cref="DrivePath"/>): its dark end goes, the reducer
+        /// opens it into the kit's tunnel, which runs on round the car at <paramref name="x"/> (along the tunnel).
+        /// </summary>
+        public void FollowDrive(int branch, float x)
+        {
+            var mouth = BranchFrame(branch);
+            if (mouth == null) return;
+            if (m_DriveBranch != branch)
+            {
+                m_DriveBranch = branch;
+                foreach (var t in mouth.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "DarkEnd") t.gameObject.SetActive(false);
+                Put(Reducer, "Reducer", new Vector3(DrivePath.ReducerX, 0f, 0f), 0f, mouth);
+                if (Tunnel != null)
+                {
+                    m_Drive = Instantiate(Tunnel, mouth);
+                    m_Drive.transform.SetLocalPositionAndRotation(new Vector3(DrivePath.TunnelFrom, 0f, 0f), Quaternion.identity);
+                    m_Drive.From = 0;
+                }
+                VisualStyles.Dress(mouth.gameObject);
+            }
+            if (m_Drive != null) m_Drive.Follow(x - DrivePath.TunnelFrom);
         }
 
         // ------------------------------------------------------------------ building

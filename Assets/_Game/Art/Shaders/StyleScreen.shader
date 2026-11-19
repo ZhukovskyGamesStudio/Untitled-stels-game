@@ -21,6 +21,7 @@ Shader "Stealth/StyleScreen"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
+            #include "GasCommon.hlsl"
 
             float _StyOn;
             float4 _StyPixel;        // x block size in pixels at 720p
@@ -85,6 +86,18 @@ Shader "Stealth/StyleScreen"
                 float normalEdge = saturate((ne - 0.35) * _StyOutline.w);
                 // Far away lines fade out (the gas and the haze swallow them).
                 return max(depthEdge, normalEdge) * saturate(1.5 - d / 40.0);
+            }
+
+            // How much of a surface the gas outside lets through (1 indoors and without a house): the ink lines are drawn
+            // after the gas pass, so a line must fade as the gas swallows what it outlines (the far city stood out in ink).
+            float GasVeil(float2 uv)
+            {
+                if (_GasOn < 0.5) return 1;
+                float raw = SampleSceneDepth(uv);
+                float3 world = ComputeWorldSpacePosition(uv, raw, UNITY_MATRIX_I_VP);
+                float3 eye = _WorldSpaceCameraPos;
+                float3 dir = normalize(world - eye);
+                return exp(-GasDepth(eye, dir, distance(world, eye), 0.5));
             }
 
             // Painterly: the flattest of the four quadrants around the pixel (Kuwahara).
@@ -192,7 +205,7 @@ Shader "Stealth/StyleScreen"
                 {
                     float2 step = max(1, _StyOutline.y * scale) * px;
                     if (block > 1.01) step = cellPx;
-                    float e = Edge(suv, step);
+                    float e = Edge(suv, step) * GasVeil(suv);
                     if (_StyGlow.x > 0)
                     {
                         float halo = Edge(suv, step * 3) * 0.45;

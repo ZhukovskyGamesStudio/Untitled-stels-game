@@ -14,7 +14,8 @@ The drivable modular kit (`kit()`, below the props; `-- <root> kit` builds only 
 the sewer, so the game assembles it at runtime along +X from pieces that join seamlessly at their ends —
 sewer_cap (closed start, faces +X) · sewer_seg_0..3 (6 m, any order) · sewer_gate_frame/door + sewer_lever ·
 sewer_hub (16 m junction hall: three openings in its end wall, one in each long wall) · sewer_branch (110 m, one
-per hub opening) · sewer_plug (bricks closing an opening that leads nowhere). Floor = a steel road grate (part Grate,
+per hub opening) · sewer_plug (bricks closing an opening that leads nowhere) · sewer_reducer (a branch opening into the wide kit
+tunnel again: the drive on to the next house). Floor = a steel road grate (part Grate,
 top at z = 0, texture Art/Textures/Sewer/grate.png = 0.5 m) over a water channel; sewer_seg_<n>_cut lacks the -Y
 wall and vault for the side camera.
 """
@@ -1586,12 +1587,27 @@ def kit_texture():
     print("KIT grate.png open fraction", round(1 - alpha.mean(), 3), path)
 
 
+def kit_reducer():
+    """sewer_reducer: where a branch tunnel (sewer_branch, 110 m) opens into the drivable kit's wide tunnel, the way on to
+    the next house: a brick wall over the kit's whole section (x 0..0.5, its face to the branch at x = 0) with the
+    branch's opening through it, a stone frame round the opening on the wide side, the road's grate and the channel
+    through the wall. The kit's segments carry on from x = 0.5 (Level.DriveTunnel)."""
+    wall = prism("Brick", kit_profile(KIT, KIT_BOTTOM - 0.05, d=0.08), 0.0, 0.5)
+    hole = prism("Hole", kit_profile(KIT_BRANCH, KIT_BED - 0.05), -0.2, 0.7)
+    subtract(wall, hole)
+    o, i = kit_profile(KIT_BRANCH, -0.02, d=0.2), kit_profile(KIT_BRANCH, -0.02)
+    part("Stone", lambda bm: rib(bm, o, i, 0.48, 0.64, KIT_BRANCH["wall"], back=False, outside=True)).name = "StoneFrame"
+    part("Concrete", lambda bm: strip(bm, channel_pts(KIT_BRANCH["half"]), 0.0, 0.5)).name = "ConcreteFloor"
+    kit_road(0.0, 0.5, KIT_BRANCH["half"], [0.0, 0.5], [-1.15, 0.0, 1.15])
+    kit_export("sewer_reducer")
+
+
 def kit():
     kit_texture()
     for v in range(4):
         for cut in (False, True):
             kit_segment(v, cut)
-    for fn in (kit_alcove, kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap):
+    for fn in (kit_alcove, kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap, kit_reducer):
         fn()
 
 

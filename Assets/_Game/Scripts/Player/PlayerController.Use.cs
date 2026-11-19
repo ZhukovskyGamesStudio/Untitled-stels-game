@@ -40,8 +40,8 @@ namespace Stealth.Player
             if (seated != m_WasSeated)
             {
                 m_WasSeated = seated;
-                // getting out beside the car — but not on arrival (the drive scene is up): the house puts us in its hatch
-                if (!seated && car != null && DriveScene.Active == null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
+                // getting out beside the car
+                if (!seated && car != null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
                 if (seated) { transform.rotation = car.transform.rotation; Motor.SetPitch(6f); } // sitting down: eyes on the road
                 m_Controller.enabled = !seated;
                 Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);

@@ -61,7 +61,7 @@ namespace Stealth.Level
                 foreach (var o in shell.Openings) PlanReveals(list, o, g, layout);
             if (g.Ceiling != CeilingKind.None && layout != null) PlanCeilings(list, layout, g.Ceiling, g);
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
-            if (layout != null) PlanRoomCeilings(list, layout, g);
+            if (layout != null) PlanRoomCeilings(list, shell, layout, g);
             if (layout != null) PlanThresholds(list, shell, layout, g);
             // (rooms with a floor of their own get it even where the style keeps the bare slab: the shop's epoxy, ShopLook)
             if (layout != null && (layout.VaultRoom >= 0 || g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
@@ -203,7 +203,7 @@ namespace Stealth.Level
         }
 
         /// <summary>Ceilings of their own (<see cref="RoomLook.Ceiling"/>): a finish just under the style's, over the whole room.</summary>
-        static void PlanRoomCeilings(List<DecorPiece> list, LevelLayout l, StyleGeometry g)
+        static void PlanRoomCeilings(List<DecorPiece> list, LevelShell shell, LevelLayout l, StyleGeometry g)
         {
             if (g.RoomLooks == null || g.RoomLooks.Length == 0) return;
             foreach (var room in l.Rooms)
@@ -211,15 +211,20 @@ namespace Stealth.Level
                 int k = CeilingLookOf(room, g);
                 if (k < 0) continue;
                 float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight - 0.014f; // (a hall's: on its top storey)
-                foreach (var r in CeilingRects(l, room))
-                    list.Add(new DecorPiece
+                // (round the duct grates' holes: a grate under a ceiling of tiles was a lid hanging from a ceiling with no way up)
+                foreach (var whole in CeilingRects(l, room))
+                    foreach (var (a, b) in CutHoles(whole.min, whole.max, shell.CeilingHoles))
                     {
-                        Kind = DecorKind.CeilingFinish, Variant = k + 1,
-                        Position = new Vector3(r.center.x, y, r.center.y),
-                        Rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward),
-                        Scale = new Vector3(r.width, r.height, 1f),
-                        Surface = new Vector4(r.width, r.height, r.xMin, r.yMin),
-                    });
+                        var r = Rect.MinMaxRect(a.x, a.y, b.x, b.y);
+                        list.Add(new DecorPiece
+                        {
+                            Kind = DecorKind.CeilingFinish, Variant = k + 1,
+                            Position = new Vector3(r.center.x, y, r.center.y),
+                            Rotation = Quaternion.LookRotation(Vector3.up, Vector3.forward),
+                            Scale = new Vector3(r.width, r.height, 1f),
+                            Surface = new Vector4(r.width, r.height, r.xMin, r.yMin),
+                        });
+                    }
             }
         }
 
@@ -636,6 +641,7 @@ namespace Stealth.Level
             {
                 if (CeilingLookOf(room, g) >= 0) continue; // a ceiling of its own: nothing hangs under it
                 var lamps = LevelBuilder.LightSpots(l, room);
+                lamps.AddRange(GratesOf(l, room)); // and of the duct grates (a tray over a grate shut the way up)
                 // a beam along z at x (or along x at z) keeps clear of the lamps it passes; shifted aside or left out
                 float? Dodge(float at, bool alongZ, Rect r)
                 {
@@ -671,6 +677,19 @@ namespace Stealth.Level
                     }
                 }
             }
+        }
+
+        /// <summary>The middles of the duct grates in a room's ceiling (on its top storey).</summary>
+        public static List<Vector2> GratesOf(LevelLayout l, PlanRoom room)
+        {
+            var list = new List<Vector2>();
+            int f = room.Floor + room.Levels - 1;
+            if (l.Vents == null) return list;
+            foreach (var net in l.Vents)
+                if (net.Floor == f)
+                    foreach (var g in net.Grates)
+                        if (g.Room == room.Id) list.Add(new Vector2(g.Position.x, g.Position.z));
+            return list;
         }
 
         /// <summary>

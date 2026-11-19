@@ -63,7 +63,9 @@ namespace Stealth.Net
         readonly List<KeyValuePair<ulong, int>> m_VoteBuffer = new();
         NetworkList<NetInventoryEntry> m_Stash, m_ExitStash;
         NetworkList<ulong> m_Cargo;
-        readonly NetworkVariable<double> m_DriveUntil = new(), m_ArriveAt = new(), m_StunnedUntil = new();
+        readonly NetworkVariable<double> m_DriveUntil = new(), m_ArriveAt = new(), m_StunnedUntil = new(), m_DepartAt = new();
+        readonly NetworkVariable<Vector4> m_DriveFrom = new();
+        readonly NetworkVariable<sbyte> m_DriveBranch = new(-1);
         readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
         /// <summary>What the team has seen of the house: [0] = the house seed, then the bits of <see cref="Stealth.Level.ExplorationMap"/>.</summary>
@@ -113,6 +115,13 @@ namespace Stealth.Net
             m_ExitStash.OnListChanged += _ => PullStash();
             m_Cargo.OnListChanged += _ => PullCargo();
             PullCargo();
+            // (the drive's start before its times: a peer never moves the car from a stale start)
+            m_DepartAt.OnValueChanged += (_, v) => m_Game.DepartAt = v;
+            m_Game.DepartAt = m_DepartAt.Value;
+            m_DriveFrom.OnValueChanged += (_, v) => m_Game.DriveFrom = v;
+            m_Game.DriveFrom = m_DriveFrom.Value;
+            m_DriveBranch.OnValueChanged += (_, v) => m_Game.DriveBranch = v;
+            m_Game.DriveBranch = m_DriveBranch.Value;
             m_DriveUntil.OnValueChanged += (_, v) => m_Game.DriveUntil = v;
             m_Game.DriveUntil = m_DriveUntil.Value;
             m_ArriveAt.OnValueChanged += (_, v) => m_Game.ArriveAt = v;
@@ -156,6 +165,9 @@ namespace Stealth.Net
             NetSync.SetList(m_Stash, ref m_PushedStash, m_Game.Stash.Version, m_Game.Stash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_ExitStash, ref m_PushedExitStash, m_Game.ExitStash.Version, m_Game.ExitStash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_Cargo, ref m_PushedCargo, m_Game.Cargo.Version, m_Game.Cargo.Items, c => c.Pack());
+            NetSync.Set(m_DepartAt, m_Game.DepartAt);
+            NetSync.Set(m_DriveFrom, m_Game.DriveFrom);
+            NetSync.Set(m_DriveBranch, (sbyte)Mathf.Clamp(m_Game.DriveBranch, -1, 127));
             NetSync.Set(m_DriveUntil, m_Game.DriveUntil);
             NetSync.Set(m_ArriveAt, m_Game.ArriveAt);
             NetSync.Set(m_StunnedUntil, m_Game.StunnedUntil);

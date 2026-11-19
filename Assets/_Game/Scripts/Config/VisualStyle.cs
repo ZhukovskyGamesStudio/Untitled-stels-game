@@ -261,14 +261,14 @@ namespace Stealth.Configs
         public Cubemap Sky;
         [Tooltip("How bright the sky looks")] public float SkyExposure = 1f;
         [Tooltip("How thick the gas looks where it is full, per metre (0.03: half gone ~25 m into it; 1.6: nothing seen 2 m into it)")]
-        public float GasDensity = 0.07f;
+        public float GasDensity = 0.14f;
         [Tooltip("How far the sky panorama is, metres: the gas between the eye and it veils it (shorter = the world outside shows more)")]
         public float SkyDistance = 70f;
         [Tooltip("Metres from the outer walls over which the gas thickens from none to full (it looks pushed away from the house)")]
         public float GasClear = 10f;
-        [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 2.5f;
+        [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 8f;
         [Tooltip("Above that it thins out over this many metres (exponentially): the sky shows overhead and from upper floors")]
-        public float GasFalloff = 2.5f;
+        public float GasFalloff = 4f;
     }
 
     /// <summary>How the colours of the world change, by kind of material.</summary>

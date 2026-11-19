@@ -315,11 +315,12 @@ namespace Stealth.Player
         void UpdateFog()
         {
             var layout = ActiveLevel.Layout;
-            if (layout == null)
+            if (layout == null || Camera.transform.position.y < LevelLayout.Underground)
             {
-                // The sewer: a damp indoor haze, the background is the haze too (never the default sky colour).
+                // The sewer (and the basement's tunnels): a damp indoor haze, the background is the haze too (never the default
+                // sky colour) — the same on the drive in the sewer and in the basement's approach (Level.DrivePath).
                 GasView.Hide();
-                if (SewerLocation.Active == null) return;
+                if (layout == null && SewerLocation.Active == null) return;
                 var a = VisualStyles.World;
                 RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, a.IndoorFogDensity * 1.4f, Time.deltaTime * 3f);
                 RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog, Time.deltaTime * 4f);
@@ -457,10 +458,22 @@ namespace Stealth.Player
 
         void LateUpdate()
         {
-            if (!IsOwner || Camera == null) return;
+            if (!IsOwner) { HoldRemoteSeat(); return; }
+            if (Camera == null) return;
             if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
             if (UsingTerminal != null) ShowTerminalView();
             else UpdateWatching();
+        }
+
+        /// <summary>
+        /// Someone else in a seat of the car on its drive (moved by the clock here, Level.DrivePath): on their seat here, facing
+        /// the road — their own peer's position comes late over the network and would trail behind the car.
+        /// </summary>
+        void HoldRemoteSeat()
+        {
+            var car = Vehicles.Car.Active;
+            if (SeatIndex < 0 || car == null || !car.Scripted || SeatIndex >= car.Seats.Length || car.Seats[SeatIndex] == null) return;
+            transform.SetPositionAndRotation(car.Seats[SeatIndex].position - Vector3.up * SeatDrop, car.transform.rotation);
         }
 
         // ------------------------------------------------------------------ server

@@ -53,9 +53,6 @@ namespace Stealth.Level
 
         /// <summary>Where the car stops (local: the car's pivot on the road, facing +X): its nose a little before the gate.</summary>
         public static readonly Vector3 CarStop = new(GateX - 4.2f, Road, -0.4f);
-        /// <summary>The car rolls in and stops: this long (s), from this speed (m/s), braking evenly.</summary>
-        public const float RollTime = 3.5f, RollSpeed = 6.3f;
-        public const float RollDistance = RollSpeed * RollTime / 2f;
 
         /// <summary>The shaft's middle in the frame (at the lobby's floor).</summary>
         public static readonly Vector3 Shaft = new(AlcoveX, Depth, ShaftZ);
@@ -103,22 +100,6 @@ namespace Stealth.Level
 
         /// <summary>The car's pose when it has stopped (world).</summary>
         public static Pose CarPose(BasementFrame f) => new(f.ToWorld(CarStop), f.Rotation * Quaternion.Euler(0f, 90f, 0f));
-
-        /// <summary>How far behind its stop the rolling car is <paramref name="left"/> seconds before it stops, and its speed then.</summary>
-        public static float RollBehind(float left, out float speed)
-        {
-            float t = Mathf.Clamp(left, 0f, RollTime);
-            speed = RollSpeed * t / RollTime;
-            return RollSpeed * t * t / (2f * RollTime);
-        }
-
-        /// <summary>The rolling car's pose <paramref name="left"/> seconds before it stops (before the roll: at its start).</summary>
-        public static Pose RollPose(BasementFrame f, float left, out float speed)
-        {
-            float behind = RollBehind(left, out speed);
-            var stop = CarPose(f);
-            return new Pose(stop.position - f.Dir(Vector3.right) * behind, stop.rotation);
-        }
 
         /// <summary>A point in the basement (its tunnel up to the gate, the alcove, the shaft under the floor): it counts as inside the house (no gas).</summary>
         public static bool Contains(BasementFrame f, Vector3 p)
