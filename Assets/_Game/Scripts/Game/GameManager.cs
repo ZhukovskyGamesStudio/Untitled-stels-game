@@ -731,7 +731,7 @@ namespace Stealth.Game
         // ------------------------------------------------------------------ locked doors and safes
 
         /// <summary>Server: a player finished hacking a locked door.</summary>
-        public void UnlockDoorServer(PlayerController player, int door)
+        void UnlockDoorServer(PlayerController player, int door)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock && !a.NeedsKey); // a key door needs its key
@@ -798,7 +798,7 @@ namespace Stealth.Game
         /// Server: a player opens or closes a drawer / locker door (looking right at it). The first time a part with hidden
         /// loot opens, the item appears inside.
         /// </summary>
-        public void ToggleStorageServer(PlayerController player, int prop, int part)
+        void ToggleStorageServer(PlayerController player, int prop, int part)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var storage = Items.Storage.All.FirstOrDefault(s => s.Index == prop);
@@ -816,7 +816,7 @@ namespace Stealth.Game
         const float StorageReach = 3.2f;
 
         /// <summary>Server: a player cracked a safe — it opens and gives valuable loot.</summary>
-        public void OpenSafeServer(PlayerController player, int safe)
+        void OpenSafeServer(PlayerController player, int safe)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed || IsOpened(OpenKeys.Safe(safe))) return;
             var box = Items.SafeBox.All.FirstOrDefault(s => s.Index == safe);

@@ -217,11 +217,31 @@ namespace Stealth.Level
         {
             if (!Signatures.TryGetValue(room.Type, out var kinds)) return;
             foreach (var k in kinds) if (m_InRoom.ContainsKey(k)) return;
-            Anchor(room, SignatureOption, SignatureOption + 3, false, 0.7f); // a small room with doors on every wall: a narrower way past it
+            Anchor(room, Option.Signature, 3, false, 0.7f); // a small room with doors on every wall: a narrower way past it
         }
 
-        /// <summary>The first option of <see cref="AnchorGroup"/> that <see cref="Signature"/> tries (the themed rooms' own options come before).</summary>
-        const int SignatureOption = 10;
+        /// <summary>
+        /// The options of <see cref="AnchorGroup"/> by name: the one contract between the callers of <see cref="Anchor(PlanRoom, int, int, bool, float)"/>
+        /// and its cases. Per room type, a run of options from the biggest to ever smaller ones; a room with several groups
+        /// (a restroom's stalls, basins, urinals; a charging room's docks and generator) has a run for each.
+        /// </summary>
+        static class Option
+        {
+            /// <summary>Any themed room's own piece: the biggest, then smaller ones (<see cref="Count"/> of them).</summary>
+            public const int Biggest = 0, Smaller = 1, Smallest = 2, Count = 3;
+            /// <summary>A restroom: three runs of three — the stalls, the basins under their mirrors, the urinals.</summary>
+            public const int Stalls = 0, Basins = 3, Urinals = 6;
+            /// <summary>The robots' charging room: a pair of docks, one dock, the generator, the remnant the humans left.</summary>
+            public const int DockPair = 0, Dock = 1, Generator = 2, Remnant = 3;
+            /// <summary>The control room: two terminals side by side, one, the video wall.</summary>
+            public const int TwoTerminals = 0, OneTerminal = 1, VideoWall = 2;
+            /// <summary>A lobby: the waiting seats (two rows, one), the mailboxes on the wall.</summary>
+            public const int Seats = 0, Mailboxes = 2;
+            /// <summary>A flat's bathroom: the bath, then the toilet with the basin.</summary>
+            public const int Bath = 0, ToiletBasin = 1;
+            /// <summary>The first of the signature pieces (<see cref="Signature"/>; after every themed room's own runs).</summary>
+            public const int Signature = 10;
+        }
 
         void Shuffle<T>(List<T> list)
         {
@@ -239,28 +259,28 @@ namespace Stealth.Level
         /// </summary>
         void Anchor(PlanRoom room)
         {
-            if (room.Type == RoomType.Lobby && m_L.PlanKind == HouseKind.Hospital) { Anchor(room, 0, 2, false); return; } // the waiting area's rows of seats
-            if (room.Type == RoomType.Lobby && m_L.PlanKind == HouseKind.Apartments) { Anchor(room, 2, 3, false, 0.6f); return; } // the entrance hall's mailboxes
+            if (room.Type == RoomType.Lobby && m_L.PlanKind == HouseKind.Hospital) { Anchor(room, Option.Seats, 2, false); return; } // the waiting area's rows of seats
+            if (room.Type == RoomType.Lobby && m_L.PlanKind == HouseKind.Apartments) { Anchor(room, Option.Mailboxes, 1, false, 0.6f); return; } // the entrance hall's mailboxes
             if (room.Type < RoomType.Gym && room.Type is not (RoomType.Kitchen or RoomType.Restroom)) return;
             if (room.Type == RoomType.Restroom)
             {
                 // a restroom is its stalls and its basins: both, each as big as the room takes; where no stall fits
                 // (they are 1.5 m deep: a narrow room with doors at both ends has no place for one) urinals on a wall
-                if (!Anchor(room, 0, 3, false)) Anchor(room, 6, 9, false);
-                Anchor(room, 3, 6, false);
+                if (!Anchor(room, Option.Stalls, 3, false)) Anchor(room, Option.Urinals, 3, false);
+                Anchor(room, Option.Basins, 3, false);
                 return;
             }
             if (room.Type == RoomType.Workshop) { WorkshopBays(room); return; }
-            if (room.Type == RoomType.Ward) { if (!Anchor(room, 0, 1, false)) Anchor(room, 1, 2, false); return; } // two beds, or one
+            if (room.Type == RoomType.Ward) { if (!Anchor(room, Option.Biggest, 1, false)) Anchor(room, Option.Smaller, 1, false); return; } // two beds, or one
             // the flats: the bed with its night tables (or the bed alone), the sofa (with its coffee table), the bath, then the
             // toilet and the basin, the hallway's shoe cabinet under the coat hooks
-            if (room.Type is RoomType.Bedroom or RoomType.Living) { if (!Anchor(room, 0, 1, false, 0.8f)) Anchor(room, 1, 2, false, 0.7f); return; }
-            if (room.Type == RoomType.Bathroom) { Anchor(room, 0, 1, false, 0.6f); Anchor(room, 1, 2, false, 0.6f); return; }
-            if (room.Type == RoomType.FlatHall) { Anchor(room, 0, 2, false, 0.7f); return; }
+            if (room.Type is RoomType.Bedroom or RoomType.Living) { if (!Anchor(room, Option.Biggest, 1, false, 0.8f)) Anchor(room, Option.Smaller, 1, false, 0.7f); return; }
+            if (room.Type == RoomType.Bathroom) { Anchor(room, Option.Bath, 1, false, 0.6f); Anchor(room, Option.ToiletBasin, 1, false, 0.6f); return; }
+            if (room.Type == RoomType.FlatHall) { Anchor(room, Option.Biggest, 2, false, 0.7f); return; }
             if (room.Type == RoomType.NurseStation && StationCounter(room)) return;
             if (room.Type is RoomType.NurseStation or RoomType.Operating or RoomType.Imaging) // in the middle
             {
-                Anchor(room, 0, 0, true);
+                AnchorFree(room);
                 if (room.Type == RoomType.Operating)
                     for (int i = m_L.Props.Count - 1; i >= 0; i--)
                         if (m_L.Props[i].Kind == PropKind.SurgicalTable && m_P.RoomAt(m_L.Props[i].Position + Vector3.up * 0.3f) == room)
@@ -272,17 +292,17 @@ namespace Stealth.Level
                 return;
             }
             if (room.Type == RoomType.ChargingStation) { ChargingStation(room); return; }
-            if (room.Type == RoomType.PaintBooth) { Anchor(room, 0, 0, true); return; } // the car in the middle of the booth
+            if (room.Type == RoomType.PaintBooth) { AnchorFree(room); return; } // the car in the middle of the booth
             if (room.Type == RoomType.ControlRoom)
             {
                 // the house's two robot terminals: side by side, or each against its own wall (the video wall if neither fits)
                 // (a narrower way past them where the walls are short: the second terminal belongs here too)
-                if (Anchor(room, 0, 1, false, 0.7f)) return;
-                if (Anchor(room, 1, 2, false, 0.7f)) { Anchor(room, 1, 2, false, 0.7f); return; }
-                Anchor(room, 2, 3, true);
+                if (Anchor(room, Option.TwoTerminals, 1, false, 0.7f)) return;
+                if (Anchor(room, Option.OneTerminal, 1, false, 0.7f)) { Anchor(room, Option.OneTerminal, 1, false, 0.7f); return; }
+                Anchor(room, Option.VideoWall, 1, true);
                 return;
             }
-            Anchor(room, 0, 3, true);
+            Anchor(room, Option.Biggest, Option.Count, true);
         }
 
         /// <summary>The ways up to vent grates (room → under the grate, the desk's side; <see cref="DuctGrate.ClimbDir"/>).</summary>
@@ -321,12 +341,12 @@ namespace Stealth.Level
             m_GeneratorPlaced = false;
             int docks = 0;
             for (int k = 0; k < 2 && docks + 2 <= ChargingDocksWanted; k++)
-                if (Anchor(room, 0, 1, false, 0.8f)) docks += 2;
+                if (Anchor(room, Option.DockPair, 1, false, 0.8f)) docks += 2;
                 else break;
-            while (docks < ChargingDocksWanted && Anchor(room, 1, 2, false, 0.8f)) docks++;
-            if (!(room.Area >= 24f && Anchor(room, 4, 4, true))) Anchor(room, 2, 3, false, 0.8f);
+            while (docks < ChargingDocksWanted && Anchor(room, Option.Dock, 1, false, 0.8f)) docks++;
+            if (!(room.Area >= 24f && AnchorFree(room))) Anchor(room, Option.Generator, 1, false, 0.8f);
             m_GeneratorPlaced = true;
-            Anchor(room, 3, 4, false, 0.8f);
+            Anchor(room, Option.Remnant, 1, false, 0.8f);
         }
 
         /// <summary>
@@ -409,16 +429,22 @@ namespace Stealth.Level
             return false;
         }
 
-        /// <summary>The first of the options [from, to) of <see cref="AnchorGroup"/> that fits along a wall (or, when <paramref name="free"/>, in the middle).</summary>
-        bool Anchor(PlanRoom room, int from, int to, bool free, float narrowest = 1.0f)
+        /// <summary>The room's own free-standing group in the middle (no option against a wall tried).</summary>
+        bool AnchorFree(PlanRoom room) => Anchor(room, 0, 0, true);
+
+        /// <summary>
+        /// The first of <paramref name="count"/> options of <see cref="AnchorGroup"/> from <paramref name="first"/> (an <see cref="Option"/>)
+        /// that fits along a wall (or, when <paramref name="free"/>, in the middle).
+        /// </summary>
+        bool Anchor(PlanRoom room, int first, int count, bool free, float narrowest = 1.0f)
         {
             var faces = FacesOf(room);
             // stalls are deep (1.5 m): at the end wall of a narrow restroom they leave the whole length to walk, along
             // its side they would leave a slot
-            if (room.Type == RoomType.Restroom && from == 0) faces.Reverse();
+            if (room.Type == RoomType.Restroom && first == Option.Stalls) faces.Reverse();
             float y = LevelLayout.FloorY(room.Floor);
             // the best option first (the biggest), smaller ones where doors leave too little wall
-            for (int option = from; option < to; option++)
+            for (int option = first; option < first + count; option++)
                 foreach (float walk in narrowest < 1.0f ? new[] { 1.7f, 1.0f, narrowest } : new[] { 1.7f, 1.0f })
                     foreach (var (w, n) in faces)
                     {
@@ -459,8 +485,8 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// A themed room's signature group against a wall (centred on the frame, u along the wall), option 0 the biggest,
-        /// 1 and 2 ever smaller; its width, 0 = no such option.
+        /// A themed room's group against a wall (centred on the frame, u along the wall) for an <see cref="Option"/>;
+        /// its width, 0 = no such option.
         /// </summary>
         float AnchorGroup(PlanRoom room, Batch b, Frame f, int option)
         {
@@ -476,24 +502,24 @@ namespace Stealth.Level
             switch (room.Type, option)
             {
                 // the robots' charging room: docks in pairs or alone, the generator against a wall, the humans' remnant askew
-                case (RoomType.ChargingStation, 0):
+                case (RoomType.ChargingStation, Option.DockPair):
                     foreach (float u in new[] { -0.62f, 0.62f }) b.Add(PropKind.ChargingDock, f.P(u, BackOf(PropKind.ChargingDock)), f.Face);
                     return 2.45f;
-                case (RoomType.ChargingStation, 1): return Single(PropKind.ChargingDock, 1.2f);
-                case (RoomType.ChargingStation, 2): return Single(PropKind.Generator, 1.9f);
-                case (RoomType.ChargingStation, 3):
+                case (RoomType.ChargingStation, Option.Dock): return Single(PropKind.ChargingDock, 1.2f);
+                case (RoomType.ChargingStation, Option.Generator): return Single(PropKind.Generator, 1.9f);
+                case (RoomType.ChargingStation, Option.Remnant):
                 {
                     var k = ChargingRooms.Remnant(m_L.ChargingFrom);
                     var r = FootprintOf(k);
                     b.Add(k, f.P(0f, BackOf(k) + 0.15f), f.Face + (Chance(0.5) ? 14f : -14f));
                     return r.width + 0.5f;
                 }
-                case (RoomType.Kitchen, 0):
-                case (RoomType.Kitchen, 1):
+                case (RoomType.Kitchen, Option.Biggest):
+                case (RoomType.Kitchen, Option.Smaller):
                 {
                     // the kitchen run (or its shorter half): sink, cooker, worktop with its microwave and the coffee machine, cupboards
                     // over it, and the fridge at its end (every kitchen has one); the whole run shifted to centre it
-                    bool full = option == 0;
+                    bool full = option == Option.Biggest;
                     float shift = full ? -0.36f : -0.355f;
                     float sink = (full ? -1.52f : -1.22f) + shift, counter = (full ? 0.92f : 0.62f) + shift;
                     b.Add(PropKind.KitchenSink, f.P(sink, BackOf(PropKind.KitchenSink)), f.Face);
@@ -507,78 +533,78 @@ namespace Stealth.Level
                     b.Item(f.P(counter, BackOf(PropKind.KitchenCounter), 0.93f));
                     return full ? 5.02f : 4.41f;
                 }
-                case (RoomType.Kitchen, 2):
+                case (RoomType.Kitchen, Option.Smallest):
                     // the smallest: the sink and the fridge beside it
                     b.Add(PropKind.KitchenSink, f.P(-0.36f, BackOf(PropKind.KitchenSink)), f.Face);
                     b.Add(PropKind.WallCabinet, f.P(-0.36f, BackOf(PropKind.WallCabinet)), f.Face, solid: false);
                     b.Add(PropKind.Fridge, f.P(0.61f, BackOf(PropKind.Fridge)), f.Face);
                     return 1.96f;
                 // the stalls: three, two, one
-                case (RoomType.Restroom, 0): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 3 : 2, 1.06f);
-                case (RoomType.Restroom, 1): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 2 : 1, 1.06f);
-                case (RoomType.Restroom, 2): return Row(f, b, PropKind.ToiletStall, 1, 1.06f);
+                case (RoomType.Restroom, Option.Stalls): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 3 : 2, 1.06f);
+                case (RoomType.Restroom, Option.Stalls + 1): return Row(f, b, PropKind.ToiletStall, room.Area > 14f ? 2 : 1, 1.06f);
+                case (RoomType.Restroom, Option.Stalls + 2): return Row(f, b, PropKind.ToiletStall, 1, 1.06f);
                 // the basins under their mirrors, the hand dryer beside them
-                case (RoomType.Restroom, 3):
+                case (RoomType.Restroom, Option.Basins):
                     b.Add(PropKind.MirrorSink, f.P(-0.62f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.MirrorSink, f.P(0.18f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.82f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 2.0f;
-                case (RoomType.Restroom, 4):
+                case (RoomType.Restroom, Option.Basins + 1):
                     b.Add(PropKind.MirrorSink, f.P(-0.22f, BackOf(PropKind.MirrorSink)), f.Face);
                     b.Add(PropKind.HandDryer, f.P(0.42f, BackOf(PropKind.HandDryer)), f.Face, solid: false);
                     return 1.2f;
-                case (RoomType.Restroom, 5): return Single(PropKind.MirrorSink, 0.75f);
-                case (RoomType.Restroom, 6): return Row(f, b, PropKind.Urinal, 3, 0.7f);
-                case (RoomType.Restroom, 7): return Row(f, b, PropKind.Urinal, 2, 0.7f);
-                case (RoomType.Restroom, 8): return Single(PropKind.Urinal, 0.6f);
-                case (RoomType.Gym, 0): return Single(PropKind.DumbbellRack, 1.5f);
-                case (RoomType.Gym, 1): return Single(PropKind.ExerciseBike, 0.65f);
-                case (RoomType.Gym, 2): return Out(PropKind.PunchingBag, 0.5f, 0.7f);
-                case (RoomType.Library, 0): return Row(f, b, PropKind.TallBookcase, 2, 1.02f);
-                case (RoomType.Library, 1): return Single(PropKind.TallBookcase, 1.05f);
-                case (RoomType.Library, 2): return Out(PropKind.Globe, 0.4f, 0.7f);
-                case (RoomType.CopyRoom, 0): { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
-                case (RoomType.CopyRoom, 1): return Single(PropKind.PaperStack, 0.85f);
-                case (RoomType.CopyRoom, 2): return Single(PropKind.Shredder, 0.5f);
+                case (RoomType.Restroom, Option.Basins + 2): return Single(PropKind.MirrorSink, 0.75f);
+                case (RoomType.Restroom, Option.Urinals): return Row(f, b, PropKind.Urinal, 3, 0.7f);
+                case (RoomType.Restroom, Option.Urinals + 1): return Row(f, b, PropKind.Urinal, 2, 0.7f);
+                case (RoomType.Restroom, Option.Urinals + 2): return Single(PropKind.Urinal, 0.6f);
+                case (RoomType.Gym, Option.Biggest): return Single(PropKind.DumbbellRack, 1.5f);
+                case (RoomType.Gym, Option.Smaller): return Single(PropKind.ExerciseBike, 0.65f);
+                case (RoomType.Gym, Option.Smallest): return Out(PropKind.PunchingBag, 0.5f, 0.7f);
+                case (RoomType.Library, Option.Biggest): return Row(f, b, PropKind.TallBookcase, 2, 1.02f);
+                case (RoomType.Library, Option.Smaller): return Single(PropKind.TallBookcase, 1.05f);
+                case (RoomType.Library, Option.Smallest): return Out(PropKind.Globe, 0.4f, 0.7f);
+                case (RoomType.CopyRoom, Option.Biggest): { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
+                case (RoomType.CopyRoom, Option.Smaller): return Single(PropKind.PaperStack, 0.85f);
+                case (RoomType.CopyRoom, Option.Smallest): return Single(PropKind.Shredder, 0.5f);
                 // the robots' control consoles (the house's terminals, LevelGenerator.PlaceTerminals), an operator's chair at each
-                case (RoomType.ControlRoom, 0):
+                case (RoomType.ControlRoom, Option.TwoTerminals):
                     foreach (float u in new[] { -0.85f, 0.85f })
                     {
                         b.Add(PropKind.Terminal, f.P(u, BackOf(PropKind.Terminal)), f.Face);
                         b.Add(PropKind.OperatorChair, f.P(u, BackOf(PropKind.Terminal) + 0.85f), f.Back);
                     }
                     return 3.4f;
-                case (RoomType.ControlRoom, 1):
+                case (RoomType.ControlRoom, Option.OneTerminal):
                     b.Add(PropKind.Terminal, f.P(0, BackOf(PropKind.Terminal)), f.Face);
                     b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
                     return 1.7f;
-                case (RoomType.ControlRoom, 2): return Single(PropKind.MonitorWall, 2.45f);
-                case (RoomType.Lab, 0):
+                case (RoomType.ControlRoom, Option.VideoWall): return Single(PropKind.MonitorWall, 2.45f);
+                case (RoomType.Lab, Option.Biggest):
                     b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);
                     b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.LabBench) + 0.1f, 0.91f));
                     return 1.85f;
-                case (RoomType.Lab, 1): return Single(PropKind.PartsCabinet, 0.95f);
-                case (RoomType.Lab, 2): return Single(PropKind.RobotArm, 0.7f);
-                case (RoomType.NapRoom, 0): return Along(PropKind.SleepPod);
-                case (RoomType.NapRoom, 1): return Out(PropKind.BeanBag, 0.6f, 0.95f);
-                case (RoomType.Studio, 0):
+                case (RoomType.Lab, Option.Smaller): return Single(PropKind.PartsCabinet, 0.95f);
+                case (RoomType.Lab, Option.Smallest): return Single(PropKind.RobotArm, 0.7f);
+                case (RoomType.NapRoom, Option.Biggest): return Along(PropKind.SleepPod);
+                case (RoomType.NapRoom, Option.Smaller): return Out(PropKind.BeanBag, 0.6f, 0.95f);
+                case (RoomType.Studio, Option.Biggest):
                     b.Add(PropKind.AcousticPanel, f.P(-0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false);
                     b.Add(PropKind.AcousticPanel, f.P(0.62f, BackOf(PropKind.AcousticPanel)), f.Face, solid: false);
                     b.Add(PropKind.MicStand, f.P(0, 0.9f), f.Face);
                     return 2.45f;
-                case (RoomType.Studio, 1): return Single(PropKind.MixingDesk, 1.65f);
-                case (RoomType.Studio, 2): { b.Add(PropKind.AcousticPanel, f.P(0, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); return 1.25f; }
-                case (RoomType.LockerRoom, 0): return Row(f, b, PropKind.Lockers, 2, 1.05f);
-                case (RoomType.LockerRoom, 1): return Single(PropKind.Lockers, 1.05f);
-                case (RoomType.LockerRoom, 2): return Out(PropKind.Bench, 0.3f, 1.65f);
-                case (RoomType.Lobby, 0): return Row(f, b, PropKind.WaitingSeats, 2, 2.5f);
-                case (RoomType.Lobby, 1): return Single(PropKind.WaitingSeats, 2.5f);
-                case (RoomType.Lobby, 2): { b.Add(PropKind.Mailboxes, f.P(0, BackOf(PropKind.Mailboxes)), f.Face, solid: false); return 1.25f; } // on the wall
-                case (RoomType.Ward, 0):
-                case (RoomType.Ward, 1):
+                case (RoomType.Studio, Option.Smaller): return Single(PropKind.MixingDesk, 1.65f);
+                case (RoomType.Studio, Option.Smallest): { b.Add(PropKind.AcousticPanel, f.P(0, BackOf(PropKind.AcousticPanel)), f.Face, solid: false); return 1.25f; }
+                case (RoomType.LockerRoom, Option.Biggest): return Row(f, b, PropKind.Lockers, 2, 1.05f);
+                case (RoomType.LockerRoom, Option.Smaller): return Single(PropKind.Lockers, 1.05f);
+                case (RoomType.LockerRoom, Option.Smallest): return Out(PropKind.Bench, 0.3f, 1.65f);
+                case (RoomType.Lobby, Option.Seats): return Row(f, b, PropKind.WaitingSeats, 2, 2.5f);
+                case (RoomType.Lobby, Option.Seats + 1): return Single(PropKind.WaitingSeats, 2.5f);
+                case (RoomType.Lobby, Option.Mailboxes): { b.Add(PropKind.Mailboxes, f.P(0, BackOf(PropKind.Mailboxes)), f.Face, solid: false); return 1.25f; } // on the wall
+                case (RoomType.Ward, Option.Biggest):
+                case (RoomType.Ward, Option.Smaller):
                 {
                     // patient beds head to the wall: the headwall unit over each, its curtain round it, a monitor and a night table beside
-                    int beds = option == 0 ? 2 : 1;
+                    int beds = option == Option.Biggest ? 2 : 1;
                     float step = 1.78f, w = beds * step; // (two beds in a 4 m ward between walls 0.3 m thick)
                     for (int i = 0; i < beds; i++)
                     {
@@ -592,47 +618,47 @@ namespace Stealth.Level
                     b.Add(PropKind.NightTable, f.P(beds == 2 ? 0f : 0.82f, BackOf(PropKind.NightTable)), f.Face);
                     return w + (beds == 1 ? 0.5f : 0f);
                 }
-                case (RoomType.Bedroom, 0):
-                case (RoomType.Bedroom, 1):
+                case (RoomType.Bedroom, Option.Biggest):
+                case (RoomType.Bedroom, Option.Smaller):
                 {
                     // the double bed head to the wall, a night table each side (a small room: the bed alone)
                     b.Add(PropKind.DoubleBed, f.P(0, BackOf(PropKind.DoubleBed)), f.Face);
-                    if (option == 1) return 1.7f;
+                    if (option == Option.Smaller) return 1.7f;
                     foreach (float s in new[] { -1.1f, 1.1f }) b.Add(PropKind.NightTable, f.P(s, BackOf(PropKind.NightTable)), f.Face);
                     if (Chance(0.5)) b.Item(f.P(Chance(0.5) ? -1.1f : 1.1f, BackOf(PropKind.NightTable), 0.56f));
                     return 2.75f;
                 }
-                case (RoomType.Living, 0):
-                case (RoomType.Living, 1):
+                case (RoomType.Living, Option.Biggest):
+                case (RoomType.Living, Option.Smaller):
                     // the sofa against the wall (and its coffee table in front of it)
                     b.Add(PropKind.Sofa, f.P(0, BackOf(PropKind.Sofa)), f.Face);
-                    if (option == 0) b.Add(PropKind.CoffeeTable, f.P(0, BackOf(PropKind.Sofa) * 2f + 0.62f), f.Face);
+                    if (option == Option.Biggest) b.Add(PropKind.CoffeeTable, f.P(0, BackOf(PropKind.Sofa) * 2f + 0.62f), f.Face);
                     return 2.3f;
-                case (RoomType.Bathroom, 0): return Single(PropKind.Bathtub, 1.75f);
-                case (RoomType.Bathroom, 1):
+                case (RoomType.Bathroom, Option.Bath): return Single(PropKind.Bathtub, 1.75f);
+                case (RoomType.Bathroom, Option.ToiletBasin):
                     b.Add(PropKind.HomeToilet, f.P(-0.42f, BackOf(PropKind.HomeToilet)), f.Face);
                     b.Add(PropKind.BathVanity, f.P(0.36f, BackOf(PropKind.BathVanity)), f.Face);
                     return 1.35f;
-                case (RoomType.FlatHall, 0):
+                case (RoomType.FlatHall, Option.Biggest):
                     // the shoe cabinet under the coat hooks, a mirror's worth of wall beside
                     b.Add(PropKind.ShoeCabinet, f.P(-0.55f, BackOf(PropKind.ShoeCabinet)), f.Face);
                     b.Add(PropKind.HallHooks, f.P(0.55f, BackOf(PropKind.HallHooks)), f.Face, solid: false);
                     return 2.1f;
-                case (RoomType.FlatHall, 1): return Single(PropKind.ShoeCabinet, 0.95f); // a hallway of doors: the shoe cabinet alone
-                case (RoomType.Infirmary, 0): { float w = Along(PropKind.HospitalBed); b.Item(f.P(0, 0.5f, 0.66f)); return w; }
-                case (RoomType.Infirmary, 1): { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
-                case (RoomType.Infirmary, 2): return Out(PropKind.PrivacyScreen, 0.3f, 1.65f);
+                case (RoomType.FlatHall, Option.Smaller): return Single(PropKind.ShoeCabinet, 0.95f); // a hallway of doors: the shoe cabinet alone
+                case (RoomType.Infirmary, Option.Biggest): { float w = Along(PropKind.HospitalBed); b.Item(f.P(0, 0.5f, 0.66f)); return w; }
+                case (RoomType.Infirmary, Option.Smaller): { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                case (RoomType.Infirmary, Option.Smallest): return Out(PropKind.PrivacyScreen, 0.3f, 1.65f);
                 // the signature pieces (Signature): compact, against a wall
-                case (RoomType.Office, SignatureOption):
-                case (RoomType.Office, SignatureOption + 1):
-                case (RoomType.OpenSpace, SignatureOption + 1):
+                case (RoomType.Office, Option.Signature):
+                case (RoomType.Office, Option.Signature + 1):
+                case (RoomType.OpenSpace, Option.Signature + 1):
                     b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face);
                     b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back);
                     b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f));
-                    if (option != SignatureOption) return 1.65f;
+                    if (option != Option.Signature) return 1.65f;
                     b.Add(PropKind.FilePedestal, f.P(1.05f, BackOf(PropKind.FilePedestal)), f.Face);
                     return 2.55f;
-                case (RoomType.OpenSpace, SignatureOption):
+                case (RoomType.OpenSpace, Option.Signature):
                     foreach (float u in new[] { -0.82f, 0.82f })
                     {
                         b.Add(PropKind.Desk, f.P(u, 0.4f + WallGap), f.Face);
@@ -640,34 +666,34 @@ namespace Stealth.Level
                     }
                     b.Item(f.P(R(-1.2f, 1.2f), 0.5f, DeskTop + 0.005f));
                     return 3.3f;
-                case (RoomType.OpenSpace, SignatureOption + 2):
+                case (RoomType.OpenSpace, Option.Signature + 2):
                     Single(PropKind.StandingDesk, 1.45f);
                     b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.StandingDesk), 1.105f));
                     return 1.45f;
-                case (RoomType.Server, SignatureOption):
+                case (RoomType.Server, Option.Signature):
                     for (int i = -1; i <= 1; i++) b.Add(PropKind.ServerRack, f.P(i * 0.72f, BackOf(PropKind.ServerRack)), f.Face);
                     return 2.2f;
-                case (RoomType.Server, SignatureOption + 1): return Row(f, b, PropKind.ServerRack, 2, 0.72f);
-                case (RoomType.Server, SignatureOption + 2): return Row(f, b, PropKind.NetworkCabinet, 2, 0.62f);
-                case (RoomType.Meeting, SignatureOption):
-                case (RoomType.Meeting, SignatureOption + 1):
+                case (RoomType.Server, Option.Signature + 1): return Row(f, b, PropKind.ServerRack, 2, 0.72f);
+                case (RoomType.Server, Option.Signature + 2): return Row(f, b, PropKind.NetworkCabinet, 2, 0.62f);
+                case (RoomType.Meeting, Option.Signature):
+                case (RoomType.Meeting, Option.Signature + 1):
                     // a small table against the wall, two chairs on the room side (or one)
                     b.Add(PropKind.RoundTable, f.P(0, 0.5f + WallGap), 0);
-                    if (option == SignatureOption) { b.Add(PropKind.Chair, f.P(-0.35f, 1.3f), f.Back); b.Add(PropKind.Chair, f.P(0.35f, 1.3f), f.Back); }
+                    if (option == Option.Signature) { b.Add(PropKind.Chair, f.P(-0.35f, 1.3f), f.Back); b.Add(PropKind.Chair, f.P(0.35f, 1.3f), f.Back); }
                     else b.Add(PropKind.Chair, f.P(0, 1.3f), f.Back);
                     b.Item(f.P(0, 0.5f + WallGap, 0.76f));
                     return 1.25f;
-                case (RoomType.Lab, SignatureOption):
+                case (RoomType.Lab, Option.Signature):
                     b.Add(PropKind.WorkTable, f.P(0, BackOf(PropKind.WorkTable)), f.Face);
                     b.Add(PropKind.Chair, f.P(0, 1.2f), f.Back);
                     b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.WorkTable), DeskTop + 0.005f));
                     return 1.65f;
-                case (RoomType.Lab, SignatureOption + 1): return Single(PropKind.WorkTable, 1.65f);
-                case (RoomType.Office, SignatureOption + 2): b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f)); return Single(PropKind.Desk, 1.65f);
-                case (RoomType.Infirmary, SignatureOption): return Along(PropKind.ExamTable);
-                case (RoomType.GameRoom, 0): return Row(f, b, PropKind.ArcadeMachine, 2, 0.8f);
-                case (RoomType.GameRoom, 1): return Single(PropKind.ArcadeMachine, 0.8f);
-                case (RoomType.GameRoom, 2): { b.Add(PropKind.DartBoard, f.P(0, BackOf(PropKind.DartBoard)), f.Face, solid: false); return 0.65f; }
+                case (RoomType.Lab, Option.Signature + 1): return Single(PropKind.WorkTable, 1.65f);
+                case (RoomType.Office, Option.Signature + 2): b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f)); return Single(PropKind.Desk, 1.65f);
+                case (RoomType.Infirmary, Option.Signature): return Along(PropKind.ExamTable);
+                case (RoomType.GameRoom, Option.Biggest): return Row(f, b, PropKind.ArcadeMachine, 2, 0.8f);
+                case (RoomType.GameRoom, Option.Smaller): return Single(PropKind.ArcadeMachine, 0.8f);
+                case (RoomType.GameRoom, Option.Smallest): { b.Add(PropKind.DartBoard, f.P(0, BackOf(PropKind.DartBoard)), f.Face, solid: false); return 0.65f; }
             }
             return 0f;
         }

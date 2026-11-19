@@ -150,7 +150,8 @@ LaserGate — отдельная ловушка (не детектор)
 
 ### Уровень
 
-`LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`). `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
+`LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`) явным списком шагов `LevelGenerator.Steps` (план → скрытая комната → тёмные комнаты → люки → типы комнат → особые комнаты → вентиляция → мебель → охрана → особенности → двери → габариты; общее состояние — `House`).
+**Правила локации** — одна стратегия `HouseRules` (`Office`/`Hospital`/`Garage`/`Apartments`, `HouseRules.Of(layout)` по `PlanKind`): своя планировка в `BuildingSettings` (`Shape`), можно ли менять типы комнат, свои проёмы, комната выхода, шанс и вид дверей, уличная дверь, вид в любом стиле (`Look`), уникальная особенность, карта до убежища; таблицы мебели по типу комнаты остаются в `Furnisher`, варианты якорей — именованные `Furnisher.Option`. `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
 **только из префабов `LevelArt`**: блоки-кубы масштабируются под размер, лестницы/двери/лазы/лампы/мебель ставятся как есть.
 Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
 **План дома** (дизайн — [Docs/HouseGenerator.md](Docs/HouseGenerator.md)) — `HousePlan`: растр клеток 0,5 м на этаж (`CellKind`: комната,
@@ -347,8 +348,9 @@ CarSilver/CarGlass/ToolRed/ShopYellow`); посты — `Furnisher.WorkshopBays`
 (`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`, `CageKey`; горят в топливо по цене серого цвета; ключи, ключ клетки (1×2) и оглушитель
 работают только из руки — `PlayerInventory.Holds/TakeHeldServer`; ключи — настоящие модели, как лопата, `ItemCatalog.KeyScale`): брошенная колонка (`WorldItem.PlayServer`, реплицирует
 `WorldItemNet`) зовёт ближайшего робота (`GameManager.UpdateLures`), он её выключает; оглушитель — `GameAction.Gadget` (X) →
-`GadgetServer` (все детекторы взломаны на `StunDuration`). Цель рук, не являющаяся `Interactable` (сейф, терминал, замок двери), — `IReachTarget` и общий поиск `ReachSearch.Nearest`;
-то, что открывается (крышка шахты, решётка, ящик, ворота), движется по `OpenTween` (первый кадр — без анимации и звука), звук дверей — `DoorSounds`.
+`GadgetServer` (все детекторы взломаны на `StunDuration`). Любая цель рук — `Interactable`, сейф, терминал, замок двери — `IReachTarget`, один общий поиск `ReachSearch.Nearest`;
+запросы по E — один `IPlayerLink.SendUse(UseKind, индекс)` (замок — `UseKind.DoorLock`, сейф — `Safe`, дверца/ящик мебели — `StoragePart`, индекс `OpenKeys.StoragePart`);
+всё, что открывается (двери, крышка шахты, решётка, ящик, ворота, дверцы шкафов), движется по `OpenTween` (первый кадр — без анимации и звука), звук дверей — `DoorSounds`.
 Режимы рук игрока (диск, пульт, терминал) выходят вместе — `PlayerController.LeaveAllModes`; сам игрок разбит на partial-файлы `PlayerController.*.cs`.
 Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
 → `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
@@ -385,9 +387,9 @@ CarSilver/CarGlass/ToolRed/ShopYellow`); посты — `Furnisher.WorkshopBays`
 модели створок и фурнитуры (ручка, D-ручка, петля, доводчик, домофон) — `Tools/Blender/doors.py`; звуки `door_open`/`door_shut` (`AutoDoor.Sound`).
 Проверяют `DoorRulesTests`.
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
-не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.
+не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `SendUse(UseKind.DoorLock)`.
 Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки
-`ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `IPlayerLink.SendOpenSafe` → лут на сервере. Открытые двери и сейфы дома —
+`ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `SendUse(UseKind.Safe)` → лут на сервере. Открытые двери и сейфы дома —
 `GameManager.Opened` (ключи `OpenKeys`: вид в старшем байте, индекс под ним — `OpenKeysTests`; сцена читает их через `IWorldState`/`World`, без статических хуков), реплицирует `GameManagerNet`.
 
 **Терминалы охраны** — `LevelLayout.Terminals`. Камеры и взлом стоят в комнате управления роботами (`RoomType.ControlRoom`: если в доме её нет,

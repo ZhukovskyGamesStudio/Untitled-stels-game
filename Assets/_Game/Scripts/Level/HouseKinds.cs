@@ -30,7 +30,7 @@ namespace Stealth.Level
         }
 
         /// <summary>A location with a plan of its own (the hospital, the repair shop, the apartment block): not the office generator's rooms and zones.</summary>
-        public static bool OwnPlan(HouseKind kind) => kind is HouseKind.Hospital or HouseKind.Garage or HouseKind.Apartments;
+        public static bool OwnPlan(HouseKind kind) => HouseRules.For(kind).OwnPlan;
 
         /// <summary>
         /// A house seed whose house number <paramref name="house"/> is of <paramref name="kind"/> (pure; the n-th one from
@@ -135,39 +135,8 @@ namespace Stealth.Level
                     s.CornerCutChance = Mathf.Min(1f, b.CornerCutChance * 1.6f);
                     s.RoomSizeScale = b.RoomSizeScale * 0.9f;
                     break;
-                case HouseKind.Hospital:
-                    // a slab: the corridor down its length, rooms on both sides; two or three floors (the theatres on top)
-                    if (b.EveryRoomType) { s.CorridorChance = 1f; break; }
-                    s.Hospital = true;
-                    s.FloorsPerHouse = new[] { 2, 2, 3, 3, 3 };
-                    s.LinkedChance = 0f;
-                    s.AtriumChance = 0f;
-                    s.RotundaChance = 0f;
-                    s.CornerCutChance = 0f;
-                    break;
-                case HouseKind.Apartments:
-                    // one entrance, one stairwell, a few flats a floor: more storeys than any other house
-                    if (b.EveryRoomType) break;
-                    s.Apartments = true;
-                    s.FloorsPerHouse = new[] { 4, 4, 5, 5, 6 };
-                    s.LinkedChance = 0f;
-                    s.AtriumChance = 0f;
-                    s.RotundaChance = 0f;
-                    s.CornerCutChance = 0f;
-                    break;
-                case HouseKind.Garage:
-                    // a box of a building: the hall two storeys high, the block beside it two floors, square rooms (not in the
-                    // rooms test: a house of every room type keeps its program)
-                    if (b.EveryRoomType) break;
-                    s.Garage = true;
-                    s.FloorsPerHouse = new[] { 2 };
-                    s.LinkedChance = 0f;
-                    s.AtriumChance = 0f;
-                    s.RotundaChance = 0f;
-                    s.CornerCutChance = 0f;
-                    s.DarkChance = b.DarkChance + 0.08f;
-                    break;
             }
+            HouseRules.For(kind).Shape(s, b); // a location's own plan
             return s;
         }
     }

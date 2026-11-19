@@ -54,7 +54,7 @@ namespace Stealth.Level
                 float pref = Preference(r.Type);
                 if (pref <= 0f || r.Area < MinArea || r.Levels != 1) continue;
                 // the apartment block's floors above the ground are one typical floor: the robots take a room down below
-                if (l.PlanKind == HouseKind.Apartments && r.Floor != 0) continue;
+                if (!HouseRules.Of(l).ChargingRoomOn(r)) continue;
                 if (r.Id == l.LobbyRoom || r.Id == l.VaultRoom || r.Id == l.HiddenRoom || r.Id == l.StorageRoom) continue;
                 if (l.ExitRoom == r.Id) continue;
                 bool onStairs = false;

@@ -110,7 +110,7 @@ namespace Stealth.Player
                     Audio.Sfx.At(Audio.Sfx.Bank?.Stash, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
                     if (safe != null)
                     {
-                        Link.SendOpenSafe(safe.Index);
+                        Link.SendUse(UseKind.Safe, safe.Index);
                     }
                     else SolveConsole(CrackingConsole);
                     StopCracking();

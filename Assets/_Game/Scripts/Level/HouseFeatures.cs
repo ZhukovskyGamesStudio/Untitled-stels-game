@@ -98,22 +98,10 @@ namespace Stealth.Level
     /// </summary>
     public static class HouseFeatures
     {
-        public static Location LocationOf(HouseKind kind) => kind switch
-        {
-            HouseKind.Hospital => Location.Hospital,
-            HouseKind.Garage => Location.Garage,
-            HouseKind.Apartments => Location.Apartments,
-            _ => Location.Office,
-        };
+        public static Location LocationOf(HouseKind kind) => HouseRules.For(kind).Location;
 
         /// <summary>The location's point of interest; none in an apartment block (its own find is the shelter map).</summary>
-        public static PropKind? PointOfInterestKind(Location location) => location switch
-        {
-            Location.Hospital => PropKind.MedTable,
-            Location.Garage => PropKind.Workbench,
-            Location.Apartments => null,
-            _ => PropKind.Programmer,
-        };
+        public static PropKind? PointOfInterestKind(Location location) => HouseRules.For(location).PointOfInterest;
 
         /// <summary>
         /// The apartment block's find: the map to the survivors' shelter, hidden in one flat above the ground floor (its own
@@ -123,7 +111,7 @@ namespace Stealth.Level
         public static void PlanShelterMap(LevelLayout l)
         {
             l.MapFlat = l.MapRoom = -1;
-            if (l.PlanKind != HouseKind.Apartments) return;
+            if (!HouseRules.Of(l).HasShelterMap) return;
             var flats = new SortedSet<int>();
             foreach (var r in l.Rooms) if (r.Flat >= 0 && (r.Floor > 0 || l.Floors == 1)) flats.Add(r.Flat);
             if (flats.Count == 0) return;

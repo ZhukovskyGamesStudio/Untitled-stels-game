@@ -64,6 +64,9 @@ namespace Stealth.Items
 
         bool IReachTarget.CanReach(Vector3 player) => Index >= 0 && !Opened;
         (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.15f, transform.position + Vector3.up * 0.9f, 0.45f);
+        Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
+        float IReachTarget.MaxReach => float.PositiveInfinity;
+        Transform IReachTarget.ReachRoot => transform;
         Vector3? IReachTarget.HandsTo => transform.position + Vector3.up * 0.5f;
 
         /// <summary>Where the loot falls out: in front of the safe, towards the middle of its room.</summary>

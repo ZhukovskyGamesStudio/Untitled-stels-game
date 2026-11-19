@@ -219,6 +219,9 @@ namespace Stealth.UI
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
             Level.UseKind.VentGrate => ReticleIcon.Hand,
             Level.UseKind.ShaftHatch => ReticleIcon.Lever,
+            Level.UseKind.DoorLock => ReticleIcon.Lock,
+            Level.UseKind.Safe => ReticleIcon.Safe,
+            Level.UseKind.StoragePart => ReticleIcon.Search,
             _ => ReticleIcon.Dot,
         };
     }

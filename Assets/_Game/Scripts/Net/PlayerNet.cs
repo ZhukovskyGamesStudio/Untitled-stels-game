@@ -121,9 +121,6 @@ namespace Stealth.Net
         public void SendHitFeedback(Vector3 awayFromSource) => HitFeedbackRpc(awayFromSource);
         public void SendPing(Vector3 position) => PingRpc(position);
         public void SendHatch(bool hide) => HatchRpc(hide);
-        public void SendUnlockDoor(int door) => UnlockDoorRpc(door);
-        public void SendOpenSafe(int safe) => OpenSafeRpc(safe);
-        public void SendToggleStorage(int prop, int part) => ToggleStorageRpc(prop, part);
         public void SendUseHand() => UseHandRpc();
 
         [Rpc(SendTo.Server)]
@@ -154,14 +151,6 @@ namespace Stealth.Net
         [Rpc(SendTo.Server)]
         void HatchRpc(bool hide) => m_Player.OnHatchRequest(hide);
 
-        [Rpc(SendTo.Server)]
-        void UnlockDoorRpc(int door) => GameManager.Instance?.UnlockDoorServer(m_Player, door);
-
-        [Rpc(SendTo.Server)]
-        void OpenSafeRpc(int safe) => GameManager.Instance?.OpenSafeServer(m_Player, safe);
-
-        [Rpc(SendTo.Server)]
-        void ToggleStorageRpc(int prop, int part) => GameManager.Instance?.ToggleStorageServer(m_Player, prop, part);
         public void SendMark(Detector target) => MarkRpc(target.GetComponent<NetworkObject>());
         public void SendMarkThing(Vector3 point) => MarkThingRpc(point);
 

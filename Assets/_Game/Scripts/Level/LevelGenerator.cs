@@ -341,95 +341,161 @@ namespace Stealth.Level
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
             FeatureSettings features, bool classic, bool classicEnemies = false)
         {
-            building ??= new BuildingSettings();
-            security ??= new SecuritySettings();
-            features ??= new FeatureSettings();
             var kind = HouseKinds.Of(seed, levelIndex);
-            building = HouseKinds.Apply(kind, building);
-            var rng = new System.Random(seed);
-            int floors = building.FloorsFor(levelIndex);
+            var h = new House
+            {
+                Seed = seed,
+                LevelIndex = levelIndex,
+                Players = players,
+                Kind = kind,
+                Classic = classic,
+                ClassicEnemies = classicEnemies,
+                Building = HouseKinds.Apply(kind, building ?? new BuildingSettings()),
+                Security = security ?? new SecuritySettings(),
+                Features = features ?? new FeatureSettings(),
+                Rng = new System.Random(seed),
+            };
+            foreach (var step in Steps) step(h);
+            return h.L;
+        }
+
+        /// <summary>What the steps of one house's generation share (<see cref="Steps"/>).</summary>
+        sealed class House
+        {
+            public int Seed, LevelIndex, Players;
+            public HouseKind Kind;
+            public bool Classic, ClassicEnemies;
+            public BuildingSettings Building;
+            public SecuritySettings Security;
+            public FeatureSettings Features;
+            /// <summary>The house's own stream: the light of the rooms, then the guards (in this order).</summary>
+            public System.Random Rng;
+            /// <summary>Has a storage room (decided before the plan: the program holds it).</summary>
+            public bool Storage;
+            public LevelLayout L;
+            /// <summary>The walk check of the accepted plan (its grid is reused by the furnisher), or null.</summary>
+            public Furnisher Checker;
+            public Furnisher Furnisher;
+            public PlanRoom EntryRoom;
+            public readonly System.Diagnostics.Stopwatch Watch = new();
+        }
+
+        /// <summary>
+        /// The generation of a house, step by step, in this order (each step reads what the ones before it decided; the
+        /// house's own stream <see cref="House.Rng"/> is drawn by <see cref="DarkRooms"/> and then <see cref="Guards"/> only).
+        /// </summary>
+        static readonly System.Action<House>[] Steps =
+        {
+            DrawPlan,        // the plan, checked: every room can be walked to (else the next variant of the same house)
+            HiddenRoom,      // a room behind illusion walls (the doorways listed again)
+            DarkRooms,       // dark rooms, flickering lamps
+            Hatches,         // the shaft to the basement, the exit hatch, the spawns; the furnisher starts here
+            RoomTypes,       // rule enforcement and zoning (not where the location's plan typed the rooms)
+            SpecialRooms,    // the main job, the storage room, the control room, the charging room
+            Ducts,           // the crawl ducts over the ceilings and the ways up to their grates
+            Furnish,         // patrol points kept free, every room furnished, then walkable
+            Guards,          // guards, devices, lasers, terminals (or the quiet house's own doors)
+            Extras,          // key doors, crates, the point of interest, wardens, the main job's finish, the shelter map
+            DoorKinds,       // every door's kind, its way and hinges, round the furniture now there
+            Finish,          // the building's bounds, windows, dimming
+        };
+
+        static void DrawPlan(House h)
+        {
+            var building = h.Building;
+            int floors = building.FloorsFor(h.LevelIndex);
             // what the house is made of comes first: its rooms, their types and sizes (corridors not counted); the plan is
             // then laid out to hold them. A storage room (it brings the workers) is decided here, from the house's own stream.
-            float roomArea = building.RoomsFor(levelIndex, players) * 100f * PlanGenerator.RoomShareOfArea;
-            bool storage = building.EveryRoomType || (features.StorageChance > 0f && levelIndex >= features.StorageFromHouse
-                && new System.Random(LevelRandom.Mix(seed, Salt.StorageRoom, 0)).NextDouble() < features.StorageChance);
+            float roomArea = building.RoomsFor(h.LevelIndex, h.Players) * 100f * PlanGenerator.RoomShareOfArea;
+            h.Storage = building.EveryRoomType || (h.Features.StorageChance > 0f && h.LevelIndex >= h.Features.StorageFromHouse
+                && new System.Random(LevelRandom.Mix(h.Seed, Salt.StorageRoom, 0)).NextDouble() < h.Features.StorageChance);
             // Generate and check: a plan where some room cannot be walked to (a doorway that did not fit, a sealed
             // corner) is thrown away and the next variant of the same house is drawn (deterministic: attempt by attempt).
-            LevelLayout l = null;
-            Furnisher checker = null;
-            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var watch = h.Watch;
+            watch.Restart();
             int attempts = building.HasRoomLimits ? 64 : 16;
             for (int attempt = 0; attempt < attempts; attempt++)
             {
-                int planSeed = attempt == 0 ? seed : LevelRandom.Mix(seed, Salt.PlanAttempt, attempt);
-                var o = classic
-                    ? PlanGenerator.GenerateClassic(planSeed, levelIndex, floors, building.RoomsFor(levelIndex, players) * 100f, building)
-                    : PlanGenerator.Generate(planSeed, levelIndex, floors, RoomProgram.Make(planSeed, floors, roomArea, building, storage), building);
-                l = new LevelLayout
+                int planSeed = attempt == 0 ? h.Seed : LevelRandom.Mix(h.Seed, Salt.PlanAttempt, attempt);
+                var o = h.Classic
+                    ? PlanGenerator.GenerateClassic(planSeed, h.LevelIndex, floors, building.RoomsFor(h.LevelIndex, h.Players) * 100f, building)
+                    : PlanGenerator.Generate(planSeed, h.LevelIndex, floors, RoomProgram.Make(planSeed, floors, roomArea, building, h.Storage), building);
+                var l = h.L = new LevelLayout
                 {
-                    Seed = seed,
-                    LevelIndex = levelIndex,
-                    ClassicEnemies = classicEnemies,
-                    Players = Mathf.Max(1, players),
+                    Seed = h.Seed,
+                    LevelIndex = h.LevelIndex,
+                    ClassicEnemies = h.ClassicEnemies,
+                    Players = Mathf.Max(1, h.Players),
                     Floors = floors,
                     Plan = o.Plan,
                     LobbyRoom = o.Lobby,
                     Mass = o.Mass,
-                    Kind = kind,
+                    Kind = h.Kind,
                     OwnPlan = building.Garage || building.Hospital || building.Apartments,
                     PlanAttempt = attempt,
                 };
                 l.Stairs.AddRange(o.Stairs);
                 RaiseVents(l, building);
                 Doorways(l);
-                if (building.Garage) WidenBoothDoorway(l);
+                HouseRules.Of(l).AfterDoorways(l);
                 l.HatchPosition = EntryHatch(l);
                 long planMs = watch.ElapsedMilliseconds;
                 bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
-                checker = o.Unreached == 0 && countOk ? new Furnisher(l, new System.Random(0)) : null;
-                bool ok = checker != null && checker.Unreached().Count == 0;
+                h.Checker = o.Unreached == 0 && countOk ? new Furnisher(l, new System.Random(0)) : null;
+                bool ok = h.Checker != null && h.Checker.Unreached().Count == 0;
                 Timing.Plan += planMs; Timing.Check += watch.ElapsedMilliseconds - planMs;
                 watch.Restart();
                 if (ok) break;
             }
+        }
 
-            // Sometimes a room hides behind illusion walls (it changes the openings: the doorways are listed again).
-            l.HiddenRoom = HouseFeatures.HideRoom(l, features);
-            if (l.HiddenRoom >= 0)
+        /// <summary>Sometimes a room hides behind illusion walls (it changes the openings: the doorways are listed again).</summary>
+        static void HiddenRoom(House h)
+        {
+            var l = h.L;
+            l.HiddenRoom = HouseFeatures.HideRoom(l, h.Features);
+            if (l.HiddenRoom < 0) return;
+            // an illusion wall may now be where a high vent's desks would stand: that vent stays low (no desk in front of the way in)
+            for (int i = 0; i < l.Plan.Openings.Count; i++)
             {
-                // an illusion wall may now be where a high vent's desks would stand: that vent stays low (no desk in front of the way in)
-                for (int i = 0; i < l.Plan.Openings.Count; i++)
-                {
-                    var o = l.Plan.Openings[i];
-                    if (!o.High || DesksFit(l, o)) continue;
-                    o.High = false;
-                    l.Plan.Openings[i] = o;
-                }
-                l.Doorways.Clear();
-                Doorways(l);
-                checker = null; // its walk grid knew the old doors
+                var o = l.Plan.Openings[i];
+                if (!o.High || DesksFit(l, o)) continue;
+                o.High = false;
+                l.Plan.Openings[i] = o;
             }
+            l.Doorways.Clear();
+            Doorways(l);
+            h.Checker = null; // its walk grid knew the old doors
+        }
 
-            // Light: some rooms are dark (robots see worse there), some lamps flicker. Never the lobby.
-            foreach (var r in l.Rooms)
+        /// <summary>Light: some rooms are dark (robots see worse there), some lamps flicker. Never the lobby.</summary>
+        static void DarkRooms(House h)
+        {
+            var b = h.Building;
+            foreach (var r in h.L.Rooms)
             {
-                if (r.Id == l.LobbyRoom) continue;
-                double roll = rng.NextDouble();
-                float dark = building.DarkChance + building.DarkChancePerHouse * Mathf.Min(levelIndex, building.MaxDarkHouses);
+                if (r.Id == h.L.LobbyRoom) continue;
+                double roll = h.Rng.NextDouble();
+                float dark = b.DarkChance + b.DarkChancePerHouse * Mathf.Min(h.LevelIndex, b.MaxDarkHouses);
                 r.Dark = roll < dark * (r.Type == RoomType.Corridor ? 0.6f : 1f);
-                r.Flicker = !r.Dark && roll > 1.0 - building.FlickerChance;
+                r.Flicker = !r.Dark && roll > 1.0 - b.FlickerChance;
             }
+        }
 
-            // The hatches where a building meets the sewer: the entry in the plant room's corner off the lobby (by the drain's
-            // way out to the street), the exit in a corner of a far room with drains (a wet room; the shop: its workshop).
-            var lobby = l.Lobby;
+        /// <summary>
+        /// Where the building meets the sewer: the shaft down to the basement the team arrives in (<see cref="Basement"/>), its
+        /// lid in the plant room's corner off the lobby (the building's drain leaves for the sewer there; the lobby's where a
+        /// house has no plant room), the exit hatch in a corner of a far room with drains (a wet room; the shop: its workshop).
+        /// The furnisher starts here: the lid, the hatch and the high vents' desks are its first pieces.
+        /// </summary>
+        static void Hatches(House h)
+        {
+            var l = h.L;
             l.HatchPosition = EntryHatch(l);
-            var entryRoom = l.Plan.RoomAt(l.HatchPosition + Vector3.up * 0.3f) ?? lobby;
-            var furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(seed, Salt.Furniture, 0)));
-            if (checker != null) furnisher.ShareWalk(checker);
+            var entryRoom = h.EntryRoom = l.Plan.RoomAt(l.HatchPosition + Vector3.up * 0.3f) ?? l.Lobby;
+            var furnisher = h.Furnisher = new Furnisher(l, new System.Random(LevelRandom.Mix(h.Seed, Salt.Furniture, 0)));
+            if (h.Checker != null) furnisher.ShareWalk(h.Checker);
             furnisher.Reserve(0, l.HatchPosition, 2.0f);
-            // the shaft down to the basement the team arrives in (Basement): its lid where the entry hatch was, in the plant
-            // room's corner (the building's drain leaves for the sewer there), the lobby's where a house has no plant room
             // (the lid's hinge away from the side a climber steps off to; the basement's tunnel runs under the house)
             l.ShaftExit = ShaftExit(l.HatchPosition, entryRoom.Center);
             furnisher.Put(entryRoom, PropKind.ShaftHatch, l.HatchPosition, Mathf.Atan2(l.ShaftExit.x, l.ShaftExit.z) * Mathf.Rad2Deg);
@@ -445,32 +511,59 @@ namespace Stealth.Level
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
             l.PlayerSpawns.AddRange(Basement.Spawns(l.Cellar));
+        }
 
-            // every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows)
-            // (the apartment block: every room is its flat's, where its plan has it — a kitchen in every flat)
-            if (!building.Apartments) RoomRules.Enforce(l.Plan, building.RoomTypeRules);
-            // zoning: themed rooms capped (one kitchen a floor…), work rooms to the facade, service rooms inside, toilets by the stairs
+        /// <summary>
+        /// Every room as its type allows (the shaping after the types may have taken a kitchen's size or its windows), then
+        /// zoning: themed rooms capped (one kitchen a floor…), work rooms to the facade, service rooms inside, toilets by the
+        /// stairs — where the location lets them retype its rooms (<see cref="HouseRules.RetypesRooms"/>: the apartment block's
+        /// every room is its flat's).
+        /// </summary>
+        static void RoomTypes(House h)
+        {
+            var l = h.L;
+            var b = h.Building;
+            bool retype = HouseRules.Of(l).RetypesRooms;
+            if (retype) RoomRules.Enforce(l.Plan, b.RoomTypeRules);
             l.RoomSteps = RoomDepth.Of(l.Plan, l.Stairs, l.LobbyRoom);
-            if (!building.Apartments) Zoning.Arrange(l.Plan, l.Stairs, building.RoomTypeRules, l.RoomSteps, building.RoomAdjacency);
+            if (retype) Zoning.Arrange(l.Plan, l.Stairs, b.RoomTypeRules, l.RoomSteps, b.RoomAdjacency);
+        }
 
-            // the house's main job: the vault and its lock panels, or the hostage's cage (their places kept free)
-            HouseFeatures.PlanObjective(l, features, furnisher);
-            // the locked storage room (furnished as storage: shelves and a pile; it brings the workers)
-            l.RoomRules = building.RoomTypeRules;
-            StorageRooms.Plan(l, features, storage);
-            EnsureControlRoom(l, building);
-            // the robots' charging room: a tech room they took over (every house has one; the guards rest there)
-            if (!building.EveryRoomType) ChargingRooms.Convert(l); // (the rooms test keeps every type)
+        /// <summary>
+        /// The house's main job (the vault and its lock panels, or the hostage's cage: their places kept free), the locked
+        /// storage room (shelves and a pile; it brings the workers), the robots' control room and their charging room (a tech
+        /// room they took over: every house has one, the guards rest there).
+        /// </summary>
+        static void SpecialRooms(House h)
+        {
+            var l = h.L;
+            HouseFeatures.PlanObjective(l, h.Features, h.Furnisher);
+            l.RoomRules = h.Building.RoomTypeRules;
+            StorageRooms.Plan(l, h.Features, h.Storage);
+            EnsureControlRoom(l, h.Building);
+            if (!h.Building.EveryRoomType) ChargingRooms.Convert(l); // (the rooms test keeps every type)
+        }
 
-            // the crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
-            // within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to)
-            VentPlan.Plan(l, building.VentCoverage, building.ClosedGrateChance, building.ClimbChance);
-            PlaceClimbs(l, furnisher);
+        /// <summary>
+        /// The crawl ducts over the ceilings (the arrival room to the exit room first); a grate is climbed from anywhere
+        /// within reach, so the furniture stays where it would be (VentGrate finds a free spot to drop down to).
+        /// </summary>
+        static void Ducts(House h)
+        {
+            var b = h.Building;
+            VentPlan.Plan(h.L, b.VentCoverage, b.ClosedGrateChance, b.ClimbChance);
+            PlaceClimbs(h.L, h.Furnisher);
+        }
 
-            // patrol points (room centres and the middles of big rooms) stay free of furniture
+        /// <summary>Patrol points (room centres and the middles of big rooms) kept free, every room furnished, then made walkable.</summary>
+        static void Furnish(House h)
+        {
+            var l = h.L;
+            var furnisher = h.Furnisher;
             Patrols(l);
             foreach (var p in l.PatrolPoints) furnisher.Reserve(LevelLayout.FloorOf(p.y), p, 0.75f);
-            l.WindowLimit = building.WindowLimit(seed); // the furniture keeps the windows clear: it must know which ones there are
+            l.WindowLimit = h.Building.WindowLimit(h.Seed); // the furniture keeps the windows clear: it must know which ones there are
+            var watch = h.Watch;
             watch.Restart();
             foreach (var r in l.Rooms) furnisher.FurnishRoom(r);
             Timing.Furnish += watch.ElapsedMilliseconds;
@@ -480,32 +573,51 @@ namespace Stealth.Level
             DropFailedClimbs(l);
             Timing.Walk += watch.ElapsedMilliseconds;
             ChargingRooms.Docks(l);
-            if (security.Enemies)
+        }
+
+        /// <summary>Guards, devices, lasers and terminals — or, in a quiet house (the rooms test), its idle consoles and its own doors.</summary>
+        static void Guards(House h)
+        {
+            var l = h.L;
+            if (h.Security.Enemies)
             {
-                PlaceSecurity(l, rng, building, security, features != null ? features.StorageWorkers : 0);
-                PlaceTerminals(l, security);
+                PlaceSecurity(l, h.Rng, h.Building, h.Security, h.Features != null ? h.Features.StorageWorkers : 0);
+                PlaceTerminals(l, h.Security);
             }
             else
             {
                 IdleConsoles(l);
                 OwnDoors(l); // a quiet house (the rooms test) still has its flats' and bathrooms' doors
             }
-            StorageRooms.Finish(l, features);
-            HouseFeatures.KeyDoors(l, features);
-            HouseFeatures.Crates(l, features);
+        }
+
+        /// <summary>The storage room's finish, key doors, crates, the point of interest, wardens, the main job's finish, the shelter map.</summary>
+        static void Extras(House h)
+        {
+            var l = h.L;
+            var f = h.Features;
+            StorageRooms.Finish(l, f);
+            HouseFeatures.KeyDoors(l, f);
+            HouseFeatures.Crates(l, f);
             HouseFeatures.PointOfInterest(l);
-            if (security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, features); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
+            if (h.Security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, f); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
             HouseFeatures.FinishObjective(l);
             HouseFeatures.PlanShelterMap(l);
             DropFailedClimbs(l); // (and anything since that changed their pieces)
-            DoorRules.Plan(l); // every door's kind, the way it opens and its hinges, round the furniture now there
+        }
 
-            float height = floors * FloorHeight;
+        /// <summary>Every door's kind, the way it opens and its hinges, round the furniture now there.</summary>
+        static void DoorKinds(House h) => DoorRules.Plan(h.L);
+
+        static void Finish(House h)
+        {
+            var l = h.L;
+            var b = h.Building;
+            float height = l.Floors * FloorHeight;
             l.BuildingBounds = new Bounds(new Vector3(l.SizeX / 2f, height / 2f, l.SizeZ / 2f), new Vector3(l.SizeX, height, l.SizeZ));
-            l.WindowLimit = building.WindowLimit(seed);
-            l.DarkRoomsDim = building.DarkRoomsDim;
-            l.DimShare = building.DimShare;
-            return l;
+            l.WindowLimit = b.WindowLimit(h.Seed);
+            l.DarkRoomsDim = b.DarkRoomsDim;
+            l.DimShare = b.DimShare;
         }
 
         /// <summary>
@@ -601,9 +713,7 @@ namespace Stealth.Level
         {
             // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
             var reach = VentPlan.VoidReach(l, l.LobbyRoom);
-            if (l.PlanKind == HouseKind.Garage)
-                foreach (var r in l.Rooms)
-                    if (r.Type == RoomType.Workshop && r.Floor == 0 && VentPlan.CanReach(l, r, reach)) return r;
+            if (HouseRules.Of(l).ExitRoom(l, reach) is PlanRoom own) return own;
             PlanRoom best = null, wet = null;
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
@@ -934,7 +1044,7 @@ namespace Stealth.Level
         }
 
         /// <summary>The shop's paint booth: its one door widened for a car (it is driven in), remembered for its big sliding door.</summary>
-        static void WidenBoothDoorway(LevelLayout l)
+        internal static void WidenBoothDoorway(LevelLayout l)
         {
             int booth = -1;
             foreach (var r in l.Rooms) if (r.Type == RoomType.PaintBooth) booth = r.Id;

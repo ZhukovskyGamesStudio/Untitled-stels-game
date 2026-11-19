@@ -116,7 +116,7 @@ namespace Stealth.Player
             StorageTarget = storage;
             StoragePart = storage.PartOf(hit.collider, hit.point);
             if (StoragePart < 0 || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
-            Link.SendToggleStorage(storage.Index, StoragePart);
+            Link.SendUse(UseKind.StoragePart, OpenKeys.StoragePart(storage.Index, StoragePart));
         }
 
         /// <summary>Locked door in reach (hold E to hack), or null.</summary>

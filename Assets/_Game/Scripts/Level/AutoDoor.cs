@@ -181,17 +181,20 @@ namespace Stealth.Level
         // from outside the storage room's door: its terminal
         bool IReachTarget.CanReach(Vector3 player) => Locked && !NeedsKey && (!Storage || IsInside(transform.position, Inward, player));
         (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.2f, transform.position + Vector3.up * 2.1f, 0.6f);
+        Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
+        float IReachTarget.MaxReach => float.PositiveInfinity;
+        Transform IReachTarget.ReachRoot => transform;
         Vector3? IReachTarget.HandsTo => null; // the door is the wall
 
-        float m_Open; // 0 closed .. 1 open
-        float m_OpenB; // a door-and-a-half's narrow leaf
+        OpenTween m_Open; // 0 closed .. 1 open
+        OpenTween m_OpenB; // a door-and-a-half's narrow leaf
         float m_Spin; // the vault's wheel: 0 .. 1 turned
         float m_Way = 1f; // a both-ways door: +1 opens to +Z, −1 to −Z
-        bool m_Opening, m_Mirrored;
-        public bool IsOpen => m_Open > 0.5f;
+        bool m_Mirrored;
+        public bool IsOpen => m_Open.Value > 0.5f;
         /// <summary>The vault's door a player has opened (unlocking alone does not move it).</summary>
         public bool SwungOpen => Vault && World.IsOpened(OpenKeys.Stage(JobStage.VaultOpen));
-        public float OpenAmount => m_Open;
+        public float OpenAmount => m_Open.Value;
 
         /// <summary>
         /// Hangs the leaves on the other jamb (<see cref="DoorSpec.HingeRight"/>): the hinges, the leaves under them, the
@@ -274,7 +277,7 @@ namespace Stealth.Level
                 openB = false;
                 for (int k = players; k < s_Agents.Count && !openB; k++) openB = Near(here, s_Agents[k]);
             }
-            if (BothWays && open && m_Open < 0.02f && s_Agents.Count > 0)
+            if (BothWays && open && m_Open.Value < 0.02f && s_Agents.Count > 0)
             {
                 // from shut: away from the nearest agent
                 var nearest = s_Agents[0];
@@ -282,34 +285,36 @@ namespace Stealth.Level
                 m_Way = AwayFrom(here, transform.forward, nearest);
             }
             if (Swing != null && Vault) open = !locked && SwungOpen; // unlocked by the panels, opened by a player
-            if (open != m_Opening)
-            {
-                m_Opening = open;
-                if (Sound == DoorSound.Slide || open) DoorSounds.Play(Sound, transform.position + Vector3.up * 1.2f, open); // a hinged door's latch: as it meets the frame
-            }
-            if (Swing != null)
+            float dt = Time.deltaTime, was = m_Open.Value;
+            OpenMove move;
+            if (Swing != null && Vault)
             {
                 // the vault door: heavy and slow; its wheel turns first, then it swings in and stays open
-                float was = m_Open;
-                if (Vault) VaultStep(open, Time.deltaTime, ref m_Spin, ref m_Open);
-                else m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / Mathf.Max(0.05f, SwingTime));
-                m_OpenB = Mathf.MoveTowards(m_OpenB, openB ? 1f : 0f, Time.deltaTime / Mathf.Max(0.05f, SwingTime));
-                if (Sound != DoorSound.Slide && was > 0f && m_Open <= 0f) DoorSounds.Play(Sound, transform.position + Vector3.up * 1.2f, false);
+                move = m_Open.Step(open, 0f, 1f); // the word only (a house built with it open: snapped open, wheel turned)
+                if (m_Open.Value >= 1f) m_Spin = 1f;
+                VaultStep(open, dt, ref m_Spin, ref m_Open.Value);
+            }
+            else move = m_Open.Step(open, dt, Swing != null ? Mathf.Max(0.05f, SwingTime) : SlideTime);
+            // a slide sounds as it starts either way; a hinged door's latch as it meets the frame
+            if (move == OpenMove.StartedOpening || (move == OpenMove.StartedShutting && Sound == DoorSound.Slide)) DoorSounds.Play(Sound, transform.position + Vector3.up * 1.2f, move == OpenMove.StartedOpening);
+            else if (Sound != DoorSound.Slide && was > 0f && m_Open.Value <= 0f) DoorSounds.Play(Sound, transform.position + Vector3.up * 1.2f, false);
+            if (Swing != null)
+            {
+                m_OpenB.Step(openB, dt, Mathf.Max(0.05f, SwingTime));
                 if (Wheel != null) Wheel.localRotation = Quaternion.Euler(0f, 0f, -VaultWheelTurns * 360f * Mathf.SmoothStep(0f, 1f, m_Spin));
-                ShowSwing(m_Open, SecondForRobots ? m_OpenB : m_Open, m_Way);
-                Blocker.enabled = m_Open < 0.15f;
-                if (BlockerB != null) BlockerB.enabled = m_OpenB < 0.15f;
+                ShowSwing(m_Open.Value, SecondForRobots ? m_OpenB.Value : m_Open.Value, m_Way);
+                Blocker.enabled = m_Open.Value < 0.15f;
+                if (BlockerB != null) BlockerB.enabled = m_OpenB.Value < 0.15f;
                 return;
             }
-            m_Open = Mathf.MoveTowards(m_Open, open ? 1f : 0f, Time.deltaTime / SlideTime);
-            float slide = Width / 4f * m_Open;
+            float slide = Width / 4f * m_Open.Value;
             PanelA.localPosition = new Vector3(-Width / 4f - slide, PanelA.localPosition.y, 0);
             PanelB.localPosition = new Vector3(Width / 4f + slide, PanelB.localPosition.y, 0);
             if (Padlocks != null)
                 foreach (var p in Padlocks)
                     if (p != null) p.localPosition = new Vector3(-slide, p.localPosition.y, p.localPosition.z); // rides on panel A's edge
             // Solid only while (almost) closed: never trap anyone in the panels.
-            Blocker.enabled = m_Open < 0.15f;
+            Blocker.enabled = m_Open.Value < 0.15f;
         }
 
         void ShowLock(bool locked)

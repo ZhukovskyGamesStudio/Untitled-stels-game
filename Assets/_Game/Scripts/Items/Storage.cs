@@ -35,7 +35,8 @@ namespace Stealth.Items
             public Quaternion ClosedRot;
             public Vector3 Hinge;       // doors: the vertical axis at the front edge, world
             public bool RightHinge;     // doors: the right leaf of a pair, hinged on its right edge, swings the other way
-            public float T01;           // 0 closed .. 1 open (shown)
+            public OpenTween Tween;     // 0 closed .. 1 open (shown)
+            public bool Posed;          // shown at least once (the first step snaps)
             public Bounds Closed;       // world bounds when closed
             public Collider[] Colliders;
         }
@@ -81,7 +82,8 @@ namespace Stealth.Items
                 p.Closed = closed[i];
                 p.RightHinge = !Drawers && rightHinged[i];
                 p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward, p.RightHinge);
-                p.T01 = 0f;
+                p.Tween = default;
+                p.Posed = false;
                 foreach (var r in p.T.GetComponentsInChildren<Renderer>(true))
                 {
                     r.GetPropertyBlock(block);
@@ -97,10 +99,11 @@ namespace Stealth.Items
             for (int i = 0; i < m_Parts.Count; i++)
             {
                 var p = m_Parts[i];
-                float target = World.IsOpened(OpenKeys.Storage(Index, i)) ? 1f : 0f;
-                if (Mathf.Approximately(p.T01, target)) continue;
-                p.T01 = Mathf.MoveTowards(p.T01, target, Time.deltaTime / StorageMath.OpenSeconds);
-                Pose(p, StorageMath.Ease(p.T01));
+                float was = p.Tween.Value;
+                p.Tween.Step(World.IsOpened(OpenKeys.Storage(Index, i)), Time.deltaTime, StorageMath.OpenSeconds);
+                if (p.Posed && p.Tween.Value == was) continue;
+                p.Posed = true;
+                Pose(p, p.Tween.Smooth);
             }
         }
 
@@ -180,8 +183,6 @@ namespace Stealth.Items
         public const float DrawerTravel = 0.32f;
         /// <summary>How far a locker door swings, degrees.</summary>
         public const float DoorAngle = 105f;
-
-        public static float Ease(float t) => t * t * (3f - 2f * t);
 
         /// <summary>
         /// The hinge of a door: the front edge on its left (looking at the furniture from the front, <paramref name="forward"/>

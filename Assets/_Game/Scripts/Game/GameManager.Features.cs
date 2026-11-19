@@ -85,6 +85,16 @@ namespace Stealth.Game
         public void UseServer(PlayerController player, UseKind kind, int index)
         {
             if (player == null || player.Downed) return;
+            switch (kind)
+            {
+                // worked at with the hands, but not Interactables: their handlers check reach themselves
+                case UseKind.DoorLock: UnlockDoorServer(player, index); return;
+                case UseKind.Safe: OpenSafeServer(player, index); return;
+                case UseKind.StoragePart:
+                    var (prop, part) = OpenKeys.StoragePartOf(index);
+                    ToggleStorageServer(player, prop, part);
+                    return;
+            }
             var thing = Interactable.All.FirstOrDefault(i => i.Kind == kind && i.Index == index);
             if (thing == null) return;
             if (!ServerReach.WithinFlat(player.transform.position, thing.Point, thing.Reach)) return;

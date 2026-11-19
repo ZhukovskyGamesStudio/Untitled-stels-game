@@ -35,7 +35,11 @@ namespace Stealth
         /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
         public static int Terminal(int terminal, int use) => Of(OpenKind.Terminal, terminal * TerminalUses + use);
         /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
-        public static int Storage(int prop, int part) => Of(OpenKind.Storage, prop * StorageParts + part);
+        public static int Storage(int prop, int part) => Of(OpenKind.Storage, StoragePart(prop, part));
+        /// <summary>A storage part as one number (a prop and its drawer or door: the index of <see cref="Stealth.Level.UseKind.StoragePart"/>).</summary>
+        public static int StoragePart(int prop, int part) => prop * StorageParts + part;
+        /// <summary>The prop and the part of <see cref="StoragePart"/>.</summary>
+        public static (int prop, int part) StoragePartOf(int index) => (index / StorageParts, index % StorageParts);
         public static int Crate(int prop) => Of(OpenKind.Crate, prop);
         public static int Med(ulong client) => Of(OpenKind.Med, (int)(client % MaxIndex));
         public static int Dryer(int prop) => Of(OpenKind.Dryer, prop);

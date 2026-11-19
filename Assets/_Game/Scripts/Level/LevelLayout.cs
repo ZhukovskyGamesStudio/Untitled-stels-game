@@ -305,7 +305,7 @@ namespace Stealth.Level
         /// <summary>The auto door <paramref name="i"/> is a flat's entry door (its hallway onto the apartment block's landing).</summary>
         public bool FlatEntry(int i)
         {
-            if (i < 0 || i >= AutoDoors.Count || Kind != HouseKind.Apartments) return false;
+            if (i < 0 || i >= AutoDoors.Count || PlanKind != HouseKind.Apartments) return false;
             var at = AutoDoors[i].position;
             foreach (var d in Doorways)
             {

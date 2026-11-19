@@ -134,12 +134,6 @@ namespace Stealth.Game
         void SendMarkThing(Vector3 point);
         /// <summary>Owner → server: hide in the hatch (true) or climb back out (false).</summary>
         void SendHatch(bool hide);
-        /// <summary>Owner → server: finished hacking the lock of this door (index in the layout's doors).</summary>
-        void SendUnlockDoor(int door);
-        /// <summary>Owner → server: cracked the dial of this safe (index in the layout's props).</summary>
-        void SendOpenSafe(int safe);
-        /// <summary>Owner → server: open or close a drawer / locker door (index in the layout's props, part of it).</summary>
-        void SendToggleStorage(int prop, int part);
         /// <summary>Owner → server: use the item in the hand (switch the flashlight, put a battery in a flashlight).</summary>
         void SendUseHand();
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>

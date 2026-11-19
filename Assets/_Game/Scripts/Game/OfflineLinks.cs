@@ -34,9 +34,6 @@ namespace Stealth.Game
         public void SendMark(Detector target) => m_P.OnMarkRequest(target);
         public void SendMarkThing(Vector3 point) => m_P.OnMarkThingRequest(point);
         public void SendHatch(bool hide) => m_P.OnHatchRequest(hide);
-        public void SendUnlockDoor(int door) => Game?.UnlockDoorServer(m_P, door);
-        public void SendOpenSafe(int safe) => Game?.OpenSafeServer(m_P, safe);
-        public void SendToggleStorage(int prop, int part) => Game?.ToggleStorageServer(m_P, prop, part);
         public void SendUseHand() => m_P.UseHandServer();
         public void SendHitFeedback(Vector3 awayFromSource) => m_P.OnHitFeedback(awayFromSource);
     }

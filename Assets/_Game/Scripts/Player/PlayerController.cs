@@ -419,7 +419,7 @@ namespace Stealth.Player
             DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) ?? StorageDoorAtTerminal() : null;
             if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
             {
-                Link.SendUnlockDoor(DoorTarget.Index);
+                Link.SendUse(UseKind.DoorLock, DoorTarget.Index);
             }
             DoorProgress = m_DoorHeld.Of(DoorTarget);
 
