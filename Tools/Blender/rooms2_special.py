@@ -516,6 +516,32 @@ def _scrolls(along, fixed, z, n=7, rr=0.045):
     return out
 
 
+def hostage(base, hip_y=0.55, back_y=0.68):
+    """The hostage, tied up: sitting on the floor at `base` against the back bars (+Y), knees up, arms round them,
+    facing the door (-Y); parts HostageBody (clothes), HostageSkin, HostageHair (+ shoes), HostageRope. Both cages."""
+    clothes = [
+        s.rbox((0.36, 0.22, 0.5), (0, back_y - 0.06, base + 0.42), r=0.07, seg=3, taper=(0.85, 0.9)),         # torso
+        s.rbox((0.34, 0.26, 0.16), (0, hip_y, base + 0.1), r=0.07, seg=3),                                     # hips
+    ]
+    for x in (-0.1, 0.1):
+        clothes.append(s.tube([Vector((x, hip_y - 0.02, base + 0.1)), Vector((x, 0.25, base + 0.46))], 0.075, res=2, smooth=False))   # thighs up
+        clothes.append(s.tube([Vector((x, 0.25, base + 0.46)), Vector((x, 0.16, base + 0.08))], 0.06, res=2, smooth=False))           # shins down
+        clothes.append(s.tube([Vector((x * 2.0, back_y - 0.06, base + 0.6)), Vector((x * 2.1, 0.36, base + 0.42))], 0.048, res=2, smooth=False))  # upper arms
+        clothes.append(s.tube([Vector((x * 2.1, 0.36, base + 0.42)), Vector((x * 0.5, 0.2, base + 0.45))], 0.042, res=2, smooth=False))  # forearms round the knees
+    s.part("HostageBody", clothes)
+    skin = [s.ball(0.1, (0, back_y - 0.1, base + 0.86), seg=16, scale=(0.95, 1.0, 1.1)),                        # head, a little bowed
+            s.rcyl(0.045, 0.1, (0, back_y - 0.07, base + 0.72), seg=10, r=0.01),                                 # neck
+            s.ball(0.042, (-0.05, 0.19, base + 0.45), seg=10), s.ball(0.042, (0.05, 0.19, base + 0.45), seg=10)]  # hands together
+    s.part("HostageSkin", skin)
+    hair = [s.ball(0.104, (0, back_y - 0.085, base + 0.9), seg=16, scale=(1.0, 1.05, 0.85))]
+    for x in (-0.1, 0.1):
+        hair.append(s.rbox((0.1, 0.22, 0.08), (x, 0.11, base + 0.04), r=0.03, seg=2))                           # shoes
+    s.part("HostageHair", hair)
+    rope = [torus(0.065, 0.014, (0, 0.19, base + 0.45), seg=14, seg_r=5, rot=(0, math.pi / 2, 0)),             # round the wrists
+            s.place(torus(0.2, 0.016, (0, 0, 0), seg=20, seg_r=5), (0, back_y - 0.06, base + 0.5), scale=(1.0, 0.65, 1.0))]  # round the chest
+    s.part("HostageRope", rope)
+
+
 def model_cage_storybook():
     """The hostage's cage in the storybook style (Blue Prince): a big ornate birdcage on a dark wooden plinth — turned
     brass corner columns with ball finials, rails top and bottom, round bars with two flat bands and a row of little
@@ -592,29 +618,7 @@ def model_cage_storybook():
     s.part("DoorEye", [s.rbox((0.07, 0.01, 0.09), (-(half - 0.3), fy - 0.095, 0.96), r=0.012, seg=2)])
 
     # the hostage: sitting on the plinth against the back bars, knees up, arms round them, facing the door
-    base = plinth
-    hip_y, back_y = 0.55, 0.68
-    clothes = [
-        s.rbox((0.36, 0.22, 0.5), (0, back_y - 0.06, base + 0.42), r=0.07, seg=3, taper=(0.85, 0.9)),         # torso
-        s.rbox((0.34, 0.26, 0.16), (0, hip_y, base + 0.1), r=0.07, seg=3),                                     # hips
-    ]
-    for x in (-0.1, 0.1):
-        clothes.append(s.tube([Vector((x, hip_y - 0.02, base + 0.1)), Vector((x, 0.25, base + 0.46))], 0.075, res=2, smooth=False))   # thighs up
-        clothes.append(s.tube([Vector((x, 0.25, base + 0.46)), Vector((x, 0.16, base + 0.08))], 0.06, res=2, smooth=False))           # shins down
-        clothes.append(s.tube([Vector((x * 2.0, back_y - 0.06, base + 0.6)), Vector((x * 2.1, 0.36, base + 0.42))], 0.048, res=2, smooth=False))  # upper arms
-        clothes.append(s.tube([Vector((x * 2.1, 0.36, base + 0.42)), Vector((x * 0.5, 0.2, base + 0.45))], 0.042, res=2, smooth=False))  # forearms round the knees
-    s.part("HostageBody", clothes)
-    skin = [s.ball(0.1, (0, back_y - 0.1, base + 0.86), seg=16, scale=(0.95, 1.0, 1.1)),                        # head, a little bowed
-            s.rcyl(0.045, 0.1, (0, back_y - 0.07, base + 0.72), seg=10, r=0.01),                                 # neck
-            s.ball(0.042, (-0.05, 0.19, base + 0.45), seg=10), s.ball(0.042, (0.05, 0.19, base + 0.45), seg=10)]  # hands together
-    s.part("HostageSkin", skin)
-    hair = [s.ball(0.104, (0, back_y - 0.085, base + 0.9), seg=16, scale=(1.0, 1.05, 0.85))]
-    for x in (-0.1, 0.1):
-        hair.append(s.rbox((0.1, 0.22, 0.08), (x, 0.11, base + 0.04), r=0.03, seg=2))                           # shoes
-    s.part("HostageHair", hair)
-    rope = [torus(0.065, 0.014, (0, 0.19, base + 0.45), seg=14, seg_r=5, rot=(0, math.pi / 2, 0)),             # round the wrists
-            s.place(torus(0.2, 0.016, (0, 0, 0), seg=20, seg_r=5), (0, back_y - 0.06, base + 0.5), scale=(1.0, 0.65, 1.0))]  # round the chest
-    s.part("HostageRope", rope)
+    hostage(plinth)
     return export("cage_storybook")
 
 

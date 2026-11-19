@@ -12,6 +12,29 @@ namespace Stealth.EditorTools
         /// a ceiling (the way into the crawl ducts), the lid over the shaft to the basement with its ladder and the storage
         /// robot's link up it. <paramref name="util"/>: the services' materials by <see cref="UtilitySlot"/>; <paramref name="led"/>: the switch's glow.
         /// </summary>
+        /// <summary>
+        /// A floor hatch's model (Tools/Blender/hatches.py) under <paramref name="parent"/>, painted with the services'
+        /// materials by part: the yellow frame and lifting bar, the dark bolts, ribs, knuckles and well, the steel lid,
+        /// the lamps in the hatch's colour. No colliders of its own (the prefab sets them), no shadows from the thin frame.
+        /// </summary>
+        static GameObject HatchModel(string file, Transform parent, Material[] util, float yaw = 0f)
+        {
+            var model = Model(file);
+            model.transform.SetParent(parent, false);
+            model.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = n.StartsWith("Frame") || n.StartsWith("Handle") ? util[(int)UtilitySlot.Warning]
+                    : n.StartsWith("Lid") ? util[(int)UtilitySlot.Panel]
+                    : n.StartsWith("EyeLamp") ? M("HatchRing")
+                    : util[(int)UtilitySlot.Dark];
+                if (n.StartsWith("Frame") || n.StartsWith("Bolts") || n.StartsWith("Pit") || n.StartsWith("EyeLamp"))
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            return model;
+        }
+
         static void BuildFittings(LevelArt art, Material[] util, Material led)
         {
             // a light switch beside a doorway (LightSwitch): a plate on the wall, a rocker that tilts, a small green lamp in it
@@ -65,26 +88,21 @@ namespace Stealth.EditorTools
             {
                 var go = new GameObject("ShaftHatch");
                 // the frame lies on the floor right round the hole (its inner edge at the hole's: 3 × 3 plan cells), the lid
-                // rests on its inner lip; the hinge along the frame's −Z bar
-                float half = Basement.ShaftHalf, bar = 0.12f, lip = 0.03f;
-                foreach (var (c, sz) in new[]
-                         {
-                             (new Vector3(0f, 0.012f, -half - bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)), (new Vector3(0f, 0.012f, half + bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)),
-                             (new Vector3(-half - bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)), (new Vector3(half + bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)),
-                         })
-                    Cube(go.transform, "Frame", c, sz, util[(int)UtilitySlot.Warning], collider: false);
+                // rests on its inner lip; the hinge along the frame's −Z bar (models: Tools/Blender/hatches.py)
+                float half = Basement.ShaftHalf, lip = 0.03f;
+                HatchModel("hatch_frame_shaft", go.transform, util);
                 var lid = new GameObject("Lid").transform;
                 lid.SetParent(go.transform, false);
                 lid.localPosition = new Vector3(0f, 0.024f, -half - lip);
                 float side = 2 * half + 2 * lip;
-                var plate = Cube(lid, "Plate", new Vector3(0f, 0.02f, side / 2f), new Vector3(side, 0.04f, side), util[(int)UtilitySlot.Panel], collider: true);
-                for (int i = 0; i < 5; i++)
-                    Cube(lid, "Rib", new Vector3(0f, 0.05f, 0.2f + i * (side - 0.4f) / 4f), new Vector3(side - 0.2f, 0.02f, 0.04f), util[(int)UtilitySlot.Dark], collider: false);
-                Cube(lid, "Handle", new Vector3(0f, 0.075f, side - 0.12f), new Vector3(0.3f, 0.04f, 0.04f), util[(int)UtilitySlot.Warning], collider: false);
+                HatchModel("hatch_lid_shaft", lid, util);
+                var plateCollider = lid.gameObject.AddComponent<BoxCollider>();
+                plateCollider.center = new Vector3(0f, 0.0175f, side / 2f);
+                plateCollider.size = new Vector3(side, 0.035f, side);
                 go.AddComponent<KeepUnmerged>(); // the lid moves: never baked into the furniture's merged mesh (it would stay shut there)
                 var h = go.AddComponent<ShaftHatch>();
                 h.Lid = lid;
-                h.LidCollider = plate.GetComponent<Collider>();
+                h.LidCollider = plateCollider;
                 var top = new GameObject("LadderTop");
                 top.transform.SetParent(go.transform, false);
                 top.AddComponent<ShaftLadder>().Top = true;

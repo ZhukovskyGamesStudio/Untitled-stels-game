@@ -811,15 +811,21 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("Balcony");
             const float L = 3.2f, D = 1.1f, slab = 0.18f, wall = 0.08f, h = 1.0f;
-            var concrete = M("Wall");
-            var steel = M("Metal");
-            Cube(root.transform, "Slab", new Vector3(0f, -slab / 2f, D / 2f), new Vector3(L, slab, D), concrete, true);
-            Cube(root.transform, "ParapetFront", new Vector3(0f, h / 2f, D - wall / 2f), new Vector3(L, h, wall), concrete, true);
+            // the look: Tools/Blender/balcony.py (a chamfered slab with a drip groove, parapet panels with recessed fields and
+            // a coping, a steel handrail on posts); the solid parts: the same boxes as ever
+            var model = Model("balcony");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "Wall", "Metal", "Metal");
+            void Solid(Vector3 c, Vector3 size)
+            {
+                var b = root.AddComponent<BoxCollider>();
+                b.center = c;
+                b.size = size;
+            }
+            Solid(new Vector3(0f, -slab / 2f, D / 2f), new Vector3(L, slab, D));
+            Solid(new Vector3(0f, h / 2f, D - wall / 2f), new Vector3(L, h, wall));
             foreach (float x in new[] { -1f, 1f })
-                Cube(root.transform, "ParapetSide", new Vector3(x * (L / 2f - wall / 2f), h / 2f, (D - wall) / 2f), new Vector3(wall, h, D - wall), concrete, true);
-            Cube(root.transform, "Rail", new Vector3(0f, h + 0.02f, D - wall / 2f), new Vector3(L + 0.02f, 0.04f, wall + 0.03f), steel, false);
-            foreach (float x in new[] { -1f, 1f })
-                Cube(root.transform, "RailSide", new Vector3(x * (L / 2f - wall / 2f), h + 0.02f, (D - wall) / 2f), new Vector3(wall + 0.03f, 0.04f, D - wall), steel, false);
+                Solid(new Vector3(x * (L / 2f - wall / 2f), h / 2f, (D - wall) / 2f), new Vector3(wall, h, D - wall));
             // the guard over the parapet: a box collider, nothing to see
             var guard = Child(root.transform, "Guard", Vector3.zero);
             guard.layer = LevelMetrics.CeilingLayer; // sight passes, bodies do not
@@ -1119,37 +1125,27 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
-        /// The exit hatch, in the look of the entry's shaft lid (ShaftHatch): a square steel frame in the floor with a yellow
-        /// rim, a dark pit inside it, a ribbed steel lid on a hinge along the +X bar (it swings up while someone hides in the
-        /// hatch, <see cref="Hatch"/>), a handle at its free edge; four corner lamps show its colour (the exit's green).
+        /// The exit hatch, in the look of the entry's shaft lid (ShaftHatch; models Tools/Blender/hatches.py): a yellow steel
+        /// angle frame in the floor with bolts, a dark pit inside it, a ribbed tread-plate lid on a hinge along the +X bar (it
+        /// swings up while someone hides in the hatch, <see cref="Hatch"/>), a lifting bar at its free edge; four lamps in
+        /// the frame's corners show its colour (the exit's green).
         /// </summary>
         static GameObject BuildHatch()
         {
             Material Util(string name) => AssetDatabase.LoadAssetAtPath<Material>($"{CityMaterialsDir}/{name}.mat") ?? M("Metal");
-            Material warning = Util("UtilWarning"), panel = Util("UtilPanel"), dark = Util("UtilDark");
+            var util = new Material[System.Enum.GetValues(typeof(UtilitySlot)).Length];
+            util[(int)UtilitySlot.Warning] = Util("UtilWarning");
+            util[(int)UtilitySlot.Panel] = Util("UtilPanel");
+            util[(int)UtilitySlot.Dark] = Util("UtilDark");
             var hatch = new GameObject("Hatch");
             const float half = 0.6f, bar = 0.1f, lip = 0.03f;
-            Cube(hatch.transform, "Pit", new Vector3(0f, 0.003f, 0f), new Vector3(2 * half, 0.006f, 2 * half), dark, false);
-            foreach (var (c, sz) in new[]
-                     {
-                         (new Vector3(0f, 0.012f, -half - bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)), (new Vector3(0f, 0.012f, half + bar / 2f), new Vector3(2 * half + 2 * bar, 0.024f, bar)),
-                         (new Vector3(-half - bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)), (new Vector3(half + bar / 2f, 0.012f, 0f), new Vector3(bar, 0.024f, 2 * half)),
-                     })
-                Cube(hatch.transform, "Frame", c, sz, warning, false);
-            // the lid on its hinge along the +X bar: it lifts its −X edge up and over
+            HatchModel("hatch_frame_exit", hatch.transform, util);
+            // the lid on its hinge along the +X bar: it lifts its −X edge up and over (the model's hinge runs along its X,
+            // the plate along +Z: turned −90° it runs along Z with the plate towards −X)
             var hinge = Child(hatch.transform, "LidHinge", new Vector3(half + lip, 0.024f, 0f));
-            float side = 2 * half + 2 * lip;
-            Cube(hinge.transform, "Plate", new Vector3(-side / 2f, 0.02f, 0f), new Vector3(side, 0.04f, side), panel, false);
-            for (int i = 0; i < 4; i++)
-                Cube(hinge.transform, "Rib", new Vector3(-0.2f - i * (side - 0.4f) / 3f, 0.05f, 0f), new Vector3(0.04f, 0.02f, side - 0.2f), dark, false);
-            Cube(hinge.transform, "Handle", new Vector3(-side + 0.12f, 0.075f, 0f), new Vector3(0.04f, 0.04f, 0.3f), warning, false);
-            for (int k = 0; k < 2; k++)
-                Cube(hinge.transform, "Knuckle", new Vector3(0f, 0.02f, (k * 2 - 1) * (half - 0.15f)), new Vector3(0.05f, 0.05f, 0.16f), dark, false);
+            HatchModel("hatch_lid_exit", hinge.transform, util, -90f);
             var h = hatch.AddComponent<Hatch>();
             h.Lid = hinge.transform;
-            // corner lamps in the frame: the hatch's colour (exit green — the way down)
-            foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
-                Cube(hatch.transform, "EyeMarkLamp", new Vector3(x * (half + bar / 2f), 0.03f, z * (half + bar / 2f)), new Vector3(0.07f, 0.02f, 0.07f), M("HatchRing"), false);
             h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
             hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
             var box = hatch.AddComponent<BoxCollider>();

@@ -545,3 +545,42 @@ def export_fbx(path, objs=None):
                              use_mesh_modifiers=True, mesh_smooth_type="FACE", add_leaf_bones=False)
     print("exported", path)
     return path
+
+
+def foliage(balls, resolution, seed, amp, target_tris):
+    """A leaf mass from overlapping balls [(centre, radius)]: a metaball cloud (the balls melt into one lumpy crown, no
+    seams where they meet), turned into a mesh, roughened along its normals and decimated to about target_tris."""
+    mb = bpy.data.metaballs.new("crown")
+    mb.resolution = resolution
+    mb.render_resolution = resolution
+    mb.threshold = 0.6
+    for c, r in balls:
+        e = mb.elements.new()
+        e.co = Vector(c)
+        e.radius = r * 1.35                                 # (the threshold shrinks a lone ball to about 3/4 of its radius)
+        e.stiffness = 2.0
+    obj = bpy.data.objects.new("crown", mb)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(obj)
+    bpy.data.metaballs.remove(mb)
+    tmp = bpy.data.objects.new("crown_mesh", me)
+    bpy.context.collection.objects.link(tmp)
+    dec = tmp.modifiers.new("dec", "DECIMATE")
+    dec.ratio = min(1.0, target_tris / max(1, len(me.polygons) * 2))
+    bpy.context.view_layer.update()
+    me2 = bpy.data.meshes.new_from_object(tmp.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(tmp)
+    bm = bmesh.new()
+    bm.from_mesh(me2)
+    bpy.data.meshes.remove(me)
+    bpy.data.meshes.remove(me2)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    bm.normal_update()
+    for v in bm.verts:                                     # roughened along the normals by a smooth hash of the position
+        p = v.co
+        k = math.sin(p.x * 3.1 + seed) * math.cos(p.y * 2.7 - seed * 0.7) + math.sin(p.z * 3.7 + seed * 1.3)
+        k += 0.5 * math.sin((p.x + p.y) * 7.3 + seed * 2.1)
+        v.co += v.normal * amp * k
+    return bm

@@ -1795,7 +1795,18 @@ def kit_hall_column(v):
     H, r = HALL_HEIGHTS[v]
     top = H - 0.3
     if v == 0:
-        part("Brick", lambda bm: box(bm, -HALL_SHAFT, HALL_SHAFT, -HALL_SHAFT, HALL_SHAFT, KIT_BED, top + 0.01)).name = "BrickColumn"
+        # a square pier with its corners chamfered (a raw box's 90-degree edges looked unfinished)
+        def pier(bm):
+            h, c = HALL_SHAFT, 0.06
+            ring = [(h, -h + c), (h, h - c), (h - c, h), (-h + c, h), (-h, h - c), (-h, -h + c), (-h + c, -h), (h - c, -h)]
+            lo = [bm.verts.new((x, y, KIT_BED)) for x, y in ring]
+            hi = [bm.verts.new((x, y, top + 0.01)) for x, y in ring]
+            bm.faces.new(list(reversed(lo)))
+            bm.faces.new(hi)
+            for i in range(8):
+                j = (i + 1) % 8
+                bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+        part("Brick", pier).name = "BrickColumn"
     else:
         part("Brick", lambda bm: cyl(bm, HALL_SHAFT + 0.02, top - KIT_BED + 0.01, (0.0, 0.0, (top + KIT_BED + 0.01) / 2), seg=16)).name = "BrickColumn"
 

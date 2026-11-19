@@ -803,17 +803,8 @@ def model_planter_large():
                            0.014, res=1, segments_per=3))
     s.part("Trim", trim)
 
-    leaves = []
-    for k, ((x, y, z), r) in enumerate(blobs):
-        b = s.ball(1.0, (0, 0, 0), seg=12)
-        for v in b.verts:
-            n = v.co.normalized()
-            bump = 1.0 + 0.07 * math.sin(6.0 * n.x + 3.1 * k) * math.cos(5.0 * n.y - 1.7 * k) + 0.05 * math.sin(8.0 * n.z + k)
-            v.co = n * bump
-            if v.co.z < -0.45:
-                v.co.z = -0.45 + (v.co.z + 0.45) * 0.5
-        s.place(b, (x, y, z), scale=(r, r, r * 0.85))
-        leaves.append(b)
+    # the canopy: the clusters melted into one lumpy leaf mass (balls side by side showed seams between them)
+    leaves = [s.foliage([((x, y, z), r * 1.05) for (x, y, z), r in blobs], 0.035, 3, 0.012, 2400)]
     s.part("Accent", leaves, sharp_angle=90)
     return export("planter_large")
 

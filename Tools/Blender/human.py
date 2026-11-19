@@ -258,11 +258,25 @@ def coat_details(shell):
 
 
 def armband():
-    """A team-coloured band around the left upper sleeve."""
+    """A team-coloured band around the left upper sleeve, fitted to it: centred on the sleeve at its height and just
+    wider than it (a fixed ring hung round the arm with a gap of over a centimetre)."""
     bm = bmesh.new()
     a, b = Vector(mirror((0.192, 0.026, 1.355), 1)), Vector(mirror((0.198, 0.028, 1.315), 1))
+    r1 = r2 = 0.062
+    sleeves = [o for _, o, _ in pieces if o.type == "MESH" and o.name.startswith(("arm", "sleeve"))]
+    for k, z in enumerate((a.z, b.z)):
+        ring = [o.matrix_world @ v.co for o in sleeves for v in o.data.vertices]
+        ring = [w for w in ring if w.x > 0.1 and abs(w.z - z) < 0.012]
+        if len(ring) < 6:
+            continue
+        cx, cy = sum(w.x for w in ring) / len(ring), sum(w.y for w in ring) / len(ring)
+        r = max(math.hypot(w.x - cx, w.y - cy) for w in ring) + 0.003
+        if k == 0:
+            a, r1 = Vector((cx, cy, z)), r
+        else:
+            b, r2 = Vector((cx, cy, z)), r
     d = b - a
-    bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=0.062, radius2=0.06, depth=d.length)
+    bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=r1, radius2=r2, depth=d.length)
     q = Vector((0, 0, 1)).rotation_difference(d.normalized())
     bmesh.ops.rotate(bm, cent=Vector(), matrix=q.to_matrix(), verts=bm.verts)
     bmesh.ops.translate(bm, vec=(a + b) / 2, verts=bm.verts)

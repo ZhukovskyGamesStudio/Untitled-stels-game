@@ -185,10 +185,12 @@ namespace Stealth.Tests
             Assert.IsTrue(alcove.GetComponentsInChildren<Transform>(true).Any(t => t.name == "MetalShutLid" && t.gameObject.activeSelf), "shut from below in the sewer");
             // the lid's frame lies right round the hole: inner edge at the hole's
             var hatch = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Level/ShaftHatch.prefab");
-            var frames = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name == "Frame").Select(r => r.bounds).ToList();
-            Assert.AreEqual(4, frames.Count);
-            Assert.AreEqual(Basement.ShaftHalf, frames.Min(b => Mathf.Max(Mathf.Abs(b.center.x) - b.extents.x, Mathf.Abs(b.center.z) - b.extents.z)), 1e-3f, "the frame starts at the hole's edge");
-            var plate = hatch.GetComponentsInChildren<MeshRenderer>(true).Single(r => r.name == "Plate").bounds;
+            // (the model, Tools/Blender/hatches.py: its frame one part; the hole is where no frame vertex is)
+            var frame = hatch.GetComponentsInChildren<MeshFilter>(true).Single(f => f.name == "Frame");
+            float inner = frame.sharedMesh.vertices.Select(v => frame.transform.TransformPoint(v) - hatch.transform.position)
+                .Min(w => Mathf.Max(Mathf.Abs(w.x), Mathf.Abs(w.z)));
+            Assert.AreEqual(Basement.ShaftHalf, inner, 0.005f, "the frame starts at the hole's edge");
+            var plate = hatch.GetComponentsInChildren<MeshRenderer>(true).Single(r => r.name == "Lid").bounds;
             Assert.Greater(plate.size.x, 2f * Basement.ShaftHalf, "the lid covers the hole");
             Assert.Less(plate.size.x, 2f * Basement.ShaftHalf + 0.2f, "and rests on the frame");
         }
