@@ -131,8 +131,15 @@ def water_cooler(L):
     """Water cooler: a cabinet with taps and a big bottle (Eye)."""
     P = Parts()
     P.add("Body", L.carcass((.34, .34, 1.0), (0, 0, 0), kick=.03))
-    P.add("Eye", L.lathe([(0, 0), (.13, 0), (.15, .05), (.15, .35), (.1, .43), (.05, .45), (0, .45)], loc=(0, 0, .99)))
+    P.add("Eye", L.lathe(COOLER_BOTTLE, loc=(0, 0, .99)))
+    for x in (-.07, .07):                                                   # the hot and cold taps over a drip tray
+        P.add("Accent", L.rod((x, -.16, .82), (x, -.205, .8), .014))
+    P.add("Accent", L.slab((.26, .06, .02), (0, -.19, .58)))
     return P
+
+
+# the cooler's bottle stands upside down: its neck in the cooler's top, the round bottom up
+COOLER_BOTTLE = [(0, 0), (.045, 0), (.045, .06), (.13, .12), (.15, .16), (.15, .38), (.12, .44), (.05, .46), (0, .46)]
 
 
 def whiteboard(L):
@@ -165,8 +172,13 @@ def toilet_stall(L):
     for x in (-.5, .5):
         for y in (-.7, 0.0):
             P.add("Body", L.slab((.05, .05, .14), (x, y, .07)))
-    P.add("Accent", L.lathe([(0, 0), (.15, 0), (.2, .3), (.22, .4), (0, .42)], loc=(0, .4, 0)))
-    P.add("Accent", L.slab((.36, .14, .36), (0, .66, .55)))
+    # the toilet against the back wall: an oval bowl on its foot, the seat with its lid down, the cistern with a flush button
+    oval = (1.0, 1.3, 1.0)                                                         # longer towards the door (-Y)
+    P.add("Accent", [s.place(b, (0, .4, 0), scale=oval) for b in L.lathe([(0, 0), (.1, 0), (.09, .1), (.12, .26), (0, .26)])])
+    P.add("Accent", [s.place(b, (0, .4, 0), scale=oval) for b in L.lathe([(0, .25), (.12, .25), (.17, .33), (.175, .39), (0, .39)])])
+    P.add("Body", [s.place(b, (0, .4, 0), scale=oval) for b in L.lathe([(0, .385), (.178, .385), (.18, .41), (.16, .43), (0, .435)])])
+    P.add("Accent", L.slab((.38, .15, .34), (0, .655, .57)) + L.slab((.06, .1, .1), (0, .57, .42)))
+    P.add("Body", L.slab((.4, .17, .03), (0, .655, .755)) + L.cyl(.025, .012, (0, .655, .775)))
     return P
 
 

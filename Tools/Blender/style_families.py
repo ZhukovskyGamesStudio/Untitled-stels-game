@@ -196,7 +196,10 @@ def export(filename):
     g.clear_scene()
 
 
-BUILDING_ITEMS = [False]  # the loot pieces are being built (no askew parts)
+BUILDING_ITEMS = [False]  # the loot pieces (or a model of rows of small aligned parts) are being built: no askew parts
+# models whose small parts sit in rows on a face (servers with their handles, keys, drawers): set askew by the derelict
+# family each its own way, they came apart from each other and from the face
+STRAIGHT = {"model_server_rack", "model_vending_machine", "model_printer"}
 
 for mod in (g, r):
     mod.box, mod.cylinder, mod.sphere, mod.merge, mod.export = box, cylinder, sphere, merge, export
@@ -208,7 +211,7 @@ ROBOT_FUNCS = [r.drone, r.spider, r.vacuum, r.turret, r.thumper, r.hound, r.sort
 for family in FAMILIES:
     g.clear_scene()
     for fn in MODEL_FUNCS + ROBOT_FUNCS:
-        BUILDING_ITEMS[0] = fn.__name__ == "model_items"
+        BUILDING_ITEMS[0] = fn.__name__ == "model_items" or fn.__name__ in STRAIGHT
         fn()
     BUILDING_ITEMS[0] = False
     print("FAMILY DONE", family)

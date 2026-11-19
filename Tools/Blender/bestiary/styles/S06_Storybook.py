@@ -802,6 +802,8 @@ def p_boxes(L):
     for (x, y, z, r, h) in ((0, 0, 0, .29, .48), (.05, -.04, .48, .24, .4), (.55, .1, 0, .21, .38)):
         P.add("Accent", [s.rcyl(r, h - .04, (x, y, z + (h - .04) / 2), seg=16, r=.008),
                          s.rcyl(r + .01, .05, (x, y, z + h - .03), seg=16, r=.008), s.rcyl(r * .5, .03, (x, y, z + h), seg=12, r=.006)])
+        # the stripes: two raised bands round the box below its lid (one part, as the original: the cardboard's colour)
+        P.add("Accent", [s.rcyl(r + .004, .03, (x, y, z + bz), seg=16, r=.004) for bz in (.1, (h - .04) * .62)])
     return P
 
 
@@ -810,7 +812,7 @@ def p_water_cooler(L):
     P = D.Parts()
     P.add("Body", L.steps([(.17, .05), (.14, .05)]) + L.fluted(.11, .1, .92, n=8) + L.steps([(.13, .04), (.16, .05)], loc=(0, 0, .91)))
     P.add("Body", L.rod((0, -.1, .8), (0, -.16, .78), .015))
-    P.add("Eye", L.lathe([(0, 0), (.13, 0), (.15, .05), (.15, .3), (.08, .4), (.04, .45), (0, .45)], loc=(0, 0, .99)))
+    P.add("Eye", L.lathe(props.COOLER_BOTTLE, loc=(0, 0, .99)))
     return P
 
 

@@ -1849,7 +1849,9 @@ if __name__ == "__main__":
         kit_hall()
     else:
         if not KIT_ONLY:
-            for fn in (tunnel, hall, branch, grate, ladder, manhole, cart, lamp, pipe, valve, barrel, crate):
+            # (the old one-piece tunnel, hall, branch, grate, cart, pipe and valve are no longer used by the game: the kit
+            # and the hall's tiles replaced them — their functions stay for reference, nothing exports them)
+            for fn in (ladder, manhole, lamp, barrel, crate):
                 fn()
                 print("SEWER", fn.__name__)
         kit()

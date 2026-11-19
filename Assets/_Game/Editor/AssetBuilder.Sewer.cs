@@ -291,9 +291,21 @@ namespace Stealth.EditorTools
             b.Plug.SetActive(false);
             var bars = new GameObject("Bars");
             bars.transform.SetParent(root.transform, false);
+            // round rusty bars (they were square cubes) through a chamfered rail and a foot rail
             for (int i = 0; i < 12; i++)
-                Cube(bars.transform, $"Bar{i}", new Vector3(0.35f, 1.9f, -2.2f + i * 0.4f), new Vector3(0.07f, 3.8f, 0.07f), SewerMat("SewerRust"), false);
-            Cube(bars.transform, "Rail", new Vector3(0.35f, 3.3f, 0f), new Vector3(0.1f, 0.12f, 4.6f), SewerMat("SewerRust"), false);
+            {
+                var rod = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                rod.name = $"Bar{i}";
+                Object.DestroyImmediate(rod.GetComponent<Collider>());
+                rod.transform.SetParent(bars.transform, false);
+                rod.transform.localPosition = new Vector3(0.35f, 1.9f, -2.2f + i * 0.4f);
+                rod.transform.localScale = new Vector3(0.07f, 1.9f, 0.07f); // (the primitive is 2 m tall)
+                var rr = rod.GetComponent<MeshRenderer>();
+                rr.sharedMaterial = SewerMat("SewerRust");
+                rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            ChamferBox(bars.transform, "Rail", new Vector3(0.35f, 3.3f, 0f), new Vector3(0.1f, 0.12f, 4.6f), SewerMat("SewerRust"), 0.015f);
+            ChamferBox(bars.transform, "FootRail", new Vector3(0.35f, 0.25f, 0f), new Vector3(0.1f, 0.1f, 4.6f), SewerMat("SewerRust"), 0.015f);
             var stop = bars.AddComponent<BoxCollider>();
             stop.center = new Vector3(0.35f, 1.9f, 0f);
             stop.size = new Vector3(0.2f, 3.8f, 4.6f);
