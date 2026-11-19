@@ -55,6 +55,17 @@ namespace Stealth.EditorTools
                 return b;
             });
             var ladder = Prefab($"{SewerKit}/Ladder.prefab", () => KitPiece("sewer_ladder", true));
+            // the segment with the alcove beside the parked car (sewer.py kit_alcove): the shaft up to the house, its ladder,
+            // a caged bulb lighting the shaft (shadowed: it never lights the tunnel through the alcove's walls)
+            var alcove = Prefab($"{SewerKit}/Alcove.prefab", () =>
+            {
+                var a = KitPiece("sewer_seg_alcove", true, KitYaw);
+                var light = Lamp(a.transform, "ShaftLight", new Vector3(2.45f, 3.72f, 4.1f), Quaternion.LookRotation(new Vector3(0.3f, -1f, 0.3f)), LightType.Spot,
+                    new Color(1f, 0.8f, 0.55f), 3.5f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+                light.spotAngle = 130f;
+                light.innerSpotAngle = 70f;
+                return a;
+            });
             var backWall = Prefab($"{SewerKit}/BackWall.prefab", () =>
             {
                 // invisible: across the whole tunnel where the sewer starts, the way back beyond it is only for the eyes
@@ -88,6 +99,7 @@ namespace Stealth.EditorTools
                 loc.Barrel = barrel;
                 loc.Crate = crate;
                 loc.Ladder = ladder;
+                loc.Alcove = alcove;
                 loc.Manhole = manhole;
                 loc.GatePrefab = gate.GetComponent<SewerGate>();
                 loc.BranchPrefab = branch.GetComponent<SewerBranch>();
@@ -125,12 +137,8 @@ namespace Stealth.EditorTools
             });
             var car = Prefab($"{PrefabsDir}/Vehicles/Car.prefab", () => BuildCar(piece.GetComponent<CargoPiece>()));
 
-            if (art.Sewer != sewer || art.DriveScene != drive)
-            {
-                art.Sewer = sewer;
-                art.DriveScene = drive;
-                EditorUtility.SetDirty(art);
-            }
+            Link(art, ref art.Sewer, sewer);
+            Link(art, ref art.DriveScene, drive);
             return car;
         }
 

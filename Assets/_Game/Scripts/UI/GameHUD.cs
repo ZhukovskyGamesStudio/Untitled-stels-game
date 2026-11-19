@@ -242,9 +242,10 @@ namespace Stealth.UI
         int m_LoadedFor = int.MinValue; // the location (sewer instance / house seed) that already opened
 
         /// <summary>
-        /// The drive to the next house ends in black: it comes up in the last moments of the drive scene, holds while the
-        /// house is built and lifts once it stands (the drive scene is gone). A location being set up (a new session, the
-        /// sewer, a house) is black at once and opens only when the player stands in place (<see cref="LoadingRules"/>).
+        /// A location being set up (a new session, the sewer, a house started some other way) is black at once and opens
+        /// only when the player stands in place (<see cref="LoadingRules"/>). The drive to the next house is never black:
+        /// the house is built during the drive scene and its camera glides back into the player's eyes in the car
+        /// (GameManager.Arrival) — the house counts as open once the player is in place there.
         /// </summary>
         void ShowLoadingFade(GameManager gm, PlayerController me)
         {
@@ -252,8 +253,13 @@ namespace Stealth.UI
             var sewer = SewerLocation.Active;
             int here = sewer != null ? sewer.GetHashCode() : ActiveLevel.Layout != null ? ActiveLevel.Layout.Seed : 0;
             bool loading = false;
-            bool driving = gm.DriveUntil > 0 || DriveScene.Active != null; // the drive scene is the show (and its own fade)
-            if (here != m_LoadedFor && !driving)
+            bool driving = gm.DriveUntil > 0 || DriveScene.Active != null; // the drive scene is the show
+            if (driving)
+            {
+                if (me != null && me.PlacedHere) m_LoadedFor = here;
+                m_LoadingSince = -1f;
+            }
+            else if (here != m_LoadedFor)
             {
                 if (m_LoadingSince < 0f) m_LoadingSince = Time.unscaledTime;
                 loading = LoadingRules.StillLoading(me != null, me != null && me.PlacedHere, sewer != null, Vehicles.Car.Active != null,
@@ -261,8 +267,7 @@ namespace Stealth.UI
                 if (!loading) { m_LoadedFor = here; m_LoadingSince = -1f; }
             }
             if (loading) m_Fade = 1f; // no fade in: the jump must never be seen
-            bool black = loading || (gm.DriveUntil > 0 && Session.ServerTime > gm.DriveUntil - 0.7) || (gm.DriveUntil <= 0 && DriveScene.Active != null);
-            m_Fade = Mathf.MoveTowards(m_Fade, black ? 1f : 0f, Time.unscaledDeltaTime / (black ? 0.6f : 0.9f));
+            m_Fade = Mathf.MoveTowards(m_Fade, loading ? 1f : 0f, Time.unscaledDeltaTime / 0.9f);
             Ui.Show(LoadingFade, m_Fade > 0.001f);
             if (m_Fade > 0.001f) LoadingFade.color = new Color(0f, 0f, 0f, m_Fade);
         }

@@ -15,22 +15,41 @@ namespace Stealth.Level
         static readonly List<GameObject> s_Props = new();
         static readonly List<Mesh> s_Meshes = new();
 
+        /// <summary>The level stands whole (not being built a piece at a time).</summary>
+        public static bool Ready { get; private set; }
+
         /// <summary>Builds <paramref name="layout"/> from the prefabs in <paramref name="art"/>, replacing the previous level.</summary>
         public static GameObject Load(LevelLayout layout, LevelArt art)
+        {
+            foreach (var _ in LoadSteps(layout, art)) { }
+            return Root;
+        }
+
+        /// <summary>
+        /// The same a piece at a time (<see cref="LevelBuilder.Steps"/>): the layout and the root are there from the first
+        /// step, <see cref="Ready"/> only after the last.
+        /// </summary>
+        public static IEnumerable<bool> LoadSteps(LevelLayout layout, LevelArt art)
         {
             Clear();
             Layout = layout;
             var builder = new LevelBuilder(art, layout);
-            Root = builder.Build();
             Shell = builder.Shell;
+            foreach (var _ in builder.Steps())
+            {
+                Root = builder.RootObject;
+                yield return true;
+            }
+            Root = builder.RootObject;
             s_Props.AddRange(builder.Props);
             s_Meshes.AddRange(builder.Meshes);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
-            return Root;
+            Ready = true;
         }
 
         public static void Clear()
         {
+            Ready = false;
             if (Root != null)
             {
                 if (Application.isPlaying) Object.Destroy(Root);
@@ -112,7 +131,21 @@ namespace Stealth.Level
             m_Plan = layout.Plan;
         }
 
+        /// <summary>The level's root while it is being built (and after).</summary>
+        public GameObject RootObject => m_Root != null ? m_Root.gameObject : null;
+
+        /// <summary>Builds the whole level at once.</summary>
         public GameObject Build()
+        {
+            foreach (var _ in Steps()) { }
+            return RootObject;
+        }
+
+        /// <summary>
+        /// Builds the level a piece at a time (each step a few hundredths of a second): the drive to the next house builds it
+        /// over several frames while the drive scene goes on (<see cref="ActiveLevel.LoadSteps"/>).
+        /// </summary>
+        public IEnumerable<bool> Steps()
         {
             var l = m_Layout;
             var root = Object.Instantiate(m_Art.LevelRoot);
@@ -129,9 +162,7 @@ namespace Stealth.Level
             // (with a hole where the shaft goes down to the basement: four pieces round it)
             float gy = CityPlan.RoadTop - 0.06f;
             var ground = Rect.MinMaxRect(W / 2 - (W + far) / 2, H / 2 - (H + far) / 2, W / 2 + (W + far) / 2, H / 2 + (H + far) / 2);
-            var shaftHole = l.HasBasement
-                ? new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) }
-                : null;
+            var shaftHole = new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) };
             foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, shaftHole))
                 Block(m_Art.OutsideGround, "OutsideGround", new Vector3((a.x + b.x) / 2f, gy, (a.y + b.y) / 2f), new Vector3(b.x - a.x, 0.1f, b.y - a.y));
             // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
@@ -139,6 +170,7 @@ namespace Stealth.Level
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, H + yard + 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
             Block(m_Art.Fence, "Fence", new Vector3(-yard - 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
             Block(m_Art.Fence, "Fence", new Vector3(W + yard + 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
+            yield return true;
 
             m_WindowCuts.Clear();
             foreach (var cut in WindowCuts(l))
@@ -150,9 +182,11 @@ namespace Stealth.Level
             {
                 m_Floor = f;
                 BuildWalls(f);
+                yield return true;
             }
             foreach (var r in l.Rooms) BuildLights(r);
             foreach (var s in l.Stairs) BuildStair(s);
+            yield return true;
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 var d = l.AutoDoors[i];
@@ -204,10 +238,14 @@ namespace Stealth.Level
                 for (int i = 0; i < l.VaultConsoles.Count; i++)
                     Place(m_Art.VaultConsole, $"VaultConsole{i}", l.VaultConsoles[i].position, l.VaultConsoles[i].rotation).GetComponent<VaultConsole>()?.Configure(i);
             BuildFacade();
+            yield return true;
             if (Application.isPlaying) CombineStatic(root);
+            yield return true;
             BuildCity(W, H); // one mesh of its own: not static-batched
+            yield return true;
             BuildUtilities();
             BuildSwitches();
+            yield return true;
 
             for (int i = 0; i < l.Props.Count; i++)
             {
@@ -220,14 +258,14 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Items.SafeBox>(out var safe)) safe.Configure(i, l.Seed);
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
-                if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, 0x7A21, i)); // its coats, its books
+                if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind);
                 Props.Add(go);
+                if (i % 80 == 79) yield return true;
             }
             BuildBasement(); // after the props: the lid over the shaft is one
-            return root;
         }
 
         // ------------------------------------------------------------------ helpers
@@ -275,7 +313,7 @@ namespace Stealth.Level
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
-            if (f == 0 && m_Layout.HasBasement) // the shaft down to the basement
+            if (f == 0) // the shaft down to the basement
                 holes.Add(new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
             bool Solid(int x, int z)
             {
@@ -320,65 +358,70 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// The basement the team arrives in (<see cref="Basement"/>): two of the sewer kit's segments under the lobby, an end
-        /// cap at the far end, the sewer's lamps; at the near end a brick wall with a doorway into the shaft chamber, the
-        /// ladder against its back wall (two lengths, up to the lobby's floor) and the ladder's ends (<see cref="ShaftLadder"/>).
+        /// The basement the team arrives in (<see cref="Basement"/>), from the sewer's kit along the basement's frame: the way
+        /// back behind an invisible wall (a few segments, then a cap), the car's stretch with the alcove and its shaft up to the
+        /// lid, the shut gate and a segment beyond it closed by a cap; the sewer's lamps; the ladder's ends
+        /// (<see cref="ShaftLadder"/>) and the storage robot's link up the shaft. (The street's lamps above, without shadows, are
+        /// too high to reach its road: 11 m of range from about 5.5 m over the street, the road 4.9 m under it.)
         /// </summary>
         void BuildBasement()
         {
-            if (!m_Layout.HasBasement || m_Art.Sewer == null) return;
+            if (m_Art.Sewer == null) return;
             var kit = m_Art.Sewer.GetComponent<SewerLocation>();
-            if (kit == null) return;
-            var o = m_Layout.BasementOrigin;
+            if (kit == null || kit.Segments == null || kit.Segments.Length == 0) return;
+            var frame = m_Layout.Cellar;
             GameObject Put(GameObject prefab, string name, Vector3 local, float yaw = 0f) =>
-                prefab != null ? Place(prefab, name, o + local, Quaternion.Euler(0f, yaw, 0f)) : null;
-            Material brick = null;
-            for (int i = 0; i < Basement.Segments; i++)
+                prefab != null ? Place(prefab, name, frame.ToWorld(local), frame.Rotation * Quaternion.Euler(0f, yaw, 0f)) : null;
+            const float seg = SewerPlan.SegmentLength;
+            int seed = m_Layout.Seed & int.MaxValue;
+            GameObject Segment(int i) => kit.Segments[(seed + i * 3) % kit.Segments.Length];
+            // the way the car came by: seen, never walked or driven (the invisible wall across the tunnel), then a cap far in the dark
+            var back = Put(kit.BackWall, "BasementBackWall", Vector3.zero);
+            if (back != null) back.transform.localScale = new Vector3(1f, 0.75f, 1f); // up to the vault (4.5 m), not through the house's floor
+            for (int i = 1; i <= Basement.BackSegments; i++) Put(Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
+            Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
+            // the car's stretch; its last segment has the alcove with the shaft and the ladder (its lid from below is the sewer's: here the real one is in the floor)
+            for (int i = 0; i < Basement.CarSegments; i++)
             {
-                if (kit.Segments == null || kit.Segments.Length == 0) break;
-                var seg = Put(kit.Segments[((i + m_Layout.Seed) & int.MaxValue) % kit.Segments.Length], $"BasementSegment{i}", new Vector3(i * SewerPlan.SegmentLength, 0f, 0f));
-                if (brick == null && seg != null) brick = BrickOf(seg);
+                bool alcove = i == Basement.CarSegments - 1 && kit.Alcove != null;
+                var go = Put(alcove ? kit.Alcove : Segment(i), alcove ? "BasementAlcove" : $"BasementSegment{i}", new Vector3(i * seg, 0f, 0f));
+                if (alcove) SetChild(go, "MetalShutLid", false);
             }
-            Put(kit.Cap, "BasementCap", new Vector3(Basement.Length, 0f, 0f), 180f); // turned round: it closes the far end
-            // lit: warm lamps on both walls of each segment (the sewer's, brighter)
-            for (int i = 0; i < Basement.Segments; i++)
-                foreach (int side in new[] { 1, -1 })
+            // the gate the team opens from the far side after the house: shut here, its lever and the housing over the vault left out
+            // (the housing would stand up through the house's floor)
+            if (kit.GatePrefab != null)
+            {
+                var gate = Put(kit.GatePrefab.gameObject, "BasementGate", new Vector3(Basement.GateX, 0f, 0f));
+                SetChild(gate, "ConcreteHousing", false);
+                foreach (var lever in gate.GetComponentsInChildren<GateLever>(true)) lever.gameObject.SetActive(false);
+                if (gate.TryGetComponent<SewerGate>(out var g) && g.LeverLight != null) g.LeverLight.gameObject.SetActive(false);
+            }
+            for (int i = 0; i < Basement.BeyondSegments; i++) Put(Segment(i + 2), $"BasementBeyond{i}", new Vector3(Basement.GateX + i * seg, 0f, 0f));
+            Put(kit.Cap, "BasementFarCap", new Vector3(Basement.GateX + Basement.BeyondSegments * seg, 0f, 0f), 180f);
+            // lamps: the car's stretch lit on alternate walls (opposite the alcove beside it), the way back dimmer and dimmer
+            var warm = new Color(1f, 0.8f, 0.55f);
+            void Lamp(string name, float x, int side, float share, float range)
+            {
+                var lamp = Put(kit.Lamp, name, new Vector3(x, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                if (lamp == null) return;
+                foreach (var light in lamp.GetComponentsInChildren<Light>())
                 {
-                    var lamp = Put(kit.Lamp, "BasementLamp", new Vector3(i * SewerPlan.SegmentLength + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                    if (lamp != null)
-                        foreach (var light in lamp.GetComponentsInChildren<Light>())
-                        {
-                            light.color = new Color(1f, 0.82f, 0.6f);
-                            light.intensity *= 1.6f;
-                            light.range = 12f;
-                        }
+                    light.color = warm;
+                    light.intensity *= share;
+                    light.range = range;
                 }
-            // the near end: a brick wall over the tunnel's whole section with a doorway, the chamber behind it up to the lobby
-            float top = Basement.Depth - 0.05f, bottom = -0.8f, wx = -Basement.EndWall / 2f, half = 4.1f;
-            void Wall(string name, float x0, float x1, float z0, float z1, float y0, float y1)
-            {
-                var go = Block(m_Art.FloorSlab, name, o + new Vector3((x0 + x1) / 2f, (y0 + y1) / 2f, (z0 + z1) / 2f), new Vector3(x1 - x0, y1 - y0, z1 - z0));
-                if (brick != null && go.TryGetComponent<Renderer>(out var r)) r.sharedMaterial = brick;
             }
-            float d = Basement.DoorHalf, c = Basement.ChamberHalf, t = 0.3f, back = Basement.ChamberBack;
-            Wall("BasementEnd", -Basement.EndWall, 0f, -half, -d, bottom, 4.6f);
-            Wall("BasementEnd", -Basement.EndWall, 0f, d, half, bottom, 4.6f);
-            Wall("BasementEnd", -Basement.EndWall, 0f, -d, d, Basement.DoorHeight, top);
-            Wall("ChamberBack", back - t, back, -c - t, c + t, bottom, top);
-            Wall("ChamberSide", back - t, -Basement.EndWall, -c - t, -c, bottom, top);
-            Wall("ChamberSide", back - t, -Basement.EndWall, c, c + t, bottom, top);
-            Wall("ChamberFloor", back, -Basement.EndWall + 0.01f, -c, c, bottom, Basement.Road);
-            _ = wx;
-            // the ladder against the back wall, facing the doorway: two lengths up to the lid
-            Put(kit.Ladder, "BasementLadder", new Vector3(Basement.LadderX, Basement.Road, 0f));
-            Put(kit.Ladder, "BasementLadderUpper", new Vector3(Basement.LadderX, Basement.Depth - 3.5f, 0f)); // its top just under the lid
+            Lamp("BasementLamp", seg * 0.5f, 1, 1.5f, 12f);
+            Lamp("BasementLamp", seg * 1.5f, -1, 1.5f, 12f);
+            Lamp("BasementLamp", Basement.AlcoveX, -1, 1.5f, 12f);
+            Lamp("BasementLamp", -seg * 0.5f, 1, 0.6f, 11f);
+            Lamp("BasementLamp", -seg * 2.5f, -1, 0.35f, 10f);
             // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
             var shaft = m_Layout.HatchPosition;
-            var path = Basement.ClimbPath(o, shaft);
-            // (the lid is a prop: configured with its prop's index, E on its handle opens and shuts it; the ladder is climbed by walking into it)
+            var path = Basement.ClimbPath(frame, shaft, m_Layout.ShaftExit);
             if (m_Art.ShaftLadder != null)
             {
-                var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(o), Quaternion.identity);
+                var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(frame), Quaternion.identity);
                 if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path);
             }
             // the storage robot's way up and down: a navmesh link from the ladder's foot to the lobby's floor, open with the lid
@@ -396,22 +439,12 @@ namespace Stealth.Level
             }
         }
 
-        /// <summary>The kit's brick (its walls' material): the material of the segment's biggest part that is not glass, water or a grate.</summary>
-        static Material BrickOf(GameObject segment)
+        /// <summary>Shows or hides a child (any depth) of a placed kit piece by its name.</summary>
+        static void SetChild(GameObject go, string name, bool on)
         {
-            Material best = null;
-            float size = 0f;
-            foreach (var r in segment.GetComponentsInChildren<Renderer>())
-                foreach (var m in r.sharedMaterials)
-                {
-                    if (m == null) continue;
-                    var n = m.name.ToLowerInvariant();
-                    if (n.Contains("water") || n.Contains("grate") || n.Contains("glow") || n.Contains("lamp")) continue;
-                    float v = r.bounds.size.sqrMagnitude;
-                    if (n.Contains("brick")) v *= 10f;
-                    if (v > size) { size = v; best = m; }
-                }
-            return best;
+            if (go == null) return;
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+                if (t.name == name) t.gameObject.SetActive(on);
         }
 
         /// <summary>The grates in the ceilings (the way into the ducts), every storey's.</summary>
@@ -695,7 +728,7 @@ namespace Stealth.Level
                     var street = DoorRules.StreetKind(m_Layout);
                     var prefab = street.HasValue ? m_Art.Door(street.Value, false) : m_Art.ExteriorDoor;
                     var go = Place(prefab != null ? prefab : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
-                    if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, 0xD00E, index * 31 + cut.opening) & 1) == 1)
+                    if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, Salt.StreetDoors, index * 31 + cut.opening) & 1) == 1)
                         exit.HingeRight();
                 }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
@@ -880,7 +913,7 @@ namespace Stealth.Level
             Block(m_Art.RailingBlock, "Railing", centre, new Vector3(RailingThickness, RailingHeight, len), rot);
             int bays = Mathf.Max(1, Mathf.CeilToInt(len / 1.25f));
             var bayRot = Quaternion.LookRotation(Vector3.Cross(d, Vector3.up)); // local X along the railing
-            int seed = LevelRandom.Mix(m_Layout.Seed, 0x57A1, 7); // one look for every railing of the house
+            int seed = LevelRandom.Mix(m_Layout.Seed, Salt.Railings, 7); // one look for every railing of the house
             for (int i = 0; i < bays; i++)
             {
                 var go = Place(m_Art.RailingBay, "RailingBay", a + d * (len * (i + 0.5f) / bays), bayRot);
@@ -936,7 +969,7 @@ namespace Stealth.Level
             var go = Place(prefab, $"Stairs_{s.Floor}", StairGeometry.Origin(s), Quaternion.Euler(0f, yaw, 0f));
             // the look: one per staircase shaft (the same on every floor), from the house seed
             if (go.TryGetComponent<StairLook>(out var look))
-                look.Configure(LevelRandom.Mix(m_Layout.Seed, 0x57A1, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
+                look.Configure(LevelRandom.Mix(m_Layout.Seed, Salt.StairLooks, Mathf.RoundToInt(s.Origin.x * 4f) * 1009 + Mathf.RoundToInt(s.Origin.y * 4f)));
         }
 
         /// <summary>The house's services (<see cref="UtilityPlan"/>: ducts, pipes, panels, sockets): one mesh, a submesh per material.</summary>

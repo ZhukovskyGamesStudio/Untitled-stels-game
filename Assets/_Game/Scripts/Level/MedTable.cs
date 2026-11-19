@@ -10,8 +10,6 @@ namespace Stealth.Level
     /// </summary>
     public class MedTable : Interactable
     {
-        /// <summary>Has this player (client id) used the table in this house (set by the game)?</summary>
-        public static System.Func<ulong, bool> UsedBy = _ => false;
 
         public override UseKind Kind => UseKind.MedTable;
         public override float HoldTime => 1.2f;
@@ -22,7 +20,7 @@ namespace Stealth.Level
         {
             int hp = Tuning.Items.Gadgets.MedTableHp;
             available = false;
-            if (UsedBy(player.ClientId)) return Loc.T("use.med.used");
+            if (World.IsOpened(OpenKeys.Med(player.ClientId))) return Loc.T("use.med.used");
             if (player.Hp >= hp) return Loc.T("use.med.full");
             available = true;
             return Loc.T("use.med");

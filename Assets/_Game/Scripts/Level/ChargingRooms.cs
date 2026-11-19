@@ -41,10 +41,10 @@ namespace Stealth.Level
         /// furniture). Not the lobby, the vault, the hidden room, the storage room, the exit's room, the hostage's room,
         /// nor a room on the stairs. Deep rooms first (the robots keep to the inside of the house). Returns the room or null.
         /// </summary>
-        public static PlanRoom Convert(LevelLayout l, Vector3 exitHatch)
+        public static PlanRoom Convert(LevelLayout l)
         {
             const float AwayFromHatch = 14f; // the guards rest there: nothing hostile starts by the team's way in
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0xC4A6, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.ChargingRoom, 0));
             PlanRoom best = null;
             float bestScore = 0f;
             // a second pass without keeping away from the team's way in (a small house: every room is near it)
@@ -54,9 +54,9 @@ namespace Stealth.Level
                 float pref = Preference(r.Type);
                 if (pref <= 0f || r.Area < MinArea || r.Levels != 1) continue;
                 // the apartment block's floors above the ground are one typical floor: the robots take a room down below
-                if (l.Kind == HouseKind.Apartments && r.Floor != 0) continue;
+                if (!HouseRules.Of(l).ChargingRoomOn(r)) continue;
                 if (r.Id == l.LobbyRoom || r.Id == l.VaultRoom || r.Id == l.HiddenRoom || r.Id == l.StorageRoom) continue;
-                if (l.Plan.RoomAt(exitHatch + Vector3.up * 0.3f)?.Id == r.Id) continue;
+                if (l.ExitRoom == r.Id) continue;
                 bool onStairs = false;
                 foreach (var st in l.Stairs) onStairs |= st.Room == r.Id || st.RoomAbove == r.Id;
                 if (onStairs || HasCage(l, r)) continue;

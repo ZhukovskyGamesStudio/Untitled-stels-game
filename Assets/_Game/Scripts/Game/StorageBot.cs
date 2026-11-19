@@ -82,7 +82,7 @@ namespace Stealth.Game
         {
             if (!StorageBotRules.CanCall(Mode) || l == null || l.Vents.Count == 0) return Answer.Busy;
             var net = l.Vents[0];
-            int exitRoom = l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+            int exitRoom = l.ExitRoom;
             int i = net.Grates.FindIndex(g => g.Room == exitRoom);
             if (i < 0) return Answer.NoWay;
             var to = net.Grates[i];
@@ -100,7 +100,7 @@ namespace Stealth.Game
         /// <summary>Server, an alarm: back to the basement it came from (through the ducts, down by the lobby, the shaft).</summary>
         public void HideServer(LevelLayout l)
         {
-            if (l == null || !l.HasBasement || Mode is BotMode.Gone or BotMode.ToExit or BotMode.ToGrate || InBasement(l)) return;
+            if (l == null || Mode is BotMode.Gone or BotMode.ToExit or BotMode.ToGrate || InBasement(l)) return;
             if (Mode == BotMode.Hiding) return;
             var net = l.Vents.Count > 0 ? l.Vents[0] : null;
             var legs = new List<BotLeg>();
@@ -114,7 +114,7 @@ namespace Stealth.Game
                 }
                 else legs.Clear();
             }
-            legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = Basement.StashSpot(l.BasementOrigin), Room = -1 });
+            legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = Basement.StashSpot(l.Cellar), Room = -1 });
             GameManager.Instance?.OpenShaftServer(); // it pushes the lid open on its way down
             Begin(legs, BotMode.Hiding, BotMode.Waiting);
         }
@@ -142,7 +142,7 @@ namespace Stealth.Game
             return true;
         }
 
-        bool InBasement(LevelLayout l) => l.HasBasement && Basement.Contains(l.BasementOrigin, transform.position);
+        bool InBasement(LevelLayout l) => Basement.Contains(l.Cellar, transform.position);
 
         void Begin(List<BotLeg> legs, BotMode mode, BotMode after)
         {

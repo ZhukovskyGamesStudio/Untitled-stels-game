@@ -98,22 +98,10 @@ namespace Stealth.Level
     /// </summary>
     public static class HouseFeatures
     {
-        public static Location LocationOf(HouseKind kind) => kind switch
-        {
-            HouseKind.Hospital => Location.Hospital,
-            HouseKind.Garage => Location.Garage,
-            HouseKind.Apartments => Location.Apartments,
-            _ => Location.Office,
-        };
+        public static Location LocationOf(HouseKind kind) => HouseRules.For(kind).Location;
 
         /// <summary>The location's point of interest; none in an apartment block (its own find is the shelter map).</summary>
-        public static PropKind? PointOfInterestKind(Location location) => location switch
-        {
-            Location.Hospital => PropKind.MedTable,
-            Location.Garage => PropKind.Workbench,
-            Location.Apartments => null,
-            _ => PropKind.Programmer,
-        };
+        public static PropKind? PointOfInterestKind(Location location) => HouseRules.For(location).PointOfInterest;
 
         /// <summary>
         /// The apartment block's find: the map to the survivors' shelter, hidden in one flat above the ground floor (its own
@@ -123,11 +111,11 @@ namespace Stealth.Level
         public static void PlanShelterMap(LevelLayout l)
         {
             l.MapFlat = l.MapRoom = -1;
-            if (l.Kind != HouseKind.Apartments) return;
+            if (!HouseRules.Of(l).HasShelterMap) return;
             var flats = new SortedSet<int>();
             foreach (var r in l.Rooms) if (r.Flat >= 0 && (r.Floor > 0 || l.Floors == 1)) flats.Add(r.Flat);
             if (flats.Count == 0) return;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x3A9E, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.ShelterMap, 0));
             int pick = rng.Next(flats.Count), k = 0;
             foreach (int f in flats) { if (k++ == pick) { l.MapFlat = f; break; } }
             PlanRoom best = null;
@@ -150,45 +138,13 @@ namespace Stealth.Level
             return r != null ? r.Flat : -1;
         }
 
-        static bool PlayerPasses(EdgeType k) => k != EdgeType.Wall;
-        static bool RobotPasses(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach;
-
         /// <summary>
         /// Rooms reached from <paramref name="start"/> through the openings (players: every kind; robots: doors and open
         /// passages) and the stairs, leaving out the opening <paramref name="skip"/> and the rooms in <paramref name="closed"/>.
         /// </summary>
         public static HashSet<int> Reach(HousePlan plan, IReadOnlyList<Stair> stairs, int start, bool player, int skip = -1,
-            ICollection<int> closed = null)
-        {
-            var adjacent = new Dictionary<int, List<int>>();
-            void Link(int a, int b)
-            {
-                if (a < 0 || b < 0) return;
-                if (!adjacent.TryGetValue(a, out var la)) adjacent[a] = la = new List<int>();
-                if (!adjacent.TryGetValue(b, out var lb)) adjacent[b] = lb = new List<int>();
-                la.Add(b);
-                lb.Add(a);
-            }
-            for (int i = 0; i < plan.Openings.Count; i++)
-            {
-                var o = plan.Openings[i];
-                if (i == skip || !(player ? PlayerPasses(o.Kind) : RobotPasses(o.Kind))) continue;
-                var w = plan.Walls[o.Wall];
-                Link(w.RoomA, w.RoomB);
-            }
-            foreach (var s in stairs) Link(s.Room, s.RoomAbove);
-            var seen = new HashSet<int> { start };
-            var queue = new Queue<int>();
-            queue.Enqueue(start);
-            while (queue.Count > 0)
-            {
-                int r = queue.Dequeue();
-                if (!adjacent.TryGetValue(r, out var next)) continue;
-                foreach (var n in next)
-                    if ((closed == null || !closed.Contains(n)) && seen.Add(n)) queue.Enqueue(n);
-            }
-            return seen;
-        }
+            ICollection<int> closed = null) =>
+            new RoomGraph(plan, stairs, player ? Passage.Players : Passage.Robots).Reach(start, skip, closed);
 
         static bool HasStair(LevelLayout l, int room)
         {
@@ -216,13 +172,13 @@ namespace Stealth.Level
         public static int HideRoom(LevelLayout l, FeatureSettings s)
         {
             if (s == null || l.LevelIndex < s.HiddenRoomsFromHouse) return -1;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x41DE, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.HideRoom, 0));
             if (rng.NextDouble() >= s.HiddenRoomChance) return -1;
             var plan = l.Plan;
             var candidates = new List<PlanRoom>();
             foreach (var r in plan.Rooms)
             {
-                if (r.Id == l.LobbyRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage) continue;
+                if (r.Id == l.LobbyRoom || r.Levels > 1 || RoomTraits.Circulation(r.Type) || r.Type == RoomType.Storage) continue;
                 if (r.Area < s.HiddenRoomMinArea || r.Area > s.HiddenRoomMaxArea || HasStair(l, r.Id)) continue;
                 bool enclosed = true;
                 int walls = 0;
@@ -285,8 +241,9 @@ namespace Stealth.Level
             int want = Mathf.Min(s.MaxKeyDoors, s.KeyDoors + l.LevelIndex / Mathf.Max(1, s.HousesPerExtraKeyDoor));
             if (want <= 0) return;
             var plan = l.Plan;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x6E7D, 0));
-            var all = Reach(plan, l.Stairs, l.LobbyRoom, true);
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.KeyDoors, 0));
+            var graph = new RoomGraph(plan, l.Stairs, Passage.Players);
+            var all = graph.Reach(l.LobbyRoom);
             var order = new List<int>();
             for (int i = 0; i < plan.Openings.Count; i++)
             {
@@ -302,7 +259,7 @@ namespace Stealth.Level
             {
                 if (l.KeyDoors.Count >= want) break;
                 var behind = new HashSet<int>(all);
-                behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
+                behind.ExceptWith(graph.Reach(l.LobbyRoom, i));
                 if (behind.Count == 0 || behind.Count > s.KeyRegionRooms || behind.Contains(l.LobbyRoom) || behind.Overlaps(taken)) continue;
                 if (i == l.VaultDoorway || (l.VaultRoom >= 0 && behind.Contains(l.VaultRoom))) continue; // the vault has a lock of its own
                 if (i == l.StorageDoorway || (l.StorageRoom >= 0 && behind.Contains(l.StorageRoom))) continue; // so has the storage room
@@ -334,16 +291,7 @@ namespace Stealth.Level
                     l.ItemSpots.RemoveAt(k);
                     break;
                 }
-                int door = -1;
-                for (int k = 0; k < l.AutoDoors.Count; k++)
-                    if ((l.AutoDoors[k].position - d.Position).sqrMagnitude < 0.1f) { door = k; break; }
-                if (door < 0)
-                {
-                    l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
-                    door = l.AutoDoors.Count - 1;
-                }
-                l.LockedDoors.Remove(door);
-                l.LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
+                int door = l.EnsureDoor(d);
                 l.KeyDoors.Add(new KeyDoor { Door = door, Key = key, Rooms = new List<int>(behind) });
                 taken.UnionWith(behind);
             }
@@ -384,17 +332,17 @@ namespace Stealth.Level
         static System.Random ObjectiveRandom(int seed, int house, FeatureSettings s, out bool vaultFirst)
         {
             // the house's number in too, and the first draw thrown away: close seeds give close first draws
-            var rng = new System.Random(LevelRandom.Mix(seed, 0x0B7E, house + 1));
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.Objective, house + 1));
             rng.Next();
             vaultFirst = rng.NextDouble() < s.VaultShare;
             return rng;
         }
 
-        static int ExitRoomId(LevelLayout l) => l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1;
+        static int ExitRoomId(LevelLayout l) => l.ExitRoom;
 
         static bool Plain(LevelLayout l, PlanRoom r) =>
             r.Id != l.LobbyRoom && r.Id != l.HiddenRoom && r.Id != ExitRoomId(l) && r.Levels == 1 &&
-            r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Storage or RoomType.PaintBooth or RoomType.Utility or RoomType.Operating or RoomType.Imaging or RoomType.NurseStation) && !HasStair(l, r.Id);
+            !RoomTraits.Circulation(r.Type) && !RoomTraits.FloorTaken(r.Type) && !HasStair(l, r.Id);
 
         /// <summary>
         /// Makes the vault's doorway wide enough for the round bank door (<see cref="LevelMetrics.VaultDoorWidth"/>):
@@ -476,7 +424,8 @@ namespace Stealth.Level
         static bool PlanVault(LevelLayout l, FeatureSettings s, System.Random rng, Furnisher furnisher)
         {
             var plan = l.Plan;
-            var all = Reach(plan, l.Stairs, l.LobbyRoom, true);
+            var graph = new RoomGraph(plan, l.Stairs, Passage.Players);
+            var all = graph.Reach(l.LobbyRoom);
             var order = new List<int>();
             for (int i = 0; i < plan.Openings.Count; i++)
             {
@@ -488,7 +437,7 @@ namespace Stealth.Level
             foreach (int i in order)
             {
                 var behind = new HashSet<int>(all);
-                behind.ExceptWith(Reach(plan, l.Stairs, l.LobbyRoom, true, i));
+                behind.ExceptWith(graph.Reach(l.LobbyRoom, i));
                 if (behind.Count != 1) continue;
                 int v = 0;
                 foreach (int id in behind) v = id;
@@ -507,6 +456,7 @@ namespace Stealth.Level
                 }
                 l.VaultRoom = v;
                 l.VaultDoorway = i;
+                furnisher?.DoorwayMoved(l.Doorways[i]);
                 foreach (var c in consoles)
                 {
                     l.VaultConsoles.Add(c);
@@ -536,31 +486,8 @@ namespace Stealth.Level
         {
             var plan = l.Plan;
             var result = new List<Pose>();
-            var adjacent = new Dictionary<int, List<int>>();
-            void Link(int a, int b)
-            {
-                if (a < 0 || b < 0) return;
-                if (!adjacent.TryGetValue(a, out var la)) adjacent[a] = la = new List<int>();
-                if (!adjacent.TryGetValue(b, out var lb)) adjacent[b] = lb = new List<int>();
-                la.Add(b);
-                lb.Add(a);
-            }
-            foreach (var o in plan.Openings)
-                if (PlayerPasses(o.Kind)) Link(plan.Walls[o.Wall].RoomA, plan.Walls[o.Wall].RoomB);
-            foreach (var st in l.Stairs) Link(st.Room, st.RoomAbove);
             // rooms by steps from the one in front of the vault (players' ways, not through the vault)
-            var seen = new HashSet<int> { outside, vault };
-            var queue = new Queue<int>();
-            queue.Enqueue(outside);
-            var byDistance = new List<int>();
-            while (queue.Count > 0)
-            {
-                int r = queue.Dequeue();
-                byDistance.Add(r);
-                if (!adjacent.TryGetValue(r, out var next)) continue;
-                foreach (int n in next)
-                    if (seen.Add(n)) queue.Enqueue(n);
-            }
+            var byDistance = new RoomGraph(plan, l.Stairs, Passage.Players).ByDistance(outside, new[] { vault });
             foreach (int r in byDistance)
             {
                 if (result.Count >= 3) break;
@@ -654,20 +581,11 @@ namespace Stealth.Level
         /// </summary>
         public static void FinishObjective(LevelLayout l)
         {
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x0B7E, 1));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.ObjectiveFinish, 1));
             if (l.Objective == ObjectiveKind.Vault)
             {
                 var d = l.Doorways[l.VaultDoorway];
-                int door = -1;
-                for (int k = 0; k < l.AutoDoors.Count; k++)
-                    if ((l.AutoDoors[k].position - d.Position).sqrMagnitude < 0.1f) { door = k; break; }
-                if (door < 0)
-                {
-                    l.AutoDoors.Add(new Pose(d.Position, d.Rotation));
-                    door = l.AutoDoors.Count - 1;
-                }
-                l.LockedDoors.Remove(door);
-                l.LaserSpots.RemoveAll(x => (x.Position - d.Position).sqrMagnitude < 1.5f);
+                int door = l.EnsureDoor(d);
                 l.VaultDoor = door;
             }
             if (l.Objective != ObjectiveKind.Hostage) return;
@@ -699,7 +617,7 @@ namespace Stealth.Level
         {
             if (s == null) return;
             int want = Mathf.Min(s.MaxCrates, s.Crates + Mathf.FloorToInt(l.LevelIndex * s.CratesPerHouse));
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0xC7A7, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Crates, 0));
             var options = new List<int>();
             for (int i = 0; i < l.Props.Count; i++)
                 if (l.Props[i].Kind is PropKind.Pallet or PropKind.Shelf or PropKind.Boxes or PropKind.PaperStack
@@ -732,7 +650,7 @@ namespace Stealth.Level
         public static void PointOfInterest(LevelLayout l)
         {
             if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x9017, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.PointOfInterest, 0));
             // a big piece of furniture with nothing standing on it stands in for the 2 m console / table / bench (not a desk
             // or a counter: lamps and appliances stand on those, and desks climb up to high vents); smaller than the
             // place — the place shrinks to its footprint
@@ -783,7 +701,7 @@ namespace Stealth.Level
         {
             if (s == null) return;
             int want = Mathf.Min(s.MaxWardens, s.Wardens + Mathf.FloorToInt(l.LevelIndex * s.WardensPerHouse));
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x3A7D, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Wardens, 0));
             var plan = l.Plan;
             var rooms = new List<PlanRoom>();
             foreach (var r in plan.Rooms)

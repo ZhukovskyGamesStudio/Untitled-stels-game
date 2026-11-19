@@ -53,7 +53,7 @@ namespace Stealth.Level
             foreach (var r in l.Plan.Rooms)
             {
                 if (r.Id == l.LobbyRoom || r.Id == l.StorageRoom || r.Id == l.ChargingRoom) continue;
-                if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue;
+                if (RoomTraits.Circulation(r.Type)) continue;
                 float w = Worth(l, r, cageRoom);
                 if (w > 0f) list.Add((r, w));
             }
@@ -74,7 +74,7 @@ namespace Stealth.Level
         public static List<int> Place(LevelLayout l, List<LaserSpot> doors, WardSettings s, int movingLasersFromHouse)
         {
             s ??= new WardSettings();
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x3A2D, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Wards, 0));
             var guarded = new List<int>();
             var ranked = Ranked(l);
             int want = Count(s, l.LevelIndex);

@@ -79,7 +79,7 @@ namespace Stealth.Enemies
             float floorY = LevelLayout.FloorY(LevelLayout.FloorOf(transform.position.y));
             var doors = new List<Vector3>();
             foreach (var d in layout.Doorways) doors.Add(d.Position);
-            var rng = new System.Random(LevelRandom.Mix(layout.Seed, 0x5E8, Mathf.RoundToInt(rect.x * 4f) * 7919 + Mathf.RoundToInt(rect.y * 4f)));
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.SpiderWebs, Mathf.RoundToInt(rect.x * 4f) * 7919 + Mathf.RoundToInt(rect.y * 4f)));
             m_Web.AddRange(SpiderWebs.Plan(rect, floorY, doors, rng, Profile.StrandSpacing, Profile.StrandGap, Profile.MaxStrands));
             if (Strand == null) return;
             var parent = ActiveLevel.Root != null ? ActiveLevel.Root.transform : null;

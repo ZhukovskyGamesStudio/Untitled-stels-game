@@ -179,11 +179,19 @@ namespace Stealth.Level
         static bool s_StyleMeshesLoaded;
         /// <summary>Objects that take a variant of the style models (players: their slot picks the department).</summary>
         static readonly Dictionary<Transform, int> s_Variants = new();
+        static readonly List<Transform> s_Dead = new();
 
         /// <summary>Marks an object (a player model) to take the style models of this variant (its department slot).</summary>
         public static void SetVariant(GameObject root, int variant)
         {
             if (root == null) return;
+            // players come and go (reconnects, a new run): the destroyed ones are forgotten
+            if (s_Variants.Count > 16)
+            {
+                s_Dead.Clear();
+                foreach (var t in s_Variants.Keys) if (t == null) s_Dead.Add(t);
+                foreach (var t in s_Dead) s_Variants.Remove(t);
+            }
             s_Variants[root.transform] = variant;
             Dress(root);
         }

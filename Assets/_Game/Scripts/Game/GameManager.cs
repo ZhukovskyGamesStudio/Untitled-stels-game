@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Stealth.Configs;
@@ -18,7 +19,7 @@ namespace Stealth.Game
     /// <see cref="RunState"/>; the network twin (GameManagerNet) replicates <see cref="Level"/> and the run state and
     /// carries requests and banners (<see cref="IGameLink"/>).
     /// </summary>
-    public partial class GameManager : MonoBehaviour
+    public partial class GameManager : MonoBehaviour, IWorldState
     {
         public static GameManager Instance { get; private set; }
 
@@ -44,6 +45,9 @@ namespace Stealth.Game
         /// <summary>The new enemy mode: this house's time is up and its guards are off their docks for good.</summary>
         bool m_GuardsAwake;
         IGameLink m_Link;
+        IGameLink m_Offline;
+        /// <summary>Requests and broadcasts: through the network twin, or (no twin) handled right here.</summary>
+        IGameLink Link => m_Link ?? (m_Offline ??= new OfflineGameLink(this));
         bool m_IsServer;
         int m_BuiltSeed;
         int m_RunSeed;
@@ -66,32 +70,26 @@ namespace Stealth.Game
         public double GoAt { get; private set; }
         /// <summary>The row of the next column the team voted for (-1 = not decided).</summary>
         public int ChosenLane { get; private set; } = -1;
-        /// <summary>Hacked doors and cracked safes of this house (<see cref="DoorKey"/>, <see cref="SafeKey"/>).</summary>
+        /// <summary>Hacked doors and cracked safes of this house (<see cref="OpenKeys"/>).</summary>
         readonly HashSet<int> m_Opened = new();
         public IReadOnlyCollection<int> Opened => m_Opened;
         public int OpenedVersion { get; private set; }
         SewerLocation m_Sewer;
 
-        public static int DoorKey(int door) => door;
-        public static int SafeKey(int safe) => 1_000_000 + safe;
-        /// <summary>The storage door held open from inside, for now (<see cref="AutoDoor.IsEscaping"/>).</summary>
-        public static int EscapeKey(int door) => 7_000_000 + door;
-        /// <summary>The <paramref name="use"/>-th hack made from a hacking terminal (index in the layout's props).</summary>
-        public static int TerminalKey(int terminal, int use) => 2_000_000 + terminal * 16 + use;
-        /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
-        public static int StorageKey(int prop, int part) => 3_000_000 + prop * 8 + part;
 
-        /// <summary>Server: loot hidden behind a drawer / locker door (<see cref="StorageKey"/> → shape, colour) until it is opened.</summary>
+        /// <summary>Server: loot hidden behind a drawer / locker door (<see cref="OpenKeys.Storage"/> → shape, colour) until it is opened.</summary>
         readonly Dictionary<int, (byte shape, byte color)> m_Hidden = new();
 
         /// <summary>Hacks already made from this terminal in this house (kept with the opened doors and safes, so replicated).</summary>
         public int TerminalUses(int terminal)
         {
             int n = 0;
-            while (n < 16 && m_Opened.Contains(TerminalKey(terminal, n))) n++;
+            while (n < OpenKeys.TerminalUses && m_Opened.Contains(OpenKeys.Terminal(terminal, n))) n++;
             return n;
         }
         public bool IsOpened(int key) => m_Opened.Contains(key);
+        public int TerminalCharges(int terminal) => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(terminal));
+        double IWorldState.Now => Session.ServerTime;
 
         /// <summary>The ways on from the house just left (rows of the next column).</summary>
         public IReadOnlyList<int> RouteOptions => Route != null ? Route.Next(Level.Index, Level.Lane) : System.Array.Empty<int>();
@@ -136,12 +134,7 @@ namespace Stealth.Game
             m_Link = link;
             m_IsServer = isServer;
             m_Run = new RunState(Tuning.Run.Rules);
-            AutoDoor.IsUnlocked = i => IsOpened(DoorKey(i));
-            AutoDoor.IsEscaping = i => IsOpened(EscapeKey(i));
-            Items.SafeBox.IsOpened = i => IsOpened(SafeKey(i));
-            Items.Storage.IsOpened = (prop, part) => IsOpened(StorageKey(prop, part));
-            SecurityTerminal.ChargesLeft = i => Mathf.Max(0, Tuning.Player.Interaction.TerminalHacks - TerminalUses(i));
-            HookFeatures();
+            World.Set(this);
             if (!isServer) return;
             // A run starts in the sewer, at the first fork (tests and -level start right in a house).
             if (DevFlags.StartInHouse || DevFlags.ForcedLevel > 0)
@@ -158,6 +151,7 @@ namespace Stealth.Game
             ActiveLevel.Clear();
             LeaveSewerLocal();
             m_Link = null;
+            World.Clear(this);
             if (Instance == this) Instance = null;
         }
 
@@ -203,6 +197,8 @@ namespace Stealth.Game
         /// <summary>Every peer: build the sewer when the run is there, take it away when a house starts, flood it when the run ends there.</summary>
         void SyncLocation()
         {
+            // on the drive the sewer stays as it is behind the drive scene (the next house is on its way)
+            if (Phase == RunPhase.Sewer && DriveUntil > 0 && m_Sewer != null) return;
             // a new run after the water rose (or another run's sewer): built afresh, dry
             if (Phase == RunPhase.Sewer && m_Sewer != null && (m_Sewer.Flooded || m_SewerFor != (Level.RunSeed, Level.Index))) LeaveSewerLocal();
             if (Phase == RunPhase.Sewer && m_Sewer == null) EnterSewerLocal();
@@ -239,25 +235,6 @@ namespace Stealth.Game
 
         GameObject m_DriveScene;
         (int seed, int depth) m_SewerFor;
-        float m_DriveEndAt = -1f;
-
-        /// <summary>Every peer: the drive scene from the departure until the next house stands (under the black of the fade).</summary>
-        void UpdateDriveScene()
-        {
-            if (DriveUntil > 0 && m_DriveScene == null && Art != null && Art.DriveScene != null)
-            {
-                m_DriveScene = Instantiate(Art.DriveScene, new Vector3(0f, -400f, 0f), Quaternion.identity);
-                m_DriveEndAt = -1f;
-                BeginDriveScene(m_DriveScene.GetComponent<DriveScene>());
-            }
-            if (m_DriveScene == null || DriveUntil > 0 || Phase != RunPhase.Playing || ActiveLevel.Layout == null) return;
-            if (m_DriveEndAt < 0f) m_DriveEndAt = Time.time + 0.5f; // the house is there: a moment of black, then fade in on it
-            else if (Time.time >= m_DriveEndAt)
-            {
-                Destroy(m_DriveScene);
-                m_DriveScene = null;
-            }
-        }
 
         /// <summary>The drive starts from where this player's eyes are in the car (the scene glides out to its side view).</summary>
         static void BeginDriveScene(DriveScene scene)
@@ -289,19 +266,22 @@ namespace Stealth.Game
 
         // ------------------------------------------------------------------ level lifecycle
 
-        void BuildLocal()
+        /// <summary>
+        /// Every peer: builds the house of <paramref name="info"/> (its layout from the background generation when it is
+        /// the house the drive went to, else generated now), a piece per step.
+        /// </summary>
+        IEnumerator BuildLocalSteps(LevelInfo info)
         {
-            var info = Level;
-            if (info.Seed == 0 || info.Seed == m_BuiltSeed) return;
+            if (info.Seed == 0 || info.Seed == m_BuiltSeed) yield break;
             m_BuiltSeed = info.Seed;
             LeaveSewerLocal();
             // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
+            var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
                 LevelGenerator.Classic, info.ClassicEnemies);
-            ActiveLevel.Load(layout, Art);
+            foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
             ApplyAtmosphere();
@@ -323,10 +303,18 @@ namespace Stealth.Game
 
         void StartLevel(int index, int lane, int houseSeed = 0)
         {
-            foreach (var obj in m_Spawned) Session.Despawn(obj);
-            m_Spawned.Clear();
-            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
+            var all = StartLevelSteps(index, lane, houseSeed, false);
+            while (all.MoveNext()) { }
+        }
 
+        /// <summary>
+        /// Server: a house starts — built (a piece per step when <paramref name="arriving"/>: the drive scene is on), its
+        /// content spawned, the team's car in its basement. Arriving, the team rides in in the seats it left in
+        /// (<see cref="ArriveCarServer"/>); else everyone stands up in the basement and the car stands at the gate. The house's
+        /// info and the phase go out together in the last step (a client builds it when it hears of it).
+        /// </summary>
+        IEnumerator StartLevelSteps(int index, int lane, int houseSeed, bool arriving)
+        {
             ScentTrail.Clear();
             m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
@@ -335,6 +323,19 @@ namespace Stealth.Game
             int seed = houseSeed != 0 ? houseSeed : Route.Node(index, lane).Seed;
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
+            var info = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
+            if (!arriving) m_Prepared = null; // (a house started some other way: nothing generated for it)
+            var build = BuildLocalSteps(info);
+            while (build.MoveNext()) if (arriving) yield return null;
+            var layout = ActiveLevel.Layout;
+
+            // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
+            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
+            if (arriving) yield return null;
+
+            foreach (var obj in m_Spawned) Session.Despawn(obj);
+            m_Spawned.Clear();
+            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
             m_Opened.Clear();
             m_Hacked.Clear();
             OpenedVersion++;
@@ -343,25 +344,16 @@ namespace Stealth.Game
             GoAt = 0;
             ChosenLane = -1;
             Votes.Clear();
-            Level = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
-            BuildLocal();
-            var layout = ActiveLevel.Layout;
-
-            // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
-            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
-
+            Level = info;
             int totalValue = SpawnContent(layout, seed);
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             m_GuardsAwake = false;
-            DespawnCarServer();
             UnloadCarServer();
             SpawnStorageBotServer(layout);
-            foreach (var p in PlayerController.All)
-            {
-                p.ResetForLevelServer();
-                if (!layout.HasBasement) p.EnterHatchServer(0); // the team comes up into the entry hatch (a basement: it stands down there)
-            }
+            foreach (var p in PlayerController.All) p.ResetForLevelServer(); // (the team arrives down in the basement)
+            if (arriving) ArriveCarServer(layout);
+            else SpawnBasementCarServer(layout, false);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
@@ -376,8 +368,8 @@ namespace Stealth.Game
                 if (s.Index >= 0)
                     for (int part = 0; part < s.PartCount; part++)
                     {
-                        free.Add(StorageKey(s.Index, part));
-                        parts[StorageKey(s.Index, part)] = (s, part);
+                        free.Add(OpenKeys.Storage(s.Index, part));
+                        parts[OpenKeys.Storage(s.Index, part)] = (s, part);
                     }
             free.Sort(); // the same order on every run of the same house
             m_Hidden.Clear();
@@ -498,8 +490,14 @@ namespace Stealth.Game
         {
             Pings.Expire(Time.time);
             RevealMap();
+            PrepareNextHouse();
             UpdateDriveScene();
             if (!m_IsServer) return;
+            if (DriveUntil > 0 && Phase == RunPhase.Playing && !m_Arriving && Session.ServerTime >= ArriveAt)
+            {
+                DriveUntil = 0; // the car stands at the gate: the team gets out
+                Banner(Loc.Pack("banner.house", Level.Index + 1));
+            }
             if (m_Run.SetPlayers(TeamSize))
                 Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
             foreach (var p in PlayerController.All)
@@ -557,8 +555,7 @@ namespace Stealth.Game
             if (!Pings.TryCallout(owner, Time.time, team.Cooldown)) return;
             if (target != null) target.MarkServer(Session.ServerTimeF + team.MarkDuration);
             ulong id = target != null ? target.NetId : 0;
-            if (m_Link != null) m_Link.BroadcastPing(owner, kind, position, id);
-            else ReceivePing(owner, kind, position, id);
+            Link.BroadcastPing(owner, kind, position, id);
         }
 
         /// <summary>Every peer: a teammate's ping (delivered by the network twin).</summary>
@@ -615,8 +612,7 @@ namespace Stealth.Game
         /// <summary>Any player: switch the whole team to this visual style (F8).</summary>
         public void RequestStyle(int index)
         {
-            if (m_Link != null) m_Link.RequestStyle(index);
-            else SetStyleServer(index);
+            Link.RequestStyle(index);
         }
 
         /// <summary>Server: the team's style (replicated by the twin, applied on the host at once).</summary>
@@ -642,8 +638,7 @@ namespace Stealth.Game
 
         public void RequestRestart()
         {
-            if (m_Link != null) m_Link.RequestRestart();
-            else RestartRunServer();
+            Link.RequestRestart();
         }
 
         /// <summary>
@@ -717,8 +712,9 @@ namespace Stealth.Game
             Cargo.Clear();
             Stash.Clear();
             ExitStash.Clear();
+            CancelArrival();
             DriveUntil = 0;
-            m_Opened.Add(GateKey); // the start of the run: no gate to open
+            m_Opened.Add(OpenKeys.Gate); // the start of the run: no gate to open
             OpenedVersion++;
             foreach (var p in PlayerController.All)
             {
@@ -735,29 +731,29 @@ namespace Stealth.Game
         // ------------------------------------------------------------------ locked doors and safes
 
         /// <summary>Server: a player finished hacking a locked door.</summary>
-        public void UnlockDoorServer(PlayerController player, int door)
+        void UnlockDoorServer(PlayerController player, int door)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.HasLock && !a.NeedsKey); // a key door needs its key
             if (d == null) return;
             var at = player.transform.position;
-            bool byHand = Vector3.Distance(d.transform.position, at) <= AutoDoor.HackReach + 1.5f;
+            bool byHand = ServerReach.Within(at, d.transform.position, AutoDoor.HackReach);
             if (d.Storage)
             {
                 // the storage room's door: from its terminal, or by hand from inside
                 bool terminal = SecurityTerminal.All.Any(t => t.Kind == TerminalKind.Doors
-                    && Vector3.Distance(Flat(t.transform.position), Flat(at)) <= SecurityTerminal.Reach + 1.5f && Mathf.Abs(t.transform.position.y - at.y) < 2f);
+                    && ServerReach.WithinFlat(at, t.transform.position, SecurityTerminal.Reach) && Mathf.Abs(t.transform.position.y - at.y) < 2f);
                 if (!terminal)
                 {
                     // by hand from inside: open for now, so the player gets out; locked again behind them (UpdateStorageDoor)
                     if (!byHand || !AutoDoor.IsInside(d.transform.position, d.Inward, at)) return;
                     m_EscapeSeen = Time.time;
-                    if (m_Opened.Add(EscapeKey(door))) OpenedVersion++;
+                    if (m_Opened.Add(OpenKeys.Escape(door))) OpenedVersion++;
                     return;
                 }
             }
             else if (!byHand) return;
-            if (m_Opened.Add(DoorKey(door))) OpenedVersion++;
+            if (m_Opened.Add(OpenKeys.Door(door))) OpenedVersion++;
         }
 
         static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);
@@ -771,7 +767,7 @@ namespace Stealth.Game
         void UpdateStorageDoor()
         {
             var d = AutoDoor.StorageDoor;
-            if (d == null || !IsOpened(EscapeKey(d.Index))) return;
+            if (d == null || !IsOpened(OpenKeys.Escape(d.Index))) return;
             var at = d.transform.position;
             foreach (var p in PlayerController.All)
                 if (AutoDoor.AtDoor(at, p.transform.position) || AutoDoor.InRoom(at, d.Inward, d.Room, p.transform.position))
@@ -780,7 +776,7 @@ namespace Stealth.Game
                     return;
                 }
             if (Time.time - m_EscapeSeen < EscapeLinger) return;
-            m_Opened.Remove(EscapeKey(d.Index));
+            m_Opened.Remove(OpenKeys.Escape(d.Index));
             OpenedVersion++;
         }
 
@@ -790,12 +786,10 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || player == null || player.Downed || target == null || target.IsHacked) return;
             var t = SecurityTerminal.Find(terminal);
             if (t == null || t.Kind != TerminalKind.Hacking) return;
-            var to = player.transform.position - t.transform.position;
-            to.y = 0;
-            if (to.magnitude > SecurityTerminal.Reach + 1.5f) return;
+            if (!ServerReach.WithinFlat(player.transform.position, t.transform.position, SecurityTerminal.Reach)) return;
             int uses = TerminalUses(terminal);
             if (uses >= Tuning.Player.Interaction.TerminalHacks) return;
-            m_Opened.Add(TerminalKey(terminal, uses));
+            m_Opened.Add(OpenKeys.Terminal(terminal, uses));
             OpenedVersion++;
             TeamHackServer(target);
         }
@@ -804,13 +798,13 @@ namespace Stealth.Game
         /// Server: a player opens or closes a drawer / locker door (looking right at it). The first time a part with hidden
         /// loot opens, the item appears inside.
         /// </summary>
-        public void ToggleStorageServer(PlayerController player, int prop, int part)
+        void ToggleStorageServer(PlayerController player, int prop, int part)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed) return;
             var storage = Items.Storage.All.FirstOrDefault(s => s.Index == prop);
             if (storage == null || part < 0 || part >= storage.PartCount) return;
             if (Vector3.Distance(storage.transform.position, player.transform.position) > StorageReach) return;
-            int key = StorageKey(prop, part);
+            int key = OpenKeys.Storage(prop, part);
             if (!m_Opened.Remove(key)) m_Opened.Add(key);
             OpenedVersion++;
             if (!m_Opened.Contains(key) || !m_Hidden.Remove(key, out var loot)) return;
@@ -822,13 +816,13 @@ namespace Stealth.Game
         const float StorageReach = 3.2f;
 
         /// <summary>Server: a player cracked a safe — it opens and gives valuable loot.</summary>
-        public void OpenSafeServer(PlayerController player, int safe)
+        void OpenSafeServer(PlayerController player, int safe)
         {
-            if (Phase != RunPhase.Playing || player == null || player.Downed || IsOpened(SafeKey(safe))) return;
+            if (Phase != RunPhase.Playing || player == null || player.Downed || IsOpened(OpenKeys.Safe(safe))) return;
             var box = Items.SafeBox.All.FirstOrDefault(s => s.Index == safe);
-            if (box == null || Vector3.Distance(box.transform.position, player.transform.position) > Items.SafeBox.Reach + 1.5f) return;
+            if (box == null || !ServerReach.Within(player.transform.position, box.transform.position, Items.SafeBox.Reach)) return;
             if (!Perception.ReachClear(player.Hands, box.transform.position + Vector3.up * 0.5f, box.transform)) return; // not through a wall
-            m_Opened.Add(SafeKey(safe));
+            m_Opened.Add(OpenKeys.Safe(safe));
             OpenedVersion++;
             var s = Tuning.Items.Safes;
             var rng = new System.Random(box.Seed);
@@ -852,6 +846,7 @@ namespace Stealth.Game
         /// </summary>
         public void StartHouseServer(HouseKind kind)
         {
+            CancelArrival();
             DriveUntil = 0;
             GoAt = 0;
             LeaveAt = 0;
@@ -877,8 +872,7 @@ namespace Stealth.Game
         /// <summary>Server: a banner for everyone — a <see cref="Loc.Pack"/>ed text, each peer reads it in its own language.</summary>
         void Banner(string text)
         {
-            if (m_Link != null) m_Link.BroadcastBanner(text);
-            else ShowBanner(text);
+            Link.BroadcastBanner(text);
         }
 
         /// <summary>Every peer: show a banner (delivered by the network twin).</summary>

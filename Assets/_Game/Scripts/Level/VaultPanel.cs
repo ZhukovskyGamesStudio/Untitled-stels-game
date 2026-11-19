@@ -10,8 +10,6 @@ namespace Stealth.Level
     {
         public Renderer[] Lamps;
 
-        /// <summary>How many of the vault's locks are solved (set by the game).</summary>
-        public static System.Func<int> Solved = () => 0;
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly Color Locked = new(1f, 0.15f, 0.08f), Open = new(0.2f, 1f, 0.35f);
@@ -20,7 +18,7 @@ namespace Stealth.Level
 
         void LateUpdate()
         {
-            int solved = Solved();
+            int solved = World.State.VaultSolved;
             if (solved == m_Shown || Lamps == null) return;
             m_Shown = solved;
             m_Block ??= new MaterialPropertyBlock();

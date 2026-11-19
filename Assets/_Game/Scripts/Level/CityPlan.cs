@@ -82,7 +82,7 @@ namespace Stealth.Level
         public static City Make(Rect house, int front, int floors, int seed)
         {
             var c = new City();
-            var rng = new System.Random(LevelRandom.Mix(seed, 0xC17E, 0));
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.City, 0));
             var e = new Edge(house, front);
             float L = e.Length, D = front % 2 == 0 ? house.height : house.width;
             float B = D + 2f;                                   // the block's depth behind the building line

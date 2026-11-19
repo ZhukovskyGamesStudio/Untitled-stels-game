@@ -19,8 +19,6 @@ namespace Stealth.Level
         [Tooltip("The middle of the hole (where the hands go).")]
         public Transform Hole;
 
-        /// <summary>Which vents' grilles are off (doorway index; set by the game).</summary>
-        public static System.Func<int, bool> IsOpen = _ => false;
 
         public override UseKind Kind => UseKind.VentGrille;
         public override float HoldTime => Configs.Tuning.Player.Interaction.VentGrilleTime;
@@ -28,7 +26,7 @@ namespace Stealth.Level
         public override float AimRadius => 0.6f;
         public override float Reach => 1.6f;
 
-        public bool Open => Index >= 0 && IsOpen(Index);
+        public bool Open => Index >= 0 && World.IsOpened(OpenKeys.Crawl(Index));
 
         int m_Shown = -1;
 

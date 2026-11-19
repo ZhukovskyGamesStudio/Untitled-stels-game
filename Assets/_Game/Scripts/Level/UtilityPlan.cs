@@ -56,7 +56,7 @@ namespace Stealth.Level
         {
             var parts = new List<UtilityPart>();
             if (l == null || l.Plan == null || shell == null) return parts;
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x51E7, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Utilities, 0));
             var faces = new List<(WallFace f, PlanRoom room)>();
             foreach (var f in shell.Walls)
             {
@@ -317,7 +317,7 @@ namespace Stealth.Level
         {
             foreach (var room in l.Rooms)
             {
-                if (room.Type is not (RoomType.Restroom or RoomType.Kitchen or RoomType.LockerRoom or RoomType.Bathroom) || room.Levels > 1) continue;
+                if (!RoomTraits.Wet(room.Type) || room.Levels > 1) continue;
                 // a corner of two plain walls: the end of a face whose neighbour round the corner is clear too
                 foreach (var (f, r) in faces)
                 {

@@ -52,19 +52,16 @@ namespace Stealth.EditorTools
             var vaultPanel = Prefab($"{LevelPrefabs}/VaultPanel.prefab", BuildVaultPanel);
             var vaultDoor = Prefab($"{LevelPrefabs}/VaultDoor.prefab", BuildVaultDoor);
             var exteriorDoor = Prefab($"{LevelPrefabs}/ExteriorDoor.prefab", BuildExteriorDoor);
-            if (art.Crate == crate && art.MedTable == med && art.Workbench == bench && art.Programmer == programmer && art.IllusionBlock == illusion
-                && art.VaultConsole == console && art.Cage == cage && art.VaultPanel == vaultPanel && art.VaultDoor == vaultDoor && art.ExteriorDoor == exteriorDoor) return;
-            art.VaultDoor = vaultDoor;
-            art.ExteriorDoor = exteriorDoor;
-            art.Crate = crate;
-            art.MedTable = med;
-            art.Workbench = bench;
-            art.Programmer = programmer;
-            art.IllusionBlock = illusion;
-            art.VaultConsole = console;
-            art.Cage = cage;
-            art.VaultPanel = vaultPanel;
-            EditorUtility.SetDirty(art);
+            Link(art, ref art.VaultDoor, vaultDoor);
+            Link(art, ref art.ExteriorDoor, exteriorDoor);
+            Link(art, ref art.Crate, crate);
+            Link(art, ref art.MedTable, med);
+            Link(art, ref art.Workbench, bench);
+            Link(art, ref art.Programmer, programmer);
+            Link(art, ref art.IllusionBlock, illusion);
+            Link(art, ref art.VaultConsole, console);
+            Link(art, ref art.Cage, cage);
+            Link(art, ref art.VaultPanel, vaultPanel);
         }
 
         /// <summary>
@@ -176,10 +173,7 @@ namespace Stealth.EditorTools
             else Debug.LogWarning("[Builder] vault_door has no TrimWheel: run Tools/Blender/rooms2_special.py --only vault_door");
             door.Wheel = wheel.transform;
             root.AddComponent<VaultHandle>().Door = door;
-            var blocker = root.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0, h / 2f, 0);
-            blocker.size = new Vector3(w, h, wall + 0.1f);
-            door.Blocker = blocker;
+            door.Blocker = DoorBlocker(root, 0f, 0f, w, h, wall + 0.1f);
             door.LockLamps = new Renderer[0];
             door.Padlocks = new Transform[0];
             Muffles(root, SoundMaterial.Door);
@@ -335,10 +329,7 @@ namespace Stealth.EditorTools
             door.SwingB = Leaf("LeafR", 1f);
             door.SwingAngle = -100f;
             door.SwingTime = 0.55f;
-            var blocker = root.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0, height / 2f, 0);
-            blocker.size = new Vector3(clear, height, 0.14f);
-            door.Blocker = blocker;
+            door.Blocker = DoorBlocker(root, 0f, 0f, clear, height, 0.14f);
             door.LockLamps = new Renderer[0];
             door.Padlocks = new Transform[0];
             Muffles(root, SoundMaterial.Door);

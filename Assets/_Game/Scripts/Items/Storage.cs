@@ -9,7 +9,7 @@ namespace Stealth.Items
     /// cabinet, parts cabinet, mail cabinet): drawers slide out, doors swing open on their hinges — every part on its own
     /// (look at it, press E). The parts are the model's
     /// children named <c>BodyDrawer{n}</c> / <c>BodyDoor{n}</c>; where they move is worked out from their meshes, so every
-    /// model family works. The server keeps which parts are open (<see cref="IsOpened"/>, replicated with the house's
+    /// model family works. The server keeps which parts are open (<see cref="World"/>, replicated with the house's
     /// opened set) and what loot is hidden behind them; every peer only animates. Moving parts stay out of the merged
     /// furniture (they carry a property block).
     /// </summary>
@@ -17,8 +17,6 @@ namespace Stealth.Items
     {
         public static readonly List<Storage> All = new();
 
-        /// <summary>Which parts are open now (set by the game: prop index, part index).</summary>
-        public static System.Func<int, int, bool> IsOpened = (_, _) => false;
 
         /// <summary>Index in <see cref="LevelLayout.Props"/>: the same on every peer, names the furniture in requests.</summary>
         public int Index { get; private set; } = -1;
@@ -37,7 +35,8 @@ namespace Stealth.Items
             public Quaternion ClosedRot;
             public Vector3 Hinge;       // doors: the vertical axis at the front edge, world
             public bool RightHinge;     // doors: the right leaf of a pair, hinged on its right edge, swings the other way
-            public float T01;           // 0 closed .. 1 open (shown)
+            public OpenTween Tween;     // 0 closed .. 1 open (shown)
+            public bool Posed;          // shown at least once (the first step snaps)
             public Bounds Closed;       // world bounds when closed
             public Collider[] Colliders;
         }
@@ -83,7 +82,8 @@ namespace Stealth.Items
                 p.Closed = closed[i];
                 p.RightHinge = !Drawers && rightHinged[i];
                 p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward, p.RightHinge);
-                p.T01 = 0f;
+                p.Tween = default;
+                p.Posed = false;
                 foreach (var r in p.T.GetComponentsInChildren<Renderer>(true))
                 {
                     r.GetPropertyBlock(block);
@@ -99,10 +99,11 @@ namespace Stealth.Items
             for (int i = 0; i < m_Parts.Count; i++)
             {
                 var p = m_Parts[i];
-                float target = IsOpened(Index, i) ? 1f : 0f;
-                if (Mathf.Approximately(p.T01, target)) continue;
-                p.T01 = Mathf.MoveTowards(p.T01, target, Time.deltaTime / StorageMath.OpenSeconds);
-                Pose(p, StorageMath.Ease(p.T01));
+                float was = p.Tween.Value;
+                p.Tween.Step(World.IsOpened(OpenKeys.Storage(Index, i)), Time.deltaTime, StorageMath.OpenSeconds);
+                if (p.Posed && p.Tween.Value == was) continue;
+                p.Posed = true;
+                Pose(p, p.Tween.Smooth);
             }
         }
 
@@ -118,7 +119,7 @@ namespace Stealth.Items
             p.T.SetPositionAndRotation(p.Hinge + turn * (p.ClosedPos - p.Hinge), turn * p.ClosedRot);
         }
 
-        public bool IsOpen(int part) => Index >= 0 && IsOpened(Index, part);
+        public bool IsOpen(int part) => Index >= 0 && World.IsOpened(OpenKeys.Storage(Index, part));
 
         /// <summary>The part a collider belongs to; the carcass itself gives the part closest to <paramref name="point"/>.</summary>
         public int PartOf(Collider c, Vector3 point)
@@ -182,8 +183,6 @@ namespace Stealth.Items
         public const float DrawerTravel = 0.32f;
         /// <summary>How far a locker door swings, degrees.</summary>
         public const float DoorAngle = 105f;
-
-        public static float Ease(float t) => t * t * (3f - 2f * t);
 
         /// <summary>
         /// The hinge of a door: the front edge on its left (looking at the furniture from the front, <paramref name="forward"/>

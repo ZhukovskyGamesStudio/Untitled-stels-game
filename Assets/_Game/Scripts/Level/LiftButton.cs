@@ -30,15 +30,15 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            var s = LiftCab.State();
-            available = LiftRules.Phase(s, LiftCab.Now(), FloorTime, DoorTime) == LiftPhase.Open && s.To != Index;
+            var s = World.State.Lift;
+            available = LiftRules.Phase(s, World.State.Now, FloorTime, DoorTime) == LiftPhase.Open && s.To != Index;
             return InCab ? Loc.F("use.lift_floor", Index + 1) : Loc.T("use.lift_call");
         }
 
         void Update()
         {
             if (Index < 0 || Lamp == null) return;
-            var s = LiftCab.State();
+            var s = World.State.Lift;
             int lit = s.To == Index ? 1 : 0;
             if (lit == m_Shown) return;
             if (m_Shown >= 0 && lit == 1) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Click : null, Point, 0.5f, Audio.Sfx.Group.Items);

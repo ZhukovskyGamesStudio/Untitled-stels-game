@@ -64,13 +64,13 @@ namespace Stealth.Level
             return (main, span - main);
         }
 
-        static bool Circulation(RoomType t) => t is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.FlatHall;
-        static bool Big(PlanRoom r) => r.Area >= 30f;
+        internal static bool Circulation(RoomType t) => t is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.FlatHall;
+        internal static bool Big(PlanRoom r) => r.Area >= 30f;
 
         /// <summary>A flat's entry: its hallway onto the landing.</summary>
         public static bool IsFlatEntry(LevelLayout l, Doorway d)
         {
-            if (l.Kind != HouseKind.Apartments || d.RoomA < 0 || d.RoomB < 0) return false;
+            if (l.PlanKind != HouseKind.Apartments || d.RoomA < 0 || d.RoomB < 0) return false;
             var a = l.Plan.Rooms[d.RoomA].Type;
             var b = l.Plan.Rooms[d.RoomB].Type;
             return (a == RoomType.FlatHall && b == RoomType.Corridor) || (b == RoomType.FlatHall && a == RoomType.Corridor);
@@ -90,10 +90,7 @@ namespace Stealth.Level
         public static float Chance(LevelLayout l, Doorway d, float chance)
         {
             if (Always(l, d)) return 1f;
-            if (l.Kind == HouseKind.Apartments && d.RoomA >= 0 && d.RoomB >= 0
-                && (l.Plan.Rooms[d.RoomA].Flat >= 0 || l.Plan.Rooms[d.RoomB].Flat >= 0)) return Mathf.Max(chance, 0.75f);
-            if (l.Kind == HouseKind.Hospital) return Mathf.Max(chance, 0.6f); // wards, theatres and the corridor's swing doors
-            return chance;
+            return HouseRules.Of(l).DoorChance(l, d, chance);
         }
 
         /// <summary>The kind of the inner door <paramref name="i"/> (index in <see cref="LevelLayout.AutoDoors"/>).</summary>
@@ -107,40 +104,11 @@ namespace Stealth.Level
             var b = l.Plan.Rooms[d.RoomB];
             bool Either(System.Func<PlanRoom, bool> f) => f(a) || f(b);
             if (Either(r => r.Type is RoomType.Utility)) return DoorKind.Steel;
-            switch (l.Kind)
-            {
-                case HouseKind.Garage:
-                    return Either(r => r.Type is RoomType.Workshop or RoomType.PaintBooth or RoomType.Storage) ? DoorKind.Steel : DoorKind.Wood;
-                case HouseKind.Hospital:
-                    if (Either(r => r.Type is RoomType.Operating)) return DoorKind.ClinicSwing;
-                    if (Circulation(a.Type) && Circulation(b.Type)) return DoorKind.ClinicSwing; // the corridor's dividing doors
-                    if (Either(r => r.Type is RoomType.Storage)) return DoorKind.Steel;
-                    return DoorKind.Clinic;
-                case HouseKind.Apartments:
-                    if (IsFlatEntry(l, d)) return DoorKind.Entry;
-                    if (Either(r => r.Type is RoomType.Living)) return DoorKind.WoodDouble;
-                    if (a.Flat < 0 && b.Flat < 0) return DoorKind.Steel; // the ground floor's storeroom, the concierge
-                    return DoorKind.Wood;
-            }
-            // offices: glass sliding doors only where the tech is; steel to storage; double doors to big rooms
-            if (Either(r => r.Type is RoomType.Server or RoomType.ControlRoom or RoomType.Lab)) return DoorKind.Slide;
-            if (l.Kind == HouseKind.DataCenter && Circulation(a.Type) && Circulation(b.Type)) return DoorKind.Slide;
-            if (Either(r => r.Type is RoomType.Storage)) return DoorKind.Steel;
-            if (Either(r => r.Type is RoomType.Restroom or RoomType.LockerRoom)) return DoorKind.Wood;
-            var room = Circulation(a.Type) ? b : a;
-            if (room.Type is RoomType.Meeting or RoomType.Library or RoomType.Lounge or RoomType.Gym or RoomType.OpenSpace or RoomType.GameRoom
-                or RoomType.Kitchen && Big(room)) return DoorKind.WoodDouble;
-            if (Circulation(a.Type) && Circulation(b.Type)) return DoorKind.WoodDouble; // a lobby onto its corridor
-            return DoorKind.Wood;
+            return HouseRules.Of(l).InnerDoor(l, d, a, b);
         }
 
         /// <summary>The street door's kind: the apartment block's thick steel one, the shop's steel one, else glass leaves (null).</summary>
-        public static DoorKind? StreetKind(LevelLayout l) => l.Kind switch
-        {
-            HouseKind.Apartments => DoorKind.Entrance,
-            HouseKind.Garage => DoorKind.Steel,
-            _ => null,
-        };
+        public static DoorKind? StreetKind(LevelLayout l) => HouseRules.Of(l).StreetDoor;
 
         /// <summary>
         /// The room the door should open into, by how buildings are made (−1: no preference): out of a flat onto the landing,

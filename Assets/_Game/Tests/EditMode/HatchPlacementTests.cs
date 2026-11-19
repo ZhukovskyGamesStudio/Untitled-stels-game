@@ -39,8 +39,7 @@ namespace Stealth.Tests
                 Assert.IsFalse(l.Doorways.Any(d => d.Exterior && (d.RoomA == room.Id || d.RoomB == room.Id)), $"{name}: no street door of its own");
                 Assert.Less(NearestWall(l, l.HatchPosition), LevelGenerator.HatchFromWall + 0.3f, $"{name}: by a wall");
                 // the team comes up from the basement under it (its shaft's lid is where the entry hatch was)
-                Assert.IsTrue(l.HasBasement, name);
-                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.BasementOrigin, p), $"{name}: the team waits in the basement");
+                foreach (var p in l.PlayerSpawns) Assert.IsTrue(Basement.Contains(l.Cellar, p), $"{name}: the team waits in the basement");
             }
         }
 

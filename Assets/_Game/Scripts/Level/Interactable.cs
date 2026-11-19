@@ -1,12 +1,15 @@
 using System.Collections.Generic;
-using Stealth.Enemies;
 using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Level
 {
-    /// <summary>What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>).</summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille }
+    /// <summary>
+    /// What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>). The last three
+    /// are not <see cref="Interactable"/>s: a locked door's lock (index: the door), a safe's dial (the prop), a storage part
+    /// (<see cref="OpenKeys.StoragePart"/>: the prop and its part).
+    /// </summary>
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the
@@ -15,7 +18,7 @@ namespace Stealth.Level
     /// nearest one in reach (<see cref="Near"/>), the HUD shows <see cref="Prompt"/>, the request goes through
     /// <see cref="IPlayerLink.SendUse"/> and the server checks it again.
     /// </summary>
-    public abstract class Interactable : MonoBehaviour
+    public abstract class Interactable : MonoBehaviour, IReachTarget
     {
         public static readonly List<Interactable> All = new();
 
@@ -55,25 +58,13 @@ namespace Stealth.Level
         /// under the crosshair; nearest first; null if none.
         /// </summary>
         public static Interactable Near(PlayerController player, Vector3 hands, Aim? aim = null)
-        {
-            Interactable best = null;
-            float bestD = float.MaxValue;
-            var at = player.transform.position;
-            foreach (var i in All)
-            {
-                if (i.Index < 0 || !i.isActiveAndEnabled || !i.Usable(player)) continue;
-                var p = i.Point;
-                if (Mathf.Abs(at.y + 0.9f - p.y) > 1.7f) continue;
-                var to = p - at;
-                to.y = 0f;
-                float d = to.magnitude;
-                if (d > i.Reach || d >= bestD) continue;
-                if (aim.HasValue && !aim.Value.At(p, i.AimRadius)) continue;
-                if (!Perception.ReachClear(hands, p, i.ReachRoot)) continue;
-                best = i;
-                bestD = d;
-            }
-            return best;
-        }
+            => ReachSearch.Nearest(All, player.transform.position, hands, float.PositiveInfinity, aim, i => i.Usable(player));
+
+        bool IReachTarget.CanReach(Vector3 player) => Index >= 0 && isActiveAndEnabled;
+        Vector3 IReachTarget.ReachPoint => Point;
+        float IReachTarget.MaxReach => Reach;
+        (Vector3, Vector3, float) IReachTarget.AimSpan { get { var p = Point; return (p, p, AimRadius); } }
+        Vector3? IReachTarget.HandsTo => Point;
+        Transform IReachTarget.ReachRoot => ReachRoot;
     }
 }

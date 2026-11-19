@@ -17,8 +17,6 @@ namespace Stealth.Level
         [Tooltip("The orientation lamp in the rocker: glows while the room is dark.")]
         public Renderer Led;
 
-        /// <summary>Whether a room's lights were switched from how the house started (room id; set by the game).</summary>
-        public static System.Func<int, bool> IsSwitched = _ => false;
 
         /// <summary>The room whose lights it switches.</summary>
         public int Room { get; private set; } = -1;
@@ -39,7 +37,7 @@ namespace Stealth.Level
         }
 
         /// <summary>Whether its room is lit now.</summary>
-        public bool LightsOn => LightMath.SwitchedOn(m_Dark, IsSwitched(Room));
+        public bool LightsOn => LightMath.SwitchedOn(m_Dark, World.IsOpened(OpenKeys.Lights(Room)));
 
         public override string Prompt(PlayerController player, out bool available)
         {

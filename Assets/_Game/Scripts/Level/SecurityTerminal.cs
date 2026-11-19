@@ -10,7 +10,7 @@ namespace Stealth.Level
     /// peer with the level; its screens glow in its colour (green cameras, blue hacking, dim when spent). The player
     /// uses it (<see cref="Player.PlayerController"/>); the server counts the hacks (<see cref="Game.GameManager"/>).
     /// </summary>
-    public class SecurityTerminal : MonoBehaviour
+    public class SecurityTerminal : MonoBehaviour, IReachTarget
     {
         public static readonly List<SecurityTerminal> All = new();
 
@@ -24,12 +24,10 @@ namespace Stealth.Level
         [Tooltip("The kiosk's screen and beacon.")]
         public Renderer AccessScreens;
 
-        /// <summary>Hacks left on a terminal (set by the game: index in the layout's props → charges left).</summary>
-        public static System.Func<int, int> ChargesLeft = _ => 0;
 
         public int Index { get; private set; } = -1;
         public TerminalKind Kind { get; private set; }
-        public int Charges => Kind == TerminalKind.Hacking ? ChargesLeft(Index) : 0;
+        public int Charges => Kind == TerminalKind.Hacking ? World.State.TerminalCharges(Index) : 0;
         /// <summary>Nothing left to do: a hacking terminal out of charges, a door terminal whose door is open.</summary>
         public bool Spent => Kind == TerminalKind.Hacking ? Charges <= 0 : Kind == TerminalKind.Doors && (AutoDoor.StorageDoor?.TerminalOpen ?? true);
 
@@ -77,22 +75,14 @@ namespace Stealth.Level
 
         /// <summary>The terminal a player can use from here (same floor, nothing in between), or null.</summary>
         public static SecurityTerminal Near(Vector3 player, Vector3 hands, float reach = Reach, Player.Aim? aim = null)
-        {
-            SecurityTerminal best = null;
-            float bestD = reach;
-            foreach (var t in All)
-            {
-                if (t.Index < 0 || Mathf.Abs(player.y - t.transform.position.y) > 1.6f) continue;
-                var p = t.transform.position;
-                if (aim.HasValue && !aim.Value.At(p + Vector3.up * 0.6f, p + Vector3.up * 1.3f, 0.55f)) continue; // looked at
-                var to = player - t.transform.position;
-                to.y = 0;
-                if (to.magnitude > bestD || !Perception.ReachClear(hands, t.transform.position + Vector3.up * 0.9f, t.transform)) continue;
-                best = t;
-                bestD = to.magnitude;
-            }
-            return best;
-        }
+            => ReachSearch.Nearest(All, player, hands, reach, aim);
+
+        bool IReachTarget.CanReach(Vector3 player) => Index >= 0;
+        (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.6f, transform.position + Vector3.up * 1.3f, 0.55f);
+        Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
+        float IReachTarget.MaxReach => float.PositiveInfinity;
+        Transform IReachTarget.ReachRoot => transform;
+        Vector3? IReachTarget.HandsTo => transform.position + Vector3.up * 0.9f;
 
         public static SecurityTerminal Find(int index)
         {

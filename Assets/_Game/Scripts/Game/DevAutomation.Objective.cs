@@ -57,7 +57,7 @@ namespace Stealth.Game
                         if (Me.Switches == null) { Log("FAIL: E at the switch panel opened nothing"); break; }
                         yield return Shot("vault_switches");
                         // the same lock from the same seed: find the presses that light every lamp, then press them for real
-                        int seed = LevelRandom.Mix(l.Seed, 0x0C05, c.Index);
+                        int seed = LevelRandom.Mix(l.Seed, Salt.VaultConsoleCode, c.Index);
                         int count = Me.Switches.Count, solution = -1;
                         for (int mask = 0; mask < 1 << count && solution < 0; mask++)
                         {

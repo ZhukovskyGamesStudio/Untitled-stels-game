@@ -6,7 +6,7 @@ namespace Stealth.Level
     /// <summary>
     /// The hand dryer on a restroom's wall (prefab Props/HandDryer): E switches it on for a few seconds — a loud roar
     /// every robot with ears within <see cref="Configs.InteractionSettings"/>' reach comes to check (the server emits the
-    /// noise, <see cref="Game.GameManager.UseServer"/>). Running or not comes from the game (<see cref="IsRunning"/>),
+    /// noise, <see cref="Game.GameManager.UseServer"/>). Running or not comes from the game (<see cref="World"/>),
     /// so every peer hears it.
     /// </summary>
     public class HandDryer : Interactable
@@ -16,8 +16,6 @@ namespace Stealth.Level
         [Tooltip("The LED: lit while it runs.")]
         public Renderer Led;
 
-        /// <summary>Whether the dryer of this prop index runs now (set by the game).</summary>
-        public static System.Func<int, bool> IsRunning = _ => false;
 
         public override UseKind Kind => UseKind.HandDryer;
         public override Vector3 Point => transform.position + Vector3.up * 1.2f + transform.forward * 0.12f;
@@ -27,14 +25,14 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            available = !IsRunning(Index);
+            available = !World.IsOpened(OpenKeys.Dryer(Index));
             return available ? Loc.T("use.dryer") : null;
         }
 
         void Update()
         {
             if (Index < 0) return;
-            bool on = IsRunning(Index);
+            bool on = World.IsOpened(OpenKeys.Dryer(Index));
             if (on == m_Was) return;
             m_Was = on;
             if (Sound != null)

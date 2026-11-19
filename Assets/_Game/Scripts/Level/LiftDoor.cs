@@ -51,13 +51,13 @@ namespace Stealth.Level
         void Update()
         {
             if (Floor < 0) return;
-            var s = LiftCab.State();
-            double now = LiftCab.Now();
+            var s = World.State.Lift;
+            double now = World.State.Now;
             float open = LiftRules.DoorOpen(s, Floor, now, FloorTime, DoorTime);
             if (!Mathf.Approximately(open, m_ShownOpen))
             {
                 if (m_ShownOpen >= 0f && (m_ShownOpen <= 0f || m_ShownOpen >= 1f) && open > 0f && open < 1f)
-                    Audio.Sfx.At(Audio.Sfx.Bank?.DoorSlide, transform.position + Vector3.up * 1.2f, Configs.Tuning.Audio.Mix.Doors, Audio.Sfx.Group.Items, 0.85f);
+                    DoorSounds.Play(DoorSound.Slide, transform.position + Vector3.up * 1.2f, open > m_ShownOpen);
                 m_ShownOpen = open;
                 float slide = Width / 2f * Mathf.SmoothStep(0f, 1f, open);
                 if (PanelA != null) PanelA.localPosition = new Vector3(-Width / 4f - slide, PanelA.localPosition.y, PanelA.localPosition.z);

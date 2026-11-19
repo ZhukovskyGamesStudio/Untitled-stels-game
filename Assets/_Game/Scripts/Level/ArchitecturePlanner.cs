@@ -252,7 +252,7 @@ namespace Stealth.Level
         {
             int nf = g.FloorDecay?.Length ?? 0, nw = g.WallDecay?.Length ?? 0, np = g.Posters?.Length ?? 0;
             if ((g.DecayDensity <= 0f || nf + nw == 0) && (g.PosterChance <= 0f || np == 0)) return;
-            var rng = new System.Random(LevelRandom.Mix(layout.Seed, 0x0DECA7, 0));
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Decor, 0));
             int layer = 0;
             float Lift() => 0.002f * (layer++ % 6);              // overlapping decals never fight for the same depth
 

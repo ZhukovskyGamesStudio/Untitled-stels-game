@@ -7,9 +7,9 @@ namespace Stealth.Items
     /// <summary>
     /// A safe on the level (prefab Props/Safe): it can be cracked with the dial minigame (<see cref="SafeLock"/>), then it
     /// gives valuable loot. Its keypad is red while locked and green once open. The server keeps the opened safes
-    /// (<see cref="IsOpened"/>); every peer only shows them.
+    /// (<see cref="World"/>); every peer only shows them.
     /// </summary>
-    public class SafeBox : MonoBehaviour
+    public class SafeBox : MonoBehaviour, IReachTarget
     {
         public static readonly List<SafeBox> All = new();
 
@@ -19,8 +19,6 @@ namespace Stealth.Items
         [Tooltip("The glowing keypad: red locked, green open.")]
         public Renderer Keypad;
 
-        /// <summary>Which safes are open now (set by the game: index in the layout's prop list).</summary>
-        public static System.Func<int, bool> IsOpened = _ => false;
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -28,7 +26,7 @@ namespace Stealth.Items
 
         /// <summary>Index in <see cref="LevelLayout.Props"/>: the same on every peer, names the safe in requests.</summary>
         public int Index { get; private set; } = -1;
-        public bool Opened => Index >= 0 && IsOpened(Index);
+        public bool Opened => Index >= 0 && World.IsOpened(OpenKeys.Safe(Index));
         /// <summary>Seed of the combination (from the house seed and the index: the same on every peer).</summary>
         public int Seed { get; private set; }
 
@@ -41,7 +39,7 @@ namespace Stealth.Items
         public void Configure(int index, int houseSeed)
         {
             Index = index;
-            Seed = LevelRandom.Mix(houseSeed, 0x5AFE, index);
+            Seed = LevelRandom.Mix(houseSeed, Salt.SafeCode, index);
             Show(false); // a property block now also keeps the keypad out of the merged furniture: it changes colour
         }
 
@@ -62,22 +60,14 @@ namespace Stealth.Items
 
         /// <summary>The closed safe a player can crack from here (same floor), or null.</summary>
         public static SafeBox ClosedNear(Vector3 player, Vector3 hands, float reach = Reach, Player.Aim? aim = null)
-        {
-            SafeBox best = null;
-            float bestD = reach;
-            foreach (var s in All)
-            {
-                if (s.Index < 0 || s.Opened || Mathf.Abs(player.y - s.transform.position.y) > 1.6f) continue;
-                var p = s.transform.position;
-                if (aim.HasValue && !aim.Value.At(p + Vector3.up * 0.15f, p + Vector3.up * 0.9f, 0.45f)) continue; // looked at
-                var to = player - s.transform.position;
-                to.y = 0;
-                if (to.magnitude > bestD || !Enemies.Perception.ReachClear(hands, s.transform.position + Vector3.up * 0.5f, s.transform)) continue;
-                best = s;
-                bestD = to.magnitude;
-            }
-            return best;
-        }
+            => ReachSearch.Nearest(All, player, hands, reach, aim);
+
+        bool IReachTarget.CanReach(Vector3 player) => Index >= 0 && !Opened;
+        (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.15f, transform.position + Vector3.up * 0.9f, 0.45f);
+        Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
+        float IReachTarget.MaxReach => float.PositiveInfinity;
+        Transform IReachTarget.ReachRoot => transform;
+        Vector3? IReachTarget.HandsTo => transform.position + Vector3.up * 0.5f;
 
         /// <summary>Where the loot falls out: in front of the safe, towards the middle of its room.</summary>
         public Vector3 LootSpot(int i)

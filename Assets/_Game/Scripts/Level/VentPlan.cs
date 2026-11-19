@@ -56,10 +56,10 @@ namespace Stealth.Level
         public static void Plan(LevelLayout l, float coverage, float closedChance = 0f, float climbChance = 0f)
         {
             l.Vents.Clear();
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, 0x7E47, 0));
+            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Vents, 0));
             for (int f = 0; f < l.Floors; f++) l.Vents.Add(PlanFloor(l, f, coverage, rng, climbChance));
             // some lids are screwed shut (own stream): never the one over the room the team arrives in
-            var lids = new System.Random(LevelRandom.Mix(l.Seed, 0x6A7E, 0));
+            var lids = new System.Random(LevelRandom.Mix(l.Seed, Salt.VentLids, 0));
             foreach (var net in l.Vents)
                 for (int i = 0; i < net.Grates.Count; i++)
                 {
@@ -69,6 +69,68 @@ namespace Stealth.Level
                     if (arrival) g.ClimbDir = -1; // never a way up in the room the team arrives in
                     net.Grates[i] = g;
                 }
+        }
+
+        /// <summary>
+        /// The duct cells of the ground floor's void a duct from <paramref name="room"/> can get to (a double-height hall or a
+        /// stair hole may cut the void in parts): the exit room must be in the lobby's part.
+        /// </summary>
+        public static HashSet<Vector2Int> VoidReach(LevelLayout l, int room)
+        {
+            var seen = new HashSet<Vector2Int>();
+            var queue = new Queue<Vector2Int>();
+            int nx = l.Plan.NX / 2, nz = l.Plan.NZ / 2;
+            for (int x = 0; x < nx; x++)
+                for (int z = 0; z < nz; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (l.Plan.SpaceAt(0, new Vector2((x + 0.5f) * Res, (z + 0.5f) * Res)) == room && Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                }
+            if (seen.Count == 0)
+            {
+                // an atrium lobby has no ceiling: the ducts start from the rooms around it (Arrival)
+                var around = l.Plan.Rooms[room].Bounds;
+                around.min -= Vector2.one * 3f;
+                around.max += Vector2.one * 3f;
+                for (int x = 0; x < nx; x++)
+                    for (int z = 0; z < nz; z++)
+                    {
+                        var c = new Vector2Int(x, z);
+                        if (around.Contains(new Vector2((x + 0.5f) * Res, (z + 0.5f) * Res)) && Allowed(l, 0, c) && seen.Add(c)) queue.Enqueue(c);
+                    }
+            }
+            var dirs = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
+            while (queue.Count > 0)
+            {
+                var c = queue.Dequeue();
+                foreach (var d in dirs)
+                {
+                    var n = c + d;
+                    if (n.x < 0 || n.y < 0 || n.x >= nx || n.y >= nz || seen.Contains(n) || !Allowed(l, 0, n)) continue;
+                    seen.Add(n);
+                    queue.Enqueue(n);
+                }
+            }
+            return seen;
+        }
+
+        /// <summary>A duct can come down into the room: one storey high, and some cell of it has the void over it.</summary>
+        public static bool CanReach(LevelLayout l, PlanRoom r, HashSet<Vector2Int> reach)
+        {
+            if (r.Levels != 1) return false;
+            var b = r.Bounds;
+            for (int x = Mathf.FloorToInt(b.xMin / Res); x * Res < b.xMax; x++)
+                for (int z = Mathf.FloorToInt(b.yMin / Res); z * Res < b.yMax; z++)
+                {
+                    var c = new Vector2Int(x, z);
+                    if (!reach.Contains(c)) continue;
+                    bool own = true;
+                    for (int px = x * 2; px <= x * 2 + 1 && own; px++)
+                        for (int pz = z * 2; pz <= z * 2 + 1 && own; pz++)
+                            own = l.Plan.SpaceAt(r.Floor, HousePlan.CellCenter(px, pz)) == r.Id;
+                    if (own) return true;
+                }
+            return false;
         }
 
         /// <summary>A duct may run in this cell of floor <paramref name="f"/>'s void: over rooms or pockets, under a slab or the roof, no stair hole.</summary>
@@ -115,7 +177,7 @@ namespace Stealth.Level
         {
             if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.ControlRoom or RoomType.ChargingStation
                 or RoomType.Storage or RoomType.Workshop or RoomType.PaintBooth) return true;
-            if (l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id == r.Id) return true;
+            if (l.ExitRoom == r.Id) return true;
             foreach (var p in l.Props)
                 if (p.Kind is PropKind.Cage or PropKind.Hatch or PropKind.ShaftHatch && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == r.Id) return true;
             return false;
@@ -153,7 +215,7 @@ namespace Stealth.Level
 
         static VentNet PlanFloor(LevelLayout l, int f, float coverage, System.Random rng, float climbChance = 0f)
         {
-            var climbRng = new System.Random(LevelRandom.Mix(l.Seed, 0xC1B, f));
+            var climbRng = new System.Random(LevelRandom.Mix(l.Seed, Salt.VentClimbs, f));
             var climbs = new Dictionary<int, int>();
             var net = new VentNet { Floor = f };
             var plan = l.Plan;
@@ -221,7 +283,7 @@ namespace Stealth.Level
             int root = f == 0 ? Arrival(l, grates, rooms) : Biggest(rooms, plan);
             var connected = new HashSet<int> { root };
             net.Cells.Add(grates[root]);
-            int exit = f == 0 ? plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Id ?? -1 : -1;
+            int exit = f == 0 ? l.ExitRoom : -1;
             int want = Mathf.Max(1, Mathf.CeilToInt(rooms.Count * coverage));
             while (connected.Count < want || (exit >= 0 && grates.ContainsKey(exit) && !connected.Contains(exit)))
             {

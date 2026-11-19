@@ -879,6 +879,92 @@ def kit_segment(variant, cut=False):
     kit_export(f"sewer_seg_{variant}" + ("_cut" if cut else ""))
 
 
+# --------------------------------------------------------------------------- the alcove with the shaft up to the house
+
+# A clean alcove in the +Y (Unity +Z, left) wall beside the parked car, and over it a brick shaft up to the lobby's floor
+# (Unity: Basement — the shaft's middle at x 3.0, y 4.345; its hole in the floor is 1.5 m square; the floor is 4.9 m
+# over the road). The ladder stands against the alcove's back wall and goes up the shaft.
+ALC_X0, ALC_X1, ALC_TOP, ALC_BACK = 1.8, 4.2, 2.4, 5.09
+SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, 4.89
+LADDER_X, LADDER_Y = 3.0, ALC_BACK - 0.25
+
+
+def kit_alcove():
+    """sewer_seg_alcove: a plain 6 m segment with the alcove and the shaft. Parts: the tunnel like sewer_seg_*, BrickAlcove
+    (its walls, the ceiling round the shaft, the shaft), StoneAlcove (lintel and jambs), ConcreteAlcove (its floor), MetalLadder
+    (up to just under the lid), RustLamp + GlowLamp (a caged bulb on the shaft's wall: the game puts the light there),
+    MetalShutLid (the lid seen from below: the sewer shows it, the house's basement hides it — the real lid is in its floor)."""
+    p, L = KIT, KIT_LEN
+    prof = kit_profile(p, KIT_WALK, extra=(ALC_TOP,))
+
+    def vault(bm):
+        for xa, xb, pr in ((0.0, ALC_X0, prof), (ALC_X0, ALC_X1, prof[:-1]), (ALC_X1, L, prof)):
+            skin(bm, [(xa, pr), (xb, pr)], p["wall"])
+    part("Brick", vault)
+
+    def alcove(bm):
+        W, H, B = KIT_WALK, p["half"], ALC_BACK
+        poly(bm, [(ALC_X0, B, W), (ALC_X1, B, W), (ALC_X1, B, ALC_TOP), (ALC_X0, B, ALC_TOP)], (0, -1, 0))      # back wall
+        poly(bm, [(ALC_X0, H, W), (ALC_X0, B, W), (ALC_X0, B, ALC_TOP), (ALC_X0, H, ALC_TOP)], (1, 0, 0))       # sides
+        poly(bm, [(ALC_X1, H, W), (ALC_X1, B, W), (ALC_X1, B, ALC_TOP), (ALC_X1, H, ALC_TOP)], (-1, 0, 0))
+        for xa, xb in ((ALC_X0, SHAFT_X0), (SHAFT_X1, ALC_X1)):                                                  # ceiling round the shaft
+            poly(bm, [(xa, H, ALC_TOP), (xb, H, ALC_TOP), (xb, B, ALC_TOP), (xa, B, ALC_TOP)], (0, 0, -1))
+        # the shaft: four walls from the alcove's ceiling up to the house's floor
+        poly(bm, [(SHAFT_X0, B, ALC_TOP), (SHAFT_X1, B, ALC_TOP), (SHAFT_X1, B, SHAFT_TOP), (SHAFT_X0, B, SHAFT_TOP)], (0, -1, 0))
+        poly(bm, [(SHAFT_X0, SHAFT_Y0, ALC_TOP), (SHAFT_X1, SHAFT_Y0, ALC_TOP), (SHAFT_X1, SHAFT_Y0, SHAFT_TOP), (SHAFT_X0, SHAFT_Y0, SHAFT_TOP)], (0, 1, 0))
+        poly(bm, [(SHAFT_X0, SHAFT_Y0, ALC_TOP), (SHAFT_X0, B, ALC_TOP), (SHAFT_X0, B, SHAFT_TOP), (SHAFT_X0, SHAFT_Y0, SHAFT_TOP)], (1, 0, 0))
+        poly(bm, [(SHAFT_X1, SHAFT_Y0, ALC_TOP), (SHAFT_X1, B, ALC_TOP), (SHAFT_X1, B, SHAFT_TOP), (SHAFT_X1, SHAFT_Y0, SHAFT_TOP)], (-1, 0, 0))
+    part("Brick", alcove).name = "BrickAlcove"
+
+    def stone(bm):
+        box(bm, ALC_X0 - 0.15, ALC_X1 + 0.15, 3.48, 3.7, ALC_TOP - 0.05, ALC_TOP + 0.24)
+        for x0, x1 in ((ALC_X0 - 0.15, ALC_X0 + 0.05), (ALC_X1 - 0.05, ALC_X1 + 0.15)):
+            box(bm, x0, x1, 3.48, 3.7, KIT_WALK - 0.02, ALC_TOP - 0.04)
+    part("Stone", stone).name = "StoneAlcove"
+    part("Concrete", lambda bm: poly(bm, [(ALC_X0, 3.75, KIT_WALK), (ALC_X1, 3.75, KIT_WALK), (ALC_X1, ALC_BACK, KIT_WALK), (ALC_X0, ALC_BACK, KIT_WALK)])).name = "ConcreteAlcove"
+
+    def ladder(bm):
+        top = SHAFT_TOP - 0.05
+        for x in (LADDER_X - 0.28, LADDER_X + 0.28):
+            box(bm, x - 0.03, x + 0.03, LADDER_Y - 0.03, LADDER_Y + 0.03, KIT_WALK, top)
+            for z in (0.7, 2.0, 3.3, 4.5):                                       # brackets to the back wall
+                box(bm, x - 0.03, x + 0.03, LADDER_Y + 0.03, ALC_BACK, z - 0.03, z + 0.03)
+        z = KIT_WALK + 0.3
+        while z < top - 0.1:
+            cyl(bm, 0.018, 0.56, (LADDER_X, LADDER_Y, z), axis="X", seg=8)
+            z += 0.3
+    part("Metal", ladder).name = "MetalLadder"
+
+    def lamp_cage(bm):
+        c = (SHAFT_X0, 4.1, 3.7)
+        box(bm, c[0], c[0] + 0.05, c[1] - 0.09, c[1] + 0.09, c[2] - 0.12, c[2] + 0.12)                       # wall plate
+        torus(bm, 0.075, 0.008, (c[0] + 0.12, c[1], c[2]), axis="X", seg=14, seg2=4)
+        for k in range(4):
+            a = math.pi * k / 2 + math.pi / 4
+            cy, cz = c[1] + 0.075 * math.cos(a), c[2] + 0.075 * math.sin(a)
+            box(bm, c[0] + 0.05, c[0] + 0.13, cy - 0.007, cy + 0.007, cz - 0.007, cz + 0.007)
+    part("Rust", lamp_cage).name = "RustLamp"
+    part("Glow", lambda bm: cyl(bm, 0.055, 0.08, (SHAFT_X0 + 0.09, 4.1, 3.7), axis="X", seg=14, r2=0.04)).name = "GlowLamp"
+
+    def lid(bm):
+        box(bm, SHAFT_X0, SHAFT_X1, SHAFT_Y0, ALC_BACK, SHAFT_TOP - 0.05, SHAFT_TOP - 0.01)
+        for k in range(4):
+            y = SHAFT_Y0 + 0.25 + k * (ALC_BACK - SHAFT_Y0 - 0.5) / 3
+            box(bm, SHAFT_X0 + 0.08, SHAFT_X1 - 0.08, y - 0.025, y + 0.025, SHAFT_TOP - 0.1, SHAFT_TOP - 0.05)
+    part("Metal", lid).name = "MetalShutLid"
+
+    rout, rin = kit_profile(p, KIT_WALK - 0.02), kit_profile(p, KIT_WALK - 0.02, d=-0.12)
+
+    def end_ribs(bm):
+        rib(bm, rout, rin, 0.0, 0.2, p["wall"], front=False)
+        rib(bm, rout, rin, L - 0.2, L, p["wall"], back=False)
+    part("Stone", end_ribs).name = "StoneRibs"
+    part("Concrete", lambda bm: strip(bm, channel_pts(KIT_ROAD, outer=3.75), 0.0, L, closed=True)).name = "ConcreteFloor"
+    part("Stone", lambda bm: [box(bm, 0.0, L, *sorted((s * 2.58, s * 2.82)), 0.10, 0.26) for s in (-1, 1)]).name = "StoneCurb"
+    kit_road(0.0, L, KIT_ROAD, [0.0, 1.5, 3.0, 4.5, 6.0], [-1.3, 0.0, 1.3])
+    kit_export("sewer_seg_alcove")
+
+
 def seg_tray(L):
     """A cable tray on the right (+Y) wall and a culvert outlet in the channel wall below the far walkway."""
     def tray(bm):
@@ -1505,7 +1591,7 @@ def kit():
     for v in range(4):
         for cut in (False, True):
             kit_segment(v, cut)
-    for fn in (kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap):
+    for fn in (kit_alcove, kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap):
         fn()
 
 

@@ -87,7 +87,7 @@ Tests/EditMode/                       тесты (asmdef Stealth.Tests.EditMode)
    `MovementMath`, `Stamina`, `HealthState`, `GasExposure`, `FootstepNoise`, `RobotBrain`, `SuspicionMeter`, `SensorMath`, `Perception` (геометрия),
    `LevelRandom`, `Hacking`, `RobotRadio`, `ScentTrail`, `SeismicSense`, `ScanLine`, `LevelGenerator`, `HousePlan`, `PlanGenerator`, `Furnisher`, `HouseKinds`, `StairGeometry`, `RoomLighting`, `LootPlanner`, `RobotRoster`,
    `ReticleRules`, `HintRules`, `BannerQueue`, `GainTracker`, `UiMath`, `ItemCatalog`, `TeamStash`, `AudioRules`, `ExplorationMap`, `MapSketch`, `PingBoard`, `Controls`,
-   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`, `StairStyles`, `HouseFeatures`, `Crafting`, `Cargo`, `CarPhysics`, `SewerPlan`, `DoorRules`.
+   `RunMap` (маршрут), `RouteVotes`, `SafeLock`, `LegMath`, `StairStyles`, `HouseFeatures`, `Crafting`, `Cargo`, `CarPhysics`, `SewerPlan`, `DoorRules`, `Basement`, `Arrival`.
 2. **Компоненты** — тонкие `NetworkBehaviour`/`MonoBehaviour`: связывают правила с вводом, сетью, физикой и сценой.
 3. **Презентеры UI и звук** — `GameHUD`, `InventoryUI`, `GameMenu`, `StashBoard` (доска склада над люком, world-space canvas): только
    показывают/двигают/красят элементы, заранее собранные в префабах. `AudioDirector` (префаб `Audio/AudioDirector` в сцене) озвучивает
@@ -150,7 +150,8 @@ LaserGate — отдельная ловушка (не детектор)
 
 ### Уровень
 
-`LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`). `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
+`LevelGenerator.Generate(seed, level)` — чистая генерация планировки (`LevelLayout`) явным списком шагов `LevelGenerator.Steps` (план → скрытая комната → тёмные комнаты → люки → типы комнат → особые комнаты → вентиляция → мебель → охрана → особенности → двери → габариты; общее состояние — `House`).
+**Правила локации** — одна стратегия `HouseRules` (`Office`/`Hospital`/`Garage`/`Apartments`, `HouseRules.Of(layout)` по `PlanKind`): своя планировка в `BuildingSettings` (`Shape`), можно ли менять типы комнат, свои проёмы, комната выхода, шанс и вид дверей, уличная дверь, вид в любом стиле (`Look`), уникальная особенность, карта до убежища; таблицы мебели по типу комнаты остаются в `Furnisher`, варианты якорей — именованные `Furnisher.Option`. `ActiveLevel.Load(layout, art)` строит сцену через `LevelBuilder`
 **только из префабов `LevelArt`**: блоки-кубы масштабируются под размер, лестницы/двери/лазы/лампы/мебель ставятся как есть.
 Генерация детерминирована: каждый пир строит уровень сам из общего сида (`GameManager.Level`). Навмеш, лут, роботы — только на сервере.
 **План дома** (дизайн — [Docs/HouseGenerator.md](Docs/HouseGenerator.md)) — `HousePlan`: растр клеток 0,5 м на этаж (`CellKind`: комната,
@@ -161,6 +162,12 @@ LaserGate — отдельная ловушка (не детектор)
 `HouseKinds` — характер дома из сида (офис, бизнес-центр, дата-центр, склад, штаб-квартира): клон `BuildingSettings` с другой программой комнат
 и формами. `LevelGenerator` — «сгенерируй и проверь»: до 16 вариантов плана (`LevelLayout.PlanAttempt`), берётся первый, где до каждой комнаты
 можно дойти. `LevelLayout` — адаптеры для остального кода (`Rooms`, `Doorways`, `Stairs`, `RoomAt`, `OpenBetweenFloors`…).
+Общие правила генератора: что значит тип комнаты — `RoomTraits` (проход, своя планировка, одна дверь, середина под мебель, «мокрая», занятый пол);
+связность комнат — `RoomGraph` (`Passage`: игроки / роботы / пешеходы; шаги, достижимость, «что за этой дверью»); комната выхода и входа — один раз
+(`LevelLayout.ExitRoom/EntryRoom`, её тип не трогают правила и зонирование — `PlanRoom.Kept`); дверь своего назначения — `LevelLayout.EnsureDoor`,
+обязательные двери есть и в тихом доме (`LevelGenerator.OwnDoors`); по какому плану построен дом — `LevelLayout.PlanKind` (тип дома, но офис,
+если своя планировка локации не применялась — тест комнат); достижимость по вентиляции — `VentPlan.VoidReach/CanReach`. Мебельщик —
+`Furnisher*.cs` (partial: таблицы, расстановка, проходимость, комнаты, стены, углы); сдвинутый проём — `Furnisher.DoorwayMoved`.
 Мебель знает про окна и про проходимость: высокое (`Furnisher.Tall`) и висящее на стене (`OnWall`) не встаёт перед окном (`WindowStrips`; в туалетах,
 раздевалках и хранилище окон нет — `LevelBuilder.WindowCuts`), одного вида в комнате не больше `Furnisher.CapOf` (один кулер, одни часы), каждая группа
 при постановке проверяется той же сеткой, что и `EnsureWalkable` (`StaysWalkable`: середина комнаты, её двери и лестницы остаются связаны) — проверка
@@ -213,7 +220,9 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
   при спавне вызывает `Bind(...)`/`Spawned(...)`, на авторитетной стороне каждый кадр копирует поля в `NetworkVariable` (`PushState`, пишет только изменения),
   на остальных — применяет их (`ApplyReplicated`/`ApplyServerState`/`ApplyOwnerState`).
 - Сообщения идут через интерфейсы из `Scripts/Game/Session.cs`: `IPlayerLink`, `IInventoryLink`, `IGameLink`, `IDetectorLink`. Двойник реализует их RPC-шками
-  и вызывает серверные обработчики игрового компонента (`OnReviveRequest`, `PickupServer`, `FinishLevelServer`…). Без двойника (тесты, офлайн) запросы выполняются сразу.
+  и вызывает серверные обработчики игрового компонента (`OnReviveRequest`, `PickupServer`, `FinishLevelServer`…). Без двойника (тесты, офлайн) запросы идут через `Offline*Link` (`Scripts/Game/OfflineLinks.cs`) прямо в серверные обработчики:
+  код, который шлёт, не различает эти случаи (`Link` вместо `m_Link`). Дальность на сервере — одно правило `ServerReach` (запас на отставание позиции).
+- Состояние дома для сцены — `IWorldState` (`World.State`, ставит `GameManager.Bind`): открытое по ключам `OpenKeys`, лифт, часы; статических хуков у компонентов нет.
 - `Session` — фасад сессии: `IsServer`, `ServerTime`, `Spawn`/`Despawn` (сетевые префабы), `Launcher` (меню: хост, подключение, Steam).
   Без запущенной сессии этот пир — сам себе сервер, время — локальное, спавн — обычный `Instantiate`.
 - Движение игрока — owner-authoritative (`NetworkTransform` Owner), здоровье, лут и роботы — server-authoritative.
@@ -244,7 +253,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
 между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`). **Взлом навсегда**: робот или устройство, взломанные руками или
 с терминала (`GameManager.TeamHackServer`, `GameManager.Hacks.cs`), выключены, пока команда держит не больше `InteractionSettings.MaxHacked` (2);
-взлом сверх лимита будит первого (`Detector.WakeServer`); занятые слоты — ключи `HackSlotKey` в `Opened`, в HUD — значки слева снизу (`GameHUD.HackSlots`).
+взлом сверх лимита будит первого (`Detector.WakeServer`); занятые слоты — ключи `OpenKeys.HackSlot` в `Opened`, в HUD — значки слева снизу (`GameHUD.HackSlots`).
 Выключенный робот осел — его капсула идёт за телом до пола (`RobotAnimator.FitCapsule`). **Переподключение** — `GameManager.Reconnect.cs`:
 кто вышел (`PlayerController.Identity` — Steam id или id компьютера, `ISessionLauncher.LocalPlayerId`), вернётся с рюкзаком туда, где стоял (тот же дом),
 иначе — к хосту (`IPlayerLink.PlaceOwner` → `PlayerController.PlaceFromServer`). Выбывший видит рюкзак того, за кем смотрит (`InventoryUI`).
@@ -255,7 +264,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 (`RoomType.Utility`, 4 × 3,5 м, вырезано из наружного угла лобби — `PlanGenerator.UtilityCorner`, одна дверь — в лобби, без окон и уличной двери;
 у связанных блоков — только где угол ни с чем не соприкасается), выход — в дальней комнате с канализацией (туалет, кухня, раздевалка; иначе
 самая дальняя, где у стены есть место), в мастерской — в дальнем заднем углу цеха (камера маслоуловителя). Сам люк — всегда у стены, лучше в углу
-(`LevelGenerator.HatchCorner`), рядом стояк с ревизией и отвод вдоль стены (`UtilityPlan.Drains`). После слияния R6–R9 Саши входного люка как такового нет: в углу техпомещения стоит крышка шахты (`PropKind.ShaftHatch`), команда начинает дом в подвале под ней (`Basement`, точки появления — `Basement.Spawns`), подвал считается входом; комната выхода — дальняя «мокрая», но обязательно достижимая по вентиляции над потолками (`LevelGenerator.Ducted`, `VentPlan`). Решётки двух видов: в потолке (короба Саши, `VentGrate`, бывают прикручены — отвёртка) и в лазах в стенах (`VentGrille`, ключ `GameManager.CrawlKey`). В палатах, операционных и диагностике подъём к решётке ставится после своей мебели (`Furnisher.Climb`).
+(`LevelGenerator.HatchCorner`), рядом стояк с ревизией и отвод вдоль стены (`UtilityPlan.Drains`). После слияния R6–R9 Саши входного люка как такового нет: в углу техпомещения стоит крышка шахты (`PropKind.ShaftHatch`, проём — ровно 3 × 3 клетки плана: центр шахты на центре клетки, `LevelGenerator.OnCells`; рамка крышки — вплотную вокруг проёма, петли — от стороны схода с лестницы `LevelLayout.ShaftExit`), под ней — **подвал прибытия** (`Basement`, рамка `LevelLayout.Cellar`: начало и поворот на 90°·k, туннель идёт под домом — `Basement.YawUnder`): участок канализации, где остановилась машина команды, — позади невидимая стена и несколько видимых сегментов с заглушкой (`BasementBackWall`), машина у закрытых ворот (`Basement.CarStop`; у ворот подвала нет рычага и короба над сводом), за воротами сегмент и заглушка; лестница — в нише сбоку от машины (`sewer_seg_alcove` из `sewer.py kit_alcove`, префаб `Level/Sewer/Alcove`: ниша, кирпичная шахта до пола дома, лестница, лампа в шахте; крышка снизу `MetalShutLid` в подвале скрыта). Команда начинает дом сидя в машине (кто не в машине — `Basement.Spawns` на мостках), подвал считается входом. В канализации после дома последний сегмент перед воротами — та же ниша, но крышка закрыта и лестница не лазается (`SewerSegment.Alcove`): обратно в дом не подняться; комната выхода — дальняя «мокрая», но обязательно достижимая по вентиляции над потолками (`VentPlan.CanReach`, `VentPlan`). Решётки двух видов: в потолке (короба Саши, `VentGrate`, бывают прикручены — отвёртка) и в лазах в стенах (`VentGrille`, ключ `OpenKeys.Crawl`). В палатах, операционных и диагностике подъём к решётке ставится после своей мебели (`Furnisher.Climb`).
 Проверяет `HatchPlacementTests`; `PlayerController.HatchIndex` (0/1, реплицирует
 `PlayerNet`). Уйти — все в люках (в любом), и хотя бы один — в люке **выхода** (`RunState.TeamInHatch`) → отсчёт `LeaveAt` → `GoToSewerServer`. У каждого люка свой склад:
 `GameManager.Stash` (вход: склад, куда при старте дома выгружается кузов (`UnloadCarServer`), и горловина бака — на его доске зона «сжечь в топливо»,
@@ -271,7 +280,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 остальные заложены кирпичом (`Sewer/Plug`), туннель без пути на этот раз — тоже кладкой (`SewerBranch.Plug`); туннели 110 м, зона выбора пути до
 `SewerLocation.VoteTo` = 90 м, стена — `StopAt` = 95 м: можно уехать в туннель, пока идёт отсчёт;
 префабы `Prefabs/Level/Sewer/*`, `AssetBuilder.Sewer`). Дорога — решётка (`SewerGrate`, alpha-clip, `Art/Textures/Sewer/grate.png`) над водой.
-Ворота (`SewerGate`, рычаг `GateLever` на стороне спуска) — `GameManager.GateKey` в `Opened`; в начале забега открыты.
+Ворота (`SewerGate`, рычаг `GateLever` на стороне спуска) — `OpenKeys.Gate` в `Opened`; в начале забега открыты.
 **Машина** — `Vehicles/Car` (сетевой префаб; двойник `CarNet` отдаёт владение водителю: owner-authoritative `NetworkTransform`):
 4 места (`CarSeat`, `Car.SitServer`, игрок в машине — `PlayerController.SeatIndex`, `PlayerMotor.Seated`; руль слева — `CarSettings.LeftHandDrive`:
 модель из Blender праворульная, левый руль — она же в зеркале, `CarLook.Mirror`, места водителя и пассажира меняются), езда — чистый `CarPhysics`
@@ -281,7 +290,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 ложится туда (`GameManager.DropOnCarServer`), взять — E по `CargoPiece`. Выбор пути — машина в зоне открытого туннеля
 (`SewerLocation.BranchAt(машина)`, `GameManager.UpdateSewer`, отсчёт `RunSettings.VoteDelay`) → `DepartServer` → `DriveUntil`
 (реплицируется): каждый пир показывает `DriveScene` (`LevelArt.DriveScene`: бесконечный туннель из `_cut`-сегментов, пикап в профиль, длинный
-объектив) → `ArriveServer` → `StartLevel`; экран темнеет и проясняется на доме (`GameHUD.ShowLoadingFade`). Панели над туннелями —
+объектив). **Прибытие без чёрного экрана** (`GameManager.Arrival.cs`, тайминги — чистый `Arrival`): с отъезда каждый пир генерирует следующий дом в фоновом потоке (`PrepareNextHouse`: какой — знает каждый, по маршруту и полосе; генерация чистая, статистика `Furnisher.Last*` — `[ThreadStatic]`), сервер через `Arrival.BuildAfter` строит его по кускам за несколько кадров (`StartLevelSteps` → `ActiveLevel.LoadSteps`/`LevelBuilder.Steps`, `ActiveLevel.Ready` — дом достроен; клиенты строят так же, услышав о доме), ставит машину в подвал в начало въезда с игроками на тех же местах (`ArriveCarServer`, места запомнены при отъезде) и объявляет срез `DriveUntil` и остановку `ArriveAt` (реплицируются). Камера сцены поездки возвращается в глаза игрока в настоящей машине (`DriveScene.Return/ReturnTo`), машина сцены тормозит до скорости въезда, на срезе сцена исчезает, а настоящая машина докатывается до ворот по общему времени (`GameManager.Rolling` → `Car`, `Basement.RollPose`); камера игрока на время сцены выключена. Панели над туннелями —
 `RouteSignView`/`SewerRoute` (коротко: значок типа дома и значок главного задания — `Tools/Art/generate_icons.py` `house_*`/`job_*`, тип дома и номер, этажи и охрана, отсчёт; висят в `SewerLocation.SignOffWall` перед торцевой стеной зала). Модель пикапа — `Tools/Blender/car.py` (`Art/Models/Car/pickup.fbx`). Затопление — `SewerLocation.Flood`.
 Позади машины — длинный туннель, откуда она приехала (`SewerLocation.BackSegments`), за невидимой стеной `BackWall`; фары и у модели в сцене поездки.
 
@@ -291,7 +300,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 два этажа вдоль улицы (z = 0), в блоке у фасада приёмка (лобби) и за ней лестница (`ReserveGarage`), сзади цеха полоса комнат (`CutStrip`:
 покрасочная камера `RoomType.PaintBooth`, склад запчастей, если он есть, раздевалка), наверху галерея буквой Г над цехом с перилами
 (`GarageGalleries`) и комнаты над блоком и задней полосой (`ZoneGarage`); цех и камеру не трогают `RoomRules.Enforce` и `Zoning`; у камеры, как у
-склада, одна дверь (`PlanGenerator.OneDoor`) — в цех, широкая (`LevelMetrics.VehicleDoorWidth`, `LevelGenerator.WidenBoothDoorway` → `HouseFeatures.WidenDoorway`,
+склада, одна дверь (`RoomTraits.OneDoor`) — в цех, широкая (`LevelMetrics.VehicleDoorWidth`, `LevelGenerator.WidenBoothDoorway` → `HouseFeatures.WidenDoorway`,
 `LevelLayout.BoothDoorway/BoothDoor`): в ней большая раздвижная `LevelArt.VehicleDoor` (машину туда заезжают), остальные двери мастерской — стальные `LevelArt.ShopDoor`;
 наружные двери — не в цехе и не в камере; в цехе внизу окон нет (там ворота), на втором ярусе — фонари.
 **Вид мастерской в любом стиле** — `ShopLook.For` (в `StyleDecor.Rebuild` поверх геометрии стиля): без арок, пилястр, панелей, рейки и карниза — простые
@@ -312,7 +321,7 @@ CarSilver/CarGlass/ToolRed/ShopYellow`); посты — `Furnisher.WorkshopBays`
 хвост короче 4 м уходит соседней комнате): первый этаж — приёмное (смотровые и процедурные `Infirmary`, рентген и КТ `RoomType.Imaging`, лаборатория, ординаторские,
 склад, раздевалка, комната персонала), выше — палаты `RoomType.Ward` по обе стороны и пост `RoomType.NurseStation` посередине передней полосы, открытый в коридор
 целой стеной, санузел и комната персонала у лестницы, на верхнем этаже в дальнем торце — две операционные `RoomType.Operating`. У палат, операционных, диагностики
-и поста одна дверь — в коридор (`PlanGenerator.OneDoor/OwnDoor`); эти типы (и мастерской) не трогают `RoomRules.Enforce`/`Zoning` (`RoomRules.Planned`).
+и поста одна дверь — в коридор (`RoomTraits.OneDoor`, `PlanGenerator.OwnDoor`); эти типы (и мастерской) не трогают `RoomRules.Enforce`/`Zoning` (`RoomTraits.Planned`).
 Мебель — `Tools/Blender/hospital.py` (16 моделей): палата — две кровати головой к стене, отодвинутые на 0,45 м, над каждой изголовье с газовыми розетками,
 вокруг шторка на потолочной направляющей, тумбочка (`AnchorGroup` Ward); пост — стойка лицом в коридор за серединой комнаты, стулья за ней (`Furnisher.StationCounter`);
 операционная — стол, наркозный аппарат у изголовья, инструментальный столик и монитор с дальней от двери стороны, лампы над столом (`Put`); диагностика —
@@ -327,26 +336,30 @@ CarSilver/CarGlass/ToolRed/ShopYellow`); посты — `Furnisher.WorkshopBays`
 **Особые места дома** — чистый `HouseFeatures` (каждое — свой поток рандома), настройки `LevelConfig.Features` (`FeatureSettings`):
 типы домов `HouseKinds` + `Location` (офис — пять характеров, больница, автомастерская, жилой дом). **Уникальная особенность локации** — у каждой своя, одна и не повторяется:
 офис — стол с глушилками (`Programmer`, кубики-оглушители по игроку), автомастерская — верстак (`Workbench`: `Crafting.Plan` — вещи одного цвета → `ItemCatalog.Diamond`),
-больница — медпункт (`MedTable`: здоровье до `GadgetSettings.MedTableHp` = 3, раз за дом — `GameManager.MedKey`), жилой дом — спрятанная карта до убежища
+больница — медпункт (`MedTable`: здоровье до `GadgetSettings.MedTableHp` = 3, раз за дом — `OpenKeys.Med`), жилой дом — спрятанная карта до убежища
 (`ShelterMap`, ниже). Стол, верстак и медпункт — `LevelLayout.PointOfInterest` (`HouseFeatures.PointOfInterestKind`): встают вместо большого стола/дивана/стеллажа,
 сжимаются до его габаритов `PropPlacement.Scale`; у жилого дома такого предмета нет; офис — больше и ценнее лут
 (`LootSettings.OfficeItems/OfficeBonus`). **Скрытая комната** (`HideRoom`: окружённая комнатами, входы `EdgeType.Illusion` с каждой
 соседней; `LevelArt.IllusionBlock` — стена без коллайдера с NotWalkable-объёмом; карта и `HousePlan.SightShare` не видят сквозь неё;
 проверка проходимости робота её не требует). **Двери с ключом** (`KeyDoors`: дверь — единственный путь в 1–3 комнаты; ключ — предмет
 `ItemCatalog.Key` в другой комнате; `AutoDoor.NeedsKey`, `KeyLock`). **Ящики** (`Crates`: стеллаж/паллета/коробки → `SearchCrate`,
-содержимое `GameManager.CrateContents`, ключ `CrateKey`). **Сторожа** (`Wardens`: `RobotKind.Warden` перед единственным проходом комнаты
+содержимое `GameManager.CrateContents`, ключ `OpenKeys.Crate`). **Сторожа** (`Wardens`: `RobotKind.Warden` перед единственным проходом комнаты
 с лутом, `RobotController.SetPost` — ходит A↔B, смотрит наружу; колонки `LureSpots`). Инструменты — особые формы `ItemCatalog` (в инвентаре — свои цвета, которых нет у лута: `ItemCatalog.UiColor`)
 (`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`, `CageKey`; горят в топливо по цене серого цвета; ключи, ключ клетки (1×2) и оглушитель
 работают только из руки — `PlayerInventory.Holds/TakeHeldServer`; ключи — настоящие модели, как лопата, `ItemCatalog.KeyScale`): брошенная колонка (`WorldItem.PlayServer`, реплицирует
 `WorldItemNet`) зовёт ближайшего робота (`GameManager.UpdateLures`), он её выключает; оглушитель — `GameAction.Gadget` (X) →
-`GadgetServer` (все детекторы взломаны на `StunDuration`). Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
+`GadgetServer` (все детекторы взломаны на `StunDuration`). Любая цель рук — `Interactable`, сейф, терминал, замок двери — `IReachTarget`, один общий поиск `ReachSearch.Nearest`;
+запросы по E — один `IPlayerLink.SendUse(UseKind, индекс)` (замок — `UseKind.DoorLock`, сейф — `Safe`, дверца/ящик мебели — `StoragePart`, индекс `OpenKeys.StoragePart`);
+всё, что открывается (двери, крышка шахты, решётка, ящик, ворота, дверцы шкафов), движется по `OpenTween` (первый кадр — без анимации и звука), звук дверей — `DoorSounds`.
+Режимы рук игрока (диск, пульт, терминал) выходят вместе — `PlayerController.LeaveAllModes`; сам игрок разбит на partial-файлы `PlayerController.*.cs`.
+Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
 → `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
 
 **Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
 (`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
 **большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами;
 дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`; диск увеличен (`AssetBuilder.VaultDoorScale`) и прижат к стене — перекрывает отверстие
-и гильзу без щели; пульты её только разблокируют, открывает игрок по E (`VaultHandle`, `UseKind.VaultDoor` → `GameManager.OpenVaultServer`, ключ `VaultOpenKey`,
+и гильзу без щели; пульты её только разблокируют, открывает игрок по E (`VaultHandle`, `UseKind.VaultDoor` → `GameManager.OpenVaultServer`, ключ `OpenKeys.Stage(JobStage.VaultOpen)`,
 `AutoDoor.IsSwungOpen`): сначала крутится штурвал (`AutoDoor.Wheel`, часть модели `TrimWheel`), потом дверь поворачивается внутрь (`AutoDoor.VaultStep`) и остаётся открытой;
 в комнате сейфа нет других проёмов (`HouseFeatures.OnlyWayIn`: ни двери на улицу, ни лаза); стены — стальные панели с заклёпками, пол — рифлёная сталь в любом стиле
 (`ArchitecturePlanner.PlanVaultFace`, `DecorPiece.Vault`, материалы `StyleKit.VaultWall/VaultFloor`, текстура `vaultsteel` из `generate_textures.py`), без постеров и пятен; проём хранилища шире (`LevelMetrics.VaultDoorWidth`, `HouseFeatures.WidenVaultDoorway` двигает его вдоль стены), стальное кольцо проходит сквозь стену, а углы между кругом и прямоугольником проёма — сама стена (`AutoDoor.WallParts` → `LevelShell.WallParts`: `StyleDecor` одевает их в отделку стены с её раскладкой, как пазухи арки; меши — `AssetBuilder.WallCornerMeshes`), у такого проёма нет обрамления и откосов стиля (`WallOpening.Vault`); внутри — ячейки, полки с деньгами,
@@ -374,17 +387,17 @@ CarSilver/CarGlass/ToolRed/ShopYellow`); посты — `Furnisher.WorkshopBays`
 модели створок и фурнитуры (ручка, D-ручка, петля, доводчик, домофон) — `Tools/Blender/doors.py`; звуки `door_open`/`door_shut` (`AutoDoor.Sound`).
 Проверяют `DoorRulesTests`.
 **Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
-не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `IPlayerLink.SendUnlockDoor`.
+не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `SendUse(UseKind.DoorLock)`.
 Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки
-`ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `IPlayerLink.SendOpenSafe` → лут на сервере. Открытые двери и сейфы дома —
-`GameManager.Opened` (ключи `DoorKey`/`SafeKey`), реплицирует `GameManagerNet`.
+`ItemsConfig.Safes`), экран — `SafeCrackView`; открытие → `SendUse(UseKind.Safe)` → лут на сервере. Открытые двери и сейфы дома —
+`GameManager.Opened` (ключи `OpenKeys`: вид в старшем байте, индекс под ним — `OpenKeysTests`; сцена читает их через `IWorldState`/`World`, без статических хуков), реплицирует `GameManagerNet`.
 
 **Терминалы охраны** — `LevelLayout.Terminals`. Камеры и взлом стоят в комнате управления роботами (`RoomType.ControlRoom`: если в доме её нет,
 `LevelGenerator.EnsureControlRoom` делает ею офис 16–60 м²; пульты с креслами ставит `Furnisher` как якорь и пристенные группы, `LevelGenerator.PlaceTerminals` берёт их
 первыми, лишние становятся столами; без комнаты — часть столов, свой поток рандома). Вид — `Tools/Blender/terminals.py`: пульт с тремя мониторами
 (`terminal_console`) и для двери склада — стойка доступа с маячком (`terminal_access`), `SecurityTerminal.Console/Access`. `SecurityTerminal` на префабе
 Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или взлом издалека — `IPlayerLink.SendRemoteHack` → `GameManager.RemoteHackServer`,
-заряды (`InteractionSettings.TerminalHacks`) хранятся ключами `GameManager.TerminalKey` в `Opened`. Игрок за терминалом — `PlayerController.UsingTerminal`.
+заряды (`InteractionSettings.TerminalHacks`) хранятся ключами `OpenKeys.Terminal` в `Opened`. Игрок за терминалом — `PlayerController.UsingTerminal`.
 **Узкие щели** — `EdgeType.Squeeze` (`LevelMetrics.SqueezeWidth`, свой поток рандома): игрок протискивается, роботов не пускает `NavMeshModifierVolume`
 в префабе `Level/SqueezeFrame`. **«Я застрял»** — `Unstuck` (кольца свободных точек вокруг игрока, потом точки патруля/спавны канализации; двигает себя
 владелец, у клиента нет навмеша). **Стиль (F8)** — общий для команды: `GameManager.RequestStyle` → `StyleIndex` реплицирует `GameManagerNet`.
@@ -408,10 +421,10 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 каждого этажа с кабель-каналом к потолку и лотком вдоль стены, накладные розетки за столами (и на стенах комнат без столов),
 стояки и труба вдоль стены в туалетах, на кухнях и в раздевалках; `LevelBuilder.BuildUtilities` склеивает в один меш (`UtilitySlot` → `LevelArt.UtilityMaterials`).
 **Выключатели света** — настоящие: у каждого проёма внутри комнаты (не коридора) префаб `Level/LightSwitch` (`UtilityPlan.SwitchSpots`, номер в списке —
-индекс; `LevelBuilder.BuildSwitches`), E (`UseKind.LightSwitch`) → `GameManager.SwitchLightsServer` переключает ключ `LightsKey(комната)` в `Opened`:
+индекс; `LevelBuilder.BuildSwitches`), E (`UseKind.LightSwitch`) → `GameManager.SwitchLightsServer` переключает ключ `OpenKeys.Lights(комната)` в `Opened`:
 светлая комната гаснет, тёмная загорается (`LightMath.SwitchedOn`), лампы (`RoomLight.IsSwitched`) и клавиша с зелёным огоньком в темноте следуют на каждом пире;
 роботы видят результат через `LightSource`, тревога по-прежнему зажигает все лампы.
-**Лазы закрыты решёткой** — `VentGrille` на `Level/VentFrame`/`HighVentFrame`: держать E (`InteractionSettings.VentGrilleTime`) → решётка снята и прислонена к стене, лаз открыт для всех (`GameManager.VentKey` в `Opened`).
+**Лазы закрыты решёткой** — `VentGrille` на `Level/VentFrame`/`HighVentFrame`: держать E (`InteractionSettings.VentGrilleTime`) → решётка снята и прислонена к стене, лаз открыт для всех (`OpenKeys.Vent` в `Opened`).
 **Табличка «Выход»** — только над проёмами на лестничную клетку и из лобби в коридор (`LevelBuilder.OnEscapeRoute`). **Номера квартир** — на табличке входной двери со стороны площадки (`AutoDoor.Number`, считаются с 1 снизу вверх, `LevelBuilder.FlatNumber`).
 **Варианты мебели** — `PropVariants` на префабе: слоты (крючок, полка), в каждом все варианты дочерними объектами; при постройке дома каждый слот по сиду (`LevelRandom.Mix(seed, 0x7A21, индекс)`) показывает один вариант или ничего и красит его из палитры (`Cloth*`, `Book*`). Вешалка-стойка и настенная вешалка — голые модели + одежда на крючках (`Tools/Blender/variants.py`: `coat_stand_bare`, `hall_hooks_bare`, `garment_*`, точки крючков — `variants_contract.json`; `AssetBuilder.HookGarments`: длинное — через крючок, на верхних крючках рейки только кепка); книжные полки — ряды книг `book_*` разных размеров и цветов, по четыре ряда на полку на выбор (`AssetBuilder.ShelfBooks`: высоты полок берутся из меша стеллажа); там, где у стиля своя модель стеллажа (бестиарий), показываются его книги (`PropVariants.Frame/Own`, `VisualStyles.IsOwnStyleMesh`, событие `VisualStyles.GeometryChanged`).
 **Порожки** — где в проёме встречаются разные полы (`ArchitecturePlanner.PlanThresholds`, `DecorPiece.Threshold`, материал `StyleKit.Threshold`).
@@ -435,7 +448,8 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 **Рандом — только по сиду.** Один сид забега (`GameManager.RunSeed`, `-seed`) даёт сиды домов (`LevelRandom.LevelSeed`), сид дома — отдельный
 поток на каждую цель (`RandomChannel`: планировка, лут, роботы, патрули, устройства, звук) и на каждый объект (`LevelRandom.Next` — n-й робот).
 `UnityEngine.Random` в игровом коде не используется (проверяет `LevelRandomTests`), он только засеян на всякий случай; новый бросок — новый канал
-или поток объекта, чтобы не сдвигать остальные.
+или поток объекта, чтобы не сдвигать остальные; соль потока — именованная константа в `Salt` (одна на поток: `LevelRandomTests.SaltsAreDistinct`,
+«голая» соль в `Mix` — ошибка теста).
 
 ### Настройки (конфиги)
 

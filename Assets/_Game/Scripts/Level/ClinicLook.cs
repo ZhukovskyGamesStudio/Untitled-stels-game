@@ -14,16 +14,8 @@ namespace Stealth.Level
         /// <summary>The geometry of the style dressed for this house (the style's own when the house is not a hospital).</summary>
         public static StyleGeometry For(StyleGeometry g, StyleKit kit, LevelLayout l)
         {
-            if (g == null || kit == null || l == null || l.Kind != HouseKind.Hospital || kit.ClinicWall == null) return g;
-            var s = g.Clone();
-            s.Doors = DoorTrim.Casing;
-            s.Baseboard = true;
-            s.Crown = false;
-            s.WainscotHeight = 0f;
-            s.RailHeight = 0f;
-            s.Pipes = false;
-            s.Ceiling = CeilingKind.None;
-            s.StripSpacing = 0f;
+            if (g == null || kit == null || l == null || l.PlanKind != HouseKind.Hospital || kit.ClinicWall == null) return g;
+            var s = LocationLook.Plain(g, pipes: false, CeilingKind.None, baseboard: true);
             var looks = new List<RoomLook>();
             var floors = new List<RoomFloor>();
             foreach (RoomType t in System.Enum.GetValues(typeof(RoomType)))

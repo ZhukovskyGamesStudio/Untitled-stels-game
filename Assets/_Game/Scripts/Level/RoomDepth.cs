@@ -12,39 +12,12 @@ namespace Stealth.Level
     public static class RoomDepth
     {
         /// <summary>An opening kind people walk through (the building's own ways).</summary>
-        public static bool Walked(EdgeType k) => k is EdgeType.Door or EdgeType.Open or EdgeType.Breach or EdgeType.Illusion;
+        public static bool Walked(EdgeType k) => RoomGraph.Passes(Passage.Walkers, k);
 
         /// <summary>Steps from the lobby per room id (−1: not reached that way).</summary>
         public static int[] Of(HousePlan plan, IReadOnlyList<Stair> stairs, int lobby)
         {
-            var steps = new int[plan.Rooms.Count];
-            for (int i = 0; i < steps.Length; i++) steps[i] = -1;
-            if (lobby < 0 || lobby >= steps.Length) return steps;
-            var links = new List<int>[plan.Rooms.Count];
-            void Link(int a, int b)
-            {
-                if (a < 0 || b < 0 || a >= links.Length || b >= links.Length) return;
-                (links[a] ??= new List<int>()).Add(b);
-                (links[b] ??= new List<int>()).Add(a);
-            }
-            foreach (var o in plan.Openings)
-            {
-                if (!Walked(o.Kind)) continue;
-                var w = plan.Walls[o.Wall];
-                Link(w.RoomA, w.RoomB);
-            }
-            if (stairs != null) foreach (var s in stairs) Link(s.Room, s.RoomAbove);
-            var q = new Queue<int>();
-            steps[lobby] = 0;
-            q.Enqueue(lobby);
-            while (q.Count > 0)
-            {
-                int r = q.Dequeue();
-                if (links[r] == null) continue;
-                foreach (int n in links[r])
-                    if (steps[n] < 0) { steps[n] = steps[r] + 1; q.Enqueue(n); }
-            }
-            return steps;
+            return new RoomGraph(plan, stairs, Passage.Walkers).Steps(lobby);
         }
 
         /// <summary>How deep a room is, 0 (the lobby) … 1 (the deepest room); unreached rooms count as deepest.</summary>
