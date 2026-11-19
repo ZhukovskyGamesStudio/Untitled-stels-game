@@ -220,6 +220,15 @@ def box(g):
     g.line([(0.76, 0.30), (0.76, 0.76)], 0.035, on="d")
 
 
+def grille(g):
+    """A vent grille: a frame with slats and a screw in each corner (taken off by hand or with a screwdriver)."""
+    g.rrect((0.12, 0.18, 0.88, 0.82), 0.05, fill=False, width=STROKE)
+    for y in (0.36, 0.50, 0.64):
+        g.line([(0.27, y), (0.73, y)], STROKE * 0.7)
+    for x, y in ((0.20, 0.26), (0.80, 0.26), (0.20, 0.74), (0.80, 0.74)):
+        g.ellipse((x - 0.035, y - 0.035, x + 0.035, y + 0.035), on="d")
+
+
 def door(g):
     g.rrect((0.24, 0.10, 0.76, 0.90), 0.03, fill=False, width=STROKE)
     g.ellipse((0.60, 0.48, 0.68, 0.56))
@@ -445,7 +454,7 @@ def main():
     glyphs = {
         "ret_hand": hand, "ret_lock": lock, "ret_key": key, "ret_hack": bolt, "ret_revive": plus_ring,
         "ret_heal": cross, "ret_search": magnifier, "ret_seat": wheel, "ret_fuel": drop, "ret_terminal": monitor,
-        "ret_craft": gem, "ret_lever": lever, "ret_safe": dial, "ret_crate": box, "ret_door": door,
+        "ret_craft": gem, "ret_lever": lever, "ret_safe": dial, "ret_crate": box, "ret_door": door, "ret_vent": grille,
     }
     for name, draw in glyphs.items():
         make(name, draw)

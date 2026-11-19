@@ -54,7 +54,7 @@ namespace Stealth.UI
     }
 
     /// <summary>The glyph in the middle of the screen: a dot, or what the thing in front of you is for.</summary>
-    public enum ReticleIcon { Dot, Hand, Lock, Key, Hack, Revive, Heal, Search, Seat, Fuel, Terminal, Craft, Lever, Safe, Crate, Door }
+    public enum ReticleIcon { Dot, Hand, Lock, Key, Hack, Revive, Heal, Search, Seat, Fuel, Terminal, Craft, Lever, Safe, Crate, Door, Vent }
 
     /// <summary>The reticle this frame: hidden (hands out, lying, in a menu), its glyph, dimmed when it can't be used now, the hold progress.</summary>
     public readonly struct Reticle
@@ -215,9 +215,9 @@ namespace Stealth.UI
             Level.UseKind.HandDryer => ReticleIcon.Hand,
             Level.UseKind.LightSwitch => ReticleIcon.Hand,
             Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
-            Level.UseKind.VentGrille => ReticleIcon.Hack,
+            Level.UseKind.VentGrille => ReticleIcon.Vent,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
-            Level.UseKind.VentGrate => ReticleIcon.Hand,
+            Level.UseKind.VentGrate => ReticleIcon.Vent,
             Level.UseKind.ShaftHatch => ReticleIcon.Lever,
             Level.UseKind.DoorLock => ReticleIcon.Lock,
             Level.UseKind.Safe => ReticleIcon.Safe,

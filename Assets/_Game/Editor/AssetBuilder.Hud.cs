@@ -38,7 +38,7 @@ namespace Stealth.EditorTools
         static readonly string[] ReticleIconNames =
         {
             null, "ret_hand", "ret_lock", "ret_key", "ret_hack", "ret_revive", "ret_heal", "ret_search", "ret_seat",
-            "ret_fuel", "ret_terminal", "ret_craft", "ret_lever", "ret_safe", "ret_crate", "ret_door",
+            "ret_fuel", "ret_terminal", "ret_craft", "ret_lever", "ret_safe", "ret_crate", "ret_door", "ret_vent",
         };
 
         /// <summary>A key cap: a 9-sliced cap that grows with the key's name, or a little mouse instead.</summary>

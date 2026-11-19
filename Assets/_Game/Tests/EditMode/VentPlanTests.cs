@@ -172,8 +172,9 @@ namespace Stealth.Tests
                     }
             }
             // (corridors, halls, the lobby, the exit and the robots' rooms never have one; a busy room may have no place for it)
-            // (the whole-room walk check keeps a busy room's way up out more often than it used to: a twentieth at least)
-            Assert.That(climbs, Is.InRange(grates / 20, grates * 3 / 4), $"{climbs} of {grates} grates have a way up");
+            // (the whole-room walk check keeps a busy room's way up out more often than it used to; grates clear of the lamps and
+            // the smaller hospitals leave fewer rooms with a place for one: a thirtieth at least)
+            Assert.That(climbs, Is.InRange(grates / 30, grates * 3 / 4), $"{climbs} of {grates} grates have a way up");
         }
 
         [Test]

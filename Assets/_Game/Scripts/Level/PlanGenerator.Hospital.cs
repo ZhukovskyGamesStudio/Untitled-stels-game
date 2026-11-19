@@ -25,10 +25,12 @@ namespace Stealth.Level
         /// <summary>A patient room's width along the corridor, metres (two beds side by side, the door beside them).</summary>
         public const int WardWidth = 4;
 
-        static List<RectInt> HospitalMass(Ctx c, System.Random rng, float area, out string kind)
+        static List<RectInt> HospitalMass(Ctx c, System.Random rng, float area, float size, out string kind)
         {
             int depth = HospFront + HospCorridor + HospBack;
-            int length = Mathf.Clamp(Mathf.RoundToInt(area / depth / WardWidth) * WardWidth + WardWidth * rng.Next(2), 32, 72);
+            // (smaller than the house's area by BuildingSettings.HospitalSize; the shortest slab still holds the lobby and the stair core)
+            int shortest = Mathf.Max(20, Mathf.RoundToInt(32f * size / WardWidth) * WardWidth), longest = Mathf.Max(shortest, Mathf.RoundToInt(72f * size / WardWidth) * WardWidth);
+            int length = Mathf.Clamp(Mathf.RoundToInt(area * size / depth / WardWidth) * WardWidth + WardWidth * rng.Next(2), shortest, longest);
             c.Hospital = new HospitalLayout
             {
                 Length = length * M,

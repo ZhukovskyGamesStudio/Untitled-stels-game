@@ -10,6 +10,7 @@ namespace Stealth.Enemies
         public float ViewAngle = 100f;
         [Tooltip("Moving faster than this is noticed (crouch-walk 1.8, walk 3.6 m/s).")]
         public float SpeedThreshold = 0.35f;
-        public float DetectionRate = 3f;
+        [Tooltip("How fast the suspicion fills while someone moves in view (per second at the base rate; 1.5: noticed in about twice the time it took at 3).")]
+        public float DetectionRate = 1.5f;
     }
 }

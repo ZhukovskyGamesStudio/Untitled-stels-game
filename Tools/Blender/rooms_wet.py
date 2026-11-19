@@ -248,20 +248,23 @@ def model_urinal():
 
 
 def model_mirror_sink():
-    """Single washbasin vanity: a porcelain cabinet 0.85 high with an oval basin sunk into its top, two doors with
-    knobs, a tiled upstand, a chrome tap, and a framed mirror flat on the wall above (1.1..1.9)."""
+    """Single washbasin vanity: a porcelain cabinet 0.85 high with an oval basin sunk into its top, hollow under it
+    behind two doors that open from the middle (BodyDoor0/1, their knobs AccentDoor0/1 ride on them: Items.Storage), a
+    tiled upstand, a chrome tap, and a framed mirror flat on the wall above (1.1..1.9)."""
     plinth = s.rbox((0.66, 0.42, 0.09), (0, 0.03, 0.045), r=0.008, seg=1)
-    cab = s.rbox((0.7, 0.48, 0.77), (0, 0.01, 0.465), r=0.012, seg=2)
-    s.groove(cab, "Z", 0.79, 0.008, 0.004)
-    cab = s.boolean(cab, s.ball(1.0, (0, -0.035, 0.875), seg=28, scale=(0.24, 0.16, 0.135)), "DIFFERENCE")
-    s.bevel_edges(cab, 0.004, 1, angle=50)
-    doors = []
-    for x in (-0.1725, 0.1725):
-        d = s.rbox((0.337, 0.02, 0.6), (x, -0.237, 0.445), r=0.008, seg=2)
+    carcass = s.cupboard(-0.35, 0.35, -0.227, 0.25, 0.09, 0.705, t=0.02)
+    top = s.rbox((0.7, 0.48, 0.15), (0, 0.01, 0.775), r=0.012, seg=2)
+    s.groove(top, "Z", 0.79, 0.008, 0.004)
+    top = s.boolean(top, s.ball(1.0, (0, -0.035, 0.875), seg=28, scale=(0.24, 0.16, 0.135)), "DIFFERENCE")
+    s.bevel_edges(top, 0.004, 1, angle=50)
+    for i, x in enumerate((-0.1725, 0.1725)):
+        d = s.rbox((0.337, 0.02, 0.55), (x, -0.237, 0.415), r=0.008, seg=2)
         shaker(d, 0.1, thickness=0.04)
-        doors.append(d)
+        s.part(f"BodyDoor{i}", [d])
+        kx = -0.05 if x < 0 else 0.05                                  # the knobs at the meeting edges
+        s.part(f"AccentDoor{i}", [s.ball(0.016, (kx, -0.256, 0.62), seg=12), s.rcyl(0.008, 0.02, (kx, -0.248, 0.62), axis="Y", seg=8, r=0.002)])
     upstand = s.rbox((0.7, 0.02, 0.3), (0, 0.238, 0.97), r=0.006, seg=1)
-    s.part("Body", [plinth, cab, *doors, upstand])
+    s.part("Body", [plinth, *carcass, top, upstand])
 
     acc = [s.rcyl(0.025, 0.008, (0, -0.035, 0.742), seg=16, r=0.002)]
     acc.append(s.rcyl(0.024, 0.06, (0, 0.17, 0.875), seg=18, r=0.005))
@@ -269,9 +272,6 @@ def model_mirror_sink():
                       0.011, segments_per=7))
     acc.append(s.rcyl(0.024, 0.035, (0, 0.17, 0.92), axis="Z", seg=16, r=0.004))
     acc.append(s.rbox((0.014, 0.08, 0.012), (0, 0.15, 0.944), r=0.005, seg=1, rot=(math.radians(-15), 0, 0)))
-    for x in (-0.05, 0.05):
-        acc.append(s.ball(0.016, (x, -0.25, 0.68), seg=12))
-        acc.append(s.rcyl(0.008, 0.02, (x, -0.246, 0.68), axis="Y", seg=8, r=0.002))
     acc.append(frame((0.6, 0.026, 0.8), (0, 0.237, 1.5), 0.035, r=0.008, seg=2))
     s.part("Accent", acc)
 

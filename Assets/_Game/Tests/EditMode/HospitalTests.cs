@@ -54,6 +54,22 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheHospitalIsSmallerThanItsAreaButAsGuarded()
+        {
+            // the same hospitals built at full size: the slab 40% shorter, the robots as many
+            int full = 0, small = 0;
+            foreach (var l in Hospitals())
+            {
+                var whole = LevelGenerator.Generate(l.Seed, l.LevelIndex, new BuildingSettings { HospitalSize = 1f }, null, 1);
+                Assert.AreEqual(HouseKind.Hospital, whole.PlanKind);
+                Assert.Less(l.SizeX * l.SizeZ, whole.SizeX * whole.SizeZ * 0.75f, $"seed {l.Seed}: smaller than the full size");
+                full += whole.RobotSpawns.Count;
+                small += l.RobotSpawns.Count;
+            }
+            Assert.That(Mathf.Abs(full - small), Is.LessThanOrEqualTo(Hospitals().Count), $"robots {small} against {full} at full size (one either way a house)");
+        }
+
+        [Test]
         public void PatientRoomsOpenOntoTheCorridorAndTheStationIsOpenToIt()
         {
             foreach (var l in Hospitals())

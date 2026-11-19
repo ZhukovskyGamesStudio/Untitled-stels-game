@@ -110,7 +110,7 @@ namespace Stealth.Level
                 }
             }
             wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass)
-                : b.Hospital ? HospitalMass(c, c.Rng(0xA55), area, out o.Mass)
+                : b.Hospital ? HospitalMass(c, c.Rng(0xA55), area, Mathf.Clamp(b.HospitalSize, 0.1f, 1f), out o.Mass)
                 : b.Apartments ? ApartmentsMass(c, c.Rng(0xA55), out o.Mass)
                 : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);

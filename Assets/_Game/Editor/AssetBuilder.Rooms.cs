@@ -235,7 +235,7 @@ namespace Stealth.EditorTools
         static readonly HashSet<PropKind> Opens = new() { PropKind.WallCabinet, PropKind.MedicineCabinet, PropKind.PartsCabinet, PropKind.MailShelf, PropKind.PantryCabinet,
             PropKind.Wardrobe, PropKind.Dresser, PropKind.ShoeCabinet,
             // every little door opens: the sink and vanity cupboards, the dishwasher, sideboards, drawers of desks and night tables
-            PropKind.KitchenSink, PropKind.BathVanity, PropKind.Dishwasher, PropKind.DoubleSink, PropKind.Credenza, PropKind.AvCredenza,
+            PropKind.KitchenSink, PropKind.BathVanity, PropKind.MirrorSink, PropKind.Dishwasher, PropKind.DoubleSink, PropKind.Credenza, PropKind.AvCredenza,
             PropKind.FilingCabinet, PropKind.FilePedestal, PropKind.ExecutiveDesk, PropKind.NightTable };
 
         /// <summary>Prefabs of the themed rooms' furniture whose models exist, into <see cref="LevelArt.RoomProps"/>.</summary>

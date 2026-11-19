@@ -208,6 +208,8 @@ namespace Stealth.Level
         /// with a corridor down its length and rooms on both sides, admissions below, wards above, theatres on top (PlanGenerator.Hospital.cs).
         /// </summary>
         [System.NonSerialized] public bool Hospital;
+        [Tooltip("The hospital's slab against the area an office of the same house would have (0.6: 40% smaller); its robots and devices stay as many as for the full size.")]
+        public float HospitalSize = 0.6f;
         /// <summary>
         /// The apartment block's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Apartments"/>, never
         /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
@@ -1080,7 +1082,9 @@ namespace Stealth.Level
 
             // A bigger team gets a bigger house — and the guards to go with it.
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
-            int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
+            // (a hospital is built smaller than its area, BuildingSettings.HospitalSize: its guards are counted for the full size)
+            float size = b.Hospital ? Mathf.Clamp(b.HospitalSize, 0.1f, 1f) : 1f;
+            int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits / size - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
             // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)
             var table = l.ClassicEnemies ? s.Roster.Robots : RobotRoster.NewEnemies(s.Roster.Robots);

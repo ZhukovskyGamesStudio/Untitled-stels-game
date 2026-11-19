@@ -149,10 +149,12 @@ namespace Stealth.Game
             }
         }
 
-        /// <summary>Whether a thing dropped here burns into fuel: at the car in the sewer (its hopper), at the entry hatch in a house.</summary>
+        /// <summary>Whether a thing dropped here burns into fuel: at the car (its hopper, the sewer or the basement), at the entry or the storage robot in a house.</summary>
         public bool CanBurnAt(Vector3 position)
         {
-            if (Phase == RunPhase.Sewer) return Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+            // at the car (its hopper): in the sewer and in the house's basement alike
+            bool atCar = Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+            if (Phase == RunPhase.Sewer || atCar) return atCar && Phase is RunPhase.Sewer or RunPhase.Playing;
             var l = ActiveLevel.Layout;
             return Phase == RunPhase.Playing && l != null && (AtEntry(l, position) || AtBot(position));
         }
