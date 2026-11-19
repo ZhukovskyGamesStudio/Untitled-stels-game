@@ -354,35 +354,21 @@ namespace Stealth.EditorTools
             var root = new GameObject(high ? "HighVentFrame" : "VentFrame");
             float w = LevelMetrics.ClearWidth(LevelMetrics.VentWidth), h = LevelMetrics.VentHeight, y0 = high ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
             float t = LevelMetrics.WallThickness, sheet = 0.02f, flange = 0.07f;
-            var metal = M("Metal");
-            // lining: floor, ceiling and sides of the duct, the length of the wall's thickness
-            Cube(root.transform, "DuctFloor", new Vector3(0, y0 + sheet / 2f, 0), new Vector3(w, sheet, t + 0.02f), metal, false);
-            Cube(root.transform, "DuctTop", new Vector3(0, y0 + h - sheet / 2f, 0), new Vector3(w, sheet, t + 0.02f), metal, false);
-            foreach (float s in new[] { -1f, 1f })
-                Cube(root.transform, s < 0 ? "DuctLeft" : "DuctRight", new Vector3(s * (w / 2f - sheet / 2f), y0 + h / 2f, 0), new Vector3(sheet, h, t + 0.02f), metal, false);
-            foreach (float z in new[] { t / 2f + 0.015f, -(t / 2f + 0.015f) })
-            {
-                string side = z > 0 ? "A" : "B";
-                Cube(root.transform, "FlangeTop" + side, new Vector3(0, y0 + h + flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
-                Cube(root.transform, "FlangeBottom" + side, new Vector3(0, y0 - flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
-                foreach (float s in new[] { -1f, 1f })
-                    Cube(root.transform, (s < 0 ? "FlangeLeft" : "FlangeRight") + side, new Vector3(s * (w / 2f + flange / 2f), y0 + h / 2f, z),
-                        new Vector3(flange, h, 0.03f), metal, false);
-            }
-            // the grille: a frame with louvres — shut in the hole on side A (its collider keeps everyone out) until a player
-            // works it loose (VentGrille), then leaning on the wall beside the hole (a high vent's: on the desk under it)
+            // the lining and the flanges round the hole on both faces (Tools/Blender/vent.py vent_duct: folded seams, screws)
+            var duct = Model("vent_duct");
+            duct.transform.SetParent(root.transform, false);
+            duct.transform.localPosition = new Vector3(0f, y0, 0f);
+            Paint(duct, "Metal", "Metal", "Metal");
+            // the grille: a frame with louvres (vent_grille, its foot at its origin, sized to its place) — shut in the hole on
+            // side A (its collider keeps everyone out) until a player works it loose (VentGrille), then leaning on the wall
+            // beside the hole (a high vent's: on the desk under it)
             float gw = w * 0.9f, gh = h * 0.9f;
             void Louvres(Transform grille, float lw, float lh)
             {
-                Cube(grille, "GrilleTop", new Vector3(0, lh - 0.025f, 0f), new Vector3(lw, 0.05f, 0.025f), metal, false);
-                Cube(grille, "GrilleBottom", new Vector3(0, 0.025f, 0f), new Vector3(lw, 0.05f, 0.025f), metal, false);
-                foreach (float s in new[] { -1f, 1f })
-                    Cube(grille, s < 0 ? "GrilleLeft" : "GrilleRight", new Vector3(s * (lw / 2f - 0.025f), lh / 2f, 0f), new Vector3(0.05f, lh, 0.025f), metal, false);
-                for (int i = 1; i < 8; i++)
-                {
-                    var slat = Cube(grille, $"Slat{i}", new Vector3(0, lh * i / 8f, 0f), new Vector3(lw - 0.08f, 0.012f, 0.06f), metal, false);
-                    slat.transform.localRotation = Quaternion.Euler(35f, 0f, 0f); // louvres
-                }
+                var g = Model("vent_grille");
+                g.transform.SetParent(grille, false);
+                g.transform.localScale = new Vector3(lw / (w - 2f * sheet), lh / (h - 2f * sheet), 1f);
+                Paint(g, "Metal", "Metal", "Metal");
             }
             var removed = new GameObject("GrilleRemoved").transform;
             removed.SetParent(root.transform, false);
@@ -762,10 +748,21 @@ namespace Stealth.EditorTools
             Cube(root.transform, "CasingHead", new Vector3(0f, h - lining + casing / 2f, face + casingDepth / 2f), new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
             // the indicator over the portal: a housing, the lamp in the middle and an arrow lamp either side
             float iy = h + casing + 0.12f;
-            Cube(root.transform, "Indicator", new Vector3(0f, iy, face + 0.02f), new Vector3(0.46f, 0.12f, 0.04f), steel, false);
-            door.HereLamp = Cube(root.transform, "HereLamp", new Vector3(0f, iy, face + 0.042f), new Vector3(0.16f, 0.06f, 0.006f), M("LampBulb"), false).GetComponent<Renderer>();
-            door.UpLamp = Cube(root.transform, "UpLamp", new Vector3(-0.15f, iy, face + 0.042f), new Vector3(0.05f, 0.06f, 0.006f), M("LockLamp"), false).GetComponent<Renderer>();
-            door.DownLamp = Cube(root.transform, "DownLamp", new Vector3(0.15f, iy, face + 0.042f), new Vector3(0.05f, 0.06f, 0.006f), M("LockLamp"), false).GetComponent<Renderer>();
+            // (Tools/Blender/lift_parts.py lift_indicator: a bevelled housing with a dark glass face, real arrows)
+            var indicator = Model("lift_indicator");
+            indicator.transform.SetParent(root.transform, false);
+            indicator.transform.localPosition = new Vector3(0f, iy, face);
+            Renderer Lamp(string part, string mat)
+            {
+                var r = Parts(indicator, part).First();
+                r.sharedMaterial = M(mat);
+                return r;
+            }
+            Parts(indicator, "Body").First().sharedMaterial = steel;
+            Parts(indicator, "Trim").First().sharedMaterial = M("Rack");
+            door.HereLamp = Lamp("EyeHere", "LampBulb");
+            door.UpLamp = Lamp("EyeUp", "LockLamp");
+            door.DownLamp = Lamp("EyeDown", "LockLamp");
             foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
             // the panels in the wall's plane, parting into it (LiftDoor slides them)
             Transform Panel(string name, float x)
@@ -784,7 +781,11 @@ namespace Stealth.EditorTools
             door.Blocker = DoorBlocker(root, 0f, 0.02f, clear, h, 0.08f);
             // the call button on a plate on the landing's face, beside the portal
             float bx = clear / 2f + casing + 0.16f;
-            Cube(root.transform, "CallPlate", new Vector3(bx, 1.1f, face + 0.006f), new Vector3(0.09f, 0.16f, 0.012f), steel, false);
+            var plate = Model("lift_callplate");
+            plate.transform.SetParent(root.transform, false);
+            plate.transform.localPosition = new Vector3(bx, 1.1f, face);
+            Paint(plate, "LiftSteel", "Metal", "Metal");
+            NoShadows(plate);
             var call = Model("lift_button");
             call.name = "CallButton";
             call.transform.SetParent(root.transform, false);

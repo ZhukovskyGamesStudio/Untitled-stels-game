@@ -329,11 +329,13 @@ namespace Stealth.EditorTools
         static GameObject BuildVaultPanel()
         {
             var root = new GameObject("VaultPanel");
-            Cube(root.transform, "Plate", new Vector3(0f, 0f, 0.01f), new Vector3(0.74f, 0.2f, 0.02f), M("Metal"), false);
+            // a steel plate with screws, three round lamps in bezels (Tools/Blender/vault_console.py vault_panel)
+            var model = Model("vault_panel");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "Metal", "PropAccent", "LockLamp");
             var panel = root.AddComponent<VaultPanel>();
-            panel.Lamps = new Renderer[3];
-            for (int i = 0; i < 3; i++)
-                panel.Lamps[i] = Cube(root.transform, $"Lamp{i}", new Vector3((i - 1) * 0.22f, 0f, 0.025f), new Vector3(0.14f, 0.1f, 0.02f), M("LockLamp"), false).GetComponent<Renderer>();
+            panel.Lamps = model.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("EyeLamp"))
+                .OrderBy(r => r.transform.TransformPoint(r.GetComponent<MeshFilter>().sharedMesh.bounds.center).x).Cast<Renderer>().ToArray();
             return root;
         }
 

@@ -115,9 +115,21 @@ def sequence():
     export("vault_console_sequence")
 
 
+def panel():
+    """vault_panel: the board over the vault's door (VaultPanel): a steel plate with bevelled edges and four screws, three
+    round lamps in chrome bezels — one per console, lit as each is solved (separate parts EyeLamp0..2, coloured in play)."""
+    s.part("Body", [s.rbox((0.74, 0.02, 0.2), (0, -0.01, 0), r=0.006, seg=2)]
+           + [s.rcyl(0.008, 0.006, (x, -0.022, z), axis="Y", seg=8, r=0.002) for x in (-0.34, 0.34) for z in (-0.07, 0.07)])
+    s.part("Accent", [s.place(ring(0.045, 0.058, 0.012, -0.032, 0.0, seg=28), ((k - 1) * 0.22, 0, 0)) for k in range(3)])
+    for k in range(3):
+        s.part(f"EyeLamp{k}", [s.ball(0.046, ((k - 1) * 0.22, -0.026, 0.0), seg=16, scale=(1.0, 0.55, 1.0))])
+    export("vault_panel")
+
+
 if __name__ == "__main__":
     s.clear_scene()
     dial()
     switches()
     sequence()
+    panel()
     print("DONE")
