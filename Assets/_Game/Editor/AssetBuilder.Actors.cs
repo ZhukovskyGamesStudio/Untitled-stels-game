@@ -192,12 +192,12 @@ namespace Stealth.EditorTools
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
-            // one metre of the spider's web along +Z (scaled to each wire), threads as geometry in three variants (Web0..2,
-            // Tools/Blender/web.py); SpiderBot lays pieces end to end and shows one variant each; no collider, no shadow
+            // a sheet of the spider's web, the unit square along +Z and up +Y (stretched to each sheet), threads as geometry in
+            // three variants (Web0..2, Tools/Blender/web.py sheet); SpiderBot shows one variant a sheet; no collider, no shadow
             var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
             {
                 var go = new GameObject("SpiderStrand");
-                var model = Model("web_piece");
+                var model = Model("web_sheet");
                 model.transform.SetParent(go.transform, false);
                 var mat = WebMaterial();
                 foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
@@ -359,6 +359,15 @@ namespace Stealth.EditorTools
                 r.receiveShadows = false;
             }
             held.SetActive(false);
+            // anything else held in the hand (PlayerController.HeldThing): its mesh or model, sized to the hand, low right in the view
+            var holder = Child(head.transform, "HeldAnchor", new Vector3(0.2f, -0.24f, 0.42f));
+            holder.transform.localRotation = Quaternion.Euler(8f, -18f, 0f);
+            var thing = Child(holder.transform, "HeldThing", Vector3.zero);
+            var thingMesh = thing.AddComponent<MeshFilter>();
+            var thingRenderer = thing.AddComponent<MeshRenderer>();
+            thingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            thingRenderer.receiveShadows = false;
+            holder.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
                 new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
@@ -378,6 +387,8 @@ namespace Stealth.EditorTools
             pc.Flashlight = beam;
             pc.ViewFlashlight = view;
             pc.HeldMap = held;
+            pc.HeldThing = thingMesh;
+            pc.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);

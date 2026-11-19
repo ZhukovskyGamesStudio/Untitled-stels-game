@@ -60,6 +60,8 @@ namespace Stealth.Tests
                     var keyRoom = l.Plan.RoomAt(k.Key + Vector3.up * 0.3f);
                     Assert.IsNotNull(keyRoom);
                     Assert.IsTrue(without.Contains(keyRoom.Id), $"seed {seed}: the key lies on this side of its door");
+                    bool onFloor = k.Key.y < LevelLayout.FloorY(keyRoom.Floor) + 0.15f;
+                    Assert.IsTrue(onFloor || HouseFeatures.OnOpenTop(l, k.Key), $"seed {seed}: the key at {k.Key} lies in plain sight (on a table or the floor), never inside furniture");
                 }
             }
             Assert.Greater(doors, 0, "the shared houses have key doors");

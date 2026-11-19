@@ -29,6 +29,10 @@ from mathutils.bvhtree import BVHTree
 import numpy as np
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+# the players' four departments (PlayerLooks.Department): `-- <out> [preview.png] backend` builds human_backend.fbx instead
+DEPARTMENTS = ("backend", "qa", "sysadmin", "designer")
+DEPT = next((a for a in argv if a in DEPARTMENTS), None)
+argv = [a for a in argv if a not in DEPARTMENTS]
 OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "Humans"))
 PREVIEW = os.path.abspath(argv[1]) if len(argv) > 1 else None
 # the skin map of the face (multiplied by the player's skin tone in the game)
@@ -134,12 +138,12 @@ def arm_chain(s, radii, start=None, end_z=0.92):
 
 
 def body_clothes():
-    """Jumpsuit: torso, arms and legs (the coat covers most of it)."""
+    """Jumpsuit: torso, arms and legs (the coat covers most of it). Returns the torso (things lie on its front)."""
     c = Chain()
     pel = c.add(P["pelvis"], (0.15, 0.1))
     c.line(pel, [(P["waist"], (0.135, 0.092)), (P["chest"], (0.158, 0.105)), (P["upchest"], (0.165, 0.098)),
                  (P["neck0"], (0.07, 0.065))])
-    piece("BodyClothes", skin_mesh("torso", c.v, c.e, c.r), TORSO + ["neck"])
+    torso = piece("BodyClothes", skin_mesh("torso", c.v, c.e, c.r), TORSO + ["neck"])
     for s in (-1, 1):
         sd = side_bones(s)
         a = arm_chain(s, (0.058, 0.048, 0.042, 0.038, 0.032))
@@ -149,6 +153,7 @@ def body_clothes():
         lg.line(hp, [(mirror(P["hip"], s), 0.08), (mirror((0.1, -0.005, 0.72), s), 0.07), (mirror(P["knee"], s), 0.056),
                      (mirror((0.105, 0.01, 0.3), s), 0.05), (mirror((0.105, 0.03, 0.13), s), 0.042)])
         piece("BodyClothes", skin_mesh("leg", lg.v, lg.e, lg.r), ["hips", f"thigh.{sd}", f"shin.{sd}"])
+    return torso
 
 
 def coat():
@@ -305,6 +310,129 @@ def boots():
         for v in obj.data.vertices:            # flat soles on the floor
             v.co.z = max(v.co.z, 0.0)
         piece("EyeDetails", obj, [f"shin.{sd}", f"foot.{sd}"])
+
+
+# --------------------------------------------------------------------------- the departments
+
+def rod(part, bones, a, b, r, seg=8):
+    """A thin round rod from a to b (a strap, a string, a temple of the glasses)."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r, radius2=r, depth=max(d.length, 1e-4))
+    q = Vector((0, 0, 1)).rotation_difference(d.normalized())
+    bmesh.ops.rotate(bm, cent=Vector(), matrix=q.to_matrix(), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(a + b) / 2, verts=bm.verts)
+    return piece(part, mesh_obj("rod", bm), bones)
+
+
+def ring(part, bones, centre, radius, minor, axis="Y", seg=24, scale=(1.0, 1.0, 1.0)):
+    """A torus round an axis (a rim of the glasses, a headband, a scarf round the neck)."""
+    bm = bmesh.new()
+    pts = []
+    for k in range(seg):
+        a = 2 * math.pi * k / seg
+        ring_pts = []
+        for j in range(8):
+            b = 2 * math.pi * j / 8
+            rr = radius + minor * math.cos(b)
+            loc = Vector((rr * math.cos(a), rr * math.sin(a), minor * math.sin(b)))
+            ring_pts.append(bm.verts.new(loc))
+        pts.append(ring_pts)
+    for k in range(seg):
+        for j in range(8):
+            bm.faces.new((pts[k][j], pts[(k + 1) % seg][j], pts[(k + 1) % seg][(j + 1) % 8], pts[k][(j + 1) % 8]))
+    if axis == "Y":
+        bmesh.ops.rotate(bm, cent=Vector(), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=bm.verts)
+    elif axis == "X":
+        bmesh.ops.rotate(bm, cent=Vector(), matrix=Matrix.Rotation(math.pi / 2, 3, "Y"), verts=bm.verts)
+    bmesh.ops.scale(bm, vec=Vector(scale), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=Vector(centre), verts=bm.verts)
+    return piece(part, mesh_obj("ring", bm), bones)
+
+
+def blob(part, bones, centre, size, rot=(0.0, 0.0, 0.0)):
+    """A smooth squashed ball (a beret, a headphone cup, a pocket's flap)."""
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14, radius=0.5)
+    bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
+    bmesh.ops.rotate(bm, cent=Vector(), matrix=Euler(rot).to_matrix(), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=Vector(centre), verts=bm.verts)
+    return piece(part, mesh_obj("blob", bm), bones)
+
+
+def eye_points():
+    return [HEAD_C + head_shape(s * 0.34, -0.93, 0.16) for s in (-1, 1)]
+
+
+def lanyard(torso, part="AccentBand"):
+    """A team-coloured lanyard round the neck to an ID card on the chest."""
+    upper = ["chest"]
+    for s in (-1, 1):
+        side = [(s * 0.05, 1.47), (s * 0.045, 1.4), (s * 0.03, 1.32), (s * 0.012, 1.24)]
+        line = [Vector((x, front_of(torso, x, z) - 0.006, z)) for x, z in side]
+        for a, b in zip(line, line[1:]):
+            rod(part, upper + ["neck"], a, b, 0.004)
+    yb = front_of(torso, 0.0, 1.19) - 0.008
+    card("Sclera", upper, (0.0, yb, 1.19), 0.055, 0.08, 0.003)
+    card("EyeDetails", upper, (-0.01, yb - 0.002, 1.2), 0.022, 0.028, 0.001)
+
+
+def department(dept, torso):
+    """What tells the four departments apart at a glance (PlayerLooks colours: Body* the department's, Accent* the team's,
+    Eye* dark, Sclera white): the backend developer's hoodie and big headphones, the QA engineer's lanyard and big glasses,
+    the sysadmin's dark vest with pockets, a coil of cable and a head torch, the designer's scarf and beret."""
+    hc = HEAD_C
+    if dept == "backend":
+        c = Chain()
+        pel = c.add((0, 0.0, 0.98), (0.165, 0.112))
+        c.line(pel, [((0, 0.005, 1.08), (0.15, 0.104)), (P["chest"], (0.17, 0.115)), (P["upchest"], (0.176, 0.108)),
+                     ((0, 0.025, 1.46), (0.1, 0.085))])
+        piece("BodyHoodie", skin_mesh("hoodie", c.v, c.e, c.r), TORSO + ["neck"])
+        h = Chain()                                                     # the hood lying down at the back of the neck
+        a = h.add((0, 0.075, 1.43), (0.1, 0.05))
+        h.add((0, 0.1, 1.5), (0.09, 0.045), a)
+        piece("BodyHoodie", skin_mesh("hood", h.v, h.e, h.r), ["chest", "neck"])
+        card("BodyHoodie", ["hips", "spine"], (0.0, front_of(torso, 0.0, 1.06) - 0.03, 1.06), 0.2, 0.11, 0.012)  # the front pocket
+        for s in (-1, 1):                                               # its drawstrings
+            rod("Sclera", ["chest", "neck"], (s * 0.03, -0.075, 1.44), (s * 0.034, -0.12, 1.32), 0.0035)
+        # big over-ear headphones: a band over the skull, a cup on each ear
+        band = [hc + Vector((0.098 * math.cos(t), 0.006, 0.122 * math.sin(t))) for t in (math.pi * k / 10 for k in range(11))]
+        for a, b in zip(band, band[1:]):
+            rod("EyeHeadphones", ["head"], a, b, 0.008)
+        for s in (-1, 1):
+            blob("EyeHeadphones", ["head"], hc + Vector((s * 0.093, 0.005, -0.008)), (0.035, 0.07, 0.08))
+    elif dept == "qa":
+        lanyard(torso)
+        # big round glasses: two rims, a bridge, temples back to the ears
+        eyes = eye_points()
+        for e in eyes:
+            ring("EyeGlasses", ["head"], e + Vector((0, -0.014, 0)), 0.021, 0.0026)
+        rod("EyeGlasses", ["head"], eyes[0] + Vector((0.021, -0.014, 0.004)), eyes[1] + Vector((-0.021, -0.014, 0.004)), 0.002)
+        for s, e in zip((-1, 1), eyes):
+            rod("EyeGlasses", ["head"], e + Vector((s * 0.021, -0.012, 0.002)), hc + Vector((s * 0.081, 0.02, 0.0)), 0.002)
+    elif dept == "sysadmin":
+        c = Chain()                                                     # the vest: over the torso, open at the arms
+        pel = c.add((0, 0.0, 1.0), (0.158, 0.11))
+        c.line(pel, [((0, 0.005, 1.1), (0.143, 0.1)), (P["chest"], (0.163, 0.112)), ((0, 0.01, 1.36), (0.15, 0.104))])
+        vest = piece("EyeVest", skin_mesh("vest", c.v, c.e, c.r), TORSO)
+        for x, z, w, hh in ((-0.08, 1.27, 0.07, 0.07), (0.08, 1.27, 0.07, 0.07), (-0.085, 1.1, 0.08, 0.08), (0.085, 1.1, 0.08, 0.08)):
+            card("EyeVest", ["spine", "chest"], (x, front_of(vest, x, z) - 0.006, z), w, hh, 0.012)  # pockets
+            card("EyeVest", ["spine", "chest"], (x, front_of(vest, x, z + hh * 0.42) - 0.01, z + hh * 0.42), w + 0.006, 0.02, 0.006)  # flaps
+        # a coil of cable clipped to the belt at the side
+        for k in range(3):
+            ring("AccentCable", ["hips"], (0.172 + k * 0.006, 0.0, 0.93), 0.085 - k * 0.006, 0.009, axis="X")
+        # a head torch: a band round the head, the lamp on the forehead
+        ring("EyeTorch", ["head"], hc + Vector((0, 0.004, 0.05)), 1.0, 0.009, axis="Z", scale=(0.087, 0.104, 1.0))
+        card("EyeTorch", ["head"], hc + Vector((0, -0.112, 0.055)), 0.045, 0.03, 0.022)
+        ring("Sclera", ["head"], hc + Vector((0, -0.124, 0.055)), 0.009, 0.004)
+    elif dept == "designer":
+        ring("AccentScarf", ["chest", "neck"], (0, 0.012, 1.45), 0.075, 0.028, axis="Z", scale=(1.0, 0.95, 1.0))
+        for k in range(4):                                              # its end hanging down the front
+            z0, z1 = 1.42 - k * 0.07, 1.42 - (k + 1) * 0.07
+            card("AccentScarf", ["chest"], (0.045, front_of(torso, 0.045, (z0 + z1) / 2) - 0.022, (z0 + z1) / 2), 0.07, 0.075, 0.014)
+        blob("EyeBeret", ["head"], hc + Vector((0.012, 0.01, 0.102)), (0.19, 0.2, 0.06), rot=(0.06, -0.12, 0.0))
+        rod("EyeBeret", ["head"], hc + Vector((0.012, 0.01, 0.13)), hc + Vector((0.012, 0.01, 0.146)), 0.005)
 
 
 # --------------------------------------------------------------------------- the head
@@ -764,7 +892,7 @@ def preview(rig, acts, path):
 def export(rig):
     os.makedirs(OUT, exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, "human_scientist.fbx"), use_selection=True,
+    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"human_{DEPT or 'scientist'}.fbx"), use_selection=True,
                              apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=False,
                              object_types={"ARMATURE", "MESH"}, use_mesh_modifiers=True, mesh_smooth_type="FACE",
                              add_leaf_bones=False, use_armature_deform_only=True, bake_anim=True,
@@ -775,7 +903,12 @@ def export(rig):
 if __name__ == "__main__":
     clear()
     skin_map(SKIN_MAP)
-    body_clothes(); coat(); armband(); skin_parts(); boots(); head(); hair_and_eyes()
+    torso = body_clothes()
+    if DEPT:
+        department(DEPT, torso)
+    else:
+        coat()
+    armband(); skin_parts(); boots(); head(); hair_and_eyes()
     rig = skeleton()
     bind(rig)
     acts = animate(rig)

@@ -22,8 +22,25 @@ namespace Stealth.EditorTools
         static GameObject s_HumanRig;
 
         /// <summary>Builds the rigged human (null when the model has not been exported yet).</summary>
-        static GameObject BuildHumanRig()
+        static GameObject BuildHumanRig() => BuildHumanRig(HumanFbx, HumanPrefabPath, "HumanRig_Scientist");
+
+        /// <summary>The players' rigged humans, one per department (human.py <c>-- … backend</c> etc.), in PlayerLooks.Department order.</summary>
+        static GameObject[] BuildDepartmentHumans()
         {
+            var list = new System.Collections.Generic.List<GameObject>();
+            foreach (var dept in new[] { "backend", "qa", "sysadmin", "designer" })
+            {
+                string name = "HumanRig_" + char.ToUpperInvariant(dept[0]) + dept.Substring(1);
+                var rig = BuildHumanRig($"{ModelsDir}/Humans/human_{dept}.fbx", $"{PrefabsDir}/Player/{name}.prefab", name);
+                if (rig == null) return new GameObject[0]; // all four or none: the player models stay
+                list.Add(rig);
+            }
+            return list.ToArray();
+        }
+
+        static GameObject BuildHumanRig(string fbx, string prefabPath, string rootName)
+        {
+            string HumanFbx = fbx, HumanPrefabPath = prefabPath;
             if (!(AssetImporter.GetAtPath(HumanFbx) is ModelImporter imp)) { Debug.LogWarning($"[Builder] {HumanFbx} missing: run Tools/Blender/human.py"); return null; }
             ConfigureHumanImport(imp);
             EnsureFolder(HumansDataDir);
@@ -43,7 +60,7 @@ namespace Stealth.EditorTools
             return Prefab(HumanPrefabPath, () =>
             {
                 // the model under a root: the import turns Blender's front (-Y) to -Z, the root faces +Z like the player
-                var go = new GameObject("HumanRig_Scientist");
+                var go = new GameObject(rootName);
                 var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(HumanFbx));
                 PrefabUtility.UnpackPrefabInstance(model, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                 model.name = "Model";
@@ -51,7 +68,7 @@ namespace Stealth.EditorTools
                 model.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
                 foreach (var r in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 {
-                    r.sharedMaterial = mats.TryGetValue(r.gameObject.name, out var m) ? m : mats["BodyClothes"];
+                    r.sharedMaterial = mats.TryGetValue(r.gameObject.name, out var m) ? m : PartMaterial(mats, r.gameObject.name);
                     r.shadowCastingMode = ShadowCastingMode.On;
                     r.updateWhenOffscreen = false;
                 }
@@ -66,6 +83,11 @@ namespace Stealth.EditorTools
                 return go;
             });
         }
+
+        /// <summary>A part of a department's human by its name's role (Body… the clothes, Accent… the team's, Eye… dark).</summary>
+        static Material PartMaterial(System.Collections.Generic.Dictionary<string, Material> mats, string part) =>
+            part.StartsWith("AccentHead") ? mats["AccentHead"] : part.StartsWith("Accent") ? mats["AccentBand"]
+            : part.StartsWith("Eye") ? mats["EyeDetails"] : part.StartsWith("Sclera") ? mats["Sclera"] : mats["BodyClothes"];
 
         static void ConfigureHumanImport(ModelImporter imp)
         {

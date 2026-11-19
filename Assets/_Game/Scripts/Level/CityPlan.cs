@@ -352,6 +352,65 @@ namespace Stealth.Level
                     }
                 }
                 bool isFront = Vector3.Dot(n, front) > 0.5f;
+                // the wall itself in relief: pilasters between the bays of a plain front, quoins up the corners of a brick
+                // one, spandrel panels under the glass of a curtain wall; the parapet's coping along the top
+                for (int k = Mathf.CeilToInt(tlo / Storey); k * Storey <= thi + 0.01f; k++)
+                {
+                    float at = s * k * Storey;
+                    if (at < lo + 0.3f || at > hi - 0.3f || glass) continue;
+                    if (facade == CitySlot.FacadeA) On(at - 0.14f, at + 0.14f, 0f, 0.1f, Storey, h - 0.2f, trim);
+                }
+                if (facade == CitySlot.FacadeB)
+                    foreach (float corner in new[] { lo, hi })
+                        for (float y = Storey; y < h - 0.6f; y += 0.6f)
+                        {
+                            float w = ((int)(y / 0.6f) % 2 == 0) ? 0.5f : 0.32f;
+                            On(corner == lo ? lo : hi - w, corner == lo ? lo + w : hi, 0f, 0.05f, y, y + 0.5f, trim);
+                        }
+                if (glass)
+                    for (int y = 1; y < storeys; y++)
+                        On(lo + 0.1f, hi - 0.1f, 0f, 0.06f, (y + win.w) * Storey, (y + 1 + win.y) * Storey, CitySlot.Metal);
+                On(lo - 0.05f, hi + 0.05f, -0.02f, 0.18f, h - 0.04f, h + 0.06f, trim);
+                // a little railing in front of some windows of a brick front (a French balcony), satellite dishes, air conditioners
+                if (facade == CitySlot.FacadeB && !glass)
+                    for (int k = Mathf.CeilToInt(tlo / Storey); (k + 1) * Storey <= thi + 0.01f; k++)
+                        for (int y = 1; y < storeys; y++)
+                        {
+                            if (rng.NextDouble() > 0.25) continue;
+                            float t0 = (k + win.x) * Storey, t1 = (k + win.z) * Storey;
+                            float a0 = Mathf.Min(s * t0, s * t1), a1 = Mathf.Max(s * t0, s * t1);
+                            if (a0 < lo + 0.15f || a1 > hi - 0.15f) continue;
+                            float sill = (y + win.y) * Storey;
+                            On(a0, a1, 0.22f, 0.25f, sill + 0.85f, sill + 0.9f, CitySlot.Metal);
+                            for (float r = a0; r <= a1 + 0.01f; r += 0.12f) On(r - 0.01f, r + 0.01f, 0.22f, 0.25f, sill, sill + 0.88f, CitySlot.Metal);
+                        }
+                for (int d = 0, dishes = storeys >= 3 && !glass ? rng.Next(0, 3) : 0; d < dishes; d++)
+                {
+                    float at = Range(rng, lo + 0.8f, hi - 0.8f), y = rng.Next(1, storeys) * Storey + Range(rng, 1.4f, 2.6f);
+                    On(at - 0.03f, at + 0.03f, 0f, 0.35f, y - 0.03f, y + 0.03f, CitySlot.Metal);      // the arm
+                    On(at - 0.3f, at + 0.3f, 0.35f, 0.42f, y - 0.3f, y + 0.3f, CitySlot.Roof);          // the dish
+                }
+                for (int u = 0, units = !glass ? rng.Next(0, 4) : 0; u < units; u++)
+                {
+                    float at = Range(rng, lo + 0.8f, hi - 1.6f), y = rng.Next(1, storeys) * Storey + 0.25f;
+                    On(at, at + 0.8f, 0f, 0.32f, y, y + 0.55f, CitySlot.Metal);
+                    On(at + 0.1f, at + 0.7f, 0.32f, 0.34f, y + 0.08f, y + 0.47f, CitySlot.Tyre);       // its grille
+                }
+                // the ground floor of a front: a shop window or two, framed, with a door between
+                if (isFront && !glass && storeys >= 2 && hi - lo > 6f && rng.NextDouble() < 0.75)
+                {
+                    float m = (lo + hi) / 2f;
+                    foreach (var (s0, s1) in new[] { (lo + 0.8f, m - 1.2f), (m + 1.2f, hi - 0.8f) })
+                    {
+                        if (s1 - s0 < 1.2f) continue;
+                        On(s0, s1, 0.08f, 0.1f, 0.5f, 2.6f, CitySlot.Glass);                             // the glass
+                        On(s0 - 0.08f, s1 + 0.08f, 0.08f, 0.16f, 2.6f, 2.72f, CitySlot.Metal);           // its frame
+                        On(s0 - 0.08f, s1 + 0.08f, 0.08f, 0.2f, 0.38f, 0.5f, CitySlot.Metal);
+                        On(s0 - 0.08f, s0, 0.08f, 0.16f, 0.5f, 2.6f, CitySlot.Metal);
+                        On(s1, s1 + 0.08f, 0.08f, 0.16f, 0.5f, 2.6f, CitySlot.Metal);
+                        for (float r = s0 + 1.2f; r < s1 - 0.4f; r += 1.2f) On(r - 0.03f, r + 0.03f, 0.08f, 0.14f, 0.5f, 2.6f, CitySlot.Metal);
+                    }
+                }
                 if (isFront && !glass)
                     foreach (float a in new[] { lo + 0.12f, hi - 0.12f })                                // drainpipes down the front's corners
                     {

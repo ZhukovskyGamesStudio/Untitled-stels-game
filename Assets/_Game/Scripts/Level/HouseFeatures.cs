@@ -283,18 +283,53 @@ namespace Stealth.Level
                 var deeper = keyRooms.FindAll(r => nearSteps != int.MaxValue && l.RoomSteps[r.Id] > nearSteps);
                 if (deeper.Count > 0) keyRooms = deeper;
                 var keyRoom = keyRooms[rng.Next(keyRooms.Count)];
-                var key = keyRoom.Center + Vector3.up * 0.02f;
+                // on top of a table, a desk, a counter — never inside a cupboard or on a shelf of a rack; else on the floor
+                Vector3? key = null;
                 for (int k = 0; k < l.ItemSpots.Count; k++)
                 {
-                    if (l.Plan.RoomAt(l.ItemSpots[k] + Vector3.up * 0.3f) != keyRoom) continue;
+                    if (l.Plan.RoomAt(l.ItemSpots[k] + Vector3.up * 0.3f) != keyRoom || !OnOpenTop(l, l.ItemSpots[k])) continue;
                     key = l.ItemSpots[k];
                     l.ItemSpots.RemoveAt(k);
                     break;
                 }
+                if (key == null)
+                {
+                    var floor = Stealth.Items.LootPlanner.FloorSpots(l, new HashSet<int> { keyRoom.Id }, 1, 0.6f);
+                    key = floor.Count > 0 ? floor[0] : keyRoom.Center + Vector3.up * 0.02f;
+                }
                 int door = l.EnsureDoor(d);
-                l.KeyDoors.Add(new KeyDoor { Door = door, Key = key, Rooms = new List<int>(behind) });
+                l.KeyDoors.Add(new KeyDoor { Door = door, Key = key.Value, Rooms = new List<int>(behind) });
                 taken.UnionWith(behind);
             }
+        }
+
+        /// <summary>Furniture with an open top a thing lies on in plain sight.</summary>
+        public static readonly HashSet<PropKind> OpenTops = new()
+        {
+            PropKind.Desk, PropKind.BarCounter, PropKind.Bench, PropKind.BenchIsland, PropKind.CoffeeTable, PropKind.ConferenceTable,
+            PropKind.ConsoleDesk, PropKind.CorridorBench, PropKind.DiningTable, PropKind.DoctorDesk, PropKind.ExamTable, PropKind.ExecutiveDesk,
+            PropKind.HallBench, PropKind.KitchenCounter, PropKind.KitchenIsland, PropKind.LabBench, PropKind.MeetingTable, PropKind.NightTable,
+            PropKind.ReadingTable, PropKind.ReceptionDesk, PropKind.RoundTable, PropKind.SideTable, PropKind.StandingDesk,
+            PropKind.SupervisorDesk, PropKind.WorkTable, PropKind.Workbench, PropKind.PingPongTable,
+        };
+
+        /// <summary>
+        /// The spot lies on the open top of a table, a desk, a counter (pure): some furniture of <see cref="OpenTops"/> under it
+        /// and nothing tall (a cupboard, a rack: <see cref="Furnisher.Tall"/>) over it.
+        /// </summary>
+        public static bool OnOpenTop(LevelLayout l, Vector3 spot)
+        {
+            bool open = false;
+            foreach (var p in l.Props)
+            {
+                if (Mathf.Abs(p.Position.y - spot.y) > 2f) continue;
+                var local = Quaternion.Inverse(Quaternion.Euler(0f, p.RotationY, 0f)) * (spot - p.Position);
+                float scale = p.Scale > 0f ? p.Scale : 1f;
+                if (!Furnisher.FootprintOf(p.Kind).Contains(new Vector2(local.x, local.z) / scale)) continue;
+                if (Furnisher.Tall.Contains(p.Kind)) return false;
+                open |= OpenTops.Contains(p.Kind) && spot.y > p.Position.y + 0.3f;
+            }
+            return open;
         }
 
         // ------------------------------------------------------------------ the main job

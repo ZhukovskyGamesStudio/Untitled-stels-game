@@ -306,7 +306,7 @@ namespace Stealth.Player
 
         public void MoveServer(int index, byte x, byte y, byte rot)
         {
-            if (index < 0 || index >= m_Items.Count) return;
+            if (index < 0 || index >= m_Items.Count || (Locked(index) && x != WornX)) return;
             var e = m_Items[index];
             if (!CanPlace(e.Shape, rot, x, y, index)) return;
             e.X = x; e.Y = y; e.Rot = rot;

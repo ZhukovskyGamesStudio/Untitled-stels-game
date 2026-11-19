@@ -20,6 +20,10 @@ namespace Stealth.Player
         public GameObject ViewFlashlight;
         [Tooltip("The shelter map held open in front of the face while it is in the hand slot (every peer sees it: a thing in the world, not UI).")]
         public GameObject HeldMap;
+        [Tooltip("Anything else in the hand slot (not the flashlight, not the map: they have their own), shown low in front of the view; every peer sees it. Its parent is the anchor that is shown and hidden.")]
+        public MeshFilter HeldThing;
+        [Tooltip("The items' meshes, colours and models (Data/ItemVisuals).")]
+        public Items.ItemVisuals Visuals;
         /// <summary>The flashlight in the hand shines (server-decided, replicated).</summary>
         public bool FlashlightOn { get; private set; }
         float m_Drain;
@@ -72,9 +76,81 @@ namespace Stealth.Player
             if (charge == 0) FlashlightOn = false;
         }
 
+        int m_HeldShape = -1, m_HeldColor = -1;
+        GameObject m_HeldModel;
+        Quaternion? m_HeldRot;
+
+        /// <summary>The longest side of a thing shown in the hand, metres (a shovel shrinks, a coin grows).</summary>
+        const float HeldSize = 0.24f;
+
+        /// <summary>
+        /// Every peer: what the hand slot holds is in the hand — its own model if it has one (a key, the speaker, the
+        /// screwdriver…), else its piece in its colour, sized to the hand. The flashlight and the map have their own.
+        /// </summary>
+        void UpdateHeldThing()
+        {
+            if (HeldThing == null || Visuals == null) return;
+            var anchor = HeldThing.transform.parent != null ? HeldThing.transform.parent.gameObject : HeldThing.gameObject;
+            var inv = GetComponent<PlayerInventory>();
+            int hand = inv != null ? inv.HandIndex() : -1;
+            int shape = -1, color = 0;
+            if (hand >= 0 && !Downed && !InHatch && UsingTerminal == null && SeatIndex < 0)
+            {
+                var e = inv.Items[hand];
+                if (e.Shape != Items.ItemCatalog.Flashlight && e.Shape != Items.ItemCatalog.ShelterMap) { shape = e.Shape; color = e.Color; }
+            }
+            bool show = shape >= 0;
+            if (anchor.activeSelf != show) anchor.SetActive(show);
+            if (!show) return;
+            if (shape != m_HeldShape || color != m_HeldColor) ShowHeld(shape, color);
+            // a remote player's head does not pitch: the thing follows their look up and down
+            if (!IsOwner) anchor.transform.localRotation = (m_HeldRot ??= anchor.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f);
+        }
+
+        void ShowHeld(int shape, int color)
+        {
+            m_HeldShape = shape;
+            m_HeldColor = color;
+            if (m_HeldModel != null) Destroy(m_HeldModel);
+            m_HeldModel = null;
+            var renderer = HeldThing.GetComponent<MeshRenderer>();
+            var model = Visuals.Models != null && shape < Visuals.Models.Length ? Visuals.Models[shape] : null;
+            Bounds b;
+            if (model != null)
+            {
+                m_HeldModel = Instantiate(model, HeldThing.transform);
+                m_HeldModel.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                HeldThing.sharedMesh = null;
+                if (renderer != null) renderer.enabled = false;
+                var size = Items.ItemCatalog.ModelSize(shape); // (a model lies along X, centred, on the floor)
+                b = new Bounds(new Vector3(0f, size.y / 2f, 0f), size);
+                var mode = IsOwner ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
+                foreach (var r in m_HeldModel.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
+                foreach (var c in m_HeldModel.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+            }
+            else
+            {
+                var mesh = Visuals.Meshes[Mathf.Clamp(shape, 0, Visuals.Meshes.Length - 1)];
+                HeldThing.sharedMesh = mesh;
+                if (renderer != null)
+                {
+                    renderer.enabled = true;
+                    renderer.sharedMaterial = Visuals.ColorMaterials[Mathf.Clamp(color, 0, Visuals.ColorMaterials.Length - 1)];
+                    renderer.shadowCastingMode = IsOwner ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
+                }
+                b = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, Vector3.one * HeldSize);
+            }
+            float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+            float scale = longest > 1e-3f ? HeldSize / longest : 1f;
+            HeldThing.transform.localScale = Vector3.one * scale;
+            HeldThing.transform.localPosition = -b.center * scale;
+            VisualStyles.Dress(HeldThing.gameObject);
+        }
+
         /// <summary>Every peer: the beam where the holder looks.</summary>
         void UpdateFlashlightView()
         {
+            UpdateHeldThing();
             if (HeldMap != null)
             {
                 var inv = GetComponent<PlayerInventory>();

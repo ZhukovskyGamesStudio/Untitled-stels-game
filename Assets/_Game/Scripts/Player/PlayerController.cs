@@ -307,6 +307,7 @@ namespace Stealth.Player
             UpdateHand();
             AtHatch = !InHatch && Hatch.IsNear(transform.position) && (!UseLook || Aimed<Hatch>() != null);
             UpdateInteractions();
+            WorkSounds();
             UpdateCallouts();
             UpdateFog();
         }
@@ -463,6 +464,7 @@ namespace Stealth.Player
             if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
             if (UsingTerminal != null) ShowTerminalView();
             else UpdateWatching();
+            ShowOwnBody(Watching != null); // through a teammate's eyes the body lying on the floor is seen like anyone's
         }
 
         /// <summary>

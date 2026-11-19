@@ -285,6 +285,8 @@ namespace Stealth.UI
             if (over is Target.Backpack or Target.Belt)
             {
                 int idx = inv.IndexAt(cell);
+                // an empty belt: the bag itself is taken off (into the backpack, the stash, the hopper's fire)
+                if (idx < 0 && over == Target.Belt && inv.BeltCount() == 0) idx = inv.WornIndex();
                 if (idx < 0) return;
                 var e = inv.Items[idx];
                 m_Tooltip = ItemCatalog.Describe(e.Shape, e.Color);
@@ -341,7 +343,7 @@ namespace Stealth.UI
         void StartShape(InventoryEntry e, Vector2Int cell)
         {
             m_DragShape = e.Shape; m_DragColor = e.Color; m_DragRot = e.Rot;
-            m_GrabCell = cell - new Vector2Int(e.X, e.Y);
+            m_GrabCell = PlayerInventory.Worn(e) ? Vector2Int.zero : cell - new Vector2Int(e.X, e.Y);
             m_DragTravel = 0f;
         }
 

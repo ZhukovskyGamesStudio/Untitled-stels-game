@@ -30,8 +30,20 @@ namespace Stealth.Level
         public static StyleWorld World => s_Current != null ? s_Current.World : s_DefaultWorld;
         static readonly StyleWorld s_DefaultWorld = new();
 
-        /// <summary>The rigged human the current style shows instead of the player model (null = the player models).</summary>
+        /// <summary>The rigged human the current style shows instead of the player model (null = none of its own).</summary>
         public static GameObject PlayerRig => s_Active && s_Current != null ? s_Current.Geometry.PlayerRig : null;
+
+        /// <summary>
+        /// The rigged human of a player in slot <paramref name="slot"/>: the style's own if it has one (the derelict station's
+        /// scientist), else the human of the player's department (null: the player model).
+        /// </summary>
+        public static GameObject PlayerRigFor(int slot)
+        {
+            if (PlayerRig != null) return PlayerRig;
+            var humans = Config != null ? Config.PlayerHumans : null;
+            if (humans == null || humans.Length == 0) return null;
+            return humans[(int)Stealth.Player.PlayerLooks.DepartmentOf(slot) % humans.Length];
+        }
 
         /// <summary>The ambient light robots reckon with: the game's own, whatever a style shows.</summary>
         public static Color GameplayAmbient => s_Active ? s_BaseAmbient : RenderSettings.ambientLight;

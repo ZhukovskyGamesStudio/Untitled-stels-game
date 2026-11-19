@@ -177,6 +177,7 @@ namespace Stealth.Enemies
             m_Slump = Mathf.MoveTowards(m_Slump, hacked ? 1f : 0f, dt * (hacked ? 1.5f : 3f));
 
             FitCapsule();
+            PassThrough(hacked && m_Robot != null);
             float power = 1f - m_Slump; // a hacked robot winds down: rotors, wheels and legs stop
             foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * Mathf.Max(power, 0.05f), 0f, Space.Self);
             foreach (var w in m_Wheels) w.Rotate(m_Speed / 0.12f * Mathf.Rad2Deg * dt, 0f, 0f, Space.Self);
@@ -215,6 +216,31 @@ namespace Stealth.Enemies
         /// The body stays solid where it is seen: a hacked robot slumps (a flyer drops to the floor), so its collider follows
         /// the slumped body down to the floor — nobody walks or crouches through a switched-off robot.
         /// </summary>
+        Collider[] m_Solid;
+        bool m_Passable;
+
+        /// <summary>
+        /// A switched-off robot is walked through: its colliders turn into triggers on every peer (players' bodies pass, the
+        /// aim and the walls' rays ignore it); switched on again, solid again.
+        /// </summary>
+        void PassThrough(bool off)
+        {
+            if (off == m_Passable) return;
+            m_Passable = off;
+            if (m_Solid == null)
+            {
+                var list = new System.Collections.Generic.List<Collider>();
+                foreach (var c in GetComponentsInChildren<Collider>(true)) if (!c.isTrigger) list.Add(c);
+                m_Solid = list.ToArray();
+            }
+            foreach (var c in m_Solid)
+            {
+                if (c == null) continue;
+                if (c is MeshCollider { convex: false }) c.enabled = !off; // (a concave mesh cannot be a trigger)
+                else c.isTrigger = off;
+            }
+        }
+
         void FitCapsule()
         {
             if (m_Capsule == null || m_Robot == null || Mathf.Approximately(m_Slump, m_CapSlump)) return;

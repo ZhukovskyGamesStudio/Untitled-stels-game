@@ -28,7 +28,7 @@ namespace Stealth.Player
         /// </summary>
         void UpdateRig()
         {
-            var prefab = VisualStyles.PlayerRig;
+            var prefab = VisualStyles.PlayerRigFor(PlayerLooks.SlotOf(ClientId));
             if (prefab != m_RigPrefab)
             {
                 if (m_Rig != null) Destroy(m_Rig.gameObject);
@@ -42,7 +42,7 @@ namespace Stealth.Player
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
                     PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId));
-                    if (IsOwner)
+                    if (IsOwner && !m_BodyShown)
                         foreach (var r in go.GetComponentsInChildren<Renderer>(true))
                             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
                 }
@@ -50,6 +50,21 @@ namespace Stealth.Player
             if (m_Rig == null) return;
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch);
+        }
+
+        bool m_BodyShown;
+
+        /// <summary>
+        /// Owner: the own body is a shadow only (the first-person view looks out of it) — but watching a teammate while
+        /// knocked out, it lies there to be seen like anyone's.
+        /// </summary>
+        void ShowOwnBody(bool shown)
+        {
+            if (shown == m_BodyShown) return;
+            m_BodyShown = shown;
+            var mode = shown ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            foreach (var r in BodyRenderers) if (r != null) r.shadowCastingMode = mode;
+            if (m_Rig != null) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
         }
 
         Transform m_LegL, m_LegR;

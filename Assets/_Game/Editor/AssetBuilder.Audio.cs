@@ -109,6 +109,13 @@ namespace Stealth.EditorTools
                 s_Bank.GuardChase = Clip("Robots/guard_chase");
                 EditorUtility.SetDirty(s_Bank);
             }
+            if (s_Bank.WorkHack == null || s_Bank.WorkPick == null || s_Bank.WorkScrew == null)
+            {
+                s_Bank.WorkHack = Clip("Items/work_hack");
+                s_Bank.WorkPick = Clip("Items/work_pick");
+                s_Bank.WorkScrew = Clip("Items/work_screw");
+                EditorUtility.SetDirty(s_Bank);
+            }
             if (s_Bank.HandDryer == null)
             {
                 s_Bank.HandDryer = Clip("Environment/hand_dryer");

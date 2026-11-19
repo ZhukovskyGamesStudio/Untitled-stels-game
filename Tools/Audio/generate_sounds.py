@@ -661,6 +661,32 @@ def unlock():
     return fade(mix(at(click(), 0.0, d), at(click(), 0.12, d), clunk))
 
 
+def work_hack():
+    """Hacking with the hands (a robot, a terminal, a lock's panel): two quick key taps on a little keypad and a soft blip."""
+    d = 0.16
+    def tap(f):
+        return bandpass(noise(0.025), f, f * 2.2) * env(int(0.025 * SR), 0.0005, 0.008, curve=6)
+    blip = sine(1650, 0.05) * env(int(0.05 * SR), 0.002, 0.03) * 0.35
+    return fade(mix(at(tap(2400), 0.0, d), at(tap(2900), 0.05, d), at(blip, 0.1, d)))
+
+
+def work_pick():
+    """Picking a lock: a pick's tiny metal tick on the pins, a short ring after it."""
+    d = 0.12
+    tick = highpass(noise(0.012), 3500) * env(int(0.012 * SR), 0.0003, 0.004, curve=6)
+    ring = mix(sine(5200, 0.08) * env(int(0.08 * SR), 0.0005, 0.04) * 0.25, sine(7300, 0.06) * env(int(0.06 * SR), 0.0005, 0.03) * 0.12)
+    return fade(mix(at(tick, 0.0, d), at(ring, 0.002, d)))
+
+
+def work_screw():
+    """A screwdriver turning a stiff screw: a ratchet's three dry clicks and a squeak of metal."""
+    d = 0.22
+    def click(f):
+        return bandpass(noise(0.018), f, f * 1.8) * env(int(0.018 * SR), 0.0004, 0.006, curve=6)
+    squeak = sweep(1900, 2300, 0.08) * env(int(0.08 * SR), 0.01, 0.06) * 0.18
+    return fade(mix(at(click(1600), 0.0, d), at(click(1700), 0.045, d), at(click(1550), 0.09, d), at(squeak, 0.12, d)))
+
+
 def door_open():
     """A hinged door opening: the handle's latch clicks back, then a short dry creak of the hinges and the air it moves."""
     d = 0.6
@@ -964,6 +990,9 @@ def main():
     write(P("Player", "gas_breath"), gas_breath(), 0.7)
     for level in range(3):
         write(P("Player", f"gas_laugh_{level}"), gas_laugh(level), 0.8)
+    write(P("Items", "work_hack"), work_hack(), 0.6)
+    write(P("Items", "work_pick"), work_pick(), 0.6)
+    write(P("Items", "work_screw"), work_screw(), 0.6)
     write(P("Environment", "door_open"), door_open(), 0.6)
     write(P("Environment", "door_shut"), door_shut(), 0.7)
 

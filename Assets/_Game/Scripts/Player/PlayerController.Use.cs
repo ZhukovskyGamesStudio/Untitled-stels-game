@@ -59,6 +59,26 @@ namespace Stealth.Player
             }
         }
 
+        float m_NextWorkTick;
+
+        /// <summary>
+        /// Owner: the sound of the hands at work while E is held — keys tapped hacking a robot, a pick ticking in a lock, a
+        /// screwdriver's ratchet at a grille (the end of it has its own sound: the robot's, the lock's, the grille's).
+        /// </summary>
+        void WorkSounds()
+        {
+            var bank = Audio.Sfx.Bank;
+            if (bank == null || Time.time < m_NextWorkTick) return;
+            AudioClip clip = null;
+            float gap = 0.3f;
+            if (HackTarget != null && HackProgress > 0f) { clip = bank.WorkHack; gap = 0.22f; }
+            else if (DoorTarget != null && DoorProgress > 0f) { clip = bank.WorkPick; gap = 0.16f; }
+            else if (UseTarget != null && UseProgress > 0f && UseTarget.Kind is UseKind.VentGrille or UseKind.VentGrate) { clip = bank.WorkScrew; gap = 0.3f; }
+            if (clip == null) return;
+            m_NextWorkTick = Time.time + gap * Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.85f, 1.15f);
+            Audio.Sfx.At(clip, Hands, 0.7f, Audio.Sfx.Group.Items, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.93f, 1.07f));
+        }
+
         /// <summary>Something in reach to use with E (a crate, the med table, a seat of the car…), or null.</summary>
         public Interactable UseTarget { get; private set; }
         /// <summary>The hint for <see cref="UseTarget"/>, whether E does something now, and the hold progress (0..1).</summary>

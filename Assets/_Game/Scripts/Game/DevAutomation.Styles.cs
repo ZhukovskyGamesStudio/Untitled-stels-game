@@ -263,7 +263,7 @@ namespace Stealth.Game
         static void DressMannequins()
         {
             s_Mannequins.RemoveAll(x => x.model == null);
-            var prefab = VisualStyles.PlayerRig;
+            var prefab = VisualStyles.PlayerRigFor(0);
             foreach (var (m, slot) in s_Mannequins)
             {
                 var old = m.transform.Find("StyleRig");

@@ -260,10 +260,16 @@ namespace Stealth.Level
 
         static readonly List<Vector3> s_Agents = new();
 
+        bool m_WasLocked;
+
         void Update()
         {
             s_Agents.Clear();
             bool locked = Locked;
+            // a lock picked or opened from a terminal: its bolt is heard on every peer (not on the first frame: a house built so)
+            if (m_WasLocked && !locked && HasLock && !Storage && Time.timeSinceLevelLoad > 1f && Index >= 0)
+                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, transform.position + Vector3.up * 1f, 0.8f, Audio.Sfx.Group.Items);
+            m_WasLocked = locked;
             if (!locked) foreach (var p in PlayerController.All) s_Agents.Add(p.transform.position); // a locked door ignores players
             int players = s_Agents.Count;
             foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);

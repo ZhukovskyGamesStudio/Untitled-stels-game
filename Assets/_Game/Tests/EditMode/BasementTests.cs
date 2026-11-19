@@ -239,6 +239,8 @@ namespace Stealth.Tests
             Assert.IsFalse(LadderMath.GetsOn(false, 1f, face, face, true, 0f, 4.9f), "out of reach");
             // stepping into the open shaft from above: it catches the falling body
             Assert.IsTrue(LadderMath.GetsOn(true, 0f, -face, face, false, 3.5f, 4.9f));
+            // walking past it up on the lobby's floor (the top of the ladder): never taken hold of
+            Assert.IsFalse(LadderMath.GetsOn(true, 1f, face, face, true, 4.85f, 4.9f), "walking past the open shaft up in the lobby");
             // W up, S down, held on the column
             var up = LadderMath.Step(new Vector3(0.2f, 1f, 0f), Vector3.zero, 1f, 0.1f);
             Assert.AreEqual(LadderMath.Speed * 0.1f, up.y, 1e-4f);

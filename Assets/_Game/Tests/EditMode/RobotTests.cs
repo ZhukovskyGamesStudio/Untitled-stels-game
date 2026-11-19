@@ -293,7 +293,7 @@ namespace Stealth.Tests
         }
     
         [Test]
-        public void TheSpidersWebIsAMazeOfWiresAwayFromTheDoors()
+        public void TheSpidersWebIsAMazeOfSheetsAwayFromTheDoors()
         {
             var room = new Rect(0f, 0f, 10f, 5f);
             var none = new List<Vector3>();
@@ -304,7 +304,8 @@ namespace Stealth.Tests
             {
                 var w = web[i];
                 Assert.AreEqual(w.A.x, w.B.x, 1e-4f, "across the shorter side");
-                Assert.That(w.A.y, Is.InRange(0.45f, 1.05f), "between the knee and the chest");
+                Assert.Less(w.A.y, 0.1f, "from the floor…");
+                Assert.Greater(w.Top, LevelMetrics.WallHeight - 0.2f, "…up to the ceiling: a whole sheet");
                 // a gap at alternating ends: the way through zig-zags
                 bool gapAtFar = w.B.z < room.yMax - 0.5f;
                 Assert.AreEqual(i % 2 == 0, gapAtFar, $"wire {i}");
@@ -318,7 +319,8 @@ namespace Stealth.Tests
             var onIt = new Vector3(s.A.x, 0f, (s.A.z + s.B.z) / 2f);
             Assert.IsTrue(SpiderWebs.Touches(s, onIt, 1.8f), "walking into it");
             Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.right * 0.6f, 1.8f), "beside it");
-            Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.up * (s.A.y + 0.1f), 1.8f), "over it (a jump)");
+            Assert.IsTrue(SpiderWebs.Touches(s, onIt + Vector3.up * 1.2f, 1.8f), "no jumping over it");
+            Assert.IsTrue(SpiderWebs.Touches(s, onIt, 0.9f), "no crawling under it");
             Assert.IsFalse(SpiderWebs.Touches(s, new Vector3(s.A.x, 0f, s.B.z + 0.6f), 1.8f), "through the gap at its end");
         }
     }

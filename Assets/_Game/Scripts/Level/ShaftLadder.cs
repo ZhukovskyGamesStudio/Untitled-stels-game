@@ -58,9 +58,13 @@ namespace Stealth.Level
         /// <summary>Climbing speed, metres a second.</summary>
         public const float Speed = 1.9f;
 
-        /// <summary>Gets on: in reach and pushing forward at the ladder (facing it), or falling down the shaft past it.</summary>
+        /// <summary>
+        /// Gets on: in reach and pushing forward at the ladder (facing it) down in the shaft, or falling down the shaft past it.
+        /// Up on the lobby's floor walking past never takes hold (it used to grab and put the walker at the top's exit, again
+        /// and again): from above one steps into the open shaft and the ladder catches the fall.
+        /// </summary>
         public static bool GetsOn(bool inZone, float forward, Vector3 facing, Vector3 ladderFacing, bool grounded, float y, float top) =>
-            inZone && ((forward > 0.1f && Vector3.Dot(facing, ladderFacing) > 0.3f) || (!grounded && y < top - 0.5f));
+            inZone && y < top - 0.5f && ((forward > 0.1f && Vector3.Dot(facing, ladderFacing) > 0.3f) || !grounded);
 
         /// <summary>The climb of one frame: up or down with W/S, drawn to the column.</summary>
         public static Vector3 Step(Vector3 feet, Vector3 column, float forward, float dt)

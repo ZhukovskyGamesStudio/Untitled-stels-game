@@ -32,6 +32,8 @@ namespace Stealth.Configs
         public StyleMeshes[] StyleModels = new StyleMeshes[0];
         [Tooltip("Draws a merged mesh of the house (style architecture, furniture): MeshFilter + MeshRenderer, nothing else")]
         public GameObject Batch;
+        [Tooltip("The players as rigged humans, one per department (PlayerLooks.Department; Tools/Blender/human.py): shown in every style that has no rigged human of its own (StyleGeometry.PlayerRig)")]
+        public GameObject[] PlayerHumans = new GameObject[0];
 
         public StyleKit KitFor(ModelFamily family)
         {
