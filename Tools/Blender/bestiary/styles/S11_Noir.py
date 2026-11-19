@@ -715,8 +715,9 @@ def p_server_rack(L):
     P = Parts()
     P.add("Body", L.carcass((.7, 1.0, 2.0), (0, 0, 0), kick=.05))
     for i in range(10):
-        P.add("Eye", [s.rbox((.5, .02, .05), (0, -.495, .3 + i * .15), r=.006, seg=1)])
-        P.add("Body", [s.rbox((.56, .025, .03), (0, -.505, .35 + i * .15), r=.004, seg=1, rot=(math.radians(25), 0, 0))])
+        # out of the front by more than the case's cubes grow (half a cube): the tubes were swallowed by the voxels
+        P.add("Eye", [s.rbox((.5, .02, .05), (0, -.522, .3 + i * .15), r=.006, seg=1)])
+        P.add("Body", [s.rbox((.56, .025, .03), (0, -.537, .35 + i * .15), r=.004, seg=1, rot=(math.radians(25), 0, 0))])
     return P
 
 

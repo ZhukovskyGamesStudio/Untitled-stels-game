@@ -145,16 +145,18 @@ def drawn_box(size, taper=(1.0, 1.0), at=(0, 0, 0)):
         flush = {2: 1, 1: -1}.get(axis, 0) * (.15 * m - .001)
         out.append(box(U - bar * 1.4, V - bar * 1.4, 0, 0, .7, flush))
     else:
+        # the three directions' bars clearly different (a tenth of a bar was under a millimetre on thin blocks: their faces
+        # nearly met in the corners and flickered), the solid well inside them
         bar = min(.04, m * .2)
         for sx in (-1, 1):
             for sy in (-1, 1):
                 out.append(s.rbox((bar, bar, h), (sx * (w / 2 - bar / 2), sy * (d / 2 - bar / 2), 0), r=0, seg=1))
             for sz in (-1, 1):
-                out.append(s.rbox((bar * .9, d - bar * .2, bar * .9), (sx * (w / 2 - bar / 2), 0, sz * (h / 2 - bar / 2)), r=0, seg=1))
+                out.append(s.rbox((bar * .8, d - bar * .25, bar * .8), (sx * (w / 2 - bar / 2), 0, sz * (h / 2 - bar / 2)), r=0, seg=1))
         for sy in (-1, 1):
             for sz in (-1, 1):
-                out.append(s.rbox((w - bar * .2, bar * .8, bar * .8), (0, sy * (d / 2 - bar / 2), sz * (h / 2 - bar / 2)), r=0, seg=1))
-        out.append(s.rbox((w - bar * .2, d - bar * .2, h - bar * .2), (0, 0, 0), r=0, seg=1))
+                out.append(s.rbox((w - bar * .6, bar * .62, bar * .62), (0, sy * (d / 2 - bar / 2), sz * (h / 2 - bar / 2)), r=0, seg=1))
+        out.append(s.rbox((w - bar * .5, d - bar * .5, h - bar * .5), (0, 0, 0), r=0, seg=1))
     if taper != (1.0, 1.0):
         for bm in out:
             for vtx in bm.verts:
@@ -858,7 +860,10 @@ def server_rack(L):
 def reception_desk(L):
     """A drafting table for a counter: a drawn front panel and, behind it, a big slanted drawing board."""
     P = D.Parts()
-    P.add("Body", L.slab((2.4, .08, 1.1), (0, -.36, .55)) + L.slab((.08, .76, 1.1), (-1.16, 0, .55)) + L.slab((.08, .76, 1.1), (1.16, 0, .55)))
+    # the sides start a centimetre into the front panel and stay a hair inside its outline: their edge bars shared the
+    # panel's corner planes (they flickered)
+    P.add("Body", L.slab((2.4, .08, 1.1), (0, -.36, .55)) + L.slab((.078, .71, 1.096), (-1.159, .025, .548))
+          + L.slab((.078, .71, 1.096), (1.159, .025, .548)))
     P.add("Accent", [s.rbox((2.36, .7, .03), (0, .02, .75), r=.002, seg=1)])
     board = drawn_box((2.3, .5, .03))
     for bm in board:

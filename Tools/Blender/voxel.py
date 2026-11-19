@@ -2,13 +2,37 @@
 
 Blender's Remesh modifier in Blocks mode, applied to each object separately (part names, pivots and the parts the game
 animates stay as they were). The grid is centred on each part's bounds, so wheel and rotor centres do not move.
-A part must keep its size: one that loses its thin bits (legs of a whiteboard, a spider's feet) is tried again on a
-finer grid, and one that cannot be voxelized without falling apart (leaves, sheets of paper) is left as it was.
+A part must keep its size and stay in one piece: one that loses its thin bits (legs of a whiteboard, a spider's feet) or
+falls apart into loose cubes (a thin leg came out as a dotted line) is tried again on a finer grid, and one that cannot be voxelized without falling apart (leaves, sheets of paper) is left as it was.
 Glowing parts (Eye*) start on a finer grid: a status lamp or a slit must not vanish into one cube.
 """
 import math
 
+import bmesh
 import bpy
+
+
+def _islands(mesh):
+    """How many separate pieces a mesh is made of (faces joined through shared vertices)."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+    seen, n = set(), 0
+    for f0 in bm.faces:
+        if f0.index in seen:
+            continue
+        n += 1
+        stack = [f0]
+        seen.add(f0.index)
+        while stack:
+            f = stack.pop()
+            for v in f.verts:
+                for g in v.link_faces:
+                    if g.index not in seen:
+                        seen.add(g.index)
+                        stack.append(g)
+    bm.free()
+    return n
 
 
 def _bounds(mesh, matrix):
@@ -43,13 +67,14 @@ def voxelize_object(obj, size, tolerance=0.03):
     want = _bounds(obj.data, obj.matrix_world)
     if want is None:
         return 0.0
-    for s in (size, size / 2, size / 4):
+    pieces = _islands(obj.data)
+    for s in (size, size / 2, size / 4, size / 8):
         if max(dims.x, dims.y, dims.z) < s * 1.5:
             break
         mesh = _blocks(obj, s)
         got = _bounds(mesh, obj.matrix_world)
         off = 1e9 if got is None else max(max(abs(a - b) for a, b in zip(want[0], got[0])), max(abs(a - b) for a, b in zip(want[1], got[1])))
-        if off <= max(tolerance, s * 0.6):
+        if off <= max(tolerance, s * 0.6) and _islands(mesh) <= pieces:
             old = obj.data
             mesh.name = old.name
             obj.data = mesh

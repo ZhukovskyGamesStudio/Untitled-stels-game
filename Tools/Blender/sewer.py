@@ -392,7 +392,7 @@ def cart():
                 rot = Matrix.Rotation(-a + math.pi / 2, 4, "Y")
                 bmesh.ops.rotate(bm, verts=bm_s["verts"], cent=(0, 0, 0), matrix=rot)
                 bmesh.ops.translate(bm, verts=bm_s["verts"], vec=c)
-        cyl(bm, 0.03, 1.36, (0.0, 0.0, 0.4), axis="Y", seg=8)                 # axle
+        cyl(bm, 0.03, 1.38, (0.0, 0.0, 0.4), axis="Y", seg=8)                 # axle (through the hubs and out: no shared end faces)
     part("Metal", wheels)
 
     def body(bm):
@@ -401,8 +401,8 @@ def cart():
             box(bm, -0.92, 0.92, y + 0.005, y + 0.15, 0.56, 0.62)
         box(bm, -0.95, 0.95, -0.52, -0.46, 0.56, 0.82)                       # sides
         box(bm, -0.95, 0.95, 0.46, 0.52, 0.56, 0.82)
-        box(bm, 0.92, 0.98, -0.52, 0.52, 0.56, 0.82)                         # front board
-        box(bm, -0.98, -0.92, -0.52, 0.52, 0.56, 0.74)                       # back board, lower
+        box(bm, 0.92, 0.98, -0.515, 0.515, 0.56, 0.82)                       # front board (inside the sides' outer faces)
+        box(bm, -0.98, -0.92, -0.515, 0.515, 0.56, 0.74)                     # back board, lower
         for y in (-0.42, 0.42):                                              # frame under the bed
             box(bm, -1.0, 1.0, y - 0.04, y + 0.04, 0.48, 0.56)
     part("Wood", body)
@@ -413,7 +413,7 @@ def cart():
         cyl(bm, 0.03, 0.8, (-1.98, 0.0, 0.65), axis="Y", seg=10)
         box(bm, -1.05, -0.99, -0.03, 0.03, 0.0, 0.56)                        # the leg it rests on
         for y in (-0.5, 0.5):                                                # corner irons
-            box(bm, 0.94, 1.0, y - 0.04, y + 0.04, 0.56, 0.84)
+            box(bm, 0.94, 1.0, y - 0.04, y + 0.04, 0.55, 0.84)                # (a little under the boards' bottom)
     part("Metal", handles).name = "Irons"
     finish_and_export("sewer_cart")
 
@@ -451,13 +451,10 @@ def pipe():
 def valve():
     def v(bm):
         torus(bm, 0.22, 0.025, (0.0, 0.0, 0.0), axis="X", seg=20, seg2=6)
-        for k in range(4):
-            a = math.pi * k / 4
-            box(bm, -0.015, 0.015, -0.22 * math.cos(a), 0.22 * math.cos(a), -0.01, 0.01) if k == 0 else None
         cyl(bm, 0.04, 0.1, (0.05, 0.0, 0.0), axis="X", seg=10)
         cyl(bm, 0.07, 0.4, (0.25, 0.0, 0.0), axis="X", seg=12)
     part("Rust", v)
-    part("Metal", lambda bm: [box(bm, -0.015, 0.015, -0.21, 0.21, -0.012, 0.012), box(bm, -0.015, 0.015, -0.012, 0.012, -0.21, 0.21)]).name = "Spokes"
+    part("Metal", lambda bm: [box(bm, -0.015, 0.015, -0.21, 0.21, -0.012, 0.012), box(bm, -0.012, 0.012, -0.012, 0.012, -0.21, 0.21)]).name = "Spokes"  # (the second a hair thinner: no shared faces)
     finish_and_export("sewer_valve")
 
 
@@ -471,9 +468,11 @@ def crate():
     part("Wood", lambda bm: box(bm, -0.3, 0.3, -0.3, 0.3, 0.0, 0.6))
 
     def frame(bm):
-        for (x0, x1, y0, y1) in [(-0.32, 0.32, -0.32, -0.27), (-0.32, 0.32, 0.27, 0.32), (-0.32, -0.27, -0.32, 0.32), (0.27, 0.32, -0.32, 0.32)]:
-            box(bm, x0, x1, y0, y1, 0.0, 0.06)
-            box(bm, x0, x1, y0, y1, 0.54, 0.6)
+        # bands round the bottom and the top, a little past the box's faces (no shared planes); the side bands stop at
+        # the long ones (their tops would overlap in the corners)
+        for (x0, x1, y0, y1) in [(-0.32, 0.32, -0.32, -0.27), (-0.32, 0.32, 0.27, 0.32), (-0.32, -0.27, -0.27, 0.27), (0.27, 0.32, -0.27, 0.27)]:
+            box(bm, x0, x1, y0, y1, -0.004, 0.06)
+            box(bm, x0, x1, y0, y1, 0.54, 0.604)
     part("Stone", frame).name = "Frame"
     finish_and_export("sewer_crate")
 

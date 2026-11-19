@@ -316,6 +316,9 @@ def model_wheel_balancer():
     s.place(hood, (-0.45, 0.0, 0.7))
     s.place(hood, rot=(0, 0, 0))
     p.add("Body", hood)
+    # the hood's arm: a post up the cabinet's left edge and a bar across into the hood (it hinged on there)
+    p.add("Trim", rod((-0.19, 0.0, 0.84), (-0.19, 0.0, 1.12), 0.025, seg=10),
+          rod((-0.19, 0.0, 1.12), (-0.37, 0.0, 1.12), 0.025, seg=10))
     p.finish()
     return export("wheel_balancer")
 
@@ -542,10 +545,11 @@ def model_paint_rack():
     p.add("Body", cans)
     p.add("Trim", s.rbox((0.28, 0.25, 0.08), (-0.3, -0.05, 0.85 + 0.05), r=0.01))
     p.add("Eye", s.rbox((0.12, 0.01, 0.04), (-0.3, -0.18, 0.92), r=0.004))
+    yp = -d / 2 + 0.03                                       # the front post: the hooks are screwed into it
     for z in (1.15, 1.55):
-        p.add("Trim", rod((w / 2 + 0.01, -0.1, z), (w / 2 + 0.1, -0.1, z), 0.008, seg=6))
-        p.add("Body", s.rbox((0.05, 0.16, 0.14), (w / 2 + 0.11, -0.12, z - 0.08), r=0.015))
-        p.add("Trim", s.rcyl(0.04, 0.09, (w / 2 + 0.11, -0.12, z + 0.02), seg=10))
+        p.add("Trim", rod((w / 2 - 0.04, yp, z), (w / 2 + 0.1, yp, z), 0.008, seg=6))
+        p.add("Body", s.rbox((0.05, 0.16, 0.14), (w / 2 + 0.11, yp - 0.02, z - 0.08), r=0.015))
+        p.add("Trim", s.rcyl(0.04, 0.09, (w / 2 + 0.11, yp - 0.02, z + 0.02), seg=10))
     p.finish()
     return export("paint_rack")
 

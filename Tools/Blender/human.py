@@ -388,12 +388,15 @@ def department(dept, torso):
         pel = c.add((0, 0.0, 0.98), (0.165, 0.112))
         c.line(pel, [((0, 0.005, 1.08), (0.15, 0.104)), (P["chest"], (0.17, 0.115)), (P["upchest"], (0.176, 0.108)),
                      ((0, 0.025, 1.46), (0.1, 0.085))])
-        piece("BodyHoodie", skin_mesh("hoodie", c.v, c.e, c.r), TORSO + ["neck"])
+        hoodie = skin_mesh("hoodie", c.v, c.e, c.r)
+        # the front pocket sits on the hoodie (it hung 2 cm off it): between the front's middle and its sides, so neither floats
+        pocket_y = 0.5 * (front_of(hoodie, 0.0, 1.06) + max(front_of(hoodie, -0.09, 1.06), front_of(hoodie, 0.09, 1.06))) + 0.003
+        piece("BodyHoodie", hoodie, TORSO + ["neck"])
         h = Chain()                                                     # the hood lying down at the back of the neck
         a = h.add((0, 0.075, 1.43), (0.1, 0.05))
         h.add((0, 0.1, 1.5), (0.09, 0.045), a)
         piece("BodyHoodie", skin_mesh("hood", h.v, h.e, h.r), ["chest", "neck"])
-        card("BodyHoodie", ["hips", "spine"], (0.0, front_of(torso, 0.0, 1.06) - 0.03, 1.06), 0.2, 0.11, 0.012)  # the front pocket
+        card("BodyHoodie", ["hips", "spine"], (0.0, pocket_y, 1.06), 0.2, 0.11, 0.012)  # the front pocket
         for s in (-1, 1):                                               # its drawstrings
             rod("Sclera", ["chest", "neck"], (s * 0.03, -0.075, 1.44), (s * 0.034, -0.12, 1.32), 0.0035)
         # big over-ear headphones: a band over the skull, a cup on each ear
@@ -889,8 +892,23 @@ def preview(rig, acts, path):
     rig.animation_data.action = None
 
 
+def drop_loose():
+    """Vertices without faces (left by the fingers' skin bodies) go: nothing draws them, the model check counts them."""
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        loose = [v for v in bm.verts if not v.link_faces]
+        if loose:
+            bmesh.ops.delete(bm, geom=loose, context="VERTS")
+            bm.to_mesh(obj.data)
+        bm.free()
+
+
 def export(rig):
     os.makedirs(OUT, exist_ok=True)
+    drop_loose()
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"human_{DEPT or 'scientist'}.fbx"), use_selection=True,
                              apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=False,

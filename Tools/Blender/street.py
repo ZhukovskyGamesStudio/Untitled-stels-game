@@ -151,6 +151,39 @@ def noisy(bm, amp, seed):
     return bm
 
 
+def foliage(balls, resolution, seed, amp, target_tris):
+    """A leaf mass from overlapping balls [(centre, radius)]: a metaball cloud (the balls melt into one lumpy crown, no
+    seams where they meet), turned into a mesh, roughened along its normals and decimated to about target_tris."""
+    mb = bpy.data.metaballs.new("crown")
+    mb.resolution = resolution
+    mb.render_resolution = resolution
+    mb.threshold = 0.6
+    for c, r in balls:
+        e = mb.elements.new()
+        e.co = Vector(c)
+        e.radius = r * 1.35                                 # (the threshold shrinks a lone ball to about 3/4 of its radius)
+        e.stiffness = 2.0
+    obj = bpy.data.objects.new("crown", mb)
+    bpy.context.collection.objects.link(obj)
+    bpy.context.view_layer.update()
+    me = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(obj)
+    bpy.data.metaballs.remove(mb)
+    tmp = bpy.data.objects.new("crown_mesh", me)
+    bpy.context.collection.objects.link(tmp)
+    dec = tmp.modifiers.new("dec", "DECIMATE")
+    dec.ratio = min(1.0, target_tris / max(1, len(me.polygons) * 2))
+    bpy.context.view_layer.update()
+    me2 = bpy.data.meshes.new_from_object(tmp.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bpy.data.objects.remove(tmp)
+    bm = bmesh.new()
+    bm.from_mesh(me2)
+    bpy.data.meshes.remove(me)
+    bpy.data.meshes.remove(me2)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    return noisy(bm, amp, seed)
+
+
 def ico(radius, loc, subdiv=2):
     bm = bmesh.new()
     bmesh.ops.create_icosphere(bm, subdivisions=subdiv, radius=radius)
@@ -201,11 +234,17 @@ def tree(seed, height, crown, blobs, lean=(0.0, 0.0)):
         mid = top.lerp(end, 0.5) + Vector((0, 0, 0.15))
         p.add("Bark", s.tube([tuple(top - Vector((0, 0, 0.25))), tuple(mid), tuple(end)], 0.07, res=1, segments_per=4,
                              radii=[1.0, 0.75, 0.5]))
+    # the crown: a cluster of leaf masses round every limb's end and a big one over the top, melted into one cloud
+    balls = [((top.x, top.y, height + crown * 0.8), crown * 0.62)]
     for k, end in enumerate(ends):
-        r = crown * rnd.uniform(0.42, 0.58)
-        p.add("Leaves", noisy(ico(r, tuple(end + Vector((0, 0, r * 0.25)))), r * 0.07, seed + k))
-    r = crown * 0.62
-    p.add("Leaves", noisy(ico(r, (top.x, top.y, height + crown * 0.85)), r * 0.08, seed + 17))
+        r = crown * rnd.uniform(0.34, 0.46)
+        balls.append((tuple(end + Vector((0, 0, r * 0.2))), r))
+        for j in range(3):                                   # smaller lumps round it, outwards and up: a ragged edge
+            a = rnd.uniform(0, 2 * math.pi)
+            out = (end - top).normalized() if (end - top).length > 1e-3 else Vector((0, 0, 1))
+            d = (out + Vector((math.cos(a), math.sin(a), rnd.uniform(-0.2, 0.7))) * 0.8).normalized()
+            balls.append((tuple(end + d * r * rnd.uniform(0.6, 0.9)), r * rnd.uniform(0.45, 0.65)))
+    p.add("Leaves", foliage(balls, crown * 0.08, seed, crown * 0.03, 2600))
     # the pit: soil a little under the grate, the grate's frame and its radial bars
     p.add("Soil", box(-0.58, 0.58, -0.58, 0.58, -0.05, 0.006, r=0.0))
     p.add("Metal", [box(-0.62, 0.62, -0.62, -0.54, 0.0, 0.02, r=0.004), box(-0.62, 0.62, 0.54, 0.62, 0.0, 0.02, r=0.004),
@@ -356,9 +395,12 @@ def m_planter():
     p = Parts()
     p.add("Concrete", s.rbox((1.2, 0.6, 0.5), (0, 0, 0.25), r=0.03, seg=2, taper=(1.06, 1.1)))
     p.add("Soil", box(-0.56, 0.56, -0.26, 0.26, 0.4, 0.505, r=0.0))
-    for k, x in enumerate((-0.33, 0.0, 0.33)):
-        r = 0.32 + 0.04 * (k % 2)
-        p.add("Leaves", noisy(ico(r, (x, 0, 0.72)), 0.03, 5 + k))
+    balls = []
+    for k, x in enumerate((-0.36, -0.12, 0.12, 0.36)):        # a trimmed shrub: a row of lumps melted into one hedge
+        r = 0.26 + 0.04 * (k % 2)
+        balls.append(((x, 0.02 * (k % 3 - 1), 0.62 + 0.04 * (k % 2)), r))   # sunk into the soil: it grows out of it
+        balls.append(((x * 0.9, -0.12 + 0.24 * (k % 2), 0.78), r * 0.6))
+    p.add("Leaves", foliage(balls, 0.04, 5, 0.01, 1400))
     p.finish(sharp=60)
     return export("planter")
 
