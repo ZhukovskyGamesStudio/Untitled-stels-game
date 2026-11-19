@@ -68,6 +68,8 @@ namespace Stealth.Audio
         public AudioClip DoorOpen, DoorShut;
         [Tooltip("Ticks while a player works at something with E held: hacking (a robot, a terminal), picking a lock, unscrewing a grille.")]
         public AudioClip WorkHack, WorkPick, WorkScrew;
+        [Tooltip("The car's shredder biting into a thing (one per thing, CarShredder).")]
+        public AudioClip Grind;
         [Tooltip("A restroom's hand dryer running (4 s, loud: robots come to check).")]
         public AudioClip HandDryer;
 

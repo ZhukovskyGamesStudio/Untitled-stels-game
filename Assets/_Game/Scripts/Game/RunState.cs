@@ -46,6 +46,8 @@ namespace Stealth.Game
         public float HatchCountdown = 5f;
         [Tooltip("Seconds the car must stand in a tunnel before the team goes (the countdown on the HUD).")]
         public float VoteDelay = 3f;
+        [Tooltip("Reinforcements: seconds from the house's start to the first extra robot coming in, then to the second, then between every one after (forever).")]
+        public float ReinforceFirst = 180f, ReinforceSecond = 120f, ReinforceEvery = 60f;
         [Tooltip("The shortest drive to the next house, seconds, before the car changes into the basement's approach (GameManager.Arrival, Level.DrivePath): the house is built meanwhile, a slow build makes it longer.")]
         public float DriveTime = 6.5f;
         [Tooltip("Seconds of warning before the run ends when the team cannot get the fuel for any way on.")]

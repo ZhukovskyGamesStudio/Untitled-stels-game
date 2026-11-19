@@ -7,7 +7,8 @@ Look: blender.exe -b --factory-startup --python Tools/Blender/review.py -- sheet
 
 Conventions (generate_models): metres, front faces Blender -Y (Unity +Z: the operator's side), z up, origin on the floor
 in the middle of the footprint (a desk's: 1.6 x 0.8 — both replace a desk of the plan). Parts: Body (the furniture),
-Accent (keys, stands, trims), Eye (every screen and lamp in ONE part: SecurityTerminal tints it by the terminal's kind).
+Accent (keys, stands, trims), Eye (the buttons and lamps: SecurityTerminal tints them by the terminal's kind), EyeScreen
+(the monitors' screens, each UV-mapped 0..1 on its own: SecurityTerminal shows the kind's picture on them).
 """
 import math
 import os
@@ -20,7 +21,19 @@ import shapes as s  # noqa: E402
 DESK_TOP = 0.76
 
 
-def _monitor(cx, cy, yaw, body, accent, eye, w=0.54, h=0.33):
+def screen_uvs(obj, frames):
+    """Each screen's own 0..1 UVs: a vertex takes the frame (centre, right, up, width, height) of the nearest screen."""
+    from mathutils import Vector
+    me = obj.data
+    uv = me.uv_layers.active.data
+    for loop in me.loops:
+        p = obj.matrix_world @ me.vertices[loop.vertex_index].co
+        c, r, u, w, h = min(frames, key=lambda f: (p - Vector(f[0])).length)
+        d = p - Vector(c)
+        uv[loop.index].uv = (d.dot(Vector(r)) / w + 0.5, d.dot(Vector(u)) / h + 0.5)
+
+
+def _monitor(cx, cy, yaw, body, accent, eye, w=0.54, h=0.33, frames=None):
     """A flat monitor on a stand, its screen to -Y turned by yaw (degrees, about z) round its own stand."""
     a = math.radians(yaw)
     fx, fy = math.sin(a), -math.cos(a)              # the screen's facing in plan
@@ -30,13 +43,16 @@ def _monitor(cx, cy, yaw, body, accent, eye, w=0.54, h=0.33):
     accent.append(s.rcyl(0.018, 0.13, (cx, cy, DESK_TOP + 0.075), seg=10, r=0.004))                           # neck
     body.append(s.rbox((w, 0.035, h), (cx, cy, z), r=0.008, seg=2, rot=rot))                                    # the case
     # the screen: 4 mm proud of the case's front, inside its bezel
-    eye.append(s.rbox((w - 0.04, 0.004, h - 0.04), (cx + fx * 0.0195, cy + fy * 0.0195, z), r=0.002, seg=1, rot=rot))
+    centre = (cx + fx * 0.0195, cy + fy * 0.0195, z)
+    eye.append(s.rbox((w - 0.04, 0.004, h - 0.04), centre, r=0.002, seg=1, rot=rot))
+    if frames is not None:
+        frames.append((centre, (-fy, fx, 0.0), (0.0, 0.0, 1.0), w - 0.04, h - 0.04))  # right: the viewer's, looking at it
 
 
 def model_terminal_console():
     """The robots' control console: a steel desk on two pedestals, three monitors in an arc at its back, a keyboard, a
     console panel of chunky buttons and a joystick to the right, a cable trunk at the back; screens in one Eye part."""
-    body, accent, eye = [], [], []
+    body, accent, eye, screens, frames = [], [], [], [], []
     body.append(s.rbox((1.6, 0.8, 0.04), (0, 0, DESK_TOP - 0.02), r=0.01, seg=2))                  # top
     for x in (-0.58, 0.58):
         body.append(s.rbox((0.42, 0.72, DESK_TOP - 0.06), (x, 0.02, (DESK_TOP - 0.04) / 2), r=0.012, seg=2))   # pedestals
@@ -44,7 +60,7 @@ def model_terminal_console():
         accent.append(s.rbox((0.36, 0.01, 0.012), (x, -0.345, 0.24), r=0.003, seg=1))
     body.append(s.rbox((0.74, 0.02, 0.4), (0, 0.36, 0.42), r=0.004, seg=1))                         # modesty panel
     for x, y, yaw in ((-0.5, 0.18, -22), (0.0, 0.24, 0), (0.5, 0.18, 22)):
-        _monitor(x, y, yaw, body, accent, eye)
+        _monitor(x, y, yaw, body, accent, screens, frames=frames)
     accent.append(s.rbox((0.46, 0.15, 0.022), (-0.08, -0.2, DESK_TOP + 0.011), r=0.006, seg=2))     # keyboard
     for k in range(10):
         for j in range(3):
@@ -61,6 +77,7 @@ def model_terminal_console():
     s.part("Body", body)
     s.part("Accent", accent)
     s.part("Eye", eye)
+    screen_uvs(s.part("EyeScreen", screens), frames)
     return rs.export("terminal_console")
 
 
@@ -81,7 +98,10 @@ def model_terminal_access():
         y, z = -0.06 - d / 2, dz                                     # in the head's own frame (front face at y = -0.06)
         yy, zz = y * math.cos(th) - z * math.sin(th), y * math.sin(th) + z * math.cos(th)
         return s.rbox((w, d, h), (dx, yy, head_z + zz), r=0.004, seg=1, rot=tilt)
-    eye.append(face(0.07, 0.38, 0.17, 0.008))                                                       # the screen
+    screen = face(0.07, 0.38, 0.17, 0.008)                                                          # the screen
+    y0, z0 = -0.06 - 0.004, 0.07
+    frame = ((0.0, y0 * math.cos(th) - z0 * math.sin(th), head_z + y0 * math.sin(th) + z0 * math.cos(th)),
+             (1.0, 0.0, 0.0), (0.0, -math.sin(th), math.cos(th)), 0.38, 0.17)
     for k in range(3):
         for j in range(3):
             accent.append(face(-0.07 - j * 0.035, 0.03, 0.025, 0.012, dx=-0.09 + k * 0.04))         # keypad
@@ -92,6 +112,7 @@ def model_terminal_access():
     s.part("Body", body)
     s.part("Accent", accent)
     s.part("Eye", eye)
+    screen_uvs(s.part("EyeScreen", [screen]), [frame])
     return rs.export("terminal_access")
 
 

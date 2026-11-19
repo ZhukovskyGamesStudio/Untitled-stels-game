@@ -274,7 +274,7 @@ namespace Stealth.Tests
             Assert.IsEmpty(RobotRoster.Newcomers(roster.Robots, 0), "the first house has no showcase");
             var second = RobotRoster.Newcomers(roster.Robots, 1);
             CollectionAssert.Contains(second, RobotKind.Spider);
-            CollectionAssert.Contains(second, RobotKind.Sweeper);
+            Assert.IsTrue(RobotRoster.IsUnlocked(RobotKind.Sweeper, 0, roster), "sweepers patrol from the first house");
             // the shared second house
             {
                 var l = TestHouses.Get(7, 1);
@@ -292,6 +292,24 @@ namespace Stealth.Tests
                     Assert.AreEqual((shape, color), Detector.DecodeCargo(Detector.EncodeCargo(shape, color)));
         }
     
+        [Test]
+        public void ReinforcementsComeInAtThreeThenTwoThenEveryMinute()
+        {
+            Assert.AreEqual(0, RobotRoster.ReinforcementsDue(179f, 180f, 120f, 60f));
+            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(180f, 180f, 120f, 60f), "3 minutes in");
+            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(299f, 180f, 120f, 60f));
+            Assert.AreEqual(2, RobotRoster.ReinforcementsDue(300f, 180f, 120f, 60f), "2 minutes after the first");
+            Assert.AreEqual(3, RobotRoster.ReinforcementsDue(360f, 180f, 120f, 60f), "then one a minute");
+            Assert.AreEqual(12, RobotRoster.ReinforcementsDue(900f, 180f, 120f, 60f), "for good");
+            var table = RobotRoster.DefaultRobots();
+            for (int i = 0; i < 200; i++)
+            {
+                var k = RobotRoster.PickReinforcement(table, 5, new System.Random(i));
+                Assert.AreNotEqual(RobotKind.Worker, k, "never a harmless one");
+                Assert.IsFalse(RobotRoster.IsDevice(k));
+            }
+        }
+
         [Test]
         public void TheSpidersWebIsAMazeOfSheetsAwayFromTheDoors()
         {

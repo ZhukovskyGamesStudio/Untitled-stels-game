@@ -228,6 +228,7 @@ namespace Stealth.Level
                 b.name = $"Branch{i}";
                 b.transform.localPosition = at; // +X leads into it
                 b.transform.localRotation = mouth.rotation;
+                foreach (var light in b.GetComponentsInChildren<Light>(true)) light.intensity *= 0.45f; // the way on lies in the dark
                 Stealth.UI.RouteSignView sign = null;
                 if (SignPrefab != null)
                 {

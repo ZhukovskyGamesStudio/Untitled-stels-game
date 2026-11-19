@@ -12,6 +12,8 @@ namespace Stealth.Player
         UseHand,
         // the team's storage robot: come to me; go to the exit through the ducts
         BotCall, BotExit,
+        // knocked out: call the team (seen through walls)
+        CallHelp,
     }
 
     /// <summary>
@@ -99,6 +101,7 @@ namespace Stealth.Player
             new(GameAction.UseHand, "actions", KeyBinding.Of(Key.V)),
             new(GameAction.BotCall, "team", KeyBinding.Of(Key.B)),
             new(GameAction.BotExit, "team", KeyBinding.Of(Key.N)),
+            new(GameAction.CallHelp, "team", KeyBinding.Of(Key.Z)),
         };
 
         const string Prefix = "stealth.key.";

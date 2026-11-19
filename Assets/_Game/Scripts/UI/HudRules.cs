@@ -243,6 +243,7 @@ namespace Stealth.UI
             if (c.Downed)
             {
                 if (c.Watching) into.Add(new Hint(Lmb, Rmb, Loc.T("hint.watch_next")));
+                if (c.Watching) into.Add(new Hint(K(GameAction.CallHelp), Loc.T("hint.call_help")));
                 else if (c.Hp > 0 && c.CanGetUp) into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.get_up")));
                 return into;
             }

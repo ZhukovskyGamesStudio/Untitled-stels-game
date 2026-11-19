@@ -687,6 +687,19 @@ def work_screw():
     return fade(mix(at(click(1600), 0.0, d), at(click(1700), 0.045, d), at(click(1550), 0.09, d), at(squeak, 0.12, d)))
 
 
+def grind():
+    """The car's shredder biting into a thing: a crunch of breaking, metal scraping on metal, a whine of the blades."""
+    rnd = np.random.default_rng(0x6A1D)                     # its own stream: the other sounds stay as they are
+    d = 0.75
+    crunch = bandpass(rnd.standard_normal(int(d * SR)), 300, 2400) * env(int(d * SR), 0.005, 0.5)
+    for k in range(7):                                      # bits breaking off
+        t = 0.04 + k * 0.085 + rnd.uniform(0, 0.03)
+        crunch += at(highpass(rnd.standard_normal(int(0.03 * SR)), 1800) * env(int(0.03 * SR), 0.0005, 0.012, curve=6) * 1.6, t, d)
+    whine = (np.sin(2 * np.pi * np.cumsum(np.linspace(380, 520, int(d * SR))) / SR) * 0.25
+             * env(int(d * SR), 0.02, 0.6))
+    return fade(mix(crunch * 0.8, whine))
+
+
 def door_open():
     """A hinged door opening: the handle's latch clicks back, then a short dry creak of the hinges and the air it moves."""
     d = 0.6
@@ -995,6 +1008,7 @@ def main():
     write(P("Items", "work_screw"), work_screw(), 0.6)
     write(P("Environment", "door_open"), door_open(), 0.6)
     write(P("Environment", "door_shut"), door_shut(), 0.7)
+    write(P("Car", "grind"), grind(), 0.8)  # (last, with its own stream: the sounds above keep theirs)
 
 
 if __name__ == "__main__":

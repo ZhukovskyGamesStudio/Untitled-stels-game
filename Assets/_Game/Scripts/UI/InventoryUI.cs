@@ -204,7 +204,7 @@ namespace Stealth.UI
             Board.Show(on);
             if (!on) return;
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
-            bool burn = GameManager.Instance.Stash == Stash;
+            bool burn = GameManager.Instance.Stash == Stash && GameManager.Instance.CanBurnAt(me.transform.position); // (the storage robot's crate: no fire)
             if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)

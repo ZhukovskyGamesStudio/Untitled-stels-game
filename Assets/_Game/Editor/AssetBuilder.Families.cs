@@ -219,7 +219,7 @@ namespace Stealth.EditorTools
             screen.SetColor("_BaseColor", new Color(0.02f, 0.04f, 0.035f));
             screen.SetFloat("_Smoothness", 0.85f);
             screen.EnableKeyword("_EMISSION");
-            screen.SetColor("_EmissionColor", new Color(0.25f, 1f, 0.75f) * 1.2f);
+            screen.SetColor("_EmissionColor", new Color(0.25f, 1f, 0.75f) * 0.36f); // decor: a faint glow, never drawing the eye
             screen.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
             EditorUtility.SetDirty(screen);
             s_Kit["Dr_Screen"] = screen;
@@ -244,8 +244,8 @@ namespace Stealth.EditorTools
                 s_Kit[name] = m;
                 return m;
             }
-            ScreenImage("Dr_ScreenText", "screen_terminal", 1.5f);
-            ScreenImage("Dr_ScreenStatic", "screen_static", 1.1f);
+            ScreenImage("Dr_ScreenText", "screen_terminal", 0.45f);
+            ScreenImage("Dr_ScreenStatic", "screen_static", 0.33f);
             var glass = LitAsset($"{KitMaterialsDir}/Dr_Glass.mat");
             glass.SetColor("_BaseColor", new Color(0.015f, 0.018f, 0.02f));
             glass.SetFloat("_Smoothness", 0.92f);

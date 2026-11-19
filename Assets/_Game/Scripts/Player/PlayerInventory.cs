@@ -350,7 +350,9 @@ namespace Stealth.Player
             if (ItemCatalog.Unburnable(e.Shape)) return;
             m_Items.RemoveAt(index);
             Changed();
-            game.BurnServer(GetComponent<PlayerController>(), e.Value);
+            // at the car it goes into the shredder (fuel once chewed); in the entry hatch it burns at once
+            if (game.AtCar(transform.position)) game.GrindServer(GetComponent<PlayerController>(), e.Shape, e.Color);
+            else game.BurnServer(GetComponent<PlayerController>(), e.Value);
         }
 
         /// <summary>Server: a battery recharges a flashlight below full charge and is used up.</summary>
@@ -403,6 +405,20 @@ namespace Stealth.Player
             var gm = GameManager.Instance;
             stash = CanAct && gm != null ? gm.StashAt(transform.position) : null;
             return stash != null;
+        }
+
+        /// <summary>Server, the car's hopper: every piece of loot leaves the backpack into <paramref name="into"/> (tools stay).</summary>
+        public void TakeLootServer(List<(byte shape, byte color)> into)
+        {
+            bool any = false;
+            for (int i = m_Items.Count - 1; i >= 0; i--)
+            {
+                if (ItemCatalog.IsTool(m_Items[i].Shape)) continue;
+                into.Add((m_Items[i].Shape, m_Items[i].Color));
+                m_Items.RemoveAt(i);
+                any = true;
+            }
+            if (any) Changed();
         }
 
         /// <summary>Server, the car's hopper: every piece of loot in the backpack becomes fuel (tools stay). Returns the fuel.</summary>
@@ -494,8 +510,10 @@ namespace Stealth.Player
             var game = GameManager.Instance;
             if (!InReach(item) || game == null || !game.CanBurnAt(transform.position) || ItemCatalog.Unburnable(item.Shape)) return;
             int fuel = item.Value;
+            byte shape = item.Shape, color = item.Color;
             Session.Despawn(item.gameObject);
-            game.BurnServer(GetComponent<PlayerController>(), fuel);
+            if (game.AtCar(transform.position)) game.GrindServer(GetComponent<PlayerController>(), shape, color);
+            else game.BurnServer(GetComponent<PlayerController>(), fuel);
         }
 
         /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>

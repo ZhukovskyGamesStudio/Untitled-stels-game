@@ -108,7 +108,7 @@ namespace Stealth.UI
                     Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, new Color(0.8f, 1f, 0.25f), null, IconShape.Diamond, 1f, 0f);
                     continue;
                 }
-                if (p.Kind != PingKind.Here) continue;
+                if (p.Kind is not (PingKind.Here or PingKind.Help)) continue;
                 var color = PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.Owner));
                 float pulse = 1f + 0.25f * Mathf.Sin(p.Age(now) * 8f);
                 Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, color, null, IconShape.Diamond, pulse, 0f);

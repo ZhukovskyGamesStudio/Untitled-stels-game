@@ -252,6 +252,7 @@ namespace Stealth.EditorTools
                     PaintTrim(go, trim);
                     if (kind == PropKind.HandDryer) DressDryer(go);
                     if (Opens.Contains(kind)) go.AddComponent<Stealth.Items.Storage>();
+                    if (kind == PropKind.ChargingDock) go.AddComponent<Stealth.Level.ChargingDock>(); // its glow pulses while a robot charges
                     if (kind == PropKind.TallBookcase) ShelfBooks(go); // its books differ every time
                     if (kind == PropKind.HallHooks) HookGarments(go, "hall_hooks_bare");
                     return go;

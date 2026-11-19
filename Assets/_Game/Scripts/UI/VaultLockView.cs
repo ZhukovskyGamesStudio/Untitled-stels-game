@@ -6,8 +6,9 @@ using UnityEngine.UI;
 namespace Stealth.UI
 {
     /// <summary>
-    /// The vault's switch and sequence locks on screen (prefab UI/HUD): a row of lamps with their number keys under
-    /// them, progress dots for the sequence, a red flash on a wrong press, the keys to use. Rules:
+    /// The vault's switch and sequence locks on screen (prefab UI/HUD): a row of glass lamps in chrome bezels — a lit one
+    /// glows and throws a halo, and lamps fade up fast and down slowly like real bulbs — with a key cap under each, the
+    /// sequence's progress as LEDs, a red flash on a wrong press, the keys to use. The panel pops in. Rules:
     /// <see cref="Items.SwitchPuzzle"/>, <see cref="Items.SequenceLock"/>; input: <see cref="PlayerController.AtConsole"/>;
     /// this only shows it. (The dial lock is the safe's own screen.)
     /// </summary>
@@ -15,17 +16,24 @@ namespace Stealth.UI
     {
         public GameObject Root;
         public Text Title;
-        [Tooltip("Lamps in a row (as many as the biggest lock has; the extra ones are hidden).")]
+        [Tooltip("A lamp's place (the lens, bezel, halo and key cap are its children); as many as the biggest lock has.")]
+        public RectTransform[] Slots;
+        [Tooltip("The lamps' glass lenses (tinted off / on).")]
         public Image[] Lamps;
+        public Image[] Halos;
         public Text[] Keys;
-        [Tooltip("The sequence's progress: one dot per step.")]
-        public Image[] Dots;
+        [Tooltip("The sequence's progress: one LED per step, a glow under each.")]
+        public Image[] Dots, DotGlows;
         public Image Flash;
         public Text Hint;
-        public float LampSpacing = 84f;
+        public float LampSpacing = 100f;
 
-        static readonly Color Off = new(0.16f, 0.17f, 0.19f, 1f), On = new(1f, 0.82f, 0.3f), Done = new(0.35f, 1f, 0.5f), Red = new(1f, 0.25f, 0.18f);
+        static readonly Color Off = new(0.17f, 0.18f, 0.21f, 1f), On = new(1f, 0.8f, 0.32f), Done = new(0.35f, 1f, 0.5f), Red = new(1f, 0.25f, 0.18f),
+            LedOff = new(0.22f, 0.24f, 0.27f);
         int m_HintControls = -1, m_HintLoc = -1, m_HintKeys = -1;
+        float[] m_Glow;
+        float m_OpenedAt;
+        bool m_WasShown;
 
         void Update()
         {
@@ -34,27 +42,48 @@ namespace Stealth.UI
             var sequence = me != null ? me.Sequence : null;
             bool shown = switches != null || sequence != null;
             Ui.Show(Root, shown);
-            if (!shown) return;
-            int count = switches != null ? switches.Count : sequence.Lamps;
+            if (!shown) { m_WasShown = false; return; }
             float now = Time.time;
+            m_Glow ??= new float[Slots.Length];
+            if (!m_WasShown)
+            {
+                m_WasShown = true;
+                m_OpenedAt = now;
+                System.Array.Clear(m_Glow, 0, m_Glow.Length);
+            }
+            float open = Mathf.Clamp01((now - m_OpenedAt) / 0.18f);
+            Root.transform.localScale = Vector3.one * Mathf.Lerp(0.9f, 1f, 1f - (1f - open) * (1f - open));
+
+            int count = switches != null ? switches.Count : sequence.Lamps;
             int lit = sequence != null ? sequence.Shown(now) : -1;
-            for (int i = 0; i < Lamps.Length; i++)
+            float spacing = Mathf.Min(LampSpacing, 520f / Mathf.Max(1, count));
+            for (int i = 0; i < Slots.Length; i++)
             {
                 bool used = i < count;
-                Ui.Show(Lamps[i], used);
-                Ui.Show(Keys[i], used);
+                Ui.Show(Slots[i], used);
                 if (!used) continue;
-                Lamps[i].rectTransform.anchoredPosition = new Vector2((i - (count - 1) / 2f) * LampSpacing, 14f);
-                Keys[i].rectTransform.anchoredPosition = new Vector2((i - (count - 1) / 2f) * LampSpacing, -46f);
-                Lamps[i].color = switches != null ? (switches.Lit(i) ? On : Off) : (i == lit ? On : Off);
+                Slots[i].anchoredPosition = new Vector2((i - (count - 1) / 2f) * spacing, Slots[i].anchoredPosition.y);
+                bool on = switches != null ? switches.Lit(i) : i == lit;
+                // a bulb: up fast, down slowly
+                m_Glow[i] = Mathf.MoveTowards(m_Glow[i], on ? 1f : 0f, Time.deltaTime * (on ? 14f : 4f));
+                float g = m_Glow[i];
+                float flicker = 1f + 0.04f * Mathf.Sin(now * 31f + i * 1.7f) * g;
+                Lamps[i].color = Color.Lerp(Off, On, g) * flicker;
+                Halos[i].color = new Color(On.r, On.g, On.b, 0.75f * g);
+                Halos[i].rectTransform.localScale = Vector3.one * (0.85f + 0.15f * g);
             }
             for (int i = 0; i < Dots.Length; i++)
             {
                 bool used = sequence != null && i < sequence.Length;
                 Ui.Show(Dots[i], used);
+                Ui.Show(DotGlows[i], used);
                 if (!used) continue;
-                Dots[i].rectTransform.anchoredPosition = new Vector2((i - (sequence.Length - 1) / 2f) * 22f, -90f);
-                Dots[i].color = i < sequence.Done ? Done : sequence.Playing(now) ? new Color(1f, 1f, 1f, 0.15f) : new Color(1f, 1f, 1f, 0.4f);
+                var at = new Vector2((i - (sequence.Length - 1) / 2f) * 26f, Dots[i].rectTransform.anchoredPosition.y);
+                Dots[i].rectTransform.anchoredPosition = at;
+                DotGlows[i].rectTransform.anchoredPosition = at;
+                bool done = i < sequence.Done, next = i == sequence.Done && !sequence.Playing(now);
+                Dots[i].color = done ? Done : next ? Color.Lerp(LedOff, On, 0.5f + 0.5f * Mathf.Sin(now * 6f)) : LedOff;
+                DotGlows[i].color = done ? new Color(Done.r, Done.g, Done.b, 0.5f) : Color.clear;
             }
             float age = now - me.ConsoleWrongTime;
             bool wrong = age < 0.45f;

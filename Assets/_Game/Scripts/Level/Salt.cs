@@ -15,7 +15,7 @@ namespace Stealth.Level
         public const int Railings = 0x57A1, StairLooks = 0x57A3, PropVariants = 0x7A21, SpiderWebs = 0x5E8;
         // the special places and the main job
         public const int ShelterMap = 0x3A9E, HideRoom = 0x41DE, KeyDoors = 0x6E7D, Crates = 0xC7A7, CrateContents = 0xC7A8;
-        public const int PointOfInterest = 0x9017, Wardens = 0x3A7D;
+        public const int PointOfInterest = 0x9017, Wardens = 0x3A7D, Reinforcements = 0x4E1F;
         public const int Objective = 0x0B7E, ObjectiveFinish = 0x0B81, VaultTreasure = 0x0B82;
         public const int SafeCode = 0x5AFE, VaultConsoleCode = 0x0C05;
         // the sewer

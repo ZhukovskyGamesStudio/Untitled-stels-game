@@ -79,7 +79,7 @@ namespace Stealth.Level
             var p = new SewerPlan
             {
                 LampColor = Palette[rng.Next(Palette.Length)],
-                LampIntensity = 7f + (float)rng.NextDouble() * 3f,
+                LampIntensity = 3.2f + (float)rng.NextDouble() * 1.4f, // dim: pools of light, the dark between them
             };
             bool afterHouse = depth >= 0;
             int behind = 2 + rng.Next(2);           // the car's stretch

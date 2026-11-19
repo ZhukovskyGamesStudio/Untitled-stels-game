@@ -333,17 +333,20 @@ def thumper(L):
     P.add("Eye", L.box((.22, .04, .05), (0, -.47, .5), r=.015))                                 # mouth slit
     for sx in (-1, 1):
         P.add("Accent", L.box((.08, .05, .1), (sx * .07, -.47, .44), r=.02))                   # mouth plates
-    # walking legs: up from the hip to a knee above the shell, down and out, the last joint hooking onto the floor
+    # walking legs: up from the hip to a knee above the shell, down and out, the last joint hooking onto the floor — each a
+    # thigh (AccentLeg{n}Upper: hip to knee) and a shin (AccentLeg{n}Lower: knee to the tip): ProceduralLegs plants the tips
+    n = 0
     for sx in (-1, 1):
         for y in (-.22, .02, .25, .46):
             hip = V((sx * .46, y, .5))
             knee = V((sx * .5, y * 1.15, .98))
             ankle = V((sx * .655, y * 1.35, .5))
             tip = V((sx * .62, max(-.66, min(.66, y * 1.45)), .02))
-            P.add("Accent", L.chain([hip, knee + (hip - knee).normalized() * .02], [.055, .045], flat=.8, seg=10))
-            P.add("Accent", L.chain([knee + (ankle - knee).normalized() * .02, ankle], [.045, .035], flat=.8, seg=10))
-            P.add("Accent", L.chain([ankle, tip], [.035, .012], flat=.8, seg=8))
-            P.add("Accent", L.ellipsoid(knee, (.068, .062, .06), seg=10))
+            P.add(f"AccentLeg{n}Upper", L.chain([hip, knee + (hip - knee).normalized() * .02], [.055, .045], flat=.8, seg=10))
+            P.add(f"AccentLeg{n}Upper", L.ellipsoid(knee, (.068, .062, .06), seg=10))
+            P.add(f"AccentLeg{n}Lower", L.chain([knee + (ankle - knee).normalized() * .02, ankle], [.045, .035], flat=.8, seg=10))
+            P.add(f"AccentLeg{n}Lower", L.chain([ankle, tip], [.035, .012], flat=.8, seg=8))
+            n += 1
     # great claws pressing the pads
     for sx in (-1, 1):
         x = sx * .3

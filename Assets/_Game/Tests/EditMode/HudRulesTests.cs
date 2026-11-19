@@ -193,7 +193,10 @@ namespace Stealth.Tests
             c.CanGetUp = false;
             CollectionAssert.IsEmpty(Hints(c), "out cold: nothing to press");
             c.Watching = true;
-            Assert.IsTrue(Hints(c).Single().Key.IsMouse, "switch whose eyes");
+            var watching = Hints(c).ToList();
+            Assert.AreEqual(2, watching.Count, "switch whose eyes, call for help");
+            Assert.IsTrue(watching.Exists(h => h.Key.IsMouse), "switch whose eyes");
+            Assert.IsTrue(watching.Exists(h => h.Key.Equals(Controls.Get(GameAction.CallHelp))), "call for help");
             var menu = Idle;
             menu.MenuOpen = true;
             menu.CanRevive = true;

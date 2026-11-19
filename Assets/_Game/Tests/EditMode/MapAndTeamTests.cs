@@ -279,6 +279,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void AKnockedOutPlayerCallsForHelpOnceAtATime()
+        {
+            var board = new PingBoard();
+            Assert.IsFalse(board.Calling(1));
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Help, Position = Vector3.zero, Until = 12f });
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Help, Position = Vector3.zero, Until = 14f });
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Here, Position = Vector3.one, Until = 6f });
+            Assert.IsTrue(board.Calling(1));
+            Assert.IsFalse(board.Calling(2));
+            Assert.AreEqual(1, board.Active.Count(p => p.Kind == PingKind.Help), "a new call replaces the old one");
+            board.Expire(15f);
+            Assert.IsFalse(board.Calling(1), "it lasts a while, then the body is out of sight again");
+        }
+
+        [Test]
         public void CalloutsCannotBeSpammed()
         {
             var board = new PingBoard();

@@ -376,10 +376,12 @@ namespace Stealth.UI
             if (cam != null)
                 foreach (var p in gm.Pings.Active)
                 {
-                    if (p.Kind != PingKind.Here) continue;
+                    if (p.Kind is not (PingKind.Here or PingKind.Help)) continue;
                     var color = PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.Owner));
                     color.a = Mathf.Clamp01(p.Until - now);
-                    Callout(cam, size, p.Position, color, Loc.F("hud.metres", Vector3.Distance(me.transform.position, p.Position)), true, p.Age(now));
+                    // a call for help pulses its ring the whole time it lasts (a ping only as it appears)
+                    float age = p.Kind == PingKind.Help ? Mathf.Repeat(p.Age(now), 1.2f) : p.Age(now);
+                    Callout(cam, size, p.Position, color, Loc.F("hud.metres", Vector3.Distance(me.transform.position, p.Position)), true, age);
                 }
             m_Callouts.End();
         }

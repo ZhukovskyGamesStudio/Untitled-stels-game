@@ -492,104 +492,167 @@ namespace Stealth.EditorTools
             root.gameObject.SetActive(false);
         }
 
+        // ------------------------------------------------------------------ minigames
+
+        static readonly Color MgGold = new(1f, 0.78f, 0.32f), MgEngrave = new(0.22f, 0.14f, 0.03f);
+
+        /// <summary>A minigame picture from <c>Art/Sprites/UI/Minigame</c> (Tools/Art/generate_minigame_ui.py), 9-sliced when a border is given.</summary>
+        static Sprite MgSprite(string name, int border = 0)
+        {
+            var path = $"{SpritesDir}/UI/Minigame/{name}.png";
+            if (AssetImporter.GetAtPath(path) is not TextureImporter importer)
+            {
+                Debug.LogWarning($"[Builder] {path} missing: run python Tools/Art/generate_minigame_ui.py");
+                return null;
+            }
+            var want = new Vector4(border, border, border, border);
+            if (importer.textureType != TextureImporterType.Sprite || importer.mipmapEnabled || !importer.alphaIsTransparency || importer.spriteBorder != want)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.alphaIsTransparency = true;
+                importer.spriteBorder = want;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        static Image Sliced(Image i)
+        {
+            i.type = Image.Type.Sliced;
+            return i;
+        }
+
+        /// <summary>A minigame panel: a soft shadow under it, the gunmetal plate with screws, a red flash over it, a brass name plate on top.</summary>
+        static (RectTransform root, Image flash, Text title) MinigamePanel(Transform holder, Vector2 pos, Vector2 size, string title, float plateWidth)
+        {
+            Img(R(holder, "Shadow", Center, Center, pos + new Vector2(0, -14), size + new Vector2(120, 120)), new Color(0, 0, 0, 0.75f), S("SoftGlow"));
+            var root = R(holder, "Panel", Center, Center, pos, size);
+            Sliced(Img(root, Color.white, MgSprite("mg_panel", 48)));
+            var flash = Sliced(Img(Stretch(root, "Flash"), new Color(1f, 0.25f, 0.18f, 0.35f), MgSprite("mg_panel", 48)));
+            var plate = R(root, "Plate", TopCenter, TopCenter, new Vector2(0, -20), new Vector2(plateWidth, 40));
+            Sliced(Img(plate, Color.white, MgSprite("mg_plate", 20)));
+            var text = Txt(Stretch(plate, "Title"), title, 17, TextAnchor.MiddleCenter, MgEngrave, true, shadow: false);
+            var engraved = text.gameObject.AddComponent<Shadow>();      // a light lip under the cut letters
+            engraved.effectColor = new Color(1f, 0.95f, 0.75f, 0.55f);
+            engraved.effectDistance = new Vector2(0f, -1f);
+            return (root, flash, text);
+        }
+
         /// <summary>
-        /// The safe minigame: a rounded panel, a metal dial (bezel, face, ticks and numbers added by the view, a hub with
-        /// a grip), a fixed gold pointer, three code windows, a stethoscope of bars, key hints.
+        /// The safe minigame: a gunmetal panel with a brass plate; three recessed code windows with amber digits and a
+        /// status LED under each; a combination dial — chrome knurled bezel, graphite face with a sunken tick band (ticks
+        /// and numbers added by the view), a fluted knob that turns with it and a fixed gloss over it, the number on its
+        /// cap, a gold pointer; under it an oscilloscope where every click of the dial is a pulse as tall as the dial is close.
         /// </summary>
         static void BuildSafeCrack(UiElements e, Transform content)
         {
             // The view stays active and shows / hides its panel (a component that hides its own object stops updating).
             var holder = R(content, "SafeCrack", Center, Center, Vector2.zero, Vector2.zero);
             var view = holder.gameObject.AddComponent<SafeCrackView>();
-            var root = R(holder, "Panel", Center, Center, new Vector2(0, 6), new Vector2(440, 520));
-            view.Root = root.gameObject;
-            view.Panel = root;
-            var gold = new Color(1f, 0.78f, 0.32f);
-            // a thin gold edge (the panel's own image) around a dark face
-            var edge = Img(root, new Color(gold.r, gold.g, gold.b, 0.45f), S("RoundPanel"));
-            edge.type = Image.Type.Sliced;
-            var back = Img(Stretch(root, "Back", 1.5f), new Color(0.035f, 0.04f, 0.05f, 0.96f), S("RoundPanel"));
-            back.type = Image.Type.Sliced;
+            var all = R(holder, "All", Center, Center, Vector2.zero, Vector2.zero);
+            view.Root = all.gameObject;
+            var (root, flash, _) = MinigamePanel(all, new Vector2(0, 6), new Vector2(470, 640), L("safe.title"), 230);
+            view.Panel = all;
+            view.Flash = flash;
 
-            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(400, 26)), L("safe.title"), 17, TextAnchor.MiddleCenter, gold, true);
-
-            // Code windows.
+            // Code windows with a LED under each.
             view.Slots = new Image[3];
+            view.SlotGlows = new Image[3];
             view.SlotTexts = new Text[3];
+            view.SlotLeds = new Image[3];
             for (int i = 0; i < 3; i++)
             {
-                var slot = R(root, $"Slot{i}", TopCenter, TopCenter, new Vector2((i - 1) * 62f, -66), new Vector2(54, 34));
-                view.Slots[i] = Img(slot, new Color(0.08f, 0.09f, 0.1f, 0.9f), S("RoundPanel"));
-                view.Slots[i].type = Image.Type.Sliced;
-                view.SlotTexts[i] = Txt(Stretch(slot, "Digit"), "", 20, TextAnchor.MiddleCenter, gold, true, shadow: false);
+                var slot = R(root, $"Slot{i}", TopCenter, TopCenter, new Vector2((i - 1) * 86f, -108), new Vector2(72, 50));
+                view.Slots[i] = Sliced(Img(slot, Color.white, MgSprite("mg_window", 20)));
+                view.SlotGlows[i] = Img(R(slot, "Glow", Center, Center, Vector2.zero, new Vector2(90, 70)), new Color(MgGold.r, MgGold.g, MgGold.b, 0.25f), S("SoftGlow"));
+                view.SlotTexts[i] = Txt(Stretch(slot, "Digit"), "", 28, TextAnchor.MiddleCenter, MgGold, true, shadow: false);
+                view.SlotLeds[i] = Img(R(slot, "Led", Center, Center, new Vector2(0, -38), new Vector2(11, 11)), new Color(0.25f, 0.27f, 0.3f), MgSprite("mg_led"));
             }
 
             // The dial.
-            var face = R(root, "Dial", Center, Center, new Vector2(0, 10), new Vector2(276, 276));
-            Img(R(face, "Shadow", Center, Center, new Vector2(0, -6), new Vector2(300, 300)), new Color(0, 0, 0, 0.6f), S("SoftGlow"));
-            view.Ring = Img(R(face, "Ring", Center, Center, Vector2.zero, new Vector2(300, 300)), new Color(0.35f, 1f, 0.5f, 0.8f), S("Ring"));
-            Img(R(face, "Bezel", Center, Center, Vector2.zero, new Vector2(276, 276)), new Color(0.82f, 0.82f, 0.86f, 1f), S("DialBezel"));
-            Img(R(face, "Face", Center, Center, Vector2.zero, new Vector2(236, 236)), new Color(0.13f, 0.14f, 0.16f, 1f), S("DialFace"));
+            var face = R(root, "Dial", Center, Center, new Vector2(0, -6), new Vector2(262, 262));
+            Img(R(face, "Shadow", Center, Center, new Vector2(0, -10), new Vector2(350, 350)), new Color(0, 0, 0, 0.8f), S("SoftGlow"));
+            view.Ring = Img(R(face, "Ring", Center, Center, Vector2.zero, new Vector2(336, 336)), new Color(0.35f, 1f, 0.5f, 0.8f), S("Ring"));
+            Img(R(face, "Bezel", Center, Center, Vector2.zero, new Vector2(302, 302)), Color.white, MgSprite("mg_dial_bezel"));
+            Img(R(face, "Face", Center, Center, Vector2.zero, new Vector2(262, 262)), Color.white, MgSprite("mg_dial_face"));
             view.Dial = R(face, "Turning", Center, Center, Vector2.zero, Vector2.zero);
             view.TickPrefab = e.DialTick;
             view.NumberPrefab = e.DialNumber;
-            view.TickRadius = 116f;
-            view.NumberRadius = 90f;
-            // the hub turns with the dial: a grip bar shows it turning
-            Img(R(view.Dial, "Hub", Center, Center, Vector2.zero, new Vector2(84, 84)), new Color(0.3f, 0.31f, 0.34f, 1f), S("Disc"));
-            Img(R(view.Dial, "HubSheen", Center, Center, new Vector2(-8, 8), new Vector2(60, 60)), new Color(1f, 1f, 1f, 0.1f), S("SoftGlow"));
-            view.Readout = Txt(R(face, "Readout", Center, Center, new Vector2(0, -2), new Vector2(80, 40)), "00", 26, TextAnchor.MiddleCenter, new Color(0.95f, 0.93f, 0.86f), true);
-            view.Flash = Img(R(face, "Flash", Center, Center, Vector2.zero, new Vector2(236, 236)), new Color(1f, 0.25f, 0.18f, 0.4f), S("Disc"));
-            var pointer = R(face, "Pointer", Center, Center, new Vector2(0, 146), new Vector2(22, 22));
-            pointer.localEulerAngles = new Vector3(0, 0, 180);
-            Img(pointer, gold, S("MapArrow"));
-            Img(R(face, "PointerLine", Center, Center, new Vector2(0, 128), new Vector2(2, 18)), gold);
+            view.TickRadius = 126f;
+            view.NumberRadius = 82f;
+            // the knob turns with the dial (its flutes show it turning); the light on it stays
+            Img(R(view.Dial, "Knob", Center, Center, Vector2.zero, new Vector2(118, 118)), Color.white, MgSprite("mg_knob"));
+            Img(R(face, "KnobGloss", Center, Center, Vector2.zero, new Vector2(118, 118)), Color.white, MgSprite("mg_knob_gloss"));
+            view.ReadoutGlow = Img(R(face, "ReadoutGlow", Center, Center, Vector2.zero, new Vector2(96, 70)), new Color(MgGold.r, MgGold.g, MgGold.b, 0.18f), S("SoftGlow"));
+            view.Readout = Txt(R(face, "Readout", Center, Center, new Vector2(0, -1), new Vector2(80, 40)), "00", 28, TextAnchor.MiddleCenter, MgGold, true, shadow: false);
+            var readoutShadow = view.Readout.gameObject.AddComponent<Shadow>();
+            readoutShadow.effectColor = new Color(0, 0, 0, 0.8f);
+            readoutShadow.effectDistance = new Vector2(1f, -1.5f);
+            view.FaceFlash = Img(R(face, "Flash", Center, Center, Vector2.zero, new Vector2(262, 262)), new Color(1f, 0.25f, 0.18f, 0.4f), S("Disc"));
+            Img(R(face, "PointerGlow", Center, Center, new Vector2(0, 160), new Vector2(64, 64)), new Color(MgGold.r, MgGold.g, MgGold.b, 0.35f), S("SoftGlow"));
+            Img(R(face, "Pointer", Center, Center, new Vector2(0, 162), new Vector2(30, 30)), Color.white, MgSprite("mg_pointer"));
 
-            // Stethoscope: bars rising towards the right number.
-            view.Bars = new Image[16];
-            for (int i = 0; i < 16; i++)
+            // The oscilloscope: the trace is a chain of segments, each with a soft glow under it.
+            var scope = R(root, "Scope", BottomCenter, BottomCenter, new Vector2(0, 46), new Vector2(330, 86));
+            Img(scope, Color.white, MgSprite("mg_scope"));
+            var trace = R(scope, "Trace", Center, Center, Vector2.zero, new Vector2(306, 70));
+            view.Trace = trace;
+            const int segments = 56;
+            view.TraceGlow = new Image[segments];
+            view.TraceLine = new Image[segments];
+            for (int i = 0; i < segments; i++)
             {
-                float hgt = 6f + i * 1.6f;
-                view.Bars[i] = Img(R(root, $"Bar{i}", BottomCenter, BottomCenter, new Vector2(-120f + i * 16f, 64), new Vector2(10, hgt)), Color.white);
-                view.Bars[i].rectTransform.pivot = new Vector2(0.5f, 0f);
+                view.TraceGlow[i] = Img(R(trace, $"G{i}", Center, Center, Vector2.zero, new Vector2(8, 9)), new Color(0.35f, 1f, 0.6f, 0.25f), S("SoftGlow"));
+                view.TraceLine[i] = Img(R(trace, $"L{i}", Center, Center, Vector2.zero, new Vector2(8, 2.2f)), new Color(0.6f, 1f, 0.75f, 1f));
             }
 
-            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 20), new Vector2(420, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
-            root.gameObject.SetActive(false);
+            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 16), new Vector2(440, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.62f));
+            all.gameObject.SetActive(false);
         }
 
         /// <summary>
-        /// The vault's switch and sequence locks: a rounded panel, a title, a row of round lamps with their number keys under
-        /// them, the sequence's progress dots, a red flash for a wrong press, the keys to use.
+        /// The vault's switch and sequence locks: a gunmetal panel with a brass plate for the title; a row of glass lamps in
+        /// chrome bezels with a coloured halo, a key cap with the number under each; the sequence's progress as LEDs; a red
+        /// flash for a wrong press; the keys to use.
         /// </summary>
         static void BuildVaultLock(Transform content)
         {
             var holder = R(content, "VaultLock", Center, Center, Vector2.zero, Vector2.zero);
             var view = holder.gameObject.AddComponent<VaultLockView>();
-            var root = R(holder, "Panel", Center, Center, new Vector2(0, -20), new Vector2(520, 270));
-            view.Root = root.gameObject;
-            var gold = new Color(1f, 0.78f, 0.32f);
-            var edge = Img(root, new Color(gold.r, gold.g, gold.b, 0.45f), S("RoundPanel"));
-            edge.type = Image.Type.Sliced;
-            var back = Img(Stretch(root, "Back", 1.5f), new Color(0.035f, 0.04f, 0.05f, 0.96f), S("RoundPanel"));
-            back.type = Image.Type.Sliced;
-            view.Flash = Img(Stretch(root, "Flash", 2f), new Color(1f, 0.25f, 0.18f, 0.35f), S("RoundPanel"));
-            view.Flash.type = Image.Type.Sliced;
-            view.Title = Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -14), new Vector2(480, 26)), "", 17, TextAnchor.MiddleCenter, gold, true);
+            var all = R(holder, "All", Center, Center, Vector2.zero, Vector2.zero);
+            view.Root = all.gameObject;
+            var (root, flash, title) = MinigamePanel(all, new Vector2(0, -20), new Vector2(600, 340), "", 320);
+            view.Flash = flash;
+            view.Title = title;
             const int lamps = 7;
+            view.Slots = new RectTransform[lamps];
+            view.Halos = new Image[lamps];
             view.Lamps = new Image[lamps];
             view.Keys = new Text[lamps];
             for (int i = 0; i < lamps; i++)
             {
-                view.Lamps[i] = Img(R(root, $"Lamp{i}", Center, Center, new Vector2(0, 14), new Vector2(62, 62)), new Color(0.16f, 0.17f, 0.19f), S("Disc"));
-                view.Keys[i] = Txt(R(root, $"Key{i}", Center, Center, new Vector2(0, -46), new Vector2(40, 28)), (i + 1).ToString(), 18, TextAnchor.MiddleCenter, new Color(0.95f, 0.93f, 0.86f), true);
+                var slot = R(root, $"Lamp{i}", Center, Center, new Vector2(0, 26), Vector2.zero);
+                view.Slots[i] = slot;
+                view.Halos[i] = Img(R(slot, "Halo", Center, Center, Vector2.zero, new Vector2(150, 150)), new Color(1f, 0.82f, 0.3f, 0f), S("SoftGlow"));
+                view.Lamps[i] = Img(R(slot, "Lens", Center, Center, Vector2.zero, new Vector2(60, 60)), new Color(0.2f, 0.21f, 0.24f), MgSprite("mg_lens"));
+                Img(R(slot, "Bezel", Center, Center, Vector2.zero, new Vector2(80, 80)), Color.white, MgSprite("mg_lamp_bezel"));
+                var cap = R(slot, "Cap", Center, Center, new Vector2(0, -74), new Vector2(40, 40));
+                Sliced(Img(cap, new Color(0.78f, 0.79f, 0.82f), MgSprite("mg_key", 18)));
+                view.Keys[i] = Txt(R(cap, "Key", Center, Center, new Vector2(0, 2), new Vector2(40, 32)), (i + 1).ToString(), 18, TextAnchor.MiddleCenter, new Color(0.12f, 0.13f, 0.15f), true, shadow: false);
             }
             const int dots = 8;
             view.Dots = new Image[dots];
+            view.DotGlows = new Image[dots];
             for (int i = 0; i < dots; i++)
-                view.Dots[i] = Img(R(root, $"Dot{i}", Center, Center, new Vector2(0, -90), new Vector2(12, 12)), new Color(1f, 1f, 1f, 0.4f), S("Disc"));
-            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 14), new Vector2(480, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.8f));
-            root.gameObject.SetActive(false);
+            {
+                view.DotGlows[i] = Img(R(root, $"DotGlow{i}", Center, Center, new Vector2(0, -118), new Vector2(34, 34)), new Color(0.35f, 1f, 0.5f, 0f), S("SoftGlow"));
+                view.Dots[i] = Img(R(root, $"Dot{i}", Center, Center, new Vector2(0, -118), new Vector2(13, 13)), new Color(0.25f, 0.27f, 0.3f), MgSprite("mg_led"));
+            }
+            view.Hint = Txt(R(root, "Hint", BottomCenter, BottomCenter, new Vector2(0, 16), new Vector2(560, 22)), "", 12, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.62f));
+            all.gameObject.SetActive(false);
         }
 
         /// <summary>

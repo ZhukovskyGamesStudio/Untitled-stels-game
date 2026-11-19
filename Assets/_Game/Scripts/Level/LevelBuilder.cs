@@ -386,7 +386,7 @@ namespace Stealth.Level
                 Put(pattern != null ? pattern.Segments[DrivePath.VariantOf(-i) % pattern.Segments.Length] : Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
                 int side = DrivePath.LampSideOf(-i);
                 var lamp = Put(kit.Lamp, $"BasementBackLamp{i}", new Vector3(-i * seg + seg / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) light.color = DriveTunnel.LampColor;
+                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) { light.color = DriveTunnel.LampColor; light.intensity = DriveTunnel.LampIntensity; }
             }
             var cap = Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
             if (pattern != null)
@@ -426,9 +426,9 @@ namespace Stealth.Level
                     light.range = range;
                 }
             }
-            Lamp("BasementLamp", seg * 0.5f, 1, 1.5f, 12f);
-            Lamp("BasementLamp", seg * 1.5f, -1, 1.5f, 12f);
-            Lamp("BasementLamp", Basement.AlcoveX, -1, 1.5f, 12f);
+            Lamp("BasementLamp", seg * 0.5f, 1, 0.7f, 11f);
+            Lamp("BasementLamp", seg * 1.5f, -1, 0.7f, 11f);
+            Lamp("BasementLamp", Basement.AlcoveX, -1, 0.7f, 11f);
             // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
             var shaft = m_Layout.HatchPosition;
             var path = Basement.ClimbPath(frame, shaft, m_Layout.ShaftExit);

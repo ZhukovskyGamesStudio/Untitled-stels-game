@@ -245,7 +245,9 @@ namespace Stealth.Player
         {
             var gm = GameManager.Instance;
             if (gm == null || (AtTerminal < 0 && !WithinCallRange(position, Team.PingRange + 5f))) return;
-            gm.CalloutServer(ClientId, PingKind.Here, position, null);
+            // knocked out, calling at their own body: a call for help (the team sees them through walls)
+            bool help = KnockedOut && (position - transform.position).magnitude < 1.5f;
+            gm.CalloutServer(ClientId, help ? PingKind.Help : PingKind.Here, position, null);
         }
 
         /// <summary>Server: the owner marked a thing (every peer finds it at this point and lights it through walls).</summary>

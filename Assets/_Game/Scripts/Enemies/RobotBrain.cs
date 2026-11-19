@@ -211,6 +211,9 @@ namespace Stealth.Enemies
             if (resting || State == RobotState.Patrol) { SetState(RobotState.Patrol, now); NextPatrolPoint(); }
         }
 
+        /// <summary>Where it rests at its dock (its back to the station).</summary>
+        public Vector3 DockSpot => m_Dock;
+
         /// <summary>Resting at its dock: no patrol, no senses — only an alarm wakes it.</summary>
         public bool Resting => Docked && Shift == GuardShift.Resting;
 

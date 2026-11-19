@@ -320,6 +320,7 @@ namespace Stealth.Game
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             m_GuardsAwake = false;
+            m_Reinforcements = 0;
             if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
             else UnloadCarServer();
             SpawnStorageBotServer(layout);
@@ -374,7 +375,8 @@ namespace Stealth.Game
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
                 if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
-                if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(pos, spawn.Rotation * Vector3.forward);
+                // (its exact spot at the dock, not the navmesh's nearest: the dock's own carving would push it aside)
+                if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(spawn.Position, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
             }
             PostWardens(layout, wardens);
@@ -471,6 +473,7 @@ namespace Stealth.Game
                 UnloadCarServer();
                 Banner(Loc.Pack("banner.house", Level.Index + 1));
             }
+            UpdateShredderServer();
             if (m_Run.SetPlayers(TeamSize))
                 Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
             foreach (var p in PlayerController.All)
@@ -496,6 +499,7 @@ namespace Stealth.Game
                 Banner(Loc.Pack("banner.guards_awake"));
             }
             UpdateHunterForecast();
+            UpdateReinforcements();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
             if (m_Run.Wipe()) Banner(Loc.Pack("banner.run_over", RunTotal));
@@ -536,7 +540,7 @@ namespace Stealth.Game
         public void ReceivePing(ulong owner, PingKind kind, Vector3 position, ulong target)
         {
             var team = Tuning.Player.Team;
-            float duration = kind is PingKind.Enemy or PingKind.Thing ? team.MarkDuration : team.PingDuration;
+            float duration = kind is PingKind.Enemy or PingKind.Thing or PingKind.Help ? team.MarkDuration : team.PingDuration;
             Pings.Add(new TeamPing { Owner = owner, Kind = kind, Position = position, Target = target, Born = Time.time, Until = Time.time + duration });
             var bank = Audio.Sfx.Bank;
             Audio.Sfx.Ui(kind is PingKind.Enemy or PingKind.Thing ? bank?.Mark : bank?.Ping, 0.8f);
@@ -552,6 +556,47 @@ namespace Stealth.Game
             if (m_HunterWarned) return;
             m_HunterWarned = true;
             Banner(Loc.Pack("banner.hunter_soon"));
+        }
+
+        int m_Reinforcements;
+
+        /// <summary>
+        /// Server: the house sends more robots the longer the team stays — one 3 minutes in, the next 2 minutes later, then one
+        /// a minute for good (<see cref="RobotRoster.ReinforcementsDue"/>, RunSettings); any kind of the house's table but a
+        /// harmless one, coming in through the furthest room of the ground floor from the players.
+        /// </summary>
+        void UpdateReinforcements()
+        {
+            var layout = ActiveLevel.Layout;
+            if (layout == null || layout.PatrolPoints.Count == 0 || DriveUntil > 0) return;
+            var s = m_Run.Settings;
+            int due = RobotRoster.ReinforcementsDue(Time.time - LevelStartTime, s.ReinforceFirst, s.ReinforceSecond, s.ReinforceEvery);
+            if (m_Reinforcements >= due) return;
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
+            m_Reinforcements++;
+            var roster = Tuning.Level.Security.Roster.Robots;
+            var table = layout.ClassicEnemies ? roster : RobotRoster.NewEnemies(roster);
+            var kind = RobotRoster.PickReinforcement(table, layout.LevelIndex, rng);
+            var at = FurthestEntry(layout);
+            if (SpawnRobotServer(kind, at, Quaternion.identity) == null) return;
+            Banner(Loc.Pack("banner.reinforcement"));
+            Debug.Log($"[Game] Reinforcement #{m_Reinforcements}: {kind} at {at}");
+        }
+
+        /// <summary>The ground floor's patrol point furthest from every player (on the navmesh): where things come in unseen.</summary>
+        Vector3 FurthestEntry(LevelLayout layout)
+        {
+            Vector3 best = layout.PatrolPoints[0];
+            float bestScore = -1f;
+            foreach (var p in layout.PatrolPoints)
+            {
+                if (LevelLayout.FloorOf(p.y) != 0) continue;
+                float score = float.MaxValue;
+                foreach (var pl in PlayerController.All) score = Mathf.Min(score, Vector3.Distance(p, pl.transform.position));
+                if (score > bestScore) { bestScore = score; best = p; }
+            }
+            if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
+            return best;
         }
 
         /// <summary>Seconds before the hunter comes that the team is warned.</summary>

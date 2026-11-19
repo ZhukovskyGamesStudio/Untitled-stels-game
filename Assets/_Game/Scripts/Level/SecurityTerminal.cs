@@ -23,6 +23,10 @@ namespace Stealth.Level
         public GameObject Console, Access;
         [Tooltip("The kiosk's screen and beacon.")]
         public Renderer AccessScreens;
+        [Tooltip("The monitors' screens of the console and of the kiosk (EyeScreen: UVs 0..1 on each): the kind's picture.")]
+        public Renderer Pictures, AccessPictures;
+        [Tooltip("What the screens show (Tools/Art/generate_screens.py): the camera feeds, hacking, the door's access.")]
+        public Texture2D CamerasPicture, HackingPicture, DoorsPicture;
 
 
         public int Index { get; private set; } = -1;
@@ -33,6 +37,7 @@ namespace Stealth.Level
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
             SpentColor = new(0.25f, 0.27f, 0.3f);
 
@@ -51,6 +56,7 @@ namespace Stealth.Level
             if (Console != null) Console.SetActive(!access);
             if (Access != null) Access.SetActive(access);
             if (access && AccessScreens != null) Screens = AccessScreens;
+            if (access && AccessPictures != null) Pictures = AccessPictures;
             m_Shown = -1;
             Show();
         }
@@ -68,6 +74,17 @@ namespace Stealth.Level
             m_Block.SetColor(BaseColorId, c);
             m_Block.SetColor(EmissionId, c * (Spent ? 0.3f : 1.6f));
             Screens.SetPropertyBlock(m_Block);
+            if (Pictures == null) return;
+            var picture = Kind switch { TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => DoorsPicture, _ => HackingPicture };
+            Pictures.GetPropertyBlock(m_Block);
+            if (picture != null)
+            {
+                m_Block.SetTexture(BaseMapId, picture);
+                m_Block.SetTexture(EmissionMapId, picture);
+            }
+            m_Block.SetColor(BaseColorId, c * 0.35f);
+            m_Block.SetColor(EmissionId, c * (Spent ? 0.25f : 1.3f));
+            Pictures.SetPropertyBlock(m_Block);
         }
 
         /// <summary>Where the player looks at it from: the side of the desk with the keyboard.</summary>

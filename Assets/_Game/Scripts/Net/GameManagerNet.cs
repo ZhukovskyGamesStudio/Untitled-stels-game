@@ -62,7 +62,9 @@ namespace Stealth.Net
         int m_PushedOpened = -1, m_PushedVotes = -1;
         readonly List<KeyValuePair<ulong, int>> m_VoteBuffer = new();
         NetworkList<NetInventoryEntry> m_Stash, m_ExitStash;
-        NetworkList<ulong> m_Cargo;
+        NetworkList<ulong> m_Cargo, m_Shred;
+        readonly NetworkVariable<double> m_ShredStart = new();
+        int m_PushedShred = -1;
         readonly NetworkVariable<double> m_DriveUntil = new(), m_ArriveAt = new(), m_StunnedUntil = new(), m_DepartAt = new();
         readonly NetworkVariable<Vector4> m_DriveFrom = new();
         readonly NetworkVariable<sbyte> m_DriveBranch = new(-1);
@@ -82,6 +84,7 @@ namespace Stealth.Net
             m_Stash = new NetworkList<NetInventoryEntry>();
             m_ExitStash = new NetworkList<NetInventoryEntry>();
             m_Cargo = new NetworkList<ulong>();
+            m_Shred = new NetworkList<ulong>();
             m_Explored = new NetworkList<ulong>();
             m_Opened = new NetworkList<int>();
             m_Votes = new NetworkList<NetVote>();
@@ -115,6 +118,9 @@ namespace Stealth.Net
             m_ExitStash.OnListChanged += _ => PullStash();
             m_Cargo.OnListChanged += _ => PullCargo();
             PullCargo();
+            m_Shred.OnListChanged += _ => PullShred();
+            m_ShredStart.OnValueChanged += (_, _) => PullShred();
+            PullShred();
             // (the drive's start before its times: a peer never moves the car from a stale start)
             m_DepartAt.OnValueChanged += (_, v) => m_Game.DepartAt = v;
             m_Game.DepartAt = m_DepartAt.Value;
@@ -165,6 +171,8 @@ namespace Stealth.Net
             NetSync.SetList(m_Stash, ref m_PushedStash, m_Game.Stash.Version, m_Game.Stash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_ExitStash, ref m_PushedExitStash, m_Game.ExitStash.Version, m_Game.ExitStash.Items, NetInventoryEntry.From);
             NetSync.SetList(m_Cargo, ref m_PushedCargo, m_Game.Cargo.Version, m_Game.Cargo.Items, c => c.Pack());
+            NetSync.Set(m_ShredStart, m_Game.Shredder.Started);
+            NetSync.SetList(m_Shred, ref m_PushedShred, m_Game.Shredder.Version, m_Game.Shredder.Pile, Stealth.Vehicles.Shredder.Pack);
             NetSync.Set(m_DepartAt, m_Game.DepartAt);
             NetSync.Set(m_DriveFrom, m_Game.DriveFrom);
             NetSync.Set(m_DriveBranch, (sbyte)Mathf.Clamp(m_Game.DriveBranch, -1, 127));
@@ -227,6 +235,13 @@ namespace Stealth.Net
         }
 
         readonly List<ulong> m_CargoBuffer = new();
+
+        void PullShred()
+        {
+            m_CargoBuffer.Clear();
+            foreach (var c in m_Shred) m_CargoBuffer.Add(c);
+            m_Game.Shredder.ApplyReplicated(m_CargoBuffer, m_ShredStart.Value);
+        }
 
         void PullCargo()
         {

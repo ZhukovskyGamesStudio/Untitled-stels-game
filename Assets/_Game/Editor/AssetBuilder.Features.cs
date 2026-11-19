@@ -77,6 +77,8 @@ namespace Stealth.EditorTools
             var screen = Cube(root.transform, "EyeScreen", new Vector3(0f, 0.36f, 0.045f), new Vector3(0.16f, 0.05f, 0.012f), M("LockLamp"), false);
             var console = root.AddComponent<VaultConsole>();
             console.Screen = screen.GetComponent<Renderer>();
+            console.LockedPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_vault_locked.png");
+            console.OpenPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_vault_open.png");
             console.Faces = new GameObject[3];
             GameObject Face(int i, string name, Material body, Vector3 size)
             {

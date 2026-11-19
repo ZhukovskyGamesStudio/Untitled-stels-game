@@ -273,6 +273,8 @@ namespace Stealth.Level
             if (!locked) foreach (var p in PlayerController.All) s_Agents.Add(p.transform.position); // a locked door ignores players
             int players = s_Agents.Count;
             foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
+            var bot = Stealth.Game.StorageBot.Active; // the team's storage robot walks through doors like a robot (a locked one too)
+            if (bot != null && !bot.InDuct) s_Agents.Add(bot.transform.position);
             ShowLock(locked);
             var here = transform.position;
             bool open = ShouldOpen(here, s_Agents);

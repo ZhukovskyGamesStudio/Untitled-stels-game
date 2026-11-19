@@ -91,6 +91,8 @@ namespace Stealth.Vehicles
         public IReadOnlyList<ulong> Occupants => m_Occupants;
         public ulong Driver => m_Occupants[0];
         public bool EngineOn => Driver != Nobody;
+        /// <summary>The shredder has things to chew (CarShredder): its blades spin fast.</summary>
+        public bool Grinding { get; set; }
         /// <summary>On the drive to the next house: moved by the clock (Level.DrivePath), not by a driver.</summary>
         public bool Scripted => m_Scripted;
         public float Speed => HasAuthority ? m_Physics.Speed : m_RemoteSpeed;
@@ -414,7 +416,7 @@ namespace Stealth.Vehicles
                 Wheels[i].localRotation = m_WheelRest[i] * Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(m_Spin, 0f, 0f);
             }
             if (Steering != null) Steering.localRotation = m_SteeringRest * CarLook.SteeringWheel(steer, s.SteeringRatio);
-            m_Grind = (m_Grind + (EngineOn ? 540f : 0f) * dt) % 360f;
+            m_Grind = (m_Grind + (Grinding ? 1800f : EngineOn ? 540f : 0f) * dt) % 360f;
             if (Grinder != null) Grinder.localRotation = m_GrinderRest * Quaternion.Euler(m_Grind, 0f, 0f);
             if (Body != null)
             {

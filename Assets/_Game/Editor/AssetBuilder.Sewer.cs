@@ -359,6 +359,41 @@ namespace Stealth.EditorTools
         /// steering wheel found by name, four seats, the hopper on the hood, the bed, colliders for the chassis and the cab,
         /// headlights, the engine's loop.
         /// </summary>
+        /// <summary>Chips spat up out of the shredder's mouth while it chews (no emission until then: CarShredder turns it on).</summary>
+        static ParticleSystem ShredderChips(Transform mouth)
+        {
+            var go = Child(mouth, "Chips", Vector3.up * 0.05f);
+            go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f); // the cone up out of the mouth
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.7f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.015f, 0.04f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.55f, 0.5f, 0.42f), new Color(0.25f, 0.24f, 0.22f));
+            main.gravityModifier = 2.2f;
+            main.maxParticles = 200;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.playOnAwake = true;
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 28f;
+            shape.radius = 0.08f;
+            var rot = ps.rotationOverLifetime;
+            rot.enabled = true;
+            rot.z = new ParticleSystem.MinMaxCurve(-8f, 8f);
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            var mat = LitAsset($"{CarMaterials}/ShredderChip.mat");
+            var particles = Shader.Find("Universal Render Pipeline/Particles/Lit");
+            if (particles != null) mat.shader = particles;
+            mat.SetColor("_BaseColor", Color.white);
+            EditorUtility.SetDirty(mat);
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            return ps;
+        }
+
         static GameObject BuildCar(CargoPiece piece)
         {
             var root = new GameObject("Car");
@@ -400,7 +435,15 @@ namespace Stealth.EditorTools
                 car.Seats[i] = s.transform;
             }
             var hopperAt = car.Grinder != null ? root.transform.InverseTransformPoint(car.Grinder.position) + Vector3.up * 0.15f : new Vector3(0f, 1.56f, 1.55f);
-            Child(root.transform, "Hopper", hopperAt).AddComponent<CarHopper>();
+            var hopper = Child(root.transform, "Hopper", hopperAt);
+            hopper.AddComponent<CarHopper>();
+            // the shredder: the things thrown in heap up in the mouth and go under the blades, chips flying (CarShredder)
+            var shredder = root.AddComponent<CarShredder>();
+            shredder.Mouth = hopper.transform;
+            shredder.PiecePrefab = piece;
+            shredder.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            shredder.Car = car;
+            shredder.Chips = ShredderChips(hopper.transform);
             car.Bed = Child(root.transform, "Bed", new Vector3(0f, 0.86f, -2.35f)).transform;
             car.CargoRoot = Child(root.transform, "Cargo").transform;
 

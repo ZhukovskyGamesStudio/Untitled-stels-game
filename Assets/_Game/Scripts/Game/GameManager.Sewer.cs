@@ -25,6 +25,40 @@ namespace Stealth.Game
 
         /// <summary>What lies in the car's bed (the whole run, replicated).</summary>
         public Cargo Cargo { get; } = new();
+        /// <summary>The car's shredder: things thrown into its hopper, chewed one after another into fuel (replicated).</summary>
+        public Shredder Shredder { get; } = new();
+        readonly List<(byte shape, byte color)> m_Chewed = new();
+        int m_ChewFuel;
+        string m_ChewBy = "";
+
+        /// <summary>Within reach of the car's hopper (a thing let go there goes into the shredder).</summary>
+        public bool AtCar(Vector3 position) => Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+
+        /// <summary>Server: a thing thrown into the car's hopper: onto the shredder's pile — its fuel comes once it is chewed.</summary>
+        public void GrindServer(PlayerController player, byte shape, byte color)
+        {
+            if (ItemCatalog.Unburnable(shape)) return;
+            Shredder.Add(shape, color, Session.ServerTime);
+            if (player != null) m_ChewBy = player.Nick;
+        }
+
+        /// <summary>Server: what the blades have finished becomes fuel at once; the banner when the pile is gone.</summary>
+        void UpdateShredderServer()
+        {
+            m_Chewed.Clear();
+            if (Shredder.Tick(Session.ServerTime, m_Chewed) == 0) return;
+            int fuel = 0;
+            foreach (var (shape, color) in m_Chewed) fuel += ItemCatalog.Value(shape, color);
+            if (fuel > 0)
+            {
+                m_Run.Deposit(fuel);
+                m_StrandedAt = -1f;
+                m_ChewFuel += fuel;
+            }
+            if (Shredder.Busy || m_ChewFuel <= 0) return;
+            Banner(Loc.Pack("banner.fuel_added", m_ChewBy, m_ChewFuel, Collected, Quota));
+            m_ChewFuel = 0;
+        }
         /// <summary>The stash in the house's exit hatch: it goes down into the car with the team.</summary>
         public TeamStash ExitStash { get; } = new();
         /// <summary>Server time until which the drive to the next house is shown on every peer, 0 = not driving. Replicated.</summary>
@@ -149,14 +183,14 @@ namespace Stealth.Game
             }
         }
 
-        /// <summary>Whether a thing dropped here burns into fuel: at the car (its hopper, the sewer or the basement), at the entry or the storage robot in a house.</summary>
+        /// <summary>Whether a thing dropped here burns into fuel: at the car (its hopper, the sewer or the basement) or at the entry in a house — never at the storage robot.</summary>
         public bool CanBurnAt(Vector3 position)
         {
             // at the car (its hopper): in the sewer and in the house's basement alike
             bool atCar = Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
             if (Phase == RunPhase.Sewer || atCar) return atCar && Phase is RunPhase.Sewer or RunPhase.Playing;
             var l = ActiveLevel.Layout;
-            return Phase == RunPhase.Playing && l != null && (AtEntry(l, position) || AtBot(position));
+            return Phase == RunPhase.Playing && l != null && AtEntry(l, position); // (not at the storage robot: its crate is a stash, no fire)
         }
 
         /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>
@@ -227,19 +261,19 @@ namespace Stealth.Game
         /// <summary>Server: loot into the engine — the backpack's, or with an empty backpack everything in the bed.</summary>
         void FeedServer(PlayerController player)
         {
+            // the backpack's loot (or with an empty backpack the bed's) into the shredder: a pile it chews into fuel
             var inventory = player.GetComponent<PlayerInventory>();
-            int fuel = inventory != null ? inventory.BurnServer() : 0;
-            if (fuel == 0)
+            m_Chewed.Clear();
+            if (inventory != null) inventory.TakeLootServer(m_Chewed);
+            if (m_Chewed.Count == 0)
                 foreach (var item in Cargo.Items.ToArray())
                 {
                     if (ItemCatalog.IsTool(item.Shape)) continue;
-                    fuel += item.Value;
+                    m_Chewed.Add((item.Shape, item.Color));
                     Cargo.Remove(item);
                 }
-            if (fuel <= 0) return;
-            m_Run.Deposit(fuel);
-            m_StrandedAt = -1f;
-            Banner(Loc.Pack("banner.fuel_added", player.Nick, fuel, Collected, Quota));
+            foreach (var (shape, color) in m_Chewed) GrindServer(player, shape, color);
+            m_Chewed.Clear();
         }
 
         /// <summary>Server: a thing dropped over the car's bed lies there (no cells, a heap). False if it was not over the bed.</summary>

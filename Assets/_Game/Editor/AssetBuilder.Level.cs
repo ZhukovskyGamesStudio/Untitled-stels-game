@@ -157,8 +157,16 @@ namespace Stealth.EditorTools
                 var terminal = go.AddComponent<Stealth.Level.SecurityTerminal>();
                 terminal.Console = console;
                 terminal.Access = access;
-                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
-                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye") && !r.name.StartsWith("EyeScreen"));
+                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye") && !r.name.StartsWith("EyeScreen"));
+                // the monitors show the kind's picture (Tools/Art/generate_screens.py) through a glowing screen material
+                var screenMat = TerminalScreenMaterial();
+                terminal.Pictures = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("EyeScreen"));
+                terminal.AccessPictures = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("EyeScreen"));
+                foreach (var r in new[] { terminal.Pictures, terminal.AccessPictures }) if (r != null) r.sharedMaterial = screenMat;
+                terminal.CamerasPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cameras.png");
+                terminal.HackingPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_hack.png");
+                terminal.DoorsPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors.png");
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
@@ -994,6 +1002,20 @@ namespace Stealth.EditorTools
         /// Ceiling panel at the ceiling surface (the pivot) with a wide spot light shining down: soft shadows, pools of light
         /// under it, darker corners. <see cref="RoomLight"/> sets colour / brightness per room and switches it off in dark rooms.
         /// </summary>
+        /// <summary>A monitor's screen showing a picture that glows through itself (the picture is set per terminal, by kind).</summary>
+        static Material TerminalScreenMaterial()
+        {
+            var m = Mat("Props", "TerminalScreen", new Color(0.3f, 0.3f, 0.3f), Color.white * 1.2f, smoothness: 0.85f);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_hack.png");
+            if (tex != null && m.GetTexture("_EmissionMap") != tex)
+            {
+                m.SetTexture("_BaseMap", tex);
+                m.SetTexture("_EmissionMap", tex);
+                EditorUtility.SetDirty(m);
+            }
+            return m;
+        }
+
         static GameObject BuildRoomLight()
         {
             var root = new GameObject("RoomLight");

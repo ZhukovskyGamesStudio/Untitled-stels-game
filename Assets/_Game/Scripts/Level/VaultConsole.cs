@@ -13,6 +13,8 @@ namespace Stealth.Level
     {
         [Tooltip("The panel's screen: red while locked, green once solved.")]
         public Renderer Screen;
+        [Tooltip("Pictures on the status strip: a shut padlock (red) until solved, an open one (green) after.")]
+        public Texture2D LockedPicture, OpenPicture;
         [Tooltip("The panel's face per minigame (Dial, Switches, Sequence): only its own shows.")]
         public GameObject[] Faces;
 
@@ -24,7 +26,8 @@ namespace Stealth.Level
         public VaultGame Game => (VaultGame)Mathf.Clamp(Index, 0, 2);
         public bool Solved => Index >= 0 && World.IsOpened(OpenKeys.Console(Index));
 
-        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor"),
+            BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color Locked = new(1f, 0.15f, 0.08f), Open = new(0.2f, 1f, 0.35f);
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -46,6 +49,12 @@ namespace Stealth.Level
             m_Block ??= new MaterialPropertyBlock();
             var c = state == 1 ? Open : Locked;
             Screen.GetPropertyBlock(m_Block);
+            var picture = state == 1 ? OpenPicture : LockedPicture;
+            if (picture != null)
+            {
+                m_Block.SetTexture(BaseMapId, picture);
+                m_Block.SetTexture(EmissionMapId, picture);
+            }
             m_Block.SetColor(BaseColorId, c);
             m_Block.SetColor(EmissionId, c * 2.2f);
             Screen.SetPropertyBlock(m_Block);

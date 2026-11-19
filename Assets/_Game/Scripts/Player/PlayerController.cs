@@ -323,8 +323,9 @@ namespace Stealth.Player
                 GasView.Hide();
                 if (layout == null && SewerLocation.Active == null) return;
                 var a = VisualStyles.World;
-                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, a.IndoorFogDensity * 1.4f, Time.deltaTime * 3f);
-                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog, Time.deltaTime * 4f);
+                // a thick dark haze: the far tunnel sinks into black whatever the style's indoor haze looks like
+                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, Mathf.Max(0.05f, a.IndoorFogDensity * 2.2f), Time.deltaTime * 3f);
+                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog * 0.3f, Time.deltaTime * 4f);
                 Camera.backgroundColor = RenderSettings.fogColor;
                 return;
             }
@@ -459,6 +460,7 @@ namespace Stealth.Player
 
         void LateUpdate()
         {
+            ShowCalling();
             if (!IsOwner) { HoldRemoteSeat(); return; }
             if (Camera == null) return;
             if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
