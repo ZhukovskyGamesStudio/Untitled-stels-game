@@ -42,7 +42,7 @@ namespace Stealth.EditorTools
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
-            s_HumanRig = BuildHumanRig();
+            BuildHumanRig(); // the scientist: no style shows him now (the derelict station shows the departments too), the prefab stays for a style that wants him
             bool rebuild = Environment.GetEnvironmentVariable("REBUILD_STYLES") == "1";
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
@@ -809,7 +809,6 @@ namespace Stealth.EditorTools
                     geo.Floor = K("Dr_FloorPlate"); geo.FloorTile = 2f; geo.Wall = K("Dr_SteelPanels"); geo.WallTile = 2.4f;
                     geo.CeilingFinish = K("Dr_CeilingVents"); geo.CeilingTile = 2.4f;
                     geo.Trim = K("Dr_Rust"); geo.Pipe = K("Dr_Rust"); geo.Beam = K("Dr_PaintedMetal"); geo.Glow = K("Glow_DimCyan");
-                    geo.PlayerRig = s_HumanRig;
                     geo.FloorDecay = new[] { K("Dc_floor_rust"), K("Dc_floor_oil"), K("Dc_floor_scorch"), K("Dc_floor_rubble") };
                     geo.WallDecay = new[] { K("Dc_wall_rust"), K("Dc_wall_rust"), K("Dc_wall_leak"), K("Dc_wall_mold"), K("Dc_wall_peel"), K("Dc_wall_scorch") }; // rust twice as often
                     geo.Posters = Enumerable.Range(0, 6).Select(i => K($"Dc_poster_{i}")).ToArray();

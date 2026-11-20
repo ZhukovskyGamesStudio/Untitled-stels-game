@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Stealth.Tests
 {
-    /// <summary>The rigged human a style shows instead of the player model (S11): a real-size person that can move.</summary>
+    /// <summary>The rigged humans shown instead of the player model: real-size people of four departments that can move.</summary>
     public class HumanRigTests
     {
         [Test]
@@ -19,14 +19,20 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void DerelictStyleHasAWorkingHuman()
+        public void EveryStyleShowsTheDepartments()
         {
             var styles = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
-            var style = styles.Styles.FirstOrDefault(s => s != null && s.name == "S16_Derelict");
-            Assert.IsNotNull(style, "no S11 style");
-            Assert.AreEqual(ModelFamily.Derelict, style.Geometry.Family);
-            var prefab = style.Geometry.PlayerRig;
-            Assert.IsNotNull(prefab, "S11 has no rigged human");
+            Assert.AreEqual(4, styles.PlayerHumans.Length, "one rigged human per department");
+            foreach (var style in styles.Styles.Where(s => s != null))
+                Assert.IsNull(style.Geometry.PlayerRig, $"{style.name} has a human of its own: its players would not show their departments");
+            Assert.AreEqual(ModelFamily.Derelict, styles.Styles.First(s => s != null && s.name == "S16_Derelict").Geometry.Family);
+        }
+
+        [Test]
+        public void DepartmentHumansWork([Values(0, 1, 2, 3)] int department)
+        {
+            var prefab = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans[department];
+            Assert.IsNotNull(prefab, "no rigged human");
 
             var rig = prefab.GetComponent<HumanRig>();
             Assert.IsNotNull(rig);
@@ -41,7 +47,7 @@ namespace Stealth.Tests
 
             Assert.IsEmpty(prefab.GetComponentsInChildren<Collider>(true), "the human is decoration: no colliders");
             var renderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            foreach (var part in new[] { "BodyClothes", "Coat", "AccentHead", "AccentBand", "EyeDetails" })
+            foreach (var part in new[] { "BodyClothes", "AccentHead", "AccentBand", "EyeDetails", "Sclera" })
                 Assert.IsTrue(renderers.Any(r => r.name == part), $"no part {part} (PlayerLooks paints by part name)");
 
             // a real adult, standing on the floor, facing +Z

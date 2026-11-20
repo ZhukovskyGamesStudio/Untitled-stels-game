@@ -19,8 +19,6 @@ namespace Stealth.EditorTools
         const string HumanControllerPath = HumansDataDir + "/HumanRig.controller";
         const string HumanPrefabPath = PrefabsDir + "/Player/HumanRig_Scientist.prefab";
 
-        static GameObject s_HumanRig;
-
         /// <summary>Builds the rigged human (null when the model has not been exported yet).</summary>
         static GameObject BuildHumanRig() => BuildHumanRig(HumanFbx, HumanPrefabPath, "HumanRig_Scientist");
 
