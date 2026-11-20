@@ -40,11 +40,11 @@ namespace Stealth.Game
         public float[] QuotaByPlayers = { 1f, 1.1f, 1.18f, 1.25f };
         [Tooltip("Quota increase per teammate left down at the end of the previous house.")]
         public float DeathPenalty = 0.15f;
+        [Tooltip("What the drive costs by the way the team takes, as a share of the house's quota: every tunnel out of the sewer gets one of these (shuffled by the run's seed), so the ways on differ in fuel.")]
+        public float[] RouteFuel = { 0.7f, 1f, 1.35f };
 
         [Header("Leaving a house")]
-        [Tooltip("Seconds from the moment the whole team is hiding in the hatch to the sewer (anyone can climb back out).")]
-        public float HatchCountdown = 5f;
-        [Tooltip("Seconds the car must stand in a tunnel before the team goes (the countdown on the HUD).")]
+        [Tooltip("Seconds the car must stand in a tunnel with the whole team in it before it goes (the countdown on the HUD).")]
         public float VoteDelay = 3f;
         [Tooltip("Reinforcements: seconds from the house's start to the first extra robot coming in, then to the second, then between every one after (forever).")]
         public float ReinforceFirst = 180f, ReinforceSecond = 120f, ReinforceEvery = 60f;
@@ -115,6 +115,28 @@ namespace Stealth.Game
             float team = byTeam == null || byTeam.Length == 0 ? 1f : byTeam[Mathf.Clamp(players - 1, 0, byTeam.Length - 1)];
             float share = Mathf.Min(s.MaxQuotaShare, (s.QuotaShare + s.QuotaShareGrowth * levelIndex) * team);
             return Mathf.Max(10, Mathf.RoundToInt(totalValue * share * (1f + s.DeathPenalty * penalties) / 5f) * 5);
+        }
+
+        /// <summary>The fuel a drive costs by a way whose share of the quota is <paramref name="share"/> (none while the quota is none: the first drive).</summary>
+        public static int RouteCost(int quota, float share) => quota <= 0 ? 0 : Mathf.Max(5, Mathf.RoundToInt(quota * share / 5f) * 5);
+
+        /// <summary>
+        /// The share of the quota the drive to the house in row <paramref name="lane"/> of column <paramref name="depth"/>
+        /// costs: one of <paramref name="shares"/>, shuffled per column by the run's seed — the ways out of one sewer all
+        /// differ (as long as there are as many shares as ways).
+        /// </summary>
+        public static float RouteShare(int runSeed, int depth, int lane, float[] shares)
+        {
+            if (shares == null || shares.Length == 0) return 1f;
+            var order = new int[shares.Length];
+            for (int i = 0; i < order.Length; i++) order[i] = i;
+            var rng = new System.Random(Stealth.Level.LevelRandom.Mix(runSeed, Stealth.Level.Salt.RouteFuel, depth));
+            for (int i = order.Length - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (order[i], order[j]) = (order[j], order[i]);
+            }
+            return shares[order[((lane % order.Length) + order.Length) % order.Length]];
         }
 
         /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
@@ -215,8 +237,8 @@ namespace Stealth.Game
         public enum Exit { Ignored, Failed, NextLevel }
 
         /// <summary>
-        /// The team has hidden in the hatch and goes down into the sewer, leaving <paramref name="playersDown"/> knocked-out
-        /// teammates behind (each one raises the next quota). The house's quota can still be paid there.
+        /// The car drives off from under the house, leaving <paramref name="playersDown"/> knocked-out teammates behind (each
+        /// one raises the next quota): the house is left.
         /// </summary>
         public bool EnterSewer(int playersDown)
         {
@@ -227,18 +249,18 @@ namespace Stealth.Game
             return true;
         }
 
-        /// <summary>The team drives on to the next house: the drive burns <see cref="Quota"/> of the fuel (not enough — it does not go).</summary>
-        public Exit Advance()
+        /// <summary>The team drives on to the next house: the drive burns <paramref name="cost"/> of the fuel (the way's, <see cref="RouteCost"/>; not enough — it does not go).</summary>
+        public Exit Advance(int cost)
         {
-            if (Phase != RunPhase.Sewer || !QuotaMet) return Exit.Ignored;
-            Collected -= Quota;
+            if (Phase != RunPhase.Sewer || Collected < cost) return Exit.Ignored;
+            Collected -= cost;
             return Exit.NextLevel;
         }
 
-        /// <summary>Not enough fuel for any way on and nothing left to feed the engine: the run ends in the sewer.</summary>
+        /// <summary>Not enough fuel for any way on and nothing left to feed the engine (in the house above either): the run ends in the sewer.</summary>
         public bool Strand()
         {
-            if (Phase != RunPhase.Sewer) return false;
+            if (Phase is not (RunPhase.Sewer or RunPhase.Playing)) return false;
             Phase = RunPhase.Failed;
             return true;
         }
@@ -248,21 +270,6 @@ namespace Stealth.Game
 
         /// <summary>Can the team trade (sell, use the stash) now: in a house at the hatch, or in the sewer.</summary>
         public bool CanTrade => Phase == RunPhase.Playing || Phase == RunPhase.Sewer;
-
-        /// <summary>
-        /// The team may leave the house: everyone hides in a hatch — the entry or the exit, either will do — or is knocked
-        /// out (lying with no HP — they stay behind), and at least one of them is in the exit's hatch. Pure.
-        /// </summary>
-        public static bool TeamInHatch(IEnumerable<(bool inHatch, bool atExit, bool knockedOut)> players)
-        {
-            bool exit = false;
-            foreach (var (inHatch, atExit, knockedOut) in players)
-            {
-                if (inHatch) { exit |= atExit; continue; }
-                if (!knockedOut) return false;
-            }
-            return exit;
-        }
 
         /// <summary>Everybody is down: the run is over.</summary>
         public bool Wipe()

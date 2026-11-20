@@ -251,6 +251,7 @@ namespace Stealth.UI
         {
             if (LoadingFade == null) return;
             var sewer = SewerLocation.Active;
+            if (sewer != null && sewer.UnderHouse) sewer = null; // (a house's own sewer is part of the house: nothing to load)
             int here = sewer != null ? sewer.GetHashCode() : ActiveLevel.Layout != null ? ActiveLevel.Layout.Seed : 0;
             bool loading = false;
             bool driving = gm.DriveUntil > 0; // the drive is the show
@@ -298,7 +299,7 @@ namespace Stealth.UI
         void ShowRouteCountdown(GameManager gm)
         {
             if (RouteCountdown == null) return;
-            bool on = gm.Phase == RunPhase.Sewer && gm.GoAt > 0;
+            bool on = gm.GoAt > 0; // (in the sewer between houses or under the house)
             Ui.Show(RouteCountdown, on);
             if (!on) return;
             float left = Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime));
@@ -437,7 +438,6 @@ namespace Stealth.UI
                 CanHack = me.HackTarget != null,
                 HackProgress = me.HackShare,
                 Playing = gm.Phase == RunPhase.Playing,
-                NearHatch = gm.Phase == RunPhase.Playing && me.AtHatch, // looking at the hatch
                 NearExit = Hatch.IndexNear(me.transform.position) == 1,
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
@@ -671,7 +671,7 @@ namespace Stealth.UI
 
         void ShowQuota(GameManager gm, float now)
         {
-            int collected = gm.Collected, quota = gm.Quota;
+            int collected = gm.Collected, quota = gm.FuelNeeded; // (the way the car stands in, else the cheapest)
             bool met = collected >= quota;
             if (gm.Level.Index < 0)
             {
@@ -687,7 +687,7 @@ namespace Stealth.UI
             }
             Ui.Show(QuotaLabel, true);
             var layout = ActiveLevel.Layout;
-            string house = SewerLocation.Active != null || layout == null ? Loc.T("hud.sewer") : HouseKinds.Title(gm.Level.Seed, layout.Kind);
+            string house = InTheSewer(gm) || layout == null ? Loc.T("hud.sewer") : HouseKinds.Title(gm.Level.Seed, layout.Kind);
             if (HouseLabel.text != house) HouseLabel.text = house;
             Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
             QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
@@ -732,7 +732,7 @@ namespace Stealth.UI
         {
             if (ObjectiveLabel == null) return;
             var l = ActiveLevel.Layout;
-            bool sewer = gm.Phase == RunPhase.Sewer;
+            bool sewer = InTheSewer(gm);
             if (!sewer && (gm.Phase != RunPhase.Playing || l == null)) { Ui.Show(ObjectiveLabel, false); return; }
             bool exitSeen = !sewer && gm.Exploration != null && MapSketch.AnyRevealed(gm.Exploration, 0,
                 new Rect(l.ExitHatchPosition.x - 0.8f, l.ExitHatchPosition.z - 0.8f, 1.6f, 1.6f));
@@ -749,6 +749,20 @@ namespace Stealth.UI
         }
 
         readonly System.Text.StringBuilder m_TaskText = new();
+
+        /// <summary>
+        /// The local player is in the sewer: between houses, or under the house past the basement's gate (the basement the
+        /// team arrives in still counts as the house: its tasks, its name).
+        /// </summary>
+        static bool InTheSewer(GameManager gm)
+        {
+            if (gm.Phase == RunPhase.Sewer) return true;
+            var me = PlayerController.Local;
+            var l = ActiveLevel.Layout;
+            if (me == null || l == null || SewerLocation.Active == null) return false;
+            var at = me.transform.position;
+            return at.y < LevelLayout.Underground && !Basement.Contains(l.Cellar, at + Vector3.up * 0.5f);
+        }
 
         static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };
 
@@ -772,7 +786,7 @@ namespace Stealth.UI
         {
             var layout = ActiveLevel.Layout;
             bool visible = layout != null && me.Camera != null && gm.Phase == RunPhase.Playing &&
-                           gm.Collected >= gm.Quota && !Hatch.IsNear(me.transform.position) && !me.InHatch;
+                           gm.QuotaMet && !Hatch.IsNear(me.transform.position) && !me.InHatch;
             Ui.Show(HatchMarker, visible);
             if (!visible) return;
             var size = Size;

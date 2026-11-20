@@ -56,6 +56,8 @@ namespace Stealth
         public static int HackSlot(int slot) => Of(OpenKind.HackSlot, slot);
         /// <summary>The lid over the shaft to the basement is open.</summary>
         public static readonly int Shaft = Of(OpenKind.Shaft, 0);
+        /// <summary>The lid over the exit hatch's shaft (down to the passage in the sewer).</summary>
+        public static readonly int ExitShaft = Of(OpenKind.Shaft, 1);
         /// <summary>The sewer's gate is open.</summary>
         public static readonly int Gate = Of(OpenKind.Gate, 0);
         public static int Stage(JobStage stage) => Of(OpenKind.Stage, (int)stage);

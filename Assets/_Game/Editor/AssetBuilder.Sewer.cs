@@ -76,6 +76,25 @@ namespace Stealth.EditorTools
                 light.innerSpotAngle = 70f;
                 return a;
             });
+            // the way to the house's exit hatch (SewerPlan.Passage, sewer.py kit_passage*): a doorway segment, the narrow
+            // passage, its turn, and the shaft's foot with the ladder up to the hatch (ShaftLadder, set up by SewerLocation) and a
+            // caged bulb low and high in the shaft (shadowed: they never light anything through its walls)
+            var doorSegment = Prefab($"{SewerKit}/SegmentDoor.prefab", () => KitPiece("sewer_seg_door", true, KitYaw));
+            var passage = Prefab($"{SewerKit}/Passage.prefab", () => KitPiece("sewer_passage", true, KitYaw));
+            var passageCorner = Prefab($"{SewerKit}/PassageCorner.prefab", () => KitPiece("sewer_passage_corner", true, KitYaw));
+            var passageEnd = Prefab($"{SewerKit}/PassageEnd.prefab", () =>
+            {
+                var e = KitPiece("sewer_passage_end", true, KitYaw);
+                e.AddComponent<ShaftLadder>();
+                foreach (var (y, dir) in new[] { (2.0f, new Vector3(0.4f, -1f, 0.6f)), (5.6f, new Vector3(0.4f, -0.6f, 0.6f)) })
+                {
+                    var light = Lamp(e.transform, "ShaftLight", new Vector3(0.45f, y, -0.62f), Quaternion.LookRotation(dir), LightType.Spot,
+                        new Color(1f, 0.8f, 0.55f), 3f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+                    light.spotAngle = 130f;
+                    light.innerSpotAngle = 70f;
+                }
+                return e;
+            });
             // the drive on to the next house (Level.DrivePath): a branch opens into the wide tunnel again, which runs on round the car
             var reducer = Prefab($"{SewerKit}/Reducer.prefab", () => KitPiece("sewer_reducer", false, KitYaw));
             var tunnel = Prefab($"{SewerKit}/DriveTunnel.prefab", () =>
@@ -91,7 +110,7 @@ namespace Stealth.EditorTools
                 var w = new GameObject("BackWall");
                 var c = w.AddComponent<BoxCollider>();
                 c.center = new Vector3(-0.15f, 3f, 0f);
-                c.size = new Vector3(0.3f, 6f, 12f);
+                c.size = new Vector3(0.3f, 6f, 8.4f); // the tunnel's width only: the passage to the exit hatch may run past it
                 return w;
             });
             var manhole = Prefab($"{SewerKit}/Manhole.prefab", () => KitPiece("sewer_manhole", false));
@@ -122,6 +141,10 @@ namespace Stealth.EditorTools
                 loc.Crate = crate;
                 loc.Ladder = ladder;
                 loc.Alcove = alcove;
+                loc.DoorSegment = doorSegment;
+                loc.PassageStraight = passage;
+                loc.PassageCorner = passageCorner;
+                loc.PassageEnd = passageEnd;
                 loc.Manhole = manhole;
                 loc.GatePrefab = gate.GetComponent<SewerGate>();
                 loc.BranchPrefab = branch.GetComponent<SewerBranch>();
@@ -356,7 +379,13 @@ namespace Stealth.EditorTools
             Mat("Car", "CarHead", new Color(1f, 0.96f, 0.85f), new Color(4f, 3.7f, 3f));
             Mat("Car", "CarTail", new Color(1f, 0.15f, 0.1f), new Color(3f, 0.3f, 0.2f));
             Mat("Car", "CarSpot", new Color(1f, 0.85f, 0.5f), new Color(2.5f, 2.1f, 1.2f));
-            Translucent(Mat("Car", "CarGlass", new Color(0.45f, 0.6f, 0.65f, 0.35f), smoothness: 0.95f));
+            // Dark tinted glass that only darkens what is behind it: a pale glass lit by the style's ambient added its own light,
+            // and underground the ink lines (which fade where nothing is lit, _StyDark) came back behind it — the cab looked
+            // clearer through the window than through the open door. No sky reflections either (nothing to reflect down there).
+            var glass = Mat("Car", "CarGlass", new Color(0.04f, 0.05f, 0.06f, 0.4f), smoothness: 0.95f);
+            Translucent(glass);
+            glass.SetFloat("_EnvironmentReflections", 0f);
+            glass.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
         }
 
         static void PaintCar(GameObject model)

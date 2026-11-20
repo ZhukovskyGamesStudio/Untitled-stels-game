@@ -261,24 +261,37 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void OverTheTopTheClimberMovesOutNeverJumps()
+        public void OverTheTopTheClimberRisesStraightUpAndStepsOffHimself()
         {
-            var exit = new Vector3(2f, 5f, 0f);
+            float floor = 5f, dt = 0.02f, longest = 0f;
             var feet = new Vector3(0f, 4.7f, 0f);
-            float dt = 0.02f, longest = 0f;
             int frames = 0;
             for (; frames < 500; frames++)
             {
-                var step = LadderMath.ClimbOut(feet, exit, dt);
+                var step = LadderMath.ClimbOut(feet, floor, dt);
                 if (step == Vector3.zero) break;
-                Assert.IsTrue(step.y <= 0f || new Vector2(step.x, step.z).magnitude < 1e-6f, "first up, then across: never through the rim");
+                Assert.AreEqual(0f, new Vector2(step.x, step.z).magnitude, 1e-6f, "straight up: never carried aside");
                 longest = Mathf.Max(longest, step.magnitude);
                 feet += step;
             }
-            Assert.Less(frames, 500, "it gets out");
-            Assert.Less(new Vector2(feet.x - exit.x, feet.z - exit.z).magnitude, 0.06f, "onto the floor by the shaft");
-            Assert.GreaterOrEqual(feet.y, exit.y, "over the floor, not in it");
-            Assert.LessOrEqual(longest, LadderMath.Speed * 1.2f * dt + 1e-5f, "a climb, not a teleport");
+            Assert.Less(frames, 500, "it gets up");
+            Assert.AreEqual(floor + LadderMath.OverRim, feet.y, 0.01f, "standing on the top, over the rim");
+            Assert.AreEqual(0f, feet.x, 1e-6f);
+            Assert.LessOrEqual(longest, LadderMath.Speed * dt + 1e-5f, "a climb, not a teleport");
+
+            // standing up there until the player walks: over the floor beside the hole, off; over the hole away from the rungs, let go
+            var shaft = new Vector3(0.3f, floor, 0f);
+            var column = feet;
+            Assert.AreEqual(LadderMath.TopState.Standing, LadderMath.AtTop(feet, shaft, Basement.ShaftHalf, column, false));
+            Assert.AreEqual(Vector3.zero, LadderMath.StepOff(Vector3.zero, dt), "no keys: stays put");
+            Assert.AreEqual(LadderMath.TopState.LetGo, LadderMath.AtTop(feet, shaft, Basement.ShaftHalf, column, true), "Jump lets go");
+            var off = new Vector3(shaft.x - Basement.ShaftHalf - 0.2f, feet.y, 0f);
+            Assert.AreEqual(LadderMath.TopState.OnFloor, LadderMath.AtTop(off, shaft, Basement.ShaftHalf, column, false), "stepped onto the floor");
+            var over = new Vector3(shaft.x + 0.6f, feet.y, 0f);
+            Assert.AreEqual(LadderMath.TopState.LetGo, LadderMath.AtTop(over, shaft, Basement.ShaftHalf, column, false), "out over the hole");
+            var walk = LadderMath.StepOff(new Vector3(0f, 1f, 1f), dt);
+            Assert.AreEqual(0f, walk.y, "the height held");
+            Assert.AreEqual(LadderMath.StepOffSpeed * dt, walk.magnitude, 1e-5f);
         }
 
         [Test]

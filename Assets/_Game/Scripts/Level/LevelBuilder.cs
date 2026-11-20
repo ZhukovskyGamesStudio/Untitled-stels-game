@@ -31,7 +31,7 @@ namespace Stealth.Level
         /// </summary>
         public static IEnumerable<bool> LoadSteps(LevelLayout layout, LevelArt art)
         {
-            Clear();
+            foreach (var step in ClearSteps()) yield return step; // the house before comes down a piece at a time (on the drive)
             Layout = layout;
             var builder = new LevelBuilder(art, layout);
             Shell = builder.Shell;
@@ -45,6 +45,38 @@ namespace Stealth.Level
             s_Meshes.AddRange(builder.Meshes);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             Ready = true;
+        }
+
+        /// <summary>Children of the old root destroyed per step when it comes down a piece at a time.</summary>
+        const int DismantlePerStep = 150;
+
+        /// <summary>
+        /// Takes the level away a piece at a time: at once it is no longer the level (no layout, no root — the next can be
+        /// built meanwhile), its navmesh is gone at once, then its pieces are destroyed a batch a step (one destroy of a
+        /// whole house was a long frame on the drive). Outside play mode, at once.
+        /// </summary>
+        public static IEnumerable<bool> ClearSteps()
+        {
+            var root = Root;
+            if (root == null || !Application.isPlaying) { Clear(); yield break; }
+            var meshes = new List<Mesh>(s_Meshes);
+            s_Meshes.Clear();
+            Root = null;
+            Clear(); // (the rest of the state; the root is ours now)
+            root.name += " (leaving)";
+            if (root.TryGetComponent<Unity.AI.Navigation.NavMeshSurface>(out var surface)) surface.enabled = false; // its navmesh off now
+            var t = root.transform;
+            int n = 0;
+            for (int i = t.childCount - 1; i >= 0; i--)
+            {
+                if (t == null) yield break;
+                if (i >= t.childCount) continue;
+                Object.Destroy(t.GetChild(i).gameObject);
+                if (++n % DismantlePerStep == 0) yield return true;
+            }
+            if (root != null) Object.Destroy(root);
+            foreach (var m in meshes)
+                if (m != null) Object.Destroy(m);
         }
 
         public static void Clear()
@@ -313,8 +345,9 @@ namespace Stealth.Level
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
-            if (f == 0) // the shaft down to the basement
-                holes.Add(new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
+            if (f == 0) // the shaft down to the basement, the exit hatch's well (3 x 3 cells each)
+                foreach (var hole in new[] { m_Layout.HatchPosition, m_Layout.ExitHatchPosition })
+                    holes.Add(new Rect(hole.x - Basement.ShaftHalf, hole.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -435,7 +468,7 @@ namespace Stealth.Level
             if (m_Art.ShaftLadder != null)
             {
                 var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(frame), Quaternion.identity);
-                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path);
+                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path, shaft, OpenKeys.Shaft);
             }
             // the storage robot's way up and down: a navmesh link from the ladder's foot to the lobby's floor, open with the lid
             if (m_Art.ShaftLink != null)
@@ -446,7 +479,7 @@ namespace Stealth.Level
                     link.startPoint = path[0];
                     link.endPoint = path[path.Length - 1];
                     link.UpdateLink();
-                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) lid.Link = link;
+                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) if (!lid.Exit) lid.Link = link; // (the entry's)
                     link.activated = false;
                 }
             }

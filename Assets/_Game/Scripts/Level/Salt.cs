@@ -19,6 +19,6 @@ namespace Stealth.Level
         public const int Objective = 0x0B7E, ObjectiveFinish = 0x0B81, VaultTreasure = 0x0B82;
         public const int SafeCode = 0x5AFE, VaultConsoleCode = 0x0C05;
         // the sewer
-        public const int Sewer = 0x5E3E, SewerHall = 0x5E4A, CarUnload = 0xCA60, CarLoad = 0xCA61;
+        public const int Sewer = 0x5E3E, SewerHall = 0x5E4A, CarUnload = 0xCA60, CarLoad = 0xCA61, RouteFuel = 0xF0E1;
     }
 }

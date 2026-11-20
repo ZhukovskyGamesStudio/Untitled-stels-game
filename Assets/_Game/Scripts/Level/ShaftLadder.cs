@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// The ladder between the basement and the lobby (prefab Level/ShaftLadder at its foot; the lid's prefab has one at its
-    /// top, unused): a ladder like any other — walk into it facing it (or step into the open shaft from above) and you are
+    /// A ladder up a shaft into the house (prefab Level/ShaftLadder at the basement's foot, and the passage's end in the
+    /// sewer under the exit hatch; the lid's prefab has one at its top, unused): a ladder like any other — walk into it facing it (or step into the open shaft from above) and you are
     /// on it, W climbs, S goes down, Jump lets go (<see cref="PlayerController"/>, its ladder mode). Off at the bottom when
     /// you reach the floor, off at the top onto the lobby's floor when the lid is open (<see cref="ShaftHatch"/>; shut, your
     /// head stops against it — E on its handle opens it from the ladder too).
@@ -14,8 +14,19 @@ namespace Stealth.Level
         [Tooltip("The lobby's end of the ladder (else its foot in the basement): only the foot carries the ladder's data.")]
         public bool Top;
 
-        /// <summary>The house's ladder (its foot), or null.</summary>
-        public static ShaftLadder Main { get; private set; }
+        /// <summary>The ladders set up now (their feet): the entry's shaft to the basement, the exit's to the passage in the sewer.</summary>
+        public static readonly System.Collections.Generic.List<ShaftLadder> All = new();
+
+        /// <summary>The ladder whose column a body at <paramref name="feet"/> is on (within reach of its rungs), or null.</summary>
+        public static ShaftLadder At(Vector3 feet)
+        {
+            foreach (var l in All)
+                if (l != null && l.InZone(feet)) return l;
+            return null;
+        }
+
+        /// <summary>The key of the lid over its top (<see cref="OpenKeys"/>): off at the top only through it open.</summary>
+        public int LidKey { get; private set; } = OpenKeys.Shaft;
 
         /// <summary>Where a climber is held (x, z) and how far up it goes: from the basement's road to the lobby's floor.</summary>
         public Vector3 Column { get; private set; }
@@ -25,11 +36,16 @@ namespace Stealth.Level
         public Vector3 TopExit { get; private set; }
         /// <summary>The way a climber faces: to the ladder (flat, unit).</summary>
         public Vector3 Facing { get; private set; }
+        /// <summary>The shaft's hole in the lobby's floor: its middle (on the floor) and half its side.</summary>
+        public Vector3 Shaft { get; private set; }
+        public float ShaftHalf { get; private set; } = Basement.ShaftHalf;
 
-        /// <summary>Sets it up from the climb (<see cref="Basement.ClimbPath"/>: foot, the ladder's bottom, its top, the lobby's floor).</summary>
-        public void Setup(Vector3[] path)
+        /// <summary>Sets it up from the climb (<see cref="Basement.ClimbPath"/>: foot, the ladder's bottom, its top, the lobby's floor) and the shaft's hole.</summary>
+        public void Setup(Vector3[] path, Vector3 shaft, int lidKey)
         {
             if (Top || path == null || path.Length < 4) return;
+            Shaft = shaft;
+            LidKey = lidKey;
             Column = path[1];
             Bottom = path[1].y;
             TopY = path[2].y;
@@ -37,13 +53,10 @@ namespace Stealth.Level
             var face = path[1] - path[0];
             face.y = 0f;
             Facing = face.sqrMagnitude > 1e-4f ? face.normalized : Vector3.forward;
-            Main = this;
+            if (!All.Contains(this)) All.Add(this);
         }
 
-        void OnDisable()
-        {
-            if (Main == this) Main = null;
-        }
+        void OnDisable() => All.Remove(this);
 
         /// <summary>A body at <paramref name="feet"/> is on the ladder's column (within reach of its rungs).</summary>
         public bool InZone(Vector3 feet) =>
@@ -55,8 +68,8 @@ namespace Stealth.Level
     {
         /// <summary>How far from the rungs' column a body takes hold, metres.</summary>
         public const float Reach = 0.5f;
-        /// <summary>Climbing speed, metres a second.</summary>
-        public const float Speed = 1.9f;
+        /// <summary>Climbing speed, metres a second (8 m of shaft in about 3 s).</summary>
+        public const float Speed = 2.6f;
 
         /// <summary>
         /// Gets on: in reach and pushing forward at the ladder (facing it) down in the shaft, or falling down the shaft past it.
@@ -81,18 +94,40 @@ namespace Stealth.Level
 
         /// <summary>How high over the lobby's floor the feet rise before stepping off the top, metres (over the rim and the lid's frame).</summary>
         public const float OverRim = 0.25f;
+        /// <summary>How fast one steps off the top of the ladder onto the floor, metres a second.</summary>
+        public const float StepOffSpeed = 1.8f;
 
         /// <summary>
-        /// Climbing out at the top, one frame: first up until the feet are <see cref="OverRim"/> over the floor, then across onto
-        /// it (to <paramref name="exit"/>) — the body moves there, it is never put there. Zero once out.
+        /// Climbing out at the top, one frame: straight up until the feet are <see cref="OverRim"/> over the floor, never
+        /// across (it used to carry the climber sideways onto a spot beside the shaft). Zero once up: the climber stands on
+        /// the top of the ladder and steps off it himself (<see cref="StepOff"/>).
         /// </summary>
-        public static Vector3 ClimbOut(Vector3 feet, Vector3 exit, float dt)
+        public static Vector3 ClimbOut(Vector3 feet, float floorY, float dt)
         {
-            float rise = exit.y + OverRim - feet.y;
-            if (rise > 0.005f) return Vector3.up * Mathf.Min(rise, Speed * dt);
-            var across = new Vector3(exit.x - feet.x, 0f, exit.z - feet.z);
-            if (across.magnitude < 0.05f) return Vector3.zero;
-            return Vector3.ClampMagnitude(across, Speed * 1.2f * dt);
+            float rise = floorY + OverRim - feet.y;
+            return rise > 0.005f ? Vector3.up * Mathf.Min(rise, Speed * dt) : Vector3.zero;
+        }
+
+        /// <summary>Standing on the top of the ladder, one frame: the walk the player asks for (flat, at a step's pace), the height held.</summary>
+        public static Vector3 StepOff(Vector3 wish, float dt)
+        {
+            wish.y = 0f;
+            return Vector3.ClampMagnitude(wish, 1f) * (StepOffSpeed * dt);
+        }
+
+        /// <summary>
+        /// Standing on the top of the ladder: keep standing there, off onto the floor (the body is over the floor beside
+        /// the hole: walk on), or let go back into the shaft (Jump, or wandered over the hole away from the rungs: the
+        /// ladder catches the fall).
+        /// </summary>
+        public enum TopState { Standing, OnFloor, LetGo }
+
+        public static TopState AtTop(Vector3 feet, Vector3 shaft, float shaftHalf, Vector3 column, bool jump)
+        {
+            float off = Mathf.Max(Mathf.Abs(feet.x - shaft.x), Mathf.Abs(feet.z - shaft.z));
+            if (off > shaftHalf + 0.05f) return TopState.OnFloor;
+            if (jump || new Vector2(feet.x - column.x, feet.z - column.z).magnitude > Reach) return TopState.LetGo;
+            return TopState.Standing;
         }
 
         /// <summary>Off at the bottom: going down and standing on the floor.</summary>

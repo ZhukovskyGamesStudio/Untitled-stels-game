@@ -994,10 +994,10 @@ def main():
     write(P("Items", "stun_blast"), stun_blast(), 0.9)
     write(P("Items", "crate_search"), crate_search(), 0.7)
     write(P("Items", "unlock"), unlock(), 0.8)
-    write(P("Car", "car_engine"), car_engine(2.0), 0.8)
+    car_engine(2.0)   # rendered, not written: a CC0 recording replaces it (import_cc0_sounds.py); the noise stream stays the same
     write(P("Car", "car_start"), car_start(), 0.8)
     write(P("Car", "car_stop"), car_stop(), 0.7)
-    write(P("Car", "car_horn"), car_horn(), 0.7)
+    car_horn()        # (the same)
     write(P("Car", "car_bump"), car_bump(), 0.7)
     write(P("Environment", "gate_open"), gate_open(), 0.8)
     write(P("Player", "gas_breath"), gas_breath(), 0.7)

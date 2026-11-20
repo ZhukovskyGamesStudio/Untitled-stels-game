@@ -25,8 +25,8 @@ namespace Stealth.EditorTools
             foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
             {
                 string n = r.gameObject.name;
-                r.sharedMaterial = n.StartsWith("Frame") || n.StartsWith("Handle") ? util[(int)UtilitySlot.Warning]
-                    : n.StartsWith("Lid") ? util[(int)UtilitySlot.Panel]
+                r.sharedMaterial = n.StartsWith("Frame") || n.StartsWith("Handle") || n.StartsWith("Rungs") ? util[(int)UtilitySlot.Warning]
+                    : n.StartsWith("Lid") || n.StartsWith("Well") ? util[(int)UtilitySlot.Panel]
                     : n.StartsWith("EyeLamp") ? M("HatchRing")
                     : util[(int)UtilitySlot.Dark];
                 if (n.StartsWith("Frame") || n.StartsWith("Bolts") || n.StartsWith("Pit") || n.StartsWith("EyeLamp"))

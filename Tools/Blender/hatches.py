@@ -5,9 +5,9 @@ ribs, a recessed lifting bar at its free edge and hinge knuckles along the other
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/hatches.py -- Assets/_Game/Art/Models
 
-Writes Props/hatch_frame_<kind>.fbx and Props/hatch_lid_<kind>.fbx for kind = shaft (opening 1.5 m: 3 x 3 plan cells,
-Basement.ShaftHalf) and exit (1.2 m). The frame: origin in the opening's middle on the floor; parts Frame (yellow),
-Bolts (dark), and for the exit Pit (the dark well) and EyeLamp (four corner lamps, the hatch's colour). The lid:
+Writes Props/hatch_frame_<kind>.fbx and Props/hatch_lid_<kind>.fbx for kind = shaft and exit (both over a shaft with a
+ladder, opening 1.5 m: 3 x 3 plan cells, Basement.ShaftHalf). The frame: origin in the opening's middle on the floor; parts Frame (yellow),
+Bolts (dark), and for the exit EyeLamp (four corner lamps, the hatch's colour). The lid:
 origin on its hinge line, the plate running from it along -Y (Unity +Z) — the builder hangs it on a hinge transform;
 parts Lid, Ribs, Handle, Knuckles. Both faces of the frame's lip and the lid's underside are closed (seen from the
 basement's ladder looking up).
@@ -22,7 +22,7 @@ import shapes as s  # noqa: E402
 KINDS = {
     # half the opening, the frame's flange width, the lid's overlap on the lip
     "shaft": (0.75, 0.12, 0.03),
-    "exit": (0.6, 0.1, 0.03),
+    "exit": (0.75, 0.12, 0.03),   # the same shaft (3 x 3 plan cells) down to the passage in the sewer
 }
 FLANGE_T = 0.012          # the flange's thickness on the floor
 LIP_H = 0.024             # the inner lip's top over the floor (the lid rests on it)
@@ -53,7 +53,6 @@ def frame(kind):
             bolts.append(s.rcyl(0.012, 0.004, (x, y, FLANGE_T + 0.001), seg=10, r=0.0015, bevel_seg=1))
     s.part("Bolts", bolts)
     if kind == "exit":
-        s.part("Pit", [s.rbox((2 * half, 2 * half, 0.006), (0, 0, 0.003), r=0.0, seg=1)])
         lamps = []
         for x in (-1, 1):
             for y in (-1, 1):

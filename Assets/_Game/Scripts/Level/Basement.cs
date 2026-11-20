@@ -35,8 +35,11 @@ namespace Stealth.Level
     /// </summary>
     public static class Basement
     {
-        /// <summary>The road under the lobby's floor: the tunnel's vault (top 4.55 m) stays under the ground.</summary>
-        public const float Depth = 4.9f;
+        /// <summary>
+        /// The road under the lobby's floor. The sewer goes on from the basement's gate under the house and the street
+        /// (<see cref="SewerLocation.UnderHouse"/>): its high hall (vaults to 7 m) and the gate's housing stay under the ground.
+        /// </summary>
+        public const float Depth = 8f;
         /// <summary>The road (over the water) and the walkways along the walls.</summary>
         public const float Road = 0.05f, Walk = 0.15f;
         /// <summary>The car's stretch from the invisible wall to the gate, the seen way back behind the wall, the stretch beyond the gate.</summary>

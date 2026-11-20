@@ -559,18 +559,37 @@ namespace Stealth.EditorTools
             // a key door: the lock panels beside the frame on both sides (shown only on doors of LevelLayout.KeyDoors)
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
-            keyLock.Panels = new[] { 1f, -1f }.Select(side =>
+            // (on leaf A by the meeting edge, on both faces of the 6 cm leaf: it slides away with it)
+            keyLock.Panels = KeyLockPanels(door.PanelA, root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, 0.035f)),
+                root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, -0.035f)));
+            Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
+            return root;
+        }
+
+        /// <summary>The height of a key lock's panel on a leaf: over the handle, at the hand.</summary>
+        const float KeyLockY = 1.32f;
+
+        /// <summary>
+        /// A key door's lock panels (shown only on doors of LevelLayout.KeyDoors): on the door's leaf itself, one on each
+        /// face (world points <paramref name="front"/> on its +Z face, <paramref name="back"/> on its −Z face), so they move
+        /// with the leaf. They used to stand on the wall beside the frame.
+        /// </summary>
+        static GameObject[] KeyLockPanels(Transform leaf, Vector3 front, Vector3 back)
+        {
+            return new[] { 1f, -1f }.Select(side =>
             {
                 var panel = Model("key_lock");
                 panel.name = side > 0 ? "KeyLockA" : "KeyLockB";
-                panel.transform.SetParent(root.transform, false);
-                panel.transform.localPosition = new Vector3(w / 2f + 0.22f, 1.15f, side * (LevelMetrics.WallThickness / 2f + 0.005f));
-                panel.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                panel.transform.SetParent(leaf, false);
+                panel.transform.position = side > 0 ? front : back;
+                // facing out of its face (the model faces its +Z; the hinge of a +X leaf is mirrored: keep it the world's way)
+                panel.transform.rotation = leaf.root.rotation * Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                var ls = leaf.lossyScale;
+                panel.transform.localScale = new Vector3(0.8f / Mathf.Abs(ls.x), 0.8f / Mathf.Abs(ls.y), 0.8f / Mathf.Abs(ls.z));
                 Paint(panel, "Metal", "Metal", "LockLamp");
+                foreach (var r in panel.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                 return panel;
             }).ToArray();
-            Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
-            return root;
         }
 
         /// <summary>
@@ -717,7 +736,11 @@ namespace Stealth.EditorTools
                 door.Blocker = DoorBlocker(root, (-clear / 2f + seam) / 2f, bz, seam + clear / 2f, height, 0.1f);
                 door.BlockerB = DoorBlocker(root, (seam + clear / 2f) / 2f, bz, clear / 2f - seam, height, 0.1f);
             }
-            DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t);
+            // the key panel on the main leaf over its handle, on both faces (hinge-local: the free edge at mainW − 0.075)
+            float keyX = mainW - 0.15f;
+            DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t,
+                door.Swing, door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ + t / 2f + 0.002f)),
+                door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ - t / 2f - 0.002f)));
             Muffles(root, SoundMaterial.Door); // only while closed: the blockers are off when open
             return root;
         }
@@ -930,9 +953,11 @@ namespace Stealth.EditorTools
         /// <summary>
         /// The locks every door has: lock lamps over it on both sides (red while locked, green once hacked; hidden on doors
         /// without a lock), a hasp with a padlock across the leaves' seam at <paramref name="seam"/> on both faces
-        /// (<paramref name="front"/>, <paramref name="back"/>: the faces' z), and the key panels beside the frame.
+        /// (<paramref name="front"/>, <paramref name="back"/>: the faces' z), and the key panels on the main leaf
+        /// (<paramref name="keyLeaf"/>, at the world points <paramref name="keyFront"/> and <paramref name="keyBack"/>).
         /// </summary>
-        static void DoorLocks(GameObject root, AutoDoor door, float w, float h, float seam, float front, float back)
+        static void DoorLocks(GameObject root, AutoDoor door, float w, float h, float seam, float front, float back,
+            Transform keyLeaf = null, Vector3 keyFront = default, Vector3 keyBack = default)
         {
             door.LockLamps = new Renderer[]
             {
@@ -955,16 +980,7 @@ namespace Stealth.EditorTools
             }).ToArray();
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
-            keyLock.Panels = new[] { 1f, -1f }.Select(side =>
-            {
-                var panel = Model("key_lock");
-                panel.name = side > 0 ? "KeyLockA" : "KeyLockB";
-                panel.transform.SetParent(root.transform, false);
-                panel.transform.localPosition = new Vector3(w / 2f + 0.22f, 1.15f, side * (LevelMetrics.WallThickness / 2f + 0.005f));
-                panel.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Paint(panel, "Metal", "Metal", "LockLamp");
-                return panel;
-            }).ToArray();
+            if (keyLeaf != null) keyLock.Panels = KeyLockPanels(keyLeaf, keyFront, keyBack);
         }
 
         /// <summary>
@@ -1138,23 +1154,26 @@ namespace Stealth.EditorTools
             util[(int)UtilitySlot.Warning] = Util("UtilWarning");
             util[(int)UtilitySlot.Panel] = Util("UtilPanel");
             util[(int)UtilitySlot.Dark] = Util("UtilDark");
-            var hatch = new GameObject("Hatch");
-            const float half = 0.6f, bar = 0.1f, lip = 0.03f;
-            HatchModel("hatch_frame_exit", hatch.transform, util);
-            // the lid on its hinge along the +X bar: it lifts its −X edge up and over (the model's hinge runs along its X,
-            // the plate along +Z: turned −90° it runs along Z with the plate towards −X)
-            var hinge = Child(hatch.transform, "LidHinge", new Vector3(half + lip, 0.024f, 0f));
-            HatchModel("hatch_lid_exit", hinge.transform, util, -90f);
-            var h = hatch.AddComponent<Hatch>();
-            h.Lid = hinge.transform;
-            h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
-            hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
-            var box = hatch.AddComponent<BoxCollider>();
-            // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
-            // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it
-            box.size = new Vector3(2 * (half + bar), 0.08f, 2 * (half + bar));
-            box.center = new Vector3(0f, 0.04f, 0f);
-            return hatch;
+            // as the entry's lid (ShaftHatch): the frame right round the hole (3 x 3 plan cells), the lid on a hinge at −Z, the
+            // ladder below it (the passage's shaft in the sewer, SewerLocation); lamps in the frame's corners in the exit's colour
+            var go = new GameObject("Hatch");
+            float half = Basement.ShaftHalf, lip = 0.03f;
+            HatchModel("hatch_frame_exit", go.transform, util);
+            var lid = new GameObject("Lid").transform;
+            lid.SetParent(go.transform, false);
+            lid.localPosition = new Vector3(0f, 0.024f, -half - lip);
+            float side = 2 * half + 2 * lip;
+            HatchModel("hatch_lid_exit", lid, util);
+            var plateCollider = lid.gameObject.AddComponent<BoxCollider>();
+            plateCollider.center = new Vector3(0f, 0.0175f, side / 2f);
+            plateCollider.size = new Vector3(side, 0.035f, side);
+            go.AddComponent<KeepUnmerged>();
+            var h = go.AddComponent<ShaftHatch>();
+            h.Lid = lid;
+            h.LidCollider = plateCollider;
+            h.Exit = true;
+            h.Glow = go.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            return go;
         }
 
         // ------------------------------------------------------------------ props

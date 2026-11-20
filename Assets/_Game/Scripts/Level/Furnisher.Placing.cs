@@ -37,9 +37,21 @@ namespace Stealth.Level
 
         /// <summary>The footprint of a model at a pose, as a world rect (yaws are multiples of 90°, near enough).</summary>
         /// <summary>A placed prop's footprint in the world (x/z, its rotation's bounding box).</summary>
-        public static Rect FootAt(PropKind k, Vector3 p, float yaw)
+        public static Rect FootAt(PropKind k, Vector3 p, float yaw) =>
+            RectAt(Foot.TryGetValue(k, out var f) ? f : Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f), p, yaw);
+
+        /// <summary>
+        /// A thing hung on a wall without the strip it hangs by (its back 0.3 m): what must stay off the room's other walls —
+        /// coat hooks by a doorway ran into the short wall beside it (hung things were only kept off other furniture).
+        /// </summary>
+        static Rect HungSpan(PropKind k, Vector3 p, float yaw)
         {
             var r = Foot.TryGetValue(k, out var f) ? f : Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f);
+            return RectAt(Rect.MinMaxRect(r.xMin, Mathf.Min(r.yMin + 0.3f, r.yMax - 0.02f), r.xMax, r.yMax), p, yaw);
+        }
+
+        static Rect RectAt(Rect r, Vector3 p, float yaw)
+        {
             var q = Quaternion.Euler(0, yaw, 0);
             Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
             foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
@@ -113,6 +125,7 @@ namespace Stealth.Level
                 {
                     var hung = FootAt(p.Kind, p.Pos, p.Yaw);
                     if (m_Keep[f].Overlaps(Grow(hung, 0.06f)) || m_Taken[f].Overlaps(Grow(hung, -0.02f))) return false; // a thin thing: a margin round it
+                    if (!OnFloor(f, room.Id, HungSpan(p.Kind, p.Pos, p.Yaw), WallClear)) return false; // its ends off the side walls
                     continue;
                 }
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
