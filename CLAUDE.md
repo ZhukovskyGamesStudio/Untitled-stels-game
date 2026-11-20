@@ -557,7 +557,7 @@ Graphics jobs выключены (`BuildPlayerWindows`): с ними плеер 
 потоков при загрузке новых вариантов шейдеров; стек расшифрован по PDB из `PlaybackEngines/windowsstandalonesupport/Variations`).
 Модели — `Tools/Blender/*.py` (после экспорта откати неизменённые FBX: `git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`;
 перед экспортом каждая модель проходит `meshfix.fix_objects`, проверка — `review.py` / `audit_models.py`, как моделировать — скилл [`blender-modeling`](.claude/skills/blender-modeling/SKILL.md)),
-звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом), голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).
+звуки — `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом; мотор и гудок машины — CC0-записи: `python Tools/Audio/import_cc0_sounds.py`, список — `Art/Audio/CREDITS.md`), голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).
 
 ## Правила кода (коротко; подробно — скилл [`stealth-code`](.claude/skills/stealth-code/SKILL.md))
 
