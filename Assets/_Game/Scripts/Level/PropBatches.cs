@@ -49,9 +49,13 @@ namespace Stealth.Level
             return true;
         }
 
+        /// <summary>Bumped by every clear: a merge going on over several frames gives up when it is not the latest.</summary>
+        static int s_Run;
+
         /// <summary>The props draw themselves again (before their meshes or materials change).</summary>
         public static void Clear()
         {
+            s_Run++;
             foreach (var r in s_Hidden)
                 if (r != null) r.forceRenderingOff = false;
             foreach (var go in s_Batches)
@@ -66,13 +70,27 @@ namespace Stealth.Level
         /// <summary>Merges the furniture as it looks now; <paramref name="holder"/> is the prefab a merged mesh is drawn with.</summary>
         public static void Rebuild(GameObject holder)
         {
+            foreach (var _ in RebuildSteps(holder)) { }
+        }
+
+        /// <summary>The same a piece of the frame at a time (<see cref="FrameBudget"/>): the house put up on the drive.</summary>
+        public static IEnumerable<bool> RebuildSteps(GameObject holder)
+        {
             Clear();
-            if (holder == null || ActiveLevel.Root == null || !Application.isPlaying) return;
-            var root = ActiveLevel.Root.transform;
+            int run = s_Run;
+            if (holder == null || ActiveLevel.Root == null || !Application.isPlaying) yield break;
+            var levelRoot = ActiveLevel.Root;
+            var root = levelRoot.transform;
+            bool Stale() => run != s_Run || ActiveLevel.Root != levelRoot || root == null;
             var batcher = new MeshBatcher(root.worldToLocalMatrix);
             var merged = new List<Renderer>();
             foreach (var prop in ActiveLevel.Props)
             {
+                if (FrameBudget.Over)
+                {
+                    yield return true;
+                    if (Stale()) yield break;
+                }
                 if (prop == null) continue;
                 foreach (var r in prop.GetComponentsInChildren<MeshRenderer>())
                 {
@@ -86,6 +104,11 @@ namespace Stealth.Level
             }
             for (int i = 0; i < root.childCount; i++)
             {
+                if (FrameBudget.Over)
+                {
+                    yield return true;
+                    if (Stale()) yield break;
+                }
                 var piece = root.GetChild(i);
                 if (!IsShellName(piece.name)) continue;
                 foreach (var r in piece.GetComponentsInChildren<MeshRenderer>())
@@ -95,11 +118,17 @@ namespace Stealth.Level
                     merged.Add(r);
                 }
             }
+            if (FrameBudget.Over)
+            {
+                yield return true;
+                if (Stale()) yield break;
+            }
             var baked = batcher.Bake();
             foreach (var b in baked) s_Meshes.Add(b.Mesh);
             MeshBatcher.Spawn(baked, holder, root, "Props", s_Batches);
             foreach (var r in merged)
             {
+                if (r == null) continue;
                 r.forceRenderingOff = true;
                 s_Hidden.Add(r);
             }

@@ -42,7 +42,7 @@ namespace Stealth.Tests
             int cost = run.Quota;
             run.Deposit(cost + 30);
             Assert.IsTrue(run.EnterSewer(0));
-            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance(run.Quota));
             Assert.AreEqual(30, run.Collected, "what is left stays in the tank");
             Assert.IsTrue(RunState.CanStillGo(10, 50, 40));
             Assert.IsFalse(RunState.CanStillGo(10, 50, 39));
@@ -57,11 +57,11 @@ namespace Stealth.Tests
             Assert.IsTrue(run.EnterSewer(0), "leaving a house is always possible");
             Assert.AreEqual(RunPhase.Sewer, run.Phase);
             Assert.IsTrue(run.CanTrade, "the rest can be fed into the engine down there");
-            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(), "not enough fuel: the car does not go");
+            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(run.Quota), "not enough fuel: the car does not go");
             Assert.AreEqual(RunPhase.Sewer, run.Phase);
             Assert.IsTrue(run.Strand(), "nothing left to burn: the run ends here");
             Assert.AreEqual(RunPhase.Failed, run.Phase);
-            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(), "nothing happens after the end");
+            Assert.AreEqual(RunState.Exit.Ignored, run.Advance(run.Quota), "nothing happens after the end");
             Assert.IsFalse(run.EnterSewer(0));
         }
 
@@ -72,20 +72,35 @@ namespace Stealth.Tests
             run.BeginLevel(0, 1000);
             run.EnterSewer(0);
             run.Deposit(run.Quota);
-            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance(run.Quota));
         }
 
         [Test]
-        public void TheTeamLeavesWhenEveryoneWhoCanIsInTheHatch()
+        public void EveryWayOnCostsItsOwnFuel()
         {
-            // (in a hatch, it is the exit's, knocked out)
-            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (true, true, false) }));
-            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (true, false, false) }), "one in the entry's will do");
-            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, false, false), (true, false, false) }), "nobody in the exit's");
-            Assert.IsFalse(RunState.TeamInHatch(new[] { (true, true, false), (false, false, false) }), "one is still upstairs");
-            Assert.IsTrue(RunState.TeamInHatch(new[] { (true, true, false), (false, false, true) }), "the knocked-out one stays behind");
-            Assert.IsFalse(RunState.TeamInHatch(new[] { (false, false, true), (false, false, true) }), "nobody is in the hatch");
-            Assert.IsFalse(RunState.TeamInHatch(new (bool, bool, bool)[0]));
+            var shares = new RunSettings().RouteFuel;
+            for (int seed = 1; seed < 40; seed++)
+                for (int depth = 0; depth < 4; depth++)
+                {
+                    var ways = new System.Collections.Generic.HashSet<float>();
+                    for (int lane = 0; lane < shares.Length; lane++) ways.Add(RunState.RouteShare(seed, depth, lane, shares));
+                    Assert.AreEqual(shares.Length, ways.Count, $"seed {seed} depth {depth}: the ways out of one sewer all differ");
+                    Assert.AreEqual(RunState.RouteShare(seed, depth, 1, shares), RunState.RouteShare(seed, depth, 1, shares), "the same on every peer");
+                }
+            Assert.AreEqual(0, RunState.RouteCost(0, 1.35f), "the first drive is free whichever way");
+            Assert.AreEqual(70, RunState.RouteCost(100, 0.7f));
+            Assert.AreEqual(135, RunState.RouteCost(100, 1.35f));
+            Assert.AreEqual(5, RunState.RouteCost(3, 0.7f), "never free once there is a quota");
+            Assert.AreEqual(0, RunState.RouteCost(100, 0.7f) % 5, "in fives");
+        }
+
+        [Test]
+        public void TheRunCanEndUnderTheHouseWhenNothingCanPayAnyWay()
+        {
+            var run = new RunState();
+            run.BeginLevel(0, 1000);
+            Assert.IsTrue(run.Strand(), "the house and the sewer under it hold too little: flooded there");
+            Assert.AreEqual(RunPhase.Failed, run.Phase);
         }
 
         [Test]
@@ -95,7 +110,7 @@ namespace Stealth.Tests
             run.BeginLevel(0, 1000);
             run.Deposit(run.Quota);
             run.EnterSewer(2);
-            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance(run.Quota));
             run.BeginLevel(1, 1000);
             Assert.AreEqual(RunState.QuotaFor(1000, 1, 2), run.Quota);
             Assert.Greater(run.Quota, RunState.QuotaFor(1000, 1, 0));

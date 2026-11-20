@@ -41,7 +41,7 @@ namespace Stealth.Player
             {
                 if (m_ServerPlace != null) return false;
                 var sewer = SewerLocation.Active;
-                if (sewer != null) return m_PlacedSewer == sewer;
+                if (sewer != null && !sewer.UnderHouse) return m_PlacedSewer == sewer; // (a house's own sewer: the house is where we are put)
                 var layout = ActiveLevel.Layout;
                 return layout != null && (m_PlacedSeed == layout.Seed || layout.PlayerSpawns.Count == 0);
             }
@@ -67,8 +67,10 @@ namespace Stealth.Player
                 Motor.SetPitch(0f);
                 return;
             }
-            if (sewer != null && sewer != m_PlacedSewer)
+            if (sewer != null && !sewer.UnderHouse && sewer != m_PlacedSewer)
             {
+                // the sewer between houses (the run's start): everyone at its spawns. A house's own sewer under it puts nobody
+                // anywhere: the team goes down the exit hatch and up again by itself
                 m_PlacedSewer = sewer;
                 int slot = PlayerLooks.SlotOf(ClientId);
                 TeleportOwner(sewer.SpawnFor(slot), sewer.SpawnRotation(slot));
@@ -113,7 +115,7 @@ namespace Stealth.Player
             }
             var fallback = new List<Vector3>();
             var sewer = SewerLocation.Active;
-            if (sewer != null)
+            if (sewer != null && (!sewer.UnderHouse || transform.position.y < LevelLayout.Underground)) // (up in the house: its own spots)
                 foreach (var s in sewer.Spawns) fallback.Add(s.position);
             else if (ActiveLevel.Layout is { } layout)
             {
@@ -174,12 +176,16 @@ namespace Stealth.Player
             }
             if (m_ClimbingOut)
             {
-                // over the top: the body rises above the rim and moves onto the lobby's floor, step by step (no jump)
-                var step = LadderMath.ClimbOut(feet, ladder.TopExit, dt);
-                m_Controller.Move(step);
-                if (step.sqrMagnitude < 1e-8f || (transform.position - feet).sqrMagnitude < 1e-8f && Time.time > m_ClimbOutSince + 1.5f)
+                // over the top: the body rises straight up above the rim, then stands on the top of the ladder; the player
+                // steps off it himself, the way he wants (nothing carries him aside)
+                var rise = LadderMath.ClimbOut(feet, ladder.Shaft.y, dt);
+                if (rise.sqrMagnitude > 1e-8f && Time.time < m_ClimbOutSince + 3f) { m_Controller.Move(rise); return; }
+                var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
+                m_Controller.Move(LadderMath.StepOff(wish, dt));
+                var state = LadderMath.AtTop(transform.position, ladder.Shaft, ladder.ShaftHalf, ladder.Column, input.Jump);
+                if (state != LadderMath.TopState.Standing)
                 {
-                    Climbing = false;
+                    Climbing = false; // on the floor: the motor walks on; let go: the ladder catches the fall
                     m_ClimbingOut = false;
                 }
                 return;

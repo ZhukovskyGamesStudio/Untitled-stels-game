@@ -190,7 +190,7 @@ namespace Stealth.Tests
             }
             float area = shell.Floors.Where(f => f.Floor == 0).Sum(f => (f.Max.x - f.Min.x) * (f.Max.y - f.Min.y));
             float rooms = layout.Rooms.Where(r => r.Floor == 0).Sum(r => r.Area);
-            float shaft = 4f * Basement.ShaftHalf * Basement.ShaftHalf; // (the hole down to the basement)
+            float shaft = 2f * 4f * Basement.ShaftHalf * Basement.ShaftHalf; // (the holes down to the basement and the exit hatch's well)
             Assert.GreaterOrEqual(area, rooms - shaft - 0.5f, "the ground floor is covered");
         }
 

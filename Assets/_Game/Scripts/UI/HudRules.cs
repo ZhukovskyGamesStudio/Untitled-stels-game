@@ -23,6 +23,8 @@ namespace Stealth.UI
         /// <summary>At a stash (a hatch of the house) or at the car.</summary>
         public bool NearTrade;
         public bool InHatch;
+        /// <summary>Sitting in the exit hatch with the house's sewer under it: crouch goes down.</summary>
+        public bool InExitHatch;
         /// <summary>A locked door in reach and how far its hack is (0..1).</summary>
         public bool LockedDoor;
         public float DoorProgress;
@@ -219,6 +221,7 @@ namespace Stealth.UI
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
             Level.UseKind.VentGrate => ReticleIcon.Vent,
             Level.UseKind.ShaftHatch => ReticleIcon.Lever,
+            Level.UseKind.ExitLadder or Level.UseKind.ExitDown => ReticleIcon.Hand,
             Level.UseKind.DoorLock => ReticleIcon.Lock,
             Level.UseKind.Safe => ReticleIcon.Safe,
             Level.UseKind.StoragePart => ReticleIcon.Search,
@@ -276,6 +279,7 @@ namespace Stealth.UI
                 into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
                 if (c.CarriedItems > 0) into.Add(new Hint(K(GameAction.StashAll), Loc.T("hint.stash_all")));
                 into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.out")));
+                if (c.InExitHatch) into.Add(new Hint(K(GameAction.CrouchHold), Loc.T("hint.hatch.down")));
                 return into;
             }
             if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)

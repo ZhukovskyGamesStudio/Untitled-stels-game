@@ -208,7 +208,7 @@ namespace Stealth.Player
         {
             var game = GameManager.Instance;
             var car = Vehicles.Car.Active;
-            if (game == null || car == null || !CanAct || game.Phase != RunPhase.Sewer) return;
+            if (game == null || car == null || !CanAct || game.Phase is not (RunPhase.Sewer or RunPhase.Playing)) return;
             if ((car.transform.position - transform.position).magnitude > CarReach || !CanPlace(item.Shape, rot, x, y)) return;
             if (!game.Cargo.Remove(item)) return; // taken by somebody else meanwhile
             m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
@@ -450,7 +450,7 @@ namespace Stealth.Player
         public void StashAllServer()
         {
             var game = GameManager.Instance;
-            if (game != null && game.Phase == RunPhase.Sewer && Vehicles.Car.Active != null && CanAct &&
+            if (game != null && game.Phase is RunPhase.Sewer or RunPhase.Playing && Vehicles.Car.Active != null && CanAct &&
                 (Vehicles.Car.Active.transform.position - transform.position).magnitude < 5f)
             {
                 // at the car: everything from the backpack onto its bed

@@ -100,6 +100,19 @@ namespace Stealth.Level
 
         public SewerPlan Plan { get; private set; }
 
+        /// <summary>
+        /// The sewer of the house the team is in: it goes on from the basement's gate (the basement is its car's stretch, so
+        /// those segments are left out) for as long as the house stands — the team goes down the exit hatch and back up as
+        /// often as it likes. Not under a house: the sewer at the run's start (<see cref="Origin"/>, alone).
+        /// </summary>
+        public bool UnderHouse { get; private set; }
+
+        /// <summary>Set at once after it is made, before it is built (nobody may take it for the sewer between houses meanwhile).</summary>
+        public void MarkUnderHouse() => UnderHouse = true;
+
+        /// <summary>Built whole (a piece a frame: its spawns and the gate are there only after the last).</summary>
+        public bool Built { get; private set; }
+
         float m_WaterBase;
         float m_FloodStart = -1f;
         int m_Ways = -1;
@@ -158,10 +171,18 @@ namespace Stealth.Level
         /// <summary>Assembles the sewer of this plan (every peer, the same plan → the same sewer).</summary>
         public void Build(SewerPlan plan)
         {
+            foreach (var _ in BuildSteps(plan)) { }
+        }
+
+        /// <summary>The same a piece of the frame at a time (<see cref="FrameBudget"/>): under a house it goes up while the team plays.</summary>
+        public IEnumerable<bool> BuildSteps(SewerPlan plan)
+        {
             Plan = plan;
+            Built = false;
             // the way the car came from: a long tunnel behind it, dimly lit, closed by an invisible wall where the sewer starts
-            Put(BackWall, "BackWall", Vector3.zero);
-            for (int i = 1; i <= BackSegments; i++)
+            // (under a house that is the basement's: here only from its gate on)
+            if (!UnderHouse) Put(BackWall, "BackWall", Vector3.zero);
+            for (int i = 1; i <= BackSegments && !UnderHouse; i++)
             {
                 float bx = -i * SewerPlan.SegmentLength;
                 if (Segments != null && Segments.Length > 0) Put(Segments[(i * 3 + plan.Segments.Count) % Segments.Length], $"BackSegment{i}", new Vector3(bx, 0f, 0f));
@@ -178,10 +199,12 @@ namespace Stealth.Level
                         }
                 }
             }
-            Put(Cap, "Cap", new Vector3(-BackSegments * SewerPlan.SegmentLength, 0f, 0f));
+            if (!UnderHouse) Put(Cap, "Cap", new Vector3(-BackSegments * SewerPlan.SegmentLength, 0f, 0f));
             for (int i = 0; i < plan.Segments.Count; i++)
             {
                 var s = plan.Segments[i];
+                if (UnderHouse && s.X < plan.GateX - 0.01f) continue; // the car's stretch: the basement
+                if (FrameBudget.Over) yield return true;
                 if (s.Alcove && Alcove != null) Put(Alcove, $"Segment{i}", new Vector3(s.X, 0f, 0f)); // its lid shut: no ladder to climb here
                 else if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
                 if (s.LampSide != 0)
@@ -223,12 +246,15 @@ namespace Stealth.Level
             Spawns = spawns.ToArray();
             if (plan.ExitLadderX >= 0f)
             {
-                Put(Ladder, "ExitLadder", new Vector3(plan.ExitLadderX, 0.15f, 3.45f));
+                var ladder = Put(Ladder, "ExitLadder", new Vector3(plan.ExitLadderX, 0.15f, 3.45f));
+                if (ladder != null) foreach (var use in ladder.GetComponentsInChildren<Interactable>()) use.Configure(0); // up into the house's exit hatch
                 Put(Manhole, "ExitManhole", new Vector3(plan.ExitLadderX, 4.15f, 3.2f));
             }
+            yield return true;
 
             // the hall: its cells (floor and vault), walls (plain, the way in, the mouths), columns, arches, lamps
             BuildHall(plan);
+            yield return true;
             // the three tunnels at their mouths; the mouths no tunnel takes are bricked up
             var hub = new Vector3(plan.HubX, 0f, 0f);
             for (int m = 0; m < plan.Mouths.Length; m++)
@@ -237,6 +263,7 @@ namespace Stealth.Level
             Branches = new Branch[SewerBranches.Count];
             for (int i = 0; i < SewerBranches.Count; i++)
             {
+                if (FrameBudget.Over) yield return true;
                 var mouth = plan.Mouths[plan.TunnelMouths[i]];
                 var at = hub + mouth.position;
                 if (BranchPrefab == null) continue;
@@ -265,6 +292,8 @@ namespace Stealth.Level
                 Water = water.transform;
                 m_WaterBase = Water.localPosition.y;
             }
+            m_Ways = -1; // (the tunnels' bars and signs for the ways on: set again now that they are there)
+            Built = true;
         }
 
         GameObject PutAt(GameObject prefab, string name, Vector3 at, Quaternion rotation)

@@ -132,13 +132,28 @@ namespace Stealth.Level
         /// <summary>A level was (re)built: the game's atmosphere was reset, put the style back on.</summary>
         public static void Reapply()
         {
+            foreach (var _ in ReapplySteps()) { }
+        }
+
+        /// <summary>
+        /// The same a piece of the frame at a time (<see cref="FrameBudget"/>): the house put up on the drive — dressing
+        /// every renderer, the style's architecture and the merge of the furniture were one long frame at its end.
+        /// </summary>
+        public static IEnumerable<bool> ReapplySteps()
+        {
             if (!s_Active)
             {
-                if (Application.isPlaying) PropBatches.Rebuild(Config != null ? Config.Batch : null);
-                return;
+                if (Application.isPlaying)
+                    foreach (var step in PropBatches.RebuildSteps(Config != null ? Config.Batch : null)) yield return step;
+                yield break;
             }
             s_BaseAmbient = RenderSettings.ambientLight;
-            Apply(s_Current);
+            var style = s_Current;
+            ApplyVolume(style);
+            ApplyScreen(style != null ? style.Screen : null);
+            ApplyWorld(World);
+            ApplyPalette(style != null ? style.Palette : null);
+            foreach (var step in ApplyGeometrySteps(style != null ? style.Geometry : null)) yield return step;
         }
 
         /// <summary>Back to the base look; the materials get their own colours back (they are assets in the editor).</summary>
@@ -248,17 +263,26 @@ namespace Stealth.Level
 
         static void ApplyGeometry(StyleGeometry g)
         {
+            foreach (var _ in ApplyGeometrySteps(g)) { }
+        }
+
+        static IEnumerable<bool> ApplyGeometrySteps(StyleGeometry g)
+        {
             var family = g != null ? g.Family : ModelFamily.None;
             PropBatches.Clear(); // the furniture is about to change: it draws itself until merged again
             if (family != s_Family) UndoReplacements();
             s_Family = family;
             StyleParts.ShowAll(s_Current != null && g != null ? s_Current.name : null); // things with a model of their own in a style
-            foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
+            foreach (var r in Object.FindObjectsByType<Renderer>())
+            {
+                if (r != null) DressRenderer(r);
+                if (FrameBudget.Over) yield return true;
+            }
             GeometryChanged?.Invoke(); // (furniture dressed in variants picks its own parts or the style's)
-            if (!Application.isPlaying) return;
+            if (!Application.isPlaying) yield break;
             var holder = Config != null ? Config.Batch : null;
-            StyleDecor.Rebuild(g, Config != null ? Config.KitFor(family) : null, holder);
-            PropBatches.Rebuild(holder);
+            foreach (var step in StyleDecor.RebuildSteps(g, Config != null ? Config.KitFor(family) : null, holder)) yield return step;
+            foreach (var step in PropBatches.RebuildSteps(holder)) yield return step;
         }
 
         static void Load()

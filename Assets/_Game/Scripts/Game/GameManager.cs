@@ -31,6 +31,29 @@ namespace Stealth.Game
         public GameObject LaserPrefab;
 
         public static float LevelStartTime { get; private set; }
+
+        /// <summary>
+        /// Server: someone climbed up into the house (out of the basement or up the exit's ladder): its clock runs from then
+        /// on without a break, wherever the team goes (the sewer under it included) — the hunter, the guards waking and the
+        /// reinforcements count on it (<see cref="HouseTime"/>).
+        /// </summary>
+        bool m_HouseEntered;
+
+        /// <summary>Server: seconds since the first player climbed up into this house (0 until then).</summary>
+        float HouseTime => m_HouseEntered ? Time.time - LevelStartTime : 0f;
+
+        /// <summary>Server: the clock starts when the first player is up in the house (the sensors' grace period with it).</summary>
+        void UpdateHouseEntry()
+        {
+            if (m_HouseEntered) return;
+            foreach (var p in PlayerController.All)
+                if (!p.Downed && p.SeatIndex < 0 && p.transform.position.y > LevelLayout.Underground + 1f)
+                {
+                    m_HouseEntered = true;
+                    LevelStartTime = Time.time;
+                    return;
+                }
+        }
         /// <summary>Sensors stay off for a moment after a house starts (RunConfig.GracePeriod).</summary>
         public static bool InGracePeriod => Instance != null && !DevFlags.SkipGracePeriod && Time.time - LevelStartTime < Instance.m_Run.Settings.GracePeriod;
 
@@ -104,8 +127,46 @@ namespace Stealth.Game
         /// <summary>The stash in the house's entry hatch: what came up from the car (it stays in the house unless carried to the exit).</summary>
         public TeamStash Stash { get; } = new();
         public RunState Run => m_Run;
+        /// <summary>The house's quota: the fuel a drive on costs by an average way (each way its share of it, <see cref="CostOf"/>).</summary>
         public int Quota => m_Run.Quota;
         public int Collected => m_Run.Collected;
+
+        /// <summary>The fuel the drive to the house in row <paramref name="lane"/> of the next column costs (every peer works it out the same way).</summary>
+        public int CostOf(int lane) => RunState.RouteCost(Quota, RunState.RouteShare(Level.RunSeed, Level.Index + 1, lane, m_Run.Settings.RouteFuel));
+
+        /// <summary>The cheapest way on from here (what the team must at least get).</summary>
+        public int CheapestCost
+        {
+            get
+            {
+                var options = RouteOptions;
+                if (options.Count == 0) return Quota;
+                int best = int.MaxValue;
+                foreach (int lane in options) best = Mathf.Min(best, CostOf(lane));
+                return best;
+            }
+        }
+
+        /// <summary>
+        /// The fuel the team is after now: the way chosen (the car standing in its tunnel), else the cheapest — the fuel on
+        /// the HUD and "enough" everywhere mean this.
+        /// </summary>
+        public int FuelNeeded
+        {
+            get
+            {
+                if (ChosenLane >= 0) return CostOf(ChosenLane);
+                var sewer = SewerLocation.Active;
+                var car = Vehicles.Car.Active;
+                var options = RouteOptions;
+                if (sewer != null && car != null && options.Count > 0)
+                {
+                    int way = SewerBranches.WayOf(sewer.BranchAt(car.transform.position), options.Count);
+                    if (way >= 0) return CostOf(options[way]);
+                }
+                return CheapestCost;
+            }
+        }
         public int RunTotal => m_Run.RunTotal;
         public RunPhase Phase => m_Run.Phase;
         public double AlarmUntil => m_Run.AlarmUntil;
@@ -206,7 +267,7 @@ namespace Stealth.Game
             {
                 // The new house and the phase arrive as separate updates: the house may have been built (and taken
                 // away by the sewer) before the phase said "playing" — then it is built again now.
-                if (m_Sewer != null) LeaveSewerLocal();
+                if (m_Sewer != null && !IsHouseSewer(m_Sewer)) LeaveSewerLocal(); // (this house's own stays: EnsureHouseSewer)
                 if (ActiveLevel.Layout == null) BuildLocal();
             }
             else if (Phase == RunPhase.Failed && m_Sewer != null) m_Sewer.Flood();
@@ -229,8 +290,79 @@ namespace Stealth.Game
 
         void LeaveSewerLocal()
         {
+            if (m_SewerBuild != null) StopCoroutine(m_SewerBuild);
+            m_SewerBuild = null;
             if (m_Sewer != null) Destroy(m_Sewer.gameObject);
             m_Sewer = null;
+            m_SewerShifted = false;
+        }
+
+        Coroutine m_SewerBuild;
+        /// <summary>The house's sewer went down out of the way on the drive (<see cref="ShiftSewerForDrive"/>).</summary>
+        bool m_SewerShifted;
+
+        /// <summary>The house's sewer stands whole under it: the exit hatch leads down into it.</summary>
+        public bool HouseSewerReady => m_Sewer != null && IsHouseSewer(m_Sewer) && m_Sewer.Built;
+
+        /// <summary>This house's own sewer (under it, of its depth), not the one between houses or another house's.</summary>
+        bool IsHouseSewer(SewerLocation sewer) => sewer != null && sewer.UnderHouse && m_SewerFor == (Level.RunSeed, Level.Index);
+
+        /// <summary>
+        /// Every peer, a house standing (not on the drive): its sewer goes on from the basement's gate under it — the descent
+        /// from the exit hatch, the hall, the tunnels on — built a piece of a frame at a time; the basement's own gate and
+        /// the stretch past it give way to it. Another house's sewer (left from the drive) goes first.
+        /// </summary>
+        void EnsureHouseSewer()
+        {
+            if (Phase != RunPhase.Playing || DriveUntil > 0 || Art == null || Art.Sewer == null) return;
+            var l = ActiveLevel.Layout;
+            if (l == null || !ActiveLevel.Ready || l.Seed != Level.Seed) return;
+            if (m_Sewer != null)
+            {
+                if (IsHouseSewer(m_Sewer)) return;
+                LeaveSewerLocal();
+            }
+            var plan = SewerPlan.Make(Level.RunSeed, Level.Index);
+            var frame = l.Cellar;
+            var at = frame.ToWorld(new Vector3(Basement.GateX - plan.GateX, 0f, 0f)); // its gate where the basement's stands
+            m_Sewer = Instantiate(Art.Sewer, at, frame.Rotation).GetComponent<SewerLocation>();
+            m_Sewer.MarkUnderHouse(); // (before any frame passes: nobody takes it for the sewer between houses)
+            m_SewerFor = (Level.RunSeed, Level.Index);
+            m_SewerShifted = false;
+            m_SewerBuild = StartCoroutine(BuildHouseSewer(m_Sewer, plan));
+        }
+
+        IEnumerator BuildHouseSewer(SewerLocation sewer, SewerPlan plan)
+        {
+            foreach (var _ in sewer.BuildSteps(plan)) yield return null;
+            if (sewer == null) yield break;
+            VisualStyles.Dress(sewer.gameObject);
+            // the basement's stand-in gate and the stretch past it (built with the house) give way to the sewer's own
+            var root = ActiveLevel.Root;
+            if (root != null)
+                foreach (Transform piece in root.transform)
+                    if (piece.name == "BasementGate" || piece.name == "BasementFarCap" || piece.name.StartsWith("BasementBeyond", System.StringComparison.Ordinal))
+                        piece.gameObject.SetActive(false);
+            m_SewerBuild = null;
+        }
+
+        /// <summary>
+        /// Every peer, the moment the car drives off: the house's sewer (the car in its tunnel, the team in the car) goes down
+        /// deep under the house in one frame, as the sewer between houses always stood (<see cref="SewerLocation.Origin"/>):
+        /// the next house goes up where this one stands, its basement and sewer with it. Everything in it moves together —
+        /// the car's drive is worked out in its tunnel's frame — so nothing changes on screen; a body on foot down here
+        /// (lying, left behind) moves with it.
+        /// </summary>
+        void ShiftSewerForDrive()
+        {
+            if (m_SewerShifted || m_Sewer == null || !m_Sewer.UnderHouse || DriveUntil <= 0) return;
+            m_SewerShifted = true;
+            var delta = new Vector3(0f, SewerLocation.Origin.y - m_Sewer.transform.position.y, 0f);
+            var me = PlayerController.Local;
+            bool carry = me != null && me.SeatIndex < 0 && me.transform.position.y < LevelLayout.Underground;
+            m_Sewer.transform.position += delta;
+            Physics.SyncTransforms();
+            if (carry) me.TeleportOwner(me.transform.position + delta, me.transform.rotation);
         }
 
         (int seed, int depth) m_SewerFor;
@@ -256,7 +388,8 @@ namespace Stealth.Game
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
             ApplyAtmosphere();
-            VisualStyles.Reapply();
+            foreach (var _ in VisualStyles.ReapplySteps()) yield return null; // (a piece of a frame at a time: FrameBudget)
+            if (PlayerController.Local != null) PlayerController.Local.SnapAir(); // under the house in the sewer: its air at once
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {HouseKinds.Name(layout.Kind)} ({layout.Mass}) {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms, {layout.Floors} floors for {layout.Players} players");
         }
 
@@ -286,6 +419,18 @@ namespace Stealth.Game
         /// </summary>
         IEnumerator StartLevelSteps(int index, int lane, int houseSeed, bool arriving)
         {
+            m_HouseEntered = false;
+            foreach (var obj in m_Spawned.ToArray())
+            {
+                Session.Despawn(obj);
+                if (arriving && FrameBudget.Over) yield return null;
+            }
+            m_Spawned.Clear();
+            foreach (var item in WorldItem.All.ToArray())
+            {
+                Session.Despawn(item.gameObject);
+                if (arriving && FrameBudget.Over) yield return null;
+            }
             ScentTrail.Clear();
             m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
@@ -301,8 +446,15 @@ namespace Stealth.Game
             var layout = ActiveLevel.Layout;
 
             // The level root prefab carries a configured NavMeshSurface (children, physics colliders, no ceiling layer).
-            ActiveLevel.Root.GetComponent<NavMeshSurface>().BuildNavMesh();
-            if (arriving) yield return null;
+            // On the drive it is baked on worker threads (the whole house in one frame was the drive's longest stall).
+            var surface = ActiveLevel.Root.GetComponent<NavMeshSurface>();
+            if (arriving)
+            {
+                var bake = BakeNavMeshAsync(surface);
+                while (bake != null && !bake.isDone) yield return null;
+                yield return null;
+            }
+            else surface.BuildNavMesh();
 
             foreach (var obj in m_Spawned) Session.Despawn(obj);
             m_Spawned.Clear();
@@ -316,7 +468,9 @@ namespace Stealth.Game
             ChosenLane = -1;
             Votes.Clear();
             Level = info;
-            int totalValue = SpawnContent(layout, seed);
+            var counted = new int[1];
+            foreach (var _ in SpawnContentSteps(layout, seed, counted)) if (arriving) yield return null; // (a piece of a frame at a time)
+            int totalValue = counted[0];
             m_Run.BeginLevel(index, totalValue, players);
             LevelStartTime = Time.time;
             m_GuardsAwake = false;
@@ -331,7 +485,30 @@ namespace Stealth.Game
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
 
+        /// <summary>Server: the navmesh of a just built house baked on worker threads (the sources are gathered now), or null.</summary>
+        static AsyncOperation BakeNavMeshAsync(NavMeshSurface surface)
+        {
+            if (surface == null) return null;
+            if (surface.navMeshData == null)
+            {
+                surface.navMeshData = new NavMeshData(surface.agentTypeID) { position = surface.transform.position, rotation = surface.transform.rotation };
+                surface.AddData();
+            }
+            return surface.UpdateNavMesh(surface.navMeshData);
+        }
+
         int SpawnContent(LevelLayout layout, int seed)
+        {
+            var counted = new int[1];
+            foreach (var _ in SpawnContentSteps(layout, seed, counted)) { }
+            return counted[0];
+        }
+
+        /// <summary>
+        /// Server: the house's loot, features, main job, robots, cameras and lasers, a piece of a frame at a time
+        /// (<see cref="FrameBudget"/>: on the drive); the loot's value (the quota counts on it) into <paramref name="counted"/>[0].
+        /// </summary>
+        IEnumerable<bool> SpawnContentSteps(LevelLayout layout, int seed, int[] counted)
         {
             var rng = LevelRandom.Stream(RandomChannel.Loot);
             var hideRng = LevelRandom.Stream(RandomChannel.Storage);
@@ -362,9 +539,13 @@ namespace Stealth.Game
                     continue;
                 }
                 total += SpawnItemServer((byte)loot.Shape, (byte)loot.Color, loot.Position, yaw).Value;
+                if (FrameBudget.Over) yield return true;
             }
             total += SpawnFeatures(layout);
+            yield return true;
             SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
+            counted[0] = total;
+            yield return true;
 
             var wardens = new List<GameObject>();
             for (int si = 0; si < layout.RobotSpawns.Count; si++)
@@ -378,14 +559,18 @@ namespace Stealth.Game
                 // (its exact spot at the dock, not the navmesh's nearest: the dock's own carving would push it aside)
                 if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(spawn.Position, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
+                if (FrameBudget.Over) yield return true;
             }
             PostWardens(layout, wardens);
 
-            foreach (var pose in layout.CameraSpots) SpawnRobotServer(RobotKind.Camera, pose.position, pose.rotation);
+            foreach (var pose in layout.CameraSpots)
+            {
+                SpawnRobotServer(RobotKind.Camera, pose.position, pose.rotation);
+                if (FrameBudget.Over) yield return true;
+            }
 
             foreach (var spot in layout.LaserSpots)
                 m_Spawned.Add(Session.Spawn(LaserPrefab, spot.Position, spot.Rotation, go => go.GetComponent<LaserGate>().Configure(spot.Kind, spot.Width)));
-            return total;
         }
 
         /// <summary>
@@ -441,10 +626,12 @@ namespace Stealth.Game
             Banner(Loc.Pack("banner.cheat_robots_off"));
         }
 
-        /// <summary>Server, cheat: the quota of this house is met.</summary>
+        /// <summary>Server, cheat: fuel for any way on from this house.</summary>
         public void FillQuotaServer()
         {
-            if (Collected < Quota) AddCollectedServer(Quota - Collected);
+            int most = Quota;
+            foreach (int lane in RouteOptions) most = Mathf.Max(most, CostOf(lane));
+            if (Collected < most) AddCollectedServer(most - Collected);
         }
 
         public void RaiseAlarmServer(Vector3 position, float radius)
@@ -466,6 +653,7 @@ namespace Stealth.Game
             RevealMap();
             PrepareNextHouse();
             UpdateDrive();
+            EnsureHouseSewer();
             if (!m_IsServer) return;
             if (DriveUntil > 0 && Phase == RunPhase.Playing && !m_Arriving && Session.ServerTime >= ArriveAt)
             {
@@ -486,13 +674,14 @@ namespace Stealth.Game
             UpdateStorageDoor();
             UpdateLift();
             UpdateObjective();
-            UpdateHatch();
+            UpdateHouseEntry();
+            if (m_Sewer != null && m_Sewer.UnderHouse && m_Sewer.Built && ActiveLevel.Ready) UpdateRouteServer(); // (may drive off)
             if (Phase != RunPhase.Playing) return;
             // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
             bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
-            if (classic && !InGracePeriod && m_Run.ShouldSendHunter(Time.time - LevelStartTime)) SpawnHunter();
+            if (classic && m_HouseEntered && !InGracePeriod && m_Run.ShouldSendHunter(HouseTime)) SpawnHunter();
             // the new mode: when the house's time is up (the hunter's timer) the guards leave their docks for good
-            if (!classic && !m_GuardsAwake && m_Run.HunterForecast(Time.time - LevelStartTime).seconds == 0f)
+            if (!classic && m_HouseEntered && !m_GuardsAwake && m_Run.HunterForecast(HouseTime).seconds == 0f)
             {
                 m_GuardsAwake = true;
                 foreach (var robot in RobotController.Robots) if (robot.Docked) robot.WakeForGoodServer();
@@ -549,7 +738,7 @@ namespace Stealth.Game
         /// <summary>Server: publish when the next hunter comes, and warn the team a minute before.</summary>
         void UpdateHunterForecast()
         {
-            var (seconds, alarms) = m_Run.HunterForecast(Time.time - LevelStartTime);
+            var (seconds, alarms) = m_Run.HunterForecast(HouseTime);
             HunterAt = seconds < 0f ? 0 : Session.ServerTime + seconds;
             HunterAlarmsLeft = alarms;
             if (seconds < 0f || seconds > HunterWarning) { m_HunterWarned = false; return; }
@@ -568,9 +757,9 @@ namespace Stealth.Game
         void UpdateReinforcements()
         {
             var layout = ActiveLevel.Layout;
-            if (layout == null || layout.PatrolPoints.Count == 0 || DriveUntil > 0) return;
+            if (layout == null || layout.PatrolPoints.Count == 0 || DriveUntil > 0 || !m_HouseEntered) return;
             var s = m_Run.Settings;
-            int due = RobotRoster.ReinforcementsDue(Time.time - LevelStartTime, s.ReinforceFirst, s.ReinforceSecond, s.ReinforceEvery);
+            int due = RobotRoster.ReinforcementsDue(HouseTime, s.ReinforceFirst, s.ReinforceSecond, s.ReinforceEvery);
             if (m_Reinforcements >= due) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
             m_Reinforcements++;
@@ -660,51 +849,8 @@ namespace Stealth.Game
             Link.RequestRestart();
         }
 
-        /// <summary>
-        /// Server: the house is left once everyone who can is hiding in the hatch (anyone can climb back out) — after a
-        /// short countdown the team is in the sewer.
-        /// </summary>
-        void UpdateHatch()
-        {
-            // everyone in a hatch (either one), at least one in the exit's
-            // (the basement the team came in through counts as the way back: down there is "in the entry")
-            bool hidden = RunState.TeamInHatch(PlayerController.All.Select(p => (p.InHatch || InBasement(p.transform.position), p.InHatch && p.HatchIndex == 1, p.KnockedOut)));
-            if (!hidden) { LeaveAt = 0; return; }
-            if (LeaveAt <= 0) LeaveAt = Session.ServerTime + m_Run.Settings.HatchCountdown;
-            else if (Session.ServerTime >= LeaveAt) GoToSewerServer();
-        }
-
-        void GoToSewerServer()
-        {
-            int down = PlayerController.All.Count(p => p.KnockedOut);
-            LeaveAt = 0;
-            foreach (var obj in m_Spawned) Session.Despawn(obj);
-            m_Spawned.Clear();
-            foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
-            if (!m_Run.EnterSewer(down)) return;
-            Votes.Clear();
-            GoAt = 0;
-            ChosenLane = -1;
-            DriveUntil = 0;
-            int lost = LoadCarServer();
-            m_Opened.Clear(); // the house is gone; the gate is shut
-            m_Hacked.Clear();
-            OpenedVersion++;
-            foreach (var p in PlayerController.All)
-            {
-                // left lying in the house: back with the team, but whatever they carried stayed there
-                if (p.KnockedOut) p.GetComponent<PlayerInventory>()?.ClearServer();
-                p.LeaveHatchServer();
-                p.ResetForLevelServer();
-            }
-            SyncLocation();
-            SpawnCarServer();
-            // only what the team lost: the sewer, the gate and the fuel are on the screen anyway
-            if (down > 0) Banner(Loc.Pack("banner.left_behind", down, Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)));
-            if (lost > 0) Banner(Loc.Pack("banner.hatch_lost", lost));
-        }
-
-        public bool QuotaMet => m_Run.QuotaMet;
+        /// <summary>Enough fuel for the way the team is after (<see cref="FuelNeeded"/>).</summary>
+        public bool QuotaMet => Collected >= FuelNeeded;
 
         /// <summary>
         /// Server: a new run — fresh seed, empty stash and backpacks, the team in the sewer before the first fork.

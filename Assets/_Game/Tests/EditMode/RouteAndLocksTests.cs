@@ -112,7 +112,7 @@ namespace Stealth.Tests
             Assert.AreEqual(RunPhase.Sewer, run.Phase);
             Assert.AreEqual(RunMap.StartDepth, run.LevelIndex);
             Assert.IsTrue(run.QuotaMet, "no quota before the first house");
-            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance());
+            Assert.AreEqual(RunState.Exit.NextLevel, run.Advance(run.Quota));
         }
 
         [Test]

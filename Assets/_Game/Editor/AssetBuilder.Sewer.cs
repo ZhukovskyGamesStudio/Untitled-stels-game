@@ -64,7 +64,13 @@ namespace Stealth.EditorTools
                 c.size = new Vector3(0.62f, 0.6f, 0.62f);
                 return b;
             });
-            var ladder = Prefab($"{SewerKit}/Ladder.prefab", () => KitPiece("sewer_ladder", true));
+            // the ladder under the exit hatch: E climbs it into the house (ExitLadder)
+            var ladder = Prefab($"{SewerKit}/Ladder.prefab", () =>
+            {
+                var l = KitPiece("sewer_ladder", true);
+                l.AddComponent<ExitLadder>();
+                return l;
+            });
             // the segment with the alcove beside the parked car (sewer.py kit_alcove): the shaft up to the house, its ladder,
             // a caged bulb lighting the shaft (shadowed: it never lights the tunnel through the alcove's walls)
             var alcove = Prefab($"{SewerKit}/Alcove.prefab", () =>
@@ -356,7 +362,13 @@ namespace Stealth.EditorTools
             Mat("Car", "CarHead", new Color(1f, 0.96f, 0.85f), new Color(4f, 3.7f, 3f));
             Mat("Car", "CarTail", new Color(1f, 0.15f, 0.1f), new Color(3f, 0.3f, 0.2f));
             Mat("Car", "CarSpot", new Color(1f, 0.85f, 0.5f), new Color(2.5f, 2.1f, 1.2f));
-            Translucent(Mat("Car", "CarGlass", new Color(0.45f, 0.6f, 0.65f, 0.35f), smoothness: 0.95f));
+            // Dark tinted glass that only darkens what is behind it: a pale glass lit by the style's ambient added its own light,
+            // and underground the ink lines (which fade where nothing is lit, _StyDark) came back behind it — the cab looked
+            // clearer through the window than through the open door. No sky reflections either (nothing to reflect down there).
+            var glass = Mat("Car", "CarGlass", new Color(0.04f, 0.05f, 0.06f, 0.4f), smoothness: 0.95f);
+            Translucent(glass);
+            glass.SetFloat("_EnvironmentReflections", 0f);
+            glass.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
         }
 
         static void PaintCar(GameObject model)

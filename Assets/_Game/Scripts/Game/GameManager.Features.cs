@@ -90,6 +90,7 @@ namespace Stealth.Game
                 // worked at with the hands, but not Interactables: their handlers check reach themselves
                 case UseKind.DoorLock: UnlockDoorServer(player, index); return;
                 case UseKind.Safe: OpenSafeServer(player, index); return;
+                case UseKind.ExitDown: ExitDownServer(player); return;
                 case UseKind.StoragePart:
                     var (prop, part) = OpenKeys.StoragePartOf(index);
                     ToggleStorageServer(player, prop, part);

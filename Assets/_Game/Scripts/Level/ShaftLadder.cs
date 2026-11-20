@@ -25,11 +25,15 @@ namespace Stealth.Level
         public Vector3 TopExit { get; private set; }
         /// <summary>The way a climber faces: to the ladder (flat, unit).</summary>
         public Vector3 Facing { get; private set; }
+        /// <summary>The shaft's hole in the lobby's floor: its middle (on the floor) and half its side.</summary>
+        public Vector3 Shaft { get; private set; }
+        public float ShaftHalf { get; private set; } = Basement.ShaftHalf;
 
-        /// <summary>Sets it up from the climb (<see cref="Basement.ClimbPath"/>: foot, the ladder's bottom, its top, the lobby's floor).</summary>
-        public void Setup(Vector3[] path)
+        /// <summary>Sets it up from the climb (<see cref="Basement.ClimbPath"/>: foot, the ladder's bottom, its top, the lobby's floor) and the shaft's hole.</summary>
+        public void Setup(Vector3[] path, Vector3 shaft)
         {
             if (Top || path == null || path.Length < 4) return;
+            Shaft = shaft;
             Column = path[1];
             Bottom = path[1].y;
             TopY = path[2].y;
@@ -55,8 +59,8 @@ namespace Stealth.Level
     {
         /// <summary>How far from the rungs' column a body takes hold, metres.</summary>
         public const float Reach = 0.5f;
-        /// <summary>Climbing speed, metres a second.</summary>
-        public const float Speed = 1.9f;
+        /// <summary>Climbing speed, metres a second (8 m of shaft in about 3 s).</summary>
+        public const float Speed = 2.6f;
 
         /// <summary>
         /// Gets on: in reach and pushing forward at the ladder (facing it) down in the shaft, or falling down the shaft past it.
@@ -81,18 +85,40 @@ namespace Stealth.Level
 
         /// <summary>How high over the lobby's floor the feet rise before stepping off the top, metres (over the rim and the lid's frame).</summary>
         public const float OverRim = 0.25f;
+        /// <summary>How fast one steps off the top of the ladder onto the floor, metres a second.</summary>
+        public const float StepOffSpeed = 1.8f;
 
         /// <summary>
-        /// Climbing out at the top, one frame: first up until the feet are <see cref="OverRim"/> over the floor, then across onto
-        /// it (to <paramref name="exit"/>) — the body moves there, it is never put there. Zero once out.
+        /// Climbing out at the top, one frame: straight up until the feet are <see cref="OverRim"/> over the floor, never
+        /// across (it used to carry the climber sideways onto a spot beside the shaft). Zero once up: the climber stands on
+        /// the top of the ladder and steps off it himself (<see cref="StepOff"/>).
         /// </summary>
-        public static Vector3 ClimbOut(Vector3 feet, Vector3 exit, float dt)
+        public static Vector3 ClimbOut(Vector3 feet, float floorY, float dt)
         {
-            float rise = exit.y + OverRim - feet.y;
-            if (rise > 0.005f) return Vector3.up * Mathf.Min(rise, Speed * dt);
-            var across = new Vector3(exit.x - feet.x, 0f, exit.z - feet.z);
-            if (across.magnitude < 0.05f) return Vector3.zero;
-            return Vector3.ClampMagnitude(across, Speed * 1.2f * dt);
+            float rise = floorY + OverRim - feet.y;
+            return rise > 0.005f ? Vector3.up * Mathf.Min(rise, Speed * dt) : Vector3.zero;
+        }
+
+        /// <summary>Standing on the top of the ladder, one frame: the walk the player asks for (flat, at a step's pace), the height held.</summary>
+        public static Vector3 StepOff(Vector3 wish, float dt)
+        {
+            wish.y = 0f;
+            return Vector3.ClampMagnitude(wish, 1f) * (StepOffSpeed * dt);
+        }
+
+        /// <summary>
+        /// Standing on the top of the ladder: keep standing there, off onto the floor (the body is over the floor beside
+        /// the hole: walk on), or let go back into the shaft (Jump, or wandered over the hole away from the rungs: the
+        /// ladder catches the fall).
+        /// </summary>
+        public enum TopState { Standing, OnFloor, LetGo }
+
+        public static TopState AtTop(Vector3 feet, Vector3 shaft, float shaftHalf, Vector3 column, bool jump)
+        {
+            float off = Mathf.Max(Mathf.Abs(feet.x - shaft.x), Mathf.Abs(feet.z - shaft.z));
+            if (off > shaftHalf + 0.05f) return TopState.OnFloor;
+            if (jump || new Vector2(feet.x - column.x, feet.z - column.z).magnitude > Reach) return TopState.LetGo;
+            return TopState.Standing;
         }
 
         /// <summary>Off at the bottom: going down and standing on the floor.</summary>

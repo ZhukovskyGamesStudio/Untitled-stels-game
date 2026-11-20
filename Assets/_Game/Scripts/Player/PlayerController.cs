@@ -318,8 +318,17 @@ namespace Stealth.Player
         static readonly int StyDarkId = Shader.PropertyToID("_StyDark");
         bool m_AmbientDimmed;
 
-        void UpdateFog()
+        /// <summary>
+        /// The air of where the camera is, at once (not eased in): after a house is built under a camera in the sewer the
+        /// game's atmosphere and the style were put back on — easing back from the street's haze and the style's full
+        /// ambient read as the style changing for a second.
+        /// </summary>
+        public void SnapAir() => UpdateFog(true);
+
+        void UpdateFog(bool snap = false)
         {
+            float Toward(float from, float to, float rate) => snap ? to : Mathf.MoveTowards(from, to, Time.deltaTime * rate);
+            Color Blend(Color from, Color to, float rate) => snap ? to : Color.Lerp(from, to, Time.deltaTime * rate);
             var layout = ActiveLevel.Layout;
             if (layout == null || Camera.transform.position.y < LevelLayout.Underground)
             {
@@ -330,9 +339,9 @@ namespace Stealth.Player
                 var a = VisualStyles.World;
                 // a thick black haze: the far tunnel sinks into black whatever the style's indoor haze looks like; the style's
                 // own ambient (the picture's, not gameplay's) all but gone, and the ink lines fade where nothing is lit
-                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, Mathf.Max(UndergroundFog, a.IndoorFogDensity * 3f), Time.deltaTime * 3f);
-                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog * 0.1f, Time.deltaTime * 4f);
-                RenderSettings.ambientLight = Color.Lerp(RenderSettings.ambientLight, VisualStyles.StyleAmbient * UndergroundAmbient, Time.deltaTime * 4f);
+                RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, Mathf.Max(UndergroundFog, a.IndoorFogDensity * 3f), 3f);
+                RenderSettings.fogColor = Blend(RenderSettings.fogColor, a.IndoorFog * 0.1f, 4f);
+                RenderSettings.ambientLight = Blend(RenderSettings.ambientLight, VisualStyles.StyleAmbient * UndergroundAmbient, 4f);
                 Shader.SetGlobalFloat(StyDarkId, 1f);
                 m_AmbientDimmed = true;
                 Camera.backgroundColor = RenderSettings.fogColor;
@@ -348,8 +357,8 @@ namespace Stealth.Player
             // (GasView): none at the walls, full 15 m out (lose sight of the house and you are lost), the sky above it.
             // Visual only — the gas still hurts where it did (UpdateGas).
             var air = VisualStyles.World;
-            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, air.IndoorFogDensity, Time.deltaTime * 3f);
-            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, air.IndoorFog, Time.deltaTime * 2f);
+            RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, air.IndoorFogDensity, 3f);
+            RenderSettings.fogColor = Blend(RenderSettings.fogColor, air.IndoorFog, 2f);
             Camera.backgroundColor = Color.black; // the gas pass adds the sky where nothing was drawn
             GasView.Show(layout, air, layout.IsInside(Camera.transform.position));
         }
@@ -473,6 +482,13 @@ namespace Stealth.Player
                     }
 
             var gm = GameManager.Instance;
+            // sitting in the exit hatch, crouch: down its ladder into the house's sewer (the server puts us at its foot)
+            if (gm != null && InHatch && HatchIndex == 1 && gm.Phase == RunPhase.Playing && gm.HouseSewerReady
+                && (Controls.Pressed(GameAction.CrouchHold) || Controls.Pressed(GameAction.CrouchToggle)))
+            {
+                Link.SendUse(UseKind.ExitDown, 0);
+                return;
+            }
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
             // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
             if (InHatch) SetHatch(false);

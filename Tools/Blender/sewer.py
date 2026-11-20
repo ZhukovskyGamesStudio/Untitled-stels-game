@@ -884,10 +884,11 @@ def kit_segment(variant, cut=False):
 # --------------------------------------------------------------------------- the alcove with the shaft up to the house
 
 # A clean alcove in the +Y (Unity +Z, left) wall beside the parked car, and over it a brick shaft up to the lobby's floor
-# (Unity: Basement — the shaft's middle at x 3.0, y 4.345; its hole in the floor is 1.5 m square; the floor is 4.9 m
+# (Unity: Basement — the shaft's middle at x 3.0, y 4.345; its hole in the floor is 1.5 m square; the floor is 8 m
 # over the road). The ladder stands against the alcove's back wall and goes up the shaft.
 ALC_X0, ALC_X1, ALC_TOP, ALC_BACK = 1.8, 4.2, 2.4, 5.09
-SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, 4.89
+BASEMENT_DEPTH = 8.0  # Unity Basement.Depth: the lobby's floor over the basement's road
+SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, BASEMENT_DEPTH - 0.01
 LADDER_X, LADDER_Y = 3.0, ALC_BACK - 0.25
 
 
@@ -929,7 +930,7 @@ def kit_alcove():
         top = SHAFT_TOP - 0.05
         for x in (LADDER_X - 0.28, LADDER_X + 0.28):
             box(bm, x - 0.03, x + 0.03, LADDER_Y - 0.03, LADDER_Y + 0.03, KIT_WALK, top)
-            for z in (0.7, 2.0, 3.3, 4.5):                                       # brackets to the back wall
+            for z in [0.7 + 1.3 * k for k in range(int((top - 0.9) / 1.3) + 1)]:    # brackets to the back wall, all the way up
                 box(bm, x - 0.03, x + 0.03, LADDER_Y + 0.03, ALC_BACK, z - 0.03, z + 0.03)
         z = KIT_WALK + 0.3
         while z < top - 0.1:

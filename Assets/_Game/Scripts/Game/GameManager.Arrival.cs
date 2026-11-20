@@ -56,9 +56,16 @@ namespace Stealth.Game
         /// <summary>Every peer, on the drive: the next house's layout starts generating on a worker thread (it is pure).</summary>
         void PrepareNextHouse()
         {
-            if (DriveUntil <= 0 || Phase != RunPhase.Sewer || m_Prepared != null || Route == null || ChosenLane < 0) return;
+            // as soon as the way is chosen (the car standing in its tunnel), not only on the drive: the team may still go
+            // back up for more, the house it will drive to is known already
+            if (Route == null || ChosenLane < 0 || Phase is not (RunPhase.Sewer or RunPhase.Playing)) return;
             var info = PredictNext();
             if (info.Seed == 0) return;
+            if (m_Prepared != null)
+            {
+                if (m_PreparedFor.Equals(info) || DriveUntil > 0) return;
+                m_Prepared = null; // another way chosen meanwhile (or the team changed): that one finishes unused
+            }
             var level = Tuning.Level;
             var (building, security, features, classic) = (level.Building, level.Security, level.Features, LevelGenerator.Classic);
             m_PreparedFor = info;
@@ -106,7 +113,7 @@ namespace Stealth.Game
         IEnumerator ArriveRoutine()
         {
             int next = Level.Index + 1, lane = ChosenLane;
-            var steps = StartLevelSteps(next, lane, 0, true);
+            var steps = Timed(StartLevelSteps(next, lane, 0, true), "the next house (server)");
             while (steps.MoveNext()) yield return null;
             m_Arriving = false;
             m_ArriveRoutine = null;
@@ -196,6 +203,7 @@ namespace Stealth.Game
                 m_Approach = null;
                 return;
             }
+            ShiftSewerForDrive();
             if (!Driving(out var pose, out _, out bool basement)) return;
             var l = ActiveLevel.Layout;
             if (m_Approach == null && l != null && ActiveLevel.Ready && ActiveLevel.Root != null)
@@ -235,9 +243,36 @@ namespace Stealth.Game
 
         IEnumerator BuildSpread(LevelInfo info)
         {
-            var steps = BuildLocalSteps(info);
+            var steps = Timed(BuildLocalSteps(info), "the next house");
             while (steps.MoveNext()) yield return null;
             m_LocalBuild = null;
+        }
+
+        /// <summary>A step of a house built on the drive that took longer than this is logged (development builds): the drive stalled there.</summary>
+        const double SlowStepMs = 30.0;
+
+        /// <summary>
+        /// The steps of a piece-by-piece job, each timed: in a development build the slow ones are written to the log with
+        /// their number and the total, so a stall on the drive can be found in a playtest's log.
+        /// </summary>
+        static IEnumerator Timed(IEnumerator steps, string what)
+        {
+            var watch = new System.Diagnostics.Stopwatch();
+            double total = 0, worst = 0;
+            int n = 0;
+            while (true)
+            {
+                watch.Restart();
+                bool more = steps.MoveNext();
+                double ms = watch.Elapsed.TotalMilliseconds;
+                total += ms;
+                worst = System.Math.Max(worst, ms);
+                if (ms > SlowStepMs && Debug.isDebugBuild) Debug.Log($"[Perf] {what}: step {n} took {ms:0} ms");
+                n++;
+                if (!more) break;
+                yield return steps.Current;
+            }
+            if (Debug.isDebugBuild) Debug.Log($"[Perf] {what}: {n} steps, {total:0} ms of work, the longest {worst:0} ms");
         }
     }
 

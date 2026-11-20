@@ -508,7 +508,10 @@ namespace Stealth.Level
             exit.Kept = exit.Id != l.LobbyRoom; // the wet room it was chosen for stays one
             l.ExitRoom = exit.Id;
             l.EntryRoom = entryRoom.Id;
-            l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
+            // on the nearest cell's middle (0.15 m off the walls' spots, HatchFromWall): its well goes down through a hole of
+            // 3 x 3 plan cells in the floor
+            var exitSpot = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
+            l.ExitHatchPosition = OnCells(exitSpot, exitSpot);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
             furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
             furnisher.PlaceVentDesks();
