@@ -236,6 +236,7 @@ namespace Stealth.EditorTools
             BuildSafeCrack(e, content);
             BuildVaultLock(content);
             BuildCheatPanel(e, content);
+            BuildStylePanel(e, root.transform); // outside Content: F8 works in the menu too, where the HUD is hidden
             // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade):
             // over everything, outside Content (which fades out on its own while the drive scene plays)
             hud.LoadingFade = Img(Stretch(root.transform, "LoadingFade"), Color.black);

@@ -215,6 +215,12 @@ namespace Stealth.Level
         /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
         /// </summary>
         [System.NonSerialized] public bool Apartments;
+        /// <summary>
+        /// The abandoned research station's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Abandoned"/>,
+        /// never saved): the hospital's slab with a spine corridor, labs, servers and control below, quarters above
+        /// (<see cref="PlanGenerator"/>.Station).
+        /// </summary>
+        [System.NonSerialized] public bool Station;
 
         [Tooltip("The apartment block: chance of a lift when it has fewer storeys than LiftAlwaysFrom.")]
         public float LiftChance = 0.5f;
@@ -433,7 +439,7 @@ namespace Stealth.Level
                     LobbyRoom = o.Lobby,
                     Mass = o.Mass,
                     Kind = h.Kind,
-                    OwnPlan = building.Garage || building.Hospital || building.Apartments,
+                    OwnPlan = building.Garage || building.Hospital || building.Apartments || building.Station,
                     PlanAttempt = attempt,
                 };
                 l.Stairs.AddRange(o.Stairs);
@@ -1103,7 +1109,7 @@ namespace Stealth.Level
             // A bigger team gets a bigger house — and the guards to go with it.
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
             // (a hospital is built smaller than its area, BuildingSettings.HospitalSize: its guards are counted for the full size)
-            float size = b.Hospital ? Mathf.Clamp(b.HospitalSize, 0.1f, 1f) : 1f;
+            float size = b.Hospital || b.Station ? Mathf.Clamp(b.HospitalSize, 0.1f, 1f) : 1f;
             int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits / size - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
             // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)

@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
-    /// <summary>The three kinds of place a house can be; each has its own point of interest.</summary>
-    public enum Location : byte { Office, Hospital, Garage, Apartments }
+    /// <summary>The kinds of place a house can be; each has its own unique feature (append only: the byte travels).</summary>
+    public enum Location : byte { Office, Hospital, Garage, Apartments, Abandoned }
 
     /// <summary>
     /// A warden's post (<see cref="RobotKind.Warden"/>): in front of the only doorway of a loot room, walking a few steps

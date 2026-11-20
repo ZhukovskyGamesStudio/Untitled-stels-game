@@ -48,13 +48,19 @@ namespace Stealth.Tests
         [Test]
         public void TheFinalWalkabilityCheckHasLittleToTakeOut()
         {
+            // nine houses of the office generator (the locations' are checked by their own tests), whatever share of the
+            // seeds the other kinds take
             int removed = 0, houses = 0;
-            foreach (var l in Houses())
-            {
-                if (HouseKinds.OwnPlan(l.Kind)) continue; // the office generator's rooms (the locations' are checked by their own tests)
-                houses++;
-                removed += Furnisher.LastRemoved;
-            }
+            for (int seed = 1; houses < 9 && seed <= 60; seed++)
+                for (int house = 0; house < 6 && houses < 9; house += 2)
+                {
+                    int s = seed * 7919 + house + (seed % 2), h = house + (seed % 2);
+                    if (HouseKinds.OwnPlan(HouseKinds.Of(s, h))) continue;
+                    LevelGenerator.Generate(s, h, null, null, 2);
+                    houses++;
+                    removed += Furnisher.LastRemoved;
+                }
+            Assert.AreEqual(9, houses);
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
             // against the far side of a wall from a room out of reach
             // (the ways up to the vent grates — crates and a desk set first in their room — make it a little busier)

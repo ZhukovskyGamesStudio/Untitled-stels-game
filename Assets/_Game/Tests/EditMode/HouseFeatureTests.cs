@@ -73,11 +73,11 @@ namespace Stealth.Tests
             // which location a house is comes from its kind alone
             var seen = new HashSet<Location>();
             for (int seed = 1; seed < 200; seed++) seen.Add(HouseFeatures.LocationOf(HouseKinds.Of(seed, 2)));
-            Assert.AreEqual(4, seen.Count, "offices, hospitals, garages and apartment blocks");
+            Assert.AreEqual(5, seen.Count, "offices, hospitals, garages, apartment blocks and abandoned stations");
             foreach (var l in TestHouses.Sample)
             {
                 int seed = l.Seed;
-                if (l.Location == Location.Apartments) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: an apartment block has its shelter map instead");
+                if (l.Location is Location.Apartments or Location.Abandoned) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: no piece of furniture to find ({l.Location})");
                 else
                 {
                     Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");

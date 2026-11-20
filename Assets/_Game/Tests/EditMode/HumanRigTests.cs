@@ -25,7 +25,7 @@ namespace Stealth.Tests
             Assert.AreEqual(4, styles.PlayerHumans.Length, "one rigged human per department");
             foreach (var style in styles.Styles.Where(s => s != null))
                 Assert.IsNull(style.Geometry.PlayerRig, $"{style.name} has a human of its own: its players would not show their departments");
-            Assert.AreEqual(ModelFamily.Derelict, styles.Styles.First(s => s != null && s.name == "S16_Derelict").Geometry.Family);
+            Assert.AreEqual(ModelFamily.Realistic, styles.Styles.First(s => s != null && s.name == "S16_Derelict").Geometry.Family, "S16 is a realistic style now (the derelict look is the abandoned station's)");
         }
 
         [Test]

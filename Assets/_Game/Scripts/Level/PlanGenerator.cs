@@ -93,7 +93,7 @@ namespace Stealth.Level
             // cut into the rooms
             List<RectInt> wings = null;
             var linkRng = c.Rng(0x11CC);
-            if (!b.Garage && !b.Hospital && !b.Apartments && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
+            if (!b.Garage && !b.Hospital && !b.Station && !b.Apartments && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
             {
                 if (program != null)
                 {
@@ -110,7 +110,7 @@ namespace Stealth.Level
                 }
             }
             wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass)
-                : b.Hospital ? HospitalMass(c, c.Rng(0xA55), area, Mathf.Clamp(b.HospitalSize, 0.1f, 1f), out o.Mass)
+                : b.Hospital || b.Station ? HospitalMass(c, c.Rng(0xA55), area, Mathf.Clamp(b.HospitalSize, 0.1f, 1f), out o.Mass, b.Station)
                 : b.Apartments ? ApartmentsMass(c, c.Rng(0xA55), out o.Mass)
                 : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);

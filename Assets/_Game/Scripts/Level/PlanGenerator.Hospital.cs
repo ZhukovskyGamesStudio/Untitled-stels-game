@@ -18,6 +18,8 @@ namespace Stealth.Level
             public int Length;               // cells
             public RectInt Corridor;         // cells, the same on every floor
             public RectInt FrontBand, BackBand;
+            /// <summary>The abandoned research station on the same slab (<see cref="BuildingSettings.Station"/>): its own program, PlanGenerator.Station.</summary>
+            public bool Station;
         }
 
         /// <summary>Depths across the slab, metres: the front rooms, the corridor (beds pass each other), the back rooms.</summary>
@@ -25,7 +27,7 @@ namespace Stealth.Level
         /// <summary>A patient room's width along the corridor, metres (two beds side by side, the door beside them).</summary>
         public const int WardWidth = 4;
 
-        static List<RectInt> HospitalMass(Ctx c, System.Random rng, float area, float size, out string kind)
+        static List<RectInt> HospitalMass(Ctx c, System.Random rng, float area, float size, out string kind, bool station = false)
         {
             int depth = HospFront + HospCorridor + HospBack;
             // (smaller than the house's area by BuildingSettings.HospitalSize; the shortest slab still holds the lobby and the stair core)
@@ -37,8 +39,9 @@ namespace Stealth.Level
                 Corridor = new RectInt(0, HospFront * M, length * M, HospCorridor * M),
                 FrontBand = new RectInt(0, 0, length * M, HospFront * M),
                 BackBand = new RectInt(0, (HospFront + HospCorridor) * M, length * M, HospBack * M),
+                Station = station,
             };
-            kind = "hospital";
+            kind = station ? "station" : "hospital";
             return new List<RectInt> { new(0, 0, length, depth) };
         }
 
@@ -73,6 +76,7 @@ namespace Stealth.Level
             bool storage = false;
             if (f == 0 && c.Program != null) foreach (var p in c.Program.Floors[0]) storage |= p.Type == RoomType.Storage && p.Required;
             bool top = f == c.Floors - 1 && f > 0;
+            if (h.Station) { ZoneStationBands(c, f, h, owner, Room, storage, top, rng); Settle(c, f, regions, owner); return; }
             // what each band holds, end to end (left of the core, then right of it); the rest of a band is patient rooms upstairs
             List<RoomType> Front(bool left, RectInt run)
             {
@@ -120,6 +124,36 @@ namespace Stealth.Level
                 }
             }
 
+            Settle(c, f, regions, owner);
+
+            static List<RoomType> Wards(List<RoomType> first, RoomType? middle = null)
+            {
+                var list = new List<RoomType>(first);
+                for (int k = 0; k < 18; k++) list.Add(k == 2 && middle is RoomType m ? m : RoomType.Ward);
+                return list;
+            }
+        }
+
+        /// <summary>The slab's free runs along x in a band (the lobby and the stair halls split it).</summary>
+        static List<RectInt> BandRuns(RectInt band, int[,] owner)
+        {
+            var runs = new List<RectInt>();
+            int start = -1;
+            for (int x = 0; x <= band.xMax; x++)
+            {
+                bool free = x < band.xMax;
+                if (free)
+                    for (int z = band.yMin; z < band.yMax && free; z++) free = owner[x, z] == -1;
+                if (free && start < 0) start = x;
+                if (!free && start >= 0) { runs.Add(new RectInt(start, band.yMin, x - start, band.height)); start = -1; }
+            }
+            return runs;
+        }
+
+        /// <summary>The zoned slab's regions tidied, typed and committed to the floor.</summary>
+        static void Settle(Ctx c, int f, List<Region> regions, int[,] owner)
+        {
+            int nx = c.Plan.NX, nz = c.Plan.NZ;
             Cleanup(regions, owner, nx, nz);
             for (int settle = 0; settle < 4; settle++)
             {
@@ -129,13 +163,6 @@ namespace Stealth.Level
             }
             AssignTypes(c, f, regions);
             Commit(c, f, regions, owner);
-
-            static List<RoomType> Wards(List<RoomType> first, RoomType? middle = null)
-            {
-                var list = new List<RoomType>(first);
-                for (int k = 0; k < 18; k++) list.Add(k == 2 && middle is RoomType m ? m : RoomType.Ward);
-                return list;
-            }
         }
 
         /// <summary>How wide a hospital room is along its band, metres.</summary>

@@ -5,9 +5,10 @@ namespace Stealth.Level
     /// <summary>What kind of building a house is: it changes the program of rooms and the shapes, not the rules.</summary>
     /// <summary>
     /// Office, Business, DataCenter, Warehouse and Headquarters are offices of different character (location
-    /// <see cref="Location.Office"/>); Hospital and Garage are locations of their own (<see cref="HouseFeatures.LocationOf"/>).
+    /// <see cref="Location.Office"/>); Hospital, Garage, Apartments and Abandoned (a research station left to decay) are
+    /// locations of their own (<see cref="HouseFeatures.LocationOf"/>). Append only: the byte travels and seeds pick by it.
     /// </summary>
-    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage, Apartments }
+    public enum HouseKind : byte { Office, Business, DataCenter, Warehouse, Headquarters, Hospital, Garage, Apartments, Abandoned }
 
     /// <summary>
     /// House kinds (pure): which one a house is (from its seed: every peer and the route panel agree without sending
@@ -20,10 +21,12 @@ namespace Stealth.Level
         {
             var rng = new System.Random(LevelRandom.Mix(seed, Salt.HouseKind, 0));
             int roll = rng.Next(100);
-            // a quarter each: an office (of some character), a hospital, a garage, an apartment block
+            // a quarter each: a hospital, a garage, an apartment block; the last quarter an office (of some character) or,
+            // about half as often, the abandoned research station
             if (roll >= 75) return HouseKind.Apartments;
             if (roll >= 50) return HouseKind.Garage;
             if (roll >= 25) return HouseKind.Hospital;
+            if (roll < 9) return HouseKind.Abandoned;
             int office = rng.Next(100);
             return office < 34 ? HouseKind.Office : office < 52 ? HouseKind.Business : office < 68 ? HouseKind.DataCenter
                  : office < 84 ? HouseKind.Warehouse : HouseKind.Headquarters;
@@ -95,6 +98,9 @@ namespace Stealth.Level
                     RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, RoomType.Storage => 1f, _ => 0f },
                 // the block's own plan lays out every flat (PlanGenerator.Apartments): the program only says whether it has a store
                 HouseKind.Apartments => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, _ => 0f },
+                // the station's own plan lays out its labs, servers, control and quarters (PlanGenerator.Station): what is
+                // left over is offices, stores and the robots' room
+                HouseKind.Abandoned => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, RoomType.Lab => 1f, RoomType.ControlRoom => 1f, _ => 0f },
                 _ => 1f,
             };
             if (b.RoomTypeRules != null)

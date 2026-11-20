@@ -277,7 +277,7 @@ namespace Stealth.Player
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
-            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
+            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen || StylePanel.IsOpen;
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking

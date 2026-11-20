@@ -322,6 +322,67 @@ namespace Stealth.EditorTools
             };
         }
 
+        /// <summary>
+        /// Walls and ceilings of every kind of room in the realistic facility style (S16): scanned plaster, concrete, brick
+        /// and wood where there are scans, the game's own tiles, padding and panels where there are none — a kitchen is
+        /// tiled behind its counter, a toilet to head height, a gym padded, a library panelled in dark wood, a store bare concrete.
+        /// </summary>
+        static RoomLook[] RealisticRoomLooks()
+        {
+            RoomLook R(RoomType room, string wall, float wallTile, string lower, float lowerHeight, string ceiling, float ceilingTile, bool plain = true) => new()
+            {
+                Room = room, Wall = wall != null ? K(wall) : null, WallTile = wallTile, Lower = lower != null ? K(lower) : null, LowerTile = 1f,
+                LowerHeight = lowerHeight, Plain = plain, Ceiling = ceiling != null ? K(ceiling) : null, CeilingTile = ceilingTile,
+            };
+            return new[]
+            {
+                R(RoomType.Restroom, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 2.0f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.LockerRoom, "Real_BeigeWall", 2.5f, "Wall_TilesMint", 1.6f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Kitchen, "Real_Plaster", 2.5f, "Wall_TilesCream", 1.4f, "Real_CeilingTiles", 1.2f),
+                R(RoomType.Gym, "Real_ConcreteWall", 3f, "Wall_Padding", 1.2f, "Ceiling_Concrete", 3f),
+                R(RoomType.Infirmary, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 1.2f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Lab, "Wall_PaintWhite", 2f, null, 0f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Server, "Wall_Panels", 2f, null, 0f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.ControlRoom, "Wall_Panels", 2f, null, 0f, "Real_CeilingTiles", 1.2f),
+                R(RoomType.Storage, "Real_ConcreteWall", 3f, null, 0f, "Ceiling_Concrete", 3f),
+                R(RoomType.CopyRoom, "Real_BeigeWall", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f),
+                R(RoomType.Studio, "Real_RawPlanks", 2f, null, 0f, null, 0f),
+                R(RoomType.GameRoom, "Real_Brick", 2f, null, 0f, null, 0f),
+                R(RoomType.Library, "Real_PaneledWood", 2f, null, 0f, null, 0f, plain: false),
+                R(RoomType.Meeting, "Real_Plaster", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f, plain: false),
+                R(RoomType.Lounge, "Real_Plaster2", 2.5f, null, 0f, null, 0f, plain: false),
+                R(RoomType.NapRoom, "Real_Plaster2", 2.5f, null, 0f, null, 0f),
+            };
+        }
+
+        /// <summary>Floors of every kind of room in the realistic facility style (S16): carpet where people sit, tiles where water is, parquet, rubber, lino, concrete.</summary>
+        static RoomFloor[] RealisticRoomFloors()
+        {
+            RoomFloor F(RoomType room, string mat, float tile) => new() { Room = room, Material = K(mat), Tile = tile };
+            return new[]
+            {
+                F(RoomType.Kitchen, "Real_CheckerTiles", 1.5f),
+                F(RoomType.Restroom, "Floor_SmallTiles", 1f),
+                F(RoomType.LockerRoom, "Floor_SmallTiles", 1f),
+                F(RoomType.Gym, "Floor_Rubber", 1f),
+                F(RoomType.Library, "Real_Herringbone", 2f),
+                F(RoomType.Lounge, "Real_Laminate", 2f),
+                F(RoomType.NapRoom, "Floor_CarpetBlue", 1f),
+                F(RoomType.Studio, "Real_PlankFloor", 2f),
+                F(RoomType.GameRoom, "Real_Carpet", 2f),
+                F(RoomType.Office, "Real_Carpet", 2f),
+                F(RoomType.OpenSpace, "Real_Carpet", 2f),
+                F(RoomType.Meeting, "Real_Carpet", 2f),
+                F(RoomType.CopyRoom, "Real_Carpet", 2f),
+                F(RoomType.ControlRoom, "Floor_CarpetCharcoal", 1f),
+                F(RoomType.Infirmary, "Floor_Lino", 1.2f),
+                F(RoomType.Lab, "Floor_Lino", 1.2f),
+                F(RoomType.Server, "Real_ConcreteClean", 2f),
+                F(RoomType.Storage, "Real_HangarConcrete", 3f),
+                F(RoomType.Lobby, "Real_Marble", 2f),
+            };
+        }
+
         /// <summary>Floors of the themed rooms in the storybook style (Blue Prince): tiles where water is, rubber, carpet, lino.</summary>
         static RoomFloor[] StorybookRoomFloors()
         {
