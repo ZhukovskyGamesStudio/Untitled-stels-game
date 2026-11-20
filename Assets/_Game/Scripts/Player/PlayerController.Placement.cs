@@ -164,9 +164,10 @@ namespace Stealth.Player
         /// </summary>
         void UpdateLadder(in PlayerInputState input, float dt)
         {
-            var ladder = ShaftLadder.Main;
-            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; return; }
             var feet = transform.position;
+            if (!Climbing || m_Ladder == null) m_Ladder = ShaftLadder.At(feet); // the entry's or the exit's: whichever we are at
+            var ladder = m_Ladder;
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; return; }
             if (!Climbing)
             {
                 var facing = transform.forward;
@@ -197,7 +198,7 @@ namespace Stealth.Player
             float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
             m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
             feet = transform.position;
-            if (climb > 0.1f && LadderMath.OffAtTop(feet.y, ladder.TopY, World.IsOpened(OpenKeys.Shaft)))
+            if (climb > 0.1f && LadderMath.OffAtTop(feet.y, ladder.TopY, World.IsOpened(ladder.LidKey)))
             {
                 m_ClimbingOut = true;
                 m_ClimbOutSince = Time.time;
@@ -207,6 +208,7 @@ namespace Stealth.Player
 
         bool m_ClimbingOut;
         float m_ClimbOutSince;
+        ShaftLadder m_Ladder;
 
         public void TeleportOwner(Vector3 position, Quaternion rotation)
         {

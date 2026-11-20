@@ -64,13 +64,7 @@ namespace Stealth.EditorTools
                 c.size = new Vector3(0.62f, 0.6f, 0.62f);
                 return b;
             });
-            // the ladder under the exit hatch: E climbs it into the house (ExitLadder)
-            var ladder = Prefab($"{SewerKit}/Ladder.prefab", () =>
-            {
-                var l = KitPiece("sewer_ladder", true);
-                l.AddComponent<ExitLadder>();
-                return l;
-            });
+            var ladder = Prefab($"{SewerKit}/Ladder.prefab", () => KitPiece("sewer_ladder", true));
             // the segment with the alcove beside the parked car (sewer.py kit_alcove): the shaft up to the house, its ladder,
             // a caged bulb lighting the shaft (shadowed: it never lights the tunnel through the alcove's walls)
             var alcove = Prefab($"{SewerKit}/Alcove.prefab", () =>
@@ -81,6 +75,25 @@ namespace Stealth.EditorTools
                 light.spotAngle = 130f;
                 light.innerSpotAngle = 70f;
                 return a;
+            });
+            // the way to the house's exit hatch (SewerPlan.Passage, sewer.py kit_passage*): a doorway segment, the narrow
+            // passage, its turn, and the shaft's foot with the ladder up to the hatch (ShaftLadder, set up by SewerLocation) and a
+            // caged bulb low and high in the shaft (shadowed: they never light anything through its walls)
+            var doorSegment = Prefab($"{SewerKit}/SegmentDoor.prefab", () => KitPiece("sewer_seg_door", true, KitYaw));
+            var passage = Prefab($"{SewerKit}/Passage.prefab", () => KitPiece("sewer_passage", true, KitYaw));
+            var passageCorner = Prefab($"{SewerKit}/PassageCorner.prefab", () => KitPiece("sewer_passage_corner", true, KitYaw));
+            var passageEnd = Prefab($"{SewerKit}/PassageEnd.prefab", () =>
+            {
+                var e = KitPiece("sewer_passage_end", true, KitYaw);
+                e.AddComponent<ShaftLadder>();
+                foreach (var (y, dir) in new[] { (2.0f, new Vector3(0.4f, -1f, 0.6f)), (5.6f, new Vector3(0.4f, -0.6f, 0.6f)) })
+                {
+                    var light = Lamp(e.transform, "ShaftLight", new Vector3(0.45f, y, -0.62f), Quaternion.LookRotation(dir), LightType.Spot,
+                        new Color(1f, 0.8f, 0.55f), 3f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+                    light.spotAngle = 130f;
+                    light.innerSpotAngle = 70f;
+                }
+                return e;
             });
             // the drive on to the next house (Level.DrivePath): a branch opens into the wide tunnel again, which runs on round the car
             var reducer = Prefab($"{SewerKit}/Reducer.prefab", () => KitPiece("sewer_reducer", false, KitYaw));
@@ -97,7 +110,7 @@ namespace Stealth.EditorTools
                 var w = new GameObject("BackWall");
                 var c = w.AddComponent<BoxCollider>();
                 c.center = new Vector3(-0.15f, 3f, 0f);
-                c.size = new Vector3(0.3f, 6f, 12f);
+                c.size = new Vector3(0.3f, 6f, 8.4f); // the tunnel's width only: the passage to the exit hatch may run past it
                 return w;
             });
             var manhole = Prefab($"{SewerKit}/Manhole.prefab", () => KitPiece("sewer_manhole", false));
@@ -128,6 +141,10 @@ namespace Stealth.EditorTools
                 loc.Crate = crate;
                 loc.Ladder = ladder;
                 loc.Alcove = alcove;
+                loc.DoorSegment = doorSegment;
+                loc.PassageStraight = passage;
+                loc.PassageCorner = passageCorner;
+                loc.PassageEnd = passageEnd;
                 loc.Manhole = manhole;
                 loc.GatePrefab = gate.GetComponent<SewerGate>();
                 loc.BranchPrefab = branch.GetComponent<SewerBranch>();

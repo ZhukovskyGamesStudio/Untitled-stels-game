@@ -1154,23 +1154,26 @@ namespace Stealth.EditorTools
             util[(int)UtilitySlot.Warning] = Util("UtilWarning");
             util[(int)UtilitySlot.Panel] = Util("UtilPanel");
             util[(int)UtilitySlot.Dark] = Util("UtilDark");
-            var hatch = new GameObject("Hatch");
-            const float half = 0.6f, bar = 0.1f, lip = 0.03f;
-            HatchModel("hatch_frame_exit", hatch.transform, util);
-            // the lid on its hinge along the +X bar: it lifts its −X edge up and over (the model's hinge runs along its X,
-            // the plate along +Z: turned −90° it runs along Z with the plate towards −X)
-            var hinge = Child(hatch.transform, "LidHinge", new Vector3(half + lip, 0.024f, 0f));
-            HatchModel("hatch_lid_exit", hinge.transform, util, -90f);
-            var h = hatch.AddComponent<Hatch>();
-            h.Lid = hinge.transform;
-            h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
-            hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
-            var box = hatch.AddComponent<BoxCollider>();
-            // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
-            // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it
-            box.size = new Vector3(2 * (half + bar), 0.08f, 2 * (half + bar));
-            box.center = new Vector3(0f, 0.04f, 0f);
-            return hatch;
+            // as the entry's lid (ShaftHatch): the frame right round the hole (3 x 3 plan cells), the lid on a hinge at −Z, the
+            // ladder below it (the passage's shaft in the sewer, SewerLocation); lamps in the frame's corners in the exit's colour
+            var go = new GameObject("Hatch");
+            float half = Basement.ShaftHalf, lip = 0.03f;
+            HatchModel("hatch_frame_exit", go.transform, util);
+            var lid = new GameObject("Lid").transform;
+            lid.SetParent(go.transform, false);
+            lid.localPosition = new Vector3(0f, 0.024f, -half - lip);
+            float side = 2 * half + 2 * lip;
+            HatchModel("hatch_lid_exit", lid, util);
+            var plateCollider = lid.gameObject.AddComponent<BoxCollider>();
+            plateCollider.center = new Vector3(0f, 0.0175f, side / 2f);
+            plateCollider.size = new Vector3(side, 0.035f, side);
+            go.AddComponent<KeepUnmerged>();
+            var h = go.AddComponent<ShaftHatch>();
+            h.Lid = lid;
+            h.LidCollider = plateCollider;
+            h.Exit = true;
+            h.Glow = go.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            return go;
         }
 
         // ------------------------------------------------------------------ props

@@ -468,7 +468,7 @@ namespace Stealth.Level
             if (m_Art.ShaftLadder != null)
             {
                 var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(frame), Quaternion.identity);
-                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path, shaft);
+                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path, shaft, OpenKeys.Shaft);
             }
             // the storage robot's way up and down: a navmesh link from the ladder's foot to the lobby's floor, open with the lid
             if (m_Art.ShaftLink != null)
@@ -479,7 +479,7 @@ namespace Stealth.Level
                     link.startPoint = path[0];
                     link.endPoint = path[path.Length - 1];
                     link.UpdateLink();
-                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) lid.Link = link;
+                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) if (!lid.Exit) lid.Link = link; // (the entry's)
                     link.activated = false;
                 }
             }

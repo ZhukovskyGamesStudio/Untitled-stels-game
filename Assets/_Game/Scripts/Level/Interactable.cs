@@ -5,12 +5,11 @@ using UnityEngine;
 namespace Stealth.Level
 {
     /// <summary>
-    /// What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>). DoorLock,
-    /// Safe, StoragePart and ExitDown are not <see cref="Interactable"/>s: a locked door's lock (index: the door), a safe's
-    /// dial (the prop), a storage part (<see cref="OpenKeys.StoragePart"/>: the prop and its part), going down from the exit
-    /// hatch into the sewer (crouching in it).
+    /// What a player uses with E (the server's handler is picked by it: <see cref="Game.GameManager.UseServer"/>). The last three
+    /// are not <see cref="Interactable"/>s: a locked door's lock (index: the door), a safe's dial (the prop), a storage part
+    /// (<see cref="OpenKeys.StoragePart"/>: the prop and its part).
     /// </summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, ExitLadder, ExitDown }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the

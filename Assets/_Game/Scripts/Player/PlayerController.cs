@@ -52,8 +52,6 @@ namespace Stealth.Player
         public bool Downed { get; private set; }
         /// <summary>Server-owned: hiding in the hatch (robots do not see you; when the whole team is in, it leaves the house).</summary>
         public bool InHatch { get; private set; }
-        /// <summary>Owner: next to the hatch and looking right at it (its collider), so the hatch key climbs in.</summary>
-        public bool AtHatch { get; private set; }
         /// <summary>Owner-owned.</summary>
         public bool Crouching { get; private set; }
         /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
@@ -305,7 +303,6 @@ namespace Stealth.Player
             UpdateNoise();
             UpdateGas();
             UpdateHand();
-            AtHatch = !InHatch && Hatch.IsNear(transform.position) && (!UseLook || Aimed<Hatch>() != null);
             UpdateInteractions();
             WorkSounds();
             UpdateCallouts();
@@ -482,17 +479,9 @@ namespace Stealth.Player
                     }
 
             var gm = GameManager.Instance;
-            // sitting in the exit hatch, crouch: down its ladder into the house's sewer (the server puts us at its foot)
-            if (gm != null && InHatch && HatchIndex == 1 && gm.Phase == RunPhase.Playing && gm.HouseSewerReady
-                && (Controls.Pressed(GameAction.CrouchHold) || Controls.Pressed(GameAction.CrouchToggle)))
-            {
-                Link.SendUse(UseKind.ExitDown, 0);
-                return;
-            }
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
-            // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
+            // (the exit is a shaft with a ladder like the entry's: nothing to sit in; out of a hatch if ever put in one)
             if (InHatch) SetHatch(false);
-            else if (AtHatch) SetHatch(true);
         }
 
         // ------------------------------------------------------------------ watching a teammate while knocked out

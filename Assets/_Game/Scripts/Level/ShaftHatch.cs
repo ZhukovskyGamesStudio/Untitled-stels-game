@@ -15,6 +15,13 @@ namespace Stealth.Level
         public Transform Lid;
         [Tooltip("Solid while the lid is (almost) shut.")]
         public Collider LidCollider;
+        [Tooltip("The exit hatch's lid (its shaft goes down to the passage in the sewer), else the entry's.")]
+        public bool Exit;
+        [Tooltip("Lamps in the frame's corners, lit in the hatch's colour (the map's).")]
+        public Renderer[] Glow;
+
+        /// <summary>The key it opens by (<see cref="OpenKeys"/>).</summary>
+        public int Key => Exit ? OpenKeys.ExitShaft : OpenKeys.Shaft;
 
         /// <summary>The navmesh link up the shaft (set by the builder): open only while the lid is.</summary>
         [System.NonSerialized] public Unity.AI.Navigation.NavMeshLink Link;
@@ -29,15 +36,31 @@ namespace Stealth.Level
         public override string Prompt(PlayerController player, out bool available)
         {
             available = true;
-            return Loc.T(World.IsOpened(OpenKeys.Shaft) ? "use.shaft_close" : "use.shaft_open");
+            return Loc.T(World.IsOpened(Key) ? "use.shaft_close" : "use.shaft_open");
         }
 
         OpenTween m_Open;
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
+
+        void Start()
+        {
+            if (Glow == null) return;
+            var block = new MaterialPropertyBlock();
+            var c = Exit ? Hatch.ExitColor : Hatch.EntryColor;
+            foreach (var r in Glow)
+            {
+                if (r == null) continue;
+                r.GetPropertyBlock(block);
+                block.SetColor(BaseColorId, c);
+                block.SetColor(EmissionId, c * 2.4f);
+                r.SetPropertyBlock(block);
+            }
+        }
 
         void Update()
         {
             if (Lid == null) return;
-            bool open = World.IsOpened(OpenKeys.Shaft);
+            bool open = World.IsOpened(Key);
             if (m_Open.Step(open, Time.deltaTime, SwingTime) != OpenMove.None) DoorSounds.Play(DoorSound.Heavy, transform.position, open);
             Lid.localRotation = Quaternion.Euler(m_Open.Smooth * OpenAngle, 0f, 0f);
             if (LidCollider != null) LidCollider.enabled = m_Open.Value < 0.1f;

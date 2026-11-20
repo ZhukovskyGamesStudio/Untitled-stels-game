@@ -497,7 +497,7 @@ namespace Stealth.UI
             var at = me.transform.position + me.transform.forward * 0.8f;
             if (Physics.Raycast(ray, out var hit, PlayerInventory.ReachDistance, mask, QueryTriggerInteraction.Ignore))
             {
-                if (!stashed && hit.collider.GetComponentInParent<Hatch>() != null)
+                if (!stashed && hit.collider.GetComponentInParent<ShaftHatch>() is { Exit: true })
                 {
                     inv.RequestDeposit(m_DragIndex);
                     return;

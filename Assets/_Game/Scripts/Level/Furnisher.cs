@@ -264,7 +264,7 @@ namespace Stealth.Level
             [PropKind.BathVanity] = Rect.MinMaxRect(-0.3f, -0.237f, 0.3f, 0.23f),
             [PropKind.WashingMachine] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.31f),
             [PropKind.ShoeCabinet] = Rect.MinMaxRect(-0.451f, -0.162f, 0.451f, 0.183f),
-            [PropKind.HallHooks] = Rect.MinMaxRect(-0.5f, -0.175f, 0.5f, 0.125f),
+            [PropKind.HallHooks] = Rect.MinMaxRect(-0.65f, -0.175f, 0.65f, 0.125f), // (the coats on its end hooks hang out past the rail)
             [PropKind.Mailboxes] = Rect.MinMaxRect(-0.6f, -0.125f, 0.6f, 0.129f),
             [PropKind.ElevatorDoors] = Rect.MinMaxRect(-0.65f, -0.06f, 0.65f, 0.077f),
         };

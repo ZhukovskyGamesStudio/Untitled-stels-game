@@ -40,6 +40,8 @@ namespace Stealth.Level
         public GameObject Cap, Lamp, Barrel, Crate, Ladder, Manhole, Flooding;
         [Tooltip("The segment with the alcove beside the car: a ladder up a shaft to the lid of the house's floor (shut from below here).")]
         public GameObject Alcove;
+        [Tooltip("The way to the house's exit hatch (SewerPlan.Passage): a segment with a doorway in its left wall, 1 m of the passage, its turn, the shaft's foot (its ladder: ShaftLadder).")]
+        public GameObject DoorSegment, PassageStraight, PassageCorner, PassageEnd;
         [Serializable]
         public class HallKit
         {
@@ -206,6 +208,8 @@ namespace Stealth.Level
                 if (UnderHouse && s.X < plan.GateX - 0.01f) continue; // the car's stretch: the basement
                 if (FrameBudget.Over) yield return true;
                 if (s.Alcove && Alcove != null) Put(Alcove, $"Segment{i}", new Vector3(s.X, 0f, 0f)); // its lid shut: no ladder to climb here
+                else if (s.Door != 0 && DoorSegment != null) // the doorway to the exit's passage (the model's is in its left wall: turned round for the right)
+                    Put(DoorSegment, $"Segment{i}", new Vector3(s.Door > 0 ? s.X : s.X + SewerPlan.SegmentLength, 0f, 0f), s.Door > 0 ? 0f : 180f);
                 else if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
                 if (s.LampSide != 0)
                 {
@@ -246,11 +250,12 @@ namespace Stealth.Level
             Spawns = spawns.ToArray();
             if (plan.ExitLadderX >= 0f)
             {
-                var ladder = Put(Ladder, "ExitLadder", new Vector3(plan.ExitLadderX, 0.15f, 3.45f));
-                if (ladder != null) foreach (var use in ladder.GetComponentsInChildren<Interactable>()) use.Configure(0); // up into the house's exit hatch
+                Put(Ladder, "ExitLadder", new Vector3(plan.ExitLadderX, 0.15f, 3.45f));
                 Put(Manhole, "ExitManhole", new Vector3(plan.ExitLadderX, 4.15f, 3.2f));
             }
             yield return true;
+
+            foreach (var step in BuildPassage(plan)) yield return step;
 
             // the hall: its cells (floor and vault), walls (plain, the way in, the mouths), columns, arches, lamps
             BuildHall(plan);
@@ -294,6 +299,65 @@ namespace Stealth.Level
             }
             m_Ways = -1; // (the tunnels' bars and signs for the ways on: set again now that they are there)
             Built = true;
+        }
+
+        /// <summary>The passage's lamps on its wall every so many metres of a straight stretch.</summary>
+        const float PassageLampEvery = 6f;
+
+        /// <summary>
+        /// The way from the doorway to the shaft under the house's exit hatch (<see cref="SewerPlan.Passage"/>): its straight
+        /// stretches of the kit's 1 m pieces (the last ones stretched a little to fit), its turns, lamps along its wall, and the
+        /// shaft's foot, whose ladder climbs to the hatch's lid in the house's floor (<see cref="ShaftLadder"/>, the lid's key
+        /// <see cref="OpenKeys.ExitShaft"/>) — up and down like the basement's.
+        /// </summary>
+        IEnumerable<bool> BuildPassage(SewerPlan plan)
+        {
+            for (int i = 0; i < plan.Passage.Count; i++)
+            {
+                if (FrameBudget.Over) yield return true;
+                var piece = plan.Passage[i];
+                var rot = Quaternion.Euler(0f, piece.Yaw, 0f);
+                var dir = rot * Vector3.right;
+                switch (piece.Kind)
+                {
+                    case PassageKind.Straight:
+                        int n = Mathf.Max(1, Mathf.RoundToInt(piece.Length));
+                        float step = piece.Length / n;
+                        for (int k = 0; k < n; k++)
+                        {
+                            var go = Put(PassageStraight, $"Passage{i}_{k}", piece.Position + dir * (step * k), piece.Yaw);
+                            if (go != null) go.transform.localScale = new Vector3(step, 1f, 1f);
+                        }
+                        var wall = rot * Vector3.forward; // its left wall
+                        for (float d = PassageLampEvery / 2f; d < piece.Length; d += PassageLampEvery)
+                        {
+                            var lamp = Put(Lamp, $"PassageLamp{i}", piece.Position + dir * d + wall * (SewerPlan.PassageHalf - 0.05f) + Vector3.up * 1.9f, SewerPlan.YawOf(-wall));
+                            if (lamp != null)
+                                foreach (var l in lamp.GetComponentsInChildren<Light>())
+                                {
+                                    l.color = plan.LampColor;
+                                    l.intensity = plan.LampIntensity * 0.5f;
+                                    l.range = 7f;
+                                }
+                        }
+                        break;
+                    case PassageKind.Corner:
+                        Put(PassageCorner, $"PassageCorner{i}", piece.Position, piece.Yaw);
+                        break;
+                    case PassageKind.End:
+                        var end = Put(PassageEnd, "PassageEnd", piece.Position, piece.Yaw);
+                        if (end == null || !end.TryGetComponent<ShaftLadder>(out var ladder)) break;
+                        var o = end.transform;
+                        var up = o.right; // into the shaft, towards its ladder
+                        var hatch = transform.TransformPoint(new Vector3(plan.ExitHatch.x, Basement.Depth, plan.ExitHatch.y));
+                        var foot = o.position + up * 0.3f + Vector3.up * 0.2f;
+                        var column = o.position + up * (2f * SewerPlan.PassageHalf - 0.25f - 0.4f) + Vector3.up * 0.2f; // 0.4 m in front of the rungs
+                        var top = new Vector3(column.x, hatch.y + 0.1f, column.z);
+                        var off = hatch + up * (Basement.ShaftHalf + 0.55f) + Vector3.up * 0.05f;
+                        ladder.Setup(new[] { foot, column, top, off }, hatch, OpenKeys.ExitShaft);
+                        break;
+                }
+            }
         }
 
         GameObject PutAt(GameObject prefab, string name, Vector3 at, Quaternion rotation)

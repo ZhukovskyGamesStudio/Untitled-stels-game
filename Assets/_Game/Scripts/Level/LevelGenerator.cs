@@ -505,15 +505,25 @@ namespace Stealth.Level
             l.BasementOrigin = Basement.Frame(l.HatchPosition, l.BasementYaw).Origin;
             l.EntryHatch = Basement.StashSpot(l.Cellar); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
+            // on a plan cell's middle (its shaft goes down through a hole of 3 x 3 cells) where the sewer's passage can come
+            // under it (SewerPlan.PassageFits: clear of the basement's tunnel); a room with no such spot gives way to another
+            System.Func<Vector3, bool> reachable = q => ExitReachable(l, q);
+            if (!TryHatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null, out var exitSpot, reachable))
+            {
+                var other = ExitRoom(l, reachable, true);
+                if (other != null && TryHatchCorner(l, other, null, out exitSpot, reachable)) exit = other;
+                else exitSpot = HatchCorner(l, exit, null);
+            }
             exit.Kept = exit.Id != l.LobbyRoom; // the wet room it was chosen for stays one
             l.ExitRoom = exit.Id;
             l.EntryRoom = entryRoom.Id;
-            // on the nearest cell's middle (0.15 m off the walls' spots, HatchFromWall): its well goes down through a hole of
-            // 3 x 3 plan cells in the floor
-            var exitSpot = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
             l.ExitHatchPosition = OnCells(exitSpot, exitSpot);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
-            furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
+            // its lid like the entry's: the side the climber steps off to (+Z) away from the tunnel — the passage's last
+            // stretch comes up from the tunnel's side, the ladder on the shaft's far wall
+            var off = l.Cellar.ToLocal(l.ExitHatchPosition);
+            var up = l.Cellar.Dir(new Vector3(0f, 0f, off.z >= 0f ? 1f : -1f));
+            furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg);
             furnisher.PlaceVentDesks();
             l.PlayerSpawns.AddRange(Basement.Spawns(l.Cellar));
         }
@@ -714,25 +724,25 @@ namespace Stealth.Level
         /// in the auto repair shop its workshop (the oil separator's chamber in the floor). Never the lobby, the hidden room,
         /// a corridor, the storage room or the paint booth.
         /// </summary>
-        static PlanRoom ExitRoom(LevelLayout l)
+        static PlanRoom ExitRoom(LevelLayout l, System.Func<Vector3, bool> spot = null, bool generic = false)
         {
             // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
             var reach = VentPlan.VoidReach(l, l.LobbyRoom);
-            if (HouseRules.Of(l).ExitRoom(l, reach) is PlanRoom own) return own;
+            if (!generic && HouseRules.Of(l).ExitRoom(l, reach) is PlanRoom own) return own;
             PlanRoom best = null, wet = null;
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
             {
                 if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || RoomTraits.FloorTaken(r.Type) || r.Area < 10f) continue; // (the booth: its car; the theatres, imaging and the station: their equipment)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
-                if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
+                if (!TryHatchCorner(l, r, null, out _, spot)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (!VentPlan.CanReach(l, r, reach)) continue;
                 if (d > far) { far = d; best = r; }
                 if (RoomTraits.Wet(r.Type) && r.Type != RoomType.Bathroom && d > farWet) { farWet = d; wet = r; }
             }
             if (wet != null && farWet >= far * 0.6f && farWet > 8.5f) return wet;
-            return best ?? l.Lobby;
+            return best ?? (generic ? null : l.Lobby);
         }
 
         /// <summary>The entry hatch: in the plant room's corner (the lobby's, where a house has no plant room).</summary>
@@ -793,7 +803,14 @@ namespace Stealth.Level
         public static Vector3 HatchCorner(LevelLayout l, PlanRoom r, Vector3? near) => TryHatchCorner(l, r, near, out var p) ? p : r.Center;
 
         /// <summary>A hatch's place by the walls of a room (see <see cref="HatchCorner"/>); false when the room has none.</summary>
-        static bool TryHatchCorner(LevelLayout l, PlanRoom r, Vector3? near, out Vector3 spot)
+        /// <summary>The sewer's passage can come under an exit hatch here (its shaft on the plan cell this snaps to).</summary>
+        public static bool ExitReachable(LevelLayout l, Vector3 p)
+        {
+            var d = l.Cellar.ToLocal(OnCells(p, p));
+            return SewerPlan.PassageFits(new Vector2(d.x, d.z));
+        }
+
+        static bool TryHatchCorner(LevelLayout l, PlanRoom r, Vector3? near, out Vector3 spot, System.Func<Vector3, bool> allowed = null)
         {
             var plan = l.Plan;
             float y = LevelLayout.FloorY(r.Floor);
@@ -823,7 +840,7 @@ namespace Stealth.Level
             foreach (float margin in new[] { 1.6f, 0.7f })
             foreach (var (p, _) in spots)
             {
-                bool ok = !l.NearStair(r.Floor, p, 1.2f);
+                bool ok = !l.NearStair(r.Floor, p, 1.2f) && (allowed == null || allowed(p));
                 for (float dx = -0.95f; dx <= 0.96f && ok; dx += 0.95f)
                     for (float dz = -0.95f; dz <= 0.96f && ok; dz += 0.95f)
                     {

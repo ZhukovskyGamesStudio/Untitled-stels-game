@@ -261,9 +261,6 @@ namespace Stealth.Game
                 case UseKind.GateLever:
                     if (Phase is RunPhase.Sewer or RunPhase.Playing && !GateOpen) { m_Opened.Add(OpenKeys.Gate); OpenedVersion++; Banner(Loc.Pack("banner.gate_open")); }
                     break;
-                case UseKind.ExitLadder:
-                    ExitUpServer(player);
-                    break;
                 case UseKind.CarSeat:
                     if (car != null && DriveUntil <= 0) car.SitServer(player, index);
                     break;
@@ -379,27 +376,6 @@ namespace Stealth.Game
                 }
                 return any;
             }
-        }
-
-        /// <summary>Server: crouching in the exit hatch — down its ladder to the house's sewer (to the car, the gate, the ways on).</summary>
-        void ExitDownServer(PlayerController player)
-        {
-            var sewer = m_Sewer;
-            if (Phase != RunPhase.Playing || player == null || player.Downed || !player.InHatch || player.HatchIndex != 1) return;
-            if (sewer == null || !IsHouseSewer(sewer) || !sewer.Built || sewer.Spawns.Length == 0) return;
-            int slot = PlayerLooks.SlotOf(player.ClientId);
-            player.LeaveHatchServer();
-            player.PlaceServer(sewer.SpawnFor(slot), sewer.SpawnRotation(slot).eulerAngles.y);
-        }
-
-        /// <summary>Server: up the ladder under the exit hatch — the player comes out sitting in the hatch, up in the house.</summary>
-        void ExitUpServer(PlayerController player)
-        {
-            var l = ActiveLevel.Layout;
-            if (Phase != RunPhase.Playing || player == null || player.Downed || l == null || !ActiveLevel.Ready || !IsHouseSewer(m_Sewer)) return;
-            player.EnterHatchServer(1);
-            var away = l.ExitHatchPosition - l.Plan.RoomAt(l.ExitHatchPosition + Vector3.up * 0.3f)?.Center ?? Vector3.forward;
-            player.PlaceServer(l.ExitHatchPosition + Vector3.up * 0.05f, Mathf.Atan2(-away.x, -away.z) * Mathf.Rad2Deg); // facing into the room
         }
 
         void CheckStranded()

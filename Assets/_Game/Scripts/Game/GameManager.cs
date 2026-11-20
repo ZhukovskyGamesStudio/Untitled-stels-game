@@ -301,9 +301,6 @@ namespace Stealth.Game
         /// <summary>The house's sewer went down out of the way on the drive (<see cref="ShiftSewerForDrive"/>).</summary>
         bool m_SewerShifted;
 
-        /// <summary>The house's sewer stands whole under it: the exit hatch leads down into it.</summary>
-        public bool HouseSewerReady => m_Sewer != null && IsHouseSewer(m_Sewer) && m_Sewer.Built;
-
         /// <summary>This house's own sewer (under it, of its depth), not the one between houses or another house's.</summary>
         bool IsHouseSewer(SewerLocation sewer) => sewer != null && sewer.UnderHouse && m_SewerFor == (Level.RunSeed, Level.Index);
 
@@ -322,8 +319,9 @@ namespace Stealth.Game
                 if (IsHouseSewer(m_Sewer)) return;
                 LeaveSewerLocal();
             }
-            var plan = SewerPlan.Make(Level.RunSeed, Level.Index);
             var frame = l.Cellar;
+            var exit = frame.ToLocal(l.ExitHatchPosition); // (the passage to its shaft: SewerPlan.Passage)
+            var plan = SewerPlan.Make(Level.RunSeed, Level.Index, new Vector2(exit.x, exit.z));
             var at = frame.ToWorld(new Vector3(Basement.GateX - plan.GateX, 0f, 0f)); // its gate where the basement's stands
             m_Sewer = Instantiate(Art.Sewer, at, frame.Rotation).GetComponent<SewerLocation>();
             m_Sewer.MarkUnderHouse(); // (before any frame passes: nobody takes it for the sewer between houses)

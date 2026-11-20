@@ -438,11 +438,9 @@ namespace Stealth.UI
                 CanHack = me.HackTarget != null,
                 HackProgress = me.HackShare,
                 Playing = gm.Phase == RunPhase.Playing,
-                NearHatch = gm.Phase == RunPhase.Playing && me.AtHatch, // looking at the hatch
                 NearExit = Hatch.IndexNear(me.transform.position) == 1,
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
-                InExitHatch = me.InHatch && me.HatchIndex == 1 && gm.HouseSewerReady,
                 LockedDoor = me.DoorTarget != null,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
