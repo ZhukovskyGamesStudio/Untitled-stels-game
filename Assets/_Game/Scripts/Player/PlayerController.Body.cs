@@ -18,6 +18,8 @@ namespace Stealth.Player
 
         GameObject m_RigPrefab;
         HumanRig m_Rig;
+        /// <summary>The department the model and the rig are dressed as now (<see cref="Department"/> follows the class).</summary>
+        Department m_LookDepartment = (Department)(-1);
 
         /// <summary>What other players see of this one: the style's rigged human if it has one, otherwise the model.</summary>
         public Transform Visual => m_Rig != null ? m_Rig.transform : Model;
@@ -28,7 +30,13 @@ namespace Stealth.Player
         /// </summary>
         void UpdateRig()
         {
-            var prefab = VisualStyles.PlayerRigFor(PlayerLooks.SlotOf(ClientId));
+            // a class picked on the start screen dresses the player anew
+            if (Department != m_LookDepartment)
+            {
+                ApplyColor();
+                if (m_Rig != null) PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+            }
+            var prefab = VisualStyles.PlayerRigFor(m_LookDepartment);
             if (prefab != m_RigPrefab)
             {
                 if (m_Rig != null) Destroy(m_Rig.gameObject);
@@ -41,7 +49,7 @@ namespace Stealth.Player
                     var go = Instantiate(prefab, Model.parent);
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
-                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId));
+                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
                     if (IsOwner && !m_BodyShown)
                         foreach (var r in go.GetComponentsInChildren<Renderer>(true))
                             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;

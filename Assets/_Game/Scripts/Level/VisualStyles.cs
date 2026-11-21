@@ -37,12 +37,15 @@ namespace Stealth.Level
         /// The rigged human of a player in slot <paramref name="slot"/>: the style's own if it has one (the derelict station's
         /// scientist), else the human of the player's department (null: the player model).
         /// </summary>
-        public static GameObject PlayerRigFor(int slot)
+        public static GameObject PlayerRigFor(int slot) => PlayerRigFor(Stealth.Player.PlayerLooks.DepartmentOf(slot));
+
+        /// <summary>The rigged human of a player dressed as <paramref name="department"/> (the style's own wins).</summary>
+        public static GameObject PlayerRigFor(Stealth.Player.Department department)
         {
             if (PlayerRig != null) return PlayerRig;
             var humans = Config != null ? Config.PlayerHumans : null;
             if (humans == null || humans.Length == 0) return null;
-            return humans[(int)Stealth.Player.PlayerLooks.DepartmentOf(slot) % humans.Length];
+            return humans[(int)department % humans.Length];
         }
 
         /// <summary>The ambient light robots reckon with: the game's own, whatever a style shows.</summary>

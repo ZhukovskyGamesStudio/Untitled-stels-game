@@ -190,15 +190,16 @@ namespace Stealth.EditorTools
                 Img(col, new Color(0.03f, 0.04f, 0.05f, 0.78f));
                 slot.Name = Txt(R(col, "Name", TopCenter, TopCenter, new Vector2(0, -4), new Vector2(190, 24)), "Player", 16, TextAnchor.MiddleCenter, Color.white, true);
                 // the class: its tool's picture between arrows, its name under it
-                slot.ClassIcon = Img(R(col, "ClassIcon", TopCenter, TopCenter, new Vector2(0, -32), new Vector2(64, 52)), Color.white);
+                // (centred pivots: an Image keeping its aspect hugs its pivot — a top pivot pushed the pictures up)
+                slot.ClassIcon = Img(R(col, "ClassIcon", TopCenter, Center, new Vector2(0, -58), new Vector2(96, 46)), Color.white);
                 slot.ClassIcon.preserveAspect = true;
-                slot.ClassPrev = Arrow(e, col, "ClassPrev", new Vector2(-72, -58), "<");
-                slot.ClassNext = Arrow(e, col, "ClassNext", new Vector2(72, -58), ">");
+                slot.ClassPrev = Arrow(e, col, "ClassPrev", new Vector2(-74, -58), "arrow_left");
+                slot.ClassNext = Arrow(e, col, "ClassNext", new Vector2(74, -58), "arrow_right");
                 slot.ClassName = Txt(R(col, "ClassName", TopCenter, TopCenter, new Vector2(0, -82), new Vector2(196, 20)), "—", 13, TextAnchor.MiddleCenter, Color.white, true);
-                slot.ItemIcon = Img(R(col, "ItemIcon", TopCenter, TopCenter, new Vector2(0, -102), new Vector2(54, 44)), Color.white);
+                slot.ItemIcon = Img(R(col, "ItemIcon", TopCenter, Center, new Vector2(0, -124), new Vector2(96, 38)), Color.white);
                 slot.ItemIcon.preserveAspect = true;
-                slot.ItemPrev = Arrow(e, col, "ItemPrev", new Vector2(-72, -124), "<");
-                slot.ItemNext = Arrow(e, col, "ItemNext", new Vector2(72, -124), ">");
+                slot.ItemPrev = Arrow(e, col, "ItemPrev", new Vector2(-74, -124), "arrow_left");
+                slot.ItemNext = Arrow(e, col, "ItemNext", new Vector2(74, -124), "arrow_right");
                 slot.ItemName = Txt(R(col, "ItemName", TopCenter, TopCenter, new Vector2(0, -146), new Vector2(196, 18)), "—", 12, TextAnchor.MiddleCenter, Color.white);
                 slot.ItemName.resizeTextForBestFit = true;
                 slot.ItemName.resizeTextMinSize = 9;
@@ -220,8 +221,11 @@ namespace Stealth.EditorTools
             screen.gameObject.SetActive(false);
         }
 
-        /// <summary>A small square arrow button of the start screen.</summary>
-        static Button Arrow(UiElements e, RectTransform parent, string name, Vector2 pos, string glyph)
+        /// <summary>
+        /// A small square arrow button of the start screen: a drawn chevron (Tools/Art/generate_icons.py), lights up in the
+        /// team's orange and grows under the mouse (<see cref="UiHover"/>).
+        /// </summary>
+        static Button Arrow(UiElements e, RectTransform parent, string name, Vector2 pos, string icon)
         {
             var b = Instance<Button>(e.Button, parent, name);
             var rt = (RectTransform)b.transform;
@@ -229,10 +233,18 @@ namespace Stealth.EditorTools
             rt.pivot = Center;
             rt.anchoredPosition = pos;
             rt.sizeDelta = new Vector2(34, 34);
+            var colors = b.colors;
+            colors.normalColor = new Color(0.2f, 0.22f, 0.26f, 0.95f);
+            colors.highlightedColor = new Color(0.95f, 0.55f, 0.2f, 1f);
+            colors.pressedColor = new Color(0.7f, 0.38f, 0.12f, 1f);
+            colors.selectedColor = colors.normalColor;
+            colors.fadeDuration = 0.06f;
+            b.colors = colors;
             var t = b.GetComponentInChildren<Text>();
-            t.text = glyph; // loc-ok
-            t.fontSize = 20;
-            t.fontStyle = FontStyle.Bold;
+            if (t != null) { t.text = ""; t.enabled = false; } // (a nested prefab instance: its label cannot be removed)
+            var glyph = Img(R(rt, "Glyph", Center, Center, Vector2.zero, new Vector2(22, 22)), Color.white, Icon(icon));
+            glyph.raycastTarget = false;
+            b.gameObject.AddComponent<UiHover>();
             return b;
         }
 

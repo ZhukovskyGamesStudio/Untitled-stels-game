@@ -154,6 +154,15 @@ def cross(g):
     g.rrect((0.14, 0.38, 0.86, 0.62), 0.05)
 
 
+def arrow_left(g):
+    # a chevron pointing left (the start screen's arrows; the right one is this mirrored)
+    g.line([(0.64, 0.18), (0.32, 0.50), (0.64, 0.82)], STROKE * 1.6)
+
+
+def arrow_right(g):
+    g.line([(0.36, 0.18), (0.68, 0.50), (0.36, 0.82)], STROKE * 1.6)
+
+
 def magnifier(g):
     g.ellipse((0.14, 0.12, 0.62, 0.60), fill=False, width=STROKE * 1.1)
     g.line([(0.57, 0.56), (0.84, 0.84)], STROKE * 1.5)
@@ -713,6 +722,8 @@ def main(only=None):
     jobs.append(("heart_full", lambda: make("heart_full", heart(True))))
     jobs.append(("heart_empty", lambda: make("heart_empty", heart(False))))
     jobs.append(("keycap", keycap))
+    jobs.append(("arrow_left", lambda: make("arrow_left", arrow_left)))
+    jobs.append(("arrow_right", lambda: make("arrow_right", arrow_right)))
     for b in ("lmb", "rmb", "mmb", "wheel"):
         jobs.append((f"mouse_{b}", lambda bb=b: make(f"mouse_{bb}", mouse(bb), rim=0.03)))
     jobs.append(("AppIcon", app_icon))

@@ -151,6 +151,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void EachClassDressesThePlayerAsItsOwnDepartment()
+        {
+            var depts = Enumerable.Range(0, ItemCatalog.ClassTools.Length).Select(Player.PlayerLooks.DepartmentOfClass).Distinct().Count();
+            Assert.AreEqual(ItemCatalog.ClassTools.Length, depts, "four classes, four looks");
+            Assert.AreEqual(Player.Department.Backend, Player.PlayerLooks.DepartmentOfClass(1), "the hacker with a keyboard: hoodie and headphones");
+            // the clothes follow the class, the team colour and the face stay the slot's
+            Assert.IsTrue(Player.PlayerLooks.PartColor("Body", 2, Player.Department.Backend, out var body));
+            Assert.AreEqual(Player.PlayerLooks.DepartmentColors[(int)Player.Department.Backend], body);
+            Assert.IsTrue(Player.PlayerLooks.PartColor("Accent", 2, Player.Department.Backend, out var team));
+            Assert.AreEqual(Player.PlayerLooks.TeamColor(2), team);
+            // before anyone picks, the team comes dressed differently
+            Assert.AreEqual(4, Enumerable.Range(0, 4).Select(s => Player.PlayerLooks.DepartmentOfClass(Player.PlayerLooks.DefaultClass(s))).Distinct().Count());
+        }
+
+        [Test]
         public void TheClockCountsUpAndShowsWhenTheNextRobotComes()
         {
             Assert.AreEqual("0:00", HouseClockRules.Format(0f));

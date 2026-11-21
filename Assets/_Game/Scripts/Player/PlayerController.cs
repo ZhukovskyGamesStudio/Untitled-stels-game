@@ -91,7 +91,7 @@ namespace Stealth.Player
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
         /// <summary>The department of this player (by slot): an IT person from backend, QA, sysadmins or design.</summary>
-        public Department Department => PlayerLooks.DepartmentOf(PlayerLooks.SlotOf(ClientId));
+        public Department Department => PlayerLooks.DepartmentOfClass(LoadoutClass); // the class dresses the player
 
         CharacterController m_Controller;
         IPlayerLink m_Link;
@@ -195,6 +195,7 @@ namespace Stealth.Player
             IsServer = isServer;
             IsSpawned = true;
             All.Add(this);
+            if (isServer) LoadoutClass = PlayerLooks.DefaultClass(PlayerLooks.SlotOf(clientId)); // until picked on the start screen
             ApplyColor();
             name = $"Player_{clientId}";
             VisualStyles.Dress(gameObject);
@@ -257,10 +258,11 @@ namespace Stealth.Player
         void ApplyColor()
         {
             int slot = PlayerLooks.SlotOf(ClientId);
+            m_LookDepartment = Department;
             if (Model != null)
             {
-                VisualStyles.SetVariant(Model.gameObject, slot); // the department's model in the current style
-                PlayerLooks.Paint(Model, slot);
+                VisualStyles.SetVariant(Model.gameObject, (int)m_LookDepartment); // the department's model in the current style
+                PlayerLooks.Paint(Model, slot, m_LookDepartment);
             }
         }
 
