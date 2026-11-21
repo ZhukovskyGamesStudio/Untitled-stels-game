@@ -8,43 +8,135 @@ namespace Stealth.Level
     {
         // ------------------------------------------------------------------ walls
 
+        /// <summary>From a wall's line to the first place a group may start: the face of the wall at its end and 3 cm.</summary>
+        static readonly float RunStart = LevelMetrics.WallThickness / 2f + 0.03f;
+        /// <summary>Of the groups along a wall, this share leaves a step of free wall after it; the rest stand side by side.</summary>
+        const float BreakChance = 0.15f;
+
         void Walls(PlanRoom room)
         {
-            var list = FacesOf(room); // longest walls first: the big pieces get the long walls
+            // a corridor is a walkway (1.7 m stays free in front of its things, far apart), a room keeps an aisle
+            bool corridor = room.Type == RoomType.Corridor;
+            foreach (var (w, n) in RunsOf(room)) // longest first: the big pieces get the long walls
+                AlongWall(room, w, n, corridor ? 1.4f : Aisle + 0.1f, 3, corridor);
+        }
+
+        /// <summary>
+        /// Groups of the room's set along one run of wall, from its start to its end: side by side as furniture stands in a
+        /// room (now and then a step of bare wall after one), the first from the corner. What does not fit at a spot (too
+        /// deep for the room, tall under a window, one too many) gives way to another group of the set before the spot is
+        /// given up; the next try is just past whatever stood in the way. Stops when <paramref name="enough"/> says so (true).
+        /// </summary>
+        bool AlongWall(PlanRoom room, PlanWall w, Vector3 n, float walk, int attempts, bool corridor, System.Func<bool> enough = null)
+        {
             float y = LevelLayout.FloorY(room.Floor);
-            foreach (var (w, n) in list)
+            var u = new Vector3(w.Dir.x, 0, w.Dir.y);
+            var start = new Vector3(w.A.x, y, w.A.y);
+            float end = w.Length - RunStart;
+            float t = corridor ? R(0.15f, 0.9f) : RunStart;
+            while (t < end - 0.15f)
             {
-                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
-                float t = R(0.15f, 0.9f);
-                // a corridor is a walkway (1.7 m stays free in front of its things), a room keeps an aisle
-                float walk = room.Type == RoomType.Corridor ? 1.4f : Aisle + 0.1f;
-                while (t < w.Length - 0.3f)
+                var face = start + u * t + n * (LevelMetrics.WallThickness / 2f);
+                float placed = 0f;
+                for (int attempt = 0; attempt < attempts && placed <= 0f; attempt++)
                 {
-                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
-                    // what does not fit here (too deep for the room, tall under a window, one too many) gives way to
-                    // another group of the room's set before the spot is given up
-                    float placed = 0f;
-                    for (int attempt = 0; attempt < 3 && placed <= 0f; attempt++)
+                    var batch = new Batch();
+                    float width = WallGroup(room, batch, face, u, n);
+                    if (width <= 0f || t + width > end) continue;
+                    // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
+                    var shift = u * (width / 2f);
+                    for (int i = 0; i < batch.Pieces.Count; i++)
                     {
-                        var batch = new Batch();
-                        float width = WallGroup(room, batch, face, u, n);
-                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
-                        // the group spans [t, t + width] along the wall: shift its pieces to the group's middle
-                        var shift = u * (width / 2f);
-                        for (int i = 0; i < batch.Pieces.Count; i++)
-                        {
-                            var p = batch.Pieces[i];
-                            p.Pos += shift;
-                            batch.Pieces[i] = p;
-                        }
-                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                        for (int i = 0; i < batch.Drops.Count; i++) { var d = batch.Drops[i]; d.Spot += shift; batch.Drops[i] = d; }
-                        if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) placed = width;
+                        var p = batch.Pieces[i];
+                        p.Pos += shift;
+                        batch.Pieces[i] = p;
                     }
-                    if (placed > 0f) t += placed + (room.Type == RoomType.Corridor ? R(4f, 10f) : R(0.15f, 1.2f));
-                    else t += 0.5f;
+                    for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
+                    for (int i = 0; i < batch.Drops.Count; i++) { var d = batch.Drops[i]; d.Spot += shift; batch.Drops[i] = d; }
+                    if (Deep(room, face + shift, n, batch, walk) && TryCommit(room, batch, front: n)) placed = width;
                 }
+                if (placed <= 0f) { t = PastBlock(room.Floor, start, u, n, t); continue; }
+                if (enough != null && enough()) return true;
+                t += placed + (corridor ? R(4f, 10f) : Chance(BreakChance) ? R(0.4f, 1.0f) : R(0f, 0.04f));
             }
+            return false;
+        }
+
+        readonly List<Rect> m_Probe = new();
+
+        /// <summary>
+        /// Where along a wall the next try goes after nothing fitted at <paramref name="t"/>: just past the furniture or the
+        /// kept spot (a doorway's step, a stair's approach) standing at the wall there, else a quarter of a metre on. Stepping
+        /// half a metre blindly left a hole after every piece that was in the way.
+        /// </summary>
+        float PastBlock(int floor, Vector3 start, Vector3 u, Vector3 n, float t)
+        {
+            var a = start + u * t + n * (LevelMetrics.WallThickness / 2f + 0.02f);
+            var b = start + u * (t + 0.25f) + n * (LevelMetrics.WallThickness / 2f + 0.9f);
+            var probe = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.z, b.z), Mathf.Max(a.x, b.x), Mathf.Max(a.z, b.z));
+            m_Probe.Clear();
+            m_Taken[floor].Query(probe, m_Probe);
+            m_Keep[floor].Query(probe, m_Probe);
+            if (m_Probe.Count == 0) return t + 0.25f;
+            float far = t;
+            foreach (var r in m_Probe)
+                foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
+                    far = Mathf.Max(far, Vector3.Dot(c - new Vector3(start.x, 0, start.z), u));
+            // the next group's footprint must keep the commit's gap (4 cm) from it
+            return Mathf.Max(t + 0.05f, far + 0.05f);
+        }
+
+        /// <summary>
+        /// The room's walls as runs: collinear pieces of wall that meet end to end (one for each room behind it) are one
+        /// straight face on this side — furnished one by one, every joint between them broke the row with a gap.
+        /// Longest first; rails, curves and runs under 0.9 m left out (as <see cref="FacesOf"/>).
+        /// </summary>
+        List<(PlanWall w, Vector3 n)> RunsOf(PlanRoom room)
+        {
+            var parts = new List<(Vector2 n, float line, float a, float b, PlanWall w)>();
+            foreach (var w in m_P.Walls)
+            {
+                if (w.Floor != room.Floor || w.Railing || w.Shaped || w.Length < 0.01f) continue;
+                if (w.RoomA != room.Id && w.RoomB != room.Id) continue;
+                var d = w.Dir;
+                var n = new Vector2(-d.y, d.x);
+                var mid = w.At(w.Length / 2f);
+                if (!InRoom(room.Floor, room.Id, mid.x + n.x * 0.3f, mid.y + n.y * 0.3f)) n = -n;
+                if (!InRoom(room.Floor, room.Id, mid.x + n.x * 0.3f, mid.y + n.y * 0.3f)) continue;
+                // along the run: the direction that keeps the room on the left of it, as for every piece of it
+                var along = new Vector2(n.y, -n.x);
+                float ta = Vector2.Dot(w.A, along), tb = Vector2.Dot(w.B, along);
+                parts.Add((n, Vector2.Dot(w.A, n), Mathf.Min(ta, tb), Mathf.Max(ta, tb), w));
+            }
+            parts.Sort((p, q) =>
+            {
+                int c = Mathf.RoundToInt(p.n.x * 10f).CompareTo(Mathf.RoundToInt(q.n.x * 10f));
+                if (c == 0) c = Mathf.RoundToInt(p.n.y * 10f).CompareTo(Mathf.RoundToInt(q.n.y * 10f));
+                if (c == 0) c = Mathf.RoundToInt(p.line * 100f).CompareTo(Mathf.RoundToInt(q.line * 100f));
+                return c != 0 ? c : p.a.CompareTo(q.a);
+            });
+            var list = new List<(PlanWall w, Vector3 n)>();
+            for (int i = 0; i < parts.Count;)
+            {
+                var p = parts[i];
+                float a = p.a, b = p.b;
+                int j = i + 1;
+                for (; j < parts.Count; j++)
+                {
+                    var q = parts[j];
+                    if ((q.n - p.n).sqrMagnitude > 1e-4f || Mathf.Abs(q.line - p.line) > 0.01f || q.a > b + 0.01f) break;
+                    b = Mathf.Max(b, q.b);
+                }
+                if (j == i + 1) { if (p.w.Length >= 0.9f) list.Add((p.w, new Vector3(p.n.x, 0, p.n.y))); }
+                else if (b - a >= 0.9f)
+                {
+                    var along = new Vector2(p.n.y, -p.n.x);
+                    list.Add((new PlanWall { Floor = room.Floor, A = p.n * p.line + along * a, B = p.n * p.line + along * b, RoomA = room.Id }, new Vector3(p.n.x, 0, p.n.y)));
+                }
+                i = j;
+            }
+            list.Sort((p, q) => q.w.Length.CompareTo(p.w.Length));
+            return list;
         }
 
         /// <summary>
@@ -658,32 +750,8 @@ namespace Stealth.Level
             int want = Mathf.Clamp(Mathf.RoundToInt(room.Area / 5f), 3, 8);
             int Have() { int n = 0; foreach (var kv in m_InRoom) n += kv.Value; return n; }
             if (Have() >= want) return;
-            float y = LevelLayout.FloorY(room.Floor);
-            foreach (var (w, n) in FacesOf(room))
-            {
-                var u = new Vector3(w.Dir.x, 0, w.Dir.y);
-                for (float t = 0.15f; t < w.Length - 0.3f;)
-                {
-                    var face = new Vector3(w.A.x, y, w.A.y) + u * t + n * (LevelMetrics.WallThickness / 2f);
-                    float placed = 0f;
-                    for (int attempt = 0; attempt < 4 && placed <= 0f; attempt++)
-                    {
-                        var batch = new Batch();
-                        float width = WallGroup(room, batch, face, u, n);
-                        if (width <= 0f || t + width > w.Length - 0.1f) continue;
-                        var shift = u * (width / 2f);
-                        for (int i = 0; i < batch.Pieces.Count; i++) { var p = batch.Pieces[i]; p.Pos += shift; batch.Pieces[i] = p; }
-                        for (int i = 0; i < batch.Items.Count; i++) batch.Items[i] += shift;
-                        if (Deep(room, face + shift, n, batch, Aisle) && TryCommit(room, batch, front: n)) placed = width;
-                    }
-                    if (placed > 0f)
-                    {
-                        if (Have() >= want) return;
-                        t += placed + 0.15f;
-                    }
-                    else t += 0.25f;
-                }
-            }
+            foreach (var (w, n) in RunsOf(room))
+                if (AlongWall(room, w, n, Aisle, 4, false, () => Have() >= want)) return;
         }
     }
 }
