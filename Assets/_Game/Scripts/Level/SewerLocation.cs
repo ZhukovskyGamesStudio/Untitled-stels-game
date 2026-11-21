@@ -188,15 +188,16 @@ namespace Stealth.Level
             {
                 float bx = -i * SewerPlan.SegmentLength;
                 if (Segments != null && Segments.Length > 0) Put(Segments[(i * 3 + plan.Segments.Count) % Segments.Length], $"BackSegment{i}", new Vector3(bx, 0f, 0f));
-                if (i % 2 == 1 && i < BackSegments)
+                bool near = plan.StartLights && i <= 3; // the spawn: the tunnel behind the car lit close by, then fading
+                if ((i % 2 == 1 || near) && i < BackSegments)
                 {
-                    int side = i % 4 == 1 ? 1 : -1;
+                    int side = near ? (i % 2 == 1 ? 1 : -1) : i % 4 == 1 ? 1 : -1;
                     var lamp = Put(Lamp, $"BackLamp{i}", new Vector3(bx + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
                     if (lamp != null)
                         foreach (var l in lamp.GetComponentsInChildren<Light>())
                         {
                             l.color = plan.LampColor;
-                            l.intensity = plan.LampIntensity * 0.45f; // fading into the distance
+                            l.intensity = plan.LampIntensity * (near ? 0.9f - 0.15f * i : 0.45f); // fading into the distance
                             l.range = 11f;
                         }
                 }
@@ -213,14 +214,22 @@ namespace Stealth.Level
                 else if (Segments != null && Segments.Length > 0) Put(Segments[s.Variant % Segments.Length], $"Segment{i}", new Vector3(s.X, 0f, 0f));
                 if (s.LampSide != 0)
                 {
-                    var lamp = Put(Lamp, $"Lamp{i}", new Vector3(s.X + SewerPlan.SegmentLength / 2f, 2.3f, s.LampSide * 3.55f), s.LampSide > 0 ? 90f : -90f);
-                    if (lamp != null)
-                        foreach (var l in lamp.GetComponentsInChildren<Light>())
-                        {
-                            l.color = plan.LampColor;
-                            l.intensity = plan.LampIntensity * (s.LampBroken ? 0.35f : 1f);
-                            l.range = 13f;
-                        }
+                    float boost = plan.StartLights ? SewerPlan.StartLampBoost : 1f;
+                    // both walls: the second lamp a third of a segment along, so the two pools overlap instead of stacking
+                    int lamps = s.LampBoth ? 2 : 1;
+                    for (int k = 0; k < lamps; k++)
+                    {
+                        int side = k == 0 ? s.LampSide : -s.LampSide;
+                        float along = s.X + SewerPlan.SegmentLength * (k == 0 ? 0.5f : 0.15f);
+                        var lamp = Put(Lamp, k == 0 ? $"Lamp{i}" : $"Lamp{i}b", new Vector3(along, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
+                        if (lamp != null)
+                            foreach (var l in lamp.GetComponentsInChildren<Light>())
+                            {
+                                l.color = plan.LampColor;
+                                l.intensity = plan.LampIntensity * boost * (s.LampBroken ? 0.35f : 1f);
+                                l.range = plan.StartLights ? 15f : 13f;
+                            }
+                    }
                 }
                 foreach (var (x, side, barrel) in s.Junk)
                     Put(barrel ? Barrel : Crate, "Junk", new Vector3(x, 0.15f, side * (SewerPlan.WalkwayZ + 0.1f)), x * 47f);
