@@ -25,6 +25,8 @@ namespace Stealth.Net
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<byte> m_Gas = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>What the body is busy with (PlayerController.Pose: a ladder, a terminal, work with the hands) — the rigged human's take.</summary>
+        readonly NetworkVariable<byte> m_Pose = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString64Bytes> m_Identity = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -50,6 +52,7 @@ namespace Stealth.Net
             m_Loadout.OnValueChanged += (_, _) => Pull();
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
+            m_Pose.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
             m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
             m_Gas.OnValueChanged += (_, now) => { if (!IsOwner) m_Player.ApplyGas(now); };
@@ -80,6 +83,7 @@ namespace Stealth.Net
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
             NetSync.Set(m_LookPitch, m_Player.LookPitch);
+            NetSync.Set(m_Pose, (byte)m_Player.Pose);
             NetSync.Set(m_Gas, (byte)Mathf.RoundToInt(Mathf.Clamp01(m_Player.GasShare) * 255f));
             if (m_PushedIdentity != m_Player.Identity)
             {
@@ -98,7 +102,7 @@ namespace Stealth.Net
                 m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value, m_Hatch.Value, m_Flashlight.Value);
                 m_Player.ApplyGear(m_Coffee.Value, m_Loadout.Value);
             }
-            if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString());
+            if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString(), (BodyPose)m_Pose.Value);
         }
 
         // ------------------------------------------------------------------ IPlayerLink
