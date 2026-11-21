@@ -325,7 +325,9 @@ namespace Stealth.EditorTools
         /// <summary>
         /// Walls and ceilings of every kind of room in the realistic facility style (S16): scanned plaster, concrete, brick
         /// and wood where there are scans, the game's own tiles, padding and panels where there are none — a kitchen is
-        /// tiled behind its counter, a toilet to head height, a gym padded, a library panelled in dark wood, a store bare concrete.
+        /// tiled behind its counter, a toilet to head height, a gym padded, a library panelled in dark wood, a store bare
+        /// concrete, a lobby with a wood dado, a corridor with a painted protection band. (Hospitals, garages, flats and the
+        /// abandoned station dress their own rooms over these: Level.ClinicLook, ShopLook, HomeLook, DerelictLook.)
         /// </summary>
         static RoomLook[] RealisticRoomLooks()
         {
@@ -352,6 +354,15 @@ namespace Stealth.EditorTools
                 R(RoomType.Meeting, "Real_Plaster", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f, plain: false),
                 R(RoomType.Lounge, "Real_Plaster2", 2.5f, null, 0f, null, 0f, plain: false),
                 R(RoomType.NapRoom, "Real_Plaster2", 2.5f, null, 0f, null, 0f),
+                // the facility's own spaces: a lobby with a wood dado, corridors with a painted protection band to a
+                // trolley's height under acoustic tiles, offices under acoustic tiles, plant rooms in bare concrete
+                R(RoomType.Lobby, "Real_Plaster", 2.5f, "Real_PaneledWood", 1.1f, "Real_CeilingTiles", 1.2f, plain: false),
+                R(RoomType.Corridor, "Real_BeigeWall", 2.5f, "Wall_PlasterOld", 1.0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Hall, "Real_BeigeWall", 2.5f, "Wall_PlasterOld", 1.0f, null, 0f, plain: false),
+                R(RoomType.Office, "Real_BeigeWall", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.OpenSpace, "Real_BeigeWall", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Utility, "Real_ConcreteWall", 3f, null, 0f, "Ceiling_Concrete", 3f),
+                R(RoomType.ChargingStation, "Wall_Panels", 2f, null, 0f, "Ceiling_Concrete", 3f),
             };
         }
 
@@ -380,6 +391,10 @@ namespace Stealth.EditorTools
                 F(RoomType.Server, "Real_ConcreteClean", 2f),
                 F(RoomType.Storage, "Real_HangarConcrete", 3f),
                 F(RoomType.Lobby, "Real_Marble", 2f),
+                F(RoomType.Corridor, "Floor_Lino", 1.2f),
+                F(RoomType.Hall, "Floor_Lino", 1.2f),
+                F(RoomType.Utility, "Real_HangarConcrete", 3f),
+                F(RoomType.ChargingStation, "Real_ConcreteClean", 2f),
             };
         }
 

@@ -8,7 +8,7 @@ description: How to model 3D assets for «Айтишники: вылазка» i
 Модель — это не код, а картинка. Код пишется вслепую, поэтому **каждая итерация заканчивается просмотром**:
 лист рендеров + проверка меша. Без просмотра модель не готова.
 
-Blender 5.2: `D:/Apps/Steam/steamapps/common/Blender/blender.exe` (не в PATH). Запуск:
+Blender 5.2: `C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe` (не в PATH). Запуск:
 `-b --factory-startup --python-exit-code 1 --python <скрипт> -- <аргументы>` (без `--python-exit-code 1` упавший скрипт
 возвращает 0).
 
@@ -24,7 +24,7 @@ Blender 5.2: `D:/Apps/Steam/steamapps/common/Blender/blender.exe` (не в PATH)
 | `Tools/Blender/audit_models.py` | пакетная проверка папок FBX: таблица Markdown, худшие сверху, сообщения ворот |
 
 ```bash
-B="D:/Apps/Steam/steamapps/common/Blender/blender.exe"
+B="C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe"
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/guard_mk2.py -- <scratchpad>/guard.fbx
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/review.py -- <scratchpad>/sheet.png <старая.fbx> <новая.fbx> --focus 0,-0.05,1.6,0.45
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/review.py -- <scratchpad>/final.png <новая.fbx> --shading
