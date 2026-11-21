@@ -194,7 +194,9 @@ namespace Stealth.UI
                 var color = d.IsHacked ? HackedColor : d is RobotController ? RobotColor : DeviceColor;
                 if (d.IsMarked && !d.IsHacked) color = Marked;
                 var glyph = KindIcons != null && (int)d.Kind < KindIcons.Length ? KindIcons[(int)d.Kind] : null;
-                Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, color, null, glyph != null ? IconShape.Glyph : IconShape.Dot,
+                // a device stays where it is mounted (a camera's lens swings with its turn: the icon would wander with it)
+                var at = d is RobotController ? d.Position : d.transform.position;
+                Icon(Flat(at), floor, floor, me, scale, radius, turn, color, null, glyph != null ? IconShape.Glyph : IconShape.Dot,
                     d is RobotController ? 1f : 0.8f, 0f, glyph);
             }
         }

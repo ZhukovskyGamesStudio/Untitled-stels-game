@@ -1,6 +1,6 @@
 ---
 name: stealth-code
-description: How to write and change code in the «Айтишники: вылазка» Unity project — layering (pure rules / components / UI presenters), the detector hierarchy and interfaces, prefab-only runtime, networking rules, naming, and checklists for adding a robot, a sensor, a level piece or a UI element. Use before writing or refactoring any C# in Assets/_Game.
+description: How to write and change code in the USG (untitled stels game) Unity project — layering (pure rules / components / UI presenters), the detector hierarchy and interfaces, prefab-only runtime, networking rules, naming, and checklists for adding a robot, a sensor, a level piece or a UI element. Use before writing or refactoring any C# in Assets/_Game.
 ---
 
 # Как писать код в этом проекте

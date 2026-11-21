@@ -1,6 +1,6 @@
 ---
 name: blender-modeling
-description: How to model 3D assets for «Айтишники: вылазка» in Blender from Python so they look made by an artist, not stacked from boxes — the shapes.py vocabulary (rounded boxes, lofts, lathes, tubes, seams, subdivision, booleans, skin), the review.py contact sheet and mesh check, the look→fix loop with an independent critic, form rules, budgets and Blender 5.2 pitfalls. Use before writing or changing any model in Tools/Blender, and when asked to make, improve, compare or review a model.
+description: How to model 3D assets for USG (untitled stels game) in Blender from Python so they look made by an artist, not stacked from boxes — the shapes.py vocabulary (rounded boxes, lofts, lathes, tubes, seams, subdivision, booleans, skin), the review.py contact sheet and mesh check, the look→fix loop with an independent critic, form rules, budgets and Blender 5.2 pitfalls. Use before writing or changing any model in Tools/Blender, and when asked to make, improve, compare or review a model.
 ---
 
 # Как моделировать (Blender из Python)

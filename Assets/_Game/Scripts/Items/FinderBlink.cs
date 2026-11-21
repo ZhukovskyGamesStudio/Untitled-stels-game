@@ -6,7 +6,7 @@ namespace Stealth.Items
 {
     /// <summary>
     /// The fuel finder's lamp (on the prefab Items/FinderModel): in a player's hand it flashes, the faster the closer the
-    /// nearest loot lying in the house (<see cref="GearRules.FinderPeriod"/>); silent, but the flash is a real light with a
+    /// nearest loot lying in the house — and the more ahead of where the holder looks (<see cref="GearRules.FinderReading"/>, <see cref="GearRules.FinderPeriod"/>); silent, but the flash is a real light with a
     /// <see cref="Level.LightSource"/>, so it lights its holder up for the robots. Lying on the floor it is dark.
     /// Every peer runs it from the same replicated items, so the server's robots see the flash where everyone does.
     /// </summary>
@@ -35,22 +35,32 @@ namespace Stealth.Items
             if (Time.time >= m_NextLook)
             {
                 m_NextLook = Time.time + 0.25f;
-                m_Period = GearRules.FinderPeriod(NearestLoot(transform.position), Tuning.Items.Gadgets);
+                var look = m_Holder.Head != null ? m_Holder.Head.forward : m_Holder.transform.forward;
+                m_Period = GearRules.FinderPeriod(NearestLoot(transform.position, look, Tuning.Items.Gadgets), Tuning.Items.Gadgets);
             }
             m_Phase += Time.deltaTime;
             if (m_Phase >= m_Period) m_Phase -= m_Period * Mathf.Floor(m_Phase / m_Period);
             SetLit(GearRules.FinderLit(m_Phase, m_Period));
         }
 
-        /// <summary>Metres to the nearest loot lying in the world (∞: none).</summary>
-        static float NearestLoot(Vector3 from)
+        /// <summary>
+        /// The best reading among the loot lying in the world (∞: none): the distance, longer for loot away from where the
+        /// holder looks (<see cref="GearRules.FinderReading"/>; on the level: the same on every peer, the yaw is replicated).
+        /// </summary>
+        static float NearestLoot(Vector3 from, Vector3 look, GadgetSettings s)
         {
+            look.y = 0f;
+            look = look.sqrMagnitude > 1e-6f ? look.normalized : Vector3.forward;
             float best = float.PositiveInfinity;
             foreach (var item in WorldItem.All)
             {
                 if (item == null || !ItemCatalog.IsLoot(item.Shape)) continue;
-                float d = Vector3.Distance(from, item.transform.position);
-                if (d < best) best = d;
+                var to = item.transform.position - from;
+                float d = to.magnitude;
+                to.y = 0f;
+                float cos = to.sqrMagnitude > 1e-4f ? Vector3.Dot(to.normalized, look) : 1f;
+                float reading = GearRules.FinderReading(d, cos, s);
+                if (reading < best) best = reading;
             }
             return best;
         }

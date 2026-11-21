@@ -69,6 +69,7 @@ namespace Stealth.Net
 
         public void RequestPickup(WorldItem item, byte x, byte y, byte rot) => PickupRpc(item.GetComponent<NetworkObject>(), x, y, rot);
         public void RequestMove(int index, byte x, byte y, byte rot) => MoveRpc(index, x, y, rot);
+        public void RequestSwapHand(int index) => SwapHandRpc(index);
         public void RequestDrop(int index, Vector3 position, float yaw) => DropRpc(index, position, yaw);
         public void RequestDeposit(int index) => DepositRpc(index);
         public void RequestStash(int index, byte x, byte y, byte rot) => StashRpc(index, x, y, rot);
@@ -110,6 +111,9 @@ namespace Stealth.Net
 
         [Rpc(SendTo.Server)]
         void MoveRpc(int index, byte x, byte y, byte rot) => m_Inventory.MoveServer(index, x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void SwapHandRpc(int index) => m_Inventory.SwapHandServer(index);
 
         [Rpc(SendTo.Server)]
         void DropRpc(int index, Vector3 position, float yaw) => m_Inventory.DropServer(index, position, yaw);

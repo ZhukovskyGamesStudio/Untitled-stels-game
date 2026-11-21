@@ -40,8 +40,49 @@ namespace Stealth.Player
             Link.SendUseHand();
         }
 
-        /// <summary>Owner: the tablet's big map is open (the hand key toggles it while the tablet is held).</summary>
+        /// <summary>Owner: the tablet is raised to the eyes (the hand key toggles it while the tablet is held).</summary>
         public bool TabletOpen { get; private set; }
+
+        bool m_HasScreen;              // the held model has a screen (the tablet): its box in the held thing's space
+        Bounds m_ScreenBox;
+        float m_Raise;                 // 0 the tablet low in the hand .. 1 up before the eyes
+        Vector3 m_HolderPos;           // the hand's anchor as built
+        Quaternion m_HolderRot;
+        bool m_HolderKnown;
+
+        /// <summary>
+        /// Owner: the tablet in the hand — where its screen face is (<paramref name="parent"/>: the held thing, whose space
+        /// is the model's: X along it, +Y up; <paramref name="box"/>: the screen face's box there). False without one.
+        /// </summary>
+        public bool HeldScreen(out Transform parent, out Bounds box)
+        {
+            parent = HeldThing != null ? HeldThing.transform : null;
+            box = m_ScreenBox;
+            return IsOwner && m_HasScreen && parent != null && parent.gameObject.activeInHierarchy;
+        }
+
+        /// <summary>
+        /// Owner, every frame: the hand's anchor between its place low on the right and up before the eyes (the tablet
+        /// raised: its screen centred in the view, facing it).
+        /// </summary>
+        void UpdateRaise(GameObject anchor)
+        {
+            if (!m_HolderKnown) { m_HolderPos = anchor.transform.localPosition; m_HolderRot = anchor.transform.localRotation; m_HolderKnown = true; }
+            if (!m_HasScreen) TabletOpen = false;
+            m_Raise = Mathf.MoveTowards(m_Raise, TabletOpen && m_HasScreen ? 1f : 0f, Time.deltaTime * 4f);
+            float k = m_Raise * m_Raise * (3f - 2f * m_Raise);
+            var t = anchor.transform;
+            if (k <= 0f) { t.SetLocalPositionAndRotation(m_HolderPos, m_HolderRot); return; }
+            // the screen's centre in the anchor's own space; raised, it sits RaisedAt before the eyes, facing them
+            var centre = new Vector3(m_ScreenBox.center.x, m_ScreenBox.max.y, m_ScreenBox.center.z);
+            var inAnchor = t.InverseTransformPoint(HeldThing.transform.TransformPoint(centre));
+            var up = Quaternion.Euler(-35f, 0f, 0f); // the tablet tilts 55° to the eyes on the fingers: 35° more faces them
+            var upPos = RaisedAt - up * inAnchor;
+            t.SetLocalPositionAndRotation(Vector3.Lerp(m_HolderPos, upPos, k), Quaternion.Slerp(m_HolderRot, up, k));
+        }
+
+        /// <summary>Where the raised tablet's screen is, in the head's space (metres before the eyes, a touch low).</summary>
+        static readonly Vector3 RaisedAt = new(0f, -0.012f, 0.17f);
 
         /// <summary>
         /// Server: the hand key. A flashlight switches on (if it has charge) or off; a battery goes into the first flashlight
@@ -112,9 +153,16 @@ namespace Stealth.Player
             }
             bool show = shape >= 0;
             if (anchor.activeSelf != show) anchor.SetActive(show);
+            if (!show && IsOwner && m_HolderKnown && (m_Raise > 0f || TabletOpen))
+            {
+                m_Raise = 0f;
+                TabletOpen = false;
+                anchor.transform.SetLocalPositionAndRotation(m_HolderPos, m_HolderRot);
+            }
             if (HeldHand != null && HeldHand.activeSelf != (show && IsOwner)) HeldHand.SetActive(show && IsOwner);
             if (!show) return;
             if (shape != m_HeldShape || color != m_HeldColor) ShowHeld(shape, color);
+            if (IsOwner) UpdateRaise(anchor);
             // a remote player's head does not pitch: the thing follows their look up and down
             if (!IsOwner) anchor.transform.localRotation = (m_HeldRot ??= anchor.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f);
         }
@@ -125,6 +173,7 @@ namespace Stealth.Player
             m_HeldColor = color;
             if (m_HeldModel != null) Destroy(m_HeldModel);
             m_HeldModel = null;
+            m_HasScreen = false;
             var renderer = HeldThing.GetComponent<MeshRenderer>();
             var model = Visuals.Models != null && shape < Visuals.Models.Length ? Visuals.Models[shape] : null;
             Bounds b;
@@ -139,6 +188,7 @@ namespace Stealth.Player
                 var mode = IsOwner ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
                 foreach (var r in m_HeldModel.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
                 foreach (var c in m_HeldModel.GetComponentsInChildren<Collider>(true)) c.enabled = false;
+                m_HasScreen = ScreenBox(m_HeldModel.transform, out m_ScreenBox);
             }
             else
             {
@@ -161,17 +211,40 @@ namespace Stealth.Player
             t.localScale = Vector3.one * scale;
             if (pose.Compact)
             {
-                t.localRotation = Quaternion.Euler(0f, -90f, 0f);
+                // on the fingers, turned, then tilted (−: its far edge up, towards the eyes)
+                t.localRotation = Quaternion.Euler(pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, pose.Yaw, 0f);
                 t.localPosition = new Vector3(0f, FistTop + b.size.y * scale * 0.5f, 0f) - t.localRotation * (b.center * scale);
             }
             else
             {
-                // model X (its length) onto +Z: yaw −90 when +X is ahead, +90 when −X is
-                t.localRotation = Quaternion.Euler(0f, 0f, pose.Roll) * Quaternion.Euler(0f, pose.Forward > 0f ? -90f : 90f, 0f);
+                // model X (its length) onto +Z: yaw −90 when +X is ahead, +90 when −X is; rolled about it, tipped up by the pitch
+                t.localRotation = Quaternion.Euler(-pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, 0f, pose.Roll)
+                                  * Quaternion.Euler(0f, pose.Forward > 0f ? -90f : 90f, 0f);
                 var grip = new Vector3(b.center.x - pose.Forward * b.size.x * (0.5f - pose.Grip), b.center.y, b.center.z); // model space
                 t.localPosition = -(t.localRotation * (grip * scale));
             }
             VisualStyles.Dress(HeldThing.gameObject);
+        }
+
+        /// <summary>The box of a model's screen face (its EyeScreen part, the tablet's) in the model's own space; false without one.</summary>
+        static bool ScreenBox(Transform model, out Bounds box)
+        {
+            box = default;
+            foreach (var f in model.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (!f.gameObject.name.StartsWith("EyeScreen") || f.sharedMesh == null) continue;
+                var b = f.sharedMesh.bounds;
+                bool first = true;
+                for (int i = 0; i < 8; i++)
+                {
+                    var c = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                    var p = model.InverseTransformPoint(f.transform.TransformPoint(c));
+                    if (first) { box = new Bounds(p, Vector3.zero); first = false; }
+                    else box.Encapsulate(p);
+                }
+                return true;
+            }
+            return false;
         }
 
         /// <summary>Every peer: the beam where the holder looks.</summary>

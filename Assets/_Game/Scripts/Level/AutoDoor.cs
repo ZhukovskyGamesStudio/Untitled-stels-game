@@ -34,6 +34,73 @@ namespace Stealth.Level
 
         public static readonly List<AutoDoor> All = new();
 
+        MeshFilter[] m_LeafMeshes;
+
+        /// <summary>
+        /// How far a thin beam (a robot's floor lidar) goes before a door leaf or panel stops it, as the leaves stand now —
+        /// shut, half open or open (their colliders are off once a door starts opening, the leaves are still there). Pure
+        /// geometry on the leaves' meshes, no physics.
+        /// </summary>
+        public static float Clip(Vector3 origin, Vector3 dir, float length)
+        {
+            foreach (var door in All)
+            {
+                if (door == null || (door.transform.position - origin).sqrMagnitude > (length + 3f) * (length + 3f)) continue;
+                door.m_LeafMeshes ??= door.LeafMeshes();
+                foreach (var f in door.m_LeafMeshes)
+                {
+                    if (f == null || f.sharedMesh == null) continue;
+                    var t = f.transform;
+                    var o = t.InverseTransformPoint(origin);
+                    var end = t.InverseTransformPoint(origin + dir * length);
+                    if (RayBox(o, end - o, f.sharedMesh.bounds, out float k)) length *= k;
+                }
+            }
+            return length;
+        }
+
+        /// <summary>The meshes of the leaves (hinged) or panels (sliding): what stands in the doorway.</summary>
+        MeshFilter[] LeafMeshes()
+        {
+            var list = new List<MeshFilter>();
+            foreach (var part in new[] { Swing, SwingB, PanelA, PanelB })
+            {
+                if (part == null) continue;
+                foreach (var f in part.GetComponentsInChildren<MeshFilter>(true))
+                    if (part == PanelA || part == PanelB || HasLeafParent(f.transform, part)) list.Add(f);
+            }
+            return list.ToArray();
+        }
+
+        static bool HasLeafParent(Transform t, Transform stop)
+        {
+            for (; t != null && t != stop; t = t.parent) if (t.name == "Leaf") return true;
+            return false;
+        }
+
+        /// <summary>Segment origin..origin+delta against a box: the fraction along it where it enters (true if it does, 0..1).</summary>
+        static bool RayBox(Vector3 origin, Vector3 delta, Bounds box, out float enter)
+        {
+            float t0 = 0f, t1 = 1f;
+            enter = 1f;
+            for (int a = 0; a < 3; a++)
+            {
+                float o = origin[a], d = delta[a], min = box.min[a], max = box.max[a];
+                if (Mathf.Abs(d) < 1e-7f)
+                {
+                    if (o < min || o > max) return false;
+                    continue;
+                }
+                float ta = (min - o) / d, tb = (max - o) / d;
+                if (ta > tb) (ta, tb) = (tb, ta);
+                t0 = Mathf.Max(t0, ta);
+                t1 = Mathf.Min(t1, tb);
+                if (t0 > t1) return false;
+            }
+            enter = t0;
+            return true;
+        }
+
         public Transform PanelA, PanelB;
         [Tooltip("A door on a hinge instead of sliding panels (the vault's round door, the street doors): turns by SwingAngle when open.")]
         public Transform Swing;

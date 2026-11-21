@@ -48,6 +48,7 @@ namespace Stealth.Game
 
         public void RequestPickup(WorldItem item, byte x, byte y, byte rot) => m_I.PickupServer(item, x, y, rot);
         public void RequestMove(int index, byte x, byte y, byte rot) => m_I.MoveServer(index, x, y, rot);
+        public void RequestSwapHand(int index) => m_I.SwapHandServer(index);
         public void RequestDrop(int index, Vector3 position, float yaw) => m_I.DropServer(index, position, yaw);
         public void RequestDeposit(int index) => m_I.DepositServer(index);
         public void RequestStash(int index, byte x, byte y, byte rot) => m_I.StashServer(index, x, y, rot);

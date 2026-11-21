@@ -89,6 +89,10 @@ namespace Stealth.Tests
             Assert.Less(near, mid);
             Assert.Less(mid, far);
             Assert.Greater(GearRules.FinderPeriod(float.PositiveInfinity, s), far, "nothing left: it barely blinks");
+            Assert.Less(GearRules.FinderReading(10f, 1f, s), GearRules.FinderReading(10f, 0f, s), "ahead reads nearer than aside");
+            Assert.Less(GearRules.FinderReading(10f, 0f, s), GearRules.FinderReading(10f, -1f, s), "aside nearer than behind");
+            Assert.AreEqual(10f, GearRules.FinderReading(10f, 1f, s), 1e-4f, "straight ahead: just the distance");
+            Assert.AreEqual(10f * s.FinderBehind, GearRules.FinderReading(10f, -1f, s), 1e-3f);
             Assert.IsTrue(GearRules.FinderLit(0.01f, 1f));
             Assert.IsFalse(GearRules.FinderLit(0.5f, 1f));
         }

@@ -107,19 +107,43 @@ namespace Stealth.EditorTools
         /// </summary>
         static void BuildHouseClock(GameHUD hud, Transform content)
         {
-            var panel = R(content, "HouseClock", TopCenter, TopCenter, new Vector2(0, -12), new Vector2(214, 58));
+            // top left under the house's panel (Quota: 16, -16, 300 x 118), as wide: all the house's news in one column
+            var panel = R(content, "HouseClock", TopLeft, TopLeft, new Vector2(16, -138), new Vector2(300, 48));
             hud.ClockPanel = Img(panel, new Color(0.22f, 0.55f, 0.85f, 0.82f));
             Img(Stretch(panel, "Shade", 2f), new Color(0f, 0f, 0f, 0.35f));
-            hud.ClockTime = Txt(R(panel, "Time", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(110, 40)), "0:00", 30, TextAnchor.MiddleLeft, Color.white, true);
-            Img(R(panel, "Robot", TopRight, TopRight, new Vector2(-66, -9), new Vector2(24, 24)), new Color(1f, 1f, 1f, 0.9f), Icon("robot_guard"));
-            hud.ClockNext = Txt(R(panel, "Next", TopRight, TopRight, new Vector2(-8, -2), new Vector2(58, 40)), "3:00", 17, TextAnchor.MiddleRight, Color.white, true);
-            hud.ClockCount = Txt(R(panel, "Count", TopLeft, TopLeft, new Vector2(112, -4), new Vector2(40, 20)), "", 12, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.75f), true);
-            hud.ClockBar = Bar(panel, "ToNext", BottomLeft, BottomLeft, new Vector2(8, 7), new Vector2(198, 6), new Color(0f, 0f, 0f, 0.45f), Color.white, 1f);
+            hud.ClockTime = Txt(R(panel, "Time", TopLeft, TopLeft, new Vector2(10, -1), new Vector2(120, 34)), "0:00", 26, TextAnchor.MiddleLeft, Color.white, true);
+            Img(R(panel, "Robot", TopRight, TopRight, new Vector2(-74, -6), new Vector2(22, 22)), new Color(1f, 1f, 1f, 0.9f), Icon("robot_guard"));
+            hud.ClockNext = Txt(R(panel, "Next", TopRight, TopRight, new Vector2(-10, -1), new Vector2(60, 34)), "3:00", 17, TextAnchor.MiddleRight, Color.white, true);
+            hud.ClockCount = Txt(R(panel, "Count", TopRight, TopRight, new Vector2(-100, -4), new Vector2(36, 20)), "", 12, TextAnchor.MiddleRight, new Color(1f, 0.85f, 0.75f), true);
+            hud.ClockBar = Bar(panel, "ToNext", BottomLeft, BottomLeft, new Vector2(8, 6), new Vector2(284, 5), new Color(0f, 0f, 0f, 0.45f), Color.white, 1f);
             // the marker over the bar's end: where the next robot is on the way
-            var marker = R(panel, "Marker", new Vector2(1, 0), Center, new Vector2(-8, 16), new Vector2(9, 9));
+            var marker = R(panel, "Marker", new Vector2(1, 0), Center, new Vector2(-8, 8.5f), new Vector2(8, 8));
             marker.localEulerAngles = new Vector3(0, 0, 45);
             Img(marker, Color.white);
             panel.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The tablet's screen: a world-space canvas with a minimap (what the team has seen, following the player) that
+        /// <see cref="GameHUD"/> lays on the screen of the tablet model in the hand (detached from the HUD on start). On the
+        /// WorldText layer: drawn after the style filter, readable in every style.
+        /// </summary>
+        static void BuildTabletScreen(UiElements e, GameHUD hud, Transform root)
+        {
+            var screen = R(root, "TabletScreen", Center, Center, Vector2.zero, new Vector2(GameHUD.TabletScreenWidth, 260));
+            var canvas = screen.gameObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            screen.gameObject.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 4f;
+            var map = BuildMap(e, screen, "Map", true, Center, Center, Vector2.zero, new Vector2(GameHUD.TabletScreenWidth, 260), 5f);
+            var mr = (RectTransform)map.transform;
+            mr.anchorMin = Vector2.zero;
+            mr.anchorMax = Vector2.one;
+            mr.offsetMin = mr.offsetMax = Vector2.zero;
+            map.GetComponent<Image>().color = new Color(0.03f, 0.07f, 0.09f, 1f);
+            hud.TabletScreen = screen;
+            hud.TabletMap = map;
+            SetLayerRecursive(screen.gameObject, Stealth.Level.LevelMetrics.WorldTextLayer);
+            screen.gameObject.SetActive(false);
         }
 
         /// <summary>The team is up in the house and its clock starts: a big notice across the screen (fades in and out).</summary>
@@ -132,8 +156,9 @@ namespace Stealth.EditorTools
             Img(band, new Color(0f, 0f, 0f, 0.55f)).raycastTarget = false;
             Img(R(band, "LineTop", TopCenter, TopCenter, Vector2.zero, new Vector2(4000, 3)), new Color(0.45f, 1f, 0.55f, 0.8f));
             Img(R(band, "LineBottom", BottomCenter, BottomCenter, Vector2.zero, new Vector2(4000, 3)), new Color(0.45f, 1f, 0.55f, 0.8f));
-            hud.EntryTitle = Txt(R(band, "Title", Center, Center, new Vector2(0, 18), new Vector2(1200, 80)), L("hud.entry.title"), 58, TextAnchor.MiddleCenter, Color.white, true);
-            hud.EntrySub = Txt(R(band, "Sub", Center, Center, new Vector2(0, -42), new Vector2(1200, 34)), "—", 20, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
+            hud.EntryTitle = Txt(R(band, "Title", Center, Center, new Vector2(0, 0), new Vector2(1200, 80)), L("hud.entry.title"), 58, TextAnchor.MiddleCenter, Color.white, true);
+            hud.EntrySub = Txt(R(band, "Sub", Center, Center, new Vector2(0, -42), new Vector2(1200, 34)), "", 20, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
+            hud.EntrySub.gameObject.SetActive(false); // the notice is the title alone
             band.gameObject.SetActive(false);
         }
 
@@ -383,9 +408,7 @@ namespace Stealth.EditorTools
             // The map terminal's map (the whole building, a floor at a time, north-up); the HUD has no minimap.
             hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(980, 720), 1f);
             hud.BigMap.gameObject.SetActive(false);
-            // the tablet's minimap, bottom left over the status icons (shown only while the tablet is held)
-            hud.MiniMap = BuildMap(e, content, "MiniMap", true, BottomLeft, BottomLeft, new Vector2(16, 84), new Vector2(220, 220), 4.5f);
-            hud.MiniMap.gameObject.SetActive(false);
+            BuildTabletScreen(e, hud, root.transform);
             BuildSafeCrack(e, content);
             BuildVaultLock(content);
             BuildCheatPanel(e, content);

@@ -1,5 +1,5 @@
 """
-Procedural sounds and music for «Айтишники: вылазка».
+Procedural sounds and music for USG (untitled stels game).
 
     python Tools/Audio/generate_sounds.py [Assets/_Game/Art/Audio]
 

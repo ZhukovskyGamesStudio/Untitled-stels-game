@@ -63,6 +63,8 @@ namespace Stealth.Items
         public float FinderFar = 30f;
         [Tooltip("Fuel finder: seconds between blinks, near and far.")]
         public float FinderFastPeriod = 0.18f, FinderSlowPeriod = 1.8f;
+        [Tooltip("Fuel finder: loot right behind the holder reads as this many times further than the same loot straight ahead (it points where you look).")]
+        public float FinderBehind = 4f;
         [Tooltip("Radio: a teammate speaking makes the radio in someone's hand sound — robots hear it within this radius, metres.")]
         public float RadioNoise = 7f;
         [Tooltip("A fall from this high (and higher) slows a player down, metres (not with the boots).")]
@@ -106,6 +108,13 @@ namespace Stealth.Items
             float t = Mathf.InverseLerp(s.FinderNear, s.FinderFar, distance);
             return Mathf.Lerp(s.FinderFastPeriod, s.FinderSlowPeriod, t);
         }
+
+        /// <summary>
+        /// How far loot "reads" on the finder: its distance, stretched the further it is from where the holder looks
+        /// (<paramref name="cosine"/> of the angle between the look and the way to it: ahead ×1, aside ×½(1+behind), behind ×behind).
+        /// </summary>
+        public static float FinderReading(float distance, float cosine, GadgetSettings s) =>
+            distance * Mathf.Lerp(1f, Mathf.Max(1f, s.FinderBehind), (1f - Mathf.Clamp(cosine, -1f, 1f)) * 0.5f);
 
         /// <summary>Whether the finder's lamp is lit at <paramref name="phase"/> seconds into a blink of <paramref name="period"/>: a short flash.</summary>
         public static bool FinderLit(float phase, float period) => phase < Mathf.Min(0.09f, period * 0.5f);

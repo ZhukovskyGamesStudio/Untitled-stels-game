@@ -1,6 +1,6 @@
 ---
 name: stealth-commit
-description: How to commit and push in the «Айтишники: вылазка» repo — the branch rule (Claude works in george, never in a colleague's branches), Russian commit message format with a tag and area, what to stage (prefabs and .meta with code, never Builds/Logs/Library), pre-commit checks and when pushing to main is allowed. Use whenever committing, pushing or merging in this project.
+description: How to commit and push in the USG (untitled stels game) repo — the branch rule (Claude works in george, never in a colleague's branches), Russian commit message format with a tag and area, what to stage (prefabs and .meta with code, never Builds/Logs/Library), pre-commit checks and when pushing to main is allowed. Use whenever committing, pushing or merging in this project.
 ---
 
 # Как коммитить

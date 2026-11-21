@@ -134,8 +134,11 @@ namespace Stealth.UI
         [Header("Map and callouts")]
         [Tooltip("The map terminal's map: the whole building, a floor at a time, north-up (the HUD has no map of its own).")]
         public MapView BigMap;
-        [Tooltip("The tablet's minimap (corner, follows the player): what the team has seen, teammates, pings, marked robots.")]
-        public MapView MiniMap;
+        [Tooltip("The tablet's screen (world-space canvas, laid on the screen of the tablet in the hand): its minimap of what the team has seen.")]
+        public RectTransform TabletScreen;
+        public MapView TabletMap;
+        /// <summary>The tablet screen canvas's width in its units (its height follows the screen's shape).</summary>
+        public const float TabletScreenWidth = 380f;
         [Tooltip("Pings and marked robots on screen, through walls.")]
         public RectTransform CalloutLayer;
         public CalloutMarkerView CalloutPrefab;
@@ -175,11 +178,14 @@ namespace Stealth.UI
             m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
             m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
             m_HintRows = new UiPool<HintView>(HintPrefab, HintStack);
+            // the tablet's screen lives in the world (on the tablet in the hand), not under the HUD's overlay canvas
+            if (TabletScreen != null) TabletScreen.SetParent(null, false);
         }
 
         void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            if (TabletScreen != null) Destroy(TabletScreen.gameObject); // (detached into the world)
         }
 
         public void FlashHit(Vector3 awayFromSource) => m_Hit.Hit(awayFromSource, Time.time);
@@ -296,8 +302,6 @@ namespace Stealth.UI
                 if (m_ClockSeen >= 0 && gm.HouseClockAt > 0 && gm.HouseClock < 5f)
                 {
                     m_EntryAt = Time.unscaledTime;
-                    var r = Tuning.Run.Rules;
-                    EntrySub.text = Loc.F("hud.entry.sub", HouseClockRules.Format(r.ReinforceFirst));
                     Audio.Sfx.Ui(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Ping : null, 1f);
                 }
                 m_ClockSeen = gm.HouseClockAt;
@@ -428,34 +432,48 @@ namespace Stealth.UI
         {
             if (GameMenu.IsOpen || gm.Exploration == null) return false;
             var t = me.UsingTerminal;
-            return m_ForceMap || (t != null && t.Kind == TerminalKind.Map) || TabletOpen(gm, me);
+            return m_ForceMap || (t != null && t.Kind == TerminalKind.Map);
         }
-
-        /// <summary>The tablet in the hand, opened with the hand key: the big map of what the team has seen (not the whole house).</summary>
-        static bool TabletOpen(GameManager gm, PlayerController me) =>
-            me.TabletOpen && gm.Phase == RunPhase.Playing && me.UsingTerminal == null && !me.Downed && me.GetComponent<PlayerInventory>().Holds(ItemCatalog.Tablet);
-
-        /// <summary>The tablet in the hand, closed: a minimap of what the team has seen in the corner.</summary>
-        static bool TabletMini(GameManager gm, PlayerController me) =>
-            !me.TabletOpen && gm.Phase == RunPhase.Playing && gm.Exploration != null && me.UsingTerminal == null && !me.Downed && !GameMenu.IsOpen
-            && me.GetComponent<PlayerInventory>().Holds(ItemCatalog.Tablet);
 
         void ShowMaps(GameManager gm, PlayerController me)
         {
-            bool mini = MiniMap != null && TabletMini(gm, me);
-            if (MiniMap != null)
-            {
-                Ui.Show(MiniMap, mini);
-                if (mini) MiniMap.Refresh(gm, me);
-            }
+            ShowTabletScreen(gm, me);
             bool open = MapOpen(gm, me);
             Ui.Show(BigMap, open);
             if (!open) return;
-            // the map terminal shows the whole house and everything in it; the tablet only what the team has seen
-            BigMap.WholeHouse = !TabletOpen(gm, me) || m_ForceMap;
+            // the map terminal shows the whole house and everything in it
+            BigMap.WholeHouse = true;
             var t = me.UsingTerminal;
             BigMap.ViewFloor = t != null && t.Kind == TerminalKind.Map ? me.TerminalFloor : -1;
             BigMap.Refresh(gm, me);
+        }
+
+        /// <summary>
+        /// The tablet in the hand: its minimap (what the team has seen) on the screen of the model itself, wherever the hand
+        /// holds it (<see cref="PlayerController.HeldScreen"/>; the hand key raises it to the eyes).
+        /// </summary>
+        void ShowTabletScreen(GameManager gm, PlayerController me)
+        {
+            if (TabletScreen == null || TabletMap == null) return;
+            bool held = me.HeldScreen(out var parent, out var box);
+            bool on = held && gm.Phase == RunPhase.Playing && gm.Exploration != null && !GameMenu.IsOpen;
+            if (!on)
+            {
+                if (TabletScreen.gameObject.activeSelf) TabletScreen.gameObject.SetActive(false);
+                if (TabletScreen.parent != null) TabletScreen.SetParent(null, false);
+                return;
+            }
+            if (TabletScreen.parent != parent)
+            {
+                // face up on the screen face (the model lies along X, +Y up): the canvas's top towards the model's +Z
+                TabletScreen.SetParent(parent, false);
+                TabletScreen.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                TabletScreen.localPosition = new Vector3(box.center.x, box.max.y + 0.0008f, box.center.z);
+                TabletScreen.sizeDelta = new Vector2(TabletScreenWidth, TabletScreenWidth * box.size.z / Mathf.Max(1e-4f, box.size.x));
+                TabletScreen.localScale = Vector3.one * (box.size.x / TabletScreenWidth);
+            }
+            if (!TabletScreen.gameObject.activeSelf) TabletScreen.gameObject.SetActive(true);
+            TabletMap.Refresh(gm, me);
         }
 
         /// <summary>

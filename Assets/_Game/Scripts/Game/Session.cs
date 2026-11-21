@@ -149,6 +149,8 @@ namespace Stealth.Game
     {
         void RequestPickup(WorldItem item, byte x, byte y, byte rot);
         void RequestMove(int index, byte x, byte y, byte rot);
+        /// <summary>A thing of the backpack into the hand, the held one into the backpack (its place if it fits there).</summary>
+        void RequestSwapHand(int index);
         void RequestDrop(int index, Vector3 position, float yaw);
         void RequestDeposit(int index);
         // Team stash at the hatch. Stash entries are named by value: another player may have changed the list meanwhile.

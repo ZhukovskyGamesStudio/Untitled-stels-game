@@ -1,5 +1,5 @@
 """
-Robot voice lines for «Айтишники: вылазка» (Windows only).
+Robot voice lines for USG (untitled stels game) (Windows only).
 
     python Tools/Audio/generate_voices.py [Assets/_Game/Art/Audio]
 

@@ -98,6 +98,25 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void AThingDraggedIntoABusyHandSwapsWithTheHeldOne()
+        {
+            var inv = Inventory();
+            inv.ApplyReplicated(new[]
+            {
+                new InventoryEntry { Shape = ItemCatalog.Flashlight, Color = 50, X = PlayerInventory.HandX },
+                new InventoryEntry { Shape = ItemCatalog.Screwdriver, Color = 0, X = 2, Y = 1 },
+            });
+            Assert.IsTrue(inv.CanSwapHand(1, out var x, out var y, out _));
+            Assert.AreEqual((2, 1), ((int)x, (int)y), "the held one takes the place of the one going into the hand");
+            inv.Bind(null);
+            inv.RequestSwapHand(1);
+            Assert.AreEqual(ItemCatalog.Screwdriver, inv.Items[inv.HandIndex()].Shape);
+            var back = inv.Items.First(e => e.Shape == ItemCatalog.Flashlight);
+            Assert.AreEqual((2, 1), ((int)back.X, (int)back.Y));
+            Assert.IsFalse(inv.CanSwapHand(inv.HandIndex(), out _, out _, out _), "the held one itself: nothing to swap");
+        }
+
+        [Test]
         public void ABatteryRechargesAFlashlightThatIsNotFull()
         {
             var inv = Inventory();

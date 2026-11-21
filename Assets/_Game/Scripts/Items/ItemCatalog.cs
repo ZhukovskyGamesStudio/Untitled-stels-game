@@ -294,14 +294,28 @@ namespace Stealth.Items
         /// −1, or 0 for a compact thing held in the palm; <see cref="Grip"/> where along it the fist closes, a share of its
         /// length from the held end; <see cref="Roll"/> degrees about the way it points (a key's flat face to the side).
         /// </summary>
+        /// <summary>
+        /// How a thing sits in the fist. <see cref="Length"/>: its longest side, metres. A long thing (<see cref="Forward"/>
+        /// ±1: which end of the model's X points ahead — the Unity import mirrors Blender's X, so a part modelled at Blender
+        /// +X is at −X here) is gripped <see cref="Grip"/> of its length from the held end, turned <see cref="Roll"/>° about
+        /// its length and tipped up <see cref="Pitch"/>° (90: upright). A compact one (Forward 0) rests on the fingers,
+        /// turned <see cref="Yaw"/>° and tilted towards the eyes <see cref="Pitch"/>°.
+        /// </summary>
         public readonly struct HeldPose
         {
-            public readonly float Length, Forward, Grip, Roll;
-            public HeldPose(float length, float forward, float grip, float roll) { Length = length; Forward = forward; Grip = grip; Roll = roll; }
+            public readonly float Length, Forward, Grip, Roll, Pitch, Yaw;
+            public HeldPose(float length, float forward, float grip, float roll, float pitch = 0f, float yaw = -90f)
+            {
+                Length = length; Forward = forward; Grip = grip; Roll = roll; Pitch = pitch; Yaw = yaw;
+            }
             public bool Compact => Forward == 0f;
         }
 
-        /// <summary>The way each thing is held: keys bow in the fist, blade ahead; the screwdriver by its handle, tip ahead; the rest in the palm.</summary>
+        /// <summary>
+        /// The way each thing is held: keys bow in the fist, blade ahead; the screwdriver by its handle, tip ahead; the radio
+        /// upright, antenna up, its face to the eyes; the fuel finder by its ribbed grip, lamp and antenna ahead; the tablet
+        /// across the hand, screen tilted to the eyes; the medkit latches out; the rest in the palm.
+        /// </summary>
         public static HeldPose HeldPoseOf(int shape)
         {
             if (shape == Key) return new HeldPose(0.13f, 1f, 0.12f, 75f);        // blade at +X (the bow at −X)
@@ -309,12 +323,12 @@ namespace Stealth.Items
             if (shape == Screwdriver) return new HeldPose(0.23f, -1f, 0.24f, 0f); // the handle at +X, the blade at −X
             if (shape == Battery) return new HeldPose(0.07f, 0f, 0f, 0f);
             if (shape == Stun) return new HeldPose(0.13f, 0f, 0f, 0f);
-            if (shape == Radio) return new HeldPose(0.2f, 1f, 0.3f, 90f);      // upright-ish, antenna ahead
-            if (shape == Keyboard) return new HeldPose(0.3f, 0f, 0f, 0f);      // carried flat on the palm
-            if (shape == Tablet) return new HeldPose(0.22f, 0f, 0f, 0f);
-            if (shape == Medkit) return new HeldPose(0.2f, 0f, 0f, 0f);
+            if (shape == Radio) return new HeldPose(0.19f, -1f, 0.3f, 0f, 78f);  // the antenna at −X: up, the display (+Y) to the eyes
+            if (shape == Keyboard) return new HeldPose(0.3f, 0f, 0f, 0f, 0f, 0f); // carried flat across the palm, keys up
+            if (shape == Tablet) return new HeldPose(0.22f, 0f, 0f, 0f, -55f, 0f); // across the hand, the screen tilted up to the eyes
+            if (shape == Medkit) return new HeldPose(0.2f, 0f, 0f, 0f, 0f, 90f);  // the latches (model +Z) out to the right
             if (shape == Coffee) return new HeldPose(0.1f, 0f, 0f, 0f);
-            if (shape == Finder) return new HeldPose(0.2f, 1f, 0.3f, 0f);     // its lamp ahead
+            if (shape == Finder) return new HeldPose(0.2f, -1f, 0.22f, 0f, 8f);  // the grip at +X in the fist, lamp and antenna (−X) ahead
             return new HeldPose(0.12f, 0f, 0f, 0f);
         }
 

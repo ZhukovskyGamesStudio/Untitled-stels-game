@@ -427,6 +427,8 @@ namespace Stealth.UI
                     if (!ItemCatalog.Holdable(m_DragShape)) return;
                     if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) Take(inv, PlayerInventory.HandX, 0, 0);
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
+                    // the hand is busy: the two swap (the held one where this one was, if there is room)
+                    else if (m_Source == DragSource.Inventory && inv.CanSwapHand(m_DragIndex, out _, out _, out _)) { inv.RequestSwapHand(m_DragIndex); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Backpack:
