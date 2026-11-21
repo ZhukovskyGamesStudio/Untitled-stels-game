@@ -141,7 +141,7 @@ namespace Stealth.Tests
             Assert.AreEqual(0.5f, feet.x, 1e-3f, "alone: in the middle");
             Assert.Greater(head.y - feet.y, 0.45f, "big on the screen");
             Assert.Less(head.y, 0.95f, "the head is in the frame");
-            Assert.Greater(feet.y, 0.33f, "the column of the class and the item fits under the feet");
+            Assert.Greater(feet.y, 0.34f, "the column of the class and the item fits under the feet, above the ready button");
             // four: the outer ones are in the frame too
             for (int i = 0; i < 4; i++)
             {

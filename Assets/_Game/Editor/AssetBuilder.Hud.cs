@@ -171,18 +171,20 @@ namespace Stealth.EditorTools
             // the presenter sits on an always-active holder: it switches its child on and off (switching itself off, its
             // Update never ran again — the screen never showed)
             var holder = Stretch(root, "StartScreen");
+            // its own canvas with a raycaster: the HUD's takes no clicks (like the cheat panel)
+            holder.gameObject.AddComponent<Canvas>();
+            holder.gameObject.AddComponent<GraphicRaycaster>();
             var view = holder.gameObject.AddComponent<StartScreen>();
             var screen = Stretch(holder, "Screen");
             view.Root = screen.gameObject;
             view.Canvas = (RectTransform)root;
             view.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
             Txt(R(screen, "Title", TopCenter, TopCenter, new Vector2(0, -24), new Vector2(900, 44)), L("start.title"), 30, TextAnchor.MiddleCenter, Color.white, true);
-            Txt(R(screen, "Help", TopCenter, TopCenter, new Vector2(0, -66), new Vector2(900, 24)), L("start.help"), 14, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.7f));
             var layer = R(screen, "Slots", BottomLeft, BottomLeft, Vector2.zero, Vector2.zero);
             view.Slots = new StartSlotView[4];
             for (int i = 0; i < 4; i++)
             {
-                var col = R(layer, $"Slot{i}", BottomLeft, TopCenter, new Vector2(320 + i * 220, 300), new Vector2(200, 210));
+                var col = R(layer, $"Slot{i}", BottomLeft, TopCenter, new Vector2(320 + i * 220, 300), new Vector2(200, 188));
                 var slot = col.gameObject.AddComponent<StartSlotView>();
                 slot.Rect = col;
                 Img(col, new Color(0.03f, 0.04f, 0.05f, 0.78f));
@@ -192,12 +194,12 @@ namespace Stealth.EditorTools
                 slot.ClassIcon.preserveAspect = true;
                 slot.ClassPrev = Arrow(e, col, "ClassPrev", new Vector2(-72, -58), "<");
                 slot.ClassNext = Arrow(e, col, "ClassNext", new Vector2(72, -58), ">");
-                slot.ClassName = Txt(R(col, "ClassName", TopCenter, TopCenter, new Vector2(0, -86), new Vector2(196, 20)), "—", 13, TextAnchor.MiddleCenter, Color.white, true);
-                slot.ItemIcon = Img(R(col, "ItemIcon", TopCenter, TopCenter, new Vector2(0, -110), new Vector2(54, 44)), Color.white);
+                slot.ClassName = Txt(R(col, "ClassName", TopCenter, TopCenter, new Vector2(0, -82), new Vector2(196, 20)), "—", 13, TextAnchor.MiddleCenter, Color.white, true);
+                slot.ItemIcon = Img(R(col, "ItemIcon", TopCenter, TopCenter, new Vector2(0, -102), new Vector2(54, 44)), Color.white);
                 slot.ItemIcon.preserveAspect = true;
-                slot.ItemPrev = Arrow(e, col, "ItemPrev", new Vector2(-72, -132), "<");
-                slot.ItemNext = Arrow(e, col, "ItemNext", new Vector2(72, -132), ">");
-                slot.ItemName = Txt(R(col, "ItemName", TopCenter, TopCenter, new Vector2(0, -156), new Vector2(196, 20)), "—", 12, TextAnchor.MiddleCenter, Color.white);
+                slot.ItemPrev = Arrow(e, col, "ItemPrev", new Vector2(-72, -124), "<");
+                slot.ItemNext = Arrow(e, col, "ItemNext", new Vector2(72, -124), ">");
+                slot.ItemName = Txt(R(col, "ItemName", TopCenter, TopCenter, new Vector2(0, -146), new Vector2(196, 18)), "—", 12, TextAnchor.MiddleCenter, Color.white);
                 slot.ItemName.resizeTextForBestFit = true;
                 slot.ItemName.resizeTextMinSize = 9;
                 slot.ItemName.resizeTextMaxSize = 12;
@@ -207,14 +209,14 @@ namespace Stealth.EditorTools
             }
             view.ReadyButton = Instance<Button>(e.Button, screen, "Ready");
             var rb = (RectTransform)view.ReadyButton.transform;
-            // top right: the columns under the figures take the bottom, the figures the middle
-            rb.anchorMin = rb.anchorMax = new Vector2(1, 1);
-            rb.pivot = new Vector2(1, 1);
-            rb.anchoredPosition = new Vector2(-28, -28);
-            rb.sizeDelta = new Vector2(260, 44);
+            // bottom right, under the columns of the figures (PickingRules frames the feet above it)
+            rb.anchorMin = rb.anchorMax = new Vector2(1, 0);
+            rb.pivot = new Vector2(1, 0);
+            rb.anchoredPosition = new Vector2(-16, 16);
+            rb.sizeDelta = new Vector2(180, 40);
             view.ReadyButtonLabel = view.ReadyButton.GetComponentInChildren<Text>();
             SetText(view.ReadyButtonLabel, L("start.ready"));
-            view.Waiting = Txt(R(screen, "Waiting", new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -78), new Vector2(260, 24)), "—", 15, TextAnchor.MiddleCenter, Color.white);
+            view.Waiting = Txt(R(screen, "Waiting", new Vector2(1, 0), new Vector2(1, 0), new Vector2(-206, 16), new Vector2(200, 40)), "—", 15, TextAnchor.MiddleRight, Color.white);
             screen.gameObject.SetActive(false);
         }
 

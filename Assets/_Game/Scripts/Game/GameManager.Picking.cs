@@ -86,7 +86,7 @@ namespace Stealth.Game
         /// Metres behind the car the row stands, between two figures, from the row to the camera, the camera's height and
         /// the height on the row it looks at (low: the figures stand in the upper half, their columns under their feet).
         /// </summary>
-        public const float Behind = 4.2f, Gap = 1.25f, CameraBack = 3.6f, CameraHeight = 1.35f, LookHeight = 0.5f;
+        public const float Behind = 4.2f, Gap = 1.15f, CameraBack = 3.6f, CameraHeight = 1.35f, LookHeight = 0.5f;
         /// <summary>The camera's vertical field of view on the start screen (fixed: the player's own setting would reframe it).</summary>
         public const float Fov = 50f;
 
