@@ -150,6 +150,66 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void JitterBufferWaitsForALatePacketWhilePlaybackStillHasSound()
+        {
+            // a packet a few ms late used to be concealed and then thrown away: constant little dropouts
+            var j = new VoiceJitter();
+            var dst = new byte[VoicePacket.MaxPayload];
+            Push(j, 0); Push(j, 1); Push(j, 2);
+            for (int i = 0; i < 3; i++) Assert.AreEqual(VoiceFrame.Packet, j.Pop(dst, out _, 3, 12, false));
+            Assert.AreEqual(VoiceFrame.None, j.Pop(dst, out _, 3, 12, false), "3 is not here yet: wait, there is still sound");
+            Assert.IsTrue(j.Playing);
+            Push(j, 3);
+            Assert.AreEqual(VoiceFrame.Packet, j.Pop(dst, out _, 3, 12, false));
+            Assert.AreEqual(3, dst[0], "played as itself, not concealed");
+            Assert.AreEqual(0, j.Late);
+            // the sound is running out: now it is given up on, and its late arrival is counted
+            Assert.AreEqual(VoiceFrame.Lost, j.Pop(dst, out _, 3, 12, true));
+            Push(j, 4);
+            Assert.AreEqual(1, j.Late);
+        }
+
+        [Test]
+        public void TheCushionGrowsOnLatePacketsAndShrinksWhenCalm()
+        {
+            var c = new VoiceCushion();
+            Assert.AreEqual(3, c.Frames(3, 12));
+            c.Update(1, 0.02f, 8f, 4);
+            c.Update(2, 0.02f, 8f, 4);
+            Assert.AreEqual(5, c.Frames(3, 12), "two late packets: two frames more");
+            for (int late = 3; late < 20; late++) c.Update(late, 0.02f, 8f, 4); // packet after packet late
+            Assert.AreEqual(4, c.Extra, "never more than the limit");
+            c.Update(19, 8.1f, 8f, 4);
+            Assert.AreEqual(3, c.Extra, "a calm stretch: one back");
+            Assert.LessOrEqual(new VoiceCushion().Frames(20, 12), 10, "never past the catch-up limit");
+        }
+
+        [Test]
+        public void VoicesFadeSmoothlyAndCarryFar()
+        {
+            // one even fade: no step and no corner along the whole range, and a mate across a big floor is still heard
+            float prev = 1f, prevSlope = 0f;
+            for (float d = 0.05f; d < S.MaxDistance; d += 0.05f)
+            {
+                float g = VoiceAcoustics.DistanceGain(d, S);
+                Assert.LessOrEqual(g, prev + 1e-6f, $"never louder further away ({d:0.00} m)");
+                float slope = (prev - g) / 0.05f;
+                Assert.Less(Mathf.Abs(slope - prevSlope), 0.02f, $"no corner in the curve at {d:0.00} m");
+                prev = g;
+                prevSlope = slope;
+            }
+            Assert.Greater(VoiceAcoustics.DistanceGain(20f, S), 0.2f, "20 m away: clearly heard");
+            Assert.Greater(VoiceAcoustics.DistanceGain(40f, S), 0.05f, "40 m: still there");
+            Assert.GreaterOrEqual(S.MaxDistance, 50f);
+            // a wall coming between: the gain glides there in about Smoothing seconds instead of jumping
+            float v = 1f;
+            v = VoiceAcoustics.Follow(v, 0.1f, 0.016f, S.Smoothing);
+            Assert.Greater(v, 0.8f, "not at once");
+            for (int i = 0; i < 60; i++) v = VoiceAcoustics.Follow(v, 0.1f, 0.016f, S.Smoothing);
+            Assert.AreEqual(0.1f, v, 0.01f, "there within a second");
+        }
+
+        [Test]
         public void RingPassesSamplesInOrderAndRefusesOverflow()
         {
             var ring = new VoiceRing(4);
@@ -190,7 +250,7 @@ namespace Stealth.Tests
         [Test]
         public void VoicesFadeWithDistanceAndGoDullBehindWalls()
         {
-            Assert.AreEqual(1f, VoiceAcoustics.DistanceGain(0.5f, S));
+            Assert.AreEqual(1f, VoiceAcoustics.DistanceGain(0.5f, S), 0.05f, "right at the mouth: full");
             Assert.Greater(VoiceAcoustics.DistanceGain(5f, S), VoiceAcoustics.DistanceGain(15f, S));
             Assert.AreEqual(0f, VoiceAcoustics.DistanceGain(S.MaxDistance, S));
             VoiceAcoustics.Blocked(1f, S, out float openVol, out float openCut);

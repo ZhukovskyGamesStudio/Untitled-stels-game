@@ -27,14 +27,17 @@ namespace Stealth.Audio
         public PlayerController Owner;
 
         VoiceJitter m_Jitter;
+        readonly VoiceCushion m_Cushion = new();
         VoiceDecoder m_Decoder;
         VoiceRing m_Ring;
         VoiceResampler m_Resampler;
         readonly float[] m_Pcm = new float[VoiceNative.Frame];
         float[] m_Out;
         readonly byte[] m_Packet = new byte[VoicePacket.MaxPayload];
-        int m_OutRate;
+        int m_OutRate, m_DspBuffer;
         float m_NextAcoustics;
+        // what the acoustics last measured, and the gain and muffling gliding towards it (VoiceSettings.Smoothing)
+        float m_TargetGain, m_TargetCutoff = 22000f, m_SmoothGain, m_SmoothCutoff = 22000f;
         volatile float m_Gain;
         float m_GainNow; // audio thread
         VoiceSpace m_Space = (VoiceSpace)255;
@@ -55,6 +58,7 @@ namespace Stealth.Audio
                 return;
             }
             m_OutRate = AudioSettings.outputSampleRate;
+            AudioSettings.GetDSPBufferSize(out m_DspBuffer, out _);
             m_Jitter = new VoiceJitter();
             m_Decoder = new VoiceDecoder();
             m_Ring = new VoiceRing(m_OutRate / 2);
@@ -84,12 +88,19 @@ namespace Stealth.Audio
         void Update()
         {
             var s = Tuning.Audio.Voice;
-            // keep ~60 ms decoded ahead of the audio thread (more at a low frame rate)
-            int want = Mathf.Max(m_OutRate * 3 / 50, (int)(m_OutRate * Time.unscaledDeltaTime * 2.5f));
+            float dt = Time.unscaledDeltaTime;
+            // Decode only as much as the audio thread will play before the next frame (and a frame's worth more): the rest of
+            // the cushion waits in the jitter buffer, where a late packet still has its turn. A frame that has not come is
+            // given up on (concealed) only when what is decoded would run out before the next Update.
+            int frame = m_OutRate / 50;
+            int low = Mathf.Max(m_DspBuffer * 2, (int)(m_OutRate * Mathf.Min(dt, 0.1f) * 1.5f));
+            int want = low + frame;
+            m_Cushion.Update(m_Jitter.Late, dt, s.JitterCalm, s.JitterGrow);
+            int cushion = m_Cushion.Frames(s.JitterFrames, s.JitterMax);
             float peak = 0f;
             for (int guard = 0; guard < 8 && m_Ring.Count < want; guard++)
             {
-                var kind = m_Jitter.Pop(m_Packet, out int length, s.JitterFrames, s.JitterMax);
+                var kind = m_Jitter.Pop(m_Packet, out int length, cushion, s.JitterMax, m_Ring.Count < low);
                 if (kind == VoiceFrame.None) break;
                 int n = kind switch
                 {
@@ -102,13 +113,19 @@ namespace Stealth.Audio
                 int o = m_Resampler.Process(m_Pcm, 0, n, m_Out, 0);
                 m_Ring.Write(m_Out, 0, o);
             }
-            Level = Mathf.Max(peak, Level - Time.unscaledDeltaTime * 2f);
+            Level = Mathf.Max(peak, Level - dt * 2f);
 
             if (Time.unscaledTime >= m_NextAcoustics)
             {
                 m_NextAcoustics = Time.unscaledTime + s.AcousticsEvery;
                 UpdateAcoustics(s);
             }
+            // glide to what the acoustics measured: stepping behind a wall dulls and quietens the voice smoothly (the
+            // cutoff in octaves, as the ear hears it)
+            m_SmoothGain = VoiceAcoustics.Follow(m_SmoothGain, m_TargetGain, dt, s.Smoothing);
+            m_SmoothCutoff = Mathf.Exp(VoiceAcoustics.Follow(Mathf.Log(m_SmoothCutoff), Mathf.Log(m_TargetCutoff), dt, s.Smoothing));
+            m_Gain = m_SmoothGain;
+            if (LowPass != null) LowPass.cutoffFrequency = m_SmoothCutoff;
         }
 
         void UpdateAcoustics(VoiceSettings s)
@@ -123,8 +140,8 @@ namespace Stealth.Audio
             bool radio = me != null && Owner != null && me != Owner && me.HoldsRadio && !me.Downed;
             if (radio && gain < RadioGain) { gain = RadioGain; cutoff = Mathf.Min(cutoff, RadioCutoff); }
             if (Source != null) Source.spatialBlend = radio && gain <= RadioGain ? 0f : 1f;
-            m_Gain = gain * s.Volume * VoicePrefs.Volume;
-            if (LowPass != null) LowPass.cutoffFrequency = cutoff;
+            m_TargetGain = gain * s.Volume * VoicePrefs.Volume;
+            m_TargetCutoff = Mathf.Clamp(cutoff, 10f, 22000f);
 
             VoiceSpace space;
             float area = 20f, height = LevelMetrics.FloorHeight;
