@@ -135,6 +135,8 @@ namespace Stealth.Player
 
         /// <summary>Down in the hatch: the eyes sink to just above the floor (peeking out), the body stays put.</summary>
         public bool InHatch { get; set; }
+        /// <summary>The walk's speed × this (the instant coffee, a hard landing: <see cref="PlayerController"/> sets it).</summary>
+        public float SpeedScale { get; set; } = 1f;
         /// <summary>Sitting in the car: no walking, falling or crouching (the car carries the player).</summary>
         public bool Seated { get; set; }
         public const float HatchEyeHeight = 0.24f;
@@ -177,7 +179,7 @@ namespace Stealth.Player
             IsSprinting = wantsSprint && Stamina.CanSprint;
             Stamina.Tick(IsSprinting && HorizontalSpeed > 0.5f, dt);
 
-            float speed = crouch ? CrouchSpeed : IsSprinting ? SprintSpeed : WalkSpeed;
+            float speed = (crouch ? CrouchSpeed : IsSprinting ? SprintSpeed : WalkSpeed) * SpeedScale;
             var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 

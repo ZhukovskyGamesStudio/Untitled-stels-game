@@ -302,6 +302,7 @@ namespace Stealth.Player
             m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
             Changed();
             Session.Despawn(item.gameObject);
+            GameManager.Instance?.NoteServer(GetComponent<PlayerController>(), StatKind.Pickups);
         }
 
         public void MoveServer(int index, byte x, byte y, byte rot)
@@ -494,7 +495,7 @@ namespace Stealth.Player
         public void SellStashedServer(InventoryEntry from)
         {
             var game = GameManager.Instance;
-            if (ItemCatalog.Unburnable(from.Shape) || !AtHatch(out var stash) || game == null || stash != game.Stash || !stash.Take(from)) return;
+            if (ItemCatalog.Unburnable(from.Shape) || !AtHatch(out var stash) || game == null || !game.CanBurnStashAt(transform.position, stash) || !stash.Take(from)) return;
             game.BurnServer(GetComponent<PlayerController>(), from.Value);
         }
 
@@ -517,6 +518,22 @@ namespace Stealth.Player
         }
 
         /// <summary>Server: put an item straight into the first free spot (rewards, scripted checks). False if it does not fit.</summary>
+        /// <summary>Server: put a holdable thing straight into the empty hand slot. False if the hand is taken or it cannot be held.</summary>
+        public bool GiveToHandServer(byte shape, byte color)
+        {
+            if (!CanPlace(shape, 0, HandX, 0)) return false;
+            m_Items.Add(new InventoryEntry { Shape = shape, Color = color, X = HandX, Y = 0, Rot = 0 });
+            Changed();
+            return true;
+        }
+
+        /// <summary>Anywhere on the player (backpack, belt, hand): the boots work while they are carried.</summary>
+        public bool Carries(byte shape)
+        {
+            foreach (var e in m_Items) if (e.Shape == shape) return true;
+            return false;
+        }
+
         public bool GiveServer(byte shape, byte color)
         {
             if (!FindSpot(shape, out var x, out var y, out var rot)) return false;

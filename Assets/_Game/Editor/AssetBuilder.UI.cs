@@ -416,6 +416,9 @@ namespace Stealth.EditorTools
                 var diamond = R(root, "Diamond", Center, Center, Vector2.zero, new Vector2(9, 9));
                 diamond.localEulerAngles = new Vector3(0, 0, 45);
                 view.Diamond = Img(diamond, Color.white);
+                // a robot or a device on the map terminal: the picture of its kind (MapView.KindIcons)
+                view.Glyph = Img(R(root, "Glyph", Center, Center, Vector2.zero, new Vector2(18, 18)), Color.white, Icon("robot_guard"));
+                view.Glyph.preserveAspect = true;
                 view.Label = Txt(R(root, "Label", Center, Center, new Vector2(0, -14), new Vector2(160, 16)), "P1", 11, TextAnchor.MiddleCenter, Color.white);
                 return root.gameObject;
             }).GetComponent<MapIconView>();
@@ -730,11 +733,16 @@ namespace Stealth.EditorTools
             view.IconLayer = R(view.Content, "Icons", Center, Center, Vector2.zero, Vector2.zero);
             view.RectPrefab = e.MapRect;
             view.IconPrefab = e.MapIcon;
+            view.KindIcons = RobotKindIcons();
             view.Caption = follow
                 ? Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(6, -2), new Vector2(120, 18)), "1", 11, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.75f))
                 : Txt(R(root, "Caption", TopLeft, TopLeft, new Vector2(12, -2), new Vector2(size.x - 24, 30)), "1", 15, TextAnchor.MiddleLeft, Color.white, true);
             return view;
         }
+
+        /// <summary>The pictures of the robots and devices, one per <see cref="Stealth.Level.RobotKind"/> (Tools/Art/generate_icons.py robot_*).</summary>
+        static Sprite[] RobotKindIcons() => System.Enum.GetNames(typeof(Stealth.Level.RobotKind))
+            .Select(n => Icon("robot_" + n.ToLowerInvariant())).ToArray();
 
         /// <summary>Background + fill (pivot left, stretched by anchorMax.x).</summary>
         static BarView Bar(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos, Vector2 size, Color background, Color fill, float inset)

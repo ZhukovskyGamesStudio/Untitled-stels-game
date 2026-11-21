@@ -1,5 +1,6 @@
 using System.Linq;
 using Stealth.Game;
+using Stealth.Items;
 using Stealth.UI;
 using UnityEditor;
 using UnityEngine;
@@ -100,6 +101,136 @@ namespace Stealth.EditorTools
             return root.gameObject;
         }
 
+        /// <summary>
+        /// The house's clock, top middle (after Risk of Rain's difficulty timer): the time counting up, the clock's second the
+        /// next extra robot comes at with a robot's picture, a bar from the last one to the next; the panel tints red.
+        /// </summary>
+        static void BuildHouseClock(GameHUD hud, Transform content)
+        {
+            var panel = R(content, "HouseClock", TopCenter, TopCenter, new Vector2(0, -12), new Vector2(214, 58));
+            hud.ClockPanel = Img(panel, new Color(0.22f, 0.55f, 0.85f, 0.82f));
+            Img(Stretch(panel, "Shade", 2f), new Color(0f, 0f, 0f, 0.35f));
+            hud.ClockTime = Txt(R(panel, "Time", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(110, 40)), "0:00", 30, TextAnchor.MiddleLeft, Color.white, true);
+            Img(R(panel, "Robot", TopRight, TopRight, new Vector2(-66, -9), new Vector2(24, 24)), new Color(1f, 1f, 1f, 0.9f), Icon("robot_guard"));
+            hud.ClockNext = Txt(R(panel, "Next", TopRight, TopRight, new Vector2(-8, -2), new Vector2(58, 40)), "3:00", 17, TextAnchor.MiddleRight, Color.white, true);
+            hud.ClockCount = Txt(R(panel, "Count", TopLeft, TopLeft, new Vector2(112, -4), new Vector2(40, 20)), "", 12, TextAnchor.MiddleLeft, new Color(1f, 0.85f, 0.75f), true);
+            hud.ClockBar = Bar(panel, "ToNext", BottomLeft, BottomLeft, new Vector2(8, 7), new Vector2(198, 6), new Color(0f, 0f, 0f, 0.45f), Color.white, 1f);
+            // the marker over the bar's end: where the next robot is on the way
+            var marker = R(panel, "Marker", new Vector2(1, 0), Center, new Vector2(-8, 16), new Vector2(9, 9));
+            marker.localEulerAngles = new Vector3(0, 0, 45);
+            Img(marker, Color.white);
+            panel.gameObject.SetActive(false);
+        }
+
+        /// <summary>The team is up in the house and its clock starts: a big notice across the screen (fades in and out).</summary>
+        static void BuildEntryBanner(GameHUD hud, Transform root)
+        {
+            var band = R(root, "EntryBanner", Center, Center, new Vector2(0, 90), new Vector2(4000, 150));
+            hud.EntryBanner = band.gameObject.AddComponent<CanvasGroup>();
+            hud.EntryBanner.blocksRaycasts = false;
+            hud.EntryBanner.interactable = false;
+            Img(band, new Color(0f, 0f, 0f, 0.55f)).raycastTarget = false;
+            Img(R(band, "LineTop", TopCenter, TopCenter, Vector2.zero, new Vector2(4000, 3)), new Color(0.45f, 1f, 0.55f, 0.8f));
+            Img(R(band, "LineBottom", BottomCenter, BottomCenter, Vector2.zero, new Vector2(4000, 3)), new Color(0.45f, 1f, 0.55f, 0.8f));
+            hud.EntryTitle = Txt(R(band, "Title", Center, Center, new Vector2(0, 18), new Vector2(1200, 80)), L("hud.entry.title"), 58, TextAnchor.MiddleCenter, Color.white, true);
+            hud.EntrySub = Txt(R(band, "Sub", Center, Center, new Vector2(0, -42), new Vector2(1200, 34)), "—", 20, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f), true);
+            band.gameObject.SetActive(false);
+        }
+
+        /// <summary>The drive's panel: the last house's titles, a row per player.</summary>
+        static void BuildStatsPanel(GameHUD hud, Transform root)
+        {
+            var panel = R(root, "HouseStats", Center, Center, new Vector2(0, 30), new Vector2(760, 430));
+            hud.StatsPanel = panel.gameObject;
+            Img(panel, new Color(0.03f, 0.04f, 0.05f, 0.82f)).raycastTarget = false;
+            Img(R(panel, "Rule", TopCenter, TopCenter, new Vector2(0, -60), new Vector2(700, 2)), new Color(1f, 0.84f, 0.35f, 0.6f));
+            hud.StatsHeader = Txt(R(panel, "Header", TopCenter, TopCenter, new Vector2(0, -12), new Vector2(720, 44)), "—", 26, TextAnchor.MiddleCenter, Color.white, true);
+            hud.StatsRows = new StatsRowView[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var row = R(panel, $"Row{i}", TopCenter, TopCenter, new Vector2(0, -74 - i * 88), new Vector2(720, 80));
+                Img(row, new Color(1f, 1f, 1f, 0.05f)).raycastTarget = false;
+                var view = row.gameObject.AddComponent<StatsRowView>();
+                view.Bar = Img(R(row, "Bar", Left, Left, Vector2.zero, new Vector2(6, 80)), Color.white);
+                view.Name = Txt(R(row, "Name", TopLeft, TopLeft, new Vector2(18, -4), new Vector2(220, 26)), "Name", 17, TextAnchor.MiddleLeft, Color.white, true);
+                view.Numbers = Txt(R(row, "Numbers", BottomLeft, BottomLeft, new Vector2(18, 6), new Vector2(240, 40)), "—", 12, TextAnchor.LowerLeft, Color.white);
+                view.Numbers.horizontalOverflow = HorizontalWrapMode.Wrap;
+                view.Title = Txt(R(row, "Title", TopLeft, TopLeft, new Vector2(260, -2), new Vector2(450, 40)), "—", 26, TextAnchor.MiddleLeft, Color.white, true);
+                view.Did = Txt(R(row, "Did", BottomLeft, BottomLeft, new Vector2(260, 8), new Vector2(450, 26)), "—", 15, TextAnchor.MiddleLeft, Color.white);
+                hud.StatsRows[i] = view;
+            }
+            panel.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The run's start screen: a column per player under their figure in the row (name, the class's tool and the extra
+        /// item with arrows, ready), a title, the ready button and who is still choosing. Outside the HUD's content (it fades out).
+        /// </summary>
+        static void BuildStartScreen(UiElements e, Transform root)
+        {
+            var screen = Stretch(root, "StartScreen");
+            var view = screen.gameObject.AddComponent<StartScreen>();
+            view.Root = screen.gameObject;
+            view.Canvas = (RectTransform)root;
+            view.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            Txt(R(screen, "Title", TopCenter, TopCenter, new Vector2(0, -24), new Vector2(900, 44)), L("start.title"), 30, TextAnchor.MiddleCenter, Color.white, true);
+            Txt(R(screen, "Help", TopCenter, TopCenter, new Vector2(0, -66), new Vector2(900, 24)), L("start.help"), 14, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.7f));
+            var layer = R(screen, "Slots", BottomLeft, BottomLeft, Vector2.zero, Vector2.zero);
+            view.Slots = new StartSlotView[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var col = R(layer, $"Slot{i}", BottomLeft, TopCenter, new Vector2(320 + i * 220, 300), new Vector2(200, 210));
+                var slot = col.gameObject.AddComponent<StartSlotView>();
+                slot.Rect = col;
+                Img(col, new Color(0.03f, 0.04f, 0.05f, 0.78f));
+                slot.Name = Txt(R(col, "Name", TopCenter, TopCenter, new Vector2(0, -4), new Vector2(190, 24)), "Player", 16, TextAnchor.MiddleCenter, Color.white, true);
+                // the class: its tool's picture between arrows, its name under it
+                slot.ClassIcon = Img(R(col, "ClassIcon", TopCenter, TopCenter, new Vector2(0, -32), new Vector2(64, 52)), Color.white);
+                slot.ClassIcon.preserveAspect = true;
+                slot.ClassPrev = Arrow(e, col, "ClassPrev", new Vector2(-72, -58), "<");
+                slot.ClassNext = Arrow(e, col, "ClassNext", new Vector2(72, -58), ">");
+                slot.ClassName = Txt(R(col, "ClassName", TopCenter, TopCenter, new Vector2(0, -86), new Vector2(196, 20)), "—", 13, TextAnchor.MiddleCenter, Color.white, true);
+                slot.ItemIcon = Img(R(col, "ItemIcon", TopCenter, TopCenter, new Vector2(0, -110), new Vector2(54, 44)), Color.white);
+                slot.ItemIcon.preserveAspect = true;
+                slot.ItemPrev = Arrow(e, col, "ItemPrev", new Vector2(-72, -132), "<");
+                slot.ItemNext = Arrow(e, col, "ItemNext", new Vector2(72, -132), ">");
+                slot.ItemName = Txt(R(col, "ItemName", TopCenter, TopCenter, new Vector2(0, -156), new Vector2(196, 20)), "—", 12, TextAnchor.MiddleCenter, Color.white);
+                slot.ItemName.resizeTextForBestFit = true;
+                slot.ItemName.resizeTextMinSize = 9;
+                slot.ItemName.resizeTextMaxSize = 12;
+                slot.ReadyMark = Img(R(col, "ReadyMark", BottomCenter, BottomCenter, new Vector2(0, 0), new Vector2(200, 26)), new Color(1f, 1f, 1f, 0.15f));
+                slot.ReadyLabel = Txt(R(col, "ReadyLabel", BottomCenter, BottomCenter, new Vector2(0, 0), new Vector2(196, 26)), "—", 13, TextAnchor.MiddleCenter, Color.white, true);
+                view.Slots[i] = slot;
+            }
+            view.ReadyButton = Instance<Button>(e.Button, screen, "Ready");
+            var rb = (RectTransform)view.ReadyButton.transform;
+            // bottom right: the columns under the figures take the bottom middle
+            rb.anchorMin = rb.anchorMax = new Vector2(1, 0);
+            rb.pivot = new Vector2(1, 0);
+            rb.anchoredPosition = new Vector2(-28, 28);
+            rb.sizeDelta = new Vector2(260, 44);
+            view.ReadyButtonLabel = view.ReadyButton.GetComponentInChildren<Text>();
+            SetText(view.ReadyButtonLabel, L("start.ready"));
+            view.Waiting = Txt(R(screen, "Waiting", new Vector2(1, 0), new Vector2(1, 0), new Vector2(-28, 78), new Vector2(260, 24)), "—", 15, TextAnchor.MiddleCenter, Color.white);
+            screen.gameObject.SetActive(false);
+        }
+
+        /// <summary>A small square arrow button of the start screen.</summary>
+        static Button Arrow(UiElements e, RectTransform parent, string name, Vector2 pos, string glyph)
+        {
+            var b = Instance<Button>(e.Button, parent, name);
+            var rt = (RectTransform)b.transform;
+            rt.anchorMin = rt.anchorMax = TopCenter;
+            rt.pivot = Center;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = new Vector2(34, 34);
+            var t = b.GetComponentInChildren<Text>();
+            t.text = glyph; // loc-ok
+            t.fontSize = 20;
+            t.fontStyle = FontStyle.Bold;
+            return b;
+        }
+
         static GameObject BuildHud(UiElements e)
         {
             var root = CanvasRoot("HUD", 0, false);
@@ -187,9 +318,13 @@ namespace Stealth.EditorTools
             hud.HeartEmpty = Icon("heart_empty");
             hud.Hearts = Enumerable.Range(0, Stealth.Player.HealthState.MaxHp + 1) // + the med table's extra point
                 .Select(i => Img(R(status, $"Heart{i}", BottomLeft, BottomLeft, new Vector2(2 + i * 22, 0), new Vector2(20, 20)), new Color(0.95f, 0.25f, 0.25f), hud.HeartFull)).ToArray();
-            // The team's switched-off robots: one plug per slot (lit = a robot is off), right of the speaker.
+            // The team's hack slots right of the speaker: a blue bolt when free, the grey picture of what is switched off
+            // when taken; the leftmost is the next to go (GameHUD.ShowHackSlots)
             hud.HackSlots = Enumerable.Range(0, 4)
-                .Select(i => Img(R(status, $"Hack{i}", BottomLeft, BottomLeft, new Vector2(76 + i * 24, 30), new Vector2(22, 22)), Color.white, Icon("ret_hack"))).ToArray();
+                .Select(i => Img(R(status, $"Hack{i}", BottomLeft, BottomLeft, new Vector2(76 + i * 28, 28), new Vector2(26, 26)), Color.white, Icon("ret_hack"))).ToArray();
+            foreach (var slot in hud.HackSlots) slot.preserveAspect = true;
+            hud.HackFree = Icon("ret_hack");
+            hud.HackKindIcons = RobotKindIcons();
 
             // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the hunter under it.
             var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 118));
@@ -231,10 +366,17 @@ namespace Stealth.EditorTools
             // The map terminal's map (the whole building, a floor at a time, north-up); the HUD has no minimap.
             hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(980, 720), 1f);
             hud.BigMap.gameObject.SetActive(false);
+            // the tablet's minimap, bottom left over the status icons (shown only while the tablet is held)
+            hud.MiniMap = BuildMap(e, content, "MiniMap", true, BottomLeft, BottomLeft, new Vector2(16, 84), new Vector2(220, 220), 4.5f);
+            hud.MiniMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
             BuildVaultLock(content);
             BuildCheatPanel(e, content);
             BuildStylePanel(e, root.transform); // outside Content: F8 works in the menu too, where the HUD is hidden
+            BuildHouseClock(hud, content);
+            BuildEntryBanner(hud, root.transform);
+            BuildStatsPanel(hud, root.transform);
+            BuildStartScreen(e, root.transform);
             // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade):
             // over everything, outside Content (which fades out on its own while the drive scene plays)
             hud.LoadingFade = Img(Stretch(root.transform, "LoadingFade"), Color.black);

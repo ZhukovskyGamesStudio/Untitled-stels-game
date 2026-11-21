@@ -40,6 +40,9 @@ namespace Stealth.Audio
         VoiceSpace m_Space = (VoiceSpace)255;
         float m_Decay = -1f;
 
+        /// <summary>A voice over the radio: this loud (of a voice next to you) and cut above this, Hz.</summary>
+        const float RadioGain = 0.7f, RadioCutoff = 3400f;
+
         /// <summary>Loudness of what is playing now (0..1, smoothed): the HUD shows who is talking.</summary>
         public float Level { get; private set; }
 
@@ -114,7 +117,13 @@ namespace Stealth.Audio
             float distance = Vector3.Distance(mouth, ears);
             float transmission = distance < 0.3f ? 1f : Perception.SoundTransmission(mouth, ears, Tuning.Perception.Hearing);
             VoiceAcoustics.Blocked(transmission, s, out float blocked, out float cutoff);
-            m_Gain = VoiceAcoustics.DistanceGain(distance, s) * blocked * s.Volume * VoicePrefs.Volume;
+            float gain = VoiceAcoustics.DistanceGain(distance, s) * blocked;
+            // the radio in the listener's hand: the voice comes over it from anywhere — thin, from the hand, never quieter than this
+            var me = PlayerController.Local;
+            bool radio = me != null && Owner != null && me != Owner && me.HoldsRadio && !me.Downed;
+            if (radio && gain < RadioGain) { gain = RadioGain; cutoff = Mathf.Min(cutoff, RadioCutoff); }
+            if (Source != null) Source.spatialBlend = radio && gain <= RadioGain ? 0f : 1f;
+            m_Gain = gain * s.Volume * VoicePrefs.Volume;
             if (LowPass != null) LowPass.cutoffFrequency = cutoff;
 
             VoiceSpace space;

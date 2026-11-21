@@ -138,6 +138,10 @@ namespace Stealth.Game
         void SendUseHand();
         /// <summary>Server → owner: you were hit, knock the camera back.</summary>
         void SendHitFeedback(Vector3 awayFromSource);
+        /// <summary>Owner → server: I fell from too high (it hurts).</summary>
+        void SendFallHurt();
+        /// <summary>Owner → server: the class and the extra item picked on the run's start screen, and whether I am ready.</summary>
+        void SendLoadout(byte cls, byte item, bool ready);
     }
 
     /// <summary>Inventory → network: owner requests (the server validates them in <see cref="PlayerInventory"/>).</summary>
@@ -175,6 +179,8 @@ namespace Stealth.Game
         void BroadcastBanner(string text);
         /// <summary>Server → everyone: a teammate's ping or mark.</summary>
         void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target);
+        /// <summary>Server → everyone: the house is over — who did what in it and the titles (<see cref="HouseStats.Pack"/>).</summary>
+        void BroadcastHouseStats(string packed);
     }
 
     /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>

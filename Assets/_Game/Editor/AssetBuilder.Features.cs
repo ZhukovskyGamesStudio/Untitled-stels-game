@@ -445,6 +445,84 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// The looks of the classes' tools, the starting items and the junk (Tools/Blender/items_more.py): a colour, a
+        /// smoothness and whether it glows, per part (by the start of the part's name; a part that matches none is the Body).
+        /// </summary>
+        static readonly Dictionary<string, (string part, Color color, float smooth, bool glow)[]> GearLooks = new()
+        {
+            ["radio"] = new[] { ("Body", new Color(0.13f, 0.14f, 0.12f), 0.45f, false), ("Accent", new Color(0.05f, 0.05f, 0.05f), 0.4f, false), ("Eye", new Color(0.2f, 1f, 0.35f), 0.5f, true) },
+            ["keyboard"] = new[] { ("Body", new Color(0.16f, 0.17f, 0.19f), 0.5f, false), ("Accent", new Color(0.85f, 0.85f, 0.82f), 0.55f, false), ("Eye", new Color(0.3f, 1f, 0.4f), 0.5f, true) },
+            ["tablet"] = new[] { ("Body", new Color(0.92f, 0.66f, 0.12f), 0.25f, false), ("Accent", new Color(0.12f, 0.12f, 0.13f), 0.6f, false), ("Eye", new Color(0.25f, 0.6f, 0.8f), 0.85f, false) },
+            ["medkit"] = new[] { ("Body", new Color(0.78f, 0.1f, 0.08f), 0.6f, false), ("Accent", new Color(0.82f, 0.83f, 0.85f), 0.65f, false), ("Trim", new Color(0.95f, 0.95f, 0.95f), 0.6f, false) },
+            ["coffee"] = new[] { ("Body", new Color(0.25f, 0.13f, 0.06f), 0.85f, false), ("Accent", new Color(0.75f, 0.6f, 0.2f), 0.7f, false), ("Trim", new Color(0.75f, 0.12f, 0.1f), 0.5f, false) },
+            ["finder"] = new[] { ("Body", new Color(0.2f, 0.3f, 0.24f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.75f), 0.7f, false), ("Eye", new Color(1f, 0.55f, 0.1f), 0.6f, false) },
+            ["boots"] = new[] { ("Body", new Color(0.36f, 0.22f, 0.12f), 0.4f, false), ("Accent", new Color(0.08f, 0.08f, 0.08f), 0.2f, false), ("Trim", new Color(0.8f, 0.65f, 0.3f), 0.3f, false) },
+            ["tomatoes"] = new[] { ("Body", new Color(0.82f, 0.14f, 0.08f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.74f), 0.7f, false) },
+            ["chess"] = new[] { ("Body", new Color(0.32f, 0.17f, 0.08f), 0.6f, false), ("Accent", new Color(0.9f, 0.85f, 0.72f), 0.65f, false) },
+            ["magazine"] = new[] { ("Body", new Color(0.85f, 0.2f, 0.45f), 0.85f, false), ("Accent", new Color(0.92f, 0.9f, 0.86f), 0.3f, false), ("Trim", new Color(0.97f, 0.97f, 0.95f), 0.7f, false) },
+            ["pills"] = new[] { ("Body", new Color(0.3f, 0.55f, 0.9f), 0.5f, false), ("Accent", new Color(0.78f, 0.8f, 0.82f), 0.75f, false) },
+            ["toothpaste"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.97f), 0.7f, false), ("Accent", new Color(0.15f, 0.4f, 0.85f), 0.65f, false) },
+            ["tape"] = new[] { ("Body", new Color(0.5f, 0.52f, 0.54f), 0.5f, false), ("Accent", new Color(0.62f, 0.45f, 0.27f), 0.2f, false) },
+            ["matches"] = new[] { ("Body", new Color(0.9f, 0.7f, 0.15f), 0.4f, false), ("Accent", new Color(0.85f, 0.68f, 0.42f), 0.3f, false), ("Trim", new Color(0.75f, 0.1f, 0.08f), 0.5f, false) },
+            ["toiletpaper"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.93f), 0.1f, false), ("Accent", new Color(0.6f, 0.45f, 0.28f), 0.15f, false) },
+            ["applecore"] = new[] { ("Body", new Color(0.95f, 0.9f, 0.72f), 0.4f, false), ("Accent", new Color(0.72f, 0.08f, 0.06f), 0.7f, false), ("Trim", new Color(0.3f, 0.18f, 0.08f), 0.3f, false) },
+            ["soap"] = new[] { ("Body", new Color(0.95f, 0.8f, 0.85f), 0.6f, false), ("Accent", new Color(0.25f, 0.55f, 0.75f), 0.4f, false) },
+            ["gloves"] = new[] { ("Body", new Color(0.85f, 0.72f, 0.42f), 0.15f, false), ("Accent", new Color(0.2f, 0.35f, 0.65f), 0.2f, false) },
+            ["necklace"] = new[] { ("Body", new Color(1f, 0.76f, 0.3f), 0.75f, false), ("Accent", new Color(0.85f, 0.05f, 0.15f), 0.95f, false) },
+            ["mop"] = new[] { ("Body", new Color(0.2f, 0.45f, 0.75f), 0.6f, false), ("Accent", new Color(0.88f, 0.86f, 0.8f), 0.05f, false) },
+            ["plush"] = new[] { ("Body", new Color(0.6f, 0.4f, 0.22f), 0.05f, false), ("Accent", new Color(0.9f, 0.78f, 0.6f), 0.1f, false), ("Trim", new Color(0.05f, 0.04f, 0.04f), 0.7f, false) },
+            ["socks"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.95f), 0.1f, false), ("Accent", new Color(0.15f, 0.35f, 0.75f), 0.15f, false) },
+        };
+
+        /// <summary>
+        /// The model of a class's tool, a starting item or a junk thing (Items/&lt;Id&gt;Model), painted by
+        /// <see cref="GearLooks"/>; the fuel finder gets its flashing lamp (<see cref="FinderBlink"/>). Null while its model
+        /// has not been exported yet (the item shows its tinted piece).
+        /// </summary>
+        static GameObject GearModel(string id)
+        {
+            string file = $"item_{id}_model";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath(file)) == null)
+            {
+                Debug.LogWarning($"[Builder] {file}.fbx missing: run Tools/Blender/items_more.py");
+                return null;
+            }
+            (string part, Color color, float smooth, bool glow)[] looks = GearLooks.TryGetValue(id, out var l) ? l : new[] { ("Body", Color.grey, 0.3f, false) };
+            foreach (var (part, color, smooth, glow) in looks)
+                Mat("Items", $"Gear_{id}_{part}", color, glow ? color * 1.6f : (Color?)null, smoothness: smooth);
+            string name = char.ToUpperInvariant(id[0]) + id.Substring(1) + "Model";
+            return Prefab($"{PrefabsDir}/Items/{name}.prefab", () =>
+            {
+                var m = Model(file);
+                m.name = name;
+                foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string part = looks.Where(x => r.gameObject.name.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
+                    r.sharedMaterial = M($"Gear_{id}_{part}");
+                }
+                if (id == "finder")
+                {
+                    var glass = m.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.gameObject.name.StartsWith("Eye"));
+                    var lampGo = new GameObject("Lamp");
+                    lampGo.transform.SetParent(m.transform, false);
+                    lampGo.transform.localPosition = glass != null ? glass.localBounds.center + Vector3.up * 0.03f : new Vector3(0f, 0.06f, 0f);
+                    var lamp = lampGo.AddComponent<Light>();
+                    lamp.type = LightType.Point;
+                    lamp.range = 2.5f;
+                    lamp.intensity = 1.4f;
+                    lamp.color = new Color(0.45f, 1f, 0.55f);
+                    lamp.shadows = LightShadows.None;
+                    lamp.enabled = false;
+                    lampGo.AddComponent<LightSource>();
+                    var blink = m.AddComponent<FinderBlink>();
+                    blink.Lamp = lamp;
+                    blink.Glass = glass;
+                }
+                return m;
+            });
+        }
+
         /// <summary>The tools among the items: their meshes (one per shape) and the lure speaker's own model.</summary>
         static void FillToolVisuals(ItemVisuals visuals)
         {
@@ -555,6 +633,14 @@ namespace Stealth.EditorTools
             icons[ItemCatalog.Stun] = ItemIcon("stun");
             icons[ItemCatalog.Speaker] = ItemIcon("speaker");
             icons[ItemCatalog.ShelterMap] = ItemIcon("map");
+            // the classes' tools, the starting items and the junk (Tools/Blender/items_more.py, item_icons.py)
+            var gear = new GameObject[ItemCatalog.Shapes.Length];
+            for (int shape = ItemCatalog.Radio; shape < ItemCatalog.Shapes.Length; shape++)
+            {
+                string id = ItemCatalog.Shapes[shape].Id;
+                gear[shape] = GearModel(id);
+                icons[shape] = ItemIcon(id);
+            }
             var meshes = ItemCatalog.Shapes.Select(s =>
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
@@ -567,7 +653,8 @@ namespace Stealth.EditorTools
                 && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey && visuals.Models[ItemCatalog.ShelterMap] == map
                 && visuals.Models[ItemCatalog.Book] == book && visuals.Models[ItemCatalog.Cans] == cans
                 && visuals.Models[ItemCatalog.Screwdriver] == screwdriver && visuals.Models[ItemCatalog.BeltBag] == beltBag
-                && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
+                && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)
+                && Enumerable.Range(ItemCatalog.Radio, ItemCatalog.Shapes.Length - ItemCatalog.Radio).All(i => visuals.Models[i] == gear[i])) return;
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
             visuals.Models[ItemCatalog.Speaker] = lure;
@@ -581,6 +668,7 @@ namespace Stealth.EditorTools
             visuals.Models[ItemCatalog.Cans] = cans;
             visuals.Models[ItemCatalog.Screwdriver] = screwdriver;
             visuals.Models[ItemCatalog.BeltBag] = beltBag;
+            for (int i = ItemCatalog.Radio; i < ItemCatalog.Shapes.Length; i++) visuals.Models[i] = gear[i];
             visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
         }
@@ -604,7 +692,13 @@ namespace Stealth.EditorTools
         /// </summary>
         static Mesh ItemPieceMesh(string id)
         {
-            if (id != "map") return AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(id))).OfType<Mesh>().First();
+            if (id != "map")
+            {
+                var mesh = AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(id))).OfType<Mesh>().FirstOrDefault();
+                if (mesh != null) return mesh;
+                Debug.LogWarning($"[Builder] item_{id}.fbx missing: run Tools/Blender/generate_models.py (its SHAPES)");
+                return AssetDatabase.LoadAllAssetsAtPath(ModelPath("item_mono")).OfType<Mesh>().First();
+            }
             string path = $"{Root}/Art/Models/Items/item_map_piece.asset";
             var piece = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             bool fresh = piece == null;

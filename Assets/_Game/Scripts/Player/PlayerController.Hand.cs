@@ -34,8 +34,14 @@ namespace Stealth.Player
         void UpdateHand()
         {
             if (!Controls.Pressed(GameAction.UseHand) || CursorMode || Downed) return;
+            // the tablet opens and closes its map on this peer only
+            var inv = GetComponent<PlayerInventory>();
+            if (inv != null && inv.Holds(Items.ItemCatalog.Tablet)) { TabletOpen = !TabletOpen; return; }
             Link.SendUseHand();
         }
+
+        /// <summary>Owner: the tablet's big map is open (the hand key toggles it while the tablet is held).</summary>
+        public bool TabletOpen { get; private set; }
 
         /// <summary>
         /// Server: the hand key. A flashlight switches on (if it has charge) or off; a battery goes into the first flashlight
@@ -47,6 +53,7 @@ namespace Stealth.Player
             int hand = inv.HandIndex();
             if (Downed || hand < 0) return;
             var e = inv.Items[hand];
+            if (UseConsumableServer(inv, e)) return;
             if (e.Shape == Items.ItemCatalog.Flashlight)
             {
                 FlashlightOn = !FlashlightOn && e.Color > 0;

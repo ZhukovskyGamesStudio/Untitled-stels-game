@@ -19,6 +19,13 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ASeatedBodyDoesNotWalk()
+        {
+            Assert.AreEqual(0f, HumanMath.WalkSpeed(9f, true), "riding in the car is not walking");
+            Assert.AreEqual(3f, HumanMath.WalkSpeed(3f, false));
+        }
+
+        [Test]
         public void EveryStyleShowsTheDepartments()
         {
             var styles = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
@@ -41,7 +48,7 @@ namespace Stealth.Tests
             var controller = rig.Animator.runtimeAnimatorController;
             Assert.IsNotNull(controller, "no animator controller");
             var clips = controller.animationClips.Select(c => c.name).ToArray();
-            foreach (var n in new[] { "Idle", "Walk", "Run", "CrouchIdle", "CrouchWalk", "Down" })
+            foreach (var n in new[] { "Idle", "Walk", "Run", "CrouchIdle", "CrouchWalk", "Down", "Sit" })
                 Assert.Contains(n, clips, $"the controller has no {n} clip");
             Assert.IsFalse(rig.Animator.applyRootMotion, "the player controller moves the body, not the animation");
 

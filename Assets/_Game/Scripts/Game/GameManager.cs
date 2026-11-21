@@ -42,6 +42,18 @@ namespace Stealth.Game
         /// <summary>Server: seconds since the first player climbed up into this house (0 until then).</summary>
         float HouseTime => m_HouseEntered ? Time.time - LevelStartTime : 0f;
 
+        /// <summary>
+        /// The server time the house's clock started (the first player up in it), 0 before that — replicated: every peer
+        /// shows the clock counting up and when the next reinforcement comes (<see cref="UI.HouseClockRules"/>).
+        /// </summary>
+        public double HouseClockAt { get; private set; }
+
+        /// <summary>Client: the server's house clock.</summary>
+        public void ApplyHouseClock(double at) => HouseClockAt = at;
+
+        /// <summary>Seconds on the house's clock now (0 until someone is up in the house), on every peer.</summary>
+        public float HouseClock => HouseClockAt > 0 ? Mathf.Max(0f, (float)(Session.ServerTime - HouseClockAt)) : 0f;
+
         /// <summary>Server: the clock starts when the first player is up in the house (the sensors' grace period with it).</summary>
         void UpdateHouseEntry()
         {
@@ -51,6 +63,7 @@ namespace Stealth.Game
                 {
                     m_HouseEntered = true;
                     LevelStartTime = Time.time;
+                    HouseClockAt = Session.ServerTime;
                     return;
                 }
         }
@@ -418,6 +431,8 @@ namespace Stealth.Game
         IEnumerator StartLevelSteps(int index, int lane, int houseSeed, bool arriving)
         {
             m_HouseEntered = false;
+            HouseClockAt = 0;
+            BeginHouseStatsServer();
             foreach (var obj in m_Spawned.ToArray())
             {
                 Session.Despawn(obj);
@@ -664,7 +679,8 @@ namespace Stealth.Game
                 Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
             foreach (var p in PlayerController.All)
                 if (!p.Downed && !p.Invisible) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
-            if (Phase == RunPhase.Sewer) { UpdateSewer(); return; }
+            UpdateStatsServer();
+            if (Phase == RunPhase.Sewer) { UpdatePickingServer(); UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
             UpdateHacks();
@@ -888,6 +904,7 @@ namespace Stealth.Game
             }
             SyncLocation();
             SpawnCarServer();
+            BeginPickingServer();
             Debug.Log($"[Game] Run started in the sewer (run seed {m_RunSeed}): {RouteOptions.Count} ways");
         }
 
@@ -916,7 +933,7 @@ namespace Stealth.Game
                 }
             }
             else if (!byHand) return;
-            if (m_Opened.Add(OpenKeys.Door(door))) OpenedVersion++;
+            if (m_Opened.Add(OpenKeys.Door(door))) { OpenedVersion++; NoteServer(player, StatKind.Locks); }
         }
 
         static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);
@@ -997,6 +1014,7 @@ namespace Stealth.Game
                 value += SpawnItemServer(shape, color, box.LootSpot(i), rng.Next(360)).Value;
             }
             Banner(Loc.Pack("banner.safe", player.Nick, value));
+            NoteServer(player, StatKind.Locks);
         }
 
         /// <summary>Server: a player pressed R after a failed run.</summary>

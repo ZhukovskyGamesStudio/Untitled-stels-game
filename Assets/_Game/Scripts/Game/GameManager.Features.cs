@@ -113,7 +113,9 @@ namespace Stealth.Game
                 case UseKind.LiftCall: LiftServer(player, index, false); break;
                 case UseKind.LiftFloor: LiftServer(player, index, true); break;
                 case UseKind.VentGrille:
-                    if (Phase == RunPhase.Playing && m_Opened.Add(OpenKeys.Crawl(index))) OpenedVersion++;
+                    // the grille is screwed on: a screwdriver in hand
+                    if (Phase == RunPhase.Playing && player.GetComponent<PlayerInventory>() is { } grilleInv && grilleInv.Holds(ItemCatalog.Screwdriver)
+                        && m_Opened.Add(OpenKeys.Crawl(index))) OpenedVersion++;
                     break;
                 case UseKind.ShaftHatch: ToggleShaftServer(thing is ShaftHatch { Exit: true }); break;
                 case UseKind.VentGrate: UnscrewServer(player, index); break;

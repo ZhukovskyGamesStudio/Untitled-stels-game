@@ -39,8 +39,12 @@ namespace Stealth.Game
         /// <summary>Replaces the driver's pedals and wheel (autopilot drives the car).</summary>
         public static Stealth.Vehicles.CarInput? CarInput;
 
+        /// <summary>A new run starts right away, without the start screen (the autopilot's runs).</summary>
+        public static bool SkipPicking;
+
         public static void Reset()
         {
+            SkipPicking = false;
             ForcedSeed = 0;
             ForcedLevel = 0;
             Peaceful = false;

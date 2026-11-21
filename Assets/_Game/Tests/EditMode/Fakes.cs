@@ -94,6 +94,10 @@ namespace Stealth.Tests
         public void SendHatch(bool hide) => Hatch.Add(hide);
         public int HandUses;
         public void SendUseHand() => HandUses++;
+        public int FallHurts;
+        public void SendFallHurt() => FallHurts++;
+        public readonly List<(byte cls, byte item, bool ready)> Loadouts = new();
+        public void SendLoadout(byte cls, byte item, bool ready) => Loadouts.Add((cls, item, ready));
         public readonly List<(Cheat cheat, bool on)> Cheats = new();
         public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
         public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();

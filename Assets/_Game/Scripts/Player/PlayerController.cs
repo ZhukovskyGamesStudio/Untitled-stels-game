@@ -182,6 +182,7 @@ namespace Stealth.Player
         {
             float radius = FootstepNoise.LandingRadius(impactSpeed);
             if (IsOwner && IsSpawned && radius > 0f) EmitNoise(radius);
+            HardLanding(impactSpeed);
         }
 
         // ------------------------------------------------------------------ binding (called by the network twin)
@@ -285,7 +286,10 @@ namespace Stealth.Player
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
                           (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
-            bool freeCursor = menu || CursorMode;
+            // the run's start screen: the team stands in a row, the mouse picks a class and an item, nobody walks
+            bool pickingNow = GameManager.Instance != null && GameManager.Instance.Picking;
+            if (pickingNow) cracking = true;
+            bool freeCursor = menu || CursorMode || pickingNow;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
@@ -296,6 +300,7 @@ namespace Stealth.Player
             Motor.InHatch = InHatch;
             UpdateLadder(input, Time.deltaTime);
             Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
+            UpdateGearMotion();
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
@@ -437,7 +442,7 @@ namespace Stealth.Player
             }
             if (ReviveTarget != null && holdE)
             {
-                ReviveProgress += Time.deltaTime;
+                ReviveProgress += WorkDt;
                 if (ReviveProgress >= m_Interaction.ReviveTime)
                 {
                     Link.SendRevive(ReviveTarget);
@@ -449,7 +454,7 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, Time.deltaTime, m_Interaction.HackHoldTime))
+            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
             {
                 Link.SendHack(HackTarget);
             }
@@ -457,7 +462,7 @@ namespace Stealth.Player
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
             DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) ?? StorageDoorAtTerminal() : null;
-            if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
+            if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, WorkDt, m_Interaction.DoorHackTime))
             {
                 Link.SendUse(UseKind.DoorLock, DoorTarget.Index);
             }
@@ -500,9 +505,16 @@ namespace Stealth.Player
             if (!IsOwner) { HoldRemoteSeat(); return; }
             if (Camera == null) return;
             if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
+            bool picking = GameManager.Instance != null && GameManager.Instance.Picking;
             if (UsingTerminal != null) ShowTerminalView();
-            else UpdateWatching();
-            ShowOwnBody(Watching != null); // through a teammate's eyes the body lying on the floor is seen like anyone's
+            else if (picking) ShowPickingView();
+            else
+            {
+                if (m_PickingView) { m_PickingView = false; Camera.transform.localPosition = Vector3.zero; Camera.transform.localRotation = Quaternion.identity; }
+                UpdateWatching();
+            }
+            // through a teammate's eyes the body lying on the floor is seen like anyone's; on the start screen the team stands in a row
+            ShowOwnBody(Watching != null || picking);
         }
 
         /// <summary>
@@ -520,8 +532,11 @@ namespace Stealth.Player
 
         public void HitServer(Vector3 source)
         {
-            if (!IsServer || Invulnerable || !m_Health.TryHit(Time.time)) return;
+            if (!IsServer || Invulnerable) return;
+            bool wasDown = Downed;
+            if (!m_Health.TryHit(Time.time)) return;
             PublishHealth();
+            if (Downed && !wasDown) GameManager.Instance?.NoteServer(this, StatKind.Downs);
             var away = transform.position - source;
             away.y = 0;
             away = away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward;
@@ -589,6 +604,7 @@ namespace Stealth.Player
         {
             if (Downed || Invisible) return; // the invisibility cheat: robots ignore this player completely
             NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), ClientId);
+            if (radius >= 6f) GameManager.Instance?.NoteServer(this, StatKind.Noise); // (a loud one: a run, a landing, not every step)
         }
 
         /// <summary>Server: the owner passed out from the gas.</summary>
@@ -605,13 +621,20 @@ namespace Stealth.Player
             if (Downed || other == null || !other.Downed) return;
             if ((other.transform.position - transform.position).magnitude > m_Interaction.ReviveDistance + 1f) return;
             other.ReviveServer();
+            GameManager.Instance?.NoteServer(this, StatKind.Revives);
         }
 
         /// <summary>Server: the owner finished holding E at a robot / device.</summary>
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            if (target is Enemies.Detector d && GameManager.Instance != null) GameManager.Instance.TeamHackServer(d);
+            // a robot needs the keyboard in the hand; without it, one that carries something is only searched: it drops it
+            if (target is Enemies.RobotController robot && !HoldsKeyboard)
+            {
+                if (robot.Cargo >= 0) robot.SearchServer();
+                return;
+            }
+            if (target is Enemies.Detector d && GameManager.Instance != null) { GameManager.Instance.TeamHackServer(d); GameManager.Instance.NoteHackServer(this); }
             else target.HackServer(m_Interaction.HackDuration);
         }
     }

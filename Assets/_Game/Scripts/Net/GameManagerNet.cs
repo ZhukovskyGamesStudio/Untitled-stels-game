@@ -67,6 +67,8 @@ namespace Stealth.Net
         int m_PushedShred = -1;
         readonly NetworkVariable<double> m_DriveUntil = new(), m_ArriveAt = new(), m_StunnedUntil = new(), m_DepartAt = new();
         readonly NetworkVariable<Vector4> m_DriveFrom = new();
+        readonly NetworkVariable<double> m_HouseClock = new();
+        readonly NetworkVariable<bool> m_Picking = new();
         readonly NetworkVariable<sbyte> m_DriveBranch = new(-1);
         readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
@@ -135,6 +137,10 @@ namespace Stealth.Net
             m_Lift.OnValueChanged += (_, v) => m_Game.Lift = v.State;
             m_Game.Lift = m_Lift.Value.State;
             m_StunnedUntil.OnValueChanged += (_, v) => m_Game.ApplyStun(v);
+            m_HouseClock.OnValueChanged += (_, v) => m_Game.ApplyHouseClock(v);
+            m_Game.ApplyHouseClock(m_HouseClock.Value);
+            m_Picking.OnValueChanged += (_, v) => m_Game.ApplyPicking(v);
+            m_Game.ApplyPicking(m_Picking.Value);
             m_Explored.OnListChanged += _ => PullExplored();
         }
 
@@ -181,6 +187,8 @@ namespace Stealth.Net
             NetSync.Set(m_ArriveAt, m_Game.ArriveAt);
             NetSync.Set(m_StunnedUntil, m_Game.StunnedUntil);
             NetSync.Set(m_Lift, NetLift.Of(m_Game.Lift));
+            NetSync.Set(m_HouseClock, m_Game.HouseClockAt);
+            NetSync.Set(m_Picking, m_Game.Picking);
         }
 
         /// <summary>Sends only the changed chunks, a few times a second; a new house resends the whole list.</summary>
@@ -268,6 +276,10 @@ namespace Stealth.Net
         [Rpc(SendTo.Server)]
         void StyleRpc(int index) => m_Game.SetStyleServer(index);
         public void BroadcastBanner(string text) => BannerRpc(text);
+        public void BroadcastHouseStats(string packed) => HouseStatsRpc(packed);
+
+        [Rpc(SendTo.Everyone)]
+        void HouseStatsRpc(string packed) => m_Game.ReceiveHouseStats(packed);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => PingRpc(owner, kind, position, target);
 
         [Rpc(SendTo.Everyone)]

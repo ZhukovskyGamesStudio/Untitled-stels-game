@@ -10,6 +10,8 @@ namespace Stealth.UI
         public Image Arrow;
         public Image Dot;
         public Image Diamond;
+        [Tooltip("A robot or a device: the picture of its kind.")]
+        public Image Glyph;
         public Text Label;
     }
 }

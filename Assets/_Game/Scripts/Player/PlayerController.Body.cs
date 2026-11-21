@@ -49,7 +49,7 @@ namespace Stealth.Player
             }
             if (m_Rig == null) return;
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch);
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0);
         }
 
         bool m_BodyShown;

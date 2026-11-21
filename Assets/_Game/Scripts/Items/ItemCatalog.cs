@@ -69,6 +69,33 @@ namespace Stealth.Items
             new Shape { Id = "beltbag",     Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             // the map to the survivors' shelter (3 x 3), hidden in a flat of an apartment block: held, it opens in front of you
             new Shape { Id = "map", Cells = new[] { V(0, 0), V(1, 0), V(2, 0), V(0, 1), V(1, 1), V(2, 1), V(0, 2), V(1, 2), V(2, 2) } },
+            // the classes' tools (a class starts with one, they also lie about): the radio hears the team from anywhere,
+            // the keyboard hacks robots, the tablet is a map terminal in the hand
+            new Shape { Id = "radio",    Cells = new[] { V(0, 0), V(0, 1) } },
+            new Shape { Id = "keyboard", Cells = new[] { V(0, 0), V(1, 0), V(2, 0) } },
+            new Shape { Id = "tablet",   Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            // the starting items (one more each at the start, they also lie about): the medkit heals, the coffee speeds you
+            // up, the fuel finder blinks faster near loot, the boots soften any fall
+            new Shape { Id = "medkit",   Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "coffee",   Cells = new[] { V(0, 0) } },
+            new Shape { Id = "finder",   Cells = new[] { V(0, 0), V(0, 1) } },
+            new Shape { Id = "boots",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            // junk: worth only its fuel, each of its own rarity (Rarity)
+            new Shape { Id = "tomatoes",    Cells = new[] { V(0, 0) } },
+            new Shape { Id = "chess",       Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "magazine",    Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "pills",       Cells = new[] { V(0, 0) } },
+            new Shape { Id = "toothpaste",  Cells = new[] { V(0, 0), V(0, 1) } },
+            new Shape { Id = "tape",        Cells = new[] { V(0, 0) } },
+            new Shape { Id = "matches",     Cells = new[] { V(0, 0) } },
+            new Shape { Id = "toiletpaper", Cells = new[] { V(0, 0) } },
+            new Shape { Id = "applecore",   Cells = new[] { V(0, 0) } },
+            new Shape { Id = "soap",        Cells = new[] { V(0, 0) } },
+            new Shape { Id = "gloves",      Cells = new[] { V(0, 0), V(0, 1) } },
+            new Shape { Id = "necklace",    Cells = new[] { V(0, 0), V(1, 0) } },
+            new Shape { Id = "mop",         Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(0, 3) } },
+            new Shape { Id = "plush",       Cells = new[] { V(0, 0), V(1, 0), V(0, 1) } },
+            new Shape { Id = "socks",       Cells = new[] { V(0, 0), V(0, 1) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
@@ -83,6 +110,52 @@ namespace Stealth.Items
         public const byte Book = 16, Cans = 17, Screwdriver = 18, BeltBag = 19;
         /// <summary>The map to the survivors' shelter: one in every apartment block, hidden in one of its flats (worth no fuel, never burns).</summary>
         public const byte ShelterMap = 20;
+        public const byte Radio = 21, Keyboard = 22, Tablet = 23;
+        public const byte Medkit = 24, Coffee = 25, Finder = 26, Boots = 27;
+        /// <summary>The junk (tomatoes … socks): plain loot of a fixed rarity each.</summary>
+        public const byte FirstJunk = 28, LastJunk = 42;
+
+        /// <summary>The classes a player picks at the start of a run: the tool each starts with (screwdriver, keyboard, radio, tablet).</summary>
+        public static readonly byte[] ClassTools = { Screwdriver, Keyboard, Radio, Tablet };
+        /// <summary>The extra item a player picks at the start of a run (flashlight, medkit, coffee, fuel finder, boots).</summary>
+        public static readonly byte[] StartItems = { Flashlight, Medkit, Coffee, Finder, Boots };
+
+        /// <summary>
+        /// The rarity (a colour of <see cref="Colors"/>: grey, green, blue, purple, gold) each thing always has: no roll —
+        /// a necklace is always gold, an apple core always grey. -1: none (tools) or made (the diamond: the workbench's colour).
+        /// </summary>
+        static readonly sbyte[] s_Rarity = BuildRarity();
+
+        static sbyte[] BuildRarity()
+        {
+            var r = new sbyte[64];
+            for (int i = 0; i < r.Length; i++) r[i] = -1;
+            // (the old tetris pieces keep a rolled colour: the value budget is still measured against them, ItemsPerOldItem)
+            r[Shovel] = 1; r[Battery] = 1; r[Book] = 0; r[Cans] = 1;
+            r[28] = 1; // tomatoes
+            r[29] = 3; // chess
+            r[30] = 1; // magazine
+            r[31] = 2; // pills
+            r[32] = 0; // toothpaste
+            r[33] = 1; // tape
+            r[34] = 0; // matches
+            r[35] = 0; // toilet paper
+            r[36] = 0; // apple core
+            r[37] = 0; // soap
+            r[38] = 1; // gloves
+            r[39] = 4; // necklace
+            r[40] = 0; // mop
+            r[41] = 2; // plush
+            r[42] = 1; // socks
+            return r;
+        }
+
+        /// <summary>The fixed rarity of a thing (a colour index), -1 if it has none (<see cref="s_Rarity"/>).</summary>
+        public static int Rarity(int shape) => shape >= 0 && shape < s_Rarity.Length ? s_Rarity[shape] : -1;
+
+        /// <summary>The colour a thing counts as: its fixed rarity if it has one, else its own colour byte.</summary>
+        static int RarityOr(int shape, int color) => Rarity(shape) >= 0 && shape != Diamond ? Mathf.Min(Rarity(shape), Colors.Length - 1) : color;
+
         /// <summary>A flashlight's full charge (its colour byte holds the charge, 0..FullCharge).</summary>
         public const byte FullCharge = 100;
 
@@ -172,18 +245,25 @@ namespace Stealth.Items
             return rows[0].Shape;
         }
 
-        /// <summary>The colour byte a new item of this shape spawns with: a flashlight comes fully charged.</summary>
-        public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)color;
+        /// <summary>
+        /// The colour byte a new item of this shape spawns with: a flashlight comes fully charged, a thing of a fixed rarity
+        /// has its rarity whatever was rolled (<see cref="Rarity"/>), the rest keep the colour given.
+        /// </summary>
+        public static byte FreshColor(int shape, int color) => shape == Flashlight ? FullCharge : (byte)RarityOr(shape, color);
 
         /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
         public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey
-            || shape is Book or Cans or Screwdriver or BeltBag or ShelterMap;
+            || shape is Book or Cans or Screwdriver or BeltBag or ShelterMap || shape >= Radio;
 
         /// <summary>How much larger than life the keys' models are (Tools/Blender/rooms2_special.py): found on a floor.</summary>
         public const float KeyScale = 2f, CageKeyScale = 1.6f;
 
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
-        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == Screwdriver || shape == ShelterMap;
+        public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == Screwdriver || shape == ShelterMap
+            || shape is Radio or Keyboard or Tablet or Medkit or Coffee or Finder;
+
+        /// <summary>Used up from the hand (the gadget key): the medkit heals, the coffee speeds you up.</summary>
+        public static bool Consumable(int shape) => shape is Medkit or Coffee;
 
         /// <summary>
         /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
@@ -202,6 +282,8 @@ namespace Stealth.Items
             if (shape == Cans) return new Vector3(0.159f, 0.111f, 0.101f);
             if (shape == Screwdriver) return new Vector3(0.23f, 0.033f, 0.035f);
             if (shape == BeltBag) return new Vector3(0.262f, 0.079f, 0.138f);
+            // the classes' tools, the starting items and the junk (Tools/Blender/items_more.py prints their bounds)
+            if (shape >= Radio && shape - Radio < GearSizes.Length) return GearSizes[shape - Radio];
             var size = Size(Shapes[shape].Cells);
             return new Vector3(size.x * StorageMath.ItemCell, StorageMath.ItemCell, size.y * StorageMath.ItemCell);
         }
@@ -227,8 +309,41 @@ namespace Stealth.Items
             if (shape == Screwdriver) return new HeldPose(0.23f, -1f, 0.24f, 0f); // the handle at +X, the blade at −X
             if (shape == Battery) return new HeldPose(0.07f, 0f, 0f, 0f);
             if (shape == Stun) return new HeldPose(0.13f, 0f, 0f, 0f);
+            if (shape == Radio) return new HeldPose(0.2f, 1f, 0.3f, 90f);      // upright-ish, antenna ahead
+            if (shape == Keyboard) return new HeldPose(0.3f, 0f, 0f, 0f);      // carried flat on the palm
+            if (shape == Tablet) return new HeldPose(0.22f, 0f, 0f, 0f);
+            if (shape == Medkit) return new HeldPose(0.2f, 0f, 0f, 0f);
+            if (shape == Coffee) return new HeldPose(0.1f, 0f, 0f, 0f);
+            if (shape == Finder) return new HeldPose(0.2f, 1f, 0.3f, 0f);     // its lamp ahead
             return new HeldPose(0.12f, 0f, 0f, 0f);
         }
+
+        /// <summary>The models' sizes from <see cref="Radio"/> on (x length, y up, z width), metres.</summary>
+        static readonly Vector3[] GearSizes =
+        {
+            new(0.221f, 0.038f, 0.066f), // radio
+            new(0.455f, 0.029f, 0.158f), // keyboard
+            new(0.263f, 0.025f, 0.195f), // tablet
+            new(0.300f, 0.102f, 0.226f), // medkit
+            new(0.126f, 0.083f, 0.083f), // coffee
+            new(0.241f, 0.051f, 0.076f), // finder
+            new(0.317f, 0.231f, 0.257f), // boots
+            new(0.111f, 0.079f, 0.079f), // tomatoes
+            new(0.300f, 0.084f, 0.160f), // chess
+            new(0.280f, 0.023f, 0.211f), // magazine
+            new(0.101f, 0.022f, 0.111f), // pills
+            new(0.202f, 0.033f, 0.054f), // toothpaste
+            new(0.100f, 0.049f, 0.103f), // tape
+            new(0.128f, 0.022f, 0.062f), // matches
+            new(0.101f, 0.110f, 0.185f), // toilet paper
+            new(0.103f, 0.057f, 0.057f), // apple core
+            new(0.090f, 0.033f, 0.064f), // soap
+            new(0.236f, 0.031f, 0.211f), // gloves
+            new(0.340f, 0.016f, 0.155f), // necklace
+            new(0.908f, 0.042f, 0.295f), // mop
+            new(0.202f, 0.269f, 0.208f), // plush
+            new(0.116f, 0.063f, 0.090f), // socks
+        };
 
         /// <summary>A drawer (0.8 m wide inside) holds it lying flat.</summary>
         public static bool FitsInDrawer(int shape) => ModelSize(shape).x <= 0.8f;
@@ -237,9 +352,12 @@ namespace Stealth.Items
         public static int DiamondValueCells { get; set; } = 10;
 
         /// <summary>Plain loot: sold, burned, combined at a workbench.</summary>
-        public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel || shape == Book || shape == Cans;
-        /// <summary>A tool: the key block, the stun cube, the lure speaker, the screwdriver, the belt bag, the shelter map (worth nothing, used instead).</summary>
-        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == Screwdriver || shape == BeltBag || shape == ShelterMap;
+        public static bool IsLoot(int shape) => shape < LootShapes || shape == Shovel || shape == Book || shape == Cans || IsJunk(shape);
+        /// <summary>The junk: tomatoes, chess, a magazine, pills … — loot of a fixed rarity, nothing to use.</summary>
+        public static bool IsJunk(int shape) => shape >= FirstJunk && shape <= LastJunk;
+        /// <summary>A tool: the key block, the stun cube, the lure speaker, the screwdriver, the belt bag, the shelter map, the classes' tools and the starting items (worth nothing, used instead).</summary>
+        public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == Screwdriver || shape == BeltBag || shape == ShelterMap
+            || shape is >= Radio and <= Boots;
 
         /// <summary>Never becomes fuel, not even one by one at the hatch or the hopper: the shelter map.</summary>
         public static bool Unburnable(int shape) => shape == ShelterMap;
@@ -259,12 +377,15 @@ namespace Stealth.Items
             ShelterMap => MapColor,
             Screwdriver => ScrewdriverColor,
             BeltBag => BeltBagColor,
-            _ => Colors[Mathf.Clamp(color, 0, Colors.Length - 1)].Color,
+            Radio or Keyboard or Tablet => ClassToolColor,
+            Medkit or Coffee or Finder or Boots => StartItemColor,
+            _ => Colors[Mathf.Clamp(RarityOr(shape, color), 0, Colors.Length - 1)].Color,
         };
 
         public static readonly Color KeyColor = new(1.00f, 0.25f, 0.80f), StunColor = new(0.10f, 0.95f, 0.95f), SpeakerColor = new(1.00f, 0.32f, 0.02f),
             CageKeyColor = new(0.55f, 1.00f, 0.15f), FlashlightColor = new(0.95f, 0.78f, 0.25f), BatteryColor = new(0.35f, 0.75f, 0.95f),
-            ScrewdriverColor = new(0.95f, 0.10f, 0.30f), BeltBagColor = new(0.55f, 0.40f, 0.25f), MapColor = new(0.86f, 0.74f, 0.52f);
+            ScrewdriverColor = new(0.95f, 0.10f, 0.30f), BeltBagColor = new(0.55f, 0.40f, 0.25f), MapColor = new(0.86f, 0.74f, 0.52f),
+            ClassToolColor = new(0.95f, 0.15f, 0.55f), StartItemColor = new(0.15f, 0.85f, 0.75f);
         public static int Cells(int shape) => Shapes[shape].Cells.Length;
 
         public static ItemColor[] DefaultColors() => new[]
@@ -289,6 +410,7 @@ namespace Stealth.Items
         public static float MeanValueCells(int shape)
         {
             if (Plain(shape)) return Shapes[shape].Cells.Length * Colors[0].Multiplier;
+            if (Rarity(shape) >= 0) return Shapes[shape].Cells.Length * Colors[RarityOr(shape, 0)].Multiplier;
             float w = 0f, m = 0f;
             foreach (var c in Colors) { w += c.SpawnWeight; m += c.SpawnWeight * c.Multiplier; }
             return Shapes[shape].Cells.Length * (w > 0f ? m / w : 1f);
@@ -309,7 +431,9 @@ namespace Stealth.Items
             return now > 0f ? old / now : 1f;
         }
 
-        public static int Value(int shape, int color) =>
+        public static int Value(int shape, int color) => ValueOf(shape, RarityOr(shape, color));
+
+        static int ValueOf(int shape, int color) =>
             shape == ShelterMap ? 0
             : Plain(shape) ? Shapes[shape].Cells.Length * Colors[0].Multiplier * PointsPerCell
             : (shape == Diamond ? DiamondValueCells : Shapes[shape].Cells.Length) * Colors[color].Multiplier * PointsPerCell;
@@ -374,6 +498,9 @@ namespace Stealth.Items
 
         public static string ColorKey(int color) => "item.color." + color;
 
+        /// <summary>The table key of a thing's name (<c>item.name.&lt;id&gt;</c>): the classes' tools, the starting items, the junk.</summary>
+        public static string NameKey(int shape) => "item.name." + Shapes[shape].Id;
+
         /// <summary>The item's short name for the player: "Синий · 30 очк.", "Ключ".</summary>
         public static string Describe(int shape, int color) => shape switch
         {
@@ -389,6 +516,8 @@ namespace Stealth.Items
             Cans => Loc.F("item.cans", ColorName(color), Value(shape, color)),
             Screwdriver => Loc.T("item.screwdriver"),
             BeltBag => Loc.T("item.beltbag"),
+            _ when IsTool(shape) => Loc.T(NameKey(shape)),
+            _ when IsJunk(shape) => Loc.F("item.junk", Loc.T(NameKey(shape)), ColorName(Rarity(shape)), Value(shape, color)),
             _ => Loc.F("item.loot", ColorName(color), Value(shape, color)),
         };
     }

@@ -30,6 +30,8 @@ namespace Stealth.UI
         public Image RectPrefab;
         public MapIconView IconPrefab;
         public Text Caption;
+        [Tooltip("The picture of each robot / device kind (indexed by RobotKind): the map terminal tells them apart.")]
+        public Sprite[] KindIcons;
 
         static readonly Color[] PartColors =
         {
@@ -191,7 +193,9 @@ namespace Stealth.UI
                 if (LevelLayout.FloorOf(d.transform.position.y) != floor) continue;
                 var color = d.IsHacked ? HackedColor : d is RobotController ? RobotColor : DeviceColor;
                 if (d.IsMarked && !d.IsHacked) color = Marked;
-                Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, color, null, IconShape.Dot, d is RobotController ? 1f : 0.75f, 0f);
+                var glyph = KindIcons != null && (int)d.Kind < KindIcons.Length ? KindIcons[(int)d.Kind] : null;
+                Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, color, null, glyph != null ? IconShape.Glyph : IconShape.Dot,
+                    d is RobotController ? 1f : 0.8f, 0f, glyph);
             }
         }
 
@@ -215,11 +219,12 @@ namespace Stealth.UI
             m_Images.End();
         }
 
-        enum IconShape { Arrow, Dot, Diamond }
+        enum IconShape { Arrow, Dot, Diamond, Glyph }
 
         void Icon(Vector2 at, int itsFloor, int floor, Vector2 me, float scale, float radius, float turn, Color color, string label,
-            IconShape shape, float size, float yaw)
+            IconShape shape, float size, float yaw, Sprite glyph = null)
         {
+            if (shape == IconShape.Glyph && glyph == null) shape = IconShape.Dot;
             var pos = at;
             if (FollowPlayer)
             {
@@ -235,7 +240,12 @@ namespace Stealth.UI
             Ui.Show(icon.Arrow, shape == IconShape.Arrow);
             Ui.Show(icon.Dot, shape == IconShape.Dot);
             Ui.Show(icon.Diamond, shape == IconShape.Diamond);
-            Image image = shape == IconShape.Arrow ? icon.Arrow : shape == IconShape.Dot ? icon.Dot : icon.Diamond;
+            if (icon.Glyph != null)
+            {
+                Ui.Show(icon.Glyph, shape == IconShape.Glyph);
+                if (shape == IconShape.Glyph && icon.Glyph.sprite != glyph) icon.Glyph.sprite = glyph;
+            }
+            Image image = shape switch { IconShape.Arrow => icon.Arrow, IconShape.Dot => icon.Dot, IconShape.Glyph => icon.Glyph, _ => icon.Diamond };
             image.color = color;
             if (shape == IconShape.Arrow) image.rectTransform.localRotation = Quaternion.Euler(0f, 0f, turn - yaw);
             string text = label == null ? null : itsFloor == floor ? label : $"{label} {(itsFloor > floor ? "↑" : "↓")}";

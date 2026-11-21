@@ -122,7 +122,7 @@ namespace Stealth.Tests
         public void FlashlightsComeChargedAndAreToolsWithPhysics()
         {
             Assert.AreEqual(ItemCatalog.FullCharge, ItemCatalog.FreshColor(ItemCatalog.Flashlight, 2));
-            Assert.AreEqual(2, ItemCatalog.FreshColor(ItemCatalog.Shovel, 2));
+            Assert.AreEqual(ItemCatalog.Rarity(ItemCatalog.Shovel), ItemCatalog.FreshColor(ItemCatalog.Shovel, 2), "a shovel has its own rarity, whatever was rolled");
             Assert.IsFalse(ItemCatalog.IsTool(ItemCatalog.Flashlight) || ItemCatalog.IsTool(ItemCatalog.Battery), "they burn into fuel at the end");
             Assert.Greater(ItemCatalog.Value(ItemCatalog.Flashlight, ItemCatalog.FullCharge), ItemCatalog.Value(ItemCatalog.Battery, 0));
             Assert.Greater(ItemCatalog.Value(ItemCatalog.Battery, 0), 0);

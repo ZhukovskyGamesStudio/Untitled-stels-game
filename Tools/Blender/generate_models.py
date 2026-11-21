@@ -691,6 +691,29 @@ SHAPES = {
     "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
     "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
     "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
+    # more pickup items (their world models: items_more.py)
+    "radio": [(0, 0), (0, 1)],                                    # walkie-talkie (1 x 2)
+    "keyboard": [(0, 0), (1, 0), (2, 0)],                         # keyboard (3 x 1)
+    "tablet": [(0, 0), (1, 0), (0, 1), (1, 1)],                    # rugged tablet (2 x 2)
+    "medkit": [(0, 0), (1, 0), (0, 1), (1, 1)],                    # first-aid box (2 x 2)
+    "coffee": [(0, 0)],                                           # jar of coffee
+    "finder": [(0, 0), (0, 1)],                                   # fuel finder (1 x 2)
+    "boots": [(0, 0), (1, 0), (0, 1), (1, 1)],                     # pair of boots (2 x 2)
+    "tomatoes": [(0, 0)],                                         # tin of tomatoes
+    "chess": [(0, 0), (1, 0), (0, 1), (1, 1)],                     # folded chessboard (2 x 2)
+    "magazine": [(0, 0), (1, 0), (0, 1), (1, 1)],                  # magazine (2 x 2)
+    "pills": [(0, 0)],                                            # pills
+    "toothpaste": [(0, 0), (0, 1)],                               # toothpaste (1 x 2)
+    "tape": [(0, 0)],                                             # duct tape
+    "matches": [(0, 0)],                                          # matchbox
+    "toiletpaper": [(0, 0)],                                      # toilet roll
+    "applecore": [(0, 0)],                                        # apple core
+    "soap": [(0, 0)],                                             # soap
+    "gloves": [(0, 0), (0, 1)],                                   # work gloves (1 x 2)
+    "necklace": [(0, 0), (1, 0)],                                 # necklace (2 x 1)
+    "mop": [(0, 0), (0, 1), (0, 2), (0, 3)],                      # mop (1 x 4)
+    "plush": [(0, 0), (1, 0), (0, 1)],                             # teddy bear (L of 3)
+    "socks": [(0, 0), (0, 1)],                                    # rolled socks (1 x 2)
 }
 
 
