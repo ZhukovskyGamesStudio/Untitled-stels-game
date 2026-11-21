@@ -172,6 +172,7 @@ namespace Stealth.UI
         void Update()
         {
             var me = Me;
+            if (GameManager.Instance != null && GameManager.Instance.Picking) me = null; // the start screen: no backpack, no hand
             Ui.Show(Panel, me != null);
             m_Tooltip = null;
             if (me == null || Mouse.current == null)
@@ -204,7 +205,7 @@ namespace Stealth.UI
             Board.Show(on);
             if (!on) return;
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
-            bool burn = GameManager.Instance.Stash == Stash && GameManager.Instance.CanBurnAt(me.transform.position); // (the storage robot's crate: no fire)
+            bool burn = GameManager.Instance.CanBurnStashAt(me.transform.position, Stash); // (the storage robot's crate: no fire)
             if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
@@ -426,6 +427,8 @@ namespace Stealth.UI
                     if (!ItemCatalog.Holdable(m_DragShape)) return;
                     if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) Take(inv, PlayerInventory.HandX, 0, 0);
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
+                    // the hand is busy: the two swap (the held one where this one was, if there is room)
+                    else if (m_Source == DragSource.Inventory && inv.CanSwapHand(m_DragIndex, out _, out _, out _)) { inv.RequestSwapHand(m_DragIndex); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Backpack:

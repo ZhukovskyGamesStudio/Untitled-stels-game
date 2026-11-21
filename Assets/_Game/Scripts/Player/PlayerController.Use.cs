@@ -108,7 +108,7 @@ namespace Stealth.Player
             if (!holdE) m_UseWaitRelease = false;
             if (UseTarget == null || !UseAvailable || m_UseWaitRelease) { UseProgress = 0f; return; }
             float hold = UseTarget.HoldTime;
-            bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, Time.deltaTime, hold);
+            bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, WorkDt, hold);
             UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) / hold : 0f; // the ring is a share of the hold, not seconds
             if (!done) return;
             m_UseWaitRelease = true; // one use per press

@@ -1,6 +1,6 @@
 ---
 name: stealth-verify
-description: How to verify a change in the «Айтишники: вылазка» Unity project without the editor — EditMode tests, rebuilding generated assets, the Windows player build, autopilot scenarios with [AUTOTEST] logs and screenshots, two-instance network runs, and the usual pitfalls. Use after any code or asset change, before committing, and when asked to "check", "test", "screenshot" or "build".
+description: How to verify a change in the USG (untitled stels game) Unity project without the editor — EditMode tests, rebuilding generated assets, the Windows player build, autopilot scenarios with [AUTOTEST] logs and screenshots, two-instance network runs, and the usual pitfalls. Use after any code or asset change, before committing, and when asked to "check", "test", "screenshot" or "build".
 ---
 
 # Как проверять изменения

@@ -95,6 +95,13 @@ namespace Stealth.Game
             s_Loudest[id] = 0f;
             if (loudest <= 0f || player.Downed || player.Invisible) return;
             NoiseSystem.EmitVoiceServer(player.transform.position, loudest, id);
+            GameManager.Instance?.NoteServer(player, StatKind.Talk, s.NoiseEvery);
+            // every radio in a teammate's hand sounds with the voice: the robots near it hear it, wherever the speaker is
+            float radio = Tuning.Items.Gadgets.RadioNoise;
+            if (radio <= 0f) return;
+            foreach (var listener in PlayerController.All)
+                if (listener != player && !listener.Invisible && listener.HoldsRadio)
+                    NoiseSystem.EmitVoiceServer(listener.transform.position, radio, listener.ClientId);
         }
 
         /// <summary>A session ended: forget the speakers.</summary>

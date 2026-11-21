@@ -1,4 +1,4 @@
-# Айтишники: вылазка — прототип кор-лупа
+# USG (untitled stels game) — прототип кор-лупа
 
 Кооперативный стелс-рогалик. Дизайн-документ: https://claude.ai/artifact/GdaGu25vZ1ezVUmZ8KWFap
 

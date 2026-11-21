@@ -1220,8 +1220,24 @@ def animate(rig):
             rot(f"shin.{s}", forward=-15)
         rot("head", forward=10 + 2 * math.sin(t * 2 * math.pi))
 
+    def sit(t):
+        # in the car's seat: the pelvis stays where it is (the model stands 0.85 m under the seat, the hips at 0.94),
+        # thighs level, shins down, a little reclined, hands forward on the wheel, breathing
+        b = math.sin(t * 2 * math.pi)
+        lower(-0.02)
+        rot("spine", forward=-6)
+        rot("chest", forward=2 + 0.8 * b)
+        rot("head", forward=4 - 0.8 * b)
+        arms_down()
+        for s in ("L", "R"):
+            rot(f"thigh.{s}", forward=88, outward=4)
+            rot(f"shin.{s}", forward=-84)
+            rot(f"foot.{s}", forward=-4)
+            rot(f"upper_arm.{s}", forward=38 + 1.0 * b, outward=6)
+            rot(f"forearm.{s}", forward=42)
+
     acts = [key("Idle", 60, idle), key("Walk", 30, walk), key("Run", 20, run), key("CrouchIdle", 60, crouch_idle),
-            key("CrouchWalk", 36, crouch_walk), key("Down", 60, down)]
+            key("CrouchWalk", 36, crouch_walk), key("Down", 60, down), key("Sit", 60, sit)]
     rig.animation_data.action = None
     for pb in rig.pose.bones:
         pb.rotation_euler = (0, 0, 0)

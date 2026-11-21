@@ -36,6 +36,8 @@ namespace Stealth.Game
         public void SendHatch(bool hide) => m_P.OnHatchRequest(hide);
         public void SendUseHand() => m_P.UseHandServer();
         public void SendHitFeedback(Vector3 awayFromSource) => m_P.OnHitFeedback(awayFromSource);
+        public void SendFallHurt() => m_P.OnFallHurtRequest();
+        public void SendLoadout(byte cls, byte item, bool ready) => m_P.OnLoadoutRequest(cls, item, ready);
     }
 
     /// <summary>The backpack's requests on a peer that is its own server (<see cref="OfflinePlayerLink"/>).</summary>
@@ -46,6 +48,7 @@ namespace Stealth.Game
 
         public void RequestPickup(WorldItem item, byte x, byte y, byte rot) => m_I.PickupServer(item, x, y, rot);
         public void RequestMove(int index, byte x, byte y, byte rot) => m_I.MoveServer(index, x, y, rot);
+        public void RequestSwapHand(int index) => m_I.SwapHandServer(index);
         public void RequestDrop(int index, Vector3 position, float yaw) => m_I.DropServer(index, position, yaw);
         public void RequestDeposit(int index) => m_I.DepositServer(index);
         public void RequestStash(int index, byte x, byte y, byte rot) => m_I.StashServer(index, x, y, rot);
@@ -71,5 +74,6 @@ namespace Stealth.Game
         public void RequestStyle(int index) => m_G.SetStyleServer(index);
         public void BroadcastBanner(string text) => m_G.ShowBanner(text);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => m_G.ReceivePing(owner, kind, position, target);
+        public void BroadcastHouseStats(string packed) => m_G.ReceiveHouseStats(packed);
     }
 }

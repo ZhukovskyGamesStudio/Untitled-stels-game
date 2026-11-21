@@ -16,6 +16,8 @@ namespace Stealth.UI
         public float ReviveProgress;
         /// <summary>A robot / device in reach to hack.</summary>
         public bool CanHack;
+        /// <summary>The hack target is a robot and no keyboard is in the hand: E only searches it (what it carries falls off).</summary>
+        public bool SearchOnly;
         public float HackProgress;
         public bool Playing, NearHatch;
         /// <summary>The hatch in reach is the exit (the way down), not the entry.</summary>
@@ -190,7 +192,7 @@ namespace Stealth.UI
             if (c.MenuOpen || c.CursorMode || c.Downed || c.Cracking || c.AtTerminal || c.InHatch) return Reticle.Hidden;
             if (c.Driving || c.Passenger) return new Reticle(ReticleIcon.Dot);
             if (c.CanRevive) return new Reticle(ReticleIcon.Revive, true, c.ReviveProgress);
-            if (c.CanHack) return new Reticle(ReticleIcon.Hack, true, c.HackProgress);
+            if (c.CanHack) return new Reticle(c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
             if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
             if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
             if (c.Storage != null) return new Reticle(ReticleIcon.Hand);
@@ -300,7 +302,7 @@ namespace Stealth.UI
             var e = K(GameAction.Interact);
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
-            if (c.CanHack) return new Hint(e, Loc.T("hint.hack"));
+            if (c.CanHack) return new Hint(e, Loc.T(c.SearchOnly ? "hint.search" : "hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T("hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
             if (c.Storage != null) return new Hint(e, c.Storage);
@@ -312,6 +314,65 @@ namespace Stealth.UI
     }
 
     /// <summary>The hunter line under the fuel bar (pure, unit tested): when it comes, or that it is in the house.</summary>
+    /// <summary>
+    /// The team's hack slots in the HUD, left to right: the free ones first (a blue bolt each), then what is switched off,
+    /// oldest first (a grey picture of its kind) — the leftmost is always the next to go: a free slot is taken before
+    /// anything wakes, then the oldest hack wakes first.
+    /// </summary>
+    public static class HackSlotRules
+    {
+        /// <summary>The kind shown in each of <paramref name="max"/> slots (-1 = free), from what is hacked oldest first.</summary>
+        public static int[] Layout(int max, System.Collections.Generic.IReadOnlyList<int> hackedOldestFirst)
+        {
+            max = Mathf.Max(0, max);
+            var slots = new int[max];
+            int used = Mathf.Min(max, hackedOldestFirst?.Count ?? 0), free = max - used;
+            for (int i = 0; i < max; i++) slots[i] = i < free ? -1 : hackedOldestFirst[hackedOldestFirst.Count - used + (i - free)];
+            return slots;
+        }
+    }
+
+    /// <summary>
+    /// The house's clock in the HUD (after Risk of Rain's difficulty timer): it counts up from the moment the team is in
+    /// the house and always shows when the next extra robot comes; the more have come, the redder it is — up to a point.
+    /// </summary>
+    public static class HouseClockRules
+    {
+        /// <summary>"M:SS" of <paramref name="seconds"/> (whole seconds, never negative).</summary>
+        public static string Format(float seconds)
+        {
+            int s = Mathf.Max(0, Mathf.FloorToInt(seconds));
+            return $"{s / 60}:{s % 60:00}";
+        }
+
+        /// <summary>The clock's second at which the next reinforcement comes (after <paramref name="elapsed"/>).</summary>
+        public static float NextAt(float elapsed, float first, float second, float every)
+        {
+            if (elapsed < first) return first;
+            if (elapsed < first + second) return first + second;
+            every = Mathf.Max(1f, every);
+            return first + second + (Mathf.Floor((elapsed - first - second) / every) + 1f) * every;
+        }
+
+        /// <summary>The clock's second the previous reinforcement came (0 before the first).</summary>
+        public static float PreviousAt(float elapsed, float first, float second, float every)
+        {
+            if (elapsed < first) return 0f;
+            if (elapsed < first + second) return first;
+            every = Mathf.Max(1f, every);
+            return first + second + Mathf.Floor((elapsed - first - second) / every) * every;
+        }
+
+        /// <summary>How hot the clock is, 0..1: the share of <paramref name="hottestAt"/> reinforcements already come (capped).</summary>
+        public static float Heat(int came, int hottestAt = 6) => Mathf.Clamp01(came / (float)Mathf.Max(1, hottestAt));
+
+        static readonly Color Calm = new(0.22f, 0.55f, 0.85f), Warm = new(0.95f, 0.62f, 0.18f), Hot = new(0.86f, 0.24f, 0.2f);
+
+        /// <summary>The clock's colour for a heat: calm blue, through amber, to a red that does not hurt the eyes.</summary>
+        public static Color ColorOf(float heat) =>
+            heat < 0.5f ? Color.Lerp(Calm, Warm, heat * 2f) : Color.Lerp(Warm, Hot, (heat - 0.5f) * 2f);
+    }
+
     public static class HunterRules
     {
         public enum Urgency { Calm, Soon, Inside }

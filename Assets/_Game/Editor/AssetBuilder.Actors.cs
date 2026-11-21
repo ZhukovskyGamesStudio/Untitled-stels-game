@@ -111,8 +111,8 @@ namespace Stealth.EditorTools
             }));
             Robot(RobotKind.Hound, RobotPrefabs + "/RobotHound.prefab", () => MobileRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 1.6f;
-                t.PatrolSpeed = 2.2f; t.InvestigateSpeed = 3.4f; t.ChaseSpeed = 4.9f; t.LoseTargetAfter = 6f;
+                s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 0.8f; s.DetectionSpeed = 0.4f;
+                t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 2.3f; t.ChaseSpeed = 3.6f; t.LoseTargetAfter = 6f; t.WarningTime = 2.5f; t.SuspicionDecay = 0.5f; t.SniffEvery = 3.5f; t.SniffTime = 1.4f;
             }));
             Robot(RobotKind.Sorter, RobotPrefabs + "/RobotSorter.prefab", () => MobileRobot("RobotSorter", "robot_sorter", "SorterBody", 0.35f, new Vector3(0, 1.25f, 0.3f), ripple, (s, t, anim) =>
             {

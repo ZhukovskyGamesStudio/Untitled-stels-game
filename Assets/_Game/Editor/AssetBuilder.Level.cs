@@ -829,13 +829,13 @@ namespace Stealth.EditorTools
 
         /// <summary>
         /// A balcony of the apartment block (+Z out of the house, origin on the wall's outer face at the floor): a concrete slab
-        /// 3.2 x 1.1 m, a solid parapet 1 m high along its front and ends with a steel handrail on it, and an invisible guard
-        /// above the parapet — nobody jumps off (a jump clears 0.9 m).
+        /// 3.2 x 1.1 m, a solid parapet 1 m high along its front and ends with a steel handrail on it. One can jump off it
+        /// (down into the yard, a hard landing from high up): its solid part stops at <see cref="BalconyClimb"/>, under a jump.
         /// </summary>
         static GameObject BuildBalcony()
         {
             var root = new GameObject("Balcony");
-            const float L = 3.2f, D = 1.1f, slab = 0.18f, wall = 0.08f, h = 1.0f;
+            const float L = 3.2f, D = 1.1f, slab = 0.18f, wall = 0.08f;
             // the look: Tools/Blender/balcony.py (a chamfered slab with a drip groove, parapet panels with recessed fields and
             // a coping, a steel handrail on posts); the solid parts: the same boxes as ever
             var model = Model("balcony");
@@ -848,23 +848,16 @@ namespace Stealth.EditorTools
                 b.size = size;
             }
             Solid(new Vector3(0f, -slab / 2f, D / 2f), new Vector3(L, slab, D));
-            Solid(new Vector3(0f, h / 2f, D - wall / 2f), new Vector3(L, h, wall));
+            // the parapet's solid part is lower than it looks (the handrail on top is for the eye): a jump (1.05 m) clears it
+            const float solid = BalconyClimb;
+            Solid(new Vector3(0f, solid / 2f, D - wall / 2f), new Vector3(L, solid, wall));
             foreach (float x in new[] { -1f, 1f })
-                Solid(new Vector3(x * (L / 2f - wall / 2f), h / 2f, (D - wall) / 2f), new Vector3(wall, h, D - wall));
-            // the guard over the parapet: a box collider, nothing to see
-            var guard = Child(root.transform, "Guard", Vector3.zero);
-            guard.layer = LevelMetrics.CeilingLayer; // sight passes, bodies do not
-            var front = guard.AddComponent<BoxCollider>();
-            front.center = new Vector3(0f, h + 0.5f, D - wall / 2f);
-            front.size = new Vector3(L, 1.0f, wall);
-            foreach (float x in new[] { -1f, 1f })
-            {
-                var side = guard.AddComponent<BoxCollider>();
-                side.center = new Vector3(x * (L / 2f - wall / 2f), h + 0.5f, (D - wall) / 2f);
-                side.size = new Vector3(wall, 1.0f, D - wall);
-            }
+                Solid(new Vector3(x * (L / 2f - wall / 2f), solid / 2f, (D - wall) / 2f), new Vector3(wall, solid, D - wall));
             return root;
         }
+
+        /// <summary>The height of a balcony parapet's collider, metres: under a jump, so one can jump off the balcony.</summary>
+        const float BalconyClimb = 0.75f;
 
         /// <summary>Furniture whose BodyDoor{n} / BodyDrawer{n} parts open for real (Items.Storage).</summary>
         static GameObject Opening(GameObject go)

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Stealth.Configs;
 using Stealth.Enemies;
+using Stealth.Level;
 
 namespace Stealth.Game
 {
@@ -20,9 +21,17 @@ namespace Stealth.Game
             get
             {
                 int n = 0;
-                while (IsOpened(OpenKeys.HackSlot(n))) n++;
+                while (HackedKind(n) >= 0) n++;
                 return n;
             }
+        }
+
+        /// <summary>The kind (<see cref="RobotKind"/>) in the team's <paramref name="slot"/>-th hack slot, oldest first — the next to wake — or -1 (every peer).</summary>
+        public int HackedKind(int slot)
+        {
+            for (int k = 0; k < RobotRoster.KindCount; k++)
+                if (IsOpened(OpenKeys.HackSlot(slot, k))) return k;
+            return -1;
         }
 
         public int MaxHacked => System.Math.Max(1, Tuning.Player.Interaction.MaxHacked);
@@ -55,12 +64,13 @@ namespace Stealth.Game
         {
             bool changed = false;
             for (int i = 0; i < 8; i++)
-            {
-                bool on = i < m_Hacked.Count, was = m_Opened.Contains(OpenKeys.HackSlot(i));
-                if (on == was) continue;
-                if (on) m_Opened.Add(OpenKeys.HackSlot(i)); else m_Opened.Remove(OpenKeys.HackSlot(i));
-                changed = true;
-            }
+                for (int k = 0; k < RobotRoster.KindCount; k++)
+                {
+                    bool on = i < m_Hacked.Count && (int)m_Hacked[i].Kind == k, was = m_Opened.Contains(OpenKeys.HackSlot(i, k));
+                    if (on == was) continue;
+                    if (on) m_Opened.Add(OpenKeys.HackSlot(i, k)); else m_Opened.Remove(OpenKeys.HackSlot(i, k));
+                    changed = true;
+                }
             if (changed) OpenedVersion++;
         }
     }

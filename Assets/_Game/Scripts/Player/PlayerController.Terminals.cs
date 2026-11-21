@@ -304,19 +304,25 @@ namespace Stealth.Player
         T Aimed<T>() where T : Component => LookTarget.At<T>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius);
 
         /// <summary>The robot / device to hack: the one looked at (or, for the autopilot, the nearest in reach).</summary>
+        /// <summary>
+        /// What the hands can do to it: a device is hacked by hand; a robot only with the keyboard in the hand — without it a
+        /// robot carrying something (the cage's key, loot) can still be searched (<see cref="OnHackRequest"/>).
+        /// </summary>
+        bool HandsCanWork(Detector d) => d is not RobotController || HoldsKeyboard || d.Cargo >= 0;
+
         Detector FindHackTarget()
         {
             if (UseLook)
             {
                 var looked = Aimed<Detector>();
-                if (looked != null) return looked.CanBeHackedFrom(transform.position, HackReach) && looked.ReachableFrom(Hands) ? looked : null;
+                if (looked != null) return HandsCanWork(looked) && looked.CanBeHackedFrom(transform.position, HackReach) && looked.ReachableFrom(Hands) ? looked : null;
                 // devices without a body to hit (cameras, sensors, plates): the one closest to the crosshair, if close enough
                 Detector bestLook = null;
                 float bestAngle = m_Interaction.LookAngle;
                 var eye = Camera.transform;
                 foreach (var d in Detector.All)
                 {
-                    if (!d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
+                    if (!HandsCanWork(d) || !d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
                     float angle = Vector3.Angle(eye.forward, d.Position - eye.position);
                     if (angle < bestAngle) { bestLook = d; bestAngle = angle; }
                 }
@@ -326,7 +332,7 @@ namespace Stealth.Player
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)
             {
-                if (!d.CanBeHackedFrom(transform.position, HackReach) || (View.HasValue && !View.Value.At(d.transform.position + Vector3.up * 0.1f, d.Position, 0.45f)) ||
+                if (!HandsCanWork(d) || !d.CanBeHackedFrom(transform.position, HackReach) || (View.HasValue && !View.Value.At(d.transform.position + Vector3.up * 0.1f, d.Position, 0.45f)) ||
                     !d.ReachableFrom(Hands)) continue;
                 float dist = (d.transform.position - transform.position).sqrMagnitude;
                 if (dist < bestDist) { best = d; bestDist = dist; }

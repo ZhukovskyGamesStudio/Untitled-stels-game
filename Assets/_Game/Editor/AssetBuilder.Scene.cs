@@ -259,7 +259,7 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ player build
 
-        public const string PlayerExe = "Builds/Windows/StealthPrototype.exe";
+        public const string PlayerExe = "Builds/Windows/USG.exe";
 
         [MenuItem("Stealth/Build Windows Player")]
         public static void BuildPlayerWindows() =>

@@ -107,6 +107,9 @@ namespace Stealth.Enemies
             DropCargoServer();
         }
 
+        /// <summary>Server: searched by a player with no keyboard: what it carries (the cage's key, loot) falls off; it is not hacked.</summary>
+        public void SearchServer() => DropCargoServer();
+
         /// <summary>Server: a hacked worker drops what it carried in front of itself — take it.</summary>
         void DropCargoServer()
         {

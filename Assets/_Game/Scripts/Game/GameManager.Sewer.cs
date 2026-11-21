@@ -40,6 +40,7 @@ namespace Stealth.Game
             if (ItemCatalog.Unburnable(shape)) return;
             Shredder.Add(shape, color, Session.ServerTime);
             if (player != null) m_ChewBy = player.Nick;
+            NoteServer(player, StatKind.Fuel, ItemCatalog.Value(shape, color));
         }
 
         /// <summary>Server: what the blades have finished becomes fuel at once; the banner when the pile is gone.</summary>
@@ -193,10 +194,18 @@ namespace Stealth.Game
             return Phase == RunPhase.Playing && l != null && AtEntry(l, position); // (not at the storage robot: its crate is a stash, no fire)
         }
 
+        /// <summary>
+        /// Whether the stash board here has the burn zone: only the entry's stash where things burn — never the storage
+        /// robot's crate (it may stand next to the car, but its board is a stash, not a fire).
+        /// </summary>
+        public bool CanBurnStashAt(Vector3 position, TeamStash stash) =>
+            stash != null && stash == Stash && !AtBot(position) && CanBurnAt(position);
+
         /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>
         public void BurnServer(PlayerController player, int fuel)
         {
             if (fuel <= 0) return;
+            NoteServer(player, StatKind.Fuel, fuel);
             m_Run.Deposit(fuel);
             m_StrandedAt = -1f;
             Banner(Loc.Pack("banner.fuel_added", player != null ? player.Nick : "", fuel, Collected, FuelNeeded));
@@ -412,7 +421,9 @@ namespace Stealth.Game
             GoAt = 0;
             int cost = CostOf(ChosenLane);
             if (Collected < cost) return;
-            if (Phase == RunPhase.Playing && !LeaveHouseServer()) return;
+            bool fromHouse = Phase == RunPhase.Playing;
+            if (fromHouse && !LeaveHouseServer()) return;
+            if (fromHouse) SendHouseStatsServer();
             if (m_Run.Advance(cost) != RunState.Exit.NextLevel) return;
             // the team stays in its seats: the car drives on down the tunnel to the next house's basement while the house is
             // built (GameManager.Arrival)

@@ -85,6 +85,8 @@ namespace Stealth.Level
         public Stealth.UI.RouteSignView SignPrefab;
         /// <summary>How far in front of the tunnels' mouths the route panels hang: the end wall of the hall is 0.6 m of brick.</summary>
         public const float SignOffWall = 0.75f;
+        /// <summary>Where a tunnel's panel stands, in its mouth's frame (+X into the tunnel): eye level, beside the car's lane.</summary>
+        public static readonly Vector3 SignSpot = new(-SignOffWall, 1.75f, 2.2f);
 
         // built at run time by Build (not in the prefab)
         [NonSerialized] public Transform Water;
@@ -291,9 +293,10 @@ namespace Stealth.Level
                 {
                     sign = Instantiate(SignPrefab, transform);
                     sign.name = $"Sign{i}";
-                    // over the mouth, 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth),
-                    // its face to the hall (a world-space canvas reads along its +Z: into the tunnel), tipped down a little
-                    sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * new Vector3(-SignOffWall, 4.4f, 0f), mouth.rotation * Quaternion.Euler(-12f, 90f, 0f));
+                    // at eye level in the mouth, on the driver's side (left-hand drive: +Z looking in), clear of the car's lane,
+                    // 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth), its face to the
+                    // hall (a world-space canvas reads along its +Z: into the tunnel) — over the mouth the car's roof hid it
+                    sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * SignSpot, mouth.rotation * Quaternion.Euler(0f, 90f, 0f));
                 }
                 Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen, Plug = b.Plug };
             }

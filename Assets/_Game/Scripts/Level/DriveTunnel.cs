@@ -72,6 +72,12 @@ namespace Stealth.Level
             return cell;
         }
 
-        void OnDestroy() => Clear();
+        // the level (or the sewer) it belongs to is going: what it hid goes with it — showing it again here was
+        // "GameObjects can not be made active when they are being destroyed"
+        void OnDestroy()
+        {
+            foreach (var go in m_Cells.Values) if (go != null) Destroy(go);
+            m_Cells.Clear();
+        }
     }
 }

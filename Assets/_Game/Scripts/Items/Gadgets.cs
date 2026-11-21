@@ -49,6 +49,75 @@ namespace Stealth.Items
         [Header("Med table (hospital)")]
         [Tooltip("Hit points the med table gives (once per player per house): more than the usual two.")]
         public int MedTableHp = 3;
+
+        [Header("Starting items and the classes' tools")]
+        [Tooltip("Instant coffee: seconds it lasts once drunk.")]
+        public float CoffeeSeconds = 60f;
+        [Tooltip("Instant coffee: walking and running speed × this.")]
+        public float CoffeeMoveScale = 1.5f;
+        [Tooltip("Instant coffee: every held-E work (hacking, unscrewing, picking locks, searching) goes this many times faster.")]
+        public float CoffeeWorkScale = 2f;
+        [Tooltip("Fuel finder: blinks fastest this close to loot (and closer), metres.")]
+        public float FinderNear = 2f;
+        [Tooltip("Fuel finder: blinks slowest this far from loot (and further), metres; beyond it, only rarely.")]
+        public float FinderFar = 30f;
+        [Tooltip("Fuel finder: seconds between blinks, near and far.")]
+        public float FinderFastPeriod = 0.18f, FinderSlowPeriod = 1.8f;
+        [Tooltip("Fuel finder: loot right behind the holder reads as this many times further than the same loot straight ahead (it points where you look).")]
+        public float FinderBehind = 4f;
+        [Tooltip("Radio: a teammate speaking makes the radio in someone's hand sound — robots hear it within this radius, metres.")]
+        public float RadioNoise = 7f;
+        [Tooltip("A fall from this high (and higher) slows a player down, metres (not with the boots).")]
+        public float FallSlowFrom = 3f;
+        [Tooltip("A fall from higher than this also hurts, metres (not with the boots).")]
+        public float FallHurtFrom = 6f;
+        [Tooltip("Seconds a hard landing slows a player down.")]
+        public float FallSlowSeconds = 5f;
+        [Tooltip("The speed left right after a landing from FallSlowFrom, and from FallHurtFrom and higher (× walking speed).")]
+        public float FallSlowLight = 0.7f, FallSlowHeavy = 0.35f;
+    }
+
+    /// <summary>
+    /// Rules of the starting items and the classes' tools (pure, unit tested): the coffee's boost, a hard landing, the fuel
+    /// finder's blink.
+    /// </summary>
+    public static class GearRules
+    {
+        /// <summary>How high a body fell, metres, from its speed when it landed (m/s).</summary>
+        public static float FallHeight(float impactSpeed, float gravity = 9.81f) => impactSpeed * impactSpeed / (2f * Mathf.Max(0.01f, gravity));
+
+        /// <summary>
+        /// What a landing from <paramref name="height"/> does: the speed left right after it (1 = none; it wears off over
+        /// <see cref="GadgetSettings.FallSlowSeconds"/>) and whether it hurts. The boots take any fall.
+        /// </summary>
+        public static (float slow, bool hurt) Landing(float height, bool boots, GadgetSettings s)
+        {
+            if (boots || height < s.FallSlowFrom) return (1f, false);
+            float t = Mathf.InverseLerp(s.FallSlowFrom, s.FallHurtFrom, height);
+            return (Mathf.Lerp(s.FallSlowLight, s.FallSlowHeavy, t), height > s.FallHurtFrom);
+        }
+
+        /// <summary>The speed scale <paramref name="since"/> seconds after a landing that left <paramref name="slow"/>: back to 1 linearly.</summary>
+        public static float SlowNow(float slow, float since, float seconds) =>
+            since >= seconds || seconds <= 0f ? 1f : Mathf.Lerp(slow, 1f, Mathf.Clamp01(since / seconds));
+
+        /// <summary>Seconds between the fuel finder's blinks at <paramref name="distance"/> metres from the nearest loot (∞: none in the house).</summary>
+        public static float FinderPeriod(float distance, GadgetSettings s)
+        {
+            if (float.IsInfinity(distance)) return s.FinderSlowPeriod * 2f;
+            float t = Mathf.InverseLerp(s.FinderNear, s.FinderFar, distance);
+            return Mathf.Lerp(s.FinderFastPeriod, s.FinderSlowPeriod, t);
+        }
+
+        /// <summary>
+        /// How far loot "reads" on the finder: its distance, stretched the further it is from where the holder looks
+        /// (<paramref name="cosine"/> of the angle between the look and the way to it: ahead ×1, aside ×½(1+behind), behind ×behind).
+        /// </summary>
+        public static float FinderReading(float distance, float cosine, GadgetSettings s) =>
+            distance * Mathf.Lerp(1f, Mathf.Max(1f, s.FinderBehind), (1f - Mathf.Clamp(cosine, -1f, 1f)) * 0.5f);
+
+        /// <summary>Whether the finder's lamp is lit at <paramref name="phase"/> seconds into a blink of <paramref name="period"/>: a short flash.</summary>
+        public static bool FinderLit(float phase, float period) => phase < Mathf.Min(0.09f, period * 0.5f);
     }
 
     /// <summary>The workbench's rule (pure, unit tested): which items of the backpack become diamonds.</summary>

@@ -83,6 +83,16 @@ namespace Stealth.Level
                 if (best >= 0 && !m_WTargets.Contains(best)) m_WTargets.Add(best);
             }
             if (!MiddleIsFurniture(room)) Target(room.Center, 6); // as Walk.Reached: the free cell nearest the middle within 1.5 m
+            else if (room.Type == RoomType.Imaging)
+            {
+                // a machine stands free in the middle and there is often one door: the floor all round it must stay one piece
+                // (the doors alone gave a single target — nothing was checked, and a row of cabinets at each end of the
+                // scanner cut the room in two: the final check then took the scanner out)
+                var rb = room.Bounds;
+                float hx = rb.width / 2f - 0.9f, hz = rb.height / 2f - 0.9f;
+                if (hx > 0.4f) { Target(room.Center + new Vector3(hx, 0f, 0f)); Target(room.Center - new Vector3(hx, 0f, 0f)); }
+                if (hz > 0.4f) { Target(room.Center + new Vector3(0f, 0f, hz)); Target(room.Center - new Vector3(0f, 0f, hz)); }
+            }
             foreach (var d in m_L.Doorways)
             {
                 if (d.Floor != room.Floor || d.Kind is not (EdgeType.Door or EdgeType.Open or EdgeType.Breach)) continue;

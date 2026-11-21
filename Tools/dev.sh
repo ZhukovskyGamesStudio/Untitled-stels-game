@@ -63,7 +63,7 @@ EOF
     scenario="${2:-full}"; clients="${3:-0}"
     if [ -n "${SEEDS:-}" ] && [ "$clients" -eq 0 ]; then
       # one quiet window per seed, all at once: shots in Builds/shots/<scenario>_<seed>, logs in Builds/host_<seed>.log
-      exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+      exe="$ROOT/Builds/Windows/USG.exe"
       pids=()
       port=7790
       for seed in ${SEEDS//,/ }; do
@@ -82,7 +82,7 @@ EOF
     fi
     shots="$P/Builds/shots/$scenario"
     rm -rf "$ROOT/Builds/shots/$scenario"; mkdir -p "$ROOT/Builds/shots/$scenario"
-    exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+    exe="$ROOT/Builds/Windows/USG.exe"
     rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
     cscenario="client"; [ "$scenario" != "full" ] && cscenario="$scenario"

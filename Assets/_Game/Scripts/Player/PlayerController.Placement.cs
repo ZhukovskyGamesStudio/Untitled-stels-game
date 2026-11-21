@@ -165,15 +165,30 @@ namespace Stealth.Player
         void UpdateLadder(in PlayerInputState input, float dt)
         {
             var feet = transform.position;
-            if (!Climbing || m_Ladder == null) m_Ladder = ShaftLadder.At(feet); // the entry's or the exit's: whichever we are at
+            if (!Climbing || m_Ladder == null) m_Ladder = ShaftLadder.At(feet) ?? ShaftLadder.AtHole(feet); // the entry's or the exit's: whichever we are at
             var ladder = m_Ladder;
-            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; return; }
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; m_Lowering = false; return; }
             if (!Climbing)
             {
                 var facing = transform.forward;
                 facing.y = 0f;
                 Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
+                // from the floor above: walking into the open hole anywhere takes the ladder, which lowers the body onto it
+                var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
+                if (!Climbing && Motor.Grounded && LadderMath.GetsOnFromAbove(feet, ladder.Shaft, ladder.ShaftHalf, World.IsOpened(ladder.LidKey), wish))
+                {
+                    Climbing = true;
+                    m_Lowering = true;
+                    m_ClimbingOut = false;
+                    m_LowerSince = Time.time;
+                }
                 if (!Climbing) return;
+            }
+            if (m_Lowering)
+            {
+                m_Controller.Move(LadderMath.Lower(feet, ladder.Column, ladder.Shaft.y, dt, out bool lowered));
+                if (lowered || Time.time > m_LowerSince + 2.5f) m_Lowering = false;
+                return;
             }
             if (m_ClimbingOut)
             {
@@ -208,6 +223,8 @@ namespace Stealth.Player
 
         bool m_ClimbingOut;
         float m_ClimbOutSince;
+        bool m_Lowering;               // getting on from the floor above: lowered onto the rungs
+        float m_LowerSince;
         ShaftLadder m_Ladder;
 
         public void TeleportOwner(Vector3 position, Quaternion rotation)

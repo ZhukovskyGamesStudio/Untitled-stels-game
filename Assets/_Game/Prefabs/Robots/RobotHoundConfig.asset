@@ -23,7 +23,7 @@ MonoBehaviour:
     ViewDistance: 13
     ViewAngle: 100
     PeripheralDistance: 2.5
-    DetectionSpeed: 0.6
+    DetectionSpeed: 0.4
     EyePitch: 0
     ColorSorter: 0
     HearingMultiplier: 0.6
@@ -33,15 +33,15 @@ MonoBehaviour:
     SeismicPeriod: 2.6
     SeismicWaveSpeed: 9
     SmellRange: 3
-    SmellSpeed: 1.6
+    SmellSpeed: 0.8
   Traits:
     CanUseStairs: 1
     HoverHeight: 0
-    PatrolSpeed: 2.2
-    InvestigateSpeed: 3.4
-    ChaseSpeed: 4.9
+    PatrolSpeed: 1.5
+    InvestigateSpeed: 2.3
+    ChaseSpeed: 3.6
     LoseTargetAfter: 6
-    WarningTime: 1.5
+    WarningTime: 2.5
     CanAttack: 1
     AlarmOnDetect: 0
     AlarmRadius: 30
@@ -49,8 +49,10 @@ MonoBehaviour:
     AttackRange: 1.7
     AttackCooldown: 1.7
     SuspiciousAt: 0.25
-    SuspicionDecay: 0.35
+    SuspicionDecay: 0.5
     PatrolWaitMin: 1
     PatrolWaitMax: 3.5
     InvestigateLookTime: 3
     StareTime: 4
+    SniffEvery: 3.5
+    SniffTime: 1.4

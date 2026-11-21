@@ -41,6 +41,8 @@ namespace Stealth.Items
         [Tooltip("Behind a key door (the key is a detour): this many items there first, and richer and bigger ones.")]
         public int KeyRoomItems = 3;
         public int KeyRoomBonus = 12;
+        [Tooltip("A spot this rich (the sum of the bonuses above: deep, dark, high up, an office…) gets the more valuable of two draws of the loot table — things have a fixed rarity, a rich spot finds the rarer ones more often.")]
+        public int RichBonus = 14;
     }
 
     /// <summary>Server-side loot placement rules (pure, unit tested).</summary>
@@ -103,7 +105,8 @@ namespace Stealth.Items
                 // the room's type says how big a thing lies in it (a kitchen: small things)
                 var rule = RuleAt(p);
                 for (int k = 0; k < 6 && !RoomRules.LootFits(rule, ItemCatalog.Cells(a)); k++) a = ItemCatalog.LootShape(rng, room);
-                if (!InHidden(p) && RegionOf(p) < 0) return a;
+                // things have a fixed rarity now: a rich spot (deep, dark, high up…) gets the more valuable of two draws
+                if (!InHidden(p) && RegionOf(p) < 0 && Bonus(p) < s.RichBonus) return a;
                 int b = ItemCatalog.LootShape(rng, room);
                 return ItemCatalog.Value(b, 0) > ItemCatalog.Value(a, 0) ? b : a;
             }

@@ -41,6 +41,7 @@ namespace Stealth.Game
             m_Scenarios["move"] = MoveScenario;
             RegisterExtraScenarios();
             // Silent from the very first frame (the developer keeps working while autotests run).
+            if (Arg("-autotest") != null) DevFlags.SkipPicking = true; // the autopilot does not pick a class
             if (Arg("-autotest") != null && Arg("-autotest-sound") == null)
             {
                 DevFlags.Mute = true;

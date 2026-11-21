@@ -272,6 +272,9 @@ namespace Stealth.Enemies
             bool important = (b == 255) != (old == 255) || f != m_State.Focus || (b == 0) != (old == 0);
             if (!important && (Time.time < m_NextAwarenessSend || Mathf.Abs(b - old) < 6)) return;
             m_NextAwarenessSend = Time.time + 0.08f;
+            // spotted for sure (the scale just filled up on this player): counted for the house's titles
+            if (b == 255 && (old != 255 || f != m_State.Focus) && f != Nobody)
+                Game.GameManager.Instance?.NoteServer(Player.PlayerController.Find(f), Game.StatKind.Spotted);
             m_State.Awareness = b;
             m_State.Focus = f;
         }

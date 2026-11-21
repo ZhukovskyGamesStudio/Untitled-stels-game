@@ -32,8 +32,10 @@ namespace Stealth.Level
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            available = !Open;
-            return Loc.T("use.vent_grille");
+            // screwed on: only a screwdriver in hand works it loose (the server checks it too)
+            var inv = player.GetComponent<PlayerInventory>();
+            available = !Open && inv != null && inv.Holds(Items.ItemCatalog.Screwdriver);
+            return Loc.T(Open || available ? "use.vent_grille" : "use.vent_grille_shut");
         }
 
         void Update()

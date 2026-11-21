@@ -52,6 +52,18 @@ namespace Stealth.Tests
         static GameObject Load(string path) => AssetDatabase.LoadAssetAtPath<GameObject>(path);
 
         [Test]
+        public void TheScreensAreDrawnOverTheViewNotInTheWorld()
+        {
+            // (a nested canvas's renderMode is its root's: setting it on a child once made the whole HUD a world-space canvas)
+            foreach (var name in new[] { "HUD", "Menu", "Inventory" })
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/UI/{name}.prefab");
+                Assert.IsNotNull(prefab, name);
+                Assert.AreEqual(RenderMode.ScreenSpaceOverlay, prefab.GetComponent<Canvas>().renderMode, name);
+            }
+        }
+
+        [Test]
         public void NoMissingScripts([ValueSource(nameof(AllPrefabPaths))] string path)
         {
             var go = Load(path);

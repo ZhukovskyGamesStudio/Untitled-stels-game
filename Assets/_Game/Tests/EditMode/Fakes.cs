@@ -94,6 +94,10 @@ namespace Stealth.Tests
         public void SendHatch(bool hide) => Hatch.Add(hide);
         public int HandUses;
         public void SendUseHand() => HandUses++;
+        public int FallHurts;
+        public void SendFallHurt() => FallHurts++;
+        public readonly List<(byte cls, byte item, bool ready)> Loadouts = new();
+        public void SendLoadout(byte cls, byte item, bool ready) => Loadouts.Add((cls, item, ready));
         public readonly List<(Cheat cheat, bool on)> Cheats = new();
         public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
         public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();
@@ -113,6 +117,7 @@ namespace Stealth.Tests
 
         public void RequestPickup(WorldItem item, byte x, byte y, byte rot) => Requests.Add($"pickup {x},{y},{rot}");
         public void RequestMove(int index, byte x, byte y, byte rot) => Requests.Add($"move {index} {x},{y},{rot}");
+        public void RequestSwapHand(int index) => Requests.Add($"swap-hand {index}");
         public void RequestDrop(int index, Vector3 position, float yaw) => Requests.Add($"drop {index}");
         public void RequestDeposit(int index) => Requests.Add($"deposit {index}");
         public void RequestStash(int index, byte x, byte y, byte rot) => Requests.Add($"stash {index} {x},{y},{rot}");

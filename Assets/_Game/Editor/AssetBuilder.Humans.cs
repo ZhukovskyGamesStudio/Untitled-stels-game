@@ -44,7 +44,7 @@ namespace Stealth.EditorTools
             EnsureFolder(HumansDataDir);
             var clips = AssetDatabase.LoadAllAssetsAtPath(HumanFbx).OfType<AnimationClip>().Where(c => !c.name.StartsWith("__preview")).ToArray();
             AnimationClip Clip(string n) => clips.FirstOrDefault(c => c.name == n);
-            var controller = BuildHumanController(Clip("Idle"), Clip("Walk"), Clip("Run"), Clip("CrouchIdle"), Clip("CrouchWalk"), Clip("Down"));
+            var controller = BuildHumanController(Clip("Idle"), Clip("Walk"), Clip("Run"), Clip("CrouchIdle"), Clip("CrouchWalk"), Clip("Down"), Clip("Sit"));
 
             var mats = new System.Collections.Generic.Dictionary<string, Material>
             {
@@ -90,7 +90,8 @@ namespace Stealth.EditorTools
         static void ConfigureHumanImport(ModelImporter imp)
         {
             bool dirty = imp.animationType != ModelImporterAnimationType.Generic || imp.materialImportMode != ModelImporterMaterialImportMode.None ||
-                         !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime);
+                         !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime)
+                         || imp.clipAnimations.Length != imp.defaultClipAnimations.Length; // a take was added in Blender (Sit)
             if (!dirty) return;
             imp.animationType = ModelImporterAnimationType.Generic;
             imp.materialImportMode = ModelImporterMaterialImportMode.None;
@@ -135,17 +136,19 @@ namespace Stealth.EditorTools
             return m;
         }
 
-        /// <summary>Speed (m/s) blends Idle → Walk → Run; Crouch blends crouched idle → crouch walk; Down lies on the floor.</summary>
+        /// <summary>Speed (m/s) blends Idle → Walk → Run; Crouch blends crouched idle → crouch walk; Down lies on the floor; Sit sits in the car.</summary>
         static AnimatorController BuildHumanController(AnimationClip idle, AnimationClip walk, AnimationClip run,
-                                                       AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down)
+                                                       AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down, AnimationClip sit)
         {
             var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(HumanControllerPath);
-            if (existing != null && !s_Force) return existing; // the prefab references it: keep its GUID
+            // the prefab references it: keep its GUID — unless it is older than the takes it should play (no Sit yet)
+            if (existing != null && !s_Force && (sit == null || existing.parameters.Any(p => p.name == "Sit"))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
             c.AddParameter("Speed", AnimatorControllerParameterType.Float);
             c.AddParameter("Crouch", AnimatorControllerParameterType.Bool);
             c.AddParameter("Down", AnimatorControllerParameterType.Bool);
+            c.AddParameter("Sit", AnimatorControllerParameterType.Bool);
             var sm = c.layers[0].stateMachine;
 
             var move = c.CreateBlendTreeInController("Move", out var moveTree, 0);
@@ -178,6 +181,18 @@ namespace Stealth.EditorTools
             fall.canTransitionToSelf = false;
             fall.AddCondition(AnimatorConditionMode.If, 0f, "Down");
             To(lying, move, "Down", false, 0.4f);
+            if (sit != null)
+            {
+                var seated = sm.AddState("Sit");
+                seated.motion = sit;
+                var sitDown = sm.AddAnyStateTransition(seated);
+                sitDown.hasExitTime = false;
+                sitDown.duration = 0.3f;
+                sitDown.canTransitionToSelf = false;
+                sitDown.AddCondition(AnimatorConditionMode.If, 0f, "Sit");
+                sitDown.AddCondition(AnimatorConditionMode.IfNot, 0f, "Down");
+                To(seated, move, "Sit", false, 0.3f);
+            }
             EditorUtility.SetDirty(c);
             return c;
         }

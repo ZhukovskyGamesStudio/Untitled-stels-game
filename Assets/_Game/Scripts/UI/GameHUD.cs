@@ -92,6 +92,23 @@ namespace Stealth.UI
         public Sprite HeartFull, HeartEmpty;
         [Tooltip("The team's hack slots, bottom left: lit = a robot / device is switched off.")]
         public Image[] HackSlots;
+        [Header("The house's clock")]
+        [Tooltip("Its panel: tinted from calm blue to red as extra robots come.")]
+        public Image ClockPanel;
+        public Text ClockTime, ClockNext, ClockCount;
+        [Tooltip("From the last extra robot to the next.")]
+        public BarView ClockBar;
+        [Header("The team comes up into the house")]
+        public CanvasGroup EntryBanner;
+        public Text EntryTitle, EntrySub;
+        [Header("The drive: the last house's titles")]
+        public GameObject StatsPanel;
+        public Text StatsHeader;
+        public StatsRowView[] StatsRows;
+        [Tooltip("A free hack slot: the bolt.")]
+        public Sprite HackFree;
+        [Tooltip("A taken hack slot: the picture of what is switched off (indexed by RobotKind).")]
+        public Sprite[] HackKindIcons;
 
         [Header("Panels")]
         public Text HouseLabel;
@@ -117,6 +134,11 @@ namespace Stealth.UI
         [Header("Map and callouts")]
         [Tooltip("The map terminal's map: the whole building, a floor at a time, north-up (the HUD has no map of its own).")]
         public MapView BigMap;
+        [Tooltip("The tablet's screen (world-space canvas, laid on the screen of the tablet in the hand): its minimap of what the team has seen.")]
+        public RectTransform TabletScreen;
+        public MapView TabletMap;
+        /// <summary>The tablet screen canvas's width in its units (its height follows the screen's shape).</summary>
+        public const float TabletScreenWidth = 380f;
         [Tooltip("Pings and marked robots on screen, through walls.")]
         public RectTransform CalloutLayer;
         public CalloutMarkerView CalloutPrefab;
@@ -156,11 +178,19 @@ namespace Stealth.UI
             m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
             m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
             m_HintRows = new UiPool<HintView>(HintPrefab, HintStack);
+            // the tablet's screen lives in the world (on the tablet in the hand), not under the HUD's overlay canvas
+            if (TabletScreen != null)
+            {
+                TabletScreen.SetParent(null, false);
+                // a root canvas of its own now: in the world (set only here — on a nested canvas it would be the HUD's mode)
+                if (TabletScreen.TryGetComponent<Canvas>(out var canvas)) canvas.renderMode = RenderMode.WorldSpace;
+            }
         }
 
         void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            if (TabletScreen != null) Destroy(TabletScreen.gameObject); // (detached into the world)
         }
 
         public void FlashHit(Vector3 awayFromSource) => m_Hit.Hit(awayFromSource, Time.time);
@@ -198,7 +228,8 @@ namespace Stealth.UI
             m_Banners.Update(now);
             m_Gain.Observe(gm.Collected, now);
             bool driveScene = gm.DriveUntil > 0; // the drive on to the next house speaks for itself
-            if (ContentGroup != null) ContentGroup.alpha = Mathf.MoveTowards(ContentGroup.alpha, driveScene ? 0f : 1f, Time.deltaTime * 2.5f);
+            bool hideHud = driveScene || gm.Picking; // (the start screen has its own)
+            if (ContentGroup != null) ContentGroup.alpha = Mathf.MoveTowards(ContentGroup.alpha, hideHud ? 0f : 1f, Time.deltaTime * 2.5f);
             var context = BuildContext(gm, me);
             CurrentReticle = driveScene ? Reticle.Hidden : ReticleRules.Choose(context);
             HintRules.Collect(context, m_Hints);
@@ -219,6 +250,9 @@ namespace Stealth.UI
             ShowHatchMarker(gm, me);
             ShowHealth(me);
             ShowHackSlots(gm);
+            ShowHouseClock(gm);
+            ShowEntryBanner(gm);
+            ShowHouseStats(gm);
             ShowTeam(me, now);
             ShowCallouts(gm, me, now);
             ShowMaps(gm, me);
@@ -226,6 +260,90 @@ namespace Stealth.UI
             Ui.Show(RunOver, gm.Phase == RunPhase.Failed);
             if (gm.Phase == RunPhase.Failed) RunOverTotal.text = Loc.F("hud.run_total", gm.RunTotal);
             NameTheKeys();
+        }
+
+        // ------------------------------------------------------------------ the house's clock, its first moment, its titles
+
+        /// <summary>
+        /// The house's clock, top middle: it counts up from when the team came up into the house, shows when the next
+        /// extra robot comes (not a countdown: the clock's second it comes at) with a bar to it, and gets redder with every
+        /// robot that has come (<see cref="HouseClockRules"/>).
+        /// </summary>
+        void ShowHouseClock(GameManager gm)
+        {
+            if (ClockPanel == null) return;
+            bool on = gm.Phase == RunPhase.Playing && gm.HouseClockAt > 0;
+            Ui.Show(ClockPanel, on);
+            if (!on) return;
+            var r = Tuning.Run.Rules;
+            float t = gm.HouseClock;
+            float next = HouseClockRules.NextAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
+            float prev = HouseClockRules.PreviousAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
+            int came = RobotRoster.ReinforcementsDue(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
+            var color = HouseClockRules.ColorOf(HouseClockRules.Heat(came));
+            color.a = 0.82f;
+            if (ClockPanel.color != color) ClockPanel.color = color;
+            string time = HouseClockRules.Format(t), at = HouseClockRules.Format(next);
+            if (ClockTime.text != time) ClockTime.text = time;
+            if (ClockNext.text != at) ClockNext.text = at;
+            if (ClockBar != null) ClockBar.Set(Mathf.InverseLerp(prev, next, t), new Color(1f, 1f, 1f, 0.9f));
+            if (ClockCount != null)
+            {
+                string n = came > 0 ? "+" + came : "";
+                if (ClockCount.text != n) ClockCount.text = n;
+            }
+        }
+
+        double m_ClockSeen = -1;
+        float m_EntryAt = -100f;
+
+        /// <summary>The moment the team first comes up into the house and its clock starts: a big notice across the screen for everyone.</summary>
+        void ShowEntryBanner(GameManager gm)
+        {
+            if (EntryBanner == null) return;
+            if (gm.HouseClockAt != m_ClockSeen)
+            {
+                // (a player who joins a house already going sees no notice: the clock has run a while)
+                if (m_ClockSeen >= 0 && gm.HouseClockAt > 0 && gm.HouseClock < 5f)
+                {
+                    m_EntryAt = Time.unscaledTime;
+                    Audio.Sfx.Ui(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Ping : null, 1f);
+                }
+                m_ClockSeen = gm.HouseClockAt;
+            }
+            float age = Time.unscaledTime - m_EntryAt;
+            const float hold = 3.2f, fade = 0.6f;
+            float a = age < 0.25f ? age / 0.25f : age < hold ? 1f : 1f - (age - hold) / fade;
+            a = Mathf.Clamp01(a);
+            Ui.Show(EntryBanner, a > 0.001f);
+            if (a <= 0.001f) return;
+            EntryBanner.alpha = a;
+            EntryTitle.rectTransform.localScale = Vector3.one * (1f + 0.08f * Mathf.Exp(-age * 4f));
+        }
+
+        /// <summary>The drive to the next house: who did what in the last one, and everyone's title.</summary>
+        void ShowHouseStats(GameManager gm)
+        {
+            if (StatsPanel == null) return;
+            bool on = gm.DriveUntil > 0 && gm.LastTitles.Count > 0 && gm.LastTitlesAt >= 0f && Time.time - gm.LastTitlesAt < 240f;
+            Ui.Show(StatsPanel, on);
+            if (!on || StatsRows == null) return;
+            Ui.Set(StatsHeader, Loc.F("stats.header", gm.LastTitlesHouse), Color.white);
+            for (int i = 0; i < StatsRows.Length; i++)
+            {
+                var row = StatsRows[i];
+                bool shown = i < gm.LastTitles.Count;
+                Ui.Show(row, shown);
+                if (!shown) continue;
+                var t = gm.LastTitles[i];
+                var who = PlayerController.Find(t.Player);
+                var team = PlayerLooks.TeamColor(PlayerLooks.SlotOf(t.Player));
+                Ui.Set(row.Name, who != null ? who.Nick : "—", team);
+                Ui.Set(row.Title, Loc.T(HouseStats.TitleKey(t.Kind)), new Color(1f, 0.84f, 0.35f));
+                Ui.Set(row.Did, t.Kind == StatKind.None ? Loc.T(HouseStats.DidKey(t.Kind)) : string.Format(Loc.Plural(HouseStats.DidKey(t.Kind), Mathf.RoundToInt(t.Value)), Mathf.RoundToInt(t.Value)), new Color(1f, 1f, 1f, 0.85f));
+                Ui.Set(row.Numbers, Loc.F("stats.numbers", t.Fuel, t.Downs, t.Revives, t.Metres), new Color(1f, 1f, 1f, 0.6f));
+                if (row.Bar != null) row.Bar.color = team;
+            }
         }
 
         /// <summary>Texts that name keys follow the rebinds and the language.</summary>
@@ -324,13 +442,43 @@ namespace Stealth.UI
 
         void ShowMaps(GameManager gm, PlayerController me)
         {
+            ShowTabletScreen(gm, me);
             bool open = MapOpen(gm, me);
             Ui.Show(BigMap, open);
             if (!open) return;
+            // the map terminal shows the whole house and everything in it
             BigMap.WholeHouse = true;
             var t = me.UsingTerminal;
             BigMap.ViewFloor = t != null && t.Kind == TerminalKind.Map ? me.TerminalFloor : -1;
             BigMap.Refresh(gm, me);
+        }
+
+        /// <summary>
+        /// The tablet in the hand: its minimap (what the team has seen) on the screen of the model itself, wherever the hand
+        /// holds it (<see cref="PlayerController.HeldScreen"/>; the hand key raises it to the eyes).
+        /// </summary>
+        void ShowTabletScreen(GameManager gm, PlayerController me)
+        {
+            if (TabletScreen == null || TabletMap == null) return;
+            bool held = me.HeldScreen(out var parent, out var box);
+            bool on = held && gm.Phase == RunPhase.Playing && gm.Exploration != null && !GameMenu.IsOpen;
+            if (!on)
+            {
+                if (TabletScreen.gameObject.activeSelf) TabletScreen.gameObject.SetActive(false);
+                if (TabletScreen.parent != null) TabletScreen.SetParent(null, false);
+                return;
+            }
+            if (TabletScreen.parent != parent)
+            {
+                // face up on the screen face (the model lies along X, +Y up): the canvas's top towards the model's +Z
+                TabletScreen.SetParent(parent, false);
+                TabletScreen.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                TabletScreen.localPosition = new Vector3(box.center.x, box.max.y + 0.0008f, box.center.z);
+                TabletScreen.sizeDelta = new Vector2(TabletScreenWidth, TabletScreenWidth * box.size.z / Mathf.Max(1e-4f, box.size.x));
+                TabletScreen.localScale = Vector3.one * (box.size.x / TabletScreenWidth);
+            }
+            if (!TabletScreen.gameObject.activeSelf) TabletScreen.gameObject.SetActive(true);
+            TabletMap.Refresh(gm, me);
         }
 
         /// <summary>
@@ -406,6 +554,9 @@ namespace Stealth.UI
             if (e.Shape == ItemCatalog.Flashlight) return e.Color > 0 || me.FlashlightOn ? Loc.T(me.FlashlightOn ? "hint.flashlight.off" : "hint.flashlight.on") : null;
             if (e.Shape == ItemCatalog.Battery)
                 for (int i = 0; i < inventory.Items.Count; i++) if (inventory.CanRecharge(i)) return Loc.T("hint.battery.use");
+            if (e.Shape == ItemCatalog.Medkit) return me.Hp < HealthState.MaxHp ? Loc.T("hint.medkit") : null;
+            if (e.Shape == ItemCatalog.Coffee) return Loc.T("hint.coffee");
+            if (e.Shape == ItemCatalog.Tablet) return Loc.T("hint.tablet");
             return null;
         }
 
@@ -426,6 +577,7 @@ namespace Stealth.UI
                 CanRevive = me.ReviveTarget != null,
                 ReviveProgress = me.ReviveShare,
                 CanHack = me.HackTarget != null,
+                SearchOnly = me.HackTarget is RobotController && !me.HoldsKeyboard,
                 HackProgress = me.HackShare,
                 Playing = gm.Phase == RunPhase.Playing,
                 NearExit = Hatch.IndexNear(me.transform.position) == 1,
@@ -789,18 +941,32 @@ namespace Stealth.UI
             Ui.Set(HatchLabel, Loc.F("hud.metres", Vector3.Distance(me.transform.position, exit)), c);
         }
 
-        /// <summary>How many of the team's hack slots are in use (a hack over the limit wakes the first robot).</summary>
+        readonly List<int> m_HackedKinds = new();
+
+        /// <summary>The team's hack slots: free ones (blue bolts) on the left, then what is switched off, oldest first, grey (HackSlotRules).</summary>
         void ShowHackSlots(GameManager gm)
         {
             if (HackSlots == null) return;
             bool house = gm != null && gm.Phase == RunPhase.Playing;
-            int used = house ? gm.HackedCount : 0, max = house ? gm.MaxHacked : 0;
+            int max = house ? gm.MaxHacked : 0;
+            m_HackedKinds.Clear();
+            if (house)
+                for (int i = 0; i < 8; i++)
+                {
+                    int k = gm.HackedKind(i);
+                    if (k < 0) break;
+                    m_HackedKinds.Add(k);
+                }
+            var layout = HackSlotRules.Layout(Mathf.Min(max, HackSlots.Length), m_HackedKinds);
             for (int i = 0; i < HackSlots.Length; i++)
             {
-                bool shown = i < max;
+                bool shown = i < layout.Length;
                 Ui.Show(HackSlots[i], shown);
                 if (!shown) continue;
-                var color = i < used ? new Color(0.35f, 0.9f, 1f, 1f) : new Color(1f, 1f, 1f, 0.3f);
+                int kind = layout[i];
+                var sprite = kind < 0 || HackKindIcons == null || kind >= HackKindIcons.Length || HackKindIcons[kind] == null ? HackFree : HackKindIcons[kind];
+                if (sprite != null && HackSlots[i].sprite != sprite) HackSlots[i].sprite = sprite;
+                var color = kind < 0 ? new Color(0.35f, 0.75f, 1f, 1f) : new Color(0.62f, 0.64f, 0.68f, 0.85f);
                 if (HackSlots[i].color != color) HackSlots[i].color = color;
             }
         }

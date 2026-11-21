@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Stealth.Player
 {
-    /// <summary>The players are IT people from different departments; the slot of a player (client id) picks one.</summary>
+    /// <summary>The players are IT people from different departments; the class a player picked dresses them as one.</summary>
     public enum Department { Backend, Qa, Sysadmin, Designer }
 
     /// <summary>
@@ -40,27 +40,49 @@ namespace Stealth.Player
 
         public static Department DepartmentOf(int slot) => (Department)(((slot % Slots) + Slots) % Slots);
 
+        /// <summary>
+        /// The department a class (index in <c>ItemCatalog.ClassTools</c>) dresses the player as: the fitter with a screwdriver
+        /// is a sysadmin (vest, cable, head torch), the hacker with a keyboard — backend (hoodie, headphones), the radio
+        /// operator — QA (badge, glasses), the cartographer with a tablet — a designer (scarf, beret).
+        /// </summary>
+        public static Department DepartmentOfClass(int cls) => cls switch
+        {
+            0 => Department.Sysadmin,
+            1 => Department.Backend,
+            2 => Department.Qa,
+            _ => Department.Designer,
+        };
+
+        /// <summary>The class a slot starts with before it picks one (the team comes dressed differently).</summary>
+        public static int DefaultClass(int slot) => ((slot % Slots) + Slots) % Slots;
+
         public static Color TeamColor(int slot) => TeamColors[((slot % Slots) + Slots) % Slots];
 
         /// <summary>The colour of a part of the player model (by the part's name), or false to keep the material's own.</summary>
-        public static bool PartColor(string part, int slot, out Color color)
+        public static bool PartColor(string part, int slot, out Color color) => PartColor(part, slot, DepartmentOf(slot), out color);
+
+        /// <summary>The colour of a part for the slot (team colour, skin) dressed as a department (clothes).</summary>
+        public static bool PartColor(string part, int slot, Department department, out Color color)
         {
             int s = ((slot % Slots) + Slots) % Slots;
             if (part.StartsWith("AccentHead")) { color = SkinTones[s]; return true; }
             if (part.StartsWith("Accent")) { color = TeamColors[s]; return true; }
             if (part.StartsWith("Eye")) { color = Dark; return true; }
-            if (part.StartsWith("Body")) { color = DepartmentColors[(int)DepartmentOf(s)]; return true; }
+            if (part.StartsWith("Body")) { color = DepartmentColors[(int)department]; return true; }
             color = default;
             return false;
         }
 
         /// <summary>Colours every part of a player model for the slot (a material property block per renderer).</summary>
-        public static void Paint(Transform model, int slot)
+        public static void Paint(Transform model, int slot) => Paint(model, slot, DepartmentOf(slot));
+
+        /// <summary>Colours every part of a player model for the slot, dressed as a department.</summary>
+        public static void Paint(Transform model, int slot, Department department)
         {
             var block = new MaterialPropertyBlock();
             foreach (var r in model.GetComponentsInChildren<Renderer>(true))
             {
-                if (!PartColor(r.gameObject.name, slot, out var c)) continue;
+                if (!PartColor(r.gameObject.name, slot, department, out var c)) continue;
                 block.Clear();
                 block.SetColor("_BaseColor", c);
                 r.SetPropertyBlock(block);

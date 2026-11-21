@@ -25,6 +25,14 @@ namespace Stealth.Level
             return null;
         }
 
+        /// <summary>The ladder whose hole in the floor a body at <paramref name="feet"/> stands at (over it or on its rim), or null.</summary>
+        public static ShaftLadder AtHole(Vector3 feet)
+        {
+            foreach (var l in All)
+                if (l != null && LadderMath.AtHole(feet, l.Shaft, l.ShaftHalf)) return l;
+            return null;
+        }
+
         /// <summary>The key of the lid over its top (<see cref="OpenKeys"/>): off at the top only through it open.</summary>
         public int LidKey { get; private set; } = OpenKeys.Shaft;
 
@@ -78,6 +86,43 @@ namespace Stealth.Level
         /// </summary>
         public static bool GetsOn(bool inZone, float forward, Vector3 facing, Vector3 ladderFacing, bool grounded, float y, float top) =>
             inZone && y < top - 0.5f && ((forward > 0.1f && Vector3.Dot(facing, ladderFacing) > 0.3f) || !grounded);
+
+        /// <summary>How far round the hole's edge a body on the floor still counts as at it (its rim, a capsule's width), metres.</summary>
+        public const float HoleRim = 0.4f;
+        /// <summary>How far down the shaft one is lowered on getting on from above, before W/S take over, metres.</summary>
+        public const float LowerDepth = 0.9f;
+
+        /// <summary>A body at <paramref name="feet"/> stands at the shaft's hole: over it or on its rim, at the floor's height.</summary>
+        public static bool AtHole(Vector3 feet, Vector3 shaft, float shaftHalf) =>
+            Mathf.Abs(feet.y - shaft.y) < 0.45f && Mathf.Max(Mathf.Abs(feet.x - shaft.x), Mathf.Abs(feet.z - shaft.z)) < shaftHalf + HoleRim;
+
+        /// <summary>
+        /// Gets on from above: at the open hole (<see cref="AtHole"/>) and walking into it — towards its middle, or already
+        /// over it. No hunting for the one spot over the rungs where a fall is caught: the ladder takes the body and lowers it
+        /// (<see cref="Lower"/>).
+        /// </summary>
+        public static bool GetsOnFromAbove(Vector3 feet, Vector3 shaft, float shaftHalf, bool lidOpen, Vector3 wish)
+        {
+            if (!lidOpen || !AtHole(feet, shaft, shaftHalf)) return false;
+            wish.y = 0f;
+            if (wish.sqrMagnitude < 0.01f) return false;
+            var toMiddle = new Vector3(shaft.x - feet.x, 0f, shaft.z - feet.z);
+            float off = Mathf.Max(Mathf.Abs(toMiddle.x), Mathf.Abs(toMiddle.z));
+            return off < shaftHalf - 0.15f || Vector3.Dot(wish.normalized, toMiddle.normalized) > 0.3f;
+        }
+
+        /// <summary>
+        /// Lowered onto the ladder from above, one frame: across to the rungs' column first, then down
+        /// <see cref="LowerDepth"/> under the floor; <paramref name="done"/> once there (W/S take over).
+        /// </summary>
+        public static Vector3 Lower(Vector3 feet, Vector3 column, float floorY, float dt, out bool done)
+        {
+            var across = new Vector3(column.x - feet.x, 0f, column.z - feet.z);
+            float bottom = floorY - LowerDepth;
+            done = across.magnitude < 0.08f && feet.y <= bottom + 0.02f;
+            if (across.magnitude > 0.08f) return Vector3.ClampMagnitude(across, Speed * dt) + Vector3.up * Mathf.Max(0f, floorY + 0.05f - feet.y) * Mathf.Min(1f, dt * 8f);
+            return across * Mathf.Min(1f, dt * 8f) + Vector3.down * Mathf.Min(Mathf.Max(0f, feet.y - bottom), Speed * dt);
+        }
 
         /// <summary>The climb of one frame: up or down with W/S, drawn to the column.</summary>
         public static Vector3 Step(Vector3 feet, Vector3 column, float forward, float dt)
