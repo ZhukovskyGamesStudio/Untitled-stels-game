@@ -199,6 +199,9 @@ namespace Stealth.Audio
             if (m_Music != MusicB && m_WeightB <= 0f && MusicB.isPlaying) MusicB.Stop();
         }
 
+        /// <summary>Where this peer's ears are now (voice chat measures walls and distance from here).</summary>
+        public static Vector3 Ears => Instance != null ? Instance.m_Listener : ListenerPosition(PlayerController.Local);
+
         /// <summary>Where the ears are: the local player's head (or the teammate they watch), else the menu camera.</summary>
         static Vector3 ListenerPosition(PlayerController me)
         {

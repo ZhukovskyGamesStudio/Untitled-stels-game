@@ -6,6 +6,9 @@ namespace Stealth.Enemies
     [CreateAssetMenu(menuName = "Stealth/Config/Devices/Turret", fileName = "RobotTurretConfig")]
     public class TurretProfile : DeviceProfile
     {
+        /// <summary>It has a microphone: hears the players talking (DeviceProfile.Hearing; existing assets without the field get this).</summary>
+        public TurretProfile() => Hearing = 0.6f;
+
         [Header("Eyes")]
         public float Range = 14f;
         public float ViewAngle = 60f;

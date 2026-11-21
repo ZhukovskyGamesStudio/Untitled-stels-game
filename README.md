@@ -168,7 +168,7 @@ Unity 6000.6.0f1, URP, Netcode for GameObjects 2.13, Steamworks.NET (AppID 480 /
 
 ## Точки стыковки для коллеги
 
-- **Войс-чат:** вызывать `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере, радиус — от громкости микрофона. Роботы с микрофонами услышат.
+- **Войс-чат:** сделан (`Docs/VoiceChat.md`): голос из рта игрока, глуше за стенами, с эхом комнаты; сервер делает из него шум `NoiseSystem.EmitServer` — роботы слышат. Настройки — пауза → Настройки, вторая колонка; говорить по кнопке — `CapsLock`.
 - **Предметы:** сейчас `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`. Для настоящих предметов — заменить каталог и `WorldItem`; инвентарь работает с формой в клетках.
 - **Мета-прогрессия:** итог забега — `GameManager.RunTotal`, конец забега — `GameManager.Phase == Failed`.
 - **Новый робот:** чек-лист в `.claude/skills/stealth-code/SKILL.md` (значение в `RobotKind`, строка в `RobotRoster`, префаб в `AssetBuilder.Actors.cs`, описание в `RobotInfo`).

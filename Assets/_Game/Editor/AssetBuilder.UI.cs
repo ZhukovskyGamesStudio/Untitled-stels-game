@@ -174,6 +174,28 @@ namespace Stealth.EditorTools
             if (width > 0f) le.minWidth = le.preferredWidth = width;
         }
 
+        /// <summary>The voice chat column of the settings page (GameMenu: mode, microphone, sensitivity with a live meter, noise suppression, volume).</summary>
+        static void BuildVoiceSettings(UiElements e, GameMenu menu, Transform settings)
+        {
+            var vc = Column(settings, "Voice", new Vector2(250, -84), 460);
+            ColumnText(vc, "Title", L("menu.voice_title"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
+            Spacer(vc, 8);
+            menu.VoiceMode = ButtonIn(e, vc, "VoiceMode", "", 30); // the labels are set by GameMenu
+            Spacer(vc, 6);
+            menu.VoiceDevice = ButtonIn(e, vc, "VoiceDevice", "", 30);
+            Spacer(vc, 8);
+            menu.MicSensitivityLabel = ColumnText(vc, "MicSensitivityLabel", "", 15, Color.white, 22);
+            menu.MicSensitivity = SliderIn(e, vc, "MicSensitivity", 0f, 1f, false);
+            menu.MicLevelLabel = ColumnText(vc, "MicLevelLabel", "", 15, Color.white, 22);
+            menu.MicLevel = SliderIn(e, vc, "MicLevel", 0f, 1f, false);
+            menu.MicLevel.interactable = false;
+            Spacer(vc, 8);
+            menu.NoiseSuppression = ToggleIn(e, vc, "NoiseSuppression", L("menu.voice_suppress"));
+            Spacer(vc, 8);
+            menu.VoiceVolumeLabel = ColumnText(vc, "VoiceVolumeLabel", "", 15, Color.white, 22);
+            menu.VoiceVolume = SliderIn(e, vc, "VoiceVolume", 0f, 2f, false);
+        }
+
         static RectTransform Column(Transform parent, string name, Vector2 pos, float width, float spacing = 6f)
         {
             var rt = R(parent, name, TopCenter, TopCenter, pos, new Vector2(width, 0));
@@ -938,7 +960,7 @@ namespace Stealth.EditorTools
             var settings = Stretch(root.transform, "Settings");
             menu.SettingsPage = settings.gameObject;
             Img(settings, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
-            var sc = Column(settings, "Column", new Vector2(0, -84), 460);
+            var sc = Column(settings, "Column", new Vector2(-250, -84), 460);
             ColumnText(sc, "Title", L("menu.settings"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
             Spacer(sc, 8);
             menu.SensitivityLabel = ColumnText(sc, "SensitivityLabel", "", 15, Color.white, 22);
@@ -959,6 +981,7 @@ namespace Stealth.EditorTools
             Spacer(sc, 10);
             menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
             Spacer(sc, 14);
+            BuildVoiceSettings(e, menu, settings);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(buttons, 32);
             var bh = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();

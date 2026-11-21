@@ -41,6 +41,7 @@ namespace Stealth.Net
             Application.runInBackground = true;
             if (QualitySettings.vSyncCount == 0) Application.targetFrameRate = 144;
             Manager.OnClientDisconnectCallback += OnClientDisconnect;
+            VoiceNet.Attach(Manager);
             Manager.OnClientConnectedCallback += id =>
             {
                 if (id == Manager.LocalClientId) SetStatus("");

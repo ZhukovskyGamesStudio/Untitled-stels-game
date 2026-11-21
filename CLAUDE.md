@@ -583,7 +583,12 @@ Graphics jobs выключены (`BuildPlayerWindows`): с ними плеер 
 
 ## Точки стыковки для коллеги
 
-- Войс-чат: `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере — роботы с микрофонами услышат.
+- Войс-чат — сделан, свой стек ([Docs/VoiceChat.md](Docs/VoiceChat.md), там же исследование и дорожная карта, в т.ч. покупка Dissonance):
+  плагин `Plugins/x86_64/StealthVoice.dll` (Opus + RNNoise от Xiph, `Tools/Voice/build_native.sh`), чистые правила `Scripts/Audio/Voice/*`
+  (`VoiceGate`, `VoiceGain`, `VoiceJitter`, `VoiceAcoustics`, `VoiceNoise`, `VoicePacket`), микрофон — `VoiceCapture` на префабе AudioDirector,
+  голос в мире — `VoicePlayback` (ребёнок `Voice` префаба игрока: плоский клип × голос в `OnAudioFilterRead`, потом Low-pass/Echo/Reverb),
+  маршрут — `VoiceHub` (сервер делает шум `NoiseSystem.EmitServer` по сырому уровню и пересылает), сеть — `Net/VoiceNet` (named messages, Unreliable);
+  настройки — `Data/Config/Audio` → `Voice`, выбор игрока — `VoicePrefs` (вторая колонка страницы настроек), кнопка — `GameAction.PushToTalk` (CapsLock).
 - Сеть: всё сетевое — в `Scripts/Net` (сборка `Stealth.Net`), игровой код от Netcode не зависит; как добавить сетевой объект — в скилле `stealth-code`.
 - Предметы: `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`, в мире — `WorldItem`, инвентарь — `PlayerInventory`.
 - Мета-прогрессия: итог забега `GameManager.RunTotal`, конец забега `GameManager.Phase == RunPhase.Failed`.

@@ -14,6 +14,8 @@ namespace Stealth.Player
         BotCall, BotExit,
         // knocked out: call the team (seen through walls)
         CallHelp,
+        // voice chat: hold to talk (when the microphone is set to push-to-talk)
+        PushToTalk,
     }
 
     /// <summary>
@@ -102,6 +104,7 @@ namespace Stealth.Player
             new(GameAction.BotCall, "team", KeyBinding.Of(Key.B)),
             new(GameAction.BotExit, "team", KeyBinding.Of(Key.N)),
             new(GameAction.CallHelp, "team", KeyBinding.Of(Key.Z)),
+            new(GameAction.PushToTalk, "team", KeyBinding.Of(Key.CapsLock)),
         };
 
         const string Prefix = "stealth.key.";
