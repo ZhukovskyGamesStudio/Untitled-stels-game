@@ -241,7 +241,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 
 **Терминал камер**: камеру на экране игрок поворачивает сам (`SecurityCamera.SteerServer`, угол — `DetectorSnapshot.Aim`;
 `IPlayerLink.SendTerminal` раз в 0,1 с); управляемая камера никого не замечает, сидящего за терминалом (`PlayerController.AtTerminal`) камеры
-не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта у всех повёрнута одинаково (север вверху, `MapView`).
+не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта (у терминала карты) — север вверху (`MapView`).
 Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
 качаются в шаг (`PlayerController.SwingLegs`, `PlayerRules.LegSwing`), сидя в машине — согнуты. Оставленный лежать в доме возвращается с пустым рюкзаком.
 **Чит-панель (F4)** — `CheatPanel` в HUD: выключить всех роботов, неуязвимость (и газ не берёт), невидимость для роботов (`PlayerController.Invisible` входит в `IsDown`; ни шума, ни следа),
@@ -251,7 +251,11 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 снаружи открывается двор в радиусе `TeamSettings.OutsideRevealRadius`, на карте он — `MapPart.Ground`);
 сервер открывает вокруг всех игроков, `GameManagerNet` реплицирует биты (`NetworkList<ulong>`, [0] = сид дома), клиент ещё и сам вокруг себя.
 `MapSketch` превращает видимое в прямоугольники (пол, стены с проёмами, лестницы, мебель из `LevelShell.Props`, люк), `MapView` рисует
-мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
+карту. **Карты на HUD нет** (ни мини-карты, ни клавиши M): карта — у **терминала карты** (`TerminalKind.Map`, `SecuritySettings.MapTerminals` = 2 стола
+после терминалов взлома и камер, каждый — самый дальний от прежних, не пульт комнаты управления; столов нет (жилой дом) — стойка-киоск вместо кресла, шкафа, тумбы или гардероба (не мельче её основания): `LevelLayout.KioskTerminals`; экран `screen_map`): сидящий за ним видит всё здание (`MapView.WholeHouse`: свой
+`ExplorationMap` с `RevealAll`, скрытая комната — глухой стеной) по этажу (`PlayerController.TerminalFloor`: колесо, A/D, ЛКМ/ПКМ) и на нём — игроков,
+всех роботов и устройства (серые — взломанные), лазеры (`LaserSpots`), вход, выход, уличные двери, склад и терминалы; исследованное (`ExplorationMap`
+команды) по-прежнему считается — для задания «найдите выход» и тестов. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
 → `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
 `PC_Renderer` рисуют их сквозь стены одним силуэтом (`Art/Shaders/MarkedXray.shader`: маска в стенсил → контур снаружи маски → заливка
 ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
@@ -448,7 +452,7 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 **Стены у лестничного проёма** — над проёмом в перекрытии плиты нет, поэтому стены нижнего этажа вдоль него достраиваются полосой до пола следующего (`LevelBuilder.StairBands`).
 Настенное (`Furnisher.OnWall`: доска, огнетушитель, часы…) висит вплотную к стене (`HungGap`), стоящая у стены мебель — с зазором `WallGap`.
 Руль машины поворачивается в сторону поворота, в `CarSettings.SteeringRatio` раз дальше колёс (`CarLook.SteeringWheel`).
-**Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
+**Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом (`BaseRooms` 9 + `RoomsPerHouse` 3,5, до `MaxRooms` 54; комната ≈ 100 м²), мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
 `RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).
 
 **Сплеш студии** — `StudioSplash` в префабе меню (юнитевский сплеш выключен, `PlayerSettings.SplashScreen.show`): крыло Zhukovsky Games, раз за запуск,

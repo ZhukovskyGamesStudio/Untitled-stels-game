@@ -12,7 +12,6 @@ namespace Stealth.EditorTools
     {
         // ------------------------------------------------------------------ HUD
 
-        const float MinimapSize = 210f;
         const string IconsDir = SpritesDir + "/Icons";
 
         /// <summary>A PNG from <c>Art/Sprites/Icons</c> (drawn by Tools/Art/generate_icons.py) as a sprite.</summary>
@@ -206,8 +205,8 @@ namespace Stealth.EditorTools
             hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -62), new Vector2(280, 52)), "", 12, TextAnchor.UpperLeft, Color.white, true); // the task list, a line each
             hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 150), new Vector2(700, 24)), "1 / 3", 15, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f, 0.9f), true);
 
-            // The team list top right under the minimap.
-            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -16 - MinimapSize - 8), new Vector2(244, 0));
+            // The team list top right (no minimap there: the map is a terminal's, TerminalKind.Map).
+            hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -16), new Vector2(244, 0));
             var team = hud.TeamList.gameObject.AddComponent<VerticalLayoutGroup>();
             team.childControlHeight = true;
             team.childControlWidth = true;
@@ -229,9 +228,8 @@ namespace Stealth.EditorTools
             hud.RunOverRestart = Txt(R(over, "Restart", TopCenter, TopCenter, new Vector2(0, -84), new Vector2(520, 24)), "R", 15, TextAnchor.MiddleCenter, Color.white);
             hud.RunOver = over.gameObject;
 
-            // The minimap (top right) and the big map (M, the whole floor, north-up).
-            hud.Minimap = BuildMap(e, content, "Minimap", true, TopRight, TopRight, new Vector2(-16, -16), new Vector2(MinimapSize, MinimapSize), 4.5f);
-            hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(760, 600), 1f);
+            // The map terminal's map (the whole building, a floor at a time, north-up); the HUD has no minimap.
+            hud.BigMap = BuildMap(e, content, "BigMap", false, Center, Center, new Vector2(0, 10), new Vector2(980, 720), 1f);
             hud.BigMap.gameObject.SetActive(false);
             BuildSafeCrack(e, content);
             BuildVaultLock(content);

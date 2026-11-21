@@ -66,7 +66,8 @@ namespace Stealth.Tests
             // (the ways up to the vent grates — crates and a desk set first in their room — make it a little busier)
             // (walls 0.3 m thick leave a little less room: a few more; grates kept clear of the lamps put a few ways up in tighter corners)
             // (the exit hatch on the plan's cells, its well through the floor: its spot moved 15 cm, a couple more)
-            Assert.That(removed, Is.LessThanOrEqualTo(houses * 9 / 5), $"{removed} groups taken out in {houses} houses");
+            // (houses half as big again since R16 — more rooms, more groups: the share per room is what it was)
+            Assert.That(removed, Is.LessThanOrEqualTo(houses * 12 / 5), $"{removed} groups taken out in {houses} houses");
         }
     }
 }

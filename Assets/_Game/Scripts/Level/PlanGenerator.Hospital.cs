@@ -31,7 +31,7 @@ namespace Stealth.Level
         {
             int depth = HospFront + HospCorridor + HospBack;
             // (smaller than the house's area by BuildingSettings.HospitalSize; the shortest slab still holds the lobby and the stair core)
-            int shortest = Mathf.Max(20, Mathf.RoundToInt(32f * size / WardWidth) * WardWidth), longest = Mathf.Max(shortest, Mathf.RoundToInt(72f * size / WardWidth) * WardWidth);
+            int shortest = Mathf.Max(20, Mathf.RoundToInt(32f * size / WardWidth) * WardWidth), longest = Mathf.Max(shortest, Mathf.RoundToInt(100f * size / WardWidth) * WardWidth);
             int length = Mathf.Clamp(Mathf.RoundToInt(area * size / depth / WardWidth) * WardWidth + WardWidth * rng.Next(2), shortest, longest);
             c.Hospital = new HospitalLayout
             {

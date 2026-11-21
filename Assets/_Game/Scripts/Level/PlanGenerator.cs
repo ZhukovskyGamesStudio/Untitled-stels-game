@@ -726,7 +726,34 @@ namespace Stealth.Level
                 if (c.Linked != null && (!AllOutside(c, r, sx, 0) || !AllOutside(c, r, 0, sz))) continue;
                 if (outside > bestOut) { bestOut = outside; best = r; }
             }
+            if (best != null || c.Linked != null) return best;
+            // a lobby that meets the outside only in short stretches (no side of a corner mostly outside): the corner with
+            // the most outer wall along its two sides still takes it — the drain leaves through what there is
+            int bestCells = 1;
+            foreach (var (sx, sz) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+            {
+                var r = new RectInt(sx < 0 ? lobby.xMin : lobby.xMax - PlantW, sz < 0 ? lobby.yMin : lobby.yMax - PlantD, PlantW, PlantD);
+                int cells = OutsideCells(c, r, sx, 0) + OutsideCells(c, r, 0, sz);
+                if (cells > bestCells) { bestCells = cells; best = r; }
+            }
             return best;
+        }
+
+        /// <summary>Cells along one side of <paramref name="r"/> that face the outside.</summary>
+        static int OutsideCells(Ctx c, RectInt r, int dx, int dz)
+        {
+            int n = 0;
+            if (dx != 0)
+            {
+                int x = dx > 0 ? r.xMax : r.xMin - 1;
+                for (int z = r.yMin; z < r.yMax; z++) if (x < 0 || x >= c.Plan.NX || !c.Footprint[x, z]) n++;
+            }
+            else
+            {
+                int z = dz > 0 ? r.yMax : r.yMin - 1;
+                for (int x = r.xMin; x < r.xMax; x++) if (z < 0 || z >= c.Plan.NZ || !c.Footprint[x, z]) n++;
+            }
+            return n;
         }
 
         /// <summary>

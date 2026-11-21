@@ -9,10 +9,11 @@ using UnityEngine.UI;
 namespace Stealth.UI
 {
     /// <summary>
-    /// A map of one floor (prefab UI/HUD: the minimap in the corner and the big map on M). Draws what the team has seen
-    /// (<see cref="MapSketch"/> over <see cref="ExplorationMap"/>) with pooled rectangles, and on top: you, teammates,
-    /// pings and marked robots. The minimap turns with your view and follows you; the big map is north-up and shows the
-    /// whole floor. Everything is pre-built in the prefab; this only places, sizes and colours it.
+    /// A map of one floor (prefab UI/HUD: the map of a map terminal, <see cref="Level.TerminalKind.Map"/>; the HUD has no
+    /// map of its own). Draws the floor (<see cref="MapSketch"/> over an <see cref="ExplorationMap"/>: the whole building
+    /// when <see cref="WholeHouse"/>, else what the team has seen) with pooled rectangles, and on top: you, teammates,
+    /// pings and marked robots — and in the whole-house view every robot and device, the lasers, the ways in and out, the
+    /// storage room and the other terminals. Everything is pre-built in the prefab; this only places, sizes and colours it.
     /// </summary>
     public class MapView : MonoBehaviour
     {
@@ -56,6 +57,24 @@ namespace Stealth.UI
         /// <summary>The floor shown; -1 = the player's floor (the big map can browse others).</summary>
         public int ViewFloor { get; set; } = -1;
 
+        /// <summary>The map terminal's view: the whole building, not only what was seen, and everything in it.</summary>
+        public bool WholeHouse { get; set; }
+
+        ExplorationMap m_Full;
+
+        /// <summary>Every tile of this house seen: what a map terminal shows (built once per house on this peer).</summary>
+        ExplorationMap FullMap(LevelLayout layout)
+        {
+            if (m_Full != null && m_Full.Layout == layout) return m_Full;
+            m_Full = new ExplorationMap(layout);
+            m_Full.RevealAll();
+            return m_Full;
+        }
+
+        static readonly Color RobotColor = new(1f, 0.3f, 0.22f), DeviceColor = new(1f, 0.6f, 0.2f), HackedColor = new(0.55f, 0.6f, 0.65f),
+            LaserColor = new(1f, 0.15f, 0.3f), TerminalColor = new(0.35f, 0.9f, 1f), StorageColor = new(1f, 0.85f, 0.3f),
+            DoorColor = new(0.5f, 0.8f, 1f), EntryColor = new(0.4f, 0.72f, 1f), ExitColor = new(0.45f, 1f, 0.5f);
+
         void Awake()
         {
             m_Images = new UiPool<Image>(RectPrefab, RectLayer);
@@ -66,6 +85,7 @@ namespace Stealth.UI
         {
             var map = gm.Exploration;
             if (map == null) return;
+            if (WholeHouse) map = FullMap(map.Layout);
             int myFloor = Mathf.Clamp(LevelLayout.FloorOf(me.transform.position.y), 0, map.Floors - 1);
             int floor = ViewFloor < 0 ? myFloor : Mathf.Clamp(ViewFloor, 0, map.Floors - 1);
             var size = Viewport.rect.size;
@@ -113,9 +133,10 @@ namespace Stealth.UI
                 float pulse = 1f + 0.25f * Mathf.Sin(p.Age(now) * 8f);
                 Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, color, null, IconShape.Diamond, pulse, 0f);
             }
+            if (WholeHouse) HouseIcons(layout, floor, me2, scale, radius, turn);
             foreach (var d in Detector.All)
             {
-                if (!d.IsMarked) continue;
+                if (!d.IsMarked || WholeHouse) continue;
                 Icon(Flat(d.Position), LevelLayout.FloorOf(d.transform.position.y), floor, me2, scale, radius, turn, Marked,
                     FollowPlayer ? null : d.DisplayName, IconShape.Dot, 1f + 0.2f * Mathf.Sin(now * 10f), 0f);
             }
@@ -131,14 +152,48 @@ namespace Stealth.UI
 
             if (Caption != null)
             {
-                string text = FollowPlayer
-                    ? Loc.F("map.floor_short", floor + 1)
+                string text = FollowPlayer ? Loc.F("map.floor_short", floor + 1)
+                    : WholeHouse ? Loc.F("map.floor_whole", floor + 1, map.Floors)
                     : Loc.F("map.floor", floor + 1, map.Floors, Mathf.RoundToInt(map.RevealedShare(floor) * 100f));
                 if (Caption.text != text) Caption.text = text;
             }
         }
 
         static Vector2 Flat(Vector3 p) => new(p.x, p.z);
+
+        /// <summary>
+        /// The map terminal's icons on the shown floor: the ways in and out (the street doors, the entry shaft, the exit
+        /// hatch), the storage room, the other terminals, the lasers, every robot and device (grey once hacked).
+        /// </summary>
+        void HouseIcons(LevelLayout l, int floor, Vector2 me, float scale, float radius, float turn)
+        {
+            if (l == null) return;
+            foreach (var d in l.Doorways)
+                if (d.Exterior && LevelLayout.FloorOf(d.Position.y) == floor)
+                    Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, DoorColor, null, IconShape.Diamond, 0.7f, 0f);
+            if (floor == 0)
+            {
+                Icon(Flat(l.HatchPosition), 0, 0, me, scale, radius, turn, EntryColor, Loc.T("map.entry"), IconShape.Diamond, 1f, 0f);
+                Icon(Flat(l.ExitHatchPosition), 0, 0, me, scale, radius, turn, ExitColor, Loc.T("map.exit"), IconShape.Diamond, 1.1f, 0f);
+            }
+            if (l.StorageRoom >= 0 && l.StorageRoom < l.Rooms.Count && l.Rooms[l.StorageRoom].Floor == floor)
+                Icon(Flat(l.Rooms[l.StorageRoom].Center), floor, floor, me, scale, radius, turn, StorageColor, Loc.T("map.storage"), IconShape.Diamond, 1f, 0f);
+            foreach (var t in SecurityTerminal.All)
+            {
+                if (t.Index < 0 || LevelLayout.FloorOf(t.transform.position.y) != floor) continue;
+                Icon(Flat(t.transform.position), floor, floor, me, scale, radius, turn, t.Spent ? HackedColor : TerminalColor, null, IconShape.Diamond, 0.75f, 0f);
+            }
+            foreach (var g in l.LaserSpots)
+                if (LevelLayout.FloorOf(g.Position.y) == floor)
+                    Icon(Flat(g.Position), floor, floor, me, scale, radius, turn, LaserColor, null, IconShape.Dot, 0.7f, 0f);
+            foreach (var d in Detector.All)
+            {
+                if (LevelLayout.FloorOf(d.transform.position.y) != floor) continue;
+                var color = d.IsHacked ? HackedColor : d is RobotController ? RobotColor : DeviceColor;
+                if (d.IsMarked && !d.IsHacked) color = Marked;
+                Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, color, null, IconShape.Dot, d is RobotController ? 1f : 0.75f, 0f);
+            }
+        }
 
         void Draw(ExplorationMap map, int floor, float scale)
         {

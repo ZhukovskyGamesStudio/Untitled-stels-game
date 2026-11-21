@@ -115,8 +115,7 @@ namespace Stealth.UI
         public Text RunOverRestart;
 
         [Header("Map and callouts")]
-        public MapView Minimap;
-        [Tooltip("The whole floor, north-up (toggled with the map key).")]
+        [Tooltip("The map terminal's map: the whole building, a floor at a time, north-up (the HUD has no map of its own).")]
         public MapView BigMap;
         [Tooltip("Pings and marked robots on screen, through walls.")]
         public RectTransform CalloutLayer;
@@ -135,7 +134,7 @@ namespace Stealth.UI
         UiPool<Text> m_TeamRows;
         UiPool<CalloutMarkerView> m_Callouts;
         UiPool<HintView> m_HintRows;
-        bool m_BigMapOpen;
+        bool m_ForceMap;
         int m_KeysVersion = -1;
         GameManager m_Subscribed;
 
@@ -312,35 +311,26 @@ namespace Stealth.UI
 
         // ------------------------------------------------------------------ map and callouts
 
-        /// <summary>Test hook: open or close the big map.</summary>
-        public void SetBigMap(bool open) => m_BigMapOpen = open;
+        /// <summary>Test hook: show the whole-house map as if sitting at a map terminal (on the player's floor).</summary>
+        public void SetBigMap(bool open) => m_ForceMap = open;
+
+        /// <summary>Sitting at a map terminal (or the test hook): the whole building, the floor the player flips to.</summary>
+        bool MapOpen(GameManager gm, PlayerController me)
+        {
+            if (GameMenu.IsOpen || gm.Exploration == null) return false;
+            var t = me.UsingTerminal;
+            return m_ForceMap || (t != null && t.Kind == TerminalKind.Map);
+        }
 
         void ShowMaps(GameManager gm, PlayerController me)
         {
-            bool canToggle = !GameMenu.IsOpen && !me.CursorMode;
-            if (canToggle && Controls.Pressed(GameAction.Map))
-            {
-                m_BigMapOpen = !m_BigMapOpen;
-                BigMap.ViewFloor = -1;
-            }
-            bool hasMap = gm.Exploration != null;
-            if (GameMenu.IsOpen || !hasMap) m_BigMapOpen = false;
-            Ui.Show(Minimap, hasMap && !m_BigMapOpen);
-            Ui.Show(BigMap, hasMap && m_BigMapOpen);
-            if (!hasMap) return;
-            if (m_BigMapOpen)
-            {
-                // Mouse wheel: another floor.
-                float wheel = UnityEngine.InputSystem.Mouse.current != null ? UnityEngine.InputSystem.Mouse.current.scroll.ReadValue().y : 0f;
-                if (Mathf.Abs(wheel) > 0.01f)
-                {
-                    int floors = gm.Exploration.Floors;
-                    int current = BigMap.ViewFloor < 0 ? LevelLayout.FloorOf(me.transform.position.y) : BigMap.ViewFloor;
-                    BigMap.ViewFloor = Mathf.Clamp(current + (wheel > 0f ? 1 : -1), 0, floors - 1);
-                }
-                BigMap.Refresh(gm, me);
-            }
-            else Minimap.Refresh(gm, me);
+            bool open = MapOpen(gm, me);
+            Ui.Show(BigMap, open);
+            if (!open) return;
+            BigMap.WholeHouse = true;
+            var t = me.UsingTerminal;
+            BigMap.ViewFloor = t != null && t.Kind == TerminalKind.Map ? me.TerminalFloor : -1;
+            BigMap.Refresh(gm, me);
         }
 
         /// <summary>
@@ -464,7 +454,7 @@ namespace Stealth.UI
                 HasStun = inventory.Holds(ItemCatalog.Stun),
                 HandUse = HandUse(me, inventory),
                 HoverItem = hover != null,
-                BigMap = m_BigMapOpen,
+                BigMap = MapOpen(gm, me),
             };
         }
 
@@ -709,8 +699,8 @@ namespace Stealth.UI
         {
             if (TerminalLabel == null) return;
             var t = me.UsingTerminal;
-            Ui.Show(TerminalLabel, t != null);
-            if (t == null) return;
+            Ui.Show(TerminalLabel, t != null && t.Kind != TerminalKind.Map); // the map has its own caption
+            if (t == null || t.Kind == TerminalKind.Map) return;
             var shown = me.TerminalView;
             string text = me.TerminalViewCount == 0 ? "—"
                 : $"{(shown != null ? shown.DisplayName : "")} · {me.TerminalViewNumber} / {me.TerminalViewCount}";

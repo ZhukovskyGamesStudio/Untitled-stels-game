@@ -6,8 +6,9 @@ namespace Stealth.Level
 {
     /// <summary>
     /// A security terminal on a desk (<see cref="LevelLayout.Terminals"/>): the camera terminal shows what the house's
-    /// cameras see, the hacking terminal hacks robots and devices from afar (a few charges per house). Built on every
-    /// peer with the level; its screens glow in its colour (green cameras, blue hacking, dim when spent). The player
+    /// cameras see, the hacking terminal hacks robots and devices from afar (a few charges per house), the map terminal shows
+    /// the whole building (<see cref="UI.MapView.WholeHouse"/>). Built on every peer with the level; its screens glow in its
+    /// colour (green cameras, blue hacking, amber map, dim when spent). The player
     /// uses it (<see cref="Player.PlayerController"/>); the server counts the hacks (<see cref="Game.GameManager"/>).
     /// </summary>
     public class SecurityTerminal : MonoBehaviour, IReachTarget
@@ -25,8 +26,8 @@ namespace Stealth.Level
         public Renderer AccessScreens;
         [Tooltip("The monitors' screens of the console and of the kiosk (EyeScreen: UVs 0..1 on each): the kind's picture.")]
         public Renderer Pictures, AccessPictures;
-        [Tooltip("What the screens show (Tools/Art/generate_screens.py): the camera feeds, hacking, the door's access.")]
-        public Texture2D CamerasPicture, HackingPicture, DoorsPicture;
+        [Tooltip("What the screens show (Tools/Art/generate_screens.py): the camera feeds, hacking, the door's access, the floor plan.")]
+        public Texture2D CamerasPicture, HackingPicture, DoorsPicture, MapPicture;
 
 
         public int Index { get; private set; } = -1;
@@ -39,7 +40,7 @@ namespace Stealth.Level
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
-            SpentColor = new(0.25f, 0.27f, 0.3f);
+            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -47,12 +48,12 @@ namespace Stealth.Level
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
 
-        public void Configure(int index, TerminalKind kind)
+        public void Configure(int index, TerminalKind kind, bool kiosk = false)
         {
             Index = index;
             Kind = kind;
-            // the door's terminal is a kiosk, never mistaken for the robots' console
-            bool access = kind == TerminalKind.Doors && Access != null;
+            // the door's terminal is a kiosk, never mistaken for the robots' console (and a map terminal with no desk to stand on)
+            bool access = (kind == TerminalKind.Doors || kiosk) && Access != null;
             if (Console != null) Console.SetActive(!access);
             if (Access != null) Access.SetActive(access);
             if (access && AccessScreens != null) Screens = AccessScreens;
@@ -69,13 +70,19 @@ namespace Stealth.Level
             if (state == m_Shown || Screens == null) return;
             m_Shown = state;
             m_Block ??= new MaterialPropertyBlock();
-            var c = Spent ? SpentColor : Kind switch { TerminalKind.Cameras => CamerasColor, TerminalKind.Doors => DoorsColor, _ => HackingColor };
+            var c = Spent ? SpentColor : Kind switch
+            {
+                TerminalKind.Cameras => CamerasColor, TerminalKind.Doors => DoorsColor, TerminalKind.Map => MapColor, _ => HackingColor,
+            };
             Screens.GetPropertyBlock(m_Block);
             m_Block.SetColor(BaseColorId, c);
             m_Block.SetColor(EmissionId, c * (Spent ? 0.3f : 1.6f));
             Screens.SetPropertyBlock(m_Block);
             if (Pictures == null) return;
-            var picture = Kind switch { TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => DoorsPicture, _ => HackingPicture };
+            var picture = Kind switch
+            {
+                TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => DoorsPicture, TerminalKind.Map => MapPicture, _ => HackingPicture,
+            };
             Pictures.GetPropertyBlock(m_Block);
             if (picture != null)
             {

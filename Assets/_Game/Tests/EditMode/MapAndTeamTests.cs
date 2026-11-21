@@ -26,7 +26,7 @@ namespace Stealth.Tests
                 Assert.GreaterOrEqual(g.x * g.y, prev, $"house {house}");
                 prev = g.x * g.y;
             }
-            Assert.AreEqual(new Vector2Int(3, 2), b.GridFor(0, 1), "the first house is small: 3 x 2");
+            Assert.AreEqual(new Vector2Int(3, 3), b.GridFor(0, 1), "the first house: 3 x 3");
             Assert.Greater(b.GridFor(8, 1).x * b.GridFor(8, 1).y, 20, "later houses are bigger than the old cap (5 x 4)");
             Assert.LessOrEqual(prev, Mathf.CeilToInt(b.MaxRooms), "never above the cap");
         }

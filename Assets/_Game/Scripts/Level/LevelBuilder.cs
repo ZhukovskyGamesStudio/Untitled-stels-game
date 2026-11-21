@@ -293,7 +293,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
-                        if (t.prop == i) terminal.Configure(i, t.kind);
+                        if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
                 Props.Add(go);
                 if (i % 80 == 79) yield return true;
             }

@@ -8,7 +8,7 @@ namespace Stealth.Player
     public enum GameAction
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
-        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats, Gadget, Horn,
+        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Style, Unstuck, Restart, Cheats, Gadget, Horn,
         UseHand,
         // the team's storage robot: come to me; go to the exit through the ducts
         BotCall, BotExit,
@@ -93,7 +93,6 @@ namespace Stealth.Player
             new(GameAction.StashAll, "actions", KeyBinding.Of(Key.G)),
             new(GameAction.Ping, "team", KeyBinding.MouseButton(2)),
             new(GameAction.Mark, "team", KeyBinding.Of(Key.Q)),
-            new(GameAction.Map, "team", KeyBinding.Of(Key.M)),
             new(GameAction.Style, "other", KeyBinding.Of(Key.F8)),
             new(GameAction.Unstuck, "other", KeyBinding.Of(Key.K)),
             new(GameAction.Restart, "other", KeyBinding.Of(Key.R)),

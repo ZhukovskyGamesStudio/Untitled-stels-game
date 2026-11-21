@@ -109,8 +109,8 @@ namespace Stealth.Level
     /// <summary>The vault's three locks, one console each (in the order of <see cref="LevelLayout.VaultConsoles"/>).</summary>
     public enum VaultGame : byte { Dial, Switches, Sequence }
 
-    /// <summary>What a security terminal does: show the house's cameras, hack robots and devices from afar, or unlock the storage room's door.</summary>
-    public enum TerminalKind : byte { Cameras, Hacking, Doors }
+    /// <summary>What a security terminal does: show the house's cameras, hack robots and devices from afar, unlock the storage room's door, or show the whole building's map (<see cref="TerminalKind.Map"/>: the only map the players have).</summary>
+    public enum TerminalKind : byte { Cameras, Hacking, Doors, Map }
 
     /// <summary>
     /// Where a worker leaves loot in the storage room (<see cref="LevelLayout.StorageDrops"/>): on a shelf's bottom board
@@ -271,6 +271,8 @@ namespace Stealth.Level
         public readonly HashSet<int> LockedDoors = new();
         /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
         public readonly List<(int prop, TerminalKind kind)> Terminals = new();
+        /// <summary>Terminals standing as a kiosk (no desk was left for them: the apartment block's map terminals) — the props of <see cref="Terminals"/>.</summary>
+        public readonly HashSet<int> KioskTerminals = new();
         /// <summary>
         /// The storage room (plan id, -1 if none: <see cref="StorageRoom"/>): its only doorway (index in <see cref="Doorways"/>),
         /// its door (in <see cref="AutoDoors"/>; locked for players, robots pass), the door terminal (in <see cref="Props"/>,

@@ -19,12 +19,12 @@ namespace Stealth.Level
     {
         [Header("Size by house (0-based); the last entry repeats")]
         public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        [Tooltip("Rooms per floor in the first house (6 = 3 x 2): the first houses are small and easy.")]
-        public float BaseRooms = 6f;
+        [Tooltip("Rooms per floor in the first house (9 = 3 x 3): enough room for the generator to vary even the first house.")]
+        public float BaseRooms = 9f;
         [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
-        public float RoomsPerHouse = 2.5f;
-        [Tooltip("Rooms per floor never go above this (36 = 6 x 6).")]
-        public float MaxRooms = 36f;
+        public float RoomsPerHouse = 3.5f;
+        [Tooltip("Rooms per floor never go above this (54 = 9 x 6).")]
+        public float MaxRooms = 54f;
         [Tooltip("Floor area by team size (1, 2, 3, 4… players; the last repeats): a bigger team gets a bigger house, much softer than ×N.")]
         public float[] AreaByPlayers = { 1f, 1.25f, 1.45f, 1.6f };
 
@@ -311,6 +311,9 @@ namespace Stealth.Level
         public int CameraTerminals = 1;
         [Tooltip("Desks turned into a terminal that hacks robots and devices from afar.")]
         public int HackTerminals = 1;
+        [Tooltip("Desks turned into a map terminal: sitting at it shows the whole building — floors, players, robots, traps, the ways in and out, " +
+                 "the storage room and the other terminals (the HUD has no map of its own). Spread out: each the furthest desk from the terminals before it.")]
+        public int MapTerminals = 2;
 
         [Header("Who")]
         public RosterSettings Roster = new();
@@ -1017,6 +1020,9 @@ namespace Stealth.Level
                 }
         }
 
+        /// <summary>What a map terminal's kiosk may stand in place of when no desk is left (<see cref="LevelLayout.KioskTerminals"/>).</summary>
+        static readonly PropKind[] KioskSpots = { PropKind.Armchair, PropKind.Cabinet, PropKind.Credenza, PropKind.Wardrobe }; // (as deep as the kiosk's foot, 0.6 m: a bookshelf left it in the wall)
+
         static void PlaceTerminals(LevelLayout l, SecuritySettings s)
         {
             // the control room's consoles first (Furnisher puts them there); what is left of them becomes a plain desk
@@ -1035,32 +1041,47 @@ namespace Stealth.Level
             // the hacking terminal first: with a single console in the control room, it is the one there
             for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
             for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
+            // the map terminals last (the picks before them stay as they were), spread over the house
+            for (int i = 0; i < s.MapTerminals; i++) want.Add(TerminalKind.Map);
+            List<int> spares = null;
             foreach (var kind in want)
             {
-                if (consoles.Count > 0)
+                // (a map terminal is never a console of the control room: two of them would stand side by side there)
+                if (consoles.Count > 0 && kind != TerminalKind.Map)
                 {
                     l.Terminals.Add((consoles[0], kind));
                     consoles.RemoveAt(0);
                     continue;
                 }
-                if (desks.Count == 0) break;
-                int pick = desks[rng.Next(desks.Count)];
+                // a house with no desk left (the apartment block): a map terminal is a kiosk in place of a plant, a chair, a shelf…
+                bool kiosk = desks.Count == 0 && kind == TerminalKind.Map;
+                if (kiosk && spares == null)
+                {
+                    spares = new List<int>();
+                    for (int i = 0; i < l.Props.Count; i++)
+                        if (System.Array.IndexOf(KioskSpots, l.Props[i].Kind) >= 0 && (l.Props[i].Position - l.HatchPosition).magnitude > HatchClear
+                            && !l.IsClimbPiece(l.Props[i].Position) && l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.LobbyRoom) spares.Add(i);
+                }
+                var pool = kiosk ? spares : desks;
+                if (pool.Count == 0) continue; // (nothing left for this kind: the map terminals may still find a kiosk spot)
+                int pick = pool[rng.Next(pool.Count)];
                 if (l.Terminals.Count > 0)
                 {
                     // the desk furthest from the terminals placed so far
                     float best = -1f;
-                    foreach (var d in desks)
+                    foreach (var d in pool)
                     {
                         float near = float.MaxValue;
                         foreach (var t in l.Terminals) near = Mathf.Min(near, (l.Props[d].Position - l.Props[t.prop].Position).sqrMagnitude);
                         if (near > best) { best = near; pick = d; }
                     }
                 }
-                desks.Remove(pick);
+                pool.Remove(pick);
                 var p = l.Props[pick];
                 p.Kind = PropKind.Terminal;
                 l.Props[pick] = p;
                 l.Terminals.Add((pick, kind));
+                if (kiosk) l.KioskTerminals.Add(pick);
             }
             consoles.AddRange(leftover);
             foreach (int i in consoles)
