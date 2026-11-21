@@ -168,8 +168,11 @@ namespace Stealth.EditorTools
         /// </summary>
         static void BuildStartScreen(UiElements e, Transform root)
         {
-            var screen = Stretch(root, "StartScreen");
-            var view = screen.gameObject.AddComponent<StartScreen>();
+            // the presenter sits on an always-active holder: it switches its child on and off (switching itself off, its
+            // Update never ran again — the screen never showed)
+            var holder = Stretch(root, "StartScreen");
+            var view = holder.gameObject.AddComponent<StartScreen>();
+            var screen = Stretch(holder, "Screen");
             view.Root = screen.gameObject;
             view.Canvas = (RectTransform)root;
             view.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
@@ -204,14 +207,14 @@ namespace Stealth.EditorTools
             }
             view.ReadyButton = Instance<Button>(e.Button, screen, "Ready");
             var rb = (RectTransform)view.ReadyButton.transform;
-            // bottom right: the columns under the figures take the bottom middle
-            rb.anchorMin = rb.anchorMax = new Vector2(1, 0);
-            rb.pivot = new Vector2(1, 0);
-            rb.anchoredPosition = new Vector2(-28, 28);
+            // top right: the columns under the figures take the bottom, the figures the middle
+            rb.anchorMin = rb.anchorMax = new Vector2(1, 1);
+            rb.pivot = new Vector2(1, 1);
+            rb.anchoredPosition = new Vector2(-28, -28);
             rb.sizeDelta = new Vector2(260, 44);
             view.ReadyButtonLabel = view.ReadyButton.GetComponentInChildren<Text>();
             SetText(view.ReadyButtonLabel, L("start.ready"));
-            view.Waiting = Txt(R(screen, "Waiting", new Vector2(1, 0), new Vector2(1, 0), new Vector2(-28, 78), new Vector2(260, 24)), "—", 15, TextAnchor.MiddleCenter, Color.white);
+            view.Waiting = Txt(R(screen, "Waiting", new Vector2(1, 1), new Vector2(1, 1), new Vector2(-28, -78), new Vector2(260, 24)), "—", 15, TextAnchor.MiddleCenter, Color.white);
             screen.gameObject.SetActive(false);
         }
 

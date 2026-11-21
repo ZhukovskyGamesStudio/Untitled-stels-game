@@ -109,7 +109,7 @@ namespace Stealth.Tests
             var car = new Vector3(10f, 0f, 5f);
             var rot = Quaternion.Euler(0f, 90f, 0f);
             var (cam, look) = PickingRules.Camera(car, rot);
-            var spots = Enumerable.Range(0, 4).Select(i => PickingRules.Spot(car, rot, i)).ToArray();
+            var spots = Enumerable.Range(0, 4).Select(i => PickingRules.Spot(car, rot, i, 4)).ToArray();
             for (int i = 0; i < 4; i++)
             {
                 var toCam = cam - spots[i].at;
@@ -121,6 +121,33 @@ namespace Stealth.Tests
             // left to right as the camera sees them
             var right = look * Vector3.right;
             Assert.Greater(Vector3.Dot(spots[3].at - spots[0].at, right), 0f);
+        }
+
+        [Test]
+        public void ASingleFigureStandsBigInTheMiddleWithRoomForItsColumnUnderIt()
+        {
+            var car = new Vector3(-3f, 0f, 8f);
+            var rot = Quaternion.Euler(0f, 30f, 0f);
+            var (cam, look) = PickingRules.Camera(car, rot);
+            var (at, _) = PickingRules.Spot(car, rot, 0, 1);
+            Vector2 View(Vector3 p)
+            {
+                var l = Quaternion.Inverse(look) * (p - cam);
+                float t = Mathf.Tan(PickingRules.Fov * 0.5f * Mathf.Deg2Rad);
+                return new Vector2(0.5f + l.x / (l.z * 2f * t * 16f / 9f), 0.5f + l.y / (l.z * 2f * t));
+            }
+            var feet = View(at);
+            var head = View(at + Vector3.up * 1.8f);
+            Assert.AreEqual(0.5f, feet.x, 1e-3f, "alone: in the middle");
+            Assert.Greater(head.y - feet.y, 0.45f, "big on the screen");
+            Assert.Less(head.y, 0.95f, "the head is in the frame");
+            Assert.Greater(feet.y, 0.33f, "the column of the class and the item fits under the feet");
+            // four: the outer ones are in the frame too
+            for (int i = 0; i < 4; i++)
+            {
+                float x = View(PickingRules.Spot(car, rot, i, 4).at).x;
+                Assert.IsTrue(x > 0.12f && x < 0.88f, $"figure {i} at {x}");
+            }
         }
 
         [Test]

@@ -125,6 +125,7 @@ namespace Stealth.Player
             if (gm == null || !gm.PickingCamera(out var at, out var rotation)) return;
             m_PickingView = true;
             Camera.transform.SetPositionAndRotation(at, rotation);
+            Camera.fieldOfView = PickingRules.Fov; // (the motor sets the player's own again once the screen is over)
         }
 
         /// <summary>Owner, every frame: the coffee and a hard landing scale the walk.</summary>

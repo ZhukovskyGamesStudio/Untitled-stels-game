@@ -172,6 +172,7 @@ namespace Stealth.UI
         void Update()
         {
             var me = Me;
+            if (GameManager.Instance != null && GameManager.Instance.Picking) me = null; // the start screen: no backpack, no hand
             Ui.Show(Panel, me != null);
             m_Tooltip = null;
             if (me == null || Mouse.current == null)
