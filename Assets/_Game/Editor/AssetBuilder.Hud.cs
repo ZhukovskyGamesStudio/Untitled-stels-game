@@ -131,8 +131,9 @@ namespace Stealth.EditorTools
         static void BuildTabletScreen(UiElements e, GameHUD hud, Transform root)
         {
             var screen = R(root, "TabletScreen", Center, Center, Vector2.zero, new Vector2(GameHUD.TabletScreenWidth, 260));
-            var canvas = screen.gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
+            // (its world-space mode is set by GameHUD once detached: a nested canvas's renderMode is its root's — set here, it
+            // turned the whole HUD into a world-space canvas)
+            screen.gameObject.AddComponent<Canvas>();
             screen.gameObject.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 4f;
             var map = BuildMap(e, screen, "Map", true, Center, Center, Vector2.zero, new Vector2(GameHUD.TabletScreenWidth, 260), 5f);
             var mr = (RectTransform)map.transform;

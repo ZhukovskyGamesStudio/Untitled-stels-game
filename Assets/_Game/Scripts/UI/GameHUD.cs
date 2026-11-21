@@ -179,7 +179,12 @@ namespace Stealth.UI
             m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
             m_HintRows = new UiPool<HintView>(HintPrefab, HintStack);
             // the tablet's screen lives in the world (on the tablet in the hand), not under the HUD's overlay canvas
-            if (TabletScreen != null) TabletScreen.SetParent(null, false);
+            if (TabletScreen != null)
+            {
+                TabletScreen.SetParent(null, false);
+                // a root canvas of its own now: in the world (set only here — on a nested canvas it would be the HUD's mode)
+                if (TabletScreen.TryGetComponent<Canvas>(out var canvas)) canvas.renderMode = RenderMode.WorldSpace;
+            }
         }
 
         void OnDestroy()
