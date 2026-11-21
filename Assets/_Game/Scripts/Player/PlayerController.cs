@@ -33,6 +33,8 @@ namespace Stealth.Player
         public Transform Head;
         public Camera Camera;
         public AudioListener Listener;
+        [Tooltip("Plays this player's voice chat from the mouth (others hear it; the owner does not).")]
+        public Stealth.Audio.VoicePlayback Voice;
         public Transform Model;
         public Transform HeadPivot;
         public Renderer[] BodyRenderers;
@@ -277,7 +279,7 @@ namespace Stealth.Player
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
-            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
+            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen || StylePanel.IsOpen;
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
@@ -564,6 +566,14 @@ namespace Stealth.Player
         }
 
         /// <summary>Last noise this player made (owner side, for the HUD meter).</summary>
+        /// <summary>This player's own voice was sent with this noise radius: the HUD's speaker shows it like a step (the server makes the robots' noise, VoiceHub).</summary>
+        public void HearOwnVoice(float radius)
+        {
+            if (radius <= 0f) return;
+            if (Time.time - LastNoiseTime > 0.3f || radius >= LastNoiseRadius) LastNoiseRadius = radius;
+            LastNoiseTime = Time.time;
+        }
+
         public float LastNoiseRadius { get; private set; }
         public float LastNoiseTime { get; private set; } = -10f;
 

@@ -242,7 +242,7 @@ namespace Stealth.Vehicles
                 k = k * k * (3f - 2f * k);
                 m_DrivePose = new Pose(m_DrivePose.position + m_DriveOffset * k, Quaternion.Slerp(Quaternion.identity, m_DriveTurn, k) * m_DrivePose.rotation);
             }
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !scripted;
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !StylePanel.IsOpen && !scripted;
             m_Input = drive
                 ? new CarInput
                 {

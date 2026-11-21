@@ -67,7 +67,12 @@ def contract(name):
     for o in set(bpy.data.objects) - before:
         if o.type == "MESH":
             ws = [o.matrix_world @ v.co for v in o.data.vertices]
-            out[o.name.split(".")[0]] = (tuple(min(w[i] for w in ws) for i in range(3)), tuple(max(w[i] for w in ws) for i in range(3)))
+            lo, hi = tuple(min(w[i] for w in ws) for i in range(3)), tuple(max(w[i] for w in ws) for i in range(3))
+            key = o.name.split(".")[0]  # Body and Body.001 are one part: their bounds add up (toilet_stall)
+            if key in out:
+                lo = tuple(min(a, b) for a, b in zip(out[key][0], lo))
+                hi = tuple(max(a, b) for a, b in zip(out[key][1], hi))
+            out[key] = (lo, hi)
         data = o.data
         bpy.data.objects.remove(o, do_unlink=True)
         if data is not None and data.users == 0:

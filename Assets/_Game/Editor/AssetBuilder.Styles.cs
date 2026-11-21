@@ -42,14 +42,16 @@ namespace Stealth.EditorTools
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
-            s_HumanRig = BuildHumanRig();
-            bool rebuild = Environment.GetEnvironmentVariable("REBUILD_STYLES") == "1";
+            BuildHumanRig(); // the scientist: no style shows him now (the derelict station shows the departments too), the prefab stays for a style that wants him
+            // REBUILD_STYLES=1: every style from its definition below; REBUILD_STYLES=S16_Derelict,S03_Payday: only these
+            var rebuildList = (Environment.GetEnvironmentVariable("REBUILD_STYLES") ?? "").Split(',').Select(n => n.Trim()).Where(n => n.Length > 0).ToList();
+            bool rebuildAll = rebuildList.Contains("1");
             var styles = new List<VisualStyle>();
             foreach (var def in StyleDefinitions())
             {
                 var path = $"{StylesDir}/{def.name}.asset";
                 var asset = AssetDatabase.LoadAssetAtPath<VisualStyle>(path);
-                if (asset != null && rebuild) { EditorUtility.CopySerialized(def, asset); asset.name = def.name; EditorUtility.SetDirty(asset); }
+                if (asset != null && (rebuildAll || rebuildList.Contains(def.name))) { EditorUtility.CopySerialized(def, asset); asset.name = def.name; EditorUtility.SetDirty(asset); }
                 if (asset == null) { AssetDatabase.CreateAsset(def, path); asset = def; }
                 FillGenerated(asset, def);
                 styles.Add(asset);
@@ -63,7 +65,7 @@ namespace Stealth.EditorTools
             }
             config.Styles = styles.ToArray();
             // the game's look (chosen by hand later; first time: the storybook style)
-            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S06_Storybook");
+            if (config.Default == null || !styles.Contains(config.Default)) config.Default = styles.FirstOrDefault(s => s.name == "S16_Derelict");
             config.Building = MaterialsIn("Environment");
             config.Furniture = MaterialsIn("Props");
             config.Robots = MaterialsIn("Robots");
@@ -780,10 +782,12 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Trim_White"); geo.Beam = K("Trim_White");
                 });
 
-            // Sasha's style (merged from feature_visual_style_11_prototype): its own model family, kit, props, decay and a rigged human
-            yield return Style("S16_Derelict", "Заброшенный комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis", // loc-ok
-                "Брошенная научная станция: грязный бетон, ржавые трубы и кабельные лотки, стальные плиты. Почти темно — " + // loc-ok
-                "светят только умирающие лампы и редкие холодные щели электроники. Бирюзово-болезненная гамма, зерно, плотный сырой воздух. " + // loc-ok
+            // Sasha's style (merged from feature_visual_style_11_prototype), now the mood without the decay: the abandoned
+            // station is a house of its own (HouseKind.Abandoned, Level.DerelictLook) in every style; here every house keeps
+            // its own look in realistic materials, each kind of room in its own finishes
+            yield return Style("S16_Derelict", "Тихий комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis", // loc-ok
+                "Ночной комплекс, где давно никого нет: настоящие материалы — бетон, краска, плитка, ковролин, у каждой комнаты свои. " + // loc-ok
+                "Почти темно — светят только лампы. Бирюзово-болезненная гамма, зерно, плотный сырой воздух, мёртвый город за окнами. " + // loc-ok
                 "Модели реалистичные, люди похожи на людей.", // loc-ok
                 s =>
                 {
@@ -804,17 +808,14 @@ namespace Stealth.EditorTools
                     p.Robots.Saturation = 0.6f;
                     p.Players.Saturation = 0.8f;
                     var geo = s.Geometry;
-                    geo.Family = ModelFamily.Derelict;
-                    geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true; geo.StripSpacing = 0f; // no glowing slits: the power is out
-                    geo.Floor = K("Dr_FloorPlate"); geo.FloorTile = 2f; geo.Wall = K("Dr_SteelPanels"); geo.WallTile = 2.4f;
-                    geo.CeilingFinish = K("Dr_CeilingVents"); geo.CeilingTile = 2.4f;
-                    geo.Trim = K("Dr_Rust"); geo.Pipe = K("Dr_Rust"); geo.Beam = K("Dr_PaintedMetal"); geo.Glow = K("Glow_DimCyan");
-                    geo.PlayerRig = s_HumanRig;
-                    geo.FloorDecay = new[] { K("Dc_floor_rust"), K("Dc_floor_oil"), K("Dc_floor_scorch"), K("Dc_floor_rubble") };
-                    geo.WallDecay = new[] { K("Dc_wall_rust"), K("Dc_wall_rust"), K("Dc_wall_leak"), K("Dc_wall_mold"), K("Dc_wall_peel"), K("Dc_wall_scorch") }; // rust twice as often
-                    geo.Posters = Enumerable.Range(0, 6).Select(i => K($"Dc_poster_{i}")).ToArray();
-                    geo.DecayDensity = 0.14f;
-                    geo.PosterChance = 0.25f;
+                    geo.Family = ModelFamily.Realistic;
+                    geo.Pipes = true; geo.Ceiling = CeilingKind.Trays; geo.Baseboard = true; geo.Doors = DoorTrim.Casing; geo.StripSpacing = 0f;
+                    geo.Stairs = StairChoice.Concrete; // a facility's bare concrete stair
+                    geo.Floor = K("Real_ConcreteClean"); geo.FloorTile = 2.5f; geo.Wall = K("Real_BeigeWall"); geo.WallTile = 2.5f;
+                    geo.CeilingFinish = K("Real_CeilingTiles"); geo.CeilingTile = 1.2f;
+                    geo.Trim = K("Real_MetalPlate"); geo.Pipe = K("Real_MetalPlate"); geo.Beam = K("Real_MetalPlate"); geo.Glow = K("Glow_DimCyan");
+                    geo.RoomLooks = RealisticRoomLooks();
+                    geo.RoomFloors = RealisticRoomFloors();
                 });
         }
     }

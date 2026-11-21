@@ -26,6 +26,7 @@ namespace Stealth.EditorTools
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 if (AssetImporter.GetAtPath(path) is not AudioImporter importer) continue;
+                if (path == VoiceFlatPath) continue; // stays raw PCM (VoiceFlatClip)
                 bool music = path.Contains("/Music/");
                 bool longLoop = music || path.Contains("office_hum") || path.Contains("gas_wind");
                 var settings = importer.defaultSampleSettings;
@@ -178,8 +179,79 @@ namespace Stealth.EditorTools
             d.AlarmSource = Source("Alarm");
             d.Flat = Source("Flat");
             d.Voices = Enumerable.Range(0, 16).Select(i => Source($"Voice{i}")).ToArray();
+            root.AddComponent<VoiceCapture>(); // this peer's microphone (voice chat)
             return root;
         });
+
+        const string VoiceFlatPath = AudioDir + "/Voice/voice_flat.wav";
+
+        /// <summary>
+        /// A short loop of a constant full-scale signal (raw 16-bit PCM, not compressed): the voice of a player is
+        /// multiplied into it on the audio thread (<see cref="VoicePlayback"/>), so Unity pans and spreads the voice in 3D
+        /// as it does any clip.
+        /// </summary>
+        static AudioClip VoiceFlatClip()
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(VoiceFlatPath);
+            if (clip != null) return clip;
+            const int rate = 48000, samples = 4800;
+            var full = System.IO.Path.GetFullPath(VoiceFlatPath);
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(full));
+            using (var w = new System.IO.BinaryWriter(System.IO.File.Create(full)))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
+                w.Write(36 + samples * 2);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("WAVEfmt "));
+                w.Write(16); w.Write((short)1); w.Write((short)1); w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16);
+                w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
+                w.Write(samples * 2);
+                for (int i = 0; i < samples; i++) w.Write(short.MaxValue);
+            }
+            AssetDatabase.ImportAsset(VoiceFlatPath);
+            if (AssetImporter.GetAtPath(VoiceFlatPath) is AudioImporter importer)
+            {
+                var s = importer.defaultSampleSettings;
+                s.loadType = AudioClipLoadType.DecompressOnLoad;
+                s.compressionFormat = AudioCompressionFormat.PCM;
+                s.preloadAudioData = true;
+                importer.defaultSampleSettings = s;
+                importer.forceToMono = true;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<AudioClip>(VoiceFlatPath);
+        }
+
+        /// <summary>The mouth of a player: plays their voice chat in 3D with the filters that place it in the house.</summary>
+        static VoicePlayback AddVoice(Transform parent)
+        {
+            var go = Child(parent, "Voice", new Vector3(0f, 1.5f, 0.12f));
+            var source = go.AddComponent<AudioSource>();
+            source.clip = VoiceFlatClip();
+            source.loop = true;
+            source.playOnAwake = false; // VoicePlayback starts it once it can multiply the voice in
+            source.spatialBlend = 1f;
+            source.dopplerLevel = 0f;
+            source.spread = 0f;
+            source.priority = 16; // voices are never the ones Unity drops
+            source.rolloffMode = AudioRolloffMode.Custom; // the distance gain is VoiceAcoustics.DistanceGain
+            source.SetCustomCurve(AudioSourceCurveType.CustomRolloff, AnimationCurve.Constant(0f, 1f, 1f));
+            source.minDistance = 1f;
+            source.maxDistance = 60f;
+            var voice = go.AddComponent<VoicePlayback>(); // before the filters: they process what it writes
+            var low = go.AddComponent<AudioLowPassFilter>();
+            low.cutoffFrequency = 22000f;
+            low.lowpassResonanceQ = 1f;
+            var echo = go.AddComponent<AudioEchoFilter>();
+            echo.enabled = false;
+            var reverb = go.AddComponent<AudioReverbFilter>();
+            reverb.reverbPreset = AudioReverbPreset.Off;
+            reverb.enabled = false;
+            voice.Source = source;
+            voice.LowPass = low;
+            voice.Echo = echo;
+            voice.Reverb = reverb;
+            return voice;
+        }
 
         /// <summary>A looping 3D sound on a prefab (configured at runtime by <see cref="LoopSound"/>).</summary>
         static void AddLoop(GameObject root, AudioClip clip, float pitch = 1f)

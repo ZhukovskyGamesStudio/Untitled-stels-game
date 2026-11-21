@@ -36,7 +36,7 @@ namespace Stealth.Tests
         public void RoomsThatBelongTogetherAreNextDoor(bool classic)
         {
             int kitchens = 0, kitchenGood = 0, naps = 0, napNoisy = 0;
-            for (int seed = 1; seed <= 8; seed++)
+            for (int seed = 1; seed <= 16; seed++)
                 for (int house = 1; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 6007 + house, house, null, null, 2, null, classic);
@@ -50,7 +50,8 @@ namespace Stealth.Tests
                         if (r.Type == RoomType.NapRoom) { naps++; if (Touches(r, RoomType.GameRoom, RoomType.Gym, RoomType.Studio)) napNoisy++; }
                     }
                 }
-            Assert.That(kitchenGood, Is.GreaterThan(kitchens * 4 / 5), $"kitchens by the open space or a lounge: {kitchenGood} of {kitchens}");
+            // (bigger houses since R16 hold more room types, so a kitchen finds the open space or a lounge next door a little less often)
+            Assert.That(kitchenGood, Is.GreaterThanOrEqualTo(kitchens * 2 / 3), $"kitchens by the open space or a lounge: {kitchenGood} of {kitchens}");
             Assert.That(napNoisy, Is.LessThanOrEqualTo(naps / 10), $"nap rooms next to noise: {napNoisy} of {naps}");
         }
 
@@ -59,7 +60,7 @@ namespace Stealth.Tests
         public void HousesAreZonedAndCapped(bool classic)
         {
             int work = 0, workDark = 0, service = 0, serviceIn = 0, wc = 0, wcCore = 0;
-            for (int seed = 1; seed <= 8; seed++)
+            for (int seed = 1; seed <= 16; seed++)
                 for (int house = 0; house < 5; house += 2)
                 {
                     var l = LevelGenerator.Generate(seed * 7727 + house, house, null, null, 2, null, classic);

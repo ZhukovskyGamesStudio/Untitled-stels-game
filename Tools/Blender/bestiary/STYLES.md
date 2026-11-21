@@ -125,8 +125,10 @@ coolant tanks and hoses, hot cores and vents (Eye), massive blocky silhouettes t
 **S15 Blueprint** «Синька» (Clean). Drafting automata from technical drawings: open frames of square beams, compass
 and ruler parts, circles and triangles, crosshair lenses, dimension-line struts. Drawn with a ruler.
 
-**S16 Derelict** «Заброшенный комплекс» (Derelict, Sasha's style). Decommissioned space-station security synths:
-worn armour shells over exposed machinery, cables, cracked panels, one limb broken or replaced, dim lenses.
+**S16 Derelict** «Тихий комплекс» (Realistic, Sasha's style reworked). The facility's own security synths, whole and
+still on duty (smooth armour shells, service hatches, both lenses lit); furniture — a late-80s/90s research complex
+fit-out: bent-tube sled frames, thick bull-nosed laminate, rounded steel cabinets, deep CRT monitors, enamel shades.
+No decay: that is the abandoned station's house look (`DerelictLook`).
 
 ## Furniture and level pieces (second pass)
 
@@ -147,7 +149,7 @@ and height ±3 cm (the build fails above 6 cm: the colliders and room layouts ar
 floor; the lamps keep the bulb (Eye) where the original's is (desk lamp ~(0, −0.16, 0.27), floor lamp ~(0, 0, 1.36–1.5),
 ceiling lamp hangs from z 0 down to −0.08); the exit sign sticks out of both faces of a 0.2 m wall (y ±0.15).
 The window keeps the shared model. S03_Heist and S04_Hunted: the realistic family swaps a dozen props for CC0 scans
-(`AssetBuilder.Families`); style the rest. S16_Derelict keeps Sasha's own props (`derelict_props.py`) — skip props there.
+(`AssetBuilder.Families`); style the rest. S16_Derelict has its own props now (22 own designs + the vocabulary; `derelict_props.py` is the unused Derelict family).
 
 ## Состояние на 11.11.2026 и что осталось доделать
 

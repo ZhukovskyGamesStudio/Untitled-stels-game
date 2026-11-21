@@ -52,10 +52,75 @@ namespace Stealth.Configs
         public float ChaseHold = 5f;
     }
 
+    /// <summary>
+    /// Proximity voice chat (Stealth.Audio.Voice*): the microphone chain (noise suppression, gain, gate), the codec, the
+    /// jitter buffer, how voices sound in the house (distance, walls, rooms) and how loud they are for the robots.
+    /// The player's own choices (mode, push-to-talk, sensitivity, volume) are in <see cref="Stealth.Audio.VoicePrefs"/>.
+    /// </summary>
+    [Serializable]
+    public class VoiceSettings
+    {
+        [Header("Codec")]
+        [Tooltip("Opus bitrate, bits per second (24000 = clear speech, 32000 = near studio, 48000 = music).")]
+        public int Bitrate = 32000;
+        [Tooltip("Expected packet loss, % (Opus adds that much redundancy so a lost packet is rebuilt from the next).")]
+        public int PacketLoss = 10;
+
+        [Header("Microphone")]
+        [Tooltip("Voice activation: the gate opens when the denoiser's voice probability is at least this.")]
+        public float VoiceProbability = 0.55f;
+        [Tooltip("Voice activation: and the frame is at least this loud (dBFS) at sensitivity 0.5 (the player's slider moves it ±20 dB).")]
+        public float GateDb = -48f;
+        [Tooltip("Seconds the gate stays open after the last voiced frame (so word endings are not cut).")]
+        public float Hangover = 0.4f;
+        [Tooltip("Automatic gain: the level speech is brought to (dBFS).")]
+        public float TargetDb = -20f;
+        [Tooltip("Automatic gain never boosts more than this (dB): a quiet voice stays a bit quieter than a loud one.")]
+        public float MaxGainDb = 15f;
+        [Tooltip("Automatic gain never cuts more than this (dB).")]
+        public float MaxCutDb = 12f;
+        [Tooltip("Seconds for the gain to rise / to fall by most of the way.")]
+        public float GainRise = 1.2f, GainFall = 0.15f;
+
+        [Header("Network")]
+        [Tooltip("Frames (20 ms each) the listener keeps buffered against network jitter.")]
+        public int JitterFrames = 3;
+        [Tooltip("More frames than this buffered: the oldest are dropped to catch up.")]
+        public int JitterMax = 12;
+
+        [Header("In the world")]
+        public float Volume = 1f;
+        [Tooltip("Full volume closer than this (m).")]
+        public float MinDistance = 1.2f;
+        [Tooltip("Silent further than this (m).")]
+        public float MaxDistance = 30f;
+        [Tooltip("Low-pass cutoff (Hz) of a voice behind everything that blocks sound (a wall, a slab): it comes through dull.")]
+        public float BlockedCutoff = 700f;
+        [Tooltip("Share of volume left at the most blocked (transmission 0).")]
+        public float BlockedVolume = 0.08f;
+        [Tooltip("How strongly rooms ring: 0 dry everywhere, 1 as designed, more = cathedral.")]
+        public float Reverb = 1f;
+        [Tooltip("Seconds between the acoustic checks of a voice (walls, rooms).")]
+        public float AcousticsEvery = 0.1f;
+
+        [Header("Robots hear it")]
+        [Tooltip("Noise radius (m) of a whisper (raw microphone level at WhisperDb, before gain).")]
+        public float WhisperRadius = 2f;
+        [Tooltip("Noise radius (m) of normal speech at SpeechDb.")]
+        public float SpeechRadius = 8f;
+        [Tooltip("Noise radius (m) of a shout at ShoutDb and above.")]
+        public float ShoutRadius = 20f;
+        [Tooltip("Raw microphone levels (dBFS) of a whisper, speech, a shout (after noise suppression, before gain).")]
+        public float WhisperDb = -42f, SpeechDb = -26f, ShoutDb = -10f;
+        [Tooltip("Seconds between the noises a talking player makes for the robots.")]
+        public float NoiseEvery = 0.25f;
+    }
+
     /// <summary>Sound mix (Data/Config/Audio.asset). The clips themselves are in Data/SoundBank.asset.</summary>
     [CreateAssetMenu(menuName = "Stealth/Config/Audio", fileName = "Audio")]
     public class AudioConfig : ScriptableObject
     {
         public AudioMix Mix = new();
+        public VoiceSettings Voice = new();
     }
 }

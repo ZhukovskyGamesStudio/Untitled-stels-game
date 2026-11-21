@@ -64,6 +64,8 @@ namespace Stealth.Player
         public int TerminalViewCount => m_TerminalTargets.Count;
         /// <summary>Owner: a terminal in reach (press E to use it), null if none.</summary>
         public SecurityTerminal TerminalTarget { get; private set; }
+        /// <summary>Owner at a map terminal: the floor its map shows (A/D, the mouse buttons or the wheel flip it).</summary>
+        public int TerminalFloor { get; private set; }
         /// <summary>0..1 of holding E at a hacking terminal.</summary>
         public float TerminalHackShare => m_TerminalHold / Mathf.Max(0.05f, m_Interaction.TerminalHackTime);
 
@@ -95,9 +97,22 @@ namespace Stealth.Player
                 StopTerminal();
                 return;
             }
+            var mouse = Mouse.current;
+            if (t.Kind == TerminalKind.Map)
+            {
+                // the map: no picture to look through, the floors to flip
+                TerminalView = null;
+                m_TerminalTargets.Clear();
+                SendTerminalState(t.Index, null, 0f, false);
+                float scroll = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+                int step = (Controls.Pressed(GameAction.Right) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || scroll > 0f ? 1 : 0)
+                         - (Controls.Pressed(GameAction.Left) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || scroll < 0f ? 1 : 0);
+                int floors = Mathf.Max(1, ActiveLevel.Layout != null ? ActiveLevel.Layout.Floors : 1);
+                TerminalFloor = Mathf.Clamp(TerminalFloor + step, 0, floors - 1);
+                return;
+            }
             SecurityTerminal.Targets(t.Kind, t.transform.position, m_TerminalTargets);
             if (m_TerminalTargets.Count == 0) { TerminalView = null; SteerTerminalCamera(null); return; }
-            var mouse = Mouse.current;
             // cameras: A/D and the mouse turn the camera, the mouse buttons and the wheel switch it; robots: A/D switch too
             bool steer = t.Kind == TerminalKind.Cameras;
             float wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
@@ -129,6 +144,7 @@ namespace Stealth.Player
             m_TerminalIndex = 0;
             m_TerminalHold = 0f;
             m_TerminalWaitRelease = waitRelease; // the E that sat us down is not a hack
+            TerminalFloor = Mathf.Max(0, LevelLayout.FloorOf(transform.position.y)); // the map opens on this floor
         }
 
         /// <summary>Test hook: the next thing on the terminal's screen (as if D was pressed).</summary>

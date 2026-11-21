@@ -1,5 +1,5 @@
 """Pictures on the screens of the things the player uses (SecurityTerminal's monitors): grey on black, the terminal tints
-them by its kind (cameras, hacking, the storage door's access) and dims them once spent.
+them by its kind (cameras, hacking, the storage door's access, the building's map) and dims them once spent.
 
     python Tools/Art/generate_screens.py
 
@@ -145,9 +145,48 @@ def screen_vault(opened):
     print("wrote", name)
 
 
+def screen_map():
+    """The map terminal: a floor plan — rooms, doorways, a stair — with a "you are here" dot and a floor strip."""
+    img, d = canvas()
+    s = SS
+    x0, y0, x1, y1 = 14, 12, 196, 148
+    d.rectangle([x0 * s, y0 * s, x1 * s, y1 * s], fill=24)
+    # the walls: the outline, a corridor across, rooms either side
+    wall = 200
+    d.rectangle([x0 * s, y0 * s, x1 * s, y1 * s], outline=wall, width=3 * s)
+    cy0, cy1 = 70, 86
+    d.line([x0 * s, cy0 * s, x1 * s, cy0 * s], fill=wall, width=2 * s)
+    d.line([x0 * s, cy1 * s, x1 * s, cy1 * s], fill=wall, width=2 * s)
+    for x in (70, 128, 160):
+        d.line([x * s, y0 * s, x * s, cy0 * s], fill=wall, width=2 * s)
+    for x in (58, 112, 150):
+        d.line([x * s, cy1 * s, x * s, y1 * s], fill=wall, width=2 * s)
+    # doorways: gaps in the corridor walls
+    for x in (40, 96, 144, 178):
+        d.rectangle([(x - 5) * s, (cy0 - 2) * s, (x + 5) * s, (cy0 + 2) * s], fill=24)
+    for x in (30, 84, 130, 172):
+        d.rectangle([(x - 5) * s, (cy1 - 2) * s, (x + 5) * s, (cy1 + 2) * s], fill=24)
+    # a stair in a corner: steps
+    for k in range(6):
+        d.line([(162 + k * 5) * s, (cy1 + 6) * s, (162 + k * 5) * s, (cy1 + 26) * s], fill=120, width=s)
+    # furniture blocks
+    for bx, by, bw, bh in ((22, 22, 30, 14), (82, 24, 34, 10), (20, 104, 26, 26), (70, 100, 30, 12), (120, 120, 22, 16)):
+        d.rectangle([bx * s, by * s, (bx + bw) * s, (by + bh) * s], fill=70)
+    # you are here: a bright dot with a ring, in the corridor
+    cx, cy = 100, 78
+    d.ellipse([(cx - 9) * s, (cy - 9) * s, (cx + 9) * s, (cy + 9) * s], outline=235, width=2 * s)
+    d.ellipse([(cx - 4) * s, (cy - 4) * s, (cx + 4) * s, (cy + 4) * s], fill=245)
+    # the floors on the right: a stack of bars, one lit
+    for k in range(4):
+        y = 30 + k * 26
+        d.rounded_rectangle([210 * s, y * s, 242 * s, (y + 18) * s], radius=3 * s, outline=140, width=s, fill=200 if k == 2 else 34)
+    finish(img, "screen_map")
+
+
 if __name__ == "__main__":
     screen_vault(False)
     screen_vault(True)
     screen_cameras()
     screen_hack()
     screen_doors()
+    screen_map()

@@ -13,7 +13,8 @@ namespace Stealth.Level
     /// </summary>
     public abstract class HouseRules
     {
-        public static readonly HouseRules Office = new OfficeRules(), Hospital = new HospitalRules(), Garage = new GarageRules(), Apartments = new ApartmentRules();
+        public static readonly HouseRules Office = new OfficeRules(), Hospital = new HospitalRules(), Garage = new GarageRules(), Apartments = new ApartmentRules(),
+            Abandoned = new AbandonedRules();
 
         /// <summary>The rules of a kind of house (an office of any character: the office's).</summary>
         public static HouseRules For(HouseKind kind) => kind switch
@@ -21,6 +22,7 @@ namespace Stealth.Level
             HouseKind.Hospital => Hospital,
             HouseKind.Garage => Garage,
             HouseKind.Apartments => Apartments,
+            HouseKind.Abandoned => Abandoned,
             _ => Office,
         };
 
@@ -29,6 +31,7 @@ namespace Stealth.Level
             Location.Hospital => Hospital,
             Location.Garage => Garage,
             Location.Apartments => Apartments,
+            Location.Abandoned => Abandoned,
             _ => Office,
         };
 
@@ -200,5 +203,35 @@ namespace Stealth.Level
 
         // the block's floors above the ground are one typical floor: the robots take a room down below
         public override bool ChargingRoomOn(PlanRoom r) => r.Floor == 0;
+    }
+
+    sealed class AbandonedRules : HouseRules
+    {
+        public override Location Location => Location.Abandoned;
+        public override PropKind? PointOfInterest => null; // its find is the station itself: dark, rotten, the robots at home
+        public override DoorKind? StreetDoor => DoorKind.Steel;
+        public override bool RetypesRooms => false; // the station's program is laid out by its plan
+
+        public override void Shape(BuildingSettings s, BuildingSettings b)
+        {
+            // a research station: a slab with a spine corridor, labs and servers along it, the quarters upstairs; the power
+            // mostly out (more dark rooms)
+            if (b.EveryRoomType) { s.CorridorChance = 1f; return; }
+            s.Station = true;
+            SingleBlock(s, new[] { 2, 2, 3, 3, 3 });
+            s.DarkChance = Mathf.Min(0.9f, b.DarkChance + 0.25f);
+        }
+
+        public override float DoorChance(LevelLayout l, Doorway d, float chance) => Mathf.Max(chance, 0.55f); // bulkheads along the spine
+
+        public override DoorKind InnerDoor(LevelLayout l, Doorway d, PlanRoom a, PlanRoom b)
+        {
+            // glass where the science was, steel everywhere else
+            if (Either(a, b, t => t is RoomType.Lab or RoomType.Server or RoomType.ControlRoom)) return DoorKind.Slide;
+            if (Either(a, b, t => t is RoomType.Restroom or RoomType.Bedroom)) return DoorKind.Wood;
+            return DoorKind.Steel;
+        }
+
+        public override StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => DerelictLook.For(g, kit, l);
     }
 }

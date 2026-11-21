@@ -252,6 +252,11 @@ namespace Stealth.UI
             {
                 bool cams = c.SittingKind == Level.TerminalKind.Cameras;
                 into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.leave")));
+                if (c.SittingKind == Level.TerminalKind.Map)
+                {
+                    into.Add(new Hint(Wheel, Loc.T("hint.map.floor"))); // (A / D and the mouse buttons too)
+                    return into;
+                }
                 into.Add(new Hint(Lmb, Rmb, Loc.T(cams ? "hint.terminal.next_camera" : "hint.terminal.next_target")));
                 if (cams) into.Add(new Hint(K(GameAction.Mark), Loc.T("hint.mark")));
                 else if (c.SittingCanHack) into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.hack")));

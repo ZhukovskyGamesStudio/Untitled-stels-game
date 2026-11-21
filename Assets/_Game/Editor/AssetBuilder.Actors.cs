@@ -407,6 +407,8 @@ namespace Stealth.EditorTools
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);
+            pc.Voice = AddVoice(root.transform);
+            pc.Voice.Owner = pc;
             return root;
         }
 

@@ -241,7 +241,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 
 **Терминал камер**: камеру на экране игрок поворачивает сам (`SecurityCamera.SteerServer`, угол — `DetectorSnapshot.Aim`;
 `IPlayerLink.SendTerminal` раз в 0,1 с); управляемая камера никого не замечает, сидящего за терминалом (`PlayerController.AtTerminal`) камеры
-не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта у всех повёрнута одинаково (север вверху, `MapView`).
+не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта (у терминала карты) — север вверху (`MapView`).
 Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
 качаются в шаг (`PlayerController.SwingLegs`, `PlayerRules.LegSwing`), сидя в машине — согнуты. Оставленный лежать в доме возвращается с пустым рюкзаком.
 **Чит-панель (F4)** — `CheatPanel` в HUD: выключить всех роботов, неуязвимость (и газ не берёт), невидимость для роботов (`PlayerController.Invisible` входит в `IsDown`; ни шума, ни следа),
@@ -251,7 +251,11 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 снаружи открывается двор в радиусе `TeamSettings.OutsideRevealRadius`, на карте он — `MapPart.Ground`);
 сервер открывает вокруг всех игроков, `GameManagerNet` реплицирует биты (`NetworkList<ulong>`, [0] = сид дома), клиент ещё и сам вокруг себя.
 `MapSketch` превращает видимое в прямоугольники (пол, стены с проёмами, лестницы, мебель из `LevelShell.Props`, люк), `MapView` рисует
-мини-карту и большую карту. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
+карту. **Карты на HUD нет** (ни мини-карты, ни клавиши M): карта — у **терминала карты** (`TerminalKind.Map`, `SecuritySettings.MapTerminals` = 2 стола
+после терминалов взлома и камер, каждый — самый дальний от прежних, не пульт комнаты управления; столов нет (жилой дом) — стойка-киоск вместо кресла, шкафа, тумбы или гардероба (не мельче её основания): `LevelLayout.KioskTerminals`; экран `screen_map`): сидящий за ним видит всё здание (`MapView.WholeHouse`: свой
+`ExplorationMap` с `RevealAll`, скрытая комната — глухой стеной) по этажу (`PlayerController.TerminalFloor`: колесо, A/D, ЛКМ/ПКМ) и на нём — игроков,
+всех роботов и устройства (серые — взломанные), лазеры (`LaserSpots`), вход, выход, уличные двери, склад и терминалы; исследованное (`ExplorationMap`
+команды) по-прежнему считается — для задания «найдите выход» и тестов. Пинг и метка робота — `IPlayerLink.SendPing/SendMark` → `GameManager.CalloutServer` → `IGameLink.BroadcastPing`
 → `PingBoard` на каждом пире; помеченный робот — `DetectorSnapshot.MarkedUntil`, его модели на слое `Marked` (8), фича `MarkedXray` на
 `PC_Renderer` рисуют их сквозь стены одним силуэтом (`Art/Shaders/MarkedXray.shader`: маска в стенсил → контур снаружи маски → заливка
 ровно один раз на пиксель; три RenderObjects-фичи, проходы 0–2). Настройки — `PlayerConfig.Team`. Взлом и вскрытие — только без стены
@@ -279,7 +283,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 (живёт весь забег), `Quota` — базовая цена поездки из этого дома (первая бесплатна); у каждого туннеля своя доля от неё (`RunSettings.RouteFuel`, перемешаны по сиду: `RunState.RouteShare/RouteCost`, `GameManager.CostOf`; на HUD — `FuelNeeded`: путь, где стоит машина, иначе самый дешёвый; цена — на табличке туннеля); `RunState.Advance(цена)` списывает её, `Strand` — забег
 окончен, если топлива не хватит даже со всей добычей (`CanStillGo`, предупреждение `RunSettings.StrandedGrace`).
 Канализацию каждый пир собирает сам: `SewerPlan.Make(RunSeed, глубина)` (чистый: заглушка, участок машины под люком входа, ворота, участок
-спуска из люка выхода, зал с тремя туннелями; число и варианты сегментов, лампы, их цвет, мусор — от сида) → `SewerLocation.Build` из кусков
+спуска из люка выхода, зал с тремя туннелями; число и варианты сегментов, лампы, их цвет, мусор — от сида; первая канализация забега, где команда появляется, освещена лучше — лампы на обеих стенах, без сломанных, ярче в `SewerPlan.StartLampBoost` раз, и туннель за машиной вблизи — `SewerPlan.StartLights`) → `SewerLocation.Build` из кусков
 набора `Tools/Blender/sewer.py` (`-- … kit`: `sewer_seg_0..3` + `_cut`, `sewer_hall_*`, `sewer_branch`, `sewer_plug`, `sewer_gate_*`, `sewer_lever`, `sewer_cap`;
 **зал развилки — каждый раз другой** (`SewerHall`, чистый, свой поток `Salt.SewerHall`; `SewerPlan.Hall`): сетка клеток 8 м под кирпичными
 крестовыми сводами на колоннах — коробка 2–4 × 2–4 клетки, потом Г, Т, крест или «рваный» с эркерами и вырезами; всегда связный, клетки не касаются
@@ -414,7 +418,7 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 **Датчики движения** висят в углу вплотную: задняя плита касается обеих стен (`LevelMetrics.SensorCornerInset`, смотрят по диагонали; `Wards` и `LevelGenerator`; проверяет `RobotTests.MotionSensorsSitFlushInTheirCorners`).
 **Узкие щели** — `EdgeType.Squeeze` (`LevelMetrics.SqueezeWidth`, свой поток рандома): игрок протискивается, роботов не пускает `NavMeshModifierVolume`
 в префабе `Level/SqueezeFrame`. **«Я застрял»** — `Unstuck` (кольца свободных точек вокруг игрока, потом точки патруля/спавны канализации; двигает себя
-владелец, у клиента нет навмеша). **Стиль (F8)** — общий для команды: `GameManager.RequestStyle` → `StyleIndex` реплицирует `GameManagerNet`.
+владелец, у клиента нет навмеша). **Стиль (F8)** — F8 открывает список стилей (`StylePanel` в HUD, вне `Content`: работает и в меню; кнопка на каждый стиль списка, текущий подсвечен), выбор общий для команды: `GameManager.RequestStyle` → `StyleIndex` реплицирует `GameManagerNet`.
 **World-space текст** (панели туннелей, доска склада) — на слое `WorldText` (9): обычные проходы его не рисуют, его рисует RenderObjects `WorldText` после
 фильтра `StyleScreen` — буквы читаются в любом стиле. Выбывший игрок смотрит глазами союзника (`PlayerController.Watching`) и видит своё лежащее тело (`PlayerController.ShowOwnBody`: обычно у владельца оно только тень). Выбывший может **позвать** (`GameAction.CallHelp`, Z): пинг на своё тело `PingKind.Help` (один на игрока, живёт `MarkDuration`), его модель видна всем сквозь стены, пока зов не погас (`PlayerController.ShowCalling`, слой `Marked`).
 
@@ -448,7 +452,7 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 **Стены у лестничного проёма** — над проёмом в перекрытии плиты нет, поэтому стены нижнего этажа вдоль него достраиваются полосой до пола следующего (`LevelBuilder.StairBands`).
 Настенное (`Furnisher.OnWall`: доска, огнетушитель, часы…) висит вплотную к стене (`HungGap`), стоящая у стены мебель — с зазором `WallGap`.
 Руль машины поворачивается в сторону поворота, в `CarSettings.SteeringRatio` раз дальше колёс (`CarLook.SteeringWheel`).
-**Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом, мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
+**Размер дома** — `BuildingSettings.GridFor(дом, игроки)`: растёт с каждым домом (`BaseRooms` 9 + `RoomsPerHouse` 3,5, до `MaxRooms` 54; комната ≈ 100 м²), мягко — с командой (`AreaByPlayers`); квота — `RunSettings.QuotaByPlayers`,
 `RunState.SetPlayers` пересчитывает квоту, когда команда меняется посреди дома. Число игроков — часть `LevelInfo` (все пиры строят один дом).
 
 **Сплеш студии** — `StudioSplash` в префабе меню (юнитевский сплеш выключен, `PlayerSettings.SplashScreen.show`): крыло Zhukovsky Games, раз за запуск,
@@ -492,7 +496,7 @@ Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или �
 `VisualStyle` (`Data/Styles/*.asset`) — один вид игры: грейдинг на URP-объёме, экранный фильтр `Art/Shaders/StyleScreen.shader`
 (пиксели, цел-ступени, «масло», контуры, штриховка, бумага, 1 бит, камкордер, неон — `FullScreenPassRendererFeature` на `PC_Renderer` после пост-обработки),
 воздух (эмбиент, дымка, цвет газа) и палитра материалов по видам (`StyleConfig`). `VisualStyles.Apply` меняет только картинку на этом пире: роботы считают
-свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. F8 листает стили, `-style <имя>` включает при запуске,
+свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. F8 открывает выбор стиля, по умолчанию — `S16_Derelict` «Тихий комплекс» (`StyleConfig.Default`), `-style <имя>` включает при запуске,
 сценарий `styles` снимает одни и те же замороженные кадры во всех стилях. Ассеты стилей создаются один раз из `AssetBuilder.Styles`
 и дальше правятся руками; `REBUILD_STYLES=1 Tools/dev.sh assets` пересоздаёт их из кода.
 Стиль меняет и форму мира (`StyleGeometry`): **семейство моделей** `Family` — лоуполи / игрушки / PS1 / чистые / реализм: свой вариант каждой модели
@@ -504,7 +508,7 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 (`designs.py`, `props.py`); сборка `build_bestiary.py` проверяет контракт оригинала (те же части, центры колёс и винтов, суставы ног,
 габариты мебели ±6 см), смотреть — `bestiary/review_style.sh`.
 Игроки — айтишники четырёх отделов (`PlayerLooks`: бэкенд, тестирование, сисадмины, дизайн по слоту игрока; `VisualStyles.SetVariant`
-выбирает модель отдела). Поверх модели во всех стилях показывается настоящий человек со скелетом и анимациями своего отдела (`VisualStyles.PlayerRigFor(слот)`: свой `StyleGeometry.PlayerRig` стиля, иначе `StyleConfig.PlayerHumans` — `Tools/Blender/human.py -- <out> [превью] backend|qa|sysadmin|designer` → `Humans/human_<отдел>.fbx`, префабы `Player/HumanRig_<Отдел>`: толстовка и наушники, бейдж и очки, жилет, кабель и налобный фонарь, шарф и берет). Цвет команды — только `Accent` (рюкзак, повязка, шнурок/шарф), одежда — цвет отдела, лицо — кожа, детали головы — тёмные. Новые объекты одеваются через `VisualStyles.Dress` при спавне. **Архитектура** — `LevelBuilder` записывает
+выбирает модель отдела). Поверх модели во всех стилях показывается настоящий человек со скелетом и анимациями своего отдела (`VisualStyles.PlayerRigFor(слот)`: свой `StyleGeometry.PlayerRig` стиля, если он задан (сейчас — ни у одного, и у `S16_Derelict` тоже отделы), иначе `StyleConfig.PlayerHumans` — `Tools/Blender/human.py -- <out> [превью] backend|qa|sysadmin|designer` → `Humans/human_<отдел>.fbx`, префабы `Player/HumanRig_<Отдел>`: толстовка и наушники, бейдж и очки, жилет, кабель и налобный фонарь, шарф и берет). Цвет команды — только `Accent` (рюкзак, повязка, шнурок/шарф), одежда — цвет отдела, лицо — кожа, детали головы — тёмные. Новые объекты одеваются через `VisualStyles.Dress` при спавне. **Архитектура** — `LevelBuilder` записывает
 оболочку дома (`ActiveLevel.Shell`: грани стен, полы, проёмы, окна), чистый `ArchitecturePlanner` раскладывает по ней детали `StyleKit`
 (плинтусы, панели, карнизы, наличники/пилястры/арки у дверей, кабельные лотки под потолком в обход ламп и лестничных проёмов (балок и кессонов нет: `CeilingKind` — только `None`/`Trays`), трубы, световые щели,
 отделка пола и стен в обход окон), `StyleDecor` ставит их под корень уровня. Декор без коллайдеров и теней — геймплей и свет не меняются (`ArchitectureTests`).
@@ -516,7 +520,7 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 **Лестницы** — коллайдеры-кубы `StairGeometry` (навмеш и шаги не меняются; `Stair.Flip` — марши вдоль другой стены угла, зеркальный вариант,
 `StairGeometry.Placement/ToWorld`) невидимы, видна одна из четырёх конструкций (`StairStyle`: бетон с парапетом,
 дерево с балясинами, открытая сталь с сеткой, белый камень со стеклом), меши генерирует `AssetBuilder.Stairs` (`Art/Models/Stairs`); выбор — `StairStyles.Pick`
-по семейству стиля и сиду дома или вид, который просит стиль (`StyleGeometry.Stairs`; у стиля по умолчанию — дерево), `StairLook` переключает при F8
+по семейству стиля и сиду дома или вид, который просит стиль (`StyleGeometry.Stairs`; у стиля по умолчанию — бетон), `StairLook` переключает при F8
 и одевает лестницу в архитектуру стиля: ступени — отделка пола, тело — отделка стен, балясины и поручни — его молдинг (`StairStyles.Parts`: роль каждого слота материала). Объём, который заняли коллайдеры под площадкой и верхним маршем, всегда закрыт панелью (торец под верхом марша — сплошной от последней ступени);
 сценарий `stairs` ставит лестницу одну во дворе и снимает каждый вид со всех сторон.
 **Лазы** — короб вентиляции: порог `LevelMetrics.VentSill` (кусок стены), над ним `VentHeight`, облицовка, фланцы и снятая решётка у стены (префаб `Level/VentFrame`).
@@ -536,9 +540,18 @@ PBR из сканов) и свой набор архитектуры (`StyleConf
 Держатель склеенного меша — `StyleConfig.Batch`.
 **Воксельный стиль `S11_Noir`** («Нуар-детектив», по мотивам Shadows of Doubt): роботы, датчики, мебель и игроки этого стиля пересобраны из кубиков 4 см
 (`Lang.voxel`, `Tools/Blender/voxel.py` — Remesh Blocks по каждой части, мельче для тонких деталей, светящиеся части — на сетке вдвое мельче), без пиксельного фильтра.
-**Стиль Саши `S16_Derelict`** «Заброшенный комплекс» (влит из `feature_visual_style_11_prototype`): семейство моделей `Derelict`, свои PBR-поверхности,
-мебель и деградация (`Tools/Blender/derelict_*.py`, пятна и плакаты раскладывает `ArchitecturePlanner`), человек со скелетом вместо модели игрока
-(`Tools/Blender/human.py`, `HumanRig`, `StyleGeometry.PlayerRig`), свет стиля только для глаз (`StyleWorld.LightScale`/`LampGlow`). Сценарий `perf` пишет, сколько рендереров рисуется и чьи они.
+**Стиль Саши `S16_Derelict`** «Тихий комплекс» (влит из `feature_visual_style_11_prototype`): настроение заброшенного комплекса (грейдинг, зерно, сырой воздух,
+мёртвый город за окнами, свет стиля только для глаз — `StyleWorld.LightScale`/`LampGlow`) без деградации: семейство `Realistic`, у каждого типа комнаты своя отделка
+(`AssetBuilder.RealisticRoomLooks/RealisticRoomFloors`: кухня — кафель и шахматный пол, туалет — плитка до 2 м, офис — ковролин, библиотека — тёмные панели и ёлочка…),
+больница, мастерская и жилой дом выглядят собой; своя мебель — исследовательский комплекс конца 80-х (трубчатые рамы-салазки, толстый ламинат, стальные шкафы, глубокие ЭЛТ-мониторы, эмалевые абажуры: `bestiary/styles/S16_Derelict.py`, `PerStyle/S16_Derelict`). Сам заброшенный вид — у дома своего типа (ниже). Семейство моделей `Derelict` (`Tools/Blender/derelict_*.py`: мебель, PBR) собирается,
+но ни один стиль его сейчас не берёт; люди отделов, как во всех стилях (учёный в халате `Player/HumanRig_Scientist` собирается, но не показывается; `Tools/Blender/human.py`, `HumanRig`).
+`REBUILD_STYLES=S16_Derelict,…` пересоздаёт из кода только названные стили. Сценарий `perf` пишет, сколько рендереров рисуется и чьи они.
+**Заброшенный комплекс** (`HouseKind.Abandoned`, `Location.Abandoned`; примерно каждый одиннадцатый дом — из доли офисов) — брошенная научная станция: своя планировка
+на «пластине» больницы (`BuildingSettings.Station`, `PlanGenerator.Station.cs`: коридор-хребет, спереди лаборатории, пульт и кабинеты, сзади серверные, склады,
+раздевалка и столовая; выше — лаборатории спереди, жилые комнаты `Bedroom`, гостиная, кухня и туалет сзади; на верхнем этаже спереди — серверные вокруг пульта),
+типы комнат не переделываются, темнее (`DarkChance` +0,25), двери стальные, у лабораторий и серверных — стеклянные раздвижные; уникального предмета нет.
+**Вид в любом стиле** — `DerelictLook.For`: стальные панели, рифлёные плиты, вентиляционные панели потолка, ржавые трубы и лотки, пятна, потёки, плесень и плакаты
+(`StyleKit.Derelict*`, `FloorDecay/WallDecay/Posters` — из материалов `Dr_*`/`Dc_*` Саши, одинаковые у всех семейств), кафельный пояс в мокрых комнатах. Проверяет `AbandonedTests`.
 
 ### Ассеты из кода
 
@@ -574,7 +587,12 @@ Graphics jobs выключены (`BuildPlayerWindows`): с ними плеер 
 
 ## Точки стыковки для коллеги
 
-- Войс-чат: `NoiseSystem.EmitServer(позиция, радиус, clientId)` на сервере — роботы с микрофонами услышат.
+- Войс-чат — сделан, свой стек ([Docs/VoiceChat.md](Docs/VoiceChat.md), там же исследование и дорожная карта, в т.ч. покупка Dissonance):
+  плагин `Plugins/x86_64/StealthVoice.dll` (Opus + RNNoise от Xiph, `Tools/Voice/build_native.sh`), чистые правила `Scripts/Audio/Voice/*`
+  (`VoiceGate`, `VoiceGain`, `VoiceJitter`, `VoiceAcoustics`, `VoiceNoise`, `VoicePacket`), микрофон — `VoiceCapture` на префабе AudioDirector,
+  голос в мире — `VoicePlayback` (ребёнок `Voice` префаба игрока: плоский клип × голос в `OnAudioFilterRead`, потом Low-pass/Echo/Reverb),
+  маршрут — `VoiceHub` (сервер делает шум `NoiseSystem.EmitServer` по сырому уровню и пересылает), сеть — `Net/VoiceNet` (named messages, Unreliable);
+  настройки — `Data/Config/Audio` → `Voice`, выбор игрока — `VoicePrefs` (вторая колонка страницы настроек), кнопка — `GameAction.PushToTalk` (CapsLock).
 - Сеть: всё сетевое — в `Scripts/Net` (сборка `Stealth.Net`), игровой код от Netcode не зависит; как добавить сетевой объект — в скилле `stealth-code`.
 - Предметы: `ItemCatalog` (форма + цвет), расстановка — `LootPlanner`, в мире — `WorldItem`, инвентарь — `PlayerInventory`.
 - Мета-прогрессия: итог забега `GameManager.RunTotal`, конец забега `GameManager.Phase == RunPhase.Failed`.

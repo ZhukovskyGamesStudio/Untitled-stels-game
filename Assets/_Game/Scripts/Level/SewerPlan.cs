@@ -12,6 +12,8 @@ namespace Stealth.Level
         /// <summary>A lamp on the wall (+1 the left wall, −1 the right, 0 none) and whether it is broken (flickers).</summary>
         public int LampSide;
         public bool LampBroken;
+        /// <summary>Lit on both walls (the run's start: <see cref="SewerPlan.StartLights"/>).</summary>
+        public bool LampBoth;
         /// <summary>The kit's segment with the alcove (its shaft up to the house the team came in through, the lid shut) instead of a variant.</summary>
         public bool Alcove;
         /// <summary>Junk on the walkways: barrels and crates (x along, side ±1).</summary>
@@ -95,6 +97,12 @@ namespace Stealth.Level
         /// <summary>The lamps' colour this time.</summary>
         public Color LampColor;
         public float LampIntensity;
+        /// <summary>
+        /// The run's first sewer, where the team spawns: well lit — lamps on both walls of every segment, none broken,
+        /// <see cref="StartLampBoost"/> brighter, and the tunnel behind the car lit near it (SewerLocation).
+        /// </summary>
+        public bool StartLights;
+        public const float StartLampBoost = 1.6f;
 
         static readonly Color[] Palette =
         {
@@ -248,6 +256,19 @@ namespace Stealth.Level
             {
                 p.ExitLadderX = -1f; // (the way up is the passage's shaft)
                 p.LayPassage(hatchX, exitHatch.Value.y, behind);
+            }
+            if (!afterHouse)
+            {
+                // the spawn: no dark gaps (set after the rolls, so nothing else of the plan moves)
+                p.StartLights = true;
+                for (int i = 0; i < p.Segments.Count; i++)
+                {
+                    var s = p.Segments[i];
+                    s.LampSide = i % 2 == 0 ? 1 : -1;
+                    s.LampBoth = true;
+                    s.LampBroken = false;
+                    p.Segments[i] = s;
+                }
             }
             // the hall's shape and its ways on: a stream of its own (the rolls above stay where they were)
             p.Hall = SewerHall.Make(new System.Random(LevelRandom.Mix(runSeed, Salt.SewerHall, depth + 7)));

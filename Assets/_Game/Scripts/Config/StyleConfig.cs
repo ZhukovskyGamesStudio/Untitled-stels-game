@@ -8,9 +8,9 @@ namespace Stealth.Configs
     /// </summary>
     public class StyleConfig : ScriptableObject
     {
-        [Tooltip("The styles, in the order F8 cycles through them; the first is the default look")]
+        [Tooltip("The styles, in the order the F8 picker lists them")]
         public VisualStyle[] Styles = new VisualStyle[0];
-        [Tooltip("The look of the game: applied when the game starts (none = the plain look). F8 and -style still switch it")]
+        [Tooltip("The look of the game: applied when the game starts (none = the plain look). the F8 picker and -style still switch it")]
         public VisualStyle Default;
 
         [Header("Materials by kind (filled by the asset builder)")]

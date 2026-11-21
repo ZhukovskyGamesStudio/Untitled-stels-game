@@ -6,6 +6,9 @@ namespace Stealth.Enemies
     [CreateAssetMenu(menuName = "Stealth/Config/Devices/Motion Sensor", fileName = "SensorMotionConfig")]
     public class MotionSensorProfile : DeviceProfile
     {
+        /// <summary>It has a microphone: hears the players talking (DeviceProfile.Hearing; existing assets without the field get this).</summary>
+        public MotionSensorProfile() => Hearing = 0.5f;
+
         public float Range = 9f;
         public float ViewAngle = 100f;
         [Tooltip("Moving faster than this is noticed (crouch-walk 1.8, walk 3.6 m/s).")]

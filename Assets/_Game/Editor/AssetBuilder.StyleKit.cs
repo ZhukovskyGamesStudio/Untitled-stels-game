@@ -21,6 +21,8 @@ namespace Stealth.EditorTools
         static readonly Dictionary<string, Material> s_Kit = new();
 
         static Material K(string name) => s_Kit.TryGetValue(name, out var m) ? m : null;
+        /// <summary>The derelict decals that exist (Art/Textures/Derelict/Decals: absent on a checkout without them).</summary>
+        static Material[] KitDecals(params string[] names) => names.Select(K).Where(m => m != null).ToArray();
 
         /// <summary>
         /// Lit materials for the style architecture and the floor and wall finishes (textures from
@@ -233,6 +235,17 @@ namespace Stealth.EditorTools
             kit.HomeStairWall = K("Home_StairWall");
             kit.HomeStairLower = K("Home_StairLower");
             kit.HomeStairFloor = K("Home_StairFloor");
+            // the abandoned station (Level.DerelictLook): Sasha's derelict surfaces and decals, the same in every family
+            kit.DerelictWall = K("Dr_SteelPanels");
+            kit.DerelictFloor = K("Dr_FloorPlate");
+            kit.DerelictCeiling = K("Dr_CeilingVents");
+            kit.DerelictRust = K("Dr_Rust");
+            kit.DerelictPaint = K("Dr_PaintedMetal");
+            kit.DerelictTiles = K("Wall_TilesWhite");
+            kit.DerelictVinyl = K("Dr_Vinyl");
+            kit.FloorDecay = KitDecals("Dc_floor_rust", "Dc_floor_oil", "Dc_floor_scorch", "Dc_floor_rubble");
+            kit.WallDecay = KitDecals("Dc_wall_rust", "Dc_wall_rust", "Dc_wall_leak", "Dc_wall_mold", "Dc_wall_peel", "Dc_wall_scorch"); // rust twice as often
+            kit.Posters = KitDecals(Enumerable.Range(0, 6).Select(i => $"Dc_poster_{i}").ToArray());
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

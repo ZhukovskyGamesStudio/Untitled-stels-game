@@ -31,6 +31,12 @@ namespace Stealth.Configs
         [Tooltip("The apartment block (Level.HomeLook): papered flats over parquet, painted kitchens over tiles, tiled bathrooms, the stairwell's oil-painted band.")]
         public Material HomeWallpaper, HomeWallpaperBed, HomeWallpaperHall, HomeParquet, HomeCeiling, HomeKitchenWall, HomeKitchenTile, HomeKitchenFloor,
             HomeBathTile, HomeBathFloor, HomeStairWall, HomeStairLower, HomeStairFloor;
+        [Tooltip("The abandoned research station in every style (Level.DerelictLook): steel wall panels, floor plates, vented ceiling panels, rusted trims and pipes, painted beams")]
+        public Material DerelictWall, DerelictFloor, DerelictCeiling, DerelictRust, DerelictPaint;
+        [Tooltip("The station's wet rooms (a tiled band) and its quarters' scuffed vinyl floor")]
+        public Material DerelictTiles, DerelictVinyl;
+        [Tooltip("The station's decay: chunks on the floors, stains on the walls, old posters")]
+        public Material[] FloorDecay = new Material[0], WallDecay = new Material[0], Posters = new Material[0];
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

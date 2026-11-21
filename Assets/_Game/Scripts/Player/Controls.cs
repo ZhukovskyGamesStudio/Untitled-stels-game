@@ -8,12 +8,14 @@ namespace Stealth.Player
     public enum GameAction
     {
         Forward, Back, Left, Right, Sprint, Jump, CrouchHold, CrouchToggle,
-        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Map, Style, Unstuck, Restart, Cheats, Gadget, Horn,
+        Interact, Hands, Rotate, Mirror, Hatch, StashAll, Ping, Mark, Style, Unstuck, Restart, Cheats, Gadget, Horn,
         UseHand,
         // the team's storage robot: come to me; go to the exit through the ducts
         BotCall, BotExit,
         // knocked out: call the team (seen through walls)
         CallHelp,
+        // voice chat: hold to talk (when the microphone is set to push-to-talk)
+        PushToTalk,
     }
 
     /// <summary>
@@ -91,7 +93,6 @@ namespace Stealth.Player
             new(GameAction.StashAll, "actions", KeyBinding.Of(Key.G)),
             new(GameAction.Ping, "team", KeyBinding.MouseButton(2)),
             new(GameAction.Mark, "team", KeyBinding.Of(Key.Q)),
-            new(GameAction.Map, "team", KeyBinding.Of(Key.M)),
             new(GameAction.Style, "other", KeyBinding.Of(Key.F8)),
             new(GameAction.Unstuck, "other", KeyBinding.Of(Key.K)),
             new(GameAction.Restart, "other", KeyBinding.Of(Key.R)),
@@ -102,6 +103,7 @@ namespace Stealth.Player
             new(GameAction.BotCall, "team", KeyBinding.Of(Key.B)),
             new(GameAction.BotExit, "team", KeyBinding.Of(Key.N)),
             new(GameAction.CallHelp, "team", KeyBinding.Of(Key.Z)),
+            new(GameAction.PushToTalk, "team", KeyBinding.Of(Key.CapsLock)),
         };
 
         const string Prefix = "stealth.key.";

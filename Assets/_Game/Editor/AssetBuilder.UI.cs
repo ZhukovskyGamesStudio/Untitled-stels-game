@@ -174,6 +174,28 @@ namespace Stealth.EditorTools
             if (width > 0f) le.minWidth = le.preferredWidth = width;
         }
 
+        /// <summary>The voice chat column of the settings page (GameMenu: mode, microphone, sensitivity with a live meter, noise suppression, volume).</summary>
+        static void BuildVoiceSettings(UiElements e, GameMenu menu, Transform settings)
+        {
+            var vc = Column(settings, "Voice", new Vector2(250, -84), 460);
+            ColumnText(vc, "Title", L("menu.voice_title"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
+            Spacer(vc, 8);
+            menu.VoiceMode = ButtonIn(e, vc, "VoiceMode", "", 30); // the labels are set by GameMenu
+            Spacer(vc, 6);
+            menu.VoiceDevice = ButtonIn(e, vc, "VoiceDevice", "", 30);
+            Spacer(vc, 8);
+            menu.MicSensitivityLabel = ColumnText(vc, "MicSensitivityLabel", "", 15, Color.white, 22);
+            menu.MicSensitivity = SliderIn(e, vc, "MicSensitivity", 0f, 1f, false);
+            menu.MicLevelLabel = ColumnText(vc, "MicLevelLabel", "", 15, Color.white, 22);
+            menu.MicLevel = SliderIn(e, vc, "MicLevel", 0f, 1f, false);
+            menu.MicLevel.interactable = false;
+            Spacer(vc, 8);
+            menu.NoiseSuppression = ToggleIn(e, vc, "NoiseSuppression", L("menu.voice_suppress"));
+            Spacer(vc, 8);
+            menu.VoiceVolumeLabel = ColumnText(vc, "VoiceVolumeLabel", "", 15, Color.white, 22);
+            menu.VoiceVolume = SliderIn(e, vc, "VoiceVolume", 0f, 2f, false);
+        }
+
         static RectTransform Column(Transform parent, string name, Vector2 pos, float width, float spacing = 6f)
         {
             var rt = R(parent, name, TopCenter, TopCenter, pos, new Vector2(width, 0));
@@ -432,7 +454,7 @@ namespace Stealth.EditorTools
                 // the house's kind on the left (office, hospital, garage…), its main job (vault / hostage) on the right
                 const float ix = 60f, jw = 42f;
                 view.KindIcon = Img(R(go.transform, "KindIcon", Left, Left, new Vector2(6, 0), new Vector2(50, 50)), Color.white, Icon("house_office"));
-                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage", "house_apartments" }
+                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage", "house_apartments", "house_abandoned" }
                     .Select(n => Icon(n)).ToArray();
                 if (view.KindIcons.Length != System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Length)
                     throw new System.InvalidOperationException("RouteSign: one icon per HouseKind");
@@ -489,6 +511,36 @@ namespace Stealth.EditorTools
             ColumnText(houses, "Title", L("cheats.start_house"), 20, new Color(1f, 0.8f, 0.3f), 30, true, TextAnchor.MiddleCenter);
             panel.Houses = System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Cast<Stealth.Level.HouseKind>()
                 .Select(k => ButtonIn(e, houses, "House" + k, L(Stealth.Level.HouseKinds.NameKey(k)), 34)).ToArray();
+            root.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The F8 style picker: its own canvas over the menu with a raycaster, a grid the panel fills with a button per style
+        /// (copies of a hidden template), hidden until opened.
+        /// </summary>
+        static void BuildStylePanel(UiElements e, Transform parent)
+        {
+            var holder = R(parent, "Styles", Center, Center, Vector2.zero, Vector2.zero);
+            var canvas = holder.gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 50;
+            holder.gameObject.AddComponent<GraphicRaycaster>();
+            var panel = holder.gameObject.AddComponent<StylePanel>();
+            var root = R(holder, "Panel", Center, Center, Vector2.zero, new Vector2(760, 470));
+            Img(root, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
+            panel.Root = root.gameObject;
+            Txt(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -12), new Vector2(720, 34)), L("styles.panel_title"), 20, TextAnchor.MiddleCenter, new Color(1f, 0.8f, 0.3f), true);
+            var list = R(root, "List", TopCenter, TopCenter, new Vector2(0, -56), new Vector2(720, 400));
+            var grid = list.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(232, 38);
+            grid.spacing = new Vector2(12, 8);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 3;
+            grid.childAlignment = TextAnchor.UpperCenter;
+            panel.List = list;
+            panel.Template = Instance<Button>(e.Button, root, "Template");
+            SetText(panel.Template.GetComponentInChildren<Text>(), "");
+            panel.Template.gameObject.SetActive(false);
             root.gameObject.SetActive(false);
         }
 
@@ -908,7 +960,7 @@ namespace Stealth.EditorTools
             var settings = Stretch(root.transform, "Settings");
             menu.SettingsPage = settings.gameObject;
             Img(settings, new Color(0.04f, 0.05f, 0.06f, 0.92f)).raycastTarget = true;
-            var sc = Column(settings, "Column", new Vector2(0, -84), 460);
+            var sc = Column(settings, "Column", new Vector2(-250, -84), 460);
             ColumnText(sc, "Title", L("menu.settings"), 26, Color.white, 44, true, TextAnchor.MiddleCenter);
             Spacer(sc, 8);
             menu.SensitivityLabel = ColumnText(sc, "SensitivityLabel", "", 15, Color.white, 22);
@@ -929,6 +981,7 @@ namespace Stealth.EditorTools
             Spacer(sc, 10);
             menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
             Spacer(sc, 14);
+            BuildVoiceSettings(e, menu, settings);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(buttons, 32);
             var bh = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
