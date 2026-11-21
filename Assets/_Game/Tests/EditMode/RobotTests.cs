@@ -284,6 +284,7 @@ namespace Stealth.Tests
             }
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void MotionSensorsSitFlushInTheirCorners()
         {

@@ -18,6 +18,7 @@ namespace Stealth.Tests
                     yield return LevelGenerator.Generate(seed * 104729 + house, house, null, null, 2, new FeatureSettings());
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void MostLootRoomsHaveASecondWayIn()
         {
@@ -46,6 +47,7 @@ namespace Stealth.Tests
             Assert.That(two, Is.GreaterThan(rooms * 3 / 4), $"loot rooms with two ways in: {two} of {rooms}");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void KeysLieDeeperThanTheirDoors()
         {

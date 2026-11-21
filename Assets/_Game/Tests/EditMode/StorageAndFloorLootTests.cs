@@ -13,6 +13,7 @@ namespace Stealth.Tests
     /// </summary>
     public class StorageAndFloorLootTests
     {
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void SomeLootLiesOnTheFloorClearOfTheFurniture()
         {
@@ -55,6 +56,7 @@ namespace Stealth.Tests
             Assert.AreEqual(-1, LootErrands.Nearest(Vector3.zero, new[] { items[1] }, 6f));
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomHasEmptyRacksWithPlacesForLoot()
         {

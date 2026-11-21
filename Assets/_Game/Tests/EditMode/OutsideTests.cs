@@ -51,6 +51,7 @@ namespace Stealth.Tests
             Assert.IsNotNull(prefab.GetComponent<BoxCollider>(), "the glass stops bodies and items");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TestHousesHaveNoneToTwoWindows()
         {

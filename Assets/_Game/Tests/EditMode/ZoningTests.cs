@@ -31,6 +31,7 @@ namespace Stealth.Tests
             Assert.AreEqual(1, RoomRules.For(RoomType.Infirmary, new BuildingSettings().RoomTypeRules).PerHouse, "the settings it came from keep theirs");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [TestCase(false)]
         [TestCase(true)]
         public void RoomsThatBelongTogetherAreNextDoor(bool classic)
@@ -55,6 +56,7 @@ namespace Stealth.Tests
             Assert.That(napNoisy, Is.LessThanOrEqualTo(naps / 10), $"nap rooms next to noise: {napNoisy} of {naps}");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [TestCase(false)]
         [TestCase(true)]
         public void HousesAreZonedAndCapped(bool classic)

@@ -229,6 +229,16 @@ namespace Stealth.Level
         public BasementFrame Cellar => new(BasementOrigin, BasementYaw);
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
+
+        /// <summary>
+        /// The two shafts down from the ground floor (3 x 3 plan cells each): the entry's to the basement and the exit's to the
+        /// sewer's passage. Everything under the floor there — the slab, the ground plate, the city's asphalt — is cut open.
+        /// </summary>
+        public List<Rect> ShaftHoles => new()
+        {
+            new Rect(HatchPosition.x - Basement.ShaftHalf, HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf),
+            new Rect(ExitHatchPosition.x - Basement.ShaftHalf, ExitHatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf),
+        };
         int m_ExitRoom = -1, m_EntryRoom = -1;
         /// <summary>The exit hatch's room (chosen once by the generator; its type is kept: <see cref="PlanRoom.Kept"/>), −1 = none.</summary>
         public int ExitRoom

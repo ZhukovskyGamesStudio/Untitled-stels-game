@@ -20,9 +20,10 @@
 Unity в batchmode не запустится, если проект открыт в редакторе — закрой его или работай через редактор.
 
 ```bash
-Tools/dev.sh cycle              # ОДИН запуск Unity: недостающие ассеты + EditMode-тесты + development-билд (только скрипты, если менялся лишь код)
+Tools/dev.sh cycle              # ОДИН запуск Unity: недостающие ассеты + EditMode-тесты без медленных + development-билд (только скрипты, если менялся лишь код)
+SLOW=1 Tools/dev.sh cycle       # весь набор, с [Category("Slow")] (десятки домов, ~90% времени): перед коммитом и после правок генератора; время тестов — Logs/test_times.txt
 NOASSETS=1 NOTESTS=1 Tools/dev.sh cycle  # шаги можно пропускать (NOPLAYER=1 — без билда, FULL=1 — полный билд); FILTER/FORCE/REBUILD как ниже
-Tools/dev.sh tests              # компиляция + все EditMode-тесты (итог и упавшие — в конце вывода); в открытом редакторе — MCP run_tests
+Tools/dev.sh tests              # компиляция + EditMode-тесты без медленных (SLOW=1 — все; итог и упавшие — в конце вывода); в открытом редакторе — MCP run_tests
 Tools/dev.sh assets             # дособрать недостающие ассеты (существующие префабы не трогает)
 FORCE=1 Tools/dev.sh assets     # пересобрать ВСЕ ассеты из кода (ручные правки в префабах пропадут)
 REBUILD_UI=1 Tools/dev.sh assets  # пересобрать только UI-префабы (HUD, меню, инвентарь, элементы)

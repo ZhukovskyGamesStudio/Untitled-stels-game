@@ -156,6 +156,7 @@ namespace Stealth.Tests
             Assert.AreEqual(0, level.Features.KeyDoors, "no key doors (no keys lying around)");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryTestRoomHasALightNormalDimOrFlickering()
         {

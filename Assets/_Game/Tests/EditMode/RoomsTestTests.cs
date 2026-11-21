@@ -51,6 +51,7 @@ namespace Stealth.Tests
             Assert.Greater(main.Styles.Styles.Length, 1, "the main game has all the styles (F8)");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void HousesHaveEveryRoomTypeOnOneFloorAndOnlyWorkers()
         {

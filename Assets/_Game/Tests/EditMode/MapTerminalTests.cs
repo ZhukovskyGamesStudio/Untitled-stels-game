@@ -11,6 +11,7 @@ namespace Stealth.Tests
     /// <summary>The HUD has no map: the map is a terminal's (TerminalKind.Map), and every kind of house has one.</summary>
     public class MapTerminalTests
     {
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryKindOfHouseHasMapTerminalsSpreadOut()
         {
