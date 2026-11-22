@@ -26,6 +26,20 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheFeetStandOnTheFloorNotOverIt()
+        {
+            // the capsule floats ~9 cm over the floor: the body goes down so the lower ankle is its height over the floor
+            Assert.AreEqual(-0.09f, HumanMath.PlantShift(0.17f, 0f, 0.08f), 1e-4f);
+            Assert.AreEqual(0.02f, HumanMath.PlantShift(0.06f, 0f, 0.08f), 1e-4f, "sunk a little: up");
+            Assert.AreEqual(-0.15f, HumanMath.PlantShift(2f, 0f, 0.08f), 1e-4f, "high in the air (falling): no dragging down");
+            Assert.IsTrue(HumanMath.Planted(false, false, BodyPose.None));
+            Assert.IsTrue(HumanMath.Planted(false, false, BodyPose.Work));
+            Assert.IsFalse(HumanMath.Planted(false, true, BodyPose.None), "seated");
+            Assert.IsFalse(HumanMath.Planted(true, false, BodyPose.None), "lying");
+            Assert.IsFalse(HumanMath.Planted(false, false, BodyPose.Ladder), "on a ladder");
+        }
+
+        [Test]
         public void TheBodyIsBusyWithOneThingAtATime()
         {
             Assert.AreEqual(BodyPose.Ladder, HumanMath.PoseOf(true, true, true), "on a ladder nothing else shows");
@@ -110,6 +124,9 @@ namespace Stealth.Tests
             var bones = prefab.GetComponentsInChildren<Transform>(true).Select(t => t.name).ToArray();
             foreach (var bone in new[] { "hips", "spine", "chest", "neck", "head", "upper_arm.L", "forearm.R", "hand.L", "fingers.L", "thumb.R", "thigh.L", "shin.R", "foot.L", "toe.R" })
                 Assert.Contains(bone, bones, $"no bone {bone}");
+            var planted = prefab.GetComponent<HumanRig>();
+            Assert.IsTrue(planted.Hips != null && planted.FootL != null && planted.FootR != null, "the bones that plant the feet");
+            Assert.That(planted.AnkleHeight, Is.InRange(0.03f, 0.16f), "the ankle's height over the sole");
 
             // a real adult, standing on the floor, facing +Z
             var go = Object.Instantiate(prefab);

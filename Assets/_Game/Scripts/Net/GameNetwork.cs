@@ -119,7 +119,8 @@ namespace Stealth.Net
         {
             if (Manager.IsServer || clientId != Manager.LocalClientId) return;
             // We were disconnected from the host.
-            SetStatus(string.IsNullOrEmpty(Manager.DisconnectReason) ? Loc.T("net.lost") : Manager.DisconnectReason);
+            if (!string.IsNullOrEmpty(Manager.DisconnectReason)) Debug.Log($"[Net] Disconnected: {Manager.DisconnectReason}");
+            SetStatus(Loc.T("net.lost")); // (the transport's own reason is for the log)
             Leave();
         }
 
@@ -138,7 +139,7 @@ namespace Stealth.Net
         ushort ISessionLauncher.LocalPort => LocalPort;
         bool ISessionLauncher.IsHost => Manager.IsHost;
         bool ISessionLauncher.SteamAvailable => SteamManager.Initialized;
-        string ISessionLauncher.SteamStatus => SteamManager.Initialized ? Loc.F("net.steam_on", SteamManager.PersonaName) : Loc.F("net.steam_off", SteamManager.Error);
+        string ISessionLauncher.SteamStatus => SteamManager.Initialized ? Loc.F("net.steam_on", SteamManager.PersonaName) : Loc.T("net.steam_off"); // (the reason — SteamManager.Error — goes to the log, not to the player)
         string ISessionLauncher.LocalPlayerName => SteamManager.Initialized ? SteamManager.PersonaName : null;
         string ISessionLauncher.LocalPlayerId
         {

@@ -124,7 +124,8 @@ namespace Stealth.Net
         {
             if (ioFailure || result.m_eResult != EResult.k_EResultOK)
             {
-                GameNetwork.Instance.SetStatus(Loc.F("net.lobby_create_failed", result.m_eResult));
+                Debug.LogWarning($"[SteamLobby] Create failed: {result.m_eResult}");
+                GameNetwork.Instance.SetStatus(Loc.T("net.lobby_create_failed"));
                 return;
             }
             LobbyId = result.m_ulSteamIDLobby;
@@ -161,7 +162,8 @@ namespace Stealth.Net
             if (owner == SteamUser.GetSteamID()) return; // we are the host
             if ((EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse != EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess)
             {
-                GameNetwork.Instance.SetStatus(Loc.F("net.lobby_join_failed", (EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse));
+                Debug.LogWarning($"[SteamLobby] Join failed: {(EChatRoomEnterResponse)entered.m_EChatRoomEnterResponse}");
+                GameNetwork.Instance.SetStatus(Loc.T("net.lobby_join_failed"));
                 LobbyId = 0;
                 return;
             }

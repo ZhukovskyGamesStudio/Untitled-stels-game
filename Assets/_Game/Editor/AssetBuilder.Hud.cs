@@ -291,6 +291,9 @@ namespace Stealth.EditorTools
             hud.HitFlash = Img(Stretch(overlays, "HitFlash"), new Color(1, 0, 0, 0.2f));
             hud.GasVignette = Img(Stretch(overlays, "GasVignette"), new Color(0.4f, 0.95f, 0.3f, 0.5f), S("Vignette"));
             hud.GasTint = Img(Stretch(overlays, "GasTint"), new Color(0.5f, 0.9f, 0.3f, 0.1f));
+            hud.SpeedLines = Img(Stretch(overlays, "SpeedLines"), new Color(1f, 0.95f, 0.85f, 0f), UiSprite("speed_lines"));
+            hud.SpeedLines.raycastTarget = false;
+            hud.SpeedLines.gameObject.SetActive(false);
             hud.LaughText = Txt(R(overlays, "Laugh", TopCenter, TopCenter, new Vector2(0, -216), new Vector2(400, 50)), "HA-HA", 30, TextAnchor.MiddleCenter, new Color(0.8f, 1f, 0.6f, 0.9f), true);
             hud.GasText = Txt(R(overlays, "GasTimer", TopCenter, TopCenter, new Vector2(0, -256), new Vector2(120, 30)), "10", 22, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.6f), true);
             hud.DownedTint = Img(Stretch(overlays, "DownedTint"), new Color(0.25f, 0f, 0f, 0.55f));

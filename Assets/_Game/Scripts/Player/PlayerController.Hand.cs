@@ -211,9 +211,12 @@ namespace Stealth.Player
             t.localScale = Vector3.one * scale;
             if (pose.Compact)
             {
-                // on the fingers, turned, then tilted (−: its far edge up, towards the eyes)
-                t.localRotation = Quaternion.Euler(pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, pose.Yaw, 0f);
-                t.localPosition = new Vector3(0f, FistTop + b.size.y * scale * 0.5f, 0f) - t.localRotation * (b.center * scale);
+                // on the fingers: rolled (stood up), turned, then tilted (−: its far edge up, towards the eyes)
+                var r = Quaternion.Euler(pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, pose.Yaw, 0f) * Quaternion.Euler(0f, 0f, pose.Roll);
+                t.localRotation = r;
+                var e = b.extents * scale; // its half height as it now stands, resting on the fist
+                float halfUp = Mathf.Abs((r * Vector3.right).y) * e.x + Mathf.Abs((r * Vector3.up).y) * e.y + Mathf.Abs((r * Vector3.forward).y) * e.z;
+                t.localPosition = new Vector3(0f, FistTop + halfUp, 0f) - r * (b.center * scale);
             }
             else
             {

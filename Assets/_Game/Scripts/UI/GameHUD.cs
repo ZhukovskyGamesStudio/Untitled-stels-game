@@ -37,6 +37,9 @@ namespace Stealth.UI
         public Image LowHpVignette;
         public Image HitFlash;
         public Image GasVignette;
+        [Tooltip("The coffee's speed lines round the edges (Tools/Art/generate_speed_lines.py): shown while running caffeinated.")]
+        public Image SpeedLines;
+        float m_Rush;
         public Image GasTint;
         public Text LaughText;
         [Tooltip("Seconds of laughing gas left before passing out.")]
@@ -631,6 +634,21 @@ namespace Stealth.UI
             {
                 var cam = me.Camera.transform;
                 HitArc.Set(UiMath.ScreenAngle(cam.position, cam.forward, cam.position + m_Hit.Direction), 120f, new Color(1f, 0.15f, 0.1f, arcAlpha));
+            }
+
+            // The coffee: running, streaks rush past the edges of the view (the motor widens the view too)
+            if (SpeedLines != null)
+            {
+                float rush = me.Downed || me.SeatIndex >= 0 || me.Watching != null ? 0f : me.Rush;
+                m_Rush = Mathf.MoveTowards(m_Rush, rush, Time.deltaTime * 3f);
+                Ui.Show(SpeedLines, m_Rush > 0.01f);
+                if (m_Rush > 0.01f)
+                {
+                    // a flicker and a slight pulse of the streaks: they rush, not stand
+                    float flicker = 0.75f + 0.25f * Mathf.PerlinNoise(now * 9f, 0.3f);
+                    SpeedLines.color = new Color(1f, 0.95f, 0.85f, 0.55f * m_Rush * flicker);
+                    SpeedLines.rectTransform.localScale = Vector3.one * (1.02f + 0.03f * Mathf.Sin(now * 23f));
+                }
             }
 
             // Laughing gas outside: the green edge says what it is; only the seconds left are written.

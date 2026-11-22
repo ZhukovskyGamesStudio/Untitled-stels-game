@@ -128,13 +128,18 @@ namespace Stealth.Player
             Camera.fieldOfView = PickingRules.Fov; // (the motor sets the player's own again once the screen is over)
         }
 
-        /// <summary>Owner, every frame: the coffee and a hard landing scale the walk.</summary>
+        /// <summary>Owner, every frame: the coffee and a hard landing scale the walk; running on coffee widens the view.</summary>
         void UpdateGearMotion()
         {
             float scale = GearRules.SlowNow(m_LandSlow, Time.time - m_LandedAt, Gear.FallSlowSeconds);
             if (Caffeinated) scale *= Gear.CoffeeMoveScale;
             Motor.SpeedScale = scale;
+            Rush = UI.RushRules.Strength(Caffeinated, Motor.HorizontalSpeed, Motor.WalkSpeed);
+            Motor.FovBoost = Rush * UI.RushRules.FovKick;
         }
+
+        /// <summary>Owner: 0..1, how fast it feels running on coffee now (the HUD's speed lines, the wider view).</summary>
+        public float Rush { get; private set; }
 
         /// <summary>Held-E work (hacking, unscrewing, picking, searching) runs this many times faster now: the coffee.</summary>
         public float WorkScale => Caffeinated ? Gear.CoffeeWorkScale : 1f;

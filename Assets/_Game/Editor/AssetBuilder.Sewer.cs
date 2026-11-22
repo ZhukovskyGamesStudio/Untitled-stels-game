@@ -123,6 +123,16 @@ namespace Stealth.EditorTools
                 return w;
             });
 
+            // the route sign's stand: a road sign's board on two galvanised posts (Tools/Blender/road_sign.py), no colliders
+            var stand = Prefab($"{SewerKit}/RouteSignStand.prefab", () =>
+            {
+                var root = new GameObject("RouteSignStand");
+                var model = Model("route_sign_stand");
+                model.transform.SetParent(root.transform, false);
+                Paint(model, "Metal", "Metal", "Metal");
+                foreach (var c in model.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+                return root;
+            });
             var sewer = Prefab($"{LevelPrefabs}/Sewer.prefab", () =>
             {
                 var root = new GameObject("Sewer");
@@ -150,6 +160,7 @@ namespace Stealth.EditorTools
                 loc.BranchPrefab = branch.GetComponent<SewerBranch>();
                 loc.Flooding = flood;
                 loc.SignPrefab = sign;
+                loc.SignStandPrefab = stand;
                 return root;
             });
 
@@ -516,11 +527,11 @@ namespace Stealth.EditorTools
             car.Headlights = new[]
             {
                 // at the model's head lamps (car.py head_lights: x ±0.70, 0.92 up, nose at z 2.35), just ahead of the bumper
-                // high beams: a long narrow throw down the tunnel, always on
-                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
-                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
+                // high beams, always on: a wide bright throw down the tunnel — walls and vault lit well ahead
+                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(2f, -4f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 45f, 65f),
+                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(2f, 4f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 45f, 65f),
             };
-            foreach (var l in car.Headlights) { l.spotAngle = 42f; l.innerSpotAngle = 18f; }
+            foreach (var l in car.Headlights) { l.spotAngle = 72f; l.innerSpotAngle = 34f; }
             var engine = root.AddComponent<AudioSource>();
             engine.clip = s_Bank != null ? s_Bank.CarEngine : null;
             engine.loop = true;

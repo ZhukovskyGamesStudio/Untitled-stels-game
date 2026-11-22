@@ -909,7 +909,7 @@ def model_floor_cushions():
 
 def model_night_table():
     """Bedside table 0.5 x 0.44: a carcass on tapered legs with a drawer that slides out (BodyDrawer0: a box behind
-    its front, the knob in it: Items.Storage) and an open niche, a top, a little lamp with a glowing shade and a book."""
+    its front, the knob in it: Items.Storage) and an open niche, a top and a little lamp with a glowing shade (no book on it: a modelled book looked like loot to pick up)."""
     body = [s.rbox((0.5, 0.44, 0.025), (0, 0, 0.3875), r=0.008, seg=2)]                    # top
     cab = s.rbox((0.46, 0.4, 0.26), (0, 0.01, 0.255), r=0.01, seg=2)
     cab = s.boolean(cab, s.rbox((0.4, 0.36, 0.1), (0, -0.04, 0.185), r=0.008, seg=1), "DIFFERENCE")  # niche
@@ -927,7 +927,6 @@ def model_night_table():
     acc = [s.lathe([(0.0, 0.398), (0.055, 0.398), (0.058, 0.405), (0.05, 0.42), (0.016, 0.428), (0.0, 0.43)],
                    seg=20, loc=(0.11, 0.06, 0))]                                             # lamp base
     acc.append(s.rcyl(0.008, 0.1, (0.11, 0.06, 0.475), seg=10, r=0.002, bevel_seg=1))       # stem
-    acc.append(s.rbox((0.15, 0.21, 0.035), (-0.1, -0.02, 0.416), r=0.004, seg=1, rot=(0, 0, 0.25)))  # book
     s.part("Accent", acc)
     s.part("Eye", [s.lathe([(0.0, 0.48), (0.085, 0.48), (0.088, 0.485), (0.064, 0.595), (0.06, 0.6), (0.0, 0.6)],
                            seg=24, loc=(0.11, 0.06, 0))])

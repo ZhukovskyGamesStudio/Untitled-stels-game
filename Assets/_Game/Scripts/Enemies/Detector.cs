@@ -284,9 +284,16 @@ namespace Stealth.Enemies
         /// <summary>Colour of the status lights in the current state (hacked is handled by the base).</summary>
         protected abstract Color StatusColor { get; }
 
+        /// <summary>Calm now (patrolling, idle): the ear lamps show their own yellow, not the status colour.</summary>
+        protected virtual bool AtEase => true;
+        /// <summary>It has a visual sensor: its eye glows (blue when calm).</summary>
+        public virtual bool GlowEyes => true;
+        /// <summary>It hears: its ear lamps glow (yellow when calm).</summary>
+        public virtual bool GlowEars => false;
+
         protected void RefreshStatus()
         {
-            Status.Apply(IsHacked ? SecurityPalette.Hacked : StatusColor);
+            Status.Apply(IsHacked ? SecurityPalette.Hacked : StatusColor, !IsHacked && AtEase, GlowEyes, GlowEars);
             OnStatusChanged();
         }
 

@@ -14,6 +14,9 @@ namespace Stealth.Enemies
     /// </summary>
     public class SpiderBot : SecurityDevice
     {
+        /// <summary>No eye to glow (blind: it feels its webs).</summary>
+        public override bool GlowEyes => false;
+
         [Tooltip("Tuning (SpiderProfile) — a separate asset next to the prefab.")]
         public SpiderProfile Profile;
         [Tooltip("One wire of its web: a unit length along local Z (scaled to the wire), its pivot at one end.")]

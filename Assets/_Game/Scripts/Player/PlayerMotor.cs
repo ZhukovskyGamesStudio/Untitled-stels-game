@@ -137,6 +137,8 @@ namespace Stealth.Player
         public bool InHatch { get; set; }
         /// <summary>The walk's speed × this (the instant coffee, a hard landing: <see cref="PlayerController"/> sets it).</summary>
         public float SpeedScale { get; set; } = 1f;
+        /// <summary>Degrees added to the field of view (running on coffee feels fast).</summary>
+        public float FovBoost { get; set; }
         /// <summary>Sitting in the car: no walking, falling or crouching (the car carries the player).</summary>
         public bool Seated { get; set; }
         public const float HatchEyeHeight = 0.24f;
@@ -270,7 +272,7 @@ namespace Stealth.Player
 
             // Field of view: a subtle widening while actually running fast.
             bool fast = IsSprinting && HorizontalSpeed > WalkSpeed + 0.5f;
-            float targetFov = GameSettings.Fov + (fast ? SprintFovKick : 0f);
+            float targetFov = GameSettings.Fov + (fast ? SprintFovKick : 0f) + FovBoost;
             m_Fov = Mathf.Lerp(m_Fov, targetFov, 1f - Mathf.Exp(-8f * dt));
             if (cam != null) cam.fieldOfView = m_Fov;
         }

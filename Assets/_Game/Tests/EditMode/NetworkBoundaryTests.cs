@@ -141,13 +141,13 @@ namespace Stealth.Tests
             plate.Spawned(new FakeDetectorLink(), 9, isServer: true);
             me.OnHackRequest(plate);
             Assert.IsTrue(plate.IsHacked);
-            Assert.AreEqual(SecurityPalette.Hacked, plate.Status.Current, "goes dark");
+            Assert.AreEqual(SecurityPalette.Off, plate.Status.Current, "a plate senses with neither eyes nor ears: nothing glows on it");
         }
 
         [Test]
         public void ReplicatedDetectorStateDrivesTheLook()
         {
-            m_Plate = Spawn("Sensors/SensorPlate.prefab", Vector3.zero);
+            m_Plate = Spawn("Sensors/SensorMotion.prefab", Vector3.zero); // a visual sensor: its lens shows the status
             var plate = (SecurityDevice)m_Plate.GetComponent<Detector>();
             plate.Spawned(new FakeDetectorLink(), 3, isServer: false);
             var s = DetectorSnapshot.Initial;

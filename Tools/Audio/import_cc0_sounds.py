@@ -9,7 +9,8 @@ Run:  python Tools/Audio/import_cc0_sounds.py
 
 - car_engine: domasx2, "racing car engine sound loops" (OpenGameArt), loop_0.wav — an idle loop; the game pitches it
   with the revs (Car.Sound). Its level creeps up by ~2 dB along the loop, which pulsed at every wrap: the slow
-  envelope is flattened, then the end is crossfaded into the start so the seam is continuous.
+  envelope is flattened, the loop is cut where the firing is back in phase with its start and crossfaded there; the
+  game keeps short loops uncompressed (AssetBuilder.Audio: Vorbis padded the seam with a click).
 - car_horn: 15HPanska_Ruttner_Jan, "Car Horn.wav" (Wikimedia Commons, from freesound 461679) — two honks; the second,
   fuller one with its ring-out is kept.
 """
@@ -74,11 +75,21 @@ def engine(x):
     padded = np.concatenate([x[-win:], x, x[:win]])
     env = np.sqrt(np.convolve(padded ** 2, np.ones(win) / win, mode="same"))[win:-win]
     x = x / np.maximum(env, 1e-3) * env.mean()
-    # the last 30 ms faded into the first: the loop ends where it begins
-    f = int(0.03 * SR)
+    # the loop's length: where what follows looks most like its start (the engine's firing in phase), searched in the
+    # last fifth; then the start crossfaded from that continuation (60 ms, equal power): at the wrap the sample after the
+    # last is the very one the recording had there, and the firing never jumps
+    f = int(0.06 * SR)
+    head = x[:f] - x[:f].mean()
+    best, length = -2.0, len(x) - f
+    for end in range(int(len(x) * 0.8), len(x) - f):
+        seg = x[end:end + f] - x[end:end + f].mean()
+        c = float(np.dot(seg, head) / (np.linalg.norm(seg) * np.linalg.norm(head) + 1e-9))
+        if c > best:
+            best, length = c, end
     ramp = np.sin(np.linspace(0, np.pi / 2, f)) ** 2
-    out = x[:len(x) - f].copy()
-    out[:f] = x[:f] * ramp + x[len(x) - f:] * (1 - ramp)
+    out = x[:length].copy()
+    out[:f] = x[:f] * ramp + x[length:length + f] * np.cos(np.linspace(0, np.pi / 2, f)) ** 2
+    print(f"car_engine loop: {length / SR:.3f} s, seam match {best:.3f}")
     return out
 
 

@@ -14,6 +14,9 @@ namespace Stealth.Enemies
     /// </summary>
     public class CeilingVacuum : SecurityDevice
     {
+        /// <summary>No eye to glow (its laser fan is what senses: no other glow).</summary>
+        public override bool GlowEyes => false;
+
         [Tooltip("Tuning (VacuumProfile) — a separate asset next to the prefab.")]
         public VacuumProfile Profile;
         protected override DeviceProfile Device => Profile;
