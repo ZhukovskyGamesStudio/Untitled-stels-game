@@ -6,6 +6,9 @@ namespace Stealth.Enemies
     /// <summary>Pressure plate in a doorway: stepping on it raises an alarm. A steel slab with a glowing border — jump over it or hack it.</summary>
     public class PressurePlate : SecurityDevice
     {
+        /// <summary>No eye to glow (it feels a step: nothing to glow).</summary>
+        public override bool GlowEyes => false;
+
         [Tooltip("Tuning (PressurePlateProfile) — a separate asset next to the prefab.")]
         public PressurePlateProfile Profile;
         protected override DeviceProfile Device => Profile;

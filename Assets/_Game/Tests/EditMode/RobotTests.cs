@@ -284,6 +284,45 @@ namespace Stealth.Tests
             }
         }
 
+        [Test]
+        public void OnlyWhatARobotSensesWithGlows()
+        {
+            var calm = SecurityPalette.Calm;
+            var (eye, ear, light, lit) = SecurityPalette.Glow(calm, true, true, true);
+            Assert.AreEqual(calm, eye, "the eye: blue");
+            Assert.AreEqual(SecurityPalette.Hearing, ear, "the ears: yellow");
+            Assert.AreEqual(calm, light);
+            Assert.IsTrue(lit);
+            (eye, ear, light, lit) = SecurityPalette.Glow(calm, true, false, true);
+            Assert.AreEqual(SecurityPalette.Off, eye, "blind: no blue anywhere");
+            Assert.AreEqual(SecurityPalette.Hearing, light, "its light is the ears' yellow");
+            (eye, ear, light, lit) = SecurityPalette.Glow(calm, true, false, false);
+            Assert.AreEqual(SecurityPalette.Off, eye);
+            Assert.AreEqual(SecurityPalette.Off, ear);
+            Assert.IsFalse(lit, "no sensors (a lidar, the hunter): nothing glows, no light");
+            (eye, ear, _, _) = SecurityPalette.Glow(SecurityPalette.Alarm, false, true, true);
+            Assert.AreEqual(SecurityPalette.Alarm, eye, "the alarm shows on what it has");
+            Assert.AreEqual(SecurityPalette.Alarm, ear);
+        }
+
+        [Test]
+        public void TheMobileRobotsGlowByTheirSenses()
+        {
+            foreach (var name in new[] { "RobotGuard", "RobotListener", "RobotHound", "RobotSweeper", "RobotHunter", "RobotWorker" })
+            {
+                var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Robots/{name}.prefab");
+                var rc = prefab.GetComponent<RobotController>();
+                Assert.IsNotEmpty(rc.Status.Renderers, $"{name}: the eye mount's lens");
+                foreach (var r in rc.Status.Renderers) Assert.IsTrue(r.transform.parent != null && HasParent(r.transform, "SensorEye"), $"{name}: {r.name} is not the eye");
+                foreach (var r in rc.Status.Dark) Assert.IsFalse(HasParent(r.transform, "SensorEye"), $"{name}: the eye is never dark");
+            }
+            static bool HasParent(Transform t, string prefix)
+            {
+                for (; t != null; t = t.parent) if (t.name.StartsWith(prefix)) return true;
+                return false;
+            }
+        }
+
         [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void MotionSensorsSitFlushInTheirCorners()

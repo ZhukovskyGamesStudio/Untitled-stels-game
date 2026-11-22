@@ -25,6 +25,7 @@ namespace Stealth.Enemies
 
         protected virtual Color IdleColor => SecurityPalette.Calm;
         protected override Color StatusColor => SecurityPalette.ForAlert(Alert, IdleColor);
+        protected override bool AtEase => Alert == 0;
 
         protected override void OnSpawned()
         {

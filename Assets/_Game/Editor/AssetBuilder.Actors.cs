@@ -140,6 +140,7 @@ namespace Stealth.EditorTools
                 // under the animated body: it leans and sags with it (the poses are the robot's own: the body sits at its origin)
                 lift.transform.SetParent(anim.Model != null ? anim.Model : go.transform, false);
                 Paint(lift, "WorkerBody", "RobotAccent", "SensorGlow");
+                rc.Status.Dark = rc.Status.Dark.Concat(Parts(lift, "Eye")).ToArray(); // the lift's lamps: no sense of its own
                 var armPivot = Child(lift.transform, "LiftArmPivot", CargoMotion.Hinge);
                 var trayPivot = Child(lift.transform, "LiftTrayPivot", CargoMotion.PinRest);
                 Find(lift, "AccentLiftArm").SetParent(armPivot.transform, true);
@@ -493,7 +494,17 @@ namespace Stealth.EditorTools
             rc.Profile = Profile<RobotProfile>(name, p => config(p.Senses, p.Traits, p.Animation));
             BuildSensorRig(root, model, rc, bodyMat, eyePos, radius);
             AddLoop(root, MotorFor(name, rc.Profile.Traits.HoverHeight > 0f), name == "RobotWorker" ? 1.3f : name == "RobotSorter" ? 1.2f : 1f);
-            rc.Status.Renderers = Parts(model, "Eye"); // the sensor lenses glow in the status colour too
+            // what glows says what it senses: the eye mount's lens (blue: it sees), the body's own lamps (yellow: it hears),
+            // never the nose or the ground probes (StatusLights, SecurityPalette.Glow)
+            bool InMount(Renderer r, string mount)
+            {
+                for (var t = r.transform; t != null && t != model.transform; t = t.parent) if (t.name.StartsWith(mount)) return true;
+                return false;
+            }
+            var glowing = Parts(model, "Eye");
+            rc.Status.Renderers = glowing.Where(r => InMount(r, "SensorEye")).ToArray();
+            rc.Status.Ears = glowing.Where(r => !InMount(r, "Sensor")).ToArray();
+            rc.Status.Dark = glowing.Where(r => InMount(r, "Sensor") && !InMount(r, "SensorEye")).ToArray();
             return root;
         }
 

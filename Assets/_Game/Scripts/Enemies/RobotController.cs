@@ -57,6 +57,11 @@ namespace Stealth.Enemies
         /// <summary>The warning moment: it has noticed someone and is about to chase («Обнаружен нарушитель»).</summary>
         public bool IsAlerted => State == RobotState.Alerted;
 
+        protected override bool AtEase => State == RobotState.Patrol;
+        /// <summary>Its eye glows only when it sees; its ear lamps only when it hears (the hunter has neither of its own).</summary>
+        public override bool GlowEyes => Profile != null && Senses.HasEyes;
+        public override bool GlowEars => Profile != null && Senses.HearingMultiplier > 0f && !Senses.FollowsSightings;
+
         protected override Color StatusColor =>
             SecurityPalette.ForState(State, ColorFilter >= 0 ? ItemCatalog.Colors[ColorFilter].Color : SecurityPalette.Calm);
 
