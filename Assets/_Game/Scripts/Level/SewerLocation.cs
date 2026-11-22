@@ -28,6 +28,8 @@ namespace Stealth.Level
             public GameObject Grate;
             [Tooltip("The panel over the mouth: where it leads.")]
             public Stealth.UI.RouteSignView Sign;
+            [Tooltip("The sign's stand: a road sign's board on two posts down to the floor (shown with the sign).")]
+            public GameObject Stand;
             [Tooltip("Lamps inside and the zone on the floor: shown only when the tunnel is open.")]
             public GameObject Lamp;
             [Tooltip("Bricks in the mouth when it leads nowhere (the bars stay behind them as the stop).")]
@@ -83,6 +85,8 @@ namespace Stealth.Level
         [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
         public SewerBranch BranchPrefab;
         public Stealth.UI.RouteSignView SignPrefab;
+        [Tooltip("The route sign's stand (Tools/Blender/road_sign.py): origin on the floor under the board, its face to −Z like the panel's.")]
+        public GameObject SignStandPrefab;
         /// <summary>How far in front of the tunnels' mouths the route panels hang: the end wall of the hall is 0.6 m of brick.</summary>
         public const float SignOffWall = 0.75f;
         /// <summary>Where a tunnel's panel stands, in its mouth's frame (+X into the tunnel): eye level, beside the car's lane.</summary>
@@ -289,6 +293,7 @@ namespace Stealth.Level
                 b.transform.localRotation = mouth.rotation;
                 foreach (var light in b.GetComponentsInChildren<Light>(true)) light.intensity *= 0.45f; // the way on lies in the dark
                 Stealth.UI.RouteSignView sign = null;
+                GameObject stand = null;
                 if (SignPrefab != null)
                 {
                     sign = Instantiate(SignPrefab, transform);
@@ -297,8 +302,15 @@ namespace Stealth.Level
                     // 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth), its face to the
                     // hall (a world-space canvas reads along its +Z: into the tunnel) — over the mouth the car's roof hid it
                     sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * SignSpot, mouth.rotation * Quaternion.Euler(0f, 90f, 0f));
+                    // a road sign: the panel is the face of a board standing on two posts on the floor, not a plate on the wall
+                    if (SignStandPrefab != null)
+                    {
+                        stand = Instantiate(SignStandPrefab, transform);
+                        stand.name = $"SignStand{i}";
+                        stand.transform.SetLocalPositionAndRotation(at + mouth.rotation * new Vector3(SignSpot.x, 0f, SignSpot.z), sign.transform.localRotation);
+                    }
                 }
-                Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Lamp = b.WhenOpen, Plug = b.Plug };
+                Branches[i] = new Branch { Mouth = b.transform, Grate = b.Bars, Sign = sign, Stand = stand, Lamp = b.WhenOpen, Plug = b.Plug };
             }
             // the water that rises if the run ends here: under the whole sewer and the hall
             float z0 = Mathf.Min(-10f, plan.Hall.MinZ - 2f), z1 = Mathf.Max(10f, plan.Hall.MaxZ + 2f);
@@ -502,6 +514,7 @@ namespace Stealth.Level
                 if (b.Grate != null) b.Grate.SetActive(!open);
                 if (b.Plug != null) b.Plug.SetActive(!open); // a way that leads nowhere is bricked up: only the ways on show
                 if (b.Sign != null) b.Sign.gameObject.SetActive(open);
+                if (b.Stand != null) b.Stand.SetActive(open);
                 if (b.Lamp != null) b.Lamp.SetActive(open);
             }
         }

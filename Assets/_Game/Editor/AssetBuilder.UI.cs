@@ -440,8 +440,9 @@ namespace Stealth.EditorTools
 
             e.RouteSign = Prefab(ElementsDir + "/RouteSign.prefab", () =>
             {
-                // A world-space panel over a sewer tunnel, ~2.0 x 0.45 m, just the two lines it holds: where it leads, how big
-                // and guarded that house is (or the countdown while the car stands in that tunnel).
+                // A world-space panel by a sewer tunnel, the face of a road sign on its stand (Level/Sewer/RouteSignStand): green
+                // with a white border, like a direction sign, just the two lines it holds: where it leads, how big and guarded
+                // that house is (or the countdown while the car stands in that tunnel).
                 const float w = 360f, h = 66f;
                 var go = new GameObject("RouteSign", typeof(RectTransform));
                 var canvas = go.AddComponent<Canvas>();
@@ -452,8 +453,8 @@ namespace Stealth.EditorTools
                 rt.localScale = Vector3.one * 0.0068f; // ~2.6 x 0.95 m: readable from the middle of the hall
                 var view = go.AddComponent<RouteSignView>();
                 view.Group = go.AddComponent<CanvasGroup>();
-                view.Frame = Img(Stretch(go.transform, "Frame"), new Color(1f, 1f, 1f, 0.35f));
-                Img(Stretch(view.Frame.rectTransform, "Back", 2f), new Color(0.02f, 0.025f, 0.03f, 0.88f));
+                view.Frame = Img(Stretch(go.transform, "Frame"), new Color(0.95f, 0.96f, 0.93f, 1f));
+                Img(Stretch(view.Frame.rectTransform, "Back", 3f), new Color(0.03f, 0.3f, 0.17f, 1f));
                 // the house's kind on the left (office, hospital, garage…), its main job (vault / hostage) on the right
                 const float ix = 60f, jw = 42f;
                 view.KindIcon = Img(R(go.transform, "KindIcon", Left, Left, new Vector2(6, 0), new Vector2(50, 50)), Color.white, Icon("house_office"));

@@ -299,6 +299,7 @@ namespace Stealth.Items
         /// ±1: which end of the model's X points ahead — the Unity import mirrors Blender's X, so a part modelled at Blender
         /// +X is at −X here) is gripped <see cref="Grip"/> of its length from the held end, turned <see cref="Roll"/>° about
         /// its length and tipped up <see cref="Pitch"/>° (90: upright). A compact one (Forward 0) rests on the fingers,
+        /// rolled <see cref="Roll"/>° about the model's Z (−90 stands a thing lying along X on its −X end… its −X up),
         /// turned <see cref="Yaw"/>° and tilted towards the eyes <see cref="Pitch"/>°.
         /// </summary>
         public readonly struct HeldPose
@@ -327,7 +328,7 @@ namespace Stealth.Items
             if (shape == Keyboard) return new HeldPose(0.3f, 0f, 0f, 0f, 0f, 0f); // carried flat across the palm, keys up
             if (shape == Tablet) return new HeldPose(0.22f, 0f, 0f, 0f, -55f, 0f); // across the hand, the screen tilted up to the eyes
             if (shape == Medkit) return new HeldPose(0.2f, 0f, 0f, 0f, 0f, 90f);  // the latches (model +Z) out to the right
-            if (shape == Coffee) return new HeldPose(0.1f, 0f, 0f, 0f);
+            if (shape == Coffee) return new HeldPose(0.11f, 0f, 0f, -90f);   // the jar lies along X, lid at −X: stood up, lid up
             if (shape == Finder) return new HeldPose(0.2f, -1f, 0.22f, 0f, 8f);  // the grip at +X in the fist, lamp and antenna (−X) ahead
             return new HeldPose(0.12f, 0f, 0f, 0f);
         }

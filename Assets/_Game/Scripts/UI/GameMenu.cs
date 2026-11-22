@@ -250,7 +250,7 @@ namespace Stealth.UI
 
         void UpdateMain(ISessionLauncher net)
         {
-            SteamStatus.text = $"Steam: {net.SteamStatus}";
+            SteamStatus.text = net.SteamStatus; // only our words: the technical reason is in the log
             HostSteam.interactable = net.SteamAvailable;
             LocalCaption.text = Loc.F("menu.local", net.LocalPort);
             Ui.Show(NetStatus, !string.IsNullOrEmpty(net.Status));

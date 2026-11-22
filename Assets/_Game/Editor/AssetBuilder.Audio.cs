@@ -29,17 +29,28 @@ namespace Stealth.EditorTools
                 if (path == VoiceFlatPath) continue; // stays raw PCM (VoiceFlatClip)
                 bool music = path.Contains("/Music/");
                 bool longLoop = music || path.Contains("office_hum") || path.Contains("gas_wind");
+                // short loops (the car's engine, robots' motors and rotors, hums) stay uncompressed: Vorbis pads a clip's
+                // end, and the seam of a loop under a second long clicked at every wrap
+                bool seamless = !longLoop && ShortLoop(path);
                 var settings = importer.defaultSampleSettings;
                 var wanted = longLoop ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad;
-                if (settings.loadType == wanted && importer.forceToMono) continue;
+                var format = seamless ? AudioCompressionFormat.PCM : AudioCompressionFormat.Vorbis;
+                if (settings.loadType == wanted && settings.compressionFormat == format && importer.forceToMono) continue;
                 settings.loadType = wanted;
-                settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                settings.compressionFormat = format;
                 settings.quality = music ? 0.6f : 0.8f;
                 importer.defaultSampleSettings = settings;
                 importer.forceToMono = true;
                 importer.loadInBackground = music;
                 importer.SaveAndReimport();
             }
+        }
+
+        /// <summary>A clip that plays as a short loop (an engine, a motor, a rotor, a hum): kept as PCM for a seamless wrap.</summary>
+        static bool ShortLoop(string path)
+        {
+            string name = System.IO.Path.GetFileNameWithoutExtension(path);
+            return name == "car_engine" || name.StartsWith("motor_") || name == "robot_motor" || name == "drone_rotor" || name.EndsWith("_hum") || name == "grind";
         }
 
         static SoundBank BuildSoundBank()

@@ -83,7 +83,18 @@ namespace Stealth.EditorTools
                 animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
                 var rig = go.AddComponent<HumanRig>();
                 rig.Animator = animator;
-                rig.HeadBone = model.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "head");
+                var bones = model.GetComponentsInChildren<Transform>(true);
+                rig.HeadBone = bones.FirstOrDefault(t => t.name == "head");
+                rig.Hips = bones.FirstOrDefault(t => t.name == "hips");
+                rig.FootL = bones.FirstOrDefault(t => t.name == "foot.L");
+                rig.FootR = bones.FirstOrDefault(t => t.name == "foot.R");
+                // the ankle over the sole: the Idle take stands on the floor (HumanRigTests), its lower foot bone's height
+                var idle = controller.animationClips.FirstOrDefault(c => c.name == "Idle");
+                if (idle != null && rig.FootL != null && rig.FootR != null)
+                {
+                    idle.SampleAnimation(model, 0f);
+                    rig.AnkleHeight = Mathf.Min(rig.FootL.position.y, rig.FootR.position.y) - go.transform.position.y;
+                }
                 return go;
             });
         }
