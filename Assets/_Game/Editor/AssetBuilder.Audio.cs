@@ -35,9 +35,13 @@ namespace Stealth.EditorTools
                 var settings = importer.defaultSampleSettings;
                 var wanted = longLoop ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad;
                 var format = seamless ? AudioCompressionFormat.PCM : AudioCompressionFormat.Vorbis;
-                if (settings.loadType == wanted && settings.compressionFormat == format && importer.forceToMono) continue;
+                // short sounds are loaded with the scene: played on demand, a clip whose data was not loaded yet failed
+                // in the player ("Cannot create FMOD::Sound instance … Unsupported file or audio format")
+                bool preload = !longLoop;
+                if (settings.loadType == wanted && settings.compressionFormat == format && settings.preloadAudioData == preload && importer.forceToMono) continue;
                 settings.loadType = wanted;
                 settings.compressionFormat = format;
+                settings.preloadAudioData = preload;
                 settings.quality = music ? 0.6f : 0.8f;
                 importer.defaultSampleSettings = settings;
                 importer.forceToMono = true;

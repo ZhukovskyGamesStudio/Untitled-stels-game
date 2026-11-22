@@ -115,8 +115,8 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// What the terminal can look at, nearest first: the cameras (camera terminal) or every robot and device that is not
-        /// hacked already (hacking terminal). Pure apart from reading the detectors' positions.
+        /// What the terminal can look at, nearest first: the cameras (camera terminal) or every robot and device but the
+        /// cameras that is not hacked already (hacking terminal). Pure apart from reading the detectors' positions.
         /// </summary>
         public static void Targets(TerminalKind kind, Vector3 from, List<Detector> into)
         {
@@ -124,7 +124,8 @@ namespace Stealth.Level
             foreach (var d in Detector.All)
             {
                 bool camera = d.Kind == RobotKind.Camera;
-                if (kind == TerminalKind.Cameras ? camera : !d.IsHacked) into.Add(d);
+                // the cameras have a terminal of their own: the hacking one shows the robots and the other devices
+                if (kind == TerminalKind.Cameras ? camera : !camera && !d.IsHacked) into.Add(d);
             }
             into.Sort((a, b) => (a.Position - from).sqrMagnitude.CompareTo((b.Position - from).sqrMagnitude));
         }

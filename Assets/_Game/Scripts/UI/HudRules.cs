@@ -336,6 +336,20 @@ namespace Stealth.UI
     /// The house's clock in the HUD (after Risk of Rain's difficulty timer): it counts up from the moment the team is in
     /// the house and always shows when the next extra robot comes; the more have come, the redder it is — up to a point.
     /// </summary>
+    /// <summary>The coffee's feel of speed (pure, unit tested): how strong the speed lines and the wider view are now.</summary>
+    public static class RushRules
+    {
+        /// <summary>
+        /// 0..1: nothing without the coffee or standing still, growing with the speed past a walk (<paramref name="walk"/>
+        /// m/s) up to full at the coffee's run.
+        /// </summary>
+        public static float Strength(bool caffeinated, float speed, float walk) =>
+            caffeinated ? Mathf.Clamp01((speed - walk * 0.8f) / Mathf.Max(0.1f, walk * 0.9f)) : 0f;
+
+        /// <summary>Degrees the field of view widens at full strength.</summary>
+        public const float FovKick = 9f;
+    }
+
     public static class HouseClockRules
     {
         /// <summary>"M:SS" of <paramref name="seconds"/> (whole seconds, never negative).</summary>

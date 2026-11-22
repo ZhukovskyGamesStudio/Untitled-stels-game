@@ -98,6 +98,16 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void RunningOnCoffeeFeelsFast()
+        {
+            Assert.AreEqual(0f, RushRules.Strength(false, 9f, 3.6f), "no coffee: nothing");
+            Assert.AreEqual(0f, RushRules.Strength(true, 0f, 3.6f), "standing: nothing");
+            Assert.AreEqual(0f, RushRules.Strength(true, 2.5f, 3.6f), "a slow walk: nothing");
+            Assert.AreEqual(1f, RushRules.Strength(true, 3.6f * 1.5f * 1.2f, 3.6f), "the coffee's run: full");
+            Assert.Less(RushRules.Strength(true, 4f, 3.6f), RushRules.Strength(true, 5f, 3.6f));
+        }
+
+        [Test]
         public void ASnifferStopsNowAndThen()
         {
             Assert.IsFalse(RobotBrain.Sniffing(1f, 3f, 1f), "walks first");

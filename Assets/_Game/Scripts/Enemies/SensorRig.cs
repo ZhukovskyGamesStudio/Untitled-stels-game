@@ -77,6 +77,21 @@ namespace Stealth.Enemies
             return false;
         }
 
+        /// <summary>
+        /// A part that moves on its own (the worker's lift and tray, wheels, rotors, legs): no mount sits on it — a mount is
+        /// a child of the body, it would stay behind in the air when the part moved (the worker's eye on its fork carriage).
+        /// </summary>
+        bool Moves(Transform t)
+        {
+            for (; t != null && t != Model; t = t.parent)
+            {
+                string n = t.name;
+                if (n.StartsWith("Lift") || n.StartsWith("AccentLift") || n.StartsWith("BodyLift") || n.StartsWith("AccentWheel")
+                    || n.StartsWith("AccentRotor") || n.StartsWith("AccentLeg")) return true;
+            }
+            return false;
+        }
+
         /// <summary>Changes when the style swaps the body's meshes.</summary>
         int Signature()
         {
@@ -92,7 +107,7 @@ namespace Stealth.Enemies
             if (Model == null) return;
             m_Body.Clear();
             foreach (var mf in Model.GetComponentsInChildren<MeshFilter>(true))
-                if (mf.sharedMesh != null && mf.sharedMesh.isReadable && !IsMount(mf.transform)) m_Body.Add(mf);
+                if (mf.sharedMesh != null && mf.sharedMesh.isReadable && !IsMount(mf.transform) && !Moves(mf.transform)) m_Body.Add(mf);
             m_Signature = Signature();
             if (m_Body.Count == 0) return;
 
@@ -137,8 +152,13 @@ namespace Stealth.Enemies
                 foreach (var m in group)
                 {
                     if (m == null || !m_Rest.TryGetValue(m, out var rest)) continue;
-                    if (Cast(new Vector3(rest.x, rest.y + lift, front), Vector3.back, out var hit))
-                        m.transform.localPosition = hit + Vector3.back * Embed;
+                    // on the face at its height, else a little higher or lower, else at the body's middle: never left in the air
+                    foreach (float y in new[] { rest.y + lift, rest.y + lift + 0.12f, rest.y + lift - 0.12f, rest.y + lift + 0.25f, b.center.y })
+                        if (Cast(new Vector3(rest.x, y, front), Vector3.back, out var hit))
+                        {
+                            m.transform.localPosition = hit + Vector3.back * Embed;
+                            break;
+                        }
                 }
             }
         }

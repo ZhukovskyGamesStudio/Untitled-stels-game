@@ -229,7 +229,7 @@ namespace Stealth.EditorTools
             }));
             Robot(RobotKind.MotionSensor, SensorPrefabs + "/SensorMotion.prefab", () => Device<MotionSensor>("SensorMotion", "sensor_pir", "RobotBody", false, false, (root, m) =>
             {
-                m.Profile = Profile<MotionSensorProfile>("SensorMotion");
+                m.Profile = Profile<MotionSensorProfile>("SensorMotion", p => p.ForgetRate = 1f); // forgets twice as fast as the base
                 Object.DestroyImmediate(root.GetComponent<BoxCollider>()); // on the wall, nothing to bump into
             }));
             Robot(RobotKind.PressurePlate, SensorPrefabs + "/SensorPlate.prefab", () => Device<PressurePlate>("SensorPlate", "sensor_plate", "RobotBody", false, false, (root, p) =>

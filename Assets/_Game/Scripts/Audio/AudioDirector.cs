@@ -284,6 +284,8 @@ namespace Stealth.Audio
                         w.NextGas = Time.time + clip.length + gasGap;
                     }
                 }
+                // riding in the car (or on a ladder) the body moves without its feet: no steps, no jumps
+                if (p.SeatIndex >= 0 || p.Pose == Stealth.Player.BodyPose.Ladder) { w.NextStep = Time.time + 0.3f; continue; }
                 switch (w.Air.Step(vy, dt, Time.time))
                 {
                     case AirEvent.Jump: Sfx.At(Bank.Jump, pos, volume * 0.8f, Sfx.Group.Footsteps); break;
@@ -309,11 +311,13 @@ namespace Stealth.Audio
         void UpdateHostage(PlayerController me)
         {
             if (me == null || Bank.HostageVoice == null || Bank.HostageVoice.Length == 0) return;
+            // the hostage sees a player who came up to the cage — not one looking at it through a camera from a terminal
+            if (me.UsingTerminal != null || me.Watching != null || me.Downed) return;
             foreach (var i in Interactable.All)
             {
                 if (i is not Cage cage || cage.Freed || cage.Hostage == null || !cage.Hostage.activeInHierarchy) continue;
                 var head = cage.transform.position + Vector3.up * 1.0f;
-                var eye = me.Camera != null ? me.Camera.transform.position : me.transform.position + Vector3.up * 1.6f;
+                var eye = me.Head != null ? me.Head.position : me.transform.position + Vector3.up * 1.6f; // the body's eyes, wherever the camera is
                 float dist = Vector3.Distance(eye, head);
                 bool sight = dist <= PeopleSounds.HostageReach && Stealth.Enemies.Perception.ReachClear(eye, head, cage.transform);
                 if (!PeopleSounds.HostageSpeaks(dist, sight, Time.time, m_NextHostage)) continue;
