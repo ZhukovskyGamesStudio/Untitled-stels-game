@@ -45,16 +45,33 @@ namespace Stealth.Audio
     /// </summary>
     public static class VoiceAcoustics
     {
-        /// <summary>Gain at this distance: full inside <see cref="VoiceSettings.MinDistance"/>, then softer than inverse
-        /// distance (a co-op game: a mate across the hall is still heard), fading to silence at the far limit.</summary>
+        /// <summary>
+        /// Gain at this distance: about full inside <see cref="VoiceSettings.MinDistance"/>, then much softer than inverse
+        /// distance (<see cref="VoiceSettings.Rolloff"/>: a co-op game, a mate down the corridor is still heard), easing
+        /// out to silence at the far limit along a smooth S from <see cref="VoiceSettings.FadeFrom"/> — no corner anywhere
+        /// in the curve, so walking away is one even fade.
+        /// </summary>
         public static float DistanceGain(float distance, VoiceSettings s)
         {
             if (distance >= s.MaxDistance) return 0f;
-            float g = Mathf.Pow(s.MinDistance / Mathf.Max(distance, s.MinDistance), 0.75f);
-            float fadeFrom = s.MaxDistance * 0.7f;
-            if (distance > fadeFrom) g *= 1f - (distance - fadeFrom) / (s.MaxDistance - fadeFrom);
+            // flat at the mouth and bending smoothly into (min / d) ^ rolloff further out: no knee at MinDistance
+            float min = Mathf.Max(0.1f, s.MinDistance), q = distance / min;
+            float g = Mathf.Pow(1f + q * q, -0.5f * Mathf.Max(0.05f, s.Rolloff));
+            float from = s.MaxDistance * Mathf.Clamp(s.FadeFrom, 0f, 0.95f);
+            if (distance > from)
+            {
+                float t = (distance - from) / (s.MaxDistance - from);
+                g *= 1f - t * t * (3f - 2f * t); // smoothstep: flat where it starts and where it ends
+            }
             return g;
         }
+
+        /// <summary>
+        /// One step of following a target over time (most of the way in <paramref name="seconds"/>): the voice's gain and
+        /// muffling glide when a wall comes between instead of jumping.
+        /// </summary>
+        public static float Follow(float current, float target, float dt, float seconds) =>
+            seconds <= 0f ? target : current + (target - current) * (1f - Mathf.Exp(-dt / seconds));
 
         /// <summary>Volume share and low-pass cutoff (Hz) of a voice that reaches the listener with this transmission.</summary>
         public static void Blocked(float transmission, VoiceSettings s, out float volume, out float cutoff)

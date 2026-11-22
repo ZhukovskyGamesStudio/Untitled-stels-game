@@ -83,17 +83,27 @@ namespace Stealth.Configs
         public float GainRise = 1.2f, GainFall = 0.15f;
 
         [Header("Network")]
-        [Tooltip("Frames (20 ms each) the listener keeps buffered against network jitter.")]
+        [Tooltip("Frames (20 ms each) the listener collects before a voice starts playing: the cushion against network jitter (it grows by itself on a jittery connection).")]
         public int JitterFrames = 3;
         [Tooltip("More frames than this buffered: the oldest are dropped to catch up.")]
         public int JitterMax = 12;
+        [Tooltip("The cushion grows by at most this many frames on a jittery connection (one per late packet)...")]
+        public int JitterGrow = 4;
+        [Tooltip("...and shrinks by one after this many seconds without a late packet.")]
+        public float JitterCalm = 8f;
 
         [Header("In the world")]
         public float Volume = 1f;
-        [Tooltip("Full volume closer than this (m).")]
-        public float MinDistance = 1.2f;
+        [Tooltip("About full volume closer than this (m); the fade bends in smoothly around it.")]
+        public float MinDistance = 1.5f;
         [Tooltip("Silent further than this (m).")]
-        public float MaxDistance = 30f;
+        public float MaxDistance = 60f;
+        [Tooltip("How fast a voice gets quieter with distance: far away gain ≈ (MinDistance / distance) ^ this (1 = inverse distance, real life; lower = carries further).")]
+        public float Rolloff = 0.55f;
+        [Tooltip("Share of MaxDistance from which the voice eases out to silence (a smooth S, no edge).")]
+        public float FadeFrom = 0.45f;
+        [Tooltip("Seconds a voice takes to follow a change of loudness or muffling (stepping behind a wall, a door closing): it glides, never jumps.")]
+        public float Smoothing = 0.12f;
         [Tooltip("Low-pass cutoff (Hz) of a voice behind everything that blocks sound (a wall, a slab): it comes through dull.")]
         public float BlockedCutoff = 700f;
         [Tooltip("Share of volume left at the most blocked (transmission 0).")]

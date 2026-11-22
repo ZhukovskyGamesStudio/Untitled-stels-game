@@ -19,6 +19,7 @@ namespace Stealth.Tests
                     yield return LevelGenerator.Generate(seed * 7919 + house + (seed % 2), house + (seed % 2), null, null, 2);
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void RoomsHaveWhatMakesThemThatRoom()
         {
@@ -45,6 +46,7 @@ namespace Stealth.Tests
             }
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheFinalWalkabilityCheckHasLittleToTakeOut()
         {

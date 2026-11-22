@@ -97,6 +97,7 @@ namespace Stealth.Tests
             foreach (var p in parts) Assert.IsNotNull(p.GetComponent<Collider>(), $"{p.name}: can't be looked at");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TestHousesHaveFurnitureToOpen()
         {

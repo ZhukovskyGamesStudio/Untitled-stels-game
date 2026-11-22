@@ -103,6 +103,7 @@ namespace Stealth.Tests
             Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {

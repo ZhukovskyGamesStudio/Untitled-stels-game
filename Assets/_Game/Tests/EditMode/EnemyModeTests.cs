@@ -20,6 +20,7 @@ namespace Stealth.Tests
                 yield return LevelGenerator.Generate(4111 + k * 97, 2 + k % 4, null, null, 2, null, false, classicEnemies);
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheNewModeHasNoHoundsHuntersOrWardens()
         {
@@ -33,6 +34,7 @@ namespace Stealth.Tests
             Assert.IsTrue(Houses(true).Any(l => l.RobotSpawns.Any(r => r.Kind is RobotKind.Hound or RobotKind.Warden)), "the old mode lost its hounds and wardens");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryHouseHasAChargingRoomTakenFromTheHumans()
         {
@@ -54,6 +56,7 @@ namespace Stealth.Tests
             }
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void GuardsRestOnTheDocks()
         {
@@ -71,6 +74,7 @@ namespace Stealth.Tests
                 Assert.IsFalse(l.RobotSpawns.Any(r => r.Docked), "the old mode's guards patrol");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheValuableRoomsAreGuardedByTraps()
         {

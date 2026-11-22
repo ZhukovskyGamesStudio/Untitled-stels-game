@@ -191,11 +191,10 @@ namespace Stealth.Level
             BuildGrates();
             float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
             // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
-            // (with a hole where the shaft goes down to the basement: four pieces round it)
+            // (with holes where the shafts go down — to the basement and from the exit hatch: pieces round them)
             float gy = CityPlan.RoadTop - 0.06f;
             var ground = Rect.MinMaxRect(W / 2 - (W + far) / 2, H / 2 - (H + far) / 2, W / 2 + (W + far) / 2, H / 2 + (H + far) / 2);
-            var shaftHole = new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) };
-            foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, shaftHole))
+            foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, l.ShaftHoles))
                 Block(m_Art.OutsideGround, "OutsideGround", new Vector3((a.x + b.x) / 2f, gy, (a.y + b.y) / 2f), new Vector3(b.x - a.x, 0.1f, b.y - a.y));
             // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, -yard - 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
@@ -346,8 +345,7 @@ namespace Stealth.Level
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
             if (f == 0) // the shaft down to the basement, the exit hatch's well (3 x 3 cells each)
-                foreach (var hole in new[] { m_Layout.HatchPosition, m_Layout.ExitHatchPosition })
-                    holes.Add(new Rect(hole.x - Basement.ShaftHalf, hole.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
+                holes.AddRange(m_Layout.ShaftHoles);
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -1112,8 +1110,8 @@ namespace Stealth.Level
                 city.Boxes.Add(box);
                 city.Ground.Add(box.Bounds);
             }
-            // the shaft down to the basement goes through the asphalt under the block
-            CityPlan.CutHole(city, new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
+            // the shafts (down to the basement, down from the exit hatch) go through the asphalt under the block
+            foreach (var hole in m_Layout.ShaftHoles) CityPlan.CutHole(city, hole);
             // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
             var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
             foreach (var b in city.Ground)

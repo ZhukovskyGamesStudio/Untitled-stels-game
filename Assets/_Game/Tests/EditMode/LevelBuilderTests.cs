@@ -63,6 +63,35 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void BothShaftsAreOpenUnderTheFloor()
+        {
+            // the exit's shaft once ran into the ground plate and the city's asphalt (cut only for the entry's): a black
+            // square with a collider under the open lid, nobody could climb down
+            Built(out var l);
+            Physics.SyncTransforms();
+            float inner = Basement.ShaftHalf - 0.4f;
+            foreach (var (name, at) in new[] { ("entry", l.HatchPosition), ("exit", l.ExitHatchPosition) })
+            {
+                var centre = new Vector3(at.x, LevelLayout.FloorY(0) - 0.8f, at.z);
+                var hits = Physics.OverlapBox(centre, new Vector3(inner, 0.7f, inner), Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+                CollectionAssert.IsEmpty(hits.Select(c => c.name), $"the {name} shaft is open under the floor");
+                // the city's merged mesh (the asphalt under the block has no collider): no face across the shaft
+                foreach (var mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+                {
+                    if (mf.name != "City" || mf.sharedMesh == null) continue;
+                    var v = mf.sharedMesh.vertices;
+                    var t = mf.sharedMesh.triangles;
+                    for (int i = 0; i < t.Length; i += 3)
+                    {
+                        var c = mf.transform.TransformPoint((v[t[i]] + v[t[i + 1]] + v[t[i + 2]]) / 3f);
+                        bool across = Mathf.Abs(c.x - at.x) < inner && Mathf.Abs(c.z - at.z) < inner && c.y < LevelLayout.FloorY(0) - 0.02f && c.y > -3f;
+                        Assert.IsFalse(across, $"the {name} shaft: a city face at {c}");
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void StairPrefabPlacementMatchesTheCornerFrame([ValueSource(nameof(Corners))] Vector2Int corner, [Values(false, true)] bool flip)
         {
             var stair = new Stair { Floor = 1, Origin = new Vector2((2 + (corner.x > 0 ? 1 : 0)) * 10f, (1 + (corner.y > 0 ? 1 : 0)) * 10f), Corner = corner, Flip = flip };

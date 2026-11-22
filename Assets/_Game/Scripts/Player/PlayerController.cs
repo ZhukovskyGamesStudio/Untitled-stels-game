@@ -247,11 +247,12 @@ namespace Stealth.Player
         public int HatchIndex { get; private set; }
 
         /// <summary>Other peers: what the owner reports.</summary>
-        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName)
+        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName, BodyPose pose = BodyPose.None)
         {
             Crouching = crouching;
             LookPitch = lookPitch;
             DisplayName = displayName ?? "";
+            Pose = pose;
         }
 
         /// <summary>Team colour on the small things only, the department's clothes, skin, dark details (PlayerLooks).</summary>
