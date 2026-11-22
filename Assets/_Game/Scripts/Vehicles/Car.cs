@@ -40,6 +40,8 @@ namespace Stealth.Vehicles
         public Transform Steering;
         public Transform Grinder;
         public Light[] Headlights;
+        [Tooltip("The cab's dome light (a warm point light under the roof), on like the beams.")]
+        public Light DomeLight;
         public Renderer[] LightGlow;
 
         [Header("Use")]

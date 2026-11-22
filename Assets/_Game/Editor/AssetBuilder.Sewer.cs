@@ -390,6 +390,7 @@ namespace Stealth.EditorTools
             Mat("Car", "CarHead", new Color(1f, 0.96f, 0.85f), new Color(4f, 3.7f, 3f));
             Mat("Car", "CarTail", new Color(1f, 0.15f, 0.1f), new Color(3f, 0.3f, 0.2f));
             Mat("Car", "CarSpot", new Color(1f, 0.85f, 0.5f), new Color(2.5f, 2.1f, 1.2f));
+            Mat("Car", "CarDome", new Color(1f, 0.9f, 0.7f), new Color(2.2f, 1.9f, 1.35f)); // the cab's dome light: a real lamp
             // Dark tinted glass that only darkens what is behind it: a pale glass lit by the style's ambient added its own light,
             // and underground the ink lines (which fade where nothing is lit, _StyDark) came back behind it — the cab looked
             // clearer through the window than through the open door. No sky reflections either (nothing to reflect down there).
@@ -407,6 +408,7 @@ namespace Stealth.EditorTools
                 r.sharedMaterial = n.StartsWith("AccentWheel") ? CarMat("CarTyre")
                     : n.StartsWith("EyeHead") ? CarMat("CarHead")
                     : n.StartsWith("EyeTail") ? CarMat("CarTail")
+                    : n.StartsWith("EyeDome") ? CarMat("CarDome")
                     : n.StartsWith("Eye") ? CarMat("CarSpot")
                     : n.StartsWith("Glass") ? CarMat("CarGlass")
                     : n.StartsWith("Seat") ? CarMat("CarSeat")
@@ -532,6 +534,9 @@ namespace Stealth.EditorTools
                 Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(2f, 4f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 45f, 65f),
             };
             foreach (var l in car.Headlights) { l.spotAngle = 72f; l.innerSpotAngle = 34f; }
+            // the dome light in the cab (car.py dome_light: under the roof over the seats' middle, Unity z = −Blender y): a warm
+            // glow over the seats and the dashboard, always on like the beams; no shadows, too weak to matter outside the cab
+            car.DomeLight = Lamp(car.Body, "DomeLight", new Vector3(0f, 1.69f, 0.14f) - car.Body.localPosition, Quaternion.identity, LightType.Point, new Color(1f, 0.86f, 0.62f), 1.4f, 2.4f);
             var engine = root.AddComponent<AudioSource>();
             engine.clip = s_Bank != null ? s_Bank.CarEngine : null;
             engine.loop = true;
