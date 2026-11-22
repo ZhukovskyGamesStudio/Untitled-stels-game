@@ -27,6 +27,8 @@ namespace Stealth.Player
         public static event System.Action<bool> LocalChanged;
 
         public const float StandHeight = 1.8f;
+        /// <summary>The body's capsule radius, metres: as slim as the person drawn — one stands right up against furniture and walls.</summary>
+        public const float BodyRadius = 0.25f;
         public const float CrouchHeight = 1.1f;
 
         [Header("Refs")]

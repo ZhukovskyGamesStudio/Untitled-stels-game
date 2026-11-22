@@ -244,7 +244,7 @@ Session (фасад)                        ⇐  NgoSessionBackend, GameNetwork 
 **Терминал камер**: камеру на экране игрок поворачивает сам (`SecurityCamera.SteerServer`, угол — `DetectorSnapshot.Aim`;
 `IPlayerLink.SendTerminal` раз в 0,1 с); управляемая камера никого не замечает, сидящего за терминалом (`PlayerController.AtTerminal`) камеры
 не видят, пинг и метка идут из вида камеры (`TerminalViewPose`). Карта (у терминала карты) — север вверху (`MapView`).
-Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
+Капсула игрока тонкая, по фигуре (`PlayerController.BodyRadius` = 0,25 м, запас 2,5 см): к ящику и стене подходят вплотную. Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
 качаются в шаг (`PlayerController.SwingLegs`, `PlayerRules.LegSwing`), сидя в машине — согнуты. Оставленный лежать в доме возвращается с пустым рюкзаком.
 **Чит-панель (F4)** — `CheatPanel` в HUD: выключить всех роботов, неуязвимость (и газ не берёт), невидимость для роботов (`PlayerController.Invisible` входит в `IsDown`; ни шума, ни следа),
 квота, телепорт к люку, вся карта, **начать дом любого типа** (вторая колонка, кнопка на каждый `HouseKind`: в любой момент — в доме, в канализации, в поездке, после провала; `Cheat.StartHouse + kind` → `GameManager.StartHouseServer`, сид подбирает `HouseKinds.SeedOf`, номер дома прежний); выполняет сервер (`IPlayerLink.SendCheat` → `PlayerController.CheatServer`). Сценарий `cheats`.

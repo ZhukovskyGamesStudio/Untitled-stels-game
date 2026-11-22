@@ -298,10 +298,11 @@ namespace Stealth.EditorTools
             var root = new GameObject("Player");
             var cc = root.AddComponent<CharacterController>();
             cc.height = PlayerController.StandHeight;
-            cc.radius = 0.35f;
+            // as slim as the person drawn (shoulders ~0.5 m): a player stands right up against a crate, a desk or a wall
+            cc.radius = PlayerController.BodyRadius;
             cc.center = new Vector3(0, PlayerController.StandHeight / 2f, 0);
             cc.stepOffset = 0.35f;
-            cc.skinWidth = 0.04f;
+            cc.skinWidth = 0.025f;
             root.AddComponent<NetworkObject>();
             var nt = root.AddComponent<NetworkTransform>();
             nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
