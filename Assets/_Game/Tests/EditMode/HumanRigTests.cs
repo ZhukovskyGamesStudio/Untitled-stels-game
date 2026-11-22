@@ -26,6 +26,47 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheCommonSkeletonMakesAHumanoid()
+        {
+            var mapped = HumanSkeleton.Map.Select(m => m.human).ToArray();
+            foreach (var bone in HumanSkeleton.Required) Assert.Contains(bone, mapped, $"{bone} is required by a humanoid Avatar");
+            Assert.AreEqual(mapped.Length, mapped.Distinct().Count(), "every humanoid bone once");
+            Assert.AreEqual(HumanSkeleton.Map.Length, HumanSkeleton.Map.Select(m => m.bone).Distinct().Count(), "every bone of ours once");
+            // the T-pose: arms straight out to their side, flat; the spine up; the legs down
+            Assert.AreEqual(Vector3.up, HumanSkeleton.Direction(HumanSkeleton.Aim.Up, Vector3.zero));
+            Assert.AreEqual(Vector3.down, HumanSkeleton.Direction(HumanSkeleton.Aim.Down, Vector3.zero));
+            var outward = HumanSkeleton.Direction(HumanSkeleton.Aim.Out, new Vector3(0.2f, 0.1f, 0.01f));
+            Assert.AreEqual(0f, outward.y, 1e-5f, "flat");
+            Assert.Greater(outward.x, 0.99f);
+            var arm = new Vector3(0.3f, -0.5f, 0.05f); // an A-pose arm, down and out
+            Assert.Less(Vector3.Angle(HumanSkeleton.Turn(arm, outward) * arm, outward), 0.01f, "turned straight out");
+            Assert.AreEqual(Quaternion.identity, HumanSkeleton.Turn(Vector3.zero, outward));
+            // every bone the T-pose turns is ours
+            var bones = HumanSkeleton.Map.Select(m => m.bone).ToArray();
+            foreach (var (bone, child, _) in HumanSkeleton.TPose)
+            {
+                Assert.Contains(bone, bones);
+                Assert.Contains(child, bones);
+            }
+        }
+
+        [Test]
+        public void TheHandCarriesWhatItHoldsWhenItIsFree()
+        {
+            Assert.IsTrue(HumanMath.Carries(true, false, false, BodyPose.None));
+            Assert.IsFalse(HumanMath.Carries(false, false, false, BodyPose.None), "nothing in the hand");
+            Assert.IsFalse(HumanMath.Carries(true, true, false, BodyPose.None), "lying");
+            Assert.IsFalse(HumanMath.Carries(true, false, true, BodyPose.None), "seated (the hands on the wheel or the lap)");
+            Assert.IsFalse(HumanMath.Carries(true, false, false, BodyPose.Work), "the hands at work");
+            Assert.IsFalse(HumanMath.Carries(true, false, false, BodyPose.Ladder), "on the rungs");
+            var palm = HumanMath.Palm(Vector3.zero, new Vector3(0.1f, 0f, 0f));
+            Assert.That(palm.x, Is.InRange(0.02f, 0.06f), "in the palm, between the wrist and the knuckles");
+            Assert.Greater(HumanSkeleton.Carry.z, 0.15f, "before the chest");
+            Assert.Greater(HumanSkeleton.Carry.x, 0f, "the right hand");
+            Assert.IsTrue(HumanSkeleton.Grip.Any(g => g.muscle.StartsWith("RightHand.Index") && g.value < -0.5f), "the fingers curl");
+        }
+
+        [Test]
         public void TheFeetStandOnTheFloorNotOverIt()
         {
             // the capsule floats ~9 cm over the floor: the body goes down so the lower ankle is its height over the floor
@@ -93,6 +134,27 @@ namespace Stealth.Tests
             foreach (var n in new[] { "Idle", "Walk", "Run", "CrouchIdle", "CrouchWalk", "Down", "Sit", "Climb", "Terminal", "Work" })
                 Assert.Contains(n, clips, $"the controller has no {n} clip");
             Assert.IsFalse(rig.Animator.applyRootMotion, "the player controller moves the body, not the animation");
+            // a humanoid on the common skeleton, the takes shared by everybody, a layer each for the legs, the upper body, the
+            // head and the right hand's grip
+            Assert.IsNotNull(rig.Animator.avatar, "no Avatar");
+            Assert.IsTrue(rig.Animator.avatar.isValid && rig.Animator.avatar.isHuman, "not a valid humanoid Avatar");
+            var layered = (UnityEditor.Animations.AnimatorController)controller;
+            Assert.AreEqual(HumanLayers.Count, layered.layers.Length);
+            Assert.AreEqual("Legs", layered.layers[HumanLayers.Legs].name);
+            Assert.AreEqual("UpperBody", layered.layers[HumanLayers.UpperBody].name);
+            Assert.AreEqual("Head", layered.layers[HumanLayers.Head].name);
+            Assert.AreEqual("RightHand", layered.layers[HumanLayers.RightHand].name);
+            Assert.IsTrue(layered.layers[HumanLayers.UpperBody].iKPass && layered.layers[HumanLayers.Head].iKPass, "IK for the hands and the look");
+            Assert.IsTrue(layered.layers[HumanLayers.Head].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Head));
+            Assert.IsFalse(layered.layers[HumanLayers.Head].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftLeg));
+            Assert.IsTrue(layered.layers[HumanLayers.Legs].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftLeg));
+            Assert.IsFalse(layered.layers[HumanLayers.Legs].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Head));
+            Assert.IsTrue(layered.layers[HumanLayers.RightHand].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.RightFingers));
+            Assert.IsTrue(controller.animationClips.Any(c => c.name == "HumanGrip"), "the grip of the right hand");
+            Assert.IsTrue(controller.animationClips.Where(c => c.name != "HumanGrip").All(c => UnityEditor.AssetDatabase.GetAssetPath(c).EndsWith("human_backend.fbx")),
+                "one set of takes for everybody");
+            Assert.IsNotNull(rig.Animator.GetComponent<HumanIK>(), "the IK relay beside the Animator");
+            Assert.IsTrue(rig.HandR != null && rig.FingersR != null, "the right hand's bones (the held thing lies there)");
 
             Assert.IsEmpty(prefab.GetComponentsInChildren<Collider>(true), "the human is decoration: no colliders");
             var renderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -132,8 +194,20 @@ namespace Stealth.Tests
             var go = Object.Instantiate(prefab);
             try
             {
-                // standing: the pose of the Idle clip (the model's own default pose is whatever the exporter left)
-                controller.animationClips.First(c => c.name == "Idle").SampleAnimation(go.GetComponent<HumanRig>().Animator.gameObject, 0f);
+                // standing: the Animator itself plays the Idle state through the humanoid Avatar (the retargeting is what is
+                // checked: a wrong T-pose in the Avatar's description twists the arms out or up)
+                var animator = go.GetComponent<HumanRig>().Animator;
+                animator.Rebind();
+                animator.Update(0f);
+                animator.Update(0.5f);
+                Transform B(string n) => go.GetComponentsInChildren<Transform>().First(t => t.name == n);
+                foreach (var side in new[] { "L", "R" })
+                {
+                    Assert.Less(B("hand." + side).position.y, B("upper_arm." + side).position.y - 0.35f, $"{side}: the arm hangs down in the idle");
+                    Assert.Less(Mathf.Abs(B("hand." + side).position.x - B("hips").position.x), 0.5f, $"{side}: the hand by the thigh, not out to the side");
+                }
+                Assert.That(B("hips").position.y, Is.InRange(0.8f, 1.15f), "the hips at a standing person's height");
+                Assert.Greater(B("head").position.y, B("chest").position.y + 0.2f, "the head over the chest");
                 // the posed geometry in world space (skinned bounds are not updated in edit mode)
                 Bounds Baked(SkinnedMeshRenderer r)
                 {

@@ -15,11 +15,13 @@ namespace Stealth.Player
     }
 
     /// <summary>
-    /// A rigged human that a visual style can put in place of the player model (<see cref="Configs.StyleGeometry.PlayerRig"/>,
-    /// built from Tools/Blender/human.py). Purely visual: <see cref="PlayerController"/> feeds it the speed, crouch, downed
-    /// state, what the body is busy with and the look pitch every frame; it drives the Animator (Idle/Walk/Run, crouch,
-    /// lying, the seat, the ladder, the terminal, work with the hands) and tilts the head after the animation. Its parts
-    /// are named like the player model's (Body…, Accent…, Eye…) so <see cref="PlayerLooks.Paint"/> colours them per player.
+    /// A rigged human shown in place of the player model (Tools/Blender/human.py; a humanoid Avatar on the common skeleton,
+    /// <see cref="HumanSkeleton"/>). Purely visual: <see cref="PlayerController"/> feeds it the speed, crouch, downed state,
+    /// what the body is busy with, the look pitch and whether the hand holds something every frame; it drives the
+    /// Animator's layers (<see cref="HumanLayers"/>: the legs, the upper body, the head, the right hand's grip), carries the
+    /// held thing in the right hand by IK and turns the head where the player looks (<see cref="OnIK"/>), and after the
+    /// animation puts the feet on the floor and the held thing in the palm. Its parts are named like the player model's
+    /// (Body…, Accent…, Eye…) so <see cref="PlayerLooks.Paint"/> colours them per player.
     /// </summary>
     public class HumanRig : MonoBehaviour
     {
@@ -33,6 +35,11 @@ namespace Stealth.Player
         public Transform FootL, FootR;
         [Tooltip("How high the ankle (the foot bone's origin) is over the sole when standing, metres in the rig's space (the builder measures it in the Idle take)")]
         public float AnkleHeight = 0.08f;
+        [Tooltip("The right hand and its finger bone: the held thing lies in the palm between them")]
+        public Transform HandR, FingersR;
+
+        /// <summary>The held thing's anchor this rig carries in its right hand (another player's; null: nothing to place).</summary>
+        [System.NonSerialized] public Transform Held;
 
         static readonly int SpeedId = Animator.StringToHash("Speed");
         static readonly int CrouchId = Animator.StringToHash("Crouch");
@@ -41,15 +48,19 @@ namespace Stealth.Player
         static readonly int PoseId = Animator.StringToHash("Pose");
         static readonly int ClimbId = Animator.StringToHash("ClimbSpeed");
 
-        float m_Pitch, m_Ground;
-        bool m_Planted;
+        float m_Pitch, m_Ground, m_Hold, m_Look;
+        bool m_Planted, m_Holding;
         static readonly RaycastHit[] s_Floor = new RaycastHit[6];
 
         /// <summary>The state of the player this frame. <paramref name="climb"/>: metres a second up the ladder (negative: down).</summary>
-        public void Pose(float speed, bool crouching, bool downed, float pitch, bool seated = false, BodyPose pose = BodyPose.None, float climb = 0f)
+        public void Pose(float speed, bool crouching, bool downed, float pitch, bool seated = false, BodyPose pose = BodyPose.None, float climb = 0f,
+                         bool holding = false)
         {
             pose = HumanMath.Shown(pose, downed, seated);
             m_Planted = HumanMath.Planted(downed, seated, pose);
+            m_Holding = HumanMath.Carries(holding, downed, seated, pose);
+            m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
+            m_Look = Mathf.MoveTowards(m_Look, downed ? 0f : 1f, Time.deltaTime * 3f);
             m_Pitch = HumanMath.HeadPitch(pitch, HumanMath.HeadShare(HeadFollow, pose), downed);
             if (Animator == null || !Animator.isActiveAndEnabled) return;
             // in a seat the body rides with the car: its speed is the car's, not a walk
@@ -59,13 +70,56 @@ namespace Stealth.Player
             Animator.SetBool(SitId, seated && !downed);
             Animator.SetInteger(PoseId, (int)pose);
             Animator.SetFloat(ClimbId, HumanMath.ClimbRate(climb), 0.08f, Time.deltaTime);
+            if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
+        }
+
+        /// <summary>
+        /// The IK pass of a layer (<see cref="HumanIK"/> relays it): the upper body's carries what the hand holds before the
+        /// chest (the right hand to <see cref="HumanSkeleton.Carry"/>, the elbow out to the side); the head's turns the head
+        /// where the player looks (the look pitch, the body's way).
+        /// </summary>
+        public void OnIK(int layer)
+        {
+            if (Animator == null || !Animator.isHuman) return;
+            var body = transform;
+            float size = Animator.transform.lossyScale.y; // (a person's height is the model's scale)
+            Vector3 At(Vector3 local) => body.position + body.rotation * (local * size);
+            if (layer == HumanLayers.UpperBody)
+            {
+                Animator.SetIKPositionWeight(AvatarIKGoal.RightHand, m_Hold);
+                Animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, m_Hold * 0.6f);
+                if (m_Hold <= 0f) return;
+                Animator.SetIKPosition(AvatarIKGoal.RightHand, At(HumanSkeleton.Carry));
+                Animator.SetIKHintPosition(AvatarIKHint.RightElbow, At(HumanSkeleton.CarryElbow));
+            }
+            else if (layer == HumanLayers.Head)
+            {
+                var head = HeadBone != null ? HeadBone.position : At(new Vector3(0f, 1.6f, 0f));
+                var look = Quaternion.AngleAxis(m_Pitch, body.right) * body.forward;
+                Animator.SetLookAtWeight(m_Look, 0.05f, 0.9f, 1f, 0.5f);
+                Animator.SetLookAtPosition(head + look * 4f);
+            }
         }
 
         void LateUpdate()
         {
             PlantFeet();
+            PlaceHeld();
+            // a rig without a humanoid Avatar (an old style's) tilts its head after the animation instead of looking by IK
+            if (Animator != null && Animator.isHuman) return;
             if (HeadBone == null || Mathf.Approximately(m_Pitch, 0f)) return;
             HeadBone.rotation = Quaternion.AngleAxis(m_Pitch, transform.right) * HeadBone.rotation;
+        }
+
+        /// <summary>
+        /// After the animation and the feet: another player's held thing in this body's right palm (between the hand and its
+        /// finger bone), facing the body's way tipped with the look — not floating at the head.
+        /// </summary>
+        void PlaceHeld()
+        {
+            if (Held == null || HandR == null || FingersR == null || !m_Holding) return;
+            Held.SetPositionAndRotation(HumanMath.Palm(HandR.position, FingersR.position),
+                Quaternion.AngleAxis(m_Pitch * 0.6f, transform.right) * transform.rotation);
         }
 
         /// <summary>
@@ -136,6 +190,15 @@ namespace Stealth.Player
         /// terminal and at work the take moves the head (the player's camera is on the terminal's screen, not in the head).
         /// </summary>
         public static float HeadShare(float follow, BodyPose pose) => pose is BodyPose.Terminal or BodyPose.Work ? 0f : follow;
+
+        /// <summary>
+        /// The hand carries what it holds before the chest: holding something and free — not lying, not seated, not on a
+        /// ladder, at a terminal or at work (those takes have the hands busy).
+        /// </summary>
+        public static bool Carries(bool holding, bool downed, bool seated, BodyPose pose) => holding && !downed && !seated && pose == BodyPose.None;
+
+        /// <summary>Where a held thing lies in the hand: a third of the way from the wrist to the knuckles.</summary>
+        public static Vector3 Palm(Vector3 hand, Vector3 fingers) => Vector3.Lerp(hand, fingers, 0.35f);
 
         /// <summary>Standing on its feet: not lying, not seated, not on a ladder — the feet are put on the floor.</summary>
         public static bool Planted(bool downed, bool seated, BodyPose pose) => !downed && !seated && pose != BodyPose.Ladder;

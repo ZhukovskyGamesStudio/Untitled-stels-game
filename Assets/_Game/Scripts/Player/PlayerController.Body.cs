@@ -58,7 +58,11 @@ namespace Stealth.Player
             UpdateBodyPose();
             if (m_Rig == null) return;
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed);
+            // the hand's thing: everyone sees it carried in the rig's right hand (the owner keeps the first-person one)
+            var held = HeldThing != null ? HeldThing.transform.parent : null;
+            bool holding = held != null && held.gameObject.activeSelf;
+            m_Rig.Held = IsOwner ? null : held;
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding);
         }
 
         /// <summary>

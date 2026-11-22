@@ -9,8 +9,9 @@ namespace Stealth.EditorTools
 {
     /// <summary>
     /// The rigged humans shown instead of the player model (Tools/Blender/human.py → Art/Models/Humans): import settings
-    /// (generic rig, looping takes), the Animator controller (move blend Idle/Walk/Run, crouch blend, lying when downed,
-    /// the seat, the ladder, the terminal, work with the hands), each person's materials — URP Lit with the maps baked
+    /// (a humanoid Avatar described from the common skeleton in a T-pose — <see cref="HumanSkeleton"/> —, looping in-place
+    /// takes), one Animator controller for everybody playing one shared set of humanoid takes in layers with avatar masks
+    /// (the legs, the upper body with the hands' IK, the head with the look-at, the right hand's grip), each person's materials — URP Lit with the maps baked
     /// from the sculpt (albedo, a tangent-space normal map, occlusion and smoothness in one mask) — and the prefab with
     /// <see cref="HumanRig"/>.
     /// </summary>
@@ -20,6 +21,9 @@ namespace Stealth.EditorTools
         const string HumansDataDir = StylesDir + "/Humans";
         const string HumanControllerPath = HumansDataDir + "/HumanRig.controller";
         const string HumanPrefabPath = PrefabsDir + "/Player/HumanRig_Scientist.prefab";
+        /// <summary>The file whose takes every person plays (humanoid clips retarget onto every Avatar).</summary>
+        const string SharedTakes = ModelsDir + "/Humans/human_backend.fbx";
+        const string HumanGripPath = HumansDataDir + "/HumanGrip.anim";
 
         /// <summary>Builds the rigged human (null when the model has not been exported yet).</summary>
         static GameObject BuildHumanRig() => BuildHumanRig(HumanFbx, HumanPrefabPath, "HumanRig_Scientist");
@@ -44,7 +48,10 @@ namespace Stealth.EditorTools
             if (!(AssetImporter.GetAtPath(HumanFbx) is ModelImporter imp)) { Debug.LogWarning($"[Builder] {HumanFbx} missing: run Tools/Blender/human.py"); return null; }
             ConfigureHumanImport(imp);
             EnsureFolder(HumansDataDir);
-            var clips = AssetDatabase.LoadAllAssetsAtPath(HumanFbx).OfType<AnimationClip>().Where(c => !c.name.StartsWith("__preview")).ToArray();
+            // one set of humanoid takes for everybody (retargeted onto each person's Avatar): the shared file's
+            if (AssetImporter.GetAtPath(SharedTakes) is ModelImporter shared && shared != imp) ConfigureHumanImport(shared);
+            var clips = AssetDatabase.LoadAllAssetsAtPath(AssetImporter.GetAtPath(SharedTakes) != null ? SharedTakes : HumanFbx)
+                .OfType<AnimationClip>().Where(c => !c.name.StartsWith("__preview")).ToArray();
             AnimationClip Clip(string n) => clips.FirstOrDefault(c => c.name == n);
             var controller = BuildHumanController(Clip("Idle"), Clip("Walk"), Clip("Run"), Clip("CrouchIdle"), Clip("CrouchWalk"), Clip("Down"), Clip("Sit"),
                 Clip("Climb"), Clip("Terminal"), Clip("Work"));
@@ -88,6 +95,10 @@ namespace Stealth.EditorTools
                 rig.Hips = bones.FirstOrDefault(t => t.name == "hips");
                 rig.FootL = bones.FirstOrDefault(t => t.name == "foot.L");
                 rig.FootR = bones.FirstOrDefault(t => t.name == "foot.R");
+                rig.HandR = bones.FirstOrDefault(t => t.name == "hand.R");
+                rig.FingersR = bones.FirstOrDefault(t => t.name == "fingers.R");
+                // the IK callbacks come to the Animator's own object: a relay hands them to the rig
+                model.AddComponent<HumanIK>().Rig = rig;
                 // the ankle over the sole: the Idle take stands on the floor (HumanRigTests), its lower foot bone's height
                 var idle = controller.animationClips.FirstOrDefault(c => c.name == "Idle");
                 if (idle != null && rig.FootL != null && rig.FootR != null)
@@ -158,13 +169,19 @@ namespace Stealth.EditorTools
 
         static void ConfigureHumanImport(ModelImporter imp)
         {
-            bool dirty = imp.animationType != ModelImporterAnimationType.Generic || imp.materialImportMode != ModelImporterMaterialImportMode.None ||
-                         !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime)
+            bool dirty = imp.animationType != ModelImporterAnimationType.Human || imp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel
+                         || imp.humanDescription.human == null || imp.humanDescription.human.Length != HumanSkeleton.Map.Length
+                         || imp.materialImportMode != ModelImporterMaterialImportMode.None ||
+                         !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime || !c.lockRootRotation)
                          || imp.clipAnimations.Length != imp.defaultClipAnimations.Length // a take was added in Blender (Sit, Climb…)
                          || imp.importNormals != ModelImporterNormals.Import || imp.importTangents != ModelImporterTangents.CalculateMikk
                          || imp.maxBonesPerVertex != 4;
             if (!dirty) return;
-            imp.animationType = ModelImporterAnimationType.Generic;
+            // the Avatar: our bones mapped onto the humanoid ones, described in a T-pose worked out from the model itself
+            var description = HumanDescriptionOf(imp.assetPath);
+            imp.animationType = ModelImporterAnimationType.Human;
+            imp.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+            if (description is HumanDescription d) imp.humanDescription = d;
             imp.materialImportMode = ModelImporterMaterialImportMode.None;
             imp.bakeAxisConversion = true;
             imp.importAnimation = true;
@@ -174,30 +191,92 @@ namespace Stealth.EditorTools
             imp.maxBonesPerVertex = 4;
             imp.skinWeights = ModelImporterSkinWeights.Standard;
             imp.SaveAndReimport();
-            // every take loops and is called by its action name (the exporter writes "Rig|Walk")
+            // every take loops, is called by its action name (the exporter writes "Rig|Walk") and stays in place: the player
+            // controller moves the body, the takes keep the root where it was (height and turn included: lying, sitting)
             imp.clipAnimations = imp.defaultClipAnimations.Select(c =>
             {
                 c.name = c.takeName.Contains('|') ? c.takeName.Substring(c.takeName.LastIndexOf('|') + 1) : c.takeName;
                 c.loopTime = true;
+                c.lockRootRotation = c.lockRootHeightY = c.lockRootPositionXZ = true;
+                c.keepOriginalOrientation = c.keepOriginalPositionY = c.keepOriginalPositionXZ = true;
+                c.heightFromFeet = false;
                 return c;
             }).ToArray();
             imp.SaveAndReimport();
+            var avatar = AssetDatabase.LoadAllAssetsAtPath(imp.assetPath).OfType<Avatar>().FirstOrDefault();
+            if (avatar == null || !avatar.isValid || !avatar.isHuman) Debug.LogError($"[Builder] {imp.assetPath}: the humanoid Avatar is not valid");
+            else Debug.Log($"[Builder] {imp.assetPath}: humanoid Avatar ok");
         }
 
         /// <summary>
-        /// Speed (m/s) blends Idle → Walk → Run; Crouch blends crouched idle → crouch walk; Down lies on the floor; Sit sits in
-        /// the car; Pose (<see cref="BodyPose"/>) plays Climb (by ClimbSpeed: backwards on the way down, still when hanging),
-        /// Terminal or Work.
+        /// The humanoid description of a rigged human: our bones mapped (<see cref="HumanSkeleton.Map"/>) and every transform
+        /// of the model in a T-pose — the arms turned straight out, the spine up, the legs down (<see cref="HumanSkeleton.TPose"/>)
+        /// — from its rest pose (an A-pose). Null when the model is not there or lacks a bone.
+        /// </summary>
+        static HumanDescription? HumanDescriptionOf(string fbx)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+            if (asset == null) return null;
+            var go = Object.Instantiate(asset);
+            go.name = asset.name;
+            try
+            {
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                go.transform.localScale = Vector3.one;
+                var all = go.GetComponentsInChildren<Transform>(true);
+                Transform Bone(string n) => all.FirstOrDefault(t => t.name == n);
+                if (HumanSkeleton.Map.Any(m => Bone(m.bone) == null)) { Debug.LogError($"[Builder] {fbx}: a bone of the common skeleton is missing"); return null; }
+                var chest = Bone("chest");
+                foreach (var (bone, child, aim) in HumanSkeleton.TPose)
+                {
+                    Transform b = Bone(bone), c = Bone(child);
+                    var outward = Bone(bone.EndsWith(".L") ? "shoulder.L" : "shoulder.R").position - chest.position;
+                    var turn = HumanSkeleton.Turn(c.position - b.position, HumanSkeleton.Direction(aim, outward));
+                    b.rotation = turn * b.rotation;
+                }
+                return new HumanDescription
+                {
+                    human = HumanSkeleton.Map.Select(m => new HumanBone
+                    {
+                        boneName = m.bone,
+                        humanName = HumanTrait.BoneName[(int)m.human],
+                        limit = new HumanLimit { useDefaultValues = true },
+                    }).ToArray(),
+                    skeleton = all.Select(t => new SkeletonBone
+                    {
+                        name = t.name,
+                        position = t.localPosition,
+                        rotation = t.localRotation,
+                        scale = t.localScale,
+                    }).ToArray(),
+                    upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
+                    armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false,
+                };
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>
+        /// The one controller of every rigged human, in four layers over the humanoid Avatar (<see cref="HumanLayers"/>):
+        /// <b>Legs</b> (the base: root, legs, feet), <b>UpperBody</b> (spine, arms, hands; its IK pass carries the held thing in
+        /// the right hand), <b>Head</b> (the head and the face; its IK pass looks where the player looks) — the three play the
+        /// same states: Speed (m/s) blends Idle → Walk → Run, Crouch blends crouched idle → crouch walk, Down lies on the
+        /// floor, Sit sits in the car, Pose (<see cref="BodyPose"/>) plays Climb (by ClimbSpeed: backwards on the way down,
+        /// still when hanging), Terminal or Work — and <b>RightHand</b> (the right fingers) closes them on what the hand holds
+        /// (its weight is set while holding).
         /// </summary>
         static AnimatorController BuildHumanController(AnimationClip idle, AnimationClip walk, AnimationClip run,
                                                        AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down, AnimationClip sit,
                                                        AnimationClip climb, AnimationClip terminal, AnimationClip work)
         {
             var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(HumanControllerPath);
-            // the prefab references it: keep its GUID — unless it is older than the takes it should play (no Sit, no Pose yet)
-            // or its clips are gone (the takes were exported anew from another model)
-            if (existing != null && !s_Force && (sit == null || existing.parameters.Any(p => p.name == "Sit"))
-                && (climb == null || existing.parameters.Any(p => p.name == "Pose")) && existing.animationClips.All(c => c != null)) return existing;
+            // the prefab references it: keep its GUID — unless it is older than its layers or takes (no Pose, not layered, other
+            // clips) or its clips are gone (the takes were exported anew)
+            if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && existing.parameters.Any(p => p.name == "Pose")
+                && existing.animationClips.All(c => c != null) && (idle == null || existing.animationClips.Contains(idle))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
             c.AddParameter("Speed", AnimatorControllerParameterType.Float);
@@ -206,15 +285,53 @@ namespace Stealth.EditorTools
             c.AddParameter("Sit", AnimatorControllerParameterType.Bool);
             c.AddParameter("Pose", AnimatorControllerParameterType.Int);
             c.AddParameter("ClimbSpeed", AnimatorControllerParameterType.Float);
-            var sm = c.layers[0].stateMachine;
+            var grip = HumanGrip();
 
-            var move = c.CreateBlendTreeInController("Move", out var moveTree, 0);
+            // the layers and their masks: the base is the first layer the controller was created with
+            var layers = c.layers;
+            layers[0].name = "Legs";
+            layers[0].avatarMask = HumanMask("HumanLegs", AvatarMaskBodyPart.Root, AvatarMaskBodyPart.LeftLeg, AvatarMaskBodyPart.RightLeg,
+                AvatarMaskBodyPart.LeftFootIK, AvatarMaskBodyPart.RightFootIK);
+            c.layers = layers;
+            void Layer(string name, AvatarMask mask, bool ik, float weight)
+            {
+                c.AddLayer(name);
+                var all = c.layers;
+                var l = all[all.Length - 1];
+                l.avatarMask = mask;
+                l.iKPass = ik;
+                l.defaultWeight = weight;
+                l.blendingMode = AnimatorLayerBlendingMode.Override;
+                all[all.Length - 1] = l;
+                c.layers = all;
+            }
+            Layer("UpperBody", HumanMask("HumanUpperBody", AvatarMaskBodyPart.Body, AvatarMaskBodyPart.LeftArm, AvatarMaskBodyPart.RightArm,
+                AvatarMaskBodyPart.LeftFingers, AvatarMaskBodyPart.RightFingers, AvatarMaskBodyPart.LeftHandIK, AvatarMaskBodyPart.RightHandIK), true, 1f);
+            Layer("Head", HumanMask("HumanHead", AvatarMaskBodyPart.Head), true, 1f);
+            Layer("RightHand", HumanMask("HumanRightHand", AvatarMaskBodyPart.RightFingers), false, 0f);
+            for (int i = 0; i < HumanLayers.RightHand; i++)
+                BodyStates(c, i, idle, walk, run, crouchIdle, crouchWalk, down, sit, climb, terminal, work);
+            var hand = c.layers[HumanLayers.RightHand].stateMachine;
+            var held = hand.AddState("Grip");
+            held.motion = grip;
+            hand.defaultState = held;
+            EditorUtility.SetDirty(c);
+            return c;
+        }
+
+        /// <summary>The same states in a layer of the controller (the legs, the upper body and the head each play them).</summary>
+        static void BodyStates(AnimatorController c, int layer, AnimationClip idle, AnimationClip walk, AnimationClip run,
+                               AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down, AnimationClip sit,
+                               AnimationClip climb, AnimationClip terminal, AnimationClip work)
+        {
+            var sm = c.layers[layer].stateMachine;
+            var move = c.CreateBlendTreeInController("Move", out var moveTree, layer);
             moveTree.blendParameter = "Speed";
             moveTree.useAutomaticThresholds = false;
             moveTree.AddChild(idle, 0f);
             moveTree.AddChild(walk, 1.5f);
             moveTree.AddChild(run, 4.5f);
-            var crouch = c.CreateBlendTreeInController("Crouch", out var crouchTree, 0);
+            var crouch = c.CreateBlendTreeInController("Crouch", out var crouchTree, layer);
             crouchTree.blendParameter = "Speed";
             crouchTree.useAutomaticThresholds = false;
             crouchTree.AddChild(crouchIdle, 0f);
@@ -276,8 +393,44 @@ namespace Stealth.EditorTools
             Busy("Climb", climb, BodyPose.Ladder, 0.2f, byClimbSpeed: true);
             Busy("Terminal", terminal, BodyPose.Terminal, 0.3f);
             Busy("Work", work, BodyPose.Work, 0.22f);
-            EditorUtility.SetDirty(c);
-            return c;
+        }
+
+        /// <summary>A humanoid avatar mask with just these body parts (an asset next to the controller, rewritten each time).</summary>
+        static AvatarMask HumanMask(string name, params AvatarMaskBodyPart[] parts)
+        {
+            string path = $"{HumansDataDir}/{name}.mask";
+            var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(path);
+            if (mask == null)
+            {
+                mask = new AvatarMask();
+                AssetDatabase.CreateAsset(mask, path);
+            }
+            for (var part = AvatarMaskBodyPart.Root; part < AvatarMaskBodyPart.LastBodyPart; part++)
+                mask.SetHumanoidBodyPartActive(part, System.Array.IndexOf(parts, part) >= 0);
+            EditorUtility.SetDirty(mask);
+            return mask;
+        }
+
+        /// <summary>
+        /// The right hand closed round a handle, as a humanoid clip of finger muscles (our hand has one finger bone, mapped as
+        /// the index: it curls all four; the thumb comes over them) — the RightHand layer plays it while the hand holds something.
+        /// </summary>
+        static AnimationClip HumanGrip()
+        {
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(HumanGripPath);
+            if (clip == null)
+            {
+                clip = new AnimationClip { name = "Grip" };
+                AssetDatabase.CreateAsset(clip, HumanGripPath);
+            }
+            clip.ClearCurves();
+            foreach (var (muscle, value) in HumanSkeleton.Grip)
+                AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), AnimationCurve.Constant(0f, 1f, value));
+            var settings = AnimationUtility.GetAnimationClipSettings(clip);
+            settings.loopTime = true;
+            AnimationUtility.SetAnimationClipSettings(clip, settings);
+            EditorUtility.SetDirty(clip);
+            return clip;
         }
     }
 }

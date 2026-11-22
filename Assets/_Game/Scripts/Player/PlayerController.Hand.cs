@@ -129,6 +129,7 @@ namespace Stealth.Player
         int m_HeldShape = -1, m_HeldColor = -1;
         GameObject m_HeldModel;
         Quaternion? m_HeldRot;
+        Vector3? m_HeldPos;
 
         /// <summary>A mesh with no bounds is taken as this big, metres.</summary>
         const float HeldSize = 0.12f;
@@ -164,7 +165,10 @@ namespace Stealth.Player
             if (shape != m_HeldShape || color != m_HeldColor) ShowHeld(shape, color);
             if (IsOwner) UpdateRaise(anchor);
             // a remote player's head does not pitch: the thing follows their look up and down
-            if (!IsOwner) anchor.transform.localRotation = (m_HeldRot ??= anchor.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f);
+            // (with a rigged human the rig then carries it in its right palm, after the animation: HumanRig.PlaceHeld)
+            if (!IsOwner)
+                anchor.transform.SetLocalPositionAndRotation(m_HeldPos ??= anchor.transform.localPosition,
+                    (m_HeldRot ??= anchor.transform.localRotation) * Quaternion.Euler(LookPitch * 0.6f, 0f, 0f));
         }
 
         void ShowHeld(int shape, int color)
