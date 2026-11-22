@@ -141,6 +141,40 @@ def hand_weights(points, sd):
     return out
 
 
+def head_weights(points):
+    """Skin weights of the head's piece (head, neck, the skin in the collar): the skull and the face — everything over
+    the jaw's line and the nape — follow the head alone, the throat under the jaw passes to the neck, the neck's base to
+    the chest. By the distance to the bones (the chest's reach is the widest) the face took half its weight from the
+    chest: whenever the head bowed, lifted or turned, the nose and the chin stayed behind with the body and the face
+    stretched out from under the hair, the glasses and the beard, which are rigid with the head."""
+    p = np.array(points, float)
+    seg = anim.bone_segments()
+    head, neck = np.array(seg["head"][0], float), np.array(seg["neck"][0], float)
+    over = (p[:, 2] - head[2]) - 0.30 * (p[:, 1] - head[1])     # over the skull's base: a plane lower at the chin than at the nape
+    skull = _step(over, -0.035, 0.0)
+    throat = _step(p[:, 2], neck[2] - 0.03, neck[2] + 0.03)
+    return {"head": skull, "neck": (1 - skull) * throat, "chest": (1 - skull) * (1 - throat)}
+
+
+def cuff_weights(points, own, sleeve_points, sleeve, forearm):
+    """A bare forearm under a rolled sleeve: up in the cuff its skin takes the weights of the sleeve's nearest point, so
+    it moves exactly as the cuff round it does, and passes to its own (the forearm, the hand) towards the wrist. The cuff
+    hangs by the hip in the rest pose and takes a little of the torso's weight; skin that followed the forearm alone left
+    the cuff by centimetres whenever the arm was raised. `forearm`: the bone's ends."""
+    at, sp = np.array(points, float), np.array(sleeve_points, float)
+    elbow, wrist = forearm
+    along = ((at - elbow) @ (wrist - elbow)) / float(np.dot(wrist - elbow, wrist - elbow))
+    cuff = 1 - _step(along, 0.46, 0.64)                                # 1 in the cuff … 0 towards the wrist
+    near = np.array([int(np.argmin(((sp - p) ** 2).sum(1))) if c > 0 else 0 for p, c in zip(at, cuff)])
+    bones = sorted(set(own) | set(sleeve))
+    zero = np.zeros(len(at))
+    w = np.stack([np.asarray(own.get(b, zero)) * (1 - cuff) + np.asarray(sleeve[b])[near] * cuff if b in sleeve
+                  else np.asarray(own[b]) * (1 - cuff) for b in bones], axis=1)
+    w = np.where(w >= np.sort(w, axis=1)[:, -4][:, None], w, 0.0)      # (the four strongest, as everywhere)
+    w /= np.maximum(w.sum(1, keepdims=True), 1e-12)
+    return {b: w[:, i] for i, b in enumerate(bones)}
+
+
 def both(*names):
     return [f"{n}.{s}" for n in names for s in ("L", "R")]
 
@@ -214,6 +248,7 @@ def figure(who):
         return np.clip(np.maximum((q[:, 0] - 0.075) / 0.02, (q[:, 1] - 0.030) / 0.012), 0, 1) * 0.75
     for o, sd in ((hand, "L"), (hand_r, "R")):
         pieces.append(Piece(o.name, "AccentHead", "skin", o, 1700 if rolled else 1500, [f"forearm.{sd}", f"hand.{sd}"], keep=keep_fingers, texel=1.3, ray=0.0035))
+        pieces[-1].cuff = rolled                        # its forearm comes out of a rolled sleeve (cuff_weights)
 
     e = face.eye_centre(f)
     for s, sd in ((1, "L"), (-1, "R")):
@@ -699,11 +734,19 @@ def assemble(pieces, who):
     bones = anim.bone_segments()
     seg = {n: (np.array(a), np.array(b)) for n, (a, b) in bones.items()}
     parts = {}
+    skin = {}
+    for p in pieces:
+        pts = sdf.points_of(p.lo)
+        skin[p.name] = (pts, hand_weights(pts, p.name[-1]) if p.name.startswith("hand.") else head_weights(pts) if p.name == "head"
+                        else build.weights(pts, seg, p.bones, RADIUS))
+    sleeves = next((p.name for p in pieces if p.name in ("shirt", "top")), None)
+    for p in pieces:
+        if getattr(p, "cuff", False) and sleeves:
+            skin[p.name] = (skin[p.name][0], cuff_weights(*skin[p.name], *skin[sleeves], seg[f"forearm.{p.name[-1]}"]))
     for p in pieces:
         for name in bones:
             p.lo.vertex_groups.new(name=name)
-        pts = sdf.points_of(p.lo)
-        build.assign(p.lo, hand_weights(pts, p.name[-1]) if p.name.startswith("hand.") else build.weights(pts, seg, p.bones, RADIUS))
+        build.assign(p.lo, skin[p.name][1])
         parts.setdefault(p.part, []).append(p.lo)
     out = []
     errors = 0

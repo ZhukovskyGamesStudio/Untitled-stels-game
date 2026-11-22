@@ -95,8 +95,11 @@ namespace Stealth.EditorTools
                 rig.Hips = bones.FirstOrDefault(t => t.name == "hips");
                 rig.FootL = bones.FirstOrDefault(t => t.name == "foot.L");
                 rig.FootR = bones.FirstOrDefault(t => t.name == "foot.R");
+                rig.ToeL = bones.FirstOrDefault(t => t.name == "toe.L");
+                rig.ToeR = bones.FirstOrDefault(t => t.name == "toe.R");
                 rig.HandR = bones.FirstOrDefault(t => t.name == "hand.R");
                 rig.FingersR = bones.FirstOrDefault(t => t.name == "middle.1.R");
+                rig.Chest = bones.FirstOrDefault(t => t.name == "chest");
                 // the IK callbacks come to the Animator's own object: a relay hands them to the rig
                 model.AddComponent<HumanIK>().Rig = rig;
                 // the ankle over the sole: the Idle take stands on the floor (HumanRigTests), its lower foot bone's height
@@ -105,6 +108,11 @@ namespace Stealth.EditorTools
                 {
                     idle.SampleAnimation(model, 0f);
                     rig.AnkleHeight = Mathf.Min(rig.FootL.position.y, rig.FootR.position.y) - go.transform.position.y;
+                    if (rig.ToeL != null && rig.ToeR != null)
+                        rig.BallHeight = Mathf.Min(rig.ToeL.position.y, rig.ToeR.position.y) - go.transform.position.y;
+                    // the chest when standing, in the model's own size: what the hand's carrying point is given for
+                    if (rig.Chest != null)
+                        rig.ChestStanding = go.transform.InverseTransformPoint(rig.Chest.position) / Mathf.Max(1e-4f, model.transform.lossyScale.y);
                 }
                 return go;
             });
@@ -346,6 +354,7 @@ namespace Stealth.EditorTools
             // clips) or its clips are gone (the takes were exported anew)
             if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && !existing.layers[HumanLayers.Head].iKPass
                 && existing.parameters.Any(p => p.name == "Pose") && existing.parameters.Any(p => p.name == "Cup")
+                && existing.parameters.Any(p => p.name == "Stride")
                 && existing.animationClips.All(c => c != null) && (idle == null || existing.animationClips.Contains(idle))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
@@ -356,6 +365,8 @@ namespace Stealth.EditorTools
             c.AddParameter("Pose", AnimatorControllerParameterType.Int);
             c.AddParameter("ClimbSpeed", AnimatorControllerParameterType.Float);
             c.AddParameter("Cup", AnimatorControllerParameterType.Float);
+            // (the walking states play at it: 1 until HumanRig sets it)
+            c.AddParameter(new AnimatorControllerParameter { name = "Stride", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
 
             // the layers and their masks: the base is the first layer the controller was created with
             var layers = c.layers;
@@ -403,14 +414,20 @@ namespace Stealth.EditorTools
             var move = c.CreateBlendTreeInController("Move", out var moveTree, layer);
             moveTree.blendParameter = "Speed";
             moveTree.useAutomaticThresholds = false;
+            // each take where its feet step at the body's speed (HumanMath: the takes' speeds); faster than the fastest,
+            // the steps quicken (Stride)
             moveTree.AddChild(idle, 0f);
-            moveTree.AddChild(walk, 1.5f);
-            moveTree.AddChild(run, 4.5f);
+            moveTree.AddChild(walk, HumanMath.WalkTakeSpeed);
+            moveTree.AddChild(run, HumanMath.RunTakeSpeed);
+            move.speedParameterActive = true;
+            move.speedParameter = "Stride";
             var crouch = c.CreateBlendTreeInController("Crouch", out var crouchTree, layer);
             crouchTree.blendParameter = "Speed";
             crouchTree.useAutomaticThresholds = false;
             crouchTree.AddChild(crouchIdle, 0f);
-            crouchTree.AddChild(crouchWalk, 1.3f);
+            crouchTree.AddChild(crouchWalk, HumanMath.CrouchTakeSpeed);
+            crouch.speedParameterActive = true;
+            crouch.speedParameter = "Stride";
             var lying = sm.AddState("Down");
             lying.motion = down;
             sm.defaultState = move;

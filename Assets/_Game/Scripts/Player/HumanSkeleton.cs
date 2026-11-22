@@ -113,6 +113,22 @@ namespace Stealth.Player
         public static readonly Vector3 Carry = new(0.19f, 1.2f, 0.4f), CarryElbow = new(0.3f, 0.95f, -0.02f);
 
         /// <summary>
+        /// A carrying point (<see cref="Carry"/>, <see cref="CarryElbow"/> — given for a standing body) for the chest where
+        /// it is now: it moves as far as the chest has moved from where it is when standing — down and forward with a
+        /// crouched, bowed body, and a little lower still the further the chest is bowed forward (the head is over the
+        /// hand then: the thing is carried under the face, not before it). Held at the standing height, a crouched player
+        /// raised the thing over the head.
+        /// </summary>
+        public static Vector3 CarryAt(Vector3 standing, Vector3 chest, Vector3 chestStanding)
+        {
+            var moved = chest - chestStanding;
+            return standing + moved + Vector3.down * (CarryBowDrop * Mathf.Max(0f, moved.z));
+        }
+
+        /// <summary>How much lower the hand carries for every metre the chest is bowed forward.</summary>
+        public const float CarryBowDrop = 0.45f;
+
+        /// <summary>
         /// The right hand's IK turn when carrying, in the body's space: a closed fist standing before the chest, the thing
         /// upright in it (picked from a grid of turns on the pose pictures: Stealth → Human Pose Pictures).
         /// </summary>

@@ -80,6 +80,45 @@ namespace Stealth.Tests
             Assert.AreEqual(-0.09f, HumanMath.PlantShift(0.17f, 0f, 0.08f), 1e-4f);
             Assert.AreEqual(0.02f, HumanMath.PlantShift(0.06f, 0f, 0.08f), 1e-4f, "sunk a little: up");
             Assert.AreEqual(-0.15f, HumanMath.PlantShift(2f, 0f, 0.08f), 1e-4f, "high in the air (falling): no dragging down");
+            // a sole is where the foot stands: under the ankle when flat, under the ball when the heel is up
+            Assert.AreEqual(0f, HumanMath.Sole(0.085f, 0.02f, 0.085f, 0.02f), 1e-5f, "flat on the floor");
+            Assert.AreEqual(0f, HumanMath.Sole(0.16f, 0.02f, 0.085f, 0.02f), 1e-5f, "on its ball, the heel up: still on the floor");
+            Assert.AreEqual(-0.03f, HumanMath.Sole(0.10f, -0.01f, 0.085f, 0.02f), 1e-5f, "the toes under the floor");
+            Assert.AreEqual(0.015f, HumanMath.Sole(0.10f, float.PositiveInfinity, 0.085f, 0.02f), 1e-5f, "a rig without toes: by the ankle");
+            // up at once, down slowly: a run's flight does not pull the body to the floor
+            float up = HumanMath.PlantFollow(0f, 0.05f, 0.05f), down = HumanMath.PlantFollow(0f, -0.05f, 0.05f);
+            Assert.Greater(up, 0.035f, "out of the floor within a frame or two");
+            Assert.Greater(down, -0.012f, "a twentieth of a second in the air: the body hardly follows");
+            Assert.AreEqual(-0.05f, HumanMath.PlantFollow(0f, -0.05f, 5f), 1e-3f, "standing: it settles onto the floor");
+            Assert.AreEqual(0f, HumanMath.PlantFollow(0f, 0.05f, 0f), 1e-6f);
+        }
+
+        [Test]
+        public void TheHandCarriesBeforeTheChestWhereverItIs()
+        {
+            var standing = new Vector3(0f, 1.25f, 0.02f);
+            Assert.AreEqual(HumanSkeleton.Carry, HumanSkeleton.CarryAt(HumanSkeleton.Carry, standing, standing), "standing: where it was");
+            // crouched and bowed: the chest 40 cm lower and 25 cm ahead — the hand goes with it, not over the head
+            var crouched = standing + new Vector3(0f, -0.4f, 0.25f);
+            var hand = HumanSkeleton.CarryAt(HumanSkeleton.Carry, crouched, standing);
+            Assert.AreEqual(HumanSkeleton.Carry.y - 0.4f - 0.25f * HumanSkeleton.CarryBowDrop, hand.y, 1e-5f, "under the bowed head");
+            Assert.AreEqual(HumanSkeleton.Carry.z + 0.25f, hand.z, 1e-5f);
+            Assert.Less(hand.y, crouched.y + 0.1f, "no higher than the chest");
+            var elbow = HumanSkeleton.CarryAt(HumanSkeleton.CarryElbow, crouched, standing);
+            Assert.Less(((HumanSkeleton.Carry - HumanSkeleton.CarryElbow) - (hand - elbow)).magnitude, 1e-5f, "the arm keeps its shape");
+        }
+
+        [Test]
+        public void TheStepsQuickenAboveTheTakesSpeed()
+        {
+            Assert.AreEqual(1f, HumanMath.StrideRate(0f, false));
+            Assert.AreEqual(1f, HumanMath.StrideRate(HumanMath.WalkTakeSpeed, false), "below the run's speed the blend slows the steps");
+            Assert.AreEqual(1f, HumanMath.StrideRate(HumanMath.RunTakeSpeed, false), 1e-5f);
+            Assert.AreEqual(1.5f, HumanMath.StrideRate(HumanMath.RunTakeSpeed * 1.5f, false), 1e-4f, "a sprint: quicker steps, no sliding");
+            Assert.AreEqual(2f, HumanMath.StrideRate(50f, false), "not a blur");
+            Assert.AreEqual(1.6f, HumanMath.StrideRate(HumanMath.CrouchTakeSpeed * 1.6f, true), 1e-4f, "crouched: by the crouched walk's speed");
+            Assert.Less(HumanMath.WalkTakeSpeed, HumanMath.RunTakeSpeed);
+            Assert.Less(HumanMath.CrouchTakeSpeed, HumanMath.WalkTakeSpeed);
             Assert.IsTrue(HumanMath.Planted(false, false, BodyPose.None));
             Assert.IsTrue(HumanMath.Planted(false, false, BodyPose.Work));
             Assert.IsFalse(HumanMath.Planted(false, true, BodyPose.None), "seated");
@@ -258,6 +297,15 @@ namespace Stealth.Tests
             var planted = prefab.GetComponent<HumanRig>();
             Assert.IsTrue(planted.Hips != null && planted.FootL != null && planted.FootR != null, "the bones that plant the feet");
             Assert.That(planted.AnkleHeight, Is.InRange(0.03f, 0.16f), "the ankle's height over the sole");
+            Assert.IsTrue(planted.ToeL != null && planted.ToeR != null, "the balls of the feet: a heel up does not sink the toes");
+            Assert.IsNotNull(planted.Chest, "the chest the hand carries a thing before");
+            Assert.That(planted.ChestStanding.y, Is.InRange(1.05f, 1.45f), "the standing chest's height, in the model's own size");
+            Assert.Less(Mathf.Abs(planted.ChestStanding.x), 0.03f);
+            Assert.Greater(HumanSkeleton.Carry.y, planted.ChestStanding.y - 0.25f, "carried about the chest's height when standing");
+            Assert.That(planted.BallHeight, Is.InRange(0.005f, 0.05f), "the ball's height over the sole");
+            Assert.Less(planted.BallHeight, planted.AnkleHeight);
+            var walking = planted.Animator.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
+            Assert.IsTrue(walking.parameters.Any(p => p.name == "Stride" && Mathf.Approximately(p.defaultFloat, 1f)), "the steps' rate, 1 until the rig sets it");
 
             // a real adult, standing on the floor, facing +Z
             var go = Object.Instantiate(prefab);

@@ -37,6 +37,10 @@ namespace Stealth.EditorTools
             new() { Name = "crouch_walk", Crouch = true, Speed = 1.3f, Time = 0.9f },
             new() { Name = "hold", Hold = true, Time = 1f, Item = ItemCatalogShape.Radio },
             new() { Name = "walk_hold", Speed = 1.5f, Hold = true, Time = 0.9f, Item = ItemCatalogShape.Tablet },
+            // (crouched with a thing in the hand: the hand is carried before the chest wherever the chest is — it was
+            // held at a standing chest's height, over the crouched head)
+            new() { Name = "crouch_hold", Crouch = true, Hold = true, Time = 1f, Item = ItemCatalogShape.Radio },
+            new() { Name = "crouch_walk_hold", Crouch = true, Speed = 1.3f, Hold = true, Time = 0.9f, Item = ItemCatalogShape.Tablet },
             new() { Name = "sit", Sit = true, Time = 1f },
             new() { Name = "down", Down = true, Time = 1.5f },
             new() { Name = "climb", Pose = BodyPose.Ladder, Climb = 1f, Time = 0.8f },

@@ -33,10 +33,18 @@ namespace Stealth.Player
         [Tooltip("The hips (the skeleton's root bone): moved up or down after the animation so the lower foot stands on the floor")]
         public Transform Hips;
         public Transform FootL, FootR;
+        [Tooltip("The toes' bones (their origin is the ball of the foot): a foot standing on its ball is planted by it, not by its raised ankle")]
+        public Transform ToeL, ToeR;
         [Tooltip("How high the ankle (the foot bone's origin) is over the sole when standing, metres in the rig's space (the builder measures it in the Idle take)")]
         public float AnkleHeight = 0.08f;
+        [Tooltip("How high the ball of the foot (the toe bone's origin) is over the sole when standing, metres in the rig's space (the builder measures it in the Idle take)")]
+        public float BallHeight = 0.02f;
         [Tooltip("The right hand and its finger bone: the held thing lies in the palm between them")]
         public Transform HandR, FingersR;
+        [Tooltip("The chest's bone: the hand carries a thing before it, wherever the take puts it (standing, crouched, bowed)")]
+        public Transform Chest;
+        [Tooltip("Where the chest's bone is when standing, in the body's space (metres for the model's own size; the builder measures it in the Idle take)")]
+        public Vector3 ChestStanding = new(0f, 1.25f, 0f);
 
         /// <summary>The held thing's anchor this rig carries in its right hand (another player's; null: nothing to place).</summary>
         [System.NonSerialized] public Transform Held;
@@ -48,6 +56,7 @@ namespace Stealth.Player
         static readonly int PoseId = Animator.StringToHash("Pose");
         static readonly int ClimbId = Animator.StringToHash("ClimbSpeed");
         static readonly int CupId = Animator.StringToHash("Cup");
+        static readonly int StrideId = Animator.StringToHash("Stride");
 
         /// <summary>The held thing is a compact one: it lies in the open palm (a long one goes through the fist).</summary>
         [System.NonSerialized] public bool Cupped;
@@ -67,7 +76,10 @@ namespace Stealth.Player
             m_Pitch = HumanMath.HeadPitch(pitch, HumanMath.HeadShare(HeadFollow, pose), downed);
             if (Animator == null || !Animator.isActiveAndEnabled) return;
             // in a seat the body rides with the car: its speed is the car's, not a walk
-            Animator.SetFloat(SpeedId, HumanMath.WalkSpeed(speed, seated || pose != BodyPose.None), 0.1f, Time.deltaTime);
+            float walk = HumanMath.WalkSpeed(speed, seated || pose != BodyPose.None);
+            Animator.SetFloat(SpeedId, walk, 0.1f, Time.deltaTime);
+            // faster than the take steps: the steps quicken, the feet do not slide
+            Animator.SetFloat(StrideId, HumanMath.StrideRate(walk, crouching), 0.1f, Time.deltaTime);
             Animator.SetBool(CrouchId, crouching && !downed && !seated && pose == BodyPose.None);
             Animator.SetBool(DownId, downed);
             Animator.SetBool(SitId, seated && !downed);
@@ -94,7 +106,9 @@ namespace Stealth.Player
             if (Animator == null || !Animator.isHuman) return;
             var body = transform;
             float size = Animator.transform.lossyScale.y; // (a person's height is the model's scale)
-            Vector3 At(Vector3 local) => body.position + body.rotation * (local * size);
+            // before the chest where the take has it now (the bones still hold the last frame's pose here: near enough)
+            var chest = Chest != null && size > 1e-4f ? body.InverseTransformPoint(Chest.position) / size : ChestStanding;
+            Vector3 At(Vector3 standing) => body.position + body.rotation * (HumanSkeleton.CarryAt(standing, chest, ChestStanding) * size);
             if (layer == HumanLayers.UpperBody)
             {
                 Animator.SetIKPositionWeight(AvatarIKGoal.RightHand, m_Hold);
@@ -134,8 +148,11 @@ namespace Stealth.Player
             : HumanMath.Grip(HandR.position, FingersR.position, transform.up, Animator != null ? Animator.transform.lossyScale.y : 1f, Cupped);
 
         /// <summary>
-        /// After the animation: the lower foot onto the floor under the body. The player's capsule floats a skin's width over
+        /// After the animation: the lower sole onto the floor under the body. The player's capsule floats a skin's width over
         /// the floor (and a body set down on a spot a few centimetres more), so the take alone left the feet in the air.
+        /// A sole is where its foot stands — on its ankle's height when flat, on its ball when the heel is up
+        /// (<see cref="HumanMath.Sole"/>); the body comes up at once and goes down slowly, so a run keeps its flight
+        /// (<see cref="HumanMath.PlantFollow"/>).
         /// </summary>
         void PlantFeet()
         {
@@ -143,12 +160,16 @@ namespace Stealth.Player
             float want = 0f;
             if (m_Planted && Floor(out float floor))
             {
-                float ankle = Mathf.Min(FootL.position.y, FootR.position.y);
-                want = HumanMath.PlantShift(ankle, floor, AnkleHeight * transform.lossyScale.y);
+                float size = transform.lossyScale.y;
+                float sole = Mathf.Min(SoleOf(FootL, ToeL, size), SoleOf(FootR, ToeR, size));
+                want = HumanMath.PlantShift(sole, floor, 0f);
             }
-            m_Ground = Mathf.Lerp(m_Ground, want, 1f - Mathf.Exp(-18f * Time.deltaTime));
+            m_Ground = HumanMath.PlantFollow(m_Ground, want, Time.deltaTime);
             if (Mathf.Abs(m_Ground) > 1e-4f) Hips.position += Vector3.up * m_Ground;
         }
+
+        float SoleOf(Transform foot, Transform toe, float size) =>
+            HumanMath.Sole(foot.position.y, toe != null ? toe.position.y : float.PositiveInfinity, AnkleHeight * size, BallHeight * size);
 
         /// <summary>The floor under the body (not the player's own colliders), within a step below its feet.</summary>
         bool Floor(out float y)
@@ -232,6 +253,36 @@ namespace Stealth.Player
         /// </summary>
         public static float PlantShift(float lowerAnkle, float floor, float ankleHeight) =>
             Mathf.Clamp(floor + ankleHeight - lowerAnkle, -0.15f, 0.08f);
+
+        /// <summary>
+        /// The speeds the walking takes step at, metres a second (Tools/Blender/humanlib/anim.py: a planted foot goes back
+        /// under the body this fast): where the blend of the legs plays each take, so the feet do not slide.
+        /// </summary>
+        public const float WalkTakeSpeed = 1.5f, RunTakeSpeed = 4.2f, CrouchTakeSpeed = 0.95f;
+
+        /// <summary>
+        /// How fast the walking takes play for a speed: their own rate up to the fastest take's speed (the blend slows the
+        /// steps below it), quicker steps above it — a sprint, a crouched hurry — up to twice.
+        /// </summary>
+        public static float StrideRate(float speed, bool crouching) =>
+            Mathf.Clamp(Mathf.Abs(speed) / (crouching ? CrouchTakeSpeed : RunTakeSpeed), 1f, 2f);
+
+        /// <summary>
+        /// The height of the floor a foot stands on by its bones: under the ankle when the foot is flat, under the ball when
+        /// the heel is up (the lower of the two; a rig without toe bones passes +infinity for the ball).
+        /// </summary>
+        public static float Sole(float ankle, float ball, float ankleHeight, float ballHeight) =>
+            Mathf.Min(ankle - ankleHeight, ball - ballHeight);
+
+        /// <summary>
+        /// The body's shift follows the wanted one: up at once (a foot never stays under the floor), down slowly — both feet
+        /// in the air for a moment (a run's flight, a step off a kerb) do not pull the body after them.
+        /// </summary>
+        public static float PlantFollow(float now, float want, float dt) =>
+            Mathf.Lerp(now, want, 1f - Mathf.Exp(-(want > now ? PlantUpRate : PlantDownRate) * Mathf.Max(0f, dt)));
+
+        /// <summary>How fast the planted body comes up out of the floor and goes down to it, per second.</summary>
+        public const float PlantUpRate = 30f, PlantDownRate = 4f;
 
         /// <summary>The progress of a hold is growing: the hands are at work (it is kept when E is let go, so its being there is not work).</summary>
         public static bool Growing(float now, float before) => now > before + 1e-5f;
