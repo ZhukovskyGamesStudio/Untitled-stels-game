@@ -90,7 +90,7 @@ namespace Stealth.EditorTools
             });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ContactDistance = 1.4f;
+                s.HasEyes = false; s.HearingMultiplier = 1.6f;
                 t.CanUseStairs = false; // wheels
                 t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 4.5f; t.LoseTargetAfter = 3f;
             }));
@@ -104,7 +104,7 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Thumper, RobotPrefabs + "/RobotThumper.prefab", () => MobileRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 0f; // deaf; it listens with its feet
-                s.SeismicRange = 10f; s.SeismicSpeed = 0.8f; s.ContactDistance = 1.6f;
+                s.SeismicRange = 10f; s.SeismicSpeed = 0.8f;
                 t.CanUseStairs = false; // tracks
                 t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3f; t.AttackRange = 1.9f;
                 t.SuspicionDecay = 0.12f; // waves come seconds apart: it keeps what it felt between them
@@ -123,7 +123,7 @@ namespace Stealth.EditorTools
             {
                 var go = MobileRobot("RobotWorker", "robot_worker", "WorkerBody", 0.45f, new Vector3(0, 0.5f, 0.4f), ripple, (s, t, anim) =>
                 {
-                    s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
+                    s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f;
                     t.CanAttack = false;    // harmless, but a snitch
                     t.AlarmRadius = 40f;
                     t.CanUseStairs = false; // wheels
@@ -165,7 +165,7 @@ namespace Stealth.EditorTools
             {
                 var go = MobileRobot("RobotSweeper", "robot_sweeper", "SweeperBody", 0.4f, new Vector3(0, 0.5f, 0.35f), ripple, (s, t, anim) =>
                 {
-                    s.HasEyes = false; s.HearingMultiplier = 0f; s.ContactDistance = 0.9f; // blind and deaf: only the floor lidar
+                    s.HasEyes = false; s.HearingMultiplier = 0f; // blind and deaf: only the floor lidar
                     s.LidarRange = 6f; s.LidarHeight = 0.22f; s.LidarTurnSpeed = 140f; s.LidarRate = 15f;
                     t.CanUseStairs = false; // wheels
                     t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.1f; t.AttackRange = 1.3f;

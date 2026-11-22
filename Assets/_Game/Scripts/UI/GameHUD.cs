@@ -119,9 +119,7 @@ namespace Stealth.UI
         public BarView QuotaBar;
         public RectTransform GainRect;
         public Text GainLabel;
-        [Tooltip("When the hunter comes (or that it is in the house), under the fuel bar.")]
-        public Text HunterLabel;
-        [Tooltip("The house's main job and how far along it is (under the hunter's line).")]
+        [Tooltip("The house's tasks and how far along they are, under the fuel bar.")]
         public Text ObjectiveLabel;
         [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
@@ -840,7 +838,6 @@ namespace Stealth.UI
                 Ui.Show(QuotaLabel, false);
                 QuotaBar.Set(1f, new Color(0.3f, 0.9f, 0.4f));
                 Ui.Show(GainLabel, false);
-                ShowHunter(gm);
                 ShowObjective(gm);
                 ShowTerminal(PlayerController.Local);
                 return;
@@ -859,7 +856,6 @@ namespace Stealth.UI
                 GainRect.anchoredPosition = new Vector2(GainX, GainY + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
-            ShowHunter(gm);
             ShowObjective(gm);
             ShowTerminal(PlayerController.Local);
         }
@@ -922,23 +918,6 @@ namespace Stealth.UI
             if (me == null || l == null || SewerLocation.Active == null) return false;
             var at = me.transform.position;
             return at.y < LevelLayout.Underground && !Basement.Contains(l.Cellar, at + Vector3.up * 0.5f);
-        }
-
-        static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };
-
-        void ShowHunter(GameManager gm)
-        {
-            if (HunterLabel == null) return;
-            int inside = 0;
-            foreach (var d in Detector.All)
-                if (d.Kind == RobotKind.Hunter && !d.IsHacked) inside++;
-            float seconds = gm.HunterAt > 0 ? (float)(gm.HunterAt - Session.ServerTime) : -1f;
-            var (text, urgency) = gm.Phase == RunPhase.Playing ? HunterRules.Line(seconds, gm.HunterAlarmsLeft, inside) : (null, HunterRules.Urgency.Calm);
-            Ui.Show(HunterLabel, text != null);
-            if (text == null) return;
-            var color = HunterColors[(int)urgency];
-            if (urgency != HunterRules.Urgency.Calm) color.a = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f); // blinks when it matters
-            Ui.Set(HunterLabel, text, color);
         }
 
         /// <summary>Once the fuel is enough: a small diamond over the exit hatch (clamped to the screen edge) with the distance.</summary>

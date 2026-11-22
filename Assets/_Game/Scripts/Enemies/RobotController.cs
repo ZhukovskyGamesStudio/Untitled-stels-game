@@ -235,8 +235,7 @@ namespace Stealth.Enemies
             {
                 IIntruder target = p;
                 if (target.IsDown) continue;
-                float d = Vector3.Distance(target.Position, transform.position);
-                if (d <= Senses.ContactDistance) return new Sighting { Target = target, Contact = true, ChasePoint = target.Position };
+                // (no "contact": a robot touched from behind does not notice it — it notices only with its sensors)
 
                 float rate = 0f;
                 bool visibleToFilter = ColorFilter < 0 || target.Carries(ColorFilter);

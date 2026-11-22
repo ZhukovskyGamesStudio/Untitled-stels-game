@@ -107,8 +107,8 @@ namespace Stealth.EditorTools
         /// </summary>
         static void BuildHouseClock(GameHUD hud, Transform content)
         {
-            // top left under the house's panel (Quota: 16, -16, 300 x 118), as wide: all the house's news in one column
-            var panel = R(content, "HouseClock", TopLeft, TopLeft, new Vector2(16, -138), new Vector2(300, 48));
+            // top left under the house's panel (Quota: 16, -16, 300 x 100), as wide: all the house's news in one column
+            var panel = R(content, "HouseClock", TopLeft, TopLeft, new Vector2(16, -120), new Vector2(300, 48));
             hud.ClockPanel = Img(panel, new Color(0.22f, 0.55f, 0.85f, 0.82f));
             Img(Stretch(panel, "Shade", 2f), new Color(0f, 0f, 0f, 0.35f));
             hud.ClockTime = Txt(R(panel, "Time", TopLeft, TopLeft, new Vector2(10, -1), new Vector2(120, 34)), "0:00", 26, TextAnchor.MiddleLeft, Color.white, true);
@@ -372,8 +372,8 @@ namespace Stealth.EditorTools
             hud.HackFree = Icon("ret_hack");
             hud.HackKindIcons = RobotKindIcons();
 
-            // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the hunter under it.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 118));
+            // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the tasks under it.
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 100));
             Img(quota, PanelColor);
             hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(280, 22)), "House", 14, TextAnchor.MiddleLeft, Color.white, true);
             hud.HouseLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -382,8 +382,7 @@ namespace Stealth.EditorTools
             hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(30, -29), new Vector2(200, 8), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
             hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(GameHUD.GainX, GameHUD.GainY), new Vector2(120, 26));
             hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
-            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 20)), "Hunter", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
-            hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -62), new Vector2(280, 52)), "", 12, TextAnchor.UpperLeft, Color.white, true); // the task list, a line each
+            hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 52)), "", 12, TextAnchor.UpperLeft, Color.white, true); // the task list, a line each
             hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 150), new Vector2(700, 24)), "1 / 3", 15, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f, 0.9f), true);
 
             // The team list top right (no minimap there: the map is a terminal's, TerminalKind.Map).

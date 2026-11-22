@@ -387,24 +387,6 @@ namespace Stealth.UI
             heat < 0.5f ? Color.Lerp(Calm, Warm, heat * 2f) : Color.Lerp(Warm, Hot, (heat - 0.5f) * 2f);
     }
 
-    public static class HunterRules
-    {
-        public enum Urgency { Calm, Soon, Inside }
-
-        /// <summary>
-        /// Text and urgency of the hunter line. <paramref name="secondsLeft"/> &lt; 0 and <paramref name="alarmsLeft"/> &lt; 0:
-        /// no more hunters come (the line shows only while one is inside). "Soon" is the last minute or the last alarm.
-        /// </summary>
-        public static (string text, Urgency urgency) Line(float secondsLeft, int alarmsLeft, int inside)
-        {
-            if (inside > 0) return (Loc.T("hud.hunter.inside"), Urgency.Inside);
-            if (secondsLeft < 0f || alarmsLeft < 0) return (null, Urgency.Calm);
-            int s = Mathf.CeilToInt(secondsLeft);
-            bool soon = secondsLeft <= 60f || alarmsLeft <= 1;
-            return (Loc.F("hud.hunter.in", $"{s / 60}:{s % 60:00}", alarmsLeft), soon ? Urgency.Soon : Urgency.Calm);
-        }
-    }
-
     /// <summary>Banners shown one after another (pure, unit tested): at most four waiting, no immediate repeats.</summary>
     public sealed class BannerQueue
     {

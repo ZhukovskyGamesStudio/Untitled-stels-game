@@ -779,7 +779,7 @@ namespace Stealth.EditorTools
             {
                 // sharp eyes on the doorway, keen ears (that is how it is drawn away), no fighting: it calls the others
                 s.ViewDistance = 10f; s.ViewAngle = 110f; s.DetectionSpeed = 1.1f; s.PeripheralDistance = 3f;
-                s.HearingMultiplier = 1.8f; s.ContactDistance = 1.2f;
+                s.HearingMultiplier = 1.8f;
                 t.CanAttack = false;
                 t.AlarmOnDetect = true;
                 t.AlarmRadius = 30f;

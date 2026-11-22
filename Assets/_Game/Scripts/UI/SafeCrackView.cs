@@ -85,7 +85,7 @@ namespace Stealth.UI
             {
                 m_LastNumber = dial.Number;
                 m_PulseTime[m_PulseNext] = now;
-                m_PulseAmp[m_PulseNext] = 0.18f + 0.82f * close * close;
+                m_PulseAmp[m_PulseNext] = SafeScope.PulseHeight(close);
                 m_PulseNext = (m_PulseNext + 1) % Pulses;
             }
             DrawScope(now, close);
@@ -179,7 +179,7 @@ namespace Stealth.UI
                 float u = 1f - age * ScopeSpeed - x;                 // how far behind the pulse's front this point is
                 if (u < -0.01f || u > 0.16f) continue;
                 u = Mathf.Max(0f, u);
-                y += m_PulseAmp[k] * Mathf.Sin(u * 95f) * Mathf.Exp(-u * 26f);
+                y += m_PulseAmp[k] * SafeScope.Ripple(u);
             }
             return y;
         }
@@ -213,5 +213,22 @@ namespace Stealth.UI
                 m_Marks.Add(t.gameObject);
             }
         }
+    }
+
+    /// <summary>
+    /// The safe's oscilloscope (pure, unit tested): how tall a click's pulse is and its shape. A far number barely ripples
+    /// the trace, a close one fills the scope to its edge: loud and quiet clicks are told apart at a glance.
+    /// </summary>
+    public static class SafeScope
+    {
+        /// <summary>The pulse's peak, a share of the scope's half height, for how close the dial is (0..1).</summary>
+        public static float PulseHeight(float closeness)
+        {
+            float c = Mathf.Clamp01(closeness);
+            return Mathf.Lerp(0.06f, 1f, c * c * c);
+        }
+
+        /// <summary>A damped ripple behind the pulse's front (<paramref name="u"/>: how far behind, in scope widths), its first peak 1.</summary>
+        public static float Ripple(float u) => Mathf.Sin(u * 95f) * Mathf.Exp(-u * 26f) / 0.675f;
     }
 }
