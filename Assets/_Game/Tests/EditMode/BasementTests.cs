@@ -232,6 +232,17 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void OnlyTheStorageRobotTakesTheShaftLadder()
+        {
+            // the shaft's navmesh link lies in the Ladder area; RobotController leaves that area out of every robot's mask
+            Assert.AreEqual(LevelMetrics.LadderArea, UnityEngine.AI.NavMesh.GetAreaFromName("Ladder"), "the area's name in the project's settings");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Level/ShaftLink.prefab");
+            var link = prefab.GetComponent("NavMeshLink");
+            Assert.IsNotNull(link);
+            Assert.AreEqual(LevelMetrics.LadderArea, new UnityEditor.SerializedObject(link).FindProperty("m_Area").intValue);
+        }
+
+        [Test]
         public void WalkingIntoTheOpenHoleFromAnywhereOnItsEdgeTakesTheLadderDown()
         {
             var shaft = new Vector3(10f, 5f, 3f);

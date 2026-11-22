@@ -71,6 +71,7 @@ namespace Stealth.Level
         public const int WorldTextLayer = 9;
         public const int CeilingLayer = 2;    // "Ignore Raycast": kept out of the navmesh and vision checks
         public const int StairsArea = 3;      // NavMesh area "Stairs": robots without legs exclude it
+        public const int LadderArea = 4;      // NavMesh area "Ladder" (the link up the basement's shaft): only the storage robot takes it
 
         // Staircase geometry in the corner frame (u, v = meters from the corner walls into the room).
         // seven steps a flight: a step of 0.29 m (4.1 m a storey), well under the player's 0.35 m — no jumping on the stairs
