@@ -73,52 +73,34 @@ namespace Stealth.EditorTools
         {
             var root = new GameObject("VaultConsole");
             // The lamp over the panel: red until solved, then green.
-            Cube(root.transform, "LampBase", new Vector3(0f, 0.36f, 0.02f), new Vector3(0.2f, 0.08f, 0.04f), M("Metal"), false);
+            ChamferBox(root.transform, "LampBase", new Vector3(0f, 0.36f, 0.02f), new Vector3(0.2f, 0.08f, 0.04f), M("Metal"));
             var screen = Cube(root.transform, "EyeScreen", new Vector3(0f, 0.36f, 0.045f), new Vector3(0.16f, 0.05f, 0.012f), M("LockLamp"), false);
             var console = root.AddComponent<VaultConsole>();
             console.Screen = screen.GetComponent<Renderer>();
+            console.LockedPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_vault_locked.png");
+            console.OpenPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_vault_open.png");
             console.Faces = new GameObject[3];
-            GameObject Face(int i, string name, Material body, Vector3 size)
+            // the three faces, modelled (Tools/Blender/vault_console.py): parts Body (the casing), Accent (steel), Trim
+            // (dark), Stripe (the hazard band / handle), EyeA/EyeB/EyeC (the lock-lamp, keypad and bulb glows)
+            GameObject Face(int i, string name, string file, string body)
             {
                 var f = new GameObject(name);
                 f.transform.SetParent(root.transform, false);
                 f.AddComponent<KeepUnmerged>(); // one of the three shows (by the panel's game)
-                Cube(f.transform, "Body", new Vector3(0f, 0f, size.z / 2f), size, body, false);
+                var model = Model(file);
+                model.transform.SetParent(f.transform, false);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    r.sharedMaterial = M(n.StartsWith("Body") ? body : n.StartsWith("Accent") ? "Metal" : n.StartsWith("Trim") ? "Rack"
+                        : n.StartsWith("Stripe") ? "BeanBag" : n.StartsWith("EyeA") ? "LockLamp" : n.StartsWith("EyeB") ? "Keypad" : n.StartsWith("EyeC") ? "LampBulb" : body);
+                }
                 console.Faces[i] = f;
                 return f;
             }
-            // The dial: a round steel safe door — a big knob with a pointer and a ring of ticks.
-            var dial = Face(0, "FaceDial", M("Metal"), new Vector3(0.5f, 0.6f, 0.08f));
-            for (int k = 0; k < 2; k++)
-                Cube(dial.transform, "Ring", new Vector3(0f, -0.02f, 0.082f), new Vector3(0.36f, 0.36f, 0.006f), M("PropAccent"), false).transform.localRotation = Quaternion.Euler(0, 0, k * 45f);
-            for (int k = 0; k < 2; k++)
-                Cube(dial.transform, "Knob", new Vector3(0f, -0.02f, 0.1f), new Vector3(0.2f, 0.2f, 0.04f), M("Metal"), false).transform.localRotation = Quaternion.Euler(0, 0, 22.5f + k * 45f);
-            Cube(dial.transform, "Pointer", new Vector3(0f, 0.07f, 0.122f), new Vector3(0.025f, 0.08f, 0.01f), M("Keypad"), false);
-            for (int k = 0; k < 12; k++)
-            {
-                float a = k * 30f * Mathf.Deg2Rad;
-                Cube(dial.transform, "Tick", new Vector3(Mathf.Sin(a) * 0.15f, -0.02f + Mathf.Cos(a) * 0.15f, 0.087f), new Vector3(0.012f, 0.03f, 0.006f), M("Ceiling"), false)
-                    .transform.localRotation = Quaternion.Euler(0, 0, -k * 30f);
-            }
-            Cube(dial.transform, "Handle", new Vector3(0.19f, -0.02f, 0.11f), new Vector3(0.04f, 0.2f, 0.05f), M("PropAccent"), false);
-            // The switches: an orange-striped electrical box, four big toggles with a lamp over each.
-            var sw = Face(1, "FaceSwitches", M("PropAccent"), new Vector3(0.56f, 0.5f, 0.09f));
-            Cube(sw.transform, "Stripe", new Vector3(0f, -0.21f, 0.092f), new Vector3(0.56f, 0.05f, 0.004f), M("BeanBag"), false);
-            for (int k = 0; k < 4; k++)
-            {
-                float x = -0.195f + k * 0.13f;
-                Cube(sw.transform, "Socket", new Vector3(x, -0.03f, 0.1f), new Vector3(0.08f, 0.16f, 0.025f), M("Metal"), false);
-                Cube(sw.transform, "Toggle", new Vector3(x, 0.02f, 0.13f), new Vector3(0.03f, 0.1f, 0.05f), M("Ceiling"), false)
-                    .transform.localRotation = Quaternion.Euler(-25f, 0, 0);
-                Cube(sw.transform, "Lamp", new Vector3(x, 0.13f, 0.095f), new Vector3(0.05f, 0.05f, 0.012f), M("Keypad"), false);
-            }
-            // The sequence: a white panel with a 3 x 3 grid of glowing buttons (the pattern to repeat).
-            var seq = Face(2, "FaceSequence", M("PropBody"), new Vector3(0.46f, 0.56f, 0.07f));
-            Cube(seq.transform, "Bezel", new Vector3(0f, -0.02f, 0.072f), new Vector3(0.36f, 0.36f, 0.006f), M("Rack"), false);
-            string[] lit = { "LockLamp", "Keypad", "LampBulb" };
-            for (int y = 0; y < 3; y++)
-                for (int x = 0; x < 3; x++)
-                    Cube(seq.transform, "Button", new Vector3((x - 1) * 0.11f, -0.02f + (1 - y) * 0.11f, 0.082f), new Vector3(0.08f, 0.08f, 0.02f), M(lit[(x + y) % 3]), false);
+            Face(0, "FaceDial", "vault_console_dial", "Metal");             // a round steel safe door's dial and handle
+            Face(1, "FaceSwitches", "vault_console_switches", "PropAccent"); // an electrical box, four toggles with lamps
+            Face(2, "FaceSequence", "vault_console_sequence", "PropBody");   // a white panel with a 3 x 3 lit keypad
             return root;
         }
 
@@ -301,16 +283,16 @@ namespace Stealth.EditorTools
             float depth = wall + 2f * proud;
             foreach (float side in new[] { -1f, 1f })
             {
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), steel, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), steel);
                 foreach (float face in new[] { -1f, 1f })
-                    Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
-                        new Vector3(casing, height + casing - lining, casingDepth), steel, false);
+                    ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
+                        new Vector3(casing, height + casing - lining, casingDepth), steel);
             }
-            Cube(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), steel, false);
+            ChamferBox(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), steel);
             foreach (float face in new[] { -1f, 1f })
-                Cube(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
-                    new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
-            Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("PropAccent"), false);
+                ChamferBox(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
+                    new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel);
+            ChamferBox(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("PropAccent"));
             // the leaves: hinged at the inner edges of the jambs, against the outer face, their glass and handles as modelled
             // (0.9 x 2.28 x 0.09) scaled to the opening; turned so the push bar faces in and the pull handle out at the meeting stiles
             float leafW = (clear - 2f * lining) / 2f, leafH = height - lining - 0.01f, hingeZ = wall / 2f + proud - 0.05f;
@@ -347,11 +329,13 @@ namespace Stealth.EditorTools
         static GameObject BuildVaultPanel()
         {
             var root = new GameObject("VaultPanel");
-            Cube(root.transform, "Plate", new Vector3(0f, 0f, 0.01f), new Vector3(0.74f, 0.2f, 0.02f), M("Metal"), false);
+            // a steel plate with screws, three round lamps in bezels (Tools/Blender/vault_console.py vault_panel)
+            var model = Model("vault_panel");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "Metal", "PropAccent", "LockLamp");
             var panel = root.AddComponent<VaultPanel>();
-            panel.Lamps = new Renderer[3];
-            for (int i = 0; i < 3; i++)
-                panel.Lamps[i] = Cube(root.transform, $"Lamp{i}", new Vector3((i - 1) * 0.22f, 0f, 0.025f), new Vector3(0.14f, 0.1f, 0.02f), M("LockLamp"), false).GetComponent<Renderer>();
+            panel.Lamps = model.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("EyeLamp"))
+                .OrderBy(r => r.transform.TransformPoint(r.GetComponent<MeshFilter>().sharedMesh.bounds.center).x).Cast<Renderer>().ToArray();
             return root;
         }
 
@@ -372,30 +356,27 @@ namespace Stealth.EditorTools
                 g.transform.SetParent(parent, false);
                 return g.transform;
             }
-            var frame = Group(root.transform, "Base");
-            Cube(frame, "Floor", new Vector3(0f, 0.03f, 0f), new Vector3(2f * half, 0.06f, 2f * half), steel, false);
-            foreach (var (x, z) in new[] { (-1, -1), (-1, 1), (1, -1), (1, 1) })
-                Cube(frame, "Post", new Vector3(x * (half - 0.04f), h / 2f, z * (half - 0.04f)), new Vector3(0.08f, h, 0.08f), steel, false);
-            Cube(frame, "Top", new Vector3(0f, h, 0f), new Vector3(2f * half, 0.05f, 2f * half), M("DoorFrame"), false);
-            const float step = 0.18f;
-            int bars = Mathf.FloorToInt((2f * half - 0.2f) / step);
-            for (int i = 0; i <= bars; i++)
+            // the cage and its door, modelled (Tools/Blender/cage.py): round posts with feet and caps, round bars held by
+            // bands, a riveted floor plate, a padlock on a hasp (its lamp: red while locked)
+            void Dress(GameObject model)
             {
-                float t = -half + 0.1f + i * (2f * half - 0.2f) / bars;
-                Cube(frame, "BarBack", new Vector3(t, h / 2f, -half + 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
-                Cube(frame, "BarLeft", new Vector3(-half + 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
-                Cube(frame, "BarRight", new Vector3(half - 0.04f, h / 2f, t), new Vector3(0.03f, h, 0.03f), steel, false);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    r.sharedMaterial = n.StartsWith("Eye") ? M("LockLamp") : n.StartsWith("Accent") ? M("DoorFrame") : steel;
+                }
             }
+            var frame = Group(root.transform, "Base");
+            var frameModel = Model("cage_base");
+            frameModel.transform.SetParent(frame, false);
+            Dress(frameModel);
             var door = new GameObject("Door");
             door.transform.SetParent(root.transform, false);
             door.AddComponent<KeepUnmerged>();
             var baseDoor = Group(door.transform, "BaseDoor");
-            for (int i = 0; i <= bars; i++)
-            {
-                float t = -half + 0.1f + i * (2f * half - 0.2f) / bars;
-                Cube(baseDoor, "Bar", new Vector3(t, h / 2f, half - 0.04f), new Vector3(0.03f, h, 0.03f), steel, false);
-            }
-            Cube(baseDoor, "Lock", new Vector3(half - 0.35f, 1.1f, half - 0.02f), new Vector3(0.16f, 0.2f, 0.08f), M("LockLamp"), false);
+            var doorModel = Model("cage_door");
+            doorModel.transform.SetParent(baseDoor, false);
+            Dress(doorModel);
             // the walls of bars and the door are solid
             void Wall(GameObject on, Vector3 c, Vector3 size)
             {
@@ -414,19 +395,24 @@ namespace Stealth.EditorTools
             var hostage = new GameObject("Hostage");
             hostage.transform.SetParent(root.transform, false);
             hostage.AddComponent<KeepUnmerged>();
-            var person = Model("player");
-            person.name = "BaseHostage";
-            person.transform.SetParent(hostage.transform, false);
-            person.transform.localPosition = new Vector3(0f, 0.06f, -0.25f);
-            Paint(person, "PlayerBody", "PlayerAccent", "PlayerGlasses");
-
-            // the storybook model: its frame, its door and its hostage go under the same groups as the base parts
             Mat("Props", "CageWood", new Color(0.3f, 0.18f, 0.1f), smoothness: 0.45f);
             Mat("Props", "CageBrass", new Color(0.78f, 0.6f, 0.3f), smoothness: 0.65f);
             Mat("Props", "HostageCoat", new Color(0.16f, 0.3f, 0.34f), smoothness: 0.2f);
             Mat("Props", "HostageSkin", new Color(0.86f, 0.68f, 0.56f), smoothness: 0.3f);
             Mat("Props", "HostageHair", new Color(0.18f, 0.12f, 0.08f), smoothness: 0.25f);
             Mat("Props", "Rope", new Color(0.66f, 0.55f, 0.36f), smoothness: 0.1f);
+            // the tied-up person sitting at the back, knees up (Tools/Blender/cage.py cage_hostage: the storybook cage's hostage)
+            var person = Model("cage_hostage");
+            person.name = "BaseHostage";
+            person.transform.SetParent(hostage.transform, false);
+            foreach (var r in person.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                string n = r.gameObject.name;
+                r.sharedMaterial = M(n.StartsWith("HostageSkin") ? "HostageSkin" : n.StartsWith("HostageHair") ? "HostageHair"
+                    : n.StartsWith("HostageRope") ? "Rope" : "HostageCoat");
+            }
+
+            // the storybook model: its frame, its door and its hostage go under the same groups as the base parts
             var story = Model("cage_storybook");
             story.name = "Storybook";
             story.transform.SetParent(root.transform, false);
@@ -457,6 +443,84 @@ namespace Stealth.EditorTools
             cage.DoorCollider = doorCollider;
             cage.Hostage = hostage;
             return root;
+        }
+
+        /// <summary>
+        /// The looks of the classes' tools, the starting items and the junk (Tools/Blender/items_more.py): a colour, a
+        /// smoothness and whether it glows, per part (by the start of the part's name; a part that matches none is the Body).
+        /// </summary>
+        static readonly Dictionary<string, (string part, Color color, float smooth, bool glow)[]> GearLooks = new()
+        {
+            ["radio"] = new[] { ("Body", new Color(0.13f, 0.14f, 0.12f), 0.45f, false), ("Accent", new Color(0.05f, 0.05f, 0.05f), 0.4f, false), ("Eye", new Color(0.2f, 1f, 0.35f), 0.5f, true) },
+            ["keyboard"] = new[] { ("Body", new Color(0.16f, 0.17f, 0.19f), 0.5f, false), ("Accent", new Color(0.85f, 0.85f, 0.82f), 0.55f, false), ("Eye", new Color(0.3f, 1f, 0.4f), 0.5f, true) },
+            ["tablet"] = new[] { ("Body", new Color(0.92f, 0.66f, 0.12f), 0.25f, false), ("Accent", new Color(0.12f, 0.12f, 0.13f), 0.6f, false), ("Eye", new Color(0.25f, 0.6f, 0.8f), 0.85f, false) },
+            ["medkit"] = new[] { ("Body", new Color(0.78f, 0.1f, 0.08f), 0.6f, false), ("Accent", new Color(0.82f, 0.83f, 0.85f), 0.65f, false), ("Trim", new Color(0.95f, 0.95f, 0.95f), 0.6f, false) },
+            ["coffee"] = new[] { ("Body", new Color(0.25f, 0.13f, 0.06f), 0.85f, false), ("Accent", new Color(0.75f, 0.6f, 0.2f), 0.7f, false), ("Trim", new Color(0.75f, 0.12f, 0.1f), 0.5f, false) },
+            ["finder"] = new[] { ("Body", new Color(0.2f, 0.3f, 0.24f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.75f), 0.7f, false), ("Eye", new Color(1f, 0.55f, 0.1f), 0.6f, false) },
+            ["boots"] = new[] { ("Body", new Color(0.36f, 0.22f, 0.12f), 0.4f, false), ("Accent", new Color(0.08f, 0.08f, 0.08f), 0.2f, false), ("Trim", new Color(0.8f, 0.65f, 0.3f), 0.3f, false) },
+            ["tomatoes"] = new[] { ("Body", new Color(0.82f, 0.14f, 0.08f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.74f), 0.7f, false) },
+            ["chess"] = new[] { ("Body", new Color(0.32f, 0.17f, 0.08f), 0.6f, false), ("Accent", new Color(0.9f, 0.85f, 0.72f), 0.65f, false) },
+            ["magazine"] = new[] { ("Body", new Color(0.85f, 0.2f, 0.45f), 0.85f, false), ("Accent", new Color(0.92f, 0.9f, 0.86f), 0.3f, false), ("Trim", new Color(0.97f, 0.97f, 0.95f), 0.7f, false) },
+            ["pills"] = new[] { ("Body", new Color(0.3f, 0.55f, 0.9f), 0.5f, false), ("Accent", new Color(0.78f, 0.8f, 0.82f), 0.75f, false) },
+            ["toothpaste"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.97f), 0.7f, false), ("Accent", new Color(0.15f, 0.4f, 0.85f), 0.65f, false) },
+            ["tape"] = new[] { ("Body", new Color(0.5f, 0.52f, 0.54f), 0.5f, false), ("Accent", new Color(0.62f, 0.45f, 0.27f), 0.2f, false) },
+            ["matches"] = new[] { ("Body", new Color(0.9f, 0.7f, 0.15f), 0.4f, false), ("Accent", new Color(0.85f, 0.68f, 0.42f), 0.3f, false), ("Trim", new Color(0.75f, 0.1f, 0.08f), 0.5f, false) },
+            ["toiletpaper"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.93f), 0.1f, false), ("Accent", new Color(0.6f, 0.45f, 0.28f), 0.15f, false) },
+            ["applecore"] = new[] { ("Body", new Color(0.95f, 0.9f, 0.72f), 0.4f, false), ("Accent", new Color(0.72f, 0.08f, 0.06f), 0.7f, false), ("Trim", new Color(0.3f, 0.18f, 0.08f), 0.3f, false) },
+            ["soap"] = new[] { ("Body", new Color(0.95f, 0.8f, 0.85f), 0.6f, false), ("Accent", new Color(0.25f, 0.55f, 0.75f), 0.4f, false) },
+            ["gloves"] = new[] { ("Body", new Color(0.85f, 0.72f, 0.42f), 0.15f, false), ("Accent", new Color(0.2f, 0.35f, 0.65f), 0.2f, false) },
+            ["necklace"] = new[] { ("Body", new Color(1f, 0.76f, 0.3f), 0.75f, false), ("Accent", new Color(0.85f, 0.05f, 0.15f), 0.95f, false) },
+            ["mop"] = new[] { ("Body", new Color(0.2f, 0.45f, 0.75f), 0.6f, false), ("Accent", new Color(0.88f, 0.86f, 0.8f), 0.05f, false) },
+            ["plush"] = new[] { ("Body", new Color(0.6f, 0.4f, 0.22f), 0.05f, false), ("Accent", new Color(0.9f, 0.78f, 0.6f), 0.1f, false), ("Trim", new Color(0.05f, 0.04f, 0.04f), 0.7f, false) },
+            ["socks"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.95f), 0.1f, false), ("Accent", new Color(0.15f, 0.35f, 0.75f), 0.15f, false) },
+        };
+
+        /// <summary>
+        /// The model of a class's tool, a starting item or a junk thing (Items/&lt;Id&gt;Model), painted by
+        /// <see cref="GearLooks"/>; the fuel finder gets its flashing lamp (<see cref="FinderBlink"/>). Null while its model
+        /// has not been exported yet (the item shows its tinted piece).
+        /// </summary>
+        static GameObject GearModel(string id)
+        {
+            string file = $"item_{id}_model";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath(file)) == null)
+            {
+                Debug.LogWarning($"[Builder] {file}.fbx missing: run Tools/Blender/items_more.py");
+                return null;
+            }
+            (string part, Color color, float smooth, bool glow)[] looks = GearLooks.TryGetValue(id, out var l) ? l : new[] { ("Body", Color.grey, 0.3f, false) };
+            foreach (var (part, color, smooth, glow) in looks)
+                Mat("Items", $"Gear_{id}_{part}", color, glow ? color * 1.6f : (Color?)null, smoothness: smooth);
+            string name = char.ToUpperInvariant(id[0]) + id.Substring(1) + "Model";
+            return Prefab($"{PrefabsDir}/Items/{name}.prefab", () =>
+            {
+                var m = Model(file);
+                m.name = name;
+                foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string part = looks.Where(x => r.gameObject.name.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
+                    r.sharedMaterial = M($"Gear_{id}_{part}");
+                }
+                if (id == "finder")
+                {
+                    var glass = m.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.gameObject.name.StartsWith("Eye"));
+                    var lampGo = new GameObject("Lamp");
+                    lampGo.transform.SetParent(m.transform, false);
+                    lampGo.transform.localPosition = glass != null ? glass.localBounds.center + Vector3.up * 0.03f : new Vector3(0f, 0.06f, 0f);
+                    var lamp = lampGo.AddComponent<Light>();
+                    lamp.type = LightType.Point;
+                    lamp.range = 2.5f;
+                    lamp.intensity = 1.4f;
+                    lamp.color = new Color(0.45f, 1f, 0.55f);
+                    lamp.shadows = LightShadows.None;
+                    lamp.enabled = false;
+                    lampGo.AddComponent<LightSource>();
+                    var blink = m.AddComponent<FinderBlink>();
+                    blink.Lamp = lamp;
+                    blink.Glass = glass;
+                }
+                return m;
+            });
         }
 
         /// <summary>The tools among the items: their meshes (one per shape) and the lure speaker's own model.</summary>
@@ -569,6 +633,14 @@ namespace Stealth.EditorTools
             icons[ItemCatalog.Stun] = ItemIcon("stun");
             icons[ItemCatalog.Speaker] = ItemIcon("speaker");
             icons[ItemCatalog.ShelterMap] = ItemIcon("map");
+            // the classes' tools, the starting items and the junk (Tools/Blender/items_more.py, item_icons.py)
+            var gear = new GameObject[ItemCatalog.Shapes.Length];
+            for (int shape = ItemCatalog.Radio; shape < ItemCatalog.Shapes.Length; shape++)
+            {
+                string id = ItemCatalog.Shapes[shape].Id;
+                gear[shape] = GearModel(id);
+                icons[shape] = ItemIcon(id);
+            }
             var meshes = ItemCatalog.Shapes.Select(s =>
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
@@ -581,7 +653,8 @@ namespace Stealth.EditorTools
                 && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey && visuals.Models[ItemCatalog.ShelterMap] == map
                 && visuals.Models[ItemCatalog.Book] == book && visuals.Models[ItemCatalog.Cans] == cans
                 && visuals.Models[ItemCatalog.Screwdriver] == screwdriver && visuals.Models[ItemCatalog.BeltBag] == beltBag
-                && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)) return;
+                && visuals.Icons != null && visuals.Icons.SequenceEqual(icons)
+                && Enumerable.Range(ItemCatalog.Radio, ItemCatalog.Shapes.Length - ItemCatalog.Radio).All(i => visuals.Models[i] == gear[i])) return;
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
             visuals.Models[ItemCatalog.Speaker] = lure;
@@ -595,6 +668,7 @@ namespace Stealth.EditorTools
             visuals.Models[ItemCatalog.Cans] = cans;
             visuals.Models[ItemCatalog.Screwdriver] = screwdriver;
             visuals.Models[ItemCatalog.BeltBag] = beltBag;
+            for (int i = ItemCatalog.Radio; i < ItemCatalog.Shapes.Length; i++) visuals.Models[i] = gear[i];
             visuals.Icons = icons;
             EditorUtility.SetDirty(visuals);
         }
@@ -618,7 +692,13 @@ namespace Stealth.EditorTools
         /// </summary>
         static Mesh ItemPieceMesh(string id)
         {
-            if (id != "map") return AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(id))).OfType<Mesh>().First();
+            if (id != "map")
+            {
+                var mesh = AssetDatabase.LoadAllAssetsAtPath(ModelPath(ItemMeshFile(id))).OfType<Mesh>().FirstOrDefault();
+                if (mesh != null) return mesh;
+                Debug.LogWarning($"[Builder] item_{id}.fbx missing: run Tools/Blender/generate_models.py (its SHAPES)");
+                return AssetDatabase.LoadAllAssetsAtPath(ModelPath("item_mono")).OfType<Mesh>().First();
+            }
             string path = $"{Root}/Art/Models/Items/item_map_piece.asset";
             var piece = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             bool fresh = piece == null;

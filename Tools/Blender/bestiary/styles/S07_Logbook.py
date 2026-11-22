@@ -836,7 +836,7 @@ def p_water_cooler(L):
     P = D.Parts()
     P.add("Body", [s.rbox((.3, .3, .2), (0, 0, .1), r=.01, seg=1)] + barrel(.16, .8, (0, 0, .6)))
     P.add("Body", L.rod((0, -.14, .5), (0, -.18, .48), .02))
-    P.add("Eye", L.lathe([(0, 0), (.13, 0), (.15, .1), (.15, .28), (.08, .38), (.04, .45), (0, .45)], loc=(0, 0, .99)))
+    P.add("Eye", L.lathe(props.COOLER_BOTTLE, loc=(0, 0, .99)))
     P.add("Body", [torus(.152, .012, (0, 0, 1.18), seg=16, seg_r=5)])
     return P
 

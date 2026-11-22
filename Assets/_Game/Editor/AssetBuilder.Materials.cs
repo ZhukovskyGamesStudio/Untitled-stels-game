@@ -134,8 +134,8 @@ namespace Stealth.EditorTools
             Mat(env, "LampPanel", new Color(1f, 0.97f, 0.9f), new Color(2.2f, 2.1f, 1.9f));
             Mat(env, "ExitSign", new Color(0.1f, 0.75f, 0.3f), new Color(0.15f, 2.2f, 0.55f));
             Mat(env, "ExitSignMark", new Color(0.95f, 1f, 0.95f), new Color(1.3f, 1.4f, 1.3f));
-            Mat(props, "LampShade", new Color(0.9f, 0.84f, 0.7f), new Color(1.3f, 1.05f, 0.6f), smoothness: 0.1f);
-            Mat(props, "LampBulb", new Color(1f, 0.9f, 0.7f), new Color(3f, 2.5f, 1.6f));
+            Mat(props, "LampShade", new Color(0.9f, 0.84f, 0.7f), new Color(0.39f, 0.32f, 0.18f), smoothness: 0.1f); // decor glows dimly (LightLeakTests.DimDecor)
+            Mat(props, "LampBulb", new Color(1f, 0.9f, 0.7f), new Color(0.9f, 0.75f, 0.48f));
 
             Mat(props, "PingPong", new Color(0.08f, 0.35f, 0.25f), smoothness: 0.4f);
             Mat(props, "BeanBag", new Color(0.85f, 0.42f, 0.15f), smoothness: 0.05f);
@@ -146,11 +146,11 @@ namespace Stealth.EditorTools
             Mat(props, "PropBody", new Color(0.62f, 0.60f, 0.56f));
             Mat(props, "PropAccent", new Color(0.22f, 0.23f, 0.26f));
             // Monitors are on: a real glow that blooms.
-            Mat(props, "PropScreen", new Color(0.05f, 0.08f, 0.1f), new Color(0.3f, 0.85f, 1.5f), smoothness: 0.8f);
+            Mat(props, "PropScreen", new Color(0.05f, 0.08f, 0.1f), new Color(0.09f, 0.255f, 0.45f), smoothness: 0.8f);
             Mat(props, "Plant", new Color(0.25f, 0.55f, 0.25f));
             Mat(props, "PlantPot", new Color(0.55f, 0.35f, 0.25f));
             Mat(props, "Rack", new Color(0.12f, 0.13f, 0.15f), smoothness: 0.5f);
-            Mat(props, "RackLights", new Color(0.2f, 1f, 0.4f), new Color(0.2f, 1.6f, 0.5f));
+            Mat(props, "RackLights", new Color(0.2f, 1f, 0.4f), new Color(0.06f, 0.48f, 0.15f));
             Mat(props, "Cardboard", new Color(0.62f, 0.47f, 0.3f));
             Mat(props, "Water", new Color(0.4f, 0.7f, 1f), smoothness: 0.9f);
             Mat(props, "Fabric", new Color(0.35f, 0.25f, 0.45f), smoothness: 0.05f);
@@ -161,7 +161,7 @@ namespace Stealth.EditorTools
             Mat(props, "Lockers", new Color(0.35f, 0.5f, 0.62f), smoothness: 0.55f);
             Mat(props, "Mirror", new Color(0.7f, 0.78f, 0.82f), smoothness: 0.98f);
             Mat(props, "Vending", new Color(0.75f, 0.12f, 0.12f), smoothness: 0.6f);
-            Mat(props, "VendingGlass", new Color(0.6f, 0.85f, 1f), new Color(1.1f, 1.5f, 1.9f), smoothness: 0.9f); // lit display
+            Mat(props, "VendingGlass", new Color(0.6f, 0.85f, 1f), new Color(0.33f, 0.45f, 0.57f), smoothness: 0.9f); // lit display, dim
             // the themed rooms' furniture (AssetBuilder.Rooms)
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);
@@ -171,6 +171,9 @@ namespace Stealth.EditorTools
             Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
             Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
             Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            Mat(props, "DoorGlass", new Color(0.58f, 0.68f, 0.72f), smoothness: 0.9f);      // satin glass of the sliding doors (opaque)
+            Mat(props, "DoorFrameAlu", new Color(0.7f, 0.72f, 0.74f), smoothness: 0.6f);    // their anodised frames
+            Mat(props, "DoorSeal", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.2f);       // the rubber on the meeting edge
             Mat(props, "ToolRed", new Color(0.72f, 0.08f, 0.06f), smoothness: 0.6f);
             Mat(props, "ShopYellow", new Color(0.95f, 0.74f, 0.08f), smoothness: 0.4f);
             Mat(props, "ShopSteel", new Color(0.46f, 0.5f, 0.54f), smoothness: 0.55f); // the shop's steel doors

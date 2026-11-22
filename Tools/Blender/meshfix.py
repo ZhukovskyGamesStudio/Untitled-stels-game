@@ -23,7 +23,7 @@ EPS = 1e-4     # faces closer than 0.1 mm count as one plane
 GAP = 0.0015   # the smaller piece grows 1.5 mm: clear of depth-buffer precision at play distance
 TOUCH = 0.004  # pieces closer than 4 mm touch (as review.check)
 SNAP = 0.07    # pieces floating up to 7 cm get attached; more is a design error
-MOVING = ("BodyDoor", "BodyDrawer")  # parts the game moves (Items.Storage): pass pinned=moving so they stay put
+MOVING = ("BodyDoor", "BodyDrawer", "AccentDoor", "TrimDoor")  # parts the game moves (Items.Storage; <Role>Door{n} rides on door n): pass pinned=moving so they stay put
 
 
 def moving(name):

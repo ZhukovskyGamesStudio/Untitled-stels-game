@@ -126,7 +126,14 @@ namespace Stealth.Level
                 else if (fromHatch <= NearHatch || rng.NextDouble() < s.CameraChance) // (a camera may hang closer than a sensor)
                     l.CameraSpots.Add(new Pose(corner + Vector3.up * (y + LevelMetrics.WallHeight - 0.3f), Quaternion.LookRotation(look)));
                 else
-                    l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.MotionSensor, Floor = room.Floor, Position = corner + Vector3.up * (y + 2.2f), Rotation = Quaternion.LookRotation(look) });
+                {
+                    // flush in the corner: back plate against both walls, looking along the diagonal
+                    var b = room.Bounds;
+                    var out_ = new Vector3(Mathf.Sign(corner.x - b.center.x), 0f, Mathf.Sign(corner.z - b.center.y));
+                    var flush = corner + out_ * (0.45f - LevelMetrics.SensorCornerInset);
+                    if (l.Plan.SpaceAt(room.Floor, new Vector2(flush.x, flush.z)) == room.Id) // (no corner found: no sensor floating mid-room)
+                        l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.MotionSensor, Floor = room.Floor, Position = flush + Vector3.up * (y + 2.2f), Rotation = Quaternion.LookRotation(-out_.normalized) });
+                }
                 any |= !near;
                 if (!any) guarded.Remove(room.Id); // all of it would have stood by the hatch: not guarded after all
             }

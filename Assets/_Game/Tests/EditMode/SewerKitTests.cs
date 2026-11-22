@@ -8,7 +8,8 @@ namespace Stealth.Tests
 {
     /// <summary>
     /// The sewer's kit pieces lie where <see cref="SewerLocation"/> expects them: each one runs from its origin along +X
-    /// (the FBX import turns Blender +X into Unity −X, the builder turns the pieces back). Once they were mirrored: the
+    /// (the FBX import turns Blender +X into Unity −X, the builder turns the pieces back); the hall's tiles fit their cells
+    /// and the sides' frames (<see cref="SewerHall"/>). Once they were mirrored: the
     /// hall overlapped the tunnel, the three tunnels ran back through it and their zones hung in the void behind the hall.
     /// </summary>
     public class SewerKitTests
@@ -57,44 +58,40 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheHallFollowsTheTunnelAndTheWaysLeaveItsFarEnd()
+        public void TheHallsTilesFitTheirCellsAndSides()
         {
-            var hub = MeshBounds(Load("Hub"));
-            Assert.AreEqual(0f, hub.min.x, 0.15f, "the hall starts where the tunnel ends");
-            Assert.AreEqual(SewerPlan.HubLength, hub.max.x, 0.15f, "and ends at the tunnels' mouths");
+            const float half = SewerHall.Cell / 2f;
+            var floor = MeshBounds(Load("HallFloor"));
+            Assert.AreEqual(-half, floor.min.x, 0.1f, "a floor tile covers its cell");
+            Assert.AreEqual(half, floor.max.x, 0.1f);
+            Assert.AreEqual(-half, floor.min.z, 0.1f);
+            Assert.AreEqual(half, floor.max.z, 0.1f);
+            Assert.AreEqual(0f, floor.max.y, 0.05f, "the road's grate on top");
+            for (int h = 0; h < SewerHall.Heights; h++)
+            {
+                var vault = MeshBounds(Load($"HallVault{h}"));
+                Assert.AreEqual(-half, vault.min.x, 0.1f, $"vault {h} covers its cell");
+                Assert.AreEqual(half, vault.max.z, 0.1f);
+                Assert.AreEqual(SewerHall.Springing[h], vault.min.y, 0.05f, $"vault {h} springs from the capitals");
+                var column = MeshBounds(Load($"HallColumn{h}"));
+                Assert.AreEqual(SewerHall.Springing[h], column.max.y, 0.05f, $"column {h} carries the vaults");
+                Assert.LessOrEqual(column.max.x, 0.5f, "a column round a corner of the cells");
+                foreach (var name in new[] { "HallWall", "HallMouth", "HallEntry" })
+                {
+                    var wall = MeshBounds(Load($"{name}{h}"));
+                    Assert.AreEqual(0f, wall.max.x, 0.05f, $"{name}{h}: its outer face at the side's frame");
+                    Assert.GreaterOrEqual(wall.min.x, -SewerHall.Wall - 0.2f, $"{name}{h}: in the wall, not in the hall");
+                    Assert.AreEqual(-half, wall.min.z, 0.1f, $"{name}{h}: along the whole side");
+                    Assert.AreEqual(half, wall.max.z, 0.1f);
+                    Assert.Greater(wall.max.y, SewerHall.Springing[h] + 1f, $"{name}{h}: up into the vault");
+                }
+            }
             var branch = Load("Branch");
             var tunnel = MeshBounds(branch, f => f.transform.IsChildOf(branch.transform.Find("Tunnel")));
             Assert.GreaterOrEqual(tunnel.min.x, -0.2f, "a way leads away from the hall, not back through it");
             Assert.Greater(tunnel.max.x, SewerLocation.StopAt, "the tunnel goes past its stop wall");
             var zone = MeshBounds(branch, f => f.transform.IsChildOf(branch.transform.Find("WhenOpen")));
             Assert.Less(zone.max.x, tunnel.max.x, "the vote zone lies inside the tunnel");
-        }
-
-        [Test]
-        public void TheWaysOnLeaveTheHallInDifferentDirections()
-        {
-            var seen = new System.Collections.Generic.HashSet<string>();
-            int sideways = 0, ahead = 0;
-            for (int seed = 0; seed < 40; seed++)
-            {
-                var p = SewerPlan.Make(seed, 2);
-                Assert.AreEqual(3, p.TunnelMouths.Distinct().Count(), "three tunnels, three mouths");
-                Assert.IsTrue(p.TunnelMouths.All(m => m >= 0 && m < SewerPlan.Mouths.Length));
-                CollectionAssert.AreEqual(p.TunnelMouths, SewerPlan.Make(seed, 2).TunnelMouths, "from the seed");
-                seen.Add(string.Join(",", p.TunnelMouths.OrderBy(m => m)));
-                if (p.TunnelMouths.Any(m => m >= 3)) sideways++;
-                if (p.TunnelMouths.Any(m => m < 3)) ahead++;
-            }
-            Assert.GreaterOrEqual(seen.Count, 6, "many arrangements of the ways on");
-            Assert.Greater(sideways, 20, "often a way to the side");
-            Assert.Greater(ahead, 20, "often one ahead");
-            // every mouth leads out of the hall
-            foreach (var m in SewerPlan.Mouths)
-            {
-                var outward = m.rotation * Vector3.right;
-                var fromCentre = m.position - new Vector3(SewerPlan.HubLength / 2f, 0f, 0f);
-                Assert.Greater(Vector3.Dot(outward, fromCentre), 0f, $"the mouth at {m.position} leads out of the hall");
-            }
             var plug = MeshBounds(Load("Plug"));
             Assert.Less(plug.max.x, 0.05f, "the plug sits in the wall, not in the tunnel");
         }

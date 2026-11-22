@@ -29,7 +29,17 @@ namespace Stealth.EditorTools
             var segments = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}.prefab", () => KitPiece($"sewer_seg_{i}", true, KitYaw))).ToArray();
             var cuts = Enumerable.Range(0, SewerPlan.Variants).Select(i => Prefab($"{SewerKit}/Segment{i}Cut.prefab", () => KitPiece($"sewer_seg_{i}_cut", false))).ToArray();
             var cap = Prefab($"{SewerKit}/Cap.prefab", () => KitPiece("sewer_cap", true, KitYaw));
-            var hub = Prefab($"{SewerKit}/Hub.prefab", () => KitPiece("sewer_hub", true, KitYaw));
+            // the hall's tiles (sewer.py kit_hall): SewerHall lays them out, different every time
+            var hallFloor = Prefab($"{SewerKit}/HallFloor.prefab", () => KitPiece("sewer_hall_floor", true, KitYaw));
+            var hallKits = Enumerable.Range(0, SewerHall.Heights).Select(h => new SewerLocation.HallKit
+            {
+                Vault = Prefab($"{SewerKit}/HallVault{h}.prefab", () => KitPiece($"sewer_hall_vault_{h}", true, KitYaw)),
+                Wall = Prefab($"{SewerKit}/HallWall{h}.prefab", () => KitPiece($"sewer_hall_wall_{h}", true, KitYaw)),
+                Mouth = Prefab($"{SewerKit}/HallMouth{h}.prefab", () => KitPiece($"sewer_hall_mouth_{h}", true, KitYaw)),
+                Entry = Prefab($"{SewerKit}/HallEntry{h}.prefab", () => KitPiece($"sewer_hall_entry_{h}", true, KitYaw)),
+                Column = Prefab($"{SewerKit}/HallColumn{h}.prefab", () => KitPiece($"sewer_hall_column_{h}", true, KitYaw)),
+                Arch = Prefab($"{SewerKit}/HallArch{h}.prefab", () => KitPiece($"sewer_hall_arch_{h}", false, KitYaw)),
+            }).ToArray();
             var plug = Prefab($"{SewerKit}/Plug.prefab", () => KitPiece("sewer_plug", true, KitYaw));
             var lamp = Prefab($"{SewerKit}/Lamp.prefab", () =>
             {
@@ -66,6 +76,25 @@ namespace Stealth.EditorTools
                 light.innerSpotAngle = 70f;
                 return a;
             });
+            // the way to the house's exit hatch (SewerPlan.Passage, sewer.py kit_passage*): a doorway segment, the narrow
+            // passage, its turn, and the shaft's foot with the ladder up to the hatch (ShaftLadder, set up by SewerLocation) and a
+            // caged bulb low and high in the shaft (shadowed: they never light anything through its walls)
+            var doorSegment = Prefab($"{SewerKit}/SegmentDoor.prefab", () => KitPiece("sewer_seg_door", true, KitYaw));
+            var passage = Prefab($"{SewerKit}/Passage.prefab", () => KitPiece("sewer_passage", true, KitYaw));
+            var passageCorner = Prefab($"{SewerKit}/PassageCorner.prefab", () => KitPiece("sewer_passage_corner", true, KitYaw));
+            var passageEnd = Prefab($"{SewerKit}/PassageEnd.prefab", () =>
+            {
+                var e = KitPiece("sewer_passage_end", true, KitYaw);
+                e.AddComponent<ShaftLadder>();
+                foreach (var (y, dir) in new[] { (2.0f, new Vector3(0.4f, -1f, 0.6f)), (5.6f, new Vector3(0.4f, -0.6f, 0.6f)) })
+                {
+                    var light = Lamp(e.transform, "ShaftLight", new Vector3(0.45f, y, -0.62f), Quaternion.LookRotation(dir), LightType.Spot,
+                        new Color(1f, 0.8f, 0.55f), 3f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+                    light.spotAngle = 130f;
+                    light.innerSpotAngle = 70f;
+                }
+                return e;
+            });
             // the drive on to the next house (Level.DrivePath): a branch opens into the wide tunnel again, which runs on round the car
             var reducer = Prefab($"{SewerKit}/Reducer.prefab", () => KitPiece("sewer_reducer", false, KitYaw));
             var tunnel = Prefab($"{SewerKit}/DriveTunnel.prefab", () =>
@@ -81,7 +110,7 @@ namespace Stealth.EditorTools
                 var w = new GameObject("BackWall");
                 var c = w.AddComponent<BoxCollider>();
                 c.center = new Vector3(-0.15f, 3f, 0f);
-                c.size = new Vector3(0.3f, 6f, 12f);
+                c.size = new Vector3(0.3f, 6f, 8.4f); // the tunnel's width only: the passage to the exit hatch may run past it
                 return w;
             });
             var manhole = Prefab($"{SewerKit}/Manhole.prefab", () => KitPiece("sewer_manhole", false));
@@ -104,13 +133,18 @@ namespace Stealth.EditorTools
                 loc.BackWall = backWall;
                 loc.Reducer = reducer;
                 loc.Tunnel = tunnel.GetComponent<DriveTunnel>();
-                loc.Hub = hub;
+                loc.HallFloor = hallFloor;
+                loc.HallKits = hallKits;
                 loc.Plug = plug;
                 loc.Lamp = lamp;
                 loc.Barrel = barrel;
                 loc.Crate = crate;
                 loc.Ladder = ladder;
                 loc.Alcove = alcove;
+                loc.DoorSegment = doorSegment;
+                loc.PassageStraight = passage;
+                loc.PassageCorner = passageCorner;
+                loc.PassageEnd = passageEnd;
                 loc.Manhole = manhole;
                 loc.GatePrefab = gate.GetComponent<SewerGate>();
                 loc.BranchPrefab = branch.GetComponent<SewerBranch>();
@@ -280,9 +314,21 @@ namespace Stealth.EditorTools
             b.Plug.SetActive(false);
             var bars = new GameObject("Bars");
             bars.transform.SetParent(root.transform, false);
+            // round rusty bars (they were square cubes) through a chamfered rail and a foot rail
             for (int i = 0; i < 12; i++)
-                Cube(bars.transform, $"Bar{i}", new Vector3(0.35f, 1.9f, -2.2f + i * 0.4f), new Vector3(0.07f, 3.8f, 0.07f), SewerMat("SewerRust"), false);
-            Cube(bars.transform, "Rail", new Vector3(0.35f, 3.3f, 0f), new Vector3(0.1f, 0.12f, 4.6f), SewerMat("SewerRust"), false);
+            {
+                var rod = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                rod.name = $"Bar{i}";
+                Object.DestroyImmediate(rod.GetComponent<Collider>());
+                rod.transform.SetParent(bars.transform, false);
+                rod.transform.localPosition = new Vector3(0.35f, 1.9f, -2.2f + i * 0.4f);
+                rod.transform.localScale = new Vector3(0.07f, 1.9f, 0.07f); // (the primitive is 2 m tall)
+                var rr = rod.GetComponent<MeshRenderer>();
+                rr.sharedMaterial = SewerMat("SewerRust");
+                rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            ChamferBox(bars.transform, "Rail", new Vector3(0.35f, 3.3f, 0f), new Vector3(0.1f, 0.12f, 4.6f), SewerMat("SewerRust"), 0.015f);
+            ChamferBox(bars.transform, "FootRail", new Vector3(0.35f, 0.25f, 0f), new Vector3(0.1f, 0.1f, 4.6f), SewerMat("SewerRust"), 0.015f);
             var stop = bars.AddComponent<BoxCollider>();
             stop.center = new Vector3(0.35f, 1.9f, 0f);
             stop.size = new Vector3(0.2f, 3.8f, 4.6f);
@@ -333,7 +379,13 @@ namespace Stealth.EditorTools
             Mat("Car", "CarHead", new Color(1f, 0.96f, 0.85f), new Color(4f, 3.7f, 3f));
             Mat("Car", "CarTail", new Color(1f, 0.15f, 0.1f), new Color(3f, 0.3f, 0.2f));
             Mat("Car", "CarSpot", new Color(1f, 0.85f, 0.5f), new Color(2.5f, 2.1f, 1.2f));
-            Translucent(Mat("Car", "CarGlass", new Color(0.45f, 0.6f, 0.65f, 0.35f), smoothness: 0.95f));
+            // Dark tinted glass that only darkens what is behind it: a pale glass lit by the style's ambient added its own light,
+            // and underground the ink lines (which fade where nothing is lit, _StyDark) came back behind it — the cab looked
+            // clearer through the window than through the open door. No sky reflections either (nothing to reflect down there).
+            var glass = Mat("Car", "CarGlass", new Color(0.04f, 0.05f, 0.06f, 0.4f), smoothness: 0.95f);
+            Translucent(glass);
+            glass.SetFloat("_EnvironmentReflections", 0f);
+            glass.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
         }
 
         static void PaintCar(GameObject model)
@@ -359,6 +411,41 @@ namespace Stealth.EditorTools
         /// steering wheel found by name, four seats, the hopper on the hood, the bed, colliders for the chassis and the cab,
         /// headlights, the engine's loop.
         /// </summary>
+        /// <summary>Chips spat up out of the shredder's mouth while it chews (no emission until then: CarShredder turns it on).</summary>
+        static ParticleSystem ShredderChips(Transform mouth)
+        {
+            var go = Child(mouth, "Chips", Vector3.up * 0.05f);
+            go.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f); // the cone up out of the mouth
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.7f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.015f, 0.04f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.55f, 0.5f, 0.42f), new Color(0.25f, 0.24f, 0.22f));
+            main.gravityModifier = 2.2f;
+            main.maxParticles = 200;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.playOnAwake = true;
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 28f;
+            shape.radius = 0.08f;
+            var rot = ps.rotationOverLifetime;
+            rot.enabled = true;
+            rot.z = new ParticleSystem.MinMaxCurve(-8f, 8f);
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            var mat = LitAsset($"{CarMaterials}/ShredderChip.mat");
+            var particles = Shader.Find("Universal Render Pipeline/Particles/Lit");
+            if (particles != null) mat.shader = particles;
+            mat.SetColor("_BaseColor", Color.white);
+            EditorUtility.SetDirty(mat);
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            return ps;
+        }
+
         static GameObject BuildCar(CargoPiece piece)
         {
             var root = new GameObject("Car");
@@ -400,7 +487,15 @@ namespace Stealth.EditorTools
                 car.Seats[i] = s.transform;
             }
             var hopperAt = car.Grinder != null ? root.transform.InverseTransformPoint(car.Grinder.position) + Vector3.up * 0.15f : new Vector3(0f, 1.56f, 1.55f);
-            Child(root.transform, "Hopper", hopperAt).AddComponent<CarHopper>();
+            var hopper = Child(root.transform, "Hopper", hopperAt);
+            hopper.AddComponent<CarHopper>();
+            // the shredder: the things thrown in heap up in the mouth and go under the blades, chips flying (CarShredder)
+            var shredder = root.AddComponent<CarShredder>();
+            shredder.Mouth = hopper.transform;
+            shredder.PiecePrefab = piece;
+            shredder.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            shredder.Car = car;
+            shredder.Chips = ShredderChips(hopper.transform);
             car.Bed = Child(root.transform, "Bed", new Vector3(0f, 0.86f, -2.35f)).transform;
             car.CargoRoot = Child(root.transform, "Cargo").transform;
 
@@ -421,10 +516,11 @@ namespace Stealth.EditorTools
             car.Headlights = new[]
             {
                 // at the model's head lamps (car.py head_lights: x ±0.70, 0.92 up, nose at z 2.35), just ahead of the bumper
-                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 9f, 24f),
-                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 9f, 24f),
+                // high beams: a long narrow throw down the tunnel, always on
+                Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
+                Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(1.5f, 0f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 22f, 55f),
             };
-            foreach (var l in car.Headlights) { l.spotAngle = 70f; l.innerSpotAngle = 40f; }
+            foreach (var l in car.Headlights) { l.spotAngle = 42f; l.innerSpotAngle = 18f; }
             var engine = root.AddComponent<AudioSource>();
             engine.clip = s_Bank != null ? s_Bank.CarEngine : null;
             engine.loop = true;

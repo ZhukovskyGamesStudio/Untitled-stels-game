@@ -18,6 +18,8 @@ namespace Stealth.Player
 
         GameObject m_RigPrefab;
         HumanRig m_Rig;
+        /// <summary>The department the model and the rig are dressed as now (<see cref="Department"/> follows the class).</summary>
+        Department m_LookDepartment = (Department)(-1);
 
         /// <summary>What other players see of this one: the style's rigged human if it has one, otherwise the model.</summary>
         public Transform Visual => m_Rig != null ? m_Rig.transform : Model;
@@ -28,7 +30,13 @@ namespace Stealth.Player
         /// </summary>
         void UpdateRig()
         {
-            var prefab = VisualStyles.PlayerRig;
+            // a class picked on the start screen dresses the player anew
+            if (Department != m_LookDepartment)
+            {
+                ApplyColor();
+                if (m_Rig != null) PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+            }
+            var prefab = VisualStyles.PlayerRigFor(m_LookDepartment);
             if (prefab != m_RigPrefab)
             {
                 if (m_Rig != null) Destroy(m_Rig.gameObject);
@@ -41,15 +49,57 @@ namespace Stealth.Player
                     var go = Instantiate(prefab, Model.parent);
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
-                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId));
-                    if (IsOwner)
+                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+                    if (IsOwner && !m_BodyShown)
                         foreach (var r in go.GetComponentsInChildren<Renderer>(true))
                             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
                 }
             }
+            UpdateBodyPose();
             if (m_Rig == null) return;
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch);
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed);
+        }
+
+        /// <summary>
+        /// What the body is busy with (the owner decides and replicates it; <see cref="HumanRig"/> plays a take for it): on a
+        /// ladder, at a terminal or a dial, the hands at work — a hold's progress growing (hacking, a lock, a grille,
+        /// reviving a teammate, anything held with E).
+        /// </summary>
+        public BodyPose Pose { get; private set; }
+        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil;
+        Vector4 m_HoldWas;
+
+        void UpdateBodyPose()
+        {
+            float y = transform.position.y, dt = Time.deltaTime;
+            // (every peer measures the climb itself: the height is replicated with the position)
+            float climb = dt > 0f ? Mathf.Clamp((y - m_LastPoseY) / dt, -4f, 4f) : 0f;
+            m_LastPoseY = y;
+            m_ClimbSpeed = Pose == BodyPose.Ladder ? Mathf.Lerp(m_ClimbSpeed, climb, 1f - Mathf.Exp(-12f * dt)) : 0f;
+            if (!IsOwner) return;
+            var hold = new Vector4(HackTarget != null ? HackProgress : 0f, DoorTarget != null ? DoorProgress : 0f,
+                UseTarget != null ? UseProgress : 0f, ReviveTarget != null ? ReviveProgress : 0f);
+            if (HumanMath.Growing(hold.x, m_HoldWas.x) || HumanMath.Growing(hold.y, m_HoldWas.y) || HumanMath.Growing(hold.z, m_HoldWas.z)
+                || HumanMath.Growing(hold.w, m_HoldWas.w)) m_WorkingUntil = Time.time + 0.2f;
+            m_HoldWas = hold;
+            bool atTerminal = UsingTerminal != null || Cracking != null || AtConsole != null;
+            Pose = Downed ? BodyPose.None : HumanMath.PoseOf(Climbing, atTerminal, Time.time < m_WorkingUntil);
+        }
+
+        bool m_BodyShown;
+
+        /// <summary>
+        /// Owner: the own body is a shadow only (the first-person view looks out of it) — but watching a teammate while
+        /// knocked out, it lies there to be seen like anyone's.
+        /// </summary>
+        void ShowOwnBody(bool shown)
+        {
+            if (shown == m_BodyShown) return;
+            m_BodyShown = shown;
+            var mode = shown ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            foreach (var r in BodyRenderers) if (r != null) r.shadowCastingMode = mode;
+            if (m_Rig != null) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
         }
 
         Transform m_LegL, m_LegR;

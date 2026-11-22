@@ -22,11 +22,36 @@ namespace Stealth.Player
         /// </summary>
         void UpdateCallouts()
         {
+            // knocked out: call the team to the body (seen through walls by everyone for a while)
+            if (KnockedOut && !GameMenu.IsOpen && Controls.Pressed(GameAction.CallHelp) && GameManager.Instance != null)
+            {
+                Link.SendPing(transform.position + Vector3.up * 0.4f);
+                return;
+            }
             // Knocked out: still a teammate — pings and marks from the eyes of the one being watched.
             bool canCall = !Downed || Watching != null;
             if (GameMenu.IsOpen || !canCall || CursorMode || Camera == null || GameManager.Instance == null) return;
             bool ping = Controls.Pressed(GameAction.Ping), mark = Controls.Pressed(GameAction.Mark);
             if (ping || mark) Callout(mark);
+        }
+
+        int[] m_Layers;
+        bool m_ShownCalling;
+
+        /// <summary>
+        /// Every peer: a player calling for help (<see cref="PingKind.Help"/>) is drawn through walls like a marked robot — their
+        /// body on the Marked layer — while the call lasts.
+        /// </summary>
+        void ShowCalling()
+        {
+            var gm = GameManager.Instance;
+            bool calling = gm != null && gm.Pings.Calling(ClientId);
+            if (calling == m_ShownCalling || Visual == null) return;
+            m_ShownCalling = calling;
+            var rs = Visual.GetComponentsInChildren<Renderer>(true);
+            if (calling) { m_Layers = new int[rs.Length]; for (int i = 0; i < rs.Length; i++) m_Layers[i] = rs[i].gameObject.layer; }
+            for (int i = 0; i < rs.Length; i++)
+                rs[i].gameObject.layer = calling ? Stealth.Enemies.Detector.XrayLayer : (m_Layers != null && i < m_Layers.Length ? m_Layers[i] : 0);
         }
 
         /// <summary>Owner: ping where the crosshair points, or mark the robot in it (falls back to a ping). Also a test hook.</summary>

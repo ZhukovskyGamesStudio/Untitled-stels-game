@@ -31,7 +31,7 @@ namespace Stealth.Level
         /// </summary>
         static List<RectInt> GarageMass(Ctx c, System.Random rng, out string kind)
         {
-            int bays = Mathf.Clamp(3 + Mathf.Min(3, c.House / 2) + rng.Next(2), 3, 6);
+            int bays = Mathf.Clamp(4 + Mathf.Min(4, c.House / 2) + rng.Next(2), 4, 8);
             int hallW = bays * BayWidth + 2, hallD = HallDepthMin + rng.Next(2), backD = 6 + rng.Next(3), blockW = 10 + rng.Next(3);
             bool left = rng.Next(2) == 0;
             int depth = hallD + backD;

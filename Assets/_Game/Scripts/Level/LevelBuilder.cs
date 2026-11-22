@@ -31,7 +31,7 @@ namespace Stealth.Level
         /// </summary>
         public static IEnumerable<bool> LoadSteps(LevelLayout layout, LevelArt art)
         {
-            Clear();
+            foreach (var step in ClearSteps()) yield return step; // the house before comes down a piece at a time (on the drive)
             Layout = layout;
             var builder = new LevelBuilder(art, layout);
             Shell = builder.Shell;
@@ -45,6 +45,38 @@ namespace Stealth.Level
             s_Meshes.AddRange(builder.Meshes);
             if (Application.isPlaying && Root.TryGetComponent<LightBudget>(out var budget)) budget.ApplyNow();
             Ready = true;
+        }
+
+        /// <summary>Children of the old root destroyed per step when it comes down a piece at a time.</summary>
+        const int DismantlePerStep = 150;
+
+        /// <summary>
+        /// Takes the level away a piece at a time: at once it is no longer the level (no layout, no root — the next can be
+        /// built meanwhile), its navmesh is gone at once, then its pieces are destroyed a batch a step (one destroy of a
+        /// whole house was a long frame on the drive). Outside play mode, at once.
+        /// </summary>
+        public static IEnumerable<bool> ClearSteps()
+        {
+            var root = Root;
+            if (root == null || !Application.isPlaying) { Clear(); yield break; }
+            var meshes = new List<Mesh>(s_Meshes);
+            s_Meshes.Clear();
+            Root = null;
+            Clear(); // (the rest of the state; the root is ours now)
+            root.name += " (leaving)";
+            if (root.TryGetComponent<Unity.AI.Navigation.NavMeshSurface>(out var surface)) surface.enabled = false; // its navmesh off now
+            var t = root.transform;
+            int n = 0;
+            for (int i = t.childCount - 1; i >= 0; i--)
+            {
+                if (t == null) yield break;
+                if (i >= t.childCount) continue;
+                Object.Destroy(t.GetChild(i).gameObject);
+                if (++n % DismantlePerStep == 0) yield return true;
+            }
+            if (root != null) Object.Destroy(root);
+            foreach (var m in meshes)
+                if (m != null) Object.Destroy(m);
         }
 
         public static void Clear()
@@ -159,11 +191,10 @@ namespace Stealth.Level
             BuildGrates();
             float yard = CityPlan.Yard, far = 2f * CityPlan.Reach;
             // the ground outside is the street's level (a kerb under the house's floor); the pavements stand on it (BuildCity)
-            // (with a hole where the shaft goes down to the basement: four pieces round it)
+            // (with holes where the shafts go down — to the basement and from the exit hatch: pieces round them)
             float gy = CityPlan.RoadTop - 0.06f;
             var ground = Rect.MinMaxRect(W / 2 - (W + far) / 2, H / 2 - (H + far) / 2, W / 2 + (W + far) / 2, H / 2 + (H + far) / 2);
-            var shaftHole = new List<Rect> { new Rect(l.HatchPosition.x - Basement.ShaftHalf, l.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf) };
-            foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, shaftHole))
+            foreach (var (a, b) in ArchitecturePlanner.CutHoles(ground.min, ground.max, l.ShaftHoles))
                 Block(m_Art.OutsideGround, "OutsideGround", new Vector3((a.x + b.x) / 2f, gy, (a.y + b.y) / 2f), new Vector3(b.x - a.x, 0.1f, b.y - a.y));
             // the invisible wall round the yard; the street and the city beyond it are scenery (BuildCity)
             Block(m_Art.Fence, "Fence", new Vector3(W / 2, 4f, -yard - 0.5f), new Vector3(W + 2f * yard + 2f, 8f, 1f));
@@ -261,7 +292,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
-                        if (t.prop == i) terminal.Configure(i, t.kind);
+                        if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
                 Props.Add(go);
                 if (i % 80 == 79) yield return true;
             }
@@ -313,8 +344,8 @@ namespace Stealth.Level
             var holes = new List<Rect>();
             foreach (var s in m_Layout.Stairs) if (s.Floor + 1 == f) holes.Add(PlanGenerator.HoleOf(s));
             if (m_Layout.HasLift) holes.Add(m_Layout.LiftWell); // the lift's cab rides through every floor (a pit under the ground floor: its floor is the cab's)
-            if (f == 0) // the shaft down to the basement
-                holes.Add(new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
+            if (f == 0) // the shaft down to the basement, the exit hatch's well (3 x 3 cells each)
+                holes.AddRange(m_Layout.ShaftHoles);
             bool Solid(int x, int z)
             {
                 var k = plan.KindAt(f, x, z);
@@ -386,7 +417,7 @@ namespace Stealth.Level
                 Put(pattern != null ? pattern.Segments[DrivePath.VariantOf(-i) % pattern.Segments.Length] : Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
                 int side = DrivePath.LampSideOf(-i);
                 var lamp = Put(kit.Lamp, $"BasementBackLamp{i}", new Vector3(-i * seg + seg / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) light.color = DriveTunnel.LampColor;
+                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) { light.color = DriveTunnel.LampColor; light.intensity = DriveTunnel.LampIntensity; }
             }
             var cap = Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
             if (pattern != null)
@@ -426,16 +457,16 @@ namespace Stealth.Level
                     light.range = range;
                 }
             }
-            Lamp("BasementLamp", seg * 0.5f, 1, 1.5f, 12f);
-            Lamp("BasementLamp", seg * 1.5f, -1, 1.5f, 12f);
-            Lamp("BasementLamp", Basement.AlcoveX, -1, 1.5f, 12f);
+            Lamp("BasementLamp", seg * 0.5f, 1, 0.7f, 11f);
+            Lamp("BasementLamp", seg * 1.5f, -1, 0.7f, 11f);
+            Lamp("BasementLamp", Basement.AlcoveX, -1, 0.7f, 11f);
             // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
             var shaft = m_Layout.HatchPosition;
             var path = Basement.ClimbPath(frame, shaft, m_Layout.ShaftExit);
             if (m_Art.ShaftLadder != null)
             {
                 var foot = Place(m_Art.ShaftLadder, "ShaftLadderFoot", Basement.LadderFoot(frame), Quaternion.identity);
-                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path);
+                if (foot.TryGetComponent<ShaftLadder>(out var ladder)) ladder.Setup(path, shaft, OpenKeys.Shaft);
             }
             // the storage robot's way up and down: a navmesh link from the ladder's foot to the lobby's floor, open with the lid
             if (m_Art.ShaftLink != null)
@@ -446,7 +477,7 @@ namespace Stealth.Level
                     link.startPoint = path[0];
                     link.endPoint = path[path.Length - 1];
                     link.UpdateLink();
-                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) lid.Link = link;
+                    foreach (var lid in m_Root.GetComponentsInChildren<ShaftHatch>(true)) if (!lid.Exit) lid.Link = link; // (the entry's)
                     link.activated = false;
                 }
             }
@@ -1079,8 +1110,8 @@ namespace Stealth.Level
                 city.Boxes.Add(box);
                 city.Ground.Add(box.Bounds);
             }
-            // the shaft down to the basement goes through the asphalt under the block
-            CityPlan.CutHole(city, new Rect(m_Layout.HatchPosition.x - Basement.ShaftHalf, m_Layout.HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf));
+            // the shafts (down to the basement, down from the exit hatch) go through the asphalt under the block
+            foreach (var hole in m_Layout.ShaftHoles) CityPlan.CutHole(city, hole);
             // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
             var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
             foreach (var b in city.Ground)
@@ -1094,6 +1125,7 @@ namespace Stealth.Level
             var tris = new List<int>[slots];
             for (int i = 0; i < slots; i++) tris[i] = new List<int>();
             foreach (var b in city.Boxes) CityPlan.AddFaces(b, verts, normals, uvs, tris);
+            AddCityModels(city, verts, normals, uvs, tris);
             var mesh = new Mesh { name = "City", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(verts);
             mesh.SetNormals(normals);
@@ -1111,6 +1143,35 @@ namespace Stealth.Level
             go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
             if (m_Art.CityLamp != null)
                 foreach (var p in city.Lamps) Place(m_Art.CityLamp, "CityLamp", p, Quaternion.identity);
+        }
+
+        /// <summary>
+        /// Every placed city model (<see cref="City.Props"/>: street furniture, cars, trees, the facades' kit) into the city's
+        /// vertex lists: each part of its <see cref="CityMesh"/> posed and drawn with its slot (Livery / Pane from the copy).
+        /// The models' meshes are read once per build.
+        /// </summary>
+        void AddCityModels(City city, List<Vector3> verts, List<Vector3> normals, List<Vector2> uvs, List<int>[] tris)
+        {
+            if (m_Art.CityMeshes == null || m_Art.CityMeshes.Length == 0) return;
+            var models = new Dictionary<CityPropKind, CityMesh>();
+            foreach (var m in m_Art.CityMeshes)
+                if (m != null && m.Meshes != null) models[m.Kind] = m;
+            var cache = new Dictionary<Mesh, (Vector3[] v, Vector3[] n, int[] t)>();
+            foreach (var p in city.Props)
+            {
+                if (!models.TryGetValue(p.Kind, out var model)) continue;
+                var pose = p.Pose;
+                for (int i = 0; i < model.Meshes.Length; i++)
+                {
+                    var mesh = model.Meshes[i];
+                    if (mesh == null) continue;
+                    if (!cache.TryGetValue(mesh, out var data))
+                        cache[mesh] = data = (mesh.vertices, mesh.normals, mesh.triangles);
+                    var slot = CityPlan.Resolve(i < model.Slots.Length ? model.Slots[i] : CitySlot.Metal, p);
+                    var local = i < model.Locals.Length ? model.Locals[i] : Matrix4x4.identity;
+                    CityPlan.AddModel(data.v, data.n, data.t, pose * local, slot, verts, normals, uvs, tris);
+                }
+            }
         }
 
         /// <summary>

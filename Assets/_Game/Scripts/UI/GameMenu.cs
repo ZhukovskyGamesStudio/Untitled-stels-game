@@ -1,3 +1,5 @@
+using Stealth.Audio;
+using Stealth.Configs;
 using Stealth.Game;
 using Stealth.Player;
 using UnityEngine;
@@ -93,6 +95,20 @@ namespace Stealth.UI
         public Button Defaults;
         public Button Done;
 
+        [Header("Voice chat")]
+        [Tooltip("Cycles voice activation / push-to-talk / off.")]
+        public Button VoiceMode;
+        [Tooltip("Cycles the microphones (Microphone.devices); its label names the current one.")]
+        public Button VoiceDevice;
+        public Text MicSensitivityLabel;
+        public Slider MicSensitivity;
+        public Text MicLevelLabel;
+        [Tooltip("Live level of the microphone (not interactive); its fill turns green above the voice activation threshold.")]
+        public Slider MicLevel;
+        public Toggle NoiseSuppression;
+        public Text VoiceVolumeLabel;
+        public Slider VoiceVolume;
+
         UiPool<FriendLobbyRowView> m_FriendRows;
         float m_NextFriendsRefresh;
 
@@ -163,9 +179,11 @@ namespace Stealth.UI
             Defaults.onClick.AddListener(() =>
             {
                 GameSettings.ResetToDefaults();
+                VoicePrefs.ResetToDefaults();
                 SyncSettingsControls();
             });
             Done.onClick.AddListener(CloseSettings);
+            WireVoice();
             if (Language != null) Language.onClick.AddListener(NextLanguage);
         }
 
@@ -219,6 +237,7 @@ namespace Stealth.UI
             if (main) UpdateMain(net);
             if (pause) UpdatePause(net);
             if (settings) UpdateSettingsLabels();
+            VoiceCapture.Testing = settings;
         }
 
         void LateUpdate()
@@ -274,6 +293,55 @@ namespace Stealth.UI
             CrouchToggle.SetIsOnWithoutNotify(GameSettings.CrouchToggle);
             Volume.SetValueWithoutNotify(GameSettings.MasterVolume);
             Music.SetValueWithoutNotify(GameSettings.MusicVolume);
+            if (MicSensitivity != null) MicSensitivity.SetValueWithoutNotify(VoicePrefs.Sensitivity);
+            if (NoiseSuppression != null) NoiseSuppression.SetIsOnWithoutNotify(VoicePrefs.NoiseSuppression);
+            if (VoiceVolume != null) VoiceVolume.SetValueWithoutNotify(VoicePrefs.Volume);
+        }
+
+        void WireVoice()
+        {
+            if (VoiceMode == null) return; // an old prefab without the voice column
+            VoiceMode.onClick.AddListener(() => VoicePrefs.Mode = VoicePrefs.Next(VoicePrefs.Mode));
+            VoiceDevice.onClick.AddListener(() =>
+            {
+                var devices = Microphone.devices;
+                int i = System.Array.IndexOf(devices, VoicePrefs.Device); // -1 = the default → the first device
+                VoicePrefs.Device = i + 1 < devices.Length ? devices[i + 1] : ""; // past the last: back to the default
+            });
+            MicSensitivity.onValueChanged.AddListener(v => VoicePrefs.Sensitivity = v);
+            NoiseSuppression.onValueChanged.AddListener(v => VoicePrefs.NoiseSuppression = v);
+            VoiceVolume.onValueChanged.AddListener(v => VoicePrefs.Volume = v);
+        }
+
+        void UpdateVoiceLabels()
+        {
+            if (VoiceMode == null) return;
+            string mode = VoicePrefs.Mode switch
+            {
+                Stealth.Audio.VoiceMode.PushToTalk => Loc.F("menu.voice_ptt", Controls.Label(GameAction.PushToTalk)),
+                Stealth.Audio.VoiceMode.Off => Loc.T("menu.voice_off"),
+                _ => Loc.T("menu.voice_activity"),
+            };
+            SetLabel(VoiceMode, mode);
+            string device = string.IsNullOrEmpty(VoicePrefs.Device) ? Loc.T("menu.voice_default_mic") : VoicePrefs.Device;
+            SetLabel(VoiceDevice, Loc.F("menu.voice_device", device));
+            MicSensitivityLabel.text = Loc.F("menu.voice_sensitivity", VoicePrefs.Sensitivity * 100f);
+            VoiceVolumeLabel.text = Loc.F("menu.voice_volume", VoicePrefs.Volume * 100f);
+            var cap = VoiceCapture.Instance;
+            bool live = cap != null && cap.Running;
+            MicLevelLabel.text = !VoiceNative.Available ? Loc.T("menu.voice_unavailable")
+                : live ? Loc.T("menu.voice_level") : Loc.T("menu.voice_no_mic");
+            float db = live ? cap.LevelDb : VoiceLevel.Silence;
+            MicLevel.SetValueWithoutNotify(Mathf.InverseLerp(-70f, 0f, db));
+            var fill = MicLevel.fillRect != null ? MicLevel.fillRect.GetComponent<Graphic>() : null;
+            bool open = live && db >= VoiceGate.ThresholdDb(VoicePrefs.Sensitivity, Tuning.Audio.Voice);
+            if (fill != null) fill.color = open ? new Color(0.35f, 0.85f, 0.45f) : new Color(0.55f, 0.58f, 0.62f);
+        }
+
+        static void SetLabel(Button button, string text)
+        {
+            var label = button.GetComponentInChildren<Text>();
+            if (label != null && label.text != text) label.text = text;
         }
 
         void UpdateSettingsLabels()
@@ -282,6 +350,7 @@ namespace Stealth.UI
             FovLabel.text = Loc.F("menu.fov", GameSettings.Fov);
             VolumeLabel.text = Loc.F("menu.volume", GameSettings.MasterVolume * 100f);
             MusicLabel.text = Loc.F("menu.music", GameSettings.MusicVolume * 100f);
+            UpdateVoiceLabels();
             if (Language != null)
             {
                 var label = Language.GetComponentInChildren<Text>();

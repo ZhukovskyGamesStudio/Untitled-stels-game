@@ -122,6 +122,10 @@ namespace Stealth.Enemies
         public float InvestigateLookTime = 3f;
         [Tooltip("Seconds of staring before it walks over to check.")]
         public float StareTime = 4f;
+        [Tooltip("Stops to sniff while it moves (patrol, check, chase): every this many seconds of walking (0 = never stops).")]
+        public float SniffEvery;
+        [Tooltip("How long each sniffing stop lasts, seconds.")]
+        public float SniffTime = 1.2f;
 
         [Header("Docked (guards in the new enemy mode)")]
         [Tooltip("Woken by an alarm, a docked guard hunts through the house for this long after the last alarm, then goes back to its charging dock and sleeps.")]
@@ -210,6 +214,9 @@ namespace Stealth.Enemies
             m_HomeBound = false;
             if (resting || State == RobotState.Patrol) { SetState(RobotState.Patrol, now); NextPatrolPoint(); }
         }
+
+        /// <summary>Where it rests at its dock (its back to the station).</summary>
+        public Vector3 DockSpot => m_Dock;
 
         /// <summary>Resting at its dock: no patrol, no senses — only an alarm wakes it.</summary>
         public bool Resting => Docked && Shift == GuardShift.Resting;
@@ -386,9 +393,24 @@ namespace Stealth.Enemies
             LastKnown = position;
             LookPoint = position;
             SetState(RobotState.Investigate, now);
-            m_Body.MoveTo(position, alarm ? m_Traits.ChaseSpeed * 0.85f : m_Traits.InvestigateSpeed);
+            m_InvestigateSpeed = alarm ? m_Traits.ChaseSpeed * 0.85f : m_Traits.InvestigateSpeed;
+            m_Body.MoveTo(position, m_InvestigateSpeed);
             m_WaitUntil = -1f;
         }
+
+        float m_InvestigateSpeed;
+
+        /// <summary>
+        /// Whether a robot that stops to sniff (<see cref="RobotTraits.SniffEvery"/>) stands still now, <paramref name="t"/>
+        /// seconds into its state: it walks <paramref name="every"/> seconds, sniffs <paramref name="time"/>, walks again (pure).
+        /// </summary>
+        public static bool Sniffing(float t, float every, float time)
+        {
+            if (every <= 0f || time <= 0f || t < every) return false;
+            return (t - every) % (every + time) < time;
+        }
+
+        bool SniffNow(float now) => Sniffing(now - m_StateTime, m_Traits.SniffEvery, m_Traits.SniffTime);
 
         /// <summary>Noticed for sure: stop, face the intruder and warn («Обнаружен нарушитель») before acting.</summary>
         void Detect(IIntruder p, float now)
@@ -437,7 +459,11 @@ namespace Stealth.Enemies
                         m_Body.Stop(); // the hunter "sleeps" until someone else spots a player
                         break;
                     }
-                    if (!m_Body.Arrived) { m_Body.Move(m_Traits.PatrolSpeed); break; }
+                    if (!m_Body.Arrived)
+                    {
+                        if (SniffNow(now)) m_Body.Stop(); else m_Body.Move(m_Traits.PatrolSpeed);
+                        break;
+                    }
                     if (m_WaitUntil < 0f)
                     {
                         m_WaitUntil = now + Range(m_Traits.PatrolWaitMin, m_Traits.PatrolWaitMax);
@@ -477,7 +503,11 @@ namespace Stealth.Enemies
                     break;
 
                 case RobotState.Investigate:
-                    if (m_Body.Arrived)
+                    if (!m_Body.Arrived && m_Traits.SniffEvery > 0f)
+                    {
+                        if (SniffNow(now)) m_Body.Stop(); else m_Body.Move(m_InvestigateSpeed);
+                    }
+                    else if (m_Body.Arrived)
                     {
                         if (m_WaitUntil < 0f) m_WaitUntil = now + m_Traits.InvestigateLookTime;
                         // Look around: sweep left and right instead of spinning on the spot.
@@ -514,9 +544,11 @@ namespace Stealth.Enemies
                         BeginInvestigation(LastKnown, false, now);
                         break;
                     }
-                    m_Body.MoveTo(LastKnown, m_Traits.ChaseSpeed);
                     var to = Target.Position - m_Body.Position;
                     to.y = 0; // flying robots dive at the player
+                    // a sniffer stops now and then even on the trail — but not with the player in its reach
+                    if (SniffNow(now) && to.magnitude > m_Traits.AttackRange) m_Body.Stop();
+                    else m_Body.MoveTo(LastKnown, m_Traits.ChaseSpeed);
                     if (m_Traits.CanAttack && to.magnitude <= m_Traits.AttackRange)
                     {
                         m_Body.Face(Target.Position, dt);

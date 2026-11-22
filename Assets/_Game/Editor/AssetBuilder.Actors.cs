@@ -111,8 +111,8 @@ namespace Stealth.EditorTools
             }));
             Robot(RobotKind.Hound, RobotPrefabs + "/RobotHound.prefab", () => MobileRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 1.6f;
-                t.PatrolSpeed = 2.2f; t.InvestigateSpeed = 3.4f; t.ChaseSpeed = 4.9f; t.LoseTargetAfter = 6f;
+                s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 0.8f; s.DetectionSpeed = 0.4f;
+                t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 2.3f; t.ChaseSpeed = 3.6f; t.LoseTargetAfter = 6f; t.WarningTime = 2.5f; t.SuspicionDecay = 0.5f; t.SniffEvery = 3.5f; t.SniffTime = 1.4f;
             }));
             Robot(RobotKind.Sorter, RobotPrefabs + "/RobotSorter.prefab", () => MobileRobot("RobotSorter", "robot_sorter", "SorterBody", 0.35f, new Vector3(0, 1.25f, 0.3f), ripple, (s, t, anim) =>
             {
@@ -192,12 +192,12 @@ namespace Stealth.EditorTools
                 t.Head = Find(root, "AccentHead" + RobotAnimator.PivotSuffix);
                 t.Point.localPosition = new Vector3(0, 1.35f, 0);
             }));
-            // one metre of the spider's web along +Z (scaled to each wire), threads as geometry in three variants (Web0..2,
-            // Tools/Blender/web.py); SpiderBot lays pieces end to end and shows one variant each; no collider, no shadow
+            // a sheet of the spider's web, the unit square along +Z and up +Y (stretched to each sheet), threads as geometry in
+            // three variants (Web0..2, Tools/Blender/web.py sheet); SpiderBot shows one variant a sheet; no collider, no shadow
             var strand = Prefab(RobotPrefabs + "/SpiderStrand.prefab", () =>
             {
                 var go = new GameObject("SpiderStrand");
-                var model = Model("web_piece");
+                var model = Model("web_sheet");
                 model.transform.SetParent(go.transform, false);
                 var mat = WebMaterial();
                 foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
@@ -334,6 +334,7 @@ namespace Stealth.EditorTools
             view.transform.SetParent(head.transform, false);
             view.transform.localPosition = new Vector3(0.16f, -0.2f, 0.3f);
             view.transform.localRotation = Quaternion.Euler(-4f, -6f, 0f);
+            view.transform.localScale = new Vector3(-1f, 1f, 1f); // the import mirrors Blender's X: mirrored back it is the right hand
             foreach (var r in view.GetComponentsInChildren<MeshRenderer>(true))
             {
                 string n = r.gameObject.name;
@@ -359,6 +360,28 @@ namespace Stealth.EditorTools
                 r.receiveShadows = false;
             }
             held.SetActive(false);
+            // anything else held in the hand (PlayerController.HeldThing): its mesh or model, sized to the hand, low right in the view
+            // where the flashlight's hand is: the fist's grip on the anchor, pointing ahead (+Z)
+            var holder = Child(head.transform, "HeldAnchor", new Vector3(0.16f, -0.2f, 0.3f));
+            holder.transform.localRotation = Quaternion.Euler(-4f, -6f, 0f);
+            var thing = Child(holder.transform, "HeldThing", Vector3.zero);
+            var thingMesh = thing.AddComponent<MeshFilter>();
+            var thingRenderer = thing.AddComponent<MeshRenderer>();
+            thingRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            thingRenderer.receiveShadows = false;
+            // the right hand closed round it (Tools/Blender/poi.py view_grip; only its owner sees it)
+            var grip = Model("view_grip");
+            grip.name = "HeldHand";
+            grip.transform.SetParent(holder.transform, false);
+            grip.transform.localScale = new Vector3(-1f, 1f, 1f);
+            foreach (var r in grip.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                r.sharedMaterial = M(r.gameObject.name.StartsWith("AccentSleeve") ? "ViewSleeve" : "PlayerAccent");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+            }
+            grip.SetActive(false);
+            holder.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
                 new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
@@ -378,9 +401,14 @@ namespace Stealth.EditorTools
             pc.Flashlight = beam;
             pc.ViewFlashlight = view;
             pc.HeldMap = held;
+            pc.HeldThing = thingMesh;
+            pc.HeldHand = grip;
+            pc.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
             pc.Model = model.transform;
             pc.HeadPivot = headPivot.transform;
             pc.BodyRenderers = model.GetComponentsInChildren<Renderer>(true);
+            pc.Voice = AddVoice(root.transform);
+            pc.Voice.Owner = pc;
             return root;
         }
 

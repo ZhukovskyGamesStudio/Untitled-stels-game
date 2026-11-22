@@ -91,6 +91,8 @@ namespace Stealth.Vehicles
         public IReadOnlyList<ulong> Occupants => m_Occupants;
         public ulong Driver => m_Occupants[0];
         public bool EngineOn => Driver != Nobody;
+        /// <summary>The shredder has things to chew (CarShredder): its blades spin fast.</summary>
+        public bool Grinding { get; set; }
         /// <summary>On the drive to the next house: moved by the clock (Level.DrivePath), not by a driver.</summary>
         public bool Scripted => m_Scripted;
         public float Speed => HasAuthority ? m_Physics.Speed : m_RemoteSpeed;
@@ -240,7 +242,7 @@ namespace Stealth.Vehicles
                 k = k * k * (3f - 2f * k);
                 m_DrivePose = new Pose(m_DrivePose.position + m_DriveOffset * k, Quaternion.Slerp(Quaternion.identity, m_DriveTurn, k) * m_DrivePose.rotation);
             }
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !scripted;
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !StylePanel.IsOpen && !scripted;
             m_Input = drive
                 ? new CarInput
                 {
@@ -414,7 +416,7 @@ namespace Stealth.Vehicles
                 Wheels[i].localRotation = m_WheelRest[i] * Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(m_Spin, 0f, 0f);
             }
             if (Steering != null) Steering.localRotation = m_SteeringRest * CarLook.SteeringWheel(steer, s.SteeringRatio);
-            m_Grind = (m_Grind + (EngineOn ? 540f : 0f) * dt) % 360f;
+            m_Grind = (m_Grind + (Grinding ? 1800f : EngineOn ? 540f : 0f) * dt) % 360f;
             if (Grinder != null) Grinder.localRotation = m_GrinderRest * Quaternion.Euler(m_Grind, 0f, 0f);
             if (Body != null)
             {
@@ -427,7 +429,7 @@ namespace Stealth.Vehicles
                 Body.localPosition = Vector3.Lerp(Body.localPosition, m_BodyRest + Vector3.up * bounce, 1f - Mathf.Exp(-20f * dt));
                 Body.localRotation = Quaternion.Slerp(Body.localRotation, Quaternion.Euler(pitch, 0f, -roll), 1f - Mathf.Exp(-6f * dt));
             }
-            bool lights = EngineOn || m_Scripted;
+            const bool lights = true; // high beams on all the time: the sewer is pitch dark
             if (Headlights != null) foreach (var l in Headlights) if (l != null && l.enabled != lights) l.enabled = lights;
         }
 

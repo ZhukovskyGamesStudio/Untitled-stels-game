@@ -67,7 +67,12 @@ def contract(name):
     for o in set(bpy.data.objects) - before:
         if o.type == "MESH":
             ws = [o.matrix_world @ v.co for v in o.data.vertices]
-            out[o.name.split(".")[0]] = (tuple(min(w[i] for w in ws) for i in range(3)), tuple(max(w[i] for w in ws) for i in range(3)))
+            lo, hi = tuple(min(w[i] for w in ws) for i in range(3)), tuple(max(w[i] for w in ws) for i in range(3))
+            key = o.name.split(".")[0]  # Body and Body.001 are one part: their bounds add up (toilet_stall)
+            if key in out:
+                lo = tuple(min(a, b) for a, b in zip(out[key][0], lo))
+                hi = tuple(max(a, b) for a, b in zip(out[key][1], hi))
+            out[key] = (lo, hi)
         data = o.data
         bpy.data.objects.remove(o, do_unlink=True)
         if data is not None and data.users == 0:
@@ -231,6 +236,11 @@ def fit_roles(name, P):
     return P
 
 
+# Voxel styles: furniture whose parts rest on each other (boxes on shelves, a dial on a door) keeps them touching on one
+# world grid (voxel.voxelize world=True); others came out better on a grid per part (compared by the model audit).
+WORLD_GRID = {"safe", "shelf", "coat_rack", "reception_desk"}
+
+
 def build(name, L, design):
     s.clear_scene()
     P = design(L)
@@ -253,14 +263,15 @@ def build(name, L, design):
                         pinned=lambda n: n.startswith(MOVING))
     if getattr(L, "voxel", 0.0) > 0.0:
         # a voxel style: every part rebuilt from cubes — but the lift's tray, 3 cm thick, must keep its exact bottom
-        voxel.voxelize([o for o in objs if not (name == "worker_lift" and o.name == "BodyLiftTray")], L.voxel)
+        voxel.voxelize([o for o in objs if not (name == "worker_lift" and o.name == "BodyLiftTray")], L.voxel,
+                       world=name in WORLD_GRID)
     objs += fillers(name, objs)
     taller(name, objs)
     return objs
 
 
 # The office desks are taller than they were drawn (generate_models.DESK_TOP_NEW): every style's design is raised the
-# same way — what is under the old top stretches, what stands on it lifts — and its screens grow to the original's.
+# same way — what is under the old top stretches, what stands on it lifts.
 TALLER = {"desk": 0.765, "terminal": 0.765, "reception_desk": 0.76}
 DESK_TOP_NEW = 0.918
 
@@ -277,21 +288,8 @@ def taller(name, objs):
             w = mw @ v.co
             w.z = w.z * k if w.z <= top + 1e-4 else w.z + top * (k - 1)
             v.co = inv @ w
-    want = contract(name).get("Eye")
-    for o in objs:
-        if not o.name.startswith("Eye") or want is None:
-            continue
-        lo, hi = bounds(o)
-        h0, h1 = want[1][2] - want[0][2], hi[2] - lo[2]
-        if h1 <= 1e-4:
-            continue
-        f = max(1.0, min(1.6, h0 / h1))                    # the screens as big as the original's (never smaller)
-        piv = ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2])
-        mw, inv = o.matrix_world, o.matrix_world.inverted()
-        for v in o.data.vertices:
-            w = mw @ v.co
-            w.x, w.y, w.z = piv[0] + (w.x - piv[0]) * f, piv[1] + (w.y - piv[1]) * f, piv[2] + (w.z - piv[2]) * f
-            v.co = inv @ w
+    # (the Eye part is no longer scaled up to the original's screen: it grew alone, out of its bezel, and took the style's
+    # light lines along the edges with it — a metre longer, floating off the furniture)
 
 
 def fillers(name, objs):

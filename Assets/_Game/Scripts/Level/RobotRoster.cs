@@ -54,12 +54,13 @@ namespace Stealth.Level
 
         public static RosterEntry[] DefaultRobots() => new RosterEntry[]
         {
-            new(RobotKind.Guard, 0, 5f),
-            new(RobotKind.Listener, 0, 3f),
+            // the first houses: mostly robots on their rounds (listener, vacuum, sweeper, drone), few guards
+            new(RobotKind.Guard, 0, 2f),
+            new(RobotKind.Listener, 0, 4f),
             new(RobotKind.Worker, 0, 2f),
-            new(RobotKind.Vacuum, 0, 1.5f),
-            new(RobotKind.Sweeper, 1, 2f),
-            new(RobotKind.Drone, 1, 2f),
+            new(RobotKind.Vacuum, 0, 3f),
+            new(RobotKind.Sweeper, 0, 3f),
+            new(RobotKind.Drone, 0, 2f),
             new(RobotKind.Spider, 1, 2f),
             new(RobotKind.Thumper, 2, 2f),
             new(RobotKind.Sorter, 2, 1.5f),
@@ -73,6 +74,25 @@ namespace Stealth.Level
             new(RobotKind.MotionSensor, 0, 2f),
             new(RobotKind.Lidar, 1, 1.5f),
         };
+
+        /// <summary>How many extra robots have come into the house <paramref name="elapsed"/> seconds after it started (pure).</summary>
+        public static int ReinforcementsDue(float elapsed, float first, float second, float every)
+        {
+            if (elapsed < first) return 0;
+            if (elapsed < first + second) return 1;
+            return 2 + Mathf.FloorToInt((elapsed - first - second) / Mathf.Max(1f, every));
+        }
+
+        /// <summary>A kind that may come in as a reinforcement: a robot of the house's table, unlocked — not a harmless worker, not a device, the hunter or a warden.</summary>
+        public static RobotKind PickReinforcement(RosterEntry[] table, int level, System.Random rng)
+        {
+            var allowed = new System.Collections.Generic.List<RosterEntry>();
+            foreach (var e in table)
+                if (e.MinLevel <= level && e.Weight > 0f && !IsDevice(e.Kind) && e.Kind is not (RobotKind.Worker or RobotKind.Hunter or RobotKind.Warden or RobotKind.Camera))
+                    allowed.Add(e);
+            if (allowed.Count == 0) return RobotKind.Guard;
+            return Pick(allowed.ToArray(), level, rng);
+        }
 
         public static bool IsDevice(RobotKind k) => k == RobotKind.Lidar || k == RobotKind.MotionSensor || k == RobotKind.PressurePlate;
 

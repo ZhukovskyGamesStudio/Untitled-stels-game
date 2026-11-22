@@ -6,7 +6,8 @@ geometry (no alpha card): an alpha-blended picture of hair-thin threads turns in
 its mipmaps average the threads with the air.
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/web.py -- Assets/_Game/Art/Models
-      (writes <root>/Robots/web_piece.fbx: parts Web0, Web1, Web2 — SpiderBot shows one per piece)
+      (writes <root>/Robots/web_piece.fbx: parts Web0, Web1, Web2; with `sheet` after the root: <root>/Robots/web_sheet.fbx,
+      the whole sheets SpiderBot spins now — one web over each, stretched to it)
 
 Contract: Unity +Z = Blender -Y is along the wire, from 0 to 1 m (Blender y 0 .. -1); the wire at the origin's height,
 the rest hangs below it (to -0.3 m) within a few centimetres of its vertical plane.
@@ -123,7 +124,90 @@ def piece(name, seed, kind):
     return s.part(name, [bm], flat=True)
 
 
+# --------------------------------------------------------------------------- a whole sheet
+
+SHEET_SILK = 0.0011   # in the unit square: a sheet is stretched about 3 m tall, the threads to ~3 mm
+
+
+def ray_to_frame(hy, hz, dy, dz, inset):
+    """How far from (hy, hz) along (dy, dz) the frame (the unit square inset by inset) is."""
+    best = 10.0
+    for edge, d, lo in ((-inset, dy, True), (-(1 - inset), dy, False)):
+        if abs(d) > 1e-6:
+            t = (edge - hy) / d
+            if t > 0:
+                best = min(best, t)
+    for edge, d in ((inset, dz), (1 - inset, dz)):
+        if abs(d) > 1e-6:
+            t = (edge - hz) / d
+            if t > 0:
+                best = min(best, t)
+    return best
+
+
+def sheet_orb(bm, rnd, hy, hz, reach, spokes, rings, broken=0.0, inset=0.04):
+    """An orb filling the sheet round its hub (hy, hz): spokes out to the frame (or reach), a spiral crossing them."""
+    ends = []
+    for k in range(spokes):
+        a = 2 * math.pi * k / spokes + rnd.uniform(-0.08, 0.08)
+        dy, dz = math.cos(a), math.sin(a)
+        r = min(reach, ray_to_frame(hy, hz, dy, dz, inset))
+        ends.append((a, r))
+        thread(bm, [(rnd.uniform(-0.003, 0.003), hy, hz), (0.0, hy + dy * r, hz + dz * r)], SHEET_SILK)
+    for ring in range(1, rings + 1):
+        f = 0.08 + 0.86 * ring / rings
+        pts = [(rnd.uniform(-0.002, 0.002), hy + math.cos(a) * r * f, hz + math.sin(a) * r * f) for a, r in ends]
+        pts.append(pts[0])
+        for p, q in zip(pts, pts[1:]):
+            if rnd.random() < broken:
+                continue  # torn: a gap in the spiral
+            thread(bm, sag(p, q, 0.002, n=2), SHEET_SILK)
+    # the hub's little mat of silk
+    for _ in range(6):
+        a = rnd.uniform(0, 2 * math.pi)
+        r = rnd.uniform(0.005, 0.02)
+        thread(bm, [(0.0, hy, hz), (0.0, hy + math.cos(a) * r, hz + math.sin(a) * r)], SHEET_SILK)
+
+
+def sheet(name, seed, kind):
+    """A web over the whole sheet (Unity +Z along it 0..1 = Blender y 0..-1, up 0..1, in the plane x = 0): the frame threads
+    round it tied to the corners (where the walls, the floor and the ceiling hold it), anchor lines, and an orb filling it
+    (kind 0), an orb off to a side with a cobweb's tangle in a corner (kind 1), or two orbs side by side (kind 2); some of
+    the spiral torn, loose ends hanging."""
+    rnd = random.Random(seed)
+    bm = bmesh.new()
+    i = 0.04
+    corners = [(-i, i), (-(1 - i), i), (-(1 - i), 1 - i), (-i, 1 - i)]
+    for (y0, z0), (y1, z1) in zip(corners, corners[1:] + corners[:1]):
+        thread(bm, sag((0.0, y0, z0), (0.0, y1, z1), rnd.uniform(0.0, 0.02), n=8), SHEET_SILK * 1.6)
+    for (y0, z0), (y1, z1) in (((0.0, 0.0), corners[0]), ((-1.0, 0.0), corners[1]), ((-1.0, 1.0), corners[2]), ((0.0, 1.0), corners[3])):
+        thread(bm, [(0.0, y0, z0), (0.0, y1, z1)], SHEET_SILK * 1.6)  # anchor lines into the corners
+    if kind == 0:
+        sheet_orb(bm, rnd, -rnd.uniform(0.42, 0.58), rnd.uniform(0.45, 0.6), 1.0, 26, 22, broken=0.06)
+    elif kind == 1:
+        sheet_orb(bm, rnd, -rnd.uniform(0.3, 0.4), rnd.uniform(0.5, 0.62), 0.42, 20, 16, broken=0.1)
+        for _ in range(40):  # a tangle in the lower far corner
+            p = (rnd.uniform(-0.01, 0.01), -rnd.uniform(0.62, 0.96), rnd.uniform(0.04, 0.4))
+            q = (rnd.uniform(-0.01, 0.01), p[1] + rnd.uniform(-0.15, 0.15), p[2] + rnd.uniform(-0.15, 0.15))
+            thread(bm, sag(p, q, rnd.uniform(0.0, 0.02), n=3), SHEET_SILK)
+    else:
+        sheet_orb(bm, rnd, -rnd.uniform(0.24, 0.3), rnd.uniform(0.5, 0.6), 0.36, 18, 14, broken=0.08)
+        sheet_orb(bm, rnd, -rnd.uniform(0.7, 0.76), rnd.uniform(0.4, 0.5), 0.34, 18, 13, broken=0.08)
+    for _ in range(rnd.randint(3, 6)):  # loose ends hanging from the top frame
+        y = -rnd.uniform(0.08, 0.92)
+        thread(bm, [(0.0, y, 1 - i), (rnd.uniform(-0.01, 0.01), y + rnd.uniform(-0.03, 0.03), 1 - i - rnd.uniform(0.05, 0.25))], SHEET_SILK)
+    return s.part(name, [bm], flat=True)
+
+
 if __name__ == "__main__":
+    if "sheet" in sys.argv:
+        s.clear_scene()
+        sheet("Web0", 0x5E90, 0)
+        sheet("Web1", 0x5E91, 1)
+        sheet("Web2", 0x5E92, 2)
+        s.export_fbx(os.path.join(g.out_dir, "Robots", "web_sheet.fbx"))
+        print("DONE")
+        sys.exit(0)
     s.clear_scene()
     piece("Web0", 0x5E80, 0)
     piece("Web1", 0x5E81, 1)

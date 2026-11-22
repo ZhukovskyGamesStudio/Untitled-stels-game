@@ -1,6 +1,6 @@
 ---
 name: stealth-commit
-description: How to commit and push in the «Айтишники: вылазка» repo — the branch rule (Claude works in george, never in a colleague's branches), Russian commit message format with a tag and area, what to stage (prefabs and .meta with code, never Builds/Logs/Library), pre-commit checks and when pushing to main is allowed. Use whenever committing, pushing or merging in this project.
+description: How to commit and push in the USG (untitled stels game) repo — the branch rule (Claude works in george, never in a colleague's branches), Russian commit message format with a tag and area, what to stage (prefabs and .meta with code, never Builds/Logs/Library), pre-commit checks and when pushing to main is allowed. Use whenever committing, pushing or merging in this project.
 ---
 
 # Как коммитить
@@ -14,7 +14,7 @@ description: How to commit and push in the «Айтишники: вылазка�
 
 ## Перед коммитом
 
-1. `Tools/dev.sh tests` — всё зелёное. Если менялись ассеты или геймплей — ещё сборка и сценарий (скилл `stealth-verify`).
+1. `SLOW=1 Tools/dev.sh tests` (или `SLOW=1 Tools/dev.sh cycle`) — всё зелёное, включая медленные тесты `[Category("Slow")]`. Если менялись ассеты или геймплей — ещё сборка и сценарий (скилл `stealth-verify`).
 2. Код, который меняет структуру префабов, коммитится **вместе** с пересобранными префабами (`FORCE=1 Tools/dev.sh assets`).
 3. Каждому новому файлу и папке в `Assets/` — свой `.meta`. Перемещать ассеты только `git mv` вместе с `.meta` (сохраняет GUID и ссылки).
 4. Не коммитить: `Builds/`, `Logs/`, `Library/`, `Temp/`, `UserSettings/`, `*.csproj`, `*.slnx`, скриншоты автотестов.

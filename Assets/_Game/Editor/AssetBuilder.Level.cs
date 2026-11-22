@@ -157,8 +157,17 @@ namespace Stealth.EditorTools
                 var terminal = go.AddComponent<Stealth.Level.SecurityTerminal>();
                 terminal.Console = console;
                 terminal.Access = access;
-                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
-                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye"));
+                terminal.Screens = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye") && !r.name.StartsWith("EyeScreen"));
+                terminal.AccessScreens = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("Eye") && !r.name.StartsWith("EyeScreen"));
+                // the monitors show the kind's picture (Tools/Art/generate_screens.py) through a glowing screen material
+                var screenMat = TerminalScreenMaterial();
+                terminal.Pictures = console.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("EyeScreen"));
+                terminal.AccessPictures = access.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("EyeScreen"));
+                foreach (var r in new[] { terminal.Pictures, terminal.AccessPictures }) if (r != null) r.sharedMaterial = screenMat;
+                terminal.CamerasPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cameras.png");
+                terminal.HackingPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_hack.png");
+                terminal.DoorsPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors.png");
+                terminal.MapPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_map.png");
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
@@ -346,35 +355,21 @@ namespace Stealth.EditorTools
             var root = new GameObject(high ? "HighVentFrame" : "VentFrame");
             float w = LevelMetrics.ClearWidth(LevelMetrics.VentWidth), h = LevelMetrics.VentHeight, y0 = high ? LevelMetrics.HighVentSill : LevelMetrics.VentSill;
             float t = LevelMetrics.WallThickness, sheet = 0.02f, flange = 0.07f;
-            var metal = M("Metal");
-            // lining: floor, ceiling and sides of the duct, the length of the wall's thickness
-            Cube(root.transform, "DuctFloor", new Vector3(0, y0 + sheet / 2f, 0), new Vector3(w, sheet, t + 0.02f), metal, false);
-            Cube(root.transform, "DuctTop", new Vector3(0, y0 + h - sheet / 2f, 0), new Vector3(w, sheet, t + 0.02f), metal, false);
-            foreach (float s in new[] { -1f, 1f })
-                Cube(root.transform, s < 0 ? "DuctLeft" : "DuctRight", new Vector3(s * (w / 2f - sheet / 2f), y0 + h / 2f, 0), new Vector3(sheet, h, t + 0.02f), metal, false);
-            foreach (float z in new[] { t / 2f + 0.015f, -(t / 2f + 0.015f) })
-            {
-                string side = z > 0 ? "A" : "B";
-                Cube(root.transform, "FlangeTop" + side, new Vector3(0, y0 + h + flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
-                Cube(root.transform, "FlangeBottom" + side, new Vector3(0, y0 - flange / 2f, z), new Vector3(w + flange * 2f, flange, 0.03f), metal, false);
-                foreach (float s in new[] { -1f, 1f })
-                    Cube(root.transform, (s < 0 ? "FlangeLeft" : "FlangeRight") + side, new Vector3(s * (w / 2f + flange / 2f), y0 + h / 2f, z),
-                        new Vector3(flange, h, 0.03f), metal, false);
-            }
-            // the grille: a frame with louvres — shut in the hole on side A (its collider keeps everyone out) until a player
-            // works it loose (VentGrille), then leaning on the wall beside the hole (a high vent's: on the desk under it)
+            // the lining and the flanges round the hole on both faces (Tools/Blender/vent.py vent_duct: folded seams, screws)
+            var duct = Model("vent_duct");
+            duct.transform.SetParent(root.transform, false);
+            duct.transform.localPosition = new Vector3(0f, y0, 0f);
+            Paint(duct, "Metal", "Metal", "Metal");
+            // the grille: a frame with louvres (vent_grille, its foot at its origin, sized to its place) — shut in the hole on
+            // side A (its collider keeps everyone out) until a player works it loose (VentGrille), then leaning on the wall
+            // beside the hole (a high vent's: on the desk under it)
             float gw = w * 0.9f, gh = h * 0.9f;
             void Louvres(Transform grille, float lw, float lh)
             {
-                Cube(grille, "GrilleTop", new Vector3(0, lh - 0.025f, 0f), new Vector3(lw, 0.05f, 0.025f), metal, false);
-                Cube(grille, "GrilleBottom", new Vector3(0, 0.025f, 0f), new Vector3(lw, 0.05f, 0.025f), metal, false);
-                foreach (float s in new[] { -1f, 1f })
-                    Cube(grille, s < 0 ? "GrilleLeft" : "GrilleRight", new Vector3(s * (lw / 2f - 0.025f), lh / 2f, 0f), new Vector3(0.05f, lh, 0.025f), metal, false);
-                for (int i = 1; i < 8; i++)
-                {
-                    var slat = Cube(grille, $"Slat{i}", new Vector3(0, lh * i / 8f, 0f), new Vector3(lw - 0.08f, 0.012f, 0.06f), metal, false);
-                    slat.transform.localRotation = Quaternion.Euler(35f, 0f, 0f); // louvres
-                }
+                var g = Model("vent_grille");
+                g.transform.SetParent(grille, false);
+                g.transform.localScale = new Vector3(lw / (w - 2f * sheet), lh / (h - 2f * sheet), 1f);
+                Paint(g, "Metal", "Metal", "Metal");
             }
             var removed = new GameObject("GrilleRemoved").transform;
             removed.SetParent(root.transform, false);
@@ -472,9 +467,9 @@ namespace Stealth.EditorTools
             float w = LevelMetrics.ClearWidth(LevelMetrics.SqueezeWidth), h = LevelMetrics.DoorHeight;
             foreach (float z in new[] { LevelMetrics.WallThickness / 2f + 0.02f, -(LevelMetrics.WallThickness / 2f + 0.02f) })
             {
-                Cube(root.transform, "Top", new Vector3(0, h, z), new Vector3(w + 0.12f, 0.06f, 0.04f), M("DoorFrame"), false);
-                Cube(root.transform, "Left", new Vector3(-w / 2f - 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
-                Cube(root.transform, "Right", new Vector3(w / 2f + 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"), false);
+                ChamferBox(root.transform, "Top", new Vector3(0, h, z), new Vector3(w + 0.12f, 0.06f, 0.04f), M("DoorFrame"));
+                ChamferBox(root.transform, "Left", new Vector3(-w / 2f - 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"));
+                ChamferBox(root.transform, "Right", new Vector3(w / 2f + 0.03f, h / 2f, z), new Vector3(0.06f, h, 0.04f), M("DoorFrame"));
             }
             var block = root.AddComponent<NavMeshModifierVolume>();
             block.center = new Vector3(0f, 1.2f, 0f);
@@ -487,7 +482,7 @@ namespace Stealth.EditorTools
         /// Sliding door: two panels and a blocker collider (enabled only while closed). Ignored by the navmesh:
         /// robots plan through doorways and the door opens when they arrive.
         /// </summary>
-        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "Door");
+        static GameObject BuildAutoDoor() => BuildAutoDoor("AutoDoor", LevelMetrics.DoorWidth, "DoorFrameAlu", accent: "DoorSeal");
 
         /// <summary>
         /// A sliding door <paramref name="width"/> wide (nominal; the leaves stretched to it) in <paramref name="paint"/>.
@@ -497,6 +492,7 @@ namespace Stealth.EditorTools
         /// </summary>
         static GameObject BuildAutoDoor(string name, float width, string paint, string leafModel = "door_leaf", string accent = null, bool sign = false)
         {
+            bool glass = name == "AutoDoor"; // (the vehicle door keeps the leaf's panes in its steel)
             var root = new GameObject(name);
             root.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
             float h = LevelMetrics.DoorHeight - 0.02f, w = width;
@@ -514,7 +510,11 @@ namespace Stealth.EditorTools
                 leaf.transform.localRotation = Quaternion.Euler(0f, turn, 0f);
                 leaf.transform.localScale = new Vector3(stretch, 1f, 1f);
                 Paint(leaf, paint, accent ?? paint, paint);
-                foreach (var r in leaf.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
+                foreach (var r in leaf.GetComponentsInChildren<Renderer>())
+                {
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    if (glass && r.gameObject.name.StartsWith("Glass")) r.sharedMaterial = M("DoorGlass"); // the sliding glass door's satin panes
+                }
                 return leaf.transform;
             }
             door.PanelA = Leaf("PanelA", leafModel, -w / 4f, 0f);
@@ -524,8 +524,8 @@ namespace Stealth.EditorTools
             if (!sign)
                 door.LockLamps = new Renderer[]
                 {
-                    Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-                    Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                    ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
+                    ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
                 };
             else
             {
@@ -534,7 +534,7 @@ namespace Stealth.EditorTools
                 foreach (float side in new[] { 1f, -1f })
                 {
                     // the sign: a steel housing on the wall over the door, its whole face lit
-                    Cube(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"), false);
+                    ChamferBox(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"));
                     lamps.Add(Cube(root.transform, side > 0 ? "SignLampA" : "SignLampB", new Vector3(0f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.96f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
                     // a band across each leaf, on the leaf (it slides with it), in front of its frame
                     foreach (var panel in new[] { door.PanelA, door.PanelB })
@@ -548,7 +548,7 @@ namespace Stealth.EditorTools
             {
                 var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(0f, 1.2f, side * 0.032f)).transform;
                 holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                ChamferBox(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), 0.004f);
                 var lockModel = Model("padlock");
                 lockModel.transform.SetParent(holder, false);
                 lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
@@ -560,18 +560,37 @@ namespace Stealth.EditorTools
             // a key door: the lock panels beside the frame on both sides (shown only on doors of LevelLayout.KeyDoors)
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
-            keyLock.Panels = new[] { 1f, -1f }.Select(side =>
+            // (on leaf A by the meeting edge, on both faces of the 6 cm leaf: it slides away with it)
+            keyLock.Panels = KeyLockPanels(door.PanelA, root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, 0.035f)),
+                root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, -0.035f)));
+            Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
+            return root;
+        }
+
+        /// <summary>The height of a key lock's panel on a leaf: over the handle, at the hand.</summary>
+        const float KeyLockY = 1.32f;
+
+        /// <summary>
+        /// A key door's lock panels (shown only on doors of LevelLayout.KeyDoors): on the door's leaf itself, one on each
+        /// face (world points <paramref name="front"/> on its +Z face, <paramref name="back"/> on its −Z face), so they move
+        /// with the leaf. They used to stand on the wall beside the frame.
+        /// </summary>
+        static GameObject[] KeyLockPanels(Transform leaf, Vector3 front, Vector3 back)
+        {
+            return new[] { 1f, -1f }.Select(side =>
             {
                 var panel = Model("key_lock");
                 panel.name = side > 0 ? "KeyLockA" : "KeyLockB";
-                panel.transform.SetParent(root.transform, false);
-                panel.transform.localPosition = new Vector3(w / 2f + 0.22f, 1.15f, side * (LevelMetrics.WallThickness / 2f + 0.005f));
-                panel.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                panel.transform.SetParent(leaf, false);
+                panel.transform.position = side > 0 ? front : back;
+                // facing out of its face (the model faces its +Z; the hinge of a +X leaf is mirrored: keep it the world's way)
+                panel.transform.rotation = leaf.root.rotation * Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                var ls = leaf.lossyScale;
+                panel.transform.localScale = new Vector3(0.8f / Mathf.Abs(ls.x), 0.8f / Mathf.Abs(ls.y), 0.8f / Mathf.Abs(ls.z));
                 Paint(panel, "Metal", "Metal", "LockLamp");
+                foreach (var r in panel.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
                 return panel;
             }).ToArray();
-            Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
-            return root;
         }
 
         /// <summary>
@@ -606,19 +625,19 @@ namespace Stealth.EditorTools
             var fm = M(frame);
             float depth = wall + 0.01f;
             foreach (float side in new[] { -1f, 1f })
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), fm, false);
-            Cube(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), fm, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), height / 2f, 0f), new Vector3(lining, height, depth), fm);
+            ChamferBox(root.transform, "Head", new Vector3(0f, height - lining / 2f, 0f), new Vector3(clear, lining, depth), fm);
             if (exterior)
             {
                 const float casing = 0.12f, casingDepth = 0.03f;
                 foreach (float side in new[] { -1f, 1f })
                     foreach (float face in new[] { -1f, 1f })
-                        Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
-                            new Vector3(casing, height + casing - lining, casingDepth), fm, false);
+                        ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (height + casing - lining) / 2f, face * (wall / 2f + casingDepth / 2f)),
+                            new Vector3(casing, height + casing - lining, casingDepth), fm);
                 foreach (float face in new[] { -1f, 1f })
-                    Cube(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
-                        new Vector3(clear + 2f * (casing - lining), casing, casingDepth), fm, false);
-                Cube(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("Metal"), false);
+                    ChamferBox(root.transform, "CasingHead", new Vector3(0f, height - lining + casing / 2f, face * (wall / 2f + casingDepth / 2f)),
+                        new Vector3(clear + 2f * (casing - lining), casing, casingDepth), fm);
+                ChamferBox(root.transform, "Sill", new Vector3(0f, 0.01f, 0f), new Vector3(clear, 0.02f, depth), M("Metal"));
             }
             foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
 
@@ -678,7 +697,7 @@ namespace Stealth.EditorTools
                             break;
                         case DoorKind.ClinicSwing:
                             foreach (float f in new[] { faceF + 0.003f, faceB - 0.003f })
-                                Cube(hinge, "PushPlate", new Vector3(w - 0.12f, 1.25f, f), new Vector3(0.1f, 0.3f, 0.006f), M("Metal"), false);
+                                ChamferBox(hinge, "PushPlate", new Vector3(w - 0.12f, 1.25f, f), new Vector3(0.1f, 0.3f, 0.006f), M("Metal"), 0.002f);
                             break;
                     }
                 }
@@ -718,7 +737,11 @@ namespace Stealth.EditorTools
                 door.Blocker = DoorBlocker(root, (-clear / 2f + seam) / 2f, bz, seam + clear / 2f, height, 0.1f);
                 door.BlockerB = DoorBlocker(root, (seam + clear / 2f) / 2f, bz, clear / 2f - seam, height, 0.1f);
             }
-            DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t);
+            // the key panel on the main leaf over its handle, on both faces (hinge-local: the free edge at mainW − 0.075)
+            float keyX = mainW - 0.15f;
+            DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t,
+                door.Swing, door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ + t / 2f + 0.002f)),
+                door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ - t / 2f - 0.002f)));
             Muffles(root, SoundMaterial.Door); // only while closed: the blockers are off when open
             return root;
         }
@@ -741,18 +764,29 @@ namespace Stealth.EditorTools
             float face = wall / 2f;
             foreach (float side in new[] { -1f, 1f })
             {
-                Cube(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), h / 2f, 0f), new Vector3(lining, h, wall + 0.01f), steel, false);
-                Cube(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (h + casing - lining) / 2f, face + casingDepth / 2f),
-                    new Vector3(casing, h + casing - lining, casingDepth), steel, false);
+                ChamferBox(root.transform, "Jamb", new Vector3(side * (clear / 2f - lining / 2f), h / 2f, 0f), new Vector3(lining, h, wall + 0.01f), steel);
+                ChamferBox(root.transform, "Casing", new Vector3(side * (clear / 2f - lining + casing / 2f), (h + casing - lining) / 2f, face + casingDepth / 2f),
+                    new Vector3(casing, h + casing - lining, casingDepth), steel);
             }
-            Cube(root.transform, "Head", new Vector3(0f, h - lining / 2f, 0f), new Vector3(clear, lining, wall + 0.01f), steel, false);
-            Cube(root.transform, "CasingHead", new Vector3(0f, h - lining + casing / 2f, face + casingDepth / 2f), new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel, false);
+            ChamferBox(root.transform, "Head", new Vector3(0f, h - lining / 2f, 0f), new Vector3(clear, lining, wall + 0.01f), steel);
+            ChamferBox(root.transform, "CasingHead", new Vector3(0f, h - lining + casing / 2f, face + casingDepth / 2f), new Vector3(clear + 2f * (casing - lining), casing, casingDepth), steel);
             // the indicator over the portal: a housing, the lamp in the middle and an arrow lamp either side
             float iy = h + casing + 0.12f;
-            Cube(root.transform, "Indicator", new Vector3(0f, iy, face + 0.02f), new Vector3(0.46f, 0.12f, 0.04f), steel, false);
-            door.HereLamp = Cube(root.transform, "HereLamp", new Vector3(0f, iy, face + 0.042f), new Vector3(0.16f, 0.06f, 0.006f), M("LampBulb"), false).GetComponent<Renderer>();
-            door.UpLamp = Cube(root.transform, "UpLamp", new Vector3(-0.15f, iy, face + 0.042f), new Vector3(0.05f, 0.06f, 0.006f), M("LockLamp"), false).GetComponent<Renderer>();
-            door.DownLamp = Cube(root.transform, "DownLamp", new Vector3(0.15f, iy, face + 0.042f), new Vector3(0.05f, 0.06f, 0.006f), M("LockLamp"), false).GetComponent<Renderer>();
+            // (Tools/Blender/lift_parts.py lift_indicator: a bevelled housing with a dark glass face, real arrows)
+            var indicator = Model("lift_indicator");
+            indicator.transform.SetParent(root.transform, false);
+            indicator.transform.localPosition = new Vector3(0f, iy, face);
+            Renderer Lamp(string part, string mat)
+            {
+                var r = Parts(indicator, part).First();
+                r.sharedMaterial = M(mat);
+                return r;
+            }
+            Parts(indicator, "Body").First().sharedMaterial = steel;
+            Parts(indicator, "Trim").First().sharedMaterial = M("Rack");
+            door.HereLamp = Lamp("EyeHere", "LampBulb");
+            door.UpLamp = Lamp("EyeUp", "LockLamp");
+            door.DownLamp = Lamp("EyeDown", "LockLamp");
             foreach (var r in root.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = ShadowCastingMode.Off;
             // the panels in the wall's plane, parting into it (LiftDoor slides them)
             Transform Panel(string name, float x)
@@ -771,7 +805,11 @@ namespace Stealth.EditorTools
             door.Blocker = DoorBlocker(root, 0f, 0.02f, clear, h, 0.08f);
             // the call button on a plate on the landing's face, beside the portal
             float bx = clear / 2f + casing + 0.16f;
-            Cube(root.transform, "CallPlate", new Vector3(bx, 1.1f, face + 0.006f), new Vector3(0.09f, 0.16f, 0.012f), steel, false);
+            var plate = Model("lift_callplate");
+            plate.transform.SetParent(root.transform, false);
+            plate.transform.localPosition = new Vector3(bx, 1.1f, face);
+            Paint(plate, "LiftSteel", "Metal", "Metal");
+            NoShadows(plate);
             var call = Model("lift_button");
             call.name = "CallButton";
             call.transform.SetParent(root.transform, false);
@@ -791,36 +829,35 @@ namespace Stealth.EditorTools
 
         /// <summary>
         /// A balcony of the apartment block (+Z out of the house, origin on the wall's outer face at the floor): a concrete slab
-        /// 3.2 x 1.1 m, a solid parapet 1 m high along its front and ends with a steel handrail on it, and an invisible guard
-        /// above the parapet — nobody jumps off (a jump clears 0.9 m).
+        /// 3.2 x 1.1 m, a solid parapet 1 m high along its front and ends with a steel handrail on it. One can jump off it
+        /// (down into the yard, a hard landing from high up): its solid part stops at <see cref="BalconyClimb"/>, under a jump.
         /// </summary>
         static GameObject BuildBalcony()
         {
             var root = new GameObject("Balcony");
-            const float L = 3.2f, D = 1.1f, slab = 0.18f, wall = 0.08f, h = 1.0f;
-            var concrete = M("Wall");
-            var steel = M("Metal");
-            Cube(root.transform, "Slab", new Vector3(0f, -slab / 2f, D / 2f), new Vector3(L, slab, D), concrete, true);
-            Cube(root.transform, "ParapetFront", new Vector3(0f, h / 2f, D - wall / 2f), new Vector3(L, h, wall), concrete, true);
-            foreach (float x in new[] { -1f, 1f })
-                Cube(root.transform, "ParapetSide", new Vector3(x * (L / 2f - wall / 2f), h / 2f, (D - wall) / 2f), new Vector3(wall, h, D - wall), concrete, true);
-            Cube(root.transform, "Rail", new Vector3(0f, h + 0.02f, D - wall / 2f), new Vector3(L + 0.02f, 0.04f, wall + 0.03f), steel, false);
-            foreach (float x in new[] { -1f, 1f })
-                Cube(root.transform, "RailSide", new Vector3(x * (L / 2f - wall / 2f), h + 0.02f, (D - wall) / 2f), new Vector3(wall + 0.03f, 0.04f, D - wall), steel, false);
-            // the guard over the parapet: a box collider, nothing to see
-            var guard = Child(root.transform, "Guard", Vector3.zero);
-            guard.layer = LevelMetrics.CeilingLayer; // sight passes, bodies do not
-            var front = guard.AddComponent<BoxCollider>();
-            front.center = new Vector3(0f, h + 0.5f, D - wall / 2f);
-            front.size = new Vector3(L, 1.0f, wall);
-            foreach (float x in new[] { -1f, 1f })
+            const float L = 3.2f, D = 1.1f, slab = 0.18f, wall = 0.08f;
+            // the look: Tools/Blender/balcony.py (a chamfered slab with a drip groove, parapet panels with recessed fields and
+            // a coping, a steel handrail on posts); the solid parts: the same boxes as ever
+            var model = Model("balcony");
+            model.transform.SetParent(root.transform, false);
+            Paint(model, "Wall", "Metal", "Metal");
+            void Solid(Vector3 c, Vector3 size)
             {
-                var side = guard.AddComponent<BoxCollider>();
-                side.center = new Vector3(x * (L / 2f - wall / 2f), h + 0.5f, (D - wall) / 2f);
-                side.size = new Vector3(wall, 1.0f, D - wall);
+                var b = root.AddComponent<BoxCollider>();
+                b.center = c;
+                b.size = size;
             }
+            Solid(new Vector3(0f, -slab / 2f, D / 2f), new Vector3(L, slab, D));
+            // the parapet's solid part is lower than it looks (the handrail on top is for the eye): a jump (1.05 m) clears it
+            const float solid = BalconyClimb;
+            Solid(new Vector3(0f, solid / 2f, D - wall / 2f), new Vector3(L, solid, wall));
+            foreach (float x in new[] { -1f, 1f })
+                Solid(new Vector3(x * (L / 2f - wall / 2f), solid / 2f, (D - wall) / 2f), new Vector3(wall, solid, D - wall));
             return root;
         }
+
+        /// <summary>The height of a balcony parapet's collider, metres: under a jump, so one can jump off the balcony.</summary>
+        const float BalconyClimb = 0.75f;
 
         /// <summary>Furniture whose BodyDoor{n} / BodyDrawer{n} parts open for real (Items.Storage).</summary>
         static GameObject Opening(GameObject go)
@@ -910,21 +947,23 @@ namespace Stealth.EditorTools
         /// <summary>
         /// The locks every door has: lock lamps over it on both sides (red while locked, green once hacked; hidden on doors
         /// without a lock), a hasp with a padlock across the leaves' seam at <paramref name="seam"/> on both faces
-        /// (<paramref name="front"/>, <paramref name="back"/>: the faces' z), and the key panels beside the frame.
+        /// (<paramref name="front"/>, <paramref name="back"/>: the faces' z), and the key panels on the main leaf
+        /// (<paramref name="keyLeaf"/>, at the world points <paramref name="keyFront"/> and <paramref name="keyBack"/>).
         /// </summary>
-        static void DoorLocks(GameObject root, AutoDoor door, float w, float h, float seam, float front, float back)
+        static void DoorLocks(GameObject root, AutoDoor door, float w, float h, float seam, float front, float back,
+            Transform keyLeaf = null, Vector3 keyFront = default, Vector3 keyBack = default)
         {
             door.LockLamps = new Renderer[]
             {
-                Cube(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
-                Cube(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp"), false).GetComponent<Renderer>(),
+                ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
+                ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
             };
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
             door.Padlocks = new[] { 1f, -1f }.Select(side =>
             {
                 var holder = Child(root.transform, side > 0 ? "PadlockA" : "PadlockB", new Vector3(seam, 1.2f, side > 0 ? front : back)).transform;
                 holder.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Cube(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), false);
+                ChamferBox(holder, "Hasp", new Vector3(0f, 0f, 0.008f), new Vector3(0.2f, 0.05f, 0.016f), M("Metal"), 0.004f);
                 var lockModel = Model("padlock");
                 lockModel.transform.SetParent(holder, false);
                 lockModel.transform.localPosition = new Vector3(0f, 0.01f, 0.035f);
@@ -935,16 +974,7 @@ namespace Stealth.EditorTools
             }).ToArray();
             var keyLock = root.AddComponent<KeyLock>();
             keyLock.Door = door;
-            keyLock.Panels = new[] { 1f, -1f }.Select(side =>
-            {
-                var panel = Model("key_lock");
-                panel.name = side > 0 ? "KeyLockA" : "KeyLockB";
-                panel.transform.SetParent(root.transform, false);
-                panel.transform.localPosition = new Vector3(w / 2f + 0.22f, 1.15f, side * (LevelMetrics.WallThickness / 2f + 0.005f));
-                panel.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
-                Paint(panel, "Metal", "Metal", "LockLamp");
-                return panel;
-            }).ToArray();
+            if (keyLeaf != null) keyLock.Panels = KeyLockPanels(keyLeaf, keyFront, keyBack);
         }
 
         /// <summary>
@@ -994,6 +1024,20 @@ namespace Stealth.EditorTools
         /// Ceiling panel at the ceiling surface (the pivot) with a wide spot light shining down: soft shadows, pools of light
         /// under it, darker corners. <see cref="RoomLight"/> sets colour / brightness per room and switches it off in dark rooms.
         /// </summary>
+        /// <summary>A monitor's screen showing a picture that glows through itself (the picture is set per terminal, by kind).</summary>
+        static Material TerminalScreenMaterial()
+        {
+            var m = Mat("Props", "TerminalScreen", new Color(0.3f, 0.3f, 0.3f), Color.white * 1.2f, smoothness: 0.85f);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_hack.png");
+            if (tex != null && m.GetTexture("_EmissionMap") != tex)
+            {
+                m.SetTexture("_BaseMap", tex);
+                m.SetTexture("_EmissionMap", tex);
+                EditorUtility.SetDirty(m);
+            }
+            return m;
+        }
+
         static GameObject BuildRoomLight()
         {
             var root = new GameObject("RoomLight");
@@ -1091,27 +1135,39 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// The exit hatch, in the look of the entry's shaft lid (ShaftHatch; models Tools/Blender/hatches.py): a yellow steel
+        /// angle frame in the floor with bolts, a dark pit inside it, a ribbed tread-plate lid on a hinge along the +X bar (it
+        /// swings up while someone hides in the hatch, <see cref="Hatch"/>), a lifting bar at its free edge; four lamps in
+        /// the frame's corners show its colour (the exit's green).
+        /// </summary>
         static GameObject BuildHatch()
         {
-            var hatch = PropObject("Hatch", "hatch", "Hatch", "PropAccent", "HatchRing", collider: false);
-            // The lid (disc and bars) on a hinge at its edge: it swings up while someone hides in the hatch.
-            var hinge = Child(hatch.transform, "LidHinge", new Vector3(0.75f, 0.03f, 0f));
-            foreach (var part in hatch.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray())
-                if (part.name.StartsWith("Body") || part.name.StartsWith("Accent")) part.SetParent(hinge.transform, true);
-            var h = hatch.AddComponent<Hatch>();
-            h.Lid = hinge.transform;
-            var b = LocalBounds(hatch);
-            // a post at the rim with a lamp on top: the hatch's colour (entry blue — the tank's filler, exit green — the way down)
-            Cube(hatch.transform, "MarkPost", new Vector3(0f, 0.65f, -0.85f), new Vector3(0.07f, 1.3f, 0.07f), M("Metal"), false);
-            Cube(hatch.transform, "EyeMarkLamp", new Vector3(0f, 1.36f, -0.85f), new Vector3(0.2f, 0.14f, 0.2f), M("HatchRing"), false);
-            h.Glow = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
-            hatch.AddComponent<KeepUnmerged>(); // the lid moves, the colours differ
-            var box = hatch.AddComponent<BoxCollider>();
-            // flush with the floor: walked over, never bumped into; the look ray finds it (the hatch key works only
-            // while looking at the hatch, PlayerController.AtHatch) and dropped items land on it
-            box.size = new Vector3(b.size.x, 0.08f, b.size.z);
-            box.center = new Vector3(b.center.x, 0.04f, b.center.z);
-            return hatch;
+            Material Util(string name) => AssetDatabase.LoadAssetAtPath<Material>($"{CityMaterialsDir}/{name}.mat") ?? M("Metal");
+            var util = new Material[System.Enum.GetValues(typeof(UtilitySlot)).Length];
+            util[(int)UtilitySlot.Warning] = Util("UtilWarning");
+            util[(int)UtilitySlot.Panel] = Util("UtilPanel");
+            util[(int)UtilitySlot.Dark] = Util("UtilDark");
+            // as the entry's lid (ShaftHatch): the frame right round the hole (3 x 3 plan cells), the lid on a hinge at −Z, the
+            // ladder below it (the passage's shaft in the sewer, SewerLocation); lamps in the frame's corners in the exit's colour
+            var go = new GameObject("Hatch");
+            float half = Basement.ShaftHalf, lip = 0.03f;
+            HatchModel("hatch_frame_exit", go.transform, util);
+            var lid = new GameObject("Lid").transform;
+            lid.SetParent(go.transform, false);
+            lid.localPosition = new Vector3(0f, 0.024f, -half - lip);
+            float side = 2 * half + 2 * lip;
+            HatchModel("hatch_lid_exit", lid, util);
+            var plateCollider = lid.gameObject.AddComponent<BoxCollider>();
+            plateCollider.center = new Vector3(0f, 0.0175f, side / 2f);
+            plateCollider.size = new Vector3(side, 0.035f, side);
+            go.AddComponent<KeepUnmerged>();
+            var h = go.AddComponent<ShaftHatch>();
+            h.Lid = lid;
+            h.LidCollider = plateCollider;
+            h.Exit = true;
+            h.Glow = go.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            return go;
         }
 
         // ------------------------------------------------------------------ props

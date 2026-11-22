@@ -1,556 +1,613 @@
-"""A realistic rigged human for the player (S11 «Заброшенный комплекс»): a station scientist in a grimy lab coat.
+"""The players' rigged humans: four people of four departments (and the station scientist of the old S16 look).
 
-Run:  blender.exe -b --factory-startup --python Tools/Blender/human.py -- Assets/_Game/Art/Models/Humans [preview.png]
+Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/human.py --
+          <out: Assets/_Game/Art/Models/Humans> [backend|qa|sysadmin|designer] [preview=<file.png>] [static=<file.fbx>] [draft]
 
-Writes <out>/human_scientist.fbx: one armature ("Rig") with skinned meshes and six in-place animation takes —
-Idle, Walk, Run, CrouchIdle, CrouchWalk, Down. Real adult proportions (1.76 m, head 1/7.6 of the height). Built from
-code: limbs and torso are skin-modifier tubes subdivided smooth, the head is a deformed sphere with jaw, cheekbones,
-brow, nose, lips, ears and eye sockets, hands have fingers and a thumb.
+Writes <out>/human_<who>.fbx — one armature ("Rig") with skinned meshes and the takes Idle, Walk, Run, CrouchIdle,
+CrouchWalk, Down, Sit, Climb, Terminal, Work — and its maps in <out>/../../Textures/Humans/: human_<who>_skin_*.png
+(head, hands, eyes) and human_<who>_outfit_*.png (everything else), each a _base (albedo), a _normal (tangent space)
+and a _mask (G occlusion, A smoothness). `static=` also writes the meshes alone in the rest pose (what
+Tools/Blender/review.py looks at: an FBX with takes comes in posed); `preview=` writes contact sheets of the sculpt,
+the game mesh and every take; `draft` sculpts coarser (a quick look at shapes).
 
-Mesh names follow the player part convention (PlayerLooks.PartColor colours them per player):
-  BodyClothes   jumpsuit / trousers            — the department's colour
-  AccentHead    head, neck, hands (skin)       — the player's skin tone
-  AccentBand    armband on the left sleeve     — the team colour
-  EyeDetails    hair, eyebrows, irises, boots  — dark
-  Coat          the lab coat                    — keeps its own (grimy off-white) material
-  Sclera        the whites of the eyes          — keeps its own material
-Every limb is its own skin-modifier piece weighted only to its own bones (no automatic heat weights: they failed on
-thin fingers and left boots behind), then the pieces of one part are joined.
-Blender: x right, -y the front, z up; Unity gets +Z forward (bake axis conversion on import).
+How a figure is made (Tools/Blender/humanlib):
+  * the body is anatomy as a distance field (body.py): pelvis, rib cage, shoulder girdle, the muscles of the limbs —
+    one build per person (broad, slim, soft), the joints the same for all, so every figure plays the same takes;
+  * the head is a skull, a jaw, a nose, lips and lids by the measurements of a real head, and a `Face` of proportions
+    makes a person of it (face.py): four different faces, hair as a volume in combed locks, a beard;
+  * clothes are the body let out by the cloth's ease, hanging where cloth hangs, hollow at the cuffs, with a few
+    deliberate folds (clothes.py); hands and shoes are fields too;
+  * each piece is meshed dense (surface nets), painted on its vertices, cut to a triangle budget, unwrapped, and the
+    dense sculpt is baked onto it: normals, colour, occlusion, smoothness (build.py);
+  * the rest pose is an A-pose; the skin follows the bones by distance within each piece's own bones (anim.py holds
+    the skeleton and the takes).
+
+Parts (the game's renderers; PlayerLooks.PartColor tints by the name's start):
+  BodyClothes  the department's garment (hoodie, shirt, vest, jumper)      — tinted the department's colour
+  AccentHead   head, neck, hands                                           — tinted the player's skin tone
+  AccentBand   armband, lanyard / scarf / cable                            — tinted the team colour
+  EyeDetails   headphones, glasses, belt                                   — tinted dark
+  Sclera       the eyes                                                    — its own colours
+  Outfit       trousers, shoes, hair, beard, everything of its own colour  — its own colours
+Blender: x the figure's left, -y its front, z up; Unity gets +Z forward (bake axis conversion on import).
 """
 import math
 import os
 import sys
+import time
 
 import bmesh
 import bpy
-from mathutils import Euler, Matrix, Vector, noise
-from mathutils.bvhtree import BVHTree
 import numpy as np
+from mathutils import Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from humanlib import anim, body, build, clothes, face, sdf, view  # noqa: E402
+from humanlib.body import Build, J  # noqa: E402
+from humanlib.build import Piece  # noqa: E402
+from humanlib.sdf import cone, ell, gauss, smax, smin, win  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "Humans"))
-PREVIEW = os.path.abspath(argv[1]) if len(argv) > 1 else None
-# the skin map of the face (multiplied by the player's skin tone in the game)
-SKIN_MAP = os.path.abspath(os.path.join(OUT, "..", "..", "Textures", "Humans", "skin_face.png"))
-FPS = 30
+WHO = next((a for a in argv if a in face.PEOPLE), "scientist")
+DRAFT = "draft" in argv
+PREVIEW = next((os.path.abspath(a[8:]) for a in argv if a.startswith("preview=")), None)
+STATIC = next((os.path.abspath(a[7:]) for a in argv if a.startswith("static=")), None)
+_pos = [a for a in argv if a not in face.PEOPLE and a != "draft" and "=" not in a]
+OUT = os.path.abspath(_pos[0] if _pos else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "Humans"))
+TEXTURES = os.path.abspath(os.path.join(OUT, "..", "..", "Textures", "Humans"))
+K = 1.6 if DRAFT else 1.0                       # the sculpt's cell size, times this
+
+HEAD_C = np.array((0.0, -0.004, 1.660))         # the head's centre on the body
+HEAD_S = 1.07                                   # the head on the body is this much bigger than face.py's (a real head is 1/7.5 of the height)
 
 
-def clear():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.context.scene.render.fps = FPS
+def H(p):
+    """A point of the body in the head's own frame (face.py's metres)."""
+    return (np.asarray(p, float) - HEAD_C) / HEAD_S
 
-
-def apply_all(obj):
-    bpy.context.view_layer.objects.active = obj
-    for o in bpy.context.scene.objects:
-        o.select_set(o == obj)
-    for m in list(obj.modifiers):
-        bpy.ops.object.modifier_apply(modifier=m.name)
-
-
-# --------------------------------------------------------------------------- skin-modifier bodies
-
-def skin_mesh(name, verts, edges, radii, root=0, subdiv=2):
-    """A tube body from a graph of points with per-point radii (rx, ry) through the skin modifier, smoothed."""
-    me = bpy.data.meshes.new(name)
-    me.from_pydata([Vector(v) for v in verts], edges, [])
-    obj = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(obj)
-    mod = obj.modifiers.new("skin", "SKIN")
-    mod.use_smooth_shade = True
-    mod.branch_smoothing = 0.6
-    for i, sv in enumerate(me.skin_vertices[0].data):
-        r = radii[i]
-        sv.radius = (r, r) if isinstance(r, (int, float)) else r
-        sv.use_root = i == root
-    sub = obj.modifiers.new("sub", "SUBSURF")
-    sub.levels = subdiv
-    sub.render_levels = subdiv
-    apply_all(obj)
-    for p in obj.data.polygons:
-        p.use_smooth = True
-    return obj
-
-
-class Chain:
-    """Collects points and edges for a skin body."""
-
-    def __init__(self):
-        self.v, self.e, self.r = [], [], []
-
-    def add(self, p, r, parent=None):
-        self.v.append(p)
-        self.r.append(r)
-        i = len(self.v) - 1
-        if parent is not None:
-            self.e.append((parent, i))
-        return i
-
-    def line(self, parent, pts):
-        last = parent
-        for p, r in pts:
-            last = self.add(p, r, last)
-        return last
-
-
-# key points of the body (metres): the skeleton below uses the same ones
-P = {
-    "pelvis": (0, 0.0, 0.96), "waist": (0, 0.005, 1.08), "chest": (0, 0.0, 1.25), "upchest": (0, 0.01, 1.38),
-    "neck0": (0, 0.02, 1.47), "neck1": (0, 0.015, 1.56), "head": (0, 0.0, 1.635),
-    "shoulder": (0.18, 0.02, 1.405), "elbow": (0.225, 0.04, 1.14), "wrist": (0.245, 0.0, 0.89), "hand": (0.25, -0.01, 0.8),
-    "hip": (0.095, 0.0, 0.92), "knee": (0.105, -0.015, 0.5), "ankle": (0.105, 0.03, 0.085), "toe": (0.11, -0.12, 0.03),
+BUILDS = {
+    "backend": Build(shoulders=0.97, chest=0.95, waist=0.93, limbs=0.92),
+    "qa": Build(shoulders=0.88, chest=0.88, waist=0.80, hips=1.10, limbs=0.86, neck=0.84, bust=0.008, soft=0.6),
+    "sysadmin": Build(shoulders=1.08, chest=1.10, waist=1.22, belly=0.045, hips=1.08, limbs=1.14, neck=1.12, soft=0.7),
+    "designer": Build(shoulders=0.87, chest=0.86, waist=0.76, hips=1.05, limbs=0.80, neck=0.82, bust=0.006, soft=0.5),
+    "scientist": Build(),
+}
+# what each wears: the top's cut, trousers and shoes (colours are linear RGB)
+OUTFITS = {
+    "backend": dict(top=dict(ease=0.015, sleeve_ease=0.012, hem=0.965, straight=0.75, neck_z=1.498, neck_r=0.072, rib=0.045), hood=True,
+                    trousers=(0.10, 0.14, 0.24), taper=0.0, shoe="sneaker", shoe_colour=(0.78, 0.78, 0.76), sole=(0.85, 0.85, 0.83)),
+    "qa": dict(top=dict(ease=0.007, sleeve_ease=0.008, hem=1.032, straight=0.15, neck_z=1.482, neck_r=0.062, folds=0.8), collar=True, tucked=True,
+               trousers=(0.085, 0.085, 0.10), taper=0.014, shoe="flat", shoe_colour=(0.05, 0.045, 0.045), sole=(0.03, 0.03, 0.03)),
+    "sysadmin": dict(top=dict(ease=0.008, sleeve_ease=0.010, hem=1.032, straight=0.3, neck_z=1.482, neck_r=0.066, cuff_t=0.46, rib=0.03), vest=True, collar=True,
+                     tucked=True, shirt=(0.42, 0.47, 0.52), trousers=(0.17, 0.16, 0.12), taper=-0.006, cargo=True, trouser_ease=0.014, shoe="boot", shoe_colour=(0.16, 0.10, 0.06),
+                     sole=(0.04, 0.035, 0.03)),
+    "designer": dict(top=dict(ease=0.014, sleeve_ease=0.012, hem=0.985, straight=0.5, neck_z=1.486, neck_r=0.066, rib=0.035, folds=0.8),
+                     trousers=(0.045, 0.045, 0.05), taper=-0.020, trouser_hem=0.125, shoe="sneaker", shoe_colour=(0.60, 0.16, 0.14), sole=(0.88, 0.87, 0.84)),
+    "scientist": dict(top=dict(ease=0.008, sleeve_ease=0.009, hem=1.032, straight=0.2, neck_z=1.482, neck_r=0.064), collar=True, tucked=True, coat=True,
+                      trousers=(0.12, 0.13, 0.15), taper=0.0, shoe="flat", shoe_colour=(0.07, 0.06, 0.05), sole=(0.03, 0.03, 0.03)),
 }
 
-
-def mirror(p, s):
-    return (p[0] * s, p[1], p[2])
-
-
-def side_bones(s):
-    return "L" if s > 0 else "R"
-
-
-# every piece is weighted only to its own bones, then pieces of one part are joined (no weights bleed across limbs)
 TORSO = ["hips", "spine", "chest"]
-pieces = []   # (part name, object, [bones])
+RADIUS = {"hips": 0.17, "spine": 0.15, "chest": 0.17, "neck": 0.06, "head": 0.10, "shoulder": 0.085, "upper_arm": 0.055, "forearm": 0.045,
+          "hand": 0.040, "fingers": 0.020, "thumb": 0.018, "thigh": 0.085, "shin": 0.06, "foot": 0.055, "toe": 0.04}
 
 
-def piece(part, obj, bones):
-    pieces.append((part, obj, bones))
-    return obj
+def both(*names):
+    return [f"{n}.{s}" for n in names for s in ("L", "R")]
 
 
-def arm_chain(s, radii, start=None, end_z=0.92):
-    """Points of an arm (shoulder to wrist) on side s with radii (shoulder, mid-upper, elbow, forearm, wrist)."""
-    c = Chain()
-    sh = c.add(mirror(start or (0.15, 0.02, 1.4), s), radii[0])
-    c.line(sh, [(mirror(P["shoulder"], s), radii[0]),
-                (mirror((0.205, 0.03, 1.29), s), radii[1]),
-                (mirror(P["elbow"], s), radii[2]),
-                (mirror((0.236, 0.02, 1.02), s), radii[3]),
-                (mirror((0.243, 0.004, end_z), s), radii[4])])
-    return c
+def mx(p):
+    q = np.array(p, float)
+    q[..., 0] = np.abs(q[..., 0])
+    return q
 
 
-def body_clothes():
-    """Jumpsuit: torso, arms and legs (the coat covers most of it)."""
-    c = Chain()
-    pel = c.add(P["pelvis"], (0.15, 0.1))
-    c.line(pel, [(P["waist"], (0.135, 0.092)), (P["chest"], (0.158, 0.105)), (P["upchest"], (0.165, 0.098)),
-                 (P["neck0"], (0.07, 0.065))])
-    piece("BodyClothes", skin_mesh("torso", c.v, c.e, c.r), TORSO + ["neck"])
-    for s in (-1, 1):
-        sd = side_bones(s)
-        a = arm_chain(s, (0.058, 0.048, 0.042, 0.038, 0.032))
-        piece("BodyClothes", skin_mesh("arm", a.v, a.e, a.r), ["chest", f"shoulder.{sd}", f"upper_arm.{sd}", f"forearm.{sd}"])
-        lg = Chain()
-        hp = lg.add(mirror((0.08, 0.0, 0.98), s), 0.082)
-        lg.line(hp, [(mirror(P["hip"], s), 0.08), (mirror((0.1, -0.005, 0.72), s), 0.07), (mirror(P["knee"], s), 0.056),
-                     (mirror((0.105, 0.01, 0.3), s), 0.05), (mirror((0.105, 0.03, 0.13), s), 0.042)])
-        piece("BodyClothes", skin_mesh("leg", lg.v, lg.e, lg.r), ["hips", f"thigh.{sd}", f"shin.{sd}"])
+def mirrored(obj, name):
+    o = obj.copy()
+    o.data = obj.data.copy()
+    o.name = name
+    bpy.context.collection.objects.link(o)
+    pts = sdf.points_of(o)
+    pts[:, 0] *= -1
+    sdf.set_points(o, pts)
+    o.data.flip_normals()
+    return o
 
 
-def coat():
-    """Knee-length lab coat: one smooth shell from the collar to below the knees, sleeves a little looser than the arms."""
-    c = Chain()
-    col = c.add((0, 0.022, 1.5), (0.072, 0.07))
-    c.line(col, [((0, 0.01, 1.4), (0.188, 0.114)), ((0, 0.0, 1.25), (0.172, 0.12)), ((0, 0.005, 1.08), (0.152, 0.108)),
-                 ((0, 0.0, 0.96), (0.19, 0.13)), ((0, 0.0, 0.8), (0.2, 0.138)), ((0, 0.0, 0.62), (0.208, 0.142)),
-                 ((0, 0.0, 0.53), (0.21, 0.145))])
-    shell = skin_mesh("coat", c.v, c.e, c.r)
-    me = shell.data
+def sculpt(name, f, lo, hi, h, mirror=False):
+    t = time.time()
+    o = sdf.mesh(name, f, lo, hi, h * K, mirror=mirror)
+    sdf.keep_biggest(o)
+    print(f"SCULPT {name}: {len(o.data.vertices)} verts, {time.time() - t:.1f} s")
+    return o
+
+
+# --------------------------------------------------------------------------- the figure
+
+def figure(who):
+    """Sculpts and paints every piece of a person: [Piece]."""
+    person, b, fit = face.PEOPLE[who], BUILDS[who], OUTFITS[who]
+    f = person.face
+    pieces = []
+    head_f = lambda p: face.head_with_ears(H(p), f) * HEAD_S
+
+    # ---- skin: the head with the neck, the hands (with the forearms under rolled sleeves), the eyes
+    def skin_f(p):
+        d = smin(head_f(p), body.neck(mx(p), Build(neck=b.neck, soft=b.soft)), 0.014)
+        return smax(d, 1.405 - p[..., 2], 0.004)
+    hd = sculpt("head", skin_f, (0, -0.15, 1.39), (0.113, 0.14, 1.82), 0.0013, mirror=True)
+    rgb, gloss = paint_head(H(sdf.points_of(hd)), person)
+    build.paint(hd, rgb, gloss)
+
+    def keep_face(pts):
+        p = H(pts)
+        front = np.clip((-p[:, 1] - 0.035) / 0.03, 0, 1) * np.clip((0.065 - p[:, 2]) / 0.02, 0, 1) * np.clip((p[:, 2] + 0.115) / 0.02, 0, 1)
+        q = mx(p)
+        fine = sum(np.exp(-(np.linalg.norm((q - c) / r, axis=1)) ** 2) for c, r in (
+            ((0, -0.095, face.mouth_z(f)), (0.032, 0.022, 0.016)), ((0.0315, -0.08, 0.008), (0.022, 0.022, 0.014)), ((0, -0.105, -0.034), (0.022, 0.022, 0.018))))
+        ears = np.clip((q[:, 0] - 0.068) / 0.004, 0, 1) * (np.abs(p[:, 2]) < 0.04)
+        neck = 0.50 * np.clip((-0.095 - p[:, 2]) / 0.02, 0, 1)                    # a round neck, not a prism
+        return np.maximum(np.maximum(0.45 * front + 0.4 * np.clip(fine, 0, 1), 0.35 * ears), neck)
+    pieces.append(Piece("head", "AccentHead", "skin", hd, 4400, ["chest", "neck", "head"], keep=keep_face, texel=1.6))
+
+    rolled = fit["top"].get("cuff_t", 1.0) < 0.9
+    hand_f = (lambda p: clothes.forearm_skin(p, b, f.female, 0.36)) if rolled else (lambda p: clothes.hand(p, f.female))
+    W = J["wrist"]
+    lo_, hi_ = (W + (-0.21 if rolled else -0.10, -0.12, -0.20), W + (0.14, 0.12, 0.26 if rolled else 0.08))
+    hand = sculpt("hand.L", hand_f, lo_, hi_, 0.0012)
+    hp = sdf.points_of(hand)
+    build.paint(hand, *paint_hand(hp, build.normals_of(hand)))
+    hand_r = mirrored(hand, "hand.R")
+    for o, sd in ((hand, "L"), (hand_r, "R")):
+        pieces.append(Piece(o.name, "AccentHead", "skin", o, 800 if rolled else 700, [f"forearm.{sd}", f"hand.{sd}", f"fingers.{sd}", f"thumb.{sd}"], texel=1.0))
+
+    e = face.eye_centre(f)
+    for s, sd in ((1, "L"), (-1, "R")):
+        c = HEAD_C + np.array((s * e[0], e[1], e[2])) * HEAD_S
+        eye = eyeball(f"eye.{sd}", c, 48, 24)
+        build.paint(eye, *paint_eye((sdf.points_of(eye) - c) / HEAD_S, person))
+        p = Piece(eye.name, "Sclera", "skin", eye, 0, ["head"], texel=2.2)
+        p.lo = eyeball(f"eye.{sd}_lo", c, 14, 8)
+        pieces.append(p)
+
+    # ---- hair (and a beard): their own colour
+    hair_f = lambda p: face.hair(H(p), f, person.hair) * HEAD_S
+    hair = sculpt("hair", hair_f, (-0.125, -0.15, 1.49), (0.125, 0.17, 1.85), 0.0016)
+    build.paint(hair, *paint_hair(H(sdf.points_of(hair)), person, 1.0))
+    pieces.append(Piece("hair", "Outfit", "outfit", hair, {"bob": 1700, "buzz": 900}.get(person.hair, 1400), ["head"], texel=1.2))
+    if person.beard:
+        bd = sculpt("beard", lambda p: face.beard(H(p), f) * HEAD_S, (0, -0.15, 1.50), (0.113, 0.07, 1.70), 0.0013, mirror=True)
+        build.paint(bd, *paint_beard(H(sdf.points_of(bd)), person))
+        pieces.append(Piece("beard", "Outfit", "outfit", bd, 700, ["head"], texel=1.2))
+
+    # ---- trousers and shoes
+    waist = 1.040
+    tr_f = lambda p: clothes.trousers(p, b, ease=fit.get("trouser_ease", 0.009), hem=fit.get("trouser_hem", 0.075 if fit["shoe"] != "boot" else 0.10),
+                                      waist=waist, taper=fit["taper"], cargo=fit.get("cargo", False))
+    tr = sculpt("trousers", tr_f, (0, -0.22, 0.05), (0.30, 0.22, 1.08), 0.0032, mirror=True)
+    build.paint(tr, *paint_trousers(sdf.points_of(tr), build.normals_of(tr), fit["trousers"]))
+    pieces.append(Piece("trousers", "Outfit", "outfit", tr, 2000, ["hips", "spine"] + both("thigh", "shin")))
+    shoe = sculpt("shoe.L", lambda p: clothes.shoe(p, fit["shoe"]), (0.03, -0.21, -0.004), (0.175, 0.12, 0.22), 0.0018)
+    build.paint(shoe, *paint_shoe(sdf.points_of(shoe), fit))
+    for o, sd in ((shoe, "L"), (mirrored(shoe, "shoe.R"), "R")):
+        pieces.append(Piece(o.name, "Outfit", "outfit", o, 520, [f"shin.{sd}", f"foot.{sd}", f"toe.{sd}"]))
+
+    # ---- the top: the department's garment (under a vest: a shirt of its own colour, and the vest is the garment)
+    top_f = lambda p: clothes.top(p, b, **fit["top"])
+    garment_f = top_f
+    if fit.get("collar"):
+        top_f_plain = top_f
+        top_f = lambda p: smin(top_f_plain(p), clothes.collar(p), 0.004)
+        garment_f = top_f
+    top = sculpt("top", top_f, (0, -0.24, 0.93), (0.62, 0.24, 1.56), 0.0032, mirror=True)
+    arms = both("shoulder", "upper_arm", "forearm")
+    if fit.get("vest"):
+        build.paint(top, *paint_cloth(sdf.points_of(top), fit["shirt"], 0.16, weave=0.03))
+        pieces.append(Piece("shirt", "Outfit", "outfit", top, 2200, TORSO + ["neck"] + arms))
+        garment_f = lambda p: clothes.vest(p, b)
+        vest = sculpt("vest", garment_f, (0, -0.26, 0.97), (0.26, 0.24, 1.54), 0.0032, mirror=True)
+        build.paint(vest, *paint_vest(sdf.points_of(vest)))
+        pieces.append(Piece("vest", "BodyClothes", "outfit", vest, 1500, TORSO + both("shoulder")))
+    else:
+        build.paint(top, *paint_top(sdf.points_of(top), who, fit))
+        pieces.append(Piece("top", "BodyClothes", "outfit", top, 3000, TORSO + ["neck"] + arms))
+    if fit.get("coat"):
+        # the lab coat over the shirt: knee length, open in a deep V, off-white and a little grimy
+        coat_f = lambda p: clothes.top(p, b, ease=0.022, sleeve_ease=0.019, hem=0.56, straight=1.0, neck_z=1.490, neck_r=0.078, v_neck=0.20,
+                                       folds=0.7, skirt=True)
+        garment_f = coat_f
+        top_f = coat_f                                                  # (the armband goes on the coat's sleeve)
+        coat = sculpt("coat", coat_f, (0, -0.26, 0.54), (0.62, 0.26, 1.56), 0.0034, mirror=True)
+        cp = sdf.points_of(coat)
+        grime = 0.82 + 0.18 * build.noise(cp, 60) - 0.10 * np.clip((0.75 - cp[:, 2]) / 0.2, 0, 1) * build.noise(cp, 35, 2)
+        overlap = gauss(np.abs(cp[:, 0]) - 0.010, 0.0022) * (cp[:, 1] < 0) * (cp[:, 2] < 1.27)
+        build.paint(coat, np.array((0.80, 0.79, 0.72))[None, :] * (grime * (1 - 0.35 * overlap))[:, None], 0.2)
+        pieces.append(Piece("coat", "Outfit", "outfit", coat, 3200, TORSO + ["neck"] + arms + both("thigh")))
+    if fit.get("hood"):
+        hood = sculpt("hood", clothes.hood, (-0.14, 0.0, 1.31), (0.14, 0.18, 1.56), 0.0032)
+        build.paint(hood, 1.0, 0.14)
+        pieces.append(Piece("hood", "BodyClothes", "outfit", hood, 420, ["chest", "neck", "spine"]))
+
+    # ---- what the team colour goes on: an armband for everyone; a lanyard, a scarf, a coil of cable
+    S, E = np.array((J["shoulder"][0] * b.shoulders, J["shoulder"][1], J["shoulder"][2])), J["elbow"]
+    axis = (E - S) / np.linalg.norm(E - S)
+    sleeve_f = top_f
+
+    def band_f(p):
+        along = (p - S) @ axis
+        d = sleeve_f(p)
+        near, _ = sdf.seg_dist(p, S, E)
+        return smax(smax(smax(d - 0.0042, -(d + 0.004), 0.001), np.abs(along - 0.150) - 0.026, 0.002), near - 0.085, 0.002)
+    band = sculpt("armband", band_f, S + (-0.09, -0.10, -0.26), S + (0.16, 0.10, 0.02), 0.0016)
+    build.paint(band, 1.0, 0.22)
+    pieces.append(Piece("armband", "AccentBand", "outfit", band, 260, ["shoulder.L", "upper_arm.L"]))
+
+    surface = garment_f
+    extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist)
+    return pieces
+
+
+def shell(surface, p, lift=0.0012, thick=0.0026):
+    """A thin layer lying on a garment: between `lift` and `lift + thick` over its surface."""
+    d = surface(p)
+    return np.maximum(d - (lift + thick), -(d - lift) - 0.004)
+
+
+def along_path(p, pts):
+    """Distance to a polyline."""
+    d = None
+    for a, c in zip(pts, pts[1:]):
+        x, _ = sdf.seg_dist(p, a, c)
+        d = x if d is None else np.minimum(d, x)
+    return d
+
+
+def extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist):
+    f = person.face
+    if fit.get("tucked"):
+        # a belt where the shirt goes into the trousers, with a buckle
+        def belt_f(p):
+            d = tr_f(p)
+            band = smax(smax(d - 0.0045, -(d + 0.004), 0.001), np.abs(p[..., 2] - (waist - 0.022)) - 0.017, 0.002)
+            return smin(band, sdf.box(p, (0, -0.118 - 0.9 * b.belly - (0.02 if b.waist > 1.1 else 0.0), waist - 0.022), (0.022, 0.012, 0.016), 0.003), 0.002)
+        belt = sculpt("belt", belt_f, (-0.22, -0.24, waist - 0.06), (0.22, 0.2, waist + 0.02), 0.0018)
+        bp = sdf.points_of(belt)
+        buckle = (np.abs(bp[:, 0]) < 0.024) & (bp[:, 1] < -0.09) & (np.abs(bp[:, 2] - (waist - 0.022)) < 0.018)
+        build.paint(belt, np.where(buckle[:, None], 6.0, 1.0) * np.ones((len(bp), 3)), np.where(buckle, 0.75, 0.4))
+        pieces.append(Piece("belt", "EyeDetails", "outfit", belt, 420, ["hips", "spine"]))
+    if who == "backend":
+        # big over-ear headphones over the hair, and the hoodie's pocket and drawstrings
+        def phones_f(p):
+            q = mx(H(p))
+            ring = np.abs(np.hypot(q[..., 0] / 0.101, (q[..., 2] + 0.006) / 0.176) - 1.0) * 0.101      # over the hair: an ellipse
+            band = np.maximum(np.maximum(ring - 0.0055, np.abs(q[..., 1] - 0.012) - 0.013), -q[..., 2] - 0.02)
+            cup = ell(q, (0.086, 0.012, -0.006), (0.020, 0.040, 0.046))
+            cushion = ell(q, (0.076, 0.012, -0.006), (0.012, 0.034, 0.040))
+            return smin(smin(band, cup, 0.006), cushion, 0.003) * HEAD_S
+        ph = sculpt("headphones", phones_f, (-0.135, -0.07, 1.57), (0.135, 0.09, 1.86), 0.0018)
+        pp = mx(H(sdf.points_of(ph)))
+        build.paint(ph, np.where((pp[:, 0] < 0.082)[:, None] & (pp[:, 2] < 0.05)[:, None], 0.55, 1.0) * np.ones((len(pp), 3)), np.where(pp[:, 0] > 0.09, 0.62, 0.3))
+        pieces.append(Piece("headphones", "EyeDetails", "outfit", ph, 700, ["head"]))
+
+        def strings_f(p):
+            d = np.minimum(*[np.hypot(p[..., 0] - np.interp(p[..., 2], [1.31, 1.467], [s * 0.034, s * 0.026]), 0) for s in (1, -1)])
+            z = p[..., 2]
+            return np.maximum(np.maximum(surface(p) - 0.0075, -(surface(p)) - 0.003), np.maximum(d - 0.0036, np.maximum(1.31 - z, z - 1.467)))
+        st = sculpt("strings", strings_f, (-0.06, -0.2, 1.29), (0.06, 0.0, 1.48), 0.0012)
+        build.paint(st, 0.86, 0.2)
+        pieces.append(Piece("strings", "Outfit", "outfit", st, 160, ["chest", "spine"]))
+    elif who in ("qa", "scientist"):
+        # a lanyard round the neck to a badge on the chest; QA wears big round glasses
+        def lanyard_f(p):
+            q = mx(p)
+            flat = np.hypot(q[..., 0] - np.interp(q[..., 2], [1.215, 1.30, 1.41, 1.474], [0.004, 0.026, 0.046, 0.058]), 0) - 0.0055
+            z = q[..., 2]
+            strap = np.maximum(shell(surface, p, 0.0008, 0.0022), np.maximum(flat, np.maximum(1.215 - z, z - 1.482)))
+            strap = np.maximum(strap, p[..., 1] + 0.0)                       # only down the front
+            return strap
+        ln = sculpt("lanyard", lanyard_f, (-0.08, -0.22, 1.20), (0.08, 0.01, 1.49), 0.0011)
+        build.paint(ln, 1.0, 0.25)
+        pieces.append(Piece("lanyard", "AccentBand", "outfit", ln, 260, ["chest", "spine", "neck"]))
+
+        def badge_f(p):
+            return np.maximum(shell(surface, p, 0.001, 0.004), sdf.box(p * (1, 0, 1), (0.0, 0.0, 1.175), (0.027, 1.0, 0.040), 0.004))
+        bg = sculpt("badge", badge_f, (-0.04, -0.22, 1.12), (0.04, -0.03, 1.23), 0.0011)
+        gp = sdf.points_of(bg)
+        photo = (np.abs(gp[:, 0] + 0.006) < 0.012) & (np.abs(gp[:, 2] - 1.186) < 0.014)
+        lines = (gp[:, 2] < 1.166) & (np.sin(gp[:, 2] * 900) > 0.2) & (np.abs(gp[:, 0]) < 0.02)
+        col = np.where(photo[:, None], (0.25, 0.3, 0.38), np.where(lines[:, None], (0.3, 0.3, 0.32), (0.86, 0.86, 0.84)))
+        build.paint(bg, col, 0.55)
+        pieces.append(Piece("badge", "Outfit", "outfit", bg, 120, ["chest", "spine"]))
+        if who == "qa":
+            e = face.eye_centre(f)
+
+            def glasses_f(p):
+                q = mx(H(p))
+                c = np.array((e[0] + 0.001, e[1] - 0.0235, e[2] - 0.002))
+                rim = np.hypot(np.hypot(q[..., 0] - c[0], q[..., 2] - c[2]) - 0.0205, q[..., 1] - c[1]) - 0.0017
+                bridge = cone(q, (0.0, c[1], c[2] + 0.006), (0.010, c[1], c[2] + 0.004), 0.0014)
+                temple = cone(q, (c[0] + 0.0205, c[1], c[2] + 0.004), (0.079 * f.skull_w, 0.012, c[2] + 0.010), 0.0014)
+                return np.minimum(np.minimum(rim, bridge), temple) * HEAD_S
+            gl = sculpt("glasses", glasses_f, (-0.10, -0.125, 1.63), (0.10, 0.035, 1.71), 0.0006)
+            build.paint(gl, 1.0, 0.7)
+            pieces.append(Piece("glasses", "EyeDetails", "outfit", gl, 520, ["head"], texel=0.6))
+    elif who == "sysadmin":
+        # a head torch on its band, a coil of cable at the hip
+        def torch_f(p):
+            q = H(p)
+            band = np.maximum(np.abs(hair_f(p) - 0.0025) - 0.0022, (np.abs(q[..., 2] - 0.058) - 0.0105) * HEAD_S)
+            lamp = sdf.box(q, (0, -0.103, 0.058), (0.022, 0.014, 0.016), 0.005)
+            lens = cone(q, (0, -0.110, 0.058), (0, -0.124, 0.058), 0.012, 0.0125)
+            return smin(smin(band, lamp * HEAD_S, 0.003), lens * HEAD_S, 0.002)
+        tc = sculpt("torch", torch_f, (-0.12, -0.15, 1.69), (0.12, 0.14, 1.76), 0.0013)
+        tp = H(sdf.points_of(tc))
+        lens = (tp[:, 1] < -0.1215) & (np.hypot(tp[:, 0], tp[:, 2] - 0.058) < 0.0105)
+        lampbox = (tp[:, 1] < -0.088) & (np.abs(tp[:, 0]) < 0.03)
+        col = np.where(lens[:, None], (0.85, 0.88, 0.8), np.where(lampbox[:, None], (0.75, 0.42, 0.05), (0.06, 0.06, 0.065)))
+        build.paint(tc, col, np.where(lens, 0.85, np.where(lampbox, 0.5, 0.2)))
+        pieces.append(Piece("torch", "Outfit", "outfit", tc, 420, ["head"]))
+
+        def cable_f(p):
+            c = np.array((0.172 * b.hips + 0.012, 0.0, 0.955))
+            r = np.hypot(p[..., 1] - c[1], p[..., 2] - c[2])
+            d = None
+            for k in range(3):
+                t = np.hypot(r - (0.072 - 0.004 * k), p[..., 0] - (c[0] + 0.009 * k)) - 0.0065
+                d = t if d is None else smin(d, t, 0.002)
+            return smin(d, cone(p, (c[0] - 0.02, 0.0, c[2] + 0.07), (c[0] + 0.02, 0.0, c[2] + 0.075), 0.007), 0.004)   # the strap it hangs on
+        cb = sculpt("cable", cable_f, (0.12, -0.10, 0.86), (0.24, 0.10, 1.06), 0.0015)
+        build.paint(cb, 1.0, 0.45)
+        pieces.append(Piece("cable", "AccentBand", "outfit", cb, 420, ["hips", "thigh.L"]))
+    elif who == "designer":
+        def scarf_f(p):
+            tail = np.maximum(shell(surface, p, 0.0005, 0.011), sdf.box(p * (1, 0, 1), (0.050, 0.0, 1.340), (0.030, 1.0, 0.115), 0.008))
+            tail = np.maximum(tail, p[..., 1])                                       # (down the front only)
+            return smin(clothes.scarf(p), tail, 0.012)
+        sc = sculpt("scarf", scarf_f, (-0.12, -0.20, 1.20), (0.12, 0.14, 1.54), 0.002)
+        sp = sdf.points_of(sc)
+        knit = 0.90 + 0.10 * np.sin(np.arctan2(sp[:, 1] - 0.02, sp[:, 0]) * 46 + sp[:, 2] * 260) * np.sin(sp[:, 2] * 420)
+        build.paint(sc, np.repeat(knit[:, None], 3, 1), 0.1)
+        pieces.append(Piece("scarf", "AccentBand", "outfit", sc, 800, ["chest", "neck", "spine"]))
+
+        def beret_f(p):
+            q = (H(p) - np.array((0.016, 0.006, 0.100))) @ (sdf.rot_y(-0.30) @ sdf.rot_x(0.14))   # pulled down over one ear
+            d = ell(q, (0.012, 0, 0.012), (0.104, 0.110, 0.028))                                # the crown, slouching to one side
+            d = smin(d, ell(q, (0.0, 0.0, -0.016), (0.082, 0.096, 0.026)), 0.016)               # down to the band round the head
+            d = smin(d, cone(q, (0.012, 0, 0.038), (0.014, 0, 0.050), 0.0045, 0.0035), 0.004)
+            return smax(d * HEAD_S, -(head_f(p) + 0.001), 0.004)             # hollow where the head is (the hair's top is inside it)
+        br = sculpt("beret", beret_f, (-0.13, -0.13, 1.71), (0.15, 0.15, 1.86), 0.0018)
+        build.paint(br, np.array((0.32, 0.035, 0.05)) * (0.9 + 0.2 * build.noise(sdf.points_of(br), 400)[:, None]), 0.12)
+        pieces.append(Piece("beret", "Outfit", "outfit", br, 520, ["head"]))
+
+
+def eyeball(name, c, seg, rings):
     bm = bmesh.new()
-    bm.from_mesh(me)
-    cap = [f for f in bm.faces if all(v.co.z < 0.545 for v in f.verts)]
-    bmesh.ops.delete(bm, geom=cap, context="FACES")
-    # the opening at the front below the chest: two overlapping panels read as a seam
-    for v in bm.verts:
-        if v.co.y < -0.06 and abs(v.co.x) < 0.025 and v.co.z < 1.22:
-            v.co.y += 0.01 * (1.0 - abs(v.co.x) / 0.025)
-    bm.to_mesh(me)
-    bm.free()
-    piece("Coat", shell, TORSO + ["neck", "thigh.L", "thigh.R"])
-    coat_details(shell)
-    for s in (-1, 1):
-        sd = side_bones(s)
-        a = arm_chain(s, (0.068, 0.056, 0.05, 0.046, 0.043), start=(0.14, 0.02, 1.4), end_z=0.94)
-        piece("Coat", skin_mesh("sleeve", a.v, a.e, a.r), ["chest", f"shoulder.{sd}", f"upper_arm.{sd}", f"forearm.{sd}"])
-
-
-def front_of(obj, x, z):
-    """The y of the front (-Y) surface of a mesh at (x, z), by a ray from in front."""
-    bvh = BVHTree.FromPolygons([v.co for v in obj.data.vertices], [p.vertices for p in obj.data.polygons])
-    hit, _, _, _ = bvh.ray_cast(Vector((x, -1.0, z)), Vector((0, 1, 0)))
-    return hit.y if hit is not None else -0.12
-
-
-def card(part, bones, centre, w, h, t, normal_y=-1.0, tilt=0.0):
-    """A thin flat box (pocket, lapel, badge) lying on a surface that faces -Y."""
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.0)
-    bmesh.ops.scale(bm, vec=Vector((w, t, h)), verts=bm.verts)
-    if tilt:
-        bmesh.ops.rotate(bm, cent=Vector(), matrix=Matrix.Rotation(tilt, 3, "Y"), verts=bm.verts)
-    bmesh.ops.translate(bm, vec=Vector(centre), verts=bm.verts)
-    piece(part, mesh_obj("card", bm, smooth=False), bones)
-
-
-def coat_details(shell):
-    """Lapels, a breast pocket with a pen, two hip pockets, buttons, and the badge on a team-coloured lanyard."""
-    upper = ["spine", "chest"]
-    for s in (-1, 1):                                                       # lapels: a folded ribbon from the collar down
-        bm = bmesh.new()
-        rows = []
-        for k in range(9):
-            t = k / 8
-            z = 1.47 - t * 0.27
-            xc = s * (0.04 + 0.03 * t)
-            half = 0.01 + 0.016 * math.sin(t * math.pi * 0.8)              # widest at the notch, narrow at both ends
-            row = []
-            for xx in (xc - half, xc + half):
-                row.append(bm.verts.new(Vector((xx, front_of(shell, xx, z) - 0.0035, z))))
-            rows.append(row)
-        for a, b in zip(rows, rows[1:]):
-            bm.faces.new((a[0], a[1], b[1], b[0]) if s > 0 else (a[1], a[0], b[0], b[1]))
-        bm.normal_update()
-        bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.003)
-        piece("Coat", mesh_obj("lapel", bm, smooth=False), upper + ["neck"])
-    bx, bz = 0.085, 1.27                                                    # breast pocket (left chest) and a pen
-    card("Coat", upper, (bx, front_of(shell, bx, bz) - 0.003, bz), 0.085, 0.09, 0.004)
-    py = front_of(shell, bx + 0.025, bz + 0.05) - 0.008
-    pen = bmesh.new()
-    bmesh.ops.create_cone(pen, cap_ends=True, segments=10, radius1=0.005, radius2=0.005, depth=0.12)
-    bmesh.ops.translate(pen, vec=Vector((bx + 0.025, py, bz + 0.03)), verts=pen.verts)
-    piece("EyeDetails", mesh_obj("pen", pen), upper)
-    for s in (-1, 1):                                                       # hip pockets
-        x, z = s * 0.11, 0.86
-        card("Coat", ["hips", "spine"], (x, front_of(shell, x, z) - 0.003, z), 0.11, 0.12, 0.004)
-    for z in (1.18, 1.04, 0.9, 0.76):                                       # buttons down the overlap
-        y = front_of(shell, 0.018, z) - 0.004
-        b = bmesh.new()
-        bmesh.ops.create_cone(b, cap_ends=True, segments=12, radius1=0.008, radius2=0.008, depth=0.004)
-        bmesh.ops.rotate(b, cent=Vector(), matrix=Matrix.Rotation(math.pi / 2, 3, "X"), verts=b.verts)
-        bmesh.ops.translate(b, vec=Vector((0.018, y, z)), verts=b.verts)
-        piece("Sclera", mesh_obj("button", b), ["hips", "spine", "chest"] if z < 1.0 else upper)
-    # lanyard round the neck to a badge on the chest
-    pts = []
-    for s in (-1, 1):
-        side = [(s * 0.05, 1.47), (s * 0.045, 1.4), (s * 0.03, 1.32), (s * 0.012, 1.24)]
-        pts.append([Vector((x, front_of(shell, x, z) - 0.006, z)) for x, z in side])
-    for line in pts:
-        for a, b in zip(line, line[1:]):
-            d = b - a
-            st = bmesh.new()
-            bmesh.ops.create_cone(st, cap_ends=True, segments=8, radius1=0.004, radius2=0.004, depth=d.length)
-            q = Vector((0, 0, 1)).rotation_difference(d.normalized())
-            bmesh.ops.rotate(st, cent=Vector(), matrix=q.to_matrix(), verts=st.verts)
-            bmesh.ops.translate(st, vec=(a + b) / 2, verts=st.verts)
-            piece("AccentBand", mesh_obj("lanyard", st), upper + ["neck"])
-    yb = front_of(shell, 0.0, 1.19) - 0.008
-    card("Sclera", upper, (0.0, yb, 1.19), 0.055, 0.08, 0.003)             # the ID card
-    card("EyeDetails", upper, (-0.01, yb - 0.002, 1.2), 0.022, 0.028, 0.001)  # its photo
-
-
-def armband():
-    """A team-coloured band around the left upper sleeve."""
-    bm = bmesh.new()
-    a, b = Vector(mirror((0.192, 0.026, 1.355), 1)), Vector(mirror((0.198, 0.028, 1.315), 1))
-    d = b - a
-    bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=0.062, radius2=0.06, depth=d.length)
-    q = Vector((0, 0, 1)).rotation_difference(d.normalized())
-    bmesh.ops.rotate(bm, cent=Vector(), matrix=q.to_matrix(), verts=bm.verts)
-    bmesh.ops.translate(bm, vec=(a + b) / 2, verts=bm.verts)
-    me = bpy.data.meshes.new("band")
-    bm.to_mesh(me)
-    bm.free()
-    obj = bpy.data.objects.new("band", me)
-    bpy.context.collection.objects.link(obj)
-    sol = obj.modifiers.new("sol", "SOLIDIFY")
-    sol.thickness = 0.005
-    apply_all(obj)
-    piece("AccentBand", obj, ["upper_arm.L"])
-
-
-def skin_parts():
-    """Skin: the neck and two hands with four fingers and a thumb each."""
-    c = Chain()
-    n0 = c.add((0, 0.022, 1.45), 0.052)
-    c.add((0, 0.016, 1.57), 0.05, n0)
-    piece("AccentHead", skin_mesh("neck", c.v, c.e, c.r), ["chest", "neck", "head"])
-    for s in (-1, 1):
-        sd = side_bones(s)
-        h = Chain()
-        w = h.add(mirror((0.243, 0.004, 0.915), s), (0.03, 0.024))
-        palm = h.add(mirror((0.25, -0.006, 0.845), s), (0.044, 0.02), w)
-        for dy, ln in ((-0.032, 0.078), (-0.011, 0.088), (0.01, 0.083), (0.029, 0.068)):
-            base = h.add(mirror((0.254, dy, 0.808), s), 0.0115, palm)
-            h.line(base, [(mirror((0.257, dy - 0.005, 0.808 - ln * 0.55), s), 0.0102),
-                          (mirror((0.259, dy - 0.012, 0.808 - ln), s), 0.0088)])
-        th = h.add(mirror((0.238, -0.032, 0.87), s), 0.0135, palm)
-        h.line(th, [(mirror((0.234, -0.058, 0.835), s), 0.0115), (mirror((0.232, -0.07, 0.805), s), 0.0098)])
-        piece("AccentHead", skin_mesh("hand", h.v, h.e, h.r), [f"forearm.{sd}", f"hand.{sd}"])
-
-
-def boots():
-    for s in (-1, 1):
-        sd = side_bones(s)
-        c = Chain()
-        top = c.add(mirror((0.105, 0.025, 0.22), s), 0.052)
-        ank = c.add(mirror((0.105, 0.03, 0.09), s), (0.054, 0.062), top)
-        c.add(mirror((0.105, 0.065, 0.045), s), (0.046, 0.042), ank)
-        ball = c.add(mirror((0.11, -0.07, 0.04), s), (0.052, 0.036), ank)
-        c.add(mirror((0.112, -0.14, 0.036), s), (0.044, 0.03), ball)
-        obj = skin_mesh("boot", c.v, c.e, c.r)
-        for v in obj.data.vertices:            # flat soles on the floor
-            v.co.z = max(v.co.z, 0.0)
-        piece("EyeDetails", obj, [f"shin.{sd}", f"foot.{sd}"])
-
-
-# --------------------------------------------------------------------------- the head
-
-def head_shape(x, y, z):
-    """Unit sphere point -> head surface point (metres, centred at the head point). Face looks to -Y."""
-    front = max(0.0, -y)
-    sx, sy, sz = 0.079, 0.097, 0.11
-    if z < 0:                                                   # jaw: narrower towards the chin
-        x *= 1.0 - 0.13 * (-z) ** 1.8
-        y *= 1.0 - 0.08 * (-z) * front
-    if z > 0.4 and y > 0:                                       # fuller back of the skull
-        y *= 1.0 + 0.06 * (z - 0.4)
-    def g(cx, cz, wx, wz, mirror_x=False):
-        xx = abs(x) if mirror_x else x
-        return math.exp(-((xx - cx) / wx) ** 2 - ((z - cz) / wz) ** 2)
-    cheek = g(0.6, -0.08, 0.22, 0.2, True) * front
-    brow = g(0.0, 0.3, 0.6, 0.08) * front ** 2
-    sock = g(0.34, 0.16, 0.16, 0.1, True) * front ** 2
-    nose = g(0.0, -0.0, 0.07, 0.2) * front ** 4               # a narrow bridge
-    tip = g(0.0, -0.13, 0.09, 0.06) * front ** 4
-    nostril = g(0.12, -0.18, 0.06, 0.04, True) * front ** 3
-    lip_up = g(0.0, -0.33, 0.3, 0.05) * front ** 3
-    lip_lo = g(0.0, -0.44, 0.26, 0.05) * front ** 3
-    mouth = g(0.0, -0.385, 0.3, 0.014) * front ** 3
-    chin = g(0.0, -0.68, 0.3, 0.12) * front ** 2
-    temple = g(0.75, 0.25, 0.15, 0.2, True) * front
-    out = (0.05 * cheek + 0.06 * brow - 0.075 * sock + 0.24 * nose + 0.1 * tip + 0.035 * nostril + 0.035 * lip_up
-           + 0.03 * lip_lo - 0.025 * mouth + 0.05 * chin - 0.03 * temple)
-    p = Vector((x, y, z))
-    n = p.normalized() if p.length > 1e-6 else Vector((0, 0, 1))
-    p = p + n * out
-    return Vector((p.x * sx, p.y * sy, p.z * sz))
-
-
-HEAD_C = Vector(P["head"]) + Vector((0, -0.004, 0.0))
-
-
-def head():
-    """A sphere sculpted into a face by displacement fields, with ears."""
-    bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=56, v_segments=36, radius=1.0)
-    uv = bm.loops.layers.uv.new("UVMap")
-    face_uv = {}
-    for v in bm.verts:
-        face_uv[v] = head_uv(*v.co)
-    for f in bm.faces:
-        us = [face_uv[l.vert][0] for l in f.loops]
-        wrap = max(us) - min(us) > 0.5                                  # the seam at the back of the head
-        for l in f.loops:
-            u, w = face_uv[l.vert]
-            l[uv].uv = ((u + 1.0) if wrap and u < 0.5 else u, w)
-    for v in bm.verts:
-        v.co = head_shape(*v.co)
-    for s in (-1, 1):
-        e = bmesh.new()
-        bmesh.ops.create_uvsphere(e, u_segments=14, v_segments=10, radius=1.0)
-        for v in e.verts:                                       # flattened shell with a rim
-            v.co = Vector((v.co.x * 0.011 * (1.0 if v.co.x * s > 0 else 0.5), v.co.y * 0.021, v.co.z * 0.031))
-        bmesh.ops.rotate(e, cent=Vector(), matrix=Matrix.Rotation(-s * 0.3, 3, "Z"), verts=e.verts)
-        bmesh.ops.translate(e, vec=Vector((s * 0.074, 0.01, 0.0)), verts=e.verts)
-        me = bpy.data.meshes.new("ear")
-        e.to_mesh(me)
-        bm.from_mesh(me)
-        bpy.data.meshes.remove(me)
-        e.free()
-    bmesh.ops.translate(bm, vec=HEAD_C, verts=bm.verts)
-    me = bpy.data.meshes.new("head")
-    bm.to_mesh(me)
-    bm.free()
-    obj = bpy.data.objects.new("head", me)
-    bpy.context.collection.objects.link(obj)
-    sub = obj.modifiers.new("sub", "SUBSURF")
-    sub.levels = 1
-    apply_all(obj)
-    for p in obj.data.polygons:
-        p.use_smooth = True
-    piece("AccentHead", obj, ["head"])
-
-
-def head_uv(x, y, z):
-    """Cylindrical UVs of a point of the unit sphere: u 0.5 at the face, v from the chin (0) to the crown (1)."""
-    u = math.atan2(x, -y) / (2 * math.pi) + 0.5
-    w = math.asin(max(-1.0, min(1.0, z))) / math.pi + 0.5
-    return u, w
-
-
-def skin_map(path, n=512):
-    """The face's skin (a multiplier of the player's skin tone): warm cheeks and nose, darker lips, a shadow of
-    stubble on the jaw and upper lip, darker eye sockets, pores. Painted in the head's UV space (head_uv)."""
-    v, u = np.mgrid[0:n, 0:n].astype(np.float32) / n
-    v = 1.0 - v                                                           # image rows from the top
-    a = (u - 0.5) * 2 * np.pi
-    lat = (v - 0.5) * np.pi
-    x, y, z = np.sin(a) * np.cos(lat), -np.cos(a) * np.cos(lat), np.sin(lat)
-    front = np.clip(-y, 0, 1)
-    def g(cx, cz, wx, wz, mirror=False):
-        xx = np.abs(x) if mirror else x
-        return np.exp(-((xx - cx) / wx) ** 2 - ((z - cz) / wz) ** 2)
-    rng = np.random.default_rng(5)
-    pores = rng.random((n, n)).astype(np.float32)
-    rgb = np.ones((n, n, 3), np.float32) * (0.975 + 0.025 * pores[..., None])
-    warm = g(0.55, -0.12, 0.25, 0.2, True) * front + 0.8 * g(0.0, -0.12, 0.12, 0.1) * front ** 3
-    rgb *= 1 - warm[..., None] * np.array([-0.04, 0.1, 0.12])
-    lips = (g(0.0, -0.33, 0.28, 0.05) + g(0.0, -0.44, 0.24, 0.05)) * front ** 3
-    rgb *= 1 - np.clip(lips, 0, 1)[..., None] * np.array([0.12, 0.35, 0.32])
-    sock = g(0.34, 0.16, 0.2, 0.12, True) * front ** 2
-    rgb *= 1 - sock[..., None] * np.array([0.18, 0.2, 0.17])
-    stubble_zone = np.clip((-z - 0.25) * 2.5, 0, 1) * front ** 0.7 + g(0.0, -0.27, 0.35, 0.05) * front ** 2
-    stubble = np.clip(stubble_zone, 0, 1) * (0.6 + 0.4 * (rng.random((n, n)) > 0.5))
-    rgb *= 1 - stubble[..., None] * np.array([0.16, 0.16, 0.14])
-    rgb[v < 0.12] = 0.97                                                  # under the chin: plain (hands and neck use it too)
-    img = bpy.data.images.new("skin_face", n, n, alpha=False)
-    rgba = np.concatenate([np.clip(rgb, 0, 1), np.ones((n, n, 1), np.float32)], -1)
-    img.pixels.foreach_set(np.ascontiguousarray(rgba[::-1]).ravel())
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    img.filepath_raw = path
-    img.file_format = "PNG"
-    img.save()
-    bpy.data.images.remove(img)
-
-
-def mesh_obj(name, bm, smooth=True):
+    bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=rings, radius=face.EYE_R * HEAD_S)
+    bmesh.ops.rotate(bm, cent=Vector(), matrix=sdf_rot_x90(), verts=bm.verts)     # the poles to the front and the back
+    bmesh.ops.translate(bm, vec=Vector(c), verts=bm.verts)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
-    obj = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(obj)
-    for p in obj.data.polygons:
-        p.use_smooth = smooth
-    return obj
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
+    return o
 
 
-def hair_and_eyes():
-    """Short hair (a cap over the skull), eyebrows, irises (dark details) and the whites of the eyes (Sclera)."""
-    bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=28, radius=1.0)
-    drop = []
-    for v in bm.verts:
-        x, y, z = v.co
-        front = max(0.0, -y)
-        hairline = 0.38 + 0.25 * front ** 2 if y < 0 else -0.25 - 0.2 * max(0.0, y)
-        if abs(x) > 0.8 and y < 0.3:
-            hairline = max(hairline, 0.2)                       # above the ears
-        if z < hairline:
-            drop.append(v)
-        p = head_shape(x, y, z)
-        n = noise.noise(Vector((x, y, z)) * 9.0) * 0.006 + noise.noise(Vector((x, y, z)) * 3.0) * 0.004
-        grow = 0.007 + 0.014 * max(0.0, z) ** 1.5 + max(0.0, n)
-        if y < -0.2 and z > 0.35:                                       # a fringe falling over the forehead
-            grow += 0.006 * max(0.0, noise.noise(Vector((x * 14.0, 0.0, 0.0))))
-        v.co = p + p.normalized() * grow
-    bmesh.ops.delete(bm, geom=drop, context="VERTS")
-    for s in (-1, 1):                                           # eyebrows
-        bmesh.ops.create_cube(bm, size=1.0, matrix=Matrix.LocRotScale(
-            head_shape(s * 0.38, -0.9, 0.3) + Vector((0, -0.004, 0)), Euler((0, s * 0.1, 0)), Vector((0.03, 0.005, 0.005))))
-    eye_at = [head_shape(s * 0.34, -0.93, 0.16) + Vector((0, 0.008, 0)) for s in (-1, 1)]
-    for p in eye_at:                                            # irises, a little in front of the whites
-        bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=8, radius=0.0062,
-                                  matrix=Matrix.Translation(p + Vector((0, -0.0075, 0))))
-    bmesh.ops.translate(bm, vec=HEAD_C, verts=bm.verts)
-    piece("EyeDetails", mesh_obj("hair", bm), ["head"])
-    w = bmesh.new()
-    for p in eye_at:
-        bmesh.ops.create_uvsphere(w, u_segments=16, v_segments=10, radius=0.0118, matrix=Matrix.Translation(p))
-    bmesh.ops.translate(w, vec=HEAD_C, verts=w.verts)
-    piece("Sclera", mesh_obj("sclera", w), ["head"])
-    lids = bmesh.new()                                                  # eyelids: the upper lid over the top of the eye,
-    for p in eye_at:                                                    # a thin lower lid: a relaxed look, not a stare
-        lid = bmesh.new()
-        bmesh.ops.create_uvsphere(lid, u_segments=16, v_segments=12, radius=0.0128)
-        drop = [v for v in lid.verts if not (v.co.z > 0.002 or v.co.z < -0.0095) or v.co.y > 0.003]
-        bmesh.ops.delete(lid, geom=drop, context="VERTS")
-        bmesh.ops.rotate(lid, cent=Vector(), matrix=Matrix.Rotation(0.12, 3, "X"), verts=lid.verts)
-        bmesh.ops.translate(lid, vec=p, verts=lid.verts)
-        me = bpy.data.meshes.new("lid")
-        lid.to_mesh(me)
-        lids.from_mesh(me)
-        bpy.data.meshes.remove(me)
-        lid.free()
-    bmesh.ops.translate(lids, vec=HEAD_C, verts=lids.verts)
-    piece("AccentHead", mesh_obj("lids", lids), ["head"])
+def sdf_rot_x90():
+    from mathutils import Matrix
+    return Matrix.Rotation(math.pi / 2, 3, "X")
 
 
-# --------------------------------------------------------------------------- skeleton
+# --------------------------------------------------------------------------- painting
 
-BONES = [  # name, head, tail, parent
-    ("hips", (0, 0, 0.94), (0, 0, 1.06), None),
-    ("spine", (0, 0, 1.06), (0, 0.005, 1.24), "hips"),
-    ("chest", (0, 0.005, 1.24), (0, 0.015, 1.44), "spine"),
-    ("neck", (0, 0.02, 1.46), (0, 0.015, 1.56), "chest"),
-    ("head", (0, 0.015, 1.56), (0, 0.0, 1.78), "neck"),
-]
-for side, s in (("L", 1), ("R", -1)):
-    BONES += [
-        (f"shoulder.{side}", (s * 0.04, 0.02, 1.43), mirror(P["shoulder"], s), "chest"),
-        (f"upper_arm.{side}", mirror(P["shoulder"], s), mirror(P["elbow"], s), f"shoulder.{side}"),
-        (f"forearm.{side}", mirror(P["elbow"], s), mirror(P["wrist"], s), f"upper_arm.{side}"),
-        (f"hand.{side}", mirror(P["wrist"], s), mirror((0.258, -0.01, 0.72), s), f"forearm.{side}"),
-        (f"thigh.{side}", mirror(P["hip"], s), mirror(P["knee"], s), "hips"),
-        (f"shin.{side}", mirror(P["knee"], s), mirror(P["ankle"], s), f"thigh.{side}"),
-        (f"foot.{side}", mirror(P["ankle"], s), mirror(P["toe"], s), f"shin.{side}"),
-    ]
-
-
-def skeleton():
-    arm = bpy.data.armatures.new("Rig")
-    rig = bpy.data.objects.new("Rig", arm)
-    bpy.context.collection.objects.link(rig)
-    bpy.context.view_layer.objects.active = rig
-    rig.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    for name, h, t, parent in BONES:
-        b = arm.edit_bones.new(name)
-        b.head, b.tail = Vector(h), Vector(t)
-        b.roll = 0.0
-        if parent:
-            b.parent = arm.edit_bones[parent]
-            b.use_connect = False
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return rig
-
-
-def seg_dist(p, a, b):
-    ab = b - a
-    t = max(0.0, min(1.0, (p - a).dot(ab) / max(1e-9, ab.length_squared)))
-    return (a + ab * t - p).length
+def paint_head(p, person):
+    """The skin of the head as a multiplier of the player's skin tone: warm cheeks, nose and ears, the lips, shadows
+    round the eyes, lash lines, eyebrows, stubble, freckles."""
+    f = person.face
+    q = mx(p)
+    n = len(p)
+    rgb = np.ones((n, 3)) * (0.965 + 0.035 * build.noise(p, 900)[:, None])
+    near = lambda c, w: np.exp(-(np.linalg.norm(q - np.array(c), axis=1) / w) ** 2)
+    warm = 0.9 * near((0.046, -0.068, -0.030), 0.028) + 0.8 * near((0, -0.118, -0.033), 0.016) + 0.8 * near((0.078, 0.014, -0.004), 0.028) + 0.4 * near((0, -0.086, -0.094), 0.02)
+    rgb *= 1 - np.clip(warm, 0, 1)[:, None] * np.array([-0.02, 0.085, 0.10])
+    lip = np.clip(1 - face.lips(q, f) / 0.0009, 0, 1) * (p[:, 1] < -0.080)
+    k = person.lip_colour
+    rgb *= 1 - lip[:, None] * np.array([0.10 + 0.05 * k, 0.26 + 0.22 * k, 0.24 + 0.16 * k])
+    e = face.eye_centre(f)
+    socket = near((e[0], e[1] - 0.012, e[2] - 0.004), 0.021)
+    rgb *= 1 - socket[:, None] * (0.12 + person.eye_shadow) * np.array([0.34, 0.40, 0.34])
+    slit = face._slit(q, f)
+    lash = np.clip(1 - np.abs(slit - 0.0008) / 0.0019, 0, 1) ** 0.6 * np.where(q[:, 2] > e[2], 1.0 if f.female else 0.8, 0.4) * (p[:, 1] < e[1] - 0.004)
+    rgb *= 1 - lash[:, None]
+    # eyebrows: an arc of hair on the brow ridge, thicker towards the nose
+    t = np.clip((q[:, 0] - 0.008) / 0.040, 0, 1)
+    arc = 0.0235 + 0.0050 * np.sin(np.pi * np.minimum(1.0, t * 1.25)) - 0.006 * t * t + (0.0025 if f.female else 0.0)
+    half = (0.0066 - 0.0036 * t) * person.brow_thick
+    hairs = 0.75 + 0.25 * np.sin(q[:, 0] * 2600 + q[:, 2] * 1400)
+    brow = np.clip(1.6 * (1 - np.abs(q[:, 2] - arc) / half), 0, 1) * (q[:, 0] > 0.006) * (q[:, 0] < 0.051) * (p[:, 1] < -0.06) * hairs
+    dark = np.array(person.brow_colour or person.hair_colour) * 0.55
+    rgb = rgb * (1 - brow[:, None]) + np.clip(dark / np.array((0.8, 0.6, 0.5)), 0, 1)[None, :] * brow[:, None] * 0.32
+    if person.stubble or person.beard:
+        # the shadow of shaved hair (or of the beard's thin edge): where a beard would grow, fading out past its outline
+        zone = np.maximum(face.beard_zone(q, f), face.moustache_zone(q, f))
+        amount = np.clip((zone + 0.010) / 0.012, 0, 1) * (1 - lip) * (0.6 + 0.4 * build.speckle(p, 2200, 0.55))
+        rgb *= 1 - amount[:, None] * max(person.stubble, 0.5 if person.beard else 0.0) * np.array([0.42, 0.38, 0.33])
+    if person.freckles:
+        zone = np.clip(near((0.030, -0.075, -0.018), 0.030) + near((0, -0.105, -0.015), 0.018), 0, 1)
+        rgb *= 1 - (zone * build.speckle(p, 1500, 0.16, 3) * person.freckles)[:, None] * np.array([0.10, 0.22, 0.30])
+    gloss = 0.36 + 0.16 * near((0, -0.105, -0.020), 0.03) + 0.10 * near((0, -0.085, 0.05), 0.04) + 0.25 * lip
+    return rgb, gloss
 
 
-def bind(rig):
-    """Weights by distance to the piece's own bones (smooth falloff), then the pieces of each part are joined."""
-    bones = {b.name: (b.head_local.copy(), b.tail_local.copy()) for b in rig.data.bones}
-    by_part = {}
-    for part, obj, allowed in pieces:
+def paint_hand(p, normals):
+    W, D, N = J["wrist"], body.HAND_D, body.HAND_N
+    along = (p - W) @ D
+    back = np.clip(-(normals @ N), 0, 1)                         # the back of the hand faces away from the palm
+    rgb = np.ones((len(p), 3)) * (0.965 + 0.035 * build.noise(p, 900)[:, None])
+    knuckle = gauss(along - 0.094, 0.012) * back
+    rgb *= 1 - knuckle[:, None] * np.array([0.0, 0.08, 0.09])
+    palm = np.clip(normals @ N, 0, 1) * win(along, 0.0, 0.2, 0.02)
+    rgb *= 1 - palm[:, None] * np.array([-0.02, 0.05, 0.06])       # the palm is pinker
+    return rgb, 0.34 + 0.08 * back
+
+
+def paint_eye(p, person):
+    """An eyeball looking forward (-y): the iris with its fibres and dark rim, the pupil, a white with red corners."""
+    r = np.hypot(p[:, 0], p[:, 2])
+    front = p[:, 1] < 0
+    a = np.arctan2(p[:, 2], p[:, 0])
+    iris_r, pupil_r = 0.0058, 0.0021
+    white = np.array((0.86, 0.84, 0.81))[None, :] * (1 - 0.25 * np.clip((r - 0.008) / 0.004, 0, 1))[:, None] * np.array((1.0, 0.93, 0.92))[None, :] ** np.clip((r - 0.007) / 0.004, 0, 1)[:, None]
+    fibres = 0.75 + 0.25 * np.sin(a * 36 + 3 * np.sin(a * 7))
+    ring = np.clip((r - iris_r * 0.8) / (iris_r * 0.2), 0, 1)
+    iris = np.array(person.iris)[None, :] * (fibres * (1.15 - 0.5 * ring) * (0.6 + 0.6 * np.clip((r - pupil_r) / (iris_r - pupil_r), 0, 1)))[:, None]
+    rgb = np.where(((r < iris_r) & front)[:, None], iris, white)
+    rgb = np.where(((r < pupil_r) & front)[:, None], 0.01, rgb)
+    return rgb, np.where(front, 0.92, 0.6)
+
+
+def paint_hair(p, person, shade):
+    locks = face._strands(p)
+    streak = 0.82 + 0.3 * locks + 0.12 * (build.noise(p * (6, 1, 1), 500) - 0.5)
+    rgb = np.array(person.hair_colour)[None, :] * (streak * shade)[:, None]
+    return rgb, 0.20 + 0.12 * locks
+
+
+def paint_beard(p, person):
+    """Short dense hairs: the hair's colour a shade darker, mottled finely, a little lighter and thinner where it fades
+    into the cheek; matte."""
+    q = mx(p)
+    inside = np.maximum(face.beard_zone(q, person.face), face.moustache_zone(q, person.face))
+    dense = np.clip(inside / 0.010, 0.25, 1.0)
+    grain = 0.78 + 0.30 * build.speckle(p, 2600, 0.5, 5) + 0.12 * (build.noise(p, 700) - 0.5)
+    rgb = np.array(person.hair_colour)[None, :] * (0.86 * grain * (0.75 + 0.25 * dense))[:, None]
+    return rgb, 0.18 + 0.08 * build.noise(p, 900)
+
+
+def paint_cloth(p, colour, gloss, weave=0.05, wear=None):
+    """Cloth of one colour: mottled a little, darker in the weave's direction."""
+    k = 1 - weave + 2 * weave * build.noise(p, 260)
+    if wear is not None:
+        k = k * (1 + wear)
+    return np.array(colour)[None, :] * k[:, None], gloss
+
+
+def paint_trousers(p, normals, colour):
+    q = mx(p)
+    H, Kn = J["hip"], J["knee"]
+    front = np.clip(-normals[:, 1], 0, 1)
+    wear = 0.22 * front * gauss(q[:, 2] - 0.72, 0.16) + 0.14 * np.clip(-normals[:, 1], 0, 1) * gauss(q[:, 2] - 0.5, 0.05)      # faded on the thighs and the knees
+    seam = gauss(np.abs(normals[:, 0]) - 1.0, 0.18) * gauss(q[:, 1] - 0.012, 0.004) * (q[:, 2] < 0.98)                         # the side seam
+    fly = gauss(q[:, 0] - 0.012, 0.0022) * front * win(q[:, 2], 0.90, 1.01, 0.01)
+    pocket = gauss(np.hypot(q[:, 0] - 0.165, q[:, 2] - 1.02) - 0.085, 0.0022) * front * (q[:, 2] > 0.93) * (q[:, 0] < 0.165)
+    stitch = np.clip(seam + fly + pocket, 0, 1)
+    rgb, gloss = paint_cloth(p, colour, 0.14, 0.06, wear)
+    rgb = rgb * (1 - 0.35 * stitch[:, None])
+    band = q[:, 2] > 1.003
+    rgb = np.where(band[:, None], rgb * 0.82, rgb)
+    rgb *= (1 - 0.3 * gauss(q[:, 0], 0.0025) * win(q[:, 2], 0.80, 0.99, 0.01))[:, None]            # the seam between the legs
+    return rgb, gloss
+
+
+def paint_shoe(p, fit):
+    sole_h = {"sneaker": 0.026, "boot": 0.030, "flat": 0.018}[fit["shoe"]]
+    z = p[:, 2]
+    upper = np.array(fit["shoe_colour"])[None, :] * (0.9 + 0.2 * build.noise(p, 300))[:, None]
+    sole = np.array(fit["sole"])[None, :] * np.ones((len(p), 1))
+    rgb = np.where((z < sole_h + 0.002)[:, None], sole, upper)
+    if fit["shoe"] != "flat":
+        lace = (np.abs(p[:, 0] - 0.103) < 0.024) & (p[:, 1] < -0.04) & (p[:, 1] > -0.13) & (z > 0.058) & (np.sin((p[:, 1]) * 300) > 0.55)
+        rgb = np.where(lace[:, None], np.clip(rgb * 0.4 + 0.5, 0, 1) if fit["shoe"] == "sneaker" else rgb * 0.5, rgb)
+        toe = (p[:, 1] < -0.15) & (z > sole_h)
+        rgb = np.where(toe[:, None] & (fit["shoe"] == "sneaker"), np.clip(rgb * 1.08, 0, 1), rgb)
+    gloss = np.where(z < sole_h + 0.002, 0.3, 0.5 if fit["shoe"] != "sneaker" else 0.28)
+    return rgb, gloss
+
+
+def paint_top(p, who, fit):
+    """The department's garment: white (the game tints it), its seams, ribs and pocket a shade darker."""
+    q = mx(p)
+    k = np.ones(len(p))
+    hem, rib = fit["top"].get("hem", 0.99), fit["top"].get("rib", 0.0)
+    if rib:
+        ribs = 0.86 + 0.08 * np.sin(np.arctan2(q[:, 1], q[:, 0]) * 150)
+        k = np.where(q[:, 2] < hem + rib, ribs, k)
+        W, E = J["wrist"], J["elbow"]
+        axis = (W - E) / np.linalg.norm(W - E)
+        cuff = ((q - W) @ axis > -rib) & (q[:, 0] > 0.3)
+        k = np.where(cuff, 0.86 + 0.08 * np.sin((q @ np.cross(axis, (0, 1.0, 0))) * 900), k)
+    if who == "backend":
+        pocket = (np.abs(q[:, 2] - 1.07) < 0.062) & (q[:, 0] < 0.115 - 0.3 * np.abs(q[:, 2] - 1.07)) & (p[:, 1] < 0)
+        edge = pocket & ~((np.abs(q[:, 2] - 1.07) < 0.057) & (q[:, 0] < 0.110 - 0.3 * np.abs(q[:, 2] - 1.07)))
+        k = np.where(edge, 0.62, np.where(pocket, 0.96, k))
+        seam = gauss(q[:, 0], 0.0016) * (p[:, 1] < 0) * (q[:, 2] > 1.14) * (q[:, 2] < 1.46)          # the zip's line
+        k = k * (1 - 0.4 * seam)
+    if who in ("qa", "scientist"):
+        placket = (q[:, 0] < 0.014) & (p[:, 1] < 0) & (q[:, 2] < 1.46)
+        k = np.where(placket & (q[:, 0] > 0.0115), 0.75, k)                                          # the placket's stitched edge
+        button = (np.hypot(q[:, 0], (q[:, 2] - 1.06) % 0.085 - 0.0425) < 0.0055) & (p[:, 1] < 0) & (q[:, 2] < 1.44) & (q[:, 2] > 1.03)
+        k = np.where(button, 0.55, k)
+    if who == "designer":
+        knit = 0.93 + 0.07 * np.sin(q[:, 2] * 700) * np.sin(np.arctan2(q[:, 1], q[:, 0] - 0.0) * 90)   # a chunky knit
+        k = k * knit
+    armhole = gauss(np.linalg.norm(q - np.array((J["shoulder"][0] - 0.012, 0.02, J["shoulder"][2] - 0.01)), axis=1) - 0.078, 0.0018)
+    k = k * (1 - 0.25 * armhole)                                                                     # the sleeve's seam
+    k = k * (0.97 + 0.06 * build.noise(p, 240))
+    gloss = {"backend": 0.10, "designer": 0.08}.get(who, 0.2)
+    return np.repeat(np.clip(k, 0, 1)[:, None], 3, 1), gloss
+
+
+def paint_vest(p):
+    q = mx(p)
+    k = 0.97 + 0.06 * build.noise(p, 240)
+    zipper = (q[:, 0] < 0.008) & (p[:, 1] < 0)
+    k = np.where(zipper, 0.45, k)
+    for z0, w, h in ((1.275, 0.042, 0.042), (1.095, 0.05, 0.05)):                                    # two chest pockets, two hip pockets
+        dx, dz = np.abs(q[:, 0] - 0.088), np.abs(q[:, 2] - z0)
+        box_ = (dx < w) & (dz < h) & (p[:, 1] < 0)
+        edge = box_ & ~((dx < w - 0.004) & (dz < h - 0.004))
+        flap = box_ & (q[:, 2] > z0 + h * 0.45)
+        k = np.where(edge, 0.6, np.where(flap, 0.88, k))
+    hems = gauss(np.abs(clothes_edge(q)), 0.004)
+    return np.repeat(np.clip(k * (1 - 0.2 * hems), 0, 1)[:, None], 3, 1), 0.16
+
+
+def clothes_edge(q):
+    return q[:, 2] - 1.012
+
+
+# --------------------------------------------------------------------------- assembling the game model
+
+def assemble(pieces, who):
+    """Cuts every piece to its budget, unwraps and packs the atlases, bakes, skins and joins the parts. Returns the rig
+    and the game's part objects."""
+    t = time.time()
+    for p in pieces:
+        if p.lo is None:
+            build.lowpoly(p)
+            build.clean(p.lo)
+            build.orient_like(p.lo, p.hi)
+        build.unwrap(p)
+    print(f"LOWPOLY {sum(sdf.tri_count(p.lo) for p in pieces)} tris in {len(pieces)} pieces, {time.time() - t:.1f} s")
+    for atlas, size in (("skin", 1024), ("outfit", 2048)):
+        group = [p for p in pieces if p.atlas == atlas]
+        build.pack(group)
+        t = time.time()
+        build.bake(group, size if not DRAFT else size // 2, TEXTURES, f"human_{who}_{atlas}")
+        print(f"BAKED {atlas}: {len(group)} pieces, {time.time() - t:.1f} s")
+    rig = anim.skeleton()
+    bones = anim.bone_segments()
+    seg = {n: (np.array(a), np.array(b)) for n, (a, b) in bones.items()}
+    parts = {}
+    for p in pieces:
         for name in bones:
-            obj.vertex_groups.new(name=name)
-        for v in obj.data.vertices:
-            ds = sorted((seg_dist(v.co, *bones[n]), n) for n in allowed)[:3]
-            ws = [1.0 / max(d, 0.01) ** 6 for d, _ in ds]
-            tot = sum(ws)
-            for (d, n), w in zip(ds, ws):
-                if w / tot > 0.01:
-                    obj.vertex_groups[n].add([v.index], w / tot, "REPLACE")
-        by_part.setdefault(part, []).append(obj)
-    result = []
-    for part, objs in by_part.items():
+            p.lo.vertex_groups.new(name=name)
+        build.assign(p.lo, build.weights(sdf.points_of(p.lo), seg, p.bones, RADIUS))
+        parts.setdefault(p.part, []).append(p.lo)
+    out = []
+    errors = 0
+    for part, objs in parts.items():
         bpy.ops.object.select_all(action="DESELECT")
         for o in objs:
             o.select_set(True)
@@ -558,228 +615,152 @@ def bind(rig):
         if len(objs) > 1:
             bpy.ops.object.join()
         obj = bpy.context.view_layer.objects.active
-        obj.name = part
-        obj.data.name = part
+        obj.name = obj.data.name = part
+        obj.data.uv_layers.active.name = "UVMap"
+        errors += build.audit(obj)
         obj.parent = rig
         mod = obj.modifiers.new("Rig", "ARMATURE")
         mod.object = rig
-        result.append(obj)
-    return result
+        out.append(obj)
+    print(f"TOPO total: {sum(sdf.tri_count(o) for o in out)} tris, {errors} errors")
+    return rig, out, errors
 
 
-# --------------------------------------------------------------------------- animation
-
-def forward_sign(rig, bone, axis="X"):
-    """+1 if a positive rotation about the bone's local axis swings its tail to the front (-Y), else -1."""
-    pb = rig.pose.bones[bone]
-    pb.rotation_mode = "XYZ"
-    before = (rig.matrix_world @ pb.tail).y
-    setattr(pb.rotation_euler, axis.lower(), 0.3)
-    bpy.context.view_layer.update()
-    after = (rig.matrix_world @ pb.tail).y
-    pb.rotation_euler = (0, 0, 0)
-    bpy.context.view_layer.update()
-    return 1.0 if after < before else -1.0
+def hide_sculpts(pieces):
+    for p in pieces:
+        for h in (p.hi if isinstance(p.hi, (list, tuple)) else [p.hi]):
+            h.hide_render = True
+            h.hide_viewport = True
 
 
-def outward_sign(rig, bone, side):
-    """+1 if a positive rotation about local Z (bone roll axis) moves the tail away from the body (|x| grows)."""
-    pb = rig.pose.bones[bone]
-    pb.rotation_mode = "XYZ"
-    before = abs((rig.matrix_world @ pb.tail).x)
-    pb.rotation_euler.z = 0.3
-    bpy.context.view_layer.update()
-    after = abs((rig.matrix_world @ pb.tail).x)
-    pb.rotation_euler = (0, 0, 0)
-    bpy.context.view_layer.update()
-    return 1.0 if after > before else -1.0
+def preview_material(obj, who, tint):
+    """Principled with the baked maps (what the game's Lit material does with them), tinted like PlayerLooks would."""
+    atlas = "skin" if obj.name in ("AccentHead", "Sclera") else "outfit"
+    mat = bpy.data.materials.new("preview_" + obj.name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+
+    def tex(suffix, data):
+        n = nt.nodes.new("ShaderNodeTexImage")
+        n.image = bpy.data.images.load(os.path.join(TEXTURES, f"human_{who}_{atlas}_{suffix}.png"), check_existing=True)
+        if data:
+            n.image.colorspace_settings.name = "Non-Color"
+        return n
+    base, nrm, mask = tex("base", False), tex("normal", True), tex("mask", True)
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.blend_type = "MULTIPLY"
+    mix.inputs[0].default_value = 1.0
+    nt.links.new(base.outputs["Color"], mix.inputs[6])
+    mix.inputs[7].default_value = (*tint, 1)
+    nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
+    nm = nt.nodes.new("ShaderNodeNormalMap")
+    nt.links.new(nrm.outputs["Color"], nm.inputs["Color"])
+    nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    inv = nt.nodes.new("ShaderNodeInvert")
+    nt.links.new(mask.outputs["Alpha"], inv.inputs["Color"])
+    nt.links.new(inv.outputs["Color"], bsdf.inputs["Roughness"])
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+    obj.color = (*tint, 1)
 
 
-def animate(rig):
-    fwd = {b.name: forward_sign(rig, b.name) for b in rig.pose.bones}
-    out = {b.name: outward_sign(rig, b.name, b.name[-1]) for b in rig.pose.bones if b.name.endswith((".L", ".R"))}
-    rig.animation_data_create()
-    for pb in rig.pose.bones:
-        pb.rotation_mode = "XYZ"
-
-    def key(action, frames, pose_fn):
-        """Keys every bone at the frames with the pose returned by pose_fn(t in 0..1)."""
-        act = bpy.data.actions.new(action)
-        act.use_fake_user = True
-        rig.animation_data.action = act
-        for f in range(frames + 1):
-            t = f / frames
-            for pb in rig.pose.bones:
-                pb.rotation_euler = (0, 0, 0)
-                pb.location = (0, 0, 0)
-            pose_fn(t)
-            for pb in rig.pose.bones:
-                pb.keyframe_insert("rotation_euler", frame=f + 1)
-                pb.keyframe_insert("location", frame=f + 1)
-        return act
-
-    def rot(bone, forward=0.0, outward=0.0, twist=0.0):
-        pb = rig.pose.bones[bone]
-        e = pb.rotation_euler
-        e.x += math.radians(forward) * fwd[bone]
-        if outward:
-            e.z += math.radians(outward) * out.get(bone, 1.0)
-        if twist:
-            e.y += math.radians(twist)
-
-    def lower(dz):
-        # hips bone points up: its local Y is world Z
-        rig.pose.bones["hips"].location = (0, dz, 0)
-
-    def arms_down():
-        for s in ("L", "R"):
-            rot(f"upper_arm.{s}", outward=-4)
-
-    def idle(t):
-        b = math.sin(t * 2 * math.pi)
-        arms_down()
-        rot("chest", forward=1.2 * b)
-        rot("spine", forward=0.6 * b)
-        rot("head", forward=-1.0 * b)
-        for s in ("L", "R"):
-            rot(f"upper_arm.{s}", forward=1.5 * b)
-            rot(f"forearm.{s}", forward=8)
-
-    def cycle(t, stride, knee, arm, elbow, lean, bob, crouch=0.0):
-        ph = t * 2 * math.pi
-        lower(-crouch + bob * (abs(math.cos(ph)) - 1.0))
-        rot("spine", forward=lean * 0.5)
-        rot("chest", forward=lean * 0.5)
-        rot("head", forward=-lean * 0.7)
-        rot("hips", twist=4 * math.sin(ph))
-        rot("chest", twist=-6 * math.sin(ph))
-        arms_down()
-        for s, sgn in (("L", 1.0), ("R", -1.0)):
-            ph_s = ph + (0 if sgn > 0 else math.pi)
-            swing = math.sin(ph_s)
-            lift = max(0.0, -math.cos(ph_s))                    # the leg in the air bends its knee
-            base_thigh = crouch * 160
-            rot(f"thigh.{s}", forward=stride * swing + base_thigh)
-            rot(f"shin.{s}", forward=-(knee * lift + 6 + crouch * 300))
-            rot(f"foot.{s}", forward=-0.4 * stride * swing + crouch * 140)
-            rot(f"upper_arm.{s}", forward=-arm * swing)
-            rot(f"forearm.{s}", forward=elbow + 0.4 * arm * max(0.0, -swing))
-
-    def walk(t):
-        cycle(t, stride=24, knee=45, arm=16, elbow=12, lean=3, bob=0.025)
-
-    def run(t):
-        cycle(t, stride=42, knee=95, arm=30, elbow=50, lean=12, bob=0.05)
-
-    def crouch_idle(t):
-        b = math.sin(t * 2 * math.pi)
-        lower(-0.38)
-        rot("spine", forward=18)
-        rot("chest", forward=12 + b)
-        rot("head", forward=-25)
-        arms_down()
-        for s in ("L", "R"):
-            rot(f"thigh.{s}", forward=80)
-            rot(f"shin.{s}", forward=-120)
-            rot(f"foot.{s}", forward=40)
-            rot(f"upper_arm.{s}", forward=25)
-            rot(f"forearm.{s}", forward=55)
-
-    def crouch_walk(t):
-        cycle(t, stride=18, knee=30, arm=10, elbow=55, lean=0, bob=0.015, crouch=0.0)
-        lower(-0.38)
-        rot("spine", forward=18)
-        rot("chest", forward=12)
-        rot("head", forward=-25)
-        for s, sgn in (("L", 1.0), ("R", -1.0)):
-            rot(f"thigh.{s}", forward=80)
-            rot(f"shin.{s}", forward=-120)
-            rot(f"foot.{s}", forward=40)
-            rot(f"upper_arm.{s}", forward=25)
-
-    def down(t):
-        # lying on the back: the whole body rotated about the hips, limbs loose
-        hips = rig.pose.bones["hips"]
-        hips.rotation_euler.x += math.radians(-88) * fwd["hips"]
-        lower(-0.82)
-        for s in ("L", "R"):
-            rot(f"upper_arm.{s}", outward=-35)
-            rot(f"forearm.{s}", forward=20)
-            rot(f"thigh.{s}", forward=10)
-            rot(f"shin.{s}", forward=-15)
-        rot("head", forward=10 + 2 * math.sin(t * 2 * math.pi))
-
-    acts = [key("Idle", 60, idle), key("Walk", 30, walk), key("Run", 20, run), key("CrouchIdle", 60, crouch_idle),
-            key("CrouchWalk", 36, crouch_walk), key("Down", 60, down)]
-    rig.animation_data.action = None
-    for pb in rig.pose.bones:
-        pb.rotation_euler = (0, 0, 0)
-        pb.location = (0, 0, 0)
-    # every action as an NLA strip so the exporter writes one take per action
-    for a in acts:
-        tr = rig.animation_data.nla_tracks.new()
-        tr.name = a.name
-        tr.strips.new(a.name, 1, a)
-        tr.mute = True
-    return acts
+TINTS = {"backend": (0.22, 0.24, 0.30), "qa": (0.85, 0.87, 0.90), "sysadmin": (0.45, 0.43, 0.32), "designer": (0.62, 0.52, 0.46), "scientist": (0.8, 0.8, 0.78)}
+SKIN = {"backend": (0.93, 0.76, 0.62), "qa": (0.96, 0.82, 0.70), "sysadmin": (0.78, 0.58, 0.44), "designer": (0.55, 0.38, 0.28), "scientist": (0.93, 0.76, 0.62)}
+TEAM = {"backend": (0.95, 0.55, 0.2), "qa": (0.6, 0.9, 0.3), "sysadmin": (0.3, 0.7, 0.95), "designer": (0.9, 0.4, 0.8), "scientist": (0.95, 0.55, 0.2)}
 
 
-# --------------------------------------------------------------------------- export / preview
-
-def preview(rig, acts, path):
-    """Workbench render: the six takes side by side at a quarter of their cycle."""
+def previews(rig, parts, acts, who, path):
+    """Contact sheets: the lit game model (EEVEE, the baked maps), its face and hands, and every take."""
     s = bpy.context.scene
-    objs = [o for o in s.objects if o.type == "MESH"]
-    cols = {"BodyClothes": (0.22, 0.25, 0.3), "Coat": (0.78, 0.77, 0.7), "AccentHead": (0.85, 0.66, 0.54),
-            "AccentBand": (0.95, 0.55, 0.2), "EyeDetails": (0.06, 0.05, 0.05), "Sclera": (0.85, 0.83, 0.78)}
-    for o in objs:
-        o.color = (*cols.get(o.name, (1, 0, 1)), 1)
-    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
-    s.collection.objects.link(cam)
-    cam.location = (0.35, -3.2, 1.1)
-    cam.rotation_euler = (math.radians(88), 0, math.radians(6))
-    cam.data.lens = 50
-    s.camera = cam
-    s.render.engine = "BLENDER_WORKBENCH"
-    s.display.shading.color_type = "OBJECT"
-    s.display.shading.light = "STUDIO"
-    s.display.shading.show_cavity = True
-    s.render.resolution_x, s.render.resolution_y = 600, 900
+    for o in parts:
+        tint = SKIN[who] if o.name == "AccentHead" else TINTS[who] if o.name.startswith("Body") else TEAM[who] if o.name.startswith("Accent") \
+            else (0.06, 0.06, 0.07) if o.name.startswith("Eye") else (1, 1, 1)
+        preview_material(o, who, tint)
+    for name, loc, energy in (("key", (2.0, -3.0, 3.2), 230), ("fill", (-2.5, -2.0, 1.6), 60), ("rim", (0.5, 3.0, 2.6), 140)):
+        light = bpy.data.objects.new(name, bpy.data.lights.new(name, "AREA"))
+        light.data.energy = energy
+        light.data.size = 2.0
+        light.location = loc
+        light.rotation_euler = (Vector((0, 0, 1.2)) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+        s.collection.objects.link(light)
     base, ext = os.path.splitext(path)
+    try:
+        view.sheet(base + "_lit" + ext, parts, shots=view.FULL, engine="BLENDER_EEVEE")
+        view.sheet(base + "_lit_face" + ext, parts, shots=view.FACE + view.BUST[:1], width=460, engine="BLENDER_EEVEE")
+    except Exception as ex:                                                  # (no GPU in this session: the Workbench sheets remain)
+        print("PREVIEW eevee failed:", ex)
+    view.sheet(base + "_mesh" + ext, parts, shots=view.FULL, color="TEXTURE")
+    view.sheet(base + "_face" + ext, parts, shots=view.FACE + view.HANDS, width=400, color="TEXTURE")
+    tiles = []
     for a in acts:
         rig.animation_data.action = a
-        s.frame_set(int(a.frame_range[1] * 0.25) + 1)
-        s.render.filepath = f"{base}_{a.name}{ext}"
-        bpy.ops.render.render(write_still=True)
-    # a close-up of the face
-    rig.animation_data.action = acts[0]
-    s.frame_set(1)
-    cam.location = (0.12, -0.55, 1.66)
-    cam.rotation_euler = (math.radians(90), 0, math.radians(12))
-    s.render.filepath = f"{base}_Face{ext}"
-    bpy.ops.render.render(write_still=True)
+        n = int(a.frame_range[1])
+        for share in (0.0, 0.25, 0.5):
+            s.frame_set(1 + int((n - 1) * share))
+            tmp = f"{base}_take_{a.name}_{int(share * 100)}{ext}"
+            view.sheet(tmp, parts, shots=[("3/4", (0.75, -0.66, 0.15), (0, 0, 0.9), 2.0)], width=300, height=560, color="TEXTURE")
+            tiles.append(tmp)
     rig.animation_data.action = None
+    s.frame_set(1)
+    rows = []
+    for i in range(0, len(tiles), 6):
+        imgs = [bpy.data.images.load(t) for t in tiles[i:i + 6]]
+        px = [np.array(im.pixels[:], np.float32).reshape(im.size[1], im.size[0], 4) for im in imgs]
+        rows.append(np.concatenate(px, 1))
+        for im in imgs:
+            bpy.data.images.remove(im)
+    w = max(r.shape[1] for r in rows)
+    sheet = np.concatenate([np.pad(r, ((0, 0), (0, w - r.shape[1]), (0, 0)), constant_values=0.2) for r in rows[::-1]], 0)
+    out = bpy.data.images.new("_takes", sheet.shape[1], sheet.shape[0], alpha=False)
+    out.pixels.foreach_set(sheet.ravel())
+    out.filepath_raw = base + "_takes" + ext
+    out.file_format = "PNG"
+    out.save()
+    for t in tiles:
+        os.remove(t)
 
 
-def export(rig):
+def export(rig, parts, who):
     os.makedirs(OUT, exist_ok=True)
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, "human_scientist.fbx"), use_selection=True,
-                             apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=False,
-                             object_types={"ARMATURE", "MESH"}, use_mesh_modifiers=True, mesh_smooth_type="FACE",
-                             add_leaf_bones=False, use_armature_deform_only=True, bake_anim=True,
-                             bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False, bake_anim_force_startend_keying=True,
-                             bake_anim_simplify_factor=0.0)
+    for o in parts:
+        o.data.materials.clear()
+    if STATIC:
+        bpy.ops.object.select_all(action="DESELECT")
+        for o in parts:
+            o.select_set(True)
+        bpy.ops.export_scene.fbx(filepath=STATIC, use_selection=True, axis_forward="-Z", axis_up="Y", bake_space_transform=True,
+                                 object_types={"MESH"}, use_mesh_modifiers=False, bake_anim=False, apply_scale_options="FBX_SCALE_ALL",
+                                 mesh_smooth_type="FACE")
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    for o in parts:
+        o.select_set(True)
+    bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, f"human_{who}.fbx"), use_selection=True, apply_scale_options="FBX_SCALE_ALL",
+                             axis_forward="-Z", axis_up="Y", bake_space_transform=False, object_types={"ARMATURE", "MESH"},
+                             use_mesh_modifiers=True, mesh_smooth_type="FACE", use_tspace=False, add_leaf_bones=False,
+                             use_armature_deform_only=True, bake_anim=True, bake_anim_use_all_actions=True,
+                             bake_anim_use_nla_strips=False, bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0)
 
 
 if __name__ == "__main__":
-    clear()
-    skin_map(SKIN_MAP)
-    body_clothes(); coat(); armband(); skin_parts(); boots(); head(); hair_and_eyes()
-    rig = skeleton()
-    bind(rig)
-    acts = animate(rig)
+    t0 = time.time()
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.scene.render.fps = anim.FPS
+    pieces = figure(WHO)
+    print(f"SCULPTED {WHO} in {time.time() - t0:.1f} s")
     if PREVIEW:
-        preview(rig, acts, PREVIEW)
-    export(rig)
-    print("DONE")
+        cols = {"AccentHead": SKIN[WHO], "BodyClothes": TINTS[WHO], "AccentBand": TEAM[WHO], "EyeDetails": (0.06, 0.06, 0.07), "Sclera": (0.9, 0.9, 0.88)}
+        for p in pieces:
+            p.hi.color = (*cols.get(p.part, (0.5, 0.5, 0.52)), 1)
+        base, ext = os.path.splitext(PREVIEW)
+        view.sheet(base + "_sculpt" + ext, [p.hi for p in pieces], shots=view.FULL)
+        view.sheet(base + "_sculpt_face" + ext, [p.hi for p in pieces], shots=view.FACE + view.BUST[:1], width=460)
+    rig, parts, errors = assemble(pieces, WHO)
+    hide_sculpts(pieces)
+    acts = anim.animate(rig)
+    if PREVIEW:
+        previews(rig, parts, acts, WHO, PREVIEW)
+    export(rig, parts, WHO)
+    print(f"DONE {WHO} in {time.time() - t0:.1f} s" + (f" WITH {errors} TOPOLOGY ERRORS" if errors else ""))

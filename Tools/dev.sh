@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Dev loop helpers (Git Bash on Windows). Usage:
-#   Tools/dev.sh tests            compile + EditMode tests (FILTER=<name>: only those)
+#   Tools/dev.sh tests            compile + EditMode tests without the [Category("Slow")] ones (SLOW=1: all of them;
+#                                FILTER=<name>: only those, slow or not)
 #   Tools/dev.sh plans            pictures of floor plans: Logs/plans/plan_<seed>_<house>.png
 #   Tools/dev.sh assets           build missing assets (FORCE=1: regenerate everything from code)
 #   Tools/dev.sh player           build Windows player
 #   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario> (SEEDS=7,42,3: one window per seed, at once)
 #   Tools/dev.sh cycle           ONE Unity launch: missing assets + EditMode tests + development player (scripts only when
-#                                only code changed). FILTER / FORCE / REBUILD as above; NOASSETS / NOTESTS / NOPLAYER / FULL = 1
+#                                only code changed). FILTER / SLOW / FORCE / REBUILD as above; NOASSETS / NOTESTS / NOPLAYER / FULL = 1
 set -u
 UNITY="${UNITY:-/d/Apps/Unity/Hub/Editor/6000.6.0f1/Editor/Unity.exe}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,8 +18,10 @@ mkdir -p "$LOGS"
 case "${1:-}" in
   tests)
     rm -f "$LOGS/tests.xml"
+    category=()
+    [ -z "${FILTER:-}" ] && [ "${SLOW:-}" != "1" ] && category=(-testCategory '!Slow')
     "$UNITY" -batchmode -nographics -projectPath "$P" -runTests -testPlatform EditMode \
-      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log" ${FILTER:+-testFilter "$FILTER"}
+      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log" ${FILTER:+-testFilter "$FILTER"} "${category[@]}"
     code=$?
     grep -E "error CS" "$LOGS/tests.log" | sort -u | head -30
     PYTHONIOENCODING=utf-8 python - "$LOGS/tests.xml" <<'EOF'
@@ -60,7 +63,7 @@ EOF
     scenario="${2:-full}"; clients="${3:-0}"
     if [ -n "${SEEDS:-}" ] && [ "$clients" -eq 0 ]; then
       # one quiet window per seed, all at once: shots in Builds/shots/<scenario>_<seed>, logs in Builds/host_<seed>.log
-      exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+      exe="$ROOT/Builds/Windows/USG.exe"
       pids=()
       port=7790
       for seed in ${SEEDS//,/ }; do
@@ -79,7 +82,7 @@ EOF
     fi
     shots="$P/Builds/shots/$scenario"
     rm -rf "$ROOT/Builds/shots/$scenario"; mkdir -p "$ROOT/Builds/shots/$scenario"
-    exe="$ROOT/Builds/Windows/StealthPrototype.exe"
+    exe="$ROOT/Builds/Windows/USG.exe"
     rm -f "$ROOT"/Builds/client*.log
     linger=""; [ "$clients" -gt 0 ] && linger="-autotest-linger"
     cscenario="client"; [ "$scenario" != "full" ] && cscenario="$scenario"

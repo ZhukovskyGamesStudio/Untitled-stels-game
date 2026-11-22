@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.LevelConfig
   Building:
     FloorsPerHouse: 020000000200000003000000030000000300000004000000i
-    BaseRooms: 6
-    RoomsPerHouse: 2.5
-    MaxRooms: 36
+    BaseRooms: 9
+    RoomsPerHouse: 3.5
+    MaxRooms: 54
     AreaByPlayers:
     - 1
     - 1.25
@@ -86,18 +86,21 @@ MonoBehaviour:
       Robots:
       - Kind: 0
         MinLevel: 0
-        Weight: 5
+        Weight: 2
       - Kind: 1
         MinLevel: 0
-        Weight: 3
+        Weight: 4
       - Kind: 9
         MinLevel: 0
         Weight: 2
       - Kind: 4
         MinLevel: 0
-        Weight: 1.5
+        Weight: 3
+      - Kind: 15
+        MinLevel: 0
+        Weight: 3
       - Kind: 2
-        MinLevel: 1
+        MinLevel: 0
         Weight: 2
       - Kind: 3
         MinLevel: 1
@@ -125,28 +128,28 @@ MonoBehaviour:
         MinLevel: 1
         Weight: 1.5
   Loot:
-    BaseItems: 6
+    BaseItems: 8
     Table:
     - Item: shovel
-      Weight: 5
+      Weight: 50
     - Item: flashlight
-      Weight: 2
+      Weight: 20
     - Item: battery
-      Weight: 3
+      Weight: 30
     - Item: book
-      Weight: 2
+      Weight: 20
       Only: []
       Favoured:
       - 12
       FavouredBoost: 5
     - Item: cans
-      Weight: 3
+      Weight: 30
       Only:
       - 4
       Favoured: []
       FavouredBoost: 0
     - Item: screwdriver
-      Weight: 3
+      Weight: 30
       Only:
       - 5
       - 13
@@ -157,10 +160,203 @@ MonoBehaviour:
       Favoured: []
       FavouredBoost: 0
     - Item: beltbag
-      Weight: 1
+      Weight: 10
       Only: []
       Favoured: []
       FavouredBoost: 0
+    - Item: radio
+      Weight: 20
+      Only: []
+      Favoured:
+      - 14
+      - 5
+      - 23
+      FavouredBoost: 3
+    - Item: keyboard
+      Weight: 20
+      Only: []
+      Favoured:
+      - 2
+      - 1
+      - 5
+      - 14
+      FavouredBoost: 3
+    - Item: tablet
+      Weight: 10
+      Only: []
+      Favoured:
+      - 14
+      - 3
+      - 2
+      FavouredBoost: 3
+    - Item: medkit
+      Weight: 20
+      Only: []
+      Favoured:
+      - 19
+      - 24
+      - 25
+      - 26
+      - 31
+      FavouredBoost: 4
+    - Item: coffee
+      Weight: 20
+      Only: []
+      Favoured:
+      - 4
+      - 8
+      - 29
+      FavouredBoost: 4
+    - Item: finder
+      Weight: 10
+      Only: []
+      Favoured:
+      - 21
+      - 23
+      - 15
+      FavouredBoost: 3
+    - Item: boots
+      Weight: 10
+      Only: []
+      Favoured:
+      - 18
+      - 28
+      - 30
+      - 11
+      FavouredBoost: 4
+    - Item: tomatoes
+      Weight: 40
+      Only: []
+      Favoured:
+      - 4
+      - 29
+      FavouredBoost: 4
+    - Item: chess
+      Weight: 15
+      Only: []
+      Favoured:
+      - 20
+      - 8
+      - 29
+      - 12
+      FavouredBoost: 4
+    - Item: magazine
+      Weight: 40
+      Only: []
+      Favoured:
+      - 0
+      - 8
+      - 3
+      - 29
+      - 30
+      FavouredBoost: 3
+    - Item: pills
+      Weight: 25
+      Only: []
+      Favoured:
+      - 19
+      - 24
+      - 25
+      - 31
+      - 7
+      FavouredBoost: 4
+    - Item: toothpaste
+      Weight: 60
+      Only: []
+      Favoured:
+      - 7
+      - 31
+      - 18
+      FavouredBoost: 5
+    - Item: tape
+      Weight: 40
+      Only: []
+      Favoured:
+      - 21
+      - 23
+      - 6
+      - 17
+      FavouredBoost: 4
+    - Item: matches
+      Weight: 60
+      Only: []
+      Favoured:
+      - 4
+      - 8
+      - 29
+      - 23
+      FavouredBoost: 3
+    - Item: toiletpaper
+      Weight: 60
+      Only: []
+      Favoured:
+      - 7
+      - 31
+      - 6
+      FavouredBoost: 5
+    - Item: applecore
+      Weight: 60
+      Only: []
+      Favoured:
+      - 4
+      - 2
+      - 1
+      - 8
+      FavouredBoost: 2
+    - Item: soap
+      Weight: 60
+      Only: []
+      Favoured:
+      - 7
+      - 31
+      - 18
+      - 4
+      FavouredBoost: 5
+    - Item: gloves
+      Weight: 40
+      Only: []
+      Favoured:
+      - 21
+      - 23
+      - 6
+      - 22
+      - 26
+      FavouredBoost: 4
+    - Item: necklace
+      Weight: 6
+      Only: []
+      Favoured:
+      - 30
+      - 29
+      - 16
+      FavouredBoost: 5
+    - Item: mop
+      Weight: 60
+      Only: []
+      Favoured:
+      - 23
+      - 7
+      - 6
+      - 9
+      FavouredBoost: 4
+    - Item: plush
+      Weight: 25
+      Only: []
+      Favoured:
+      - 30
+      - 16
+      - 29
+      - 20
+      FavouredBoost: 4
+    - Item: socks
+      Weight: 40
+      Only: []
+      Favoured:
+      - 30
+      - 18
+      - 11
+      - 28
+      FavouredBoost: 5
     ItemsPerHouse: 2
     RoomsPerExtraItem: 3
     MinSpacing: 1.5

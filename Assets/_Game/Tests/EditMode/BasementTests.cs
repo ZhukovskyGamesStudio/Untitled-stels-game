@@ -17,6 +17,7 @@ namespace Stealth.Tests
         [OneTimeTearDown]
         public void Cleanup() => ActiveLevel.Clear();
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryHouseHasABasementUnderItsPlantRoom()
         {
@@ -185,10 +186,12 @@ namespace Stealth.Tests
             Assert.IsTrue(alcove.GetComponentsInChildren<Transform>(true).Any(t => t.name == "MetalShutLid" && t.gameObject.activeSelf), "shut from below in the sewer");
             // the lid's frame lies right round the hole: inner edge at the hole's
             var hatch = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Level/ShaftHatch.prefab");
-            var frames = hatch.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name == "Frame").Select(r => r.bounds).ToList();
-            Assert.AreEqual(4, frames.Count);
-            Assert.AreEqual(Basement.ShaftHalf, frames.Min(b => Mathf.Max(Mathf.Abs(b.center.x) - b.extents.x, Mathf.Abs(b.center.z) - b.extents.z)), 1e-3f, "the frame starts at the hole's edge");
-            var plate = hatch.GetComponentsInChildren<MeshRenderer>(true).Single(r => r.name == "Plate").bounds;
+            // (the model, Tools/Blender/hatches.py: its frame one part; the hole is where no frame vertex is)
+            var frame = hatch.GetComponentsInChildren<MeshFilter>(true).Single(f => f.name == "Frame");
+            float inner = frame.sharedMesh.vertices.Select(v => frame.transform.TransformPoint(v) - hatch.transform.position)
+                .Min(w => Mathf.Max(Mathf.Abs(w.x), Mathf.Abs(w.z)));
+            Assert.AreEqual(Basement.ShaftHalf, inner, 0.005f, "the frame starts at the hole's edge");
+            var plate = hatch.GetComponentsInChildren<MeshRenderer>(true).Single(r => r.name == "Lid").bounds;
             Assert.Greater(plate.size.x, 2f * Basement.ShaftHalf, "the lid covers the hole");
             Assert.Less(plate.size.x, 2f * Basement.ShaftHalf + 0.2f, "and rests on the frame");
         }
@@ -229,6 +232,28 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void WalkingIntoTheOpenHoleFromAnywhereOnItsEdgeTakesTheLadderDown()
+        {
+            var shaft = new Vector3(10f, 5f, 3f);
+            float half = 0.75f;
+            var rim = shaft + new Vector3(half + 0.3f, 0f, 0.5f); // on the rim, off the rungs' side
+            Assert.IsTrue(LadderMath.GetsOnFromAbove(rim, shaft, half, true, Vector3.left), "into the hole");
+            Assert.IsFalse(LadderMath.GetsOnFromAbove(rim, shaft, half, true, Vector3.right), "walking away from it");
+            Assert.IsFalse(LadderMath.GetsOnFromAbove(rim, shaft, half, true, Vector3.zero), "standing at it");
+            Assert.IsFalse(LadderMath.GetsOnFromAbove(rim, shaft, half, false, Vector3.left), "the lid is shut");
+            Assert.IsFalse(LadderMath.GetsOnFromAbove(rim + Vector3.right, shaft, half, true, Vector3.left), "too far from the hole");
+            Assert.IsTrue(LadderMath.GetsOnFromAbove(shaft + new Vector3(0.2f, 0f, 0f), shaft, half, true, Vector3.right), "over the hole: any step");
+            // lowered: across to the rungs, then down under the floor, then W/S take over
+            var column = shaft + new Vector3(-0.4f, -3f, 0f);
+            var feet = rim;
+            bool done = false;
+            for (int i = 0; i < 400 && !done; i++) feet += LadderMath.Lower(feet, column, shaft.y, 0.02f, out done);
+            Assert.IsTrue(done);
+            Assert.AreEqual(shaft.y - LadderMath.LowerDepth, feet.y, 0.05f);
+            Assert.Less(new Vector2(feet.x - column.x, feet.z - column.z).magnitude, 0.1f);
+        }
+
+        [Test]
         public void TheLadderIsClimbedByWalkingIntoItWithWAndS()
         {
             var face = Vector3.left;
@@ -239,6 +264,8 @@ namespace Stealth.Tests
             Assert.IsFalse(LadderMath.GetsOn(false, 1f, face, face, true, 0f, 4.9f), "out of reach");
             // stepping into the open shaft from above: it catches the falling body
             Assert.IsTrue(LadderMath.GetsOn(true, 0f, -face, face, false, 3.5f, 4.9f));
+            // walking past it up on the lobby's floor (the top of the ladder): never taken hold of
+            Assert.IsFalse(LadderMath.GetsOn(true, 1f, face, face, true, 4.85f, 4.9f), "walking past the open shaft up in the lobby");
             // W up, S down, held on the column
             var up = LadderMath.Step(new Vector3(0.2f, 1f, 0f), Vector3.zero, 1f, 0.1f);
             Assert.AreEqual(LadderMath.Speed * 0.1f, up.y, 1e-4f);
@@ -254,6 +281,40 @@ namespace Stealth.Tests
             Assert.IsFalse(LadderMath.OffAtTop(4.7f, 4.9f, false), "the lid is shut: the head stops against it");
             Assert.IsTrue(LadderMath.OffAtBottom(-1f, true, 0.1f, 0f));
             Assert.IsFalse(LadderMath.OffAtBottom(1f, true, 0.1f, 0f), "climbing up from the floor");
+        }
+
+        [Test]
+        public void OverTheTopTheClimberRisesStraightUpAndStepsOffHimself()
+        {
+            float floor = 5f, dt = 0.02f, longest = 0f;
+            var feet = new Vector3(0f, 4.7f, 0f);
+            int frames = 0;
+            for (; frames < 500; frames++)
+            {
+                var step = LadderMath.ClimbOut(feet, floor, dt);
+                if (step == Vector3.zero) break;
+                Assert.AreEqual(0f, new Vector2(step.x, step.z).magnitude, 1e-6f, "straight up: never carried aside");
+                longest = Mathf.Max(longest, step.magnitude);
+                feet += step;
+            }
+            Assert.Less(frames, 500, "it gets up");
+            Assert.AreEqual(floor + LadderMath.OverRim, feet.y, 0.01f, "standing on the top, over the rim");
+            Assert.AreEqual(0f, feet.x, 1e-6f);
+            Assert.LessOrEqual(longest, LadderMath.Speed * dt + 1e-5f, "a climb, not a teleport");
+
+            // standing up there until the player walks: over the floor beside the hole, off; over the hole away from the rungs, let go
+            var shaft = new Vector3(0.3f, floor, 0f);
+            var column = feet;
+            Assert.AreEqual(LadderMath.TopState.Standing, LadderMath.AtTop(feet, shaft, Basement.ShaftHalf, column, false));
+            Assert.AreEqual(Vector3.zero, LadderMath.StepOff(Vector3.zero, dt), "no keys: stays put");
+            Assert.AreEqual(LadderMath.TopState.LetGo, LadderMath.AtTop(feet, shaft, Basement.ShaftHalf, column, true), "Jump lets go");
+            var off = new Vector3(shaft.x - Basement.ShaftHalf - 0.2f, feet.y, 0f);
+            Assert.AreEqual(LadderMath.TopState.OnFloor, LadderMath.AtTop(off, shaft, Basement.ShaftHalf, column, false), "stepped onto the floor");
+            var over = new Vector3(shaft.x + 0.6f, feet.y, 0f);
+            Assert.AreEqual(LadderMath.TopState.LetGo, LadderMath.AtTop(over, shaft, Basement.ShaftHalf, column, false), "out over the hole");
+            var walk = LadderMath.StepOff(new Vector3(0f, 1f, 1f), dt);
+            Assert.AreEqual(0f, walk.y, "the height held");
+            Assert.AreEqual(LadderMath.StepOffSpeed * dt, walk.magnitude, 1e-5f);
         }
 
         [Test]

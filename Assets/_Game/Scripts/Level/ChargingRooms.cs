@@ -91,7 +91,7 @@ namespace Stealth.Level
         };
 
         /// <summary>A guard resting at a dock stands this far in front of it, facing the room.</summary>
-        public const float DockStandOff = 0.85f;
+        public const float DockStandOff = 0.7f; // its back against the dock (half its depth 0.32 + the robot's 0.38)
 
         /// <summary>
         /// After the furniture: the docks in the charging room → where the guards rest, facing out into the room; then, up

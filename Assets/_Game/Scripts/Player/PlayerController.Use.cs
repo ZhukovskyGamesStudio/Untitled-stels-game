@@ -59,6 +59,34 @@ namespace Stealth.Player
             }
         }
 
+        float m_NextWorkTick;
+
+        /// <summary>
+        /// Owner: the sound of the hands at work while E is held — keys tapped hacking a robot, a pick ticking in a lock, a
+        /// screwdriver's ratchet at a grille (the end of it has its own sound: the robot's, the lock's, the grille's).
+        /// </summary>
+        Vector3 m_WorkWas;
+
+        void WorkSounds()
+        {
+            var bank = Audio.Sfx.Bank;
+            // only while the work goes on: a hold's progress is kept when E is let go (and shown when aiming at it again),
+            // so it is the progress growing this frame that sounds, not its being there
+            float hack = HackTarget != null ? HackProgress : 0f, pick = DoorTarget != null ? DoorProgress : 0f;
+            float screw = UseTarget != null && UseTarget.Kind is UseKind.VentGrille or UseKind.VentGrate ? UseProgress : 0f;
+            bool hacking = hack > m_WorkWas.x, picking = pick > m_WorkWas.y, screwing = screw > m_WorkWas.z;
+            m_WorkWas = new Vector3(hack, pick, screw);
+            if (bank == null || Time.time < m_NextWorkTick) return;
+            AudioClip clip = null;
+            float gap = 0.3f;
+            if (hacking) { clip = bank.WorkHack; gap = 0.22f; }
+            else if (picking) { clip = bank.WorkPick; gap = 0.16f; }
+            else if (screwing) { clip = bank.WorkScrew; gap = 0.3f; }
+            if (clip == null) return;
+            m_NextWorkTick = Time.time + gap * Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.85f, 1.15f);
+            Audio.Sfx.At(clip, Hands, 0.7f, Audio.Sfx.Group.Items, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.93f, 1.07f));
+        }
+
         /// <summary>Something in reach to use with E (a crate, the med table, a seat of the car…), or null.</summary>
         public Interactable UseTarget { get; private set; }
         /// <summary>The hint for <see cref="UseTarget"/>, whether E does something now, and the hold progress (0..1).</summary>
@@ -80,7 +108,7 @@ namespace Stealth.Player
             if (!holdE) m_UseWaitRelease = false;
             if (UseTarget == null || !UseAvailable || m_UseWaitRelease) { UseProgress = 0f; return; }
             float hold = UseTarget.HoldTime;
-            bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, Time.deltaTime, hold);
+            bool done = hold <= 0f ? Controls.Pressed(GameAction.Interact) : holdE && m_UseHeld.Hold(UseTarget, WorkDt, hold);
             UseProgress = hold > 0f ? m_UseHeld.Of(UseTarget) / hold : 0f; // the ring is a share of the hold, not seconds
             if (!done) return;
             m_UseWaitRelease = true; // one use per press

@@ -21,6 +21,8 @@ namespace Stealth.Level
         public const float Ahead = 66f, Behind = 60f;
         /// <summary>The lamps' colour (the basement's warm light).</summary>
         public static readonly Color LampColor = new(1f, 0.8f, 0.55f);
+        /// <summary>…and their brightness (dim: the tunnel between them dark).</summary>
+        public const float LampIntensity = 2.4f;
 
         /// <summary>The segments it may have: k from <see cref="From"/> to <see cref="To"/>.</summary>
         public int From = int.MinValue / 2, To = int.MaxValue / 2;
@@ -64,12 +66,18 @@ namespace Stealth.Level
                 int side = DrivePath.LampSideOf(k);
                 var lamp = Instantiate(Lamp, cell.transform);
                 lamp.transform.SetLocalPositionAndRotation(new Vector3(SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), Quaternion.Euler(0f, side > 0 ? 90f : -90f, 0f));
-                foreach (var light in lamp.GetComponentsInChildren<Light>()) light.color = LampColor;
+                foreach (var light in lamp.GetComponentsInChildren<Light>()) { light.color = LampColor; light.intensity = LampIntensity; }
             }
             VisualStyles.Dress(cell);
             return cell;
         }
 
-        void OnDestroy() => Clear();
+        // the level (or the sewer) it belongs to is going: what it hid goes with it — showing it again here was
+        // "GameObjects can not be made active when they are being destroyed"
+        void OnDestroy()
+        {
+            foreach (var go in m_Cells.Values) if (go != null) Destroy(go);
+            m_Cells.Clear();
+        }
     }
 }

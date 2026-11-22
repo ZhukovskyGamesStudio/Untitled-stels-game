@@ -113,9 +113,11 @@ namespace Stealth.Game
                 case UseKind.LiftCall: LiftServer(player, index, false); break;
                 case UseKind.LiftFloor: LiftServer(player, index, true); break;
                 case UseKind.VentGrille:
-                    if (Phase == RunPhase.Playing && m_Opened.Add(OpenKeys.Crawl(index))) OpenedVersion++;
+                    // the grille is screwed on: a screwdriver in hand
+                    if (Phase == RunPhase.Playing && player.GetComponent<PlayerInventory>() is { } grilleInv && grilleInv.Holds(ItemCatalog.Screwdriver)
+                        && m_Opened.Add(OpenKeys.Crawl(index))) OpenedVersion++;
                     break;
-                case UseKind.ShaftHatch: ToggleShaftServer(); break;
+                case UseKind.ShaftHatch: ToggleShaftServer(thing is ShaftHatch { Exit: true }); break;
                 case UseKind.VentGrate: UnscrewServer(player, index); break;
                 default: UseSewerServer(player, kind, index); break;
             }
@@ -133,10 +135,12 @@ namespace Stealth.Game
         }
 
         /// <summary>Server: the lid over the shaft to the basement opens (or shuts) for everyone.</summary>
-        void ToggleShaftServer()
+        /// <summary>Server: the lid over a shaft opens or shuts for everyone — the entry's (down to the basement) or the exit's (down to the passage in the sewer).</summary>
+        void ToggleShaftServer(bool exit)
         {
             if (Phase != RunPhase.Playing) return;
-            if (!m_Opened.Remove(OpenKeys.Shaft)) m_Opened.Add(OpenKeys.Shaft);
+            int key = exit ? OpenKeys.ExitShaft : OpenKeys.Shaft;
+            if (!m_Opened.Remove(key)) m_Opened.Add(key);
             OpenedVersion++;
         }
 

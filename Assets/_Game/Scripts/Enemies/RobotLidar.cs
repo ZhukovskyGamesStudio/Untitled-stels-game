@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Stealth.Enemies
 {
     /// <summary>
-    /// Floor lidar of a mobile robot (the sweeper): a red laser line spinning around it at ankle height, stopped by walls and
-    /// furniture. Feet on the floor that cross the line are noticed; a player standing on a chair or a desk, or in mid-jump,
+    /// Floor lidar of a mobile robot (the sweeper): a red laser line spinning around it at ankle height, stopped by walls,
+    /// furniture and door leaves. Feet on the floor that cross the line are noticed; a player standing on a chair or a desk, or in mid-jump,
     /// is above it. The direction comes from the shared clock, so every peer draws the same line the server senses with.
     /// </summary>
     public class RobotLidar : MonoBehaviour
@@ -39,6 +39,8 @@ namespace Stealth.Enemies
                 if (c.GetComponentInParent<IIntruder>() != null || c.transform.IsChildOf(Robot.transform)) continue;
                 m_Length = Mathf.Min(m_Length, s_Hits[i].distance);
             }
+            // door leaves stop it as they stand (their blockers are off once a door starts opening — a leaf is still there)
+            m_Length = Level.AutoDoor.Clip(m_Start, m_Dir, m_Length);
             return (m_Start, m_Dir, m_Length);
         }
 

@@ -5,7 +5,7 @@
 # <root>/<style>_props.png (furniture and level pieces).
 set -e
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
-B="${BLENDER:-D:/Apps/Steam/steamapps/common/Blender/blender.exe}"
+B="${BLENDER:-C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe}"
 ROOT="$1"; STYLES="$2"; ONLY="${3:+--only $3}"; SET="${4:-robots}"
 "$B" -b --factory-startup --python "$HERE/build_bestiary.py" -- "$ROOT" --styles "$STYLES" $ONLY --set "$SET" 2>&1 \
   | grep -E "CONTRACT|floats|DONE|Error|Traceback|line [0-9]|MESHFIX .*: [1-9][0-9]* pieces attached" || true

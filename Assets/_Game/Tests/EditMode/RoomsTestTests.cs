@@ -51,6 +51,7 @@ namespace Stealth.Tests
             Assert.Greater(main.Styles.Styles.Length, 1, "the main game has all the styles (F8)");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void HousesHaveEveryRoomTypeOnOneFloorAndOnlyWorkers()
         {
@@ -73,7 +74,7 @@ namespace Stealth.Tests
                         foreach (var r in l.RobotSpawns) Assert.AreEqual(Stealth.Level.RobotKind.Worker, r.Kind, $"{at}: workers only");
                         Assert.IsEmpty(l.CameraSpots);
                         Assert.IsEmpty(l.LaserSpots);
-                        foreach (var t in l.Terminals) Assert.AreEqual(TerminalKind.Doors, t.kind, "only the storage room's door terminal");
+                        foreach (var t in l.Terminals) Assert.That(t.kind, Is.EqualTo(TerminalKind.Doors).Or.EqualTo(TerminalKind.Map), "only the storage room's door terminal and the map terminals");
                     }
         }
 

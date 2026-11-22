@@ -8,9 +8,9 @@ namespace Stealth.Configs
     /// </summary>
     public class StyleConfig : ScriptableObject
     {
-        [Tooltip("The styles, in the order F8 cycles through them; the first is the default look")]
+        [Tooltip("The styles, in the order the F8 picker lists them")]
         public VisualStyle[] Styles = new VisualStyle[0];
-        [Tooltip("The look of the game: applied when the game starts (none = the plain look). F8 and -style still switch it")]
+        [Tooltip("The look of the game: applied when the game starts (none = the plain look). the F8 picker and -style still switch it")]
         public VisualStyle Default;
 
         [Header("Materials by kind (filled by the asset builder)")]
@@ -32,6 +32,8 @@ namespace Stealth.Configs
         public StyleMeshes[] StyleModels = new StyleMeshes[0];
         [Tooltip("Draws a merged mesh of the house (style architecture, furniture): MeshFilter + MeshRenderer, nothing else")]
         public GameObject Batch;
+        [Tooltip("The players as rigged humans, one per department (PlayerLooks.Department; Tools/Blender/human.py): shown in every style that has no rigged human of its own (StyleGeometry.PlayerRig)")]
+        public GameObject[] PlayerHumans = new GameObject[0];
 
         public StyleKit KitFor(ModelFamily family)
         {

@@ -329,9 +329,18 @@ def model_chair():
 
 
 def model_server_rack():
-    merge("Body", [box((0.7, 1.0, 2.0), (0, 0, 1.0))])
-    parts = [box((0.6, 0.02, 0.06), (0, -0.505, 0.2 + i * 0.16)) for i in range(11)]
-    merge("Eye", parts)
+    """A 42U rack 0.7 x 1.0 x 2.0: the cabinet, eleven servers in it (each a front plate with two handles and a vent
+    strip), a row of status LEDs and a drive lamp on each instead of a glowing bar across."""
+    units, lamps = [box((0.7, 1.0, 2.0), (0, 0, 1.0))], []      # (servers in Body: the styles' racks have no Accent part)
+    for i in range(11):
+        z = 0.2 + i * 0.16
+        units.append(box((0.6, 0.02, 0.13), (0, -0.505, z)))
+        units += [box((0.02, 0.025, 0.09), (x, -0.52, z)) for x in (-0.28, 0.28)]                 # handles
+        units.append(box((0.3, 0.008, 0.05), (-0.06, -0.517, z)))                                   # vent strip
+        lamps += [box((0.016, 0.006, 0.012), (0.12 + k * 0.03, -0.518, z + 0.035)) for k in range(4)]
+        lamps.append(box((0.05, 0.006, 0.01), (0.17, -0.518, z - 0.035)))
+    merge("Body", units)
+    merge("Eye", lamps)
     export("server_rack")
 
 
@@ -366,11 +375,13 @@ def model_meeting_table():
 
 
 def model_plant():
-    merge("Accent", [cylinder(0.22, 0.45, (0, 0, 0.225), segments=12, radius2=0.18)])
-    merge("Body", [
-        sphere(0.35, (0, 0, 0.8), segments=10),
-        sphere(0.25, (0.1, 0.05, 1.15), segments=10),
-    ])
+    """A potted shrub: a pot widening upwards with a rolled rim, a bushy crown of overlapping clumps over it."""
+    merge("Accent", [cylinder(0.17, 0.42, (0, 0, 0.21), segments=16, radius2=0.21),
+                     cylinder(0.225, 0.05, (0, 0, 0.43), segments=16)])
+    merge("Body", [sphere(r, loc, segments=12) for r, loc in (
+        (0.26, (0, 0, 0.72)), (0.22, (0.17, 0.05, 0.84)), (0.22, (-0.16, -0.04, 0.82)), (0.2, (0.03, 0.16, 0.88)),
+        (0.2, (-0.02, -0.16, 0.9)), (0.24, (0, 0, 1.02)), (0.16, (0.1, -0.05, 1.16)))]
+          + [cylinder(0.04, 0.3, (0, 0, 0.58), segments=8)])                                # the stem out of the pot
     export("plant")
 
 
@@ -388,7 +399,11 @@ def model_kitchen_counter():
         merge(f"BodyDoor{i}", [box((0.592, 0.022, 0.774), (x, -0.314, 0.488)),
                                box((0.14, 0.025, 0.02), (hx, -0.332, 0.8))])
     merge("Accent", [box((2.44, 0.7, 0.05), (0, 0, 0.905))])
-    merge("Eye", [box((0.5, 0.45, 0.32), (0.7, 0, 1.09))])         # microwave
+    # the microwave: a casing in the cupboards' colour on little feet, the glowing parts only its door window and display
+    # (it was one glowing box)
+    merge("Body", [box((0.5, 0.42, 0.3), (0.7, 0.01, 1.095)), box((0.46, 0.38, 0.02), (0.7, 0.01, 0.94))])
+    merge("Eye", [box((0.3, 0.012, 0.19), (0.63, -0.205, 1.095)), box((0.08, 0.012, 0.035), (0.89, -0.205, 1.18))])
+    merge("Accent", [box((0.02, 0.02, 0.2), (0.8, -0.215, 1.095))] + [box((0.03, 0.012, 0.03), (0.89, -0.207, z)) for z in (1.11, 1.06, 1.01)])
     export("kitchen_counter")
 
 
@@ -410,8 +425,14 @@ def model_boxes():
 
 
 def model_water_cooler():
-    merge("Body", [box((0.35, 0.35, 1.0), (0, 0, 0.5))])
-    merge("Eye", [cylinder(0.15, 0.45, (0, 0, 1.22), segments=12)])
+    # (the taps and the tray are part of Body: the styles' own coolers have only Body and Eye, a part of its own would show
+    # through them)
+    merge("Body", [box((0.35, 0.35, 1.0), (0, 0, 0.5))]
+          + [box((0.03, 0.05, 0.06), (x, -0.195, 0.81)) for x in (-0.07, 0.07)]                 # hot and cold taps
+          + [box((0.26, 0.06, 0.02), (0, -0.19, 0.58))])                                       # the drip tray
+    # the bottle stands upside down: its neck in the cooler's top, the round bottom up
+    merge("Eye", [cylinder(0.045, 0.062, (0, 0, 1.03), segments=12), cylinder(0.045, 0.06, (0, 0, 1.09), segments=12, radius2=0.15),
+                  cylinder(0.15, 0.26, (0, 0, 1.25), segments=16), cylinder(0.15, 0.07, (0, 0, 1.415), segments=16, radius2=0.06)])
     export("water_cooler")
 
 
@@ -432,7 +453,12 @@ def model_toilet_stall():
     merge("Body", [
         box((0.05, 1.5, 1.9), (-0.5, 0, 1.05)), box((0.05, 1.5, 1.9), (0.5, 0, 1.05)), box((1.0, 0.05, 1.9), (0, 0.75, 1.05)),
     ] + [box((0.05, 0.05, 0.12), (x, y, 0.06)) for x in (-0.5, 0.5) for y in (-0.7, 0.0)])   # the raised walls stand on feet
-    merge("Accent", [cylinder(0.2, 0.42, (0, 0.4, 0.21), segments=12)])
+    # the toilet against the back wall: a foot, the bowl, the seat with its lid down, the cistern with a flush button
+    merge("Accent", [cylinder(0.1, 0.26, (0, 0.42, 0.13), segments=14, radius2=0.12),
+                     cylinder(0.12, 0.14, (0, 0.42, 0.32), segments=16, radius2=0.18),
+                     box((0.38, 0.15, 0.34), (0, 0.655, 0.57)), box((0.06, 0.1, 0.1), (0, 0.57, 0.42))])
+    merge("Body", [cylinder(0.185, 0.03, (0, 0.42, 0.404), segments=16), box((0.4, 0.17, 0.03), (0, 0.655, 0.755)),
+                   cylinder(0.025, 0.012, (0, 0.655, 0.776), segments=10)])
     export("toilet_stall")
 
 
@@ -464,10 +490,19 @@ def model_bookshelf():
 
 
 def model_printer():
-    """Office copier 0.6 x 0.6 x 1.1 with a paper tray and a glowing panel."""
-    merge("Body", [box((0.6, 0.6, 0.95), (0, 0, 0.475)), box((0.55, 0.5, 0.12), (0, 0.02, 1.01))])
-    merge("Accent", [box((0.35, 0.3, 0.03), (-0.1, -0.35, 0.8)), box((0.5, 0.05, 0.25), (0, -0.31, 0.3))])
-    merge("Eye", [box((0.15, 0.03, 0.08), (0.18, -0.29, 0.97))])
+    """Office copier 0.6 x 0.6 x 1.1: the cabinet with three paper drawers (handles), the scanner raised on a column at
+    its right over the inner output tray (copies lying in it), a document feeder on the scanner and the control panel
+    sticking out at its front right with a glowing screen. (Pieces inset 2 mm where they meet: no shared planes.)"""
+    merge("Body", [box((0.6, 0.6, 0.85), (0, 0, 0.425)),                                    # cabinet with the engine
+                   box((0.14, 0.596, 0.076), (0.229, 0, 0.884)),                             # the column under the scanner
+                   box((0.6, 0.6, 0.1), (0, 0, 0.97)),                                       # the scanner
+                   box((0.4, 0.36, 0.06), (-0.05, 0.05, 1.049)),                             # document feeder
+                   box((0.2, 0.12, 0.04), (0.18, -0.33, 0.99))]                              # control panel
+          + [box((0.56, 0.012, 0.16), (0, -0.304, z)) for z in (0.1, 0.28, 0.46)])          # drawer fronts
+    merge("Accent", [box((0.18, 0.02, 0.022), (0, -0.316, z + 0.05)) for z in (0.1, 0.28, 0.46)]   # drawer handles
+          + [box((0.3, 0.36, 0.018), (-0.1, -0.05, 0.859)),                                  # copies in the inner tray
+             box((0.3, 0.2, 0.012), (-0.05, -0.04, 1.085))])                                 # the feeder's tray
+    merge("Eye", [box((0.12, 0.07, 0.008), (0.18, -0.335, 1.013))])
     export("printer")
 
 
@@ -491,10 +526,20 @@ def model_fridge():
 
 
 def model_coffee_machine():
-    """Stands on a counter (0.93 m): 0.35 x 0.4 x 0.5."""
-    merge("Body", [box((0.35, 0.4, 0.5), (0, 0, 0.25))])
-    merge("Accent", [box((0.2, 0.15, 0.05), (0, -0.17, 0.08)), cylinder(0.04, 0.09, (0, -0.15, 0.17), segments=10)])
-    merge("Eye", [box((0.12, 0.02, 0.06), (0, -0.205, 0.4))])
+    """Espresso machine on a counter (0.93 m): 0.35 x 0.4 x 0.5 — a plinth, a back tower and a hood over a recessed brewing
+    bay; under the hood the group head with two spouts over a cup on the grated drip tray, a display and buttons on the
+    hood's front. (Boards inset 2 mm where they meet: no two faces share a plane.)"""
+    merge("Body", [box((0.35, 0.4, 0.06), (0, 0, 0.03)),                                    # plinth
+                   box((0.346, 0.216, 0.346), (0, 0.09, 0.229)),                             # the back tower
+                   box((0.35, 0.4, 0.1), (0, 0, 0.45)),                                      # the hood
+                   cylinder(0.034, 0.07, (0, -0.1, 0.115), segments=14)])                    # the cup
+    merge("Accent", [box((0.24, 0.17, 0.016), (0, -0.105, 0.068)),                         # drip tray
+                     cylinder(0.04, 0.045, (0, -0.1, 0.3775), segments=16),                  # group head
+                     cylinder(0.007, 0.03, (-0.016, -0.1, 0.34), segments=8),
+                     cylinder(0.007, 0.03, (0.016, -0.1, 0.34), segments=8)]
+           + [box((0.22, 0.012, 0.004), (0, -0.105 + k * 0.035, 0.078)) for k in (-2, -1, 0, 1, 2)]     # the tray's grate
+           + [box((0.03, 0.012, 0.022), (x, -0.206, 0.45)) for x in (-0.12, -0.075)])      # buttons
+    merge("Eye", [box((0.12, 0.01, 0.045), (0.07, -0.204, 0.45))])
     export("coffee_machine")
 
 
@@ -534,7 +579,10 @@ def model_tv_stand():
 
 def model_reception_desk():
     """Front counter 2.4 x 0.8: high front panel towards the visitor (-Y), work top behind."""
-    merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.08, 0.8, 1.1), (-1.16, 0, 0.55)), box((0.08, 0.8, 1.1), (1.16, 0, 0.55))])
+    # the sides start inside the front panel, a hair within its outline: flush with it, their faces met its in one plane
+    # (the styles' bevels made them flicker)
+    merge("Body", [box((2.4, 0.08, 1.1), (0, -0.36, 0.55)), box((0.078, 0.73, 1.096), (-1.159, 0.035, 0.548)),
+                   box((0.078, 0.73, 1.096), (1.159, 0.035, 0.548))])
     merge("Accent", [box((2.5, 0.3, 0.04), (0, -0.33, 1.12)), box((2.3, 0.7, 0.04), (0, 0.02, 0.74))])
     merge("Eye", [box((0.62, 0.05, 0.4), (0.4, 0.15, 1.0)), box((0.07, 0.07, 0.2), (0.4, 0.2, 0.84))])
     raise_top(0.76, DESK_TOP_NEW)  # the work top at the office desk's height
@@ -591,8 +639,14 @@ def model_wash_basin():
 
 def model_vending_machine():
     merge("Body", [box((0.9, 0.8, 1.9), (0, 0, 0.95))])
-    merge("Accent", [box((0.6, 0.02, 0.15), (-0.1, -0.41, 0.25)), box((0.12, 0.02, 0.5), (0.33, -0.41, 1.2))])
-    merge("Eye", [box((0.6, 0.02, 1.1), (-0.1, -0.405, 1.15))])
+    # the glass in a frame, the side panel with a keypad (3 x 4 keys), a coin slot and a note slot, the pickup flap below
+    frame = [box((0.66, 0.03, 0.03), (-0.1, -0.413, z)) for z in (0.585, 1.715)]
+    frame += [box((0.03, 0.03, 1.1), (x, -0.413, 1.15)) for x in (-0.415, 0.215)]
+    keys = [box((0.025, 0.012, 0.02), (0.3 + c * 0.035, -0.418, 1.3 - r * 0.032)) for r in range(4) for c in range(3)]
+    merge("Accent", frame + keys + [box((0.6, 0.02, 0.15), (-0.1, -0.41, 0.25)), box((0.12, 0.02, 0.5), (0.335, -0.41, 1.2)),
+                                    box((0.3, 0.03, 0.03), (-0.1, -0.425, 0.31)),            # the flap's handle
+                                    box((0.012, 0.012, 0.05), (0.31, -0.418, 1.0)), box((0.07, 0.012, 0.012), (0.355, -0.418, 1.02))])
+    merge("Eye", [box((0.6, 0.02, 1.1), (-0.1, -0.405, 1.15)), box((0.1, 0.012, 0.05), (0.335, -0.418, 1.39))])  # glass, display
     export("vending_machine")
 
 
@@ -637,6 +691,29 @@ SHAPES = {
     "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
     "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
     "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
+    # more pickup items (their world models: items_more.py)
+    "radio": [(0, 0), (0, 1)],                                    # walkie-talkie (1 x 2)
+    "keyboard": [(0, 0), (1, 0), (2, 0)],                         # keyboard (3 x 1)
+    "tablet": [(0, 0), (1, 0), (0, 1), (1, 1)],                    # rugged tablet (2 x 2)
+    "medkit": [(0, 0), (1, 0), (0, 1), (1, 1)],                    # first-aid box (2 x 2)
+    "coffee": [(0, 0)],                                           # jar of coffee
+    "finder": [(0, 0), (0, 1)],                                   # fuel finder (1 x 2)
+    "boots": [(0, 0), (1, 0), (0, 1), (1, 1)],                     # pair of boots (2 x 2)
+    "tomatoes": [(0, 0)],                                         # tin of tomatoes
+    "chess": [(0, 0), (1, 0), (0, 1), (1, 1)],                     # folded chessboard (2 x 2)
+    "magazine": [(0, 0), (1, 0), (0, 1), (1, 1)],                  # magazine (2 x 2)
+    "pills": [(0, 0)],                                            # pills
+    "toothpaste": [(0, 0), (0, 1)],                               # toothpaste (1 x 2)
+    "tape": [(0, 0)],                                             # duct tape
+    "matches": [(0, 0)],                                          # matchbox
+    "toiletpaper": [(0, 0)],                                      # toilet roll
+    "applecore": [(0, 0)],                                        # apple core
+    "soap": [(0, 0)],                                             # soap
+    "gloves": [(0, 0), (0, 1)],                                   # work gloves (1 x 2)
+    "necklace": [(0, 0), (1, 0)],                                 # necklace (2 x 1)
+    "mop": [(0, 0), (0, 1), (0, 2), (0, 3)],                      # mop (1 x 4)
+    "plush": [(0, 0), (1, 0), (0, 1)],                             # teddy bear (L of 3)
+    "socks": [(0, 0), (0, 1)],                                    # rolled socks (1 x 2)
 }
 
 

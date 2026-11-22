@@ -6,6 +6,9 @@ namespace Stealth.Enemies
     [CreateAssetMenu(menuName = "Stealth/Config/Devices/Camera", fileName = "SecurityCameraConfig")]
     public class CameraProfile : DeviceProfile
     {
+        /// <summary>It has a microphone: hears the players talking (DeviceProfile.Hearing; existing assets without the field get this).</summary>
+        public CameraProfile() => Hearing = 0.8f;
+
         [Tooltip("Downward tilt, degrees.")]
         public float Tilt = 28f;
         public float SweepAngle = 80f;

@@ -12,6 +12,8 @@ namespace Stealth.Vehicles
         public MeshRenderer Renderer;
 
         public CargoItem Item { get; private set; }
+        /// <summary>A piece in the bed is taken with E; one in the shredder's mouth (index −1) only shows what is being eaten.</summary>
+        public override bool Usable(PlayerController player) => Index >= 0;
 
         public override UseKind Kind => UseKind.CarCargo;
         public override float Reach => 2.2f;

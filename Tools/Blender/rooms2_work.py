@@ -252,11 +252,13 @@ def model_round_bench_planter():
         cushions.append(revolve(rounded_rect(0.505, 0.9, 0.3, 0.46, 0.035, n=2), seg=10, a0=a0, a1=a1))
     s.part("Body", cushions)
 
-    leaves = [blob((0.0, 0.0, 1.62), (0.3, 0.28, 0.24), sub=3, seed=1),
-              blob((0.17, 0.07, 1.5), (0.2, 0.18, 0.16), sub=3, seed=2),
-              blob((-0.16, 0.09, 1.54), (0.2, 0.18, 0.16), sub=3, seed=3),
-              blob((0.04, -0.17, 1.52), (0.2, 0.18, 0.15), sub=3, seed=4),
-              blob((-0.02, 0.02, 1.79), (0.17, 0.16, 0.13), sub=3, seed=5)]
+    # the crown: one lumpy leaf mass (five balls side by side showed seams between them)
+    balls = [((0.0, 0.0, 1.6), 0.24), ((0.17, 0.07, 1.5), 0.17), ((-0.16, 0.09, 1.54), 0.17), ((0.04, -0.17, 1.52), 0.16),
+             ((-0.02, 0.02, 1.76), 0.14)]
+    for k in range(7):                                       # small lumps round the rim: a ragged, leafy edge
+        a = 2 * math.pi * k / 7 + 0.4
+        balls.append(((0.24 * math.cos(a), 0.24 * math.sin(a), 1.56 + 0.06 * (k % 3)), 0.09 + 0.015 * (k % 2)))
+    leaves = [s.foliage(balls, 0.022, 1, 0.012, 2200)]
     for k in range(7):
         a = 2 * math.pi * k / 7 + 0.3
         leaves.append(blob((0.32 * math.cos(a), 0.32 * math.sin(a), 0.93), (0.11, 0.11, 0.08), sub=2, amp=0.25,

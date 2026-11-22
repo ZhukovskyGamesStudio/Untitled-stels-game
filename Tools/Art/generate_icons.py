@@ -1,6 +1,7 @@
-"""HUD icons: the reticle's interaction glyphs, the noise speaker, the visibility eye, hearts, key caps and mouse buttons.
+"""HUD icons: the reticle's interaction glyphs, robot and device markers (robot_<kind>), the noise speaker, the visibility eye, hearts, key caps and mouse buttons.
 
-    python Tools/Art/generate_icons.py
+    python Tools/Art/generate_icons.py                  # everything
+    python Tools/Art/generate_icons.py --only robot_    # only the icons whose name starts with the prefix
 
 Writes Assets/_Game/Art/Sprites/Icons/*.png (deterministic). A glyph is white with a dark rim so it reads on any
 background; Unity tints the white part (the Image colour) and the rim stays dark. Drawn at 4x and downsampled.
@@ -153,6 +154,15 @@ def cross(g):
     g.rrect((0.14, 0.38, 0.86, 0.62), 0.05)
 
 
+def arrow_left(g):
+    # a chevron pointing left (the start screen's arrows; the right one is this mirrored)
+    g.line([(0.64, 0.18), (0.32, 0.50), (0.64, 0.82)], STROKE * 1.6)
+
+
+def arrow_right(g):
+    g.line([(0.36, 0.18), (0.68, 0.50), (0.36, 0.82)], STROKE * 1.6)
+
+
 def magnifier(g):
     g.ellipse((0.14, 0.12, 0.62, 0.60), fill=False, width=STROKE * 1.1)
     g.line([(0.57, 0.56), (0.84, 0.84)], STROKE * 1.5)
@@ -218,6 +228,15 @@ def box(g):
     g.line([(0.14, 0.63), (0.86, 0.63)], 0.04, on="d")
     g.line([(0.24, 0.30), (0.24, 0.76)], 0.035, on="d")
     g.line([(0.76, 0.30), (0.76, 0.76)], 0.035, on="d")
+
+
+def grille(g):
+    """A vent grille: a frame with slats and a screw in each corner (taken off by hand or with a screwdriver)."""
+    g.rrect((0.12, 0.18, 0.88, 0.82), 0.05, fill=False, width=STROKE)
+    for y in (0.36, 0.50, 0.64):
+        g.line([(0.27, y), (0.73, y)], STROKE * 0.7)
+    for x, y in ((0.20, 0.26), (0.80, 0.26), (0.20, 0.74), (0.80, 0.74)):
+        g.ellipse((x - 0.035, y - 0.035, x + 0.035, y + 0.035), on="d")
 
 
 def door(g):
@@ -402,6 +421,15 @@ def house_apartments(g):
     g.rrect((0.38, 0.72, 0.62, 0.75), 0.005, on="d")
 
 
+def house_abandoned(g):
+    # a research block with a broken roof line, boarded windows and a hazard mark on its door
+    g.poly([(0.16, 0.30), (0.40, 0.22), (0.50, 0.32), (0.62, 0.18), (0.84, 0.26), (0.84, 0.88), (0.16, 0.88)])
+    g.line([(0.24, 0.42), (0.40, 0.56)], 0.05, on="d")
+    g.line([(0.24, 0.56), (0.40, 0.42)], 0.05, on="d")
+    g.rrect((0.58, 0.40, 0.76, 0.56), 0.01, on="d")
+    g.poly([(0.50, 0.62), (0.60, 0.80), (0.40, 0.80)], on="d")
+
+
 def job_vault(g):
     g.rrect((0.12, 0.12, 0.88, 0.88), 0.08)
     g.ellipse((0.24, 0.24, 0.76, 0.76), fill=False, width=0.06, on="d")
@@ -417,6 +445,235 @@ def job_hostage(g):
     for x in (0.22, 0.40, 0.60, 0.78):
         g.line([(x, 0.08), (x, 0.92)], 0.05, on="d")
     g.line([(0.14, 0.08), (0.86, 0.08)], 0.05, on="d")
+
+
+# ------------------------------------------------------------------ robots and devices (map markers, hack slots)
+# Bold silhouettes read at 20 px: thick parts, few details, every kind a different outline.
+
+RS = 0.10  # robot stroke: limbs, rails, stems
+
+
+def _rot(pts, cx, cy, deg):
+    a = math.radians(deg)
+    c, s = math.cos(a), math.sin(a)
+    return [(cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c) for x, y in pts]
+
+
+def _dot(g, x, y, r, on="w"):
+    g.ellipse((x - r, y - r, x + r, y + r), on=on)
+
+
+def robot_guard(g):
+    # a biped: a boxy head with one camera eye, a torso, two legs bent at the knee, flat feet
+    g.rrect((0.32, 0.06, 0.68, 0.32), 0.07)
+    _dot(g, 0.50, 0.19, 0.075, on="d")
+    _dot(g, 0.50, 0.19, 0.03)
+    g.rrect((0.27, 0.36, 0.73, 0.62), 0.07)
+    g.line([(0.40, 0.60), (0.35, 0.75), (0.38, 0.87)], RS)
+    g.line([(0.60, 0.60), (0.65, 0.75), (0.62, 0.87)], RS)
+    g.rrect((0.24, 0.84, 0.44, 0.93), 0.03)
+    g.rrect((0.56, 0.84, 0.76, 0.93), 0.03)
+
+
+def robot_listener(g):
+    # a blind wheeled box with two big round ear dishes on stalks
+    g.line([(0.40, 0.46), (0.24, 0.26)], RS * 0.8)
+    g.line([(0.60, 0.46), (0.76, 0.26)], RS * 0.8)
+    for cx in (0.21, 0.79):
+        _dot(g, cx, 0.22, 0.16)
+        g.ellipse((cx - 0.09, 0.13, cx + 0.09, 0.31), fill=False, width=0.035, on="d")
+        _dot(g, cx, 0.22, 0.03, on="d")
+    g.rrect((0.26, 0.42, 0.74, 0.74), 0.08)
+    g.rrect((0.34, 0.52, 0.66, 0.60), 0.03, on="d")
+    for cx in (0.32, 0.68):
+        _dot(g, cx, 0.80, 0.11)
+        _dot(g, cx, 0.80, 0.04, on="d")
+
+
+def robot_drone(g):
+    # a quadcopter seen from the front: two rotors on arms, a body, a camera ball hanging below
+    g.line([(0.20, 0.38), (0.80, 0.38)], RS)
+    for cx in (0.20, 0.80):
+        g.line([(cx, 0.38), (cx, 0.24)], RS * 0.8)
+        g.rrect((cx - 0.17, 0.17, cx + 0.17, 0.25), 0.04)
+    g.rrect((0.34, 0.32, 0.66, 0.56), 0.08)
+    g.line([(0.50, 0.56), (0.50, 0.64)], RS * 0.7)
+    _dot(g, 0.50, 0.72, 0.12)
+    _dot(g, 0.50, 0.74, 0.05, on="d")
+    g.line([(0.30, 0.56), (0.24, 0.66)], RS * 0.6)
+    g.line([(0.70, 0.56), (0.76, 0.66)], RS * 0.6)
+
+
+def robot_spider(g):
+    # top view: a body and eight legs, four a side, bent at the knee
+    for s in (-1, 1):
+        for knee, foot, y0 in (((0.26, 0.14), (0.14, 0.04), 0.36), ((0.18, 0.32), (0.06, 0.30), 0.42),
+                               ((0.18, 0.56), (0.06, 0.66), 0.48), ((0.26, 0.74), (0.16, 0.92), 0.54)):
+            g.line([(0.5 + s * 0.08, y0), (0.5 + s * (0.5 - knee[0]), knee[1]), (0.5 + s * (0.5 - foot[0]), foot[1])], RS * 0.7)
+    g.ellipse((0.36, 0.26, 0.64, 0.54))
+    g.ellipse((0.33, 0.46, 0.67, 0.90))
+    _dot(g, 0.44, 0.33, 0.035, on="d")
+    _dot(g, 0.56, 0.33, 0.035, on="d")
+
+
+def robot_vacuum(g):
+    # a disc hanging from a ceiling rail, a fan of laser lines down to the floor
+    g.rrect((0.06, 0.06, 0.94, 0.14), 0.03)
+    g.line([(0.50, 0.12), (0.50, 0.22)], RS)
+    g.ellipse((0.20, 0.20, 0.80, 0.42))
+    _dot(g, 0.50, 0.33, 0.05, on="d")
+    for x in (0.16, 0.33, 0.50, 0.67, 0.84):
+        g.line([(0.50, 0.42), (x, 0.90)], 0.05)
+
+
+def robot_turret(g):
+    # a gun turret: a tripod base, a round housing, a double barrel to the right
+    g.poly([(0.30, 0.66), (0.50, 0.66), (0.62, 0.88), (0.18, 0.88)])
+    g.rrect((0.12, 0.84, 0.68, 0.93), 0.03)
+    g.line([(0.40, 0.66), (0.40, 0.56)], RS * 1.2)
+    g.rrect((0.14, 0.28, 0.64, 0.60), 0.15)
+    g.rrect((0.56, 0.32, 0.94, 0.41), 0.03)
+    g.rrect((0.56, 0.47, 0.94, 0.56), 0.03)
+    _dot(g, 0.32, 0.44, 0.06, on="d")
+
+
+def robot_thumper(g):
+    # a body on tracks, a piston down to a heavy foot on the ground, shock waves rising to both sides of it
+    g.rrect((0.30, 0.04, 0.70, 0.24), 0.05)
+    _dot(g, 0.50, 0.14, 0.045, on="d")
+    g.rrect((0.12, 0.24, 0.88, 0.40), 0.08)
+    for x in (0.24, 0.42, 0.58, 0.76):
+        _dot(g, x, 0.32, 0.035, on="d")
+    g.rrect((0.44, 0.38, 0.56, 0.62), 0.02)
+    g.rrect((0.33, 0.60, 0.67, 0.80), 0.04)
+    g.rrect((0.04, 0.84, 0.96, 0.92), 0.03)
+    for r in (0.30, 0.44):
+        g.arc((0.50 - r, 0.84 - r, 0.50 + r, 0.84 + r), 198, 240, RS * 0.75)
+        g.arc((0.50 - r, 0.84 - r, 0.50 + r, 0.84 + r), 300, 342, RS * 0.75)
+
+
+def robot_hound(g):
+    # a robot dog in profile, head down to the floor, sniffing (scent dots at the nose)
+    g.rrect((0.12, 0.30, 0.64, 0.52), 0.09)
+    g.line([(0.14, 0.34), (0.06, 0.16)], RS * 0.7)
+    for x0, x1 in ((0.20, 0.16), (0.32, 0.30), (0.50, 0.50), (0.60, 0.64)):
+        g.line([(x0, 0.48), (x1, 0.88)], RS)
+    g.line([(0.58, 0.38), (0.72, 0.58)], RS * 1.4)
+    g.poly(_rot([(0.62, 0.54), (0.86, 0.54), (0.94, 0.66), (0.86, 0.72), (0.62, 0.72)], 0.74, 0.63, 30))
+    _dot(g, 0.72, 0.60, 0.03, on="d")
+    _dot(g, 0.94, 0.88, 0.035)
+    _dot(g, 0.84, 0.92, 0.03)
+
+
+def robot_sorter(g):
+    # a sorting bin with three slots, a circle, a square and a triangle dropping into them
+    _dot(g, 0.22, 0.20, 0.11)
+    g.rrect((0.40, 0.09, 0.60, 0.29), 0.02)
+    g.poly([(0.78, 0.07), (0.90, 0.30), (0.66, 0.30)])
+    g.rrect((0.10, 0.40, 0.90, 0.92), 0.06)
+    for x in (0.22, 0.50, 0.78):
+        g.poly([(x - 0.10, 0.40), (x + 0.10, 0.40), (x + 0.05, 0.54), (x - 0.05, 0.54)], on="d")
+    g.rrect((0.20, 0.68, 0.80, 0.76), 0.02, on="d")
+
+
+def robot_worker(g):
+    # a small robot on a tread holding a big crate over its head with both arms
+    g.rrect((0.10, 0.04, 0.90, 0.36), 0.03)
+    g.rrect((0.17, 0.10, 0.83, 0.30), 0.0, fill=False, width=0.035, on="d")
+    g.line([(0.19, 0.12), (0.81, 0.28)], 0.035, on="d")
+    g.line([(0.38, 0.56), (0.22, 0.48), (0.22, 0.36)], RS * 0.9)
+    g.line([(0.62, 0.56), (0.78, 0.48), (0.78, 0.36)], RS * 0.9)
+    g.rrect((0.34, 0.44, 0.66, 0.74), 0.08)
+    _dot(g, 0.44, 0.56, 0.035, on="d")
+    _dot(g, 0.56, 0.56, 0.035, on="d")
+    g.rrect((0.26, 0.78, 0.74, 0.93), 0.07)
+    for x in (0.36, 0.50, 0.64):
+        _dot(g, x, 0.855, 0.03, on="d")
+
+
+def robot_hunter(g):
+    # a sharp mask: swept-back horns, a pointed jaw, two angry slit eyes
+    g.poly([(0.08, 0.08), (0.36, 0.30), (0.64, 0.30), (0.92, 0.08), (0.86, 0.52), (0.62, 0.78),
+            (0.50, 0.94), (0.38, 0.78), (0.14, 0.52)])
+    g.poly([(0.20, 0.42), (0.44, 0.52), (0.42, 0.60), (0.26, 0.54)], on="d")
+    g.poly([(0.80, 0.42), (0.56, 0.52), (0.58, 0.60), (0.74, 0.54)], on="d")
+
+
+def robot_lidar(g):
+    # a pole on a floor base, a head with a laser line through it and its spin orbit
+    g.rrect((0.30, 0.84, 0.70, 0.93), 0.03)
+    g.line([(0.50, 0.86), (0.50, 0.44)], RS)
+    g.ellipse((0.14, 0.30, 0.86, 0.54), fill=False, width=0.045)
+    g.rrect((0.06, 0.39, 0.94, 0.45), 0.03)
+    g.rrect((0.38, 0.24, 0.62, 0.56), 0.06)
+    _dot(g, 0.50, 0.40, 0.045, on="d")
+    g.poly([(0.20, 0.29), (0.30, 0.26), (0.28, 0.36)])
+
+
+def robot_motionsensor(g):
+    # a dome sensor in the top-right corner of two walls, motion waves going out of it
+    g.rrect((0.86, 0.06, 0.94, 0.94), 0.02)
+    g.rrect((0.06, 0.06, 0.94, 0.14), 0.02)
+    g.poly(_rot([(0.62, 0.18), (0.82, 0.18), (0.82, 0.38)], 0.82, 0.18, 0))
+    _dot(g, 0.70, 0.30, 0.12)
+    for r in (0.30, 0.46, 0.62):
+        g.arc((0.82 - r, 0.18 - r, 0.82 + r, 0.18 + r), 110, 160, RS * 0.75)
+
+
+def robot_pressureplate(g):
+    # a floor tile in perspective with an arrow pressing down onto it
+    g.poly([(0.20, 0.64), (0.80, 0.64), (0.94, 0.88), (0.06, 0.88)])
+    g.poly([(0.30, 0.69), (0.70, 0.69), (0.78, 0.83), (0.22, 0.83)], on="d")
+    g.poly([(0.34, 0.71), (0.66, 0.71), (0.72, 0.81), (0.28, 0.81)])
+    g.rrect((0.41, 0.06, 0.59, 0.36), 0.03)
+    g.poly([(0.24, 0.32), (0.76, 0.32), (0.50, 0.58)])
+
+
+def robot_camera(g):
+    # a wall CCTV camera: a wall plate, an arm, the body tilted down to the right with its lens and hood
+    g.rrect((0.06, 0.14, 0.16, 0.50), 0.02)
+    g.line([(0.14, 0.32), (0.30, 0.32), (0.36, 0.40)], RS)
+    body = _rot([(0.26, 0.30), (0.80, 0.30), (0.80, 0.54), (0.26, 0.54)], 0.53, 0.42, 22)
+    g.poly(body)
+    hood = _rot([(0.30, 0.24), (0.92, 0.24), (0.86, 0.32), (0.30, 0.32)], 0.53, 0.42, 22)
+    g.poly(hood)
+    lens = _rot([(0.80, 0.42)], 0.53, 0.42, 22)[0]
+    _dot(g, lens[0] - 0.05, lens[1] - 0.01, 0.07, on="d")
+
+
+def robot_sweeper(g):
+    # a flat floor disc in 3/4 view with a bumper, a sensor bump and two spinning side brushes
+    g.ellipse((0.14, 0.36, 0.86, 0.66))
+    g.rrect((0.14, 0.51, 0.86, 0.62), 0.0)
+    g.ellipse((0.14, 0.47, 0.86, 0.77))
+    g.arc((0.14, 0.36, 0.86, 0.66), 0, 180, 0.035, on="d")
+    g.rrect((0.40, 0.28, 0.60, 0.44), 0.05)
+    for cx in (0.20, 0.80):
+        for a in range(0, 180, 45):
+            r = math.radians(a)
+            g.line([(cx - math.cos(r) * 0.15, 0.82 - math.sin(r) * 0.07), (cx + math.cos(r) * 0.15, 0.82 + math.sin(r) * 0.07)], 0.05)
+
+
+def robot_warden(g):
+    # a heavy guard behind a tall shield: wide shoulders, a head with its eye over the rim, feet below
+    g.rrect((0.32, 0.04, 0.68, 0.26), 0.06)
+    _dot(g, 0.50, 0.15, 0.06, on="d")
+    g.rrect((0.06, 0.26, 0.94, 0.44), 0.08)
+    g.rrect((0.20, 0.84, 0.40, 0.94), 0.03)
+    g.rrect((0.60, 0.84, 0.80, 0.94), 0.03)
+    shield = [(0.16, 0.32), (0.84, 0.32), (0.84, 0.64), (0.50, 0.90), (0.16, 0.64)]
+    g.poly(shield)
+    g.cut(mask_of(g.size, lambda m: [m.line([a, b], 0.035) for a, b in zip(shield, shield[1:] + shield[:1])]))
+    g.line([(0.32, 0.46), (0.50, 0.60), (0.68, 0.46)], 0.07, on="d")
+
+
+ROBOTS = {
+    "robot_guard": robot_guard, "robot_listener": robot_listener, "robot_drone": robot_drone, "robot_spider": robot_spider,
+    "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, "robot_hound": robot_hound,
+    "robot_sorter": robot_sorter, "robot_worker": robot_worker, "robot_hunter": robot_hunter, "robot_lidar": robot_lidar,
+    "robot_motionsensor": robot_motionsensor, "robot_pressureplate": robot_pressureplate, "robot_camera": robot_camera,
+    "robot_sweeper": robot_sweeper, "robot_warden": robot_warden,
+}
 
 
 def make(name, draw, size=R, rim=0.045):
@@ -440,32 +697,42 @@ def app_icon(size=512):
     print("app icon ->", os.path.abspath(path))
 
 
-def main():
+def main(only=None):
+    """only: a name prefix (python Tools/Art/generate_icons.py --only robot_) writes just the icons it matches."""
     os.makedirs(OUT, exist_ok=True)
+    jobs = []
     glyphs = {
         "ret_hand": hand, "ret_lock": lock, "ret_key": key, "ret_hack": bolt, "ret_revive": plus_ring,
         "ret_heal": cross, "ret_search": magnifier, "ret_seat": wheel, "ret_fuel": drop, "ret_terminal": monitor,
-        "ret_craft": gem, "ret_lever": lever, "ret_safe": dial, "ret_crate": box, "ret_door": door,
+        "ret_craft": gem, "ret_lever": lever, "ret_safe": dial, "ret_crate": box, "ret_door": door, "ret_vent": grille,
     }
     for name, draw in glyphs.items():
-        make(name, draw)
+        jobs.append((name, lambda n=name, d=draw: make(n, d)))
     for name, draw in {"house_office": house_office, "house_business": house_business, "house_datacenter": house_datacenter,
                        "house_warehouse": house_warehouse, "house_hq": house_hq, "house_hospital": house_hospital,
-                       "house_garage": house_garage, "house_apartments": house_apartments, "job_vault": job_vault, "job_hostage": job_hostage}.items():
-        make(name, draw, size=96)
+                       "house_garage": house_garage, "house_apartments": house_apartments, "house_abandoned": house_abandoned, "job_vault": job_vault, "job_hostage": job_hostage}.items():
+        jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
+    for name, draw in ROBOTS.items():
+        jobs.append((name, lambda n=name, d=draw: make(n, d)))
     for level in range(4):
-        make(f"noise_{level}", speaker(level))
+        jobs.append((f"noise_{level}", lambda lv=level: make(f"noise_{lv}", speaker(lv))))
     frames = 8
     for i in range(frames):
-        make(f"eye_{i}", eye(i / (frames - 1)))
-    make("heart_full", heart(True))
-    make("heart_empty", heart(False))
-    keycap()
+        jobs.append((f"eye_{i}", lambda k=i: make(f"eye_{k}", eye(k / (frames - 1)))))
+    jobs.append(("heart_full", lambda: make("heart_full", heart(True))))
+    jobs.append(("heart_empty", lambda: make("heart_empty", heart(False))))
+    jobs.append(("keycap", keycap))
+    jobs.append(("arrow_left", lambda: make("arrow_left", arrow_left)))
+    jobs.append(("arrow_right", lambda: make("arrow_right", arrow_right)))
     for b in ("lmb", "rmb", "mmb", "wheel"):
-        make(f"mouse_{b}", mouse(b), rim=0.03)
-    app_icon()
+        jobs.append((f"mouse_{b}", lambda bb=b: make(f"mouse_{bb}", mouse(bb), rim=0.03)))
+    jobs.append(("AppIcon", app_icon))
+    for name, job in jobs:
+        if only is None or name.startswith(only):
+            job()
     print("icons ->", os.path.abspath(OUT))
 
-
 if __name__ == "__main__":
-    main()
+    import sys
+    args = sys.argv[1:]
+    main(args[args.index("--only") + 1] if "--only" in args else None)

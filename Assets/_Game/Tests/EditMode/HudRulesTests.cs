@@ -49,6 +49,17 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheNextHackSlotToGoIsOnTheLeft()
+        {
+            // two bolts; a robot hacked: bolt / robot; a camera: robot / camera; a sensor wakes the robot: camera / sensor
+            CollectionAssert.AreEqual(new[] { -1, -1 }, HackSlotRules.Layout(2, new int[0]));
+            CollectionAssert.AreEqual(new[] { -1, 0 }, HackSlotRules.Layout(2, new[] { 0 }));
+            CollectionAssert.AreEqual(new[] { 0, 14 }, HackSlotRules.Layout(2, new[] { 0, 14 }));
+            CollectionAssert.AreEqual(new[] { 14, 12 }, HackSlotRules.Layout(2, new[] { 14, 12 }));
+            CollectionAssert.AreEqual(new[] { 14, 12 }, HackSlotRules.Layout(2, new[] { 0, 14, 12 }), "more than fit: the newest");
+        }
+
+        [Test]
         public void TheHunterIsNeverASurprise()
         {
             var (text, urgency) = HunterRules.Line(250.2f, 3, 0);
@@ -193,7 +204,10 @@ namespace Stealth.Tests
             c.CanGetUp = false;
             CollectionAssert.IsEmpty(Hints(c), "out cold: nothing to press");
             c.Watching = true;
-            Assert.IsTrue(Hints(c).Single().Key.IsMouse, "switch whose eyes");
+            var watching = Hints(c).ToList();
+            Assert.AreEqual(2, watching.Count, "switch whose eyes, call for help");
+            Assert.IsTrue(watching.Exists(h => h.Key.IsMouse), "switch whose eyes");
+            Assert.IsTrue(watching.Exists(h => h.Key.Equals(Controls.Get(GameAction.CallHelp))), "call for help");
             var menu = Idle;
             menu.MenuOpen = true;
             menu.CanRevive = true;

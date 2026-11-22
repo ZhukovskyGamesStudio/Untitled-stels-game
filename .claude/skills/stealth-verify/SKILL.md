@@ -1,6 +1,6 @@
 ---
 name: stealth-verify
-description: How to verify a change in the «Айтишники: вылазка» Unity project without the editor — EditMode tests, rebuilding generated assets, the Windows player build, autopilot scenarios with [AUTOTEST] logs and screenshots, two-instance network runs, and the usual pitfalls. Use after any code or asset change, before committing, and when asked to "check", "test", "screenshot" or "build".
+description: How to verify a change in the USG (untitled stels game) Unity project without the editor — EditMode tests, rebuilding generated assets, the Windows player build, autopilot scenarios with [AUTOTEST] logs and screenshots, two-instance network runs, and the usual pitfalls. Use after any code or asset change, before committing, and when asked to "check", "test", "screenshot" or "build".
 ---
 
 # Как проверять изменения
@@ -22,6 +22,11 @@ description: How to verify a change in the «Айтишники: вылазка�
 (генерируются один раз на весь прогон), не генерируй десятки своих; статистику по сотням сидов проверяй на чистой функции,
 которая принимает решение, а не на целых домах.
 
+**Медленные тесты** — те, что генерируют десятки домов (статистика планировки, зонирование, режим врагов, вентиляция…), помечены
+`[Category("Slow")]`: это ~40 тестов и ~90% времени (замер — `Logs/test_times.txt`, его пишет каждый `cycle`). `cycle` и `tests`
+их пропускают; `SLOW=1` — весь набор: перед коммитом и после правок генератора (`LevelGenerator`, `PlanGenerator*`, `Furnisher*`,
+`HouseFeatures`, ростер, настройки дома). `FILTER=` запускает названные тесты, медленные тоже. Новый тест, который идёт дольше
+5 с, — тоже `[Category("Slow")]`.
 
 ```bash
 Tools/dev.sh tests

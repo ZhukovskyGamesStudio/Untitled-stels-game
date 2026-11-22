@@ -168,7 +168,8 @@ def hunter(L):
                 d = v.co - V((pts[0].x, pts[0].y, v.co.z))
                 v.co -= V((-sn, c, 0)) * d.dot(V((-sn, c, 0))) * .7
         P.add("Accent" if k % 2 else "Body", rib)
-    P.add("Eye", L.tentacle([(0, .2, .95), (0, .26, 1.35), (0, .24, 1.7), (0, .12, 1.98)], .028, .028, res=2, per=5))  # dorsal seam
+    # dorsal seam: on the mantle's back (y offset + half depth of the loft above, +1 cm) — it ran inside the body below 1.5 m
+    P.add("Eye", L.tentacle([(0, .28, .95), (0, .265, 1.35), (0, .21, 1.7), (0, .06, 1.95)], .028, .028, res=2, per=5))
     for k in range(3):
         z = 1.2 + k * .22
         P.add("Accent", L.cone((0, .24 - k * .03, z), (0, .38 - k * .04, z + .14), .045, seg=8))           # back fins

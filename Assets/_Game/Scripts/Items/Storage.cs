@@ -17,7 +17,7 @@ namespace Stealth.Items
     {
         public static readonly List<Storage> All = new();
 
-        [Tooltip("Every door is a compartment of its own (staff lockers): all hinged on the same side, no pairs opening from the middle")]
+        [Tooltip("Every door is a compartment of its own (staff lockers): all hinged on the right, handle on the left, no pairs opening from the middle")]
         public bool Individual;
 
 
@@ -90,7 +90,7 @@ namespace Stealth.Items
                 p.ClosedPos = p.T.position;
                 p.ClosedRot = p.T.rotation;
                 p.Closed = closed[i];
-                p.RightHinge = !Drawers && !Individual && rightHinged[i];
+                p.RightHinge = !Drawers && (Individual || rightHinged[i]);
                 p.Hinge = StorageMath.Hinge(p.Closed, transform.right, transform.forward, p.RightHinge);
                 p.Tween = default;
                 p.Posed = false;

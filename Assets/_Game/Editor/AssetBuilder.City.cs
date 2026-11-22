@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.IO;
 using Stealth.Level;
 using UnityEditor;
 using UnityEngine;
@@ -84,6 +86,21 @@ namespace Stealth.EditorTools
             mats[(int)CitySlot.Plinth] = Mat("CityPlinth", new Color(0.36f, 0.35f, 0.34f), "paving", 0.25f);
             mats[(int)CitySlot.TailLight] = Mat("CityTailLight", new Color(1f, 0.12f, 0.08f), null, 0.5f, 0f, null, new Color(2.6f, 0.25f, 0.15f));
             mats[(int)CitySlot.Soil] = Mat("CitySoil", new Color(0.16f, 0.12f, 0.09f), "asphalt", 0.05f);
+            // the models' own (Tools/Blender/street.py): windows lit warm, a television's blue, dark; more car paints;
+            // the benches' slats, concrete, chrome, white window frames
+            mats[(int)CitySlot.WindowLit] = Mat("CityWindowLit", new Color(0.95f, 0.82f, 0.55f), null, 0.85f, 0f, null, windows);
+            mats[(int)CitySlot.WindowDim] = Mat("CityWindowDim", new Color(0.35f, 0.45f, 0.65f), null, 0.85f, 0f, null, new Color(0.45f, 0.7f, 1.3f));
+            mats[(int)CitySlot.WindowDark] = Mat("CityWindowDark", new Color(0.07f, 0.09f, 0.12f), null, 0.92f, 0.3f);
+            mats[(int)CitySlot.CarWhite] = Mat("CityCarWhite", new Color(0.82f, 0.82f, 0.8f), null, 0.75f, 0.2f);
+            mats[(int)CitySlot.CarBlack] = Mat("CityCarBlack", new Color(0.06f, 0.06f, 0.07f), null, 0.8f, 0.3f);
+            mats[(int)CitySlot.CarGreen] = Mat("CityCarGreen", new Color(0.12f, 0.28f, 0.18f), null, 0.75f, 0.3f);
+            mats[(int)CitySlot.Wood] = Mat("CityWood", new Color(0.42f, 0.27f, 0.15f), null, 0.3f);
+            mats[(int)CitySlot.Concrete] = Mat("CityConcrete", new Color(0.55f, 0.55f, 0.53f), "paving", 0.15f);
+            mats[(int)CitySlot.Chrome] = Mat("CityChrome", new Color(0.75f, 0.76f, 0.78f), null, 0.85f, 0.9f);
+            mats[(int)CitySlot.Frame] = Mat("CityFrame", new Color(0.86f, 0.86f, 0.84f), null, 0.4f);
+            // resolved per copy (CityProp.Paint / Pane) before merging: never drawn as themselves, kept filled as a fallback
+            mats[(int)CitySlot.Livery] = mats[(int)CitySlot.CarWhite];
+            mats[(int)CitySlot.Pane] = mats[(int)CitySlot.WindowDark];
 
             var piece = Prefab($"{LevelPrefabs}/City.prefab", () =>
             {
@@ -121,7 +138,58 @@ namespace Stealth.EditorTools
             Link(art, ref art.CityPiece, piece);
             Link(art, ref art.CityLamp, lamp);
             LinkAll(art, ref art.CityMaterials, mats);
+            art.CityMeshes = BuildCityMeshes();
+            EditorUtility.SetDirty(art);
             LinkAll(art, ref art.UtilityMaterials, util);
+        }
+
+        /// <summary>
+        /// The city's models (Art/Models/City, Tools/Blender/street.py) as the level builder merges them: each
+        /// <see cref="CityPropKind"/>'s parts, the <see cref="CitySlot"/> named by each part (Livery / Pane are filled in per
+        /// copy) and the part's place in the model. A model not exported yet is left out (its copies are not drawn).
+        /// </summary>
+        static CityMesh[] BuildCityMeshes()
+        {
+            var list = new List<CityMesh>();
+            foreach (CityPropKind kind in System.Enum.GetValues(typeof(CityPropKind)))
+            {
+                string path;
+                try { path = ModelPath(CityPlan.ModelFile(kind)); }
+                catch (FileNotFoundException)
+                {
+                    Debug.LogWarning($"[Builder] {CityPlan.ModelFile(kind)}.fbx is missing: run Tools/Blender/street.py");
+                    continue;
+                }
+                var model = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+                var meshes = new List<Mesh>();
+                var slots = new List<CitySlot>();
+                var locals = new List<Matrix4x4>();
+                foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (mf.sharedMesh == null) continue;
+                    meshes.Add(mf.sharedMesh);
+                    // a model of one part comes in as that part at the root, named after the file: then its mesh has the name
+                    slots.Add(CitySlotOf(path, mf.gameObject.name, mf.sharedMesh.name));
+                    locals.Add(model.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix);
+                }
+                Object.DestroyImmediate(model);
+                list.Add(new CityMesh { Kind = kind, Meshes = meshes.ToArray(), Slots = slots.ToArray(), Locals = locals.ToArray() });
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>A part's slot from its object's or mesh's name ("Stone", "Livery.001", "Glass 1"); unknown names are drawn as metal.</summary>
+        static CitySlot CitySlotOf(string path, params string[] names)
+        {
+            foreach (var full in names)
+            {
+                var name = full ?? "";
+                int cut = name.IndexOfAny(new[] { '.', ' ', '_' });
+                if (cut > 0) name = name.Substring(0, cut);
+                if (System.Enum.TryParse<CitySlot>(name, false, out var slot) && System.Enum.IsDefined(typeof(CitySlot), slot)) return slot;
+            }
+            Debug.LogWarning($"[Builder] {path}: part {string.Join(" / ", names)} is not a CitySlot, drawn as Metal");
+            return CitySlot.Metal;
         }
     }
 }

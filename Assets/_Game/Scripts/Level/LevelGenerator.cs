@@ -19,12 +19,12 @@ namespace Stealth.Level
     {
         [Header("Size by house (0-based); the last entry repeats")]
         public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        [Tooltip("Rooms per floor in the first house (6 = 3 x 2): the first houses are small and easy.")]
-        public float BaseRooms = 6f;
+        [Tooltip("Rooms per floor in the first house (9 = 3 x 3): enough room for the generator to vary even the first house.")]
+        public float BaseRooms = 9f;
         [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
-        public float RoomsPerHouse = 2.5f;
-        [Tooltip("Rooms per floor never go above this (36 = 6 x 6).")]
-        public float MaxRooms = 36f;
+        public float RoomsPerHouse = 3.5f;
+        [Tooltip("Rooms per floor never go above this (54 = 9 x 6).")]
+        public float MaxRooms = 54f;
         [Tooltip("Floor area by team size (1, 2, 3, 4… players; the last repeats): a bigger team gets a bigger house, much softer than ×N.")]
         public float[] AreaByPlayers = { 1f, 1.25f, 1.45f, 1.6f };
 
@@ -208,11 +208,19 @@ namespace Stealth.Level
         /// with a corridor down its length and rooms on both sides, admissions below, wards above, theatres on top (PlanGenerator.Hospital.cs).
         /// </summary>
         [System.NonSerialized] public bool Hospital;
+        [Tooltip("The hospital's slab against the area an office of the same house would have (0.6: 40% smaller); its robots and devices stay as many as for the full size.")]
+        public float HospitalSize = 0.6f;
         /// <summary>
         /// The apartment block's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Apartments"/>, never
         /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
         /// </summary>
         [System.NonSerialized] public bool Apartments;
+        /// <summary>
+        /// The abandoned research station's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Abandoned"/>,
+        /// never saved): the hospital's slab with a spine corridor, labs, servers and control below, quarters above
+        /// (<see cref="PlanGenerator"/>.Station).
+        /// </summary>
+        [System.NonSerialized] public bool Station;
 
         [Tooltip("The apartment block: chance of a lift when it has fewer storeys than LiftAlwaysFrom.")]
         public float LiftChance = 0.5f;
@@ -303,6 +311,9 @@ namespace Stealth.Level
         public int CameraTerminals = 1;
         [Tooltip("Desks turned into a terminal that hacks robots and devices from afar.")]
         public int HackTerminals = 1;
+        [Tooltip("Desks turned into a map terminal: sitting at it shows the whole building — floors, players, robots, traps, the ways in and out, " +
+                 "the storage room and the other terminals (the HUD has no map of its own). Spread out: each the furthest desk from the terminals before it.")]
+        public int MapTerminals = 2;
 
         [Header("Who")]
         public RosterSettings Roster = new();
@@ -431,7 +442,7 @@ namespace Stealth.Level
                     LobbyRoom = o.Lobby,
                     Mass = o.Mass,
                     Kind = h.Kind,
-                    OwnPlan = building.Garage || building.Hospital || building.Apartments,
+                    OwnPlan = building.Garage || building.Hospital || building.Apartments || building.Station,
                     PlanAttempt = attempt,
                 };
                 l.Stairs.AddRange(o.Stairs);
@@ -503,12 +514,25 @@ namespace Stealth.Level
             l.BasementOrigin = Basement.Frame(l.HatchPosition, l.BasementYaw).Origin;
             l.EntryHatch = Basement.StashSpot(l.Cellar); // no hatch down there: where the team's stash is kept
             var exit = ExitRoom(l);
+            // on a plan cell's middle (its shaft goes down through a hole of 3 x 3 cells) where the sewer's passage can come
+            // under it (SewerPlan.PassageFits: clear of the basement's tunnel); a room with no such spot gives way to another
+            System.Func<Vector3, bool> reachable = q => ExitReachable(l, q);
+            if (!TryHatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null, out var exitSpot, reachable))
+            {
+                var other = ExitRoom(l, reachable, true);
+                if (other != null && TryHatchCorner(l, other, null, out exitSpot, reachable)) exit = other;
+                else exitSpot = HatchCorner(l, exit, null);
+            }
             exit.Kept = exit.Id != l.LobbyRoom; // the wet room it was chosen for stays one
             l.ExitRoom = exit.Id;
             l.EntryRoom = entryRoom.Id;
-            l.ExitHatchPosition = HatchCorner(l, exit, exit.Type == RoomType.Workshop ? FarFrom(l, exit) : (Vector3?)null);
+            l.ExitHatchPosition = OnCells(exitSpot, exitSpot);
             furnisher.Reserve(0, l.ExitHatchPosition, 2.0f);
-            furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, 0f);
+            // its lid like the entry's: the side the climber steps off to (+Z) away from the tunnel — the passage's last
+            // stretch comes up from the tunnel's side, the ladder on the shaft's far wall
+            var off = l.Cellar.ToLocal(l.ExitHatchPosition);
+            var up = l.Cellar.Dir(new Vector3(0f, 0f, off.z >= 0f ? 1f : -1f));
+            furnisher.Put(exit, PropKind.Hatch, l.ExitHatchPosition, Mathf.Atan2(up.x, up.z) * Mathf.Rad2Deg);
             furnisher.PlaceVentDesks();
             l.PlayerSpawns.AddRange(Basement.Spawns(l.Cellar));
         }
@@ -709,25 +733,25 @@ namespace Stealth.Level
         /// in the auto repair shop its workshop (the oil separator's chamber in the floor). Never the lobby, the hidden room,
         /// a corridor, the storage room or the paint booth.
         /// </summary>
-        static PlanRoom ExitRoom(LevelLayout l)
+        static PlanRoom ExitRoom(LevelLayout l, System.Func<Vector3, bool> spot = null, bool generic = false)
         {
             // the crawl ducts must reach it (VentPlan): a room with a ceiling of its own and a void over it
             var reach = VentPlan.VoidReach(l, l.LobbyRoom);
-            if (HouseRules.Of(l).ExitRoom(l, reach) is PlanRoom own) return own;
+            if (!generic && HouseRules.Of(l).ExitRoom(l, reach) is PlanRoom own) return own;
             PlanRoom best = null, wet = null;
             float far = -1f, farWet = -1f;
             foreach (var r in l.Rooms)
             {
                 if (r.Floor != 0 || r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || RoomTraits.FloorTaken(r.Type) || r.Area < 10f) continue; // (the booth: its car; the theatres, imaging and the station: their equipment)
                 if (l.NearStair(0, r.Center, 1.4f)) continue;
-                if (!TryHatchCorner(l, r, null, out _)) continue; // no place by its walls (all doorways and open sides)
+                if (!TryHatchCorner(l, r, null, out _, spot)) continue; // no place by its walls (all doorways and open sides)
                 float d = (r.Center - l.HatchPosition).magnitude;
                 if (!VentPlan.CanReach(l, r, reach)) continue;
                 if (d > far) { far = d; best = r; }
                 if (RoomTraits.Wet(r.Type) && r.Type != RoomType.Bathroom && d > farWet) { farWet = d; wet = r; }
             }
             if (wet != null && farWet >= far * 0.6f && farWet > 8.5f) return wet;
-            return best ?? l.Lobby;
+            return best ?? (generic ? null : l.Lobby);
         }
 
         /// <summary>The entry hatch: in the plant room's corner (the lobby's, where a house has no plant room).</summary>
@@ -788,7 +812,14 @@ namespace Stealth.Level
         public static Vector3 HatchCorner(LevelLayout l, PlanRoom r, Vector3? near) => TryHatchCorner(l, r, near, out var p) ? p : r.Center;
 
         /// <summary>A hatch's place by the walls of a room (see <see cref="HatchCorner"/>); false when the room has none.</summary>
-        static bool TryHatchCorner(LevelLayout l, PlanRoom r, Vector3? near, out Vector3 spot)
+        /// <summary>The sewer's passage can come under an exit hatch here (its shaft on the plan cell this snaps to).</summary>
+        public static bool ExitReachable(LevelLayout l, Vector3 p)
+        {
+            var d = l.Cellar.ToLocal(OnCells(p, p));
+            return SewerPlan.PassageFits(new Vector2(d.x, d.z));
+        }
+
+        static bool TryHatchCorner(LevelLayout l, PlanRoom r, Vector3? near, out Vector3 spot, System.Func<Vector3, bool> allowed = null)
         {
             var plan = l.Plan;
             float y = LevelLayout.FloorY(r.Floor);
@@ -818,7 +849,7 @@ namespace Stealth.Level
             foreach (float margin in new[] { 1.6f, 0.7f })
             foreach (var (p, _) in spots)
             {
-                bool ok = !l.NearStair(r.Floor, p, 1.2f);
+                bool ok = !l.NearStair(r.Floor, p, 1.2f) && (allowed == null || allowed(p));
                 for (float dx = -0.95f; dx <= 0.96f && ok; dx += 0.95f)
                     for (float dz = -0.95f; dz <= 0.96f && ok; dz += 0.95f)
                     {
@@ -989,6 +1020,9 @@ namespace Stealth.Level
                 }
         }
 
+        /// <summary>What a map terminal's kiosk may stand in place of when no desk is left (<see cref="LevelLayout.KioskTerminals"/>).</summary>
+        static readonly PropKind[] KioskSpots = { PropKind.Armchair, PropKind.Cabinet, PropKind.Credenza, PropKind.Wardrobe }; // (as deep as the kiosk's foot, 0.6 m: a bookshelf left it in the wall)
+
         static void PlaceTerminals(LevelLayout l, SecuritySettings s)
         {
             // the control room's consoles first (Furnisher puts them there); what is left of them becomes a plain desk
@@ -1007,32 +1041,47 @@ namespace Stealth.Level
             // the hacking terminal first: with a single console in the control room, it is the one there
             for (int i = 0; i < s.HackTerminals; i++) want.Add(TerminalKind.Hacking);
             for (int i = 0; i < (l.CameraSpots.Count > 0 ? s.CameraTerminals : 0); i++) want.Add(TerminalKind.Cameras);
+            // the map terminals last (the picks before them stay as they were), spread over the house
+            for (int i = 0; i < s.MapTerminals; i++) want.Add(TerminalKind.Map);
+            List<int> spares = null;
             foreach (var kind in want)
             {
-                if (consoles.Count > 0)
+                // (a map terminal is never a console of the control room: two of them would stand side by side there)
+                if (consoles.Count > 0 && kind != TerminalKind.Map)
                 {
                     l.Terminals.Add((consoles[0], kind));
                     consoles.RemoveAt(0);
                     continue;
                 }
-                if (desks.Count == 0) break;
-                int pick = desks[rng.Next(desks.Count)];
+                // a house with no desk left (the apartment block): a map terminal is a kiosk in place of a plant, a chair, a shelf…
+                bool kiosk = desks.Count == 0 && kind == TerminalKind.Map;
+                if (kiosk && spares == null)
+                {
+                    spares = new List<int>();
+                    for (int i = 0; i < l.Props.Count; i++)
+                        if (System.Array.IndexOf(KioskSpots, l.Props[i].Kind) >= 0 && (l.Props[i].Position - l.HatchPosition).magnitude > HatchClear
+                            && !l.IsClimbPiece(l.Props[i].Position) && l.Plan.RoomAt(l.Props[i].Position + Vector3.up * 0.3f)?.Id != l.LobbyRoom) spares.Add(i);
+                }
+                var pool = kiosk ? spares : desks;
+                if (pool.Count == 0) continue; // (nothing left for this kind: the map terminals may still find a kiosk spot)
+                int pick = pool[rng.Next(pool.Count)];
                 if (l.Terminals.Count > 0)
                 {
                     // the desk furthest from the terminals placed so far
                     float best = -1f;
-                    foreach (var d in desks)
+                    foreach (var d in pool)
                     {
                         float near = float.MaxValue;
                         foreach (var t in l.Terminals) near = Mathf.Min(near, (l.Props[d].Position - l.Props[t.prop].Position).sqrMagnitude);
                         if (near > best) { best = near; pick = d; }
                     }
                 }
-                desks.Remove(pick);
+                pool.Remove(pick);
                 var p = l.Props[pick];
                 p.Kind = PropKind.Terminal;
                 l.Props[pick] = p;
                 l.Terminals.Add((pick, kind));
+                if (kiosk) l.KioskTerminals.Add(pick);
             }
             consoles.AddRange(leftover);
             foreach (int i in consoles)
@@ -1080,7 +1129,9 @@ namespace Stealth.Level
 
             // A bigger team gets a bigger house — and the guards to go with it.
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
-            int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits - solo));
+            // (a hospital is built smaller than its area, BuildingSettings.HospitalSize: its guards are counted for the full size)
+            float size = b.Hospital || b.Station ? Mathf.Clamp(b.HospitalSize, 0.1f, 1f) : 1f;
+            int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits / size - solo));
             int robots = s.RobotsFor(level, l.Floors, teamRooms);
             // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)
             var table = l.ClassicEnemies ? s.Roster.Robots : RobotRoster.NewEnemies(s.Roster.Robots);
@@ -1143,7 +1194,7 @@ namespace Stealth.Level
                     {
                         case RobotKind.MotionSensor:
                         {
-                            var (c, inward) = CornerOf(l, room, rng, 0.2f);
+                            var (c, inward) = CornerOf(l, room, rng, LevelMetrics.SensorCornerInset); // flush in the corner
                             pos = c + Vector3.up * 2.2f;
                             rot = Quaternion.LookRotation(inward);
                             break;

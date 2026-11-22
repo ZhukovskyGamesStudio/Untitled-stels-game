@@ -37,6 +37,8 @@ namespace Stealth.Game
         public const float StashReach = 2.4f;
         /// <summary>Called, it stops this close to the player who called it.</summary>
         public const float Arrive = 1.6f;
+        /// <summary>The longest way it walks on the floor to a caller or the exit (metres); further, or no way at all: through the ducts.</summary>
+        public const float WalkFurthest = 45f;
         /// <summary>Crawling through the ducts, metres a second; climbing through a grate, the same.</summary>
         public const float DuctSpeed = 1.8f;
         /// <summary>Seen in a room by a robot or a camera for this long, the alarm goes off, seconds.</summary>

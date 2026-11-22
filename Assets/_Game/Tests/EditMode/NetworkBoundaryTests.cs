@@ -125,8 +125,9 @@ namespace Stealth.Tests
             Assert.IsTrue(p.IsCrouching);
             Assert.AreEqual(PlayerController.CrouchHeight, p.Height);
             Assert.AreEqual("Саша", p.Nick);
-            p.ApplyOwnerState(false, 0, "");
+            p.ApplyOwnerState(false, 0, "", BodyPose.Ladder);
             Assert.AreEqual("Игрок 5", p.Nick, "a default name without Steam");
+            Assert.AreEqual(BodyPose.Ladder, p.Pose, "what the owner's body is busy with (the rigged human plays its take)");
         }
 
         [Test]

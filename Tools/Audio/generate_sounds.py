@@ -1,5 +1,5 @@
 """
-Procedural sounds and music for «Айтишники: вылазка».
+Procedural sounds and music for USG (untitled stels game).
 
     python Tools/Audio/generate_sounds.py [Assets/_Game/Art/Audio]
 
@@ -661,6 +661,45 @@ def unlock():
     return fade(mix(at(click(), 0.0, d), at(click(), 0.12, d), clunk))
 
 
+def work_hack():
+    """Hacking with the hands (a robot, a terminal, a lock's panel): two quick key taps on a little keypad and a soft blip."""
+    d = 0.16
+    def tap(f):
+        return bandpass(noise(0.025), f, f * 2.2) * env(int(0.025 * SR), 0.0005, 0.008, curve=6)
+    blip = sine(1650, 0.05) * env(int(0.05 * SR), 0.002, 0.03) * 0.35
+    return fade(mix(at(tap(2400), 0.0, d), at(tap(2900), 0.05, d), at(blip, 0.1, d)))
+
+
+def work_pick():
+    """Picking a lock: a pick's tiny metal tick on the pins, a short ring after it."""
+    d = 0.12
+    tick = highpass(noise(0.012), 3500) * env(int(0.012 * SR), 0.0003, 0.004, curve=6)
+    ring = mix(sine(5200, 0.08) * env(int(0.08 * SR), 0.0005, 0.04) * 0.25, sine(7300, 0.06) * env(int(0.06 * SR), 0.0005, 0.03) * 0.12)
+    return fade(mix(at(tick, 0.0, d), at(ring, 0.002, d)))
+
+
+def work_screw():
+    """A screwdriver turning a stiff screw: a ratchet's three dry clicks and a squeak of metal."""
+    d = 0.22
+    def click(f):
+        return bandpass(noise(0.018), f, f * 1.8) * env(int(0.018 * SR), 0.0004, 0.006, curve=6)
+    squeak = sweep(1900, 2300, 0.08) * env(int(0.08 * SR), 0.01, 0.06) * 0.18
+    return fade(mix(at(click(1600), 0.0, d), at(click(1700), 0.045, d), at(click(1550), 0.09, d), at(squeak, 0.12, d)))
+
+
+def grind():
+    """The car's shredder biting into a thing: a crunch of breaking, metal scraping on metal, a whine of the blades."""
+    rnd = np.random.default_rng(0x6A1D)                     # its own stream: the other sounds stay as they are
+    d = 0.75
+    crunch = bandpass(rnd.standard_normal(int(d * SR)), 300, 2400) * env(int(d * SR), 0.005, 0.5)
+    for k in range(7):                                      # bits breaking off
+        t = 0.04 + k * 0.085 + rnd.uniform(0, 0.03)
+        crunch += at(highpass(rnd.standard_normal(int(0.03 * SR)), 1800) * env(int(0.03 * SR), 0.0005, 0.012, curve=6) * 1.6, t, d)
+    whine = (np.sin(2 * np.pi * np.cumsum(np.linspace(380, 520, int(d * SR))) / SR) * 0.25
+             * env(int(d * SR), 0.02, 0.6))
+    return fade(mix(crunch * 0.8, whine))
+
+
 def door_open():
     """A hinged door opening: the handle's latch clicks back, then a short dry creak of the hinges and the air it moves."""
     d = 0.6
@@ -955,17 +994,21 @@ def main():
     write(P("Items", "stun_blast"), stun_blast(), 0.9)
     write(P("Items", "crate_search"), crate_search(), 0.7)
     write(P("Items", "unlock"), unlock(), 0.8)
-    write(P("Car", "car_engine"), car_engine(2.0), 0.8)
+    car_engine(2.0)   # rendered, not written: a CC0 recording replaces it (import_cc0_sounds.py); the noise stream stays the same
     write(P("Car", "car_start"), car_start(), 0.8)
     write(P("Car", "car_stop"), car_stop(), 0.7)
-    write(P("Car", "car_horn"), car_horn(), 0.7)
+    car_horn()        # (the same)
     write(P("Car", "car_bump"), car_bump(), 0.7)
     write(P("Environment", "gate_open"), gate_open(), 0.8)
     write(P("Player", "gas_breath"), gas_breath(), 0.7)
     for level in range(3):
         write(P("Player", f"gas_laugh_{level}"), gas_laugh(level), 0.8)
+    write(P("Items", "work_hack"), work_hack(), 0.6)
+    write(P("Items", "work_pick"), work_pick(), 0.6)
+    write(P("Items", "work_screw"), work_screw(), 0.6)
     write(P("Environment", "door_open"), door_open(), 0.6)
     write(P("Environment", "door_shut"), door_shut(), 0.7)
+    write(P("Car", "grind"), grind(), 0.8)  # (last, with its own stream: the sounds above keep theirs)
 
 
 if __name__ == "__main__":

@@ -5,9 +5,10 @@ namespace Stealth.Game
 {
     /// <summary>
     /// "Here!" — a spot; Enemy — a robot marked for the team (it is also lit through walls while marked); Thing — a thing
-    /// marked for the team (loot, a crate, a panel…: lit through walls in yellow-green, <see cref="Level.MarkedThings"/>).
+    /// marked for the team (loot, a crate, a panel…: lit through walls in yellow-green, <see cref="Level.MarkedThings"/>); Help —
+    /// a knocked-out player calls the team to themselves: their body is seen through walls while it lasts.
     /// </summary>
-    public enum PingKind : byte { Here, Enemy, Thing }
+    public enum PingKind : byte { Here, Enemy, Thing, Help }
 
     public struct TeamPing
     {
@@ -62,6 +63,7 @@ namespace Stealth.Game
                 bool same = p.Kind switch
                 {
                     PingKind.Here => o.Kind == PingKind.Here && o.Owner == p.Owner,
+                    PingKind.Help => o.Kind == PingKind.Help && o.Owner == p.Owner,
                     PingKind.Thing => o.Kind == PingKind.Thing && (o.Position - p.Position).sqrMagnitude < 0.25f, // the same thing marked again
                     _ => o.Kind == PingKind.Enemy && o.Target == p.Target,
                 };
@@ -75,6 +77,13 @@ namespace Stealth.Game
         {
             int removed = m_Pings.RemoveAll(p => now >= p.Until);
             if (removed > 0) Version++;
+        }
+
+        /// <summary>This player is calling for help now (a Help ping of theirs is up).</summary>
+        public bool Calling(ulong owner)
+        {
+            foreach (var p in m_Pings) if (p.Kind == PingKind.Help && p.Owner == owner) return true;
+            return false;
         }
 
         public void Clear()

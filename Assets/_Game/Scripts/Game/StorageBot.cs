@@ -61,6 +61,12 @@ namespace Stealth.Game
         public Answer CallServer(Vector3 caller, LevelLayout l)
         {
             if (!StorageBotRules.CanCall(Mode) || l == null) return Answer.Busy;
+            // on its feet with a way there on the floor: it simply walks over (the ducts only when there is no other way)
+            if (WalksTo(caller))
+            {
+                Begin(new List<BotLeg> { new() { Kind = BotLegKind.Walk, To = caller, Room = -2 } }, BotMode.Coming, BotMode.Waiting);
+                return Answer.Coming;
+            }
             int floor = LevelLayout.FloorOf(caller.y + 0.1f);
             if (floor >= l.Vents.Count) return Answer.NoWay;
             var net = l.Vents[floor];
@@ -80,7 +86,13 @@ namespace Stealth.Game
         /// <summary>Server: sent to the exit — through the ducts to the exit room, down, into the exit hatch.</summary>
         public Answer SendToExitServer(LevelLayout l)
         {
-            if (!StorageBotRules.CanCall(Mode) || l == null || l.Vents.Count == 0) return Answer.Busy;
+            if (!StorageBotRules.CanCall(Mode) || l == null) return Answer.Busy;
+            if (WalksTo(l.ExitHatchPosition))
+            {
+                Begin(new List<BotLeg> { new() { Kind = BotLegKind.LeaveByHatch, To = l.ExitHatchPosition } }, BotMode.ToGrate, BotMode.Gone);
+                return Answer.Coming;
+            }
+            if (l.Vents.Count == 0) return Answer.Busy;
             var net = l.Vents[0];
             int exitRoom = l.ExitRoom;
             int i = net.Grates.FindIndex(g => g.Room == exitRoom);
@@ -144,6 +156,22 @@ namespace Stealth.Game
 
         bool InBasement(LevelLayout l) => Basement.Contains(l.Cellar, transform.position);
 
+        static NavMeshPath s_Path; // made on first use: Unity forbids it in a static initializer
+
+        /// <summary>Out of the ducts, on the navmesh, with a whole walkable way to <paramref name="to"/> that is not too long.</summary>
+        bool WalksTo(Vector3 to)
+        {
+            if (m_InDuct || m_Agent == null) return false;
+            OnFloor();
+            if (!m_Agent.isOnNavMesh || !NavMesh.SamplePosition(to, out var hit, 1.5f, NavMesh.AllAreas)) return false;
+            s_Path ??= new NavMeshPath();
+            if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, s_Path) || s_Path.status != NavMeshPathStatus.PathComplete) return false;
+            float length = 0f;
+            var corners = s_Path.corners;
+            for (int i = 1; i < corners.Length; i++) length += Vector3.Distance(corners[i - 1], corners[i]);
+            return length <= StorageBotRules.WalkFurthest;
+        }
+
         void Begin(List<BotLeg> legs, BotMode mode, BotMode after)
         {
             m_Legs.Clear();
@@ -167,6 +195,7 @@ namespace Stealth.Game
                 case BotLegKind.Walk:
                 case BotLegKind.LeaveByHatch:
                     OnFloor();
+                    if (!m_Agent.isOnNavMesh) { m_LegUntil = Time.time; break; } // nowhere to walk from: the leg ends at once
                     m_Agent.isStopped = false;
                     var to = leg.To;
                     if (NavMesh.SamplePosition(to, out var hit, 1.5f, NavMesh.AllAreas)) to = hit.position;
@@ -200,9 +229,11 @@ namespace Stealth.Game
 
         void OnFloor()
         {
-            if (m_Agent.enabled) return;
-            m_Agent.enabled = true;
-            m_Agent.Warp(transform.position);
+            if (!m_Agent.enabled) m_Agent.enabled = true;
+            if (m_Agent.isOnNavMesh) return;
+            // off the navmesh (out of a duct, set down by the network): onto the nearest walkable spot, or SetDestination throws
+            if (NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas)) m_Agent.Warp(hit.position);
+            else m_Agent.Warp(transform.position);
         }
 
         void Update()

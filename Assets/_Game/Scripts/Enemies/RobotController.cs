@@ -107,6 +107,9 @@ namespace Stealth.Enemies
             DropCargoServer();
         }
 
+        /// <summary>Server: searched by a player with no keyboard: what it carries (the cage's key, loot) falls off; it is not hacked.</summary>
+        public void SearchServer() => DropCargoServer();
+
         /// <summary>Server: a hacked worker drops what it carried in front of itself — take it.</summary>
         void DropCargoServer()
         {
@@ -165,6 +168,27 @@ namespace Stealth.Enemies
 
         // ------------------------------------------------------------------ update
 
+        /// <summary>
+        /// Server: resting, it backs right up to its charging dock and stands on the dock's spot exactly (the navmesh ends
+        /// short of the dock, it would stand off it and to the side); off the dock the agent takes the body again.
+        /// </summary>
+        void HoldOnDock(float dt)
+        {
+            bool rest = m_Brain.Resting;
+            if (rest)
+            {
+                if (m_Agent.updatePosition) m_Agent.updatePosition = false;
+                var spot = m_Brain.DockSpot;
+                spot.y = transform.position.y;
+                transform.position = Vector3.MoveTowards(transform.position, spot, dt * 1.2f);
+            }
+            else if (!m_Agent.updatePosition)
+            {
+                m_Agent.updatePosition = true;
+                m_Agent.nextPosition = transform.position; // off the dock from where it stands
+            }
+        }
+
         void Update()
         {
             if (!IsServer || m_Brain == null || !m_Agent.isOnNavMesh) return;
@@ -180,6 +204,7 @@ namespace Stealth.Enemies
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
             if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
+            HoldOnDock(dt);
             SetMode(ModeOf(m_Brain.State)); // (resting comes and goes without a change of state)
             if (m_HasPost && State == RobotState.Patrol && Arrived)
             {

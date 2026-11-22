@@ -94,6 +94,7 @@ namespace Stealth.EditorTools
                 lidPivot.position = new Vector3(b.center.x, b.min.y, b.min.z);
                 foreach (var r in lids) r.transform.SetParent(lidPivot, true);
             }
+            WalkingLegs(root, model); // its crab legs (cut at the knee) walk by inverse kinematics
             var anim = root.AddComponent<StorageBotAnimator>();
             anim.Model = model.transform;
             anim.LidPivot = lidPivot;
@@ -258,7 +259,7 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ player build
 
-        public const string PlayerExe = "Builds/Windows/StealthPrototype.exe";
+        public const string PlayerExe = "Builds/Windows/USG.exe";
 
         [MenuItem("Stealth/Build Windows Player")]
         public static void BuildPlayerWindows() =>

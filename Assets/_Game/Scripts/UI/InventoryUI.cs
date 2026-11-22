@@ -172,6 +172,7 @@ namespace Stealth.UI
         void Update()
         {
             var me = Me;
+            if (GameManager.Instance != null && GameManager.Instance.Picking) me = null; // the start screen: no backpack, no hand
             Ui.Show(Panel, me != null);
             m_Tooltip = null;
             if (me == null || Mouse.current == null)
@@ -204,7 +205,7 @@ namespace Stealth.UI
             Board.Show(on);
             if (!on) return;
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
-            bool burn = GameManager.Instance.Stash == Stash;
+            bool burn = GameManager.Instance.CanBurnStashAt(me.transform.position, Stash); // (the storage robot's crate: no fire)
             if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
@@ -285,6 +286,8 @@ namespace Stealth.UI
             if (over is Target.Backpack or Target.Belt)
             {
                 int idx = inv.IndexAt(cell);
+                // an empty belt: the bag itself is taken off (into the backpack, the stash, the hopper's fire)
+                if (idx < 0 && over == Target.Belt && inv.BeltCount() == 0) idx = inv.WornIndex();
                 if (idx < 0) return;
                 var e = inv.Items[idx];
                 m_Tooltip = ItemCatalog.Describe(e.Shape, e.Color);
@@ -341,7 +344,7 @@ namespace Stealth.UI
         void StartShape(InventoryEntry e, Vector2Int cell)
         {
             m_DragShape = e.Shape; m_DragColor = e.Color; m_DragRot = e.Rot;
-            m_GrabCell = cell - new Vector2Int(e.X, e.Y);
+            m_GrabCell = PlayerInventory.Worn(e) ? Vector2Int.zero : cell - new Vector2Int(e.X, e.Y);
             m_DragTravel = 0f;
         }
 
@@ -424,6 +427,8 @@ namespace Stealth.UI
                     if (!ItemCatalog.Holdable(m_DragShape)) return;
                     if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) Take(inv, PlayerInventory.HandX, 0, 0);
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
+                    // the hand is busy: the two swap (the held one where this one was, if there is room)
+                    else if (m_Source == DragSource.Inventory && inv.CanSwapHand(m_DragIndex, out _, out _, out _)) { inv.RequestSwapHand(m_DragIndex); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Backpack:
@@ -495,7 +500,7 @@ namespace Stealth.UI
             var at = me.transform.position + me.transform.forward * 0.8f;
             if (Physics.Raycast(ray, out var hit, PlayerInventory.ReachDistance, mask, QueryTriggerInteraction.Ignore))
             {
-                if (!stashed && hit.collider.GetComponentInParent<Hatch>() != null)
+                if (!stashed && hit.collider.GetComponentInParent<ShaftHatch>() is { Exit: true })
                 {
                     inv.RequestDeposit(m_DragIndex);
                     return;

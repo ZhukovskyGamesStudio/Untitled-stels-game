@@ -45,8 +45,20 @@ def export(path, shift=None):
 
 
 def plain():
+    """A sliding glass door's leaf (server room, lab, control room): an aluminium frame — stiles, a top rail, a deep kick
+    rail and a mid rail at hand height — round two panes of satin glass (part Glass, painted DoorGlass by the builder;
+    opaque: what a robot cannot see through, a player does not either), a rubber seal on the meeting edge (Accent)."""
     s.clear_scene()
-    s.part("Body", [s.rbox((W, 0.06, H), (0, 0, H / 2), r=0.004, seg=1)])
+    t, st = 0.06, 0.055                                     # frame depth, stile width
+    rails = [(0.0, 0.16), (0.96, 1.02), (H - 0.08, H)]       # kick rail, mid rail, top rail (z from, z to)
+    frame = [s.rbox((st, t, H), (sx * (W / 2 - st / 2), 0, H / 2), r=0.004, seg=1) for sx in (-1, 1)]
+    frame += [s.rbox((W - 2 * st + 0.01, t - 0.004, z1 - z0), (0, 0, (z0 + z1) / 2), r=0.003, seg=1) for z0, z1 in rails]
+    s.part("Body", frame)
+    panes = []
+    for (_, za), (zb, _) in zip(rails, rails[1:]):
+        panes.append(s.rbox((W - 2 * st + 0.012, 0.012, zb - za + 0.012), (0, 0, (za + zb) / 2), r=0.001, seg=1))
+    s.part("Glass", panes)
+    s.part("Accent", [s.rbox((0.014, t + 0.006, H - 0.02), (W / 2 + 0.002, 0, H / 2), r=0.005, seg=1)])  # the seal
     export(os.path.join(MODELS, "Level", "door_leaf.fbx"), B_SHIFT)
 
 

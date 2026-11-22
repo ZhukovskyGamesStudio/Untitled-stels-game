@@ -26,7 +26,7 @@ namespace Stealth.Tests
                 Assert.GreaterOrEqual(g.x * g.y, prev, $"house {house}");
                 prev = g.x * g.y;
             }
-            Assert.AreEqual(new Vector2Int(3, 2), b.GridFor(0, 1), "the first house is small: 3 x 2");
+            Assert.AreEqual(new Vector2Int(3, 3), b.GridFor(0, 1), "the first house: 3 x 3");
             Assert.Greater(b.GridFor(8, 1).x * b.GridFor(8, 1).y, 20, "later houses are bigger than the old cap (5 x 4)");
             Assert.LessOrEqual(prev, Mathf.CeilToInt(b.MaxRooms), "never above the cap");
         }
@@ -276,6 +276,21 @@ namespace Stealth.Tests
             board.Expire(7f);
             Assert.AreEqual(1, board.Active.Count);
             Assert.AreEqual(PingKind.Enemy, board.Active[0].Kind);
+        }
+
+        [Test]
+        public void AKnockedOutPlayerCallsForHelpOnceAtATime()
+        {
+            var board = new PingBoard();
+            Assert.IsFalse(board.Calling(1));
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Help, Position = Vector3.zero, Until = 12f });
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Help, Position = Vector3.zero, Until = 14f });
+            board.Add(new TeamPing { Owner = 1, Kind = PingKind.Here, Position = Vector3.one, Until = 6f });
+            Assert.IsTrue(board.Calling(1));
+            Assert.IsFalse(board.Calling(2));
+            Assert.AreEqual(1, board.Active.Count(p => p.Kind == PingKind.Help), "a new call replaces the old one");
+            board.Expire(15f);
+            Assert.IsFalse(board.Calling(1), "it lasts a while, then the body is out of sight again");
         }
 
         [Test]

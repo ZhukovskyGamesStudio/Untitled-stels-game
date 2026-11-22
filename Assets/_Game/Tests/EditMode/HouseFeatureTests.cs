@@ -60,6 +60,8 @@ namespace Stealth.Tests
                     var keyRoom = l.Plan.RoomAt(k.Key + Vector3.up * 0.3f);
                     Assert.IsNotNull(keyRoom);
                     Assert.IsTrue(without.Contains(keyRoom.Id), $"seed {seed}: the key lies on this side of its door");
+                    bool onFloor = k.Key.y < LevelLayout.FloorY(keyRoom.Floor) + 0.15f;
+                    Assert.IsTrue(onFloor || HouseFeatures.OnOpenTop(l, k.Key), $"seed {seed}: the key at {k.Key} lies in plain sight (on a table or the floor), never inside furniture");
                 }
             }
             Assert.Greater(doors, 0, "the shared houses have key doors");
@@ -71,11 +73,11 @@ namespace Stealth.Tests
             // which location a house is comes from its kind alone
             var seen = new HashSet<Location>();
             for (int seed = 1; seed < 200; seed++) seen.Add(HouseFeatures.LocationOf(HouseKinds.Of(seed, 2)));
-            Assert.AreEqual(4, seen.Count, "offices, hospitals, garages and apartment blocks");
+            Assert.AreEqual(5, seen.Count, "offices, hospitals, garages, apartment blocks and abandoned stations");
             foreach (var l in TestHouses.Sample)
             {
                 int seed = l.Seed;
-                if (l.Location == Location.Apartments) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: an apartment block has its shelter map instead");
+                if (l.Location is Location.Apartments or Location.Abandoned) Assert.AreEqual(-1, l.PointOfInterest, $"seed {seed}: no piece of furniture to find ({l.Location})");
                 else
                 {
                     Assert.GreaterOrEqual(l.PointOfInterest, 0, $"seed {seed} ({l.Kind})");
@@ -101,6 +103,7 @@ namespace Stealth.Tests
             Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {

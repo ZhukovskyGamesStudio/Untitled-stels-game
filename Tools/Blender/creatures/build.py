@@ -39,7 +39,7 @@ for _mod in ("walkers", "rollers", "devices"):
         print(f"CREATURES MODULE {_mod} failed to load: {e!r}")
 
 # new models with no original to compare with
-NEW = {"robot_storage"}
+NEW = {"robot_storage", "robot_thumper"}  # (the thumper walks on legs of its own: not fitted to the old tracked model's parts)
 
 # the original's object origins that are not the world origin (poi.py builds the warden with pivots on its parts)
 ORIGINS = {

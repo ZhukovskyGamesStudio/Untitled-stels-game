@@ -13,8 +13,9 @@ Layout (metres, Unity X):  0..12 the tunnel from the ladder (main channel in the
 The drivable modular kit (`kit()`, below the props; `-- <root> kit` builds only it): the team drives a pickup through
 the sewer, so the game assembles it at runtime along +X from pieces that join seamlessly at their ends —
 sewer_cap (closed start, faces +X) · sewer_seg_0..3 (6 m, any order) · sewer_gate_frame/door + sewer_lever ·
-sewer_hub (16 m junction hall: three openings in its end wall, one in each long wall) · sewer_branch (110 m, one
-per hub opening) · sewer_plug (bricks closing an opening that leads nowhere) · sewer_reducer (a branch opening into the wide kit
+sewer_hub (16 m junction hall: three openings in its end wall, one in each long wall; no longer used: the game lays
+the hall out of the sewer_hall_* tiles, different every time — kit_hall, `-- <root> hall` builds only them) ·
+sewer_branch (110 m, one per hub opening) · sewer_plug (bricks closing an opening that leads nowhere) · sewer_reducer (a branch opening into the wide kit
 tunnel again: the drive on to the next house). Floor = a steel road grate (part Grate,
 top at z = 0, texture Art/Textures/Sewer/grate.png = 0.5 m) over a water channel; sewer_seg_<n>_cut lacks the -Y
 wall and vault for the side camera.
@@ -29,7 +30,8 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 KIT_ONLY = "kit" in argv  # `-- <root> kit`: build only the drivable modular kit (sewer_seg_*, gate, hub, branch, cap)
-argv = [a for a in argv if a != "kit"]
+HALL_ONLY = "hall" in argv  # `-- <root> hall`: build only the hall's tiles (sewer_hall_*, kit_hall)
+argv = [a for a in argv if a not in ("kit", "hall")]
 ROOT = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models")
 OUT = os.path.join(ROOT, "Sewer")
 
@@ -390,7 +392,7 @@ def cart():
                 rot = Matrix.Rotation(-a + math.pi / 2, 4, "Y")
                 bmesh.ops.rotate(bm, verts=bm_s["verts"], cent=(0, 0, 0), matrix=rot)
                 bmesh.ops.translate(bm, verts=bm_s["verts"], vec=c)
-        cyl(bm, 0.03, 1.36, (0.0, 0.0, 0.4), axis="Y", seg=8)                 # axle
+        cyl(bm, 0.03, 1.38, (0.0, 0.0, 0.4), axis="Y", seg=8)                 # axle (through the hubs and out: no shared end faces)
     part("Metal", wheels)
 
     def body(bm):
@@ -399,8 +401,8 @@ def cart():
             box(bm, -0.92, 0.92, y + 0.005, y + 0.15, 0.56, 0.62)
         box(bm, -0.95, 0.95, -0.52, -0.46, 0.56, 0.82)                       # sides
         box(bm, -0.95, 0.95, 0.46, 0.52, 0.56, 0.82)
-        box(bm, 0.92, 0.98, -0.52, 0.52, 0.56, 0.82)                         # front board
-        box(bm, -0.98, -0.92, -0.52, 0.52, 0.56, 0.74)                       # back board, lower
+        box(bm, 0.92, 0.98, -0.515, 0.515, 0.56, 0.82)                       # front board (inside the sides' outer faces)
+        box(bm, -0.98, -0.92, -0.515, 0.515, 0.56, 0.74)                     # back board, lower
         for y in (-0.42, 0.42):                                              # frame under the bed
             box(bm, -1.0, 1.0, y - 0.04, y + 0.04, 0.48, 0.56)
     part("Wood", body)
@@ -411,7 +413,7 @@ def cart():
         cyl(bm, 0.03, 0.8, (-1.98, 0.0, 0.65), axis="Y", seg=10)
         box(bm, -1.05, -0.99, -0.03, 0.03, 0.0, 0.56)                        # the leg it rests on
         for y in (-0.5, 0.5):                                                # corner irons
-            box(bm, 0.94, 1.0, y - 0.04, y + 0.04, 0.56, 0.84)
+            box(bm, 0.94, 1.0, y - 0.04, y + 0.04, 0.55, 0.84)                # (a little under the boards' bottom)
     part("Metal", handles).name = "Irons"
     finish_and_export("sewer_cart")
 
@@ -449,13 +451,10 @@ def pipe():
 def valve():
     def v(bm):
         torus(bm, 0.22, 0.025, (0.0, 0.0, 0.0), axis="X", seg=20, seg2=6)
-        for k in range(4):
-            a = math.pi * k / 4
-            box(bm, -0.015, 0.015, -0.22 * math.cos(a), 0.22 * math.cos(a), -0.01, 0.01) if k == 0 else None
         cyl(bm, 0.04, 0.1, (0.05, 0.0, 0.0), axis="X", seg=10)
         cyl(bm, 0.07, 0.4, (0.25, 0.0, 0.0), axis="X", seg=12)
     part("Rust", v)
-    part("Metal", lambda bm: [box(bm, -0.015, 0.015, -0.21, 0.21, -0.012, 0.012), box(bm, -0.015, 0.015, -0.012, 0.012, -0.21, 0.21)]).name = "Spokes"
+    part("Metal", lambda bm: [box(bm, -0.015, 0.015, -0.21, 0.21, -0.012, 0.012), box(bm, -0.012, 0.012, -0.012, 0.012, -0.21, 0.21)]).name = "Spokes"  # (the second a hair thinner: no shared faces)
     finish_and_export("sewer_valve")
 
 
@@ -469,9 +468,11 @@ def crate():
     part("Wood", lambda bm: box(bm, -0.3, 0.3, -0.3, 0.3, 0.0, 0.6))
 
     def frame(bm):
-        for (x0, x1, y0, y1) in [(-0.32, 0.32, -0.32, -0.27), (-0.32, 0.32, 0.27, 0.32), (-0.32, -0.27, -0.32, 0.32), (0.27, 0.32, -0.32, 0.32)]:
-            box(bm, x0, x1, y0, y1, 0.0, 0.06)
-            box(bm, x0, x1, y0, y1, 0.54, 0.6)
+        # bands round the bottom and the top, a little past the box's faces (no shared planes); the side bands stop at
+        # the long ones (their tops would overlap in the corners)
+        for (x0, x1, y0, y1) in [(-0.32, 0.32, -0.32, -0.27), (-0.32, 0.32, 0.27, 0.32), (-0.32, -0.27, -0.27, 0.27), (0.27, 0.32, -0.27, 0.27)]:
+            box(bm, x0, x1, y0, y1, -0.004, 0.06)
+            box(bm, x0, x1, y0, y1, 0.54, 0.604)
     part("Stone", frame).name = "Frame"
     finish_and_export("sewer_crate")
 
@@ -883,10 +884,11 @@ def kit_segment(variant, cut=False):
 # --------------------------------------------------------------------------- the alcove with the shaft up to the house
 
 # A clean alcove in the +Y (Unity +Z, left) wall beside the parked car, and over it a brick shaft up to the lobby's floor
-# (Unity: Basement — the shaft's middle at x 3.0, y 4.345; its hole in the floor is 1.5 m square; the floor is 4.9 m
+# (Unity: Basement — the shaft's middle at x 3.0, y 4.345; its hole in the floor is 1.5 m square; the floor is 8 m
 # over the road). The ladder stands against the alcove's back wall and goes up the shaft.
 ALC_X0, ALC_X1, ALC_TOP, ALC_BACK = 1.8, 4.2, 2.4, 5.09
-SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, 4.89
+BASEMENT_DEPTH = 8.0  # Unity Basement.Depth: the lobby's floor over the basement's road
+SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, BASEMENT_DEPTH - 0.01
 LADDER_X, LADDER_Y = 3.0, ALC_BACK - 0.25
 
 
@@ -928,7 +930,7 @@ def kit_alcove():
         top = SHAFT_TOP - 0.05
         for x in (LADDER_X - 0.28, LADDER_X + 0.28):
             box(bm, x - 0.03, x + 0.03, LADDER_Y - 0.03, LADDER_Y + 0.03, KIT_WALK, top)
-            for z in (0.7, 2.0, 3.3, 4.5):                                       # brackets to the back wall
+            for z in [0.7 + 1.3 * k for k in range(int((top - 0.9) / 1.3) + 1)]:    # brackets to the back wall, all the way up
                 box(bm, x - 0.03, x + 0.03, LADDER_Y + 0.03, ALC_BACK, z - 0.03, z + 0.03)
         z = KIT_WALK + 0.3
         while z < top - 0.1:
@@ -965,6 +967,139 @@ def kit_alcove():
     kit_road(0.0, L, KIT_ROAD, [0.0, 1.5, 3.0, 4.5, 6.0], [-1.3, 0.0, 1.3])
     kit_export("sewer_seg_alcove")
 
+
+
+# --------------------------------------------------------------------------- the way to the house's exit hatch
+
+# A narrow lined passage from a doorway in the tunnel's left (+Y, Unity +Z) wall to the shaft under the house's exit hatch
+# (Unity: SewerPlan.Passage lays the pieces out): 1.5 m wide (the shaft's hole is 3 x 3 plan cells), its floor at the
+# walkway's top, a flat ceiling at 2.4 m. Straight pieces are 1 m long (the game repeats them, the last stretched to fit), a
+# corner turns from -X to +Y, the end is the shaft's foot: open on -X, its brick walls go up to the house's floor, the
+# ladder against the far (+X) wall, as in the alcove's shaft.
+PASS_HALF, PASS_TOP = 0.75, ALC_TOP
+DOOR_X0, DOOR_X1, DOOR_OUT = 3.0 - PASS_HALF, 3.0 + PASS_HALF, 4.2
+
+
+def passage_walls(bm, x0, x1, sides, top=PASS_TOP):
+    """The passage's walls along x (sides: +1 / -1 for the +Y / -Y wall), from the floor to `top`."""
+    for side in sides:
+        y = side * PASS_HALF
+        poly(bm, [(x0, y, KIT_WALK), (x1, y, KIT_WALK), (x1, y, top), (x0, y, top)], (0, -side, 0))
+
+
+def passage_base(bm, x0, x1, sides):
+    """A stone skirting along the foot of the passage's walls."""
+    for side in sides:
+        y0, y1 = sorted((side * PASS_HALF, side * (PASS_HALF - 0.07)))
+        box(bm, x0, x1, y0, y1, KIT_WALK - 0.02, KIT_WALK + 0.14)
+
+
+def kit_side_door():
+    """sewer_seg_door: a plain 6 m segment with a doorway in the left wall, the start of the way to the house's exit
+    hatch: 1.5 m wide, 2.4 m high, lined through the wall to y DOOR_OUT, where the passage goes on."""
+    p, L = KIT, KIT_LEN
+    prof = kit_profile(p, KIT_WALK, extra=(PASS_TOP,))
+
+    def vault(bm):
+        for xa, xb, pr in ((0.0, DOOR_X0, prof), (DOOR_X0, DOOR_X1, prof[:-1]), (DOOR_X1, L, prof)):
+            skin(bm, [(xa, pr), (xb, pr)], p["wall"])
+    part("Brick", vault)
+
+    def stub(bm):
+        W, H, B = KIT_WALK, p["half"], DOOR_OUT
+        poly(bm, [(DOOR_X0, H, W), (DOOR_X0, B, W), (DOOR_X0, B, PASS_TOP), (DOOR_X0, H, PASS_TOP)], (1, 0, 0))
+        poly(bm, [(DOOR_X1, H, W), (DOOR_X1, B, W), (DOOR_X1, B, PASS_TOP), (DOOR_X1, H, PASS_TOP)], (-1, 0, 0))
+        poly(bm, [(DOOR_X0, H, PASS_TOP), (DOOR_X1, H, PASS_TOP), (DOOR_X1, B, PASS_TOP), (DOOR_X0, B, PASS_TOP)], (0, 0, -1))
+    part("Brick", stub).name = "BrickDoor"
+
+    def stone(bm):
+        box(bm, DOOR_X0 - 0.15, DOOR_X1 + 0.15, 3.48, 3.7, PASS_TOP - 0.05, PASS_TOP + 0.24)
+        for x0, x1 in ((DOOR_X0 - 0.15, DOOR_X0 + 0.05), (DOOR_X1 - 0.05, DOOR_X1 + 0.15)):
+            box(bm, x0, x1, 3.48, 3.7, KIT_WALK - 0.02, PASS_TOP - 0.04)
+    part("Stone", stone).name = "StoneDoor"
+
+    rout, rin = kit_profile(p, KIT_WALK - 0.02), kit_profile(p, KIT_WALK - 0.02, d=-0.12)
+
+    def end_ribs(bm):
+        rib(bm, rout, rin, 0.0, 0.2, p["wall"], front=False)
+        rib(bm, rout, rin, L - 0.2, L, p["wall"], back=False)
+    part("Stone", end_ribs).name = "StoneRibs"
+    part("Concrete", lambda bm: strip(bm, channel_pts(KIT_ROAD, outer=3.75), 0.0, L, closed=True)).name = "ConcreteFloor"
+    part("Concrete", lambda bm: poly(bm, [(DOOR_X0, 3.75, KIT_WALK), (DOOR_X1, 3.75, KIT_WALK), (DOOR_X1, DOOR_OUT, KIT_WALK),
+                                          (DOOR_X0, DOOR_OUT, KIT_WALK)])).name = "ConcreteDoor"
+    part("Stone", lambda bm: [box(bm, 0.0, L, *sorted((s * 2.58, s * 2.82)), 0.10, 0.26) for s in (-1, 1)]).name = "StoneCurb"
+    kit_road(0.0, L, KIT_ROAD, [0.0, 1.5, 3.0, 4.5, 6.0], [-1.3, 0.0, 1.3])
+    kit_export("sewer_seg_door")
+
+
+def kit_passage():
+    """sewer_passage: 1 m of the passage along +X (open at both ends)."""
+    L, H = 1.0, PASS_HALF
+
+    def brick(bm):
+        passage_walls(bm, 0.0, L, (1, -1))
+        poly(bm, [(0, -H, PASS_TOP), (L, -H, PASS_TOP), (L, H, PASS_TOP), (0, H, PASS_TOP)], (0, 0, -1))
+    part("Brick", brick).name = "BrickPassage"
+    part("Concrete", lambda bm: poly(bm, [(0, -H, KIT_WALK), (L, -H, KIT_WALK), (L, H, KIT_WALK), (0, H, KIT_WALK)])).name = "ConcretePassage"
+    part("Stone", lambda bm: passage_base(bm, 0.0, L, (1, -1))).name = "StonePassage"
+    kit_export("sewer_passage")
+
+
+def kit_passage_corner():
+    """sewer_passage_corner: the passage turning, centred on the origin: open on -X and +Y, walls on +X and -Y."""
+    H = PASS_HALF
+
+    def walls(bm):
+        poly(bm, [(H, -H, KIT_WALK), (H, H, KIT_WALK), (H, H, PASS_TOP), (H, -H, PASS_TOP)], (-1, 0, 0))
+        passage_walls(bm, -H, H, (-1,))
+        poly(bm, [(-H, -H, PASS_TOP), (H, -H, PASS_TOP), (H, H, PASS_TOP), (-H, H, PASS_TOP)], (0, 0, -1))
+    part("Brick", walls).name = "BrickCorner"
+    part("Concrete", lambda bm: poly(bm, [(-H, -H, KIT_WALK), (H, -H, KIT_WALK), (H, H, KIT_WALK), (-H, H, KIT_WALK)])).name = "ConcreteCorner"
+
+    def base(bm):
+        passage_base(bm, -H, H, (-1,))
+        box(bm, H - 0.07, H, -H + 0.07, H, KIT_WALK - 0.02, KIT_WALK + 0.14)
+    part("Stone", base).name = "StoneCorner"
+    kit_export("sewer_passage_corner")
+
+
+def kit_passage_end():
+    """sewer_passage_end: the shaft's foot, open on -X (x 0..1.5): brick walls up to the house's floor, the ladder against
+    the +X wall (its rungs 0.25 m off it, as in the alcove), caged bulbs on the -Y wall (the game puts the light there)."""
+    H, X1, top = PASS_HALF, 2 * PASS_HALF, SHAFT_TOP
+
+    def walls(bm):
+        poly(bm, [(X1, -H, KIT_WALK), (X1, H, KIT_WALK), (X1, H, top), (X1, -H, top)], (-1, 0, 0))
+        passage_walls(bm, 0.0, X1, (1, -1), top)
+        poly(bm, [(0.0, -H, PASS_TOP), (0.0, H, PASS_TOP), (0.0, H, top), (0.0, -H, top)], (1, 0, 0))   # over the way in
+    part("Brick", walls).name = "BrickShaft"
+    part("Concrete", lambda bm: poly(bm, [(0, -H, KIT_WALK), (X1, -H, KIT_WALK), (X1, H, KIT_WALK), (0, H, KIT_WALK)])).name = "ConcreteShaft"
+
+    def base(bm):
+        passage_base(bm, 0.0, X1, (1, -1))
+        box(bm, X1 - 0.07, X1, -H + 0.07, H - 0.07, KIT_WALK - 0.02, KIT_WALK + 0.14)
+    part("Stone", base).name = "StoneShaft"
+    lx = X1 - 0.25
+
+    def ladder(bm):
+        rail_top = top - 0.05
+        for y in (-0.28, 0.28):
+            box(bm, lx - 0.03, lx + 0.03, y - 0.03, y + 0.03, KIT_WALK, rail_top)
+            for z in [0.7 + 1.3 * k for k in range(int((rail_top - 0.9) / 1.3) + 1)]:   # brackets to the wall
+                box(bm, lx + 0.03, X1, y - 0.03, y + 0.03, z - 0.03, z + 0.03)
+        z = KIT_WALK + 0.3
+        while z < rail_top - 0.1:
+            cyl(bm, 0.018, 0.56, (lx, 0.0, z), axis="Y", seg=8)
+            z += 0.3
+    part("Metal", ladder).name = "MetalLadder"
+
+    def cages(bm):
+        for z in (2.0, 5.6):
+            box(bm, 0.36, 0.54, -H, -H + 0.05, z - 0.12, z + 0.12)
+            torus(bm, 0.075, 0.008, (0.45, -H + 0.12, z), axis="Y", seg=14, seg2=4)
+    part("Rust", cages).name = "RustLamp"
+    part("Glow", lambda bm: [cyl(bm, 0.055, 0.08, (0.45, -H + 0.09, z), axis="Y", seg=14, r2=0.04) for z in (2.0, 5.6)]).name = "GlowLamp"
+    kit_export("sewer_passage_end")
 
 def seg_tray(L):
     """A cable tray on the right (+Y) wall and a culvert outlet in the channel wall below the far walkway."""
@@ -1602,20 +1737,257 @@ def kit_reducer():
     kit_export("sewer_reducer")
 
 
+# --------------------------------------------------------------------------- the junction hall, modular (Level.SewerHall)
+#
+# The game lays the hall out of these tiles on a grid of HALL_CELL m cells, different every time (SewerHall): a floor
+# and a groin vault per cell, a wall on every side of the boundary (plain, with a mouth of the branch's profile, or the
+# way in from the sewer's tunnel), a column at every corner of the cells (half in the wall on the boundary), a stone
+# arch between neighbouring cells. Two heights (HALL_HEIGHTS: where the vaults spring, how far they rise).
+# Frames: a floor, a vault, a column and an arch are centred on their cell / corner / side (an arch spans y); every wall
+# piece is in a branch tunnel's frame: origin in the middle of the wall's OUTER face at road level, +x out of the hall,
+# the inner face at x = -HALL_WALL on the cell's side, the side running y -4..4 (a branch tunnel or sewer_plug starts at
+# that origin). The edge arch of a cell (where its vault meets a neighbour's or a wall): z = H + r * sqrt(1 - (2t / HALL_CELL)^2),
+# springing at the corners (the columns' axes); the stone arches under it spring from the capitals' edges (HALL_SPAN).
+
+HALL_CELL, HALL_WALL = 8.0, 0.6                 # SewerHall.Cell, SewerHall.Wall
+HALL_HEIGHTS = ((3.4, 2.2), (4.2, 2.8))         # (springing, rise): SewerHall.Springing
+HALL_SHAFT, HALL_BASE, HALL_CAP = 0.32, 0.38, 0.46  # column halves: shaft, base (SewerHall.ColumnHalf), capital
+HALL_SPAN = HALL_CELL / 2 - HALL_CAP            # the stone arches' half span (capital edge to capital edge)
+HALL_ARC = 24                                   # vault / arch segments (even: a vertex at the crown)
+HALL_BAND = 0.3                                 # the stone arches' depth under the vault
+
+
+def hall_arch_pts(H, r, lift=0.0):
+    """The edge arch of a cell, (y, z) from the corner at -HALL_CELL / 2 over the crown to the other corner."""
+    h = HALL_CELL / 2
+    return [(-h * math.cos(math.pi * i / HALL_ARC), H + lift + r * math.sin(math.pi * i / HALL_ARC)) for i in range(HALL_ARC + 1)]
+
+
+def hall_band_curves(H, r, depth=HALL_BAND, sink=0.05):
+    """A stone arch's two edges, (y, z), point for point: the intrados (HALL_SPAN, from capital edge to capital edge,
+    `depth` under the vault's crown) and the extrados, the edge arch `sink` up into the vault (none at the feet: they
+    lie on the capitals from the capital's edge to the corner)."""
+    h = HALL_CELL / 2
+    inner, outer = [], []
+    for i in range(HALL_ARC + 1):
+        th = math.pi - math.pi * i / HALL_ARC
+        inner.append((HALL_SPAN * math.cos(th), H + (r - depth) * math.sin(th)))
+        outer.append((h * math.cos(th), H + (r + sink) * math.sin(th)))
+    return inner, outer
+
+
+def hall_band(bm, x0, x1, H, r, back=True):
+    """A stone arch between x0 and x1 following the edge arch: its faces (front at x0, back at x1 unless it lies on a
+    wall, the intrados). It lands on the capitals; its top is in the vault."""
+    inner, outer = hall_band_curves(H, r)
+    for k in range(HALL_ARC):
+        (yi0, zi0), (yi1, zi1) = inner[k], inner[k + 1]
+        (yo0, zo0), (yo1, zo1) = outer[k], outer[k + 1]
+        kface(bm, [bm.verts.new((x0, yi0, zi0)), bm.verts.new((x0, yi1, zi1)), bm.verts.new((x0, yo1, zo1)), bm.verts.new((x0, yo0, zo0))], (-1, 0, 0))
+        if back:
+            kface(bm, [bm.verts.new((x1, yi0, zi0)), bm.verts.new((x1, yi1, zi1)), bm.verts.new((x1, yo1, zo1)), bm.verts.new((x1, yo0, zo0))], (1, 0, 0))
+        ym, zm = (yi0 + yi1) / 2, (zi0 + zi1) / 2
+        kface(bm, [bm.verts.new((x0, yi0, zi0)), bm.verts.new((x1, yi0, zi0)), bm.verts.new((x1, yi1, zi1)), bm.verts.new((x0, yi1, zi1))],
+              (0, -ym, H + r * 0.3 - zm))
+
+
+def hall_wall_slab(name, H, r):
+    """The wall on a side: 0.6 m of brick from below the channel's bed up 0.3 m past the cell's edge arch (the vault's
+    edge sinks into it), along the whole side."""
+    h = HALL_CELL / 2
+    pts = [(h, KIT_BOTTOM - 0.05), (-h, KIT_BOTTOM - 0.05)] + hall_arch_pts(H, r, 0.3)
+    return prism(name, pts, -HALL_WALL, 0.0)
+
+
+def hall_base(bm, gaps=()):
+    """The stone plinth along a wall's foot (6 cm proud, from the channel's bed to 0.3 over the road), broken where an
+    opening is: gaps = [(y0, y1)]."""
+    h = HALL_CELL / 2
+    edges = [-h] + [v for g in gaps for v in g] + [h]
+    for y0, y1 in zip(edges[0::2], edges[1::2]):
+        box(bm, -HALL_WALL - 0.06, -HALL_WALL + 0.01, y0, y1, KIT_BED, 0.3)
+
+
+def kit_hall_floor():
+    """sewer_hall_floor: a cell's floor (x, y -4..4): the road's grate over the whole cell at z = 0, beams across it
+    every 2 m (x = -3, -1, 1, 3) on piers, stringers along it, the water, the bed."""
+    h = HALL_CELL / 2
+    part("Grate", lambda bm: poly(bm, [(-h, -h, 0.0), (h, -h, 0.0), (h, h, 0.0), (-h, h, 0.0)]))
+
+    def frame(bm):
+        for c in (-3.0, -1.0, 1.0, 3.0):
+            beam(bm, c, lambda x: h - 0.006, -h, h, web_end=h - 0.006)
+        stringers(bm, [-3.0, -1.0, 1.0, 3.0], -h, h)
+    part("Metal", frame).name = "MetalFrame"
+    part("Water", lambda bm: poly(bm, [(-h, -h, KIT_WATER), (h, -h, KIT_WATER), (h, h, KIT_WATER), (-h, h, KIT_WATER)]))
+
+    def bed(bm):
+        poly(bm, [(-h, -h, KIT_BED), (h, -h, KIT_BED), (h, h, KIT_BED), (-h, h, KIT_BED)])
+        for c in (-3.0, -1.0, 1.0, 3.0):
+            for y in (-2.0, 2.0):
+                box(bm, c - 0.1, c + 0.1, y - 0.12, y + 0.12, KIT_BED - 0.02, -0.315)
+    part("Concrete", bed).name = "ConcreteBed"
+    kit_export("sewer_hall_floor")
+
+
+def kit_hall_vault(v):
+    """sewer_hall_vault_<v>: a cell's brick groin vault (x, y -4..4, faces down): two barrels crossing, the creases on
+    the diagonals, down to the corners (the columns' axes); on each side the edge arch."""
+    H, r = HALL_HEIGHTS[v]
+    h = HALL_CELL / 2
+    arch = hall_arch_pts(H, r)
+    ys = [y for y, _ in arch]
+    zs = [z for _, z in arch]
+
+    def vault(bm):
+        for q in range(4):
+            c, s = round(math.cos(q * math.pi / 2)), round(math.sin(q * math.pi / 2))
+
+            def P(x, y, z):
+                return (c * x - s * y, s * x + c * y, z)
+            for k in range(len(ys) - 1):   # the sector |y| <= x of this quarter: the barrel along x, z by y alone
+                y0, y1, z0, z1 = ys[k], ys[k + 1], zs[k], zs[k + 1]
+                pts = [P(abs(y0), y0, z0), P(h, y0, z0), P(h, y1, z1), P(abs(y1), y1, z1)]
+                if abs(abs(y0) - h) < 1e-6:
+                    pts = pts[1:]
+                elif abs(abs(y1) - h) < 1e-6:
+                    pts = pts[:3]
+                poly(bm, pts, (0, 0, -1))
+    part("Brick", vault).name = "BrickVault"
+    kit_export(f"sewer_hall_vault_{v}")
+
+
+def kit_hall_wall(v):
+    """sewer_hall_wall_<v>: a plain wall on a side (branch frame: outer face at x = 0), its plinth and a stone arch on its
+    inner face under the vault's edge arch."""
+    H, r = HALL_HEIGHTS[v]
+    hall_wall_slab("BrickWall", H, r)
+
+    def stone(bm):
+        hall_base(bm)
+        hall_band(bm, -HALL_WALL - 0.12, -HALL_WALL + 0.01, H, r, back=False)
+    part("Stone", stone).name = "StoneTrim"
+    kit_export(f"sewer_hall_wall_{v}")
+
+
+def kit_hall_mouth(v):
+    """sewer_hall_mouth_<v>: a wall with a mouth of the branch's profile (4.6 x 3.8 over the road, down to the channel's
+    bed) in the middle of the side; a stone frame on the inner face, a half rib meeting the branch's at x = 0, the road's
+    grate and its beams through the wall, the sign plate over the frame (the game hangs the route panel there)."""
+    H, r = HALL_HEIGHTS[v]
+    wall = hall_wall_slab("BrickWall", H, r)
+    subtract(wall, prism("cut", kit_profile(KIT_BRANCH, KIT_BED - 0.03), -HALL_WALL - 0.2, 0.2))
+    o, i = kit_profile(KIT_BRANCH, KIT_BED, d=0.22), kit_profile(KIT_BRANCH, KIT_BED)
+    ro, ri = kit_profile(KIT_BRANCH, -0.02), kit_profile(KIT_BRANCH, -0.02, d=-0.1)
+    gap = KIT_BRANCH["half"] + 0.15
+
+    def stone(bm):
+        rib(bm, o, i, -HALL_WALL - 0.15, -HALL_WALL, KIT_BRANCH["wall"], back=False, outside=True)
+        rib(bm, ro, ri, -0.2, 0.0, KIT_BRANCH["wall"], back=False)
+        hall_base(bm, [(-gap, gap)])
+        hall_band(bm, -HALL_WALL - 0.12, -HALL_WALL + 0.01, H, r, back=False)
+    part("Stone", stone).name = "StoneTrim"
+    kit_road(-HALL_WALL, 0.0, KIT_BRANCH["half"], [-HALL_WALL, 0.0], [-1.15, 0.0, 1.15])
+    part("Metal", lambda bm: box(bm, -HALL_WALL - 0.08, -HALL_WALL + 0.01, -0.9, 0.9, 4.1, 4.75)).name = "MetalFrameSign"
+    kit_export(f"sewer_hall_mouth_{v}")
+
+
+def kit_hall_entry(v):
+    """sewer_hall_entry_<v>: the wall the sewer's tunnel comes in through (branch frame: x = 0 is where the last segment
+    ends, -x into the hall): the segment's section cut through it, its walkways, kerbs, road and half rib running on
+    through the wall, the walkways' ends closed towards the hall (a step down onto the hall's grate)."""
+    H, r = HALL_HEIGHTS[v]
+    wall = hall_wall_slab("BrickWall", H, r)
+    subtract(wall, prism("cut", kit_profile(KIT, KIT_BED - 0.03), -HALL_WALL - 0.2, 0.2))
+    outer, x0 = KIT["half"] + 0.02, -HALL_WALL - 0.002   # 2 cm into the reveal's brick, the ends 2 mm proud of the wall
+
+    def walkways(bm):
+        strip(bm, channel_pts(KIT_ROAD, outer=outer), x0, 0.0, closed=True)
+        rr = KIT_ROAD
+        for s in (-1, 1):   # the ends towards the hall
+            ya, yb = sorted((s * rr, s * outer))
+            poly(bm, [(x0, ya, -0.9), (x0, yb, -0.9), (x0, yb, KIT_WALK), (x0, ya, KIT_WALK)], (-1, 0, 0))
+            ya, yb = sorted((s * (rr - 0.18), s * rr))
+            poly(bm, [(x0, ya, -0.18), (x0, yb, -0.18), (x0, yb, -0.06), (x0, ya, -0.06)], (-1, 0, 0))
+        poly(bm, [(x0, -rr, -0.9), (x0, rr, -0.9), (x0, rr, KIT_BED), (x0, -rr, KIT_BED)], (-1, 0, 0))
+    part("Concrete", walkways).name = "ConcreteFloor"
+    rout, rin = kit_profile(KIT, KIT_WALK - 0.02), kit_profile(KIT, KIT_WALK - 0.02, d=-0.12)
+
+    def stone(bm):
+        for s in (-1, 1):
+            box(bm, -HALL_WALL, 0.0, *sorted((s * 2.58, s * 2.82)), 0.10, 0.26)
+        rib(bm, rout, rin, -0.2, 0.0, KIT["wall"], back=False)
+        hall_band(bm, -HALL_WALL - 0.12, -HALL_WALL + 0.01, H, r, back=False)
+    part("Stone", stone).name = "StoneTrim"
+    kit_road(-HALL_WALL, 0.0, KIT_ROAD, [-HALL_WALL, 0.0], [-1.3, 0.0, 1.3])
+    kit_export(f"sewer_hall_entry_{v}")
+
+
+def kit_hall_column(v):
+    """sewer_hall_column_<v>: a column at a corner of the cells, from the channel's bed up to where the vaults spring:
+    a square brick pier (low) or a round one (high), a stone base and a capital (the arches land on it)."""
+    H, r = HALL_HEIGHTS[v]
+    top = H - 0.3
+    if v == 0:
+        # a square pier with its corners chamfered (a raw box's 90-degree edges looked unfinished)
+        def pier(bm):
+            h, c = HALL_SHAFT, 0.06
+            ring = [(h, -h + c), (h, h - c), (h - c, h), (-h + c, h), (-h, h - c), (-h, -h + c), (-h + c, -h), (h - c, -h)]
+            lo = [bm.verts.new((x, y, KIT_BED)) for x, y in ring]
+            hi = [bm.verts.new((x, y, top + 0.01)) for x, y in ring]
+            bm.faces.new(list(reversed(lo)))
+            bm.faces.new(hi)
+            for i in range(8):
+                j = (i + 1) % 8
+                bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+        part("Brick", pier).name = "BrickColumn"
+    else:
+        part("Brick", lambda bm: cyl(bm, HALL_SHAFT + 0.02, top - KIT_BED + 0.01, (0.0, 0.0, (top + KIT_BED + 0.01) / 2), seg=16)).name = "BrickColumn"
+
+    def stone(bm):
+        box(bm, -HALL_BASE, HALL_BASE, -HALL_BASE, HALL_BASE, KIT_BED - 0.02, 0.32)
+        box(bm, -0.39, 0.39, -0.39, 0.39, top, H - 0.17)
+        box(bm, -HALL_CAP, HALL_CAP, -HALL_CAP, HALL_CAP, H - 0.17, H)
+    part("Stone", stone).name = "StoneColumn"
+    kit_export(f"sewer_hall_column_{v}")
+
+
+def kit_hall_arch(v):
+    """sewer_hall_arch_<v>: the stone arch between two neighbouring cells (across x -0.2..0.2, spanning y from capital to
+    capital under the vaults' shared edge arch)."""
+    H, r = HALL_HEIGHTS[v]
+    part("Stone", lambda bm: hall_band(bm, -0.2, 0.2, H, r)).name = "StoneArch"
+    kit_export(f"sewer_hall_arch_{v}")
+
+
+def kit_hall():
+    kit_hall_floor()
+    for v in range(len(HALL_HEIGHTS)):
+        for fn in (kit_hall_vault, kit_hall_wall, kit_hall_mouth, kit_hall_entry, kit_hall_column, kit_hall_arch):
+            fn(v)
+
+
 def kit():
     kit_texture()
     for v in range(4):
         for cut in (False, True):
             kit_segment(v, cut)
-    for fn in (kit_alcove, kit_gate_frame, kit_gate_door, kit_lever, kit_hub, kit_branch, kit_plug, kit_cap, kit_reducer):
+    for fn in (kit_alcove, kit_side_door, kit_passage, kit_passage_corner, kit_passage_end, kit_gate_frame, kit_gate_door,
+               kit_lever, kit_hub, kit_branch, kit_plug, kit_cap, kit_reducer):
         fn()
+    kit_hall()
 
 
 if __name__ == "__main__":
     clear()
-    if not KIT_ONLY:
-        for fn in (tunnel, hall, branch, grate, ladder, manhole, cart, lamp, pipe, valve, barrel, crate):
-            fn()
-            print("SEWER", fn.__name__)
-    kit()
+    if HALL_ONLY:
+        kit_hall()
+    else:
+        if not KIT_ONLY:
+            # (the old one-piece tunnel, hall, branch, grate, cart, pipe and valve are no longer used by the game: the kit
+            # and the hall's tiles replaced them — their functions stay for reference, nothing exports them)
+            for fn in (ladder, manhole, lamp, barrel, crate):
+                fn()
+                print("SEWER", fn.__name__)
+        kit()
     print("DONE")

@@ -109,8 +109,8 @@ namespace Stealth.Level
     /// <summary>The vault's three locks, one console each (in the order of <see cref="LevelLayout.VaultConsoles"/>).</summary>
     public enum VaultGame : byte { Dial, Switches, Sequence }
 
-    /// <summary>What a security terminal does: show the house's cameras, hack robots and devices from afar, or unlock the storage room's door.</summary>
-    public enum TerminalKind : byte { Cameras, Hacking, Doors }
+    /// <summary>What a security terminal does: show the house's cameras, hack robots and devices from afar, unlock the storage room's door, or show the whole building's map (<see cref="TerminalKind.Map"/>: the only map the players have).</summary>
+    public enum TerminalKind : byte { Cameras, Hacking, Doors, Map }
 
     /// <summary>
     /// Where a worker leaves loot in the storage room (<see cref="LevelLayout.StorageDrops"/>): on a shelf's bottom board
@@ -229,6 +229,16 @@ namespace Stealth.Level
         public BasementFrame Cellar => new(BasementOrigin, BasementYaw);
         /// <summary>The exit hatch (another room of the ground floor, far from the lobby): the team leaves by it.</summary>
         public Vector3 ExitHatchPosition;
+
+        /// <summary>
+        /// The two shafts down from the ground floor (3 x 3 plan cells each): the entry's to the basement and the exit's to the
+        /// sewer's passage. Everything under the floor there — the slab, the ground plate, the city's asphalt — is cut open.
+        /// </summary>
+        public List<Rect> ShaftHoles => new()
+        {
+            new Rect(HatchPosition.x - Basement.ShaftHalf, HatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf),
+            new Rect(ExitHatchPosition.x - Basement.ShaftHalf, ExitHatchPosition.z - Basement.ShaftHalf, 2 * Basement.ShaftHalf, 2 * Basement.ShaftHalf),
+        };
         int m_ExitRoom = -1, m_EntryRoom = -1;
         /// <summary>The exit hatch's room (chosen once by the generator; its type is kept: <see cref="PlanRoom.Kept"/>), −1 = none.</summary>
         public int ExitRoom
@@ -271,6 +281,8 @@ namespace Stealth.Level
         public readonly HashSet<int> LockedDoors = new();
         /// <summary>Security terminals: index in <see cref="Props"/> (a desk turned into a console) and what it does.</summary>
         public readonly List<(int prop, TerminalKind kind)> Terminals = new();
+        /// <summary>Terminals standing as a kiosk (no desk was left for them: the apartment block's map terminals) — the props of <see cref="Terminals"/>.</summary>
+        public readonly HashSet<int> KioskTerminals = new();
         /// <summary>
         /// The storage room (plan id, -1 if none: <see cref="StorageRoom"/>): its only doorway (index in <see cref="Doorways"/>),
         /// its door (in <see cref="AutoDoors"/>; locked for players, robots pass), the door terminal (in <see cref="Props"/>,

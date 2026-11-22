@@ -20,11 +20,12 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheDefaultStyleHasWoodenStairsDressedInItsOwnFinishes()
+        public void TheDefaultStyleHasConcreteStairsDressedInItsOwnFinishes()
         {
             var config = AssetDatabase.LoadAssetAtPath<StyleConfig>("Assets/_Game/Data/Styles/Styles.asset");
             var g = config.Default.Geometry;
-            Assert.AreEqual(StairChoice.Wood, g.Stairs, "painted wood with balusters, like the panelled rooms around it");
+            Assert.AreEqual("S16_Derelict", config.Default.name, "the quiet facility is the game's look");
+            Assert.AreEqual(StairChoice.Concrete, g.Stairs, "a facility's bare concrete stair");
             Assert.IsNotNull(g.Floor, "its treads take the floor finish");
             Assert.IsNotNull(g.Wall, "its body the wall finish");
             Assert.IsNotNull(g.Trim, "its balusters the trim");

@@ -20,9 +20,13 @@ namespace Stealth.Net
         readonly NetworkVariable<bool> m_InHatch = new();
         readonly NetworkVariable<byte> m_Hatch = new();
         readonly NetworkVariable<bool> m_Flashlight = new();
+        readonly NetworkVariable<double> m_Coffee = new();
+        readonly NetworkVariable<ushort> m_Loadout = new();
         readonly NetworkVariable<bool> m_Crouching = new(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<sbyte> m_LookPitch = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<byte> m_Gas = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>What the body is busy with (PlayerController.Pose: a ladder, a terminal, work with the hands) — the rigged human's take.</summary>
+        readonly NetworkVariable<byte> m_Pose = new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString32Bytes> m_Name = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<FixedString64Bytes> m_Identity = new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -44,8 +48,11 @@ namespace Stealth.Net
             m_InHatch.OnValueChanged += (_, _) => Pull();
             m_Hatch.OnValueChanged += (_, _) => Pull();
             m_Flashlight.OnValueChanged += (_, _) => Pull();
+            m_Coffee.OnValueChanged += (_, _) => Pull();
+            m_Loadout.OnValueChanged += (_, _) => Pull();
             m_Crouching.OnValueChanged += (_, _) => Pull();
             m_LookPitch.OnValueChanged += (_, _) => Pull();
+            m_Pose.OnValueChanged += (_, _) => Pull();
             m_Name.OnValueChanged += (_, _) => Pull();
             m_Identity.OnValueChanged += (_, now) => m_Player.ApplyIdentity(now.ToString());
             m_Gas.OnValueChanged += (_, now) => { if (!IsOwner) m_Player.ApplyGas(now); };
@@ -70,10 +77,13 @@ namespace Stealth.Net
                 NetSync.Set(m_InHatch, m_Player.InHatch);
                 NetSync.Set(m_Hatch, (byte)m_Player.HatchIndex);
                 NetSync.Set(m_Flashlight, m_Player.FlashlightOn);
+                NetSync.Set(m_Coffee, m_Player.CoffeeUntil);
+                NetSync.Set(m_Loadout, m_Player.LoadoutPacked);
             }
             if (!IsOwner) return;
             NetSync.Set(m_Crouching, m_Player.Crouching);
             NetSync.Set(m_LookPitch, m_Player.LookPitch);
+            NetSync.Set(m_Pose, (byte)m_Player.Pose);
             NetSync.Set(m_Gas, (byte)Mathf.RoundToInt(Mathf.Clamp01(m_Player.GasShare) * 255f));
             if (m_PushedIdentity != m_Player.Identity)
             {
@@ -87,8 +97,12 @@ namespace Stealth.Net
 
         void Pull()
         {
-            if (!IsServer) m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value, m_Hatch.Value, m_Flashlight.Value);
-            if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString());
+            if (!IsServer)
+            {
+                m_Player.ApplyServerState(m_Hp.Value, m_Downed.Value, m_InHatch.Value, m_Hatch.Value, m_Flashlight.Value);
+                m_Player.ApplyGear(m_Coffee.Value, m_Loadout.Value);
+            }
+            if (!IsOwner) m_Player.ApplyOwnerState(m_Crouching.Value, m_LookPitch.Value, m_Name.Value.ToString(), (BodyPose)m_Pose.Value);
         }
 
         // ------------------------------------------------------------------ IPlayerLink
@@ -122,6 +136,14 @@ namespace Stealth.Net
         public void SendPing(Vector3 position) => PingRpc(position);
         public void SendHatch(bool hide) => HatchRpc(hide);
         public void SendUseHand() => UseHandRpc();
+        public void SendFallHurt() => FallHurtRpc();
+        public void SendLoadout(byte cls, byte item, bool ready) => LoadoutRpc(cls, item, ready);
+
+        [Rpc(SendTo.Server)]
+        void FallHurtRpc() => m_Player.OnFallHurtRequest();
+
+        [Rpc(SendTo.Server)]
+        void LoadoutRpc(byte cls, byte item, bool ready) => m_Player.OnLoadoutRequest(cls, item, ready);
 
         [Rpc(SendTo.Server)]
         void UseHandRpc() => m_Player.UseHandServer();

@@ -333,17 +333,20 @@ def thumper(L):
     P.add("Eye", L.box((.22, .04, .05), (0, -.47, .5), r=.015))                                 # mouth slit
     for sx in (-1, 1):
         P.add("Accent", L.box((.08, .05, .1), (sx * .07, -.47, .44), r=.02))                   # mouth plates
-    # walking legs: up from the hip to a knee above the shell, down and out, the last joint hooking onto the floor
+    # walking legs: up from the hip to a knee above the shell, down and out, the last joint hooking onto the floor — each a
+    # thigh (AccentLeg{n}Upper: hip to knee) and a shin (AccentLeg{n}Lower: knee to the tip): ProceduralLegs plants the tips
+    n = 0
     for sx in (-1, 1):
         for y in (-.22, .02, .25, .46):
             hip = V((sx * .46, y, .5))
             knee = V((sx * .5, y * 1.15, .98))
             ankle = V((sx * .655, y * 1.35, .5))
             tip = V((sx * .62, max(-.66, min(.66, y * 1.45)), .02))
-            P.add("Accent", L.chain([hip, knee + (hip - knee).normalized() * .02], [.055, .045], flat=.8, seg=10))
-            P.add("Accent", L.chain([knee + (ankle - knee).normalized() * .02, ankle], [.045, .035], flat=.8, seg=10))
-            P.add("Accent", L.chain([ankle, tip], [.035, .012], flat=.8, seg=8))
-            P.add("Accent", L.ellipsoid(knee, (.068, .062, .06), seg=10))
+            P.add(f"AccentLeg{n}Upper", L.chain([hip, knee + (hip - knee).normalized() * .02], [.055, .045], flat=.8, seg=10))
+            P.add(f"AccentLeg{n}Upper", L.ellipsoid(knee, (.068, .062, .06), seg=10))
+            P.add(f"AccentLeg{n}Lower", L.chain([knee + (ankle - knee).normalized() * .02, ankle], [.045, .035], flat=.8, seg=10))
+            P.add(f"AccentLeg{n}Lower", L.chain([ankle, tip], [.035, .012], flat=.8, seg=8))
+            n += 1
     # great claws pressing the pads
     for sx in (-1, 1):
         x = sx * .3
@@ -370,7 +373,7 @@ def storage(L):
     crate's corners and edges, a friendly glowing ring on the lid. The lid (BodyLid + EyeLid, both hinged on the crate's
     back top edge, STORAGE_HINGE) opens. The crab comes out of an opening in the crate's front: thorax, eye stalks,
     one big claw and one small, two pairs of curled jointed walking legs a side, a pair of short legs at the back.
-    It glides (no moving parts). Fits a 0.9 m duct."""
+    Its legs walk (ProceduralLegs). Fits a 0.9 m duct."""
     P = Parts()
     cw, cd, z0, z1, cy = .5, .52, .13, .58, .07
     zc = (z0 + z1) / 2
@@ -415,18 +418,25 @@ def storage(L):
                                bend=(0, -.02, .03), seg=6))
         P.add("Accent", L.claw(palm + V((0, -.04 * k, -.02)), palm + V((-sx * .03, -.13 * k - .02, -.04)), .025 * k,
                                bend=(0, -.02, -.02), seg=6))
-    # curled jointed legs: up to a knee, down to an ankle, the last joint curling back under
+    # curled jointed legs: up to a knee, down to an ankle, the last joint curling back under — each cut at the knee, a
+    # thigh (AccentLeg{n}Upper: hip to knee, with the knee's joint) and a shin (AccentLeg{n}Lower: knee to the tip):
+    # ProceduralLegs plants the tips and walks them
+    n = 0
     for sx in (-1, 1):
         for y in (-.3, -.18):
             hip, knee = V((sx * .12, y, .22)), V((sx * .26, y - .03, .34))
             ankle, tip = V((sx * .34, y - .06, .14)), V((sx * .3, y - .02, .01))
-            P.add("Accent", L.chain([hip, knee], [.026, .022], seg=8) + L.chain([knee, ankle], [.022, .018], seg=8))
-            P.add("Accent", L.claw(ankle, tip, .016, bend=(sx * .02, 0, 0), seg=6))
-            for j in (knee, ankle):
-                P.add("Body", L.ellipsoid(j, (.03, .03, .03), seg=8))                           # joints
+            P.add(f"AccentLeg{n}Upper", L.chain([hip, knee + (hip - knee).normalized() * .01], [.026, .022], seg=8))
+            P.add(f"AccentLeg{n}Upper", L.ellipsoid(knee, (.03, .03, .03), seg=8))
+            P.add(f"AccentLeg{n}Lower", L.chain([knee + (ankle - knee).normalized() * .01, ankle], [.022, .018], seg=8))
+            P.add(f"AccentLeg{n}Lower", L.ellipsoid(ankle, (.03, .03, .03), seg=8))
+            P.add(f"AccentLeg{n}Lower", L.claw(ankle, tip, .016, bend=(sx * .02, 0, 0), seg=6))
+            n += 1
+    for sx in (-1, 1):
         hip, knee = V((sx * .18, .26, .15)), V((sx * .29, .3, .16))                           # short back legs
-        P.add("Accent", L.chain([hip, knee], [.022, .018], seg=8))
-        P.add("Accent", L.claw(knee, V((sx * .3, .32, .01)), .016, bend=(sx * .02, 0, 0), seg=6))
+        P.add(f"AccentLeg{n}Upper", L.chain([hip, knee + (hip - knee).normalized() * .01], [.022, .018], seg=8))
+        P.add(f"AccentLeg{n}Lower", L.claw(knee, V((sx * .3, .32, .01)), .016, bend=(sx * .02, 0, 0), seg=6))
+        n += 1
     return P
 
 

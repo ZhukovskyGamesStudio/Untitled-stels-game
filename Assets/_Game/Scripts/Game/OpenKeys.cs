@@ -52,10 +52,14 @@ namespace Stealth
         /// <summary>A vault lock panel solved.</summary>
         public static int Console(int console) => Of(OpenKind.Console, console);
         public static int CageOpen(int prop) => Of(OpenKind.Cage, prop);
-        /// <summary>One of the team's hack slots taken.</summary>
-        public static int HackSlot(int slot) => Of(OpenKind.HackSlot, slot);
+        /// <summary>One of the team's hack slots taken (oldest first), by a robot / device of this kind (<see cref="Stealth.Level.RobotKind"/>).</summary>
+        public static int HackSlot(int slot, int kind = 0) => Of(OpenKind.HackSlot, slot * HackKinds + kind);
+        /// <summary>Kinds a hack slot's key can tell apart.</summary>
+        public const int HackKinds = 64;
         /// <summary>The lid over the shaft to the basement is open.</summary>
         public static readonly int Shaft = Of(OpenKind.Shaft, 0);
+        /// <summary>The lid over the exit hatch's shaft (down to the passage in the sewer).</summary>
+        public static readonly int ExitShaft = Of(OpenKind.Shaft, 1);
         /// <summary>The sewer's gate is open.</summary>
         public static readonly int Gate = Of(OpenKind.Gate, 0);
         public static int Stage(JobStage stage) => Of(OpenKind.Stage, (int)stage);

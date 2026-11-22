@@ -21,6 +21,8 @@ namespace Stealth.EditorTools
         static readonly Dictionary<string, Material> s_Kit = new();
 
         static Material K(string name) => s_Kit.TryGetValue(name, out var m) ? m : null;
+        /// <summary>The derelict decals that exist (Art/Textures/Derelict/Decals: absent on a checkout without them).</summary>
+        static Material[] KitDecals(params string[] names) => names.Select(K).Where(m => m != null).ToArray();
 
         /// <summary>
         /// Lit materials for the style architecture and the floor and wall finishes (textures from
@@ -122,6 +124,7 @@ namespace Stealth.EditorTools
             Mat("Trim_Metal", new Color(0.42f, 0.44f, 0.47f), null, 0.5f, 0.8f);
             Mat("Trim_Rust", new Color(0.42f, 0.27f, 0.17f), null, 0.3f, 0.4f);
             Mat("Trim_Brass", new Color(0.78f, 0.62f, 0.32f), null, 0.6f, 1f);
+            Mat("Threshold", new Color(0.3f, 0.29f, 0.27f), null, 0.12f); // a worn, dull strip: nobody looks at it
             Mat("Trim_Black", new Color(0.07f, 0.07f, 0.08f), null, 0.4f);
             Mat("Trim_Toon", new Color(0.98f, 0.55f, 0.22f), null, 0.2f);
             Mat("Trim_Olive", new Color(0.32f, 0.3f, 0.2f), null, 0.2f);
@@ -204,7 +207,7 @@ namespace Stealth.EditorTools
             kit.VaultFloor = K("Vault_Floor");
             kit.VaultWallTile = 2f;
             kit.VaultFloorTile = 1f;
-            kit.Threshold = K("Trim_Brass");
+            kit.Threshold = K("Threshold");
             kit.ShopWall = K("Shop_Wall");
             kit.ShopWallLower = K("Shop_WallLower");
             kit.ShopFloor = K("Shop_Floor");
@@ -232,6 +235,17 @@ namespace Stealth.EditorTools
             kit.HomeStairWall = K("Home_StairWall");
             kit.HomeStairLower = K("Home_StairLower");
             kit.HomeStairFloor = K("Home_StairFloor");
+            // the abandoned station (Level.DerelictLook): Sasha's derelict surfaces and decals, the same in every family
+            kit.DerelictWall = K("Dr_SteelPanels");
+            kit.DerelictFloor = K("Dr_FloorPlate");
+            kit.DerelictCeiling = K("Dr_CeilingVents");
+            kit.DerelictRust = K("Dr_Rust");
+            kit.DerelictPaint = K("Dr_PaintedMetal");
+            kit.DerelictTiles = K("Wall_TilesWhite");
+            kit.DerelictVinyl = K("Dr_Vinyl");
+            kit.FloorDecay = KitDecals("Dc_floor_rust", "Dc_floor_oil", "Dc_floor_scorch", "Dc_floor_rubble");
+            kit.WallDecay = KitDecals("Dc_wall_rust", "Dc_wall_rust", "Dc_wall_leak", "Dc_wall_mold", "Dc_wall_peel", "Dc_wall_scorch"); // rust twice as often
+            kit.Posters = KitDecals(Enumerable.Range(0, 6).Select(i => $"Dc_poster_{i}").ToArray());
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)

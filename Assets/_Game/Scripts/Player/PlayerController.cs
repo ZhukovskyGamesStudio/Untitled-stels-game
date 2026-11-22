@@ -33,6 +33,8 @@ namespace Stealth.Player
         public Transform Head;
         public Camera Camera;
         public AudioListener Listener;
+        [Tooltip("Plays this player's voice chat from the mouth (others hear it; the owner does not).")]
+        public Stealth.Audio.VoicePlayback Voice;
         public Transform Model;
         public Transform HeadPivot;
         public Renderer[] BodyRenderers;
@@ -52,8 +54,6 @@ namespace Stealth.Player
         public bool Downed { get; private set; }
         /// <summary>Server-owned: hiding in the hatch (robots do not see you; when the whole team is in, it leaves the house).</summary>
         public bool InHatch { get; private set; }
-        /// <summary>Owner: next to the hatch and looking right at it (its collider), so the hatch key climbs in.</summary>
-        public bool AtHatch { get; private set; }
         /// <summary>Owner-owned.</summary>
         public bool Crouching { get; private set; }
         /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
@@ -91,7 +91,7 @@ namespace Stealth.Player
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
 
         /// <summary>The department of this player (by slot): an IT person from backend, QA, sysadmins or design.</summary>
-        public Department Department => PlayerLooks.DepartmentOf(PlayerLooks.SlotOf(ClientId));
+        public Department Department => PlayerLooks.DepartmentOfClass(LoadoutClass); // the class dresses the player
 
         CharacterController m_Controller;
         IPlayerLink m_Link;
@@ -182,6 +182,7 @@ namespace Stealth.Player
         {
             float radius = FootstepNoise.LandingRadius(impactSpeed);
             if (IsOwner && IsSpawned && radius > 0f) EmitNoise(radius);
+            HardLanding(impactSpeed);
         }
 
         // ------------------------------------------------------------------ binding (called by the network twin)
@@ -194,6 +195,7 @@ namespace Stealth.Player
             IsServer = isServer;
             IsSpawned = true;
             All.Add(this);
+            if (isServer) LoadoutClass = PlayerLooks.DefaultClass(PlayerLooks.SlotOf(clientId)); // until picked on the start screen
             ApplyColor();
             name = $"Player_{clientId}";
             VisualStyles.Dress(gameObject);
@@ -245,21 +247,23 @@ namespace Stealth.Player
         public int HatchIndex { get; private set; }
 
         /// <summary>Other peers: what the owner reports.</summary>
-        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName)
+        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName, BodyPose pose = BodyPose.None)
         {
             Crouching = crouching;
             LookPitch = lookPitch;
             DisplayName = displayName ?? "";
+            Pose = pose;
         }
 
         /// <summary>Team colour on the small things only, the department's clothes, skin, dark details (PlayerLooks).</summary>
         void ApplyColor()
         {
             int slot = PlayerLooks.SlotOf(ClientId);
+            m_LookDepartment = Department;
             if (Model != null)
             {
-                VisualStyles.SetVariant(Model.gameObject, slot); // the department's model in the current style
-                PlayerLooks.Paint(Model, slot);
+                VisualStyles.SetVariant(Model.gameObject, (int)m_LookDepartment); // the department's model in the current style
+                PlayerLooks.Paint(Model, slot, m_LookDepartment);
             }
         }
 
@@ -279,13 +283,16 @@ namespace Stealth.Player
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
-            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
+            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen || StylePanel.IsOpen;
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
                           (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
-            bool freeCursor = menu || CursorMode;
+            // the run's start screen: the team stands in a row, the mouse picks a class and an item, nobody walks
+            bool pickingNow = GameManager.Instance != null && GameManager.Instance.Picking;
+            if (pickingNow) cracking = true;
+            bool freeCursor = menu || CursorMode || pickingNow;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
@@ -296,6 +303,7 @@ namespace Stealth.Player
             Motor.InHatch = InHatch;
             UpdateLadder(input, Time.deltaTime);
             Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
+            UpdateGearMotion();
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
@@ -305,15 +313,29 @@ namespace Stealth.Player
             UpdateNoise();
             UpdateGas();
             UpdateHand();
-            AtHatch = !InHatch && Hatch.IsNear(transform.position) && (!UseLook || Aimed<Hatch>() != null);
             UpdateInteractions();
+            WorkSounds();
             UpdateCallouts();
             UpdateFog();
         }
 
         /// <summary>Dark haze indoors (it only takes the distance away, it does not light anything), the gas fog outside.</summary>
-        void UpdateFog()
+        /// <summary>Underground: the haze's least density, and how much of the style's ambient light is left.</summary>
+        const float UndergroundFog = 0.085f, UndergroundAmbient = 0.15f;
+        static readonly int StyDarkId = Shader.PropertyToID("_StyDark");
+        bool m_AmbientDimmed;
+
+        /// <summary>
+        /// The air of where the camera is, at once (not eased in): after a house is built under a camera in the sewer the
+        /// game's atmosphere and the style were put back on — easing back from the street's haze and the style's full
+        /// ambient read as the style changing for a second.
+        /// </summary>
+        public void SnapAir() => UpdateFog(true);
+
+        void UpdateFog(bool snap = false)
         {
+            float Toward(float from, float to, float rate) => snap ? to : Mathf.MoveTowards(from, to, Time.deltaTime * rate);
+            Color Blend(Color from, Color to, float rate) => snap ? to : Color.Lerp(from, to, Time.deltaTime * rate);
             var layout = ActiveLevel.Layout;
             if (layout == null || Camera.transform.position.y < LevelLayout.Underground)
             {
@@ -322,32 +344,57 @@ namespace Stealth.Player
                 GasView.Hide();
                 if (layout == null && SewerLocation.Active == null) return;
                 var a = VisualStyles.World;
-                RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, a.IndoorFogDensity * 1.4f, Time.deltaTime * 3f);
-                RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, a.IndoorFog, Time.deltaTime * 4f);
+                // a thick black haze: the far tunnel sinks into black whatever the style's indoor haze looks like; the style's
+                // own ambient (the picture's, not gameplay's) all but gone, and the ink lines fade where nothing is lit
+                RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, Mathf.Max(UndergroundFog, a.IndoorFogDensity * 3f), 3f);
+                RenderSettings.fogColor = Blend(RenderSettings.fogColor, a.IndoorFog * 0.1f, 4f);
+                RenderSettings.ambientLight = Blend(RenderSettings.ambientLight, VisualStyles.StyleAmbient * UndergroundAmbient, 4f);
+                Shader.SetGlobalFloat(StyDarkId, 1f);
+                m_AmbientDimmed = true;
                 Camera.backgroundColor = RenderSettings.fogColor;
                 return;
+            }
+            if (m_AmbientDimmed)
+            {
+                m_AmbientDimmed = false;
+                RenderSettings.ambientLight = VisualStyles.StyleAmbient;
+                Shader.SetGlobalFloat(StyDarkId, 0f);
             }
             // The engine's fog is only the dark haze, inside and out. The gas is drawn in the world by the gas pass
             // (GasView): none at the walls, full 15 m out (lose sight of the house and you are lost), the sky above it.
             // Visual only — the gas still hurts where it did (UpdateGas).
             var air = VisualStyles.World;
-            RenderSettings.fogDensity = Mathf.MoveTowards(RenderSettings.fogDensity, air.IndoorFogDensity, Time.deltaTime * 3f);
-            RenderSettings.fogColor = Color.Lerp(RenderSettings.fogColor, air.IndoorFog, Time.deltaTime * 2f);
+            RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, air.IndoorFogDensity, 3f);
+            RenderSettings.fogColor = Blend(RenderSettings.fogColor, air.IndoorFog, 2f);
             Camera.backgroundColor = Color.black; // the gas pass adds the sky where nothing was drawn
             GasView.Show(layout, air, layout.IsInside(Camera.transform.position));
         }
 
         bool m_PlacedInHatch;
 
-        /// <summary>Owner: the server let us into the hatch — stand in its middle (and leave it where we are when climbing out).</summary>
+        float m_HatchGlideUntil;
+
+        /// <summary>
+        /// Owner: the server let us into the hatch — slide down into its middle (no jump: the body moves there over a moment,
+        /// and the model sinks, <see cref="HatchDepth"/>); climbing out leaves us where we are.
+        /// </summary>
         void EnterHatchIfNeeded()
         {
-            if (InHatch == m_PlacedInHatch) return;
-            m_PlacedInHatch = InHatch;
-            var layout = ActiveLevel.Layout;
-            if (!InHatch || layout == null) return;
-            TeleportOwner(Hatch.PositionOf(HatchIndex) + Vector3.up * 0.05f, transform.rotation);
+            if (InHatch != m_PlacedInHatch)
+            {
+                m_PlacedInHatch = InHatch;
+                m_HatchGlideUntil = InHatch ? Time.time + 1.5f : 0f;
+            }
+            if (!InHatch || ActiveLevel.Layout == null || Time.time > m_HatchGlideUntil) return;
+            var target = Hatch.PositionOf(HatchIndex) + Vector3.up * 0.05f;
+            var away = target - transform.position;
+            away.y = 0f;
+            if (away.magnitude < 0.02f) { m_HatchGlideUntil = 0f; return; }
+            m_Controller.Move(Vector3.ClampMagnitude(away, HatchGlideSpeed * Time.deltaTime));
         }
+
+        /// <summary>How fast a body slides into a hatch's middle, metres a second.</summary>
+        const float HatchGlideSpeed = 2.5f;
 
         void UpdateNoise()
         {
@@ -398,7 +445,7 @@ namespace Stealth.Player
             }
             if (ReviveTarget != null && holdE)
             {
-                ReviveProgress += Time.deltaTime;
+                ReviveProgress += WorkDt;
                 if (ReviveProgress >= m_Interaction.ReviveTime)
                 {
                     Link.SendRevive(ReviveTarget);
@@ -410,7 +457,7 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, Time.deltaTime, m_Interaction.HackHoldTime))
+            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
             {
                 Link.SendHack(HackTarget);
             }
@@ -418,7 +465,7 @@ namespace Stealth.Player
 
             // A locked door: hold E next to it to hack the lock (when nothing more urgent is in reach).
             DoorTarget = ReviveTarget == null && HackTarget == null ? AutoDoor.LockedNear(transform.position, AutoDoor.HackReach, View) ?? StorageDoorAtTerminal() : null;
-            if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, Time.deltaTime, m_Interaction.DoorHackTime))
+            if (DoorTarget != null && holdE && m_DoorHeld.Hold(DoorTarget, WorkDt, m_Interaction.DoorHackTime))
             {
                 Link.SendUse(UseKind.DoorLock, DoorTarget.Index);
             }
@@ -443,9 +490,8 @@ namespace Stealth.Player
 
             var gm = GameManager.Instance;
             if (gm == null || !Controls.Pressed(GameAction.Hatch) || gm.Phase != RunPhase.Playing) return;
-            // The hatch: hide in it (the team leaves when everyone is in) or climb back out.
+            // (the exit is a shaft with a ladder like the entry's: nothing to sit in; out of a hatch if ever put in one)
             if (InHatch) SetHatch(false);
-            else if (AtHatch) SetHatch(true);
         }
 
         // ------------------------------------------------------------------ watching a teammate while knocked out
@@ -458,11 +504,20 @@ namespace Stealth.Player
 
         void LateUpdate()
         {
+            ShowCalling();
             if (!IsOwner) { HoldRemoteSeat(); return; }
             if (Camera == null) return;
             if (!ReferenceEquals(UsingTerminal, null) && UsingTerminal == null) StopTerminal(); // the house went away
+            bool picking = GameManager.Instance != null && GameManager.Instance.Picking;
             if (UsingTerminal != null) ShowTerminalView();
-            else UpdateWatching();
+            else if (picking) ShowPickingView();
+            else
+            {
+                if (m_PickingView) { m_PickingView = false; Camera.transform.localPosition = Vector3.zero; Camera.transform.localRotation = Quaternion.identity; }
+                UpdateWatching();
+            }
+            // through a teammate's eyes the body lying on the floor is seen like anyone's; on the start screen the team stands in a row
+            ShowOwnBody(Watching != null || picking);
         }
 
         /// <summary>
@@ -480,8 +535,11 @@ namespace Stealth.Player
 
         public void HitServer(Vector3 source)
         {
-            if (!IsServer || Invulnerable || !m_Health.TryHit(Time.time)) return;
+            if (!IsServer || Invulnerable) return;
+            bool wasDown = Downed;
+            if (!m_Health.TryHit(Time.time)) return;
             PublishHealth();
+            if (Downed && !wasDown) GameManager.Instance?.NoteServer(this, StatKind.Downs);
             var away = transform.position - source;
             away.y = 0;
             away = away.sqrMagnitude > 0.01f ? away.normalized : -transform.forward;
@@ -526,6 +584,14 @@ namespace Stealth.Player
         }
 
         /// <summary>Last noise this player made (owner side, for the HUD meter).</summary>
+        /// <summary>This player's own voice was sent with this noise radius: the HUD's speaker shows it like a step (the server makes the robots' noise, VoiceHub).</summary>
+        public void HearOwnVoice(float radius)
+        {
+            if (radius <= 0f) return;
+            if (Time.time - LastNoiseTime > 0.3f || radius >= LastNoiseRadius) LastNoiseRadius = radius;
+            LastNoiseTime = Time.time;
+        }
+
         public float LastNoiseRadius { get; private set; }
         public float LastNoiseTime { get; private set; } = -10f;
 
@@ -541,6 +607,7 @@ namespace Stealth.Player
         {
             if (Downed || Invisible) return; // the invisibility cheat: robots ignore this player completely
             NoiseSystem.EmitServer(position, Mathf.Min(radius, 20f), ClientId);
+            if (radius >= 6f) GameManager.Instance?.NoteServer(this, StatKind.Noise); // (a loud one: a run, a landing, not every step)
         }
 
         /// <summary>Server: the owner passed out from the gas.</summary>
@@ -557,13 +624,20 @@ namespace Stealth.Player
             if (Downed || other == null || !other.Downed) return;
             if ((other.transform.position - transform.position).magnitude > m_Interaction.ReviveDistance + 1f) return;
             other.ReviveServer();
+            GameManager.Instance?.NoteServer(this, StatKind.Revives);
         }
 
         /// <summary>Server: the owner finished holding E at a robot / device.</summary>
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            if (target is Enemies.Detector d && GameManager.Instance != null) GameManager.Instance.TeamHackServer(d);
+            // a robot needs the keyboard in the hand; without it, one that carries something is only searched: it drops it
+            if (target is Enemies.RobotController robot && !HoldsKeyboard)
+            {
+                if (robot.Cargo >= 0) robot.SearchServer();
+                return;
+            }
+            if (target is Enemies.Detector d && GameManager.Instance != null) { GameManager.Instance.TeamHackServer(d); GameManager.Instance.NoteHackServer(this); }
             else target.HackServer(m_Interaction.HackDuration);
         }
     }

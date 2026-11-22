@@ -16,11 +16,15 @@ namespace Stealth.EditorTools
     /// launches paid that three times. The player is a development build, and when nothing but code changed since the last
     /// one it is a scripts-only build (seconds instead of minutes): every content file's size and time go into a stamp next
     /// to the exe, and a different stamp means a full build. Env: FILTER (tests), FORCE / REBUILD / REBUILD_UI (assets),
-    /// NOASSETS / NOTESTS / NOPLAYER = 1 to skip a step, FULL = 1 to force a full player build.
+    /// NOASSETS / NOTESTS / NOPLAYER = 1 to skip a step, FULL = 1 to force a full player build. The tests marked
+    /// <c>[Category("Slow")]</c> (they generate dozens of houses: ~90% of the time) are left out unless SLOW = 1 or a FILTER
+    /// names them; run them before a commit and after changes to the generator.
     /// </summary>
     public static class DevCycle
     {
         const string StampPath = "Builds/Windows/dev_build_stamp.txt";
+        /// <summary>The tests left out of the everyday run (SLOW = 1 runs them too).</summary>
+        const string SlowCategory = "Slow";
 
         static bool Env(string name) => Environment.GetEnvironmentVariable(name) == "1";
 
@@ -62,6 +66,8 @@ namespace Stealth.EditorTools
         {
             public int Total, Passed, Failed, Skipped;
             public readonly List<string> Failures = new();
+            /// <summary>Seconds per test (Logs/test_times.txt: the slowest first, and per class).</summary>
+            public readonly List<(double seconds, string name)> Times = new();
             public bool Done;
 
             public void RunStarted(ITestAdaptor tests) { }
@@ -72,6 +78,7 @@ namespace Stealth.EditorTools
             {
                 if (result.Test.IsSuite) return;
                 Total++;
+                Times.Add((result.Duration, result.FullName));
                 switch (result.TestStatus)
                 {
                     case TestStatus.Passed: Passed++; break;
@@ -93,11 +100,35 @@ namespace Stealth.EditorTools
             var filter = new Filter { testMode = TestMode.EditMode };
             var only = Environment.GetEnvironmentVariable("FILTER");
             if (!string.IsNullOrEmpty(only)) filter.groupNames = new[] { only };
+            else if (!Env("SLOW")) filter.categoryNames = new[] { "!" + SlowCategory };
             api.Execute(new ExecutionSettings(filter) { runSynchronously = true });
             api.UnregisterCallbacks(results);
-            Debug.Log($"[Cycle] tests: total={results.Total} passed={results.Passed} failed={results.Failed}");
+            bool slow = Env("SLOW") || !string.IsNullOrEmpty(only);
+            Debug.Log($"[Cycle] tests: total={results.Total} passed={results.Passed} failed={results.Failed} in {results.Times.Sum(t => t.seconds):0} s" +
+                      (slow ? "" : " (without the slow ones: SLOW=1 runs them)"));
+            WriteTimes(results.Times);
             foreach (var f in results.Failures) Debug.Log("[Cycle] " + f);
             return results.Failed == 0;
+        }
+
+        /// <summary>Logs/test_times.txt: the classes by their total time, then the slowest tests.</summary>
+        static void WriteTimes(List<(double seconds, string name)> times)
+        {
+            var sb = new StringBuilder();
+            double total = times.Sum(t => t.seconds);
+            sb.Append($"total {total:0} s, {times.Count} tests\n\nby class:\n");
+            static string ClassOf(string name)
+            {
+                int paren = name.IndexOf('(');
+                var method = paren >= 0 ? name.Substring(0, paren) : name;
+                return method.Substring(0, Math.Max(0, method.LastIndexOf('.')));
+            }
+            foreach (var g in times.GroupBy(t => ClassOf(t.name)).OrderByDescending(g => g.Sum(x => x.seconds)))
+                sb.Append($"{g.Sum(x => x.seconds),8:0.0} {g.Count(),5} {g.Key}\n");
+            sb.Append("\nslowest:\n");
+            foreach (var t in times.OrderByDescending(t => t.seconds).Take(80)) sb.Append($"{t.seconds,8:0.0} {t.name}\n");
+            Directory.CreateDirectory("Logs");
+            File.WriteAllText("Logs/test_times.txt", sb.ToString());
         }
 
         // ------------------------------------------------------------------ the player

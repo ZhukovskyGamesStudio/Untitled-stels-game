@@ -1,6 +1,6 @@
 ---
 name: blender-modeling
-description: How to model 3D assets for «Айтишники: вылазка» in Blender from Python so they look made by an artist, not stacked from boxes — the shapes.py vocabulary (rounded boxes, lofts, lathes, tubes, seams, subdivision, booleans, skin), the review.py contact sheet and mesh check, the look→fix loop with an independent critic, form rules, budgets and Blender 5.2 pitfalls. Use before writing or changing any model in Tools/Blender, and when asked to make, improve, compare or review a model.
+description: How to model 3D assets for USG (untitled stels game) in Blender from Python so they look made by an artist, not stacked from boxes — the shapes.py vocabulary (rounded boxes, lofts, lathes, tubes, seams, subdivision, booleans, skin), the review.py contact sheet and mesh check, the look→fix loop with an independent critic, form rules, budgets and Blender 5.2 pitfalls. Use before writing or changing any model in Tools/Blender, and when asked to make, improve, compare or review a model.
 ---
 
 # Как моделировать (Blender из Python)
@@ -8,7 +8,7 @@ description: How to model 3D assets for «Айтишники: вылазка» i
 Модель — это не код, а картинка. Код пишется вслепую, поэтому **каждая итерация заканчивается просмотром**:
 лист рендеров + проверка меша. Без просмотра модель не готова.
 
-Blender 5.2: `D:/Apps/Steam/steamapps/common/Blender/blender.exe` (не в PATH). Запуск:
+Blender 5.2: `C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe` (не в PATH). Запуск:
 `-b --factory-startup --python-exit-code 1 --python <скрипт> -- <аргументы>` (без `--python-exit-code 1` упавший скрипт
 возвращает 0).
 
@@ -24,7 +24,7 @@ Blender 5.2: `D:/Apps/Steam/steamapps/common/Blender/blender.exe` (не в PATH)
 | `Tools/Blender/audit_models.py` | пакетная проверка папок FBX: таблица Markdown, худшие сверху, сообщения ворот |
 
 ```bash
-B="D:/Apps/Steam/steamapps/common/Blender/blender.exe"
+B="C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe"
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/guard_mk2.py -- <scratchpad>/guard.fbx
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/review.py -- <scratchpad>/sheet.png <старая.fbx> <новая.fbx> --focus 0,-0.05,1.6,0.45
 "$B" -b --factory-startup --python-exit-code 1 --python Tools/Blender/review.py -- <scratchpad>/final.png <новая.fbx> --shading
@@ -159,6 +159,31 @@ Unity триангулирует сам) и `no material` (материалы п
 - «повреждения» — второй слой поверх своей конструкции, а не сама конструкция (первый Derelict был базой с трещинами);
 - стык «грань в грань» ломается от любого скругления стиля — детали входят друг в друга на 5 мм и больше;
 - независимый критик по рядам (только PNG + нейтральный ряд для сравнения) находит «слишком похоже на базу» лучше автора.
+
+## Люди: поля расстояний и запекание (`Tools/Blender/human.py`, `humanlib/`)
+
+Органику (тело, лицо, одежду, волосы) из лофтов и трубок не собрать: швы в плечах, манекен. Игроки-люди лепятся **полями
+расстояний** в numpy и запекаются на игровую сетку — этот же путь годится для любого органического персонажа:
+
+- `humanlib/sdf.py`: объёмы (`ell`, `cone`, `chain`, `box`), плавные объединения и вырезы (`smin`, `smax`), складки (`ridge`),
+  и `mesh(name, f, lo, hi, h)` — naive surface nets: плотная четырёхугольная сетка любой топологии (рукав из плеча без шва).
+  Вершины сети лежат «террасами» до доли клетки от поверхности — `snap` досаживает их по градиенту поля. Грани сети
+  ориентируй по градиенту (`orient`), а игровой сетки — по плотной (`build.orient_like`): `recalc_face_normals` на таких
+  сетках выворачивал половину граней, и запекание читало скульптуру изнутри.
+- Тонкая оболочка (манжета с полостью, пояс) должна быть толще 2–3 клеток сетки, иначе рвётся в крошки; закрытый торец
+  рукава, в который входит кисть, лучше полости.
+- Аксессуар, лежащий на одежде (шнурок, бейдж, повязка, конец шарфа), — слой над полем одежды, пересечённый с областью
+  (`shell(surface, p, lift, thick)` в `human.py`): сам повторяет форму тела любого сложения.
+- `humanlib/build.py`: `paint` (цвет и гладкость по вершинам плотной сетки) → `lowpoly` (Decimate с весами «где держать
+  треугольники») → `clean` → `unwrap` / `pack` → `bake` (Cycles на CPU работает без окна, секунды: NORMAL, EMIT цвета, AO)
+  → `audit` (строки `TOPO`; ноль неманифолдных и открытых рёбер — условие сборки).
+- Смотреть: `preview=<png>` пишет листы `*_sculpt`, `*_lit` (EEVEE с запечёнными картами), `*_lit_face`, `*_takes`
+  (каждый дубль в трёх кадрах); `static=<fbx>` — сетка в позе покоя для `review.py` (его ворота ловят то, чего не меряет
+  `audit`: копланарные торцы двух вещей на одной высоте, части нормалями внутрь).
+- Несколько сборок сразу — параллельными процессами Blender (по ~10 минут на человека в полном разрешении, `draft` — минута).
+- Позы пиши через `anim.Poser`: `bend` (вперёд / в сторону / вокруг оси — оси берутся от направления кости в покое),
+  `reach` (плечо «куда смотрит рука», а не «на сколько от А-позы»: поднятая вперёд рука в А-позе иначе уходит к середине),
+  `lean` для позвоночника. Критик по листам дублей находит «руки сдаются» и «приседает на табуретке» лучше автора.
 
 ## Что даёт прогон (ноябрь 2026, все 679 моделей стилей)
 

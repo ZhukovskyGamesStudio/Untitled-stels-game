@@ -25,6 +25,41 @@ namespace Stealth.Game
 
         /// <summary>What lies in the car's bed (the whole run, replicated).</summary>
         public Cargo Cargo { get; } = new();
+        /// <summary>The car's shredder: things thrown into its hopper heap up and are torn up a few at a time into fuel (replicated).</summary>
+        public Shredder Shredder { get; } = new();
+        readonly List<(byte shape, byte color)> m_Chewed = new();
+        int m_ChewFuel;
+        string m_ChewBy = "";
+
+        /// <summary>Within reach of the car's hopper (a thing let go there goes into the shredder).</summary>
+        public bool AtCar(Vector3 position) => Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+
+        /// <summary>Server: a thing thrown into the car's hopper: onto the shredder's pile — its fuel comes once it is chewed.</summary>
+        public void GrindServer(PlayerController player, byte shape, byte color)
+        {
+            if (ItemCatalog.Unburnable(shape)) return;
+            Shredder.Add(shape, color, Session.ServerTime);
+            if (player != null) m_ChewBy = player.Nick;
+            NoteServer(player, StatKind.Fuel, ItemCatalog.Value(shape, color));
+        }
+
+        /// <summary>Server: what the blades have finished becomes fuel at once; the banner when the pile is gone.</summary>
+        void UpdateShredderServer()
+        {
+            m_Chewed.Clear();
+            if (Shredder.Tick(Session.ServerTime, m_Chewed) == 0) return;
+            int fuel = 0;
+            foreach (var (shape, color) in m_Chewed) fuel += ItemCatalog.Value(shape, color);
+            if (fuel > 0)
+            {
+                m_Run.Deposit(fuel);
+                m_StrandedAt = -1f;
+                m_ChewFuel += fuel;
+            }
+            if (Shredder.Busy || m_ChewFuel <= 0) return;
+            Banner(Loc.Pack("banner.fuel_added", m_ChewBy, m_ChewFuel, Collected, FuelNeeded));
+            m_ChewFuel = 0;
+        }
         /// <summary>The stash in the house's exit hatch: it goes down into the car with the team.</summary>
         public TeamStash ExitStash { get; } = new();
         /// <summary>Server time until which the drive to the next house is shown on every peer, 0 = not driving. Replicated.</summary>
@@ -149,21 +184,31 @@ namespace Stealth.Game
             }
         }
 
-        /// <summary>Whether a thing dropped here burns into fuel: at the car in the sewer (its hopper), at the entry hatch in a house.</summary>
+        /// <summary>Whether a thing dropped here burns into fuel: at the car (its hopper, the sewer or the basement) or at the entry in a house — never at the storage robot.</summary>
         public bool CanBurnAt(Vector3 position)
         {
-            if (Phase == RunPhase.Sewer) return Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+            // at the car (its hopper): in the sewer and in the house's basement alike
+            bool atCar = Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
+            if (Phase == RunPhase.Sewer || atCar) return atCar && Phase is RunPhase.Sewer or RunPhase.Playing;
             var l = ActiveLevel.Layout;
-            return Phase == RunPhase.Playing && l != null && (AtEntry(l, position) || AtBot(position));
+            return Phase == RunPhase.Playing && l != null && AtEntry(l, position); // (not at the storage robot: its crate is a stash, no fire)
         }
+
+        /// <summary>
+        /// Whether the stash board here has the burn zone: only the entry's stash where things burn — never the storage
+        /// robot's crate (it may stand next to the car, but its board is a stash, not a fire).
+        /// </summary>
+        public bool CanBurnStashAt(Vector3 position, TeamStash stash) =>
+            stash != null && stash == Stash && !AtBot(position) && CanBurnAt(position);
 
         /// <summary>Server: fuel a player put in (a thing into the hopper or the entry hatch).</summary>
         public void BurnServer(PlayerController player, int fuel)
         {
             if (fuel <= 0) return;
+            NoteServer(player, StatKind.Fuel, fuel);
             m_Run.Deposit(fuel);
             m_StrandedAt = -1f;
-            Banner(Loc.Pack("banner.fuel_added", player != null ? player.Nick : "", fuel, Collected, Quota));
+            Banner(Loc.Pack("banner.fuel_added", player != null ? player.Nick : "", fuel, Collected, FuelNeeded));
         }
 
         /// <summary>Server, the team comes down: the exit hatch's things go into the car; the entry hatch's stay in the house.</summary>
@@ -179,6 +224,25 @@ namespace Stealth.Game
             int lost = Stash.Items.Count;
             Stash.Clear();
             return lost;
+        }
+
+        /// <summary>
+        /// Server, the car drives off from under the house: the house is left behind — the knocked out with it (each one raises
+        /// the next quota, their things stay there), the exit hatch's stash rides in the bed, the entry's is lost.
+        /// </summary>
+        bool LeaveHouseServer()
+        {
+            int down = PlayerController.All.Count(p => p.KnockedOut);
+            if (!m_Run.EnterSewer(down)) return false;
+            int lost = LoadCarServer();
+            foreach (var p in PlayerController.All)
+            {
+                if (p.KnockedOut) p.GetComponent<PlayerInventory>()?.ClearServer();
+                p.LeaveHatchServer();
+            }
+            if (down > 0) Banner(Loc.Pack("banner.left_behind", down, Mathf.RoundToInt(m_Run.Settings.DeathPenalty * down * 100)));
+            if (lost > 0) Banner(Loc.Pack("banner.hatch_lost", lost));
+            return true;
         }
 
         // ------------------------------------------------------------------ the car
@@ -204,7 +268,7 @@ namespace Stealth.Game
             switch (kind)
             {
                 case UseKind.GateLever:
-                    if (Phase == RunPhase.Sewer && !GateOpen) { m_Opened.Add(OpenKeys.Gate); OpenedVersion++; Banner(Loc.Pack("banner.gate_open")); }
+                    if (Phase is RunPhase.Sewer or RunPhase.Playing && !GateOpen) { m_Opened.Add(OpenKeys.Gate); OpenedVersion++; Banner(Loc.Pack("banner.gate_open")); }
                     break;
                 case UseKind.CarSeat:
                     if (car != null && DriveUntil <= 0) car.SitServer(player, index);
@@ -225,26 +289,26 @@ namespace Stealth.Game
         /// <summary>Server: loot into the engine — the backpack's, or with an empty backpack everything in the bed.</summary>
         void FeedServer(PlayerController player)
         {
+            // the backpack's loot (or with an empty backpack the bed's) into the shredder: a pile it chews into fuel
             var inventory = player.GetComponent<PlayerInventory>();
-            int fuel = inventory != null ? inventory.BurnServer() : 0;
-            if (fuel == 0)
+            m_Chewed.Clear();
+            if (inventory != null) inventory.TakeLootServer(m_Chewed);
+            if (m_Chewed.Count == 0)
                 foreach (var item in Cargo.Items.ToArray())
                 {
                     if (ItemCatalog.IsTool(item.Shape)) continue;
-                    fuel += item.Value;
+                    m_Chewed.Add((item.Shape, item.Color));
                     Cargo.Remove(item);
                 }
-            if (fuel <= 0) return;
-            m_Run.Deposit(fuel);
-            m_StrandedAt = -1f;
-            Banner(Loc.Pack("banner.fuel_added", player.Nick, fuel, Collected, Quota));
+            foreach (var (shape, color) in m_Chewed) GrindServer(player, shape, color);
+            m_Chewed.Clear();
         }
 
         /// <summary>Server: a thing dropped over the car's bed lies there (no cells, a heap). False if it was not over the bed.</summary>
         public bool DropOnCarServer(byte shape, byte color, Vector3 at, float yaw)
         {
             var car = Car.Active;
-            if (car == null || Phase != RunPhase.Sewer || !car.OverBed(at, out var spot)) return false;
+            if (car == null || Phase is not (RunPhase.Sewer or RunPhase.Playing) || !car.OverBed(at, out var spot)) return false;
             Cargo.Add(shape, color, spot.x, spot.y, yaw);
             return true;
         }
@@ -263,6 +327,16 @@ namespace Stealth.Game
                 UpdateDriveServer();
                 return;
             }
+            UpdateRouteServer();
+        }
+
+        /// <summary>
+        /// Server: the way on — in the sewer between houses or in the house's own sewer under it. The car standing in an open
+        /// tunnel chooses its way; the team goes once it has the fuel for that way and everyone who can is in the car (a
+        /// short countdown) — till then the way stays chosen and the team may go back up into the house for more.
+        /// </summary>
+        void UpdateRouteServer()
+        {
             var sewer = SewerLocation.Active;
             var car = Car.Active;
             var options = RouteOptions;
@@ -277,37 +351,64 @@ namespace Stealth.Game
                 return;
             }
             int lane = options[way];
-            if (!QuotaMet)
+            if (ChosenLane != lane)
+            {
+                ChosenLane = lane; // the way is chosen (the next house starts generating), fuel or not: the team may go back up for more
+                GoAt = 0;
+            }
+            if (!AllAboard) { GoAt = 0; return; } // the car waits for the team
+            if (Collected < CostOf(lane))
             {
                 GoAt = 0;
-                ChosenLane = -1;
                 if (Time.time >= m_FuelNagAt)
                 {
                     m_FuelNagAt = Time.time + 6f;
-                    Banner(Loc.Pack("banner.fuel_short", Collected, Quota));
+                    Banner(Loc.Pack("banner.fuel_short", Collected, CostOf(lane)));
                 }
                 return;
             }
-            if (ChosenLane != lane)
-            {
-                ChosenLane = lane;
-                GoAt = Session.ServerTime + m_Run.Settings.VoteDelay;
-                return;
-            }
+            if (GoAt <= 0) { GoAt = Session.ServerTime + m_Run.Settings.VoteDelay; return; }
             if (Session.ServerTime >= GoAt) DepartServer();
+        }
+
+        /// <summary>Everyone who can sit is in the car (the knocked out stay behind: they come round in the next house with nothing).</summary>
+        static bool AllAboard
+        {
+            get
+            {
+                bool any = false;
+                foreach (var p in PlayerController.All)
+                {
+                    if (p.KnockedOut) continue;
+                    if (p.SeatIndex < 0) return false;
+                    any = true;
+                }
+                return any;
+            }
         }
 
         void CheckStranded()
         {
-            if (QuotaMet) { m_StrandedAt = -1f; return; }
+            int cheapest = CheapestCost;
+            if (Collected >= cheapest) { m_StrandedAt = -1f; return; }
             int burnable = CarHopper.BedFuel(Cargo);
             foreach (var p in PlayerController.All) burnable += CarHopper.BackpackFuel(p.GetComponent<PlayerInventory>());
             foreach (var item in WorldItem.All) if (!ItemCatalog.IsTool(item.Shape)) burnable += item.Value;
-            if (RunState.CanStillGo(Collected, Quota, burnable)) { m_StrandedAt = -1f; return; }
+            foreach (var hidden in m_Hidden.Values) burnable += ItemCatalog.Value(hidden.shape, hidden.color); // in the house's drawers still
+            var house = ActiveLevel.Layout;
+            if (Phase == RunPhase.Playing)
+                foreach (var stash in new[] { Stash, ExitStash }) // the hatches' stashes are still there to fetch from
+                    foreach (var e in stash.Items)
+                        if (!ItemCatalog.IsTool(e.Shape)) burnable += ItemCatalog.Value(e.Shape, e.Color);
+            if (Phase == RunPhase.Playing && house != null)
+                foreach (int c in house.Crates)
+                    if (!IsOpened(OpenKeys.Crate(c)))
+                        foreach (var (shape, color) in CrateContents(house, c, Gadgets, Tuning.Level.Loot)) burnable += ItemCatalog.Value(shape, color);
+            if (RunState.CanStillGo(Collected, cheapest, burnable)) { m_StrandedAt = -1f; return; }
             if (m_StrandedAt < 0f)
             {
                 m_StrandedAt = Time.time;
-                Banner(Loc.Pack("banner.stranded", Collected, Quota));
+                Banner(Loc.Pack("banner.stranded", Collected, cheapest));
                 return;
             }
             if (Time.time - m_StrandedAt < m_Run.Settings.StrandedGrace || !m_Run.Strand()) return;
@@ -318,7 +419,12 @@ namespace Stealth.Game
         void DepartServer()
         {
             GoAt = 0;
-            if (m_Run.Advance() != RunState.Exit.NextLevel) return;
+            int cost = CostOf(ChosenLane);
+            if (Collected < cost) return;
+            bool fromHouse = Phase == RunPhase.Playing;
+            if (fromHouse && !LeaveHouseServer()) return;
+            if (fromHouse) SendHouseStatsServer();
+            if (m_Run.Advance(cost) != RunState.Exit.NextLevel) return;
             // the team stays in its seats: the car drives on down the tunnel to the next house's basement while the house is
             // built (GameManager.Arrival)
             DepartCarServer(Car.Active);

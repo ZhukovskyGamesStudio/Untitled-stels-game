@@ -274,7 +274,7 @@ namespace Stealth.Tests
             Assert.IsEmpty(RobotRoster.Newcomers(roster.Robots, 0), "the first house has no showcase");
             var second = RobotRoster.Newcomers(roster.Robots, 1);
             CollectionAssert.Contains(second, RobotKind.Spider);
-            CollectionAssert.Contains(second, RobotKind.Sweeper);
+            Assert.IsTrue(RobotRoster.IsUnlocked(RobotKind.Sweeper, 0, roster), "sweepers patrol from the first house");
             // the shared second house
             {
                 var l = TestHouses.Get(7, 1);
@@ -282,6 +282,37 @@ namespace Stealth.Tests
                 foreach (var kind in second)
                     Assert.IsTrue(l.RobotSpawns.Exists(r => r.Kind == kind), $"seed {seed}: no {kind} in the house that introduces it");
             }
+        }
+
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
+        [Test]
+        public void MotionSensorsSitFlushInTheirCorners()
+        {
+            int seen = 0;
+            foreach (var (seed, level) in new[] { (7, 1), (42, 3), (3, 5), (11, 4) })
+            {
+                var l = TestHouses.Get(seed, level);
+                foreach (var r in l.RobotSpawns)
+                {
+                    if (r.Kind != RobotKind.MotionSensor) continue;
+                    var floor = r.Position - Vector3.up * 2.2f;
+                    var room = l.Plan.RoomAt(floor + Vector3.up * 0.3f);
+                    Assert.IsNotNull(room, $"seed {seed}: a sensor out of any room");
+                    var b = room.Bounds;
+                    bool flush = false;
+                    foreach (var cx in new[] { b.xMin, b.xMax })
+                        foreach (var cz in new[] { b.yMin, b.yMax })
+                        {
+                            var off = new Vector2(r.Position.x - cx, r.Position.z - cz);
+                            if (Mathf.Abs(Mathf.Abs(off.x) - LevelMetrics.SensorCornerInset) > 0.02f || Mathf.Abs(Mathf.Abs(off.y) - LevelMetrics.SensorCornerInset) > 0.02f) continue;
+                            var diagonal = new Vector3(off.x, 0f, off.y).normalized;   // from the corner into the room
+                            flush |= Vector3.Dot(r.Rotation * Vector3.forward, diagonal) > 0.99f;
+                        }
+                    Assert.IsTrue(flush, $"seed {seed}: the sensor at {r.Position} floats off its corner");
+                    seen++;
+                }
+            }
+            Assert.Greater(seen, 0, "some sensor in these houses");
         }
 
         [Test]
@@ -293,7 +324,25 @@ namespace Stealth.Tests
         }
     
         [Test]
-        public void TheSpidersWebIsAMazeOfWiresAwayFromTheDoors()
+        public void ReinforcementsComeInAtThreeThenTwoThenEveryMinute()
+        {
+            Assert.AreEqual(0, RobotRoster.ReinforcementsDue(179f, 180f, 120f, 60f));
+            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(180f, 180f, 120f, 60f), "3 minutes in");
+            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(299f, 180f, 120f, 60f));
+            Assert.AreEqual(2, RobotRoster.ReinforcementsDue(300f, 180f, 120f, 60f), "2 minutes after the first");
+            Assert.AreEqual(3, RobotRoster.ReinforcementsDue(360f, 180f, 120f, 60f), "then one a minute");
+            Assert.AreEqual(12, RobotRoster.ReinforcementsDue(900f, 180f, 120f, 60f), "for good");
+            var table = RobotRoster.DefaultRobots();
+            for (int i = 0; i < 200; i++)
+            {
+                var k = RobotRoster.PickReinforcement(table, 5, new System.Random(i));
+                Assert.AreNotEqual(RobotKind.Worker, k, "never a harmless one");
+                Assert.IsFalse(RobotRoster.IsDevice(k));
+            }
+        }
+
+        [Test]
+        public void TheSpidersWebIsAMazeOfSheetsAwayFromTheDoors()
         {
             var room = new Rect(0f, 0f, 10f, 5f);
             var none = new List<Vector3>();
@@ -304,7 +353,8 @@ namespace Stealth.Tests
             {
                 var w = web[i];
                 Assert.AreEqual(w.A.x, w.B.x, 1e-4f, "across the shorter side");
-                Assert.That(w.A.y, Is.InRange(0.45f, 1.05f), "between the knee and the chest");
+                Assert.Less(w.A.y, 0.1f, "from the floor…");
+                Assert.Greater(w.Top, LevelMetrics.WallHeight - 0.2f, "…up to the ceiling: a whole sheet");
                 // a gap at alternating ends: the way through zig-zags
                 bool gapAtFar = w.B.z < room.yMax - 0.5f;
                 Assert.AreEqual(i % 2 == 0, gapAtFar, $"wire {i}");
@@ -318,7 +368,8 @@ namespace Stealth.Tests
             var onIt = new Vector3(s.A.x, 0f, (s.A.z + s.B.z) / 2f);
             Assert.IsTrue(SpiderWebs.Touches(s, onIt, 1.8f), "walking into it");
             Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.right * 0.6f, 1.8f), "beside it");
-            Assert.IsFalse(SpiderWebs.Touches(s, onIt + Vector3.up * (s.A.y + 0.1f), 1.8f), "over it (a jump)");
+            Assert.IsTrue(SpiderWebs.Touches(s, onIt + Vector3.up * 1.2f, 1.8f), "no jumping over it");
+            Assert.IsTrue(SpiderWebs.Touches(s, onIt, 0.9f), "no crawling under it");
             Assert.IsFalse(SpiderWebs.Touches(s, new Vector3(s.A.x, 0f, s.B.z + 0.6f), 1.8f), "through the gap at its end");
         }
     }

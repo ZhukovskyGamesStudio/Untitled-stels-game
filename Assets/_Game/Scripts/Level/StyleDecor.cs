@@ -22,8 +22,12 @@ namespace Stealth.Level
         /// <summary>Renderers they are drawn with.</summary>
         public static int Renderers => s_Batches.Count;
 
+        /// <summary>Bumped by every clear: a rebuild going on over several frames gives up when it is not the latest.</summary>
+        static int s_Run;
+
         public static void Clear()
         {
+            s_Run++;
             foreach (var go in s_Batches)
                 if (go != null) Object.Destroy(go);
             foreach (var m in s_Meshes)
@@ -35,20 +39,33 @@ namespace Stealth.Level
 
         public static void Rebuild(StyleGeometry g, StyleKit kit, GameObject holder)
         {
+            foreach (var _ in RebuildSteps(g, kit, holder)) { }
+        }
+
+        /// <summary>The same a piece of the frame at a time (<see cref="FrameBudget"/>): the house put up on the drive.</summary>
+        public static IEnumerable<bool> RebuildSteps(StyleGeometry g, StyleKit kit, GameObject holder)
+        {
             Clear();
+            int run = s_Run;
             var wallParts = ActiveLevel.Shell?.WallParts;
             if (wallParts != null)
                 foreach (var r in wallParts)
                     if (r != null) r.forceRenderingOff = false; // the bare wall's look until the finish takes over
             bool vault = ActiveLevel.Layout != null && ActiveLevel.Layout.VaultRoom >= 0; // dressed in steel in every style
             if (ActiveLevel.Layout != null) g = HouseRules.Of(ActiveLevel.Layout).Look(g, kit, ActiveLevel.Layout); // a shop, a hospital, a block of flats dress as one in every style
-            if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) return;
+            if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) yield break;
             s_Kit = kit;
             var root = ActiveLevel.Root.transform;
             var batcher = new MeshBatcher(root.worldToLocalMatrix);
             AddWallParts(batcher, wallParts, g, kit);
+            var levelRoot = ActiveLevel.Root;
             foreach (var p in ArchitecturePlanner.Plan(ActiveLevel.Shell, ActiveLevel.Layout, g))
             {
+                if (FrameBudget.Over)
+                {
+                    yield return true;
+                    if (run != s_Run || ActiveLevel.Root != levelRoot || root == null) yield break; // cleared, or another house meanwhile
+                }
                 bool finish = p.IsQuad;
                 var prefab = finish ? kit.Finish : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
                 if (prefab == null) continue;
@@ -93,6 +110,11 @@ namespace Stealth.Level
                     for (int i = 0; i < (style != null ? 1 : part.materials.Length); i++)
                         batcher.Add(chunk, part.look, style != null ? style : part.materials[i], part.mesh, i, place);
                 }
+            }
+            if (FrameBudget.Over)
+            {
+                yield return true;
+                if (run != s_Run || ActiveLevel.Root != levelRoot || root == null) yield break;
             }
             var baked = batcher.Bake();
             foreach (var b in baked) s_Meshes.Add(b.Mesh);

@@ -80,6 +80,9 @@ namespace Stealth.Tests
         /// Every material reacts to light. One that glows must glow for real (HDR emission above the bloom threshold) —
         /// a dim emission just looks like a material that ignores the lamps. Unlit only for effects and the gas behind windows.
         /// </summary>
+        /// <summary>Things that only decorate (desk monitors, lamp shades and bulbs, server lights, a vending machine's glass): a faint glow, below the bloom — they must not draw the eye away from what the player can use.</summary>
+        public static readonly HashSet<string> DimDecor = new() { "PropScreen", "LampShade", "LampBulb", "RackLights", "VendingGlass" };
+
         [Test]
         public void MaterialsEitherTakeLightOrReallyGlow()
         {
@@ -98,6 +101,7 @@ namespace Stealth.Tests
                 bool keyword = mat.IsKeywordEnabled("_EMISSION");
                 if (glow <= 0f && !keyword) continue; // takes light, does not glow
                 Assert.IsTrue(keyword, $"{mat.name} has an emission colour but _EMISSION is off: it does not glow at all");
+                if (DimDecor.Contains(mat.name)) { Assert.Less(glow, 1f, $"{mat.name}: decor glows dimly, never draws the eye"); continue; }
                 Assert.GreaterOrEqual(glow, 1f, $"{mat.name} glows dimly: make it bloom or not glow");
             }
         }

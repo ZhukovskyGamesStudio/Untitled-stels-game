@@ -15,7 +15,7 @@ namespace Stealth.Game
     {
         bool m_StyleArgApplied;
 
-        /// <summary>F8 — next visual style (any build); -style &lt;name&gt; picks one at start.</summary>
+        /// <summary>-style &lt;name&gt; picks a visual style at start (F8 opens the picker, <see cref="UI.StylePanel"/>).</summary>
         void Update()
         {
             if (!m_StyleArgApplied)
@@ -29,13 +29,6 @@ namespace Stealth.Game
                     else Debug.LogWarning($"[Style] no style '{name}'");
                 }
             }
-            if (UI.ControlsPanel.Rebinding || !Controls.Pressed(GameAction.Style)) return;
-            int next = VisualStyles.NextIndex();
-            if (next < 0) return;
-            // In a session the whole team switches (GameManager replicates the choice); in the menu only this window.
-            var gm = GameManager.Instance;
-            if (gm != null) gm.RequestStyle(next);
-            else VisualStyles.Apply(VisualStyles.At(next));
         }
 
         /// <summary>
@@ -263,7 +256,7 @@ namespace Stealth.Game
         static void DressMannequins()
         {
             s_Mannequins.RemoveAll(x => x.model == null);
-            var prefab = VisualStyles.PlayerRig;
+            var prefab = VisualStyles.PlayerRigFor(0);
             foreach (var (m, slot) in s_Mannequins)
             {
                 var old = m.transform.Find("StyleRig");

@@ -3,8 +3,8 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
-    /// <summary>The three kinds of place a house can be; each has its own point of interest.</summary>
-    public enum Location : byte { Office, Hospital, Garage, Apartments }
+    /// <summary>The kinds of place a house can be; each has its own unique feature (append only: the byte travels).</summary>
+    public enum Location : byte { Office, Hospital, Garage, Apartments, Abandoned }
 
     /// <summary>
     /// A warden's post (<see cref="RobotKind.Warden"/>): in front of the only doorway of a loot room, walking a few steps
@@ -283,18 +283,53 @@ namespace Stealth.Level
                 var deeper = keyRooms.FindAll(r => nearSteps != int.MaxValue && l.RoomSteps[r.Id] > nearSteps);
                 if (deeper.Count > 0) keyRooms = deeper;
                 var keyRoom = keyRooms[rng.Next(keyRooms.Count)];
-                var key = keyRoom.Center + Vector3.up * 0.02f;
+                // on top of a table, a desk, a counter — never inside a cupboard or on a shelf of a rack; else on the floor
+                Vector3? key = null;
                 for (int k = 0; k < l.ItemSpots.Count; k++)
                 {
-                    if (l.Plan.RoomAt(l.ItemSpots[k] + Vector3.up * 0.3f) != keyRoom) continue;
+                    if (l.Plan.RoomAt(l.ItemSpots[k] + Vector3.up * 0.3f) != keyRoom || !OnOpenTop(l, l.ItemSpots[k])) continue;
                     key = l.ItemSpots[k];
                     l.ItemSpots.RemoveAt(k);
                     break;
                 }
+                if (key == null)
+                {
+                    var floor = Stealth.Items.LootPlanner.FloorSpots(l, new HashSet<int> { keyRoom.Id }, 1, 0.6f);
+                    key = floor.Count > 0 ? floor[0] : keyRoom.Center + Vector3.up * 0.02f;
+                }
                 int door = l.EnsureDoor(d);
-                l.KeyDoors.Add(new KeyDoor { Door = door, Key = key, Rooms = new List<int>(behind) });
+                l.KeyDoors.Add(new KeyDoor { Door = door, Key = key.Value, Rooms = new List<int>(behind) });
                 taken.UnionWith(behind);
             }
+        }
+
+        /// <summary>Furniture with an open top a thing lies on in plain sight.</summary>
+        public static readonly HashSet<PropKind> OpenTops = new()
+        {
+            PropKind.Desk, PropKind.BarCounter, PropKind.Bench, PropKind.BenchIsland, PropKind.CoffeeTable, PropKind.ConferenceTable,
+            PropKind.ConsoleDesk, PropKind.CorridorBench, PropKind.DiningTable, PropKind.DoctorDesk, PropKind.ExamTable, PropKind.ExecutiveDesk,
+            PropKind.HallBench, PropKind.KitchenCounter, PropKind.KitchenIsland, PropKind.LabBench, PropKind.MeetingTable, PropKind.NightTable,
+            PropKind.ReadingTable, PropKind.ReceptionDesk, PropKind.RoundTable, PropKind.SideTable, PropKind.StandingDesk,
+            PropKind.SupervisorDesk, PropKind.WorkTable, PropKind.Workbench, PropKind.PingPongTable,
+        };
+
+        /// <summary>
+        /// The spot lies on the open top of a table, a desk, a counter (pure): some furniture of <see cref="OpenTops"/> under it
+        /// and nothing tall (a cupboard, a rack: <see cref="Furnisher.Tall"/>) over it.
+        /// </summary>
+        public static bool OnOpenTop(LevelLayout l, Vector3 spot)
+        {
+            bool open = false;
+            foreach (var p in l.Props)
+            {
+                if (Mathf.Abs(p.Position.y - spot.y) > 2f) continue;
+                var local = Quaternion.Inverse(Quaternion.Euler(0f, p.RotationY, 0f)) * (spot - p.Position);
+                float scale = p.Scale > 0f ? p.Scale : 1f;
+                if (!Furnisher.FootprintOf(p.Kind).Contains(new Vector2(local.x, local.z) / scale)) continue;
+                if (Furnisher.Tall.Contains(p.Kind)) return false;
+                open |= OpenTops.Contains(p.Kind) && spot.y > p.Position.y + 0.3f;
+            }
+            return open;
         }
 
         // ------------------------------------------------------------------ the main job
@@ -647,6 +682,9 @@ namespace Stealth.Level
         /// becomes the robot programming console (office), the med table (hospital) or the workbench (garage); an apartment block
         /// has no such place (its find is the shelter map). After the furniture.
         /// </summary>
+        /// <summary>The smallest the point of interest is made to fit a piece's place, while a bigger piece is to be had.</summary>
+        public const float MinPointScale = 0.85f;
+
         public static void PointOfInterest(LevelLayout l)
         {
             if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
@@ -663,7 +701,9 @@ namespace Stealth.Level
                     if (LevelLayout.FloorOf(w.y) == LevelLayout.FloorOf(p.y + 0.1f) && new Vector2(w.x - p.x, w.z - p.z).magnitude < Mathf.Max(need.width, need.height) / 2f + 1.2f) return true;
                 return false;
             }
-            // away from the hatch where the house allows it; a small first house has no "far"
+            // big enough first (a sofa's or a shelf's footprint shrank the medical table to a toy): at most a little smaller
+            // than the place, then away from the hatch where the house allows it (a small first house has no "far")
+            foreach (float least in new[] { MinPointScale, 0f })
             foreach (float away in new[] { 6f, 2.5f })
             // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
             foreach (var wanted in new[] { PropKind.PingPongTable, PropKind.PoolTable, PropKind.SectionalSofa, PropKind.AirHockey, PropKind.ReceptionDesk,
@@ -677,7 +717,8 @@ namespace Stealth.Level
                 for (int i = 0; i < l.Props.Count; i++)
                     if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away
                         && (!Furnisher.Tall.Contains(kind) || !AtWindow(l.Props[i].Position))) options.Add(i);
-                if (options.Count == 0) continue;
+                var room = Furnisher.FootprintOf(wanted);
+                if (options.Count == 0 || Mathf.Min(1f, room.width / need.width, room.height / need.height) < least) continue;
                 int pick = options[rng.Next(options.Count)];
                 var p = l.Props[pick];
                 var have = Furnisher.FootprintOf(wanted);

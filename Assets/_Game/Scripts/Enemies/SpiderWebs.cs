@@ -4,17 +4,24 @@ using UnityEngine;
 namespace Stealth.Enemies
 {
     /// <summary>
-    /// The spider's web (pure, unit tested): wires strung across its room like the walls of a simple maze — each from one
-    /// long wall towards the other, leaving a gap at alternating ends, at a height between the knee and the chest (step
-    /// over the low ones, find the gap of the high ones). None runs past a doorway. A player who touches one brings the
-    /// spider (<see cref="SpiderBot"/>); every peer strings the same wires from the room and the spider's place.
+    /// The spider's web (pure, unit tested): webs spun across its room like the walls of a simple maze — each a whole
+    /// sheet from the floor up to the ceiling, from one long wall towards the other, leaving a gap at alternating ends: no
+    /// stepping over, no ducking under, the way through zig-zags from gap to gap. None runs past a doorway. A player who
+    /// touches one brings the spider (<see cref="SpiderBot"/>); every peer spins the same webs from the room and the
+    /// spider's place.
     /// </summary>
     public static class SpiderWebs
     {
         public struct Strand
         {
+            /// <summary>The sheet's foot line along the floor (A to B) and the height of its top.</summary>
             public Vector3 A, B;
+            public float Top;
+            public float Height => Top - A.y;
         }
+
+        /// <summary>The sheets hang this far over the floor and stop this far under the ceiling.</summary>
+        public const float Foot = 0.03f, UnderCeiling = 0.05f;
 
         /// <summary>
         /// The wires of a room (<paramref name="room"/> in x/z, its floor at <paramref name="floorY"/>): across the shorter
@@ -22,7 +29,7 @@ namespace Stealth.Enemies
         /// ends, at most <paramref name="max"/>, none within 1.5 m of a doorway (<paramref name="doors"/>).
         /// </summary>
         public static List<Strand> Plan(Rect room, float floorY, IReadOnlyList<Vector3> doors, System.Random rng,
-            float spacing = 1.7f, float gap = 1.0f, int max = 6)
+            float spacing = 1.7f, float gap = 1.0f, int max = 6, float ceiling = Stealth.Level.LevelMetrics.WallHeight)
         {
             var list = new List<Strand>();
             bool alongX = room.width >= room.height;
@@ -37,7 +44,8 @@ namespace Stealth.Enemies
                 // the wire's line, and its ends from one long wall to the gap before the other
                 float from = inset, to = across - inset;
                 if (i % 2 == 0) to -= gap; else from += gap;
-                float y = floorY + Mathf.Lerp(0.45f, 1.05f, (float)rng.NextDouble());
+                rng.NextDouble(); // (the wires' height once: the stream of the rest stays as it was)
+                float y = floorY + Foot;
                 Vector3 P(float along, float side) => alongX
                     ? new Vector3(room.xMin + along, y, room.yMin + side)
                     : new Vector3(room.xMin + side, y, room.yMin + along);
@@ -46,16 +54,15 @@ namespace Stealth.Enemies
                 bool nearDoor = false;
                 foreach (var d in doors)
                     if (Mathf.Abs(d.y - floorY) < 1.5f && DistanceToSegment(new Vector2(d.x, d.z), new Vector2(a.x, a.z), new Vector2(b.x, b.z)) < 1.5f) { nearDoor = true; break; }
-                if (!nearDoor) list.Add(new Strand { A = a, B = b });
+                if (!nearDoor) list.Add(new Strand { A = a, B = b, Top = floorY + ceiling - UnderCeiling });
             }
             return list;
         }
 
-        /// <summary>A body (feet at <paramref name="feet"/>, this tall and wide) touches the wire.</summary>
+        /// <summary>A body (feet at <paramref name="feet"/>, this tall and wide) touches the sheet.</summary>
         public static bool Touches(in Strand s, Vector3 feet, float height, float radius = 0.3f)
         {
-            float y = s.A.y;
-            if (y < feet.y + 0.05f || y > feet.y + height) return false;
+            if (feet.y + height < s.A.y || feet.y > s.Top) return false;
             return DistanceToSegment(new Vector2(feet.x, feet.z), new Vector2(s.A.x, s.A.z), new Vector2(s.B.x, s.B.z)) < radius + 0.03f;
         }
 

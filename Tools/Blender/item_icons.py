@@ -9,6 +9,8 @@ Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's 
   book 2 x 3, cans 2 x 2, screwdriver 1 x 3, beltbag 2 x 2   Art/Models/Items/item_<id>_model.fbx
   diamond, key, cagekey, stun (2 x 2), speaker (2 x 1)  the tools and the crafted diamond, seen three-quarter
   map         3 x 3 cells                            Art/Models/Items/item_map_model.fbx (apartments.py)
+  radio, keyboard, tablet, medkit, coffee, finder, boots, tomatoes, chess, magazine, pills, toothpaste, tape,
+  matches, toiletpaper, applecore, soap, gloves, necklace, mop, plush, socks   item_<id>_model.fbx (items_more.py)
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
 a dark outline so it reads on any cell colour. The UI turns and mirrors the picture with the item.
@@ -78,6 +80,84 @@ ITEMS = {
         "Body": ((0.86, 0.8, 0.64), 0.0, 0.8, 0.0),
         "Accent": ((0.45, 0.2, 0.12), 0.0, 0.7, 0.0),
         "Trim": ((0.55, 0.08, 0.06), 0.0, 0.35, 0.0)}, "top"),
+    # more pickup items (items_more.py)
+    "radio": (1, 2, "item_radio_model", {
+        "Body": ((0.13, 0.14, 0.12), 0.0, 0.55, 0.0),                    # dark olive plastic
+        "EyeLed": ((0.2, 1.0, 0.35), 0.0, 0.3, 2.0),
+        "Accent": ((0.05, 0.05, 0.05), 0.0, 0.6, 0.0)}),                 # rubber antenna, knob, grille
+    "keyboard": (3, 1, "item_keyboard_model", {
+        "Body": ((0.16, 0.17, 0.19), 0.0, 0.5, 0.0),
+        "EyeLed": ((0.3, 1.0, 0.4), 0.0, 0.3, 2.0),
+        "Accent": ((0.85, 0.85, 0.82), 0.0, 0.45, 0.0)}, "tilted"),      # keycaps
+    "tablet": (2, 2, "item_tablet_model", {
+        "Body": ((0.92, 0.66, 0.12), 0.0, 0.75, 0.0),                    # rugged rubber case
+        "EyeScreen": ((0.25, 0.75, 0.95), 0.0, 0.2, 1.0),
+        "Accent": ((0.12, 0.12, 0.13), 0.0, 0.4, 0.0)}),                 # bezel
+    "medkit": (2, 2, "item_medkit_model", {
+        "Body": ((0.78, 0.1, 0.08), 0.0, 0.4, 0.0),
+        "Trim": ((0.95, 0.95, 0.95), 0.0, 0.4, 0.0),                     # the cross
+        "Accent": ((0.82, 0.83, 0.85), 0.6, 0.35, 0.0)}, "front"),       # latches, handle
+    "coffee": (1, 1, "item_coffee_model", {
+        "Body": ((0.25, 0.13, 0.06), 0.0, 0.15, 0.0),                    # brown glass
+        "Trim": ((0.75, 0.12, 0.1), 0.0, 0.5, 0.0),                      # label
+        "Accent": ((0.75, 0.6, 0.2), 0.8, 0.3, 0.0)}, "front"),          # gold lid
+    "finder": (1, 2, "item_finder_model", {
+        "Body": ((0.2, 0.3, 0.24), 0.0, 0.5, 0.0),
+        "EyeLed": ((1.0, 0.55, 0.1), 0.0, 0.2, 2.5),                     # the lamp that blinks
+        "Accent": ((0.7, 0.72, 0.75), 0.8, 0.3, 0.0)}),
+    "boots": (2, 2, "item_boots_model", {
+        "Body": ((0.36, 0.22, 0.12), 0.0, 0.6, 0.0),                     # leather
+        "Trim": ((0.8, 0.65, 0.3), 0.0, 0.7, 0.0),                       # laces
+        "Accent": ((0.08, 0.08, 0.08), 0.0, 0.8, 0.0)}, "front"),        # soles
+    "tomatoes": (1, 1, "item_tomatoes_model", {
+        "Body": ((0.82, 0.14, 0.08), 0.0, 0.5, 0.0),
+        "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}, "front"),
+    "chess": (2, 2, "item_chess_model", {
+        "Body": ((0.32, 0.17, 0.08), 0.0, 0.4, 0.0),                     # dark wood
+        "Accent": ((0.9, 0.85, 0.72), 0.0, 0.35, 0.0)}, "tilted"),       # squares, pieces, hinges
+    "magazine": (2, 2, "item_magazine_model", {
+        "Body": ((0.85, 0.2, 0.45), 0.0, 0.15, 0.0),                     # glossy cover
+        "Trim": ((0.97, 0.97, 0.95), 0.0, 0.3, 0.0),                     # masthead, cover lines
+        "Accent": ((0.92, 0.9, 0.86), 0.0, 0.7, 0.0)}, "tilted"),        # pages
+    "pills": (1, 1, "item_pills_model", {
+        "Body": ((0.3, 0.55, 0.9), 0.0, 0.5, 0.0),
+        "Accent": ((0.78, 0.8, 0.82), 0.8, 0.25, 0.0)}),                 # blister foil
+    "toothpaste": (1, 2, "item_toothpaste_model", {
+        "Body": ((0.95, 0.95, 0.97), 0.0, 0.3, 0.0),
+        "Accent": ((0.15, 0.4, 0.85), 0.0, 0.35, 0.0)}),                 # cap
+    "tape": (1, 1, "item_tape_model", {
+        "Body": ((0.5, 0.52, 0.54), 0.2, 0.5, 0.0),
+        "Accent": ((0.62, 0.45, 0.27), 0.0, 0.8, 0.0)}, "front"),        # cardboard core
+    "matches": (1, 1, "item_matches_model", {
+        "Body": ((0.9, 0.7, 0.15), 0.0, 0.6, 0.0),
+        "Trim": ((0.75, 0.1, 0.08), 0.0, 0.5, 0.0),                      # heads
+        "Accent": ((0.85, 0.68, 0.42), 0.0, 0.7, 0.0)}),                 # drawer and sticks
+    "toiletpaper": (1, 1, "item_toiletpaper_model", {
+        "Body": ((0.95, 0.95, 0.93), 0.0, 0.9, 0.0),
+        "Accent": ((0.6, 0.45, 0.28), 0.0, 0.85, 0.0)}, "front"),
+    "applecore": (1, 1, "item_applecore_model", {
+        "Body": ((0.95, 0.9, 0.72), 0.0, 0.6, 0.0),                      # flesh
+        "Trim": ((0.3, 0.18, 0.08), 0.0, 0.7, 0.0),                      # stem, calyx, seeds
+        "Accent": ((0.72, 0.08, 0.06), 0.0, 0.3, 0.0)}, "front"),        # skin
+    "soap": (1, 1, "item_soap_model", {
+        "Body": ((0.95, 0.8, 0.85), 0.0, 0.4, 0.0),
+        "Accent": ((0.25, 0.55, 0.75), 0.0, 0.6, 0.0)}, "front"),        # wrapper band
+    "gloves": (1, 2, "item_gloves_model", {
+        "Body": ((0.85, 0.72, 0.42), 0.0, 0.85, 0.0),                    # canvas
+        "Accent": ((0.2, 0.35, 0.65), 0.0, 0.8, 0.0)}),                  # knitted cuffs
+    "necklace": (2, 1, "item_necklace_model", {
+        "Body": ((1.0, 0.76, 0.3), 0.45, 0.3, 0.0),                      # gold (half metallic: reads bright here)
+        "Accent": ((0.85, 0.05, 0.15), 0.0, 0.05, 0.2)}),                # rubies
+    "mop": (1, 4, "item_mop_model", {
+        "Body": ((0.2, 0.45, 0.75), 0.0, 0.4, 0.0),                      # handle and clamp
+        "Accent": ((0.88, 0.86, 0.8), 0.0, 0.95, 0.0)}),                 # strands
+    "plush": (2, 2, "item_plush_model", {
+        "Body": ((0.6, 0.4, 0.22), 0.0, 0.95, 0.0),                      # fur
+        "Trim": ((0.05, 0.04, 0.04), 0.0, 0.3, 0.0),                     # eyes, nose
+        "Accent": ((0.9, 0.78, 0.6), 0.0, 0.9, 0.0)}, "front"),          # muzzle, ears, tummy, pads
+    "socks": (1, 2, "item_socks_model", {
+        "Body": ((0.95, 0.95, 0.95), 0.0, 0.9, 0.0),
+        "Accent": ((0.15, 0.35, 0.75), 0.0, 0.85, 0.0)}),                # stripes
 }
 
 

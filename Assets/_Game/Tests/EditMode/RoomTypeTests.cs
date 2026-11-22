@@ -38,6 +38,7 @@ namespace Stealth.Tests
             Assert.IsTrue(RoomRules.LootFits(RoomRules.For(RoomType.Storage, RoomRules.Defaults()), 9), "storage: anything");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void KitchensFitTheirRuleAndHaveAFridgeAndATable()
         {
@@ -73,6 +74,7 @@ namespace Stealth.Tests
             Assert.That(tables, Is.GreaterThan(kitchens / 2), $"most kitchens have their table ({tables} of {kitchens}; a small one with doors all round may have no room for it): " + string.Join("; ", noTable));
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomIsBehindOneLockedDoorWithItsTerminalElsewhere()
         {
@@ -106,6 +108,7 @@ namespace Stealth.Tests
             Assert.That(found, Is.GreaterThan(4), "most houses find a room for it");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomHasShelvesAndAPileForTheWorkers()
         {
@@ -133,6 +136,7 @@ namespace Stealth.Tests
             Assert.That(piles, Is.GreaterThan(0));
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WorkersComeOnlyWithAStorageRoomAndWorkOnItsFloor()
         {
@@ -183,6 +187,7 @@ namespace Stealth.Tests
             foreach (var t in RoomRules.Programmed) Assert.IsTrue(every.Floors[0].Exists(r => r.Type == t), $"every type: {t}");
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryRoomOfAHouseIsAtLeastItsTypesSmallest()
         {
@@ -195,6 +200,7 @@ namespace Stealth.Tests
                 }
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void CorridorsAreNeverRooms()
         {
@@ -209,6 +215,7 @@ namespace Stealth.Tests
             }
         }
 
+        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheClassicGeneratorGuessesTypesAndStillHasItsStorageRoom()
         {
