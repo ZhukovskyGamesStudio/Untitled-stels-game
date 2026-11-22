@@ -113,15 +113,19 @@ namespace Stealth.Player
         }
 
         /// <summary>
-        /// After the animation and the feet: another player's held thing in this body's right palm (between the hand and its
-        /// finger bone), facing the body's way tipped with the look — not floating at the head.
+        /// After the animation and the feet: another player's held thing in this body's right hand (in its closed fingers),
+        /// facing the body's way tipped with the look — not floating at the head.
         /// </summary>
         void PlaceHeld()
         {
             if (Held == null || HandR == null || FingersR == null || !m_Holding) return;
-            Held.SetPositionAndRotation(HumanMath.Palm(HandR.position, FingersR.position),
+            Held.SetPositionAndRotation(HeldSpot(),
                 Quaternion.AngleAxis(m_Pitch * 0.6f, transform.right) * transform.rotation);
         }
+
+        /// <summary>Where the held thing's grip is, in the world: in the closed fingers of the right hand (<see cref="HumanMath.Grip"/>).</summary>
+        public Vector3 HeldSpot() => HandR == null || FingersR == null ? transform.position + Vector3.up
+            : HumanMath.Grip(HandR.position, FingersR.position, transform.up, Animator != null ? Animator.transform.lossyScale.y : 1f);
 
         /// <summary>
         /// After the animation: the lower foot onto the floor under the body. The player's capsule floats a skin's width over
@@ -198,8 +202,15 @@ namespace Stealth.Player
         /// </summary>
         public static bool Carries(bool holding, bool downed, bool seated, BodyPose pose) => holding && !downed && !seated && pose == BodyPose.None;
 
-        /// <summary>Where a held thing lies in the hand: a third of the way from the wrist to the knuckles.</summary>
-        public static Vector3 Palm(Vector3 hand, Vector3 fingers) => Vector3.Lerp(hand, fingers, 0.35f);
+        /// <summary>
+        /// Where a held thing's grip is in the carrying hand (palm up, the fingers folded over it): by the knuckles, a
+        /// little over the palm — a long thing goes through the folded fingers there, a compact one rests on them.
+        /// <paramref name="size"/>: the person's scale.
+        /// </summary>
+        public static Vector3 Grip(Vector3 hand, Vector3 fingers, Vector3 up, float size) =>
+            Vector3.Lerp(hand, fingers, GripAlong) + up * (GripOverPalm * size);
+
+        public const float GripAlong = 0.9f, GripOverPalm = 0f;
 
         /// <summary>Standing on its feet: not lying, not seated, not on a ladder — the feet are put on the floor.</summary>
         public static bool Planted(bool downed, bool seated, BodyPose pose) => !downed && !seated && pose != BodyPose.Ladder;

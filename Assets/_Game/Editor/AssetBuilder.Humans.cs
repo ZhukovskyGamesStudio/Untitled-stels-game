@@ -167,10 +167,17 @@ namespace Stealth.EditorTools
             return m;
         }
 
-        static void ConfigureHumanImport(ModelImporter imp)
+        /// <summary>
+        /// The way the Avatar is described (<see cref="HumanDescriptionOf"/>), stamped on the import: a model imported with
+        /// an older description is imported anew. Change it with the description.
+        /// </summary>
+        const string HumanAvatarVersion = "humanoid: T-pose from the bind pose, facing +Z, palms down; twist on the keyed bone";
+
+        internal static void ConfigureHumanImport(ModelImporter imp, bool force = false)
         {
-            bool dirty = imp.animationType != ModelImporterAnimationType.Human || imp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel
+            bool dirty = force || imp.animationType != ModelImporterAnimationType.Human || imp.avatarSetup != ModelImporterAvatarSetup.CreateFromThisModel
                          || imp.humanDescription.human == null || imp.humanDescription.human.Length != HumanSkeleton.Map.Length
+                         || imp.userData != HumanAvatarVersion
                          || imp.materialImportMode != ModelImporterMaterialImportMode.None ||
                          !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime || !c.lockRootRotation)
                          || imp.clipAnimations.Length != imp.defaultClipAnimations.Length // a take was added in Blender (Sit, Climb…)
@@ -190,6 +197,7 @@ namespace Stealth.EditorTools
             imp.importTangents = ModelImporterTangents.CalculateMikk;
             imp.maxBonesPerVertex = 4;
             imp.skinWeights = ModelImporterSkinWeights.Standard;
+            imp.userData = HumanAvatarVersion;
             imp.SaveAndReimport();
             // every take loops, is called by its action name (the exporter writes "Rig|Walk") and stays in place: the player
             // controller moves the body, the takes keep the root where it was (height and turn included: lying, sitting)
@@ -226,13 +234,38 @@ namespace Stealth.EditorTools
                 var all = go.GetComponentsInChildren<Transform>(true);
                 Transform Bone(string n) => all.FirstOrDefault(t => t.name == n);
                 if (HumanSkeleton.Map.Any(m => Bone(m.bone) == null)) { Debug.LogError($"[Builder] {fbx}: a bone of the common skeleton is missing"); return null; }
+                // the file comes in posed (a frame of a take, not the rest pose): the T-pose is worked out from the pose the
+                // meshes were bound in — the real A-pose
+                int unbound = ToBindPose(go);
+                if (unbound > 0) Debug.LogWarning($"[Builder] {fbx}: {unbound} bones of the common skeleton are bound to no mesh (their rest pose is unknown)");
                 var chest = Bone("chest");
+                // Unity works out every joint's axes from this pose taking the figure to face +Z: ours faces -Z in the file
+                // (the prefab turns the model round), which bent the knees and elbows the wrong way round — the armature is
+                // turned to face +Z in the description
+                var armature = Bone("hips").parent;
+                if (armature != null && armature != go.transform && Facing(all) < 0f)
+                {
+                    var turnRound = Quaternion.Euler(0f, 180f, 0f);
+                    armature.SetPositionAndRotation(turnRound * armature.position, turnRound * armature.rotation);
+                }
                 foreach (var (bone, child, aim) in HumanSkeleton.TPose)
                 {
                     Transform b = Bone(bone), c = Bone(child);
-                    var outward = Bone(bone.EndsWith(".L") ? "shoulder.L" : "shoulder.R").position - chest.position;
+                    // straight out to its side: along X exactly (the shoulder's side of the chest)
+                    var outward = new Vector3(Mathf.Sign(Bone(bone.EndsWith(".L") ? "upper_arm.L" : "upper_arm.R").position.x - chest.position.x), 0f, 0f);
                     var turn = HumanSkeleton.Turn(c.position - b.position, HumanSkeleton.Direction(aim, outward));
                     b.rotation = turn * b.rotation;
+                }
+                // … and the palms face down, the thumbs ahead: the whole arm is rolled about its length until the thumb's side
+                // of the hand looks forward (from the A-pose it nearly does; a palm looking ahead is a quarter turn of twist in
+                // every take, which Unity then spreads over the upper arm and the forearm)
+                foreach (var sd in new[] { "L", "R" })
+                {
+                    Transform up = Bone("upper_arm." + sd), hand = Bone("hand." + sd), thumb = Bone("thumb." + sd);
+                    var axis = (hand.position - up.position).normalized;
+                    var thumbSide = Vector3.ProjectOnPlane(thumb.position - hand.position, axis);
+                    float roll = Vector3.SignedAngle(thumbSide, Vector3.forward, axis);
+                    up.rotation = Quaternion.AngleAxis(roll, axis) * up.rotation;
                 }
                 return new HumanDescription
                 {
@@ -249,7 +282,9 @@ namespace Stealth.EditorTools
                         rotation = t.localRotation,
                         scale = t.localScale,
                     }).ToArray(),
-                    upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
+                    // a limb's twist stays on the bone that was keyed (no twist bones to spread it over): measured by the audit
+                    upperArmTwist = HumanSkeleton.ArmTwist, lowerArmTwist = HumanSkeleton.ArmTwist,
+                    upperLegTwist = HumanSkeleton.LegTwist, lowerLegTwist = HumanSkeleton.LegTwist,
                     armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false,
                 };
             }
@@ -257,6 +292,34 @@ namespace Stealth.EditorTools
             {
                 Object.DestroyImmediate(go);
             }
+        }
+
+        /// <summary>
+        /// Puts the bones of a model where its skinned meshes were bound (the rest pose), whatever pose the import left it
+        /// in. Returns how many bones of the common skeleton no mesh is bound to.
+        /// </summary>
+        internal static int ToBindPose(GameObject go)
+        {
+            var bound = new System.Collections.Generic.Dictionary<Transform, Matrix4x4>();
+            foreach (var r in go.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (r.sharedMesh == null) continue;
+                var poses = r.sharedMesh.bindposes;
+                var bones = r.bones;
+                for (int i = 0; i < bones.Length && i < poses.Length; i++)
+                    if (bones[i] != null && !bound.ContainsKey(bones[i])) bound[bones[i]] = r.transform.localToWorldMatrix * poses[i].inverse;
+            }
+            // (parents come first in the hierarchy's order)
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+                if (bound.TryGetValue(t, out var m)) t.SetPositionAndRotation(m.GetColumn(3), m.rotation);
+            return HumanSkeleton.Map.Count(m => bound.Keys.All(t => t.name != m.bone));
+        }
+
+        /// <summary>Which way the figure faces along Z (+1 / -1): its toes are ahead of its ankles.</summary>
+        static float Facing(Transform[] bones)
+        {
+            Transform foot = bones.FirstOrDefault(t => t.name == "foot.L"), toe = bones.FirstOrDefault(t => t.name == "toe.L");
+            return foot == null || toe == null ? 1f : Mathf.Sign(toe.position.z - foot.position.z);
         }
 
         /// <summary>
@@ -272,6 +335,7 @@ namespace Stealth.EditorTools
                                                        AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down, AnimationClip sit,
                                                        AnimationClip climb, AnimationClip terminal, AnimationClip work)
         {
+            var grip = HumanGrip(); // (rewritten every time: its muscles are tuned in HumanSkeleton.Grip)
             var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(HumanControllerPath);
             // the prefab references it: keep its GUID — unless it is older than its layers or takes (no Pose, not layered, other
             // clips) or its clips are gone (the takes were exported anew)
@@ -286,7 +350,6 @@ namespace Stealth.EditorTools
             c.AddParameter("Sit", AnimatorControllerParameterType.Bool);
             c.AddParameter("Pose", AnimatorControllerParameterType.Int);
             c.AddParameter("ClimbSpeed", AnimatorControllerParameterType.Float);
-            var grip = HumanGrip();
 
             // the layers and their masks: the base is the first layer the controller was created with
             var layers = c.layers;

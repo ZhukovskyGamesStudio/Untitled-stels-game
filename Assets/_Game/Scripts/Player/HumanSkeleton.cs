@@ -53,6 +53,13 @@ namespace Stealth.Player
 
         public enum Aim { Up, Down, Out }
 
+        /// <summary>
+        /// How the Avatar spreads a limb's twist between the bone and its child (HumanDescription.upperArmTwist…): our limbs
+        /// have no twist bones, so the twist stays where the take keyed it — these values play the takes back bone for bone
+        /// (measured: Stealth → Human Rig Audit).
+        /// </summary>
+        public const float ArmTwist = 1f, LegTwist = 0f;
+
         /// <summary>The world direction a bone points in the T-pose: <paramref name="outward"/> is its side, flat (arms).</summary>
         public static Vector3 Direction(Aim aim, Vector3 outward) => aim switch
         {
@@ -91,8 +98,8 @@ namespace Stealth.Player
         /// </summary>
         public static readonly (string muscle, float value)[] Grip =
         {
-            ("RightHand.Index.1 Stretched", -0.9f), ("RightHand.Index.Spread", 0f),
-            ("RightHand.Thumb.1 Stretched", -0.35f), ("RightHand.Thumb.Spread", -0.4f),
+            ("RightHand.Index.1 Stretched", -1.5f), ("RightHand.Index.Spread", 0f),
+            ("RightHand.Thumb.1 Stretched", -0.9f), ("RightHand.Thumb.Spread", -0.6f),
         };
     }
 

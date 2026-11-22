@@ -59,8 +59,9 @@ namespace Stealth.Tests
             Assert.IsFalse(HumanMath.Carries(true, false, true, BodyPose.None), "seated (the hands on the wheel or the lap)");
             Assert.IsFalse(HumanMath.Carries(true, false, false, BodyPose.Work), "the hands at work");
             Assert.IsFalse(HumanMath.Carries(true, false, false, BodyPose.Ladder), "on the rungs");
-            var palm = HumanMath.Palm(Vector3.zero, new Vector3(0.1f, 0f, 0f));
-            Assert.That(palm.x, Is.InRange(0.02f, 0.06f), "in the palm, between the wrist and the knuckles");
+            var grip = HumanMath.Grip(Vector3.zero, new Vector3(0.1f, 0f, 0f), Vector3.up, 1f);
+            Assert.That(grip.x, Is.InRange(0.06f, 0.1f), "by the knuckles: in the closed fingers, not at the wrist");
+            Assert.That(grip.y, Is.InRange(-0.01f, 0.04f), "at the palm, not floating over it");
             Assert.Greater(HumanSkeleton.Carry.z, 0.15f, "before the chest");
             Assert.Greater(HumanSkeleton.Carry.x, 0f, "the right hand");
             Assert.IsTrue(HumanSkeleton.Grip.Any(g => g.muscle.StartsWith("RightHand.Index") && g.value < -0.5f), "the fingers curl");
@@ -106,6 +107,62 @@ namespace Stealth.Tests
             Assert.AreEqual(0f, HumanMath.HeadShare(0.7f, BodyPose.Terminal), "at a terminal the take moves the head");
             Assert.AreEqual(0.7f, HumanMath.HeadShare(0.7f, BodyPose.Ladder), "on a ladder the head looks where the player does");
             Assert.AreEqual(0f, HumanMath.WalkSpeed(3f, true));
+        }
+
+        /// <summary>
+        /// The clips the game plays are the takes that were authored: every bone of every person, at a few moments of every
+        /// take, is where anim.py put it. (A humanoid Avatar described in a wrong T-pose — worked out from the pose the file
+        /// comes in instead of the bind pose, facing -Z, palms ahead — bent the knees sideways and twisted thighs and arms a
+        /// quarter turn.) The reference is written by Stealth → Human Rig Audit; run it after exporting the takes anew.
+        /// </summary>
+        [Test]
+        public void TheGamePlaysTheTakesAsAuthored([Values("backend", "qa", "sysadmin", "designer")] string who)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string file = System.IO.Path.Combine(Application.dataPath, "_Game/Tests/EditMode/HumanTakesReference.csv");
+            Assert.IsTrue(System.IO.File.Exists(file), "no reference: run Tools/human_audit.sh");
+            var asset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Art/Models/Humans/human_{who}.fbx");
+            Assert.IsNotNull(asset);
+            var clips = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans[0].GetComponent<HumanRig>().Animator.runtimeAnimatorController.animationClips;
+            var go = Object.Instantiate(asset);
+            try
+            {
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                var bones = go.GetComponentsInChildren<Transform>(true).GroupBy(t => t.name).ToDictionary(g => g.Key, g => g.First());
+                string sampled = null;
+                int checkedBones = 0;
+                float worstCm = 0f, worstDeg = 0f;
+                string worst = "";
+                foreach (var line in System.IO.File.ReadLines(file))
+                {
+                    if (line.Length == 0 || line[0] == '#') continue;
+                    var f = line.Split(',');
+                    string key = f[0] + "@" + f[1];
+                    if (key != sampled)
+                    {
+                        var clip = clips.FirstOrDefault(c => c.name == f[0]);
+                        Assert.IsNotNull(clip, $"the controller has no {f[0]} clip");
+                        clip.SampleAnimation(go, float.Parse(f[1], inv) * clip.length);
+                        sampled = key;
+                    }
+                    Assert.IsTrue(bones.TryGetValue(f[2], out var bone), $"no bone {f[2]}");
+                    var at = new Vector3(float.Parse(f[3], inv), float.Parse(f[4], inv), float.Parse(f[5], inv));
+                    var turn = new Quaternion(float.Parse(f[6], inv), float.Parse(f[7], inv), float.Parse(f[8], inv), float.Parse(f[9], inv));
+                    float cm = Vector3.Distance(at, go.transform.InverseTransformPoint(bone.position)) * 100f;
+                    float deg = Quaternion.Angle(turn, Quaternion.Inverse(go.transform.rotation) * bone.rotation);
+                    if (cm > worstCm || deg > worstDeg) worst = $"{key} {f[2]}: {cm:0.0} cm, {deg:0} deg";
+                    worstCm = Mathf.Max(worstCm, cm);
+                    worstDeg = Mathf.Max(worstDeg, deg);
+                    checkedBones++;
+                }
+                Assert.Greater(checkedBones, 500, "the reference is empty");
+                Assert.Less(worstCm, 2.5f, $"a bone is not where the take puts it ({worst})");
+                Assert.Less(worstDeg, 20f, $"a bone is twisted against the take ({worst})");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
 
         [Test]

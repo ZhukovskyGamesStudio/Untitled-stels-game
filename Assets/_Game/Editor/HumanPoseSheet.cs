@@ -118,7 +118,7 @@ namespace Stealth.EditorTools
                     // the thing in the palm, held the way the game holds it (PlayerController.HeldLocal under the anchor that
                     // HumanRig.PlaceHeld puts in the palm)
                     GameObject thing = null;
-                    var palm = rig.HandR != null && rig.FingersR != null ? HumanMath.Palm(rig.HandR.position, rig.FingersR.position) : Vector3.up;
+                    var palm = rig.HeldSpot();
                     if (shot.Hold && shot.Item >= 0 && visuals != null)
                         thing = Held(visuals, shot.Item, shot.Color, palm, go.transform.rotation);
                     // a three-quarter view from the front (the body faces +Z); lying, from higher and further; the hand close up
