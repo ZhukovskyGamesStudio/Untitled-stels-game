@@ -23,7 +23,7 @@ namespace Stealth.EditorTools
         const string HumanPrefabPath = PrefabsDir + "/Player/HumanRig_Scientist.prefab";
         /// <summary>The file whose takes every person plays (humanoid clips retarget onto every Avatar).</summary>
         const string SharedTakes = ModelsDir + "/Humans/human_backend.fbx";
-        const string HumanGripPath = HumansDataDir + "/HumanGrip.anim";
+        const string HumanGripPath = HumansDataDir + "/HumanGrip.anim", HumanCupPath = HumansDataDir + "/HumanCup.anim";
 
         /// <summary>Builds the rigged human (null when the model has not been exported yet).</summary>
         static GameObject BuildHumanRig() => BuildHumanRig(HumanFbx, HumanPrefabPath, "HumanRig_Scientist");
@@ -96,7 +96,7 @@ namespace Stealth.EditorTools
                 rig.FootL = bones.FirstOrDefault(t => t.name == "foot.L");
                 rig.FootR = bones.FirstOrDefault(t => t.name == "foot.R");
                 rig.HandR = bones.FirstOrDefault(t => t.name == "hand.R");
-                rig.FingersR = bones.FirstOrDefault(t => t.name == "fingers.R");
+                rig.FingersR = bones.FirstOrDefault(t => t.name == "middle.1.R");
                 // the IK callbacks come to the Animator's own object: a relay hands them to the rig
                 model.AddComponent<HumanIK>().Rig = rig;
                 // the ankle over the sole: the Idle take stands on the floor (HumanRigTests), its lower foot bone's height
@@ -171,7 +171,7 @@ namespace Stealth.EditorTools
         /// The way the Avatar is described (<see cref="HumanDescriptionOf"/>), stamped on the import: a model imported with
         /// an older description is imported anew. Change it with the description.
         /// </summary>
-        const string HumanAvatarVersion = "humanoid: T-pose from the bind pose, facing +Z, palms down; twist on the keyed bone";
+        const string HumanAvatarVersion = "humanoid: T-pose from the bind pose, facing +Z, palms down; twist on the keyed bone; fifteen finger bones a hand, straight in the T-pose, the palm level by the knuckles";
 
         internal static void ConfigureHumanImport(ModelImporter imp, bool force = false)
         {
@@ -250,10 +250,11 @@ namespace Stealth.EditorTools
                 }
                 foreach (var (bone, child, aim) in HumanSkeleton.TPose)
                 {
-                    Transform b = Bone(bone), c = Bone(child);
+                    Transform b = Bone(bone), c = child != null ? Bone(child) : null;
                     // straight out to its side: along X exactly (the shoulder's side of the chest)
                     var outward = new Vector3(Mathf.Sign(Bone(bone.EndsWith(".L") ? "upper_arm.L" : "upper_arm.R").position.x - chest.position.x), 0f, 0f);
-                    var turn = HumanSkeleton.Turn(c.position - b.position, HumanSkeleton.Direction(aim, outward));
+                    // (a bone with no child — a finger's last — lies along its own Y, as Blender writes bones)
+                    var turn = HumanSkeleton.Turn(c != null ? c.position - b.position : b.up, HumanSkeleton.Direction(aim, outward));
                     b.rotation = turn * b.rotation;
                 }
                 // … and the palms face down, the thumbs ahead: the whole arm is rolled about its length until the thumb's side
@@ -261,9 +262,11 @@ namespace Stealth.EditorTools
                 // every take, which Unity then spreads over the upper arm and the forearm)
                 foreach (var sd in new[] { "L", "R" })
                 {
-                    Transform up = Bone("upper_arm." + sd), hand = Bone("hand." + sd), thumb = Bone("thumb." + sd);
+                    Transform up = Bone("upper_arm." + sd), hand = Bone("hand." + sd);
                     var axis = (hand.position - up.position).normalized;
-                    var thumbSide = Vector3.ProjectOnPlane(thumb.position - hand.position, axis);
+                    // (the thumb's side by the row of knuckles, little finger to index: it lies in the palm's plane exactly, and
+                    // the fingers' one-axis joints then curl about the axis Unity gives them)
+                    var thumbSide = Vector3.ProjectOnPlane(Bone("index.1." + sd).position - Bone("little.1." + sd).position, axis);
                     float roll = Vector3.SignedAngle(thumbSide, Vector3.forward, axis);
                     up.rotation = Quaternion.AngleAxis(roll, axis) * up.rotation;
                 }
@@ -335,12 +338,14 @@ namespace Stealth.EditorTools
                                                        AnimationClip crouchIdle, AnimationClip crouchWalk, AnimationClip down, AnimationClip sit,
                                                        AnimationClip climb, AnimationClip terminal, AnimationClip work)
         {
-            var grip = HumanGrip(); // (rewritten every time: its muscles are tuned in HumanSkeleton.Grip)
+            // (rewritten every time: their muscles are tuned in HumanSkeleton.Grip / Cup)
+            var grip = HandClip(HumanGripPath, "Grip", HumanSkeleton.Grip);
+            var cup = HandClip(HumanCupPath, "Cup", HumanSkeleton.Cup);
             var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(HumanControllerPath);
             // the prefab references it: keep its GUID — unless it is older than its layers or takes (no Pose, not layered, other
             // clips) or its clips are gone (the takes were exported anew)
             if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && !existing.layers[HumanLayers.Head].iKPass
-                && existing.parameters.Any(p => p.name == "Pose")
+                && existing.parameters.Any(p => p.name == "Pose") && existing.parameters.Any(p => p.name == "Cup")
                 && existing.animationClips.All(c => c != null) && (idle == null || existing.animationClips.Contains(idle))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
@@ -350,6 +355,7 @@ namespace Stealth.EditorTools
             c.AddParameter("Sit", AnimatorControllerParameterType.Bool);
             c.AddParameter("Pose", AnimatorControllerParameterType.Int);
             c.AddParameter("ClimbSpeed", AnimatorControllerParameterType.Float);
+            c.AddParameter("Cup", AnimatorControllerParameterType.Float);
 
             // the layers and their masks: the base is the first layer the controller was created with
             var layers = c.layers;
@@ -376,8 +382,13 @@ namespace Stealth.EditorTools
             for (int i = 0; i < HumanLayers.RightHand; i++)
                 BodyStates(c, i, idle, walk, run, crouchIdle, crouchWalk, down, sit, climb, terminal, work);
             var hand = c.layers[HumanLayers.RightHand].stateMachine;
+            // one state: the fist round a handle blending into the palm cupped under a compact thing (Cup 0 … 1)
             var held = hand.AddState("Grip");
-            held.motion = grip;
+            var tree = new BlendTree { name = "Grip", blendType = BlendTreeType.Simple1D, blendParameter = "Cup", useAutomaticThresholds = false, hideFlags = HideFlags.HideInHierarchy };
+            AssetDatabase.AddObjectToAsset(tree, c);
+            tree.AddChild(grip, 0f);
+            tree.AddChild(cup, 1f);
+            held.motion = tree;
             hand.defaultState = held;
             EditorUtility.SetDirty(c);
             return c;
@@ -479,16 +490,16 @@ namespace Stealth.EditorTools
         /// The right hand closed round a handle, as a humanoid clip of finger muscles (our hand has one finger bone, mapped as
         /// the index: it curls all four; the thumb comes over them) — the RightHand layer plays it while the hand holds something.
         /// </summary>
-        static AnimationClip HumanGrip()
+        static AnimationClip HandClip(string path, string name, (string muscle, float value)[] muscles)
         {
-            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(HumanGripPath);
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
             if (clip == null)
             {
-                clip = new AnimationClip { name = "Grip" };
-                AssetDatabase.CreateAsset(clip, HumanGripPath);
+                clip = new AnimationClip { name = name };
+                AssetDatabase.CreateAsset(clip, path);
             }
             clip.ClearCurves();
-            foreach (var (muscle, value) in HumanSkeleton.Grip)
+            foreach (var (muscle, value) in muscles)
                 AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), AnimationCurve.Constant(0f, 1f, value));
             var settings = AnimationUtility.GetAnimationClipSettings(clip);
             settings.loopTime = true;

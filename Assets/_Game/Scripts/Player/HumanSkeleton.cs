@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Stealth.Player
@@ -10,17 +12,30 @@ namespace Stealth.Player
     /// </summary>
     public static class HumanSkeleton
     {
-        /// <summary>Our bone → the humanoid bone. The hand has one finger bone (the whole fingers) and the thumb.</summary>
-        public static readonly (string bone, HumanBodyBones human)[] Map =
+        /// <summary>The fingers of a hand, as the bones are named: <c>&lt;finger&gt;.&lt;1..3&gt;.&lt;L|R&gt;</c>, 1 from the knuckle.</summary>
+        public static readonly string[] Fingers = { "thumb", "index", "middle", "ring", "little" };
+
+        /// <summary>Our bone → the humanoid bone: the body, then every finger's three bones (<see cref="FingerMap"/>).</summary>
+        public static readonly (string bone, HumanBodyBones human)[] Map = Body().Concat(FingerMap()).ToArray();
+
+        /// <summary>The fingers' bones → the humanoid ones (the enum runs thumb … little, proximal … distal, left then right).</summary>
+        static IEnumerable<(string bone, HumanBodyBones human)> FingerMap()
+        {
+            for (int side = 0; side < 2; side++)
+            for (int f = 0; f < Fingers.Length; f++)
+            for (int i = 0; i < 3; i++)
+                yield return ($"{Fingers[f]}.{i + 1}.{(side == 0 ? "L" : "R")}",
+                    (side == 0 ? HumanBodyBones.LeftThumbProximal : HumanBodyBones.RightThumbProximal) + f * 3 + i);
+        }
+
+        static (string bone, HumanBodyBones human)[] Body() => new[]
         {
             ("hips", HumanBodyBones.Hips), ("spine", HumanBodyBones.Spine), ("chest", HumanBodyBones.Chest),
             ("neck", HumanBodyBones.Neck), ("head", HumanBodyBones.Head),
             ("shoulder.L", HumanBodyBones.LeftShoulder), ("upper_arm.L", HumanBodyBones.LeftUpperArm),
             ("forearm.L", HumanBodyBones.LeftLowerArm), ("hand.L", HumanBodyBones.LeftHand),
-            ("fingers.L", HumanBodyBones.LeftIndexProximal), ("thumb.L", HumanBodyBones.LeftThumbProximal),
             ("shoulder.R", HumanBodyBones.RightShoulder), ("upper_arm.R", HumanBodyBones.RightUpperArm),
             ("forearm.R", HumanBodyBones.RightLowerArm), ("hand.R", HumanBodyBones.RightHand),
-            ("fingers.R", HumanBodyBones.RightIndexProximal), ("thumb.R", HumanBodyBones.RightThumbProximal),
             ("thigh.L", HumanBodyBones.LeftUpperLeg), ("shin.L", HumanBodyBones.LeftLowerLeg),
             ("foot.L", HumanBodyBones.LeftFoot), ("toe.L", HumanBodyBones.LeftToes),
             ("thigh.R", HumanBodyBones.RightUpperLeg), ("shin.R", HumanBodyBones.RightLowerLeg),
@@ -40,13 +55,24 @@ namespace Stealth.Player
         /// <summary>
         /// The T-pose, bone by bone (parents first): which way the bone from <c>bone</c> to <c>child</c> points — up the
         /// spine, the arms straight out to their side (<see cref="Out"/>: the side of the shoulder from the chest), the legs
-        /// straight down. The feet, toes and thumbs keep their own direction.
+        /// straight down, the four fingers straight out with the hand (a finger's last bone has no child: null — it lies
+        /// along its own axis). The feet, toes and thumbs keep their own direction.
         /// </summary>
-        public static readonly (string bone, string child, Aim aim)[] TPose =
+        public static readonly (string bone, string child, Aim aim)[] TPose = BodyTPose().Concat(FingerTPose()).ToArray();
+
+        static IEnumerable<(string bone, string child, Aim aim)> FingerTPose()
+        {
+            foreach (var side in new[] { "L", "R" })
+            foreach (var finger in Fingers.Skip(1))
+            for (int i = 1; i <= 3; i++)
+                yield return ($"{finger}.{i}.{side}", i < 3 ? $"{finger}.{i + 1}.{side}" : null, Aim.Out);
+        }
+
+        static (string bone, string child, Aim aim)[] BodyTPose() => new[]
         {
             ("hips", "spine", Aim.Up), ("spine", "chest", Aim.Up), ("chest", "neck", Aim.Up), ("neck", "head", Aim.Up),
-            ("shoulder.L", "upper_arm.L", Aim.Out), ("upper_arm.L", "forearm.L", Aim.Out), ("forearm.L", "hand.L", Aim.Out), ("hand.L", "fingers.L", Aim.Out),
-            ("shoulder.R", "upper_arm.R", Aim.Out), ("upper_arm.R", "forearm.R", Aim.Out), ("forearm.R", "hand.R", Aim.Out), ("hand.R", "fingers.R", Aim.Out),
+            ("shoulder.L", "upper_arm.L", Aim.Out), ("upper_arm.L", "forearm.L", Aim.Out), ("forearm.L", "hand.L", Aim.Out), ("hand.L", "middle.1.L", Aim.Out),
+            ("shoulder.R", "upper_arm.R", Aim.Out), ("upper_arm.R", "forearm.R", Aim.Out), ("forearm.R", "hand.R", Aim.Out), ("hand.R", "middle.1.R", Aim.Out),
             ("thigh.L", "shin.L", Aim.Down), ("shin.L", "foot.L", Aim.Down),
             ("thigh.R", "shin.R", Aim.Down), ("shin.R", "foot.R", Aim.Down),
         };
@@ -93,14 +119,36 @@ namespace Stealth.Player
         public static readonly Quaternion CarryHand = Quaternion.Euler(0f, 0f, 180f) * Quaternion.Euler(0f, 90f, 0f);
 
         /// <summary>
-        /// The right hand's grip as humanoid finger muscles (curve names of a humanoid clip; −1 bent .. 1 stretched): the one
-        /// finger bone curls (it is mapped as the index), the thumb comes in over it.
+        /// The right hand's grip as humanoid finger muscles (curve names of a humanoid clip; −1 bent .. 1 stretched): the
+        /// four fingers closed round a handle, each joint curled, the little finger tightest; the thumb comes in over them.
         /// </summary>
-        public static readonly (string muscle, float value)[] Grip =
+        public static (string muscle, float value)[] Grip => s_Grip ??= GripMuscles().ToArray();
+        static (string muscle, float value)[] s_Grip;
+
+        /// <summary>How far each finger's three joints close in the grip (index … little), and the thumb's.</summary>
+        static readonly float[] GripCurl = { -0.62f, -0.72f, -0.5f }, GripThumb = { -0.25f, -0.45f, -0.4f };
+
+        static IEnumerable<(string muscle, float value)> GripMuscles() => HandMuscles(GripCurl, 0.05f, -0.2f, GripThumb, -0.5f);
+
+        /// <summary>
+        /// The right hand cupped under a compact thing (a jar, a box, a tablet lying on it): the palm open, the fingers a
+        /// little curled round its far edge, the thumb out at its side.
+        /// </summary>
+        public static (string muscle, float value)[] Cup => s_Cup ??= HandMuscles(CupCurl, 0.03f, 0.15f, CupThumb, 0.3f).ToArray();
+        static (string muscle, float value)[] s_Cup;
+        static readonly float[] CupCurl = { 0.35f, 0.1f, 0.0f }, CupThumb = { 0.3f, 0.2f, 0.1f };
+
+        static IEnumerable<(string muscle, float value)> HandMuscles(float[] curl, float tighter, float spread, float[] thumb, float thumbSpread)
         {
-            ("RightHand.Index.1 Stretched", -1.5f), ("RightHand.Index.Spread", 0f),
-            ("RightHand.Thumb.1 Stretched", -0.9f), ("RightHand.Thumb.Spread", -0.6f),
-        };
+            string[] names = { "Index", "Middle", "Ring", "Little" };
+            for (int f = 0; f < names.Length; f++)
+            {
+                for (int i = 0; i < 3; i++) yield return ($"RightHand.{names[f]}.{i + 1} Stretched", curl[i] - tighter * f);
+                yield return ($"RightHand.{names[f]}.Spread", spread);
+            }
+            for (int i = 0; i < 3; i++) yield return ($"RightHand.Thumb.{i + 1} Stretched", thumb[i]);
+            yield return ("RightHand.Thumb.Spread", thumbSpread);
+        }
     }
 
     /// <summary>The layers of the rigged humans' Animator controller (AssetBuilder.Humans builds it), by index.</summary>

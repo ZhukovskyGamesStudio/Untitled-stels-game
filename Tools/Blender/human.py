@@ -89,7 +89,56 @@ OUTFITS = {
 
 TORSO = ["hips", "spine", "chest"]
 RADIUS = {"hips": 0.17, "spine": 0.15, "chest": 0.17, "neck": 0.06, "head": 0.10, "shoulder": 0.085, "upper_arm": 0.055, "forearm": 0.045,
-          "hand": 0.040, "fingers": 0.020, "thumb": 0.018, "thigh": 0.085, "shin": 0.06, "foot": 0.055, "toe": 0.04}
+          "hand": 0.040, "thigh": 0.085, "shin": 0.06, "foot": 0.055, "toe": 0.04}
+
+
+def _step(x, lo, hi):
+    t = np.clip((x - lo) / (hi - lo), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def hand_weights(points, sd):
+    """Skin weights of a hand's points (side "L" / "R"): every finger follows its own three bones — a point belongs to
+    the finger it is nearest to, its weight passes from bone to bone across each joint and from the hand to the finger
+    across the knuckle — and the rest follows the hand and the forearm by distance. Fingers lie millimetres apart:
+    weights by the distance to every bone would drag a finger after its neighbour."""
+    p = np.array(points, float)
+    if sd == "R":
+        p[:, 0] *= -1
+    chains = clothes.hand_chains()
+    names = list(chains)
+    n = len(p)
+    near = np.full(n, 1e9)
+    own = np.zeros(n, int)
+    along = np.zeros((len(names), n, 3))                           # for every finger: metres past the head of each of its bones
+    for k, name in enumerate(names):
+        pts = chains[name]
+        best = np.full(n, 1e9)
+        for i in range(3):
+            d, _ = sdf.seg_dist(p, pts[i], pts[i + 1])
+            ab = pts[i + 1] - pts[i]
+            along[k, :, i] = ((p - pts[i]) @ ab) / np.linalg.norm(ab)
+            best = np.minimum(best, d)
+        own = np.where(best < near, k, own)
+        near = np.minimum(near, best)
+    seg = {b: (np.array(a), np.array(c)) for b, (a, c) in anim.bone_segments().items()}
+    out = build.weights(np.array(points, float), seg, [f"forearm.{sd}", f"hand.{sd}"], RADIUS)
+    for k, name in enumerate(names):
+        mine = own == k
+        a = along[k]
+        # into the finger across the knuckle (the thumb's first bone lies inside the palm: it takes the ball of the thumb,
+        # as far as the thumb's own flesh reaches), then from bone to bone across each joint
+        if name == "thumb":
+            w_in = _step(a[:, 0], -0.004, 0.022) * mine * _step(0.030 - near, 0.0, 0.012)
+        else:
+            w_in = _step(a[:, 0], -0.007, 0.006) * mine
+        w23 = _step(a[:, 1], -0.005, 0.005)
+        w3 = _step(a[:, 2], -0.004, 0.004)
+        for b in list(out):
+            out[b] = out[b] * (1 - w_in)
+        for i, w in enumerate((w_in * (1 - w23), w_in * w23 * (1 - w3), w_in * w23 * w3)):
+            out[f"{name}.{i + 1}.{sd}"] = w
+    return out
 
 
 def both(*names):
@@ -134,6 +183,7 @@ def figure(who):
     # ---- skin: the head with the neck, the hands (with the forearms under rolled sleeves), the eyes
     def skin_f(p):
         d = smin(head_f(p), body.neck(mx(p), Build(neck=b.neck, soft=b.soft)), 0.014)
+        d = smax(d, np.minimum(p[..., 1] - 0.050, 1.470 - p[..., 2]), 0.004)      # the neck's base stays inside the garment's back (it showed under a collar)
         return smax(d, 1.405 - p[..., 2], 0.004)
     hd = sculpt("head", skin_f, (0, -0.15, 1.39), (0.113, 0.14, 1.82), 0.0013, mirror=True)
     rgb, gloss = paint_head(H(sdf.points_of(hd)), person)
@@ -158,8 +208,12 @@ def figure(who):
     hp = sdf.points_of(hand)
     build.paint(hand, *paint_hand(hp, build.normals_of(hand)))
     hand_r = mirrored(hand, "hand.R")
+
+    def keep_fingers(pts):
+        q = clothes.hand_frame(mx(pts))                 # triangles go to the fingers and the thumb, not to the palm's flat
+        return np.clip(np.maximum((q[:, 0] - 0.075) / 0.02, (q[:, 1] - 0.030) / 0.012), 0, 1) * 0.75
     for o, sd in ((hand, "L"), (hand_r, "R")):
-        pieces.append(Piece(o.name, "AccentHead", "skin", o, 800 if rolled else 700, [f"forearm.{sd}", f"hand.{sd}", f"fingers.{sd}", f"thumb.{sd}"], texel=1.0))
+        pieces.append(Piece(o.name, "AccentHead", "skin", o, 1700 if rolled else 1500, [f"forearm.{sd}", f"hand.{sd}"], keep=keep_fingers, texel=1.3, ray=0.0035))
 
     e = face.eye_centre(f)
     for s, sd in ((1, "L"), (-1, "R")):
@@ -172,6 +226,9 @@ def figure(who):
 
     # ---- hair (and a beard): their own colour
     hair_f = lambda p: face.hair(H(p), f, person.hair) * HEAD_S
+    if who == "designer":
+        loose = hair_f
+        hair_f = lambda p: smax(loose(p), -(beret_solid(p) + 0.003), 0.003)     # no hair inside the beret: none to show through it
     hair = sculpt("hair", hair_f, (-0.125, -0.15, 1.49), (0.125, 0.17, 1.85), 0.0016)
     build.paint(hair, *paint_hair(H(sdf.points_of(hair)), person, 1.0))
     pieces.append(Piece("hair", "Outfit", "outfit", hair, {"bob": 1700, "buzz": 900}.get(person.hair, 1400), ["head"], texel=1.2))
@@ -190,7 +247,7 @@ def figure(who):
     shoe = sculpt("shoe.L", lambda p: clothes.shoe(p, fit["shoe"]), (0.03, -0.21, -0.004), (0.175, 0.12, 0.22), 0.0018)
     build.paint(shoe, *paint_shoe(sdf.points_of(shoe), fit))
     for o, sd in ((shoe, "L"), (mirrored(shoe, "shoe.R"), "R")):
-        pieces.append(Piece(o.name, "Outfit", "outfit", o, 520, [f"shin.{sd}", f"foot.{sd}", f"toe.{sd}"]))
+        pieces.append(Piece(o.name, "Outfit", "outfit", o, 720, [f"shin.{sd}", f"foot.{sd}", f"toe.{sd}"]))
 
     # ---- the top: the department's garment (under a vest: a shirt of its own colour, and the vest is the garment)
     top_f = lambda p: clothes.top(p, b, **fit["top"])
@@ -237,14 +294,25 @@ def figure(who):
         along = (p - S) @ axis
         d = sleeve_f(p)
         near, _ = sdf.seg_dist(p, S, E)
-        return smax(smax(smax(d - 0.0042, -(d + 0.004), 0.001), np.abs(along - 0.150) - 0.026, 0.002), near - 0.085, 0.002)
+        # (standing clear of the sleeve: the sleeve's game mesh is a few millimetres off its sculpt and showed through a band lying on it)
+        return smax(smax(smax(d - 0.0080, -(d - 0.0008), 0.001), np.abs(along - 0.150) - 0.026, 0.002), near - 0.095, 0.002)
     band = sculpt("armband", band_f, S + (-0.09, -0.10, -0.26), S + (0.16, 0.10, 0.02), 0.0016)
     build.paint(band, 1.0, 0.22)
-    pieces.append(Piece("armband", "AccentBand", "outfit", band, 260, ["shoulder.L", "upper_arm.L"]))
+    pieces.append(Piece("armband", "AccentBand", "outfit", band, 300, TORSO + ["neck"] + arms))     # (the sleeve's bones: it moves as the sleeve does)
 
     surface = garment_f
     extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist)
     return pieces
+
+
+def beret_solid(p):
+    """The designer's beret as a solid (the body's space): pulled down over one ear, its crown slouching to one side,
+    big enough to sit over the hair."""
+    q = (H(p) - np.array((0.016, 0.006, 0.100))) @ (sdf.rot_y(-0.30) @ sdf.rot_x(0.14))
+    d = ell(q, (0.012, 0, 0.014), (0.112, 0.118, 0.030))                                # the crown
+    d = smin(d, ell(q, (0.0, 0.002, -0.016), (0.091, 0.105, 0.030)), 0.016)             # down to the band round the head
+    d = smin(d, cone(q, (0.012, 0, 0.041), (0.014, 0, 0.053), 0.0045, 0.0035), 0.004)   # the stalk
+    return d * HEAD_S
 
 
 def shell(surface, p, lift=0.0012, thick=0.0026):
@@ -370,11 +438,7 @@ def extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist):
         pieces.append(Piece("scarf", "AccentBand", "outfit", sc, 800, ["chest", "neck", "spine"]))
 
         def beret_f(p):
-            q = (H(p) - np.array((0.016, 0.006, 0.100))) @ (sdf.rot_y(-0.30) @ sdf.rot_x(0.14))   # pulled down over one ear
-            d = ell(q, (0.012, 0, 0.012), (0.104, 0.110, 0.028))                                # the crown, slouching to one side
-            d = smin(d, ell(q, (0.0, 0.0, -0.016), (0.082, 0.096, 0.026)), 0.016)               # down to the band round the head
-            d = smin(d, cone(q, (0.012, 0, 0.038), (0.014, 0, 0.050), 0.0045, 0.0035), 0.004)
-            return smax(d * HEAD_S, -(head_f(p) + 0.001), 0.004)             # hollow where the head is (the hair's top is inside it)
+            return smax(beret_solid(p), -(head_f(p) + 0.001), 0.004)         # hollow where the head is (the hair under it is cut away: figure)
         br = sculpt("beret", beret_f, (-0.13, -0.13, 1.71), (0.15, 0.15, 1.86), 0.0018)
         build.paint(br, np.array((0.32, 0.035, 0.05)) * (0.9 + 0.2 * build.noise(sdf.points_of(br), 400)[:, None]), 0.12)
         pieces.append(Piece("beret", "Outfit", "outfit", br, 520, ["head"]))
@@ -411,14 +475,17 @@ def paint_head(p, person):
     near = lambda c, w: np.exp(-(np.linalg.norm(q - np.array(c), axis=1) / w) ** 2)
     warm = 0.9 * near((0.046, -0.068, -0.030), 0.028) + 0.8 * near((0, -0.118, -0.033), 0.016) + 0.8 * near((0.078, 0.014, -0.004), 0.028) + 0.4 * near((0, -0.086, -0.094), 0.02)
     rgb *= 1 - np.clip(warm, 0, 1)[:, None] * np.array([-0.02, 0.085, 0.10])
-    lip = np.clip(1 - face.lips(q, f) / 0.0009, 0, 1) * (p[:, 1] < -0.080)
+    lip = np.clip(1 - face.lips(q, f) / 0.0022, 0, 1) ** 0.7 * (p[:, 1] < -0.080)      # (the red of the lips, fading out past their edge)
     k = person.lip_colour
     rgb *= 1 - lip[:, None] * np.array([0.10 + 0.05 * k, 0.26 + 0.22 * k, 0.24 + 0.16 * k])
     e = face.eye_centre(f)
     socket = near((e[0], e[1] - 0.012, e[2] - 0.004), 0.021)
     rgb *= 1 - socket[:, None] * (0.12 + person.eye_shadow) * np.array([0.34, 0.40, 0.34])
-    slit = face._slit(q, f)
-    lash = np.clip(1 - np.abs(slit - 0.0008) / 0.0019, 0, 1) ** 0.6 * np.where(q[:, 2] > e[2], 1.0 if f.female else 0.8, 0.4) * (p[:, 1] < e[1] - 0.004)
+    # the lash line: a dark rim just outside the almond, on the lids only (the almond is flat: measured by depth too, it
+    # drew its outline again wherever the brow stood as far forward as the lids)
+    slit = face._slit(q, f, flat=True)
+    lids = (p[:, 1] < e[1] - 0.004) & (np.abs(q[:, 2] - e[2]) < 0.011) & (np.abs(q[:, 0] - e[0]) < 0.021) & (p[:, 1] > e[1] - 0.022)
+    lash = np.clip(1 - np.abs(slit - 0.0008) / 0.0016, 0, 1) ** 0.6 * np.where(q[:, 2] > e[2] - 0.0017, 1.0 if f.female else 0.8, 0.35) * lids
     rgb *= 1 - lash[:, None]
     # eyebrows: an arc of hair on the brow ridge, thicker towards the nose
     t = np.clip((q[:, 0] - 0.008) / 0.040, 0, 1)
@@ -449,7 +516,23 @@ def paint_hand(p, normals):
     rgb *= 1 - knuckle[:, None] * np.array([0.0, 0.08, 0.09])
     palm = np.clip(normals @ N, 0, 1) * win(along, 0.0, 0.2, 0.02)
     rgb *= 1 - palm[:, None] * np.array([-0.02, 0.05, 0.06])       # the palm is pinker
-    return rgb, 0.34 + 0.08 * back
+    gloss = 0.34 + 0.08 * back
+    # the joints' creases on the back of every finger, and a nail on its last bone
+    for name, pts in clothes.hand_chains().items():
+        for i in (1, 2):
+            axis = (pts[i + 1] - pts[i - 1]) / np.linalg.norm(pts[i + 1] - pts[i - 1])
+            crease = gauss((p - pts[i]) @ axis, 0.0018) * (np.linalg.norm(p - pts[i], axis=1) < 0.013) * back
+            rgb *= 1 - 0.5 * crease[:, None] * np.array([0.10, 0.20, 0.22])
+        a, b = pts[2], pts[3]
+        axis = (b - a) / np.linalg.norm(b - a)
+        t = (p - a) @ axis / np.linalg.norm(b - a)
+        d, _ = sdf.seg_dist(p, a, b + axis * 0.004)
+        up = np.cross(axis, np.cross(-N, axis))
+        up /= np.linalg.norm(up)
+        nail = (d < 0.012) * np.clip((normals @ up - 0.55) / 0.12, 0, 1) * win(t, 0.42, 1.25, 0.06)   # on the finger's back
+        rgb = rgb * (1 - nail[:, None]) + nail[:, None] * np.array([1.03, 0.90, 0.88])
+        gloss = gloss + 0.34 * nail
+    return rgb, gloss
 
 
 def paint_eye(p, person):
@@ -511,17 +594,33 @@ def paint_trousers(p, normals, colour):
 
 
 def paint_shoe(p, fit):
-    sole_h = {"sneaker": 0.026, "boot": 0.030, "flat": 0.018}[fit["shoe"]]
-    z = p[:, 2]
-    upper = np.array(fit["shoe_colour"])[None, :] * (0.9 + 0.2 * build.noise(p, 300))[:, None]
-    sole = np.array(fit["sole"])[None, :] * np.ones((len(p), 1))
-    rgb = np.where((z < sole_h + 0.002)[:, None], sole, upper)
-    if fit["shoe"] != "flat":
-        lace = (np.abs(p[:, 0] - 0.103) < 0.024) & (p[:, 1] < -0.04) & (p[:, 1] > -0.13) & (z > 0.058) & (np.sin((p[:, 1]) * 300) > 0.55)
-        rgb = np.where(lace[:, None], np.clip(rgb * 0.4 + 0.5, 0, 1) if fit["shoe"] == "sneaker" else rgb * 0.5, rgb)
-        toe = (p[:, 1] < -0.15) & (z > sole_h)
-        rgb = np.where(toe[:, None] & (fit["shoe"] == "sneaker"), np.clip(rgb * 1.08, 0, 1), rgb)
-    gloss = np.where(z < sole_h + 0.002, 0.3, 0.5 if fit["shoe"] != "sneaker" else 0.28)
+    """A shoe's colours by clothes.shoe's own measures: the sole (it lifts with the toe), the upper, the laces where
+    the sculpt has them, the toe cap and the heel's counter a shade apart, a dark opening at the collar."""
+    kind = fit["shoe"]
+    sole_h = {"sneaker": 0.026, "boot": 0.030, "flat": 0.016}[kind]
+    top_z = {"sneaker": 0.125, "boot": 0.19, "flat": 0.085}[kind]
+    x, y, z = p[:, 0], p[:, 1], p[:, 2]
+    t = np.clip((0.085 - y) / 0.282, 0, 1)
+    spring = 0.011 * np.clip((t - 0.76) / 0.24, 0, 1) ** 2
+    zz = z - sole_h - spring
+    on_sole = zz < 0.002
+    upper = np.array(fit["shoe_colour"])[None, :] * (0.92 + 0.16 * build.noise(p, 300))[:, None]
+    sole = np.array(fit["sole"])[None, :] * (0.94 + 0.06 * build.noise(p, 500))[:, None]
+    if kind == "sneaker":
+        sole = sole * np.where(zz < -0.013, 0.72, 1.0)[:, None]                 # the outsole under the white midsole
+    rgb = np.where(on_sole[:, None], sole, upper)
+    if kind != "flat":
+        lace = np.zeros(len(p), bool)
+        for s in (0.15, 0.38, 0.62, 0.86):                                      # (where clothes.shoe raises them)
+            cy, cz = -0.042 - 0.082 * s, 0.103 - 0.038 * s
+            lace |= (np.abs(y - cy) < 0.0042) & (np.abs(x - 0.106) < 0.024) & (z > cz - 0.016)
+        rgb = np.where(lace[:, None], np.clip(rgb * 0.3 + 0.6, 0, 1) if kind == "sneaker" else rgb * 0.45, rgb)
+        cap = (t > 0.80) & ~on_sole
+        rgb = np.where(cap[:, None], np.clip(rgb * (1.10 if kind == "sneaker" else 0.86), 0, 1), rgb)
+        counter = (t < 0.17) & (zz > 0.004) & (zz < 0.060)
+        rgb = np.where(counter[:, None], rgb * 0.82, rgb)
+    rgb = rgb * (1 - 0.75 * np.clip((z - (top_z - 0.004)) / 0.004, 0, 1))[:, None]   # the opening (the leg goes into it)
+    gloss = np.where(on_sole, 0.3, 0.5 if kind != "sneaker" else 0.28)
     return rgb, gloss
 
 
@@ -603,7 +702,8 @@ def assemble(pieces, who):
     for p in pieces:
         for name in bones:
             p.lo.vertex_groups.new(name=name)
-        build.assign(p.lo, build.weights(sdf.points_of(p.lo), seg, p.bones, RADIUS))
+        pts = sdf.points_of(p.lo)
+        build.assign(p.lo, hand_weights(pts, p.name[-1]) if p.name.startswith("hand.") else build.weights(pts, seg, p.bones, RADIUS))
         parts.setdefault(p.part, []).append(p.lo)
     out = []
     errors = 0

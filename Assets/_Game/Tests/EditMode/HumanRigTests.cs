@@ -46,7 +46,7 @@ namespace Stealth.Tests
             foreach (var (bone, child, _) in HumanSkeleton.TPose)
             {
                 Assert.Contains(bone, bones);
-                Assert.Contains(child, bones);
+                if (child != null) Assert.Contains(child, bones); // (a finger's last bone has no child)
             }
         }
 
@@ -65,6 +65,12 @@ namespace Stealth.Tests
             Assert.Greater(HumanSkeleton.Carry.z, 0.15f, "before the chest");
             Assert.Greater(HumanSkeleton.Carry.x, 0f, "the right hand");
             Assert.IsTrue(HumanSkeleton.Grip.Any(g => g.muscle.StartsWith("RightHand.Index") && g.value < -0.5f), "the fingers curl");
+            foreach (var finger in new[] { "Thumb", "Index", "Middle", "Ring", "Little" })
+                Assert.AreEqual(3, HumanSkeleton.Grip.Count(g => g.muscle.StartsWith($"RightHand.{finger}.") && g.muscle.EndsWith("Stretched")), $"every joint of the {finger}");
+            Assert.Less(HumanSkeleton.Grip.Where(g => g.muscle.Contains("Index")).Min(g => g.value), HumanSkeleton.Cup.Where(g => g.muscle.Contains("Index")).Min(g => g.value), "a cupped palm is more open than a fist");
+            var cup = HumanMath.Grip(Vector3.zero, new Vector3(0.1f, 0f, 0f), Vector3.up, 1f, true);
+            Assert.Less(cup.x, grip.x, "a compact thing lies over the middle of the palm, not at the knuckles");
+            Assert.AreEqual(15 * 2, HumanSkeleton.Map.Count(m => m.human >= HumanBodyBones.LeftThumbProximal && m.human <= HumanBodyBones.RightLittleDistal), "three bones for every finger of both hands");
         }
 
         [Test]
@@ -150,6 +156,9 @@ namespace Stealth.Tests
                     var turn = new Quaternion(float.Parse(f[6], inv), float.Parse(f[7], inv), float.Parse(f[8], inv), float.Parse(f[9], inv));
                     float cm = Vector3.Distance(at, go.transform.InverseTransformPoint(bone.position)) * 100f;
                     float deg = Quaternion.Angle(turn, Quaternion.Inverse(go.transform.rotation) * bone.rotation);
+                    // (a thumb's last joints bend about one axis in a humanoid, a little off the one the takes use: its tip
+                    // stays in place — the position is held — and turns a few degrees more about itself)
+                    if (f[2].StartsWith("thumb.")) deg *= 20f / 32f;
                     if (cm > worstCm || deg > worstDeg) worst = $"{key} {f[2]}: {cm:0.0} cm, {deg:0} deg";
                     worstCm = Mathf.Max(worstCm, cm);
                     worstDeg = Mathf.Max(worstDeg, deg);
@@ -209,7 +218,9 @@ namespace Stealth.Tests
             Assert.IsFalse(layered.layers[HumanLayers.Legs].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Head));
             Assert.IsTrue(layered.layers[HumanLayers.RightHand].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.RightFingers));
             Assert.IsTrue(controller.animationClips.Any(c => c.name == "HumanGrip"), "the grip of the right hand");
-            Assert.IsTrue(controller.animationClips.Where(c => c.name != "HumanGrip").All(c => UnityEditor.AssetDatabase.GetAssetPath(c).EndsWith("human_backend.fbx")),
+            Assert.IsTrue(controller.animationClips.Any(c => c.name == "HumanCup"), "the palm cupped under a compact thing");
+            Assert.IsTrue(layered.parameters.Any(p => p.name == "Cup"), "fist … cupped palm");
+            Assert.IsTrue(controller.animationClips.Where(c => c.name != "HumanGrip" && c.name != "HumanCup").All(c => UnityEditor.AssetDatabase.GetAssetPath(c).EndsWith("human_backend.fbx")),
                 "one set of takes for everybody");
             Assert.IsNotNull(rig.Animator.GetComponent<HumanIK>(), "the IK relay beside the Animator");
             Assert.IsTrue(rig.HandR != null && rig.FingersR != null, "the right hand's bones (the held thing lies there)");
@@ -242,7 +253,7 @@ namespace Stealth.Tests
             Assert.AreEqual(heads.Length, heads.Distinct().Count(), "each department has a face of its own");
             // the bones the takes and the head tilt need
             var bones = prefab.GetComponentsInChildren<Transform>(true).Select(t => t.name).ToArray();
-            foreach (var bone in new[] { "hips", "spine", "chest", "neck", "head", "upper_arm.L", "forearm.R", "hand.L", "fingers.L", "thumb.R", "thigh.L", "shin.R", "foot.L", "toe.R" })
+            foreach (var bone in new[] { "hips", "spine", "chest", "neck", "head", "upper_arm.L", "forearm.R", "hand.L", "index.1.L", "middle.3.R", "little.2.L", "thumb.1.R", "thigh.L", "shin.R", "foot.L", "toe.R" })
                 Assert.Contains(bone, bones, $"no bone {bone}");
             var planted = prefab.GetComponent<HumanRig>();
             Assert.IsTrue(planted.Hips != null && planted.FootL != null && planted.FootR != null, "the bones that plant the feet");

@@ -47,6 +47,10 @@ namespace Stealth.Player
         static readonly int SitId = Animator.StringToHash("Sit");
         static readonly int PoseId = Animator.StringToHash("Pose");
         static readonly int ClimbId = Animator.StringToHash("ClimbSpeed");
+        static readonly int CupId = Animator.StringToHash("Cup");
+
+        /// <summary>The held thing is a compact one: it lies in the open palm (a long one goes through the fist).</summary>
+        [System.NonSerialized] public bool Cupped;
 
         float m_Pitch, m_Ground, m_Hold;
         bool m_Planted, m_Holding;
@@ -70,6 +74,7 @@ namespace Stealth.Player
             Animator.SetInteger(PoseId, (int)pose);
             Animator.SetFloat(ClimbId, HumanMath.ClimbRate(climb), 0.08f, Time.deltaTime);
             if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
+            Animator.SetFloat(CupId, Cupped ? 1f : 0f, 0.08f, Time.deltaTime);
         }
 
         /// <summary>Skips the blend of the hold (a still picture: Stealth → Human Pose Pictures).</summary>
@@ -77,6 +82,7 @@ namespace Stealth.Player
         {
             m_Hold = m_Holding ? 1f : 0f;
             if (Animator != null && Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
+            if (Animator != null) Animator.SetFloat(CupId, Cupped ? 1f : 0f);
         }
 
         /// <summary>
@@ -125,7 +131,7 @@ namespace Stealth.Player
 
         /// <summary>Where the held thing's grip is, in the world: in the closed fingers of the right hand (<see cref="HumanMath.Grip"/>).</summary>
         public Vector3 HeldSpot() => HandR == null || FingersR == null ? transform.position + Vector3.up
-            : HumanMath.Grip(HandR.position, FingersR.position, transform.up, Animator != null ? Animator.transform.lossyScale.y : 1f);
+            : HumanMath.Grip(HandR.position, FingersR.position, transform.up, Animator != null ? Animator.transform.lossyScale.y : 1f, Cupped);
 
         /// <summary>
         /// After the animation: the lower foot onto the floor under the body. The player's capsule floats a skin's width over
@@ -207,10 +213,15 @@ namespace Stealth.Player
         /// little over the palm — a long thing goes through the folded fingers there, a compact one rests on them.
         /// <paramref name="size"/>: the person's scale.
         /// </summary>
-        public static Vector3 Grip(Vector3 hand, Vector3 fingers, Vector3 up, float size) =>
-            Vector3.Lerp(hand, fingers, GripAlong) + up * (GripOverPalm * size);
+        public static Vector3 Grip(Vector3 hand, Vector3 fingers, Vector3 up, float size, bool cupped = false) =>
+            Vector3.Lerp(hand, fingers, cupped ? CupAlong : GripAlong) + up * ((cupped ? CupOverPalm : GripOverPalm) * size);
 
-        public const float GripAlong = 0.9f, GripOverPalm = 0f;
+        /// <summary>
+        /// The fist grips by the knuckles, at the height of the hand. A cupped palm carries its thing over its middle: the
+        /// place of the thing is counted from the top of a fist (PlayerController.HeldLocal), and the skin of an open palm
+        /// lies that much lower.
+        /// </summary>
+        public const float GripAlong = 0.9f, GripOverPalm = 0f, CupAlong = 0.62f, CupOverPalm = -0.022f;
 
         /// <summary>Standing on its feet: not lying, not seated, not on a ladder — the feet are put on the floor.</summary>
         public static bool Planted(bool downed, bool seated, BodyPose pose) => !downed && !seated && pose != BodyPose.Ladder;

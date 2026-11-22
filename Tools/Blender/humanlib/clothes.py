@@ -6,6 +6,7 @@ few deliberate folds where cloth really breaks — the crook of the elbow, behin
 drag lines from the shoulder — instead of noise all over.
 """
 import math
+from dataclasses import replace
 
 import numpy as np
 
@@ -93,7 +94,7 @@ def _body_folds(q, amount=1.0):
     f = 0.0
     for zz, amp in ((1.075, 0.0030), (1.035, 0.0035)):
         f += amp * gauss(z - zz - 0.10 * (x - 0.12), 0.011) * win(x, 0.105, 0.3, 0.018)       # at the waist, towards the sides
-    f += 0.002 * ridge(q, (0.165, -0.040, 1.340), (0.105, -0.080, 1.250), 0.018)            # from the armpit towards the chest
+    f += 0.0008 * ridge(q, (0.165, -0.040, 1.340), (0.105, -0.080, 1.250), 0.018)           # from the armpit towards the chest (faint: a deep one outlined a breast)
     f += 0.0035 * ridge(q, (0.165, 0.060, 1.330), (0.085, 0.100, 1.215), 0.018)             # … and across the back
     f -= 0.0035 * gauss(x, 0.016) * np.clip(y * 12, 0, 1) * win(z, 1.08, 1.40, 0.05)        # the spine
     return f * amount
@@ -109,7 +110,12 @@ def top(p, b: Build, ease=0.010, sleeve_ease=None, hem=0.99, straight=0.0, neck_
     sleeve_ease = ease if sleeve_ease is None else sleeve_ease
     S = np.array((J["shoulder"][0] * b.shoulders, J["shoulder"][1], J["shoulder"][2]))
     E, W = J["elbow"], J["wrist"]
-    d = B.torso(q, b) - ease
+    # cloth does not cling: it spans from the chest's fullest line to the next (no muscle shows through a shirt), and a
+    # sleeve is a tube round the arm, not a skin over the biceps
+    under = replace(b, soft=1.0)
+    d = B.torso(q, under)
+    d = smin(d, ell(q, (0, -0.004 - 0.5 * b.bust, 1.285), (0.146 * b.chest, 0.100 * b.chest + 0.012 + 0.9 * b.bust, 0.16)), 0.045)
+    d = d - ease
     if straight:
         column = ell(q, (0, 0.004 - 0.4 * b.belly, 1.13), ((0.150 * b.chest + ease) , (0.108 * b.chest + ease + 0.4 * b.belly), 0.30))
         d = smin(d, column + (1 - straight) * 0.02, 0.04)
@@ -120,7 +126,9 @@ def top(p, b: Build, ease=0.010, sleeve_ease=None, hem=0.99, straight=0.0, neck_
     d = d - _body_folds(q, folds)
     if sleeves:
         end = _along(E, W, cuff_t)
-        arm = B.arm(q, b) - sleeve_ease
+        g = b.limbs
+        tube = smin(cone(q, S, E, 0.050 * g, 0.044 * g), cone(q, E, W, 0.044 * g, 0.031 * g), 0.02)
+        arm = smin(B.arm(q, under), tube, 0.02) - sleeve_ease
         arm = arm - _sleeve_folds(q, b, cuff_t) * folds
         axis = (W - E) / np.linalg.norm(W - E)
         along = (q - end) @ axis                                              # > 0 past the cuff
@@ -191,39 +199,85 @@ def scarf(p):
 
 # --------------------------------------------------------------------------- hands
 
-# a finger: the knuckle's place across the palm (metres towards the thumb), the length, the radius, how much it is curled
-FINGERS = ((0.030, 0.072, 0.0088, 0.55), (0.010, 0.080, 0.0092, 0.65), (-0.010, 0.074, 0.0088, 0.75), (-0.028, 0.058, 0.0078, 0.9))
+# a finger: its name, the knuckle in the hand's frame (metres along the hand, towards the thumb), how it fans out from
+# the middle finger (radians, towards the thumb), its length, its radius, how much it is curled at rest
+FINGERS = (("index", 0.091, 0.029, 0.085, 0.072, 0.0095, 0.50), ("middle", 0.095, 0.009, 0.015, 0.080, 0.0098, 0.60),
+           ("ring", 0.091, -0.011, -0.065, 0.074, 0.0093, 0.72), ("little", 0.083, -0.029, -0.165, 0.058, 0.0083, 0.85))
+PHALANGES = (0.44, 0.30, 0.26)
+# the thumb: the joint at the wrist's side, the knuckle, the last joint, the tip (hand's frame) and the radii there
+THUMB = ((0.020, 0.030, 0.006), (0.052, 0.051, 0.015), (0.082, 0.060, 0.026), (0.105, 0.063, 0.036))
+THUMB_R = (0.0128, 0.0108, 0.0096, 0.0080)
+
+
+def hand_chains_local():
+    """Every finger as four points in the hand's frame (along, to the thumb, out of the palm): knuckle, two joints, tip.
+    {"thumb" | "index" | "middle" | "ring" | "little": [4 points]} — the skeleton's finger bones lie on them."""
+    out = {"thumb": [np.array(q, float) for q in THUMB]}
+    for name, a, t, fan, ln, _, c in FINGERS:
+        pts = [np.array((a, t, -0.001))]
+        bend = 0.20 * c
+        for share in PHALANGES:
+            flat = math.cos(bend) * ln * share
+            pts.append(pts[-1] + np.array((math.cos(fan) * flat, math.sin(fan) * flat, math.sin(bend) * ln * share)))
+            bend += 0.55 * c
+        out[name] = pts
+    return out
+
+
+def hand_chains():
+    """The left hand's fingers in the world (the rest pose): {finger: [4 points]}."""
+    W, D, N, T = J["wrist"], B.HAND_D, B.HAND_N, B.HAND_T
+    return {k: [W + q[0] * D + q[1] * T + q[2] * N for q in pts] for k, pts in hand_chains_local().items()}
+
+
+def hand_frame(p):
+    """Points of the world in the left hand's frame: along the hand, to the thumb, out of the palm."""
+    W, D, N, T = J["wrist"], B.HAND_D, B.HAND_N, B.HAND_T
+    return np.stack([(p - W) @ D, (p - W) @ T, (p - W) @ N], -1)
 
 
 def hand(p, female=False, curl=1.0):
-    """The left hand hanging loose: wrist, palm, four fingers half curled, the thumb. (World space, the rest pose.)"""
-    W, D, N, T = J["wrist"], B.HAND_D, B.HAND_N, B.HAND_T
-    k = 0.92 if female else 1.0
-    lq = np.stack([(p - W) @ D, (p - W) @ T, (p - W) @ N], -1) / k         # the hand's frame: along, to the thumb, out of the palm
+    """The left hand hanging loose: the wrist, a palm broad at the knuckles and narrow at the wrist with the two pads
+    of its heel, four fingers of their own lengths fanning from an arc of knuckles, half curled, each with its joints,
+    and the thumb turned in over the palm. A woman's hand is finer (the joints are where a man's are: one skeleton)."""
+    lq = hand_frame(p)
+    g = 0.88 if female else 1.0                                           # the girth of fingers and palm
 
     def at(a, t, n):
         return np.array((a, t, n), float)
-    d = ell(lq, at(0.048, 0.002, 0.0), (0.050, 0.041, 0.0135))                                   # the palm
-    d = smin(d, cone(lq, at(-0.030, 0.0, 0.0), at(0.010, 0.0, 0.0), 0.026, 0.024, flat=(2, 0.72)), 0.016)   # the wrist
-    d = smin(d, ell(lq, at(0.030, 0.028, 0.008), (0.028, 0.017, 0.013)), 0.012)                  # the ball of the thumb
-    d = smin(d, ell(lq, at(0.035, -0.030, 0.006), (0.030, 0.012, 0.011)), 0.012)                 # the heel of the hand
-    for t, ln, r, c in FINGERS:
-        c *= curl
-        a0 = at(0.092, t, -0.001)
-        pts = [a0]
-        bend = 0.22 * c
-        for share in (0.42, 0.30, 0.28):
-            last = pts[-1]
-            pts.append(last + np.array((math.cos(bend), 0.0, math.sin(bend))) * ln * share)
-            bend += 0.62 * c
-        radii = (r, r * 0.94, r * 0.86, r * 0.74)
+    # the palm: a slab that narrows to the wrist
+    wq = lq.copy()
+    wq[..., 1] = lq[..., 1] / (np.clip(0.74 + 0.26 * lq[..., 0] / 0.085, 0.74, 1.02) * (0.94 if female else 1.0))
+    d = box(wq, at(0.050, 0.000, 0.000), (0.036, 0.030, 0.0105 * g), 0.0104)
+    d = smin(d, ell(lq, at(0.050, 0.000, -0.004), (0.046, 0.034 * g, 0.0105 * g)), 0.012)                       # the back of the hand: a little domed
+    d = smin(d, cone(lq, at(-0.034, 0.0, 0.0), at(0.008, 0.0, 0.0), 0.0255 * g, 0.0245 * g, flat=(2, 0.70)), 0.014)   # the wrist
+    d = smin(d, ell(lq, at(0.030, 0.024, 0.009), (0.029, 0.017, 0.0125 * g)), 0.010)                            # the ball of the thumb
+    d = smin(d, ell(lq, at(0.034, -0.027, 0.007), (0.031, 0.011, 0.0105 * g)), 0.010)                           # the heel of the hand
+    d = smin(d, ell(lq, at(0.081, 0.000, 0.005), (0.013, 0.033, 0.0062 * g)), 0.012)                            # the pads under the fingers
+    chains = hand_chains_local()
+    fingers = None
+    for name, _, _, _, _, r, _ in FINGERS:
+        pts = chains[name]
+        r = r * g
+        radii = (r, r * 0.94, r * 0.87, r * 0.76)
+        f = None
         for i in range(3):
-            d = smin(d, cone(lq, pts[i], pts[i + 1], radii[i], radii[i + 1]), 0.004)
-        d = smin(d, ell(lq, a0 + (0.0, 0.0, -0.004), (0.0105, 0.0100, 0.0085)), 0.006)           # the knuckle
-    th = [at(0.022, 0.034, 0.006), at(0.052, 0.054, 0.014), at(0.082, 0.062, 0.024), at(0.104, 0.062, 0.034)]
-    for a, c2, r0, r1 in ((th[0], th[1], 0.0135, 0.0112), (th[1], th[2], 0.0112, 0.0098), (th[2], th[3], 0.0098, 0.0080)):
-        d = smin(d, cone(lq, a, c2, r0, r1), 0.006)
-    return d * k
+            seg = cone(lq, pts[i], pts[i + 1], radii[i], radii[i + 1])
+            f = seg if f is None else smin(f, seg, 0.004)
+        for i in (1, 2):
+            f = smin(f, ell(lq, pts[i] + at(0, 0, -0.0012), (radii[i] * 0.99,) * 3), 0.004)                       # the joints: a little knobbly on the back
+        f = smin(f, ell(lq, pts[0] + at(-0.002, 0.0, -0.0045), (0.0115, 0.0098 * g, 0.0080)), 0.005)             # the knuckle
+        fingers = f if fingers is None else np.minimum(fingers, f)       # (fingers do not melt into each other)
+    d = smin(d, fingers, 0.0045)
+    th = chains["thumb"]
+    t_ = None
+    for i in range(3):
+        seg = cone(lq, th[i], th[i + 1], THUMB_R[i] * g, THUMB_R[i + 1] * g)
+        t_ = seg if t_ is None else smin(t_, seg, 0.003)
+    t_ = smin(t_, ell(lq, th[2] + at(0, 0.001, 0), (THUMB_R[2] * g * 1.04,) * 3), 0.003)
+    d = smin(d, t_, 0.007)
+    d = smin(d, ell(lq, at(0.058, 0.033, 0.007), (0.018, 0.012, 0.0055)), 0.008)                                 # the web between thumb and palm
+    return d
 
 
 def forearm_skin(p, b: Build, hand_female=False, to=0.42):
@@ -240,34 +294,50 @@ def forearm_skin(p, b: Build, hand_female=False, to=0.42):
 # --------------------------------------------------------------------------- shoes
 
 def shoe(p, kind="sneaker"):
-    """The left shoe. Kinds: sneaker (a thick sole, a padded collar), boot (higher, a tread), flat (a low city shoe)."""
-    A, Bl, T = J["ankle"], J["ball"], J["toe"]
+    """The left shoe, built on a last: along the foot from the heel to the toe every cross-section has its own breadth
+    and height (narrow heel, broad ball, a low rounded toe that lifts off the floor), the upper standing on a sole of
+    the same outline a few millimetres wider. Kinds: sneaker (a thick sole, a padded collar, laces), boot (a shaft
+    over the ankle, a tread), flat (a low city shoe)."""
     x0 = 0.103
-    sole_h = {"sneaker": 0.026, "boot": 0.030, "flat": 0.018}[kind]
-    q = np.array(p, float)
-    y, z = q[..., 1], q[..., 2]
-    # the last (the foot's volume): heel, arch, ball, toes
-    d = ell(q, (x0 - 0.002, 0.050, 0.055), (0.036, 0.042, 0.050))                                # the heel
-    d = smin(d, ell(q, (x0, -0.020, 0.052), (0.040, 0.070, 0.040)), 0.03)                        # the instep
-    d = smin(d, ell(q, (x0 + 0.004, -0.105, 0.038), (0.046, 0.050, 0.028)), 0.03)                # the ball
-    d = smin(d, ell(q, (x0 + 0.006, -0.150, 0.034), (0.040, 0.034, 0.024)), 0.02)                # the toe box
+    sole_h = {"sneaker": 0.026, "boot": 0.030, "flat": 0.016}[kind]
     top_z = {"sneaker": 0.125, "boot": 0.19, "flat": 0.085}[kind]
-    d = smin(d, cone(q, (x0, 0.022, 0.07), (x0, 0.020, top_z), 0.044, 0.045), 0.02)               # the collar round the ankle
+    low = 0.84 if kind == "flat" else 1.0
+    q = np.array(p, float)
+    x, y, z = q[..., 0], q[..., 1], q[..., 2]
+    back, length = 0.085, 0.282                                  # the heel's back (y) and the shoe's length towards -y
+    t = np.clip((back - y) / length, 0.0, 1.0)                   # 0 at the heel … 1 at the toe's tip
+    w = np.interp(t, [0.0, 0.05, 0.30, 0.68, 0.90, 1.0], [0.012, 0.029, 0.036, 0.047, 0.040, 0.010])        # half the breadth
+    h = np.interp(t, [0.0, 0.10, 0.30, 0.50, 0.70, 0.92, 1.0], [0.070, 0.105, 0.105, 0.062, 0.042, 0.030, 0.016]) * low
+    xc = x0 + 0.005 * t                                          # the foot points a little outward
+    spring = 0.011 * np.clip((t - 0.76) / 0.24, 0.0, 1.0) ** 2   # the toe lifts off the floor
+    zz = z - sole_h - spring                                     # the height over the sole
+    ends = np.maximum(y - back, (back - length) - y)             # past the heel or the toe
+    r = np.sqrt(((x - xc) / w) ** 2 + (np.maximum(zz, 0.0) / h) ** 2)
+    d = smax((r - 1.0) * np.minimum(w, h) * 0.9, ends, 0.030)
+    d = smin(d, cone(q, (x0, 0.022, 0.07), (x0, 0.020, top_z), 0.042, 0.044), 0.02)             # the collar round the ankle
     d = smax(d, z - top_z, 0.006)
     if kind != "flat":
         d = d - 0.004 * gauss(z - (top_z - 0.012), 0.012) * win(y, -0.03, 0.2, 0.02)             # the padded rim
-        d = d - 0.0035 * ridge(q, (x0, -0.045, 0.098), (x0, -0.125, 0.064), 0.016, taper=False)  # the tongue and laces
-        for t in (0.2, 0.45, 0.7, 0.95):
-            c = np.array((x0, -0.045 - 0.08 * t, 0.100 - 0.036 * t))
-            d = d - 0.0022 * ridge(q, c + (-0.022, 0, -0.004), c + (0.022, 0, -0.004), 0.004)    # the laces
-    # the sole: a slab under the last, a little wider, its edge standing proud
-    outline = ell(q * (1, 1, 0) , (x0 + 0.002, -0.047, 0.0), (0.0465, 0.1215, 1.0))
-    outline = smax(outline, -(ell(q * (1, 1, 0), (x0 + 0.075, 0.04, 0.0), (0.035, 0.09, 1.0))), 0.03)   # narrower at the heel's inside
-    sole = smax(outline, np.abs(z - sole_h * 0.5) - sole_h * 0.5, 0.004)
-    d = smax(d, sole_h * 0.6 - z, 0.003)
-    d = smin(d, sole, 0.004)
-    d = d + 0.0018 * gauss(z - (sole_h + 0.002), 0.0025)                                          # the welt: a groove over the sole
+        d = d - 0.0040 * ridge(q, (x0 + 0.002, -0.040, 0.100), (x0 + 0.003, -0.122, 0.064), 0.017, taper=False)  # the tongue under the laces
+        for s in (0.15, 0.38, 0.62, 0.86):
+            c = np.array((x0 + 0.003, -0.042 - 0.082 * s, 0.103 - 0.038 * s))
+            d = d - 0.0026 * ridge(q, c + (-0.023, 0, -0.004), c + (0.023, 0, -0.004), 0.004)    # the laces
+        d = d + 0.0014 * gauss(t - 0.80, 0.007) * np.clip(zz / 0.006, 0, 1)                      # the toe cap's seam
+        d = d - 0.0016 * win(t, -0.1, 0.17, 0.02) * win(zz, 0.004, 0.060, 0.008)                 # the heel's stiff counter
+    else:
+        d = d + 0.0012 * gauss(t - 0.78, 0.006) * np.clip(zz / 0.006, 0, 1)                      # a city shoe's toe seam
+    # the sole: the same outline a little wider, lifting with the toe; a groove where the upper meets it
+    out = smax(np.abs(x - xc) - (w + 0.0032), ends - 0.003, 0.030)
+    sole = smax(out, np.maximum(spring - z, z - (sole_h + spring)), 0.004)
+    d = smax(d, (sole_h * 0.6 + spring) - z, 0.003)
+    d = smin(d, sole, 0.003)
+    d = d + 0.0018 * gauss(zz - 0.002, 0.0025)
+    if kind == "sneaker":
+        d = d + 0.0010 * gauss(zz + 0.013, 0.002) * (t > 0.03)                                    # a line round the midsole
     if kind == "boot":
-        d = d - 0.002 * (np.sin(y * 260) > 0.3) * win(z, 0.0, sole_h * 0.7, 0.002)                # the tread's teeth
+        d = d - 0.002 * (np.sin(y * 260) > 0.3) * win(z - spring, 0.0, sole_h * 0.7, 0.002)      # the tread's teeth
+    if kind != "sneaker":
+        d = smin(d, smax(smax(np.abs(x - xc) - (w + 0.0032), np.maximum(y - back - 0.003, (back - 0.062) - y), 0.012),
+                         np.maximum(-z, z - (sole_h + 0.008)), 0.003), 0.003) if kind == "flat" else d   # a city shoe's heel
     d = smax(d, -z, 0.001)                                                                        # flat on the floor
     return d

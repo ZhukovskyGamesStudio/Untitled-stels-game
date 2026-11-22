@@ -109,6 +109,7 @@ namespace Stealth.EditorTools
                     PlayerLooks.Paint(go.transform, (int)dept, dept);
                     animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
                     animator.Rebind();
+                    rig.Cupped = shot.Item >= 0 && Items.ItemCatalog.HeldPoseOf(shot.Item).Compact;
                     rig.Pose(shot.Speed, shot.Crouch, shot.Down, 0f, shot.Sit, shot.Pose, shot.Climb, shot.Hold);
                     rig.Settle();
                     animator.SetFloat("Speed", shot.Speed);

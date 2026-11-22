@@ -17,24 +17,28 @@ FPS = 30
 def _bones():
     b = [("hips", J["hips"], J["spine"], None), ("spine", J["spine"], J["chest"], "hips"), ("chest", J["chest"], J["neck"] - (0, 0.005, 0.03), "spine"),
          ("neck", J["neck"], J["head"], "chest"), ("head", J["head"], J["crown"], "neck")]
-    from . import body as B
-    thumb0 = J["wrist"] + B.HAND_D * 0.030 + B.HAND_T * 0.030
-    thumb1 = J["wrist"] + B.HAND_D * 0.100 + B.HAND_T * 0.062 + B.HAND_N * 0.03
+    from . import clothes
+    chains = clothes.hand_chains()                                     # every finger: knuckle, two joints, tip
     for s, sd in ((1, "L"), (-1, "R")):
         m = lambda p: side(p, s)
         b += [(f"shoulder.{sd}", m(J["clavicle"]), m(J["shoulder"]), "chest"),
               (f"upper_arm.{sd}", m(J["shoulder"]), m(J["elbow"]), f"shoulder.{sd}"),
               (f"forearm.{sd}", m(J["elbow"]), m(J["wrist"]), f"upper_arm.{sd}"),
               (f"hand.{sd}", m(J["wrist"]), m(J["knuckle"]), f"forearm.{sd}"),
-              (f"fingers.{sd}", m(J["knuckle"]), m(J["fingertip"]), f"hand.{sd}"),
-              (f"thumb.{sd}", m(thumb0), m(thumb1), f"hand.{sd}"),
               (f"thigh.{sd}", m(J["hip"]), m(J["knee"]), "hips"),
               (f"shin.{sd}", m(J["knee"]), m(J["ankle"]), f"thigh.{sd}"),
               (f"foot.{sd}", m(J["ankle"]), m(J["ball"]), f"shin.{sd}"),
               (f"toe.{sd}", m(J["ball"]), m(J["toe"]), f"foot.{sd}")]
+        for finger in FINGERS:
+            pts = chains[finger]
+            for i in range(3):
+                b.append((f"{finger}.{i + 1}.{sd}", m(pts[i]), m(pts[i + 1]), f"{finger}.{i}.{sd}" if i else f"hand.{sd}"))
     return b
 
 
+# three bones a finger (1 from the knuckle … 3 the tip); a take bends "fingers" / "thumb" as a whole (Poser.bend)
+FINGERS = ("thumb", "index", "middle", "ring", "little")
+CURL = (0.85, 1.0, 0.6)                 # how a finger's curl is shared between its three joints
 BONES = _bones()
 
 
@@ -96,11 +100,23 @@ class Poser:
         """A limb swung forward (its end towards the figure's front; a hand, fingers and a thumb: towards the palm),
         outward (away from the body) and twisted about its own length (outward for a positive angle). Degrees."""
         s = -1.0 if bone.endswith(".R") else 1.0
+        base, sd = bone.split(".")[0], bone.split(".")[-1]
+        if base == "fingers" or bone == f"thumb.{sd}":
+            # the whole hand's fingers (or the whole thumb): every joint takes its share of the curl; the little finger
+            # closes a little more than the index, as a hand does
+            for k, finger in enumerate(FINGERS[1:] if base == "fingers" else FINGERS[:1]):
+                for i, share in enumerate(CURL if base == "fingers" else (0.5, 0.7, 0.6)):
+                    self.bend(f"{finger}.{i + 1}.{sd}", fwd=fwd * share * (1.0 + 0.06 * k), out=out if i == 0 else 0.0, twist=twist if i == 0 else 0.0)
+            return
         d = self._dir(bone)
-        if bone.split(".")[0] in ("hand", "fingers", "thumb"):
+        if base in ("hand",) + FINGERS:
             from . import body as B
             palm = Vector((B.HAND_N[0] * s, B.HAND_N[1], B.HAND_N[2]))
             front = palm
+            if base == "thumb":
+                # a thumb closes across the palm, over the fingers: towards the little finger's side and into the palm
+                across = Vector((-B.HAND_T[0] * s, -B.HAND_T[1], -B.HAND_T[2]))
+                front = (across * 0.85 + palm * 0.5).normalized()
         else:
             front = Vector((0, -1, 0))
         q = Quaternion()

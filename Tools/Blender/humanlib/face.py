@@ -55,24 +55,25 @@ def eye_centre(f: Face):
     return np.array((0.0315 * f.eye_gap, -0.0665 + f.eye_deep, 0.008))
 
 
-def _slit(q, f: Face):
+def _slit(q, f: Face, flat=False):
     """The almond between the lids: the lens between an upper and a lower arc (pointed corners, the upper lid more
-    arched), bored straight through the lids; its outer corner a little higher."""
+    arched), bored straight through the lids; its outer corner a little higher. flat: the almond alone, as seen from
+    the front (metres outside its outline, whatever the depth)."""
     e = eye_centre(f)
-    d = q - np.array((e[0], e[1], e[2] - 0.0006))
+    d = q - np.array((e[0], e[1], e[2] - 0.0017))
     c, s = math.cos(f.eye_tilt), math.sin(f.eye_tilt)
     x, z = d[..., 0] * c + d[..., 2] * s, d[..., 2] * c - d[..., 0] * s
-    w, hu, hl = 0.0156 * f.eye_size, 0.0062 * f.eye_size * f.eye_open, 0.0040 * f.eye_size * f.eye_open
+    w, hu, hl = 0.0150 * f.eye_size, 0.0050 * f.eye_size * f.eye_open, 0.0040 * f.eye_size * f.eye_open
     ru, rl = (w * w + hu * hu) / (2 * hu), (w * w + hl * hl) / (2 * hl)
     lens = np.maximum(np.hypot(x, z - (hu - ru)) - ru, np.hypot(x, z + (hl - rl)) - rl)
-    return np.maximum(lens, np.abs(d[..., 1] + 0.012) - 0.013)
+    return lens if flat else np.maximum(lens, np.abs(d[..., 1] + 0.012) - 0.013)
 
 
 def lips(q, f: Face):
     """The two lips (their own volumes: the map of the face colours them)."""
     z = -0.040 - 0.022 * f.face_len
-    up = ell(q, (0, -0.0905, z + 0.0044), (0.0235 * f.mouth_w, 0.0090, 0.0042 * f.lips))
-    lo = ell(q, (0, -0.0890, z - 0.0054), (0.0190 * f.mouth_w, 0.0095, 0.0054 * f.lips))
+    up = ell(q, (0, -0.0900, z + 0.0042), (0.0235 * f.mouth_w, 0.0105, 0.0044 * f.lips))
+    lo = ell(q, (0, -0.0885, z - 0.0052), (0.0190 * f.mouth_w, 0.0108, 0.0056 * f.lips))
     return np.minimum(up, lo)
 
 
@@ -108,8 +109,8 @@ def head(p, f: Face):
     # the nose: the bridge from between the eyes down to the tip, the tip, the wings, the nostrils
     tip = np.array((0.0, -0.1025 - 0.0115 * f.nose_out, -0.008 - 0.0235 * f.nose_len + f.nose_up))
     root = np.array((0.0, -0.0865, 0.012))
-    d = smin(d, cone(q, root, tip, 0.0052, 0.0060), 0.010)
-    d = smin(d, ell(q, (0, tip[1] + 0.022, (root[2] + 2 * tip[2]) / 3), (0.0085 * f.nose_w, 0.010, 0.018 * f.nose_len)), 0.010)   # its sides sloping to the cheeks
+    d = smin(d, cone(q, root, tip, 0.0040, 0.0056), 0.013)
+    d = smin(d, ell(q, (0, tip[1] + 0.025, (root[2] + 2 * tip[2]) / 3), (0.0125 * f.nose_w, 0.011, 0.020 * f.nose_len)), 0.015)   # its sides sloping to the cheeks
     if f.nose_hump:
         d = smin(d, ell(q, root + (tip - root) * 0.42 + np.array((0, -f.nose_hump, 0)), (0.0058, 0.0058, 0.010)), 0.008)
     d = smin(d, ell(q, tip + np.array((0, 0.0025, 0.0005)), (0.0064 * f.nose_w, 0.0062, 0.0056)), 0.007)
@@ -123,7 +124,7 @@ def head(p, f: Face):
     d = smin(d, ell(q, (0, -0.069, mz - 0.001), (0.032 * f.mouth_w, 0.022, 0.022)), 0.014)
     d = smin(d, lips(q, f), 0.004)
     corner = np.array((0.0245 * f.mouth_w, -0.0800, mz - 0.0005 + f.smile))
-    d = smax(d, -cone(q, (0.0, -0.1005, mz - 0.0002), corner, 0.0010, 0.0009), 0.0018)        # the line of the mouth
+    d = smax(d, -cone(q, (0.0, -0.1015, mz - 0.0002), corner, 0.0006, 0.0005), 0.0012)        # the line of the mouth
     d = smax(d, -cone(q, (0, tip[1] + 0.0165, tip[2] - 0.0115), (0, -0.0995, mz + 0.0090), 0.0012, 0.0016), 0.003)   # the philtrum
     d = smax(d, -ell(q, (0, -0.0950, mz - 0.0165), (0.017 * f.mouth_w, 0.0070, 0.0050)), 0.008)   # the dip over the chin
     if f.folds:
@@ -179,9 +180,11 @@ def _strands(p, amount=1.0):
     e2 = np.array((0.0, -0.92, 0.39))
     phi = np.arctan2(v @ e2, v @ e1)
     r = np.linalg.norm(v, axis=-1)
-    locks = np.abs(np.sin(7.0 * phi + 9.0 * r + 0.8 * np.sin(31.0 * r + 2.0 * phi)))
-    fine = 0.5 + 0.5 * np.sin(23.0 * phi + 40.0 * r)
-    return (0.75 * locks ** 0.7 + 0.25 * fine) * amount
+    # many narrow locks, a little wavy and of uneven width (seven broad ones read as the segments of a pumpkin)
+    locks = np.abs(np.sin(17.0 * phi + 12.0 * r + 1.4 * np.sin(29.0 * r + 3.0 * phi) + 0.9 * np.sin(5.0 * phi)))
+    fine = 0.5 + 0.5 * np.sin(53.0 * phi + 64.0 * r + 2.0 * np.sin(11.0 * phi))
+    v = 0.6 * locks ** 0.6 + 0.4 * fine
+    return (1.0 - 0.55 * (1.0 - v)) * amount                  # (shallow: hair is a mass with a grain, not ropes)
 
 
 def hair(p, f: Face, style: str):
@@ -198,9 +201,10 @@ def hair(p, f: Face, style: str):
 
     def lying(thick, cut, low, groove=0.0016):
         """Hair of a thickness lying on the scalp inside a hairline: tapering to it, grooved between the locks."""
-        edge = np.clip(np.minimum(cut, -nape(low)) / 0.016, 0.0, 1.0) ** 0.7        # 0 at the hairline … 1 well inside it
+        edge = np.clip(np.minimum(cut, -nape(low)) / 0.036, 0.0, 1.0)               # 0 at the hairline … 1 well inside it: thinning to it, no rim
+        edge = edge * edge * (3 - 2 * edge)
         d = head(p, f) - (0.0012 + thick * edge) + groove * (1.0 - locks) * edge
-        d = smax(d, -(cut + 0.005 * (locks - 0.55)), 0.0015)                        # (the hairline breaks into locks)
+        d = smax(d, -(cut + 0.0022 * (locks - 0.75)), 0.0015)                       # (the hairline breaks into locks, a little)
         d = smax(d, nape(low) - 0.004 * (locks - 0.55), 0.003)
         return d
 
@@ -208,22 +212,24 @@ def hair(p, f: Face, style: str):
         return smax(lying(0.0030, _face_cut(q, f, 0.004, -0.002), 0.030, 0.0004), -ear_hole, 0.002)
     if style in ("crop", "messy"):
         top = 0.013 if style == "crop" else 0.019
-        t = 0.005 + top * np.clip((z - 0.03) / 0.07, 0, 1)                          # short at the sides, longer on top
+        up = np.clip((z + 0.02) / 0.12, 0, 1)
+        t = 0.005 + top * up * up * (3 - 2 * up)                                    # short at the sides, longer on top
         d = lying(t, _face_cut(q, f, 0.0 if style == "crop" else 0.004), 0.022)
         if style == "crop":
             d = smin(d, ell(p, (0.018, -0.060, 0.094), (0.048, 0.022, 0.016)) + 0.0016 * (1 - locks), 0.014)   # the fringe swept to one side
             d = smax(d, -cone(p, (-0.034, -0.085, 0.108), (-0.040, 0.020, 0.126), 0.0024), 0.005)              # the parting
         else:
-            d = smin(d, ell(p, (0.004, -0.052, 0.100), (0.056, 0.036, 0.020)) + 0.0022 * (1 - locks), 0.018)    # a mop pushed forward
-            d = smin(d, ell(p, (-0.028, -0.078, 0.082), (0.026, 0.016, 0.015)) + 0.0018 * (1 - locks), 0.012)   # … falling on the forehead
+            d = smin(d, ell(p, (0.004, -0.050, 0.098), (0.056, 0.038, 0.022)) + 0.0022 * (1 - locks), 0.030)    # a mop pushed forward
+            d = smin(d, ell(p, (-0.026, -0.076, 0.084), (0.028, 0.017, 0.016)) + 0.0018 * (1 - locks), 0.020)   # … falling on the forehead
+            d = smin(d, ell(p, (0.034, -0.070, 0.088), (0.020, 0.015, 0.013)) + 0.0018 * (1 - locks), 0.018)    # … and a lock to the other side
         return smax(d, -ear_hole, 0.003)
     if style == "bob":
         t = 0.007 + 0.007 * np.clip((z - 0.0) / 0.08, 0, 1)
         d = head(p, f) - t + 0.0018 * (1 - locks)
-        d = smin(d, ell(q, (0.060 * f.skull_w, 0.024, -0.040), (0.022, 0.056, 0.058)) + 0.0020 * (1 - locks), 0.022)   # the sides falling to the jaw
+        d = smin(d, ell(q, (0.066 * f.skull_w, 0.026, -0.040), (0.018, 0.054, 0.058)) + 0.0020 * (1 - locks), 0.022)   # the sides falling to the jaw
         d = smin(d, ell(p, (0, 0.066, -0.040), (0.064, 0.032, 0.058)) + 0.0020 * (1 - locks), 0.024)                   # the back
-        d = smin(d, ell(p, (0.0, -0.064, 0.084), (0.058, 0.020, 0.018)) + 0.0016 * (1 - locks), 0.012)                 # the fringe
-        d = smax(d, -ell(q, (0, -0.150, -0.050), (0.080, 0.134, 0.124)), 0.003)                 # the face looks out of it
+        d = smin(d, ell(p, (0.0, -0.064, 0.092), (0.058, 0.020, 0.014)) + 0.0016 * (1 - locks), 0.012)                 # the fringe: over the forehead, clear of the brows
+        d = smax(d, -ell(q, (0, -0.150, -0.043), (0.096, 0.136, 0.126)), 0.006)                 # the face looks out of it, cheekbones and all
         d = smax(d, -(z + 0.080 + 0.008 * (locks - 0.5)), 0.004)                               # cut level at the jaw, in locks
         return d
     if style == "bun":
@@ -272,16 +278,19 @@ def beard(p, f: Face, length=0.0050):
     edge = edge * edge * (3 - 2 * edge)
     full = 0.55 + 0.45 * np.clip((-0.045 - y) / 0.03, 0.0, 1.0)        # fuller on the chin than on the cheeks
     tufts = 0.5 + 0.5 * np.sin(q[..., 0] * 190 + 2.2 * np.sin(q[..., 2] * 130)) * np.sin(q[..., 2] * 170 + 1.7 * np.sin(y * 150))
-    d = skin - (0.0004 + length * edge * full) + 0.0005 * tufts * edge
+    mz = mouth_z(f)
+    mouth = ell(q, (0, -0.094, mz - 0.0008), (0.0225 * f.mouth_w, 0.014, 0.0058 * f.lips))   # the lips and the corners of the mouth: bare
+    bare = smin(lips(q, f) - 0.0014, mouth, 0.002)                     # metres outside the bare patch round the lips
+    by_lips = np.clip(bare / 0.011, 0.0, 1.0)                          # the beard thins to the lips (a thick rim round them read as a mask's window)
+    skin = smin(skin, ell(q, (0, -0.0900, mz - 0.0165), (0.017 * f.mouth_w, 0.0075, 0.0055)), 0.006)   # (hair fills the dip under the lower lip)
+    d = skin - (0.0004 + length * edge * full * (0.25 + 0.75 * by_lips)) + 0.0005 * tufts * edge
     d = smax(d, -(inside + 0.001), 0.0012)
     tin = moustache_zone(q, f)
     te = np.clip(tin / 0.0045, 0.0, 1.0)
-    tash = skin - (0.0004 + length * 0.75 * te * te * (3 - 2 * te)) + 0.0004 * tufts * te
+    tash = skin - (0.0004 + length * 0.75 * te * te * (3 - 2 * te) * (0.35 + 0.65 * by_lips)) + 0.0004 * tufts * te
     tash = smax(tash, -(tin + 0.0008), 0.001)
     d = smin(d, tash, 0.003)
-    mz = mouth_z(f)
-    mouth = ell(q, (0, -0.094, mz - 0.0020), (0.0235 * f.mouth_w, 0.016, 0.0085 * f.lips))   # the lips and the corners of the mouth: bare
-    d = smax(d, -smin(lips(q, f) - 0.0032, mouth, 0.003), 0.0025)
+    d = smax(d, -bare, 0.003)
     return d
 
 
@@ -311,7 +320,7 @@ PEOPLE = {
     "qa": Person(Face(skull_w=0.98, face_w=0.98, face_len=0.93, jaw_w=0.84, jaw_sq=0.0, chin_w=0.74, cheekbone=0.85, cheek=1.2, brow=0.35,
                       forehead=0.002, eye_size=1.1, eye_open=1.12, eye_tilt=0.12, nose_len=0.90, nose_w=0.90, nose_out=0.86, nose_up=0.0022,
                       lips=1.15, mouth_w=0.95, smile=0.0012, folds=0.1, ear=0.94, neck=0.86, female=True),
-                 "bob", (0.34, 0.17, 0.08), (0.20, 0.42, 0.30), brow_thick=0.75, lip_colour=0.75, freckles=0.6, eye_shadow=0.1),
+                 "bob", (0.19, 0.085, 0.04), (0.20, 0.42, 0.30), brow_thick=0.75, lip_colour=0.75, freckles=0.6, eye_shadow=0.1),
     # the sysadmin: a broad square head, a heavy brow, a wide nose, cropped hair and a full beard
     "sysadmin": Person(Face(skull_w=1.04, face_w=1.06, face_len=1.0, jaw_w=1.13, jaw_sq=1.0, chin_w=1.2, cheekbone=0.95, cheek=1.15, brow=1.35,
                             eye_size=0.94, eye_open=0.9, eye_tilt=0.05, eye_deep=0.0015, nose_w=1.18, nose_len=0.98, nose_out=0.98,

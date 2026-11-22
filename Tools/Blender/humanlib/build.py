@@ -18,9 +18,10 @@ from . import sdf
 class Piece:
     """One sculpted piece: its dense mesh, its game mesh, the part it belongs to (the renderer in the game) and the
     atlas it is baked into."""
-    def __init__(self, name, part, atlas, hi, tris, bones, keep=None, texel=1.0, sides=None):
+    def __init__(self, name, part, atlas, hi, tris, bones, keep=None, texel=1.0, sides=None, ray=None):
         self.name, self.part, self.atlas, self.hi, self.tris, self.bones = name, part, atlas, hi, tris, bones
         self.keep, self.texel, self.lo, self.sides = keep, texel, None, sides
+        self.ray = ray                  # how far the bake looks for the sculpt from the game mesh (fingers: less than the gap between them)
 
 
 # --------------------------------------------------------------------------- painting
@@ -205,6 +206,8 @@ def bake(pieces, size, path, name, ray=0.012, ao_samples=24):
     his = [h for p in pieces for h in (p.hi if isinstance(p.hi, (list, tuple)) else [p.hi])]
     for p in pieces:
         srcs = p.hi if isinstance(p.hi, (list, tuple)) else [p.hi]
+        bk.cage_extrusion = p.ray or ray
+        bk.max_ray_distance = (p.ray or ray) * 2
         for o in los:
             o.hide_render = o is not p.lo                      # the other game meshes neither catch nor block rays
         for kind, mat, samples in (("normal", plain, 1), ("col", emit_col, 1), ("gloss", emit_gloss, 1), ("ao", plain, ao_samples)):

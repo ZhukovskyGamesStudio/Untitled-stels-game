@@ -62,6 +62,7 @@ namespace Stealth.Player
             var held = HeldThing != null ? HeldThing.transform.parent : null;
             bool holding = held != null && held.gameObject.activeSelf;
             m_Rig.Held = IsOwner ? null : held;
+            m_Rig.Cupped = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding);
         }
 
