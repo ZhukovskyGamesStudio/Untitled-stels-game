@@ -11,7 +11,7 @@ namespace Stealth.EditorTools
     /// The rigged humans shown instead of the player model (Tools/Blender/human.py → Art/Models/Humans): import settings
     /// (a humanoid Avatar described from the common skeleton in a T-pose — <see cref="HumanSkeleton"/> —, looping in-place
     /// takes), one Animator controller for everybody playing one shared set of humanoid takes in layers with avatar masks
-    /// (the legs, the upper body with the hands' IK, the head with the look-at, the right hand's grip), each person's materials — URP Lit with the maps baked
+    /// (the legs, the upper body with the hands' IK, the head and face, the right hand's grip), each person's materials — URP Lit with the maps baked
     /// from the sculpt (albedo, a tangent-space normal map, occlusion and smoothness in one mask) — and the prefab with
     /// <see cref="HumanRig"/>.
     /// </summary>
@@ -262,7 +262,7 @@ namespace Stealth.EditorTools
         /// <summary>
         /// The one controller of every rigged human, in four layers over the humanoid Avatar (<see cref="HumanLayers"/>):
         /// <b>Legs</b> (the base: root, legs, feet), <b>UpperBody</b> (spine, arms, hands; its IK pass carries the held thing in
-        /// the right hand), <b>Head</b> (the head and the face; its IK pass looks where the player looks) — the three play the
+        /// the right hand), <b>Head</b> (the head and the face; the look turns it after the animation) — the three play the
         /// same states: Speed (m/s) blends Idle → Walk → Run, Crouch blends crouched idle → crouch walk, Down lies on the
         /// floor, Sit sits in the car, Pose (<see cref="BodyPose"/>) plays Climb (by ClimbSpeed: backwards on the way down,
         /// still when hanging), Terminal or Work — and <b>RightHand</b> (the right fingers) closes them on what the hand holds
@@ -275,7 +275,8 @@ namespace Stealth.EditorTools
             var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(HumanControllerPath);
             // the prefab references it: keep its GUID — unless it is older than its layers or takes (no Pose, not layered, other
             // clips) or its clips are gone (the takes were exported anew)
-            if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && existing.parameters.Any(p => p.name == "Pose")
+            if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && !existing.layers[HumanLayers.Head].iKPass
+                && existing.parameters.Any(p => p.name == "Pose")
                 && existing.animationClips.All(c => c != null) && (idle == null || existing.animationClips.Contains(idle))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
@@ -307,7 +308,7 @@ namespace Stealth.EditorTools
             }
             Layer("UpperBody", HumanMask("HumanUpperBody", AvatarMaskBodyPart.Body, AvatarMaskBodyPart.LeftArm, AvatarMaskBodyPart.RightArm,
                 AvatarMaskBodyPart.LeftFingers, AvatarMaskBodyPart.RightFingers, AvatarMaskBodyPart.LeftHandIK, AvatarMaskBodyPart.RightHandIK), true, 1f);
-            Layer("Head", HumanMask("HumanHead", AvatarMaskBodyPart.Head), true, 1f);
+            Layer("Head", HumanMask("HumanHead", AvatarMaskBodyPart.Head), false, 1f);
             Layer("RightHand", HumanMask("HumanRightHand", AvatarMaskBodyPart.RightFingers), false, 0f);
             for (int i = 0; i < HumanLayers.RightHand; i++)
                 BodyStates(c, i, idle, walk, run, crouchIdle, crouchWalk, down, sit, climb, terminal, work);

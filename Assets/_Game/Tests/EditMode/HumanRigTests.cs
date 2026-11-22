@@ -144,7 +144,8 @@ namespace Stealth.Tests
             Assert.AreEqual("UpperBody", layered.layers[HumanLayers.UpperBody].name);
             Assert.AreEqual("Head", layered.layers[HumanLayers.Head].name);
             Assert.AreEqual("RightHand", layered.layers[HumanLayers.RightHand].name);
-            Assert.IsTrue(layered.layers[HumanLayers.UpperBody].iKPass && layered.layers[HumanLayers.Head].iKPass, "IK for the hands and the look");
+            Assert.IsTrue(layered.layers[HumanLayers.UpperBody].iKPass, "IK for the hands");
+            Assert.IsFalse(layered.layers[HumanLayers.Head].iKPass, "no look-at IK: on this Avatar it bowed every head (the look turns the head after the animation)");
             Assert.IsTrue(layered.layers[HumanLayers.Head].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.Head));
             Assert.IsFalse(layered.layers[HumanLayers.Head].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftLeg));
             Assert.IsTrue(layered.layers[HumanLayers.Legs].avatarMask.GetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftLeg));

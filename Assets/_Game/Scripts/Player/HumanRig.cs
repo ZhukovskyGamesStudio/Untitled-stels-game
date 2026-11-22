@@ -19,8 +19,8 @@ namespace Stealth.Player
     /// <see cref="HumanSkeleton"/>). Purely visual: <see cref="PlayerController"/> feeds it the speed, crouch, downed state,
     /// what the body is busy with, the look pitch and whether the hand holds something every frame; it drives the
     /// Animator's layers (<see cref="HumanLayers"/>: the legs, the upper body, the head, the right hand's grip), carries the
-    /// held thing in the right hand by IK and turns the head where the player looks (<see cref="OnIK"/>), and after the
-    /// animation puts the feet on the floor and the held thing in the palm. Its parts are named like the player model's
+    /// held thing in the right hand by IK (<see cref="OnIK"/>), and after the animation puts the feet on the floor, the held
+    /// thing in the palm and turns the head where the player looks. Its parts are named like the player model's
     /// (Body…, Accent…, Eye…) so <see cref="PlayerLooks.Paint"/> colours them per player.
     /// </summary>
     public class HumanRig : MonoBehaviour
@@ -48,7 +48,7 @@ namespace Stealth.Player
         static readonly int PoseId = Animator.StringToHash("Pose");
         static readonly int ClimbId = Animator.StringToHash("ClimbSpeed");
 
-        float m_Pitch, m_Ground, m_Hold, m_Look;
+        float m_Pitch, m_Ground, m_Hold;
         bool m_Planted, m_Holding;
         static readonly RaycastHit[] s_Floor = new RaycastHit[6];
 
@@ -60,7 +60,6 @@ namespace Stealth.Player
             m_Planted = HumanMath.Planted(downed, seated, pose);
             m_Holding = HumanMath.Carries(holding, downed, seated, pose);
             m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
-            m_Look = Mathf.MoveTowards(m_Look, downed ? 0f : 1f, Time.deltaTime * 3f);
             m_Pitch = HumanMath.HeadPitch(pitch, HumanMath.HeadShare(HeadFollow, pose), downed);
             if (Animator == null || !Animator.isActiveAndEnabled) return;
             // in a seat the body rides with the car: its speed is the car's, not a walk
@@ -73,10 +72,16 @@ namespace Stealth.Player
             if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
         }
 
+        /// <summary>Skips the blend of the hold (a still picture: Stealth → Human Pose Pictures).</summary>
+        public void Settle()
+        {
+            m_Hold = m_Holding ? 1f : 0f;
+            if (Animator != null && Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
+        }
+
         /// <summary>
         /// The IK pass of a layer (<see cref="HumanIK"/> relays it): the upper body's carries what the hand holds before the
-        /// chest (the right hand to <see cref="HumanSkeleton.Carry"/>, the elbow out to the side); the head's turns the head
-        /// where the player looks (the look pitch, the body's way).
+        /// chest (the right hand to <see cref="HumanSkeleton.Carry"/>, the elbow out to the side).
         /// </summary>
         public void OnIK(int layer)
         {
@@ -92,21 +97,15 @@ namespace Stealth.Player
                 Animator.SetIKPosition(AvatarIKGoal.RightHand, At(HumanSkeleton.Carry));
                 Animator.SetIKHintPosition(AvatarIKHint.RightElbow, At(HumanSkeleton.CarryElbow));
             }
-            else if (layer == HumanLayers.Head)
-            {
-                var head = HeadBone != null ? HeadBone.position : At(new Vector3(0f, 1.6f, 0f));
-                var look = Quaternion.AngleAxis(m_Pitch, body.right) * body.forward;
-                Animator.SetLookAtWeight(m_Look, 0.05f, 0.9f, 1f, 0.5f);
-                Animator.SetLookAtPosition(head + look * 4f);
-            }
+            // (the head's look is not an IK look-at: on this Avatar it bowed every head — the head is turned after the
+            // animation instead, LateUpdate)
         }
 
         void LateUpdate()
         {
             PlantFeet();
             PlaceHeld();
-            // a rig without a humanoid Avatar (an old style's) tilts its head after the animation instead of looking by IK
-            if (Animator != null && Animator.isHuman) return;
+            // the head follows the look after the animation (over whatever the Head layer's take does)
             if (HeadBone == null || Mathf.Approximately(m_Pitch, 0f)) return;
             HeadBone.rotation = Quaternion.AngleAxis(m_Pitch, transform.right) * HeadBone.rotation;
         }

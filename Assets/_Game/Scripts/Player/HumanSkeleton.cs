@@ -96,7 +96,7 @@ namespace Stealth.Player
         public const int Legs = 0;
         /// <summary>Spine, arms and hands; its IK pass puts the right hand on the carried thing.</summary>
         public const int UpperBody = 1;
-        /// <summary>The head and the face; its IK pass turns the head where the player looks.</summary>
+        /// <summary>The head and the face (its takes; the look turns the head after the animation: HumanRig).</summary>
         public const int Head = 2;
         /// <summary>The right fingers: the grip, weighted while the hand holds something.</summary>
         public const int RightHand = 3;
