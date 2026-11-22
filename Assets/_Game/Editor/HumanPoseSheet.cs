@@ -22,25 +22,43 @@ namespace Stealth.EditorTools
         {
             public string Name;
             public float Speed, Climb, Time;
-            public bool Crouch, Down, Sit, Hold, NoIK;
+            public bool Crouch, Down, Sit, Hold, NoIK, Close;
+            /// <summary>The thing in the hand (an ItemCatalog shape; -1: nothing) and its colour.</summary>
+            public int Item, Color;
             public BodyPose Pose;
         }
 
         static readonly Shot[] Shots =
         {
-            new() { Name = "idle", Time = 1.2f },
+            new() { Name = "idle", Time = 1.2f, Item = -1 },
             new() { Name = "walk", Speed = 1.5f, Time = 0.9f },
             new() { Name = "run", Speed = 4.5f, Time = 0.75f },
             new() { Name = "crouch", Crouch = true, Time = 1f },
             new() { Name = "crouch_walk", Crouch = true, Speed = 1.3f, Time = 0.9f },
-            new() { Name = "hold", Hold = true, Time = 1f },
-            new() { Name = "walk_hold", Speed = 1.5f, Hold = true, Time = 0.9f },
+            new() { Name = "hold", Hold = true, Time = 1f, Item = ItemCatalogShape.Radio },
+            new() { Name = "walk_hold", Speed = 1.5f, Hold = true, Time = 0.9f, Item = ItemCatalogShape.Tablet },
             new() { Name = "sit", Sit = true, Time = 1f },
             new() { Name = "down", Down = true, Time = 1.5f },
             new() { Name = "climb", Pose = BodyPose.Ladder, Climb = 1f, Time = 0.8f },
             new() { Name = "terminal", Pose = BodyPose.Terminal, Time = 1f },
             new() { Name = "work", Pose = BodyPose.Work, Time = 1f },
+            // the right hand close up with each kind of thing it carries
+            new() { Name = "hand_screwdriver", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Screwdriver },
+            new() { Name = "hand_radio", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Radio },
+            new() { Name = "hand_tablet", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Tablet },
+            new() { Name = "hand_keyboard", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Keyboard },
+            new() { Name = "hand_coffee", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Coffee },
+            new() { Name = "hand_medkit", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Medkit },
+            new() { Name = "hand_finder", Hold = true, Close = true, Time = 1f, Item = ItemCatalogShape.Finder },
+            new() { Name = "hand_loot", Hold = true, Close = true, Time = 1f, Item = 0, Color = 2 },
         };
+
+        /// <summary>The shapes the pictures hold (ItemCatalog's, as constants for the table above).</summary>
+        static class ItemCatalogShape
+        {
+            public const int Screwdriver = Items.ItemCatalog.Screwdriver, Radio = Items.ItemCatalog.Radio, Tablet = Items.ItemCatalog.Tablet,
+                Keyboard = Items.ItemCatalog.Keyboard, Coffee = Items.ItemCatalog.Coffee, Medkit = Items.ItemCatalog.Medkit, Finder = Items.ItemCatalog.Finder;
+        }
 
         const int Width = 640, Height = 860;
 
@@ -50,7 +68,7 @@ namespace Stealth.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var humans = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans;
             string root = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "poses");
-            var held = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Items/RadioModel.prefab");
+            var visuals = AssetDatabase.LoadAssetAtPath<Items.ItemVisuals>("Assets/_Game/Data/ItemVisuals.asset");
 
             var sun = new GameObject("Sun").AddComponent<Light>();
             sun.type = LightType.Directional;
@@ -97,15 +115,15 @@ namespace Stealth.EditorTools
                     animator.SetFloat("ClimbSpeed", shot.Climb);
                     // the take runs a while (blends settle), a frame at a time so the IK passes run too
                     for (float t = 0f; t < shot.Time; t += 1f / 30f) animator.Update(1f / 30f);
+                    // the thing in the palm, held the way the game holds it (PlayerController.HeldLocal under the anchor that
+                    // HumanRig.PlaceHeld puts in the palm)
                     GameObject thing = null;
-                    if (shot.Hold && held != null && rig.HandR != null && rig.FingersR != null)
-                    {
-                        thing = Object.Instantiate(held);
-                        thing.transform.SetPositionAndRotation(HumanMath.Palm(rig.HandR.position, rig.FingersR.position), go.transform.rotation * Quaternion.Euler(-80f, 90f, 0f));
-                    }
-                    // a three-quarter view from the front (the body faces +Z); lying, from higher and further
-                    var look = shot.Down ? new Vector3(0f, 0.3f, 0f) : new Vector3(0f, shot.Sit || shot.Crouch ? 0.65f : 0.95f, 0f);
-                    cam.transform.position = look + (shot.Down ? new Vector3(2.4f, 2.6f, 2.6f) : new Vector3(1.7f, 0.45f, 3.3f));
+                    var palm = rig.HandR != null && rig.FingersR != null ? HumanMath.Palm(rig.HandR.position, rig.FingersR.position) : Vector3.up;
+                    if (shot.Hold && shot.Item >= 0 && visuals != null)
+                        thing = Held(visuals, shot.Item, shot.Color, palm, go.transform.rotation);
+                    // a three-quarter view from the front (the body faces +Z); lying, from higher and further; the hand close up
+                    var look = shot.Close ? palm : shot.Down ? new Vector3(0f, 0.3f, 0f) : new Vector3(0f, shot.Sit || shot.Crouch ? 0.65f : 0.95f, 0f);
+                    cam.transform.position = look + (shot.Close ? new Vector3(0.75f, 0.3f, 0.8f) : shot.Down ? new Vector3(2.4f, 2.6f, 2.6f) : new Vector3(1.7f, 0.45f, 3.3f));
                     cam.transform.LookAt(look);
                     cam.Render();
                     RenderTexture.active = rt;
@@ -121,6 +139,33 @@ namespace Stealth.EditorTools
             cam.targetTexture = null;
             Object.DestroyImmediate(rt);
             Object.DestroyImmediate(tex);
+        }
+
+        /// <summary>A held thing as the game shows it: an anchor at the palm facing the body's way, the model or the piece inside.</summary>
+        static GameObject Held(Items.ItemVisuals visuals, int shape, int color, Vector3 palm, Quaternion body)
+        {
+            var anchor = new GameObject("HeldAnchor");
+            anchor.transform.SetPositionAndRotation(palm, body);
+            var thing = new GameObject("HeldThing");
+            thing.transform.SetParent(anchor.transform, false);
+            var model = visuals.Models != null && shape < visuals.Models.Length ? visuals.Models[shape] : null;
+            Bounds b;
+            if (model != null)
+            {
+                Object.Instantiate(model, thing.transform);
+                b = PlayerController.ModelBounds(shape);
+            }
+            else
+            {
+                var mesh = visuals.Meshes[Mathf.Clamp(shape, 0, visuals.Meshes.Length - 1)];
+                thing.AddComponent<MeshFilter>().sharedMesh = mesh;
+                thing.AddComponent<MeshRenderer>().sharedMaterial = visuals.ColorMaterials[Mathf.Clamp(color, 0, visuals.ColorMaterials.Length - 1)];
+                b = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, Vector3.one * 0.12f);
+            }
+            PlayerController.HeldLocal(shape, b, out var position, out var rotation, out float scale);
+            thing.transform.localScale = Vector3.one * scale;
+            thing.transform.SetLocalPositionAndRotation(position, rotation);
+            return anchor;
         }
 
         /// <summary>Batch entry: the pictures, then quit.</summary>

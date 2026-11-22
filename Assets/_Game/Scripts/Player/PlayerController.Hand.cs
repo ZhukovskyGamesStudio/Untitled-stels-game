@@ -187,8 +187,7 @@ namespace Stealth.Player
                 m_HeldModel.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
                 HeldThing.sharedMesh = null;
                 if (renderer != null) renderer.enabled = false;
-                var size = Items.ItemCatalog.ModelSize(shape); // (a model lies along X, centred, on the floor)
-                b = new Bounds(new Vector3(0f, size.y / 2f, 0f), size);
+                b = ModelBounds(shape);
                 var mode = IsOwner ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
                 foreach (var r in m_HeldModel.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
                 foreach (var c in m_HeldModel.GetComponentsInChildren<Collider>(true)) c.enabled = false;
@@ -206,31 +205,47 @@ namespace Stealth.Player
                 }
                 b = mesh != null ? mesh.bounds : new Bounds(Vector3.zero, Vector3.one * HeldSize);
             }
-            // in the fist the right way round: a long thing points ahead along the anchor's +Z (its held end in the fist,
-            // turned about that way), a compact one rests on the closed fingers
-            var pose = Items.ItemCatalog.HeldPoseOf(shape);
-            float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
-            float scale = longest > 1e-3f ? pose.Length / longest : 1f;
+            HeldLocal(shape, b, out var position, out var rotation, out float scale);
             var t = HeldThing.transform;
             t.localScale = Vector3.one * scale;
+            t.SetLocalPositionAndRotation(position, rotation);
+            VisualStyles.Dress(HeldThing.gameObject);
+        }
+
+        /// <summary>The bounds a held model is fitted by: its catalogue size (a model lies along X, centred, on the floor).</summary>
+        public static Bounds ModelBounds(int shape)
+        {
+            var size = Items.ItemCatalog.ModelSize(shape);
+            return new Bounds(new Vector3(0f, size.y / 2f, 0f), size);
+        }
+
+        /// <summary>
+        /// How a thing of <paramref name="shape"/> (its mesh or model within <paramref name="b"/>) sits in the fist, in the
+        /// hand's anchor (+Z ahead, the grip at the origin): a long thing points ahead along +Z with its held end in the fist
+        /// (turned about that way), a compact one rests on the closed fingers (<see cref="Items.ItemCatalog.HeldPoseOf"/>).
+        /// The first-person hand and another player's rigged hand (HumanRig.PlaceHeld) hold it the same way.
+        /// </summary>
+        public static void HeldLocal(int shape, Bounds b, out Vector3 position, out Quaternion rotation, out float scale)
+        {
+            var pose = Items.ItemCatalog.HeldPoseOf(shape);
+            float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+            scale = longest > 1e-3f ? pose.Length / longest : 1f;
             if (pose.Compact)
             {
                 // on the fingers: rolled (stood up), turned, then tilted (−: its far edge up, towards the eyes)
-                var r = Quaternion.Euler(pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, pose.Yaw, 0f) * Quaternion.Euler(0f, 0f, pose.Roll);
-                t.localRotation = r;
+                rotation = Quaternion.Euler(pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, pose.Yaw, 0f) * Quaternion.Euler(0f, 0f, pose.Roll);
                 var e = b.extents * scale; // its half height as it now stands, resting on the fist
-                float halfUp = Mathf.Abs((r * Vector3.right).y) * e.x + Mathf.Abs((r * Vector3.up).y) * e.y + Mathf.Abs((r * Vector3.forward).y) * e.z;
-                t.localPosition = new Vector3(0f, FistTop + halfUp, 0f) - r * (b.center * scale);
+                float halfUp = Mathf.Abs((rotation * Vector3.right).y) * e.x + Mathf.Abs((rotation * Vector3.up).y) * e.y + Mathf.Abs((rotation * Vector3.forward).y) * e.z;
+                position = new Vector3(0f, FistTop + halfUp, 0f) - rotation * (b.center * scale);
             }
             else
             {
                 // model X (its length) onto +Z: yaw −90 when +X is ahead, +90 when −X is; rolled about it, tipped up by the pitch
-                t.localRotation = Quaternion.Euler(-pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, 0f, pose.Roll)
-                                  * Quaternion.Euler(0f, pose.Forward > 0f ? -90f : 90f, 0f);
+                rotation = Quaternion.Euler(-pose.Pitch, 0f, 0f) * Quaternion.Euler(0f, 0f, pose.Roll)
+                           * Quaternion.Euler(0f, pose.Forward > 0f ? -90f : 90f, 0f);
                 var grip = new Vector3(b.center.x - pose.Forward * b.size.x * (0.5f - pose.Grip), b.center.y, b.center.z); // model space
-                t.localPosition = -(t.localRotation * (grip * scale));
+                position = -(rotation * (grip * scale));
             }
-            VisualStyles.Dress(HeldThing.gameObject);
         }
 
         /// <summary>The box of a model's screen face (its EyeScreen part, the tablet's) in the model's own space; false without one.</summary>

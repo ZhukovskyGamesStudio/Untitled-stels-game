@@ -92,9 +92,11 @@ namespace Stealth.Player
             if (layer == HumanLayers.UpperBody)
             {
                 Animator.SetIKPositionWeight(AvatarIKGoal.RightHand, m_Hold);
-                Animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, m_Hold * 0.6f);
+                Animator.SetIKRotationWeight(AvatarIKGoal.RightHand, m_Hold);
+                Animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, m_Hold);
                 if (m_Hold <= 0f) return;
                 Animator.SetIKPosition(AvatarIKGoal.RightHand, At(HumanSkeleton.Carry));
+                Animator.SetIKRotation(AvatarIKGoal.RightHand, body.rotation * HumanSkeleton.CarryHand);
                 Animator.SetIKHintPosition(AvatarIKHint.RightElbow, At(HumanSkeleton.CarryElbow));
             }
             // (the head's look is not an IK look-at: on this Avatar it bowed every head — the head is turned after the

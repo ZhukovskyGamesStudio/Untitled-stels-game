@@ -74,9 +74,16 @@ namespace Stealth.Player
 
         /// <summary>
         /// Where a player carries the thing in the hand, in the body's space (x right, y up, z forward, metres for a body
-        /// 1.8 m tall): the right hand before the chest, a little out to the side.
+        /// 1.8 m tall): the right hand raised before the chest, the forearm ahead (the elbow lower, by the side) — where the
+        /// thing is seen.
         /// </summary>
-        public static readonly Vector3 Carry = new(0.17f, 1.08f, 0.3f), CarryElbow = new(0.4f, 1.15f, -0.05f);
+        public static readonly Vector3 Carry = new(0.19f, 1.2f, 0.4f), CarryElbow = new(0.3f, 0.95f, -0.02f);
+
+        /// <summary>
+        /// The right hand's IK turn when carrying, in the body's space: a closed fist standing before the chest, the thing
+        /// upright in it (picked from a grid of turns on the pose pictures: Stealth → Human Pose Pictures).
+        /// </summary>
+        public static readonly Quaternion CarryHand = Quaternion.Euler(0f, 0f, 180f) * Quaternion.Euler(0f, 90f, 0f);
 
         /// <summary>
         /// The right hand's grip as humanoid finger muscles (curve names of a humanoid clip; −1 bent .. 1 stretched): the one
