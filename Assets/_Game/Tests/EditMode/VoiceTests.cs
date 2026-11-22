@@ -8,6 +8,18 @@ namespace Stealth.Tests
 {
     public class VoiceTests
     {
+        [Test]
+        public void OverTheRadioATeammateSoundsRightBySide()
+        {
+            var s = new VoiceSettings();
+            float close = VoiceAcoustics.DistanceGain(VoiceAcoustics.RadioDistance, s);
+            var (far, farCut) = VoiceAcoustics.OverRadio(0f, s);
+            Assert.AreEqual(close, far, 1e-5f, "across the house: as loud as standing next to you");
+            Assert.AreEqual(22000f, farCut, "not muffled: clear");
+            Assert.Greater(close, 0.9f * VoiceAcoustics.DistanceGain(0f, s), "loud: a voice at your ear");
+            Assert.AreEqual(1f, VoiceAcoustics.OverRadio(1f, s).gain, 1e-5f, "never quieter than the voice itself");
+        }
+
         static readonly VoiceSettings S = new();
 
         [Test]

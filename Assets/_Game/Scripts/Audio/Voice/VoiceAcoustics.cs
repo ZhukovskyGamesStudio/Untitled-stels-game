@@ -51,6 +51,16 @@ namespace Stealth.Audio
         /// out to silence at the far limit along a smooth S from <see cref="VoiceSettings.FadeFrom"/> — no corner anywhere
         /// in the curve, so walking away is one even fade.
         /// </summary>
+        /// <summary>How far away a voice over the radio sounds: right next to you, metres.</summary>
+        public const float RadioDistance = 0.6f;
+
+        /// <summary>
+        /// A voice over the radio in the listener's hand: as loud and as clear as a speaker standing right by (never
+        /// quieter than at <see cref="RadioDistance"/>, nothing muffled by walls or distance).
+        /// </summary>
+        public static (float gain, float cutoff) OverRadio(float gain, VoiceSettings s) =>
+            (Mathf.Max(gain, DistanceGain(RadioDistance, s)), 22000f);
+
         public static float DistanceGain(float distance, VoiceSettings s)
         {
             if (distance >= s.MaxDistance) return 0f;
