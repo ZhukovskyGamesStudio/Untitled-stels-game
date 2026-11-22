@@ -66,14 +66,26 @@ def _slit(q, f: Face, flat=False):
     w, hu, hl = 0.0150 * f.eye_size, 0.0050 * f.eye_size * f.eye_open, 0.0040 * f.eye_size * f.eye_open
     ru, rl = (w * w + hu * hu) / (2 * hu), (w * w + hl * hl) / (2 * hl)
     lens = np.maximum(np.hypot(x, z - (hu - ru)) - ru, np.hypot(x, z + (hl - rl)) - rl)
-    return lens if flat else np.maximum(lens, np.abs(d[..., 1] + 0.012) - 0.013)
+    if flat:
+        return lens
+    # bored only in front of the ball and of a floor 6 mm before its centre: the almond is wider than the ball, and a bore
+    # straight through left black holes in the corners — now the corners are shallow pockets (the caruncle is painted in)
+    ball = (EYE_R - 0.0004) - np.linalg.norm(q - e, axis=-1)
+    floor = q[..., 1] - (e[1] - 0.006)
+    return np.maximum(np.maximum(lens, ball), np.maximum(floor, -0.025 - (q[..., 1] - e[1])))
 
 
 def lips(q, f: Face):
     """The two lips (their own volumes: the map of the face colours them)."""
     z = -0.040 - 0.022 * f.face_len
-    up = ell(q, (0, -0.0900, z + 0.0042), (0.0235 * f.mouth_w, 0.0105, 0.0044 * f.lips))
-    lo = ell(q, (0, -0.0885, z - 0.0052), (0.0190 * f.mouth_w, 0.0108, 0.0056 * f.lips))
+    # the upper lip's Cupid's bow: two peaks either side of a dip over the middle (the whole lip follows it, so the line
+    # of the mouth dips a little in the middle too, under the lip's tubercle)
+    ax = np.abs(q[..., 0])
+    bow = 0.0011 * np.exp(-((ax - 0.0055 * f.mouth_w) / 0.0040) ** 2) - 0.0007 * np.exp(-(ax / 0.0028) ** 2)
+    qu = np.array(q, float)
+    qu[..., 2] = q[..., 2] - bow * np.clip((q[..., 2] - (z + 0.0036)) / (0.0044 * f.lips), 0, 1)   # (the top edge only: the line of the mouth stays shut)
+    up = ell(qu, (0, -0.0900, z + 0.0036), (0.0235 * f.mouth_w, 0.0105, 0.0044 * f.lips))
+    lo = ell(q, (0, -0.0885, z - 0.0045), (0.0190 * f.mouth_w, 0.0108, 0.0056 * f.lips))
     return np.minimum(up, lo)
 
 
@@ -81,8 +93,9 @@ def mouth_z(f: Face):
     return -0.040 - 0.022 * f.face_len
 
 
-def head(p, f: Face):
-    """The head without ears and hair: negative inside."""
+def head(p, f: Face, creases=True):
+    """The head without ears and hair: negative inside. (creases=False: without the creases that follow its surface — the
+    surface they are laid on.)"""
     q = np.array(p, float)
     q[..., 0] = np.abs(q[..., 0])
     L = f.face_len
@@ -118,23 +131,108 @@ def head(p, f: Face):
     d = smin(d, ell(q, wing, (0.0058 * f.nose_w, 0.0088, 0.0060)), 0.009)
     d = smin(d, cone(q, tip + np.array((0, 0.004, -0.004)), (0.0, tip[1] + 0.017, tip[2] - 0.0085), 0.0034, 0.0038), 0.004)   # the pillar between the nostrils
     d = smin(d, ell(q, (0, tip[1] + 0.0150, tip[2] - 0.0052), (0.0115 * f.nose_w, 0.0095, 0.0055)), 0.006)       # the nose's base
-    d = smax(d, -ell(q, (0.0060 * f.nose_w, tip[1] + 0.0135, tip[2] - 0.0112 - f.nose_up * 0.5), (0.0028, 0.0046, 0.0030)), 0.002)   # nostrils: they open downwards
+    d = smax(d, -ell(q, (0.0060 * f.nose_w, tip[1] + 0.0135, tip[2] - 0.0100 - f.nose_up * 0.5), (0.0028, 0.0046, 0.0026)), 0.002)   # nostrils: they open downwards
+    # (reaching 3.5 mm under the nose's base, they bored into the upper lip below it and left crumbs of skin there)
     # the mouth: its mound, the lips, the line between them, the dip under the nose and the one over the chin
     mz = mouth_z(f)
     d = smin(d, ell(q, (0, -0.069, mz - 0.001), (0.032 * f.mouth_w, 0.022, 0.022)), 0.014)
     d = smin(d, lips(q, f), 0.004)
     corner = np.array((0.0245 * f.mouth_w, -0.0800, mz - 0.0005 + f.smile))
-    d = smax(d, -cone(q, (0.0, -0.1015, mz - 0.0002), corner, 0.0006, 0.0005), 0.0012)        # the line of the mouth
-    d = smax(d, -cone(q, (0, tip[1] + 0.0165, tip[2] - 0.0115), (0, -0.0995, mz + 0.0090), 0.0012, 0.0016), 0.003)   # the philtrum
+    if creases:                                                                             # the line of the mouth, laid in the valley between
+        d = smax(d, -_groove(q, _mouth_path(f), MOUTH_R), 0.0015)                           # the lips (a straight line missed the middle and
+                                                                                            # bit pits in beside it)
+    if creases:                                                                             # the philtrum, on the skin (a straight capsule
+        d = smax(d, -_groove(q, _philtrum_path(f), PHILTRUM_R), 0.003)                      # dug a crumbling pit under the nose)
     d = smax(d, -ell(q, (0, -0.0950, mz - 0.0165), (0.017 * f.mouth_w, 0.0070, 0.0050)), 0.008)   # the dip over the chin
-    if f.folds:
-        a = wing + np.array((0.004, 0.004, 0.002))
-        d = smax(d, -cone(q, a, corner + np.array((0.009, 0.003, 0.006)), 0.0010 * f.folds, 0.0005 * f.folds), 0.008)   # nose-to-mouth creases
+    if f.folds and creases:
+        # nose-to-mouth creases: a soft valley that follows the cheek's surface from the nose's wing to beside the mouth's
+        # corner, deepest near the nose and fading to nothing at its end (a straight capsule left the skin in its middle
+        # and dived 6 mm into the mouth's mound at its end: a dark pit by each corner)
+        d = smax(d, -_groove(q, _fold_path(f)), 0.003)
     # the eyes: lids over the ball, their crease, the slit
     d = smin(d, ell(q, e, (EYE_R + 0.0024,) * 3), 0.009)
-    d = smax(d, -cone(q, e + np.array((-0.011, -0.0135, 0.0100)), e + np.array((0.0125, -0.0100, 0.0088)), 0.0008), 0.0025)   # the upper lid's crease
+    if creases:                                                                             # the upper lid's crease, on the lid (a straight
+        d = smax(d, -_groove(q, _crease_path(f)), 0.0025)                                   # capsule cut a crater where the face fell away)
     d = smax(d, -_slit(q, f), 0.0012)
     return d
+
+
+GROOVE_R = 0.0024
+_GROOVES = {}
+
+
+MOUTH_R = 0.0012
+
+
+def _groove(q, pts, r=GROOVE_R):
+    """A crease along a path of capsule axes held off the skin (see _on_skin): the capsules' union, to carve out."""
+    out = None
+    for a, b in zip(pts[:-1], pts[1:]):
+        seg = cone(q, a, b, r)
+        out = seg if out is None else np.minimum(out, seg)
+    return out
+
+
+def _on_skin(f: Face, name, a, b, depth, r=GROOVE_R):
+    """The axis of a crease that follows the skin: points on the line a→b brought onto the surface of the head without
+    its creases straight along the line of sight (the line keeps its course), then held off it so a capsule of GROOVE_R
+    bites exactly depth(t) into the skin (Newton steps along the field's gradient: the skin curves). A straight capsule
+    left the skin in one place and dived into it in another — a crease that vanished midway and ended in a pit."""
+    key = (name, repr(f))
+    if key in _GROOVES:
+        return _GROOVES[key]
+    t = np.linspace(0, 1, 9)[:, None]
+    pts = np.asarray(a, float) + (np.asarray(b, float) - np.asarray(a, float)) * t
+    skin = lambda x: head(x, f, creases=False)
+    eps = 1e-4
+    for _ in range(8):
+        v = skin(pts)
+        dy = (skin(pts + np.array((0, eps, 0))) - v) / eps
+        pts[:, 1] -= v / np.where(np.abs(dy) < 0.2, -0.2, dy)
+    v = skin(pts)
+    g = np.stack([(skin(pts + np.eye(3)[i] * eps) - v) / eps for i in range(3)], -1)
+    g /= np.linalg.norm(g, axis=-1, keepdims=True)
+    hold = r - depth(t[:, 0])
+    out = pts + g * hold[:, None]
+    for _ in range(6):
+        out = out + g * (hold - skin(out))[:, None]
+    _GROOVES[key] = out
+    return out
+
+
+def _fold_path(f: Face):
+    """The nose-to-mouth crease: from the nose's wing to beside the mouth's corner, deepest near the nose, nothing at
+    the end."""
+    tip = np.array((0.0, -0.1025 - 0.0115 * f.nose_out, -0.008 - 0.0235 * f.nose_len + f.nose_up))
+    wing = np.array((0.0112 * f.nose_w, tip[1] + 0.0140, tip[2] - 0.0042 - f.nose_up * 0.6))
+    mz = mouth_z(f)
+    depth = lambda t: 0.0011 * f.folds * np.sin(np.pi * np.clip(t * 1.1 + 0.08, 0, 1)) ** 0.8 - 0.0003 * t ** 3
+    return _on_skin(f, "fold", wing + np.array((0.0045, 0.0, 0.0015)), (0.0245 * f.mouth_w + 0.0085, -0.080, mz - 0.0015 + f.smile), depth)
+
+
+def _mouth_path(f: Face):
+    """The line of the mouth: from the middle to the corner, a millimetre deep, a little deeper into the corner."""
+    mz = mouth_z(f)
+    depth = lambda t: 0.0007 + 0.0002 * t * t
+    return _on_skin(f, "mouth", (0.0, -0.13, mz - 0.0002), (0.0238 * f.mouth_w, -0.13, mz - 0.0005 + f.smile), depth, MOUTH_R)
+
+
+PHILTRUM_R = 0.0030
+
+
+def _philtrum_path(f: Face):
+    """The philtrum: the shallow trough from under the nose down to the bow of the upper lip, fading at both ends."""
+    tip = np.array((0.0, -0.1025 - 0.0115 * f.nose_out, -0.008 - 0.0235 * f.nose_len + f.nose_up))
+    mz = mouth_z(f)
+    depth = lambda t: 0.0006 * np.sin(np.pi * np.clip(t * 1.15 + 0.05, 0, 1)) ** 0.6 - 0.0002
+    return _on_skin(f, "philtrum", (0.0, -0.13, tip[2] - 0.0125), (0.0, -0.13, mz + 0.0075), depth, PHILTRUM_R)
+
+
+def _crease_path(f: Face):
+    """The upper lid's crease: over the lid from the inner corner to the outer, fading out at both ends."""
+    e = eye_centre(f)
+    depth = lambda t: 0.0007 * np.sin(np.pi * np.clip(t * 1.1 - 0.05, 0, 1)) ** 0.7 - 0.0002
+    return _on_skin(f, "crease", e + np.array((-0.011, -0.03, 0.0100)), e + np.array((0.0125, -0.03, 0.0088)), depth)
 
 
 def ear(p):
@@ -199,7 +297,7 @@ def hair(p, f: Face, style: str):
     nape = lambda low: -(z + 0.44 * (y + 0.02) + low) / 1.09                        # everything under the nape's line
     locks = _strands(p)
 
-    def lying(thick, cut, low, groove=0.0016):
+    def lying(thick, cut, low, groove=0.0010):
         """Hair of a thickness lying on the scalp inside a hairline: tapering to it, grooved between the locks."""
         edge = np.clip(np.minimum(cut, -nape(low)) / 0.036, 0.0, 1.0)               # 0 at the hairline … 1 well inside it: thinning to it, no rim
         edge = edge * edge * (3 - 2 * edge)
@@ -211,17 +309,20 @@ def hair(p, f: Face, style: str):
     if style == "buzz":
         return smax(lying(0.0030, _face_cut(q, f, 0.004, -0.002), 0.030, 0.0004), -ear_hole, 0.002)
     if style in ("crop", "messy"):
-        top = 0.013 if style == "crop" else 0.019
-        up = np.clip((z + 0.02) / 0.12, 0, 1)
-        t = 0.005 + top * up * up * (3 - 2 * up)                                    # short at the sides, longer on top
+        top = 0.013 if style == "crop" else 0.012
+        up = np.clip((z - 0.005) / 0.105, 0, 1)
+        t = 0.0035 + top * up * up * (3 - 2 * up)                                   # short at the sides and the back (tapered, not a bowl), longer on top
         d = lying(t, _face_cut(q, f, 0.0 if style == "crop" else 0.004), 0.022)
         if style == "crop":
             d = smin(d, ell(p, (0.018, -0.060, 0.094), (0.048, 0.022, 0.016)) + 0.0016 * (1 - locks), 0.014)   # the fringe swept to one side
             d = smax(d, -cone(p, (-0.034, -0.085, 0.108), (-0.040, 0.020, 0.126), 0.0024), 0.005)              # the parting
         else:
-            d = smin(d, ell(p, (0.004, -0.050, 0.098), (0.056, 0.038, 0.022)) + 0.0022 * (1 - locks), 0.030)    # a mop pushed forward
-            d = smin(d, ell(p, (-0.026, -0.076, 0.084), (0.028, 0.017, 0.016)) + 0.0018 * (1 - locks), 0.020)   # … falling on the forehead
-            d = smin(d, ell(p, (0.034, -0.070, 0.088), (0.020, 0.015, 0.013)) + 0.0018 * (1 - locks), 0.018)    # … and a lock to the other side
+            # a mop pushed forward: tapering locks from the crown that fall over the hairline and end in points (a blob
+            # of an ellipsoid over the forehead ended in a blunt brim: a helmet, a bowl cut, from every side)
+            for a, b, r in (((0.010, -0.025, 0.118), (-0.024, -0.090, 0.074), 0.0105), ((0.026, -0.030, 0.114), (0.030, -0.088, 0.072), 0.0095),
+                            ((-0.012, -0.018, 0.121), (-0.048, -0.076, 0.078), 0.0090), ((0.042, -0.016, 0.110), (0.060, -0.068, 0.070), 0.0080),
+                            ((-0.032, -0.010, 0.114), (-0.064, -0.050, 0.076), 0.0075), ((0.0, -0.040, 0.118), (0.006, -0.094, 0.080), 0.0085)):
+                d = smin(d, cone(p, a, b, r, 0.0012) + 0.0016 * (1 - locks), 0.010)
         return smax(d, -ear_hole, 0.003)
     if style == "bob":
         t = 0.007 + 0.007 * np.clip((z - 0.0) / 0.08, 0, 1)
@@ -279,19 +380,29 @@ def beard(p, f: Face, length=0.0050):
     full = 0.55 + 0.45 * np.clip((-0.045 - y) / 0.03, 0.0, 1.0)        # fuller on the chin than on the cheeks
     tufts = 0.5 + 0.5 * np.sin(q[..., 0] * 190 + 2.2 * np.sin(q[..., 2] * 130)) * np.sin(q[..., 2] * 170 + 1.7 * np.sin(y * 150))
     mz = mouth_z(f)
-    mouth = ell(q, (0, -0.094, mz - 0.0008), (0.0225 * f.mouth_w, 0.014, 0.0058 * f.lips))   # the lips and the corners of the mouth: bare
+    mouth = ell(q, (0, -0.094, mz - 0.0008), (0.0200 * f.mouth_w, 0.014, 0.0052 * f.lips))   # the lips and the corners of the mouth: bare
     bare = smin(lips(q, f) - 0.0014, mouth, 0.002)                     # metres outside the bare patch round the lips
     by_lips = np.clip(bare / 0.011, 0.0, 1.0)                          # the beard thins to the lips (a thick rim round them read as a mask's window)
     skin = smin(skin, ell(q, (0, -0.0900, mz - 0.0165), (0.017 * f.mouth_w, 0.0075, 0.0055)), 0.006)   # (hair fills the dip under the lower lip)
-    d = skin - (0.0004 + length * edge * full * (0.25 + 0.75 * by_lips)) + 0.0005 * tufts * edge
-    d = smax(d, -(inside + 0.001), 0.0012)
+    # at its outline (and round the lips) the beard sinks SINK under the skin, so its edge is where it meets the skin, and
+    # the cuts that bound it lie inside the head: ending in a sheet 0.4 mm over the skin (finer than the sculpt's 1.3 mm
+    # cells) it tore into flaps and stood as a step all round in the game
+    near_lips = np.clip((bare - 0.0004) / 0.0030, 0.0, 1.0)            # (it grows right up to the lips: a wide bare ring read as a mask's window)
+    d = skin - (-SINK + (length * full * (0.25 + 0.75 * by_lips) + SINK) * edge * near_lips) + 0.0005 * tufts * edge
+    d = smax(d, -(inside + 0.004), 0.002)
     tin = moustache_zone(q, f)
-    te = np.clip(tin / 0.0045, 0.0, 1.0)
-    tash = skin - (0.0004 + length * 0.75 * te * te * (3 - 2 * te) * (0.35 + 0.65 * by_lips)) + 0.0004 * tufts * te
-    tash = smax(tash, -(tin + 0.0008), 0.001)
+    te = np.clip(tin / 0.0030, 0.0, 1.0)
+    te = te * te * (3 - 2 * te)
+    # (the moustache keeps most of its thickness down to the lip: thinned like the beard, only a thin bar of it rose
+    # above the skin, apart from the beard)
+    tash = skin - (-SINK * 0.5 + (length * 0.75 * (0.65 + 0.35 * by_lips) + SINK * 0.5) * te * near_lips) + 0.0004 * tufts * te
+    tash = smax(tash, -(tin + 0.004), 0.002)
     d = smin(d, tash, 0.003)
-    d = smax(d, -bare, 0.003)
+    d = smax(d, -(bare + 0.001), 0.002)
     return d
+
+
+SINK = 0.0015
 
 
 # --------------------------------------------------------------------------- the four people

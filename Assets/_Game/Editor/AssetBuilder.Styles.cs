@@ -78,7 +78,9 @@ namespace Stealth.EditorTools
             config.Wear = BuildWearVariants(config.Materials);
             config.Props = BuildPropReplacements();
             config.StyleModels = BuildStyleModels(styles);
+            config.Wardrobe = BuildWardrobe();
             config.PlayerHumans = BuildDepartmentHumans();
+            if (config.PlayerOutfits == null || config.PlayerOutfits.Length == 0) config.PlayerOutfits = DefaultOutfits();
             // the palette of a style recolours the family versions of a material too
             Material[] WithVariants(Material[] a) => a.Concat(config.Materials.SelectMany(set =>
                 set.From.Select((m, i) => (m, i)).Where(x => a.Contains(x.m)).Select(x => set.To[x.i]))).ToArray();

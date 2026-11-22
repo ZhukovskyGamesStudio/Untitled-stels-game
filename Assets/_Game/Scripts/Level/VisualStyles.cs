@@ -48,6 +48,14 @@ namespace Stealth.Level
             return humans[(int)department % humans.Length];
         }
 
+        /// <summary>What a department's rigged human wears (item names; empty — the person's own outfit).</summary>
+        public static IReadOnlyList<string> OutfitFor(Stealth.Player.Department department) =>
+            Config != null ? Config.OutfitFor((int)department) : System.Array.Empty<string>();
+
+        /// <summary>Every item the rigged humans can wear (made for every person's build).</summary>
+        public static IReadOnlyList<Stealth.Player.WearPiece> Wardrobe =>
+            Config != null && Config.Wardrobe != null ? Config.Wardrobe : System.Array.Empty<Stealth.Player.WearPiece>();
+
         /// <summary>The ambient light robots reckon with: the game's own, whatever a style shows.</summary>
         public static Color GameplayAmbient => s_Active ? s_BaseAmbient : RenderSettings.ambientLight;
 

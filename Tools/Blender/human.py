@@ -42,7 +42,7 @@ import numpy as np
 from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from humanlib import anim, body, build, clothes, face, sdf, view  # noqa: E402
+from humanlib import anim, body, build, cards, clothes, face, sdf, view  # noqa: E402
 from humanlib.body import Build, J  # noqa: E402
 from humanlib.build import Piece  # noqa: E402
 from humanlib.sdf import cone, ell, gauss, smax, smin, win  # noqa: E402
@@ -52,6 +52,7 @@ WHO = next((a for a in argv if a in face.PEOPLE), "scientist")
 DRAFT = "draft" in argv
 PREVIEW = next((os.path.abspath(a[8:]) for a in argv if a.startswith("preview=")), None)
 STATIC = next((os.path.abspath(a[7:]) for a in argv if a.startswith("static=")), None)
+ITEM_ARG = next((a[5:] for a in argv if a.startswith("item=")), None)     # item=hoodie,bob | item=all: wardrobe items made for this person
 _pos = [a for a in argv if a not in face.PEOPLE and a != "draft" and "=" not in a]
 OUT = os.path.abspath(_pos[0] if _pos else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "Humans"))
 TEXTURES = os.path.abspath(os.path.join(OUT, "..", "..", "Textures", "Humans"))
@@ -173,14 +174,59 @@ def sculpt(name, f, lo, hi, h, mirror=False):
 
 # --------------------------------------------------------------------------- the figure
 
-def figure(who):
-    """Sculpts and paints every piece of a person: [Piece]."""
-    person, b, fit = face.PEOPLE[who], BUILDS[who], OUTFITS[who]
-    f = person.face
-    pieces = []
-    head_f = lambda p: face.head_with_ears(H(p), f) * HEAD_S
+class Who:
+    """A person the pieces are made for: their build, face and colours (an item made for one fits their body only)."""
+    def __init__(self, who):
+        self.who, self.person, self.b = who, face.PEOPLE[who], BUILDS[who]
+        self.f = self.person.face
+        f = self.f
+        self.head_f = lambda p: face.head_with_ears(H(p), f) * HEAD_S
+        style = self.person.hair
+        self.hair_f = lambda p: face.hair(H(p), f, style) * HEAD_S             # their own hair (what a head torch's band lies on)
 
-    # ---- skin: the head with the neck, the hands (with the forearms under rolled sleeves), the eyes
+
+# The wardrobe: every item a slot and the outfit (OUTFITS) whose cut and colours it has; made for any person's build.
+# Things that lie on a garment come with it (the armband, a hood and its strings, a lanyard and badge, a scarf; a belt and
+# a cable coil with the trousers). Hair, a beard and what sits on the head are made on the wearer's own head.
+ITEMS = {
+    "hoodie": ("top", "backend"), "shirt": ("top", "qa"), "vest": ("top", "sysadmin"), "jumper": ("top", "designer"),
+    "jeans": ("bottom", "backend"), "slacks": ("bottom", "qa"), "cargo": ("bottom", "sysadmin"), "wide": ("bottom", "designer"),
+    "sneakers": ("feet", "backend"), "flats": ("feet", "qa"), "boots": ("feet", "sysadmin"), "red_sneakers": ("feet", "designer"),
+    "messy": ("hair", None), "bob": ("hair", None), "buzz": ("hair", None), "bun": ("hair", None),
+    "beard": ("beard", None),
+    "headphones": ("head", None), "torch": ("head", None), "beret": ("head", None),
+    "glasses": ("eyes", None),
+}
+# what each person wears out of the box (the game's HumanOutfits config says the same; the game can swap any of it)
+DEFAULTS = {
+    "backend": ["hoodie", "jeans", "sneakers", "messy", "headphones"],
+    "qa": ["shirt", "slacks", "flats", "bob", "glasses"],
+    "sysadmin": ["vest", "cargo", "boots", "buzz", "beard", "torch"],
+    "designer": ["jumper", "wide", "red_sneakers", "bun", "beret"],
+}
+
+
+def figure(who, items=None, body_too=True):
+    """Sculpts and paints the pieces of a person: the body (head, hands with the forearms, eyes) and the items — their
+    own outfit by default. [Piece], every item's pieces with its slot."""
+    c = Who(who)
+    items = DEFAULTS[who] if items is None else items
+    pieces = body_pieces(c) if body_too else []
+    for name in items:
+        made = ITEM_MAKERS[name](c, items)
+        for p in made:
+            p.slot = ITEMS[name][0]
+        pieces += made
+    return pieces
+
+
+def body_pieces(c):
+    """The skin: the head with the neck, both hands with the forearms (bare under rolled sleeves, hidden in long ones),
+    the eyes."""
+    person, b, f = c.person, c.b, c.f
+    pieces = []
+    head_f = c.head_f
+
     def skin_f(p):
         d = smin(head_f(p), body.neck(mx(p), Build(neck=b.neck, soft=b.soft)), 0.014)
         d = smax(d, np.minimum(p[..., 1] - 0.050, 1.470 - p[..., 2]), 0.004)      # the neck's base stays inside the garment's back (it showed under a collar)
@@ -193,99 +239,180 @@ def figure(who):
         p = H(pts)
         front = np.clip((-p[:, 1] - 0.035) / 0.03, 0, 1) * np.clip((0.065 - p[:, 2]) / 0.02, 0, 1) * np.clip((p[:, 2] + 0.115) / 0.02, 0, 1)
         q = mx(p)
-        fine = sum(np.exp(-(np.linalg.norm((q - c) / r, axis=1)) ** 2) for c, r in (
+        fine = sum(np.exp(-(np.linalg.norm((q - c_) / r, axis=1)) ** 2) for c_, r in (
             ((0, -0.095, face.mouth_z(f)), (0.032, 0.022, 0.016)), ((0.0315, -0.08, 0.008), (0.022, 0.022, 0.014)), ((0, -0.105, -0.034), (0.022, 0.022, 0.018))))
         ears = np.clip((q[:, 0] - 0.068) / 0.004, 0, 1) * (np.abs(p[:, 2]) < 0.04)
         neck = 0.50 * np.clip((-0.095 - p[:, 2]) / 0.02, 0, 1)                    # a round neck, not a prism
-        return np.maximum(np.maximum(0.45 * front + 0.4 * np.clip(fine, 0, 1), 0.35 * ears), neck)
-    pieces.append(Piece("head", "AccentHead", "skin", hd, 4400, ["chest", "neck", "head"], keep=keep_face, texel=1.6))
+        return np.maximum(np.maximum(0.45 * front + 0.5 * np.clip(fine, 0, 1), 0.35 * ears), neck)
+    # (6500 triangles, the eyes, the nose and the lips held hardest: with 4400 a lip was six segments wide and the game
+    # mesh cut under the nose's wings — no bake makes that smooth)
+    # (fine: a second pass of the bake looks for the sculpt only 4 mm off the game mesh — from 12 mm the upper lip found the
+    # nose's underside first and baked it in: knobs under the nose, a cracked lip, a shadow round the nose's wings)
+    pieces.append(Piece("head", "AccentHead", "skin", hd, 6500, ["chest", "neck", "head"], keep=keep_face, texel=1.6, fine=0.004, angle=45.0))   # (at 66° the ear folded onto itself in UV)
 
-    rolled = fit["top"].get("cuff_t", 1.0) < 0.9
-    hand_f = (lambda p: clothes.forearm_skin(p, b, f.female, 0.36)) if rolled else (lambda p: clothes.hand(p, f.female))
+    # the hands always with the forearms: any top may roll its sleeves up (a long sleeve hides the forearm; it is hollow at the cuff)
     W = J["wrist"]
-    lo_, hi_ = (W + (-0.21 if rolled else -0.10, -0.12, -0.20), W + (0.14, 0.12, 0.26 if rolled else 0.08))
-    hand = sculpt("hand.L", hand_f, lo_, hi_, 0.0012)
+    hand = sculpt("hand.L", lambda p: clothes.forearm_skin(p, b, f.female, 0.36), W + (-0.21, -0.12, -0.20), W + (0.14, 0.12, 0.26), 0.0012)
     hp = sdf.points_of(hand)
     build.paint(hand, *paint_hand(hp, build.normals_of(hand)))
     hand_r = mirrored(hand, "hand.R")
 
     def keep_fingers(pts):
         q = clothes.hand_frame(mx(pts))                 # triangles go to the fingers and the thumb, not to the palm's flat
-        return np.clip(np.maximum((q[:, 0] - 0.075) / 0.02, (q[:, 1] - 0.030) / 0.012), 0, 1) * 0.75
+        return np.clip(np.maximum((q[:, 0] - 0.075) / 0.02, (q[:, 1] - 0.030) / 0.012), 0, 1) * 0.9
     for o, sd in ((hand, "L"), (hand_r, "R")):
-        pieces.append(Piece(o.name, "AccentHead", "skin", o, 1700 if rolled else 1500, [f"forearm.{sd}", f"hand.{sd}"], keep=keep_fingers, texel=1.3, ray=0.0035))
+        # (1500 triangles left every finger an octagon in a close-up: the fingers take the extra)
+        pieces.append(Piece(o.name, "AccentHead", "skin", o, 3000, [f"forearm.{sd}", f"hand.{sd}"], keep=keep_fingers, texel=1.3, fine=(0.0035, 0.0015), angle=40.0))
+        # (from 3.5 mm off a finger's side the ray starts inside the next finger — the gap is 2–3 mm — and bakes that one:
+        # light blotches between the fingers; the 1.5 mm pass finds the finger's own skin, the game mesh is within 1 mm of it)
 
     e = face.eye_centre(f)
     for s, sd in ((1, "L"), (-1, "R")):
-        c = HEAD_C + np.array((s * e[0], e[1], e[2])) * HEAD_S
-        eye = eyeball(f"eye.{sd}", c, 48, 24)
-        build.paint(eye, *paint_eye((sdf.points_of(eye) - c) / HEAD_S, person))
+        cen = HEAD_C + np.array((s * e[0], e[1], e[2])) * HEAD_S
+        eye = eyeball(f"eye.{sd}", cen, 48, 24)
+        build.paint(eye, *paint_eye((sdf.points_of(eye) - cen) / HEAD_S, person))
         p = Piece(eye.name, "Sclera", "skin", eye, 0, ["head"], texel=2.2)
-        p.lo = eyeball(f"eye.{sd}_lo", c, 14, 8)
+        p.lo = eyeball(f"eye.{sd}_lo", cen, 14, 8)
         pieces.append(p)
+    return pieces
 
-    # ---- hair (and a beard): their own colour
-    hair_f = lambda p: face.hair(H(p), f, person.hair) * HEAD_S
-    if who == "designer":
-        loose = hair_f
-        hair_f = lambda p: smax(loose(p), -(beret_solid(p) + 0.003), 0.003)     # no hair inside the beret: none to show through it
-    hair = sculpt("hair", hair_f, (-0.125, -0.15, 1.49), (0.125, 0.17, 1.85), 0.0016)
-    build.paint(hair, *paint_hair(H(sdf.points_of(hair)), person, 1.0))
-    pieces.append(Piece("hair", "Outfit", "outfit", hair, {"bob": 1700, "buzz": 900}.get(person.hair, 1400), ["head"], texel=1.2))
-    if person.beard:
-        bd = sculpt("beard", lambda p: face.beard(H(p), f) * HEAD_S, (0, -0.15, 1.50), (0.113, 0.07, 1.70), 0.0013, mirror=True)
-        build.paint(bd, *paint_beard(H(sdf.points_of(bd)), person))
-        pieces.append(Piece("beard", "Outfit", "outfit", bd, 700, ["head"], texel=1.2))
 
-    # ---- trousers and shoes
+# --------------------------------------------------------------------------- the items
+
+# hair cards of a style: length, segments, width, depth of the deepest layer, coverage (cards over a spot), how near the
+# skin they stop, how far their tips stand off (a buzz cut has none: no locks to show, the grain painted on its mass does)
+CARDS = {
+    "messy": (0.050, 6, 0.009, 0.0010, 2.8, 0.0012, 0.0042),
+    "crop": (0.032, 4, 0.008, 0.0010, 2.8, 0.0012, 0.0030),
+    "bob": (0.110, 8, 0.012, 0.0012, 2.8, 0.0012, 0.0025),
+    "bun": (0.080, 7, 0.010, 0.0010, 2.8, 0.0012, 0.0015),
+    "beard": (0.012, 3, 0.0022, 0.0006, 1.3, 0.0004, 0.0040),
+}
+
+
+def hair_cards(name, style, volume, skin, base, cut=None, seed=0):
+    """The cards of a style over its sculpted mass (`base`, the roots are spread over it): a Piece of the part "Hair"
+    with its own UVs on the strand texture (not baked)."""
+    length, segments, width, depth, coverage, stop, tip = CARDS[style]
+    rng = np.random.default_rng(1234 + seed)
+    keep = lambda pts, nrm: (skin(pts) > stop * 0.5) & (np.ones(len(pts), bool) if cut is None else cut(pts) > 0.002)
+    _, _, area = cards.roots_on(base, keep, 1, rng)
+    count = int(min(1500, coverage * area / (width * length * 0.8)))
+    roots, _, _ = cards.roots_on(base, keep, max(count, 1), rng)
+    spine, normals, n, widths = cards.grow(volume, skin, roots, cards.flow_of(style, H), length, segments, width, depth, rng, stop=stop, cut=cut)
+    obj = cards.mesh(name, spine, normals, n, widths, rng, tip_lift=tip, v_from=0.5 if style == "beard" else 0.0)
+    p = Piece(name, "Hair", "outfit", obj, 0, ["head"])
+    p.lo, p.own_uv = obj, True
+    print(f"CARDS {name}: {len(obj.data.polygons)} triangles from {count} roots")
+    return p
+
+
+def item_hair(style):
+    def make(c, worn):
+        hair_f = lambda p: face.hair(H(p), c.f, style) * HEAD_S
+        cut = None
+        if "beret" in worn:
+            loose = hair_f
+            hair_f = lambda p: smax(loose(p), -(beret_solid(p) + 0.003), 0.003)     # no hair inside the beret: none to show through it
+            cut = lambda p: beret_solid(p)
+        # the sculpted mass a little in from the hair's surface, darker: the strands lie over it, no skin between them
+        base_f = (lambda p: hair_f(p) + 0.0012) if style in CARDS else hair_f
+        hair = sculpt("hair", base_f, (-0.125, -0.15, 1.49), (0.125, 0.17, 1.85), 0.0016)
+        build.paint(hair, *paint_hair(H(sdf.points_of(hair)), c.person, 0.45 if style in CARDS else 1.0))
+        pieces = [Piece("hair", "Outfit", "outfit", hair, {"bob": 1700, "buzz": 900}.get(style, 1400), ["head"], texel=1.2)]
+        if style in CARDS:
+            pieces.append(hair_cards("cards", style, hair_f, c.head_f, hair, cut))
+        return pieces
+    return make
+
+
+def item_beard(c, worn):
+    beard_f = lambda p: face.beard(H(p), c.f) * HEAD_S
+    bd = sculpt("beard", lambda p: beard_f(p) + 0.0006, (0, -0.15, 1.50), (0.113, 0.07, 1.70), 0.0013, mirror=True)
+    build.paint(bd, *paint_beard(H(sdf.points_of(bd)), c.person))
+    return [Piece("beard", "Outfit", "outfit", bd, 1400, ["head"], texel=1.4, fine=0.004),   # (700: its outline a polygon of steps)
+            hair_cards("beard_cards", "beard", beard_f, c.head_f, bd, seed=7)]
+
+
+def trousers_of(c, o):
     waist = 1.040
-    tr_f = lambda p: clothes.trousers(p, b, ease=fit.get("trouser_ease", 0.009), hem=fit.get("trouser_hem", 0.075 if fit["shoe"] != "boot" else 0.10),
-                                      waist=waist, taper=fit["taper"], cargo=fit.get("cargo", False))
-    tr = sculpt("trousers", tr_f, (0, -0.22, 0.05), (0.30, 0.22, 1.08), 0.0032, mirror=True)
-    build.paint(tr, *paint_trousers(sdf.points_of(tr), build.normals_of(tr), fit["trousers"]))
-    pieces.append(Piece("trousers", "Outfit", "outfit", tr, 2000, ["hips", "spine"] + both("thigh", "shin")))
-    shoe = sculpt("shoe.L", lambda p: clothes.shoe(p, fit["shoe"]), (0.03, -0.21, -0.004), (0.175, 0.12, 0.22), 0.0018)
-    build.paint(shoe, *paint_shoe(sdf.points_of(shoe), fit))
-    for o, sd in ((shoe, "L"), (mirrored(shoe, "shoe.R"), "R")):
-        pieces.append(Piece(o.name, "Outfit", "outfit", o, 720, [f"shin.{sd}", f"foot.{sd}", f"toe.{sd}"]))
+    return (lambda p: clothes.trousers(p, c.b, ease=o.get("trouser_ease", 0.009), hem=o.get("trouser_hem", 0.075 if o["shoe"] != "boot" else 0.10),
+                                       waist=waist, taper=o["taper"], cargo=o.get("cargo", False))), waist
 
-    # ---- the top: the department's garment (under a vest: a shirt of its own colour, and the vest is the garment)
-    top_f = lambda p: clothes.top(p, b, **fit["top"])
+
+def item_bottom(origin):
+    def make(c, worn):
+        o, b = OUTFITS[origin], c.b
+        tr_f, waist = trousers_of(c, o)
+        tr = sculpt("trousers", tr_f, (0, -0.22, 0.05), (0.30, 0.22, 1.08), 0.0032, mirror=True)
+        build.paint(tr, *paint_trousers(sdf.points_of(tr), build.normals_of(tr), o["trousers"]))
+        pieces = [Piece("trousers", "Outfit", "outfit", tr, 2000, ["hips", "spine"] + both("thigh", "shin"))]
+        if o.get("tucked"):
+            # a belt where the shirt goes into the trousers, with a buckle
+            def belt_f(p):
+                d = tr_f(p)
+                band = smax(smax(d - 0.0045, -(d + 0.004), 0.001), np.abs(p[..., 2] - (waist - 0.022)) - 0.017, 0.002)
+                return smin(band, sdf.box(p, (0, -0.118 - 0.9 * b.belly - (0.02 if b.waist > 1.1 else 0.0), waist - 0.022), (0.022, 0.012, 0.016), 0.003), 0.002)
+            belt = sculpt("belt", belt_f, (-0.22, -0.24, waist - 0.06), (0.22, 0.2, waist + 0.02), 0.0018)
+            bp = sdf.points_of(belt)
+            buckle = (np.abs(bp[:, 0]) < 0.024) & (bp[:, 1] < -0.09) & (np.abs(bp[:, 2] - (waist - 0.022)) < 0.018)
+            build.paint(belt, np.where(buckle[:, None], 6.0, 1.0) * np.ones((len(bp), 3)), np.where(buckle, 0.75, 0.4))
+            pieces.append(Piece("belt", "EyeDetails", "outfit", belt, 420, ["hips", "spine"]))
+        if origin == "sysadmin":
+            def cable_f(p):                                                      # a coil of cable at the hip, on its strap
+                cc = np.array((0.172 * b.hips + 0.012, 0.0, 0.955))
+                r = np.hypot(p[..., 1] - cc[1], p[..., 2] - cc[2])
+                d = None
+                for k in range(3):
+                    t = np.hypot(r - (0.072 - 0.004 * k), p[..., 0] - (cc[0] + 0.009 * k)) - 0.0065
+                    d = t if d is None else smin(d, t, 0.002)
+                return smin(d, cone(p, (cc[0] - 0.02, 0.0, cc[2] + 0.07), (cc[0] + 0.02, 0.0, cc[2] + 0.075), 0.007), 0.004)
+            cb = sculpt("cable", cable_f, (0.12, -0.10, 0.86), (0.24, 0.10, 1.06), 0.0015)
+            build.paint(cb, 1.0, 0.45)
+            pieces.append(Piece("cable", "AccentBand", "outfit", cb, 420, ["hips", "thigh.L"]))
+        return pieces
+    return make
+
+
+def item_feet(origin):
+    def make(c, worn):
+        o = OUTFITS[origin]
+        shoe = sculpt("shoe.L", lambda p: clothes.shoe(p, o["shoe"]), (0.03, -0.21, -0.004), (0.175, 0.12, 0.22), 0.0018)
+        build.paint(shoe, *paint_shoe(sdf.points_of(shoe), o))
+        return [Piece(s.name, "Outfit", "outfit", s, 720, [f"shin.{sd}", f"foot.{sd}", f"toe.{sd}"]) for s, sd in ((shoe, "L"), (mirrored(shoe, "shoe.R"), "R"))]
+    return make
+
+
+def top_of(c, o, origin):
+    """The garment of an outfit made for this body: [Piece] and the outermost garment's surface (what a lanyard, a
+    scarf's tail and drawstrings lie on); the armband on the sleeve comes with it."""
+    b = c.b
+    top_f = lambda p: clothes.top(p, b, **o["top"])
     garment_f = top_f
-    if fit.get("collar"):
+    if o.get("collar"):
         top_f_plain = top_f
         top_f = lambda p: smin(top_f_plain(p), clothes.collar(p), 0.004)
         garment_f = top_f
     top = sculpt("top", top_f, (0, -0.24, 0.93), (0.62, 0.24, 1.56), 0.0032, mirror=True)
     arms = both("shoulder", "upper_arm", "forearm")
-    if fit.get("vest"):
-        build.paint(top, *paint_cloth(sdf.points_of(top), fit["shirt"], 0.16, weave=0.03))
+    pieces = []
+    if o.get("vest"):
+        # under a vest: a shirt of its own colour, and the vest is the department's garment
+        build.paint(top, *paint_cloth(sdf.points_of(top), o["shirt"], 0.16, weave=0.03))
         pieces.append(Piece("shirt", "Outfit", "outfit", top, 2200, TORSO + ["neck"] + arms))
         garment_f = lambda p: clothes.vest(p, b)
         vest = sculpt("vest", garment_f, (0, -0.26, 0.97), (0.26, 0.24, 1.54), 0.0032, mirror=True)
         build.paint(vest, *paint_vest(sdf.points_of(vest)))
         pieces.append(Piece("vest", "BodyClothes", "outfit", vest, 1500, TORSO + both("shoulder")))
     else:
-        build.paint(top, *paint_top(sdf.points_of(top), who, fit))
+        build.paint(top, *paint_top(sdf.points_of(top), origin, o))
         pieces.append(Piece("top", "BodyClothes", "outfit", top, 3000, TORSO + ["neck"] + arms))
-    if fit.get("coat"):
-        # the lab coat over the shirt: knee length, open in a deep V, off-white and a little grimy
-        coat_f = lambda p: clothes.top(p, b, ease=0.022, sleeve_ease=0.019, hem=0.56, straight=1.0, neck_z=1.490, neck_r=0.078, v_neck=0.20,
-                                       folds=0.7, skirt=True)
-        garment_f = coat_f
-        top_f = coat_f                                                  # (the armband goes on the coat's sleeve)
-        coat = sculpt("coat", coat_f, (0, -0.26, 0.54), (0.62, 0.26, 1.56), 0.0034, mirror=True)
-        cp = sdf.points_of(coat)
-        grime = 0.82 + 0.18 * build.noise(cp, 60) - 0.10 * np.clip((0.75 - cp[:, 2]) / 0.2, 0, 1) * build.noise(cp, 35, 2)
-        overlap = gauss(np.abs(cp[:, 0]) - 0.010, 0.0022) * (cp[:, 1] < 0) * (cp[:, 2] < 1.27)
-        build.paint(coat, np.array((0.80, 0.79, 0.72))[None, :] * (grime * (1 - 0.35 * overlap))[:, None], 0.2)
-        pieces.append(Piece("coat", "Outfit", "outfit", coat, 3200, TORSO + ["neck"] + arms + both("thigh")))
-    if fit.get("hood"):
+    if o.get("hood"):
         hood = sculpt("hood", clothes.hood, (-0.14, 0.0, 1.31), (0.14, 0.18, 1.56), 0.0032)
         build.paint(hood, 1.0, 0.14)
         pieces.append(Piece("hood", "BodyClothes", "outfit", hood, 420, ["chest", "neck", "spine"]))
 
-    # ---- what the team colour goes on: an armband for everyone; a lanyard, a scarf, a coil of cable
+    # the team colour on everyone's sleeve: an armband
     S, E = np.array((J["shoulder"][0] * b.shoulders, J["shoulder"][1], J["shoulder"][2])), J["elbow"]
     axis = (E - S) / np.linalg.norm(E - S)
     sleeve_f = top_f
@@ -299,10 +426,122 @@ def figure(who):
     band = sculpt("armband", band_f, S + (-0.09, -0.10, -0.26), S + (0.16, 0.10, 0.02), 0.0016)
     build.paint(band, 1.0, 0.22)
     pieces.append(Piece("armband", "AccentBand", "outfit", band, 300, TORSO + ["neck"] + arms))     # (the sleeve's bones: it moves as the sleeve does)
+    return pieces, garment_f
 
-    surface = garment_f
-    extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist)
-    return pieces
+
+def item_top(origin):
+    def make(c, worn):
+        o = OUTFITS[origin]
+        pieces, surface = top_of(c, o, origin)
+        if origin == "backend":
+            def strings_f(p):                                                    # the hoodie's drawstrings
+                d = np.minimum(*[np.hypot(p[..., 0] - np.interp(p[..., 2], [1.31, 1.467], [s * 0.034, s * 0.026]), 0) for s in (1, -1)])
+                z = p[..., 2]
+                return np.maximum(np.maximum(surface(p) - 0.0075, -(surface(p)) - 0.003), np.maximum(d - 0.0036, np.maximum(1.31 - z, z - 1.467)))
+            st = sculpt("strings", strings_f, (-0.06, -0.2, 1.29), (0.06, 0.0, 1.48), 0.0012)
+            build.paint(st, 0.86, 0.2)
+            pieces.append(Piece("strings", "Outfit", "outfit", st, 160, ["chest", "spine"]))
+        elif origin == "qa":
+            def lanyard_f(p):                                                    # a lanyard round the neck to a badge on the chest
+                q = mx(p)
+                flat = np.hypot(q[..., 0] - np.interp(q[..., 2], [1.215, 1.30, 1.41, 1.474], [0.004, 0.026, 0.046, 0.058]), 0) - 0.0055
+                z = q[..., 2]
+                strap = np.maximum(shell(surface, p, 0.0008, 0.0022), np.maximum(flat, np.maximum(1.215 - z, z - 1.482)))
+                return np.maximum(strap, p[..., 1] + 0.0)                        # only down the front
+            ln = sculpt("lanyard", lanyard_f, (-0.08, -0.22, 1.20), (0.08, 0.01, 1.49), 0.0011)
+            build.paint(ln, 1.0, 0.25)
+            pieces.append(Piece("lanyard", "AccentBand", "outfit", ln, 260, ["chest", "spine", "neck"]))
+
+            def badge_f(p):
+                return np.maximum(shell(surface, p, 0.001, 0.004), sdf.box(p * (1, 0, 1), (0.0, 0.0, 1.175), (0.027, 1.0, 0.040), 0.004))
+            bg = sculpt("badge", badge_f, (-0.04, -0.22, 1.12), (0.04, -0.03, 1.23), 0.0011)
+            gp = sdf.points_of(bg)
+            photo = (np.abs(gp[:, 0] + 0.006) < 0.012) & (np.abs(gp[:, 2] - 1.186) < 0.014)
+            lines = (gp[:, 2] < 1.166) & (np.sin(gp[:, 2] * 900) > 0.2) & (np.abs(gp[:, 0]) < 0.02)
+            col = np.where(photo[:, None], (0.25, 0.3, 0.38), np.where(lines[:, None], (0.3, 0.3, 0.32), (0.86, 0.86, 0.84)))
+            build.paint(bg, col, 0.55)
+            pieces.append(Piece("badge", "Outfit", "outfit", bg, 120, ["chest", "spine"]))
+        elif origin == "designer":
+            def scarf_f(p):
+                tail = np.maximum(shell(surface, p, 0.0005, 0.011), sdf.box(p * (1, 0, 1), (0.050, 0.0, 1.340), (0.030, 1.0, 0.115), 0.008))
+                tail = np.maximum(tail, p[..., 1])                                   # (down the front only)
+                return smin(clothes.scarf(p), tail, 0.012)
+            sc = sculpt("scarf", scarf_f, (-0.12, -0.20, 1.20), (0.12, 0.14, 1.54), 0.002)
+            sp = sdf.points_of(sc)
+            knit = 0.90 + 0.10 * np.sin(np.arctan2(sp[:, 1] - 0.02, sp[:, 0]) * 46 + sp[:, 2] * 260) * np.sin(sp[:, 2] * 420)
+            build.paint(sc, np.repeat(knit[:, None], 3, 1), 0.1)
+            pieces.append(Piece("scarf", "AccentBand", "outfit", sc, 800, ["chest", "neck", "spine"]))
+        return pieces
+    return make
+
+
+def item_headphones(c, worn):
+    # big over-ear headphones over the hair
+    def phones_f(p):
+        q = mx(H(p))
+        ring = np.abs(np.hypot(q[..., 0] / 0.101, (q[..., 2] + 0.006) / 0.176) - 1.0) * 0.101      # over the hair: an ellipse
+        band = np.maximum(np.maximum(ring - 0.0055, np.abs(q[..., 1] - 0.012) - 0.013), -q[..., 2] - 0.02)
+        cup = ell(q, (0.086, 0.012, -0.006), (0.020, 0.040, 0.046))
+        cushion = ell(q, (0.076, 0.012, -0.006), (0.012, 0.034, 0.040))
+        return smin(smin(band, cup, 0.006), cushion, 0.003) * HEAD_S
+    ph = sculpt("headphones", phones_f, (-0.135, -0.07, 1.57), (0.135, 0.09, 1.86), 0.0018)
+    pp = mx(H(sdf.points_of(ph)))
+    build.paint(ph, np.where((pp[:, 0] < 0.082)[:, None] & (pp[:, 2] < 0.05)[:, None], 0.55, 1.0) * np.ones((len(pp), 3)), np.where(pp[:, 0] > 0.09, 0.62, 0.3))
+    return [Piece("headphones", "EyeDetails", "outfit", ph, 700, ["head"])]
+
+
+def item_torch(c, worn):
+    # a head torch on its band, lying on the wearer's own hair
+    hair_f = c.hair_f
+
+    def torch_f(p):
+        q = H(p)
+        band = np.maximum(np.abs(hair_f(p) - 0.0025) - 0.0022, (np.abs(q[..., 2] - 0.058) - 0.0105) * HEAD_S)
+        lamp = sdf.box(q, (0, -0.103, 0.058), (0.022, 0.014, 0.016), 0.005)
+        lens = cone(q, (0, -0.110, 0.058), (0, -0.124, 0.058), 0.012, 0.0125)
+        return smin(smin(band, lamp * HEAD_S, 0.003), lens * HEAD_S, 0.002)
+    tc = sculpt("torch", torch_f, (-0.12, -0.15, 1.69), (0.12, 0.14, 1.76), 0.0013)
+    tp = H(sdf.points_of(tc))
+    lens = (tp[:, 1] < -0.1215) & (np.hypot(tp[:, 0], tp[:, 2] - 0.058) < 0.0105)
+    lampbox = (tp[:, 1] < -0.088) & (np.abs(tp[:, 0]) < 0.03)
+    col = np.where(lens[:, None], (0.85, 0.88, 0.8), np.where(lampbox[:, None], (0.75, 0.42, 0.05), (0.06, 0.06, 0.065)))
+    build.paint(tc, col, np.where(lens, 0.85, np.where(lampbox, 0.5, 0.2)))
+    return [Piece("torch", "Outfit", "outfit", tc, 420, ["head"])]
+
+
+def item_beret(c, worn):
+    head_f = c.head_f
+
+    def beret_f(p):
+        return smax(beret_solid(p), -(head_f(p) + 0.001), 0.004)             # hollow where the head is (the hair under it is cut away: item_hair)
+    br = sculpt("beret", beret_f, (-0.13, -0.13, 1.71), (0.15, 0.15, 1.86), 0.0018)
+    build.paint(br, np.array((0.32, 0.035, 0.05)) * (0.9 + 0.2 * build.noise(sdf.points_of(br), 400)[:, None]), 0.12)
+    return [Piece("beret", "Outfit", "outfit", br, 520, ["head"])]
+
+
+def item_glasses(c, worn):
+    f = c.f
+    e = face.eye_centre(f)
+
+    def glasses_f(p):                                                            # big round glasses
+        q = mx(H(p))
+        cc = np.array((e[0] + 0.001, e[1] - 0.0235, e[2] - 0.002))
+        rim = np.hypot(np.hypot(q[..., 0] - cc[0], q[..., 2] - cc[2]) - 0.0205, q[..., 1] - cc[1]) - 0.0017
+        bridge = cone(q, (0.0, cc[1], cc[2] + 0.006), (0.010, cc[1], cc[2] + 0.004), 0.0014)
+        temple = cone(q, (cc[0] + 0.0205, cc[1], cc[2] + 0.004), (0.079 * f.skull_w, 0.012, cc[2] + 0.010), 0.0014)
+        return np.minimum(np.minimum(rim, bridge), temple) * HEAD_S
+    gl = sculpt("glasses", glasses_f, (-0.10, -0.125, 1.63), (0.10, 0.035, 1.71), 0.0006)
+    build.paint(gl, 1.0, 0.7)
+    return [Piece("glasses", "EyeDetails", "outfit", gl, 520, ["head"], texel=0.6)]
+
+
+ITEM_MAKERS = {
+    **{n: item_top(o) for n, (s, o) in ITEMS.items() if s == "top"},
+    **{n: item_bottom(o) for n, (s, o) in ITEMS.items() if s == "bottom"},
+    **{n: item_feet(o) for n, (s, o) in ITEMS.items() if s == "feet"},
+    **{n: item_hair(n) for n, (s, o) in ITEMS.items() if s == "hair"},
+    "beard": item_beard, "headphones": item_headphones, "torch": item_torch, "beret": item_beret, "glasses": item_glasses,
+}
 
 
 def beret_solid(p):
@@ -328,120 +567,6 @@ def along_path(p, pts):
         x, _ = sdf.seg_dist(p, a, c)
         d = x if d is None else np.minimum(d, x)
     return d
-
-
-def extras(who, pieces, person, b, fit, surface, head_f, hair_f, tr_f, waist):
-    f = person.face
-    if fit.get("tucked"):
-        # a belt where the shirt goes into the trousers, with a buckle
-        def belt_f(p):
-            d = tr_f(p)
-            band = smax(smax(d - 0.0045, -(d + 0.004), 0.001), np.abs(p[..., 2] - (waist - 0.022)) - 0.017, 0.002)
-            return smin(band, sdf.box(p, (0, -0.118 - 0.9 * b.belly - (0.02 if b.waist > 1.1 else 0.0), waist - 0.022), (0.022, 0.012, 0.016), 0.003), 0.002)
-        belt = sculpt("belt", belt_f, (-0.22, -0.24, waist - 0.06), (0.22, 0.2, waist + 0.02), 0.0018)
-        bp = sdf.points_of(belt)
-        buckle = (np.abs(bp[:, 0]) < 0.024) & (bp[:, 1] < -0.09) & (np.abs(bp[:, 2] - (waist - 0.022)) < 0.018)
-        build.paint(belt, np.where(buckle[:, None], 6.0, 1.0) * np.ones((len(bp), 3)), np.where(buckle, 0.75, 0.4))
-        pieces.append(Piece("belt", "EyeDetails", "outfit", belt, 420, ["hips", "spine"]))
-    if who == "backend":
-        # big over-ear headphones over the hair, and the hoodie's pocket and drawstrings
-        def phones_f(p):
-            q = mx(H(p))
-            ring = np.abs(np.hypot(q[..., 0] / 0.101, (q[..., 2] + 0.006) / 0.176) - 1.0) * 0.101      # over the hair: an ellipse
-            band = np.maximum(np.maximum(ring - 0.0055, np.abs(q[..., 1] - 0.012) - 0.013), -q[..., 2] - 0.02)
-            cup = ell(q, (0.086, 0.012, -0.006), (0.020, 0.040, 0.046))
-            cushion = ell(q, (0.076, 0.012, -0.006), (0.012, 0.034, 0.040))
-            return smin(smin(band, cup, 0.006), cushion, 0.003) * HEAD_S
-        ph = sculpt("headphones", phones_f, (-0.135, -0.07, 1.57), (0.135, 0.09, 1.86), 0.0018)
-        pp = mx(H(sdf.points_of(ph)))
-        build.paint(ph, np.where((pp[:, 0] < 0.082)[:, None] & (pp[:, 2] < 0.05)[:, None], 0.55, 1.0) * np.ones((len(pp), 3)), np.where(pp[:, 0] > 0.09, 0.62, 0.3))
-        pieces.append(Piece("headphones", "EyeDetails", "outfit", ph, 700, ["head"]))
-
-        def strings_f(p):
-            d = np.minimum(*[np.hypot(p[..., 0] - np.interp(p[..., 2], [1.31, 1.467], [s * 0.034, s * 0.026]), 0) for s in (1, -1)])
-            z = p[..., 2]
-            return np.maximum(np.maximum(surface(p) - 0.0075, -(surface(p)) - 0.003), np.maximum(d - 0.0036, np.maximum(1.31 - z, z - 1.467)))
-        st = sculpt("strings", strings_f, (-0.06, -0.2, 1.29), (0.06, 0.0, 1.48), 0.0012)
-        build.paint(st, 0.86, 0.2)
-        pieces.append(Piece("strings", "Outfit", "outfit", st, 160, ["chest", "spine"]))
-    elif who in ("qa", "scientist"):
-        # a lanyard round the neck to a badge on the chest; QA wears big round glasses
-        def lanyard_f(p):
-            q = mx(p)
-            flat = np.hypot(q[..., 0] - np.interp(q[..., 2], [1.215, 1.30, 1.41, 1.474], [0.004, 0.026, 0.046, 0.058]), 0) - 0.0055
-            z = q[..., 2]
-            strap = np.maximum(shell(surface, p, 0.0008, 0.0022), np.maximum(flat, np.maximum(1.215 - z, z - 1.482)))
-            strap = np.maximum(strap, p[..., 1] + 0.0)                       # only down the front
-            return strap
-        ln = sculpt("lanyard", lanyard_f, (-0.08, -0.22, 1.20), (0.08, 0.01, 1.49), 0.0011)
-        build.paint(ln, 1.0, 0.25)
-        pieces.append(Piece("lanyard", "AccentBand", "outfit", ln, 260, ["chest", "spine", "neck"]))
-
-        def badge_f(p):
-            return np.maximum(shell(surface, p, 0.001, 0.004), sdf.box(p * (1, 0, 1), (0.0, 0.0, 1.175), (0.027, 1.0, 0.040), 0.004))
-        bg = sculpt("badge", badge_f, (-0.04, -0.22, 1.12), (0.04, -0.03, 1.23), 0.0011)
-        gp = sdf.points_of(bg)
-        photo = (np.abs(gp[:, 0] + 0.006) < 0.012) & (np.abs(gp[:, 2] - 1.186) < 0.014)
-        lines = (gp[:, 2] < 1.166) & (np.sin(gp[:, 2] * 900) > 0.2) & (np.abs(gp[:, 0]) < 0.02)
-        col = np.where(photo[:, None], (0.25, 0.3, 0.38), np.where(lines[:, None], (0.3, 0.3, 0.32), (0.86, 0.86, 0.84)))
-        build.paint(bg, col, 0.55)
-        pieces.append(Piece("badge", "Outfit", "outfit", bg, 120, ["chest", "spine"]))
-        if who == "qa":
-            e = face.eye_centre(f)
-
-            def glasses_f(p):
-                q = mx(H(p))
-                c = np.array((e[0] + 0.001, e[1] - 0.0235, e[2] - 0.002))
-                rim = np.hypot(np.hypot(q[..., 0] - c[0], q[..., 2] - c[2]) - 0.0205, q[..., 1] - c[1]) - 0.0017
-                bridge = cone(q, (0.0, c[1], c[2] + 0.006), (0.010, c[1], c[2] + 0.004), 0.0014)
-                temple = cone(q, (c[0] + 0.0205, c[1], c[2] + 0.004), (0.079 * f.skull_w, 0.012, c[2] + 0.010), 0.0014)
-                return np.minimum(np.minimum(rim, bridge), temple) * HEAD_S
-            gl = sculpt("glasses", glasses_f, (-0.10, -0.125, 1.63), (0.10, 0.035, 1.71), 0.0006)
-            build.paint(gl, 1.0, 0.7)
-            pieces.append(Piece("glasses", "EyeDetails", "outfit", gl, 520, ["head"], texel=0.6))
-    elif who == "sysadmin":
-        # a head torch on its band, a coil of cable at the hip
-        def torch_f(p):
-            q = H(p)
-            band = np.maximum(np.abs(hair_f(p) - 0.0025) - 0.0022, (np.abs(q[..., 2] - 0.058) - 0.0105) * HEAD_S)
-            lamp = sdf.box(q, (0, -0.103, 0.058), (0.022, 0.014, 0.016), 0.005)
-            lens = cone(q, (0, -0.110, 0.058), (0, -0.124, 0.058), 0.012, 0.0125)
-            return smin(smin(band, lamp * HEAD_S, 0.003), lens * HEAD_S, 0.002)
-        tc = sculpt("torch", torch_f, (-0.12, -0.15, 1.69), (0.12, 0.14, 1.76), 0.0013)
-        tp = H(sdf.points_of(tc))
-        lens = (tp[:, 1] < -0.1215) & (np.hypot(tp[:, 0], tp[:, 2] - 0.058) < 0.0105)
-        lampbox = (tp[:, 1] < -0.088) & (np.abs(tp[:, 0]) < 0.03)
-        col = np.where(lens[:, None], (0.85, 0.88, 0.8), np.where(lampbox[:, None], (0.75, 0.42, 0.05), (0.06, 0.06, 0.065)))
-        build.paint(tc, col, np.where(lens, 0.85, np.where(lampbox, 0.5, 0.2)))
-        pieces.append(Piece("torch", "Outfit", "outfit", tc, 420, ["head"]))
-
-        def cable_f(p):
-            c = np.array((0.172 * b.hips + 0.012, 0.0, 0.955))
-            r = np.hypot(p[..., 1] - c[1], p[..., 2] - c[2])
-            d = None
-            for k in range(3):
-                t = np.hypot(r - (0.072 - 0.004 * k), p[..., 0] - (c[0] + 0.009 * k)) - 0.0065
-                d = t if d is None else smin(d, t, 0.002)
-            return smin(d, cone(p, (c[0] - 0.02, 0.0, c[2] + 0.07), (c[0] + 0.02, 0.0, c[2] + 0.075), 0.007), 0.004)   # the strap it hangs on
-        cb = sculpt("cable", cable_f, (0.12, -0.10, 0.86), (0.24, 0.10, 1.06), 0.0015)
-        build.paint(cb, 1.0, 0.45)
-        pieces.append(Piece("cable", "AccentBand", "outfit", cb, 420, ["hips", "thigh.L"]))
-    elif who == "designer":
-        def scarf_f(p):
-            tail = np.maximum(shell(surface, p, 0.0005, 0.011), sdf.box(p * (1, 0, 1), (0.050, 0.0, 1.340), (0.030, 1.0, 0.115), 0.008))
-            tail = np.maximum(tail, p[..., 1])                                       # (down the front only)
-            return smin(clothes.scarf(p), tail, 0.012)
-        sc = sculpt("scarf", scarf_f, (-0.12, -0.20, 1.20), (0.12, 0.14, 1.54), 0.002)
-        sp = sdf.points_of(sc)
-        knit = 0.90 + 0.10 * np.sin(np.arctan2(sp[:, 1] - 0.02, sp[:, 0]) * 46 + sp[:, 2] * 260) * np.sin(sp[:, 2] * 420)
-        build.paint(sc, np.repeat(knit[:, None], 3, 1), 0.1)
-        pieces.append(Piece("scarf", "AccentBand", "outfit", sc, 800, ["chest", "neck", "spine"]))
-
-        def beret_f(p):
-            return smax(beret_solid(p), -(head_f(p) + 0.001), 0.004)         # hollow where the head is (the hair under it is cut away: figure)
-        br = sculpt("beret", beret_f, (-0.13, -0.13, 1.71), (0.15, 0.15, 1.86), 0.0018)
-        build.paint(br, np.array((0.32, 0.035, 0.05)) * (0.9 + 0.2 * build.noise(sdf.points_of(br), 400)[:, None]), 0.12)
-        pieces.append(Piece("beret", "Outfit", "outfit", br, 520, ["head"]))
 
 
 def eyeball(name, c, seg, rings):
@@ -475,7 +600,8 @@ def paint_head(p, person):
     near = lambda c, w: np.exp(-(np.linalg.norm(q - np.array(c), axis=1) / w) ** 2)
     warm = 0.9 * near((0.046, -0.068, -0.030), 0.028) + 0.8 * near((0, -0.118, -0.033), 0.016) + 0.8 * near((0.078, 0.014, -0.004), 0.028) + 0.4 * near((0, -0.086, -0.094), 0.02)
     rgb *= 1 - np.clip(warm, 0, 1)[:, None] * np.array([-0.02, 0.085, 0.10])
-    lip = np.clip(1 - face.lips(q, f) / 0.0022, 0, 1) ** 0.7 * (p[:, 1] < -0.080)      # (the red of the lips, fading out past their edge)
+    lip = np.clip(1 - face.lips(q, f) / 0.0028, 0, 1) ** 0.7 * (p[:, 1] < -0.080)      # (the red of the lips, fading out past their edge)
+    lip *= np.clip((0.0235 * f.mouth_w - q[:, 0]) / 0.007, 0, 1) ** 0.6                  # … and towards the corners (two red stripes ended bluntly)
     k = person.lip_colour
     rgb *= 1 - lip[:, None] * np.array([0.10 + 0.05 * k, 0.26 + 0.22 * k, 0.24 + 0.16 * k])
     e = face.eye_centre(f)
@@ -487,12 +613,19 @@ def paint_head(p, person):
     lids = (p[:, 1] < e[1] - 0.004) & (np.abs(q[:, 2] - e[2]) < 0.011) & (np.abs(q[:, 0] - e[0]) < 0.021) & (p[:, 1] > e[1] - 0.022)
     lash = np.clip(1 - np.abs(slit - 0.0008) / 0.0016, 0, 1) ** 0.6 * np.where(q[:, 2] > e[2] - 0.0017, 1.0 if f.female else 0.8, 0.35) * lids
     rgb *= 1 - lash[:, None]
+    # the pockets in the corners of the almond: the pink caruncle at the inner one, a darker pink at the outer
+    pocket = (slit < 0.0004) * (p[:, 1] > e[1] - 0.0080) * np.clip((np.abs(q[:, 0] - e[0]) - 0.0085) / 0.002, 0, 1)
+    rgb *= 1 - pocket[:, None] * np.where(q[:, 0] < e[0], 1.0, 0.6)[:, None] * np.array([0.02, 0.30, 0.26])
     # eyebrows: an arc of hair on the brow ridge, thicker towards the nose
     t = np.clip((q[:, 0] - 0.008) / 0.040, 0, 1)
     arc = 0.0235 + 0.0050 * np.sin(np.pi * np.minimum(1.0, t * 1.25)) - 0.006 * t * t + (0.0025 if f.female else 0.0)
     half = (0.0066 - 0.0036 * t) * person.brow_thick
-    hairs = 0.75 + 0.25 * np.sin(q[:, 0] * 2600 + q[:, 2] * 1400)
-    brow = np.clip(1.6 * (1 - np.abs(q[:, 2] - arc) / half), 0, 1) * (q[:, 0] > 0.006) * (q[:, 0] < 0.051) * (p[:, 1] < -0.06) * hairs
+    # (no drawn hairs: the sculpt's vertices are 1.3 mm apart, and a finer stripe aliased into a checkerboard in the game —
+    # a soft mass, denser at the lower edge and at the head of the brow, thinning out along its tail, reads as a brow)
+    hairs = (0.82 + 0.18 * build.noise(p, 260, 5)) * (1.0 - 0.35 * t * t)
+    edge = (q[:, 2] - arc) / half
+    brow = np.clip(1.25 * (1 - np.abs(edge) ** 1.6) * (1.0 - 0.15 * np.clip(edge, 0, 1)), 0, 1) * hairs
+    brow *= np.clip((q[:, 0] - 0.006) / 0.004, 0, 1) * np.clip((0.051 - q[:, 0]) / 0.006, 0, 1) * (p[:, 1] < -0.06)
     dark = np.array(person.brow_colour or person.hair_colour) * 0.55
     rgb = rgb * (1 - brow[:, None]) + np.clip(dark / np.array((0.8, 0.6, 0.5)), 0, 1)[None, :] * brow[:, None] * 0.32
     if person.stubble or person.beard:
@@ -503,7 +636,7 @@ def paint_head(p, person):
     if person.freckles:
         zone = np.clip(near((0.030, -0.075, -0.018), 0.030) + near((0, -0.105, -0.015), 0.018), 0, 1)
         rgb *= 1 - (zone * build.speckle(p, 1500, 0.16, 3) * person.freckles)[:, None] * np.array([0.10, 0.22, 0.30])
-    gloss = 0.36 + 0.16 * near((0, -0.105, -0.020), 0.03) + 0.10 * near((0, -0.085, 0.05), 0.04) + 0.25 * lip
+    gloss = 0.36 + 0.16 * near((0, -0.105, -0.020), 0.03) + 0.10 * near((0, -0.085, 0.05), 0.04) + 0.10 * lip
     return rgb, gloss
 
 
@@ -552,7 +685,9 @@ def paint_eye(p, person):
 
 def paint_hair(p, person, shade):
     locks = face._strands(p)
-    streak = 0.82 + 0.3 * locks + 0.12 * (build.noise(p * (6, 1, 1), 500) - 0.5)
+    # the grain follows the locks only a little; lighter and darker locks come and go along their length (a lock-for-lock
+    # stripe as dark as a groove read as the segments of a pumpkin from the crown down)
+    streak = 0.86 + 0.13 * locks + 0.16 * (build.noise(p, 170, 2) - 0.5) + 0.10 * (build.noise(p * (4, 1, 1), 420) - 0.5)
     rgb = np.array(person.hair_colour)[None, :] * (streak * shade)[:, None]
     return rgb, 0.20 + 0.12 * locks
 
@@ -678,7 +813,7 @@ def clothes_edge(q):
 
 # --------------------------------------------------------------------------- assembling the game model
 
-def assemble(pieces, who):
+def assemble(pieces, stem, atlases=(("skin", 2048), ("outfit", 2048))):
     """Cuts every piece to its budget, unwraps and packs the atlases, bakes, skins and joins the parts. Returns the rig
     and the game's part objects."""
     t = time.time()
@@ -687,13 +822,16 @@ def assemble(pieces, who):
             build.lowpoly(p)
             build.clean(p.lo)
             build.orient_like(p.lo, p.hi)
-        build.unwrap(p)
+        if not p.own_uv:
+            build.unwrap(p)
     print(f"LOWPOLY {sum(sdf.tri_count(p.lo) for p in pieces)} tris in {len(pieces)} pieces, {time.time() - t:.1f} s")
-    for atlas, size in (("skin", 1024), ("outfit", 2048)):
-        group = [p for p in pieces if p.atlas == atlas]
-        build.pack(group)
+    for atlas, size in atlases:                                        # (the skin at 2048: the face is what a close-up looks at)
+        group = [p for p in pieces if p.atlas == atlas and not p.own_uv]
+        if not group:
+            continue
+        build.pack(group, size if not DRAFT else size // 2)
         t = time.time()
-        build.bake(group, size if not DRAFT else size // 2, TEXTURES, f"human_{who}_{atlas}")
+        build.bake(group, size if not DRAFT else size // 2, TEXTURES, f"human_{stem}_{atlas}", ao_samples=64 if not DRAFT else 16)   # (24 samples baked a grain of sand into every skin)
         print(f"BAKED {atlas}: {len(group)} pieces, {time.time() - t:.1f} s")
     rig = anim.skeleton()
     bones = anim.bone_segments()
@@ -704,7 +842,7 @@ def assemble(pieces, who):
             p.lo.vertex_groups.new(name=name)
         pts = sdf.points_of(p.lo)
         build.assign(p.lo, hand_weights(pts, p.name[-1]) if p.name.startswith("hand.") else build.weights(pts, seg, p.bones, RADIUS))
-        parts.setdefault(p.part, []).append(p.lo)
+        parts.setdefault(p.part if p.slot is None else f"{p.part}.{p.slot}", []).append(p.lo)     # (an item's: "<part>.<slot>", the wardrobe's handle)
     out = []
     errors = 0
     for part, objs in parts.items():
@@ -717,7 +855,7 @@ def assemble(pieces, who):
         obj = bpy.context.view_layer.objects.active
         obj.name = obj.data.name = part
         obj.data.uv_layers.active.name = "UVMap"
-        errors += build.audit(obj)
+        errors += build.audit(obj, open_ok=part.startswith("Hair"))
         obj.parent = rig
         mod = obj.modifiers.new("Rig", "ARMATURE")
         mod.object = rig
@@ -729,6 +867,8 @@ def assemble(pieces, who):
 def hide_sculpts(pieces):
     for p in pieces:
         for h in (p.hi if isinstance(p.hi, (list, tuple)) else [p.hi]):
+            if h is p.lo:
+                continue                                                  # (hair cards: the game mesh is its own sculpt)
             h.hide_render = True
             h.hide_viewport = True
 
@@ -822,6 +962,43 @@ def previews(rig, parts, acts, who, path):
         os.remove(t)
 
 
+def sidecar(path, **data):
+    """What the game reads beside a file (AssetBuilder.SidecarOf): the slot and name of an item, a person's own items, the hair's colour."""
+    import json
+    with open(os.path.splitext(path)[0] + ".json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=1)
+
+
+def export_item(rig, parts, who, item):
+    """An item's file: the skeleton (no takes: it is worn on a person's) and its meshes, and its sidecar."""
+    os.makedirs(OUT, exist_ok=True)
+    for o in parts:
+        o.data.materials.clear()
+    bpy.ops.object.select_all(action="DESELECT")
+    rig.select_set(True)
+    for o in parts:
+        o.select_set(True)
+    path = os.path.join(OUT, f"human_{who}__{item}.fbx")
+    bpy.ops.export_scene.fbx(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y",
+                             bake_space_transform=False, object_types={"ARMATURE", "MESH"}, use_mesh_modifiers=True, mesh_smooth_type="FACE",
+                             use_tspace=False, add_leaf_bones=False, use_armature_deform_only=True, bake_anim=False)
+    sidecar(path, who=who, item=item, slot=ITEMS[item][0])
+
+
+def make_item(who, item):
+    """Sculpts, bakes and exports one wardrobe item made for a person's build (its own maps: human_<who>__<item>_outfit_*)."""
+    t0 = time.time()
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.context.scene.render.fps = anim.FPS
+    pieces = figure(who, [item], body_too=False)
+    size = 1024 if ITEMS[item][0] in ("top", "bottom") else 512
+    rig, parts, errors = assemble(pieces, f"{who}__{item}", (("outfit", size),))
+    hide_sculpts(pieces)
+    export_item(rig, parts, who, item)
+    print(f"ITEM {who} {item}: {time.time() - t0:.1f} s" + (f" WITH {errors} TOPOLOGY ERRORS" if errors else ""))
+    return errors
+
+
 def export(rig, parts, who):
     os.makedirs(OUT, exist_ok=True)
     for o in parts:
@@ -842,9 +1019,16 @@ def export(rig, parts, who):
                              use_mesh_modifiers=True, mesh_smooth_type="FACE", use_tspace=False, add_leaf_bones=False,
                              use_armature_deform_only=True, bake_anim=True, bake_anim_use_all_actions=True,
                              bake_anim_use_nla_strips=False, bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0)
+    sidecar(os.path.join(OUT, f"human_{who}.fbx"), who=who, items={ITEMS[n][0]: n for n in DEFAULTS.get(who, [])},
+            hair_colour=list(face.PEOPLE[who].hair_colour) if who in face.PEOPLE else [0.1, 0.08, 0.06])
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and ITEM_ARG:
+    # wardrobe items for this person: item=all — every item that is not their own (theirs are in their model)
+    names = [n for n in ITEMS if n not in DEFAULTS.get(WHO, [])] if ITEM_ARG == "all" else ITEM_ARG.split(",")
+    bad = sum(make_item(WHO, n) for n in names)
+    print(f"DONE {WHO} items {','.join(names)}" + (f" WITH {bad} TOPOLOGY ERRORS" if bad else ""))
+elif __name__ == "__main__":
     t0 = time.time()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.context.scene.render.fps = anim.FPS
@@ -857,7 +1041,7 @@ if __name__ == "__main__":
         base, ext = os.path.splitext(PREVIEW)
         view.sheet(base + "_sculpt" + ext, [p.hi for p in pieces], shots=view.FULL)
         view.sheet(base + "_sculpt_face" + ext, [p.hi for p in pieces], shots=view.FACE + view.BUST[:1], width=460)
-    rig, parts, errors = assemble(pieces, WHO)
+    rig, parts, errors = assemble(pieces, WHO)                     # (the person's maps: human_<who>_skin_*, human_<who>_outfit_*)
     hide_sculpts(pieces)
     acts = anim.animate(rig)
     if PREVIEW:

@@ -79,7 +79,9 @@ namespace Stealth.EditorTools
                 model.transform.localScale = Vector3.one * HumanHeight(who);
                 foreach (var r in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
                 {
-                    r.sharedMaterial = mats.TryGetValue(r.gameObject.name, out var m) ? m : PartMaterial(mats, r.gameObject.name);
+                    // ("<part>.<slot>": a renderer of the person's own outfit — the part says the material)
+                    string part = WardrobeRules.PartOf(r.gameObject.name);
+                    r.sharedMaterial = part == "Hair" ? HairCardMaterial($"Human_{who}_Hair", HairColourOf(who)) : mats.TryGetValue(part, out var m) ? m : PartMaterial(mats, part);
                     r.shadowCastingMode = ShadowCastingMode.On;
                     r.updateWhenOffscreen = false;
                 }
@@ -99,6 +101,16 @@ namespace Stealth.EditorTools
                 rig.FingersR = bones.FirstOrDefault(t => t.name == "middle.1.R");
                 // the IK callbacks come to the Animator's own object: a relay hands them to the rig
                 model.AddComponent<HumanIK>().Rig = rig;
+                // the wardrobe: the person's own outfit, slot by slot (its renderers are "<part>.<slot>"; the item names from human.py's sidecar)
+                var wardrobe = go.AddComponent<HumanWardrobe>();
+                wardrobe.Who = who;
+                wardrobe.Model = model.transform;
+                var ownItems = SidecarOf(fbx).Items;
+                wardrobe.Own = model.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+                    .Select(r => (slot: WardrobeRules.SlotOfPart(r.gameObject.name), r)).Where(x => x.slot != null)
+                    .GroupBy(x => x.slot)
+                    .Select(g => new HumanWardrobe.Worn { Slot = g.Key, Item = ownItems.TryGetValue(g.Key, out var it) ? it : null, Renderers = g.Select(x => (Renderer)x.r).ToArray() })
+                    .ToArray();
                 // the ankle over the sole: the Idle take stands on the floor (HumanRigTests), its lower foot bone's height
                 var idle = controller.animationClips.FirstOrDefault(c => c.name == "Idle");
                 if (idle != null && rig.FootL != null && rig.FootR != null)
@@ -108,6 +120,141 @@ namespace Stealth.EditorTools
                 }
                 return go;
             });
+        }
+
+        /// <summary>What human.py writes beside a person's or an item's file (human_&lt;who&gt;.json, human_&lt;who&gt;__&lt;item&gt;.json).</summary>
+        sealed class HumanSidecar
+        {
+            public string Slot, Item;
+            public System.Collections.Generic.Dictionary<string, string> Items = new();
+            public Color HairColour = new(0.1f, 0.08f, 0.06f);
+        }
+
+        /// <summary>The sidecar of a human's file (json: "slot", "item", "items" {slot: item}, "hair_colour" [r, g, b] linear); empty when missing.</summary>
+        static HumanSidecar SidecarOf(string fbx)
+        {
+            var car = new HumanSidecar();
+            string path = System.IO.Path.ChangeExtension(fbx, ".json");
+            if (!System.IO.File.Exists(path)) return car;
+            string json = System.IO.File.ReadAllText(path);
+            const System.Text.RegularExpressions.RegexOptions S = System.Text.RegularExpressions.RegexOptions.Singleline;
+            string Str(string key)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(json, "\"" + key + "\"\\s*:\\s*\"([^\"]*)\"");
+                return m.Success ? m.Groups[1].Value : null;
+            }
+            car.Slot = Str("slot");
+            car.Item = Str("item");
+            var items = System.Text.RegularExpressions.Regex.Match(json, "\"items\"\\s*:\\s*\\{([^}]*)\\}", S);
+            if (items.Success)
+                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(items.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\""))
+                    car.Items[m.Groups[1].Value] = m.Groups[2].Value;
+            var hair = System.Text.RegularExpressions.Regex.Match(json, "\"hair_colour\"\\s*:\\s*\\[([^\\]]*)\\]", S);
+            if (hair.Success)
+            {
+                var v = hair.Groups[1].Value.Split(',').Select(x => float.Parse(x.Trim(), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                if (v.Length >= 3) car.HairColour = new Color(v[0], v[1], v[2]).gamma;      // (linear in the file, the material's colour is sRGB)
+            }
+            return car;
+        }
+
+        static Color HairColourOf(string who) => SidecarOf($"{ModelsDir}/Humans/human_{who}.fbx").HairColour;
+
+        const string WearDir = PrefabsDir + "/Player/Wear";
+
+        /// <summary>
+        /// Every item made for every person (human.py <c>item=…</c> → Art/Models/Humans/human_&lt;who&gt;__&lt;item&gt;.fbx): a
+        /// prefab each (Prefabs/Player/Wear/&lt;who&gt;/&lt;item&gt;) — its skinned meshes with their bones' names
+        /// (<see cref="WearPiece"/>), bound to the wearer's skeleton when worn — and its own baked maps.
+        /// </summary>
+        static WearPiece[] BuildWardrobe()
+        {
+            var list = new System.Collections.Generic.List<WearPiece>();
+            string dir = ModelsDir + "/Humans";
+            if (!AssetDatabase.IsValidFolder(dir)) return list.ToArray();
+            ConfigureHumanTextures();
+            foreach (var guid in AssetDatabase.FindAssets("human_ t:Model", new[] { dir }).OrderBy(g => AssetDatabase.GUIDToAssetPath(g)))
+            {
+                string fbx = AssetDatabase.GUIDToAssetPath(guid);
+                string file = System.IO.Path.GetFileNameWithoutExtension(fbx);
+                int cut = file.IndexOf("__", System.StringComparison.Ordinal);
+                if (cut < 0) continue;
+                string who = file.Substring("human_".Length, cut - "human_".Length), item = file.Substring(cut + 2);
+                var car = SidecarOf(fbx);
+                if (AssetImporter.GetAtPath(fbx) is ModelImporter imp) ConfigureWearImport(imp);
+                var mat = HumanMaps($"Human_{who}__{item}", $"{who}__{item}", "outfit");
+                var hairMat = HairCardMaterial($"Human_{who}__{item}_Hair", HairColourOf(who));
+                var piece = Prefab($"{WearDir}/{who}/{item}.prefab", () =>
+                {
+                    var go = new GameObject(item);
+                    var wear = go.AddComponent<WearPiece>();
+                    wear.Slot = car.Slot ?? "";
+                    wear.Item = item;
+                    wear.Who = who;
+                    var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+                    var parts = new System.Collections.Generic.List<WearPiece.Part>();
+                    foreach (var src in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                    {
+                        var child = new GameObject(src.gameObject.name);
+                        child.transform.SetParent(go.transform, false);
+                        var r = child.AddComponent<SkinnedMeshRenderer>();
+                        r.sharedMesh = src.sharedMesh;
+                        r.sharedMaterial = WardrobeRules.PartOf(src.gameObject.name) == "Hair" ? hairMat : mat;
+                        r.localBounds = src.localBounds;
+                        r.shadowCastingMode = ShadowCastingMode.On;
+                        r.updateWhenOffscreen = false;
+                        parts.Add(new WearPiece.Part { Renderer = r, Bones = src.bones.Select(b => b != null ? b.name : "").ToArray(), Root = src.rootBone != null ? src.rootBone.name : "hips" });
+                    }
+                    wear.Parts = parts.ToArray();
+                    return go;
+                });
+                if (piece != null && piece.TryGetComponent<WearPiece>(out var w)) list.Add(w);
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>An item's file: the skeleton and its meshes, no takes, no Avatar (it is worn on a person's skeleton).</summary>
+        static void ConfigureWearImport(ModelImporter imp)
+        {
+            if (imp.animationType == ModelImporterAnimationType.Generic && !imp.importAnimation && imp.materialImportMode == ModelImporterMaterialImportMode.None
+                && imp.importNormals == ModelImporterNormals.Import && imp.importTangents == ModelImporterTangents.CalculateMikk && imp.bakeAxisConversion) return;
+            imp.animationType = ModelImporterAnimationType.Generic;
+            imp.avatarSetup = ModelImporterAvatarSetup.NoAvatar;
+            imp.importAnimation = false;
+            imp.materialImportMode = ModelImporterMaterialImportMode.None;
+            imp.bakeAxisConversion = true;
+            imp.importNormals = ModelImporterNormals.Import;
+            imp.importTangents = ModelImporterTangents.CalculateMikk;
+            imp.skinWeights = ModelImporterSkinWeights.Standard;     // (four bones a vertex)
+            imp.SaveAndReimport();
+        }
+
+        /// <summary>The outfits of the departments as the persons wear them out of the box (a starting point to edit in Styles.asset).</summary>
+        static Stealth.Configs.HumanOutfit[] DefaultOutfits() => new[] { "backend", "qa", "sysadmin", "designer" }
+            .Select(who => new Stealth.Configs.HumanOutfit { Items = SidecarOf($"{ModelsDir}/Humans/human_{who}.fbx").Items.Values.ToArray() }).ToArray();
+
+        /// <summary>
+        /// Hair cards: strips of the strand texture (Art/Textures/Humans/hair_strands.png, white strands — the colour is the
+        /// person's hair) cut out by alpha (coverage kept in the mips: strands do not melt away in the distance), seen from
+        /// both sides, matte with a little sheen.
+        /// </summary>
+        static Material HairCardMaterial(string name, Color colour)
+        {
+            var m = LitAsset($"{HumansDataDir}/{name}.mat");
+            m.SetColor("_BaseColor", colour);
+            m.SetTexture("_BaseMap", Tex(HumanTextures + "/hair_strands.png"));
+            m.SetFloat("_AlphaClip", 1f);
+            m.EnableKeyword("_ALPHATEST_ON");
+            m.SetFloat("_Cutoff", 0.45f);
+            m.SetFloat("_Cull", (float)CullMode.Off);
+            m.SetFloat("_Smoothness", 0.35f);
+            m.SetFloat("_Metallic", 0f);
+            m.SetTexture("_BumpMap", null);
+            m.DisableKeyword("_NORMALMAP");
+            m.SetOverrideTag("RenderType", "TransparentCutout");
+            m.renderQueue = (int)RenderQueue.AlphaTest;
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         /// <summary>How tall a person is, as a share of the sculpt's 1.80 m (the lanky developer, the short tester, the stocky sysadmin, the designer).</summary>
@@ -130,6 +277,22 @@ namespace Stealth.EditorTools
                 var file = System.IO.Path.GetFileNameWithoutExtension(path);
                 var type = file.EndsWith("_normal") ? TextureImporterType.NormalMap : TextureImporterType.Default;
                 bool srgb = file.EndsWith("_base");
+                if (file == "hair_strands")
+                {
+                    // the strand texture: coverage kept in the mips (a box filter thins strands to nothing in the distance), alpha as transparency
+                    if (imp.mipMapsPreserveCoverage && imp.alphaIsTransparency && imp.wrapMode == TextureWrapMode.Clamp && imp.sRGBTexture) continue;
+                    imp.textureType = TextureImporterType.Default;
+                    imp.sRGBTexture = true;
+                    imp.alphaIsTransparency = true;
+                    imp.mipmapEnabled = true;
+                    imp.mipMapsPreserveCoverage = true;
+                    imp.alphaTestReferenceValue = 0.45f;
+                    imp.wrapMode = TextureWrapMode.Clamp;
+                    imp.filterMode = FilterMode.Trilinear;
+                    imp.anisoLevel = 4;
+                    imp.SaveAndReimport();
+                    continue;
+                }
                 if (imp.textureType == type && imp.sRGBTexture == srgb && imp.filterMode == FilterMode.Trilinear && imp.mipmapEnabled
                     && imp.wrapMode == TextureWrapMode.Clamp && imp.anisoLevel == 4) continue;
                 imp.textureType = type;
