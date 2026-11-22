@@ -71,13 +71,20 @@ namespace Stealth.Player
             inv.GiveServer(extra, ItemCatalog.FreshColor(extra, 0));
         }
 
-        /// <summary>Server, the hand key on a medkit (heals to full, used up) or the instant coffee (drunk: faster for a while).</summary>
+        /// <summary>Server, the hand key on a medkit (heals to full, used up), a bandage (heals a little) or the instant coffee (drunk: faster for a while).</summary>
         bool UseConsumableServer(PlayerInventory inv, InventoryEntry e)
         {
             if (e.Shape == ItemCatalog.Medkit)
             {
                 if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Medkit)) return true;
                 HealServer(HealthState.MaxHp - Hp);
+                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
+                return true;
+            }
+            if (e.Shape == ItemCatalog.Bandage)
+            {
+                if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Bandage)) return true;
+                HealServer(Mathf.Min(Gear.BandageHp, HealthState.MaxHp - Hp));
                 Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
                 return true;
             }

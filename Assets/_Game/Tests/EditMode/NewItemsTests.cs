@@ -39,7 +39,7 @@ namespace Stealth.Tests
         [Test]
         public void TheShapesAreTheirSizes()
         {
-            Assert.AreEqual(new Vector2Int(2, 3), ItemCatalog.Size(ItemCatalog.Shapes[ItemCatalog.Book].Cells));
+            Assert.AreEqual(new Vector2Int(2, 2), ItemCatalog.Size(ItemCatalog.Shapes[ItemCatalog.Book].Cells));
             Assert.AreEqual(new Vector2Int(2, 2), ItemCatalog.Size(ItemCatalog.Shapes[ItemCatalog.Cans].Cells));
             Assert.AreEqual(new Vector2Int(1, 3), ItemCatalog.Size(ItemCatalog.Shapes[ItemCatalog.Screwdriver].Cells));
             Assert.IsTrue(ItemCatalog.Holdable(ItemCatalog.Screwdriver), "the screwdriver is used from the hand");
@@ -67,7 +67,7 @@ namespace Stealth.Tests
             Assert.IsTrue(inv.HasBelt);
             Assert.IsTrue(inv.CanPlace(ItemCatalog.Cans, 0, PlayerInventory.BeltX0 + 2, 2), "a 2 x 2 in the belt's corner");
             Assert.IsFalse(inv.CanPlace(ItemCatalog.Cans, 0, PlayerInventory.BeltX0 + 3, 0), "over the belt's edge");
-            Assert.IsFalse(inv.CanPlace(ItemCatalog.Book, 0, PlayerInventory.BeltX0, 2), "too tall for what is left");
+            Assert.IsFalse(inv.CanPlace(ItemCatalog.Screwdriver, 0, PlayerInventory.BeltX0, 2), "too tall for what is left");
             Assert.IsFalse(inv.CanPlace(ItemCatalog.BeltBag, 0, PlayerInventory.WornX, 0), "one bag worn at a time");
             Object.DestroyImmediate(inv.gameObject);
 

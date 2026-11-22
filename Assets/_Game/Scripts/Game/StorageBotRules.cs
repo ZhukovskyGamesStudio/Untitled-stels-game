@@ -26,8 +26,9 @@ namespace Stealth.Game
     /// <summary>
     /// The storage robot's rules (pure, tested). It lives in the ducts: called, it crawls to the grate nearest the player
     /// and comes down only if the room under it is safe (no awake robot, camera or sensor there) — otherwise it waits up in
-    /// the duct, its stash in reach of a player standing under the grate. Out of the ducts it walks only the last stretch
-    /// (to the player, to the exit hatch, home to the basement). Sent to the exit (once the exit room is seen) it crawls to
+    /// the duct, its stash in reach of a player standing under the grate. Out of the ducts it walks only within the room it
+    /// stands in (<see cref="SameRoom"/>: to the player beside it, to the exit hatch of this room) and the last stretch
+    /// under a grate; to anywhere else it goes up into the ducts (<see cref="Way"/>). Sent to the exit (once the exit room is seen) it crawls to
     /// the exit room and leaves by the exit hatch with its load; on an alarm it hides in the basement. Robots that see it in
     /// a room raise the alarm.
     /// </summary>
@@ -37,8 +38,40 @@ namespace Stealth.Game
         public const float StashReach = 2.4f;
         /// <summary>Called, it stops this close to the player who called it.</summary>
         public const float Arrive = 1.6f;
-        /// <summary>The longest way it walks on the floor to a caller or the exit (metres); further, or no way at all: through the ducts.</summary>
+        /// <summary>The longest way it walks on the floor when the ducts do not lead there at all (metres).</summary>
         public const float WalkFurthest = 45f;
+
+        /// <summary>How it gets somewhere.</summary>
+        public enum Route { Walk, Ducts, None }
+
+        /// <summary>
+        /// Where it stands and where it is going are one room (or both the basement it arrived in): it walks over. A point
+        /// in no room (a doorway, outside) is in none.
+        /// </summary>
+        public static bool SameRoom(LevelLayout l, Vector3 from, Vector3 to)
+        {
+            if (l == null) return false;
+            bool a = Basement.Contains(l.Cellar, from), b = Basement.Contains(l.Cellar, to);
+            if (a || b) return a && b;
+            var ra = l.RoomAt(from + Vector3.up * 0.1f);
+            var rb = l.RoomAt(to + Vector3.up * 0.1f);
+            return ra != null && rb != null && ra.Id == rb.Id && ra.Floor == rb.Floor;
+        }
+
+        /// <summary>
+        /// The way it takes (pure): on the floor within its own room; to another room through the ducts, never across the
+        /// house on foot — unless the ducts do not lead there, then on foot after all if the way is not too long.
+        /// </summary>
+        /// <param name="sameRoom">Start and end are in one room (<see cref="SameRoom"/>).</param>
+        /// <param name="floorWay">The length of the way on the floor, metres; negative: there is none (or it is up in the ducts).</param>
+        /// <param name="ducts">The ducts lead there.</param>
+        public static Route Way(bool sameRoom, float floorWay, bool ducts)
+        {
+            bool walkable = floorWay >= 0f && floorWay <= WalkFurthest;
+            if (sameRoom && walkable) return Route.Walk;
+            if (ducts) return Route.Ducts;
+            return walkable ? Route.Walk : Route.None;
+        }
         /// <summary>Crawling through the ducts, metres a second; climbing through a grate, the same.</summary>
         public const float DuctSpeed = 1.8f;
         /// <summary>Seen in a room by a robot or a camera for this long, the alarm goes off, seconds.</summary>

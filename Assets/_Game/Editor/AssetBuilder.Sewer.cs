@@ -44,7 +44,9 @@ namespace Stealth.EditorTools
             var lamp = Prefab($"{SewerKit}/Lamp.prefab", () =>
             {
                 var root = new GameObject("SewerLamp");
-                SewerLamp(root.transform, Vector3.zero, 0f, false);
+                var set = root.AddComponent<Stealth.Level.SewerLamp>();
+                set.Beam = SewerLamp(root.transform, Vector3.zero, 0f, false);
+                set.Halo = root.transform.Find("Halo").GetComponent<Light>();
                 return root;
             });
             var barrel = Prefab($"{SewerKit}/Barrel.prefab", () =>
@@ -66,7 +68,9 @@ namespace Stealth.EditorTools
             });
             var ladder = Prefab($"{SewerKit}/Ladder.prefab", () => KitPiece("sewer_ladder", true));
             // the segment with the alcove beside the parked car (sewer.py kit_alcove): the shaft up to the house, its ladder,
-            // a caged bulb lighting the shaft (shadowed: it never lights the tunnel through the alcove's walls)
+            // a caged bulb lighting the shaft (shadowed: it never lights the tunnel through the alcove's walls), one half way
+            // up lighting the shaft's walls both ways, and one under the lid, shining up at it: whoever climbs the ladder
+            // sees the shaft all its length and the lid above
             var alcove = Prefab($"{SewerKit}/Alcove.prefab", () =>
             {
                 var a = KitPiece("sewer_seg_alcove", true, KitYaw);
@@ -74,25 +78,38 @@ namespace Stealth.EditorTools
                     new Color(1f, 0.8f, 0.55f), 3.5f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
                 light.spotAngle = 130f;
                 light.innerSpotAngle = 70f;
+                ShaftFill(a.transform, new Vector3(2.45f, Basement.Depth - ShaftMidLamp, 4.1f), new Vector3(0.45f, 0f, 0.2f), true, true);
+                LidLight(a.transform, new Vector3(2.45f, Basement.Depth - ShaftLidLamp, 4.1f), new Vector3(0.45f, 1f, 0.2f));
                 return a;
             });
             // the way to the house's exit hatch (SewerPlan.Passage, sewer.py kit_passage*): a doorway segment, the narrow
             // passage, its turn, and the shaft's foot with the ladder up to the hatch (ShaftLadder, set up by SewerLocation) and a
             // caged bulb low and high in the shaft (shadowed: they never light anything through its walls)
-            var doorSegment = Prefab($"{SewerKit}/SegmentDoor.prefab", () => KitPiece("sewer_seg_door", true, KitYaw));
+            var doorSegment = Prefab($"{SewerKit}/SegmentDoor.prefab", () =>
+            {
+                // a dim lamp on the wall beside the doorway (the model's is in its left wall, x 2.25..3.75): the way up to the
+                // house is found from along the tunnel
+                var d = KitPiece("sewer_seg_door", true, KitYaw);
+                SewerLamp(d.transform, new Vector3(4.3f, 2.2f, 3.55f), 90f, false, EntranceLamp, 7f).name = "DoorLight";
+                return d;
+            });
             var passage = Prefab($"{SewerKit}/Passage.prefab", () => KitPiece("sewer_passage", true, KitYaw));
             var passageCorner = Prefab($"{SewerKit}/PassageCorner.prefab", () => KitPiece("sewer_passage_corner", true, KitYaw));
             var passageEnd = Prefab($"{SewerKit}/PassageEnd.prefab", () =>
             {
                 var e = KitPiece("sewer_passage_end", true, KitYaw);
                 e.AddComponent<ShaftLadder>();
-                foreach (var (y, dir) in new[] { (2.0f, new Vector3(0.4f, -1f, 0.6f)), (5.6f, new Vector3(0.4f, -0.6f, 0.6f)) })
+                foreach (var (y, dir) in new[] { (2.0f, new Vector3(0.4f, -1f, 0.6f)), (5.6f, new Vector3(0.4f, -0.6f, 0.6f)) }) // (sewer.py PASSAGE_LAMPS)
                 {
                     var light = Lamp(e.transform, "ShaftLight", new Vector3(0.45f, y, -0.62f), Quaternion.LookRotation(dir), LightType.Spot,
                         new Color(1f, 0.8f, 0.55f), 3f, 6f, LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
                     light.spotAngle = 130f;
                     light.innerSpotAngle = 70f;
                 }
+                // (its two bulbs shine down the shaft; between and over them the walls are lit by fills)
+                ShaftFill(e.transform, new Vector3(0.45f, 3.8f, -0.62f), new Vector3(0.3f, 0f, 0.6f), true, false);
+                ShaftFill(e.transform, new Vector3(0.45f, 5.6f, -0.62f), new Vector3(0.3f, 0f, 0.6f), true, false, 2.2f); // (ends under the lid)
+                LidLight(e.transform, new Vector3(0.45f, Basement.Depth - ShaftLidLamp, -0.62f), new Vector3(0.3f, 1f, 0.6f));
                 return e;
             });
             // the drive on to the next house (Level.DrivePath): a branch opens into the wide tunnel again, which runs on round the car
@@ -278,16 +295,62 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        static Light SewerLamp(Transform parent, Vector3 pos, float wallYaw, bool shadows, float intensity = 5.5f, float range = 11f)
+        /// <summary>
+        /// A caged lamp on a wall (its model, turned to the wall): the beam — a wide spot off the wall and down — which is
+        /// returned, and the halo beside it ("Halo": a short point light a step off the wall, no shadows) that lights the
+        /// wall round the lamp, the vault and the floor under it (<see cref="Stealth.Level.SewerLamp"/>).
+        /// </summary>
+        static Light SewerLamp(Transform parent, Vector3 pos, float wallYaw, bool shadows, float intensity = 5.5f, float range = 11f, Color? color = null)
         {
             SewerModel("sewer_lamp", parent, pos, wallYaw, false);
             var away = Quaternion.Euler(0f, wallYaw, 0f) * Vector3.right;
+            var tint = color ?? new Color(1f, 0.78f, 0.5f);
             var light = Lamp(parent, "Light", pos + away * 0.25f, Quaternion.LookRotation(away + Vector3.down * 0.7f), LightType.Spot,
-                new Color(1f, 0.78f, 0.5f), intensity, range, shadows ? LightShadows.Soft : LightShadows.None);
+                tint, intensity, range, shadows ? LightShadows.Soft : LightShadows.None);
             light.spotAngle = 150f;
             light.innerSpotAngle = 80f;
+            var (haloIntensity, haloRange) = Stealth.Level.SewerLamp.HaloFor(intensity, range);
+            Lamp(parent, "Halo", pos + away * 0.6f, Quaternion.identity, LightType.Point, tint, haloIntensity, haloRange);
             return light;
         }
+
+        /// <summary>A shaft's lid lamp hangs this far under the lid, the one half way up this far (Tools/Blender/sewer.py LID_LAMP, MID_LAMP: their caged bulbs).</summary>
+        const float ShaftLidLamp = 1.3f, ShaftMidLamp = 2.8f;
+        /// <summary>The dim lamps that mark a way into a level (a tunnel's mouth in the hall, the doorway to the exit's passage).</summary>
+        const float EntranceLamp = 3f;
+
+        /// <summary>
+        /// A dim shadowed bulb near the top of a shaft, shining up at the hatch's lid (its walls keep the light in: nothing
+        /// in the house over it is lit through the floor).
+        /// </summary>
+        static Light LidLight(Transform parent, Vector3 pos, Vector3 up)
+        {
+            var light = Lamp(parent, "LidLight", pos, Quaternion.LookRotation(up), LightType.Spot, new Color(1f, 0.8f, 0.55f), 5f, 3.6f,
+                LightShadows.Soft, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow);
+            light.spotAngle = 150f;
+            light.innerSpotAngle = 90f;
+            return light;
+        }
+
+        /// <summary>
+        /// A bulb part way up a shaft lighting its walls up and / or down from it: wide spots without shadows, short enough
+        /// to end inside the shaft (never up to the house's floor), so they cost no shadow map and light nothing else.
+        /// <paramref name="lean"/>: off the wall the bulb hangs on, towards the shaft's middle.
+        /// </summary>
+        static void ShaftFill(Transform parent, Vector3 pos, Vector3 lean, bool up, bool down, float range = ShaftFillRange)
+        {
+            foreach (float way in new[] { 1f, -1f })
+            {
+                if (way > 0f ? !up : !down) continue;
+                var light = Lamp(parent, way > 0f ? "ShaftFillUp" : "ShaftFillDown", pos + lean.normalized * 0.12f,
+                    Quaternion.LookRotation(lean * 0.35f + Vector3.up * way), LightType.Spot, new Color(1f, 0.8f, 0.55f), 3f, range);
+                light.spotAngle = 150f;
+                light.innerSpotAngle = 90f;
+            }
+        }
+
+        /// <summary>How far a shaft's fill light reaches, metres (under 3: LightLeakTests; the highest ends below the lid).</summary>
+        const float ShaftFillRange = 2.4f;
 
         /// <summary>The gate: the frame, the shutter (a collider while it is down) and the lever on the exit's side.</summary>
         static GameObject BuildSewerGate()
@@ -371,6 +434,16 @@ namespace Stealth.EditorTools
                 var l = Lamp(open.transform, "TunnelLight", new Vector3(x, 3.3f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(0.65f, 0.85f, 1f), power, 9f);
                 l.spotAngle = 150f;
             }
+            // a dim cold lamp on the hall's wall either side of the mouth (its brick: x -0.6..0, the mouth 4.6 m wide): the
+            // ways on are seen from anywhere in the hall, each a pool of the tunnels' own light in the hall's warm one
+            var marks = new System.Collections.Generic.List<Light>();
+            for (int k = 0; k < 2; k++)
+            {
+                var lamp = Child(open.transform, $"MouthLamp{k}", new Vector3(-0.65f, 2.4f, k == 0 ? -3f : 3f));
+                SewerLamp(lamp.transform, Vector3.zero, 180f, false, EntranceLamp, 8f, new Color(0.65f, 0.85f, 1f)).name = "MouthLight";
+                marks.AddRange(lamp.GetComponentsInChildren<Light>(true)); // the beam and its halo
+            }
+            b.MouthLights = marks.ToArray();
             var wall = Child(root.transform, "StopWall", new Vector3(SewerLocation.StopAt, 1.8f, 0f)).AddComponent<BoxCollider>(); // invisible: the tunnel goes on as far as the eye sees
             wall.size = new Vector3(0.4f, 3.6f, 4.8f);
             return root;

@@ -55,6 +55,8 @@ namespace Stealth.Level
         public bool DarkRoomsDim;
         [Tooltip("How bright a dim lamp is, share of a normal one.")]
         public float DimShare = 0.3f;
+        [Tooltip("The soft warm light of the houses people work and live in (not the hospital, not the abandoned station).")]
+        public LightMood Mood = new();
 
         [Header("Passages")]
         [Tooltip("Share of the main passages that are open arches instead of doors.")]
@@ -642,6 +644,7 @@ namespace Stealth.Level
             l.WindowLimit = b.WindowLimit(h.Seed);
             l.DarkRoomsDim = b.DarkRoomsDim;
             l.DimShare = b.DimShare;
+            l.Mood = b.Mood;
         }
 
         /// <summary>

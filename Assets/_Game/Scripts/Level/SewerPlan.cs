@@ -133,6 +133,7 @@ namespace Stealth.Level
             var seg = Segments[best];
             seg.Door = side;
             seg.LampSide = -side; // its lamp on the other wall
+            seg.LampBroken = false; // (and whole: the way up to the house is never left in the dark)
             seg.Junk.RemoveAll(j => j.side == side);
             Segments[best] = seg;
             float dx = seg.X + SegmentLength / 2f, far = Mathf.Abs(hz) - PassageHalf;

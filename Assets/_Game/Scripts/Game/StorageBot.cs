@@ -61,52 +61,83 @@ namespace Stealth.Game
         public Answer CallServer(Vector3 caller, LevelLayout l)
         {
             if (!StorageBotRules.CanCall(Mode) || l == null) return Answer.Busy;
-            // on its feet with a way there on the floor: it simply walks over (the ducts only when there is no other way)
-            if (WalksTo(caller))
+            // in the caller's own room it simply walks over; to another room it goes through the ducts (on foot only when
+            // they do not lead there)
+            var ducts = DuctsToCaller(caller, l);
+            switch (StorageBotRules.Way(StorageBotRules.SameRoom(l, transform.position, caller), FloorWay(caller), ducts != null))
             {
-                Begin(new List<BotLeg> { new() { Kind = BotLegKind.Walk, To = caller, Room = -2 } }, BotMode.Coming, BotMode.Waiting);
-                return Answer.Coming;
+                case StorageBotRules.Route.Walk:
+                    Begin(new List<BotLeg> { new() { Kind = BotLegKind.Walk, To = caller, Room = -2 } }, BotMode.Coming, BotMode.Waiting);
+                    return Answer.Coming;
+                case StorageBotRules.Route.Ducts:
+                    StartClimb(l);
+                    Begin(ducts, BotMode.Coming, BotMode.Waiting);
+                    return Answer.Coming;
+                default:
+                    return Answer.NoWay;
             }
+        }
+
+        /// <summary>The legs through the ducts to the grate nearest a caller, down (if the room is safe) and over to them; null: no such way.</summary>
+        List<BotLeg> DuctsToCaller(Vector3 caller, LevelLayout l)
+        {
             int floor = LevelLayout.FloorOf(caller.y + 0.1f);
-            if (floor >= l.Vents.Count) return Answer.NoWay;
+            if (floor < 0 || floor >= l.Vents.Count) return null;
             var net = l.Vents[floor];
-            var target = StorageBotRules.NearestGrate(net, caller);
-            if (target is not DuctGrate to) return Answer.NoWay;
+            if (StorageBotRules.NearestGrate(net, caller) is not DuctGrate to) return null;
             var legs = new List<BotLeg>();
-            if (!ToDucts(legs, l, floor, out var cell)) return Answer.NoWay;
+            if (!ToDucts(legs, l, floor, out var cell)) return null;
             var crawl = StorageBotRules.Crawl(net, cell, to.Cell);
-            if (crawl == null) return Answer.NoWay;
+            if (crawl == null) return null;
             legs.Add(new BotLeg { Kind = BotLegKind.Crawl, Route = crawl });
             legs.Add(new BotLeg { Kind = BotLegKind.ClimbDown, To = to.Position, CheckSafe = true, Room = to.Room });
             legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = caller, Room = -2 }); // −2: stop next to them
-            Begin(legs, BotMode.Coming, BotMode.Waiting);
-            return Answer.Coming;
+            return legs;
+        }
+
+        /// <summary>The legs through the ducts to the exit room's grate, down and into the exit hatch; null: no such way.</summary>
+        List<BotLeg> DuctsToExit(LevelLayout l)
+        {
+            if (l.Vents.Count == 0) return null;
+            var net = l.Vents[0];
+            int exitRoom = l.ExitRoom;
+            int i = net.Grates.FindIndex(g => g.Room == exitRoom);
+            if (i < 0) return null;
+            var to = net.Grates[i];
+            var legs = new List<BotLeg>();
+            if (!ToDucts(legs, l, 0, out var cell)) return null;
+            var crawl = StorageBotRules.Crawl(net, cell, to.Cell);
+            if (crawl == null) return null;
+            legs.Add(new BotLeg { Kind = BotLegKind.Crawl, Route = crawl });
+            legs.Add(new BotLeg { Kind = BotLegKind.ClimbDown, To = to.Position, Room = to.Room });
+            legs.Add(new BotLeg { Kind = BotLegKind.LeaveByHatch, To = l.ExitHatchPosition });
+            return legs;
+        }
+
+        /// <summary>Setting off for the ducts from the basement: it pushes the shaft's lid open on its way up.</summary>
+        void StartClimb(LevelLayout l)
+        {
+            if (!m_InDuct && InBasement(l)) GameManager.Instance?.OpenShaftServer();
         }
 
         /// <summary>Server: sent to the exit — through the ducts to the exit room, down, into the exit hatch.</summary>
         public Answer SendToExitServer(LevelLayout l)
         {
             if (!StorageBotRules.CanCall(Mode) || l == null) return Answer.Busy;
-            if (WalksTo(l.ExitHatchPosition))
+            // already in the exit's room: on foot to the hatch; from anywhere else through the ducts
+            var ducts = DuctsToExit(l);
+            switch (StorageBotRules.Way(StorageBotRules.SameRoom(l, transform.position, l.ExitHatchPosition), FloorWay(l.ExitHatchPosition), ducts != null))
             {
-                Begin(new List<BotLeg> { new() { Kind = BotLegKind.LeaveByHatch, To = l.ExitHatchPosition } }, BotMode.ToGrate, BotMode.Gone);
-                return Answer.Coming;
+                case StorageBotRules.Route.Walk:
+                    Begin(new List<BotLeg> { new() { Kind = BotLegKind.LeaveByHatch, To = l.ExitHatchPosition } }, BotMode.ToGrate, BotMode.Gone);
+                    return Answer.Coming;
+                case StorageBotRules.Route.Ducts:
+                    StartClimb(l);
+                    Begin(ducts, BotMode.ToGrate, BotMode.Gone);
+                    return Answer.Coming;
+                default:
+                    return Answer.NoWay;
             }
-            if (l.Vents.Count == 0) return Answer.Busy;
-            var net = l.Vents[0];
-            int exitRoom = l.ExitRoom;
-            int i = net.Grates.FindIndex(g => g.Room == exitRoom);
-            if (i < 0) return Answer.NoWay;
-            var to = net.Grates[i];
-            var legs = new List<BotLeg>();
-            if (!ToDucts(legs, l, 0, out var cell)) return Answer.NoWay;
-            var crawl = StorageBotRules.Crawl(net, cell, to.Cell);
-            if (crawl == null) return Answer.NoWay;
-            legs.Add(new BotLeg { Kind = BotLegKind.Crawl, Route = crawl });
-            legs.Add(new BotLeg { Kind = BotLegKind.ClimbDown, To = to.Position, Room = to.Room });
-            legs.Add(new BotLeg { Kind = BotLegKind.LeaveByHatch, To = l.ExitHatchPosition });
-            Begin(legs, BotMode.ToGrate, BotMode.Gone);
-            return Answer.Coming;
         }
 
         /// <summary>Server, an alarm: back to the basement it came from (through the ducts, down by the lobby, the shaft).</summary>
@@ -145,8 +176,7 @@ namespace Stealth.Game
             }
             int here = InBasement(l) ? 0 : LevelLayout.FloorOf(transform.position.y + 0.1f);
             if (here != floor || floor >= l.Vents.Count) return false;
-            var near = InBasement(l) ? l.HatchPosition : transform.position;
-            if (InBasement(l)) GameManager.Instance?.OpenShaftServer(); // up the shaft: it pushes the lid open
+            var near = InBasement(l) ? l.HatchPosition : transform.position; // (from the basement: up the shaft first)
             if (StorageBotRules.NearestGrate(l.Vents[floor], near) is not DuctGrate up) return false;
             legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = new Vector3(up.Position.x, LevelLayout.FloorY(floor), up.Position.z), Room = -1 });
             legs.Add(new BotLeg { Kind = BotLegKind.ClimbUp, To = up.Position, Room = up.Room });
@@ -158,18 +188,18 @@ namespace Stealth.Game
 
         static NavMeshPath s_Path; // made on first use: Unity forbids it in a static initializer
 
-        /// <summary>Out of the ducts, on the navmesh, with a whole walkable way to <paramref name="to"/> that is not too long.</summary>
-        bool WalksTo(Vector3 to)
+        /// <summary>The length of the whole walkable way to <paramref name="to"/>, metres; −1: up in the ducts, off the navmesh or no way.</summary>
+        float FloorWay(Vector3 to)
         {
-            if (m_InDuct || m_Agent == null) return false;
+            if (m_InDuct || m_Agent == null) return -1f;
             OnFloor();
-            if (!m_Agent.isOnNavMesh || !NavMesh.SamplePosition(to, out var hit, 1.5f, NavMesh.AllAreas)) return false;
+            if (!m_Agent.isOnNavMesh || !NavMesh.SamplePosition(to, out var hit, 1.5f, NavMesh.AllAreas)) return -1f;
             s_Path ??= new NavMeshPath();
-            if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, s_Path) || s_Path.status != NavMeshPathStatus.PathComplete) return false;
+            if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, s_Path) || s_Path.status != NavMeshPathStatus.PathComplete) return -1f;
             float length = 0f;
             var corners = s_Path.corners;
             for (int i = 1; i < corners.Length; i++) length += Vector3.Distance(corners[i - 1], corners[i]);
-            return length <= StorageBotRules.WalkFurthest;
+            return length;
         }
 
         void Begin(List<BotLeg> legs, BotMode mode, BotMode after)

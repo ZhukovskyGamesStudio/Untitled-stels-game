@@ -1,6 +1,7 @@
 """More pickup items as they lie in the world: a walkie-talkie, a keyboard, a rugged tablet, a first-aid box, a jar of
 coffee, the fuel finder, a pair of boots, a tin of tomatoes, a folded chessboard, a magazine, pills, toothpaste, duct
-tape, matches, a toilet roll, an apple core, soap, work gloves, a necklace, a mop, a teddy bear and rolled-up socks.
+tape, matches, a toilet roll, an apple core, soap, work gloves, a necklace, a mop, a teddy bear, rolled-up socks, an
+SSD drive, a game controller, a gaming keyboard, a fuel canister and a roll of bandages.
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/items_more.py -- Assets/_Game/Art/Models [--only a,b]
       (--only takes model names: item_radio_model,item_mop_model; files land in <root>/Items/item_<id>_model.fbx)
@@ -732,6 +733,159 @@ def model_item_plush_model():
     return export("item_plush_model")
 
 
+# --------------------------------------------------------------------------- more loot
+
+def model_item_ssd_model():
+    """A 2.5-inch SSD drive lying flat, 0.10 x 0.07 x 0.007: the anodised case with one corner cut and the connector's
+    notch in its -X end (Body), a label off to one side and a bold stripe across (Trim), the gold contacts in the notch
+    and four case screws (Accent)."""
+    L, W, H = 0.1, 0.07, 0.007
+    case = s.rbox((L, W, H), (0, 0, H / 2), r=0.0018, seg=2)
+    case = s.boolean(case, s.rbox((0.009, 0.05, 0.0042), (-L / 2 + 0.002, -0.004, 0.0029), r=0.0, seg=1))        # the notch
+    case = s.boolean(case, s.rbox((0.022, 0.022, 0.02), (L / 2, W / 2, H / 2), r=0.0, seg=1, rot=(0, 0, math.pi / 4)))
+    s.part("Body", [case])
+    s.part("Trim", [s.rbox((0.044, 0.034, 0.0014), (0.02, -0.01, H - 0.0003), r=0.0004, seg=1),
+                    s.rbox((0.009, W - 0.006, 0.0014), (-0.022, 0, H - 0.0003), r=0.0004, seg=1)])
+    acc = [s.rbox((0.006, 0.046, 0.0016), (-L / 2 + 0.0058, -0.004, 0.0029), r=0.0003, seg=1)]                    # the contacts
+    acc += [s.rcyl(0.0028, 0.0016, (x, y, H - 0.0003), seg=10, r=0.0004, bevel_seg=1)
+            for x, y in ((-0.0435, 0.0285), (-0.0435, -0.0285), (0.0435, -0.0285), (0.031, 0.0285))]
+    s.part("Accent", acc)
+    return export("item_ssd_model")
+
+
+def model_item_gamepad_model():
+    """A game controller lying face up, 0.16 x 0.10 x 0.045, its grips toward -Y: one shell - a thick middle running
+    out into the two grips (Body), two low thumbsticks, the d-pad, the shoulder triggers and the middle pad (Accent),
+    four face buttons (Trim), the light bar on the back edge (Eye)."""
+    pts = [(-0.064, -0.05, 0.02), (-0.058, -0.022, 0.022), (-0.047, 0.012, 0.024), (0.0, 0.016, 0.024),
+           (0.047, 0.012, 0.024), (0.058, -0.022, 0.022), (0.064, -0.05, 0.02)]
+    shell = s.skin(pts, [0.013, 0.018, 0.024, 0.021, 0.024, 0.018, 0.013], smooth_levels=2)
+    s.place(shell, scale=(1.0, 1.0, 0.8))                                       # flatter than it is wide
+    s.part("Body", [shell])
+    acc = []
+    for x in (-0.021, 0.021):                                                   # the thumbsticks, low
+        acc.append(s.rcyl(0.007, 0.009, (x, -0.003, 0.0365), seg=14, r=0.001, bevel_seg=1))
+        acc.append(s.ball(0.0095, (x, -0.003, 0.0425), seg=14, scale=(1.0, 1.0, 0.4)))
+    a, b = 0.004, 0.0115
+    plus = [(a, b), (-a, b), (-a, a), (-b, a), (-b, -a), (-a, -a), (-a, -b), (a, -b), (a, -a), (b, -a), (b, a), (a, a)]
+    acc.append(s.place(prism(plus, 0.031, 0.0405, r=0.0008), (-0.048, 0.014, 0)))
+    acc += [s.rbox((0.03, 0.014, 0.014), (sx * 0.045, 0.032, 0.0225), r=0.005, seg=2) for sx in (-1, 1)]    # triggers
+    acc.append(s.rbox((0.03, 0.018, 0.004), (0, 0.017, 0.0345), r=0.001, seg=1))                            # the middle pad
+    s.part("Accent", acc)
+    s.part("Trim", [s.rcyl(0.0045, 0.009, (0.048 + dx, 0.014 + dy, 0.0365), seg=12, r=0.0012, bevel_seg=1)
+                    for dx, dy in ((0.01, 0), (-0.01, 0), (0, 0.01), (0, -0.01))])
+    s.part("Eye", [s.rbox((0.036, 0.008, 0.007), (0, 0.033, 0.021), r=0.002, seg=1)])
+    return export("item_gamepad_model")
+
+
+def model_item_gamekeyboard_model():
+    """A compact gaming keyboard without a numpad lying flat, 0.36 x 0.13: a low case (Body), a glowing plate under the
+    keys and a glowing line round the case (Eye), dark keycaps (Accent) with the pale gamer's keys - Esc, W A S D, the
+    arrows (Trim). The space bar is at -Y (the front)."""
+    total = 18.25 * KEY_U
+    xs = -total / 2
+    case = s.rbox((total + 0.014, 0.128, 0.017), (0, 0, 0.0105), r=0.005, seg=2)        # z 0.002 .. 0.019
+    feet = [s.rbox((0.04, 0.012, 0.004), (x, 0.052, 0.002), r=0.0015, seg=1) for x in (-0.13, 0.13)]
+    s.part("Body", [case, *feet])
+    s.part("Eye", [s.rbox((total + 0.004, 0.118, 0.0024), (0, 0, 0.0196), r=0.0008, seg=1),       # under the keys
+                   s.rbox((total + 0.0164, 0.1304, 0.003), (0, 0, 0.0075), r=0.0012, seg=1)])       # round the case
+    z0 = 0.0202
+    y_of = lambda r: -0.0505 + r * KEY_U  # noqa: E731  (row 0 = space row at the front)
+    dark, pale = [], []
+
+    def row(r, widths, x_off=0.0, light=()):
+        x = xs + x_off * KEY_U
+        n = 0
+        for w in widths:
+            if w > 0:
+                (pale if n in light else dark).append(_keycap(x + w * KEY_U / 2, y_of(r), w, 1.0, z0))
+                n += 1
+            x += abs(w) * KEY_U
+
+    row(0, [1.25, 1.25, 1.25, 6.25, 1.25, 1.25, 1.25, 1.25])
+    row(1, [2.25] + [1] * 10 + [2.75])
+    row(2, [1.75] + [1] * 11 + [2.25], light=(1, 2, 3))            # A S D
+    row(3, [1.5] + [1] * 12 + [1.5], light=(2,))                   # W
+    row(4, [1] * 13 + [2])
+    f_row = 5.3
+    row(f_row, [1, -1, 1, 1, 1, 1, -0.5, 1, 1, 1, 1, -0.5, 1, 1, 1, 1], light=(0,))   # Esc
+    nav = 15.25
+    row(f_row, [1, 1, 1], nav)
+    row(4, [1, 1, 1], nav)
+    row(3, [1, 1, 1], nav)
+    row(1, [-1, 1], nav, light=(0,))                               # the arrows
+    row(0, [1, 1, 1], nav, light=(0, 1, 2))
+    s.part("Accent", dark)
+    s.part("Trim", pale)
+    return export("item_gamekeyboard_model")
+
+
+def model_item_canister_model():
+    """A steel fuel canister standing, 0.29 x 0.15 x 0.47, taller than wide: the pressed body with its welded seam, a
+    thick cross stamped in both faces, the top with its shoulder sloping down to the spout's side, three carrying bars
+    and the spout's neck (Body), the screw cap with its lever (Accent), a hazard diamond on the front face (Trim)."""
+    W, D, H = 0.29, 0.15, 0.36
+    tank = s.rbox((W, D, H), (0, 0, H / 2), r=0.022, seg=3)
+    s.groove(tank, "Y", 0.0, width=0.006, depth=0.003)                                   # the welded seam
+    tilt = 0.55
+    body = [tank,
+            s.rbox((0.19, D - 0.012, 0.07), (-0.045, 0, H + 0.018), r=0.02, seg=3),                        # under the bars
+            s.rbox((0.15, D - 0.012, 0.07), (0.075, 0, H - 0.004), r=0.02, seg=3, rot=(0, tilt, 0))]       # the shoulder
+    for sy in (-1, 1):                                                                   # the stamped crosses
+        for a in (0.82, -0.82):
+            body.append(s.rbox((0.3, 0.012, 0.03), (0, sy * (D / 2 - 0.002), 0.18), r=0.004, seg=1, rot=(0, a, 0)))
+    top = H + 0.085
+    for y in (-0.04, 0.0, 0.04):                                                         # three bars: two carry it together
+        body.append(s.tube([(-0.125, y, H + 0.03), (-0.122, y, top - 0.012), (-0.105, y, top), (-0.0, y, top),
+                            (0.017, y, top - 0.012), (0.02, y, H + 0.03)], 0.0085, res=1, smooth=True, segments_per=5))
+    ax = (math.sin(tilt), 0.0, math.cos(tilt))
+    neck = (0.092, 0.0, H + 0.035)
+    body.append(s.rcyl(0.021, 0.06, neck, seg=18, r=0.002, bevel_seg=1, rot=(0, tilt, 0)))
+    s.part("Body", body)
+    cap = tuple(neck[k] + ax[k] * 0.034 for k in range(3))
+    lug = tuple(neck[k] + ax[k] * 0.048 for k in range(3))
+    s.part("Accent", [s.rcyl(0.027, 0.022, cap, seg=18, r=0.004, bevel_seg=2, rot=(0, tilt, 0)),
+                      s.rbox((0.012, 0.06, 0.008), lug, r=0.003, seg=1, rot=(0, tilt, 0))])     # the cap's lever
+    s.part("Trim", [s.rbox((0.085, 0.006, 0.085), (0, -(D / 2 + 0.004), 0.18), r=0.0015, seg=1, rot=(0, math.pi / 4, 0))])
+    return export("item_canister_model")
+
+
+def _ribbon(xs, zs, half_w, t):
+    """A strip of cloth along X through (x, z) points, half_w to each side in Y, t thick."""
+    bm = bmesh.new()
+    rings = [[bm.verts.new((x, -half_w, z)), bm.verts.new((x, half_w, z)), bm.verts.new((x, half_w, z + t)),
+              bm.verts.new((x, -half_w, z + t))] for x, z in zip(xs, zs)]
+    for q, r in zip(rings, rings[1:]):
+        for k in range(4):
+            bm.faces.new((q[k], q[(k + 1) % 4], r[(k + 1) % 4], r[k]))
+    bm.faces.new(rings[0])
+    bm.faces.new(list(reversed(rings[-1])))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def model_item_bandage_model():
+    """A roll of gauze bandage lying on its side, 0.07 wide and 0.045 across (its axis along Y), its loose end run off
+    from under it along +X as a ribbon as wide as the roll with one soft wave: the wound roll with the turns showing on
+    its ends and the ribbon (Body), two red stripes round the roll (Accent)."""
+    R, L = 0.0225, 0.07
+    turns = []
+    r, up = 0.0085, True
+    while r < R - 0.003:                                           # the turns of the gauze, seen on the roll's ends
+        turns.append((r, 0.0012 if up else 0.0))
+        r += 0.0018
+        up = not up
+    prof = [(0.0, 0.006), (0.0055, 0.006), (0.0065, 0.0)] + turns + [(R - 0.0015, 0.0), (R, 0.002), (R, L - 0.002), (R - 0.0015, L)]
+    prof += [(r, L - z) for r, z in reversed(turns)] + [(0.0065, L), (0.0055, L - 0.006), (0.0, L - 0.006)]
+    roll = s.lathe(prof, seg=32, axis="Y", loc=(0, -L / 2, R))
+    n = 18
+    xs = [-0.006 + 0.094 * k / (n - 1) for k in range(n)]
+    zs = [0.0005 + 0.006 * math.sin(math.pi * min(1.0, max(0.0, (x - 0.038) / 0.036))) ** 2 for x in xs]
+    s.part("Body", [roll, _ribbon(xs, zs, L / 2 - 0.003, 0.0016)])
+    s.part("Accent", [s.rcyl(R + 0.0007, 0.007, (0, y, R), axis="Y", seg=32, r=0.0004, bevel_seg=1) for y in (-0.012, 0.012)])
+    return export("item_bandage_model")
+
+
 MODELS = {
     "item_radio_model": model_item_radio_model,
     "item_keyboard_model": model_item_keyboard_model,
@@ -755,6 +909,11 @@ MODELS = {
     "item_mop_model": model_item_mop_model,
     "item_plush_model": model_item_plush_model,
     "item_socks_model": model_item_socks_model,
+    "item_ssd_model": model_item_ssd_model,
+    "item_gamepad_model": model_item_gamepad_model,
+    "item_gamekeyboard_model": model_item_gamekeyboard_model,
+    "item_canister_model": model_item_canister_model,
+    "item_bandage_model": model_item_bandage_model,
 }
 
 

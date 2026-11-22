@@ -558,6 +558,7 @@ namespace Stealth.UI
             if (e.Shape == ItemCatalog.Battery)
                 for (int i = 0; i < inventory.Items.Count; i++) if (inventory.CanRecharge(i)) return Loc.T("hint.battery.use");
             if (e.Shape == ItemCatalog.Medkit) return me.Hp < HealthState.MaxHp ? Loc.T("hint.medkit") : null;
+            if (e.Shape == ItemCatalog.Bandage) return me.Hp < HealthState.MaxHp ? Loc.T("hint.bandage") : null;
             if (e.Shape == ItemCatalog.Coffee) return Loc.T("hint.coffee");
             if (e.Shape == ItemCatalog.Tablet) return Loc.T("hint.tablet");
             return null;

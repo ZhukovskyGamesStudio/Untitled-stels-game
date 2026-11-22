@@ -890,12 +890,17 @@ ALC_X0, ALC_X1, ALC_TOP, ALC_BACK = 1.8, 4.2, 2.4, 5.09
 BASEMENT_DEPTH = 8.0  # Unity Basement.Depth: the lobby's floor over the basement's road
 SHAFT_X0, SHAFT_X1, SHAFT_Y0, SHAFT_TOP = 2.26, 3.74, 3.6, BASEMENT_DEPTH - 0.01
 LADDER_X, LADDER_Y = 3.0, ALC_BACK - 0.25
+LID_LAMP = 1.3        # a caged bulb this far under a shaft's lid: whoever climbs the ladder sees the lid above
+MID_LAMP = 2.8        # and one this far under the lid, half way up: the shaft is lit all its length
+ALCOVE_LAMPS = (3.7, SHAFT_TOP - MID_LAMP, SHAFT_TOP - LID_LAMP)     # the alcove's shaft: over the alcove, half way, under the lid
+PASSAGE_LAMPS = (2.0, 3.8, 5.6, SHAFT_TOP - LID_LAMP)                # the exit's shaft, from the passage's floor up
 
 
 def kit_alcove():
     """sewer_seg_alcove: a plain 6 m segment with the alcove and the shaft. Parts: the tunnel like sewer_seg_*, BrickAlcove
     (its walls, the ceiling round the shaft, the shaft), StoneAlcove (lintel and jambs), ConcreteAlcove (its floor), MetalLadder
-    (up to just under the lid), RustLamp + GlowLamp (a caged bulb on the shaft's wall: the game puts the light there),
+    (up to just under the lid), RustLamp + GlowLamp (caged bulbs up the shaft's wall at ALCOVE_LAMPS, the top one LID_LAMP
+    under the lid: the game puts the lights there),
     MetalShutLid (the lid seen from below: the sewer shows it, the house's basement hides it — the real lid is in its floor)."""
     p, L = KIT, KIT_LEN
     prof = kit_profile(p, KIT_WALK, extra=(ALC_TOP,))
@@ -939,15 +944,17 @@ def kit_alcove():
     part("Metal", ladder).name = "MetalLadder"
 
     def lamp_cage(bm):
-        c = (SHAFT_X0, 4.1, 3.7)
-        box(bm, c[0], c[0] + 0.05, c[1] - 0.09, c[1] + 0.09, c[2] - 0.12, c[2] + 0.12)                       # wall plate
-        torus(bm, 0.075, 0.008, (c[0] + 0.12, c[1], c[2]), axis="X", seg=14, seg2=4)
-        for k in range(4):
-            a = math.pi * k / 2 + math.pi / 4
-            cy, cz = c[1] + 0.075 * math.cos(a), c[2] + 0.075 * math.sin(a)
-            box(bm, c[0] + 0.05, c[0] + 0.13, cy - 0.007, cy + 0.007, cz - 0.007, cz + 0.007)
+        for z in ALCOVE_LAMPS:
+            c = (SHAFT_X0, 4.1, z)
+            box(bm, c[0], c[0] + 0.05, c[1] - 0.09, c[1] + 0.09, c[2] - 0.12, c[2] + 0.12)                   # wall plate
+            torus(bm, 0.075, 0.008, (c[0] + 0.12, c[1], c[2]), axis="X", seg=14, seg2=4)
+            for k in range(4):
+                a = math.pi * k / 2 + math.pi / 4
+                cy, cz = c[1] + 0.075 * math.cos(a), c[2] + 0.075 * math.sin(a)
+                box(bm, c[0] + 0.05, c[0] + 0.13, cy - 0.007, cy + 0.007, cz - 0.007, cz + 0.007)
     part("Rust", lamp_cage).name = "RustLamp"
-    part("Glow", lambda bm: cyl(bm, 0.055, 0.08, (SHAFT_X0 + 0.09, 4.1, 3.7), axis="X", seg=14, r2=0.04)).name = "GlowLamp"
+    part("Glow", lambda bm: [cyl(bm, 0.055, 0.08, (SHAFT_X0 + 0.09, 4.1, z), axis="X", seg=14, r2=0.04)
+                             for z in ALCOVE_LAMPS]).name = "GlowLamp"
 
     def lid(bm):
         box(bm, SHAFT_X0, SHAFT_X1, SHAFT_Y0, ALC_BACK, SHAFT_TOP - 0.05, SHAFT_TOP - 0.01)
@@ -1065,7 +1072,8 @@ def kit_passage_corner():
 
 def kit_passage_end():
     """sewer_passage_end: the shaft's foot, open on -X (x 0..1.5): brick walls up to the house's floor, the ladder against
-    the +X wall (its rungs 0.25 m off it, as in the alcove), caged bulbs on the -Y wall (the game puts the light there)."""
+    the +X wall (its rungs 0.25 m off it, as in the alcove), caged bulbs on the -Y wall, the top one LID_LAMP under the lid
+    (the game puts the lights there)."""
     H, X1, top = PASS_HALF, 2 * PASS_HALF, SHAFT_TOP
 
     def walls(bm):
@@ -1094,11 +1102,11 @@ def kit_passage_end():
     part("Metal", ladder).name = "MetalLadder"
 
     def cages(bm):
-        for z in (2.0, 5.6):
+        for z in PASSAGE_LAMPS:
             box(bm, 0.36, 0.54, -H, -H + 0.05, z - 0.12, z + 0.12)
             torus(bm, 0.075, 0.008, (0.45, -H + 0.12, z), axis="Y", seg=14, seg2=4)
     part("Rust", cages).name = "RustLamp"
-    part("Glow", lambda bm: [cyl(bm, 0.055, 0.08, (0.45, -H + 0.09, z), axis="Y", seg=14, r2=0.04) for z in (2.0, 5.6)]).name = "GlowLamp"
+    part("Glow", lambda bm: [cyl(bm, 0.055, 0.08, (0.45, -H + 0.09, z), axis="Y", seg=14, r2=0.04) for z in PASSAGE_LAMPS]).name = "GlowLamp"
     kit_export("sewer_passage_end")
 
 def seg_tray(L):

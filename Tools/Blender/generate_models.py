@@ -687,7 +687,7 @@ SHAPES = {
     "shovel": [(0, 0), (0, 1), (0, 2), (0, 3)],                    # the shovel's piece in grids and the cart (ItemCatalog.Shovel, 1 x 4)
     "flashlight": [(0, 0), (0, 1), (0, 2)],                       # ItemCatalog.Flashlight (1 x 3)
     "battery": [(0, 0)],                                          # ItemCatalog.Battery
-    "book": [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)],      # book, shape 16 (2 x 3)
+    "book": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # book, shape 16 (2 x 2)
     "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
     "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
     "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
@@ -714,6 +714,11 @@ SHAPES = {
     "mop": [(0, 0), (0, 1), (0, 2), (0, 3)],                      # mop (1 x 4)
     "plush": [(0, 0), (1, 0), (0, 1)],                             # teddy bear (L of 3)
     "socks": [(0, 0), (0, 1)],                                    # rolled socks (1 x 2)
+    "ssd": [(0, 0)],                                              # SSD drive
+    "gamepad": [(0, 0), (1, 0)],                                  # game controller (2 x 1)
+    "gamekeyboard": [(0, 0), (1, 0), (2, 0)],                     # gaming keyboard (3 x 1)
+    "canister": [(0, 0), (1, 0), (0, 1), (1, 1)],                  # fuel canister (2 x 2)
+    "bandage": [(0, 0)],                                          # roll of bandages
 }
 
 

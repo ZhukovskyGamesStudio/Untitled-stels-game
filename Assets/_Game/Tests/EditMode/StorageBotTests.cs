@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using Stealth.Game;
 using Stealth.Level;
@@ -114,6 +115,35 @@ namespace Stealth.Tests
             Assert.AreEqual(1, Stealth.Audio.GuardSounds.Pick(false, Stealth.Enemies.RobotState.Investigate, false).clip);
             Assert.AreEqual(2, Stealth.Audio.GuardSounds.Pick(false, Stealth.Enemies.RobotState.Chase, false).clip, "chasing");
             Assert.AreEqual(-1, Stealth.Audio.GuardSounds.Pick(false, Stealth.Enemies.RobotState.Chase, true).clip, "hacked: silent");
+        }
+        [Test]
+        public void InItsOwnRoomItWalksAndToAnotherRoomItTakesTheDucts()
+        {
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(true, 6f, true), "beside the caller: on foot");
+            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(false, 6f, true), "another room, however near: the ducts");
+            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(true, -1f, true), "up in the ducts already: no way on the floor");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 20f, false), "no duct leads there: on foot after all");
+            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(false, StorageBotRules.WalkFurthest + 5f, false), "and too far on foot");
+            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(true, -1f, false));
+        }
+
+        [Test]
+        public void OneRoomIsTheSameRoomOfOneStoreyOrTheBasementForBoth()
+        {
+            foreach (var l in TestHouses.Sample)
+            {
+                var rooms = l.Plan.Rooms.Where(r => r.Area > 9f && l.RoomAt(r.Center + Vector3.up * 0.1f) == r).Take(6).ToList();
+                Assert.GreaterOrEqual(rooms.Count, 2);
+                foreach (var r in rooms)
+                {
+                    Assert.IsTrue(StorageBotRules.SameRoom(l, r.Center, r.Center + new Vector3(0.3f, 0f, 0.2f)), $"{r.Type}: two steps apart");
+                    foreach (var other in rooms)
+                        if (other != r) Assert.IsFalse(StorageBotRules.SameRoom(l, r.Center, other.Center), $"{r.Type} and {other.Type}");
+                }
+                var cellar = Basement.StashSpot(l.Cellar);
+                Assert.IsTrue(StorageBotRules.SameRoom(l, cellar, Basement.Spawns(l.Cellar)[0]), "both down in the basement");
+                Assert.IsFalse(StorageBotRules.SameRoom(l, cellar, rooms[0].Center), "the basement and a room of the house");
+            }
         }
     }
 }

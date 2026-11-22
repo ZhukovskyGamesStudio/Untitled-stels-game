@@ -307,13 +307,17 @@ namespace Stealth.Level
                         return 1.65f;
                     }
                     if (roll < 42)
-                    {   // the boss's suite: credenza at the wall, the big desk in front of it facing the door, two guest chairs
+                    {   // the boss's suite: credenza at the wall, the big desk in front of it facing the door, two guest chairs;
+                        // the desk's drawers (the model's front) are at the boss's chair, far enough from the credenza for
+                        // both to open
+                        float doors = BackOf(PropKind.Credenza) + Foot[PropKind.Credenza].yMax + OpenReach(PropKind.Credenza);
+                        float desk = doors + OpenReach(PropKind.ExecutiveDesk) + Foot[PropKind.ExecutiveDesk].yMax + 0.02f;
                         b.Add(PropKind.Credenza, f.P(0, BackOf(PropKind.Credenza)), f.Face);
-                        b.Add(PropKind.Chair, f.P(0, 0.9f), f.Face);
-                        b.Add(PropKind.ExecutiveDesk, f.P(0, 1.72f), f.Face);
-                        b.Add(PropKind.GuestChair, f.P(-0.45f, 2.55f), f.Back);
-                        b.Add(PropKind.GuestChair, f.P(0.45f, 2.55f), f.Back);
-                        b.Item(f.P(R(-0.5f, 0.5f), 1.7f, 0.765f));
+                        b.Add(PropKind.Chair, f.P(0, desk - 0.82f), f.Face);
+                        b.Add(PropKind.ExecutiveDesk, f.P(0, desk), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(-0.45f, desk + 0.83f), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(0.45f, desk + 0.83f), f.Back);
+                        b.Item(f.P(R(-0.5f, 0.5f), desk - 0.02f, 0.765f));
                         b.Item(f.P(R(-0.5f, 0.5f), BackOf(PropKind.Credenza), 0.755f));
                         return Clock(1.85f);
                     }

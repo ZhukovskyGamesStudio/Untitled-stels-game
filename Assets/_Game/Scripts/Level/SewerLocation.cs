@@ -199,13 +199,7 @@ namespace Stealth.Level
                 {
                     int side = near ? (i % 2 == 1 ? 1 : -1) : i % 4 == 1 ? 1 : -1;
                     var lamp = Put(Lamp, $"BackLamp{i}", new Vector3(bx + SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                    if (lamp != null)
-                        foreach (var l in lamp.GetComponentsInChildren<Light>())
-                        {
-                            l.color = plan.LampColor;
-                            l.intensity = plan.LampIntensity * (near ? 0.9f - 0.15f * i : 0.45f); // fading into the distance
-                            l.range = 11f;
-                        }
+                    SewerLamp.Set(lamp, plan.LampColor, plan.LampIntensity * (near ? 0.9f - 0.15f * i : 0.45f), 11f); // fading into the distance
                 }
             }
             if (!UnderHouse) Put(Cap, "Cap", new Vector3(-BackSegments * SewerPlan.SegmentLength, 0f, 0f));
@@ -228,13 +222,7 @@ namespace Stealth.Level
                         int side = k == 0 ? s.LampSide : -s.LampSide;
                         float along = s.X + SewerPlan.SegmentLength * (k == 0 ? 0.5f : 0.15f);
                         var lamp = Put(Lamp, k == 0 ? $"Lamp{i}" : $"Lamp{i}b", new Vector3(along, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                        if (lamp != null)
-                            foreach (var l in lamp.GetComponentsInChildren<Light>())
-                            {
-                                l.color = plan.LampColor;
-                                l.intensity = plan.LampIntensity * boost * (s.LampBroken ? 0.35f : 1f);
-                                l.range = plan.StartLights ? 15f : 13f;
-                            }
+                        SewerLamp.Set(lamp, plan.LampColor, plan.LampIntensity * boost * (s.LampBroken ? 0.35f : 1f), plan.StartLights ? 15f : 13f);
                     }
                 }
                 foreach (var (x, side, barrel) in s.Junk)
@@ -291,7 +279,8 @@ namespace Stealth.Level
                 b.name = $"Branch{i}";
                 b.transform.localPosition = at; // +X leads into it
                 b.transform.localRotation = mouth.rotation;
-                foreach (var light in b.GetComponentsInChildren<Light>(true)) light.intensity *= 0.45f; // the way on lies in the dark
+                foreach (var light in b.GetComponentsInChildren<Light>(true))
+                    if (b.MouthLights == null || System.Array.IndexOf(b.MouthLights, light) < 0) light.intensity *= 0.45f; // the way on lies in the dark, its mouth is marked
                 Stealth.UI.RouteSignView sign = null;
                 GameObject stand = null;
                 if (SignPrefab != null)
@@ -356,13 +345,7 @@ namespace Stealth.Level
                         for (float d = PassageLampEvery / 2f; d < piece.Length; d += PassageLampEvery)
                         {
                             var lamp = Put(Lamp, $"PassageLamp{i}", piece.Position + dir * d + wall * (SewerPlan.PassageHalf - 0.05f) + Vector3.up * 1.9f, SewerPlan.YawOf(-wall));
-                            if (lamp != null)
-                                foreach (var l in lamp.GetComponentsInChildren<Light>())
-                                {
-                                    l.color = plan.LampColor;
-                                    l.intensity = plan.LampIntensity * 0.5f;
-                                    l.range = 7f;
-                                }
+                            SewerLamp.Set(lamp, plan.LampColor, plan.LampIntensity * 0.5f, 7f);
                         }
                         break;
                     case PassageKind.Corner:
@@ -416,13 +399,7 @@ namespace Stealth.Level
             for (int i = 0; i < hall.Lamps.Count; i++)
             {
                 var lamp = PutAt(Lamp, $"HallLamp{i}", hub + hall.Lamps[i].position, hall.Lamps[i].rotation);
-                if (lamp != null)
-                    foreach (var l in lamp.GetComponentsInChildren<Light>())
-                    {
-                        l.color = plan.LampColor;
-                        l.intensity = plan.LampIntensity;
-                        l.range = 14f;
-                    }
+                SewerLamp.Set(lamp, plan.LampColor, plan.LampIntensity, 14f);
             }
         }
 

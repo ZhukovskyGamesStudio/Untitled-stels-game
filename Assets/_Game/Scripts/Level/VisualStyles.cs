@@ -555,12 +555,20 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ air
 
         /// <summary>The ambient light the style sets (the picture only; gameplay uses <see cref="GameplayAmbient"/>): dimmed underground by the player's view.</summary>
-        public static Color StyleAmbient => s_Current != null ? World.Ambient : s_BaseAmbient;
+        public static Color StyleAmbient
+        {
+            get
+            {
+                if (s_Current == null) return s_BaseAmbient;
+                var mood = RoomLighting.MoodOf(ActiveLevel.Layout); // the house's soft warm light: its fill light too
+                return mood != null ? mood.Ambient(World.Ambient) : World.Ambient;
+            }
+        }
 
         static void ApplyWorld(StyleWorld w)
         {
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = s_Current != null ? w.Ambient : s_BaseAmbient;
+            RenderSettings.ambientLight = StyleAmbient;
             LightSource.VisualScale = s_Current != null && w.LightScale > 0f ? w.LightScale : 1f;
             LightSource.GlowScale = s_Current != null && w.LampGlow >= 0f ? w.LampGlow : 1f;
         }
