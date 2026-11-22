@@ -265,7 +265,7 @@ def hand(p, female=False, curl=1.0):
             seg = cone(lq, pts[i], pts[i + 1], radii[i], radii[i + 1])
             f = seg if f is None else smin(f, seg, 0.004)
         for i in (1, 2):
-            f = smin(f, ell(lq, pts[i] + at(0, 0, -0.0012), (radii[i] * 0.99,) * 3), 0.004)                       # the joints: a little knobbly on the back
+            f = smin(f, ell(lq, pts[i] + at(0, 0, -0.0006), (radii[i] * 0.93,) * 3), 0.004)                       # the joints: a hint of knuckle on the back (fuller, they read as beads on a string)
         f = smin(f, ell(lq, pts[0] + at(-0.002, 0.0, -0.0045), (0.0115, 0.0098 * g, 0.0080)), 0.005)             # the knuckle
         fingers = f if fingers is None else np.minimum(fingers, f)       # (fingers do not melt into each other)
     d = smin(d, fingers, 0.0045)

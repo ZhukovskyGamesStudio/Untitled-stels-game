@@ -49,10 +49,13 @@ namespace Stealth.Player
                     var go = Instantiate(prefab, Model.parent);
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
-                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
-                    if (IsOwner && !m_BodyShown)
-                        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
-                            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                    // the department's outfit (the person's own unless the config dresses them otherwise); later swaps repaint
+                    if (go.TryGetComponent<HumanWardrobe>(out var wardrobe))
+                    {
+                        wardrobe.Dress(VisualStyles.OutfitFor(m_LookDepartment), VisualStyles.Wardrobe);
+                        wardrobe.Changed += DressRig;
+                    }
+                    DressRig();
                 }
             }
             UpdateBodyPose();
@@ -64,6 +67,16 @@ namespace Stealth.Player
             m_Rig.Held = IsOwner ? null : held;
             m_Rig.Cupped = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding);
+        }
+
+        /// <summary>The rig's renderers as they are now (a wardrobe swap brings new ones): coloured for the slot, a shadow only for the owner.</summary>
+        void DressRig()
+        {
+            if (m_Rig == null) return;
+            PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+            if (IsOwner && !m_BodyShown)
+                foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true))
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
         }
 
         /// <summary>

@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Stealth.Configs;
 using Stealth.Player;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Stealth.Tests
 {
@@ -267,23 +268,38 @@ namespace Stealth.Tests
             Assert.IsEmpty(prefab.GetComponentsInChildren<Collider>(true), "the human is decoration: no colliders");
             var renderers = prefab.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             // (EyeDetails — headphones, glasses, a belt — is worn by some and not by others)
+            // (a part of the person's own outfit is "<part>.<slot>": the wardrobe swaps it by its slot)
             foreach (var part in new[] { "BodyClothes", "AccentHead", "AccentBand", "Sclera", "Outfit" })
-                Assert.IsTrue(renderers.Any(r => r.name == part), $"no part {part} (PlayerLooks paints by part name)");
+                Assert.IsTrue(renderers.Any(r => WardrobeRules.PartOf(r.name) == part), $"no part {part} (PlayerLooks paints by part name)");
+            var wardrobe = prefab.GetComponent<HumanWardrobe>();
+            Assert.IsNotNull(wardrobe, "the wardrobe on the rig");
+            foreach (var slot in new[] { "top", "bottom", "feet", "hair" })
+                Assert.IsTrue(wardrobe.Own.Any(w => w.Slot == slot && w.Renderers.Length > 0 && !string.IsNullOrEmpty(w.Item)), $"the person's own {slot} is not in the wardrobe");
             // lit per pixel: every part has the person's baked maps — albedo, a normal map (not the eyes), occlusion and smoothness
             int triangles = 0;
             foreach (var r in renderers)
             {
                 var m = r.sharedMaterial;
                 Assert.IsNotNull(m, $"{r.name}: no material");
+                triangles += r.sharedMesh.triangles.Length / 3;
+                if (WardrobeRules.PartOf(r.name) == "Hair")
+                {
+                    // hair cards: the strand texture cut out by alpha, both sides
+                    Assert.IsTrue(m.IsKeywordEnabled("_ALPHATEST_ON"), $"{r.name}: the strands are not cut out");
+                    Assert.AreEqual((float)CullMode.Off, m.GetFloat("_Cull"), $"{r.name}: a card is seen from both sides");
+                    Assert.IsNotNull(m.GetTexture("_BaseMap"), $"{r.name}: no strand texture");
+                    continue;
+                }
                 Assert.IsNotNull(m.GetTexture("_BaseMap"), $"{r.name}: no baked albedo");
                 Assert.IsNotNull(m.GetTexture("_MetallicGlossMap"), $"{r.name}: no baked mask (occlusion, smoothness)");
                 if (r.name != "Sclera") Assert.IsNotNull(m.GetTexture("_BumpMap"), $"{r.name}: no baked normal map");
                 Assert.IsTrue(r.sharedMesh.uv.Length == r.sharedMesh.vertexCount, $"{r.name}: no UVs");
                 Assert.IsTrue(r.sharedMesh.tangents.Length == r.sharedMesh.vertexCount, $"{r.name}: no tangents (the normal map needs them)");
                 Assert.LessOrEqual(r.quality == SkinQuality.Auto ? 4 : (int)r.quality, 4);
-                triangles += r.sharedMesh.triangles.Length / 3;
             }
-            Assert.That(triangles, Is.InRange(9000, 19000), "the triangle budget of a player");
+            // (~21.5 thousand and the hair cards: the head 6500 with the eyes, nose and lips held, each hand 3000 — fingers were
+            // octagons, a lip six segments —, a hairstyle's cards up to ~9 thousand)
+            Assert.That(triangles, Is.InRange(9000, 34000), "the triangle budget of a player");
             // the four are different people: of different heights, and the head's mesh is not shared between departments
             var heights = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans.Select(h => h.GetComponentInChildren<Animator>(true).transform.localScale.y).ToArray();
             Assert.Greater(heights.Max() - heights.Min(), 0.05f, "the tallest and the shortest differ by a few centimetres at least");
