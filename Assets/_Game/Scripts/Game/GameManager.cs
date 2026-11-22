@@ -964,6 +964,7 @@ namespace Stealth.Game
         public void RemoteHackServer(PlayerController player, int terminal, Detector target)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed || target == null || target.IsHacked) return;
+            if (target.Kind == RobotKind.Camera) return; // the cameras are not on the hacking terminal's list
             var t = SecurityTerminal.Find(terminal);
             if (t == null || t.Kind != TerminalKind.Hacking) return;
             if (!ServerReach.WithinFlat(player.transform.position, t.transform.position, SecurityTerminal.Reach)) return;

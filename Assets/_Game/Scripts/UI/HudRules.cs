@@ -350,6 +350,31 @@ namespace Stealth.UI
         public const float FovKick = 9f;
     }
 
+    /// <summary>The hacking terminal's list (pure, unit tested): which rows show, and the names numbered within a kind.</summary>
+    public static class HackListRules
+    {
+        /// <summary>The first row shown so that the pick stays in view, a few rows from the top where it can.</summary>
+        public static int FirstShown(int pick, int count, int shown)
+        {
+            if (count <= shown || pick < 0) return 0;
+            return Mathf.Clamp(pick - shown / 3, 0, count - shown);
+        }
+
+        /// <summary>The row's name: the kind's name, numbered (1, 2…) when the list holds more than one of that kind.</summary>
+        public static string Label<T, K>(string name, System.Collections.Generic.IReadOnlyList<T> list, int index, System.Func<T, K> kindOf)
+        {
+            var kind = kindOf(list[index]);
+            int number = 0, total = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!Equals(kindOf(list[i]), kind)) continue;
+                total++;
+                if (i <= index) number = total;
+            }
+            return total > 1 ? $"{name} {number}" : name;
+        }
+    }
+
     public static class HouseClockRules
     {
         /// <summary>"M:SS" of <paramref name="seconds"/> (whole seconds, never negative).</summary>

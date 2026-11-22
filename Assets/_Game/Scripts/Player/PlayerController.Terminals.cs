@@ -60,6 +60,9 @@ namespace Stealth.Player
             Link.SendTerminal(terminal, steered, yaw);
         }
         public Detector TerminalView { get; private set; }
+        /// <summary>Owner at a terminal: what it shows (the cameras, or the hacking terminal's list) and which one is picked.</summary>
+        public IReadOnlyList<Detector> TerminalTargets => m_TerminalTargets;
+        public int TerminalIndex => m_TerminalIndex;
         public int TerminalViewNumber => m_TerminalIndex + 1;
         public int TerminalViewCount => m_TerminalTargets.Count;
         /// <summary>Owner: a terminal in reach (press E to use it), null if none.</summary>
@@ -177,6 +180,8 @@ namespace Stealth.Player
             rotation = Quaternion.identity;
             var d = TerminalView;
             if (d == null) return false;
+            // the hacking terminal is a list on its screen: nothing seen through the robots, the player's own eyes stay
+            if (UsingTerminal != null && UsingTerminal.Kind == TerminalKind.Hacking) return false;
             if (d is SecurityCamera cam && cam.Pivot != null)
             {
                 // just in front of the lens: the camera's own housing and glow stay behind the view

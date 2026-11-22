@@ -115,8 +115,9 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// What the terminal can look at, nearest first: the cameras (camera terminal) or every robot and device but the
-        /// cameras that is not hacked already (hacking terminal). Pure apart from reading the detectors' positions.
+        /// What the terminal shows: the cameras nearest first (camera terminal, seen through them), or a list of every robot
+        /// and device in the house but the cameras, hacked ones too, by kind — not by distance: the list tells nothing of where
+        /// they are (hacking terminal). Pure apart from reading the detectors' positions.
         /// </summary>
         public static void Targets(TerminalKind kind, Vector3 from, List<Detector> into)
         {
@@ -124,10 +125,18 @@ namespace Stealth.Level
             foreach (var d in Detector.All)
             {
                 bool camera = d.Kind == RobotKind.Camera;
-                // the cameras have a terminal of their own: the hacking one shows the robots and the other devices
-                if (kind == TerminalKind.Cameras ? camera : !camera && !d.IsHacked) into.Add(d);
+                // the cameras have a terminal of their own: the hacking one lists the robots and the other devices
+                if (kind == TerminalKind.Cameras ? camera : !camera) into.Add(d);
             }
-            into.Sort((a, b) => (a.Position - from).sqrMagnitude.CompareTo((b.Position - from).sqrMagnitude));
+            if (kind == TerminalKind.Cameras) into.Sort((a, b) => (a.Position - from).sqrMagnitude.CompareTo((b.Position - from).sqrMagnitude));
+            else into.Sort(HackListOrder);
+        }
+
+        /// <summary>The hacking terminal's list order: by kind, then by network id (stable, and nothing about distance).</summary>
+        public static int HackListOrder(Detector a, Detector b)
+        {
+            int k = ((int)a.Kind).CompareTo((int)b.Kind);
+            return k != 0 ? k : a.NetId.CompareTo(b.NetId);
         }
     }
 }

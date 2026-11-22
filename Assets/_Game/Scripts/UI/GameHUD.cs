@@ -123,6 +123,15 @@ namespace Stealth.UI
         public Text ObjectiveLabel;
         [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
+        [Tooltip("The hacking terminal: a list of every robot and device but the cameras (no view through them).")]
+        public GameObject HackList;
+        public Text HackTitle;
+        public RectTransform HackRows;
+        [Tooltip("A hidden row copied for each line of the list.")]
+        public HackRowView HackRowTemplate;
+        [Tooltip("The kinds' pictures (robot_*), one per RobotKind.")]
+        public Sprite[] HackKindPictures;
+        UiPool<HackRowView> m_HackRows;
         public RectTransform TeamList;
         public Text TeamRowPrefab;
         public CanvasGroup Banner;
@@ -860,13 +869,55 @@ namespace Stealth.UI
             ShowTerminal(PlayerController.Local);
         }
 
+        /// <summary>Rows the hacking list shows at once (it scrolls with the pick).</summary>
+        public const int HackRowsShown = 12;
+
+        /// <summary>
+        /// The hacking terminal: every robot and device but the cameras, by kind (numbered when there are several of a kind),
+        /// hacked ones greyed; the pick highlighted, the hold of E filling it. Where they are is not shown.
+        /// </summary>
+        void ShowHackList(PlayerController me)
+        {
+            if (HackList == null) return;
+            var t = me.UsingTerminal;
+            bool on = t != null && t.Kind == TerminalKind.Hacking;
+            if (HackList.activeSelf != on) HackList.SetActive(on);
+            if (!on) return;
+            m_HackRows ??= new UiPool<HackRowView>(HackRowTemplate, HackRows);
+            Ui.Set(HackTitle, Loc.F("hud.hack.title", t.Charges), t.Charges > 0 ? Color.white : new Color(1f, 0.5f, 0.4f));
+            var list = me.TerminalTargets;
+            int pick = list.Count > 0 ? Mathf.Clamp(me.TerminalIndex, 0, list.Count - 1) : -1;
+            int start = HackListRules.FirstShown(pick, list.Count, HackRowsShown);
+            m_HackRows.Begin();
+            for (int i = start; i < Mathf.Min(list.Count, start + HackRowsShown); i++)
+            {
+                var d = list[i];
+                if (d == null) continue;
+                var row = m_HackRows.Next();
+                bool picked = i == pick;
+                var icon = HackKindPictures != null && (int)d.Kind < HackKindPictures.Length ? HackKindPictures[(int)d.Kind] : null;
+                if (row.Icon.sprite != icon) row.Icon.sprite = icon;
+                var tone = d.IsHacked ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
+                row.Icon.color = tone;
+                Ui.Set(row.Name, HackListRules.Label(d.DisplayName, list, i, x => x.Kind), tone);
+                float share = picked && !d.IsHacked ? me.TerminalHackShare : 0f;
+                string state = d.IsHacked ? Loc.T("hud.terminal.hacked") : share > 0f ? $"{Mathf.RoundToInt(share * 100f)}%" : "";
+                Ui.Set(row.State, state, d.IsHacked ? new Color(1f, 1f, 1f, 0.45f) : new Color(1f, 0.85f, 0.4f));
+                row.Back.color = picked ? new Color(0.25f, 0.6f, 1f, 0.35f) : new Color(1f, 1f, 1f, 0.04f);
+                row.Fill.rectTransform.anchorMax = new Vector2(share, 1f);
+                Ui.Show(row.Fill, share > 0f);
+            }
+            m_HackRows.End();
+        }
+
         /// <summary>At a terminal: what is on the screen, which of how many, and the charges of a hacking terminal.</summary>
         void ShowTerminal(PlayerController me)
         {
             if (TerminalLabel == null) return;
             var t = me.UsingTerminal;
-            Ui.Show(TerminalLabel, t != null && t.Kind != TerminalKind.Map); // the map has its own caption
-            if (t == null || t.Kind == TerminalKind.Map) return;
+            ShowHackList(me);
+            Ui.Show(TerminalLabel, t != null && t.Kind == TerminalKind.Cameras); // the map and the hacking list have their own captions
+            if (t == null || t.Kind != TerminalKind.Cameras) return;
             var shown = me.TerminalView;
             string text = me.TerminalViewCount == 0 ? "—"
                 : $"{(shown != null ? shown.DisplayName : "")} · {me.TerminalViewNumber} / {me.TerminalViewCount}";

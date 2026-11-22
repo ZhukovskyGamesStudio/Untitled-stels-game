@@ -71,6 +71,19 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheHackingListScrollsWithThePickAndNumbersAKind()
+        {
+            Assert.AreEqual(0, HackListRules.FirstShown(5, 8, 12), "all fit: from the top");
+            Assert.AreEqual(0, HackListRules.FirstShown(2, 30, 12));
+            Assert.AreEqual(16, HackListRules.FirstShown(20, 30, 12), "the pick a few rows from the top");
+            Assert.AreEqual(18, HackListRules.FirstShown(29, 30, 12), "at the end: the last rows");
+            var kinds = new[] { 1, 1, 2, 3, 3, 3 };
+            Assert.AreEqual("Охранник 2", HackListRules.Label("Охранник", kinds, 1, k => k));
+            Assert.AreEqual("Дрон", HackListRules.Label("Дрон", kinds, 2, k => k), "one of its kind: no number");
+            Assert.AreEqual("Пылесос 3", HackListRules.Label("Пылесос", kinds, 5, k => k));
+        }
+
+        [Test]
         public void HunterForecastCountsDownToTheRule()
         {
             var s = new Stealth.Game.RunSettings();
