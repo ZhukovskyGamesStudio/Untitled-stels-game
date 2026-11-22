@@ -6,11 +6,12 @@ Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's 
   shovel      1 x 4 cells (ItemCatalog.Shovel)       Art/Models/Items/item_shovel_model.fbx
   flashlight  1 x 3 cells (ItemCatalog.Flashlight)   Art/Models/Items/item_flashlight_model.fbx
   battery     1 x 1 cell  (ItemCatalog.Battery)      Art/Models/Items/item_battery_model.fbx
-  book 2 x 3, cans 2 x 2, screwdriver 1 x 3, beltbag 2 x 2   Art/Models/Items/item_<id>_model.fbx
+  book 2 x 2, cans 2 x 2, screwdriver 1 x 3, beltbag 2 x 2   Art/Models/Items/item_<id>_model.fbx
   diamond, key, cagekey, stun (2 x 2), speaker (2 x 1)  the tools and the crafted diamond, seen three-quarter
   map         3 x 3 cells                            Art/Models/Items/item_map_model.fbx (apartments.py)
   radio, keyboard, tablet, medkit, coffee, finder, boots, tomatoes, chess, magazine, pills, toothpaste, tape,
-  matches, toiletpaper, applecore, soap, gloves, necklace, mop, plush, socks   item_<id>_model.fbx (items_more.py)
+  matches, toiletpaper, applecore, soap, gloves, necklace, mop, plush, socks, ssd, gamepad, gamekeyboard, canister,
+  bandage   item_<id>_model.fbx (items_more.py)
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
 a dark outline so it reads on any cell colour. The UI turns and mirrors the picture with the item.
@@ -47,7 +48,7 @@ ITEMS = {
     "battery": (1, 1, "item_battery_model", {
         "Body": ((0.1, 0.38, 0.85), 0.0, 0.35, 0.0),
         "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}),
-    "book": (2, 3, "item_book_model", {
+    "book": (2, 2, "item_book_model", {
         "Body": ((0.45, 0.08, 0.07), 0.0, 0.55, 0.0),                     # cloth cover
         "AccentLabel": ((0.85, 0.66, 0.25), 0.8, 0.3, 0.0),              # gilt title plate
         "Accent": ((0.9, 0.86, 0.74), 0.0, 0.8, 0.0)}, "tilted"),        # pages
@@ -158,6 +159,27 @@ ITEMS = {
     "socks": (1, 2, "item_socks_model", {
         "Body": ((0.95, 0.95, 0.95), 0.0, 0.9, 0.0),
         "Accent": ((0.15, 0.35, 0.75), 0.0, 0.85, 0.0)}),                # stripes
+    "ssd": (1, 1, "item_ssd_model", {
+        "Body": ((0.1, 0.1, 0.11), 0.6, 0.35, 0.0),                      # anodised case
+        "Trim": ((0.85, 0.2, 0.15), 0.0, 0.4, 0.0),                      # label
+        "Accent": ((0.78, 0.62, 0.2), 0.9, 0.3, 0.0)}, "tilted"),        # connector, screws
+    "gamepad": (2, 1, "item_gamepad_model", {
+        "Body": ((0.16, 0.17, 0.2), 0.0, 0.45, 0.0),
+        "Trim": ((0.85, 0.25, 0.2), 0.0, 0.4, 0.0),                      # face buttons
+        "Eye": ((0.3, 0.7, 1.0), 0.0, 0.3, 1.5),                         # light bar
+        "Accent": ((0.06, 0.06, 0.07), 0.0, 0.5, 0.0)}, "tilted"),       # sticks, pad, triggers
+    "gamekeyboard": (3, 1, "item_gamekeyboard_model", {
+        "Body": ((0.07, 0.07, 0.08), 0.3, 0.45, 0.0),                    # case
+        "Trim": ((0.92, 0.92, 0.94), 0.0, 0.45, 0.0),                    # pale keys
+        "Eye": ((0.9, 0.25, 0.95), 0.0, 0.3, 1.5),                       # the glow under the keys
+        "Accent": ((0.2, 0.21, 0.23), 0.0, 0.5, 0.0)}, "tilted"),        # dark keys
+    "canister": (2, 2, "item_canister_model", {
+        "Body": ((0.72, 0.1, 0.07), 0.3, 0.45, 0.0),                     # painted steel
+        "Trim": ((0.95, 0.8, 0.15), 0.0, 0.5, 0.0),                      # hazard label
+        "Accent": ((0.08, 0.08, 0.08), 0.0, 0.5, 0.0)}, "front"),        # cap, spout strap
+    "bandage": (1, 1, "item_bandage_model", {
+        "Body": ((0.93, 0.91, 0.85), 0.0, 0.95, 0.0),                    # gauze
+        "Accent": ((0.78, 0.12, 0.1), 0.0, 0.6, 0.0)}, "front"),         # the stripes round the roll
 }
 
 

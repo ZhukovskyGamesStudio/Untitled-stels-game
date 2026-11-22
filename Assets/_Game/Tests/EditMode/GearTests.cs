@@ -233,5 +233,37 @@ namespace Stealth.Tests
             Assert.AreEqual(StatKind.Falls, back[0].Kind);
             Assert.AreEqual(412, back[0].Metres);
         }
+        [Test]
+        public void TheNewLootIsJunkWithItsOwnRarityAndTheBandageHeals()
+        {
+            Assert.AreEqual("ssd", ItemCatalog.Shapes[ItemCatalog.Ssd].Id);
+            Assert.AreEqual("gamepad", ItemCatalog.Shapes[ItemCatalog.Gamepad].Id);
+            Assert.AreEqual("gamekeyboard", ItemCatalog.Shapes[ItemCatalog.GameKeyboard].Id);
+            Assert.AreEqual("canister", ItemCatalog.Shapes[ItemCatalog.Canister].Id);
+            Assert.AreEqual("bandage", ItemCatalog.Shapes[ItemCatalog.Bandage].Id);
+            Assert.AreEqual(ItemCatalog.Shapes.Length - 1, ItemCatalog.LastJunk, "the junk runs to the end of the catalogue");
+            Assert.AreEqual(4, ItemCatalog.Rarity(ItemCatalog.Canister), "fuel is gold");
+            int best = Enumerable.Range(ItemCatalog.FirstJunk, ItemCatalog.LastJunk - ItemCatalog.FirstJunk + 1).Max(s => ItemCatalog.Value(s, 0));
+            Assert.AreEqual(best, ItemCatalog.Value(ItemCatalog.Canister, 0), "a canister of fuel burns best of all the junk");
+            // the gaming keyboard is loot, not the hacker's tool
+            Assert.IsFalse(ItemCatalog.IsTool(ItemCatalog.GameKeyboard));
+            Assert.IsFalse(ItemCatalog.Holdable(ItemCatalog.GameKeyboard));
+            Assert.IsTrue(ItemCatalog.IsTool(ItemCatalog.Keyboard));
+            // bandages: loot that is also used from the hand
+            Assert.IsTrue(ItemCatalog.IsLoot(ItemCatalog.Bandage) && ItemCatalog.Holdable(ItemCatalog.Bandage) && ItemCatalog.Consumable(ItemCatalog.Bandage));
+            Assert.Greater(new GadgetSettings().BandageHp, 0);
+            Assert.Less(new GadgetSettings().BandageHp, Stealth.Player.HealthState.MaxHp, "less than a medkit: that heals in full");
+            foreach (byte s in new[] { ItemCatalog.Ssd, ItemCatalog.Gamepad, ItemCatalog.GameKeyboard, ItemCatalog.Canister })
+                Assert.IsFalse(ItemCatalog.Consumable(s));
+        }
+
+        [Test]
+        public void TheBookTakesTwoByTwoCells()
+        {
+            var cells = ItemCatalog.Shapes[ItemCatalog.Book].Cells;
+            Assert.AreEqual(4, cells.Length);
+            Assert.AreEqual(1, cells.Max(c => c.x));
+            Assert.AreEqual(1, cells.Max(c => c.y));
+        }
     }
 }

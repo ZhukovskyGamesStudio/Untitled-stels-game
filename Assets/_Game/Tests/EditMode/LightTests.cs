@@ -132,5 +132,37 @@ namespace Stealth.Tests
                 UnityEngine.Object.DestroyImmediate(go);
             }
         }
+        [Test]
+        public void TheWarmSoftLightIsWarmerAndSofterThanALampsOwn()
+        {
+            var mood = new LightMood();
+            foreach (RoomType type in System.Enum.GetValues(typeof(RoomType)))
+            {
+                var (own, power) = RoomLighting.For(type, false);
+                var (warm, soft) = RoomLighting.For(type, false, 0f, mood);
+                Assert.Less(warm.b / warm.r, own.b / own.r, $"{type}: less blue for its red");
+                Assert.AreEqual(own.r, warm.r, 1e-4f, $"{type}: the red stays");
+                Assert.Less(soft, power, $"{type}: softer");
+                Assert.Greater(soft, power * 0.6f, $"{type}: but still a lit room");
+                Assert.AreEqual((own, power), RoomLighting.For(type, false, 0f, null), $"{type}: no mood, the lamp's own light");
+            }
+            Assert.AreEqual(0f, RoomLighting.For(RoomType.Office, true, 0f, mood).intensity, "a dark room stays dark");
+            var air = new Color(0.1f, 0.1f, 0.12f);
+            var filled = mood.Ambient(air);
+            Assert.Greater(filled.r, air.r, "the fill light lifts the shadows");
+            Assert.Less(filled.b / filled.r, air.b / air.r, "and warms them");
+        }
+
+        [Test]
+        public void EveryHouseButTheHospitalAndTheAbandonedStationHasTheWarmLight()
+        {
+            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
+            {
+                var l = TestHouses.Get(HouseKinds.SeedOf(kind, 3, 5), 3);
+                Assert.AreEqual(kind, HouseKinds.Of(l.Seed, 3));
+                bool cold = kind is HouseKind.Hospital or HouseKind.Abandoned;
+                Assert.AreEqual(!cold, RoomLighting.MoodOf(l) != null, kind.ToString());
+            }
+        }
     }
 }

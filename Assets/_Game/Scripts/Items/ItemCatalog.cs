@@ -61,9 +61,9 @@ namespace Stealth.Items
             // the flashlight (1 x 3; it lights when held and switched on, its charge is its colour byte) and its batteries
             new Shape { Id = "flashlight", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
             new Shape { Id = "battery", Cells = new[] { V(0, 0) } },
-            // a book (2 x 3, anywhere, most in a library), canned food (2 x 2, kitchens), a screwdriver (1 x 3, tech rooms: in
+            // a book (2 x 2, anywhere, most in a library), canned food (2 x 2, kitchens), a screwdriver (1 x 3, tech rooms: in
             // hand it takes the closed lids off the vents), a belt bag (2 x 2 lying about; picked up it is worn: a 4 x 4 panel)
-            new Shape { Id = "book",        Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1), V(0, 2), V(1, 2) } },
+            new Shape { Id = "book",        Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             new Shape { Id = "cans",        Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             new Shape { Id = "screwdriver", Cells = new[] { V(0, 0), V(0, 1), V(0, 2) } },
             new Shape { Id = "beltbag",     Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
@@ -96,6 +96,13 @@ namespace Stealth.Items
             new Shape { Id = "mop",         Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(0, 3) } },
             new Shape { Id = "plush",       Cells = new[] { V(0, 0), V(1, 0), V(0, 1) } },
             new Shape { Id = "socks",       Cells = new[] { V(0, 0), V(0, 1) } },
+            // more loot: an SSD drive, a game controller (2 x 1), a gaming keyboard (3 x 1: not the hacker's tool), a fuel
+            // canister (2 x 2, the best fuel there is) and a roll of bandages (in the hand it heals a little)
+            new Shape { Id = "ssd",          Cells = new[] { V(0, 0) } },
+            new Shape { Id = "gamepad",      Cells = new[] { V(0, 0), V(1, 0) } },
+            new Shape { Id = "gamekeyboard", Cells = new[] { V(0, 0), V(1, 0), V(2, 0) } },
+            new Shape { Id = "canister",     Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
+            new Shape { Id = "bandage",      Cells = new[] { V(0, 0) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
@@ -112,8 +119,11 @@ namespace Stealth.Items
         public const byte ShelterMap = 20;
         public const byte Radio = 21, Keyboard = 22, Tablet = 23;
         public const byte Medkit = 24, Coffee = 25, Finder = 26, Boots = 27;
-        /// <summary>The junk (tomatoes … socks): plain loot of a fixed rarity each.</summary>
-        public const byte FirstJunk = 28, LastJunk = 42;
+        /// <summary>The junk (tomatoes … bandages): plain loot of a fixed rarity each.</summary>
+        public const byte FirstJunk = 28, LastJunk = 47;
+        public const byte Ssd = 43, Gamepad = 44, GameKeyboard = 45, Canister = 46;
+        /// <summary>A roll of bandages: loot like the rest of the junk, and in the hand it heals (<see cref="GadgetSettings.BandageHp"/>).</summary>
+        public const byte Bandage = 47;
 
         /// <summary>The classes a player picks at the start of a run: the tool each starts with (screwdriver, keyboard, radio, tablet).</summary>
         public static readonly byte[] ClassTools = { Screwdriver, Keyboard, Radio, Tablet };
@@ -147,6 +157,11 @@ namespace Stealth.Items
             r[40] = 0; // mop
             r[41] = 2; // plush
             r[42] = 1; // socks
+            r[Ssd] = 3;
+            r[Gamepad] = 2;
+            r[GameKeyboard] = 2;
+            r[Canister] = 4; // fuel: gold
+            r[Bandage] = 1;
             return r;
         }
 
@@ -260,10 +275,10 @@ namespace Stealth.Items
 
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
         public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == Screwdriver || shape == ShelterMap
-            || shape is Radio or Keyboard or Tablet or Medkit or Coffee or Finder;
+            || shape is Radio or Keyboard or Tablet or Medkit or Coffee or Finder or Bandage;
 
-        /// <summary>Used up from the hand (the gadget key): the medkit heals, the coffee speeds you up.</summary>
-        public static bool Consumable(int shape) => shape is Medkit or Coffee;
+        /// <summary>Used up from the hand (the gadget key): the medkit heals in full, a bandage a little, the coffee speeds you up.</summary>
+        public static bool Consumable(int shape) => shape is Medkit or Coffee or Bandage;
 
         /// <summary>
         /// The size of an item's model, metres: x along its length (the model's X), y its thickness (up), z its width.
@@ -358,6 +373,11 @@ namespace Stealth.Items
             new(0.908f, 0.042f, 0.295f), // mop
             new(0.202f, 0.269f, 0.208f), // plush
             new(0.116f, 0.063f, 0.090f), // socks
+            new(0.100f, 0.007f, 0.070f), // ssd
+            new(0.148f, 0.044f, 0.087f), // gamepad
+            new(0.363f, 0.028f, 0.130f), // gaming keyboard
+            new(0.295f, 0.461f, 0.163f), // canister
+            new(0.111f, 0.046f, 0.070f), // bandage
         };
 
         /// <summary>A drawer (0.8 m wide inside) holds it lying flat.</summary>

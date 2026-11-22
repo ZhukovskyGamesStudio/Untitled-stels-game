@@ -444,6 +444,7 @@ namespace Stealth.Level
             m_Keep = new RectGrid[m_P.Floors];
             m_Solid = new RectGrid[m_P.Floors];
             for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); m_Solid[f] = new RectGrid(); }
+            InitOpening(m_P.Floors);
             foreach (var d in l.Doorways) KeepDoorway(d);
             foreach (var s in l.Stairs)
             {

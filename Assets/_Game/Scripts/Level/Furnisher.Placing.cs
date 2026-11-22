@@ -148,6 +148,7 @@ namespace Stealth.Level
                 // a room under 7 × 5 m
                 if (m_Taken[f].Overlaps(Grow(all, aisle)) || m_Keep[f].Overlaps(Grow(all, 0.3f)) || !OnFloor(f, room.Id, all, aisle * 0.7f)) return false;
             }
+            if (!RoomToOpen(room, b)) return false; // doors and drawers: room to open, nothing put in the way of those already there
             if (rects.Count > 0 && !StaysWalkable(room, rects)) return false;
             // pieces of one group may touch each other, but not other groups
             int group = m_Groups++;
@@ -157,6 +158,7 @@ namespace Stealth.Level
                 m_GroupOf.Add(group);
                 m_InRoom[p.Kind] = (m_InRoom.TryGetValue(p.Kind, out int have) ? have : 0) + 1;
                 m_Taken[f].Add(FootAt(p.Kind, p.Pos, p.Yaw)); // hung and standing-on things too: nothing else goes under or into them
+                NoteOpening(f, p.Kind, p.Pos, p.Yaw);
                 if (p.Solid && InTheWay(p.Kind)) m_Solid[f].Add(FootAt(p.Kind, p.Pos, p.Yaw));
             }
             foreach (var i in b.Items) { m_L.ItemSpots.Add(i); m_ItemGroup.Add(group); }
@@ -206,6 +208,7 @@ namespace Stealth.Level
             m_L.Props.Add(new PropPlacement { Kind = k, Position = p, RotationY = yaw });
             m_GroupOf.Add(-1);
             m_Taken[room.Floor].Add(FootAt(k, p, yaw));
+            NoteOpening(room.Floor, k, p, yaw);
             if (InTheWay(k)) m_Solid[room.Floor].Add(FootAt(k, p, yaw));
         }
     }

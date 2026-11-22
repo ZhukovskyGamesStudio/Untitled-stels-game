@@ -113,5 +113,80 @@ namespace Stealth.Tests
             var spots = gate.GetComponent<SewerGate>().HazardLights;
             Assert.IsTrue(spots.All(l => gate.transform.InverseTransformPoint(l.transform.position).x < 0f));
         }
+        [Test]
+        public void EveryWayOnIsMarkedByItsOwnLampsInTheHall()
+        {
+            var branch = Load("Branch").GetComponent<SewerBranch>();
+            Assert.AreEqual(4, branch.MouthLights.Length, "two lamps: each its beam and its halo");
+            foreach (var l in branch.MouthLights)
+            {
+                Assert.IsTrue(l.transform.IsChildOf(branch.WhenOpen.transform), "lit only while the way is open");
+                var at = branch.transform.InverseTransformPoint(l.transform.position);
+                Assert.Less(at.x, -0.6f, "on the hall's side of the wall the tunnel starts in");
+                Assert.Greater(Mathf.Abs(at.z), 2.3f, "beside the mouth, not in it (4.6 m wide)");
+                Assert.That(l.intensity, Is.InRange(1f, 4.5f), "dim");
+                Assert.Less(l.color.r, l.color.b, "the tunnels' cold light, not the hall's warm one");
+            }
+            Assert.AreEqual(2, branch.MouthLights.Count(l => branch.transform.InverseTransformPoint(l.transform.position).z > 0f), "one lamp on each side");
+            var door = Load("SegmentDoor").GetComponentsInChildren<Light>(true);
+            Assert.AreEqual(1, door.Count(l => l.name == "DoorLight"), "a lamp beside the doorway to the exit's passage");
+        }
+
+        [Test]
+        public void ASewerLampLightsTheWallItHangsOn()
+        {
+            var lamp = Load("Lamp").GetComponent<SewerLamp>();
+            Assert.IsNotNull(lamp.Beam);
+            Assert.IsNotNull(lamp.Halo);
+            Assert.AreEqual(LightType.Point, lamp.Halo.type, "all round: the wall behind the lamp, the vault, the floor");
+            Assert.LessOrEqual(lamp.Halo.range, SewerLamp.HaloReach);
+            Assert.Less(2.3f + SewerLamp.HaloReach, Basement.Depth, "from a lamp's height it ends under the house's floor: it has no shadows");
+            // set by whoever places it: the halo follows the beam
+            var go = Object.Instantiate(lamp.gameObject);
+            try
+            {
+                SewerLamp.Set(go, Color.cyan, 4f, 13f);
+                var placed = go.GetComponent<SewerLamp>();
+                Assert.AreEqual(4f, placed.Beam.intensity, 1e-4f);
+                Assert.AreEqual(13f, placed.Beam.range, 1e-4f);
+                Assert.AreEqual(4f * SewerLamp.HaloShare, placed.Halo.intensity, 1e-4f);
+                Assert.AreEqual(SewerLamp.HaloReach, placed.Halo.range, 1e-4f, "a long beam: the halo stays short");
+                Assert.AreEqual(Color.cyan, placed.Halo.color);
+                SewerLamp.Set(go, Color.cyan, 2f, 7f);
+                Assert.AreEqual(3.5f, placed.Halo.range, 1e-4f, "a short beam's halo is shorter still");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void AShaftHasADimLampUnderItsLidShiningUp()
+        {
+            foreach (string name in new[] { "Alcove", "PassageEnd" })
+            {
+                var piece = Load(name);
+                var lid = piece.GetComponentsInChildren<Light>(true).Where(l => l.name == "LidLight").ToArray();
+                Assert.AreEqual(1, lid.Length, name);
+                var at = piece.transform.InverseTransformPoint(lid[0].transform.position);
+                Assert.That(Basement.Depth - at.y, Is.InRange(0.8f, 2f), $"{name}: just under the lid");
+                Assert.Greater(piece.transform.InverseTransformDirection(lid[0].transform.forward).y, 0.7f, $"{name}: it shines up at the lid");
+                Assert.Greater(lid[0].range, Basement.Depth - at.y, $"{name}: and reaches it");
+                Assert.AreNotEqual(LightShadows.None, lid[0].shadows, $"{name}: the shaft's walls keep its light in");
+                // the shaft is lit all its length: no stretch of its wall further than a fill's reach from a light
+                var heights = piece.GetComponentsInChildren<Light>(true).Where(l => l.name.StartsWith("Shaft") || l.name == "LidLight")
+                    .Select(l => piece.transform.InverseTransformPoint(l.transform.position).y).OrderBy(y => y).ToList();
+                Assert.GreaterOrEqual(heights.Count, 3, name);
+                for (int i = 1; i < heights.Count; i++)
+                    Assert.LessOrEqual(heights[i] - heights[i - 1], 2f, $"{name}: a dark stretch between {heights[i - 1]:0.0} and {heights[i]:0.0} m");
+                foreach (var fill in piece.GetComponentsInChildren<Light>(true).Where(l => l.name.StartsWith("ShaftFill")))
+                {
+                    var from = piece.transform.InverseTransformPoint(fill.transform.position);
+                    Assert.AreEqual(LightShadows.None, fill.shadows, $"{name}: a fill costs no shadow map");
+                    Assert.Less(from.y + fill.range, Basement.Depth, $"{name}: it ends inside the shaft, under the house's floor");
+                }
+                // its bulb is in the model: the glowing part reaches up to it
+                var glow = MeshBounds(piece, f => f.name.StartsWith("Glow"));
+                Assert.Greater(glow.max.y, at.y - 0.2f, $"{name}: the caged bulb is where the light is");
+            }
+        }
     }
 }
