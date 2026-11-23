@@ -1,0 +1,79 @@
+---
+name: stealth-house-features
+description: "Особые места и интерактив дома USG: HouseFeatures (уникальные особенности локаций, скрытая комната, двери с ключом, ящики, сторожа, инструменты-предметы), Interactable/UseKind/SendUse, лестница шахты, главное задание (большой сейф с пультами, заложник), DoorRules (виды дверей, петли, куда открываются), запертые двери и сейфы, OpenKeys, терминалы охраны. Используй перед правкой дверей, замков, сейфов, заданий, терминалов или чего-то, что игрок использует по E."
+---
+
+# stealth-house-features
+
+Подробности подсистемы, вынесенные из CLAUDE.md. Общие правила кода — скилл `stealth-code`, проверка — `stealth-verify`.
+
+## Особые места дома и всё, что по E
+
+**Особые места дома** — чистый `HouseFeatures` (каждое — свой поток рандома), настройки `LevelConfig.Features` (`FeatureSettings`):
+типы домов `HouseKinds` + `Location` (офис — пять характеров, больница, автомастерская, жилой дом). **Уникальная особенность локации** — у каждой своя, одна и не повторяется:
+офис — стол с глушилками (`Programmer`, кубики-оглушители по игроку), автомастерская — верстак (`Workbench`: `Crafting.Plan` — вещи одного цвета → `ItemCatalog.Diamond`),
+больница — медпункт (`MedTable`: здоровье до `GadgetSettings.MedTableHp` = 3, раз за дом — `OpenKeys.Med`), жилой дом — спрятанная карта до убежища
+(`ShelterMap`, ниже). Стол, верстак и медпункт — `LevelLayout.PointOfInterest` (`HouseFeatures.PointOfInterestKind`): встают вместо большого стола/дивана/стеллажа,
+сжимаются до его габаритов `PropPlacement.Scale`, но сначала ищется мебель, под которую сжимать почти не нужно (`HouseFeatures.MinPointScale` = 0,85: медпункт на месте дивана или стеллажа был игрушечным); у жилого дома такого предмета нет; офис — больше и ценнее лут
+(`LootSettings.OfficeItems/OfficeBonus`). **Скрытая комната** (`HideRoom`: окружённая комнатами, входы `EdgeType.Illusion` с каждой
+соседней; `LevelArt.IllusionBlock` — стена без коллайдера с NotWalkable-объёмом; карта и `HousePlan.SightShare` не видят сквозь неё;
+проверка проходимости робота её не требует). **Двери с ключом** (`KeyDoors`: дверь — единственный путь в 1–3 комнаты; ключ — предмет
+`ItemCatalog.Key` в другой комнате, только на открытой поверхности (`HouseFeatures.OnOpenTop`: стол, стойка, верстак; не в шкафу и не на полке стеллажа) или на полу; `AutoDoor.NeedsKey`, `KeyLock`). **Ящики** (`Crates`: стеллаж/паллета/коробки → `SearchCrate`,
+содержимое `GameManager.CrateContents`, ключ `OpenKeys.Crate`). **Сторожа** (`Wardens`: `RobotKind.Warden` перед единственным проходом комнаты
+с лутом, `RobotController.SetPost` — ходит A↔B, смотрит наружу; колонки `LureSpots`). Инструменты — особые формы `ItemCatalog` (в инвентаре — свои цвета, которых нет у лута: `ItemCatalog.UiColor`)
+(`LootShapes` = 8; `Diamond`, `Key`, `Stun`, `Speaker`, `CageKey`; горят в топливо по цене серого цвета; ключи, ключ клетки (1×2) и оглушитель
+работают только из руки — `PlayerInventory.Holds/TakeHeldServer`; ключи — настоящие модели, как лопата, `ItemCatalog.KeyScale`): брошенная колонка (`WorldItem.PlayServer`, реплицирует
+`WorldItemNet`) зовёт ближайшего робота (`GameManager.UpdateLures`), он её выключает; оглушитель — `GameAction.Gadget` (X) →
+`GadgetServer` (все детекторы взломаны на `StunDuration`). Любая цель рук — `Interactable`, сейф, терминал, замок двери — `IReachTarget`, один общий поиск `ReachSearch.Nearest`;
+запросы по E — один `IPlayerLink.SendUse(UseKind, индекс)` (замок — `UseKind.DoorLock`, сейф — `Safe`, дверца/ящик мебели — `StoragePart`, индекс `OpenKeys.StoragePart`);
+всё, что открывается (двери, крышка шахты, решётка, ящик, ворота, дверцы шкафов), движется по `OpenTween` (первый кадр — без анимации и звука), звук дверей — `DoorSounds`.
+Лестница шахты подвала берёт игрока, когда он в шахте (в любом месте её колодца, не только у перекладин — `LadderMath.InZone`) идёт к лестнице любыми клавишами или падает в неё (`LadderMath.GetsOn`), или когда сверху его ступни оказались над самим открытым проёмом (`LadderMath.GetsOnFromAbove`: у кромки, рядом с проёмом и вдоль него ничего не тянет и не переносит — раньше шахта «засасывала» проходящих). **W идёт туда, куда игрок смотрит**: смотрит вверх — вверх, вниз — вниз, S обратно; при взгляде около горизонта направление прежнее (`LadderMath.LookWay`, `LevelLook` 8°; при входе снизу — вверх, сверху — вниз); сойдя с лестницы с зажатой клавишей, снова на неё не берут, пока клавишу не отпустили (`m_LadderLatch`); стоя над проёмом наверху, держит, пока не сошёл на пол или не прыгнул (`LadderMath.AtTop`). Крышка снизу — рама из уголка, раскосы и скоба (`hatches.py`), а не голый лист; наверху он вылезает сам — поднимается над краем и сходит на пол лобби (`LadderMath.ClimbOut`), без телепорта; в люк выхода тоже съезжает к середине, а не переносится (`PlayerController.EnterHatchIfNeeded`). **Люк выхода** выглядит как крышка шахты: квадратная стальная рама с жёлтой кромкой, тёмный колодец, рифлёная крышка на петлях вдоль +X, лампы цвета люка в углах рамы (`AssetBuilder.BuildHatch`); петли крышки — у ближайшей стены (`ShaftHatch.HingeAgainstWall`, при первом открытии): открытая, она стоит у стены, а не плитой посреди комнаты. Предмет из рюкзака, брошенный в занятую руку, меняется с ней местами (`PlayerInventory.CanSwapHand/SwapHandServer`: то, что было в руке, — на его место, иначе в свободное). Пустую поясную сумку можно снять, взяв за пояс, и сжечь в топливо. Режимы рук игрока (диск, пульт, терминал) выходят вместе — `PlayerController.LeaveAllModes`; сам игрок разбит на partial-файлы `PlayerController.*.cs`.
+Всё, что игрок использует по E, — `Interactable` (`UseKind`, `IPlayerLink.SendUse`
+→ `GameManager.UseServer`). Модели — `Tools/Blender/poi.py`.
+
+## Главное задание, двери, замки, терминалы
+
+**Главное задание дома** (необязательное, видно ещё в канализации на панели туннеля: `SewerRoute` строит превью дома) — `LevelLayout.Objective`
+(`HouseFeatures.PlanObjective` до мебели, `FinishObjective` после охраны; свой поток рандома; настройки `FeatureSettings` + `ItemsConfig.Objectives`):
+**большой сейф** — комната за единственной дверью (`VaultRoom`/`VaultDoor`, `AutoDoor.Vault`: не взламывается, табло `VaultPanel` с тремя лампами;
+дверь — круглая банковская на петле, `LevelArt.VaultDoor`, `AutoDoor.Swing`; диск увеличен (`AssetBuilder.VaultDoorScale`) и прижат к стене — перекрывает отверстие
+и гильзу без щели; пульты её только разблокируют, открывает игрок по E (`VaultHandle`, `UseKind.VaultDoor` → `GameManager.OpenVaultServer`, ключ `OpenKeys.Stage(JobStage.VaultOpen)`,
+`AutoDoor.SwungOpen`): сначала крутится штурвал (`AutoDoor.Wheel`, часть модели `TrimWheel`), потом дверь поворачивается внутрь (`AutoDoor.VaultStep`) и остаётся открытой;
+в комнате сейфа нет других проёмов (`HouseFeatures.OnlyWayIn`: ни двери на улицу, ни лаза); стены — стальные панели с заклёпками, пол — рифлёная сталь в любом стиле
+(`ArchitecturePlanner.PlanVaultFace`, `DecorPiece.Vault`, материалы `StyleKit.VaultWall/VaultFloor`, текстура `vaultsteel` из `generate_textures.py`), без постеров и пятен; проём хранилища шире (`LevelMetrics.VaultDoorWidth`, `HouseFeatures.WidenVaultDoorway` двигает его вдоль стены), стальное кольцо проходит сквозь стену, а углы между кругом и прямоугольником проёма — сама стена (`AutoDoor.WallParts` → `LevelShell.WallParts`: `StyleDecor` одевает их в отделку стены с её раскладкой, как пазухи арки; меши — `AssetBuilder.WallCornerMeshes`), у такого проёма нет обрамления и откосов стиля (`WallOpening.Vault`); внутри — ячейки, полки с деньгами,
+золото на поддонах и тележки, `Furnisher.VaultRoom`; запертые двери — с навесным замком `AutoDoor.Padlocks`, двери фасада — тяжёлые распашные `LevelArt.ExteriorDoor`: две створки открываются наружу (`AutoDoor.SwingB`,
+`SwingTime`; `LevelBuilder` поворачивает +Z двери на улицу), стальная коробка ровно по проёму — обкладка откосов и наличники на обеих сторонах стены),
+три пульта на стенах ближайших комнат (`VaultConsoles`, `VaultConsole`: диск — мини-игра сейфа, переключатели `SwitchPuzzle`, последовательность
+`SequenceLock`; экран `VaultLockView`, цифры — `Controls.DigitPressed`), все три решены → дверь разблокирована, внутри сокровища (`VaultTreasure`);
+задание показывается по шагам (`ObjectiveRules.Step`, `GameManager.ObjectiveStage`: найдите сейф → разблокируйте дверь (k/3) → откройте её;
+найдите заложника → заберите ключ у охранника (заложник по E помечает его для всех) → освободите); **заложник** — клетка `Cage` (`PropKind.Cage`) в большой комнате (в «Книжке-чертеже» — своя модель: латунная клетка-«птичья» на деревянном
+постаменте, замок, связанный заложник — `rooms2_special.py cage_storybook`; вид по стилю переключает `StyleParts`), ключ `ItemCatalog.CageKey` на спине охранника (`KeyCarrier`, `RobotController.CarryServer`;
+взломан — роняет), с ключом E → награда (алмаз). Награды не входят в квоту дома. Сервер — `GameManager.Objective.cs`, строка в HUD — `ObjectiveRules`;
+сценарий `objective` проходит оба задания настоящими клавишами.
+**Двери** — `DoorRules` (чистый, после мебели: `LevelLayout.DoorLooks` параллельно `AutoDoors`): вид (`DoorKind`), сторона открывания и петли.
+Почти все — на петлях: тонкая деревянная филёнчатая между комнатами (`WoodDoor`/`NarrowDoor`), двустворчатая со стеклом в большие комнаты и гостиную
+(`WoodDoubleDoor`), стёганая стальная у квартиры (`FlatDoor`), толстая подъездная с домофоном и доводчиком на улицу жилого дома (`EntranceDoor`), стальная
+(`ShopDoor`: мастерская, техпомещение, склады; уличная мастерской), больничная (`ClinicDoor`) и маятниковая с иллюминаторами в коридорах и операционных
+(`ClinicSwingDoor`, `AutoDoor.BothWays`: от того, кто подошёл); раздвижная стеклянная (`AutoDoor`) — только серверная, лаборатория, пульт и коридоры
+дата-центра; склад, покрасочная камера и сейф — свои. Одностворчатые — «полуторные» (проём 1,6 м): основная створка ~0,95 м пропускает игрока,
+узкая открывается только для робота (`AutoDoor.SecondForRobots`, свой `BlockerB`). Куда открывается: квартира — наружу на площадку, санузел и
+кладовка (< 6 м²) — из себя, из коридора — в комнату, между комнатами — в более глубокую (`RoomSteps`); петли — у косяка ближе к углу, выключатель —
+у ручки (`DoorRules.HandleWay` → `UtilityPlan.SwitchSpots`); из четырёх вариантов берётся первый, чей размах (`DoorRules.Sweeps`) не задевает стену
+чужой комнаты, лестницу, мебель и соседние двери (`CountClashes`). Всегда с дверью: вход в квартиру, санузел, туалет, спальня, техпомещение
+(`DoorRules.Always`, их не занимают лазеры и плиты); в квартирах и больнице дверей больше (`DoorRules.Chance`). Префаб открывается в свой +Z
+(`LevelBuilder` поворачивает его на 180° для `Back`), главная створка — на −X, `AutoDoor.HingeRight` зеркалит петли; сборщик — `AssetBuilder.BuildHingedDoor`,
+модели створок и фурнитуры (ручка, D-ручка, петля, доводчик, домофон) — `Tools/Blender/doors.py`; звуки `door_open`/`door_shut` (`AutoDoor.Sound`).
+Проверяют `DoorRulesTests`.
+**Запертые двери и сейфы.** `LevelLayout.LockedDoors` (индексы `AutoDoors`, свой поток рандома, с `LockedDoorsFromHouse`): `AutoDoor.Locked`
+не пускает игроков, роботов пускает; взлом — держать E (`InteractionSettings.DoorHackTime`) → `SendUse(UseKind.DoorLock)`.
+Сейф — `SafeBox` на префабе Props/Safe (индекс в `LevelLayout.Props`, сид кода от сида дома), мини-игра — `SafeLock` (настройки
+`ItemsConfig.Safes`), экран — `SafeCrackView` (хромированный диск с рифлёной ручкой, окна кода со светодиодами, осциллограф: каждый щелчок — импульс, тем выше и зеленее, чем ближе число); пульты хранилища — `VaultLockView` (стеклянные лампы в хромовых ободах с ореолом, клавиши-колпачки); картинки миниигр — `python Tools/Art/generate_minigame_ui.py` → `Art/Sprites/UI/Minigame` (`AssetBuilder.MgSprite`, рамки 9-slice там же); открытие → `SendUse(UseKind.Safe)` → лут на сервере. Открытые двери и сейфы дома —
+`GameManager.Opened` (ключи `OpenKeys`: вид в старшем байте, индекс под ним — `OpenKeysTests`; сцена читает их через `IWorldState`/`World`, без статических хуков), реплицирует `GameManagerNet`.
+
+**Терминалы охраны** — `LevelLayout.Terminals`. Камеры и взлом стоят в комнате управления роботами (у взлома — роботы и устройства, но не камеры: они только у терминала камер, `SecurityTerminal.Targets`) (`RoomType.ControlRoom`: если в доме её нет,
+`LevelGenerator.EnsureControlRoom` делает ею офис 16–60 м²; пульты с креслами ставит `Furnisher` как якорь и пристенные группы, `LevelGenerator.PlaceTerminals` берёт их
+первыми, лишние становятся столами; без комнаты — часть столов, свой поток рандома). Вид — `Tools/Blender/terminals.py`: пульт с тремя мониторами
+(`terminal_console`) и для двери склада — стойка доступа с маячком (`terminal_access`: голова — почти целиком экран 16:10, на нём проём склада с ящиками и замок; заперто — красная, роллета опущена, открыто — зелёная, проём открыт, замок снят: `SecurityTerminal.DoorsOpenPicture`, станция двери не гаснет), `SecurityTerminal.Console/Access`. `SecurityTerminal` на префабе
+Props/Terminal: камеры (вид через `SecurityCamera.Pivot`) или взлом издалека — по списку, без вида от роботов: посреди экрана все роботы и устройства дома кроме камер, по виду, а не по расстоянию (где они — не видно), с номером внутри вида, взломанные серые (`GameHUD.ShowHackList`, `HackListRules`, `HackRowView`, `SecurityTerminal.HackListOrder`), A/D/колесо выбирают, удержание E взламывает — `IPlayerLink.SendRemoteHack` → `GameManager.RemoteHackServer`,
+заряды (`InteractionSettings.TerminalHacks`) хранятся ключами `OpenKeys.Terminal` в `Opened`. Игрок за терминалом — `PlayerController.UsingTerminal`.
+На мониторах — картинка своего дела (`SecurityTerminal.Pictures/AccessPictures`, часть `EyeScreen` с UV 0..1 на каждый экран): камеры, взлом, доступ к двери; потраченный терминал тускнеет; у пультов хранилища на табло — замок, закрытый / открытый (`VaultConsole.LockedPicture/OpenPicture`). Картинки — `python Tools/Art/generate_screens.py` → `Art/Textures/Screens`.
