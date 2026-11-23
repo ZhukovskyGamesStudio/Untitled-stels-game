@@ -3,7 +3,8 @@ coffee, the fuel finder, a pair of boots, a tin of tomatoes, a folded chessboard
 tape, matches, a toilet roll, an apple core, soap, work gloves, a necklace, a mop, a teddy bear, rolled-up socks, an
 SSD drive, a game controller, a gaming keyboard, a fuel canister and a roll of bandages; the upgraded tools (a power
 screwdriver, a mechanical keyboard with a radio, a field tablet), a double espresso, spring boots, a gas mask, a
-sledgehammer, a floor motion sensor, a chess-piece detector, the crafting parts (a blueprint, a circuit board, wires,
+sledgehammer, a floor motion sensor, a chess-piece detector, a field detector with a ring of lamps (the upgraded
+fuel finder), the crafting parts (a blueprint, a circuit board, wires,
 a chip) and collectible Staunton chess pieces (each exported twice: item_<piece>_w_model and _b_model).
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/items_more.py -- Assets/_Game/Art/Models [--only a,b]
@@ -1249,6 +1250,85 @@ def model_item_chessdetector_model():
     return export("item_chessdetector_model")
 
 
+PROFINDER_SEGMENTS = 16
+PROFINDER_HEAD = (0.055, 0.0)    # the dial's centre (Blender x, y)
+
+
+def _profinder_outline(x0=-0.115, w=0.046, head_r=0.058, corner=0.014, n_arc=48, n_corner=6):
+    """The casing seen from above: a round head (the dial) at +X on a narrower panel that ends square, corners rounded."""
+    hx, hy = PROFINDER_HEAD
+    a = math.asin(w / head_r)
+    pts = []
+    # back-right corner (x0, -w), rounded
+    for k in range(n_corner + 1):
+        t = math.pi + (math.pi / 2) * k / n_corner          # 180..270 degrees
+        pts.append((x0 + corner + corner * math.cos(t), -w + corner + corner * math.sin(t)))
+    # along the side to the head, round the head (counter-clockwise, through +X), back along the other side
+    for k in range(n_arc + 1):
+        t = -(math.pi - a) + 2 * (math.pi - a) * k / n_arc
+        pts.append((hx + head_r * math.cos(t), hy + head_r * math.sin(t)))
+    for k in range(n_corner + 1):
+        t = math.pi / 2 + (math.pi / 2) * k / n_corner      # 90..180 degrees
+        pts.append((x0 + corner + corner * math.cos(t), w - corner + corner * math.sin(t)))
+    return pts
+
+
+def _arc_pad(r0, r1, a0, a1, z0, z1, centre, n=5):
+    """A flat pad shaped as a sector of a ring (one lamp of the dial)."""
+    cx, cy = centre
+    outer = [(cx + r1 * math.cos(a0 + (a1 - a0) * k / n), cy + r1 * math.sin(a0 + (a1 - a0) * k / n)) for k in range(n + 1)]
+    inner = [(cx + r0 * math.cos(a1 - (a1 - a0) * k / n), cy + r0 * math.sin(a1 - (a1 - a0) * k / n)) for k in range(n + 1)]
+    return prism(outer + inner, z0, z1, r=0.0005, seg=1)
+
+
+def model_item_profinder_model():
+    """The upgraded fuel finder, a handheld field detector lying flat, 0.23 m: a casing with a round head (Body, red
+    plastic), the head's ring of sixteen lamps around a lamp in the middle — the lit one shows which way the loot lies
+    (EyeSeg00..15 and EyeLed: each its own part, lit in the game one by one), a toothed bezel round them and the face
+    plate of the panel (Accent, grey metal), the dial's black bed, the screws, a ribbed knob and three mode buttons
+    (Trim), a small LCD on the panel (TrimLcd)."""
+    hx, hy = PROFINDER_HEAD
+    top = 0.034
+    body = prism(_profinder_outline(), 0.0, top, r=0.006, seg=3)
+    s.groove(body, "Z", 0.012, width=0.0018, depth=0.0009)                                # shell seam
+    s.part("Body", [body])
+    # the toothed bezel round the dial, the panel's face plate
+    accent = [poi.ring(0.0545, 0.0445, 0.007, (hx, hy, top + 0.0035), seg=48, r=0.0012)]
+    teeth = 40
+    for k in range(teeth):
+        t = 2 * math.pi * k / teeth
+        accent.append(s.rbox((0.0055, 0.0036, 0.0075), (hx + 0.0535 * math.cos(t), hy + 0.0535 * math.sin(t), top + 0.0035),
+                             r=0.0008, seg=1, rot=(0, 0, t)))
+    accent.append(s.rbox((0.098, 0.074, 0.003), (-0.056, 0.0, top + 0.0015), r=0.003, seg=2))
+    accent.append(s.rcyl(0.0035, 0.004, (hx, hy - 0.0505, top + 0.0055), seg=10, r=0.001))     # the bezel's index mark
+    s.part("Accent", accent)
+    # the dial's bed with its grid rings, the screws, the knob, the buttons
+    trim = [s.rcyl(0.0447, 0.004, (hx, hy, top + 0.002), seg=48, r=0.0006),
+            poi.ring(0.0205, 0.0195, 0.001, (hx, hy, top + 0.0042), seg=40, r=0.0002),
+            poi.ring(0.0425, 0.0415, 0.001, (hx, hy, top + 0.0042), seg=48, r=0.0002)]
+    for x, y in ((-0.1, -0.031), (-0.1, 0.031), (-0.012, -0.031), (-0.012, 0.031)):
+        trim.append(s.rcyl(0.0032, 0.002, (x, y, top + 0.004), seg=10, r=0.0008))
+    knob = s.rcyl(0.0115, 0.011, (-0.072, 0.019, top + 0.0085), seg=24, r=0.002)
+    trim.append(knob)
+    trim.append(s.rcyl(0.0035, 0.0115, (-0.072, 0.019 - 0.0085, top + 0.0095), axis="Y", seg=8, r=0.0008))  # knob's pointer
+    for y in (-0.024, -0.010, 0.004):
+        trim.append(s.rbox((0.009, 0.0085, 0.004), (-0.098, y - 0.004, top + 0.004), r=0.0012, seg=2))
+    s.part("Trim", trim)
+    s.part("TrimLcd", [s.rbox((0.034, 0.028, 0.0016), (-0.034, -0.014, top + 0.0035), r=0.0006, seg=1)])
+    # the ring of lamps: segment k is centred at angle 2πk/n from +X (counter-clockwise from above)
+    n = PROFINDER_SEGMENTS
+    step = 2 * math.pi / n
+    gap = math.radians(3.5)
+    for k in range(n):
+        a = step * k
+        s.part(f"EyeSeg{k:02d}", [_arc_pad(0.0225, 0.0395, a - step / 2 + gap / 2, a + step / 2 - gap / 2,
+                                            top + 0.0038, top + 0.0058, (hx, hy))])
+    lamp = s.lathe([(0.0115, 0.0), (0.0114, 0.003), (0.0098, 0.0068), (0.006, 0.0094), (0.0, 0.0104)], seg=24,
+                   loc=(hx, hy, top + 0.0038))
+    s.part("EyeLed", [lamp])
+    return export("item_profinder_model")
+
+
 def model_item_blueprint_model():
     """A technical blueprint sheet lying flat, 0.30 x 0.20, two opposite corners curling up (Body, blue paper), a
     border, a title block and a faint floor plan in thin white lines on its flat middle (Accent)."""
@@ -1495,6 +1575,7 @@ NEW_MODELS = {
     "item_hammer_model": model_item_hammer_model,
     "item_robosensor_model": model_item_robosensor_model,
     "item_chessdetector_model": model_item_chessdetector_model,
+    "item_profinder_model": model_item_profinder_model,
     "item_blueprint_model": model_item_blueprint_model,
     "item_circuit_model": model_item_circuit_model,
     "item_wires_model": model_item_wires_model,

@@ -11,7 +11,7 @@ Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's 
   map         3 x 3 cells                            Art/Models/Items/item_map_model.fbx (apartments.py)
   radio, keyboard, tablet, medkit, coffee, finder, boots, tomatoes, chess, magazine, pills, toothpaste, tape,
   matches, toiletpaper, applecore, soap, gloves, necklace, mop, plush, socks, ssd, gamepad, gamekeyboard, canister,
-  bandage, proscrewdriver, prokeyboard, protablet, espresso, jumpboots, gasmask, hammer, robosensor, chessdetector,
+  bandage, proscrewdriver, prokeyboard, protablet, espresso, jumpboots, gasmask, hammer, robosensor, chessdetector, profinder,
   blueprint, circuit, wires, chip, pawn_w/_b, knight_w/_b, bishop_w/_b, rook_w/_b, queen_w/_b, king_w/_b
             item_<id>_model.fbx (items_more.py)
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
@@ -228,6 +228,16 @@ ITEMS = {
         "Eye": ((0.3, 1.0, 0.5), 0.0, 0.3, 1.5),                         # screen, LED
         "Trim": ((0.95, 0.75, 0.25), 0.8, 0.3, 0.0),                     # coil, rim, knight emblem
         "Accent": ((0.08, 0.08, 0.09), 0.0, 0.5, 0.0)}),                 # trigger, cap, dish
+    "profinder": (2, 2, "item_profinder_model", {
+        "Body": ((0.72, 0.16, 0.1), 0.0, 0.45, 0.0),                     # red casing
+        "Accent": ((0.62, 0.64, 0.66), 0.8, 0.35, 0.0),                  # toothed bezel, face plate
+        "Trim": ((0.06, 0.06, 0.07), 0.0, 0.5, 0.0),                     # dial bed, knob, buttons
+        "TrimLcd": ((0.55, 0.63, 0.48), 0.0, 0.7, 0.0),
+        "Eye": ((0.05, 0.18, 0.07), 0.0, 0.3, 0.0),                      # the ring's dark lamps…
+        "EyeSeg03": ((0.3, 1.0, 0.4), 0.0, 0.3, 2.5),                    # …and the lit ones: the way to the loot
+        "EyeSeg04": ((0.3, 1.0, 0.4), 0.0, 0.3, 4.0),
+        "EyeSeg05": ((0.3, 1.0, 0.4), 0.0, 0.3, 2.5),
+        "EyeLed": ((0.3, 1.0, 0.4), 0.0, 0.3, 1.5)}),
     "blueprint": (3, 2, "item_blueprint_model", {
         "Body": ((0.12, 0.3, 0.7), 0.0, 0.85, 0.0),                      # blue paper
         "Accent": ((0.85, 0.92, 1.0), 0.0, 0.8, 0.0)}),                  # white lines

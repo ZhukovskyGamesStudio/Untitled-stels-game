@@ -114,6 +114,7 @@ namespace Stealth.Items
             new Shape { Id = "hammer",         Cells = new[] { V(0, 0), V(0, 1), V(0, 2), V(0, 3) } },
             new Shape { Id = "robosensor",     Cells = new[] { V(0, 0), V(0, 1) } },
             new Shape { Id = "chessdetector",  Cells = new[] { V(0, 0), V(0, 1) } },
+            new Shape { Id = "profinder",      Cells = new[] { V(0, 0), V(1, 0), V(0, 1), V(1, 1) } },
             // a blueprint (its colour byte: the recipe it shows, CraftBook), and what an unscrewed device drops
             new Shape { Id = "blueprint",      Cells = new[] { V(0, 0), V(1, 0), V(2, 0), V(0, 1), V(1, 1), V(2, 1) } },
             new Shape { Id = "circuit",        Cells = new[] { V(0, 0), V(1, 0) } },
@@ -154,16 +155,18 @@ namespace Stealth.Items
         /// <summary>A roll of bandages: loot like the rest of the junk, and in the hand it heals (<see cref="GadgetSettings.BandageHp"/>).</summary>
         public const byte Bandage = 47;
 
-        /// <summary>The things made at the workbench (<see cref="Crafting"/>): upgraded screwdriver … chess detector.</summary>
-        public const byte FirstCrafted = 48, LastCrafted = 56;
+        /// <summary>The things made at the workbench (<see cref="Crafting"/>): upgraded screwdriver … upgraded fuel finder.</summary>
+        public const byte FirstCrafted = 48, LastCrafted = 57;
         public const byte ProScrewdriver = 48, ProKeyboard = 49, ProTablet = 50, Espresso = 51, JumpBoots = 52,
             GasMask = 53, Hammer = 54, RoboSensor = 55, ChessDetector = 56;
+        /// <summary>The upgraded fuel finder: its ring of lamps shows which way the nearest loot lies (<see cref="FinderBlink"/>).</summary>
+        public const byte ProFinder = 57;
         /// <summary>A blueprint: its colour byte is the recipe it shows (<see cref="CraftBook"/>).</summary>
-        public const byte Blueprint = 57;
+        public const byte Blueprint = 58;
         /// <summary>What an unscrewed device drops (the upgraded screwdriver): fuel, nothing to use.</summary>
-        public const byte Circuit = 58, Wires = 59, Chip = 60;
+        public const byte Circuit = 59, Wires = 60, Chip = 61;
         /// <summary>The chess pieces, white then black of each: pawn, knight, bishop, rook, queen, king.</summary>
-        public const byte FirstChess = 61, LastChess = 72;
+        public const byte FirstChess = 62, LastChess = 73;
 
         /// <summary>The thing an upgraded one is made from and works as (the upgraded screwdriver is a screwdriver too), else itself.</summary>
         public static byte BaseOf(int shape) => shape switch
@@ -173,6 +176,7 @@ namespace Stealth.Items
             ProTablet => Tablet,
             Espresso => Coffee,
             JumpBoots => Boots,
+            ProFinder => Finder,
             _ => (byte)shape,
         };
 
@@ -225,7 +229,7 @@ namespace Stealth.Items
             r[Bandage] = 1;
             // what the workbench makes: the rarity a blueprint shows for it
             r[ProScrewdriver] = 2; r[ProKeyboard] = 3; r[ProTablet] = 2; r[Espresso] = 1; r[JumpBoots] = 3;
-            r[GasMask] = 2; r[Hammer] = 3; r[RoboSensor] = 2; r[ChessDetector] = 4;
+            r[GasMask] = 2; r[Hammer] = 3; r[RoboSensor] = 2; r[ChessDetector] = 4; r[ProFinder] = 3;
             r[Circuit] = 1; r[Wires] = 0; r[Chip] = 2;
             // the dearer a piece in chess, the rarer: pawn grey, knight and bishop green, rook blue, queen purple, king gold
             for (int k = 0; k < 6; k++) r[ChessPiece(k, false)] = r[ChessPiece(k, true)] = (sbyte)(k switch { 0 => 0, 1 or 2 => 1, 3 => 2, 4 => 3, _ => 4 });
@@ -351,7 +355,7 @@ namespace Stealth.Items
         /// <summary>What can go into the hand slot (and be used with the hand key).</summary>
         public static bool Holdable(int shape) => shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun || shape == Screwdriver || shape == ShelterMap
             || shape is Radio or Keyboard or Tablet or Medkit or Coffee or Finder or Bandage
-            || shape is ProScrewdriver or ProKeyboard or ProTablet or Espresso or Hammer or RoboSensor;
+            || shape is ProScrewdriver or ProKeyboard or ProTablet or Espresso or Hammer or RoboSensor or ProFinder;
 
         /// <summary>Used up from the hand (the gadget key): the medkit heals in full, a bandage a little, the coffee speeds you up.</summary>
         public static bool Consumable(int shape) => shape is Medkit or Coffee or Bandage or Espresso;
@@ -428,6 +432,7 @@ namespace Stealth.Items
             if (shape == Espresso) return new HeldPose(0.1f, 0f, 0f, -90f);           // lying along X, lid at −X: stood up, lid up
             if (shape == Hammer) return new HeldPose(0.6f, -1f, 0.12f, 0f, 30f);     // by the end of the handle, the head (−X) ahead and up
             if (shape == ChessDetector) return new HeldPose(0.2f, -1f, 0.3f, 0f, 5f); // the dish (−X) ahead
+            if (shape == ProFinder) return new HeldPose(0.21f, 0f, 0f, 0f, -25f, 90f);  // on the fingers along the view, the dial ahead tilted to the eyes
             return new HeldPose(0.12f, 0f, 0f, 0f);
         }
 
@@ -471,6 +476,7 @@ namespace Stealth.Items
             new(0.876f, 0.094f, 0.180f), // hammer
             new(0.153f, 0.176f, 0.147f), // robosensor
             new(0.197f, 0.061f, 0.123f), // chessdetector
+            new(0.228f, 0.049f, 0.116f), // profinder
             new(0.300f, 0.022f, 0.200f), // blueprint
             new(0.140f, 0.010f, 0.070f), // circuit
             new(0.088f, 0.025f, 0.076f), // wires

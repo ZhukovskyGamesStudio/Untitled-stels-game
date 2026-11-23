@@ -176,6 +176,34 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheUpgradedFinderIsAFinderMadeFromOne()
+        {
+            Assert.IsTrue(ItemCatalog.IsCrafted(ItemCatalog.ProFinder));
+            Assert.IsTrue(ItemCatalog.Works(ItemCatalog.ProFinder, ItemCatalog.Finder));
+            Assert.IsTrue(ItemCatalog.Holdable(ItemCatalog.ProFinder));
+            var book = new CraftBook(7, null);
+            var r = book.Recipes[System.Array.IndexOf(CraftBook.Results, ItemCatalog.ProFinder)];
+            Assert.AreEqual(ItemCatalog.ProFinder, r.Result);
+            CollectionAssert.Contains(r.Ingredients, ItemCatalog.Finder, "always made from a fuel finder");
+        }
+
+        [Test]
+        public void TheUpgradedFindersRingPointsTheWayToTheLoot()
+        {
+            var s = new CraftedSettings();
+            var toLoot = new Vector3(3f, 0.5f, 3f);
+            float dist = toLoot.magnitude;
+            Assert.AreEqual(1f, CraftedRules.DialGlow(new Vector3(1f, 0.2f, 1f), toLoot, dist, s), 1e-4f, "the lamp that points at it: full");
+            Assert.AreEqual(0f, CraftedRules.DialGlow(new Vector3(-1f, 0f, -1f), toLoot, dist, s), "the opposite lamp: dark");
+            Assert.AreEqual(0f, CraftedRules.DialGlow(new Vector3(1f, 0f, 1f), toLoot, s.FinderRange + 1f, s), "out of range: dark");
+            Assert.AreEqual(0f, CraftedRules.DialGlow(new Vector3(1f, 0f, 1f), toLoot, float.PositiveInfinity, s), "no loot: dark");
+            // a lamp 22.5° off (the next of sixteen): dark when the loot is near, lit when it is far — only the general way
+            var next = Quaternion.Euler(0f, 22.5f, 0f) * new Vector3(1f, 0f, 1f);
+            Assert.AreEqual(0f, CraftedRules.DialGlow(next, toLoot, 1f, s), "near: one lamp");
+            Assert.Greater(CraftedRules.DialGlow(next, toLoot, s.FinderRange * 0.9f, s), 0.5f, "far: its neighbours too");
+        }
+
+        [Test]
         public void TheRobotSensorSeesMovingRobotsAheadOfIt()
         {
             var s = new CraftedSettings();

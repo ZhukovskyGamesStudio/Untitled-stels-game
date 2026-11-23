@@ -46,6 +46,14 @@ namespace Stealth.Items
         public float SensorAngle = 100f;
         [Tooltip("A robot slower than this (m/s) is not seen.")]
         public float SensorSpeed = 0.3f;
+
+        [Header("Upgraded fuel finder: its ring of lamps shows which way the nearest loot lies")]
+        [Tooltip("How far it feels loot, metres: further, the ring is dark (the lamp in the middle still blinks slowly).")]
+        public float FinderRange = 30f;
+        [Tooltip("How wide the lit part of the ring is, degrees each side, with the loot close and at the edge of the range: far away it shows only the general way.")]
+        public float FinderSpreadNear = 20f, FinderSpreadFar = 60f;
+        [Tooltip("How bright the ring stays between the blinks (the blink itself is full).")]
+        [Range(0f, 1f)] public float FinderSteady = 0.45f;
     }
 
     /// <summary>What the workbench's things do (pure, unit tested): the numbers the components ask for.</summary>
@@ -94,6 +102,22 @@ namespace Stealth.Items
                 roll -= w;
             }
             return ItemCatalog.ChessPiece(kind, rng.Next(2) == 1);
+        }
+
+        /// <summary>
+        /// How bright a lamp of the upgraded fuel finder's ring is (0..1): the lamp that points from the dial
+        /// (<paramref name="lampWay"/>) the way the nearest loot lies (<paramref name="lootWay"/>, <paramref name="distance"/>
+        /// metres off; both flattened), its neighbours dimmer — the further the loot, the wider and vaguer; dark out of range.
+        /// </summary>
+        public static float DialGlow(Vector3 lampWay, Vector3 lootWay, float distance, CraftedSettings s)
+        {
+            if (float.IsInfinity(distance) || float.IsNaN(distance) || distance > s.FinderRange) return 0f;
+            var a = new Vector3(lampWay.x, 0f, lampWay.z);
+            var b = new Vector3(lootWay.x, 0f, lootWay.z);
+            if (b.sqrMagnitude < 0.01f) return 1f; // right under the dial: the whole ring
+            if (a.sqrMagnitude < 1e-8f) return 0f;
+            float spread = Mathf.Max(1f, Mathf.Lerp(s.FinderSpreadNear, s.FinderSpreadFar, Mathf.Clamp01(distance / Mathf.Max(0.01f, s.FinderRange))));
+            return Mathf.Clamp01(1f - Vector3.Angle(a, b) / spread);
         }
 
         /// <summary>

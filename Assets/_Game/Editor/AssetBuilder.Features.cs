@@ -456,7 +456,7 @@ namespace Stealth.EditorTools
             ["tablet"] = new[] { ("Body", new Color(0.92f, 0.66f, 0.12f), 0.25f, false), ("Accent", new Color(0.12f, 0.12f, 0.13f), 0.6f, false), ("Eye", new Color(0.25f, 0.6f, 0.8f), 0.85f, false) },
             ["medkit"] = new[] { ("Body", new Color(0.78f, 0.1f, 0.08f), 0.6f, false), ("Accent", new Color(0.82f, 0.83f, 0.85f), 0.65f, false), ("Trim", new Color(0.95f, 0.95f, 0.95f), 0.6f, false) },
             ["coffee"] = new[] { ("Body", new Color(0.25f, 0.13f, 0.06f), 0.85f, false), ("Accent", new Color(0.75f, 0.6f, 0.2f), 0.7f, false), ("Trim", new Color(0.75f, 0.12f, 0.1f), 0.5f, false) },
-            ["finder"] = new[] { ("Body", new Color(0.2f, 0.3f, 0.24f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.75f), 0.7f, false), ("Eye", new Color(1f, 0.55f, 0.1f), 0.6f, false) },
+            ["finder"] = new[] { ("Body", new Color(0.2f, 0.3f, 0.24f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.75f), 0.7f, false), ("Eye", new Color(1f, 0.55f, 0.1f), 0.6f, true) }, // (glows: FinderBlink lights it)
             ["boots"] = new[] { ("Body", new Color(0.36f, 0.22f, 0.12f), 0.4f, false), ("Accent", new Color(0.08f, 0.08f, 0.08f), 0.2f, false), ("Trim", new Color(0.8f, 0.65f, 0.3f), 0.3f, false) },
             ["tomatoes"] = new[] { ("Body", new Color(0.82f, 0.14f, 0.08f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.74f), 0.7f, false) },
             ["chess"] = new[] { ("Body", new Color(0.32f, 0.17f, 0.08f), 0.6f, false), ("Accent", new Color(0.9f, 0.85f, 0.72f), 0.65f, false) },
@@ -488,10 +488,17 @@ namespace Stealth.EditorTools
             ["hammer"] = new[] { ("Body", new Color(0.72f, 0.52f, 0.3f), 0.4f, false), ("Accent", new Color(0.3f, 0.31f, 0.33f), 0.65f, false), ("Trim", new Color(0.06f, 0.06f, 0.06f), 0.3f, false) },
             ["robosensor"] = new[] { ("Body", new Color(0.2f, 0.21f, 0.23f), 0.55f, false), ("Accent", new Color(0.92f, 0.92f, 0.9f), 0.8f, false), ("Trim", new Color(0.95f, 0.75f, 0.15f), 0.5f, false), ("Eye", new Color(1f, 0.15f, 0.1f), 0.6f, true) },
             ["chessdetector"] = new[] { ("Body", new Color(0.12f, 0.3f, 0.5f), 0.6f, false), ("Accent", new Color(0.08f, 0.08f, 0.09f), 0.5f, false), ("Trim", new Color(0.95f, 0.75f, 0.25f), 0.7f, false), ("Eye", new Color(0.3f, 1f, 0.5f), 0.6f, true) },
+            ["profinder"] = new[] { ("Body", new Color(0.72f, 0.16f, 0.1f), 0.45f, false), ("Accent", new Color(0.62f, 0.64f, 0.66f), 0.6f, false), ("Trim", new Color(0.07f, 0.07f, 0.08f), 0.4f, false), ("TrimLcd", new Color(0.55f, 0.63f, 0.48f), 0.7f, false), ("Eye", new Color(0.05f, 0.13f, 0.07f), 0.85f, true) }, // (dark glass: FinderBlink lights the ring lamp by lamp, GearGlow)
             ["blueprint"] = new[] { ("Body", new Color(0.12f, 0.3f, 0.7f), 0.15f, false), ("Accent", new Color(0.85f, 0.92f, 1f), 0.2f, false) },
             ["circuit"] = new[] { ("Body", new Color(0.1f, 0.45f, 0.2f), 0.6f, false), ("Accent", new Color(0.06f, 0.06f, 0.06f), 0.6f, false), ("Trim", new Color(0.75f, 0.77f, 0.8f), 0.7f, false), ("TrimGold", new Color(0.95f, 0.75f, 0.25f), 0.7f, false), ("Eye", new Color(1f, 0.15f, 0.1f), 0.6f, true) },
             ["wires"] = new[] { ("Body", new Color(0.8f, 0.1f, 0.08f), 0.55f, false), ("Accent", new Color(0.1f, 0.3f, 0.85f), 0.55f, false), ("AccentYellow", new Color(0.95f, 0.8f, 0.1f), 0.55f, false), ("Trim", new Color(0.05f, 0.05f, 0.05f), 0.5f, false), ("TrimCopper", new Color(0.85f, 0.45f, 0.25f), 0.7f, false) },
             ["chip"] = new[] { ("Body", new Color(0.06f, 0.06f, 0.06f), 0.5f, false), ("Trim", new Color(0.95f, 0.75f, 0.25f), 0.7f, false), ("Accent", new Color(0.78f, 0.8f, 0.82f), 0.75f, false) },
+        };
+
+        /// <summary>A glowing part whose light is not its colour: the upgraded finder's ring lamps are dark glass that lights green.</summary>
+        static readonly Dictionary<string, Color> GearGlow = new()
+        {
+            ["profinder_Eye"] = new Color(0.4f, 1.4f, 0.55f),
         };
 
         /// <summary>The chess pieces' looks: ivory or glossy black, a felt base (items_more.py: the same piece twice, _w and _b).</summary>
@@ -515,7 +522,7 @@ namespace Stealth.EditorTools
             (string part, Color color, float smooth, bool glow)[] looks = GearLooks.TryGetValue(id, out var l) ? l
                 : id.EndsWith("_w") || id.EndsWith("_b") ? ChessLooks(id) : new[] { ("Body", Color.grey, 0.3f, false) };
             foreach (var (part, color, smooth, glow) in looks)
-                Mat("Items", $"Gear_{id}_{part}", color, glow ? color * 1.6f : (Color?)null, smoothness: smooth);
+                Mat("Items", $"Gear_{id}_{part}", color, glow ? GearGlow.TryGetValue($"{id}_{part}", out var lit) ? lit : color * 1.6f : (Color?)null, smoothness: smooth);
             string name = char.ToUpperInvariant(id[0]) + id.Substring(1) + "Model";
             return Prefab($"{PrefabsDir}/Items/{name}.prefab", () =>
             {
@@ -526,23 +533,28 @@ namespace Stealth.EditorTools
                     string part = looks.Where(x => r.gameObject.name.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
                     r.sharedMaterial = M($"Gear_{id}_{part}");
                 }
-                if (id == "finder")
+                if (id is "finder" or "profinder")
                 {
-                    var glass = m.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.gameObject.name.StartsWith("Eye"));
+                    var glass = m.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.gameObject.name.StartsWith("EyeLed"))
+                        ?? m.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.gameObject.name.StartsWith("Eye"));
                     var lampGo = new GameObject("Lamp");
                     lampGo.transform.SetParent(m.transform, false);
-                    lampGo.transform.localPosition = glass != null ? glass.localBounds.center + Vector3.up * 0.03f : new Vector3(0f, 0.06f, 0f);
+                    // a hand's width off the glass: robots see the flash all the same, but it does not blow out the hand holding it
+                    lampGo.transform.localPosition = (glass != null ? glass.localBounds.center : Vector3.zero) + Vector3.up * 0.2f;
                     var lamp = lampGo.AddComponent<Light>();
                     lamp.type = LightType.Point;
                     lamp.range = 2.5f;
                     lamp.intensity = 1.4f;
-                    lamp.color = new Color(0.45f, 1f, 0.55f);
+                    lamp.color = glass != null && glass.sharedMaterial != null ? Color.Lerp(glass.sharedMaterial.color, Color.white, 0.3f) : new Color(0.45f, 1f, 0.55f); // the glass's colour
                     lamp.shadows = LightShadows.None;
                     lamp.enabled = false;
                     lampGo.AddComponent<LightSource>();
                     var blink = m.AddComponent<FinderBlink>();
                     blink.Lamp = lamp;
                     blink.Glass = glass;
+                    // the upgraded finder: its ring of lamps (items_more.py EyeSeg00..15)
+                    blink.Segments = m.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.gameObject.name.StartsWith("EyeSeg"))
+                        .OrderBy(r => r.gameObject.name, System.StringComparer.Ordinal).Cast<Renderer>().ToArray();
                 }
                 return m;
             });

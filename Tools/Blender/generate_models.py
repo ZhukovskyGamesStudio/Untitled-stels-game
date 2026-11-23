@@ -731,6 +731,7 @@ SHAPES = {
     "hammer": [(0, 0), (0, 1), (0, 2), (0, 3)],                   # sledgehammer (1 x 4)
     "robosensor": [(0, 0), (0, 1)],                               # floor motion sensor (1 x 2)
     "chessdetector": [(0, 0), (0, 1)],                            # chess-piece detector (1 x 2)
+    "profinder": [(0, 0), (1, 0), (0, 1), (1, 1)],                 # upgraded fuel finder (2 x 2)
     "blueprint": [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)],  # blueprint sheet (3 x 2)
     "circuit": [(0, 0), (1, 0)],                                  # circuit board (2 x 1)
     "wires": [(0, 0)],                                            # bundle of wires

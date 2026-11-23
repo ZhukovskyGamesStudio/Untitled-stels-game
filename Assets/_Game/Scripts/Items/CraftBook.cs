@@ -48,7 +48,7 @@ namespace Stealth.Items
         public static readonly byte[] Results =
         {
             ItemCatalog.ProScrewdriver, ItemCatalog.ProKeyboard, ItemCatalog.ProTablet, ItemCatalog.Espresso, ItemCatalog.JumpBoots,
-            ItemCatalog.GasMask, ItemCatalog.Hammer, ItemCatalog.RoboSensor, ItemCatalog.ChessDetector,
+            ItemCatalog.GasMask, ItemCatalog.Hammer, ItemCatalog.RoboSensor, ItemCatalog.ChessDetector, ItemCatalog.ProFinder,
         };
 
         /// <summary>The thing a result is always made from (255: none — any random ingredients).</summary>
@@ -60,6 +60,7 @@ namespace Stealth.Items
             ItemCatalog.Espresso => ItemCatalog.Coffee,
             ItemCatalog.JumpBoots => ItemCatalog.Boots,
             ItemCatalog.ChessDetector => 29, // the folded chessboard
+            ItemCatalog.ProFinder => ItemCatalog.Finder,
             _ => byte.MaxValue,
         };
 
