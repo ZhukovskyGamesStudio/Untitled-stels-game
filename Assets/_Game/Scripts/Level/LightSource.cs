@@ -26,6 +26,12 @@ namespace Stealth.Level
         /// <summary>The soft look of the ceiling lamps in the current style (<see cref="Configs.StyleWorld.CeilingGlow"/>): 0 none. Visual only.</summary>
         public static float CeilingGlow;
 
+        /// <summary>
+        /// How bright this one light looks on this peer, × the style's scale (1: as set). Visual only, like
+        /// <see cref="VisualScale"/>: a fuel finder dims its flash in its own holder's eyes (<see cref="Items.FinderBlink"/>).
+        /// </summary>
+        [System.NonSerialized] public float LookScale = 1f;
+
         Light m_Light;
         float m_Raw = -1f;      // the intensity the game set (lamp logic, flicker, alarm)
         float m_Shown = -1f;    // what we wrote into the light for the eye
@@ -57,7 +63,7 @@ namespace Stealth.Level
             var l = Light;
             if (l == null) return;
             m_Raw = LightMath.RawIntensity(l.intensity, m_Raw, m_Shown);
-            m_Shown = m_Raw * VisualScale;
+            m_Shown = m_Raw * VisualScale * LookScale;
             l.intensity = m_Shown;
         }
 

@@ -41,6 +41,7 @@ namespace Stealth.Items
             m_Holder = GetComponentInParent<PlayerController>();
             m_Lit = true;
             SetLit(false);
+            DimForHolder(true);
             if (!Ring) return;
             m_SegmentAt = new Vector3[Segments.Length];
             m_Shown = new float[Segments.Length];
@@ -52,6 +53,21 @@ namespace Stealth.Items
             m_DialAt = Glass != null ? transform.InverseTransformPoint(Glass.bounds.center) : Vector3.zero;
             m_LootDistance = float.PositiveInfinity;
             ShowRing(0f);
+        }
+
+        void OnDisable() => DimForHolder(false);
+
+        /// <summary>How bright the flash looks in its own holder's eyes (a light a hand's width off the finder was a photo flash).</summary>
+        const float OwnFlash = 0.12f;
+
+        /// <summary>
+        /// The flash in its holder's own view is dim (<see cref="Level.LightSource.LookScale"/>): the teammates see it as
+        /// ever, and the robots read its true brightness on the server.
+        /// </summary>
+        void DimForHolder(bool on)
+        {
+            if (Lamp == null || !Lamp.TryGetComponent<Level.LightSource>(out var source)) return;
+            source.LookScale = on && m_Holder != null && m_Holder.IsOwner ? OwnFlash : 1f;
         }
 
         void Update()
@@ -140,13 +156,13 @@ namespace Stealth.Items
             }
         }
 
-        /// <summary>A lamp's glow, 0 (dark) .. 1 (its material's own glow, a touch over: it just blooms).</summary>
+        /// <summary>A lamp's glow, 0 (dark) .. 1 (three quarters of its material's own glow).</summary>
         void Paint(Renderer r, float glow)
         {
             m_Block ??= new MaterialPropertyBlock();
             r.GetPropertyBlock(m_Block);
             var c = r.sharedMaterial != null && r.sharedMaterial.HasProperty(EmissionId) ? r.sharedMaterial.GetColor(EmissionId) : Color.green;
-            m_Block.SetColor(EmissionId, Color.Lerp(c * 0.02f, c * 1.2f, glow));
+            m_Block.SetColor(EmissionId, Color.Lerp(c * 0.02f, c * 0.75f, glow)); // (a lamp, not a photo flash: barely blooms)
             r.SetPropertyBlock(m_Block);
         }
 
