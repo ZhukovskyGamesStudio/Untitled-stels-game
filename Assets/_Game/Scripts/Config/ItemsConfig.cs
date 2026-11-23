@@ -19,5 +19,9 @@ namespace Stealth.Configs
         public Stealth.Items.ObjectiveSettings Objectives = new();
         [Tooltip("Tools and places: stun cube, lure speaker, crates, workbench, med table.")]
         public GadgetSettings Gadgets = new();
+        [Tooltip("The car's workbench: the run's recipes, a failed combine, blueprints and chess pieces in the houses.")]
+        public CraftingSettings Crafting = new();
+        [Tooltip("What the things made at the workbench do (upgraded screwdriver, keyboard, tablet, espresso, jump boots, gas mask, hammer, robot sensor).")]
+        public CraftedSettings Crafted = new();
     }
 }

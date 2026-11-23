@@ -405,6 +405,10 @@ namespace Stealth.EditorTools
                 .Select(i => Img(R(status, $"Hack{i}", BottomLeft, BottomLeft, new Vector2(76 + i * 28, 28), new Vector2(26, 26)), Color.white, Icon("ret_hack"))).ToArray();
             foreach (var slot in hud.HackSlots) slot.preserveAspect = true;
             hud.HackFree = Icon("ret_hack");
+            // tired arms (the hammer, once per house) right of the hearts
+            hud.TiredArms = Img(R(status, "TiredArms", BottomLeft, BottomLeft, new Vector2(72, 0), new Vector2(22, 22)), new Color(1f, 0.75f, 0.35f), Icon("tired_arms"));
+            hud.TiredArms.preserveAspect = true;
+            hud.TiredArms.gameObject.SetActive(false);
             hud.HackKindIcons = RobotKindIcons();
 
             // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the tasks under it.

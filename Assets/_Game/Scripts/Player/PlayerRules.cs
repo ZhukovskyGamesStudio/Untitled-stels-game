@@ -95,7 +95,7 @@ namespace Stealth.Player
     public class GasSettings
     {
         [Tooltip("Seconds outside until you pass out.")]
-        public float Limit = 25f;
+        public float Limit = 15f;
         [Tooltip("Seconds outside until you start laughing (noise).")]
         public float LaughAfter = 8f;
         public float LaughInterval = 1.2f;
@@ -116,7 +116,11 @@ namespace Stealth.Player
         public GasExposure(GasSettings settings = null) => m_S = settings ?? new GasSettings();
 
         public GasSettings Settings => m_S;
-        public float Limit => m_S.Limit;
+        public float Limit => m_Limit > 0f ? m_Limit : m_S.Limit;
+        float m_Limit;
+
+        /// <summary>A longer (or the usual: 0) time to pass out in: the gas mask.</summary>
+        public void SetLimit(float seconds) => m_Limit = seconds;
         public float LaughAfter => m_S.LaughAfter;
         public float LaughInterval => m_S.LaughInterval;
         float RecoveryRate => m_S.RecoveryRate;

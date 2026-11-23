@@ -37,6 +37,7 @@ namespace Stealth.Game
         public void SendUseHand() => m_P.UseHandServer();
         public void SendHitFeedback(Vector3 awayFromSource) => m_P.OnHitFeedback(awayFromSource);
         public void SendFallHurt() => m_P.OnFallHurtRequest();
+        public void SendGear(GearAction action, Detector target, Vector3 point) => m_P.OnGearRequest(action, target, point);
         public void SendLoadout(byte cls, byte item, bool ready) => m_P.OnLoadoutRequest(cls, item, ready);
     }
 
@@ -62,6 +63,10 @@ namespace Stealth.Game
         public void RequestRecharge(int battery, int flashlight) => m_I.RechargeServer(battery, flashlight);
         public void RequestRechargeWorld(WorldItem battery, int flashlight) => m_I.RechargeWorldServer(battery, flashlight);
         public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => m_I.DropStashedServer(from, position, yaw);
+        public void RequestBench(int index, byte x, byte y, byte rot) => m_I.BenchServer(index, x, y, rot);
+        public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => m_I.UnbenchServer(from, x, y, rot);
+        public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => m_I.BenchMoveServer(from, x, y, rot);
+        public void RequestCombine() => m_I.CombineServer();
     }
 
     /// <summary>The run's requests and broadcasts on a peer that is its own server (<see cref="OfflinePlayerLink"/>).</summary>

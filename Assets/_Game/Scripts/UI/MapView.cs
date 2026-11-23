@@ -62,6 +62,9 @@ namespace Stealth.UI
         /// <summary>The map terminal's view: the whole building, not only what was seen, and everything in it.</summary>
         public bool WholeHouse { get; set; }
 
+        /// <summary>The upgraded minimap (in the hand): the devices by their pictures, the locked doors and the crates, searched or not.</summary>
+        public bool Upgraded { get; set; }
+
         ExplorationMap m_Full;
 
         /// <summary>Every tile of this house seen: what a map terminal shows (built once per house on this peer).</summary>
@@ -136,6 +139,7 @@ namespace Stealth.UI
                 Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, color, null, IconShape.Diamond, pulse, 0f);
             }
             if (WholeHouse) HouseIcons(layout, floor, me2, scale, radius, turn);
+            else if (Upgraded) UpgradedIcons(gm, layout, floor, me2, scale, radius, turn);
             foreach (var d in Detector.All)
             {
                 if (!d.IsMarked || WholeHouse) continue;
@@ -200,6 +204,43 @@ namespace Stealth.UI
                     d is RobotController ? 1f : 0.8f, 0f, glyph);
             }
         }
+
+        /// <summary>
+        /// The upgraded minimap's icons near the player on their floor: every device by its picture (grey once off), the
+        /// locked doors (red), the crates (grey once searched, gold before).
+        /// </summary>
+        void UpgradedIcons(GameManager gm, LevelLayout l, int floor, Vector2 me, float scale, float radius, float turn)
+        {
+            if (l == null) return;
+            bool Near(Vector2 at) => (at - me).magnitude * scale <= radius;
+            foreach (var d in Detector.All)
+            {
+                if (d is RobotController || LevelLayout.FloorOf(d.transform.position.y) != floor) continue;
+                var at = Flat(d.transform.position);
+                if (!Near(at)) continue;
+                var glyph = KindIcons != null && (int)d.Kind < KindIcons.Length ? KindIcons[(int)d.Kind] : null;
+                var color = d.IsHacked ? HackedColor : d.IsMarked ? Marked : DeviceColor;
+                Icon(at, floor, floor, me, scale, radius, turn, color, null, glyph != null ? IconShape.Glyph : IconShape.Dot, 0.8f, 0f, glyph);
+            }
+            foreach (var door in AutoDoor.All)
+            {
+                if (door == null || !door.Locked || LevelLayout.FloorOf(door.transform.position.y) != floor) continue;
+                var at = Flat(door.transform.position);
+                if (Near(at)) Icon(at, floor, floor, me, scale, radius, turn, LockedColor, null, IconShape.Diamond, 0.75f, 0f);
+            }
+            foreach (int prop in l.Crates)
+            {
+                if (prop < 0 || prop >= l.Props.Count) continue;
+                var p = l.Props[prop].Position;
+                if (LevelLayout.FloorOf(p.y) != floor) continue;
+                var at = Flat(p);
+                if (!Near(at)) continue;
+                bool searched = gm.IsOpened(OpenKeys.Crate(prop));
+                Icon(at, floor, floor, me, scale, radius, turn, searched ? HackedColor : StorageColor, null, IconShape.Dot, searched ? 0.6f : 0.8f, 0f);
+            }
+        }
+
+        static readonly Color LockedColor = new(1f, 0.25f, 0.3f);
 
         void Draw(ExplorationMap map, int floor, float scale)
         {

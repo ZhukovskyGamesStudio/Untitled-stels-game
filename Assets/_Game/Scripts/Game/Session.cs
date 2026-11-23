@@ -94,6 +94,9 @@ namespace Stealth.Game
     /// <summary>A cheat (F4 panel). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.</summary>
     public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, StartHouse = 32 }
 
+    /// <summary>What a thing made at the workbench does on request (<see cref="IPlayerLink.SendGear"/>).</summary>
+    public enum GearAction : byte { Ram, Unscrew, Hammer }
+
     public interface IPlayerLink
     {
         /// <summary>
@@ -140,6 +143,8 @@ namespace Stealth.Game
         void SendHitFeedback(Vector3 awayFromSource);
         /// <summary>Owner → server: I fell from too high (it hurts).</summary>
         void SendFallHurt();
+        /// <summary>The workbench's things: ram a robot (double espresso), unscrew a device (upgraded screwdriver), break the floor (hammer).</summary>
+        void SendGear(GearAction action, Detector target, Vector3 point);
         /// <summary>Owner → server: the class and the extra item picked on the run's start screen, and whether I am ready.</summary>
         void SendLoadout(byte cls, byte item, bool ready);
     }
@@ -170,6 +175,12 @@ namespace Stealth.Game
         void RequestRechargeWorld(WorldItem battery, int flashlight);
         /// <summary>An item of the team stash dropped into the world.</summary>
         void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw);
+        // The car's workbench (its entries named by value, like the stash's).
+        void RequestBench(int index, byte x, byte y, byte rot);
+        void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot);
+        void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot);
+        /// <summary>«Combine»: what lies on the bench becomes its recipe's result (or may break).</summary>
+        void RequestCombine();
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

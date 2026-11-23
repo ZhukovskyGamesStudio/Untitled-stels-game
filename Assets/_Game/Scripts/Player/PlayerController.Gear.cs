@@ -88,6 +88,7 @@ namespace Stealth.Player
                 Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
                 return true;
             }
+            if (e.Shape == ItemCatalog.Espresso) return DrinkEspressoServer(inv);
             if (e.Shape == ItemCatalog.Coffee)
             {
                 if (!inv.TakeHeldServer(ItemCatalog.Coffee)) return true;

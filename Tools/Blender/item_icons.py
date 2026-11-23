@@ -11,7 +11,9 @@ Writes <out>/<id>.png (RGBA, 128 px per inventory cell, the size of the shape's 
   map         3 x 3 cells                            Art/Models/Items/item_map_model.fbx (apartments.py)
   radio, keyboard, tablet, medkit, coffee, finder, boots, tomatoes, chess, magazine, pills, toothpaste, tape,
   matches, toiletpaper, applecore, soap, gloves, necklace, mop, plush, socks, ssd, gamepad, gamekeyboard, canister,
-  bandage   item_<id>_model.fbx (items_more.py)
+  bandage, proscrewdriver, prokeyboard, protablet, espresso, jumpboots, gasmask, hammer, robosensor, chessdetector,
+  blueprint, circuit, wires, chip, pawn_w/_b, knight_w/_b, bishop_w/_b, rook_w/_b, queen_w/_b, king_w/_b
+            item_<id>_model.fbx (items_more.py)
 Each model lies along X in its file; it is turned to stand along the picture's height (its head up), seen from
 above with a little tilt, lit by a soft key and a rim light, rendered with Cycles on a transparent film, then given
 a dark outline so it reads on any cell colour. The UI turns and mirrors the picture with the item.
@@ -180,7 +182,78 @@ ITEMS = {
     "bandage": (1, 1, "item_bandage_model", {
         "Body": ((0.93, 0.91, 0.85), 0.0, 0.95, 0.0),                    # gauze
         "Accent": ((0.78, 0.12, 0.1), 0.0, 0.6, 0.0)}, "front"),         # the stripes round the roll
+    # upgraded tools, gadgets and crafting parts (items_more.py)
+    "proscrewdriver": (1, 3, "item_proscrewdriver_model", {
+        "Body": ((0.95, 0.5, 0.08), 0.0, 0.4, 0.0),                      # orange housing
+        "TrimSteel": ((0.7, 0.72, 0.75), 0.9, 0.25, 0.0),                # chuck and bit
+        "Trim": ((0.88, 0.66, 0.25), 0.9, 0.3, 0.0),                     # brass collar and band
+        "EyeLed": ((1.0, 0.95, 0.8), 0.0, 0.2, 2.0),
+        "Accent": ((0.07, 0.07, 0.075), 0.0, 0.7, 0.0)}),                # battery, rubber grip, rocker
+    "prokeyboard": (3, 1, "item_prokeyboard_model", {
+        "Body": ((0.12, 0.13, 0.15), 0.3, 0.4, 0.0),                     # dark aluminium case
+        "EyeLed": ((0.3, 1.0, 0.4), 0.0, 0.3, 2.0),
+        "Eye": ((0.2, 0.9, 1.0), 0.0, 0.3, 1.5),                         # the glow under the keys
+        "Accent": ((0.24, 0.25, 0.28), 0.0, 0.45, 0.0)}, "tilted"),      # keycaps, dongle, antenna
+    "protablet": (2, 2, "item_protablet_model", {
+        "Body": ((0.16, 0.17, 0.18), 0.0, 0.75, 0.0),                    # black rubber bumper
+        "EyeScreen": ((0.25, 0.75, 0.95), 0.0, 0.2, 1.0),
+        "EyeSensor": ((1.0, 0.2, 0.15), 0.0, 0.2, 2.0),
+        "Accent": ((0.92, 0.55, 0.1), 0.0, 0.45, 0.0)}),                 # bezel, sensor pod, antenna
+    "espresso": (1, 1, "item_espresso_model", {
+        "Body": ((0.95, 0.94, 0.9), 0.0, 0.6, 0.0),                      # paper cup
+        "TrimBand": ((0.95, 0.75, 0.2), 0.5, 0.35, 0.0),                 # the two gold stripes
+        "Trim": ((0.55, 0.36, 0.2), 0.0, 0.8, 0.0),                      # card sleeve
+        "Accent": ((0.08, 0.08, 0.08), 0.0, 0.4, 0.0)}, "front"),        # lid
+    "jumpboots": (2, 2, "item_jumpboots_model", {
+        "Body": ((0.32, 0.12, 0.08), 0.0, 0.55, 0.0),                    # oxblood leather
+        "TrimSpring": ((0.75, 0.77, 0.8), 0.9, 0.25, 0.0),               # springs and pistons
+        "Trim": ((0.95, 0.8, 0.2), 0.0, 0.6, 0.0),                       # laces
+        "Accent": ((0.08, 0.08, 0.08), 0.0, 0.8, 0.0)}, "front"),        # soles and foot plates
+    "gasmask": (2, 2, "item_gasmask_model", {
+        "Body": ((0.18, 0.2, 0.16), 0.0, 0.75, 0.0),                     # rubber, straps too
+        "AccentFilter": ((0.35, 0.38, 0.22), 0.3, 0.5, 0.0),             # olive filter canister
+        "Accent": ((0.25, 0.4, 0.42), 0.2, 0.05, 0.0),                   # lenses
+        "Trim": ((0.42, 0.44, 0.42), 0.6, 0.4, 0.0)}),                   # rims, valve, port
+    "hammer": (1, 4, "item_hammer_model", {
+        "Body": ((0.72, 0.52, 0.3), 0.0, 0.6, 0.0),                      # hickory handle
+        "Accent": ((0.3, 0.31, 0.33), 0.85, 0.35, 0.0),                  # steel head
+        "Trim": ((0.06, 0.06, 0.06), 0.0, 0.7, 0.0)}),                   # rubber grip, wedge
+    "robosensor": (1, 2, "item_robosensor_model", {
+        "Body": ((0.2, 0.21, 0.23), 0.2, 0.45, 0.0),
+        "EyeLed": ((1.0, 0.15, 0.1), 0.0, 0.3, 2.0),
+        "Accent": ((0.92, 0.92, 0.9), 0.0, 0.2, 0.0),                    # milky PIR dome
+        "Trim": ((0.95, 0.75, 0.15), 0.0, 0.5, 0.0)}, "front"),          # feet, collar
+    "chessdetector": (1, 2, "item_chessdetector_model", {
+        "Body": ((0.12, 0.3, 0.5), 0.0, 0.4, 0.0),                       # blue plastic
+        "Eye": ((0.3, 1.0, 0.5), 0.0, 0.3, 1.5),                         # screen, LED
+        "Trim": ((0.95, 0.75, 0.25), 0.8, 0.3, 0.0),                     # coil, rim, knight emblem
+        "Accent": ((0.08, 0.08, 0.09), 0.0, 0.5, 0.0)}),                 # trigger, cap, dish
+    "blueprint": (3, 2, "item_blueprint_model", {
+        "Body": ((0.12, 0.3, 0.7), 0.0, 0.85, 0.0),                      # blue paper
+        "Accent": ((0.85, 0.92, 1.0), 0.0, 0.8, 0.0)}),                  # white lines
+    "circuit": (2, 1, "item_circuit_model", {
+        "Body": ((0.1, 0.45, 0.2), 0.0, 0.4, 0.0),                       # green board
+        "TrimGold": ((0.95, 0.75, 0.25), 0.9, 0.3, 0.0),
+        "Trim": ((0.75, 0.77, 0.8), 0.8, 0.3, 0.0),                      # capacitors, crystal
+        "EyeLed": ((1.0, 0.15, 0.1), 0.0, 0.3, 2.0),
+        "Accent": ((0.06, 0.06, 0.06), 0.0, 0.4, 0.0)}, "tilted"),       # chips, header
+    "wires": (1, 1, "item_wires_model", {
+        "Body": ((0.8, 0.1, 0.08), 0.0, 0.45, 0.0),                      # red wire
+        "AccentYellow": ((0.95, 0.8, 0.1), 0.0, 0.45, 0.0),
+        "Accent": ((0.1, 0.3, 0.85), 0.0, 0.45, 0.0),                    # blue wire
+        "TrimCopper": ((0.85, 0.45, 0.25), 0.9, 0.3, 0.0),
+        "Trim": ((0.05, 0.05, 0.05), 0.0, 0.5, 0.0)}),                   # cable tie
+    "chip": (1, 1, "item_chip_model", {
+        "Body": ((0.06, 0.06, 0.06), 0.0, 0.5, 0.0),                     # epoxy package
+        "Trim": ((0.95, 0.75, 0.25), 0.9, 0.3, 0.0),                     # gold pins
+        "Accent": ((0.78, 0.8, 0.82), 0.9, 0.25, 0.0)}, "tilted"),       # heat spreader
 }
+# collectible chess pieces: one model, white ivory or glossy black (still lit enough to read on the dark grid)
+for _kind, _tall in (("pawn", 1), ("knight", 1), ("bishop", 1), ("rook", 1), ("queen", 2), ("king", 2)):
+    for _c, _body in (("w", ((0.92, 0.86, 0.72), 0.0, 0.3, 0.0)), ("b", ((0.12, 0.11, 0.105), 0.0, 0.12, 0.0))):
+        ITEMS[f"{_kind}_{_c}"] = (1, _tall, f"item_{_kind}_{_c}_model", {
+            "Body": _body,
+            "Accent": ((0.12, 0.35, 0.18), 0.0, 0.9, 0.0)}, "front")     # felt
 
 
 def clear():

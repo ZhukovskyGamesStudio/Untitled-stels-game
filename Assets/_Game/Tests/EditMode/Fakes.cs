@@ -96,6 +96,8 @@ namespace Stealth.Tests
         public void SendUseHand() => HandUses++;
         public int FallHurts;
         public void SendFallHurt() => FallHurts++;
+        public readonly List<(GearAction action, Detector target, Vector3 point)> Gear = new();
+        public void SendGear(GearAction action, Detector target, Vector3 point) => Gear.Add((action, target, point));
         public readonly List<(byte cls, byte item, bool ready)> Loadouts = new();
         public void SendLoadout(byte cls, byte item, bool ready) => Loadouts.Add((cls, item, ready));
         public readonly List<(Cheat cheat, bool on)> Cheats = new();
@@ -131,6 +133,10 @@ namespace Stealth.Tests
         public void RequestRecharge(int battery, int flashlight) => Requests.Add($"recharge {battery} {flashlight}");
         public void RequestRechargeWorld(WorldItem battery, int flashlight) => Requests.Add($"recharge-world {flashlight}");
         public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => Requests.Add($"drop-stashed {from.X},{from.Y}");
+        public void RequestBench(int index, byte x, byte y, byte rot) => Requests.Add($"bench {index} {x},{y},{rot}");
+        public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unbench {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"bench-move {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestCombine() => Requests.Add("combine");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

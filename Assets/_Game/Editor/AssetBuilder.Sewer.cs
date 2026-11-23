@@ -532,6 +532,42 @@ namespace Stealth.EditorTools
             return ps;
         }
 
+        /// <summary>Where the workbench's top is in the car's frame (Tools/Blender/car_bench.py): the hands go there.</summary>
+        static readonly Vector3 CarBenchTop = new(0f, 1.2f, -0.585f);
+
+        /// <summary>The bench's paint by part (car_bench.py): a green steel frame, a wooden top, the pegboard, steel tools, red grips, the lamp.</summary>
+        static readonly (string part, Color color, float smooth, bool glow)[] CarBenchLooks =
+        {
+            ("Body", new Color(0.18f, 0.3f, 0.24f), 0.45f, false), ("Accent", new Color(0.7f, 0.5f, 0.3f), 0.3f, false),
+            ("AccentBoard", new Color(0.75f, 0.74f, 0.7f), 0.2f, false), ("Trim", new Color(0.65f, 0.67f, 0.7f), 0.7f, false),
+            ("TrimHandle", new Color(0.8f, 0.15f, 0.1f), 0.5f, false), ("EyeLamp", new Color(1f, 0.85f, 0.6f), 0.5f, true),
+        };
+
+        /// <summary>
+        /// The workbench at the cab's end of the bed (Tools/Blender/car_bench.py, modelled in the car's frame): its model on
+        /// the car's body (it sways with it), the place E opens it (<see cref="CarWorkbench"/>) at its top.
+        /// </summary>
+        static void BuildCarBench(Transform root, Transform body)
+        {
+            if (AssetDatabase.FindAssets("car_workbench t:Model", new[] { ModelsDir }).Length > 0)
+            {
+                var model = Model("car_workbench");
+                model.name = "Workbench";
+                model.transform.SetParent(body, false);
+                foreach (var (part, color, smooth, glow) in CarBenchLooks)
+                    Mat("Props", $"CarBench_{part}", color, glow ? color * 1.4f : (Color?)null, smoothness: smooth);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    string part = CarBenchLooks.Where(x => n.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
+                    r.sharedMaterial = M($"CarBench_{part}");
+                    if (n.StartsWith("Eye")) r.shadowCastingMode = ShadowCastingMode.Off;
+                }
+            }
+            else Debug.LogWarning("[Builder] car_workbench.fbx missing: run Tools/Blender/car_bench.py");
+            Child(root, "BenchUse", CarBenchTop).AddComponent<CarWorkbench>();
+        }
+
         static GameObject BuildCar(CargoPiece piece)
         {
             var root = new GameObject("Car");
@@ -583,6 +619,7 @@ namespace Stealth.EditorTools
             shredder.Car = car;
             shredder.Chips = ShredderChips(hopper.transform);
             car.Bed = Child(root.transform, "Bed", new Vector3(0f, 0.86f, -2.35f)).transform;
+            BuildCarBench(root.transform, body.transform);
             car.CargoRoot = Child(root.transform, "Cargo").transform;
 
             // solid: the chassis with the bed walls and the cab; the hull (for the walls ahead) is not a collider of its own

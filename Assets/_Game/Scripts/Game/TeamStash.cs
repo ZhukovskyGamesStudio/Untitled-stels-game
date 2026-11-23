@@ -17,6 +17,18 @@ namespace Stealth.Game
 
         readonly List<InventoryEntry> m_Items = new();
 
+        /// <summary>This grid's size in cells (the hatch's stash: <see cref="Width"/> x <see cref="Height"/>; the car's workbench: 4 x 4).</summary>
+        public int Columns { get; }
+        public int Rows { get; }
+
+        public TeamStash() : this(Width, Height) { }
+
+        public TeamStash(int columns, int rows)
+        {
+            Columns = columns;
+            Rows = rows;
+        }
+
         public IReadOnlyList<InventoryEntry> Items => m_Items;
         /// <summary>Bumped on every change (the network twin replicates on change).</summary>
         public int Version { get; private set; }
@@ -31,7 +43,7 @@ namespace Stealth.Game
             }
         }
 
-        public static bool IsCell(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
+        public bool IsCell(int x, int y) => x >= 0 && y >= 0 && x < Columns && y < Rows;
 
         HashSet<Vector2Int> Occupied(int ignoreIndex)
         {
@@ -86,8 +98,8 @@ namespace Stealth.Game
         public bool FindSpot(int shape, out byte x, out byte y, out byte rot)
         {
             for (int r = 0; r < 4; r++)
-                for (int yy = 0; yy < Height; yy++)
-                    for (int xx = 0; xx < Width; xx++)
+                for (int yy = 0; yy < Rows; yy++)
+                    for (int xx = 0; xx < Columns; xx++)
                         if (CanPlace(shape, r, xx, yy))
                         {
                             x = (byte)xx; y = (byte)yy; rot = (byte)r;

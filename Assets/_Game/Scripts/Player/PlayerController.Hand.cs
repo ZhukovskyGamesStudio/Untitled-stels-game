@@ -39,6 +39,7 @@ namespace Stealth.Player
             // the tablet opens and closes its map on this peer only
             var inv = GetComponent<PlayerInventory>();
             if (inv != null && inv.Holds(Items.ItemCatalog.Tablet)) { TabletOpen = !TabletOpen; return; }
+            if (UseCraftedInHand(inv)) return;
             Link.SendUseHand();
         }
 

@@ -20,7 +20,7 @@ namespace Stealth.Player
     /// Tarkov-like grid inventory. Server-authoritative: the owner calls <c>Request…</c>, the server validates in
     /// <c>…Server</c> handlers. The network twin (InventoryNet) replicates <see cref="Items"/> and carries the requests.
     /// </summary>
-    public class PlayerInventory : MonoBehaviour
+    public partial class PlayerInventory : MonoBehaviour
     {
         public const float ReachDistance = 3.5f;
         /// <summary>The hand slot: an entry with this X is held in the hand, not in the backpack's grid (one at a time).</summary>
@@ -74,7 +74,7 @@ namespace Stealth.Player
 
         public bool Carries(int color)
         {
-            foreach (var e in m_Items) if (e.Color == color) return true;
+            foreach (var e in m_Items) if (ItemCatalog.ColorOf(e.Shape, e.Color) == color) return true; // (a blueprint's byte is its recipe)
             return false;
         }
 
@@ -424,6 +424,17 @@ namespace Stealth.Player
             Session.Despawn(battery.gameObject);
         }
 
+        /// <summary>Server: the held thing's colour byte (the upgraded screwdriver marks the house it was used in).</summary>
+        public void SetHeldColorServer(byte color)
+        {
+            int h = HandIndex();
+            if (h < 0 || m_Items[h].Color == color) return;
+            var e = m_Items[h];
+            e.Color = color;
+            m_Items[h] = e;
+            Changed();
+        }
+
         /// <summary>Server: the charge of the flashlight at this index (it drains while it shines).</summary>
         public void SetChargeServer(int index, byte charge)
         {
@@ -573,8 +584,15 @@ namespace Stealth.Player
             return true;
         }
 
-        /// <summary>Anywhere on the player (backpack, belt, hand): the boots work while they are carried.</summary>
+        /// <summary>Anywhere on the player (backpack, belt, hand): the boots work while they are carried (an upgraded one counts as its base, <see cref="ItemCatalog.Works"/>).</summary>
         public bool Carries(byte shape)
+        {
+            foreach (var e in m_Items) if (ItemCatalog.Works(e.Shape, shape)) return true;
+            return false;
+        }
+
+        /// <summary>Anywhere on the player, this very thing (not a thing it is the upgrade of).</summary>
+        public bool CarriesExactly(byte shape)
         {
             foreach (var e in m_Items) if (e.Shape == shape) return true;
             return false;
@@ -607,11 +625,18 @@ namespace Stealth.Player
         public bool Holds(byte shape)
         {
             int h = HandIndex();
+            return h >= 0 && ItemCatalog.Works(m_Items[h].Shape, shape);
+        }
+
+        /// <summary>Whether the hand slot holds this very thing (not a thing it is the upgrade of).</summary>
+        public bool HoldsExactly(byte shape)
+        {
+            int h = HandIndex();
             return h >= 0 && m_Items[h].Shape == shape;
         }
 
-        /// <summary>Whether the backpack or the hand has an item of this shape.</summary>
-        public bool Has(byte shape) => m_Items.Exists(e => e.Shape == shape);
+        /// <summary>Whether the backpack or the hand has an item of this shape (or its upgrade).</summary>
+        public bool Has(byte shape) => m_Items.Exists(e => ItemCatalog.Works(e.Shape, shape));
 
         /// <summary>Server: use up the item in the hand if it is of this shape.</summary>
         public bool TakeHeldServer(byte shape)

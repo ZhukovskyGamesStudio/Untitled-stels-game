@@ -34,12 +34,13 @@ namespace Stealth.Game
             return -1;
         }
 
-        public int MaxHacked => System.Math.Max(1, Tuning.Player.Interaction.MaxHacked);
+        /// <summary>The team's hack slots (every peer): one more while anyone carries an upgraded keyboard.</summary>
+        public int MaxHacked => CraftedHackSlots();
 
         /// <summary>Server: the team switches a robot / device off (for good, within the limit: over it the first one wakes).</summary>
         public void TeamHackServer(Detector target)
         {
-            if (target == null) return;
+            if (target == null || m_Unscrewed.Contains(target)) return; // (taken apart: off for good already)
             m_Hacked.RemoveAll(d => d == null || !d.IsHacked || d == target);
             while (m_Hacked.Count >= MaxHacked)
             {
@@ -57,7 +58,16 @@ namespace Stealth.Game
         {
             int before = m_Hacked.Count;
             m_Hacked.RemoveAll(d => d == null || !d.IsHacked);
-            if (m_Hacked.Count != before) SyncHackSlots();
+            m_Unscrewed.RemoveWhere(d => d == null);
+            // the upgraded keyboard left the team (dropped, burned): the slot it gave goes, its robot wakes
+            bool woke = false;
+            for (int max = MaxHacked; m_Hacked.Count > max; woke = true)
+            {
+                var first = m_Hacked[0];
+                m_Hacked.RemoveAt(0);
+                first.WakeServer();
+            }
+            if (m_Hacked.Count != before || woke) SyncHackSlots();
         }
 
         void SyncHackSlots()
