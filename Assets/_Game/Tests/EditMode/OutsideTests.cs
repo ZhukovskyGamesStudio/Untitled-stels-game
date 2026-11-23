@@ -51,15 +51,15 @@ namespace Stealth.Tests
             Assert.IsNotNull(prefab.GetComponent<BoxCollider>(), "the glass stops bodies and items");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TestHousesHaveNoneToTwoWindows()
         {
             var level = AssetDatabase.LoadAssetAtPath<LevelConfig>("Assets/_Game/Data/Config/RoomsTest/Level.asset");
             var counts = new System.Collections.Generic.HashSet<int>();
+            TestHouses.RoomsTests(24); // (made at once)
             for (int seed = 1; seed <= 24; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 7919, 0, level.Building, level.Security, 1);
+                var l = TestHouses.RoomsTest(seed - 1);
                 int n = LevelBuilder.WindowSpots(l).Count;
                 Assert.That(n, Is.InRange(0, 2), $"seed {seed}");
                 Assert.AreEqual(n, LevelBuilder.WindowSpots(l).Count, "the same windows every time");

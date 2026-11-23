@@ -87,7 +87,11 @@ namespace Stealth.Player
         /// <summary>0..1 of holding E over a downed teammate.</summary>
         public float ReviveShare => ReviveProgress / m_Interaction.ReviveTime;
         /// <summary>0..1 of holding E at a robot / device.</summary>
-        public float HackShare => HackProgress / m_Interaction.HackHoldTime;
+        public float HackShare => HackProgress / HackHoldTime;
+        /// <summary>Seconds of E the target in reach takes: a hack, or the upgraded screwdriver taking a device apart.</summary>
+        float HackHoldTime => Unscrewing ? Configs.Tuning.Items.Crafted.UnscrewTime : m_Interaction.HackHoldTime;
+        /// <summary>Owner: E at <see cref="HackTarget"/> takes it apart with the upgraded screwdriver (not a hack).</summary>
+        public bool Unscrewing { get; private set; }
         public float HackReach => m_Interaction.HackReach;
         public float Height => Crouching ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
@@ -289,8 +293,9 @@ namespace Stealth.Player
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
+            UpdateBench(menu);
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
-                          (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
+                          (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode || AtBench);
             // the run's start screen: the team stands in a row, the mouse picks a class and an item, nobody walks
             bool pickingNow = GameManager.Instance != null && GameManager.Instance.Picking;
             if (pickingNow) cracking = true;
@@ -306,6 +311,7 @@ namespace Stealth.Player
             UpdateLadder(input, Time.deltaTime);
             Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
             UpdateGearMotion();
+            UpdateCrafted();
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
@@ -461,9 +467,12 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
+            // the upgraded screwdriver (once per house): a device is taken apart instead — off for good, its innards fall out
+            Unscrewing = HackTarget is SecurityDevice && CanUnscrew(m_Inventory);
+            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, HackHoldTime))
             {
-                Link.SendHack(HackTarget);
+                if (Unscrewing) Link.SendGear(GearAction.Unscrew, HackTarget, HackTarget.Position);
+                else Link.SendHack(HackTarget);
             }
             HackProgress = m_HackHeld.Of(HackTarget);
 

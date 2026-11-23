@@ -54,13 +54,19 @@ namespace Stealth.Level
         {
             var q = Quaternion.Euler(0, yaw, 0);
             Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
-            foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
+            // the four corners turned (no array of them: this runs some hundred thousand times a house)
+            Corner(new Vector3(r.xMin, 0, r.yMin));
+            Corner(new Vector3(r.xMax, 0, r.yMin));
+            Corner(new Vector3(r.xMin, 0, r.yMax));
+            Corner(new Vector3(r.xMax, 0, r.yMax));
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+
+            void Corner(Vector3 c)
             {
                 var w = p + q * c;
                 min = Vector2.Min(min, new Vector2(w.x, w.z));
                 max = Vector2.Max(max, new Vector2(w.x, w.z));
             }
-            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
         /// <summary>The rect lies on the floor of <paramref name="room"/> with a margin from its walls.</summary>
@@ -97,7 +103,8 @@ namespace Stealth.Level
         {
             int f = room.Floor;
             if (m_Fridge && b.Pieces.Exists(p => p.Kind == PropKind.Fridge)) return false; // one fridge a kitchen
-            var rects = new List<Rect>();
+            var rects = m_CommitRects;
+            rects.Clear();
             // windows: a tall piece in front of one fails the group; a thing hung on the wall there is left out of it
             // (the kitchen run stays, its cupboards over the window do not) unless the group is only that
             if (m_Windows != null)
@@ -172,6 +179,7 @@ namespace Stealth.Level
         }
 
         int m_Groups;
+        readonly List<Rect> m_CommitRects = new(); // TryCommit's footprints (one list for every try: read before it returns)
         bool[] m_WalkFree;  // the walk grid of the bare building (see Walk), built on the first check
         int[] m_WalkOwner;
         readonly List<int> m_GroupOf = new();    // per prop of the layout: the group it came with (−1: not removable)

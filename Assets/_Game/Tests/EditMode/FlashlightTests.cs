@@ -175,7 +175,6 @@ namespace Stealth.Tests
             Assert.AreEqual(0, level.Features.KeyDoors, "no key doors (no keys lying around)");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryTestRoomHasALightNormalDimOrFlickering()
         {
@@ -183,9 +182,10 @@ namespace Stealth.Tests
             Assert.IsTrue(level.Building.DarkRoomsDim);
             Assert.AreEqual(0.25f, level.Building.FlickerChance, 1e-4f);
             int dim = 0, flicker = 0, rooms = 0;
+            TestHouses.RoomsTests(24); // (made at once)
             for (int seed = 1; seed <= 16; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 7907, 0, level.Building, level.Security, 1);
+                var l = TestHouses.RoomsTest(seed - 1);
                 Assert.IsTrue(l.DarkRoomsDim);
                 foreach (var r in l.Rooms)
                 {

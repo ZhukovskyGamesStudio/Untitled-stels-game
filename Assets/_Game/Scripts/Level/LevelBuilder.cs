@@ -10,6 +10,8 @@ namespace Stealth.Level
         public static GameObject Root { get; private set; }
         /// <summary>Surfaces of the house (walls, floors, openings) that visual styles dress.</summary>
         public static LevelShell Shell { get; private set; }
+        /// <summary>The prefabs the level was built from (the hammer's hole cuts its slab with them).</summary>
+        public static LevelArt Art { get; private set; }
         /// <summary>The furniture placed in the house (one object per prop).</summary>
         public static IReadOnlyList<GameObject> Props => s_Props;
         static readonly List<GameObject> s_Props = new();
@@ -33,6 +35,7 @@ namespace Stealth.Level
         {
             foreach (var step in ClearSteps()) yield return step; // the house before comes down a piece at a time (on the drive)
             Layout = layout;
+            Art = art;
             var builder = new LevelBuilder(art, layout);
             Shell = builder.Shell;
             foreach (var _ in builder.Steps())

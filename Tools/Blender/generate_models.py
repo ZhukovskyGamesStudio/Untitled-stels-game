@@ -721,6 +721,27 @@ SHAPES = {
     "gamekeyboard": [(0, 0), (1, 0), (2, 0)],                     # gaming keyboard (3 x 1)
     "canister": [(0, 0), (1, 0), (0, 1), (1, 1)],                  # fuel canister (2 x 2)
     "bandage": [(0, 0)],                                          # roll of bandages
+    # upgraded tools, gadgets, crafting parts and collectible chess pieces (items_more.py)
+    "proscrewdriver": [(0, 0), (0, 1), (0, 2)],                   # power screwdriver (1 x 3)
+    "prokeyboard": [(0, 0), (1, 0), (2, 0)],                      # mechanical keyboard with a radio (3 x 1)
+    "protablet": [(0, 0), (1, 0), (0, 1), (1, 1)],                 # upgraded rugged tablet (2 x 2)
+    "espresso": [(0, 0)],                                         # double espresso
+    "jumpboots": [(0, 0), (1, 0), (0, 1), (1, 1)],                 # spring boots (2 x 2)
+    "gasmask": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # gas mask (2 x 2)
+    "hammer": [(0, 0), (0, 1), (0, 2), (0, 3)],                   # sledgehammer (1 x 4)
+    "robosensor": [(0, 0), (0, 1)],                               # floor motion sensor (1 x 2)
+    "chessdetector": [(0, 0), (0, 1)],                            # chess-piece detector (1 x 2)
+    "profinder": [(0, 0), (1, 0), (0, 1), (1, 1)],                 # upgraded fuel finder (2 x 2)
+    "blueprint": [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)],  # blueprint sheet (3 x 2)
+    "circuit": [(0, 0), (1, 0)],                                  # circuit board (2 x 1)
+    "wires": [(0, 0)],                                            # bundle of wires
+    "chip": [(0, 0)],                                             # processor chip
+    "pawn_w": [(0, 0)], "pawn_b": [(0, 0)],                       # chess pieces, white and black
+    "knight_w": [(0, 0)], "knight_b": [(0, 0)],
+    "bishop_w": [(0, 0)], "bishop_b": [(0, 0)],
+    "rook_w": [(0, 0)], "rook_b": [(0, 0)],
+    "queen_w": [(0, 0), (0, 1)], "queen_b": [(0, 0), (0, 1)],     # (1 x 2)
+    "king_w": [(0, 0), (0, 1)], "king_b": [(0, 0), (0, 1)],       # (1 x 2)
 }
 
 

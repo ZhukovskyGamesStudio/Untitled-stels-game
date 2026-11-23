@@ -11,16 +11,13 @@ namespace Stealth.Tests
     /// <summary>The HUD has no map: the map is a terminal's (TerminalKind.Map), and every kind of house has one.</summary>
     public class MapTerminalTests
     {
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryKindOfHouseHasMapTerminalsSpreadOut()
         {
             var missing = new List<string>();
-            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
-                foreach (int house in new[] { 1, 3 })
+            foreach (var (kind, house, l) in TestHouses.Kinds(1, 3))
                 {
-                    int seed = HouseKinds.SeedOf(kind, house, 100);
-                    var l = LevelGenerator.Generate(seed, house);
+                    int seed = l.Seed;
                     var maps = l.Terminals.Where(t => t.kind == TerminalKind.Map).ToList();
                     if (maps.Count == 0) { missing.Add($"{kind} {seed}/{house}"); continue; }
                     foreach (var (prop, _) in maps)
@@ -41,7 +38,7 @@ namespace Stealth.Tests
             // added last: the hacking and camera terminals stand where they stood before there were map terminals
             var b = new SecuritySettings { MapTerminals = 0 };
             var l = TestHouses.Get(42, 2);
-            var without = LevelGenerator.Generate(42, 2, null, b);
+            var without = TestHouses.Make(42, 2, null, b);
             // (the storage door's kiosk is chosen after them, from the desks left: it may take another one)
             static bool Robots((int prop, TerminalKind kind) t) => t.kind is TerminalKind.Hacking or TerminalKind.Cameras;
             CollectionAssert.AreEqual(without.Terminals.Where(Robots).ToList(), l.Terminals.Where(Robots).ToList());

@@ -87,6 +87,9 @@ namespace Stealth.Vehicles
         /// <summary>The engine's hopper on the hood (things dragged onto it burn into fuel).</summary>
         public CarHopper Hopper => m_Hopper != null ? m_Hopper : m_Hopper = GetComponentInChildren<CarHopper>();
         CarHopper m_Hopper;
+        /// <summary>The workbench in the bed (the team's bench: <see cref="Game.GameManager.Bench"/>).</summary>
+        public CarWorkbench Bench => m_Bench != null ? m_Bench : m_Bench = GetComponentInChildren<CarWorkbench>();
+        CarWorkbench m_Bench;
         static readonly RaycastHit[] s_Hits = new RaycastHit[16];
         static readonly Collider[] s_Overlaps = new Collider[16];
 

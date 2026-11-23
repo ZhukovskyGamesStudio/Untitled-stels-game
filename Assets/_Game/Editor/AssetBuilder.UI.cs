@@ -50,7 +50,7 @@ namespace Stealth.EditorTools
         static Font UiFont => s_Font != null ? s_Font : s_Font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         static readonly Vector2 TopLeft = new(0, 1), TopCenter = new(0.5f, 1), TopRight = new(1, 1), Center = new(0.5f, 0.5f),
-            BottomLeft = new(0, 0), BottomCenter = new(0.5f, 0), Left = new(0, 0.5f);
+            BottomLeft = new(0, 0), BottomCenter = new(0.5f, 0), BottomRight = new(1, 0), Left = new(0, 0.5f);
 
         static readonly Color PanelColor = new(0, 0, 0, 0.45f);
 
@@ -840,11 +840,72 @@ namespace Stealth.EditorTools
             ui.HandItems = R(hole, "HandItems", Center, TopLeft, Vector2.zero, Vector2.zero);
             ui.HandLabel = Txt(R(ui.HandSlot, "Label", BottomCenter, BottomCenter, new Vector2(0, 2), new Vector2(2 * c + 12, 18)), "", 11, TextAnchor.MiddleCenter, Color.white);
 
+            BuildBenchPanel(root.transform, ui);
+
             ui.Ghost = R(root.transform, "DragGhost", BottomLeft, TopLeft, Vector2.zero, Vector2.zero);
             ui.BlockPrefab = e.InventoryBlock;
             ui.HighlightPrefab = e.CellHighlight;
             ui.Tooltip = Txt(R(root.transform, "Tooltip", BottomLeft, TopLeft, Vector2.zero, new Vector2(320, 22)), "", 13, TextAnchor.MiddleLeft, Color.white);
             return root;
+        }
+
+        /// <summary>
+        /// The car's workbench above the open backpack (shown while the bench is open, InventoryUI.Bench): its 4 x 4 grid on
+        /// the left, «combine» right of it a little under the middle with what comes of it over the button (a picture and a
+        /// name, or «result unknown»), and an (i) in the corner whose rules show on hover.
+        /// </summary>
+        static void BuildBenchPanel(Transform root, InventoryUI ui)
+        {
+            const float c = InventoryUI.Cell, pad = 14f, title = 22f, side = 170f, gap = 14f;
+            int n = Stealth.Items.CraftBook.BenchSize;
+            float gw = n * c, gh = n * c;
+            float w = pad + gw + gap + side + pad, h = title + pad + gh + pad;
+            // above the backpack (its panel is 190 px high, 13 px off the bottom)
+            var panel = R(root, "Bench", BottomCenter, BottomCenter, new Vector2(0, 218), new Vector2(w, h));
+            Img(Stretch(panel, "Background"), Color.white, UiSprite("hand_slot"));
+            Txt(R(panel, "Title", TopLeft, TopLeft, new Vector2(pad, -4), new Vector2(gw, title)), L("bench.title"), 13, TextAnchor.MiddleLeft, Color.white, bold: true);
+
+            var grid = R(panel, "Grid", TopLeft, TopLeft, new Vector2(pad, -(title + pad)), new Vector2(gw, gh));
+            grid.pivot = TopLeft;
+            grid.anchoredPosition = new Vector2(pad, -(title + pad));
+            Img(R(grid, "Lining", Center, Center, Vector2.zero, new Vector2(gw + 6, gh + 6)), new Color(0f, 0f, 0f, 0.45f));
+            var cells = new List<Image>();
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                    cells.Add(Img(R(grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), new Color(1, 1, 1, 0.08f)));
+            ui.BenchGrid = grid;
+            ui.BenchCells = cells.ToArray();
+            ui.BenchItems = Stretch(grid, "Items");
+            ui.BenchItems.pivot = TopLeft;
+            ui.BenchHighlights = Stretch(grid, "Highlights");
+            ui.BenchHighlights.pivot = TopLeft;
+
+            // the right side: the result over the button, the button a little under the middle of the grid
+            float sx = pad + gw + gap;
+            float mid = -(title + pad + gh / 2f);
+            var button = R(panel, "Combine", TopLeft, TopLeft, new Vector2(sx, mid - 14f), new Vector2(side, 36f));
+            ui.CombineButton = button;
+            ui.CombineBackground = Img(Stretch(button, "Background"), new Color(0.95f, 0.55f, 0.1f, 0.6f));
+            ui.CombineLabel = Txt(Stretch(button, "Label"), L("bench.combine"), 15, TextAnchor.MiddleCenter, Color.white, bold: true);
+            ui.ResultLabel = Txt(R(panel, "Result", TopLeft, BottomLeft, new Vector2(sx, mid - 14f + 4f), new Vector2(side, 34f)), "", 12, TextAnchor.LowerCenter, Color.white);
+            ui.ResultIcon = Img(R(panel, "ResultIcon", TopLeft, BottomLeft, new Vector2(sx + side / 2f - 20f, mid - 14f + 40f), new Vector2(40f, 40f)), Color.white);
+            ui.ResultIcon.preserveAspect = true;
+            ui.ResultIcon.raycastTarget = false;
+            ui.ResultIcon.gameObject.SetActive(false);
+
+            // the (i): its tip over the panel while hovered
+            var info = R(panel, "Info", TopRight, TopRight, new Vector2(-6, -4), new Vector2(20, 20));
+            Img(info, Color.white, Icon("info"));
+            ui.InfoZone = info;
+            var tip = R(panel, "InfoTip", TopRight, BottomRight, new Vector2(0, 6), new Vector2(360, 76));
+            Img(Stretch(tip, "Background"), new Color(0f, 0f, 0f, 0.85f));
+            Txt(Stretch(tip, "Text", 8f), L("bench.info"), 12, TextAnchor.MiddleLeft, Color.white);
+            tip.gameObject.SetActive(false);
+            ui.InfoTip = tip.gameObject;
+            ui.QuestionIcon = Icon("question");
+
+            ui.BenchPanel = panel.gameObject;
+            panel.gameObject.SetActive(false);
         }
 
         /// <summary>

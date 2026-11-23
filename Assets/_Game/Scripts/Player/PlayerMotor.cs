@@ -84,7 +84,10 @@ namespace Stealth.Player
         float GroundAccel => m_S.GroundAccel;
         float GroundDecel => m_S.GroundDecel;
         float AirAccel => m_S.AirAccel;
-        float JumpHeight => m_S.JumpHeight;
+        float JumpHeight => JumpHeightOverride > 0f ? JumpHeightOverride : m_S.JumpHeight;
+
+        /// <summary>A higher jump than the tuned one (0: the tuned one): the jump boots.</summary>
+        public float JumpHeightOverride { get; set; }
         float CoyoteTime => m_S.CoyoteTime;
         float JumpBuffer => m_S.JumpBuffer;
         float GroundSnapDistance => m_S.GroundSnapDistance;

@@ -212,8 +212,11 @@ namespace Stealth.Level
                 if (k < 0) continue;
                 float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight - 0.014f; // (a hall's: on its top storey)
                 // (round the duct grates' holes: a grate under a ceiling of tiles was a lid hanging from a ceiling with no way up)
+                // (and round the hammer's holes in the floor above it)
+                var holes = new List<Rect>(shell.CeilingHoles);
+                foreach (var (hole, floor) in shell.FloorHoles) if (floor == room.Floor + room.Levels) holes.Add(hole);
                 foreach (var whole in CeilingRects(l, room))
-                    foreach (var (a, b) in CutHoles(whole.min, whole.max, shell.CeilingHoles))
+                    foreach (var (a, b) in CutHoles(whole.min, whole.max, holes))
                     {
                         var r = Rect.MinMaxRect(a.x, a.y, b.x, b.y);
                         list.Add(new DecorPiece

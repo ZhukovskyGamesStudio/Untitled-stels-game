@@ -20,12 +20,7 @@ namespace Stealth.Tests
         static List<LevelLayout> Garages()
         {
             if (s_Garages.Count > 0) return s_Garages;
-            for (int seed = 1; s_Garages.Count < 5 && seed < 400; seed++)
-            {
-                int house = 1 + seed % 4;
-                if (HouseKinds.Of(seed, house) != HouseKind.Garage) continue;
-                s_Garages.Add(TestHouses.Get(seed, house));
-            }
+            s_Garages.AddRange(TestHouses.First(HouseKind.Garage, 5, seed => 1 + seed % 4));
             return s_Garages;
         }
 

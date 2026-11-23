@@ -144,7 +144,7 @@ namespace Stealth.Items
             var byColor = new Dictionary<int, List<int>>();
             for (int i = 0; i < items.Count; i++)
             {
-                if (!ItemCatalog.IsLoot(items[i].Shape)) continue;
+                if (!ItemCatalog.IsLoot(items[i].Shape) || items[i].Shape == ItemCatalog.Blueprint) continue; // (its colour byte is its recipe)
                 if (!byColor.TryGetValue(items[i].Color, out var list)) byColor[items[i].Color] = list = new List<int>();
                 list.Add(i);
             }

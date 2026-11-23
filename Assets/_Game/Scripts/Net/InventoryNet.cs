@@ -75,6 +75,22 @@ namespace Stealth.Net
         public void RequestStash(int index, byte x, byte y, byte rot) => StashRpc(index, x, y, rot);
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => UnstashRpc(NetInventoryEntry.From(from), x, y, rot);
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => StashMoveRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestBench(int index, byte x, byte y, byte rot) => BenchRpc(index, x, y, rot);
+        public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => UnbenchRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => BenchMoveRpc(NetInventoryEntry.From(from), x, y, rot);
+        public void RequestCombine() => CombineRpc();
+
+        [Rpc(SendTo.Server)]
+        void BenchRpc(int index, byte x, byte y, byte rot) => m_Inventory.BenchServer(index, x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void UnbenchRpc(NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.UnbenchServer(from.ToEntry(), x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void BenchMoveRpc(NetInventoryEntry from, byte x, byte y, byte rot) => m_Inventory.BenchMoveServer(from.ToEntry(), x, y, rot);
+
+        [Rpc(SendTo.Server)]
+        void CombineRpc() => m_Inventory.CombineServer();
         public void RequestSellStashed(InventoryEntry from) => SellStashedRpc(NetInventoryEntry.From(from));
         public void RequestStashWorld(WorldItem item, byte x, byte y, byte rot) => StashWorldRpc(item.GetComponent<NetworkObject>(), x, y, rot);
         public void RequestSellWorld(WorldItem item) => SellWorldRpc(item.GetComponent<NetworkObject>());

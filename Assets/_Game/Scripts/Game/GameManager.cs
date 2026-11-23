@@ -539,7 +539,8 @@ namespace Stealth.Game
             HideShelterMap(layout, free, parts, hideRng);
             int total = 0;
             float inStorage = Tuning.Level.Loot.InStorageChance;
-            foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
+            var planned = LootPlanner.Plan(layout, rng, Tuning.Level.Loot);
+            foreach (var loot in planned)
             {
                 float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
                 // a part it fits in: a shovel only stands in a tall compartment, small things go in drawers and cupboards too
@@ -555,6 +556,7 @@ namespace Stealth.Game
                 if (FrameBudget.Over) yield return true;
             }
             total += SpawnFeatures(layout);
+            total += SpawnCraftingLoot(layout, seed, planned);
             yield return true;
             SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
             counted[0] = total;
@@ -664,6 +666,8 @@ namespace Stealth.Game
         {
             Pings.Expire(Time.time);
             RevealMap();
+            _ = Book; // this run's recipes on every peer (a blueprint's worth reads them)
+            UpdateHoles();
             PrepareNextHouse();
             UpdateDrive();
             EnsureHouseSewer();
@@ -684,6 +688,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
             UpdateHacks();
+            UpdateRoboSensorsServer();
             UpdateDryers();
             UpdateStorageDoor();
             UpdateLift();
@@ -891,6 +896,7 @@ namespace Stealth.Game
             Cargo.Clear();
             Stash.Clear();
             ExitStash.Clear();
+            ClearCraftingServer();
             CancelArrival();
             DriveUntil = 0;
             m_Opened.Add(OpenKeys.Gate); // the start of the run: no gate to open

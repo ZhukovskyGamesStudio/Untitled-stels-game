@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Stealth.Level;
 using UnityEngine;
@@ -11,14 +12,8 @@ namespace Stealth.Tests
     /// </summary>
     public class StealthLayoutTests
     {
-        static IEnumerable<LevelLayout> Houses()
-        {
-            for (int seed = 1; seed <= 12; seed++)
-                for (int house = 1; house < 6; house += 2)
-                    yield return LevelGenerator.Generate(seed * 104729 + house, house, null, null, 2, new FeatureSettings());
-        }
+        static IEnumerable<LevelLayout> Houses() => TestHouses.Offices();
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void MostLootRoomsHaveASecondWayIn()
         {
@@ -47,7 +42,6 @@ namespace Stealth.Tests
             Assert.That(two, Is.GreaterThan(rooms * 3 / 4), $"loot rooms with two ways in: {two} of {rooms}");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void KeysLieDeeperThanTheirDoors()
         {

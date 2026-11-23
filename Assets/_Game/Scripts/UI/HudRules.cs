@@ -18,6 +18,8 @@ namespace Stealth.UI
         public bool CanHack;
         /// <summary>The hack target is a robot and no keyboard is in the hand: E only searches it (what it carries falls off).</summary>
         public bool SearchOnly;
+        /// <summary>The upgraded screwdriver: E at the device in reach takes it apart (not a hack).</summary>
+        public bool Unscrew;
         public float HackProgress;
         public bool Playing, NearHatch;
         /// <summary>The hatch in reach is the exit (the way down), not the entry.</summary>
@@ -192,7 +194,7 @@ namespace Stealth.UI
             if (c.MenuOpen || c.CursorMode || c.Downed || c.Cracking || c.AtTerminal || c.InHatch) return Reticle.Hidden;
             if (c.Driving || c.Passenger) return new Reticle(ReticleIcon.Dot);
             if (c.CanRevive) return new Reticle(ReticleIcon.Revive, true, c.ReviveProgress);
-            if (c.CanHack) return new Reticle(c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
+            if (c.CanHack) return new Reticle(c.Unscrew ? ReticleIcon.Vent : c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
             if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
             if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
             if (c.Storage != null) return new Reticle(ReticleIcon.Hand);
@@ -207,6 +209,7 @@ namespace Stealth.UI
             Level.UseKind.Crate => ReticleIcon.Crate,
             Level.UseKind.MedTable => ReticleIcon.Heal,
             Level.UseKind.Workbench => ReticleIcon.Craft,
+            Level.UseKind.CarBench => ReticleIcon.Craft,
             Level.UseKind.KeyDoor => ReticleIcon.Key,
             Level.UseKind.GateLever => ReticleIcon.Lever,
             Level.UseKind.CarSeat => ReticleIcon.Seat,
@@ -302,7 +305,7 @@ namespace Stealth.UI
             var e = K(GameAction.Interact);
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
-            if (c.CanHack) return new Hint(e, Loc.T(c.SearchOnly ? "hint.search" : "hint.hack"));
+            if (c.CanHack) return new Hint(e, Loc.T(c.Unscrew ? "hint.unscrew" : c.SearchOnly ? "hint.search" : "hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T("hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
             if (c.Storage != null) return new Hint(e, c.Storage);

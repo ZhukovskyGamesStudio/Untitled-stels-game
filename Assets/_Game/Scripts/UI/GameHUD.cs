@@ -95,6 +95,8 @@ namespace Stealth.UI
         public Sprite HeartFull, HeartEmpty;
         [Tooltip("The team's hack slots, bottom left: lit = a robot / device is switched off.")]
         public Image[] HackSlots;
+        [Tooltip("Tired arms: this player has swung a hammer in this house (it cannot again; a teammate can).")]
+        public Image TiredArms;
         [Header("The house's clock")]
         [Tooltip("Its panel: tinted from calm blue to red as extra robots come.")]
         public Image ClockPanel;
@@ -260,6 +262,7 @@ namespace Stealth.UI
             ShowHatchMarker(gm, me);
             ShowHealth(me);
             ShowHackSlots(gm);
+            if (TiredArms != null) Ui.Show(TiredArms, me.TiredArms && !me.Downed && gm.Phase == RunPhase.Playing);
             ShowHouseClock(gm);
             ShowEntryBanner(gm);
             ShowHouseStats(gm);
@@ -488,6 +491,7 @@ namespace Stealth.UI
                 TabletScreen.localScale = Vector3.one * (box.size.x / TabletScreenWidth);
             }
             if (!TabletScreen.gameObject.activeSelf) TabletScreen.gameObject.SetActive(true);
+            TabletMap.Upgraded = me.TryGetComponent<PlayerInventory>(out var tabletInv) && tabletInv.HoldsExactly(ItemCatalog.ProTablet);
             TabletMap.Refresh(gm, me);
         }
 
@@ -567,7 +571,10 @@ namespace Stealth.UI
             if (e.Shape == ItemCatalog.Medkit) return me.Hp < HealthState.MaxHp ? Loc.T("hint.medkit") : null;
             if (e.Shape == ItemCatalog.Bandage) return me.Hp < HealthState.MaxHp ? Loc.T("hint.bandage") : null;
             if (e.Shape == ItemCatalog.Coffee) return Loc.T("hint.coffee");
-            if (e.Shape == ItemCatalog.Tablet) return Loc.T("hint.tablet");
+            if (e.Shape == ItemCatalog.Espresso) return Loc.T("hint.espresso");
+            if (e.Shape is ItemCatalog.Tablet or ItemCatalog.ProTablet) return Loc.T("hint.tablet");
+            if (e.Shape == ItemCatalog.Hammer) return me.TiredArms ? null : Loc.T("hint.hammer");
+            if (e.Shape == ItemCatalog.RoboSensor) return Loc.T("hint.robosensor");
             return null;
         }
 
@@ -589,6 +596,7 @@ namespace Stealth.UI
                 ReviveProgress = me.ReviveShare,
                 CanHack = me.HackTarget != null,
                 SearchOnly = me.HackTarget is RobotController && !me.HoldsKeyboard,
+                Unscrew = me.Unscrewing,
                 HackProgress = me.HackShare,
                 Playing = gm.Phase == RunPhase.Playing,
                 NearExit = Hatch.IndexNear(me.transform.position) == 1,

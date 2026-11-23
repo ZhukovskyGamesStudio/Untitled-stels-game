@@ -19,12 +19,7 @@ namespace Stealth.Tests
         static List<LevelLayout> Hospitals()
         {
             if (s_Hospitals.Count > 0) return s_Hospitals;
-            for (int seed = 1; s_Hospitals.Count < 4 && seed < 400; seed++)
-            {
-                int house = 1 + seed % 4;
-                if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;
-                s_Hospitals.Add(TestHouses.Get(seed, house));
-            }
+            s_Hospitals.AddRange(TestHouses.First(HouseKind.Hospital, 4, seed => 1 + seed % 4));
             return s_Hospitals;
         }
 
@@ -53,7 +48,6 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheHospitalIsSmallerThanItsAreaButAsGuarded()
         {
@@ -61,7 +55,7 @@ namespace Stealth.Tests
             int full = 0, small = 0;
             foreach (var l in Hospitals())
             {
-                var whole = LevelGenerator.Generate(l.Seed, l.LevelIndex, new BuildingSettings { HospitalSize = 1f }, null, 1);
+                var whole = TestHouses.Make(l.Seed, l.LevelIndex, new BuildingSettings { HospitalSize = 1f }, null, 1);
                 Assert.AreEqual(HouseKind.Hospital, whole.PlanKind);
                 Assert.Less(l.SizeX * l.SizeZ, whole.SizeX * whole.SizeZ * 0.75f, $"seed {l.Seed}: smaller than the full size");
                 full += whole.RobotSpawns.Count;

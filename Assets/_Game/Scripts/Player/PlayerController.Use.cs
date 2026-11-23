@@ -113,6 +113,7 @@ namespace Stealth.Player
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
+            if (UseTarget.Kind == UseKind.CarBench) { AtBench = true; return; }      // the bench opens here; its moves are asked of the server
             Link.SendUse(UseTarget.Kind, UseTarget.Index);
         }
 

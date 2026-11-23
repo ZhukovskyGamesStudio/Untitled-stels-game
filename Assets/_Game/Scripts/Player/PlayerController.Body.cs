@@ -56,8 +56,10 @@ namespace Stealth.Player
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
                     // the department's outfit (the person's own unless the config dresses them otherwise); later swaps repaint
+                    m_BootsWorn = -1;
                     if (go.TryGetComponent<HumanWardrobe>(out var wardrobe))
                     {
+                        m_Wardrobe = wardrobe;
                         wardrobe.Dress(VisualStyles.OutfitFor(m_LookDepartment), VisualStyles.Wardrobe);
                         wardrobe.Changed += DressRig;
                     }
@@ -66,6 +68,7 @@ namespace Stealth.Player
             }
             UpdateBodyPose();
             if (m_Rig == null) return;
+            UpdateBootsWorn();
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
             // the hand's thing: everyone sees it carried in the rig's right hand (the owner keeps the first-person one)
             var held = HeldThing != null ? HeldThing.transform.parent : null;
@@ -77,6 +80,35 @@ namespace Stealth.Player
             m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
             m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside);
+        }
+
+        HumanWardrobe m_Wardrobe;
+        int m_BootsWorn = -1;
+
+        /// <summary>
+        /// Boots (plain or jump boots) anywhere on the player are on their feet: the wardrobe's boots made for this person;
+        /// without them, the outfit's own shoes again (every peer: backpacks are replicated).
+        /// </summary>
+        void UpdateBootsWorn()
+        {
+            if (m_Wardrobe == null) return;
+            int want = m_Inventory != null && m_Inventory.Carries(Items.ItemCatalog.Boots) ? 1 : 0;
+            if (want == m_BootsWorn) return;
+            m_BootsWorn = want;
+            const string slot = "feet", boots = "boots";
+            if (want == 1)
+            {
+                if (m_Wardrobe.ItemIn(slot) == boots) return;
+                WearPiece piece = null;
+                foreach (var p in VisualStyles.Wardrobe)
+                    if (p != null && p.Who == m_Wardrobe.Who && p.Item == boots) { piece = p; break; }
+                if (piece != null) m_Wardrobe.Wear(piece);
+                else m_Wardrobe.WearOwn(slot); // (the person whose own shoes are the boots)
+                return;
+            }
+            var outfit = VisualStyles.OutfitFor(m_LookDepartment);
+            if (outfit != null && outfit.Count > 0) m_Wardrobe.Dress(outfit, VisualStyles.Wardrobe);
+            else m_Wardrobe.WearOwn(slot);
         }
 
         /// <summary>
