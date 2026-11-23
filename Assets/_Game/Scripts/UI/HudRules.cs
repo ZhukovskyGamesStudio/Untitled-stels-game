@@ -350,6 +350,31 @@ namespace Stealth.UI
         public const float FovKick = 9f;
     }
 
+    /// <summary>The hacking terminal's list (pure, unit tested): which rows show, and the names numbered within a kind.</summary>
+    public static class HackListRules
+    {
+        /// <summary>The first row shown so that the pick stays in view, a few rows from the top where it can.</summary>
+        public static int FirstShown(int pick, int count, int shown)
+        {
+            if (count <= shown || pick < 0) return 0;
+            return Mathf.Clamp(pick - shown / 3, 0, count - shown);
+        }
+
+        /// <summary>The row's name: the kind's name, numbered (1, 2…) when the list holds more than one of that kind.</summary>
+        public static string Label<T, K>(string name, System.Collections.Generic.IReadOnlyList<T> list, int index, System.Func<T, K> kindOf)
+        {
+            var kind = kindOf(list[index]);
+            int number = 0, total = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (!Equals(kindOf(list[i]), kind)) continue;
+                total++;
+                if (i <= index) number = total;
+            }
+            return total > 1 ? $"{name} {number}" : name;
+        }
+    }
+
     public static class HouseClockRules
     {
         /// <summary>"M:SS" of <paramref name="seconds"/> (whole seconds, never negative).</summary>
@@ -385,24 +410,6 @@ namespace Stealth.UI
         /// <summary>The clock's colour for a heat: calm blue, through amber, to a red that does not hurt the eyes.</summary>
         public static Color ColorOf(float heat) =>
             heat < 0.5f ? Color.Lerp(Calm, Warm, heat * 2f) : Color.Lerp(Warm, Hot, (heat - 0.5f) * 2f);
-    }
-
-    public static class HunterRules
-    {
-        public enum Urgency { Calm, Soon, Inside }
-
-        /// <summary>
-        /// Text and urgency of the hunter line. <paramref name="secondsLeft"/> &lt; 0 and <paramref name="alarmsLeft"/> &lt; 0:
-        /// no more hunters come (the line shows only while one is inside). "Soon" is the last minute or the last alarm.
-        /// </summary>
-        public static (string text, Urgency urgency) Line(float secondsLeft, int alarmsLeft, int inside)
-        {
-            if (inside > 0) return (Loc.T("hud.hunter.inside"), Urgency.Inside);
-            if (secondsLeft < 0f || alarmsLeft < 0) return (null, Urgency.Calm);
-            int s = Mathf.CeilToInt(secondsLeft);
-            bool soon = secondsLeft <= 60f || alarmsLeft <= 1;
-            return (Loc.F("hud.hunter.in", $"{s / 60}:{s % 60:00}", alarmsLeft), soon ? Urgency.Soon : Urgency.Calm);
-        }
     }
 
     /// <summary>Banners shown one after another (pure, unit tested): at most four waiting, no immediate repeats.</summary>

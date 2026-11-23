@@ -111,7 +111,8 @@ namespace Stealth.EditorTools
                 go.AddComponent<ShaftLadder>();
                 return go;
             });
-            // the storage robot's way up the shaft: a navmesh link (the builder sets its ends; the lid opens and shuts it)
+            // the storage robot's way up the shaft: a navmesh link (the builder sets its ends; the lid opens and shuts it), in
+            // the Ladder area no other robot walks (RobotController's area mask)
             var shaftLink = Prefab($"{LevelPrefabs}/ShaftLink.prefab", () =>
             {
                 var go = new GameObject("ShaftLink");
@@ -120,6 +121,7 @@ namespace Stealth.EditorTools
                 link.bidirectional = true;
                 link.autoUpdate = false;
                 link.costModifier = 4;
+                link.area = Stealth.Level.LevelMetrics.LadderArea;
                 return go;
             });
             Link(art, ref art.ShaftHatch, shaftHatch);

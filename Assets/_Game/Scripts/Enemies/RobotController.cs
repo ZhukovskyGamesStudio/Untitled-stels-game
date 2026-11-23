@@ -74,7 +74,9 @@ namespace Stealth.Enemies
             if (!IsServer) return;
 
             m_Agent.enabled = true;
-            m_Agent.areaMask = Traits.CanUseStairs ? NavMesh.AllAreas : NavMesh.AllAreas & ~(1 << LevelMetrics.StairsArea);
+            // robots do not climb ladders (the shaft's link is the storage robot's alone); stairs only on legs
+            int mask = NavMesh.AllAreas & ~(1 << LevelMetrics.LadderArea);
+            m_Agent.areaMask = Traits.CanUseStairs ? mask : mask & ~(1 << LevelMetrics.StairsArea);
             m_Agent.baseOffset = Traits.HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = Traits.PatrolSpeed;
@@ -233,8 +235,7 @@ namespace Stealth.Enemies
             {
                 IIntruder target = p;
                 if (target.IsDown) continue;
-                float d = Vector3.Distance(target.Position, transform.position);
-                if (d <= Senses.ContactDistance) return new Sighting { Target = target, Contact = true, ChasePoint = target.Position };
+                // (no "contact": a robot touched from behind does not notice it — it notices only with its sensors)
 
                 float rate = 0f;
                 bool visibleToFilter = ColorFilter < 0 || target.Carries(ColorFilter);

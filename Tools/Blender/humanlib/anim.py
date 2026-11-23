@@ -17,24 +17,29 @@ FPS = 30
 def _bones():
     b = [("hips", J["hips"], J["spine"], None), ("spine", J["spine"], J["chest"], "hips"), ("chest", J["chest"], J["neck"] - (0, 0.005, 0.03), "spine"),
          ("neck", J["neck"], J["head"], "chest"), ("head", J["head"], J["crown"], "neck")]
-    from . import body as B
-    thumb0 = J["wrist"] + B.HAND_D * 0.030 + B.HAND_T * 0.030
-    thumb1 = J["wrist"] + B.HAND_D * 0.100 + B.HAND_T * 0.062 + B.HAND_N * 0.03
+    from . import clothes
+    chains = clothes.hand_chains()                                     # every finger: knuckle, two joints, tip
     for s, sd in ((1, "L"), (-1, "R")):
         m = lambda p: side(p, s)
         b += [(f"shoulder.{sd}", m(J["clavicle"]), m(J["shoulder"]), "chest"),
               (f"upper_arm.{sd}", m(J["shoulder"]), m(J["elbow"]), f"shoulder.{sd}"),
               (f"forearm.{sd}", m(J["elbow"]), m(J["wrist"]), f"upper_arm.{sd}"),
               (f"hand.{sd}", m(J["wrist"]), m(J["knuckle"]), f"forearm.{sd}"),
-              (f"fingers.{sd}", m(J["knuckle"]), m(J["fingertip"]), f"hand.{sd}"),
-              (f"thumb.{sd}", m(thumb0), m(thumb1), f"hand.{sd}"),
               (f"thigh.{sd}", m(J["hip"]), m(J["knee"]), "hips"),
               (f"shin.{sd}", m(J["knee"]), m(J["ankle"]), f"thigh.{sd}"),
               (f"foot.{sd}", m(J["ankle"]), m(J["ball"]), f"shin.{sd}"),
               (f"toe.{sd}", m(J["ball"]), m(J["toe"]), f"foot.{sd}")]
+        for finger in FINGERS:
+            pts = chains[finger]
+            for i in range(3):
+                b.append((f"{finger}.{i + 1}.{sd}", m(pts[i]), m(pts[i + 1]), f"{finger}.{i}.{sd}" if i else f"hand.{sd}"))
     return b
 
 
+HEEL_BACK = 0.06                        # the heel's end of the sole lies this far behind the ankle, metres
+# three bones a finger (1 from the knuckle … 3 the tip); a take bends "fingers" / "thumb" as a whole (Poser.bend)
+FINGERS = ("thumb", "index", "middle", "ring", "little")
+CURL = (0.85, 1.0, 0.6)                 # how a finger's curl is shared between its three joints
 BONES = _bones()
 
 
@@ -96,11 +101,23 @@ class Poser:
         """A limb swung forward (its end towards the figure's front; a hand, fingers and a thumb: towards the palm),
         outward (away from the body) and twisted about its own length (outward for a positive angle). Degrees."""
         s = -1.0 if bone.endswith(".R") else 1.0
+        base, sd = bone.split(".")[0], bone.split(".")[-1]
+        if base == "fingers" or bone == f"thumb.{sd}":
+            # the whole hand's fingers (or the whole thumb): every joint takes its share of the curl; the little finger
+            # closes a little more than the index, as a hand does
+            for k, finger in enumerate(FINGERS[1:] if base == "fingers" else FINGERS[:1]):
+                for i, share in enumerate(CURL if base == "fingers" else (0.5, 0.7, 0.6)):
+                    self.bend(f"{finger}.{i + 1}.{sd}", fwd=fwd * share * (1.0 + 0.06 * k), out=out if i == 0 else 0.0, twist=twist if i == 0 else 0.0)
+            return
         d = self._dir(bone)
-        if bone.split(".")[0] in ("hand", "fingers", "thumb"):
+        if base in ("hand",) + FINGERS:
             from . import body as B
             palm = Vector((B.HAND_N[0] * s, B.HAND_N[1], B.HAND_N[2]))
             front = palm
+            if base == "thumb":
+                # a thumb closes across the palm, over the fingers: towards the little finger's side and into the palm
+                across = Vector((-B.HAND_T[0] * s, -B.HAND_T[1], -B.HAND_T[2]))
+                front = (across * 0.85 + palm * 0.5).normalized()
         else:
             front = Vector((0, -1, 0))
         q = Quaternion()
@@ -140,6 +157,109 @@ class Poser:
         """The pelvis moved in the figure's axes (metres)."""
         self.loc["hips"] = Vector(self.loc.get("hips", (0, 0, 0))) + Vector((dx, dy, dz))
 
+    def world(self, bone):
+        """Where the pose so far puts a bone: its turn from the rest pose and its head, in the figure's axes."""
+        chain = []
+        b = self.rig.data.bones[bone]
+        while b is not None:
+            chain.append(b)
+            b = b.parent
+        q, at = Quaternion(), Vector((0, 0, 0))
+        for b in reversed(chain):
+            if b.parent is None:
+                at = b.head_local + Vector(self.loc.get(b.name, (0, 0, 0)))
+            else:
+                at = at + q @ (b.head_local - b.parent.head_local)
+            q = q @ self.q.get(b.name, Quaternion())
+        return q, at
+
+    def soles(self, sd):
+        """The heel, the ball and the tip of a side's sole as posed (the figure's axes; the floor is z = 0): the lowest
+        of them is what the foot stands on."""
+        foot, toe = self.rig.data.bones[f"foot.{sd}"], self.rig.data.bones[f"toe.{sd}"]
+        qf, ankle = self.world(f"foot.{sd}")
+        qt, ball = self.world(f"toe.{sd}")
+        tip = toe.tail_local - toe.head_local
+        return (ankle + qf @ Vector((0, HEEL_BACK, -foot.head_local.z)), ball + qf @ Vector((0, 0, -toe.head_local.z)),
+                ball + qt @ Vector((tip.x, tip.y, -toe.head_local.z)))
+
+    def low(self, sd):
+        """How high a side's sole is over the floor (its lowest point; negative: under it)."""
+        return min(p.z for p in self.soles(sd))
+
+    def sole(self, sd, heel=0.0, out=0.0):
+        """The foot of a side by where its sole lies, whatever the leg above it does: level with the floor, the toes
+        turned `out` degrees from the pelvis's heading. `heel` degrees lifts the heel — the foot stands on its ball, the
+        toes flat on the floor; a negative one lifts the toes (a heel about to strike). Call it after everything above
+        the foot is posed: a leg's own angles (and a bowed pelvis) pitch the foot with them."""
+        s = -1.0 if sd == "R" else 1.0
+        shin, _ = self.world(f"shin.{sd}")
+        left = self.world("hips")[0] @ Vector((1, 0, 0))
+        yaw = math.atan2(left.y, left.x) + math.radians(out) * s
+        want = Quaternion(Vector((0, 0, 1)), yaw) @ Quaternion(Vector((1, 0, 0)), math.radians(heel))
+        self.q[f"foot.{sd}"] = shin.inverted() @ want
+        self.q[f"toe.{sd}"] = Quaternion(Vector((1, 0, 0)), math.radians(-max(0.0, heel)))
+
+    def step(self, sd, ball, heel=0.0, out=0.0, spread=0.0):
+        """The leg of a side by where its foot goes: the ball of the sole at `ball` (the figure's axes; z over the
+        floor), the heel lifted `heel` degrees (the foot turns about its ball; a negative one lifts the toes about the
+        heel's end), the knee ahead. The thigh and the shin are bent by the two-bone rule in the plane the pelvis
+        faces; the thigh is swung `spread` degrees out. Call it after the pelvis is posed."""
+        foot, toe = self.rig.data.bones[f"foot.{sd}"], self.rig.data.bones[f"toe.{sd}"]
+        thigh, shin = self.rig.data.bones[f"thigh.{sd}"], self.rig.data.bones[f"shin.{sd}"]
+        pelvis = self.world("hips")[0]
+        left = pelvis @ Vector((1, 0, 0))
+        facing = Quaternion(Vector((0, 0, 1)), math.atan2(left.y, left.x))
+        turn = Quaternion(Vector((1, 0, 0)), math.radians(heel))
+        ankle, sole_ball = foot.head_local, Vector((toe.head_local.x, toe.head_local.y, 0.0))
+        if heel >= 0:                                       # about the ball
+            to = Vector(ball) + facing @ (turn @ (ankle - sole_ball))
+        else:                                               # about the heel's end, the ball lifted
+            end = Vector((ankle.x, ankle.y + HEEL_BACK, 0.0))
+            to = Vector(ball) + facing @ ((end - sole_ball) + turn @ (ankle - end))
+        _, hip = self.world(f"thigh.{sd}")
+        d = pelvis.inverted() @ (to - hip)                  # in the pelvis's own frame: -y its front, z up
+        a, b = (thigh.tail_local - thigh.head_local).length, (foot.head_local - shin.head_local).length
+        c = max(abs(a - b) + 1e-4, min(a + b - 1e-4, math.hypot(d.y, d.z)))
+        fold = math.pi - math.acos(max(-1.0, min(1.0, (a * a + b * b - c * c) / (2 * a * b))))
+        ahead = math.atan2(-d.y, -d.z) + math.acos(max(-1.0, min(1.0, (a * a + c * c - b * b) / (2 * a * c))))
+        # (the rest pose's own angles: the thigh is not quite plumb, the knee not quite straight)
+        t0, s0 = self._dir(f"thigh.{sd}"), self._dir(f"shin.{sd}")
+        rest_ahead, rest_shin = math.atan2(-t0.y, -t0.z), math.atan2(-s0.y, -s0.z)
+        self.q[f"thigh.{sd}"] = Quaternion()
+        self.bend(f"thigh.{sd}", fwd=math.degrees(ahead - rest_ahead), out=spread)
+        self.rebend(f"shin.{sd}", fwd=-math.degrees(fold - (rest_ahead - rest_shin)))
+        self.sole(sd, heel=heel, out=out)
+
+    def stand(self, feet="LR"):
+        """The pelvis moved up or down so the lower sole (of these feet) stands on the floor — the feet neither sink
+        into it nor hang over it."""
+        self.move(dz=-min(self.low(sd) for sd in feet))
+
+    def solve(self, f, lo, hi, steps=22):
+        """The value between lo and hi where f crosses zero (f poses the rig for its argument; bisection, f rising or
+        falling through the range): the pose is left at it. With no crossing: the end nearer to zero."""
+        a, b = f(lo), f(hi)
+        if a * b > 0:
+            x = lo if abs(a) < abs(b) else hi
+            f(x)
+            return x
+        for _ in range(steps):
+            mid = 0.5 * (lo + hi)
+            m = f(mid)
+            if (m > 0) == (a > 0):
+                lo, a = mid, m
+            else:
+                hi = mid
+        x = 0.5 * (lo + hi)
+        f(x)
+        return x
+
+    def rebend(self, bone, **bend):
+        """A limb's bend set anew (not added to what it had): see `bend`."""
+        self.q[bone] = Quaternion()
+        self.bend(bone, **bend)
+
     def apply(self):
         for pb in self.rig.pose.bones:
             r = self.rest[pb.name]
@@ -150,6 +270,18 @@ class Poser:
 
 def _ease(t):
     return t * t * (3 - 2 * t)
+
+
+RUN_AHEAD, RUN_BEHIND = 0.38, 0.55      # a run's planted foot: from this far ahead of the hips to this far behind, metres
+RUN_PLANTED = 0.29                      # the share of the run's cycle a foot is planted (under a half: a flight)
+CROUCH_STEP = 0.56                      # a crouched step's length on the floor, metres
+CROUCH_PLANTED = 0.58                   # the share of the crouched walk's cycle a foot is planted
+
+
+# A step's phase: the leg is furthest ahead at 90° and furthest behind at 270° — planted on the way back, in the air on
+# the way forward. The knee's fold is a half-wave centred this far before the leg passes under the body (radians): it
+# begins as the leg pushes off behind and is over before the heel strikes ahead.
+LIFT_LEAD = 0.35
 
 
 def animate(rig):
@@ -194,7 +326,10 @@ def animate(rig):
         for s in which:
             P.bend(f"thigh.{s}", fwd=thigh, out=out)
             P.bend(f"shin.{s}", fwd=-knee)
-            P.bend(f"foot.{s}", fwd=(knee - thigh) if foot is None else foot)   # by default the sole stays level
+            if foot is None:
+                P.sole(s, out=out)                  # by default the sole lies level (whatever the pelvis above the leg does)
+            else:
+                P.bend(f"foot.{s}", fwd=foot)
             if toe:
                 P.bend(f"toe.{s}", fwd=toe)
 
@@ -219,26 +354,46 @@ def animate(rig):
             P.bend(f"foot.{s}", fwd=1 + 4 * w, out=5)
         arms(fwd=2, spread=6, elbow=16 + 1.5 * b, sway=1.5 * shift, hand=16)
 
-    def gait(t, stride, knee, arm, elbow, lean, bob, sway, crouch=0.0, toe_off=18.0, twist=7.0, fist=16.0):
+    def gait(t, stride, knee, arm, elbow, lean, bob, sway, crouch=0.0, toe_off=18.0, twist=7.0, fist=16.0, flight=None):
         """One cycle of both legs: the heel strikes ahead, the body rides over the planted leg, the foot rolls off its
         toes, the knee folds through the swing; the pelvis drops on the passing side and turns with the stride, the
-        chest and the arms counter it."""
+        chest and the arms counter it. `flight` — a run: (metres the planted foot lands ahead of the hips, leaves the
+        floor behind them, the share of the cycle it is planted — under a half: the body flies between its steps —,
+        how high the heel kicks up): the feet are put where they step (Poser.step), back under the body at one speed."""
         ph = t * two_pi
-        P.move(dz=-crouch - bob * (0.5 - 0.5 * math.cos(2 * ph)), dx=sway * math.sin(ph))
+        # (a walk is lowest with the legs apart; a run lowest over the planted leg and highest in its flight)
+        P.move(dz=-crouch - bob * (0.5 + (0.5 if flight else -0.5) * math.cos(2 * ph)), dx=sway * math.sin(ph))
         P.lean("hips", fwd=lean * 0.25, turn=twist * math.sin(ph), side_=3.0 * math.sin(ph + math.pi / 2))
         P.lean("spine", fwd=lean * 0.4, turn=-0.9 * twist * math.sin(ph), side_=-1.5 * math.sin(ph + math.pi / 2))
         P.lean("chest", fwd=lean * 0.35, turn=-1.3 * twist * math.sin(ph), side_=-2.0 * math.sin(ph + math.pi / 2))
         P.lean("neck", fwd=-lean * 0.3)
         P.lean("head", fwd=-lean * 0.45, turn=4 * math.sin(ph))
+        hips = P.world("hips")[1]
         for s, sg in (("L", 1.0), ("R", -1.0)):
             p = ph + (0 if sg > 0 else math.pi)
-            swing = math.sin(p)                            # + the leg is ahead
-            lift = max(0.0, math.sin(p - math.pi * 0.5 + 0.9))      # in the air: from toe-off, through the pass, to before the strike
-            push = max(0.0, -math.sin(p + 0.35)) ** 2      # the planted leg behind the body: pushing off
-            P.bend(f"thigh.{s}", fwd=stride * swing + 6 + knee * 0.28 * lift)
-            P.bend(f"shin.{s}", fwd=-(5 + knee * lift + 8 * push))
-            P.bend(f"foot.{s}", fwd=-0.25 * stride * swing + 10 * lift - toe_off * push + 4)
-            P.bend(f"toe.{s}", fwd=toe_off * 1.4 * push)
+            swing = math.sin(p)                            # + the leg is ahead; it goes back from 90° to 270° (planted)
+            if flight:
+                ahead, behind, share, kick = flight
+                u = (p / two_pi - 0.5 + share / 2) % 1.0   # the step: 0 the strike, the leg under the body at 180°
+                if u < share:
+                    v = u / share
+                    y, up = -ahead + (ahead + behind) * v, 0.0
+                    heel = 2 * toe_off * _ease(max(0.0, (v - 0.45) / 0.55)) - 10 * max(0.0, 1 - v / 0.12)
+                else:
+                    v = (u - share) / (1 - share)
+                    y = behind - (ahead + behind) * _ease(v)
+                    up = kick * 1.6 * math.sin(math.pi * v) * (1 - v) ** 0.6
+                    heel = 2 * toe_off * (1 - v) ** 2 - 10 * v ** 4
+                P.step(s, (0.085 * sg, hips.y + y, up), heel=heel, out=3)
+            else:
+                lift = max(0.0, math.cos(p + LIFT_LEAD))   # in the air: from toe-off, through the pass, to before the strike
+                push = max(0.0, -math.sin(p + 0.35)) ** 2  # the planted leg behind the body: pushing off
+                P.bend(f"thigh.{s}", fwd=stride * swing + 6 + knee * 0.28 * lift)
+                P.bend(f"shin.{s}", fwd=-(5 + knee * lift + 8 * push))
+                # the sole: flat while it carries the body, the heel rising as the leg pushes off behind (the toes stay
+                # on the floor), the toes up as the heel comes to strike ahead
+                heel = (0.7 * stride + toe_off) * push - 0.6 * stride * max(0.0, swing) ** 3 * (1.0 if lift > 0 else max(0.0, swing))
+                P.sole(s, heel=heel, out=4)
             a = -swing                                     # the arm swings against its leg
             P.reach(s, fwd=arm * a + 3, spread=6 + 2 * max(0.0, -a), twist=-8)
             P.bend(f"forearm.{s}", fwd=elbow + 0.5 * arm * max(0.0, a))
@@ -246,12 +401,17 @@ def animate(rig):
             P.bend(f"fingers.{s}", fwd=fist)
             P.bend(f"thumb.{s}", fwd=fist * 0.4)
             P.bend(f"shoulder.{s}", fwd=3.0 * a)
+        if not flight:
+            P.stand()                                      # a walk: the body rides on the planted foot
+        else:                                              # a run: the body flies between its steps — it is only
+            P.move(dz=max(0.0, -min(P.low("L"), P.low("R"))))   # lifted clear of the floor where a foot would sink
 
     def walk(t):
-        gait(t, stride=24, knee=54, arm=26, elbow=16, lean=4, bob=0.022, sway=0.012, twist=8)
+        gait(t, stride=24, knee=54, arm=26, elbow=16, lean=4, bob=0.0, sway=0.012, twist=8)
 
     def run(t):
-        gait(t, stride=42, knee=112, arm=44, elbow=84, lean=19, bob=0.05, sway=0.006, toe_off=30, twist=11, fist=62)
+        gait(t, stride=42, knee=112, arm=44, elbow=84, lean=19, bob=0.045, sway=0.006, crouch=0.075, toe_off=30, twist=11, fist=62,
+             flight=(RUN_AHEAD, RUN_BEHIND, RUN_PLANTED, 0.30))
 
     # ---- crouching
 
@@ -273,13 +433,17 @@ def animate(rig):
         P.move(dx=0.008 * sh)
         P.lean("hips", turn=-8)
         P.lean("chest", turn=10 + 2 * sh)
-        P.bend("thigh.L", fwd=96, out=10)                 # the leading leg
+        P.bend("thigh.L", fwd=96, out=10)                 # the leading leg: its foot flat on the floor
         P.bend("shin.L", fwd=-104)
-        P.bend("foot.L", fwd=12, out=6)
-        P.bend("thigh.R", fwd=44, out=8)                  # the trailing leg, on the ball of the foot
-        P.bend("shin.R", fwd=-112)
-        P.bend("foot.R", fwd=46)
-        P.bend("toe.R", fwd=42)
+        P.sole("L", out=6)
+        P.bend("thigh.R", fwd=44, out=8)                  # the trailing leg, on the ball of the foot: its knee bends
+        P.stand("L")                                      # as far as brings the ball down to the floor the other stands on
+
+        def trailing(knee):
+            P.rebend("shin.R", fwd=-knee)
+            P.sole("R", heel=48, out=4)
+            return P.low("R") - P.low("L")
+        P.solve(trailing, 40, 150)
         P.reach("L", fwd=52, spread=10, twist=-10)
         P.bend("forearm.L", fwd=38)
         P.bend("fingers.L", fwd=22)
@@ -288,25 +452,35 @@ def animate(rig):
         P.bend("fingers.R", fwd=34)
 
     def crouch_walk(t):
-        """Sneaking: long low steps, heel to toe, the body level; the arms out a little for balance, countering the legs."""
+        """Sneaking: low steps, heel to toe, the body level; the arms out a little for balance, countering the legs.
+        The feet are put where they step (Poser.step): a planted foot goes back under the body at one speed
+        (CROUCH_STEP in CROUCH_PLANTED of the cycle — the speed the game plays the take for), rolls off its ball and
+        swings ahead in an arc."""
         crouched(t, 0.5)
         ph = t * two_pi
-        P.move(dz=-0.016 * (0.5 - 0.5 * math.cos(2 * ph)), dx=0.016 * math.sin(ph))
-        P.lean("hips", turn=9 * math.sin(ph), side_=3 * math.sin(ph + math.pi / 2))
+        P.move(dx=0.014 * math.sin(ph))
+        P.lean("hips", turn=7 * math.sin(ph), side_=2 * math.sin(ph + math.pi / 2))
         P.lean("chest", turn=-10 * math.sin(ph))
+        hips = P.world("hips")[1]
         for s, sg in (("L", 1.0), ("R", -1.0)):
-            p = ph + (0 if sg > 0 else math.pi)
-            swing = math.sin(p)                            # + the leg is ahead
-            lift = max(0.0, math.sin(p - math.pi * 0.5 + 0.9))
-            push = max(0.0, -math.sin(p + 0.35)) ** 2
-            P.bend(f"thigh.{s}", fwd=70 + 28 * swing + 10 * lift, out=9)
-            P.bend(f"shin.{s}", fwd=-(96 + 30 * lift - 14 * swing + 8 * push))
-            P.bend(f"foot.{s}", fwd=26 - 12 * swing + 12 * lift + 14 * push)
-            P.bend(f"toe.{s}", fwd=26 * push)
+            u = (t + (0.25 if sg > 0 else 0.75)) % 1.0     # the step: planted first, then the swing (the left leg is
+            if u < CROUCH_PLANTED:                         # furthest ahead at a quarter of the cycle, as in the gait)
+                v = u / CROUCH_PLANTED
+                y = (v - 0.5) * CROUCH_STEP                # (-y is the front: from ahead to behind)
+                up = 0.0
+                heel = 26 * _ease(max(0.0, (v - 0.72) / 0.28)) - 7 * max(0.0, 1 - v / 0.14)
+            else:
+                v = (u - CROUCH_PLANTED) / (1 - CROUCH_PLANTED)
+                y = (0.5 - _ease(v)) * CROUCH_STEP
+                up = 0.075 * math.sin(v * math.pi)
+                heel = 26 * (1 - v) ** 2 - 7 * v ** 3
+            swing = -y / (0.5 * CROUCH_STEP)               # + the leg is ahead
+            P.step(s, (0.10 * sg, hips.y - 0.10 + y, up), heel=heel, out=6, spread=7)
             a = -swing
             P.reach(s, fwd=30 + 20 * a, spread=14, twist=-12)
             P.bend(f"forearm.{s}", fwd=58 + 12 * max(0.0, a))
             P.bend(f"fingers.{s}", fwd=26)
+        P.stand()
 
     # ---- down, seated
 
@@ -383,6 +557,7 @@ def animate(rig):
         P.lean("neck", fwd=12 - 14 * look)
         P.lean("head", fwd=12 - 20 * look, turn=3 * math.sin(t * two_pi))
         legs(thigh=10, knee=14, out=3)
+        P.stand()
         for s, sg in (("L", 1.0), ("R", -1.0)):
             tap = math.sin(t * two_pi * 12 + (0 if sg > 0 else 1.9))                         # the fingers
             hop = math.sin(t * two_pi * 3 + (0 if sg > 0 else 2.4))                          # the hand moves along the keys
@@ -404,6 +579,7 @@ def animate(rig):
         P.lean("neck", fwd=12)
         P.lean("head", fwd=9 + 2 * math.sin(2 * ph), turn=4)
         legs(thigh=14, knee=22, out=4)
+        P.stand()
         # the left hand holds the thing still
         P.reach("L", fwd=50, spread=4, twist=-24)
         P.bend("forearm.L", fwd=52 + 1.5 * math.sin(2 * ph))
@@ -420,7 +596,7 @@ def animate(rig):
         P.bend("thumb.R", fwd=22)
 
     acts = [key("Idle", 240, idle), key("Walk", 32, walk), key("Run", 22, run), key("CrouchIdle", 90, crouch_idle),
-            key("CrouchWalk", 40, crouch_walk), key("Down", 120, down), key("Sit", 90, sit),
+            key("CrouchWalk", 30, crouch_walk), key("Down", 120, down), key("Sit", 90, sit),
             key("Climb", 36, climb), key("Terminal", 120, terminal), key("Work", 90, work)]
     rig.animation_data.action = None
     P.clear()

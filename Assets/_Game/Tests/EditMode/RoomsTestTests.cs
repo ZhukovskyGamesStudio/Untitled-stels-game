@@ -110,8 +110,9 @@ namespace Stealth.Tests
                 Assert.AreEqual((-1f, -1), Stealth.Game.RunState.HunterForecast(0, 9999f, house, 0, root.Run.Rules), "no countdown");
                 Assert.IsFalse(Stealth.Game.RunState.HunterDue(10, 9999f, house, 0, root.Run.Rules), "the hunter never comes");
             }
-            Assert.IsTrue(main.Run.Rules.Hunter, "the game keeps its hunter");
-            Assert.IsTrue(Stealth.Game.RunState.HunterDue(0, 9999f, 0, 0, main.Run.Rules));
+            // the game's hunter by time and alarms is off too (the reinforcements took its place); the rule still works when on
+            Assert.IsFalse(main.Run.Rules.Hunter, "no hunter in the game");
+            Assert.IsTrue(Stealth.Game.RunState.HunterDue(0, 9999f, 0, 0, new Stealth.Game.RunSettings()), "on, it would come");
         }
     }
 }

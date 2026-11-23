@@ -90,7 +90,7 @@ namespace Stealth.EditorTools
             });
             Robot(RobotKind.Listener, RobotPrefabs + "/RobotListener.prefab", () => MobileRobot("RobotListener", "robot_listener", "ListenerBody", 0.55f, new Vector3(0, 1.2f, 0f), ripple, (s, t, anim) =>
             {
-                s.HasEyes = false; s.HearingMultiplier = 1.6f; s.ContactDistance = 1.4f;
+                s.HasEyes = false; s.HearingMultiplier = 1.6f;
                 t.CanUseStairs = false; // wheels
                 t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 3.2f; t.ChaseSpeed = 4.5f; t.LoseTargetAfter = 3f;
             }));
@@ -104,7 +104,7 @@ namespace Stealth.EditorTools
             Robot(RobotKind.Thumper, RobotPrefabs + "/RobotThumper.prefab", () => MobileRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), ripple, (s, t, anim) =>
             {
                 s.HasEyes = false; s.HearingMultiplier = 0f; // deaf; it listens with its feet
-                s.SeismicRange = 10f; s.SeismicSpeed = 0.8f; s.ContactDistance = 1.6f;
+                s.SeismicRange = 10f; s.SeismicSpeed = 0.8f;
                 t.CanUseStairs = false; // tracks
                 t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3f; t.AttackRange = 1.9f;
                 t.SuspicionDecay = 0.12f; // waves come seconds apart: it keeps what it felt between them
@@ -123,7 +123,7 @@ namespace Stealth.EditorTools
             {
                 var go = MobileRobot("RobotWorker", "robot_worker", "WorkerBody", 0.45f, new Vector3(0, 0.5f, 0.4f), ripple, (s, t, anim) =>
                 {
-                    s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f; s.ContactDistance = 0.9f;
+                    s.ViewDistance = 10f; s.ViewAngle = 90f; s.DetectionSpeed = 0.5f; s.HearingMultiplier = 0.5f;
                     t.CanAttack = false;    // harmless, but a snitch
                     t.AlarmRadius = 40f;
                     t.CanUseStairs = false; // wheels
@@ -165,7 +165,7 @@ namespace Stealth.EditorTools
             {
                 var go = MobileRobot("RobotSweeper", "robot_sweeper", "SweeperBody", 0.4f, new Vector3(0, 0.5f, 0.35f), ripple, (s, t, anim) =>
                 {
-                    s.HasEyes = false; s.HearingMultiplier = 0f; s.ContactDistance = 0.9f; // blind and deaf: only the floor lidar
+                    s.HasEyes = false; s.HearingMultiplier = 0f; // blind and deaf: only the floor lidar
                     s.LidarRange = 6f; s.LidarHeight = 0.22f; s.LidarTurnSpeed = 140f; s.LidarRate = 15f;
                     t.CanUseStairs = false; // wheels
                     t.PatrolSpeed = 1.4f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3.1f; t.AttackRange = 1.3f;
@@ -298,10 +298,11 @@ namespace Stealth.EditorTools
             var root = new GameObject("Player");
             var cc = root.AddComponent<CharacterController>();
             cc.height = PlayerController.StandHeight;
-            cc.radius = 0.35f;
+            // as slim as the person drawn (shoulders ~0.5 m): a player stands right up against a crate, a desk or a wall
+            cc.radius = PlayerController.BodyRadius;
             cc.center = new Vector3(0, PlayerController.StandHeight / 2f, 0);
             cc.stepOffset = 0.35f;
-            cc.skinWidth = 0.04f;
+            cc.skinWidth = 0.025f;
             root.AddComponent<NetworkObject>();
             var nt = root.AddComponent<NetworkTransform>();
             nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner;
@@ -385,10 +386,21 @@ namespace Stealth.EditorTools
             holder.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
-                new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
+                new Color(1f, 0.93f, 0.8f), 8f, 18f, LightShadows.Soft);
             beam.spotAngle = 55f;
-            beam.innerSpotAngle = 22f;
+            beam.innerSpotAngle = 16f; // (a soft beam: a bright middle, fading out to its edge — no hard-edged disc on a wall)
             beam.enabled = false;
+            beam.cullingMask = ~(1 << PlayerController.OwnBodyLayer); // no shadows of its owner's own body in the beam from his head
+            // a faint light round the eyes, only for the player's own view and only where the style asks (StyleWorld.EyeGlow):
+            // no shadows, no LightSource — robots do not see by it
+            // (behind the eyes: what is in the hand, a span from the camera, is not burnt out by it)
+            var eyeGlow = Child(head.transform, "EyeGlow", new Vector3(0f, 0.1f, -0.6f)).AddComponent<Light>();
+            eyeGlow.type = LightType.Point;
+            eyeGlow.color = new Color(0.92f, 0.96f, 1f);
+            eyeGlow.intensity = 0.09f;
+            eyeGlow.range = 3.2f;
+            eyeGlow.shadows = LightShadows.None;
+            eyeGlow.enabled = false;
 
             var motor = root.AddComponent<PlayerMotor>();
             root.AddComponent<PlayerInventory>();
@@ -400,6 +412,7 @@ namespace Stealth.EditorTools
             pc.Camera = cam;
             pc.Listener = listener;
             pc.Flashlight = beam;
+            pc.EyeGlow = eyeGlow;
             pc.ViewFlashlight = view;
             pc.HeldMap = held;
             pc.HeldThing = thingMesh;
@@ -665,8 +678,24 @@ namespace Stealth.EditorTools
             gate.EmitterA = Emitter("EmitterA", 90f);
             gate.EmitterB = Emitter("EmitterB", -90f);
             gate.Beams = Enumerable.Range(0, 3)
-                .Select(i => Cube(root.transform, $"Beam{i}", new Vector3(0, 1f, 0), new Vector3(1.8f, LaserGate.BeamThickness, LaserGate.BeamThickness), M("Laser"), false).transform)
+                .Select(i => Cube(root.transform, $"Beam{i}", new Vector3(0, 1f, 0), new Vector3(1.8f, LaserGate.BeamThickness, LaserGate.BeamThickness), M("LaserCore"), false).transform)
                 .ToArray();
+            // a beam of light, not a painted rod: two crossed sheets of soft glow along each core (children of the beam:
+            // they stretch with it — the gate scales its length — and hide with it), 13 cm across
+            foreach (var beam in gate.Beams)
+                for (int k = 0; k < 2; k++)
+                {
+                    var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    Object.DestroyImmediate(q.GetComponent<Collider>());
+                    q.name = k == 0 ? "GlowUp" : "GlowFlat";
+                    q.transform.SetParent(beam, false);
+                    q.transform.localRotation = Quaternion.Euler(k * 90f, 0f, 0f);
+                    q.transform.localScale = new Vector3(1f, 0.13f / LaserGate.BeamThickness, 1f);
+                    var r = q.GetComponent<MeshRenderer>();
+                    r.sharedMaterial = M("LaserGlow");
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    r.receiveShadows = false;
+                }
             return root;
         }
 

@@ -66,7 +66,7 @@ namespace Stealth.Level
                 int side = DrivePath.LampSideOf(k);
                 var lamp = Instantiate(Lamp, cell.transform);
                 lamp.transform.SetLocalPositionAndRotation(new Vector3(SewerPlan.SegmentLength / 2f, 2.3f, side * 3.55f), Quaternion.Euler(0f, side > 0 ? 90f : -90f, 0f));
-                foreach (var light in lamp.GetComponentsInChildren<Light>()) { light.color = LampColor; light.intensity = LampIntensity; }
+                SewerLamp.Set(lamp, LampColor, LampIntensity);
             }
             VisualStyles.Dress(cell);
             return cell;

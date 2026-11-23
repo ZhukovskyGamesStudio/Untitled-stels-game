@@ -62,6 +62,7 @@ namespace Stealth.Level
 
         void Update()
         {
+            LiveScreens.Tick(Time.time); // (the house's screens of static: this runs wherever a house stands)
             if (Time.time >= m_NextScan) Scan();
             if (Time.time < m_NextSort) return;
             m_NextSort = Time.time + 0.2f;

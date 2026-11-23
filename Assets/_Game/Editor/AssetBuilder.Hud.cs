@@ -107,8 +107,8 @@ namespace Stealth.EditorTools
         /// </summary>
         static void BuildHouseClock(GameHUD hud, Transform content)
         {
-            // top left under the house's panel (Quota: 16, -16, 300 x 118), as wide: all the house's news in one column
-            var panel = R(content, "HouseClock", TopLeft, TopLeft, new Vector2(16, -138), new Vector2(300, 48));
+            // top left under the house's panel (Quota: 16, -16, 300 x 100), as wide: all the house's news in one column
+            var panel = R(content, "HouseClock", TopLeft, TopLeft, new Vector2(16, -120), new Vector2(300, 48));
             hud.ClockPanel = Img(panel, new Color(0.22f, 0.55f, 0.85f, 0.82f));
             Img(Stretch(panel, "Shade", 2f), new Color(0f, 0f, 0f, 0.35f));
             hud.ClockTime = Txt(R(panel, "Time", TopLeft, TopLeft, new Vector2(10, -1), new Vector2(120, 34)), "0:00", 26, TextAnchor.MiddleLeft, Color.white, true);
@@ -145,6 +145,41 @@ namespace Stealth.EditorTools
             hud.TabletMap = map;
             SetLayerRecursive(screen.gameObject, Stealth.Level.LevelMetrics.WorldTextLayer);
             screen.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The hacking terminal's list in the middle of the screen: a title with the charges and up to
+        /// <see cref="GameHUD.HackRowsShown"/> rows (kind icon, name, state, the hold's fill), copies of a hidden row.
+        /// </summary>
+        static void BuildHackList(GameHUD hud, Transform content)
+        {
+            const float w = 420f, rowH = 28f, head = 40f;
+            var panel = R(content, "HackList", Center, Center, new Vector2(0, 20), new Vector2(w, head + GameHUD.HackRowsShown * rowH + 10f));
+            Img(panel, new Color(0.02f, 0.05f, 0.04f, 0.88f));
+            Img(R(panel, "Rule", TopCenter, TopCenter, new Vector2(0, -head + 4), new Vector2(w - 20, 2)), new Color(0.45f, 1f, 0.55f, 0.5f));
+            hud.HackTitle = Txt(R(panel, "Title", TopCenter, TopCenter, new Vector2(0, -4), new Vector2(w - 20, 30)), "—", 17, TextAnchor.MiddleCenter, Color.white, true);
+            var rows = R(panel, "Rows", TopLeft, TopLeft, new Vector2(10, -head - 2), new Vector2(w - 20, GameHUD.HackRowsShown * rowH));
+            var layout = rows.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 2f;
+            layout.childControlHeight = false;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            hud.HackRows = rows;
+            var row = R(rows, "Row", TopLeft, TopLeft, Vector2.zero, new Vector2(w - 20, rowH - 2));
+            var view = row.gameObject.AddComponent<HackRowView>();
+            view.Back = Img(row, new Color(1f, 1f, 1f, 0.04f));
+            var fill = Stretch(row, "Fill");
+            fill.anchorMax = new Vector2(0f, 1f);
+            view.Fill = Img(fill, new Color(1f, 0.85f, 0.4f, 0.25f));
+            view.Icon = Img(R(row, "Icon", Left, Left, new Vector2(6, 0), new Vector2(20, 20)), Color.white);
+            view.Icon.preserveAspect = true;
+            view.Name = Txt(R(row, "Name", Left, Left, new Vector2(34, 0), new Vector2(250, rowH - 2)), "—", 14, TextAnchor.MiddleLeft, Color.white, true);
+            view.State = Txt(R(row, "State", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-8, 0), new Vector2(110, rowH - 2)), "", 13, TextAnchor.MiddleRight, Color.white);
+            row.gameObject.SetActive(false);
+            hud.HackRowTemplate = view;
+            hud.HackKindPictures = RobotKindIcons();
+            panel.gameObject.SetActive(false);
+            hud.HackList = panel.gameObject;
         }
 
         /// <summary>The team is up in the house and its clock starts: a big notice across the screen (fades in and out).</summary>
@@ -372,8 +407,8 @@ namespace Stealth.EditorTools
             hud.HackFree = Icon("ret_hack");
             hud.HackKindIcons = RobotKindIcons();
 
-            // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the hunter under it.
-            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 118));
+            // Fuel panel, top left: the house's name, a drop, the tank / what the drive burns, the tasks under it.
+            var quota = R(content, "Quota", TopLeft, TopLeft, new Vector2(16, -16), new Vector2(300, 100));
             Img(quota, PanelColor);
             hud.HouseLabel = Txt(R(quota, "House", TopLeft, TopLeft, new Vector2(10, -2), new Vector2(280, 22)), "House", 14, TextAnchor.MiddleLeft, Color.white, true);
             hud.HouseLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -382,9 +417,9 @@ namespace Stealth.EditorTools
             hud.QuotaBar = Bar(quota, "Bar", TopLeft, TopLeft, new Vector2(30, -29), new Vector2(200, 8), new Color(0, 0, 0, 0.5f), new Color(1f, 0.8f, 0.2f), 2f);
             hud.GainRect = R(quota, "Gain", TopLeft, Left, new Vector2(GameHUD.GainX, GameHUD.GainY), new Vector2(120, 26));
             hud.GainLabel = Txt(hud.GainRect, "+20", 18, TextAnchor.MiddleLeft, new Color(0.45f, 1f, 0.5f), true);
-            hud.HunterLabel = Txt(R(quota, "Hunter", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 20)), "Hunter", 12, TextAnchor.MiddleLeft, new Color(1, 1, 1, 0.7f));
-            hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -62), new Vector2(280, 52)), "", 12, TextAnchor.UpperLeft, Color.white, true); // the task list, a line each
+            hud.ObjectiveLabel = Txt(R(quota, "Objective", TopLeft, TopLeft, new Vector2(10, -44), new Vector2(280, 52)), "", 12, TextAnchor.UpperLeft, Color.white, true); // the task list, a line each
             hud.TerminalLabel = Txt(R(content, "Terminal", BottomCenter, BottomCenter, new Vector2(0, 150), new Vector2(700, 24)), "1 / 3", 15, TextAnchor.MiddleCenter, new Color(0.75f, 1f, 0.8f, 0.9f), true);
+            BuildHackList(hud, content);
 
             // The team list top right (no minimap there: the map is a terminal's, TerminalKind.Map).
             hud.TeamList = R(content, "Team", TopRight, TopRight, new Vector2(-16, -16), new Vector2(244, 0));

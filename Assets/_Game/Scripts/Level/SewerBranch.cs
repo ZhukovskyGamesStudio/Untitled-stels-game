@@ -13,5 +13,7 @@ namespace Stealth.Level
         public GameObject WhenOpen;
         [Tooltip("Bricks in the mouth, shown with the bars when the tunnel leads nowhere this time.")]
         public GameObject Plug;
+        [Tooltip("The lamps by the mouth on the hall's side (under WhenOpen): they keep their light, the ones inside are dimmed.")]
+        public Light[] MouthLights;
     }
 }

@@ -70,6 +70,7 @@ namespace Stealth.Level
             Sockets(parts, l, shell, faces, rng);
             Pipes(parts, l, shell, faces);
             Drains(parts, l);
+            CableRoutes.Lay(parts, l); // the vault's locks and the storage door's terminal wired to their doors
             return parts;
         }
 

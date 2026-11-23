@@ -158,37 +158,37 @@ namespace Stealth.Player
         public bool Climbing { get; private set; }
 
         /// <summary>
-        /// Owner, every frame before the motor: the ladder. On it when walking into it facing it (or falling down the open
-        /// shaft past it); W up, S down, Jump lets go; off at the floor below, off onto the lobby's floor at the top when the
-        /// lid is open (shut, the head stops against it). While on it the motor only turns the view (it is "seated").
+        /// Owner, every frame before the motor: the ladder. On it when walking into it (or out over the open shaft from
+        /// above, or falling down it); W climbs the way the player looks — up the shaft or down it — and S the other way
+        /// (<see cref="LadderMath.LookWay"/>); Jump lets go; off at the floor below, off onto the lobby's floor at the top when the lid is open (shut, the head stops
+        /// against it). Off the ladder with the keys still held, they take it again only once let go (or the body has left
+        /// it): a held W used to climb straight back. While on it the motor only turns the view (it is "seated").
         /// </summary>
         void UpdateLadder(in PlayerInputState input, float dt)
         {
             var feet = transform.position;
             if (!Climbing || m_Ladder == null) m_Ladder = ShaftLadder.At(feet) ?? ShaftLadder.AtHole(feet); // the entry's or the exit's: whichever we are at
             var ladder = m_Ladder;
-            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; m_Lowering = false; return; }
+            if (ladder == null || Downed || InHatch || SeatIndex >= 0) { Climbing = false; m_ClimbingOut = false; m_LadderLatch = false; return; }
             if (!Climbing)
             {
-                var facing = transform.forward;
-                facing.y = 0f;
-                Climbing = LadderMath.GetsOn(ladder.InZone(feet), input.Move.y, facing.normalized, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY);
-                // from the floor above: walking into the open hole anywhere takes the ladder, which lowers the body onto it
+                bool inZone = ladder.InZone(feet);
                 var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
-                if (!Climbing && Motor.Grounded && LadderMath.GetsOnFromAbove(feet, ladder.Shaft, ladder.ShaftHalf, World.IsOpened(ladder.LidKey), wish))
+                if (m_LadderLatch && (input.Move.sqrMagnitude < 0.01f || (!inZone && !LadderMath.AtHole(feet, ladder.Shaft, ladder.ShaftHalf)))) m_LadderLatch = false;
+                if (m_LadderLatch) wish = Vector3.zero; // (the keys that brought it off the ladder; in the air it is still caught)
+                bool fromAbove = false;
+                if (LadderMath.GetsOn(inZone, wish, ladder.Facing, Motor.Grounded, feet.y, ladder.TopY))
                 {
                     Climbing = true;
-                    m_Lowering = true;
-                    m_ClimbingOut = false;
-                    m_LowerSince = Time.time;
+                    fromAbove = !Motor.Grounded && feet.y > ladder.Bottom + LadderMath.FellFrom;
                 }
+                // from the floor above: out over the open hole, the ladder holds the body (nothing reaches for it at the edge)
+                else if (LadderMath.GetsOnFromAbove(feet, ladder.Shaft, ladder.ShaftHalf, World.IsOpened(ladder.LidKey)))
+                    Climbing = fromAbove = true;
                 if (!Climbing) return;
-            }
-            if (m_Lowering)
-            {
-                m_Controller.Move(LadderMath.Lower(feet, ladder.Column, ladder.Shaft.y, dt, out bool lowered));
-                if (lowered || Time.time > m_LowerSince + 2.5f) m_Lowering = false;
-                return;
+                m_ClimbingOut = false;
+                m_LadderLatch = false;
+                m_LadderWay = fromAbove ? -1f : 1f; // (until the look says: LadderMath.LookWay)
             }
             if (m_ClimbingOut)
             {
@@ -198,19 +198,19 @@ namespace Stealth.Player
                 if (rise.sqrMagnitude > 1e-8f && Time.time < m_ClimbOutSince + 3f) { m_Controller.Move(rise); return; }
                 var wish = transform.forward * input.Move.y + transform.right * input.Move.x;
                 m_Controller.Move(LadderMath.StepOff(wish, dt));
-                var state = LadderMath.AtTop(transform.position, ladder.Shaft, ladder.ShaftHalf, ladder.Column, input.Jump);
+                var state = LadderMath.AtTop(transform.position, ladder.Shaft, ladder.ShaftHalf, input.Jump);
                 if (state != LadderMath.TopState.Standing)
                 {
                     Climbing = false; // on the floor: the motor walks on; let go: the ladder catches the fall
                     m_ClimbingOut = false;
+                    m_LadderLatch = state == LadderMath.TopState.OnFloor;
                 }
                 return;
             }
             if (input.Jump || !ladder.InZone(feet)) { Climbing = false; return; }
-            // W climbs the way the player looks: facing away from the ladder (back to the rungs), W goes down and S up
-            var look = transform.forward;
-            look.y = 0f;
-            float climb = input.Move.y * LadderMath.Direction(look.normalized, ladder.Facing);
+            // W climbs the way the player looks: up the shaft or down it
+            m_LadderWay = LadderMath.LookWay(Motor.Pitch, m_LadderWay);
+            float climb = input.Move.y * m_LadderWay;
             m_Controller.Move(LadderMath.Step(feet, ladder.Column, climb, dt));
             feet = transform.position;
             if (climb > 0.1f && LadderMath.OffAtTop(feet.y, ladder.TopY, World.IsOpened(ladder.LidKey)))
@@ -218,13 +218,18 @@ namespace Stealth.Player
                 m_ClimbingOut = true;
                 m_ClimbOutSince = Time.time;
             }
-            else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom)) Climbing = false;
+            else if (LadderMath.OffAtBottom(climb, m_Controller.isGrounded, feet.y, ladder.Bottom))
+            {
+                Climbing = false;
+                m_LadderLatch = true;
+            }
         }
+
+        float m_LadderWay = 1f;        // W's way on the ladder (1 up, −1 down): where the player last looked, up or down
+        bool m_LadderLatch;            // just off the ladder, the keys still held: no getting on by them
 
         bool m_ClimbingOut;
         float m_ClimbOutSince;
-        bool m_Lowering;               // getting on from the floor above: lowered onto the rungs
-        float m_LowerSince;
         ShaftLadder m_Ladder;
 
         public void TeleportOwner(Vector3 position, Quaternion rotation)

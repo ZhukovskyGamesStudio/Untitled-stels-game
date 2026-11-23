@@ -37,8 +37,6 @@ namespace Stealth.Enemies
         public float HearingMultiplier;
 
         [Header("Other")]
-        [Tooltip("Bumping into the robot this close starts a chase.")]
-        public float ContactDistance = 1.3f;
         [Tooltip("Seismic: stomps the floor and a wave runs out to this range along its floor, through walls (0 = no seismic sensor). " +
                  "A player moving when the wave passes is felt; one standing still is not.")]
         public float SeismicRange;
@@ -145,8 +143,6 @@ namespace Stealth.Enemies
         public IIntruder Target;
         /// <summary>Suspicion per second.</summary>
         public float Rate;
-        /// <summary>Bumped into the robot: chase at once.</summary>
-        public bool Contact;
         /// <summary>Where to run while chasing (the target, or the next point of its scent trail).</summary>
         public Vector3 ChasePoint;
 
@@ -322,11 +318,6 @@ namespace Stealth.Enemies
             }
             Suspect = s.Target;
             LookPoint = s.Target.Position;
-            if (s.Contact && !m_Senses.FollowsSightings)
-            {
-                Detect(s.Target, now);
-                return;
-            }
             Suspicion = Mathf.Min(1f, Suspicion + s.Rate * dt);
             if (Suspicion >= 1f) Detect(s.Target, now);
             // Only a patrolling robot stops to stare; one already walking over to check keeps walking.

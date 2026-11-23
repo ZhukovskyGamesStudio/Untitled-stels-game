@@ -316,6 +316,7 @@ namespace Stealth.Level
                     m_Taken[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
                 if (InTheWay(p.Kind)) m_Solid[LevelLayout.FloorOf(p.Position.y)].Add(FootAt(p.Kind, p.Position, p.RotationY));
             }
+            RenoteOpening();
         }
 
         /// <summary>The walkable grid of the house for one check.</summary>

@@ -60,15 +60,27 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheHunterIsNeverASurprise()
+        public void TheSafesLoudClickTowersOverAQuietOne()
         {
-            var (text, urgency) = HunterRules.Line(250.2f, 3, 0);
-            Assert.AreEqual("Охотник через 4:11 · тревог: 3", text);
-            Assert.AreEqual(HunterRules.Urgency.Calm, urgency);
-            Assert.AreEqual(HunterRules.Urgency.Soon, HunterRules.Line(59f, 3, 0).urgency, "the last minute");
-            Assert.AreEqual(HunterRules.Urgency.Soon, HunterRules.Line(300f, 1, 0).urgency, "one more alarm brings it");
-            Assert.AreEqual(HunterRules.Urgency.Inside, HunterRules.Line(-1f, -1, 1).urgency);
-            Assert.IsNull(HunterRules.Line(-1f, -1, 0).text, "no more hunters in this house: no line");
+            Assert.AreEqual(1f, SafeScope.PulseHeight(1f), 1e-4f, "on the number: the scope's full height");
+            Assert.Less(SafeScope.PulseHeight(0f), 0.1f, "far off: a ripple");
+            Assert.Greater(SafeScope.PulseHeight(1f) / SafeScope.PulseHeight(0.5f), 3f, "half way there is still clearly lower");
+            float peak = 0f;
+            for (float u = 0f; u < 0.16f; u += 0.0005f) peak = Mathf.Max(peak, SafeScope.Ripple(u));
+            Assert.AreEqual(1f, peak, 0.02f, "the ripple's first peak is the pulse's height");
+        }
+
+        [Test]
+        public void TheHackingListScrollsWithThePickAndNumbersAKind()
+        {
+            Assert.AreEqual(0, HackListRules.FirstShown(5, 8, 12), "all fit: from the top");
+            Assert.AreEqual(0, HackListRules.FirstShown(2, 30, 12));
+            Assert.AreEqual(16, HackListRules.FirstShown(20, 30, 12), "the pick a few rows from the top");
+            Assert.AreEqual(18, HackListRules.FirstShown(29, 30, 12), "at the end: the last rows");
+            var kinds = new[] { 1, 1, 2, 3, 3, 3 };
+            Assert.AreEqual("Охранник 2", HackListRules.Label("Охранник", kinds, 1, k => k));
+            Assert.AreEqual("Дрон", HackListRules.Label("Дрон", kinds, 2, k => k), "one of its kind: no number");
+            Assert.AreEqual("Пылесос 3", HackListRules.Label("Пылесос", kinds, 5, k => k));
         }
 
         [Test]

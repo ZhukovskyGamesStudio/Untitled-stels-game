@@ -12,6 +12,19 @@ namespace Stealth.Vehicles
         /// <summary>The model's own driver side: the steering wheel sits at +X.</summary>
         public const bool ModelIsLeftHand = false;
 
+        /// <summary>
+        /// A headlight's strength with something <paramref name="distance"/> metres before it (pure): its full strength,
+        /// but no more than puts <paramref name="glare"/> on that surface (a beam made to reach 65 m of tunnel puts a
+        /// thousand times as much on a gate 2 m away: two burnt-out discs that hurt to look at). Nearer than a metre counts
+        /// as a metre; nothing ahead, or no limit (<paramref name="glare"/> 0): full.
+        /// </summary>
+        public static float Headlight(float full, float distance, float glare)
+        {
+            if (glare <= 0f || float.IsInfinity(distance)) return full;
+            float d = Mathf.Max(1f, distance);
+            return Mathf.Min(full, glare * d * d);
+        }
+
         /// <summary>Whether a model built as <see cref="ModelIsLeftHand"/> must be mirrored for these settings.</summary>
         public static bool NeedsMirror(CarSettings s) => (s ?? new CarSettings()).LeftHandDrive != ModelIsLeftHand;
 

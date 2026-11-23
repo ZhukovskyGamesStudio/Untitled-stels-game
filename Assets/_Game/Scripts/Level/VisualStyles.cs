@@ -48,6 +48,14 @@ namespace Stealth.Level
             return humans[(int)department % humans.Length];
         }
 
+        /// <summary>What a department's rigged human wears (item names; empty — the person's own outfit).</summary>
+        public static IReadOnlyList<string> OutfitFor(Stealth.Player.Department department) =>
+            Config != null ? Config.OutfitFor((int)department) : System.Array.Empty<string>();
+
+        /// <summary>Every item the rigged humans can wear (made for every person's build).</summary>
+        public static IReadOnlyList<Stealth.Player.WearPiece> Wardrobe =>
+            Config != null && Config.Wardrobe != null ? Config.Wardrobe : System.Array.Empty<Stealth.Player.WearPiece>();
+
         /// <summary>The ambient light robots reckon with: the game's own, whatever a style shows.</summary>
         public static Color GameplayAmbient => s_Active ? s_BaseAmbient : RenderSettings.ambientLight;
 
@@ -179,6 +187,7 @@ namespace Stealth.Level
             if (s_Active) RenderSettings.ambientLight = s_BaseAmbient;
             LightSource.VisualScale = 1f;
             LightSource.GlowScale = 1f;
+            LightSource.CeilingGlow = 0f;
             s_Current = s_Default;
             s_Active = false;
         }
@@ -555,14 +564,41 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ air
 
         /// <summary>The ambient light the style sets (the picture only; gameplay uses <see cref="GameplayAmbient"/>): dimmed underground by the player's view.</summary>
-        public static Color StyleAmbient => s_Current != null ? World.Ambient : s_BaseAmbient;
+        public static Color StyleAmbient
+        {
+            get
+            {
+                if (s_Current == null) return s_BaseAmbient;
+                var mood = RoomLighting.MoodOf(ActiveLevel.Layout); // the house's soft warm light: its fill light too
+                return mood != null ? mood.Ambient(World.Ambient) : World.Ambient;
+            }
+        }
+
+        /// <summary>
+        /// How far the player's view is under the ground, 0 (in a house) … 1 (the sewer): the lamps' look goes from the
+        /// style's <see cref="StyleWorld.LightScale"/> to that times <see cref="StyleWorld.UndergroundLights"/>. Set by the
+        /// view (PlayerController.UpdateFog), eased: climbing a shaft, the lamps do not jump.
+        /// </summary>
+        public static float Underground
+        {
+            get => s_Underground;
+            set { s_Underground = Mathf.Clamp01(value); LightSource.VisualScale = LampScale(World); }
+        }
+        static float s_Underground;
+
+        static float LampScale(StyleWorld w)
+        {
+            if (s_Current == null || w.LightScale <= 0f) return 1f;
+            return w.LightScale * Mathf.Lerp(1f, Mathf.Max(0.01f, w.UndergroundLights), s_Underground);
+        }
 
         static void ApplyWorld(StyleWorld w)
         {
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = s_Current != null ? w.Ambient : s_BaseAmbient;
-            LightSource.VisualScale = s_Current != null && w.LightScale > 0f ? w.LightScale : 1f;
+            RenderSettings.ambientLight = StyleAmbient;
+            LightSource.VisualScale = LampScale(w);
             LightSource.GlowScale = s_Current != null && w.LampGlow >= 0f ? w.LampGlow : 1f;
+            LightSource.CeilingGlow = s_Current != null ? Mathf.Max(0f, w.CeilingGlow) : 0f;
         }
 
         // ------------------------------------------------------------------ palette

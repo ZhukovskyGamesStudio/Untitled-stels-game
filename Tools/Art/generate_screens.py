@@ -100,23 +100,131 @@ def screen_hack():
     finish(img, "screen_hack")
 
 
-def screen_doors():
+def crate(d, x, y, w, h, level=200):
+    """A crate: a box with a rim, two straps and a plank line."""
+    s = SS
+    d.rectangle([x * s, y * s, (x + w) * s, (y + h) * s], fill=level)
+    d.rectangle([(x + 3) * s, (y + 3) * s, (x + w - 3) * s, (y + h - 3) * s], fill=level - 70)
+    for k in (0.3, 0.7):
+        d.rectangle([(x + w * k - 2) * s, y * s, (x + w * k + 2) * s, (y + h) * s], fill=level)
+    d.line([(x + 3) * s, (y + h / 2) * s, (x + w - 3) * s, (y + h / 2) * s], fill=level - 30, width=s)
+
+
+def padlock(d, cx, cy, size, opened, level=240):
+    """A padlock (its body's middle at cx, cy): shut, or its shackle swung up out of the body."""
+    s = SS * size
+    lift = 12 * s if opened else 0
+    box = [cx - 14 * s, cy - 34 * s - lift, cx + 14 * s, cy - 6 * s - lift]
+    d.arc(box, 180, 360, fill=level, width=int(5 * s))
+    d.rectangle([cx - 14 * s, cy - 20 * s - lift, cx - 9 * s, cy - 4 * s], fill=level)
+    if not opened:
+        d.rectangle([cx + 9 * s, cy - 20 * s, cx + 14 * s, cy - 4 * s], fill=level)
+    else:
+        d.rectangle([cx + 9 * s, cy - 20 * s - lift, cx + 14 * s, cy - 16 * s - lift + 6 * s], fill=level)
+    d.rounded_rectangle([cx - 20 * s, cy - 8 * s, cx + 20 * s, cy + 22 * s], radius=int(4 * s), fill=level)
+    d.ellipse([cx - 4 * s, cy + 1 * s, cx + 4 * s, cy + 9 * s], fill=20)
+    d.rectangle([cx - 2 * s, cy + 6 * s, cx + 2 * s, cy + 15 * s], fill=20)
+
+
+def screen_doors(opened=False):
+    """The storage door's station: the storeroom — a doorway with crates stacked behind it — and its lock. Locked: the
+    roller door is down (its slats) with the crates marked on it, a shut padlock beside it. Open: the door is rolled up under the lintel,
+    the crates stand in the open doorway, the padlock hangs open beside it with a tick."""
     img, d = canvas()
     s = SS
-    # a padlock on the left, a keypad on the right, an ACCESS bar under them
-    cx, cy = 80, 72
-    d.arc([(cx - 24) * s, (cy - 46) * s, (cx + 24) * s, (cy + 2) * s], 180, 360, fill=230, width=7 * s)
-    d.rectangle([(cx - 24) * s, (cy - 22) * s, (cx - 17) * s, (cy - 4) * s], fill=230)
-    d.rectangle([(cx + 17) * s, (cy - 22) * s, (cx + 24) * s, (cy - 4) * s], fill=230)
-    d.rounded_rectangle([(cx - 34) * s, (cy - 6) * s, (cx + 34) * s, (cy + 44) * s], radius=6 * s, fill=230)
-    d.ellipse([(cx - 7) * s, (cy + 8) * s, (cx + 7) * s, (cy + 22) * s], fill=20)
-    d.rectangle([(cx - 3) * s, (cy + 18) * s, (cx + 3) * s, (cy + 34) * s], fill=20)
-    for r in range(4):
-        for c in range(3):
-            x, y = 158 + c * 26, 24 + r * 24
-            d.rounded_rectangle([x * s, y * s, (x + 20) * s, (y + 18) * s], radius=3 * s, outline=150, width=s, fill=40 if (r, c) != (1, 1) else 180)
-    d.rectangle([20 * s, (H - 22) * s, (W - 20) * s, (H - 12) * s], fill=120)
-    finish(img, "screen_doors")
+    frame(d)
+    # the doorway on the left two thirds: jambs, a lintel, the floor line
+    x0, x1, y0, y1 = 28, 164, 22, 136
+    d.rectangle([(x0 - 8) * s, (y0 - 8) * s, (x1 + 8) * s, y0 * s], fill=170)                       # lintel
+    d.rectangle([(x0 - 8) * s, y0 * s, x0 * s, y1 * s], fill=170)                                   # jambs
+    d.rectangle([x1 * s, y0 * s, (x1 + 8) * s, y1 * s], fill=170)
+    d.rectangle([14 * s, y1 * s, 178 * s, (y1 + 4) * s], fill=110)                                  # floor
+    # the crates inside: two below, one on top
+    crate(d, x0 + 14, y1 - 46, 50, 46)
+    crate(d, x0 + 70, y1 - 46, 50, 46)
+    crate(d, x0 + 40, y1 - 88, 54, 42)
+    if opened:
+        d.rectangle([x0 * s, y0 * s, x1 * s, (y0 + 16) * s], fill=120)                              # the door, rolled up
+        for k in range(3):
+            d.line([x0 * s, (y0 + 4 + k * 5) * s, x1 * s, (y0 + 4 + k * 5) * s], fill=60, width=s)
+    else:
+        d.rectangle([x0 * s, y0 * s, x1 * s, y1 * s], fill=96)                                      # the door, down: slats
+        for y in range(y0 + 6, y1, 9):
+            d.line([x0 * s, y * s, x1 * s, y * s], fill=44, width=2 * s)
+        d.rectangle([x0 * s, (y1 - 6) * s, x1 * s, y1 * s], fill=150)                               # its bottom bar
+        # what is behind it, marked on the door: the same crates, dimmer
+        crate(d, x0 + 20, y1 - 52, 44, 40, level=168)
+        crate(d, x0 + 72, y1 - 52, 44, 40, level=168)
+        crate(d, x0 + 44, y1 - 90, 48, 36, level=168)
+    # the lock on the right
+    padlock(d, 214 * s, 78 * s, 1.5, opened)
+    if opened:
+        d.line([196 * s, 126 * s, 208 * s, 138 * s, 234 * s, 112 * s], fill=240, width=6 * s, joint="curve")   # a tick
+    else:
+        d.rectangle([188 * s, 128 * s, 240 * s, 136 * s], fill=120)                                 # an access bar
+    finish(img, "screen_doors_open" if opened else "screen_doors")
+
+
+def screen_static():
+    """A screen left on with no signal: grey noise in fine horizontal streaks (256 x 256, tiles; the game makes it jump)."""
+    rnd = random.Random(21)
+    size = 256
+    img = Image.new("L", (size, size))
+    px = img.load()
+    for y in range(size):
+        band = 0.82 + 0.18 * math.sin(y * 2 * math.pi * 3 / size)          # three soft bands (tiles)
+        x = 0
+        while x < size:
+            run = rnd.choice((1, 1, 1, 2, 2, 3))
+            v = int(min(255, max(0, rnd.gauss(118, 62) * band)))
+            for k in range(run):
+                if x + k < size:
+                    px[x + k, y] = v
+            x += run
+    img.convert("RGB").save(os.path.join(OUT, "screen_static.png"))
+    print("wrote screen_static")
+
+
+def screen_cracked():
+    """Broken glass: a dead dark screen with an impact a little off its middle — jagged cracks running out to the
+    edges, a few rings of short cracks round the impact, a crazed patch at it (512 x 512: about a metre of screen)."""
+    rnd = random.Random(5)
+    size, s = 512, 2
+    img = Image.new("L", (size * s, size * s), 9)
+    d = ImageDraw.Draw(img)
+    cx, cy = 0.42 * size * s, 0.56 * size * s
+    spokes = []
+    n = 11
+    for k in range(n):
+        a = 2 * math.pi * (k + rnd.uniform(-0.3, 0.3)) / n
+        pts, r = [(cx, cy)], 0.0
+        while r < size * s * 0.75:
+            r += rnd.uniform(18, 46) * s
+            a += rnd.uniform(-0.16, 0.16)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+        spokes.append(pts)
+        d.line(pts, fill=rnd.randint(150, 215), width=rnd.choice((1, 2, 2)) * s)
+        if rnd.random() < 0.6 and len(pts) > 3:                              # a branch
+            j = rnd.randint(2, len(pts) - 2)
+            b, br, bp = a + rnd.choice((-1, 1)) * rnd.uniform(0.4, 0.8), 0.0, [pts[j]]
+            while br < 130 * s:
+                br += rnd.uniform(14, 34) * s
+                b += rnd.uniform(-0.2, 0.2)
+                bp.append((pts[j][0] + br * math.cos(b), pts[j][1] + br * math.sin(b)))
+            d.line(bp, fill=rnd.randint(110, 170), width=s)
+    for ring in (2, 3, 5):                                                    # short cracks from spoke to spoke
+        for k in range(n):
+            a, b = spokes[k], spokes[(k + 1) % n]
+            if ring < len(a) and ring < len(b) and rnd.random() < 0.75:
+                d.line([a[ring], b[ring]], fill=rnd.randint(95, 150), width=s)
+    for _ in range(26):                                                       # the crazed patch at the impact
+        a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(0, 22 * s)
+        p = (cx + r * math.cos(a), cy + r * math.sin(a))
+        q = (p[0] + rnd.uniform(-12, 12) * s, p[1] + rnd.uniform(-12, 12) * s)
+        d.line([p, q], fill=rnd.randint(140, 220), width=s)
+    img = img.resize((size, size), Image.LANCZOS)
+    img.convert("RGB").save(os.path.join(OUT, "screen_cracked.png"))
+    print("wrote screen_cracked")
 
 
 def screen_vault(opened):
@@ -189,4 +297,7 @@ if __name__ == "__main__":
     screen_cameras()
     screen_hack()
     screen_doors()
+    screen_doors(opened=True)
+    screen_static()
+    screen_cracked()
     screen_map()

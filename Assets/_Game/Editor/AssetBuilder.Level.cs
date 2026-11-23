@@ -87,9 +87,7 @@ namespace Stealth.EditorTools
             var rack = Prefab(p + "ServerRack.prefab", () => PropObject("ServerRack", "server_rack", "Rack", "Rack", "RackLights"));
             var cabinet = Prefab(p + "Cabinet.prefab", () =>
             {
-                var go = PropObject("Cabinet", "cabinet", "PropBody", "PropAccent", "PropScreen");
-                go.AddComponent<Stealth.Items.Storage>(); // the drawers slide out (BodyDrawer0..2)
-                return go;
+                return Opening(PropObject("Cabinet", "cabinet", "PropBody", "PropAccent", "PropScreen")); // the drawers slide out (BodyDrawer0..2)
             });
             var meeting = Prefab(p + "MeetingTable.prefab", () => PropObject("MeetingTable", "meeting_table", "PropBody", "PropAccent", "PropScreen"));
             var plant = Prefab(p + "Plant.prefab", () => PropObject("Plant", "plant", "Plant", "PlantPot", "Plant"));
@@ -115,7 +113,7 @@ namespace Stealth.EditorTools
             var pLockers = Prefab(p + "Lockers.prefab", () =>
             {
                 var go = PropObject("Lockers", "lockers", "Lockers", "PropAccent", "PropAccent");
-                go.AddComponent<Stealth.Items.Storage>().Individual = true; // the doors swing open (BodyDoor0..2)
+                go.AddComponent<Stealth.Items.Storage>().Individual = true; // the doors swing open (BodyDoor0..1: two — from the middle)
                 return go;
             });
             var pPallet = Prefab(p + "Pallet.prefab", () => PropObject("Pallet", "pallet", "Cardboard", "Wood", "Wood"));
@@ -167,16 +165,22 @@ namespace Stealth.EditorTools
                 terminal.CamerasPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cameras.png");
                 terminal.HackingPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_hack.png");
                 terminal.DoorsPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors.png");
+                terminal.DoorsOpenPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors_open.png");
                 terminal.MapPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_map.png");
                 return go;
             });
             var pDeskLamp = Prefab(p + "DeskLamp.prefab", () =>
             {
                 var go = PropObject("DeskLamp", "desk_lamp", "Metal", "LampShade", "LampBulb", collider: false);
-                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.27f, 0.16f), Quaternion.Euler(65f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.8f, 3.2f,
+                // The light hangs well over the lamp, shining down on the desk: a pool that fades across the top. Under
+                // the shade itself, a hand's breadth from the desk, the same light burnt a white disc into it (the
+                // inverse square at 0.27 m) with a halo over half the screen. The lamp's own model casts no shadow
+                // (the light is above it).
+                NoShadows(go);
+                var lamp = Lamp(go.transform, "Light", new Vector3(0f, 0.85f, 0.14f), Quaternion.Euler(84f, 0f, 0f), LightType.Spot, new Color(1f, 0.82f, 0.55f), 1.25f, 3.2f,
                     LightShadows.Soft, UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow); // small: low maps (LightBudget.Cost)
-                lamp.spotAngle = 120f;
-                lamp.innerSpotAngle = 50f;
+                lamp.spotAngle = 96f;
+                lamp.innerSpotAngle = 24f;
                 return go;
             });
             var pFloorLamp = Prefab(p + "FloorLamp.prefab", () =>
@@ -274,6 +278,7 @@ namespace Stealth.EditorTools
             Link(levelArt, ref levelArt.VehicleDoor, vehicleDoor);
             Link(levelArt, ref levelArt.ClinicDoor, clinicDoor);
             Link(levelArt, ref levelArt.StorageDoor, storageDoor);
+            LinkAll(levelArt, ref levelArt.Screens, new[] { M("PropScreen"), M("ScreenOff"), M("ScreenStatic"), M("ScreenCracked") });
             BuildFeatureArt(levelArt);
             BuildCityArt(levelArt);
             BuildRoomProps(levelArt);
@@ -859,10 +864,37 @@ namespace Stealth.EditorTools
         /// <summary>The height of a balcony parapet's collider, metres: under a jump, so one can jump off the balcony.</summary>
         const float BalconyClimb = 0.75f;
 
-        /// <summary>Furniture whose BodyDoor{n} / BodyDrawer{n} parts open for real (Items.Storage).</summary>
+        /// <summary>
+        /// Furniture whose BodyDoor{n} / BodyDrawer{n} parts open for real (Items.Storage). A drawer whose front stands
+        /// high gets a floor close under the front's top (<see cref="Stealth.Items.StorageMath.DrawerFloor"/>: a board in
+        /// the drawer, with a collider — loot lies and falls on it): on the model's own bottom, a third of a metre under
+        /// the front's top at chest height, the front hid the loot from a standing player.
+        /// </summary>
         static GameObject Opening(GameObject go)
         {
             go.AddComponent<Stealth.Items.Storage>();
+            foreach (var t in go.GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.StartsWith("BodyDrawer")) continue;
+                var mf = t.GetComponent<MeshFilter>();
+                var mr = t.GetComponent<MeshRenderer>();
+                if (mf == null || mf.sharedMesh == null || mr == null) continue;
+                var points = mf.sharedMesh.vertices.Select(v => go.transform.InverseTransformPoint(t.TransformPoint(v))).ToArray();
+                if (points.Length == 0) continue;
+                var b = new Bounds(points[0], Vector3.zero);
+                foreach (var q in points) b.Encapsulate(q);
+                float floor = Stealth.Items.StorageMath.DrawerFloor(b, 0f);
+                if (floor < b.min.y + 0.06f) continue; // the model's own bottom will do
+                // the tray: what lies well behind the front (the front and its handle are wider and stand before it)
+                var tray = points.Where(q => q.z < b.max.z - 0.08f && q.y < floor).ToArray();
+                if (tray.Length == 0) continue;
+                float x0 = tray.Min(q => q.x), x1 = tray.Max(q => q.x), z0 = tray.Min(q => q.z), z1 = b.max.z - 0.06f;
+                if (x1 - x0 < 0.12f || z1 - z0 < 0.12f) continue;
+                var size = new Vector3(x1 - x0 - 0.04f, 0.014f, z1 - z0 - 0.03f);
+                var board = ChamferBox(go.transform, "DrawerFloor", new Vector3((x0 + x1) / 2f, floor - 0.007f, (z0 + 0.03f + z1) / 2f), size, mr.sharedMaterial, 0.003f);
+                board.AddComponent<BoxCollider>().size = size;
+                board.transform.SetParent(t, true); // it slides with the drawer
+            }
             return go;
         }
 
@@ -1058,22 +1090,45 @@ namespace Stealth.EditorTools
             // as if by nothing. (No invisible geometry: a shadow-only shade still writes depth and hides the panels.)
             var light = Lamp(root.transform, "Lamp", new Vector3(0f, -0.3f, 0f), Quaternion.identity, LightType.Point,
                 Color.white, LightMath.RoomIntensity, 9.5f, LightShadows.Soft);
-            light.cookie = LampCookie();
+            light.cookie = LampCookie(LampCookiePath, 0f);
             var rl = root.AddComponent<RoomLight>();
             rl.Lamp = light;
+            rl.Cookie = light.cookie;
+            rl.SoftCookie = LampCookie(SoftLampCookiePath, LightMath.SoftCeilingShare);
             rl.Panels = panels.ToArray();
+            // The soft look (where the style asks: LightSource.CeilingGlow; hidden otherwise): a hot middle just under
+            // each diffuser, fading to its edges, and the light the fixture throws on the ceiling round it — glow over
+            // the picture, no light cast (the cookie keeps the real light off the ceiling: nothing leaks upstairs).
+            Renderer Glow(string name, Vector3 at, Vector2 size)
+            {
+                var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Object.DestroyImmediate(q.GetComponent<Collider>());
+                q.name = name;
+                q.transform.SetParent(root.transform, false);
+                q.transform.localPosition = at;
+                q.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f); // facing down
+                q.transform.localScale = new Vector3(size.x, size.y, 1f);
+                var r = q.GetComponent<MeshRenderer>();
+                r.sharedMaterial = M("LampGlow");
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                r.enabled = false;
+                return r;
+            }
+            rl.Cores = new[] { Glow("CoreA", new Vector3(0f, -0.082f, -0.32f), new Vector2(1.5f, 0.74f)), Glow("CoreB", new Vector3(0f, -0.082f, 0.32f), new Vector2(1.5f, 0.74f)) };
+            rl.Halo = Glow("Halo", new Vector3(0f, -0.012f, 0f), new Vector2(4.4f, 4.4f));
             return root;
         }
 
-        const string LampCookiePath = SpritesDir + "/LampCookie.cubemap";
+        const string LampCookiePath = SpritesDir + "/LampCookie.cubemap", SoftLampCookiePath = SpritesDir + "/LampCookieSoft.cubemap";
 
         /// <summary>
         /// Cube cookie of the ceiling lamps: full light downwards and sideways, fading out above the horizon (no light onto
         /// the ceiling it hangs from).
         /// </summary>
-        static Cubemap LampCookie()
+        static Cubemap LampCookie(string path, float up)
         {
-            var cookie = AssetDatabase.LoadAssetAtPath<Cubemap>(LampCookiePath);
+            var cookie = AssetDatabase.LoadAssetAtPath<Cubemap>(path);
             if (cookie != null && !s_Force) return cookie;
             const int size = 32;
             var cube = new Cubemap(size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
@@ -1084,15 +1139,15 @@ namespace Stealth.EditorTools
                 for (int y = 0; y < size; y++)
                     for (int x = 0; x < size; x++)
                     {
-                        float v = LightMath.CookieUpFade(CubeDirection(face, (x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f).y);
+                        float v = LightMath.Cookie(CubeDirection(face, (x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f).normalized.y, up);
                         px[y * size + x] = new Color(v, v, v, v);
                     }
                 cube.SetPixels(px, face);
             }
             cube.Apply();
-            if (cookie != null) AssetDatabase.DeleteAsset(LampCookiePath);
+            if (cookie != null) AssetDatabase.DeleteAsset(path);
             EnsureFolder(SpritesDir);
-            AssetDatabase.CreateAsset(cube, LampCookiePath);
+            AssetDatabase.CreateAsset(cube, path);
             return cube;
         }
 

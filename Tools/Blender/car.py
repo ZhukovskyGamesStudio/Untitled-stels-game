@@ -12,7 +12,7 @@ Contract (metres, Blender: front -Y = Unity +Z, z up, origin on the ground in th
   steering wheel hub (-0.42, -0.45, 1.12) facing the driver
   cargo bed: floor top z 0.85, inside x -0.85..0.85, y 0.35..2.35, walls and tailgate to z 1.3 — empty and flat
   hopper mouth centre (0, -1.55, 1.56), radius 0.33, a toothed grinder drum inside spinning about x
-Parts: Body, Accent, Dark, Glass, Seat, EyeHead, EyeTail, EyeSpot (merged by role) and the animated pivots
+Parts: Body, Accent, Dark, Glass, Seat, EyeHead, EyeTail, EyeSpot, EyeDome (the cab's dome light), DarkDome (merged by role) and the animated pivots
 AccentWheelFL/FR/RL/RR (origin at the wheel centre; L = -x), AccentSteering (hub), AccentHopperGrinder (spin axis).
 """
 import math
@@ -426,13 +426,23 @@ def spot_lights():
     return [s.rcyl(0.07, 0.02, (x, 0.262, 2.075), axis="Y", seg=14, r=0.006, bevel_seg=1) for x in (-0.6, 0.6)]
 
 
+def dome_light():
+    """The cab's dome light under the roof, over the seats' middle: a warm lens (EyeDome)."""
+    return [s.rbox((0.24, 0.13, 0.022), (0, -0.12, 1.752), r=0.01, seg=2)]
+
+
+def dome_bezel():
+    """Its dark plastic frame against the headliner (DarkDome)."""
+    return [s.rbox((0.29, 0.17, 0.014), (0, -0.12, 1.761), r=0.012, seg=2)]
+
+
 # --------------------------------------------------------------------------- build and export
 
 def build():
     s.clear_scene()
     objs = [s.part("Body", body()), s.part("Accent", accent()), s.part("Dark", dark()), s.part("Glass", glass()),
             s.part("Seat", seats()), s.part("EyeHead", head_lights()), s.part("EyeTail", tail_lights()),
-            s.part("EyeSpot", spot_lights())]
+            s.part("EyeSpot", spot_lights()), s.part("EyeDome", dome_light()), s.part("DarkDome", dome_bezel())]
     objs += [wheel("AccentWheelFL", -1, -AXLE_Y), wheel("AccentWheelFR", 1, -AXLE_Y),
              wheel("AccentWheelRL", -1, AXLE_Y), wheel("AccentWheelRR", 1, AXLE_Y)]
     objs += [steering(), grinder()]

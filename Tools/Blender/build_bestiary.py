@@ -1,7 +1,7 @@
 """Builds the robots, devices and sensor modules of every visual style from bestiary/ (designs × style languages).
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/build_bestiary.py -- <models_root>
-          [--styles S05_Toon,S11_Noir] [--only robot_drone,robot_guard] [--set robots|props|all] [--base]
+          [--styles S06_Storybook,S16_Derelict] [--only robot_drone,robot_guard] [--set robots|props|all] [--base]
 
 Writes <models_root>/Styles/PerStyle/<style>/<model>__<style>.fbx (the asset builder maps them onto the original models
 by mesh name for that style only: AssetBuilder.BuildStyleModels). --base also writes the neutral language as style
@@ -33,9 +33,7 @@ import props  # noqa: E402
 from lang import Lang  # noqa: E402
 
 REPO_MODELS = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "_Game", "Art", "Models"))
-STYLES = ["S01_NightShift", "S02_Scrapyard", "S03_Heist", "S04_Hunted", "S05_Toon", "S06_Storybook", "S07_Logbook",
-          "S08_Footage", "S09_WhiteRoom", "S10_Grid", "S11_Noir", "S12_TestChamber", "S13_Comic", "S14_Thermal",
-          "S15_Blueprint", "S16_Derelict"]
+STYLES = ["S06_Storybook", "S16_Derelict"]   # (the game keeps two styles; the others' designs are in the repository's history)
 
 
 LEVEL = ("hatch", "window", "ceiling_lamp", "exit_sign")

@@ -12,7 +12,8 @@ namespace Stealth.Enemies
     ///  * Blinking — three beams on a timer: wait for the gap;
     ///  * Moving — one beam sliding up and down: jump over or crouch under in time.
     /// Touching a beam hurts and raises an alarm. The cycle uses the shared server time, so every peer agrees.
-    /// The beams are pre-built children of the prefab (<see cref="Beams"/>); unused ones stay hidden.
+    /// The beams are pre-built children of the prefab (<see cref="Beams"/>); unused ones stay hidden. A beam is a thin
+    /// bright core with two crossed sheets of soft glow along it (its children: they stretch and hide with it).
     /// </summary>
     public class LaserGate : MonoBehaviour
     {

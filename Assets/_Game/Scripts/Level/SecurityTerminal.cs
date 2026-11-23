@@ -28,6 +28,8 @@ namespace Stealth.Level
         public Renderer Pictures, AccessPictures;
         [Tooltip("What the screens show (Tools/Art/generate_screens.py): the camera feeds, hacking, the door's access, the floor plan.")]
         public Texture2D CamerasPicture, HackingPicture, DoorsPicture, MapPicture;
+        [Tooltip("The door's station once the storeroom is unlocked: the doorway open, the padlock off.")]
+        public Texture2D DoorsOpenPicture;
 
 
         public int Index { get; private set; } = -1;
@@ -40,7 +42,7 @@ namespace Stealth.Level
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
-            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f);
+            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -70,18 +72,21 @@ namespace Stealth.Level
             if (state == m_Shown || Screens == null) return;
             m_Shown = state;
             m_Block ??= new MaterialPropertyBlock();
-            var c = Spent ? SpentColor : Kind switch
+            // the door's station never goes dark: red while the storeroom is locked, green — its picture the open doorway — once it is not
+            bool open = Spent && Kind == TerminalKind.Doors, dim = Spent && !open;
+            var c = open ? DoorsOpenColor : dim ? SpentColor : Kind switch
             {
                 TerminalKind.Cameras => CamerasColor, TerminalKind.Doors => DoorsColor, TerminalKind.Map => MapColor, _ => HackingColor,
             };
             Screens.GetPropertyBlock(m_Block);
             m_Block.SetColor(BaseColorId, c);
-            m_Block.SetColor(EmissionId, c * (Spent ? 0.3f : 1.6f));
+            m_Block.SetColor(EmissionId, c * (dim ? 0.3f : 1.6f));
             Screens.SetPropertyBlock(m_Block);
             if (Pictures == null) return;
             var picture = Kind switch
             {
-                TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => DoorsPicture, TerminalKind.Map => MapPicture, _ => HackingPicture,
+                TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => open && DoorsOpenPicture != null ? DoorsOpenPicture : DoorsPicture,
+                TerminalKind.Map => MapPicture, _ => HackingPicture,
             };
             Pictures.GetPropertyBlock(m_Block);
             if (picture != null)
@@ -90,7 +95,7 @@ namespace Stealth.Level
                 m_Block.SetTexture(EmissionMapId, picture);
             }
             m_Block.SetColor(BaseColorId, c * 0.35f);
-            m_Block.SetColor(EmissionId, c * (Spent ? 0.25f : 1.3f));
+            m_Block.SetColor(EmissionId, c * (dim ? 0.25f : 1.3f));
             Pictures.SetPropertyBlock(m_Block);
         }
 
@@ -115,8 +120,9 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// What the terminal can look at, nearest first: the cameras (camera terminal) or every robot and device but the
-        /// cameras that is not hacked already (hacking terminal). Pure apart from reading the detectors' positions.
+        /// What the terminal shows: the cameras nearest first (camera terminal, seen through them), or a list of every robot
+        /// and device in the house but the cameras, hacked ones too, by kind — not by distance: the list tells nothing of where
+        /// they are (hacking terminal). Pure apart from reading the detectors' positions.
         /// </summary>
         public static void Targets(TerminalKind kind, Vector3 from, List<Detector> into)
         {
@@ -124,10 +130,18 @@ namespace Stealth.Level
             foreach (var d in Detector.All)
             {
                 bool camera = d.Kind == RobotKind.Camera;
-                // the cameras have a terminal of their own: the hacking one shows the robots and the other devices
-                if (kind == TerminalKind.Cameras ? camera : !camera && !d.IsHacked) into.Add(d);
+                // the cameras have a terminal of their own: the hacking one lists the robots and the other devices
+                if (kind == TerminalKind.Cameras ? camera : !camera) into.Add(d);
             }
-            into.Sort((a, b) => (a.Position - from).sqrMagnitude.CompareTo((b.Position - from).sqrMagnitude));
+            if (kind == TerminalKind.Cameras) into.Sort((a, b) => (a.Position - from).sqrMagnitude.CompareTo((b.Position - from).sqrMagnitude));
+            else into.Sort(HackListOrder);
+        }
+
+        /// <summary>The hacking terminal's list order: by kind, then by network id (stable, and nothing about distance).</summary>
+        public static int HackListOrder(Detector a, Detector b)
+        {
+            int k = ((int)a.Kind).CompareTo((int)b.Kind);
+            return k != 0 ? k : a.NetId.CompareTo(b.NetId);
         }
     }
 }

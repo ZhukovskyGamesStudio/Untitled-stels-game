@@ -30,6 +30,7 @@ namespace Stealth.Tests
                 for (int kind = 0; kind < Stealth.Level.RobotRoster.KindCount; kind++) Add(OpenKeys.HackSlot(i, kind), $"slot {i}/{kind}");
                 Add(OpenKeys.Med((ulong)i), "med " + i);
                 for (int part = 0; part < OpenKeys.StorageParts; part++) Add(OpenKeys.Storage(i, part), $"storage {i}/{part}");
+                for (int part = 0; part < OpenKeys.StorageParts; part++) Add(OpenKeys.Ajar(i, part), $"ajar {i}/{part}");
                 for (int use = 0; use < OpenKeys.TerminalUses; use++) Add(OpenKeys.Terminal(i, use), $"terminal {i}/{use}");
             }
             Add(OpenKeys.Shaft, "shaft");

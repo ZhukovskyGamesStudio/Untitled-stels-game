@@ -34,6 +34,15 @@ namespace Stealth.Configs
         public GameObject Batch;
         [Tooltip("The players as rigged humans, one per department (PlayerLooks.Department; Tools/Blender/human.py): shown in every style that has no rigged human of its own (StyleGeometry.PlayerRig)")]
         public GameObject[] PlayerHumans = new GameObject[0];
+        [Tooltip("Items the rigged humans can wear (Prefabs/Player/Wear/<who>/<item>, Tools/Blender/human.py item=…): every item made for every person's build")]
+        public Stealth.Player.WearPiece[] Wardrobe = new Stealth.Player.WearPiece[0];
+        [Tooltip("What each department wears (PlayerLooks.Department order): item names, a slot each (a slot not named is bare); an empty list keeps the person's own outfit")]
+        public HumanOutfit[] PlayerOutfits = new HumanOutfit[0];
+
+        /// <summary>The outfit of a department (empty: the person's own).</summary>
+        public string[] OutfitFor(int department) =>
+            PlayerOutfits != null && department >= 0 && department < PlayerOutfits.Length && PlayerOutfits[department] != null
+                ? PlayerOutfits[department].Items : System.Array.Empty<string>();
 
         public StyleKit KitFor(ModelFamily family)
         {
@@ -41,5 +50,13 @@ namespace Stealth.Configs
             if (Kits != null && i < Kits.Length && Kits[i] != null) return Kits[i];
             return Kits != null && Kits.Length > 0 ? Kits[0] : null;
         }
+    }
+
+    /// <summary>What a rigged human wears: item names of the wardrobe (HumanWardrobe), a slot each.</summary>
+    [System.Serializable]
+    public class HumanOutfit
+    {
+        [Tooltip("hoodie / shirt / vest / jumper, jeans / slacks / cargo / wide, sneakers / flats / boots / red_sneakers, messy / bob / buzz / bun, beard, headphones / torch / beret, glasses")]
+        public string[] Items = new string[0];
     }
 }

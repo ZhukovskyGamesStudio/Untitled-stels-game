@@ -51,13 +51,13 @@ namespace Stealth.Tests
             Assert.AreEqual(1, m_Body.PatrolRequests, "then it walks");
         }
 
-        void Sense(float rate, float seconds, IIntruder target = null, bool contact = false)
+        void Sense(float rate, float seconds, IIntruder target = null)
         {
             target ??= m_Player;
             for (float t = 0; t < seconds; t += Dt)
             {
                 m_Now += Dt;
-                m_Brain.OnSensed(new Sighting { Target = target, Rate = rate, Contact = contact, ChasePoint = target.Position }, m_Now, Dt);
+                m_Brain.OnSensed(new Sighting { Target = target, Rate = rate, ChasePoint = target.Position }, m_Now, Dt);
                 m_Brain.Tick(m_Now, Dt);
             }
         }
@@ -96,11 +96,14 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void BumpingIntoARobotDetectsAtOnceButStillWarns()
+        public void ARobotDetectsOnlyWithItsSensesAndStillWarns()
         {
-            Sense(0f, Dt, contact: true);
-            Assert.AreEqual(RobotState.Alerted, m_Brain.State);
-            Sense(0f, m_Traits.WarningTime + Dt, contact: true);
+            // touching it from behind is no sense of its own: a player right by it that its sensors do not pick up goes unnoticed
+            Sense(0f, 2f);
+            Assert.AreEqual(RobotState.Patrol, m_Brain.State, "touched, not noticed");
+            Sense(100f, Dt);
+            Assert.AreEqual(RobotState.Alerted, m_Brain.State, "seen: detected, the warning first");
+            Sense(100f, m_Traits.WarningTime + Dt);
             Assert.AreEqual(RobotState.Chase, m_Brain.State);
         }
 
@@ -327,7 +330,7 @@ namespace Stealth.Tests
             Assert.IsTrue(m_Brain.Asleep);
             Assert.IsTrue(m_Body.Stopped, "does not walk around while asleep");
 
-            Sense(0f, 2f, contact: true);
+            Sense(0f, 2f);
             Assert.IsTrue(m_Brain.Asleep, "standing right next to it does not wake it");
             m_Brain.Investigate(new Vector3(5, 0, 5), true, m_Now);
             m_Brain.OnFelt(new Vector3(5, 0, 5), 1f, m_Player, m_Now);

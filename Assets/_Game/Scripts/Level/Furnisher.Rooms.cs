@@ -1095,8 +1095,8 @@ namespace Stealth.Level
                     break;
                 case RoomType.Office:
                     if (roll < 0.5)
-                    {   // the boss's desk in the middle: the chair behind it, two guests in front
-                        b.Add(PropKind.ExecutiveDesk, f.P(0, 0), f.Face);
+                    {   // the boss's desk in the middle: the chair behind it (at its drawers: the model's front), two guests in front
+                        b.Add(PropKind.ExecutiveDesk, f.P(0, 0), f.Back);
                         b.Add(PropKind.Chair, f.P(0, -0.8f), f.Face);
                         b.Add(PropKind.GuestChair, f.P(-0.45f, 0.85f), f.Back);
                         b.Add(PropKind.GuestChair, f.P(0.45f, 0.85f), f.Back);

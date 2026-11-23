@@ -21,6 +21,12 @@ namespace Stealth.Player
         /// <summary>The department the model and the rig are dressed as now (<see cref="Department"/> follows the class).</summary>
         Department m_LookDepartment = (Department)(-1);
 
+        /// <summary>
+        /// The layer of the owner's own body (TagManager "OwnBody"): the owner's flashlight leaves it out (its culling mask,
+        /// set in the prefab), so the beam from his head throws no shadows of his own legs, hair and sleeves before him.
+        /// </summary>
+        public const int OwnBodyLayer = 11;
+
         /// <summary>What other players see of this one: the style's rigged human if it has one, otherwise the model.</summary>
         public Transform Visual => m_Rig != null ? m_Rig.transform : Model;
 
@@ -49,17 +55,49 @@ namespace Stealth.Player
                     var go = Instantiate(prefab, Model.parent);
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
-                    PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
-                    if (IsOwner && !m_BodyShown)
-                        foreach (var r in go.GetComponentsInChildren<Renderer>(true))
-                            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+                    // the department's outfit (the person's own unless the config dresses them otherwise); later swaps repaint
+                    if (go.TryGetComponent<HumanWardrobe>(out var wardrobe))
+                    {
+                        wardrobe.Dress(VisualStyles.OutfitFor(m_LookDepartment), VisualStyles.Wardrobe);
+                        wardrobe.Changed += DressRig;
+                    }
+                    DressRig();
                 }
             }
             UpdateBodyPose();
             if (m_Rig == null) return;
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed);
+            // the hand's thing: everyone sees it carried in the rig's right hand (the owner keeps the first-person one)
+            var held = HeldThing != null ? HeldThing.transform.parent : null;
+            bool holding = held != null && held.gameObject.activeSelf;
+            m_Rig.Held = IsOwner ? null : held;
+            m_Rig.Cupped = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
+            // the owner looks out of his own body: it hangs from his eyes, and its right arm gives way to the view's hand
+            bool inside = IsOwner && !m_BodyShown;
+            m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
+            m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside);
         }
+
+        /// <summary>
+        /// The rig's renderers as they are now (a wardrobe swap brings new ones): coloured for the slot; the owner's own are
+        /// on their own layer (his flashlight casts no shadows of them) and, while he looks out of the body, what is on its
+        /// head is a shadow only (<see cref="HumanMath.OnTheHead"/>).
+        /// </summary>
+        void DressRig()
+        {
+            if (m_Rig == null) return;
+            PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+            if (!IsOwner) return;
+            foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true))
+            {
+                if (!m_ShownCalling) r.gameObject.layer = OwnBodyLayer;
+                r.shadowCastingMode = OwnShadow(r, m_BodyShown);
+            }
+        }
+
+        static UnityEngine.Rendering.ShadowCastingMode OwnShadow(Renderer r, bool shown) =>
+            !shown && HumanMath.OnTheHead(r.name) ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
 
         /// <summary>
         /// What the body is busy with (the owner decides and replicates it; <see cref="HumanRig"/> plays a take for it): on a
@@ -90,8 +128,9 @@ namespace Stealth.Player
         bool m_BodyShown;
 
         /// <summary>
-        /// Owner: the own body is a shadow only (the first-person view looks out of it) — but watching a teammate while
-        /// knocked out, it lies there to be seen like anyone's.
+        /// Owner: the view looks out of the own body — what is on its head is a shadow only, the rest is seen under the eyes
+        /// (the plain model, where a style has no rigged human, stays a shadow) — but watching a teammate while knocked out,
+        /// it lies there to be seen whole, like anyone's.
         /// </summary>
         void ShowOwnBody(bool shown)
         {
@@ -99,7 +138,7 @@ namespace Stealth.Player
             m_BodyShown = shown;
             var mode = shown ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             foreach (var r in BodyRenderers) if (r != null) r.shadowCastingMode = mode;
-            if (m_Rig != null) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = mode;
+            if (m_Rig != null) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = OwnShadow(r, shown);
         }
 
         Transform m_LegL, m_LegR;

@@ -964,6 +964,7 @@ namespace Stealth.Game
         public void RemoteHackServer(PlayerController player, int terminal, Detector target)
         {
             if (Phase != RunPhase.Playing || player == null || player.Downed || target == null || target.IsHacked) return;
+            if (target.Kind == RobotKind.Camera) return; // the cameras are not on the hacking terminal's list
             var t = SecurityTerminal.Find(terminal);
             if (t == null || t.Kind != TerminalKind.Hacking) return;
             if (!ServerReach.WithinFlat(player.transform.position, t.transform.position, SecurityTerminal.Reach)) return;
@@ -975,8 +976,11 @@ namespace Stealth.Game
         }
 
         /// <summary>
-        /// Server: a player opens or closes a drawer / locker door (looking right at it). The first time a part with hidden
-        /// loot opens, the item appears inside.
+        /// Server: a player opens or closes a drawer / locker door (looking right at it). A part with hidden loot opens:
+        /// the item appears inside. One drawer of a column is open at a time (an open one covers those under it): opening
+        /// one pushes the others back; and what lies in a drawer that shuts goes in with it (<see cref="StowServer"/>). A
+        /// drawer pushed back empty stays ajar (<see cref="OpenKeys.Ajar"/>): the team sees it has been searched; one with
+        /// something still in it shuts, like one never opened. A drawer a player shuts himself is left the same way.
         /// </summary>
         void ToggleStorageServer(PlayerController player, int prop, int part)
         {
@@ -985,11 +989,39 @@ namespace Stealth.Game
             if (storage == null || part < 0 || part >= storage.PartCount) return;
             if (Vector3.Distance(storage.transform.position, player.transform.position) > StorageReach) return;
             int key = OpenKeys.Storage(prop, part);
-            if (!m_Opened.Remove(key)) m_Opened.Add(key);
+            bool open = !m_Opened.Remove(key);
+            if (open)
+            {
+                m_Opened.Add(key);
+                m_Opened.Remove(OpenKeys.Ajar(prop, part));
+                foreach (int other in storage.Stacked(part))
+                    if (m_Opened.Remove(OpenKeys.Storage(prop, other)) && !StowServer(storage, other)) m_Opened.Add(OpenKeys.Ajar(prop, other));
+            }
+            else if (storage.Drawers && !StowServer(storage, part)) m_Opened.Add(OpenKeys.Ajar(prop, part));
             OpenedVersion++;
-            if (!m_Opened.Contains(key) || !m_Hidden.Remove(key, out var loot)) return;
+            if (!open || !m_Hidden.Remove(key, out var loot)) return;
             var (pos, rot) = storage.LootPose(part, loot.shape);
             Session.Spawn(ItemPrefab, pos, rot, go => go.GetComponent<WorldItem>().SetLook(loot.shape, loot.color));
+        }
+
+        /// <summary>
+        /// Server: a drawer shuts — the item lying in it goes back in with it, hidden again until the drawer is opened
+        /// (left where the drawer had been, it hung in the air before the cabinet). One item a drawer, as hidden loot is.
+        /// True: something is in the drawer now.
+        /// </summary>
+        bool StowServer(Items.Storage storage, int part)
+        {
+            int key = OpenKeys.Storage(storage.Index, part);
+            if (m_Hidden.ContainsKey(key)) return true;
+            var inside = storage.OpenInside(part);
+            foreach (var item in WorldItem.All)
+            {
+                if (item == null || item.Taking || !inside.Contains(item.transform.position)) continue;
+                m_Hidden[key] = (item.Shape, item.Color);
+                Session.Despawn(item.gameObject);
+                return true;
+            }
+            return false;
         }
 
         /// <summary>How far from a drawer cabinet / lockers a player can be to use them (the client asks by looking at a part).</summary>

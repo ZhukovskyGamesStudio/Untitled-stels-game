@@ -29,11 +29,10 @@ namespace Stealth.Tests
             var root = Resources.Load<GameConfig>(GameConfig.ResourcePath);
             Assert.IsNotNull(root.Styles, "GameConfig has no styles");
             var styles = root.Styles.Styles;
-            Assert.GreaterOrEqual(styles.Length, 17, "the base look and sixteen styles");
+            Assert.AreEqual(2, styles.Length, "the two styles the game keeps: the storybook and the quiet facility");
             Assert.IsTrue(styles.Any(s => s != null && s.name == "S16_Derelict"), "Sasha's abandoned facility is one of the styles (F8)");
             Assert.IsTrue(styles.All(s => s != null));
             Assert.AreEqual(styles.Length, styles.Select(s => s.Title).Distinct().Count(), "titles are unique");
-            Assert.AreEqual(0f, styles[0].Screen.OutlineStrength, "the first style is the base look");
             Assert.IsNotNull(root.Styles.Default, "the game has a look");
             CollectionAssert.Contains(styles, root.Styles.Default);
             Assert.IsNotEmpty(root.Styles.Building);

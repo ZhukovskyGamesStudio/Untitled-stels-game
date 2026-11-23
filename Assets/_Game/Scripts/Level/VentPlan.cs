@@ -178,6 +178,29 @@ namespace Stealth.Level
         }
 
         /// <summary>The grate in cell <paramref name="c"/> would cut into (or touch) a ceiling lamp hanging at one of <paramref name="lamps"/>.</summary>
+        /// <summary>
+        /// Which way a ceiling grate is turned (pure; degrees about the vertical, a quarter turn at a time): its lid hangs
+        /// open from the hinge edge (the prefab's −Z, turned by this) — on the side furthest from every doorway of its
+        /// storey. A grate sits just inside its room's way in: hinged on the door's side, the open lid hung across the door.
+        /// </summary>
+        public static float LidYaw(Vector3 grate, IReadOnlyList<Doorway> doorways)
+        {
+            float best = -1f, yaw = 0f;
+            for (int k = 0; k < 4; k++)
+            {
+                var edge = grate + Quaternion.Euler(0f, k * 90f, 0f) * Vector3.back * (Res / 2f);
+                float near = float.MaxValue;
+                if (doorways != null)
+                    foreach (var d in doorways)
+                    {
+                        if (Mathf.Abs(d.Position.y - (grate.y - LevelMetrics.WallHeight)) > 1f) continue; // another storey's
+                        near = Mathf.Min(near, new Vector2(edge.x - d.Position.x, edge.z - d.Position.z).magnitude);
+                    }
+                if (near > best + 0.05f) { best = near; yaw = k * 90f; }
+            }
+            return yaw;
+        }
+
         public static bool ClashesLamp(Vector2Int c, List<Vector2> lamps)
         {
             var m = new Vector2((c.x + 0.5f) * Res, (c.y + 0.5f) * Res);

@@ -51,6 +51,8 @@ namespace Stealth.Items
         public int MedTableHp = 3;
 
         [Header("Starting items and the classes' tools")]
+        [Tooltip("A roll of bandages: hit points it gives back (never over the usual full health); the medkit heals in full.")]
+        public int BandageHp = 1;
         [Tooltip("Instant coffee: seconds it lasts once drunk.")]
         public float CoffeeSeconds = 60f;
         [Tooltip("Instant coffee: walking and running speed × this.")]

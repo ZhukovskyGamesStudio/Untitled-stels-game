@@ -605,7 +605,9 @@ def model_coat_rack():
 def model_lockers():
     """Staff lockers, 1.0 x 0.5 x 2.05 (a head above a 1.8 m person): an open-fronted carcass with two compartments
     0.47 m wide inside (any loot item stands in one on end: Items.StorageMath.LootPose; a hat shelf in each) and two
-    doors that swing open (separate parts BodyDoor0..1 with their vents and handle: the game moves them, Items.Storage)."""
+    doors that swing open (separate parts BodyDoor0..1 with their vents and handle: the game moves them, Items.Storage).
+    The two open from the middle, each hinged at its outer side (neither stands open before the other's compartment):
+    the handles are at their meeting edges."""
     W, H, C = 1.0, 2.05, 0.49              # width, height, compartment pitch
     xs = (-C / 2, C / 2)
     merge("Body", [box((0.02, 0.5, H), (x, 0, H / 2)) for x in (-W / 2 + 0.01, 0.0, W / 2 - 0.01)]  # sides and the divider
@@ -615,7 +617,7 @@ def model_lockers():
     for i, x in enumerate(xs):
         merge(f"BodyDoor{i}", [box((C - 0.02, 0.02, H - 0.08), (x, -0.245, H / 2 + 0.02))]  # the door
               + [box((0.32, 0.012, 0.02), (x, -0.258, H - 0.17 - k * 0.04)) for k in range(3)]  # vents
-              + [box((0.03, 0.03, 0.12), (x + C / 2 - 0.05, -0.265, 1.05))])                    # handle
+              + [box((0.03, 0.03, 0.12), (x + (C / 2 - 0.05) * (1 if x < 0 else -1), -0.265, 1.05))])  # handle, at the middle
     export("lockers")
 
 
@@ -687,7 +689,7 @@ SHAPES = {
     "shovel": [(0, 0), (0, 1), (0, 2), (0, 3)],                    # the shovel's piece in grids and the cart (ItemCatalog.Shovel, 1 x 4)
     "flashlight": [(0, 0), (0, 1), (0, 2)],                       # ItemCatalog.Flashlight (1 x 3)
     "battery": [(0, 0)],                                          # ItemCatalog.Battery
-    "book": [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)],      # book, shape 16 (2 x 3)
+    "book": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # book, shape 16 (2 x 2)
     "cans": [(0, 0), (1, 0), (0, 1), (1, 1)],                      # tins, shape 17 (2 x 2)
     "screwdriver": [(0, 0), (0, 1), (0, 2)],                      # screwdriver, shape 18 (1 x 3)
     "beltbag": [(0, 0), (1, 0), (0, 1), (1, 1)],                   # belt bag, shape 19 (2 x 2)
@@ -714,6 +716,11 @@ SHAPES = {
     "mop": [(0, 0), (0, 1), (0, 2), (0, 3)],                      # mop (1 x 4)
     "plush": [(0, 0), (1, 0), (0, 1)],                             # teddy bear (L of 3)
     "socks": [(0, 0), (0, 1)],                                    # rolled socks (1 x 2)
+    "ssd": [(0, 0)],                                              # SSD drive
+    "gamepad": [(0, 0), (1, 0)],                                  # game controller (2 x 1)
+    "gamekeyboard": [(0, 0), (1, 0), (2, 0)],                     # gaming keyboard (3 x 1)
+    "canister": [(0, 0), (1, 0), (0, 1), (1, 1)],                  # fuel canister (2 x 2)
+    "bandage": [(0, 0)],                                          # roll of bandages
 }
 
 

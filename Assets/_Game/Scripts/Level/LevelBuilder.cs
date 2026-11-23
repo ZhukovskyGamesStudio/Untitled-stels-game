@@ -101,11 +101,50 @@ namespace Stealth.Level
         }
     }
 
+    /// <summary>
+    /// The soft warm light of a house (Data/Config/Level → Building → Mood): its lamps' colours pulled to a warm tint and
+    /// dimmed a little, the style's ambient (the picture's fill light) warmed and lifted so shadows are less harsh.
+    /// </summary>
+    [System.Serializable]
+    public class LightMood
+    {
+        [Tooltip("The warm tint the lamps' colours are multiplied towards (an incandescent bulb).")]
+        public Color Tint = new(1f, 0.82f, 0.62f);
+        [Tooltip("How far the lamps go to the tint: 0 keeps their own colours, 1 multiplies by the tint in full.")]
+        [Range(0f, 1f)] public float Warmth = 0.6f;
+        [Tooltip("The lamps' brightness, share of their own: under 1 is softer. Robots see by it too.")]
+        [Range(0.4f, 1.2f)] public float Brightness = 0.88f;
+        [Tooltip("The tint of the ambient light (the picture only: robots do not see by it).")]
+        public Color AmbientTint = new(1f, 0.86f, 0.7f);
+        [Tooltip("How far the ambient goes to its tint.")]
+        [Range(0f, 1f)] public float AmbientWarmth = 0.7f;
+        [Tooltip("The ambient's strength, share of the style's own: over 1 fills the shadows (softer contrast).")]
+        [Range(0.5f, 2f)] public float AmbientFill = 1.25f;
+
+        /// <summary>A lamp's colour in this mood (pure): its own, multiplied towards the tint.</summary>
+        public Color Lamp(Color own) => Mul(own, Color.Lerp(Color.white, Tint, Warmth));
+
+        /// <summary>The ambient in this mood (pure): the style's own, warmed and lifted.</summary>
+        public Color Ambient(Color own) => Mul(own, Color.Lerp(Color.white, AmbientTint, AmbientWarmth)) * AmbientFill;
+
+        static Color Mul(Color a, Color b) => new(a.r * b.r, a.g * b.g, a.b * b.b, a.a);
+    }
+
     /// <summary>Light of a room by its type (pure, unit tested).</summary>
     public static class RoomLighting
     {
         /// <summary>Ceiling panels sit this far either side of the room centre (along x).</summary>
         public const float LampOffset = 2.5f;
+
+        /// <summary>The soft warm light of this house, or null: the hospital and the abandoned station keep theirs (<see cref="HouseRules.WarmLight"/>).</summary>
+        public static LightMood MoodOf(LevelLayout l) => l != null && l.Mood != null && HouseRules.Of(l).WarmLight ? l.Mood : null;
+
+        /// <summary>A room's light in a house's mood (pure): <see cref="For(RoomType, bool, float)"/>, then warmer and softer.</summary>
+        public static (Color color, float intensity) For(RoomType room, bool dark, float dimShare, LightMood mood)
+        {
+            var (color, intensity) = For(room, dark, dimShare);
+            return mood == null ? (color, intensity) : (mood.Lamp(color), intensity * mood.Brightness);
+        }
 
         public static (Color color, float intensity) For(RoomType room, bool dark, float dimShare = 0f)
         {
@@ -177,12 +216,34 @@ namespace Stealth.Level
         /// Builds the level a piece at a time (each step a few hundredths of a second): the drive to the next house builds it
         /// over several frames while the drive scene goes on (<see cref="ActiveLevel.LoadSteps"/>).
         /// </summary>
+        /// <summary>
+        /// A piece's screens with nothing to show (the models' glowing screen material): off, static or cracked, by the
+        /// house's seed (<see cref="ScreenLooks"/>) — before the style dresses the piece. Little displays keep their glow.
+        /// </summary>
+        void DressScreens(GameObject go, int seed)
+        {
+            var screens = m_Art.Screens;
+            if (screens == null || screens.Length < 4 || screens[0] == null) return;
+            var look = ScreenLooks.Pick(seed);
+            var to = screens[1 + (int)look];
+            if (to == null) return;
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (r.sharedMaterial != screens[0]) continue;
+                var size = r.bounds.size;
+                if (Mathf.Max(size.x, Mathf.Max(size.y, size.z)) < ScreenLooks.SmallScreen) continue;
+                r.sharedMaterial = to;
+                if (look == ScreenLook.Static) LiveScreens.Add(r);
+            }
+        }
+
         public IEnumerable<bool> Steps()
         {
             var l = m_Layout;
             var root = Object.Instantiate(m_Art.LevelRoot);
             root.name = $"Level_{l.Seed}";
             m_Root = root.transform;
+            LiveScreens.Clear();
 
             float W = l.SizeX, H = l.SizeZ;
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
@@ -290,6 +351,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
+                DressScreens(go, LevelRandom.Mix(l.Seed, Salt.Screens, i));
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
@@ -417,7 +479,7 @@ namespace Stealth.Level
                 Put(pattern != null ? pattern.Segments[DrivePath.VariantOf(-i) % pattern.Segments.Length] : Segment(i + 5), $"BasementBack{i}", new Vector3(-i * seg, 0f, 0f));
                 int side = DrivePath.LampSideOf(-i);
                 var lamp = Put(kit.Lamp, $"BasementBackLamp{i}", new Vector3(-i * seg + seg / 2f, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                if (lamp != null) foreach (var light in lamp.GetComponentsInChildren<Light>()) { light.color = DriveTunnel.LampColor; light.intensity = DriveTunnel.LampIntensity; }
+                SewerLamp.Set(lamp, DriveTunnel.LampColor, DriveTunnel.LampIntensity);
             }
             var cap = Put(kit.Cap, "BasementBackCap", new Vector3(-Basement.BackSegments * seg, 0f, 0f));
             if (pattern != null)
@@ -448,18 +510,12 @@ namespace Stealth.Level
             var warm = new Color(1f, 0.8f, 0.55f);
             void Lamp(string name, float x, int side, float share, float range)
             {
-                var lamp = Put(kit.Lamp, name, new Vector3(x, 2.3f, side * 3.55f), side > 0 ? 90f : -90f);
-                if (lamp == null) return;
-                foreach (var light in lamp.GetComponentsInChildren<Light>())
-                {
-                    light.color = warm;
-                    light.intensity *= share;
-                    light.range = range;
-                }
+                SewerLamp.Scale(Put(kit.Lamp, name, new Vector3(x, 2.3f, side * 3.55f), side > 0 ? 90f : -90f), warm, share, range);
             }
-            Lamp("BasementLamp", seg * 0.5f, 1, 0.7f, 11f);
-            Lamp("BasementLamp", seg * 1.5f, -1, 0.7f, 11f);
-            Lamp("BasementLamp", Basement.AlcoveX, -1, 0.7f, 11f);
+            // (at the lamps' full strength: this is where the team arrives and finds the ladder)
+            Lamp("BasementLamp", seg * 0.5f, 1, 1f, 12f);
+            Lamp("BasementLamp", seg * 1.5f, -1, 1f, 12f);
+            Lamp("BasementLamp", Basement.AlcoveX, -1, 1f, 12f);
             // the ladder's ends: under the lid in the lobby (built with it, as a prop) and at its foot
             var shaft = m_Layout.HatchPosition;
             var path = Basement.ClimbPath(frame, shaft, m_Layout.ShaftExit);
@@ -499,7 +555,7 @@ namespace Stealth.Level
             foreach (var net in m_Layout.Vents)
                 foreach (var g in net.Grates)
                 {
-                    var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.identity);
+                    var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.Euler(0f, VentPlan.LidYaw(g.Position, m_Layout.Doorways), 0f));
                     if (go.TryGetComponent<VentGrate>(out var grate)) grate.Setup(index, g.Room, g.Closed);
                     index++;
                 }
@@ -971,8 +1027,9 @@ namespace Stealth.Level
         /// <summary>Ceiling lights of a room: about one per 70 m², spread over its floor (clear of stair holes), under its own ceiling.</summary>
         void BuildLights(PlanRoom r)
         {
-            var (color, intensity) = RoomLighting.For(r.Type, r.Dark, m_Layout.DarkRoomsDim ? m_Layout.DimShare : 0f);
-            var (litColor, litIntensity) = RoomLighting.For(r.Type, false); // a light switch turns a dark room on
+            var mood = RoomLighting.MoodOf(m_Layout); // warm and soft, but for the hospital and the abandoned station
+            var (color, intensity) = RoomLighting.For(r.Type, r.Dark, m_Layout.DarkRoomsDim ? m_Layout.DimShare : 0f, mood);
+            var (litColor, litIntensity) = RoomLighting.For(r.Type, false, 0f, mood); // a light switch turns a dark room on
             float ceiling = LevelLayout.FloorY(r.Floor + r.Levels - 1) + LevelMetrics.WallHeight;
             int k = 0;
             foreach (var p in LightSpots(m_Layout, r))

@@ -119,12 +119,19 @@ namespace Stealth.UI
         public BarView QuotaBar;
         public RectTransform GainRect;
         public Text GainLabel;
-        [Tooltip("When the hunter comes (or that it is in the house), under the fuel bar.")]
-        public Text HunterLabel;
-        [Tooltip("The house's main job and how far along it is (under the hunter's line).")]
+        [Tooltip("The house's tasks and how far along they are, under the fuel bar.")]
         public Text ObjectiveLabel;
         [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
+        [Tooltip("The hacking terminal: a list of every robot and device but the cameras (no view through them).")]
+        public GameObject HackList;
+        public Text HackTitle;
+        public RectTransform HackRows;
+        [Tooltip("A hidden row copied for each line of the list.")]
+        public HackRowView HackRowTemplate;
+        [Tooltip("The kinds' pictures (robot_*), one per RobotKind.")]
+        public Sprite[] HackKindPictures;
+        UiPool<HackRowView> m_HackRows;
         public RectTransform TeamList;
         public Text TeamRowPrefab;
         public CanvasGroup Banner;
@@ -558,6 +565,7 @@ namespace Stealth.UI
             if (e.Shape == ItemCatalog.Battery)
                 for (int i = 0; i < inventory.Items.Count; i++) if (inventory.CanRecharge(i)) return Loc.T("hint.battery.use");
             if (e.Shape == ItemCatalog.Medkit) return me.Hp < HealthState.MaxHp ? Loc.T("hint.medkit") : null;
+            if (e.Shape == ItemCatalog.Bandage) return me.Hp < HealthState.MaxHp ? Loc.T("hint.bandage") : null;
             if (e.Shape == ItemCatalog.Coffee) return Loc.T("hint.coffee");
             if (e.Shape == ItemCatalog.Tablet) return Loc.T("hint.tablet");
             return null;
@@ -840,7 +848,6 @@ namespace Stealth.UI
                 Ui.Show(QuotaLabel, false);
                 QuotaBar.Set(1f, new Color(0.3f, 0.9f, 0.4f));
                 Ui.Show(GainLabel, false);
-                ShowHunter(gm);
                 ShowObjective(gm);
                 ShowTerminal(PlayerController.Local);
                 return;
@@ -859,9 +866,49 @@ namespace Stealth.UI
                 GainRect.anchoredPosition = new Vector2(GainX, GainY + age * 8f);
                 Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
             }
-            ShowHunter(gm);
             ShowObjective(gm);
             ShowTerminal(PlayerController.Local);
+        }
+
+        /// <summary>Rows the hacking list shows at once (it scrolls with the pick).</summary>
+        public const int HackRowsShown = 12;
+
+        /// <summary>
+        /// The hacking terminal: every robot and device but the cameras, by kind (numbered when there are several of a kind),
+        /// hacked ones greyed; the pick highlighted, the hold of E filling it. Where they are is not shown.
+        /// </summary>
+        void ShowHackList(PlayerController me)
+        {
+            if (HackList == null) return;
+            var t = me.UsingTerminal;
+            bool on = t != null && t.Kind == TerminalKind.Hacking;
+            if (HackList.activeSelf != on) HackList.SetActive(on);
+            if (!on) return;
+            m_HackRows ??= new UiPool<HackRowView>(HackRowTemplate, HackRows);
+            Ui.Set(HackTitle, Loc.F("hud.hack.title", t.Charges), t.Charges > 0 ? Color.white : new Color(1f, 0.5f, 0.4f));
+            var list = me.TerminalTargets;
+            int pick = list.Count > 0 ? Mathf.Clamp(me.TerminalIndex, 0, list.Count - 1) : -1;
+            int start = HackListRules.FirstShown(pick, list.Count, HackRowsShown);
+            m_HackRows.Begin();
+            for (int i = start; i < Mathf.Min(list.Count, start + HackRowsShown); i++)
+            {
+                var d = list[i];
+                if (d == null) continue;
+                var row = m_HackRows.Next();
+                bool picked = i == pick;
+                var icon = HackKindPictures != null && (int)d.Kind < HackKindPictures.Length ? HackKindPictures[(int)d.Kind] : null;
+                if (row.Icon.sprite != icon) row.Icon.sprite = icon;
+                var tone = d.IsHacked ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
+                row.Icon.color = tone;
+                Ui.Set(row.Name, HackListRules.Label(d.DisplayName, list, i, x => x.Kind), tone);
+                float share = picked && !d.IsHacked ? me.TerminalHackShare : 0f;
+                string state = d.IsHacked ? Loc.T("hud.terminal.hacked") : share > 0f ? $"{Mathf.RoundToInt(share * 100f)}%" : "";
+                Ui.Set(row.State, state, d.IsHacked ? new Color(1f, 1f, 1f, 0.45f) : new Color(1f, 0.85f, 0.4f));
+                row.Back.color = picked ? new Color(0.25f, 0.6f, 1f, 0.35f) : new Color(1f, 1f, 1f, 0.04f);
+                row.Fill.rectTransform.anchorMax = new Vector2(share, 1f);
+                Ui.Show(row.Fill, share > 0f);
+            }
+            m_HackRows.End();
         }
 
         /// <summary>At a terminal: what is on the screen, which of how many, and the charges of a hacking terminal.</summary>
@@ -869,8 +916,9 @@ namespace Stealth.UI
         {
             if (TerminalLabel == null) return;
             var t = me.UsingTerminal;
-            Ui.Show(TerminalLabel, t != null && t.Kind != TerminalKind.Map); // the map has its own caption
-            if (t == null || t.Kind == TerminalKind.Map) return;
+            ShowHackList(me);
+            Ui.Show(TerminalLabel, t != null && t.Kind == TerminalKind.Cameras); // the map and the hacking list have their own captions
+            if (t == null || t.Kind != TerminalKind.Cameras) return;
             var shown = me.TerminalView;
             string text = me.TerminalViewCount == 0 ? "—"
                 : $"{(shown != null ? shown.DisplayName : "")} · {me.TerminalViewNumber} / {me.TerminalViewCount}";
@@ -922,23 +970,6 @@ namespace Stealth.UI
             if (me == null || l == null || SewerLocation.Active == null) return false;
             var at = me.transform.position;
             return at.y < LevelLayout.Underground && !Basement.Contains(l.Cellar, at + Vector3.up * 0.5f);
-        }
-
-        static readonly Color[] HunterColors = { new(1f, 1f, 1f, 0.7f), new(1f, 0.7f, 0.25f), new(1f, 0.3f, 0.25f) };
-
-        void ShowHunter(GameManager gm)
-        {
-            if (HunterLabel == null) return;
-            int inside = 0;
-            foreach (var d in Detector.All)
-                if (d.Kind == RobotKind.Hunter && !d.IsHacked) inside++;
-            float seconds = gm.HunterAt > 0 ? (float)(gm.HunterAt - Session.ServerTime) : -1f;
-            var (text, urgency) = gm.Phase == RunPhase.Playing ? HunterRules.Line(seconds, gm.HunterAlarmsLeft, inside) : (null, HunterRules.Urgency.Calm);
-            Ui.Show(HunterLabel, text != null);
-            if (text == null) return;
-            var color = HunterColors[(int)urgency];
-            if (urgency != HunterRules.Urgency.Calm) color.a = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 6f); // blinks when it matters
-            Ui.Set(HunterLabel, text, color);
         }
 
         /// <summary>Once the fuel is enough: a small diamond over the exit hatch (clamped to the screen edge) with the distance.</summary>

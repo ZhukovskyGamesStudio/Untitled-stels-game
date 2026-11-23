@@ -13,8 +13,8 @@ namespace Stealth.Game
     /// The sewer and the car on the server: the team comes down the house's exit, opens the gate for the car, feeds loot
     /// into its engine (fuel), heaps things in its bed and drives into a tunnel to choose the next house. The drive burns
     /// the house's quota of fuel; while the next house is built every peer shows the car driving on (<see cref="DriveUntil"/>).
-    /// What the team brings up from the car lies in the hatch they come in through (<see cref="Stash"/>); what is to go on
-    /// must be carried to the exit's hatch (<see cref="ExitStash"/>).
+    /// What the car brings goes into the storage robot's crate (<see cref="Stash"/>); nothing is put away at a hatch — loot
+    /// is carried down to the car (its bed, its hopper); what the robot carries down the exit goes into the bed (<see cref="ExitStash"/>).
     /// </summary>
     public partial class GameManager
     {
@@ -75,16 +75,11 @@ namespace Stealth.Game
         /// <summary>The stash of the hatch a player stands at (the entry or the exit of the house), null elsewhere.</summary>
         public TeamStash StashAt(Vector3 position)
         {
+            // nothing is put away at the hatches (neither the entry nor the exit): only in the storage robot's crate
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
-            if (AtEntry(l, position)) return Stash;
-            if (AtBot(position)) return Stash;
-            if (Hatch.IsNear(position, l.ExitHatchPosition)) return ExitStash;
-            return null;
+            return AtBot(position) ? Stash : null;
         }
-
-        /// <summary>At the team's way in: down in the basement, while there is no storage robot (with one, the stash rides in it).</summary>
-        static bool AtEntry(LevelLayout l, Vector3 position) => StorageBot.Active == null && Basement.Contains(l.Cellar, position);
 
         /// <summary>Next to the storage robot (its stash in reach).</summary>
         static bool AtBot(Vector3 position)
@@ -162,10 +157,8 @@ namespace Stealth.Game
         {
             var l = ActiveLevel.Layout;
             if (Phase != RunPhase.Playing || l == null) return null;
-            if (Hatch.IsNear(position, l.ExitHatchPosition)) return l.ExitHatchPosition;
             var bot = StorageBot.Active;
-            if (bot != null) return bot.transform.position; // the board hangs over the robot
-            return l.EntryHatch;
+            return bot != null ? bot.transform.position : null; // the board hangs over the robot (the hatches have none)
         }
 
         /// <summary>Server, a house starts: what lies in the car's bed is brought up into the entry hatch (as much as fits).</summary>
@@ -184,14 +177,11 @@ namespace Stealth.Game
             }
         }
 
-        /// <summary>Whether a thing dropped here burns into fuel: at the car (its hopper, the sewer or the basement) or at the entry in a house — never at the storage robot.</summary>
+        /// <summary>Whether a thing dropped here burns into fuel: only at the car (its hopper, in the sewer or the basement) — not at a hatch, not at the storage robot.</summary>
         public bool CanBurnAt(Vector3 position)
         {
-            // at the car (its hopper): in the sewer and in the house's basement alike
             bool atCar = Car.Active != null && (Car.Active.transform.position - position).magnitude <= PlayerInventory.CarReach;
-            if (Phase == RunPhase.Sewer || atCar) return atCar && Phase is RunPhase.Sewer or RunPhase.Playing;
-            var l = ActiveLevel.Layout;
-            return Phase == RunPhase.Playing && l != null && AtEntry(l, position); // (not at the storage robot: its crate is a stash, no fire)
+            return atCar && Phase is RunPhase.Sewer or RunPhase.Playing;
         }
 
         /// <summary>

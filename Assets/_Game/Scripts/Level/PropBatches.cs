@@ -43,9 +43,15 @@ namespace Stealth.Level
             while (top.parent != null && top.parent != root) top = top.parent;
             if (top.parent != root || !IsShellName(top.name)) return false;
             var lamp = top.GetComponent<RoomLight>();
-            if (lamp != null && lamp.Panels != null)
+            if (lamp == null) return true;
+            if (lamp.Panels != null)
                 foreach (var p in lamp.Panels)
                     if (p == r) return false;
+            // (its soft glow — the diffusers' hot middle, the light on the ceiling — follows the lamp too)
+            if (lamp.Halo == r) return false;
+            if (lamp.Cores != null)
+                foreach (var c in lamp.Cores)
+                    if (c == r) return false;
             return true;
         }
 

@@ -82,33 +82,34 @@ def model_terminal_console():
 
 
 def model_terminal_access():
-    """The storage door's access station: a steel kiosk on a broad foot — a column, an angled head with a screen, a
-    keypad and a card reader, a striped warning collar and a beacon on top; screen and beacon in one Eye part."""
+    """The storage door's access station: a steel kiosk on a broad foot — a column, a broad angled head that is nearly
+    all screen (it shows what the station is for: the storeroom's door, locked or open — Tools/Art/generate_screens.py;
+    the screen has the picture's own 16:10, so nothing is stretched), a card reader under it, a striped warning collar
+    and a beacon on top; the reader's light and the beacon in one Eye part (red locked, green open)."""
     body, accent, eye = [], [], []
     body.append(s.rbox((0.62, 0.5, 0.06), (0, 0.05, 0.03), r=0.02, seg=2))                         # foot
     body.append(s.rbox((0.3, 0.24, 1.0), (0, 0.08, 0.56), r=0.03, seg=3, taper=(0.85, 0.85)))      # column
     accent.append(s.rbox((0.32, 0.26, 0.06), (0, 0.08, 0.2), r=0.01, seg=1))                       # collar (the stripes are its material)
     tilt = (math.radians(-35), 0, 0)
-    head_z = 1.12
-    body.append(s.rbox((0.5, 0.12, 0.4), (0, 0.0, head_z), r=0.03, seg=3, rot=tilt))               # the head
+    head_z = 1.14
+    body.append(s.rbox((0.58, 0.12, 0.48), (0, 0.0, head_z), r=0.03, seg=3, rot=tilt))             # the head
     # its face looks up and to the operator: a thing at (dx, dz) on the face (dz up its slope), d thick, stands proud of it
     th = math.radians(-35)
 
-    def face(dz, w, h, d, dx=0.0):
-        y, z = -0.06 - d / 2, dz                                     # in the head's own frame (front face at y = -0.06)
+    def face(dz, w, h, d, dx=0.0, sink=0.0):
+        y, z = -0.06 - d / 2 + sink, dz                              # in the head's own frame (front face at y = -0.06)
         yy, zz = y * math.cos(th) - z * math.sin(th), y * math.sin(th) + z * math.cos(th)
         return s.rbox((w, d, h), (dx, yy, head_z + zz), r=0.004, seg=1, rot=tilt)
-    screen = face(0.07, 0.38, 0.17, 0.008)                                                          # the screen
-    y0, z0 = -0.06 - 0.004, 0.07
+    sw, sh, sz = 0.496, 0.31, 0.05                                                                  # the screen: 16:10
+    accent.append(face(sz, sw + 0.03, sh + 0.03, 0.012, sink=0.006))                                # its bezel (sunk: no face shares a plane)
+    screen = face(sz, sw, sh, 0.012, sink=0.002)
+    y0, z0 = -0.06 - 0.004, sz
     frame = ((0.0, y0 * math.cos(th) - z0 * math.sin(th), head_z + y0 * math.sin(th) + z0 * math.cos(th)),
-             (1.0, 0.0, 0.0), (0.0, -math.sin(th), math.cos(th)), 0.38, 0.17)
-    for k in range(3):
-        for j in range(3):
-            accent.append(face(-0.07 - j * 0.035, 0.03, 0.025, 0.012, dx=-0.09 + k * 0.04))         # keypad
-    accent.append(face(-0.1, 0.12, 0.06, 0.02, dx=0.14))                                            # card reader
-    eye.append(face(-0.075, 0.07, 0.006, 0.024, dx=0.14))                                           # its slot light
-    accent.append(s.rcyl(0.05, 0.05, (0, 0.1, head_z + 0.24), seg=16, r=0.008))                    # beacon base
-    eye.append(s.ball(0.055, (0, 0.1, head_z + 0.3), seg=16, scale=(1, 1, 0.9)))                   # beacon
+             (1.0, 0.0, 0.0), (0.0, -math.sin(th), math.cos(th)), sw, sh)
+    accent.append(face(-0.175, 0.2, 0.05, 0.024, sink=0.004))                                       # card reader, under the screen
+    eye.append(face(-0.175, 0.13, 0.008, 0.03, sink=0.003))                                         # its slot light
+    accent.append(s.rcyl(0.055, 0.05, (0, 0.1, head_z + 0.27), seg=16, r=0.008))                   # beacon base
+    eye.append(s.ball(0.065, (0, 0.1, head_z + 0.335), seg=16, scale=(1, 1, 0.9)))                 # beacon
     s.part("Body", body)
     s.part("Accent", accent)
     s.part("Eye", eye)

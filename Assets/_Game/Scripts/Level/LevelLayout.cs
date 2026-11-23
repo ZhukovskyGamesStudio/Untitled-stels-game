@@ -392,6 +392,8 @@ namespace Stealth.Level
         /// <summary>Dark rooms have dim lamps (<see cref="DimShare"/> of the usual brightness) instead of none.</summary>
         public bool DarkRoomsDim;
         public float DimShare = 0.3f;
+        /// <summary>The settings of the soft warm light; whether this house has it — <see cref="RoomLighting.MoodOf"/>.</summary>
+        public LightMood Mood = new();
 
         /// <summary>Size of the building's bounding box, metres (x, z).</summary>
         public float SizeX => Plan != null ? Plan.SizeX : 0f;

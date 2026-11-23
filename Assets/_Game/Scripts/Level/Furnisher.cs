@@ -326,6 +326,8 @@ namespace Stealth.Level
                 PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
                 PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist or PropKind.CtScanner or PropKind.XrayMachine or
                 PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink => 1,
+            // (drawers: a wall of them in one room was a chore to open, and most were empty)
+            PropKind.Cabinet or PropKind.FilingCabinet or PropKind.FilePedestal or
             PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or
                 PropKind.RobotArm or PropKind.MicStand or PropKind.InfoKiosk or PropKind.Whiteboard or PropKind.NoticeBoard or PropKind.BinPair or
                 PropKind.PaperBin or PropKind.PaperStack or PropKind.GuitarStand or PropKind.AmpCabinet or PropKind.NightTable or PropKind.Plant or
@@ -444,6 +446,7 @@ namespace Stealth.Level
             m_Keep = new RectGrid[m_P.Floors];
             m_Solid = new RectGrid[m_P.Floors];
             for (int f = 0; f < m_P.Floors; f++) { m_Taken[f] = new RectGrid(); m_Keep[f] = new RectGrid(); m_Solid[f] = new RectGrid(); }
+            InitOpening(m_P.Floors);
             foreach (var d in l.Doorways) KeepDoorway(d);
             foreach (var s in l.Stairs)
             {

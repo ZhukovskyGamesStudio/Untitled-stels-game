@@ -18,9 +18,14 @@ from . import sdf
 class Piece:
     """One sculpted piece: its dense mesh, its game mesh, the part it belongs to (the renderer in the game) and the
     atlas it is baked into."""
-    def __init__(self, name, part, atlas, hi, tris, bones, keep=None, texel=1.0, sides=None):
+    def __init__(self, name, part, atlas, hi, tris, bones, keep=None, texel=1.0, sides=None, ray=None, fine=None, angle=66.0):
         self.name, self.part, self.atlas, self.hi, self.tris, self.bones = name, part, atlas, hi, tris, bones
         self.keep, self.texel, self.lo, self.sides = keep, texel, None, sides
+        self.ray = ray                  # how far the bake looks for the sculpt from the game mesh (fingers: less than the gap between them)
+        self.slot = None                # the wardrobe slot of an item's piece (None: the body); the game part is "<part>.<slot>"
+        self.own_uv = False             # its UVs are its own (hair cards on the strand texture): not unwrapped, packed or baked
+        self.angle = angle              # the unwrap's angle between faces of one island (a curled finger folds onto itself at 66°)
+        self.fine = fine                # nearer passes over the first (one reach or several, far to near): where one finds the sculpt it wins
 
 
 # --------------------------------------------------------------------------- painting
@@ -108,26 +113,44 @@ def lowpoly(piece):
     return lo
 
 
-def unwrap(piece, angle=66.0):
-    """UVs of a game mesh: islands by the angle between faces, sized by their area times the piece's texel weight."""
+def unwrap(piece, angle=None):
+    """UVs of a game mesh: islands by the angle between faces, sized by their area on the body times the piece's texel
+    weight — one density across the pieces of an atlas. (Each piece's own unwrap fills its own unit square: packed as
+    they came, two eyeballs took most of the skin atlas and the face got 120 pixels of it.)"""
     lo = piece.lo
     bpy.ops.object.select_all(action="DESELECT")
     lo.select_set(True)
     bpy.context.view_layer.objects.active = lo
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(angle), island_margin=0.003, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(angle or piece.angle), island_margin=0.003, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
     bpy.ops.uv.average_islands_scale()
     bpy.ops.object.mode_set(mode="OBJECT")
-    if piece.texel != 1.0:
-        uv = lo.data.uv_layers.active.data
-        co = np.empty(len(uv) * 2)
-        uv.foreach_get("uv", co)
-        uv.foreach_set("uv", co * piece.texel)
+    me = lo.data
+    uv = me.uv_layers.active.data
+    co = np.empty(len(uv) * 2)
+    uv.foreach_get("uv", co)
+    co = co.reshape(-1, 2)
+    v = np.empty(len(me.vertices) * 3)
+    me.vertices.foreach_get("co", v)
+    v = v.reshape(-1, 3)
+    world, flat = 0.0, 0.0
+    for poly in me.polygons:
+        loops = list(poly.loop_indices)
+        a = [v[me.loops[i].vertex_index] for i in loops]
+        u = [co[i] for i in loops]
+        for k in range(1, len(loops) - 1):
+            world += 0.5 * np.linalg.norm(np.cross(a[k] - a[0], a[k + 1] - a[0]))
+            e1, e2 = u[k] - u[0], u[k + 1] - u[0]
+            flat += 0.5 * abs(e1[0] * e2[1] - e1[1] * e2[0])
+    scale = piece.texel * math.sqrt(world / max(flat, 1e-12))         # UV units per metre: the same for every piece (times its weight)
+    uv.foreach_set("uv", (co * scale).ravel())
 
 
-def pack(pieces, margin=0.004):
-    """Packs the islands of several game meshes into one square: the meshes are joined for the packing and split again."""
+def pack(pieces, size):
+    """Packs the islands of several game meshes into one square of size texels, 16 texels apart (the bake's margins,
+    6 texels, must not reach a neighbour): the meshes are joined for the packing and split again."""
+    margin = 16.0 / size
     los = [p.lo for p in pieces]
     counts = [len(o.data.loops) for o in los]
     # (pack_islands works on the edit mesh of all selected objects at once)
@@ -138,8 +161,20 @@ def pack(pieces, margin=0.004):
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.select_all(action="SELECT")
-    bpy.ops.uv.pack_islands(rotate=True, margin=margin, scale=True)
+    bpy.ops.uv.pack_islands(rotate=True, margin_method="FRACTION", margin=margin, scale=True)   # (a fraction of the square, not of the islands)
     bpy.ops.object.mode_set(mode="OBJECT")
+    # (a lone mesh's islands came out of the square: whatever the packer did, everything is fitted into it, margins kept)
+    uvs = []
+    for o in los:
+        co = np.empty(len(o.data.uv_layers.active.data) * 2)
+        o.data.uv_layers.active.data.foreach_get("uv", co)
+        uvs.append(co.reshape(-1, 2))
+    allc = np.concatenate(uvs)
+    lo_, hi_ = allc.min(0), allc.max(0)
+    if lo_.min() < margin * 0.5 - 1e-6 or hi_.max() > 1 - margin * 0.5 + 1e-6:
+        k = (1 - 2 * margin) / max((hi_ - lo_).max(), 1e-9)
+        for o, co in zip(los, uvs):
+            o.data.uv_layers.active.data.foreach_set("uv", ((co - lo_) * k + margin).ravel())
     return counts
 
 
@@ -189,7 +224,9 @@ def bake(pieces, size, path, name, ray=0.012, ao_samples=24):
     bk.use_cage = False
     bk.cage_extrusion = ray
     bk.max_ray_distance = ray * 2
-    bk.margin = max(4, size // 128)
+    # the margin a piece's bake spills over its islands' edges: less than half the gap the packing leaves (16 texels, see
+    # pack), or a piece baked later paints over its neighbour (an eye's margin coloured a cheek grey beside the nose)
+    bk.margin = 6
     bk.margin_type = "EXTEND"
     bk.use_clear = False
     bk.normal_space = "TANGENT"
@@ -201,10 +238,19 @@ def bake(pieces, size, path, name, ray=0.012, ao_samples=24):
     for o in los:
         o.data.materials.clear()
         o.data.materials.append(target)
+        # the game mesh only says where the pixels are: it must not shade the sculpt — where it lies a fraction of a
+        # millimetre outside it, the occlusion rays from the sculpt hit it at once (dark triangles by the nose)
+        o.visible_diffuse = o.visible_glossy = o.visible_shadow = o.visible_transmission = o.visible_volume_scatter = False
     plain = bpy.data.materials.new("_plain")
     his = [h for p in pieces for h in (p.hi if isinstance(p.hi, (list, tuple)) else [p.hi])]
-    for p in pieces:
+    # each piece's own passes one after another (the next piece then lays its margin over this one's, as before): the far
+    # pass, then the near one over it — where the near one finds the sculpt it wins
+    fines = lambda p: list(p.fine) if isinstance(p.fine, (list, tuple)) else ([p.fine] if p.fine else [])
+    passes = [(p, r) for p in pieces for r in [p.ray or ray] + fines(p)]
+    for p, reach in passes:
         srcs = p.hi if isinstance(p.hi, (list, tuple)) else [p.hi]
+        bk.cage_extrusion = reach
+        bk.max_ray_distance = reach * 2
         for o in los:
             o.hide_render = o is not p.lo                      # the other game meshes neither catch nor block rays
         for kind, mat, samples in (("normal", plain, 1), ("col", emit_col, 1), ("gloss", emit_gloss, 1), ("ao", plain, ao_samples)):
@@ -293,7 +339,7 @@ def assign(obj, wts):
 
 # --------------------------------------------------------------------------- the audit
 
-def audit(obj, label=None):
+def audit(obj, label=None, open_ok=False):
     """Topology of a game mesh, printed as one TOPO line; returns the number of hard errors (non-manifold edges, faces
     with no area, loose vertices, vertices without weights or with more than four)."""
     me = obj.data
@@ -325,7 +371,7 @@ def audit(obj, label=None):
         co = np.empty(len(me.uv_layers.active.data) * 2)
         me.uv_layers.active.data.foreach_get("uv", co)
         uv_out = int(((co < -1e-4) | (co > 1 + 1e-4)).sum())
-    errors = nonman + rim + zero + loose + unweighted + heavy
+    errors = nonman + (0 if open_ok else rim) + zero + loose + unweighted + heavy      # (hair cards are open strips)
     print(f"TOPO {label or obj.name}: {tris} tris, {nverts} verts | non-manifold {nonman}, open edges {rim}, zero-area {zero}, "
           f"loose {loose}, slivers {slivers} ({100.0 * slivers / max(1, tris):.1f}%), poles>9 {poles}, folded {flipped} | "
           f"unweighted {unweighted}, >4 bones {heavy}, uv outside {uv_out}" + ("  <-- ERRORS" if errors else ""))

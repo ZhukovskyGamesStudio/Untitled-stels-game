@@ -236,28 +236,8 @@ def visor_band(p):
 # --------------------------------------------------------------------------- the styles
 
 PLANS = {
-    "S00_Base": ("clean", Plan(head="box")),
-    "S01_NightShift": ("lofi", Plan(torso=(0.52, 0.34), leg_r=0.095, arm_r=0.08, hand_r=0.075, seg=6, helmet="hazmat", foot=(0.14, 0.3, 0.1))),
-    "S02_Scrapyard": ("toy", Plan(hip=0.55, leg_r=0.1, torso=(0.5, 0.4), top=1.18, shoulder_x=0.28, arm_r=0.085, arm_len=0.42, head_r=0.25,
-                                 head_z=1.45, hand_r=0.08, foot=(0.16, 0.24, 0.1), seg=20)),
-    "S03_Heist": ("realistic", Plan(seg=20, mask=True)),
-    "S04_Hunted": ("realistic", Plan(hip=1.0, leg_r=0.055, torso=(0.38, 0.22), top=1.48, shoulder_x=0.23, arm_r=0.045, arm_len=0.66,
-                                    head_r=0.12, head_z=1.64, hand_r=0.045, seg=16)),
-    "S05_Toon": ("lowpoly", Plan(torso=(0.56, 0.34), leg_r=0.1, arm_r=0.085, arm_len=0.56, hand_r=0.1, head_r=0.15, head="ico",
-                                 foot=(0.16, 0.32, 0.12), seg=6, taper=1.18)),
     "S06_Storybook": ("clean", Plan(hip=0.95, leg_r=0.06, torso=(0.36, 0.22), top=1.45, shoulder_x=0.22, arm_r=0.045, head_r=0.12,
                                     head_z=1.62, seg=20, taper=1.12)),
-    "S07_Logbook": ("clean", Plan(torso=(0.46, 0.3), seg=16, taper=0.95)),
-    "S08_Footage": ("toy", Plan(torso=(0.5, 0.34), leg_r=0.1, arm_r=0.085, hand_r=0.08, seg=20, helmet="diver", foot=(0.15, 0.3, 0.12))),
-    "S09_WhiteRoom": ("crystal", Plan(square=True, head="ico", seg=6)),
-    "S10_Grid": ("clean", Plan(torso=(0.42, 0.24), leg_r=0.065, arm_r=0.05, seg=20, taper=1.1, visor=True)),
-    # blocky noir figures, a sleek lab jumpsuit, chunky comic heroes, a heat suit, ruler-drawn blueprint people
-    "S11_Noir": ("lofi", Plan(torso=(0.46, 0.28), leg_r=0.07, arm_r=0.06, seg=6, square=True, taper=1.12, hat="fedora")),
-    "S12_TestChamber": ("clean", Plan(torso=(0.4, 0.24), leg_r=0.06, arm_r=0.045, seg=24, taper=0.95)),
-    "S13_Comic": ("lowpoly", Plan(torso=(0.5, 0.3), leg_r=0.085, arm_r=0.075, arm_len=0.6, hand_r=0.08, head_r=0.15, seg=8, taper=1.2,
-                                  foot=(0.15, 0.3, 0.1))),
-    "S14_Thermal": ("realistic", Plan(seg=16, helmet="hazmat")),
-    "S15_Blueprint": ("clean", Plan(torso=(0.4, 0.22), leg_r=0.05, arm_r=0.04, seg=8, square=True, head="box")),
     # real adult proportions (1.75 m, head 1/7.5 of the height); the stand-in until the rigged human replaces it
     "S16_Derelict": ("realistic", Plan(hip=0.92, leg_r=0.068, torso=(0.4, 0.23), top=1.44, shoulder_x=0.23, arm_r=0.048, arm_len=0.64,
                                        head_r=0.108, head_z=1.63, hand_r=0.045, foot=(0.1, 0.27, 0.07), seg=24, taper=1.12,
@@ -266,7 +246,7 @@ PLANS = {
 
 
 # voxel styles: the figure rebuilt from cubes of this size (the same grid as the style's robots and furniture)
-VOXEL = {"S11_Noir": 0.04}
+VOXEL = {}
 
 
 def build(style, finish, p, dept):

@@ -82,6 +82,12 @@ namespace Stealth.Level
         /// <summary>The house hides the map to the shelter (<see cref="HouseFeatures.PlanShelterMap"/>).</summary>
         public virtual bool HasShelterMap => false;
 
+        /// <summary>
+        /// Soft warm light (<see cref="LightMood"/>): the lamps and the air of a place people work and live in. Not where
+        /// the light is clinical or dead (the hospital, the abandoned station).
+        /// </summary>
+        public virtual bool WarmLight => true;
+
         /// <summary>The location's own plan settings shared by all of them: a single block, no atriums, rotundas or cut corners.</summary>
         protected static void SingleBlock(BuildingSettings s, int[] floors)
         {
@@ -118,6 +124,7 @@ namespace Stealth.Level
     sealed class HospitalRules : HouseRules
     {
         public override Location Location => Location.Hospital;
+        public override bool WarmLight => false; // cold and even: a hospital
         public override PropKind? PointOfInterest => PropKind.MedTable;
 
         public override void Shape(BuildingSettings s, BuildingSettings b)
@@ -208,6 +215,7 @@ namespace Stealth.Level
     sealed class AbandonedRules : HouseRules
     {
         public override Location Location => Location.Abandoned;
+        public override bool WarmLight => false; // what still burns here burns cold
         public override PropKind? PointOfInterest => null; // its find is the station itself: dark, rotten, the robots at home
         public override DoorKind? StreetDoor => DoorKind.Steel;
         public override bool RetypesRooms => false; // the station's program is laid out by its plan

@@ -41,6 +41,14 @@ namespace Stealth.Vehicles
         [Header("Layout")]
         [Tooltip("Steering wheel on the left (driver's seat on the left, passenger on the right). Off — a right-hand car.")]
         public bool LeftHandDrive = true;
+
+        [Header("Lights")]
+        [Tooltip("The most light the headlights put on what they shine straight at, in the light's own units (intensity over the distance squared; at full strength, 45, a wall 15 m ahead gets 0.2): the beams dim as a wall comes close. 0 — never dimmed.")]
+        public float HeadlightGlare = 0.2f;
+        [Tooltip("How far ahead the headlights look for what they shine at, metres (past the distance where they are at full strength anyway).")]
+        public float HeadlightReach = 16f;
+        [Tooltip("How fast the beams follow (dimming and brightening), 1/s.")]
+        public float HeadlightEase = 5f;
     }
 
     /// <summary>What the driver does this frame.</summary>

@@ -326,6 +326,47 @@ namespace Stealth.EditorTools
                 float inside = Mathf.Min(edge - v, v - notch) * 40f;
                 return Mathf.Clamp01(inside);
             });
+            // A laser beam's glow, across the beam (v): brightest on its line, gone at the sheet's edges; along it (u) even,
+            // fading out just at the ends.
+            Sprite("BeamGlow", 16, 64, (u, v) =>
+            {
+                float across = Mathf.Clamp01(1f - Mathf.Abs(v - 0.5f) * 2f);
+                float ends = Mathf.Clamp01(Mathf.Min(u, 1f - u) * 12f);
+                return Mathf.Pow(across, 2.6f) * ends;
+            });
+            GlowMaterials();
+        }
+
+        /// <summary>
+        /// Glow drawn over the picture (additive, unlit, textured with a soft sprite): the ceiling lamps' hot middle and the
+        /// pool of light round them on the ceiling (RoomLight sets the colour), a laser beam's core and its halo. They need
+        /// the sprites, so they are made after them.
+        /// </summary>
+        static void GlowMaterials()
+        {
+            Material Soft(Material m, string sprite)
+            {
+                m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>($"{SpritesDir}/{sprite}.png"));
+                Additive(m);
+                return m;
+            }
+            Soft(Mat("Environment", "LampGlow", Color.white, unlit: true), "SoftGlow");
+            // a laser: a deep red line bright enough to bloom, and the red haze round it
+            Mat("FX", "LaserCore", new Color(1.9f, 0.05f, 0.02f), unlit: true);
+            Soft(Mat("FX", "LaserGlow", new Color(1.25f, 0.07f, 0.03f, 0.9f), unlit: true), "BeamGlow");
+            // furniture screens with nothing to show (Level.ScreenLooks; pictures: Tools/Art/generate_screens.py): dark glass
+            // switched off, static (dim: decor), cracked glass
+            Mat("Props", "ScreenOff", new Color(0.02f, 0.022f, 0.026f), smoothness: 0.9f);
+            var noise = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_static.png");
+            var snow = Mat("Props", "ScreenStatic", new Color(0.05f, 0.05f, 0.055f), new Color(0.6f, 0.62f, 0.66f), smoothness: 0.8f);
+            snow.SetTexture("_BaseMap", noise);
+            snow.SetTexture("_EmissionMap", noise);
+            snow.SetTextureScale("_BaseMap", Vector2.one * Stealth.Level.LiveScreens.Tiling);
+            EditorUtility.SetDirty(snow);
+            var cracked = Mat("Props", "ScreenCracked", Color.white, smoothness: 0.85f);
+            cracked.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cracked.png"));
+            cracked.SetTextureScale("_BaseMap", Vector2.one);
+            EditorUtility.SetDirty(cracked);
         }
 
         static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha, Vector4 border = default)

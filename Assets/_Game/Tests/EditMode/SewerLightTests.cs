@@ -49,5 +49,22 @@ namespace Stealth.Tests
                 Assert.AreEqual(a.Segments[i].Junk.Count, b.Segments[i].Junk.Count);
             }
         }
+        [Test]
+        public void TheDoorwayToTheExitsPassageIsNeverLeftInTheDark()
+        {
+            int doors = 0;
+            for (int seed = 1; seed <= 60; seed++)
+            {
+                var p = SewerPlan.Make(seed, 2, new UnityEngine.Vector2(30.4f, -11f));
+                foreach (var s in p.Segments)
+                {
+                    if (s.Door == 0) continue;
+                    doors++;
+                    Assert.AreEqual(-s.Door, s.LampSide, $"seed {seed}: the segment's lamp across from the doorway");
+                    Assert.IsFalse(s.LampBroken, $"seed {seed}: and whole");
+                }
+            }
+            Assert.Greater(doors, 30);
+        }
     }
 }
