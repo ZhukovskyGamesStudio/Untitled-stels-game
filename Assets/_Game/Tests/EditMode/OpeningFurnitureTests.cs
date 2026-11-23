@@ -37,14 +37,11 @@ namespace Stealth.Tests
         [Test]
         public void WhatOpensHasRoomToOpen() => Check(TestHouses.Sample);
 
-        [Test, Category("Slow")]
+        [Test]
         public void WhatOpensHasRoomToOpenInEveryKindOfHouse()
         {
-            var houses = new List<LevelLayout>();
-            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
-                for (int level = 1; level <= 5; level += 2)
-                    houses.Add(TestHouses.Get(HouseKinds.SeedOf(kind, 11 + level, level), level));
-            Check(houses);
+            // a house of every kind at 1 and 3: the houses the map terminals and the light are checked on too
+            Check(TestHouses.Kinds(1, 3).Select(k => k.layout).ToList());
         }
 
         [Test]

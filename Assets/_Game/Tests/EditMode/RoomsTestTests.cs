@@ -51,7 +51,6 @@ namespace Stealth.Tests
             Assert.Greater(main.Styles.Styles.Length, 1, "the main game has all the styles (F8)");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void HousesHaveEveryRoomTypeOnOneFloorAndOnlyWorkers()
         {
@@ -60,11 +59,13 @@ namespace Stealth.Tests
             Assert.IsTrue(level.Building.EveryRoomType);
             Assert.AreEqual(0, level.Building.RoomCountMin + level.Building.RoomCountMax, "no room count limits: the house is as big as its rooms");
             Assert.AreEqual(0f, level.Building.RoomAreaMin + level.Building.RoomAreaMax, "no size limits but each type's own");
-            for (int seed = 1; seed <= 6; seed++)
+            TestHouses.Many(from seed in Enumerable.Range(1, 4) from house in Enumerable.Range(0, 3) from players in new[] { 1, 4 }
+                select TestHouses.RoomsTestSpec(seed - 1, house, players)); // (made at once)
+            for (int seed = 1; seed <= 4; seed++)
                 for (int house = 0; house < 3; house++)
                     for (int players = 1; players <= 4; players += 3)
                     {
-                        var l = LevelGenerator.Generate(seed * 7919 + house, house, level.Building, level.Security, players, level.Features);
+                        var l = TestHouses.RoomsTest(seed - 1, house, players);
                         string at = $"seed {seed} house {house} players {players}";
                         foreach (var t in RoomRules.Programmed)
                             Assert.IsTrue(l.Rooms.Any(r => r.Type == t), $"{at}: a {t}");
@@ -85,7 +86,7 @@ namespace Stealth.Tests
             int withCorridor = 0, houses = 0;
             for (int seed = 1; seed <= 10; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 104729, 0, level.Building, level.Security, 1, level.Features);
+                var l = TestHouses.RoomsTest(seed - 1);
                 houses++;
                 if (BuildingSettings.CountJoiningCorridors(l) > 0) withCorridor++;
                 foreach (var r in l.Rooms)

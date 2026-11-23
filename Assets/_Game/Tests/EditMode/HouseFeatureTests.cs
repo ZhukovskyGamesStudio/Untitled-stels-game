@@ -103,7 +103,6 @@ namespace Stealth.Tests
             Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {
@@ -111,7 +110,7 @@ namespace Stealth.Tests
             // wardens are the old enemies' (LevelGenerator.ClassicEnemies)
             foreach (var (seed, level) in TestHouses.SampleKeys)
             {
-                var l = LevelGenerator.Generate(seed, level, null, null, 1, null, false, true);
+                var l = TestHouses.Make(seed, level, null, null, 1, null, false, true);
                 foreach (var w in l.Wardens)
                 {
                     wardens++;

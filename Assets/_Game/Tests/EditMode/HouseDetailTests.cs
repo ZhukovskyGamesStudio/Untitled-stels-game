@@ -21,13 +21,8 @@ namespace Stealth.Tests
 
         static LevelLayout Block()
         {
-            for (int seed = 1; seed < 400; seed++)
-            {
-                int house = seed % 5;
-                if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
-                var l = TestHouses.Get(seed, house);
+            foreach (var l in TestHouses.First(HouseKind.Apartments, 8, seed => seed % 5)) // (the apartment tests' blocks first)
                 if (l.Plan.Balconies.Count > 0) return l;
-            }
             Assert.Fail("no apartment block with balconies");
             return null;
         }

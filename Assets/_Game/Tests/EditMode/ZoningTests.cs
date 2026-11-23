@@ -9,6 +9,9 @@ namespace Stealth.Tests
     /// <summary>Zoning: work rooms on the facade, service rooms inside, toilets by the stairs, themed rooms capped.</summary>
     public class ZoningTests
     {
+        /// <summary>Houses of the classic plan generator to measure (the first of the shared set's keys).</summary>
+        const int ClassicHouses = 12;
+
         [Test]
         public void ATypeScoresBestInItsZone()
         {
@@ -31,16 +34,13 @@ namespace Stealth.Tests
             Assert.AreEqual(1, RoomRules.For(RoomType.Infirmary, new BuildingSettings().RoomTypeRules).PerHouse, "the settings it came from keep theirs");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [TestCase(false)]
         [TestCase(true)]
         public void RoomsThatBelongTogetherAreNextDoor(bool classic)
         {
             int kitchens = 0, kitchenGood = 0, naps = 0, napNoisy = 0;
-            for (int seed = 1; seed <= 16; seed++)
-                for (int house = 1; house < 5; house += 2)
+            foreach (var l in TestHouses.Offices(classic ? ClassicHouses : TestHouses.OfficeCount, classic))
                 {
-                    var l = LevelGenerator.Generate(seed * 6007 + house, house, null, null, 2, null, classic);
                     if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own, no open space (PlanGenerator.Garage/Hospital)
                     var plan = l.Plan;
                     bool Touches(PlanRoom r, params RoomType[] types) => plan.Walls.Any(w => w.Length >= 1f && w.RoomA >= 0 && w.RoomB >= 0
@@ -56,16 +56,13 @@ namespace Stealth.Tests
             Assert.That(napNoisy, Is.LessThanOrEqualTo(naps / 10), $"nap rooms next to noise: {napNoisy} of {naps}");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [TestCase(false)]
         [TestCase(true)]
         public void HousesAreZonedAndCapped(bool classic)
         {
             int work = 0, workDark = 0, service = 0, serviceIn = 0, wc = 0, wcCore = 0;
-            for (int seed = 1; seed <= 16; seed++)
-                for (int house = 0; house < 5; house += 2)
+            foreach (var l in TestHouses.Offices(classic ? ClassicHouses : TestHouses.OfficeCount, classic))
                 {
-                    var l = LevelGenerator.Generate(seed * 7727 + house, house, null, null, 2, null, classic);
                     if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own (PlanGenerator.Garage/Hospital): its zones are its layout
                     var plan = l.Plan;
                     bool garage = l.Kind == HouseKind.Garage; // the repair shop lays out its rooms by hand: caps hold, zones are its own
@@ -89,7 +86,7 @@ namespace Stealth.Tests
                                                    && plan.Rooms[w.RoomA == r.Id ? w.RoomB : w.RoomA].Type == RoomType.Hall);
                         if (core) wcCore++;
                     }
-                    string at = $"seed {seed} house {house} ({l.Kind})";
+                    string at = $"seed {l.Seed} house {l.LevelIndex} ({l.Kind})";
                     foreach (var kv in inHouse)
                     {
                         var rule = RoomRules.For(kv.Key, rules);

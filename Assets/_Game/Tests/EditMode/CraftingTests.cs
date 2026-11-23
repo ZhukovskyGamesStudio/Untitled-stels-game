@@ -241,7 +241,7 @@ namespace Stealth.Tests
         [Test]
         public void TheHammerOnlyBreaksAnOpenBitOfAnUpperFloor()
         {
-            var l = LevelGenerator.Generate(7, 4);
+            var l = TestHouses.Make(7, 4);
             Assert.IsFalse(FloorHoles.CanBreak(l, 0, new RectInt(10, 10, 2, 2)), "not the ground floor");
             int found = 0;
             for (int f = 1; f < l.Floors && found == 0; f++)
@@ -281,7 +281,7 @@ namespace Stealth.Tests
         [Test]
         public void TheExtrasLieOnFreeSpots()
         {
-            var l = LevelGenerator.Generate(7, 3);
+            var l = TestHouses.Make(7, 3);
             var loot = LootPlanner.Plan(l, new System.Random(1));
             var spots = LootPlanner.Extras(l, new System.Random(2), 4, loot, 0.5f);
             Assert.AreEqual(4, spots.Count);

@@ -16,7 +16,7 @@ namespace Stealth.Tests
     {
         static IEnumerable<LevelLayout> Houses()
         {
-            for (int k = 0; k < 16; k++) yield return LevelGenerator.Generate(7001 + k * 131, k % 5, null, null, 1 + k % 3);
+            foreach (var l in TestHouses.Corpus(16)) yield return l;
         }
 
         [Test]
@@ -28,7 +28,6 @@ namespace Stealth.Tests
             Assert.Greater(LevelMetrics.LandingEnd - 0.12f, 0.9f, "the landing is wide enough to turn on");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheDuctsLeadFromTheLobbyToTheExitRoom()
         {
@@ -49,7 +48,6 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void MostRoomsHaveAGrateAndEveryGrateIsOnTheNetwork()
         {
@@ -71,7 +69,6 @@ namespace Stealth.Tests
             Assert.Greater(grated, rooms * 0.6f, $"{grated} of {rooms} rooms have a grate");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheDuctsRunOnlyWhereThereIsAVoid()
         {
@@ -96,7 +93,6 @@ namespace Stealth.Tests
             Assert.AreEqual(1, ArchitecturePlanner.CutHoles(Vector2.zero, Vector2.one, new List<Rect> { new Rect(5f, 5f, 1f, 1f) }).Count, "a hole elsewhere leaves it whole");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void NoGrateCutsIntoACeilingLamp()
         {
@@ -151,7 +147,6 @@ namespace Stealth.Tests
             finally { Object.DestroyImmediate(ceiling); }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void SomeGratesHaveAWayUpButNeverTheFirstRoom()
         {

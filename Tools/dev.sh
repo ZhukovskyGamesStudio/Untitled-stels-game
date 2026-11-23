@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Dev loop helpers (Git Bash on Windows). Usage:
-#   Tools/dev.sh tests            compile + EditMode tests without the [Category("Slow")] ones (SLOW=1: all of them;
-#                                FILTER=<name>: only those, slow or not)
+#   Tools/dev.sh tests            compile + every EditMode test (FILTER=<name>: only those). With the editor open (its MCP
+#                                bridge answers on port 6400) they run there, no second Unity is started; BATCH=1: batchmode anyway
 #   Tools/dev.sh plans            pictures of floor plans: Logs/plans/plan_<seed>_<house>.png
 #   Tools/dev.sh assets           build missing assets (FORCE=1: regenerate everything from code)
 #   Tools/dev.sh player           build Windows player
 #   Tools/dev.sh run <scenario> [clients]   run the build with -autotest <scenario> (SEEDS=7,42,3: one window per seed, at once)
 #   Tools/dev.sh cycle           ONE Unity launch: missing assets + EditMode tests + development player (scripts only when
-#                                only code changed). FILTER / SLOW / FORCE / REBUILD as above; NOASSETS / NOTESTS / NOPLAYER / FULL = 1
+#                                only code changed). FILTER / FORCE / REBUILD as above; NOASSETS / NOTESTS / NOPLAYER / FULL = 1
 set -u
 UNITY="${UNITY:-/d/Apps/Unity/Hub/Editor/6000.6.0f1/Editor/Unity.exe}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,11 +17,19 @@ mkdir -p "$LOGS"
 
 case "${1:-}" in
   tests)
+    if [ -z "${BATCH:-}" ] && python "$ROOT/Tools/unity_mcp.py" ping >/dev/null 2>&1; then
+      # the editor is open (batchmode would not start): compile there, then its test runner
+      echo "the editor is open: the tests run in it (BATCH=1 to close it and use batchmode)"
+      python "$ROOT/Tools/unity_mcp.py" refresh_unity '{"mode":"force","scope":"all","compile":"request"}' >/dev/null 2>&1
+      sleep 3
+      for i in $(seq 1 120); do python "$ROOT/Tools/unity_mcp.py" ping >/dev/null 2>&1 && break; sleep 1; done   # (the bridge is down while it reloads)
+      python "$ROOT/Tools/unity_mcp.py" read_console '{"action":"get","types":["error"],"count":50}' 2>/dev/null | grep -o 'error CS[^"\\]*' | sort -u | head -30
+      GROUP=1 "$ROOT/Tools/unity_test.sh" "${FILTER:-Stealth.Tests}"
+      exit $? ;
+    fi
     rm -f "$LOGS/tests.xml"
-    category=()
-    [ -z "${FILTER:-}" ] && [ "${SLOW:-}" != "1" ] && category=(-testCategory '!Slow')
     "$UNITY" -batchmode -nographics -projectPath "$P" -runTests -testPlatform EditMode \
-      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log" ${FILTER:+-testFilter "$FILTER"} "${category[@]}"
+      -testResults "$P/Logs/tests.xml" -logFile "$P/Logs/tests.log" ${FILTER:+-testFilter "$FILTER"}
     code=$?
     grep -E "error CS" "$LOGS/tests.log" | sort -u | head -30
     PYTHONIOENCODING=utf-8 python - "$LOGS/tests.xml" <<'EOF'

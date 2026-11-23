@@ -79,9 +79,14 @@ namespace Stealth.Level
             m_Keep[floor].Query(probe, m_Probe);
             if (m_Probe.Count == 0) return t + 0.25f;
             float far = t;
+            var s0 = new Vector3(start.x, 0, start.z);
             foreach (var r in m_Probe)
-                foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
-                    far = Mathf.Max(far, Vector3.Dot(c - new Vector3(start.x, 0, start.z), u));
+            {
+                far = Mathf.Max(far, Vector3.Dot(new Vector3(r.xMin, 0, r.yMin) - s0, u));
+                far = Mathf.Max(far, Vector3.Dot(new Vector3(r.xMax, 0, r.yMin) - s0, u));
+                far = Mathf.Max(far, Vector3.Dot(new Vector3(r.xMin, 0, r.yMax) - s0, u));
+                far = Mathf.Max(far, Vector3.Dot(new Vector3(r.xMax, 0, r.yMax) - s0, u));
+            }
             // the next group's footprint must keep the commit's gap (4 cm) from it
             return Mathf.Max(t + 0.05f, far + 0.05f);
         }
@@ -151,15 +156,21 @@ namespace Stealth.Level
             foreach (var p in b.Pieces)
             {
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
-                foreach (var c in new[] { new Vector3(r.xMin, 0, r.yMin), new Vector3(r.xMax, 0, r.yMin), new Vector3(r.xMin, 0, r.yMax), new Vector3(r.xMax, 0, r.yMax) })
-                    for (float d = 0f; d <= walk + Facing + 0.01f; d += 0.25f)
-                    {
-                        var q = c + n * d;
-                        if (d <= walk + 0.01f && !InRoom(room.Floor, room.Id, q.x, q.z)) return false;
-                        if (d > 0.2f && m_Taken[room.Floor].Contains(new Vector2(q.x, q.z))) return false;
-                    }
+                if (!Clear(new Vector3(r.xMin, 0, r.yMin)) || !Clear(new Vector3(r.xMax, 0, r.yMin))
+                    || !Clear(new Vector3(r.xMin, 0, r.yMax)) || !Clear(new Vector3(r.xMax, 0, r.yMax))) return false;
             }
             return true;
+
+            bool Clear(Vector3 c)
+            {
+                for (float d = 0f; d <= walk + Facing + 0.01f; d += 0.25f)
+                {
+                    var q = c + n * d;
+                    if (d <= walk + 0.01f && !InRoom(room.Floor, room.Id, q.x, q.z)) return false;
+                    if (d > 0.2f && m_Taken[room.Floor].Contains(new Vector2(q.x, q.z))) return false;
+                }
+                return true;
+            }
         }
 
         /// <summary>One group along a wall, laid out from the wall's face (u along it from 0 to the returned width, n into the room).</summary>

@@ -22,7 +22,6 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void PrivateRoomsLieDeeperThanPublicOnes()
         {
@@ -31,11 +30,9 @@ namespace Stealth.Tests
             float robots = 0, rooms = 0;
             int nr = 0, nrooms = 0;
             int offices = 0;
-            for (int seed = 1; offices < 40 && seed <= 240; seed++)
+            foreach (var l in TestHouses.Offices()) // (a location's plan has its rooms where its layout puts them)
             {
-                if (HouseKinds.OwnPlan(HouseKinds.Of(seed * 3571, 3))) continue; // a plan of its own: its rooms where its layout has them
                 offices++;
-                var l = LevelGenerator.Generate(seed * 3571, 3);
                 foreach (var r in l.Rooms)
                 {
                     int privacy = RoomRules.For(r.Type, l.RoomRules).Privacy;
@@ -53,7 +50,8 @@ namespace Stealth.Tests
                     nr++;
                 }
             }
-            Assert.That(priv / nv, Is.GreaterThan(pub / np + 0.05f), $"private rooms {priv / nv:0.00} deep, public {pub / np:0.00}");
+            Assert.That(offices, Is.GreaterThanOrEqualTo(15), "offices to measure");
+            Assert.That(priv / nv, Is.GreaterThan(pub / np + 0.05f), $"private rooms {priv / nv:0.00} deep, public {pub / np:0.00} ({offices} offices)");
             // (measured over 40 offices after the locations came: the weight keeps the guards about as deep as the rooms, not
             // clearly deeper — SecuritySettings.DeepRoomWeight is a balance question; the check keeps them from the shallow end)
             Assert.That(robots / Mathf.Max(1, nr), Is.GreaterThan(rooms / nrooms - 0.03f), $"guards {robots / Mathf.Max(1, nr):0.00} deep, rooms {rooms / nrooms:0.00}");

@@ -95,7 +95,7 @@ namespace Stealth.Tests
                 int house = seed % 5;
                 if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
                 found++;
-                yield return LevelGenerator.Generate(seed, house, b);
+                yield return TestHouses.Make(seed, house, b);
             }
         }
 
