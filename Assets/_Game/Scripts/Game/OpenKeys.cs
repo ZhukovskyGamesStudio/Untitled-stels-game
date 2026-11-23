@@ -3,7 +3,7 @@ namespace Stealth
     /// <summary>What a key of the house's replicated state (<see cref="IWorldState.IsOpened"/>) is about.</summary>
     public enum OpenKind : byte
     {
-        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage,
+        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage, Ajar,
     }
 
     /// <summary>The stages of a house's main job kept with the opened things (<see cref="OpenKind.Stage"/>).</summary>
@@ -36,6 +36,11 @@ namespace Stealth
         public static int Terminal(int terminal, int use) => Of(OpenKind.Terminal, terminal * TerminalUses + use);
         /// <summary>An open drawer / locker door (prop index in the layout, part of it).</summary>
         public static int Storage(int prop, int part) => Of(OpenKind.Storage, StoragePart(prop, part));
+        /// <summary>
+        /// A drawer left ajar (prop, part): it was looked through and found empty, then pushed back by another of its column
+        /// being opened — it stays a little out, so a searched drawer is told from an untouched one at a glance.
+        /// </summary>
+        public static int Ajar(int prop, int part) => Of(OpenKind.Ajar, StoragePart(prop, part));
         /// <summary>A storage part as one number (a prop and its drawer or door: the index of <see cref="Stealth.Level.UseKind.StoragePart"/>).</summary>
         public static int StoragePart(int prop, int part) => prop * StorageParts + part;
         /// <summary>The prop and the part of <see cref="StoragePart"/>.</summary>

@@ -386,10 +386,21 @@ namespace Stealth.EditorTools
             holder.SetActive(false);
             // the beam from the flashlight's lens in the view
             var beam = Lamp(head.transform, "Flashlight", new Vector3(0.15f, -0.19f, 0.48f), Quaternion.identity, LightType.Spot,
-                new Color(1f, 0.93f, 0.8f), 6f, 16f, LightShadows.Soft);
+                new Color(1f, 0.93f, 0.8f), 8f, 18f, LightShadows.Soft);
             beam.spotAngle = 55f;
-            beam.innerSpotAngle = 22f;
+            beam.innerSpotAngle = 16f; // (a soft beam: a bright middle, fading out to its edge — no hard-edged disc on a wall)
             beam.enabled = false;
+            beam.cullingMask = ~(1 << PlayerController.OwnBodyLayer); // no shadows of its owner's own body in the beam from his head
+            // a faint light round the eyes, only for the player's own view and only where the style asks (StyleWorld.EyeGlow):
+            // no shadows, no LightSource — robots do not see by it
+            // (behind the eyes: what is in the hand, a span from the camera, is not burnt out by it)
+            var eyeGlow = Child(head.transform, "EyeGlow", new Vector3(0f, 0.1f, -0.6f)).AddComponent<Light>();
+            eyeGlow.type = LightType.Point;
+            eyeGlow.color = new Color(0.92f, 0.96f, 1f);
+            eyeGlow.intensity = 0.09f;
+            eyeGlow.range = 3.2f;
+            eyeGlow.shadows = LightShadows.None;
+            eyeGlow.enabled = false;
 
             var motor = root.AddComponent<PlayerMotor>();
             root.AddComponent<PlayerInventory>();
@@ -401,6 +412,7 @@ namespace Stealth.EditorTools
             pc.Camera = cam;
             pc.Listener = listener;
             pc.Flashlight = beam;
+            pc.EyeGlow = eyeGlow;
             pc.ViewFlashlight = view;
             pc.HeldMap = held;
             pc.HeldThing = thingMesh;
@@ -666,8 +678,24 @@ namespace Stealth.EditorTools
             gate.EmitterA = Emitter("EmitterA", 90f);
             gate.EmitterB = Emitter("EmitterB", -90f);
             gate.Beams = Enumerable.Range(0, 3)
-                .Select(i => Cube(root.transform, $"Beam{i}", new Vector3(0, 1f, 0), new Vector3(1.8f, LaserGate.BeamThickness, LaserGate.BeamThickness), M("Laser"), false).transform)
+                .Select(i => Cube(root.transform, $"Beam{i}", new Vector3(0, 1f, 0), new Vector3(1.8f, LaserGate.BeamThickness, LaserGate.BeamThickness), M("LaserCore"), false).transform)
                 .ToArray();
+            // a beam of light, not a painted rod: two crossed sheets of soft glow along each core (children of the beam:
+            // they stretch with it — the gate scales its length — and hide with it), 13 cm across
+            foreach (var beam in gate.Beams)
+                for (int k = 0; k < 2; k++)
+                {
+                    var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    Object.DestroyImmediate(q.GetComponent<Collider>());
+                    q.name = k == 0 ? "GlowUp" : "GlowFlat";
+                    q.transform.SetParent(beam, false);
+                    q.transform.localRotation = Quaternion.Euler(k * 90f, 0f, 0f);
+                    q.transform.localScale = new Vector3(1f, 0.13f / LaserGate.BeamThickness, 1f);
+                    var r = q.GetComponent<MeshRenderer>();
+                    r.sharedMaterial = M("LaserGlow");
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    r.receiveShadows = false;
+                }
             return root;
         }
 

@@ -10,7 +10,9 @@ ladder, opening 1.5 m: 3 x 3 plan cells, Basement.ShaftHalf). The frame: origin 
 Bolts (dark), and for the exit EyeLamp (four corner lamps, the hatch's colour). The lid:
 origin on its hinge line, the plate running from it along -Y (Unity +Z) — the builder hangs it on a hinge transform;
 parts Lid, Ribs, Handle, Knuckles. Both faces of the frame's lip and the lid's underside are closed (seen from the
-basement's ladder looking up).
+basement's ladder looking up); the underside is a lid's too, not a blank sheet: a welded frame of angle bars inside the
+opening, two diagonal braces and a grab bar at the free edge (it is what a climber looks at all the way up the shaft,
+and what faces the room while the lid stands open).
 """
 import os
 import sys
@@ -70,6 +72,17 @@ def lid(kind):
     for i in range(5):                                       # tread ribs across the plate (diagonal tread reads as noise)
         y = -0.18 - i * (side - 0.36) / 4
         ribs.append(s.rbox((side - 0.16, 0.035, 0.012), (0, y, LID_T + 0.005), r=0.004, seg=1))
+    # the underside: a frame of angle bars just inside the opening (the lid overlaps the lip by `lip`), a bar across
+    # the middle and two braces; they sink 5 mm into the plate
+    inner, deep, bar_w = half - 0.05, 0.03, 0.04
+    mid_y = -side / 2
+    for y in (mid_y - inner + bar_w / 2, mid_y, mid_y + inner - bar_w / 2):
+        ribs.append(s.rbox((2 * inner, bar_w, deep + 0.005), (0, y, -deep / 2 + 0.0025), r=0.004, seg=1))
+    for x in (-inner + bar_w / 2, inner - bar_w / 2):
+        ribs.append(s.rbox((bar_w, 2 * inner - 2 * bar_w + 0.01, deep + 0.002), (x, mid_y, -deep / 2 + 0.003), r=0.004, seg=1))
+    for sg, d in ((-1, deep - 0.006), (1, deep - 0.009)):         # (each bar its own depth: no two faces in one plane)
+        ribs.append(s.rbox((0.03, inner * 1.25, d + 0.003), (sg * inner * 0.5, mid_y, -d / 2 + 0.0015), r=0.003, seg=1,
+                           rot=(0, 0, sg * 0.78)))
     s.part("Ribs", ribs)
     # the lifting bar in a recess at the free edge (a pocket plate under it, the bar across on two posts)
     hy = -side + 0.1
@@ -77,6 +90,11 @@ def lid(kind):
               s.rcyl(0.011, 0.26, (0, hy, LID_T + 0.03), axis="X", seg=12, r=0.003)]
     for x in (-0.12, 0.12):
         handle.append(s.rcyl(0.009, 0.03, (x, hy, LID_T + 0.016), seg=10, r=0.002))
+    # the grab bar under the lid (pushed up from the ladder), clear of the frame bar beside it
+    gy = -side + lip + 0.2
+    handle.append(s.rcyl(0.011, 0.3, (0, gy, -0.06), axis="X", seg=12, r=0.003))
+    for x in (-0.14, 0.14):
+        handle.append(s.rcyl(0.009, 0.068, (x, gy, -0.028), seg=10, r=0.002))
     s.part("Handle", handle)
     knuckles = [s.rcyl(0.018, 0.14, (x, 0.0, LID_T / 2), axis="X", seg=14, r=0.003) for x in (-half + 0.18, half - 0.18)]
     s.part("Knuckles", knuckles)

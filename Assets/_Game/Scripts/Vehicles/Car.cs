@@ -432,7 +432,33 @@ namespace Stealth.Vehicles
                 Body.localRotation = Quaternion.Slerp(Body.localRotation, Quaternion.Euler(pitch, 0f, -roll), 1f - Mathf.Exp(-6f * dt));
             }
             const bool lights = true; // high beams on all the time: the sewer is pitch dark
-            if (Headlights != null) foreach (var l in Headlights) if (l != null && l.enabled != lights) l.enabled = lights;
+            if (Headlights == null) return;
+            // (their strength as built, without the style's visual scale: LightSource writes that over the light)
+            m_HeadlightFull ??= System.Array.ConvertAll(Headlights, l => l == null ? 0f : l.TryGetComponent<Stealth.Level.LightSource>(out var source) ? source.RawIntensity : l.intensity);
+            m_HeadlightNow ??= (float[])m_HeadlightFull.Clone();
+            for (int i = 0; i < Headlights.Length; i++)
+            {
+                var l = Headlights[i];
+                if (l == null) continue;
+                if (l.enabled != lights) l.enabled = lights;
+                // close to a wall the beam dims (CarLook.Headlight): what it shines at is never burnt out
+                float want = CarLook.Headlight(m_HeadlightFull[i], AheadOf(l.transform, s.HeadlightReach), s.HeadlightGlare);
+                m_HeadlightNow[i] = Mathf.Lerp(m_HeadlightNow[i], want, 1f - Mathf.Exp(-s.HeadlightEase * dt));
+                l.intensity = m_HeadlightNow[i];
+            }
+        }
+
+        float[] m_HeadlightFull, m_HeadlightNow;
+        static readonly RaycastHit[] s_Ahead = new RaycastHit[8];
+
+        /// <summary>How far before a lamp the first thing it shines at is (not the car itself, not a trigger), or infinity within <paramref name="reach"/>.</summary>
+        float AheadOf(Transform lamp, float reach)
+        {
+            int n = Physics.RaycastNonAlloc(lamp.position, lamp.forward, s_Ahead, reach, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.PositiveInfinity;
+            for (int i = 0; i < n; i++)
+                if (!s_Ahead[i].collider.transform.IsChildOf(transform) && s_Ahead[i].distance < nearest) nearest = s_Ahead[i].distance;
+            return nearest;
         }
 
         void Sound()

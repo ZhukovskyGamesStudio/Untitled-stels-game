@@ -12,7 +12,7 @@ namespace Stealth.Level
         public const int Furniture = 0xF0E, StorageRoom = 0x5702, RaisedVents = 0x4856, Terminals = 0x7E41, Locks = 0x10C4;
         public const int ChargingRoom = 0xC4A6, Wards = 0x3A2D, Vents = 0x7E47, VentLids = 0x6A7E, VentClimbs = 0xC1B;
         public const int Utilities = 0x51E7, City = 0xC17E, CityDetail = 0xC1D7, Decor = 0x0DECA7, StreetDoors = 0xD00E;
-        public const int Railings = 0x57A1, StairLooks = 0x57A3, PropVariants = 0x7A21, SpiderWebs = 0x5E8;
+        public const int Railings = 0x57A1, StairLooks = 0x57A3, PropVariants = 0x7A21, SpiderWebs = 0x5E8, Screens = 0x5C4E;
         // the special places and the main job
         public const int ShelterMap = 0x3A9E, HideRoom = 0x41DE, KeyDoors = 0x6E7D, Crates = 0xC7A7, CrateContents = 0xC7A8;
         public const int PointOfInterest = 0x9017, Wardens = 0x3A7D, Reinforcements = 0x4E1F;

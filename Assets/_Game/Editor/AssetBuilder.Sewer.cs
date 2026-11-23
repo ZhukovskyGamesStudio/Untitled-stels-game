@@ -606,7 +606,7 @@ namespace Stealth.EditorTools
                 Lamp(root.transform, "HeadlightL", new Vector3(-0.7f, 0.92f, 2.55f), Quaternion.Euler(2f, -4f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 45f, 65f),
                 Lamp(root.transform, "HeadlightR", new Vector3(0.7f, 0.92f, 2.55f), Quaternion.Euler(2f, 4f, 0f), LightType.Spot, new Color(1f, 0.95f, 0.85f), 45f, 65f),
             };
-            foreach (var l in car.Headlights) { l.spotAngle = 72f; l.innerSpotAngle = 34f; }
+            foreach (var l in car.Headlights) { l.spotAngle = 72f; l.innerSpotAngle = 10f; } // (a soft beam: bright in its middle, fading all the way out — a wide inner cone drew a hard-edged disc on a wall)
             // the dome light in the cab (car.py dome_light: under the roof over the seats' middle, Unity z = −Blender y): a warm
             // glow over the seats and the dashboard, always on like the beams; no shadows, too weak to matter outside the cab
             car.DomeLight = Lamp(car.Body, "DomeLight", new Vector3(0f, 1.69f, 0.14f) - car.Body.localPosition, Quaternion.identity, LightType.Point, new Color(1f, 0.86f, 0.62f), 1.4f, 2.4f);

@@ -23,6 +23,9 @@ namespace Stealth.Level
         /// <summary>How bright the glowing lamp diffusers look in the current style (<see cref="Configs.StyleWorld.LampGlow"/>). Visual only.</summary>
         public static float GlowScale = 1f;
 
+        /// <summary>The soft look of the ceiling lamps in the current style (<see cref="Configs.StyleWorld.CeilingGlow"/>): 0 none. Visual only.</summary>
+        public static float CeilingGlow;
+
         Light m_Light;
         float m_Raw = -1f;      // the intensity the game set (lamp logic, flicker, alarm)
         float m_Shown = -1f;    // what we wrote into the light for the eye

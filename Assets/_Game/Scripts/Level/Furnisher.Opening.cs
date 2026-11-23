@@ -7,7 +7,9 @@ namespace Stealth.Level
     /// The furnisher: furniture that opens (see <see cref="Furnisher"/>). A cupboard's doors and a chest's drawers need the
     /// strip of floor in front of them (<see cref="SwingAt"/>): it stays the room's own floor — such a piece never stands
     /// with its front to a wall — and free of other furniture, and nothing is put there later; two such pieces never open
-    /// into each other. Chairs and bins do not count: one shoves them aside.
+    /// into each other. Chairs and bins do not count: one shoves them aside. The same strip is kept before what is looked
+    /// at from its front (<see cref="Faced"/>: a logo totem, a kiosk, a board on a stand): a totem at the end of one wall
+    /// stood with its screen a hand's breadth from the side of the lockers on the next.
     /// </summary>
     public sealed partial class Furnisher
     {
@@ -24,6 +26,16 @@ namespace Stealth.Level
             PropKind.FilingCabinet, PropKind.FilePedestal, PropKind.ExecutiveDesk, PropKind.NightTable,
         };
 
+        /// <summary>Standing pieces with a face to be seen (their front, the model's +Z): it keeps a strip of floor clear before it, like a cupboard's doors.</summary>
+        public static readonly HashSet<PropKind> Faced = new()
+        {
+            PropKind.LogoTotem, PropKind.InfoKiosk, PropKind.DirectoryBoard, PropKind.Flipchart, PropKind.MobileWhiteboard, PropKind.MapBoard,
+            PropKind.VendingMachine, PropKind.Jukebox, PropKind.DisplayCase, PropKind.MagazineRack,
+        };
+
+        /// <summary>The piece keeps the floor before its front clear: it opens there, or it is looked at from there.</summary>
+        public static bool NeedsFront(PropKind k) => Opens.Contains(k) || Faced.Contains(k);
+
         /// <summary>Things one shoves aside to get at a door or a drawer: they may stand in front of it.</summary>
         static readonly HashSet<PropKind> Shoved = new()
         {
@@ -32,11 +44,11 @@ namespace Stealth.Level
         };
 
         /// <summary>
-        /// How far a piece opens in front of itself, metres: a drawer's travel (Items.StorageMath.DrawerTravel 0.32) and a
+        /// How far a piece opens in front of itself, metres: a drawer's travel (Items.StorageMath.DrawerTravel 0.38) and a
         /// narrow door's leaf with a little to spare; the wide leaves of a wardrobe, a fridge, a pantry and lockers reach further.
         /// </summary>
         public static float OpenReach(PropKind k) =>
-            k is PropKind.Wardrobe or PropKind.Fridge or PropKind.PantryCabinet or PropKind.Lockers ? 0.55f : 0.45f;
+            k is PropKind.Wardrobe or PropKind.Fridge or PropKind.PantryCabinet or PropKind.Lockers ? 0.55f : Faced.Contains(k) ? 0.7f : 0.45f;
 
         /// <summary>The strip of floor a placed piece opens into (world x/z): as wide as the piece, <see cref="OpenReach"/> deep in front of it.</summary>
         public static Rect SwingAt(PropKind k, Vector3 p, float yaw)
@@ -148,7 +160,7 @@ namespace Stealth.Level
             var r = FootAt(k, p, yaw);
             if (BlocksLow(k)) m_LowAt[f].Add(r);
             if (BlocksHigh(k)) m_HighAt[f].Add(r);
-            if (Opens.Contains(k)) (OpensHigh(k) ? m_SwingHigh : m_SwingLow)[f].Add(SwingAt(k, p, yaw));
+            if (NeedsFront(k)) (OpensHigh(k) ? m_SwingHigh : m_SwingLow)[f].Add(SwingAt(k, p, yaw));
         }
 
         /// <summary>After groups were taken out: the same from the furniture that is left.</summary>
@@ -178,7 +190,7 @@ namespace Stealth.Level
                 var r = FootAt(p.Kind, p.Pos, p.Yaw);
                 if (BlocksLow(p.Kind) && m_SwingLow[f].Overlaps(r)) return false;
                 if (BlocksHigh(p.Kind) && m_SwingHigh[f].Overlaps(r)) return false;
-                if (!Opens.Contains(p.Kind)) continue;
+                if (!NeedsFront(p.Kind)) continue;
                 bool high = OpensHigh(p.Kind);
                 var s = SwingAt(p.Kind, p.Pos, p.Yaw);
                 if (!OnFloor(f, room.Id, s, WallClear)) return false;
@@ -189,7 +201,7 @@ namespace Stealth.Level
                     var q = b.Pieces[j];
                     if (!BlocksOpening(p.Kind, q.Kind)) continue;
                     if (FootAt(q.Kind, q.Pos, q.Yaw).Overlaps(s)) return false;
-                    if (j > i && Opens.Contains(q.Kind) && BlocksOpening(q.Kind, p.Kind) && SwingAt(q.Kind, q.Pos, q.Yaw).Overlaps(s)) return false;
+                    if (j > i && NeedsFront(q.Kind) && BlocksOpening(q.Kind, p.Kind) && SwingAt(q.Kind, q.Pos, q.Yaw).Overlaps(s)) return false;
                 }
             }
             return true;

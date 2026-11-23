@@ -370,7 +370,7 @@ namespace Stealth.Game
                 break;
             }
             // the other kinds of door trim (pilasters, casings with panels or a cornice): the same doorways from the front
-            foreach (var name in new[] { "S03_Heist", "S02_Scrapyard", "S15_Blueprint", "S11_Noir" })
+            foreach (var name in new[] { "S16_Derelict" })
             {
                 var style = VisualStyles.Find(name);
                 if (style == null) continue;

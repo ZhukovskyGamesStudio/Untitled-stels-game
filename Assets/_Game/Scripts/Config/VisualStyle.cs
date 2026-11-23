@@ -255,6 +255,14 @@ namespace Stealth.Configs
         public float LightScale = 1f;
         [Tooltip("How bright the glowing lamp diffusers look (1 = as they are), apart from the light they cast. Visual only")]
         public float LampGlow = 1f;
+        [Tooltip("The soft look of a ceiling lamp (0 = none: a flat glowing panel): a hot middle on each diffuser fading to its edges, and a pool of light on the ceiling round the fixture, fading out. 1 = full. Visual only (no light is cast)")]
+        public float CeilingGlow;
+        [Tooltip("A faint light round the player's own eyes, its strength (0 = none): what is right before the player — the inside of a drawer, a corner in his own shadow — is never pitch black. Only its owner sees it; robots do not (visual only)")]
+        public float EyeGlow;
+        [Tooltip("How far the light round the eyes reaches, metres")]
+        public float EyeGlowRange = 2.2f;
+        [Tooltip("Under the ground (the sewer, the basement) the lamps look this many times brighter than LightScale makes them: a style with a low exposure for its rooms keeps its tunnels lit. Visual only")]
+        public float UndergroundLights = 1f;
 
         [Header("Outside (visual only: the gas in the air still hurts where it did)")]
         [Tooltip("The world outside: a latitude-longitude panorama imported as a cubemap, seen above the gas (doors, windows). Empty = no sky")]

@@ -401,8 +401,11 @@ namespace Stealth.EditorTools
                     if (wood) SetPbr(m, $"{ExternalTextures}/dark_wood", Color.white);
                     else if (fabric) SetPbr(m, $"{ExternalTextures}/dirty_carpet", Saturate(c, 1f, 1.5f));
                     else if (pot) SetPbr(m, $"{ExternalTextures}/concrete_floor_01", c * 1.3f);
-                    else if (metal) SetPbr(m, $"{ExternalTextures}/metal_plate", c * 1.6f);
-                    else if (painted) SetPbr(m, $"{ExternalTextures}/painted_metal_shutter", c * 1.5f);
+                    // Bare metal and painted furniture keep their own colour, smooth: no scan fits them. The ones tried
+                    // read as something else on every piece — tread plate on each handle, post, vault door and terminal
+                    // (rusty flooring), a roller shutter's slats across each cabinet, desk and locker.
+                    else if (metal) { m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", 0.35f); m.SetFloat("_Smoothness", 0.5f); }
+                    else if (painted) { m.SetColor("_BaseColor", c); m.SetFloat("_Metallic", 0f); m.SetFloat("_Smoothness", 0.38f); }
                     break;
                 case ModelFamily.Derelict:
                     // everything is industrial now: wood becomes painted steel, fabric cracked vinyl, plastic yellowed composite

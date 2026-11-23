@@ -5,7 +5,9 @@ namespace Stealth.Level
 {
     /// <summary>
     /// Ceiling lights of a room: two glowing panels and one point light between them with soft shadows (walls and slabs
-    /// keep the light inside the room). In a dark room it is off
+    /// keep the light inside the room). Where the style asks (<see cref="LightSource.CeilingGlow"/>) the lamp looks soft:
+    /// a hot middle on each diffuser fading to its edges (<see cref="Cores"/>) and a pool of light on the ceiling round
+    /// the fixture (<see cref="Halo"/>) — glow drawn over the picture, no light cast. In a dark room it is off
     /// (the panel too); a broken one flickers; during an alarm every lamp pulses red, even in dark rooms. Purely visual,
     /// runs on every peer; robots read the result through its <see cref="LightSource"/>.
     /// </summary>
@@ -17,8 +19,14 @@ namespace Stealth.Level
         public float Seed;
         [Tooltip("The glowing diffusers of the panels: their emission follows the light.")]
         public Renderer[] Panels;
+        [Tooltip("The hot middle of each diffuser (additive, soft): shown where the style has soft ceiling lamps.")]
+        public Renderer[] Cores;
+        [Tooltip("The pool of light on the ceiling round the fixture (additive, soft).")]
+        public Renderer Halo;
+        [Tooltip("The lamp's cookies: none of its light goes up (a recessed panel), and — where the style has soft lamps — a share of it does: the lamp lights its own ceiling and the tops of its walls, with shadows, so nothing of it reaches the next room.")]
+        public Texture Cookie, SoftCookie;
 
-        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly Color AlarmColor = new(1f, 0.15f, 0.1f);
 
 
@@ -27,8 +35,8 @@ namespace Stealth.Level
         float m_BaseIntensity, m_LitIntensity;
         int m_Room = -1;
         bool m_Dark;
-        MaterialPropertyBlock m_Block;
-        float m_LastGlow = -1f;
+        MaterialPropertyBlock m_Block, m_GlowBlock;
+        float m_LastGlow = -1f, m_LastSoft = -1f;
         Color m_LastColor;
 
         public void Init(Color color, float intensity, bool flicker, float seed) => Init(color, intensity, flicker, seed, -1, false, color, intensity);
@@ -72,13 +80,37 @@ namespace Stealth.Level
             m_Light.enabled = intensity > 0.001f;
             if (Panels == null || Panels.Length == 0) return;
             // The panel glows with the lamp (property block: the shared material stays untouched).
-            float glow = Mathf.Clamp01(intensity / LightMath.RoomIntensity) * LightSource.GlowScale; // the style's look of the diffusers
-            if (Mathf.Abs(glow - m_LastGlow) < 0.02f && color == m_LastColor) return;
+            float lit = Mathf.Clamp01(intensity / LightMath.RoomIntensity);
+            float glow = lit * LightSource.GlowScale; // the style's look of the diffusers
+            float soft = lit * LightSource.CeilingGlow;
+            var cookie = LightSource.CeilingGlow > 0f && SoftCookie != null ? SoftCookie : Cookie;
+            if (cookie != null && m_Light.cookie != cookie) m_Light.cookie = cookie;
+            if (Mathf.Abs(glow - m_LastGlow) < 0.02f && Mathf.Abs(soft - m_LastSoft) < 0.02f && color == m_LastColor) return;
             m_LastGlow = glow;
+            m_LastSoft = soft;
             m_LastColor = color;
             m_Block ??= new MaterialPropertyBlock();
             m_Block.SetColor(EmissionId, color * (LightMath.PanelGlow * glow));
             foreach (var p in Panels) if (p != null) p.SetPropertyBlock(m_Block);
+            // the soft look: the diffusers' hot middle and the light on the ceiling round the fixture (linear values, as
+            // vectors: a property block's colours are taken as sRGB)
+            bool show = soft > 0.01f;
+            var linear = color.linear;
+            m_GlowBlock ??= new MaterialPropertyBlock();
+            if (Cores != null)
+                foreach (var c in Cores)
+                {
+                    if (c == null) continue;
+                    if (c.enabled != show) c.enabled = show;
+                    if (!show) continue;
+                    m_GlowBlock.SetVector(BaseColorId, LightMath.Glow(linear, LightMath.CoreGlow * soft));
+                    c.SetPropertyBlock(m_GlowBlock);
+                }
+            if (Halo == null) return;
+            if (Halo.enabled != show) Halo.enabled = show;
+            if (!show) return;
+            m_GlowBlock.SetVector(BaseColorId, LightMath.Glow(linear, LightMath.HaloGlow * soft));
+            Halo.SetPropertyBlock(m_GlowBlock);
         }
     }
 
@@ -99,6 +131,21 @@ namespace Stealth.Level
         public const float AlarmIntensity = 1.4f;
         /// <summary>Emission of a lit panel (HDR, catches the bloom).</summary>
         public const float PanelGlow = 2.2f;
+        /// <summary>The hot middle of a soft lamp's diffuser, added over its even glow (linear: over 1 with the panel's own, it blooms a little).</summary>
+        public const float CoreGlow = 1.1f;
+        /// <summary>The glow added on the ceiling right round a soft lamp (linear): a little — the lamp's own light is on the ceiling there (<see cref="SoftCeilingShare"/>).</summary>
+        public const float HaloGlow = 0.1f;
+        /// <summary>
+        /// How much of a soft lamp's light goes up, share of what goes down: its room's ceiling and the tops of its walls
+        /// are lit by it — the room's own fill, cast with the lamp's shadows (a dark room next door gets none of it).
+        /// </summary>
+        public const float SoftCeilingShare = 0.35f;
+
+        /// <summary>A lamp's cookie in a direction (pure): full down and sideways, <paramref name="up"/> of it above the horizon.</summary>
+        public static float Cookie(float dirY, float up) => Mathf.Lerp(up, 1f, CookieUpFade(dirY));
+
+        /// <summary>An additive glow's colour (linear, alpha 1): the lamp's colour at this strength.</summary>
+        public static Vector4 Glow(Color linear, float strength) => new(linear.r * strength, linear.g * strength, linear.b * strength, 1f);
 
         /// <summary>Whether a room's lamps are on (pure): a room that started lit goes dark when switched, a dark one lights up.</summary>
         public static bool SwitchedOn(bool startedDark, bool switched) => startedDark == switched;

@@ -48,6 +48,15 @@ namespace Stealth.Player
 
         /// <summary>The held thing's anchor this rig carries in its right hand (another player's; null: nothing to place).</summary>
         [System.NonSerialized] public Transform Held;
+        /// <summary>
+        /// The owner's own view: the eyes this body hangs from. Every frame, after the animation, the body is moved so that
+        /// its head is at them (a take leans and bobs the head away from the fixed camera: looking down, the player sees
+        /// his own chest, arms and legs under him, never the back of his own head). Null: where the animation has it.
+        /// </summary>
+        [System.NonSerialized] public Transform Eyes;
+        /// <summary>The owner's own view: the right arm is the view's own hand model just now — this body's is folded away.</summary>
+        [System.NonSerialized] public bool HideRightArm;
+        Transform m_ArmR;
 
         static readonly int SpeedId = Animator.StringToHash("Speed");
         static readonly int CrouchId = Animator.StringToHash("Crouch");
@@ -126,10 +135,24 @@ namespace Stealth.Player
         void LateUpdate()
         {
             PlantFeet();
+            FirstPerson();
             PlaceHeld();
             // the head follows the look after the animation (over whatever the Head layer's take does)
             if (HeadBone == null || Mathf.Approximately(m_Pitch, 0f)) return;
             HeadBone.rotation = Quaternion.AngleAxis(m_Pitch, transform.right) * HeadBone.rotation;
+        }
+
+        /// <summary>After the animation and the feet: the owner's own body under his eyes (<see cref="Eyes"/>, <see cref="HideRightArm"/>).</summary>
+        void FirstPerson()
+        {
+            if (m_ArmR == null && Animator != null && Animator.isHuman) m_ArmR = Animator.GetBoneTransform(HumanBodyBones.RightUpperArm);
+            if (m_ArmR != null)
+            {
+                var scale = Eyes != null && HideRightArm ? Vector3.one * 1e-4f : Vector3.one;
+                if (m_ArmR.localScale != scale) m_ArmR.localScale = scale;
+            }
+            if (Eyes == null || HeadBone == null || Hips == null) return;
+            Hips.position += HumanMath.EyeShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y);
         }
 
         /// <summary>
@@ -234,6 +257,29 @@ namespace Stealth.Player
         /// little over the palm — a long thing goes through the folded fingers there, a compact one rests on them.
         /// <paramref name="size"/>: the person's scale.
         /// </summary>
+        /// <summary>Where the eyes are from the head bone (the skull's base): up and ahead, metres of a person of scale 1.</summary>
+        public const float EyesUp = 0.1f, EyesAhead = 0.05f;
+        /// <summary>The furthest a body is moved to bring its head to its owner's eyes, metres (a pose that leaves the camera far behind is left alone past it).</summary>
+        public const float EyeReach = 0.8f;
+
+        /// <summary>How to move a body so that its eyes are at <paramref name="eyes"/> (pure): its head bone is at <paramref name="head"/>, it faces <paramref name="forward"/>.</summary>
+        public static Vector3 EyeShift(Vector3 eyes, Vector3 head, Vector3 forward, float size) =>
+            Vector3.ClampMagnitude(eyes - (head + Vector3.up * (EyesUp * size) + forward * (EyesAhead * size)), EyeReach);
+
+        /// <summary>
+        /// A part of the body its owner must not see from inside his own head (pure, by the renderer's name, "part.slot"):
+        /// the eyeballs and what is worn on the head — hair, beard, a hat, glasses. They still cast their shadow. The skin
+        /// of the head itself is seen from inside: its faces look away.
+        /// </summary>
+        public static bool OnTheHead(string renderer)
+        {
+            if (string.IsNullOrEmpty(renderer)) return false;
+            if (renderer.StartsWith("Sclera", System.StringComparison.Ordinal)) return true;
+            int dot = renderer.LastIndexOf('.');
+            string slot = dot >= 0 ? renderer.Substring(dot + 1) : "";
+            return slot is "hair" or "beard" or "head" or "eyes";
+        }
+
         public static Vector3 Grip(Vector3 hand, Vector3 fingers, Vector3 up, float size, bool cupped = false) =>
             Vector3.Lerp(hand, fingers, cupped ? CupAlong : GripAlong) + up * ((cupped ? CupOverPalm : GripOverPalm) * size);
 

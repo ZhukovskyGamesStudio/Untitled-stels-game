@@ -216,12 +216,34 @@ namespace Stealth.Level
         /// Builds the level a piece at a time (each step a few hundredths of a second): the drive to the next house builds it
         /// over several frames while the drive scene goes on (<see cref="ActiveLevel.LoadSteps"/>).
         /// </summary>
+        /// <summary>
+        /// A piece's screens with nothing to show (the models' glowing screen material): off, static or cracked, by the
+        /// house's seed (<see cref="ScreenLooks"/>) — before the style dresses the piece. Little displays keep their glow.
+        /// </summary>
+        void DressScreens(GameObject go, int seed)
+        {
+            var screens = m_Art.Screens;
+            if (screens == null || screens.Length < 4 || screens[0] == null) return;
+            var look = ScreenLooks.Pick(seed);
+            var to = screens[1 + (int)look];
+            if (to == null) return;
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (r.sharedMaterial != screens[0]) continue;
+                var size = r.bounds.size;
+                if (Mathf.Max(size.x, Mathf.Max(size.y, size.z)) < ScreenLooks.SmallScreen) continue;
+                r.sharedMaterial = to;
+                if (look == ScreenLook.Static) LiveScreens.Add(r);
+            }
+        }
+
         public IEnumerable<bool> Steps()
         {
             var l = m_Layout;
             var root = Object.Instantiate(m_Art.LevelRoot);
             root.name = $"Level_{l.Seed}";
             m_Root = root.transform;
+            LiveScreens.Clear();
 
             float W = l.SizeX, H = l.SizeZ;
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
@@ -329,6 +351,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
+                DressScreens(go, LevelRandom.Mix(l.Seed, Salt.Screens, i));
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
@@ -532,7 +555,7 @@ namespace Stealth.Level
             foreach (var net in m_Layout.Vents)
                 foreach (var g in net.Grates)
                 {
-                    var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.identity);
+                    var go = Place(m_Art.VentGrate, $"VentGrate_{index}", g.Position, Quaternion.Euler(0f, VentPlan.LidYaw(g.Position, m_Layout.Doorways), 0f));
                     if (go.TryGetComponent<VentGrate>(out var grate)) grate.Setup(index, g.Room, g.Closed);
                     index++;
                 }

@@ -187,6 +187,7 @@ namespace Stealth.Level
             if (s_Active) RenderSettings.ambientLight = s_BaseAmbient;
             LightSource.VisualScale = 1f;
             LightSource.GlowScale = 1f;
+            LightSource.CeilingGlow = 0f;
             s_Current = s_Default;
             s_Active = false;
         }
@@ -573,12 +574,31 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>
+        /// How far the player's view is under the ground, 0 (in a house) … 1 (the sewer): the lamps' look goes from the
+        /// style's <see cref="StyleWorld.LightScale"/> to that times <see cref="StyleWorld.UndergroundLights"/>. Set by the
+        /// view (PlayerController.UpdateFog), eased: climbing a shaft, the lamps do not jump.
+        /// </summary>
+        public static float Underground
+        {
+            get => s_Underground;
+            set { s_Underground = Mathf.Clamp01(value); LightSource.VisualScale = LampScale(World); }
+        }
+        static float s_Underground;
+
+        static float LampScale(StyleWorld w)
+        {
+            if (s_Current == null || w.LightScale <= 0f) return 1f;
+            return w.LightScale * Mathf.Lerp(1f, Mathf.Max(0.01f, w.UndergroundLights), s_Underground);
+        }
+
         static void ApplyWorld(StyleWorld w)
         {
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = StyleAmbient;
-            LightSource.VisualScale = s_Current != null && w.LightScale > 0f ? w.LightScale : 1f;
+            LightSource.VisualScale = LampScale(w);
             LightSource.GlowScale = s_Current != null && w.LampGlow >= 0f ? w.LampGlow : 1f;
+            LightSource.CeilingGlow = s_Current != null ? Mathf.Max(0f, w.CeilingGlow) : 0f;
         }
 
         // ------------------------------------------------------------------ palette

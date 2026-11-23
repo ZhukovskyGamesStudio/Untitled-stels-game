@@ -351,6 +351,7 @@ namespace Stealth.Player
                 RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, Mathf.Max(UndergroundFog, a.IndoorFogDensity * 3f), 3f);
                 RenderSettings.fogColor = Blend(RenderSettings.fogColor, a.IndoorFog * 0.1f, 4f);
                 RenderSettings.ambientLight = Blend(RenderSettings.ambientLight, VisualStyles.StyleAmbient * UndergroundAmbient, 4f);
+                VisualStyles.Underground = Toward(VisualStyles.Underground, 1f, 1.2f); // the tunnels' lamps as the style shows them there
                 Shader.SetGlobalFloat(StyDarkId, 1f);
                 m_AmbientDimmed = true;
                 Camera.backgroundColor = RenderSettings.fogColor;
@@ -366,6 +367,7 @@ namespace Stealth.Player
             // (GasView): none at the walls, full 15 m out (lose sight of the house and you are lost), the sky above it.
             // Visual only — the gas still hurts where it did (UpdateGas).
             var air = VisualStyles.World;
+            VisualStyles.Underground = Toward(VisualStyles.Underground, 0f, 1.2f);
             RenderSettings.fogDensity = Toward(RenderSettings.fogDensity, air.IndoorFogDensity, 3f);
             RenderSettings.fogColor = Blend(RenderSettings.fogColor, air.IndoorFog, 2f);
             Camera.backgroundColor = Color.black; // the gas pass adds the sky where nothing was drawn

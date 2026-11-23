@@ -16,6 +16,8 @@ namespace Stealth.Player
 
         [Tooltip("The flashlight's beam (off unless a charged flashlight in the hand is switched on).")]
         public Light Flashlight;
+        [Tooltip("A faint light round the eyes, only its owner's (the style sets its strength: StyleWorld.EyeGlow).")]
+        public Light EyeGlow;
         [Tooltip("The hand holding the flashlight, seen in the first-person view while a flashlight is in the hand slot (owner only).")]
         public GameObject ViewFlashlight;
         [Tooltip("The shelter map held open in front of the face while it is in the hand slot (every peer sees it: a thing in the world, not UI).")]
@@ -288,6 +290,15 @@ namespace Stealth.Player
                 int hand = inv != null ? inv.HandIndex() : -1;
                 bool show = IsOwner && hand >= 0 && inv.Items[hand].Shape == Items.ItemCatalog.Flashlight && !Downed && !InHatch && UsingTerminal == null;
                 if (ViewFlashlight.activeSelf != show) ViewFlashlight.SetActive(show);
+            }
+            if (EyeGlow != null)
+            {
+                // what is right before the eyes is never pitch black (a drawer's inside, a corner in one's own shadow): the
+                // picture's only — robots see by LightSource lights, and no other player draws this one
+                var air = VisualStyles.World;
+                bool glow = IsOwner && air.EyeGlow > 0f && !Downed && Watching == null;
+                if (EyeGlow.enabled != glow) EyeGlow.enabled = glow;
+                if (glow) { EyeGlow.intensity = air.EyeGlow; EyeGlow.range = air.EyeGlowRange; }
             }
             if (Flashlight == null) return;
             bool on = FlashlightOn && !Downed && !InHatch;

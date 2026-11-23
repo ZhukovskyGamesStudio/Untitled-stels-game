@@ -48,11 +48,55 @@ namespace Stealth.Tests
             var drawer = new Bounds(new Vector3(0f, 0.6f, 0f), new Vector3(0.86f, 0.4f, 0.42f));
             var inDrawer = StorageMath.LootSpot(drawer, Vector3.forward, 0f, drawer: true);
             Assert.Greater(inDrawer.z, 0.2f, "where the drawer is pulled out to");
-            Assert.AreEqual(drawer.min.y + 0.08f, inDrawer.y, 1e-4f, "on its bottom");
+            Assert.AreEqual(StorageMath.DrawerFloor(drawer, 0f) + 0.05f, inDrawer.y, 1e-4f, "on its floor");
             var door = new Bounds(new Vector3(0f, 0.97f, -0.245f), new Vector3(0.28f, 1.82f, 0.02f));
             var inLocker = StorageMath.LootSpot(door, Vector3.back, 0f, drawer: false);
             Assert.Greater(inLocker.z, door.center.z, "behind the door, inside the compartment");
             Assert.Less(inLocker.y, 0.3f, "on its floor");
+        }
+
+        [Test]
+        public void AHighDrawersFloorIsNearItsTopSoTheLootIsSeenOverTheFront()
+        {
+            // the office cabinet's three drawers: fronts 0.34 m tall, their tops at 0.41, 0.78 and 1.15 m
+            Bounds Front(float top) => new(new Vector3(0f, top - 0.17f, 0f), new Vector3(0.86f, 0.34f, 0.42f));
+            Assert.AreEqual(Front(0.41f).min.y + 0.03f, StorageMath.DrawerFloor(Front(0.41f), 0f), 1e-4f, "the bottom drawer: the model's own floor");
+            float top = StorageMath.DrawerFloor(Front(1.15f), 0f);
+            Assert.Greater(top, Front(1.15f).min.y + 0.12f, "the top drawer: a floor raised towards its front's top");
+            Assert.LessOrEqual(top, 1.15f - StorageMath.ShallowDrawer + 1e-4f, "still a drawer: something lies in it");
+            // looking over the front from a step away (0.4 m), no more than a hand's width of the floor behind it is hidden
+            foreach (float h in new[] { 0.41f, 0.78f, 1.15f, 1.3f })
+            {
+                float floor = StorageMath.DrawerFloor(Front(h), 0f);
+                float hidden = (h - floor) * 0.4f / (StorageMath.EyeHeight - h);
+                Assert.Less(hidden, 0.125f, $"front top at {h}: {hidden:0.00} m of the floor hidden");
+            }
+            Assert.AreEqual(2f + 0.41f - 0.34f + 0.03f, StorageMath.DrawerFloor(new Bounds(new Vector3(0f, 2.24f, 0f), new Vector3(0.86f, 0.34f, 0.42f)), 2f), 1e-4f, "on an upper storey: from its floor");
+            var pullOut = new Bounds(new Vector3(0f, 0.45f, 0f), new Vector3(0.6f, 0.8f, 0.5f));
+            Assert.AreEqual(pullOut.min.y + 0.03f, StorageMath.DrawerFloor(pullOut, 0f), 1e-4f, "a dishwasher's pull-out is no drawer");
+            // the loot lies on that floor, where the drawer is pulled out to
+            var (pos, _) = StorageMath.LootPose(new Vector3(0.22f, 0.1f, 0.22f), Front(1.15f), Vector3.forward, 0.44f, drawer: true);
+            Assert.AreEqual(top + 0.01f, pos.y, 1e-4f);
+            Assert.AreEqual(StorageMath.Travel(0.44f), pos.z, 1e-4f);
+            Assert.AreEqual(0.3f, StorageMath.Travel(0.34f), 1e-4f, "a shallow piece: the drawer's back stays in the carcass");
+        }
+
+        [Test]
+        public void DrawersOfOneColumnAreOneOverAnother()
+        {
+            Bounds D(float x, float y) => new(new Vector3(x, y, 0f), new Vector3(0.4f, 0.2f, 0.4f));
+            Assert.IsTrue(StorageMath.SameColumn(D(0f, 0.2f), D(0f, 0.8f), Vector3.right));
+            Assert.IsTrue(StorageMath.SameColumn(D(0f, 0.2f), D(0.05f, 0.5f), Vector3.right), "a little askew");
+            Assert.IsFalse(StorageMath.SameColumn(D(-0.5f, 0.5f), D(0.5f, 0.5f), Vector3.right), "the two pedestals of a desk");
+            Assert.IsTrue(StorageMath.SameColumn(D(0f, 0.2f), D(0f, 0.8f), Vector3.forward), "the furniture turned");
+            Assert.AreEqual(90f, StorageMath.DoorAngle, "an open door stands square to the front: it leans across no compartment");
+            // a searched, empty drawer pushed back by another one stays a little out
+            Assert.AreEqual(0f, StorageMath.Slide(0f, 0f, 0.38f), "shut");
+            Assert.AreEqual(0.38f, StorageMath.Slide(1f, 0f, 0.38f), 1e-5f, "open");
+            Assert.AreEqual(StorageMath.AjarGap, StorageMath.Slide(0f, 1f, 0.38f), 1e-5f, "left ajar");
+            Assert.AreEqual(0.38f, StorageMath.Slide(1f, 1f, 0.38f), 1e-5f, "opened again: all the way out");
+            Assert.AreEqual(0.19f, StorageMath.Slide(0.5f, 1f, 0.38f), 1e-5f, "sliding in: not there yet");
+            Assert.Less(StorageMath.AjarGap, 0.12f, "ajar: nothing in it can be seen or reached");
         }
 
         [Test]

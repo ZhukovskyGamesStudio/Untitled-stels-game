@@ -28,6 +28,8 @@ namespace Stealth.Level
         public Renderer Pictures, AccessPictures;
         [Tooltip("What the screens show (Tools/Art/generate_screens.py): the camera feeds, hacking, the door's access, the floor plan.")]
         public Texture2D CamerasPicture, HackingPicture, DoorsPicture, MapPicture;
+        [Tooltip("The door's station once the storeroom is unlocked: the doorway open, the padlock off.")]
+        public Texture2D DoorsOpenPicture;
 
 
         public int Index { get; private set; } = -1;
@@ -40,7 +42,7 @@ namespace Stealth.Level
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
-            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f);
+            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -70,18 +72,21 @@ namespace Stealth.Level
             if (state == m_Shown || Screens == null) return;
             m_Shown = state;
             m_Block ??= new MaterialPropertyBlock();
-            var c = Spent ? SpentColor : Kind switch
+            // the door's station never goes dark: red while the storeroom is locked, green — its picture the open doorway — once it is not
+            bool open = Spent && Kind == TerminalKind.Doors, dim = Spent && !open;
+            var c = open ? DoorsOpenColor : dim ? SpentColor : Kind switch
             {
                 TerminalKind.Cameras => CamerasColor, TerminalKind.Doors => DoorsColor, TerminalKind.Map => MapColor, _ => HackingColor,
             };
             Screens.GetPropertyBlock(m_Block);
             m_Block.SetColor(BaseColorId, c);
-            m_Block.SetColor(EmissionId, c * (Spent ? 0.3f : 1.6f));
+            m_Block.SetColor(EmissionId, c * (dim ? 0.3f : 1.6f));
             Screens.SetPropertyBlock(m_Block);
             if (Pictures == null) return;
             var picture = Kind switch
             {
-                TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => DoorsPicture, TerminalKind.Map => MapPicture, _ => HackingPicture,
+                TerminalKind.Cameras => CamerasPicture, TerminalKind.Doors => open && DoorsOpenPicture != null ? DoorsOpenPicture : DoorsPicture,
+                TerminalKind.Map => MapPicture, _ => HackingPicture,
             };
             Pictures.GetPropertyBlock(m_Block);
             if (picture != null)
@@ -90,7 +95,7 @@ namespace Stealth.Level
                 m_Block.SetTexture(EmissionMapId, picture);
             }
             m_Block.SetColor(BaseColorId, c * 0.35f);
-            m_Block.SetColor(EmissionId, c * (Spent ? 0.25f : 1.3f));
+            m_Block.SetColor(EmissionId, c * (dim ? 0.25f : 1.3f));
             Pictures.SetPropertyBlock(m_Block);
         }
 

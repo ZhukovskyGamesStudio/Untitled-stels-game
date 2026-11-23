@@ -42,6 +42,14 @@ namespace Stealth.Tests
             Assert.IsNotNull(lamp.GetComponentInChildren<Light>().cookie, "the cookie keeps the light off the ceiling");
             Assert.AreEqual(1f, LightMath.CookieUpFade(-0.5f), 1e-4f, "down: full light");
             Assert.AreEqual(0f, LightMath.CookieUpFade(0.9f), 1e-4f, "up: none");
+            // a soft lamp (a style's choice) sends a share up, onto its own ceiling — with the lamp's shadows, so it stays in the room
+            Assert.AreEqual(1f, LightMath.Cookie(-0.5f, LightMath.SoftCeilingShare), 1e-4f);
+            Assert.AreEqual(LightMath.SoftCeilingShare, LightMath.Cookie(0.9f, LightMath.SoftCeilingShare), 1e-4f);
+            Assert.AreEqual(0f, LightMath.Cookie(0.9f, 0f), 1e-4f);
+            var room = lamp.GetComponent<RoomLight>();
+            Assert.IsNotNull(room.Cookie, "the plain cookie");
+            Assert.IsNotNull(room.SoftCookie, "the soft one");
+            Assert.AreNotEqual(LightShadows.None, room.Lamp.shadows, "light sent up must be shadowed: it would cross the slab");
             // A shadow-only renderer still writes depth in Forward+: it hid the glowing panels and the ceiling.
             foreach (var r in lamp.GetComponentsInChildren<Renderer>(true))
                 Assert.AreNotEqual(ShadowCastingMode.ShadowsOnly, r.shadowCastingMode, $"{r.name}: invisible geometry hides what is behind it");
@@ -81,12 +89,12 @@ namespace Stealth.Tests
         /// a dim emission just looks like a material that ignores the lamps. Unlit only for effects and the gas behind windows.
         /// </summary>
         /// <summary>Things that only decorate (desk monitors, lamp shades and bulbs, server lights, a vending machine's glass): a faint glow, below the bloom — they must not draw the eye away from what the player can use.</summary>
-        public static readonly HashSet<string> DimDecor = new() { "PropScreen", "LampShade", "LampBulb", "RackLights", "VendingGlass" };
+        public static readonly HashSet<string> DimDecor = new() { "PropScreen", "ScreenStatic", "LampShade", "LampBulb", "RackLights", "VendingGlass" };
 
         [Test]
         public void MaterialsEitherTakeLightOrReallyGlow()
         {
-            var unlitAllowed = new HashSet<string> { "Laser", "LaserSheet", "Radio", "Stomp", "Window" };
+            var unlitAllowed = new HashSet<string> { "Laser", "LaserSheet", "LaserCore", "LaserGlow", "LampGlow", "Radio", "Stomp", "Window" };
             foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { "Assets/_Game/Art/Materials" }))
             {
                 var mat = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));

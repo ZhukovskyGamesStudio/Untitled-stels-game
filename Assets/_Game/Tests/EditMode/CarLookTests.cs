@@ -13,6 +13,15 @@ namespace Stealth.Tests
         {
             Assert.IsTrue(new CarSettings().LeftHandDrive);
             Assert.IsTrue(CarLook.NeedsMirror(new CarSettings()), "the model itself is right-hand");
+            // the headlights: full down the tunnel, dimmed before a wall so that it gets no more than the glare allows
+            Assert.AreEqual(45f, CarLook.Headlight(45f, float.PositiveInfinity, 0.2f), "nothing ahead");
+            Assert.AreEqual(45f, CarLook.Headlight(45f, 16f, 0.2f), "far enough: full");
+            Assert.AreEqual(0.2f * 4f, CarLook.Headlight(45f, 2f, 0.2f), 1e-4f, "a gate 2 m ahead");
+            Assert.AreEqual(0.2f, CarLook.Headlight(45f, 2f, 0.2f) / 4f, 1e-4f, "…gets the glare's worth, not eleven");
+            Assert.AreEqual(0.2f, CarLook.Headlight(45f, 0.2f, 0.2f), 1e-4f, "nose to the wall: as at a metre");
+            Assert.AreEqual(45f, CarLook.Headlight(45f, 2f, 0f), "no limit set");
+            var car = new CarSettings();
+            Assert.Less(CarLook.Headlight(45f, 2f, car.HeadlightGlare), 2f, "as set: a gate before the parked car is not burnt out");
             Assert.IsFalse(CarLook.NeedsMirror(new CarSettings { LeftHandDrive = false }));
         }
 
