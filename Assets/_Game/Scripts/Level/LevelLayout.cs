@@ -101,7 +101,9 @@ namespace Stealth.Level
         // the robots' charging room (Tools/Blender/charging.py): what the robots built themselves
         ChargingDock, BatteryStack, Generator, ScrapShrine, ConduitGrowth, CableMass,
         // the lid over the shaft down to the basement the team arrives in (ShaftHatch), in the lobby's middle
-        ShaftHatch }
+        ShaftHatch,
+        // a chest-high cube shelf (Tools/Blender/low_shelf.py): the way up to a ceiling grate where filing cabinets or crates do not belong
+        LowShelf }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }
@@ -353,6 +355,8 @@ namespace Stealth.Level
         public ObjectiveKind Objective;
         /// <summary>Vault: its room (plan id), its only door (index in <see cref="AutoDoors"/>), where its treasure lies.</summary>
         public int VaultRoom = -1, VaultDoor = -1;
+        /// <summary>A point in the vault (robots do not get in before the team opens it).</summary>
+        public bool IsVault(Vector3 p) => VaultRoom >= 0 && RoomAt(p + Vector3.up * 0.3f)?.Id == VaultRoom;
         /// <summary>Vault: its doorway (index in <see cref="Doorways"/> and the plan's openings).</summary>
         public int VaultDoorway = -1;
         public readonly List<Vector3> VaultTreasure = new();
@@ -378,7 +382,7 @@ namespace Stealth.Level
         public readonly List<int> WardedRooms = new();
         /// <summary>The crawl ducts in each storey's ceiling void (index = the storey under it), <see cref="VentPlan"/>.</summary>
         public readonly List<VentNet> Vents = new();
-        /// <summary>Where the crates and desks of the ways up to the grates stand: never turned into a terminal or anything else.</summary>
+        /// <summary>Where the pieces of the ways up to the grates stand: never turned into a terminal or anything else.</summary>
         public readonly List<Vector3> ClimbPieces = new();
         public bool IsClimbPiece(Vector3 p)
         {

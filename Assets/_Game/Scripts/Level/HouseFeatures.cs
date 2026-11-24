@@ -715,7 +715,7 @@ namespace Stealth.Level
             {
                 var options = new List<int>();
                 for (int i = 0; i < l.Props.Count; i++)
-                    if (l.Props[i].Kind == wanted && (l.Props[i].Position - l.HatchPosition).magnitude > away
+                    if (l.Props[i].Kind == wanted && !l.IsClimbPiece(l.Props[i].Position) && (l.Props[i].Position - l.HatchPosition).magnitude > away
                         && (!Furnisher.Tall.Contains(kind) || !AtWindow(l.Props[i].Position))) options.Add(i);
                 var room = Furnisher.FootprintOf(wanted);
                 if (options.Count == 0 || Mathf.Min(1f, room.width / need.width, room.height / need.height) < least) continue;

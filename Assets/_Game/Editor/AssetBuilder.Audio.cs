@@ -15,7 +15,7 @@ namespace Stealth.EditorTools
         static AudioClip Clip(string path)
         {
             var clip = AssetDatabase.LoadAssetAtPath<AudioClip>($"{AudioDir}/{path}.wav");
-            if (clip == null) Debug.LogWarning($"[Builder] Missing sound {path}: run Tools/Audio/generate_sounds.py");
+            if (clip == null) Debug.LogWarning($"[Builder] Missing sound {path}: run Tools/Audio/import_cc0_sounds.py or generate_sounds.py");
             return clip;
         }
 
@@ -54,7 +54,8 @@ namespace Stealth.EditorTools
         static bool ShortLoop(string path)
         {
             string name = System.IO.Path.GetFileNameWithoutExtension(path);
-            return name == "car_engine" || name.StartsWith("motor_") || name == "robot_motor" || name == "drone_rotor" || name.EndsWith("_hum") || name == "grind";
+            return name == "car_engine" || name.StartsWith("motor_") || name == "robot_motor" || name == "drone_rotor" || name.EndsWith("_hum") || name == "grind"
+                || name.StartsWith("guard_") || name == "alarm";
         }
 
         static SoundBank BuildSoundBank()
@@ -62,7 +63,6 @@ namespace Stealth.EditorTools
             ConfigureAudioImport();
             s_Bank = DataAsset<SoundBank>(DataDir + "/SoundBank.asset", b =>
             {
-                b.Footsteps = Enumerable.Range(0, 4).Select(i => Clip($"Player/footstep_{i}")).ToArray();
                 b.Jump = Clip("Player/jump");
                 b.Land = Clip("Player/land");
                 b.Hurt = Clip("Player/hurt");
@@ -105,7 +105,13 @@ namespace Stealth.EditorTools
                 b.ExploreMusic = Clip("Music/music_explore");
                 b.ChaseMusic = Clip("Music/music_chase");
                 FillLateClips(b);
+                FillRecordedClips(b);
             });
+            if (RecordedClipsMissing(s_Bank))
+            {
+                FillRecordedClips(s_Bank);
+                EditorUtility.SetDirty(s_Bank);
+            }
             // Clips added after the bank was created (the bank itself is never overwritten without FORCE).
             if (s_Bank.Ping == null || s_Bank.Mark == null)
             {
@@ -130,26 +136,71 @@ namespace Stealth.EditorTools
                 s_Bank.Grind = Clip("Car/grind");
                 EditorUtility.SetDirty(s_Bank);
             }
-            if (s_Bank.WorkHack == null || s_Bank.WorkPick == null || s_Bank.WorkScrew == null)
-            {
-                s_Bank.WorkHack = Clip("Items/work_hack");
-                s_Bank.WorkPick = Clip("Items/work_pick");
-                s_Bank.WorkScrew = Clip("Items/work_screw");
-                EditorUtility.SetDirty(s_Bank);
-            }
             if (s_Bank.HandDryer == null)
             {
                 s_Bank.HandDryer = Clip("Environment/hand_dryer");
                 EditorUtility.SetDirty(s_Bank);
             }
-            if (s_Bank.GasBreath == null || s_Bank.GasLaugh == null || s_Bank.GasLaugh.Length != 3 || s_Bank.HostageVoice == null || s_Bank.HostageVoice.Length != 5)
+            if (s_Bank.GasBreath == null || s_Bank.HostageVoice == null || s_Bank.HostageVoice.Length != 5)
             {
                 s_Bank.GasBreath = Clip("Player/gas_breath");
-                s_Bank.GasLaugh = Enumerable.Range(0, 3).Select(i => Clip($"Player/gas_laugh_{i}")).ToArray();
                 s_Bank.HostageVoice = new[] { "help", "key", "out", "quiet", "hurry" }.Select(n => Clip($"Voices/hostage_{n}")).ToArray();
                 EditorUtility.SetDirty(s_Bank);
             }
             return s_Bank;
+        }
+
+        static AudioClip[] Takes(string path, int count) => Enumerable.Range(0, count).Select(i => Clip($"{path}_{i}")).ToArray();
+
+        static bool RecordedClipsMissing(SoundBank b) =>
+            new[] { b.StepConcrete, b.StepTile, b.StepWood, b.StepSoft, b.StepCarpet, b.StepMetal, b.StepWet, b.GasCough, b.WorkHack, b.WorkPick, b.WorkScrew, b.WorkUnit, b.LadderRung }
+                .Any(a => a == null || a.Length == 0 || a.Any(c => c == null))
+            || new[] { b.UnlockUnit, b.DoorHeavyOpen, b.DoorHeavyShut, b.DrawerOpen, b.DrawerClose, b.SteelDrawerOpen, b.SteelDrawerClose, b.CupboardOpen, b.CupboardClose,
+                b.SteelCupboardOpen, b.SteelCupboardClose, b.SwitchOn, b.SwitchOff, b.HatchOpen, b.GrilleOff, b.SafeTick, b.Clank, b.Latch, b.TerminalKey, b.Bandage, b.Drink,
+                b.TerminalGranted, b.TerminalHackDone, b.ConsoleSolved, b.VaultUnlocked }
+                .Any(c => c == null);
+
+        /// <summary>The clips cut from recordings (Tools/Audio/recorded.py) that have no older generated namesake.</summary>
+        static void FillRecordedClips(SoundBank b)
+        {
+            b.StepConcrete = Takes("Player/step_concrete", 4);
+            b.StepTile = Takes("Player/step_tile", 4);
+            b.StepWood = Takes("Player/step_wood", 4);
+            b.StepSoft = Takes("Player/step_soft", 4);
+            b.StepCarpet = Takes("Player/step_carpet", 4);
+            b.StepMetal = Takes("Player/step_metal", 4);
+            b.StepWet = Takes("Player/step_wet", 4);
+            b.GasCough = Takes("Player/gas_cough", 3);
+            b.WorkHack = Takes("Items/work_hack", 4);
+            b.WorkPick = Takes("Items/work_pick", 4);
+            b.WorkScrew = Takes("Items/work_screw", 3);
+            b.WorkUnit = Takes("Items/work_unit", 3);
+            b.UnlockUnit = Clip("Items/unlock_unit");
+            b.LadderRung = Takes("Player/ladder_rung", 4);
+            b.TerminalGranted = Clip("Items/terminal_granted");
+            b.TerminalHackDone = Clip("Items/terminal_hack_done");
+            b.ConsoleSolved = Clip("Items/console_solved");
+            b.VaultUnlocked = Clip("Items/vault_unlocked");
+            b.DoorHeavyOpen = Clip("Environment/door_heavy_open");
+            b.DoorHeavyShut = Clip("Environment/door_heavy_shut");
+            b.DrawerOpen = Clip("Environment/drawer_open");
+            b.DrawerClose = Clip("Environment/drawer_close");
+            b.SteelDrawerOpen = Clip("Environment/steel_drawer_open");
+            b.SteelDrawerClose = Clip("Environment/steel_drawer_close");
+            b.CupboardOpen = Clip("Environment/cupboard_open");
+            b.CupboardClose = Clip("Environment/cupboard_close");
+            b.SteelCupboardOpen = Clip("Environment/steel_cupboard_open");
+            b.SteelCupboardClose = Clip("Environment/steel_cupboard_close");
+            b.SwitchOn = Clip("Environment/switch_on");
+            b.SwitchOff = Clip("Environment/switch_off");
+            b.HatchOpen = Clip("Environment/hatch_open");
+            b.GrilleOff = Clip("Environment/grille_off");
+            b.SafeTick = Clip("Items/safe_tick");
+            b.Clank = Clip("Items/clank");
+            b.Latch = Clip("Items/latch");
+            b.TerminalKey = Clip("Items/terminal_key");
+            b.Bandage = Clip("Items/bandage");
+            b.Drink = Clip("Items/drink");
         }
 
         static void FillLateClips(SoundBank b)

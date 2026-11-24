@@ -6,7 +6,7 @@ namespace Stealth.Level
 {
     /// <summary>
     /// A grate in a room's ceiling (prefab Level/VentGrate, spots from <see cref="VentPlan"/>): the way into the storey's
-    /// crawl ducts. Open, it is a hole in the ceiling: a player gets in from a way up under it (a crate stack and a desk,
+    /// crawl ducts. Open, it is a hole in the ceiling: a player gets in from a way up under it (a chest-high piece and a step,
     /// <see cref="DuctGrate.ClimbDir"/>) with a crouched jump — once the feet are nearly at the duct's floor they are pulled
     /// in (<see cref="IntoDuct"/>) — and drops out by walking into it from the duct. Screwed shut, it is floor in the duct
     /// and ceiling below until a player with a screwdriver in hand takes its lid off (E, the server, for everyone).
@@ -72,7 +72,7 @@ namespace Stealth.Level
         /// A crouched body rising through an open grate gets in (pure): its feet within <paramref name="assist"/> under the
         /// duct's floor, inside the hole (the body's middle within its half width less a margin).
         /// </summary>
-        public static bool IntoDuct(Vector3 feet, Vector3 grate, bool crouched, bool rising, float assist = 0.45f)
+        public static bool IntoDuct(Vector3 feet, Vector3 grate, bool crouched, bool rising, float assist = 0.5f)
         {
             if (!crouched || !rising) return false;
             float floor = grate.y + LevelMetrics.CeilingBoard;
@@ -99,7 +99,8 @@ namespace Stealth.Level
             // open: a hole (nothing to stand on); shut: floor in the duct, ceiling below
             if (m_Floor != null && m_Floor.enabled == open) m_Floor.enabled = !open;
             if (Lid == null) return;
-            m_Open.Step(open, Time.deltaTime, 1f / 3f);
+            if (m_Open.Step(open, Time.deltaTime, 1f / 3f) == OpenMove.StartedOpening) // its lid swings down: every peer hears it
+                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.GrilleOff : null, transform.position, 0.8f, Audio.Sfx.Group.Items);
             Lid.localRotation = Quaternion.Euler(m_Open.Value * 85f, 0f, 0f);
         }
     }

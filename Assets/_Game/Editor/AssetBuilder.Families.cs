@@ -27,13 +27,14 @@ namespace Stealth.EditorTools
         const string DerelictPropsDir = ModelsDir + "/StyleProps/Derelict";
 
         /// <summary>Scanned CC0 model → our model it replaces in the realistic family (see Tools/Art/fetch_cc0.py).</summary>
+        /// (Not the dining table: it wears a checked tablecloth, in a meeting room.)
         static readonly Dictionary<string, string> RealisticProps = new()
         {
             ["metal_office_desk"] = "desk", ["modern_arm_chair_01"] = "chair", ["drawer_cabinet"] = "cabinet",
-            ["potted_plant_02"] = "plant", ["wooden_bookshelf_worn"] = "bookshelf", ["steel_frame_shelves_01"] = "shelf",
+            ["potted_plant_02"] = "plant", ["steel_frame_shelves_01"] = "shelf",
             ["cardboard_box_01"] = "boxes", ["sofa_02"] = "sofa", ["ArmChair_01"] = "armchair",
-            ["modern_coffee_table_01"] = "coffee_table", ["round_wooden_table_01"] = "round_table", ["dining_table"] = "meeting_table",
-            ["metal_trash_can"] = "trash_bin", ["desk_lamp_arm_01"] = "desk_lamp",
+            ["modern_coffee_table_01"] = "coffee_table", ["round_wooden_table_01"] = "round_table",
+            // (not the street's rusted trash can, the chipped desk lamp and the scuffed bookshelf: the style's own stand there)
         };
 
         // ------------------------------------------------------------------ textures
@@ -41,7 +42,7 @@ namespace Stealth.EditorTools
         /// <summary>Import settings of the downloaded textures: normal maps, linear masks, point-filtered pixel art.</summary>
         static void ConfigureExternalTextures()
         {
-            var roots = new[] { ExternalDir, DerelictTextures }.Where(AssetDatabase.IsValidFolder).ToArray();
+            var roots = new[] { ExternalDir, DerelictTextures, SurfaceTextures }.Where(AssetDatabase.IsValidFolder).ToArray();
             if (roots.Length == 0) return;
             foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", roots))
             {
@@ -50,7 +51,12 @@ namespace Stealth.EditorTools
                 var file = Path.GetFileNameWithoutExtension(path);
                 bool pixel = path.StartsWith(PixelTextures);
                 var type = file == "normal" ? TextureImporterType.NormalMap : TextureImporterType.Default;
-                bool srgb = file != "mask" && file != "normal";
+                bool srgb = file != "mask" && file != "normal" && file != "relief";
+                if (file == "relief" && imp.textureCompression != TextureImporterCompression.Uncompressed) // slopes of a degree or two: no blocks
+                {
+                    imp.textureCompression = TextureImporterCompression.Uncompressed;
+                    imp.SaveAndReimport();
+                }
                 var filter = pixel ? FilterMode.Point : FilterMode.Trilinear;
                 bool decal = path.StartsWith(DerelictDecals);            // single images with edges: never repeat
                 var wrap = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
@@ -174,19 +180,34 @@ namespace Stealth.EditorTools
             }
             // realistic office / bank (PAYDAY)
             Pbr("Real_Marble", "marble_01", Color.white);
-            Pbr("Real_Plaster", "plastered_wall_04", new Color(1f, 0.97f, 0.92f));
-            Pbr("Real_CeilingTiles", "ceiling_interior", Color.white);
-            Pbr("Real_DarkWood", "dark_wood", Color.white);
+            // (painted walls and ceilings, skirting and door casings, pipes and trays: surfaces of the game's own — the scans were
+            // a flat colour (beige_wall_001), lumpy brown plaster (ceiling_interior) and orange stripes (dark_wood))
+            WallPaint("Real_BeigeWall", "9E8C78", 0.95f);
+            WallPaint("Real_Plaster", "A9A39A", 0.8f);
+            WallPaint("Real_Plaster2", "B0A898", 0.8f);
+            WallPaint("Paint_White", "C9CBC8", 1f);
+            WallPaint("Paint_Band", "837E6C", 1.5f);
+            // (rooms of one kind are not all one beige: a sage and a slate-blue wall among them, RealisticRoomLooks)
+            WallPaint("Paint_Sage", "8C9882", 1f);
+            WallPaint("Paint_Slate", "7F8D9A", 1f);
+            WallPaint("Real_CeilingTiles", "B9B6AE", 0.6f, true);
+            void Made(string name, string surface, string hex)
+            {
+                var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+                SetSurface(m, surface, Hex(hex));
+                EditorUtility.SetDirty(m);
+                s_Kit[name] = m;
+            }
+            Made("Real_DarkWood", "wood", "51341F");
+            Made("Trim_Metal", "powdercoat", "62666B");
             Pbr("Real_Carpet", "dirty_carpet", new Color(0.75f, 0.8f, 0.9f));
             Pbr("Real_Laminate", "laminate_floor_02", Color.white);
-            Pbr("Real_BeigeWall", "beige_wall_001", Color.white);
             Pbr("Real_MetalPlate", "metal_plate", Color.white);
             // realistic old English house (Sir, You Are Being Hunted)
             Pbr("Real_OldFloor", "old_wooden_floor_01", Color.white);
             Pbr("Real_Peeling", "peeling_painted_wall", Color.white);
             Pbr("Real_Brick", "large_red_bricks", Color.white);
             Pbr("Real_DarkPlanks", "dark_planks", Color.white);
-            Pbr("Real_Plaster2", "plastered_wall", new Color(0.92f, 0.9f, 0.8f));
             // the mansion of R.E.P.O.
             Pbr("Real_Wallpaper", "decrepit_wallpaper", Color.white);
             Pbr("Real_PaneledWood", "dark_paneled_wood", Color.white);
@@ -274,25 +295,30 @@ namespace Stealth.EditorTools
         /// </summary>
         static MaterialVariants[] BuildMaterialVariants()
         {
-            var originals = new[] { "Environment", "Props", "Robots", "Player" }
-                .SelectMany(MaterialsIn)
-                .Where(m => m.shader != null && m.shader.name == "Universal Render Pipeline/Lit" && !m.IsKeywordEnabled("_EMISSION"))
-                .ToArray();
+            static bool Plain(Material m) => m.shader != null && m.shader.name == "Universal Render Pipeline/Lit" && !m.IsKeywordEnabled("_EMISSION");
+            var originals = new[] { "Environment", "Props", "Robots", "Player" }.SelectMany(MaterialsIn).Where(Plain).ToArray();
+            var items = MaterialsIn("Items").Where(m => Plain(m) && ItemSurfaces.ContainsKey(m.name)).ToArray();
             var sets = new List<MaterialVariants>();
             foreach (ModelFamily f in System.Enum.GetValues(typeof(ModelFamily)))
             {
                 if (f == ModelFamily.None) continue;
                 var to = new List<Material>();
-                foreach (var o in originals)
+                // the items are made of something only among scanned surfaces; elsewhere they stay as painted
+                var here = f == ModelFamily.Realistic ? originals.Concat(items).ToArray() : originals;
+                foreach (var o in here)
                 {
                     var m = LitAsset($"{FamilyMaterialsDir}/{f}/{o.name}.mat");
                     m.CopyPropertiesFromMaterial(o);
                     m.shaderKeywords = o.shaderKeywords;
-                    FamilyLook(m, o, f);
+                    if (ItemSurfaces.TryGetValue(o.name, out var item) && items.Contains(o))
+                    {
+                        if (AssetDatabase.IsValidFolder($"{SurfaceTextures}/{item.surface}")) SetSurface(m, item.surface, o.GetColor("_BaseColor"), item.scale, thing: true);
+                    }
+                    else FamilyLook(m, o, f);
                     EditorUtility.SetDirty(m);
                     to.Add(m);
                 }
-                var from = originals.ToList();
+                var from = here.ToList();
                 // the derelict complex has no power: every screen is dead dark glass, not a glowing panel
                 var screen = AssetDatabase.LoadAssetAtPath<Material>($"{Root}/Art/Materials/Props/PropScreen.mat");
                 if (f == ModelFamily.Derelict && screen != null && K("Dr_Glass") != null) { from.Add(screen); to.Add(K("Dr_Glass")); }
@@ -363,6 +389,7 @@ namespace Stealth.EditorTools
         /// <summary>What a material becomes in a family, judged by its name (Wood, Fabric, Metal, …Body).</summary>
         static void FamilyLook(Material m, Material o, ModelFamily f)
         {
+            if (o.GetTexture("_BaseMap") != null) return; // printed (covers, spines): the picture is the thing
             string n = o.name;
             bool structure = n is "Wall" or "Floor" or "Ceiling" or "OutsideGround" or "Blinds" or "WindowFrame";
             bool wood = n.Contains("Wood") || n == "DoorFrame" || n == "PingPong";
@@ -429,6 +456,29 @@ namespace Stealth.EditorTools
 
         // ------------------------------------------------------------------ scanned furniture
 
+        /// <summary>Scans that stand for a piece of ours with a screen: they get a computer of their own (our screen is hidden with the rest).</summary>
+        static readonly HashSet<string> ScannedMonitors = new() { "metal_office_desk" };
+
+        /// <summary>A screen, keyboard and mouse (Tools/Blender/desk_monitor.py) on a scanned desk's top, kept in shape whatever the desk is stretched by.</summary>
+        static void AddMonitor(GameObject desk, Bounds bounds, Vector3 stretch)
+        {
+            var m = Model("desk_monitor");
+            m.name = "Monitor";
+            m.transform.SetParent(desk.transform, false);
+            m.transform.localScale = new Vector3(1f / stretch.x, 1f / stretch.y, 1f / stretch.z);
+            m.transform.localPosition = new Vector3(bounds.center.x, bounds.max.y, bounds.center.z - 0.12f / stretch.z);
+            var plastic = LitAsset($"{FamilyMaterialsDir}/Scanned/desk_monitor.mat");
+            plastic.SetColor("_BaseColor", new Color(0.035f, 0.036f, 0.038f));
+            plastic.SetFloat("_Smoothness", 0.42f);
+            EditorUtility.SetDirty(plastic);
+            foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                r.sharedMaterial = r.name.StartsWith("Eye") ? M("PropScreen") : MachineMaterial(r.name) is { } made ? M(made) : plastic;
+                r.shadowCastingMode = r.name.StartsWith("Eye") ? ShadowCastingMode.Off : ShadowCastingMode.On;
+            }
+            foreach (var c in m.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+        }
+
         /// <summary>
         /// Prefabs of the scanned CC0 furniture (Art/External/Models, materials from their texture folders) and where each
         /// goes: stretched into the bounds of our model (never larger, at most 25 % out of proportion), standing on its floor.
@@ -445,6 +495,15 @@ namespace Stealth.EditorTools
                 var imp = AssetImporter.GetAtPath(fbx) as ModelImporter;
                 if (imp == null) continue;
                 if (imp.materialImportMode != ModelImporterMaterialImportMode.None) { imp.materialImportMode = ModelImporterMaterialImportMode.None; imp.SaveAndReimport(); }
+                string ourPath;
+                try { ourPath = ModelPath(ours); }
+                catch (FileNotFoundException) { continue; }
+                var ob = BoundsOf(AssetDatabase.LoadAssetAtPath<GameObject>(ourPath), skipGlow: true);
+                var nb = BoundsOf(AssetDatabase.LoadAssetAtPath<GameObject>(fbx));
+                var s = new Vector3(ob.size.x / nb.size.x, ob.size.y / nb.size.y, ob.size.z / nb.size.z);
+                float mean = Mathf.Pow(s.x * s.y * s.z, 1f / 3f);
+                s = new Vector3(Mathf.Min(s.x, mean * 1.25f), Mathf.Min(s.y, mean * 1.25f), Mathf.Min(s.z, mean * 1.25f));
+                bool ownScreen = ScannedMonitors.Contains(id);
                 var prefab = Prefab($"{KitPrefabsDir}/Scanned/{id}.prefab", () =>
                 {
                     var go = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(fbx));
@@ -464,21 +523,14 @@ namespace Stealth.EditorTools
                         r.shadowCastingMode = ShadowCastingMode.On;
                     }
                     foreach (var c in go.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+                    if (ownScreen) AddMonitor(go, nb, s);
                     return go;
                 });
-                string ourPath;
-                try { ourPath = ModelPath(ours); }
-                catch (FileNotFoundException) { continue; }
                 var ourMeshes = AssetDatabase.LoadAllAssetsAtPath(ourPath).OfType<Mesh>().ToArray();
                 var key = ourMeshes.FirstOrDefault(m => m.name == "Body") ?? ourMeshes.FirstOrDefault();
                 if (key == null) continue;
-                var ob = BoundsOf(AssetDatabase.LoadAssetAtPath<GameObject>(ourPath), skipGlow: true);
-                var nb = BoundsOf(prefab);
-                var s = new Vector3(ob.size.x / nb.size.x, ob.size.y / nb.size.y, ob.size.z / nb.size.z);
-                float mean = Mathf.Pow(s.x * s.y * s.z, 1f / 3f);
-                s = new Vector3(Mathf.Min(s.x, mean * 1.25f), Mathf.Min(s.y, mean * 1.25f), Mathf.Min(s.z, mean * 1.25f));
                 var pos = new Vector3(ob.center.x - nb.center.x * s.x, ob.min.y - nb.min.y * s.y, ob.center.z - nb.center.z * s.z);
-                list.Add(new PropReplacement { Family = ModelFamily.Realistic, Key = key, Prefab = prefab, Position = pos, Scale = s });
+                list.Add(new PropReplacement { Family = ModelFamily.Realistic, Key = key, Prefab = prefab, Position = pos, Scale = s, HideGlow = ownScreen });
             }
             AssetDatabase.SaveAssets();
             return list.ToArray();

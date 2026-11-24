@@ -20,23 +20,8 @@ namespace Stealth.Configs
         public float VaultWallTile = 2f, VaultFloorTile = 1f;
         [Tooltip("The metal strip over a doorway where two different floors meet")]
         public Material Threshold;
-        [Tooltip("The auto repair shop in every style (Level.ShopLook): painted block walls with a dark band low, an epoxy floor, a metal deck overhead")]
-        public Material ShopWall, ShopWallLower, ShopFloor, ShopCeiling;
-        [Tooltip("The shop's paint booth: white filter panels on the walls and overhead, a steel grating underfoot")]
-        public Material BoothWall, BoothFloor, BoothCeiling;
-        [Tooltip("The hospital in every style (Level.ClinicLook): washable paint over a wall-protection band, the wards warmer, acoustic tiles, sheet vinyl")]
-        public Material ClinicWall, ClinicWardWall, ClinicGuard, ClinicCeiling, ClinicFloor;
-        [Tooltip("The hospital's theatres and imaging rooms: white panels, a seamless green-grey floor")]
-        public Material TheatreWall, TheatreFloor;
-        [Tooltip("The apartment block (Level.HomeLook): papered flats over parquet, painted kitchens over tiles, tiled bathrooms, the stairwell's oil-painted band.")]
-        public Material HomeWallpaper, HomeWallpaperBed, HomeWallpaperHall, HomeParquet, HomeCeiling, HomeKitchenWall, HomeKitchenTile, HomeKitchenFloor,
-            HomeBathTile, HomeBathFloor, HomeStairWall, HomeStairLower, HomeStairFloor;
-        [Tooltip("The abandoned research station in every style (Level.DerelictLook): steel wall panels, floor plates, vented ceiling panels, rusted trims and pipes, painted beams")]
-        public Material DerelictWall, DerelictFloor, DerelictCeiling, DerelictRust, DerelictPaint;
-        [Tooltip("The station's wet rooms (a tiled band) and its quarters' scuffed vinyl floor")]
-        public Material DerelictTiles, DerelictVinyl;
-        [Tooltip("The station's decay: chunks on the floors, stains on the walls, old posters")]
-        public Material[] FloorDecay = new Material[0], WallDecay = new Material[0], Posters = new Material[0];
+        [Tooltip("What hangs on walls for the look of it, indexed by Level.WallThing (framed prints, signs, a thermostat, a grille)")]
+        public GameObject[] Things = new GameObject[0];
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

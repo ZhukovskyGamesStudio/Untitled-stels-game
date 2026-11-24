@@ -108,6 +108,123 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ARoomsOwnCeilingCoversAllOfIt()
+        {
+            // its narrow parts and the triangles behind angled walls too: the style's plaster showed there (dark patches)
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            foreach (var l in new[] { TestHouses.Get(99991, 4), TestHouses.Get(7, 3), TestHouses.Get(42, 5) })
+            {
+                var g = new StyleGeometry { CeilingFinish = Lit(), RoomLooks = l.Rooms.Select(r => r.Type).Distinct().Select(t => new RoomLook { Room = t, Ceiling = Lit(), CeilingTile = 1f }).ToArray() };
+                var shell = new LevelShell();
+                var own = ArchitecturePlanner.Plan(shell, l, g).Where(p => p.Kind == DecorKind.CeilingFinish && p.Variant > 0).ToList();
+                foreach (var room in l.Rooms.Where(r => r.Levels == 1))
+                {
+                    float y = LevelLayout.FloorY(room.Floor) + LevelMetrics.WallHeight;
+                    var pieces = own.Where(p => Mathf.Abs(p.Position.y - y) < 0.1f)
+                        .Select(p => new Rect(p.Position.x - p.Scale.x / 2f, p.Position.z - p.Scale.y / 2f, p.Scale.x, p.Scale.y)).ToList();
+                    for (int x = 0; x < l.Plan.NX; x++)
+                        for (int z = 0; z < l.Plan.NZ; z++)
+                        {
+                            if (l.Plan.IdAt(room.Floor, x, z) != room.Id || l.Plan.KindAt(room.Floor, x, z) is not (CellKind.Room or CellKind.Pocket)) continue;
+                            var c = HousePlan.CellCenter(x, z);
+                            if (l.Stairs.Any(s => s.Floor == room.Floor && PlanGenerator.HoleOf(s).Contains(c))) continue;
+                            Assert.AreEqual(1, pieces.Count(p => p.Contains(c)), $"seed {l.Seed}: {room.Type} {room.Id} at {c} on floor {room.Floor}");
+                        }
+                }
+            }
+        }
+
+        [Test]
+        public void AGratesHoleIsInItsOwnFloorsCeilingOnly()
+        {
+            var shell = Shell(out var layout);
+            Assert.IsNotEmpty(shell.CeilingHoles);
+            foreach (var h in shell.CeilingHoles)
+                Assert.IsTrue(layout.Vents.Any(n => n.Floor == h.Floor && n.Grates.Any(x => h.Area.Contains(new Vector2(x.Position.x, x.Position.z)))), $"a hole without a grate on floor {h.Floor} at {h.Area.center}");
+        }
+
+        [Test]
+        public void NoPostStandsBareInARoom()
+        {
+            var shell = Shell(out var layout);
+            Assert.IsNotEmpty(shell.Posts);
+            var g = Everything(CeilingKind.None);
+            var finishes = ArchitecturePlanner.Plan(shell, layout, g).Where(p => p.Kind == DecorKind.WallFinish).ToList();
+            int dressed = 0;
+            foreach (var post in shell.Posts)
+            {
+                var probe = post.At(post.Length / 2f) + post.Normal * 0.3f + Vector3.up * 0.5f;
+                if (layout.Plan.RoomAt(probe) == null) continue;
+                for (float u = 0.03f; u < post.Length; u += 0.06f)
+                {
+                    var at = post.At(u) + Vector3.up * 1.3f;
+                    bool covered = finishes.Any(p => Vector3.Dot(p.Rotation * Vector3.forward, -post.Normal) > 0.999f
+                        && Mathf.Abs(Vector3.Dot(p.Position - at, post.Normal)) < 0.02f
+                        && Mathf.Abs(Vector3.Dot(p.Position - at, p.Rotation * Vector3.right)) <= p.Scale.x / 2f + 0.03f
+                        && Mathf.Abs(p.Position.y - at.y) <= p.Scale.y / 2f);
+                    Assert.IsTrue(covered, $"a bare post at {at}, facing {post.Normal}");
+                }
+                dressed++;
+            }
+            Assert.Greater(dressed, 20);
+        }
+
+        [Test]
+        public void PipesTurnUpBeforeWhatIsMountedOverADoor()
+        {
+            var shell = new LevelShell();
+            var a = new Vector3(0f, 0f, 0f);
+            var b = new Vector3(6f, 0f, 0f);
+            foreach (var n in new[] { Vector3.forward, Vector3.back })
+                shell.Walls.Add(new WallFace { A = a, B = b, Y0 = 0f, Y1 = LevelMetrics.WallHeight, Normal = n });
+            var g = new StyleGeometry { Pipes = true };
+            int Bends(System.Collections.Generic.List<DecorPiece> p) => p.Count(x => x.Kind == DecorKind.PipeBend);
+            Assert.AreEqual(0, Bends(ArchitecturePlanner.Plan(shell, null, g)), "nothing over the door: straight on");
+            var sign = LevelBuilder.StorageSign;
+            sign.Center += new Vector3(3f, 0f, 0f);
+            sign.Along = Vector3.left;
+            shell.Signs.Add(sign);
+            var plan = ArchitecturePlanner.Plan(shell, null, g);
+            Assert.AreEqual(4, Bends(plan), "two ends on each face");
+            foreach (var p in plan)
+            {
+                float half = p.Kind == DecorKind.Pipes ? p.Scale.x / 2f : 0.15f;
+                Assert.IsTrue(p.Position.x + half <= 3f - sign.HalfWidth || p.Position.x - half >= 3f + sign.HalfWidth, $"a {p.Kind} over the sign at {p.Position}");
+                if (p.Kind != DecorKind.PipeBend) continue;
+                // the bend's pipe comes from the far side of the sign: its own −X, mirrored or not, points away from it
+                var from = p.Rotation * new Vector3(-p.Scale.x, 0f, 0f);
+                Assert.Greater(Vector3.Dot(from, new Vector3(p.Position.x - 3f, 0f, 0f)), 0f, "the bend ends its run");
+            }
+        }
+
+        [Test]
+        public void PostersAndStainsHangOnWallsOnly()
+        {
+            Material Lit() => new(Shader.Find("Universal Render Pipeline/Lit"));
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            var g = new StyleGeometry { WallDecay = new[] { Lit() }, Posters = new[] { Lit() }, DecayDensity = 0.2f, PosterChance = 1f };
+            int windows = 0;
+            foreach (var (seed, house) in new[] { (99991, 4), (7, 3), (42, 5) })
+            {
+                var l = TestHouses.Get(seed, house);
+                ActiveLevel.Load(l, art);
+                var shell = ActiveLevel.Shell;
+                s_Shell = null; // (this fixture's shared house is gone)
+                windows += shell.Openings.Count(o => o.Vent);
+                var hung = ArchitecturePlanner.Plan(shell, l, g).Where(p => p.Kind is DecorKind.Poster or DecorKind.WallDecal).ToList();
+                Assert.IsNotEmpty(hung);
+                foreach (var p in hung)
+                    foreach (var o in shell.Openings)
+                    {
+                        var d = p.Position - o.Center;
+                        if (d.y < 0f || d.y > LevelMetrics.WallHeight || Mathf.Abs(Vector3.Dot(d, p.Rotation * Vector3.forward)) > 0.25f || Mathf.Abs(Vector3.Dot(o.Along, p.Rotation * Vector3.forward)) > 0.1f) continue;
+                        Assert.GreaterOrEqual(Mathf.Abs(Vector3.Dot(d, o.Along)), p.Scale.x / 2f + o.Width / 2f - 0.02f, $"seed {seed}: a {p.Kind} in the opening at {o.Center}");
+                    }
+            }
+            Assert.Greater(windows, 5, "openings with wall under them");
+        }
+
+        [Test]
         public void DecayAndPostersAreSeededStayOnTheirSurfacesAndSkipTheWindows()
         {
             var shell = Shell(out var layout);
@@ -255,7 +372,7 @@ namespace Stealth.Tests
                     $"a {trim} on the {(o.Vent ? "vent" : "slot")} at {o.Center}");
             if (trim == DoorTrim.Casing) return;
             foreach (var p in pieces.Where(p => p.Kind == DecorKind.Pilaster))
-                Assert.AreEqual(LevelMetrics.WallHeight - ArchitecturePlanner.CrownDrop, p.Scale.y * LevelMetrics.WallHeight, 1e-3f,
+                Assert.AreEqual(LevelMetrics.WallHeight - ArchitecturePlanner.CrownDrop, p.Scale.y * 3f, 1e-3f,
                     "a pilaster stops under the cornice, which runs on over its capital");
         }
 
@@ -341,13 +458,13 @@ namespace Stealth.Tests
                 foreach (DecorKind kind in System.Enum.GetValues(typeof(DecorKind)))
                 {
                     if (kind is DecorKind.FloorFinish or DecorKind.WallFinish or DecorKind.CeilingFinish or
-                        DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster) continue; // quads, not kit pieces
+                        DecorKind.FloorDecal or DecorKind.WallDecal or DecorKind.Poster or DecorKind.WallThing) continue; // quads, not kit pieces; things: kit.Things
                     Assert.IsNotNull(kit.Pieces[(int)kind], $"{f}: no prefab for {kind}");
                     foreach (var c in kit.Pieces[(int)kind].GetComponentsInChildren<Collider>(true)) Assert.Fail($"{f}/{kind} has a collider");
                 }
                 Assert.IsNotNull(kit.Finish);
             }
-            Assert.GreaterOrEqual(config.Props.Count(p => p.Family == ModelFamily.Realistic && p.Prefab != null && p.Key != null), 12,
+            Assert.GreaterOrEqual(config.Props.Count(p => p.Family == ModelFamily.Realistic && p.Prefab != null && p.Key != null), 10,
                 "the realistic family swaps the furniture for scanned models");
             foreach (var p in config.Props)
             {

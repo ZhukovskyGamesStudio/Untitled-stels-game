@@ -103,6 +103,8 @@ namespace Stealth.Configs
         [Tooltip("Floor decals per square metre (walls: per metre of wall × 0.6); 0 = none")] public float DecayDensity;
         [Tooltip("Posters on the walls")] public Material[] Posters = new Material[0];
         [Range(0, 1), Tooltip("Chance of a poster on 4 m of wall")] public float PosterChance;
+        [Range(0, 2), Tooltip("Things hung on the walls per 4 m of free wall: framed prints, certificates, signs, thermostats (Level.WallThings picks by room); 0 = bare walls")]
+        public float ThingChance;
 
         [Header("Players")]
         [Tooltip("A rigged human (Player/HumanRig) shown instead of the player model; null = the style's player models")]
@@ -135,16 +137,25 @@ namespace Stealth.Configs
             return -1;
         }
 
-        /// <summary>The index in <see cref="RoomLooks"/> of a room type's own look, or −1.</summary>
-        public int RoomLookOf(Stealth.Level.RoomType room)
+        /// <summary>
+        /// The index in <see cref="RoomLooks"/> of a room type's own look, or −1. A type listed several times has that many
+        /// looks to choose from: <paramref name="pick"/> (a number of the room, from the house seed) takes one — every wall
+        /// of one room asks with the same number.
+        /// </summary>
+        public int RoomLookOf(Stealth.Level.RoomType room, int pick = 0)
         {
             if (RoomLooks == null) return -1;
+            int first = -1, count = 0;
             for (int i = 0; i < RoomLooks.Length; i++)
-                if (RoomLooks[i].Room == room) return i;
-            return -1;
+                if (RoomLooks[i].Room == room) { if (count++ == 0) first = i; }
+            if (count <= 1) return first;
+            int want = (int)((uint)pick % (uint)count);
+            for (int i = 0; i < RoomLooks.Length; i++)
+                if (RoomLooks[i].Room == room && want-- == 0) return i;
+            return first;
         }
 
-        /// <summary>A copy (the arrays shared until replaced): a house kind dresses itself on top of the style (Level.ShopLook).</summary>
+        /// <summary>A copy (the arrays shared until replaced): a house dresses itself on top of the style (<see cref="HouseLook"/>).</summary>
         public StyleGeometry Clone() => (StyleGeometry)MemberwiseClone();
 
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
@@ -175,7 +186,15 @@ namespace Stealth.Configs
         public Color VignetteColor = Color.black;
         [Range(0, 1)] public float ChromaticAberration;
         [Range(0, 1)] public float FilmGrain;
+        [Range(0, 1), Tooltip("Shiny and metal things mirror what is on the screen (0 = not at all). Nothing else is mirrored: a dark room stays dark")] public float Reflections;
+        [Range(0, 2), Tooltip("Bounced light: lit surfaces on the screen light what faces them — a ceiling over a lit floor, the underside of a desk (0 = none). A picture only; a dark room stays dark")]
+        public float Bounce;
+        [Range(0.5f, 6f), Tooltip("How far a surface throws its bounced light, metres")] public float BounceReach = 4.5f;
+        [Range(0, 3), Tooltip("Room fill: the soft light a room's burning lamps leave in it after bouncing off its walls — shadows in a lit room are not black (0 = none). Never crosses a wall; a room with its lamps off gets nothing. A picture only")]
+        public float RoomFill;
         [Range(-1, 1)] public float LensDistortion;
+
+        public StyleGrade Clone() => (StyleGrade)MemberwiseClone();
     }
 
     /// <summary>The whole-screen filter (Art/Shaders/StyleScreen.shader). Zero = that part is off.</summary>
@@ -277,6 +296,8 @@ namespace Stealth.Configs
         [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 8f;
         [Tooltip("Above that it thins out over this many metres (exponentially): the sky shows overhead and from upper floors")]
         public float GasFalloff = 4f;
+
+        public StyleWorld Clone() => (StyleWorld)MemberwiseClone();
     }
 
     /// <summary>How the colours of the world change, by kind of material.</summary>

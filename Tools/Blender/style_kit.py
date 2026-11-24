@@ -20,7 +20,8 @@ import meshfix  # noqa: E402
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 base_dir = argv[0] if argv else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models", "StyleKit")
 # no family: the plain kit in StyleKit/; with families: StyleKit/<Family>/ reshaped like the family's models
-FAMILIES = argv[1:] or [None]
+ONLY = [a[5:] for a in argv if a.startswith("only=")]      # only=pipes: just these pieces
+FAMILIES = [a for a in argv[1:] if not a.startswith("only=")] or [None]
 family = None
 out_dir = base_dir
 
@@ -50,6 +51,36 @@ def cyl_x(r, d, z, x0=-0.5, x1=0.5, seg=12):
     bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r, radius2=r, depth=x1 - x0)
     bmesh.ops.rotate(bm, cent=Vector((0, 0, 0)), matrix=Matrix.Rotation(math.pi / 2, 3, "Y"), verts=bm.verts)
     bmesh.ops.translate(bm, vec=Vector(((x0 + x1) / 2, -d, z)), verts=bm.verts)
+    return bm
+
+
+def cyl_z(r, d, x, z0, z1, seg=12):
+    """Upright cylinder at depth d."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r, radius2=r, depth=z1 - z0)
+    bmesh.ops.translate(bm, vec=Vector((x, -d, (z0 + z1) / 2)), verts=bm.verts)
+    return bm
+
+
+def elbow(r, d, z, turn, top=2.78, seg=12, steps=6):
+    """A pipe along +x at depth d and height z, ending at x = 0: it turns up (radius `turn` at its middle) and runs to `top`."""
+    path = [(-0.03, z, 0.0)]                                                     # x, z, how far turned up
+    path += [(turn * math.sin(a), z + turn * (1 - math.cos(a)), a) for a in (math.pi / 2 * k / steps for k in range(steps + 1))]
+    path.append((turn, top, math.pi / 2))
+    bm = bmesh.new()
+    rings = []
+    for x, h, a in path:
+        ring = []
+        for k in range(seg):
+            t = 2 * math.pi * k / seg
+            out, side = r * math.cos(t), r * math.sin(t)                         # out: away from the bend's middle
+            ring.append(bm.verts.new((x + out * math.sin(a), -d + side, h - out * math.cos(a))))
+        rings.append(ring)
+    for a, b in zip(rings, rings[1:]):
+        for k in range(seg):
+            bm.faces.new((a[k], a[(k + 1) % seg], b[(k + 1) % seg], b[k]))
+    bm.faces.new(rings[0])
+    bm.faces.new(list(reversed(rings[-1])))
     return bm
 
 
@@ -188,6 +219,10 @@ def pipes():
     export("kit_pipes")
     merge("Accent", [box(-0.03, 0.03, 0, 0.3, 2.55, 2.58), box(-0.03, 0.03, 0.09, 0.15, 2.55, 2.69), box(-0.025, 0.025, 0.23, 0.29, 2.66, 2.74)])
     export("kit_pipe_clamp")
+    # where a run ends (it comes from -x): both pipes turn up into the ceiling (2.75 m), a collar where each goes through it
+    merge("Body", [elbow(0.06, 0.12, 2.62, 0.09), elbow(0.035, 0.26, 2.7, 0.045)])
+    merge("Accent", [cyl_z(0.085, 0.12, 0.09, 2.735, 2.76), cyl_z(0.055, 0.26, 0.045, 2.735, 2.76)])
+    export("kit_pipe_bend")
 
 
 def strip():
@@ -303,5 +338,6 @@ if __name__ == "__main__":
         out_dir = base_dir if family is None else os.path.join(base_dir, family.capitalize())
         clear()
         for fn in (baseboard, crown, rail, wainscot, pipes, strip, pilaster, casing, arch, beam, ibeam, coffer, tray):
-            fn()
+            if not ONLY or fn.__name__ in ONLY:
+                fn()
     print("DONE")

@@ -331,7 +331,7 @@ namespace Stealth.Tests
             {
                 var m = r.sharedMaterial;
                 Assert.IsNotNull(m, $"{r.name}: no material");
-                triangles += r.sharedMesh.triangles.Length / 3;
+                if (r.enabled) triangles += r.sharedMesh.triangles.Length / 3; // (the own view's skin is drawn instead of the other)
                 if (WardrobeRules.PartOf(r.name) == "Hair")
                 {
                     // hair cards: the strand texture cut out by alpha, both sides

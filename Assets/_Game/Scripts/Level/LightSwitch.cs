@@ -50,7 +50,7 @@ namespace Stealth.Level
             if (Index < 0) return;
             int on = LightsOn ? 1 : 0;
             if (on == m_Shown) return;
-            if (m_Shown >= 0) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Click : null, Point, 0.6f, Audio.Sfx.Group.Items);
+            if (m_Shown >= 0) Audio.Sfx.At(Audio.Sfx.Bank == null ? null : on == 1 ? Audio.Sfx.Bank.SwitchOn : Audio.Sfx.Bank.SwitchOff, Point, 0.8f, Audio.Sfx.Group.Items);
             m_Shown = on;
             if (Rocker != null) Rocker.localRotation = Quaternion.Euler(on == 1 ? -9f : 9f, 0f, 0f);
             if (Led != null) Led.enabled = on == 0;

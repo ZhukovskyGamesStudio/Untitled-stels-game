@@ -70,7 +70,7 @@ namespace Stealth.Player
             var host = safe != null ? safe.transform : CrackingConsole != null ? CrackingConsole.transform : null;
             bool away = host == null || (safe != null && safe.Opened) || (CrackingConsole != null && CrackingConsole.Solved)
                         || (host.position - transform.position).magnitude > Items.SafeBox.Reach + 0.6f;
-            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
+            if (away) // (Esc leaves: LeaveModeOnEscape; E tries a number here)
             {
                 StopCracking();
                 return;
@@ -80,7 +80,7 @@ namespace Stealth.Player
             {
                 int ticks = Cracking.Turn(mouse.delta.ReadValue().x);
                 if (ticks > 0)
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, host.position + Vector3.up, 0.15f + 0.85f * Cracking.Closeness(), Audio.Sfx.Group.Items,
+                    Audio.Sfx.At(Audio.Sfx.Bank?.SafeTick, host.position + Vector3.up, 0.15f + 0.85f * Cracking.Closeness(), Audio.Sfx.Group.Items,
                         0.8f + 0.5f * Cracking.Closeness());
             }
             bool tryNow = Time.frameCount != m_CrackStartFrame &&
@@ -100,14 +100,14 @@ namespace Stealth.Player
             {
                 case Items.SafeLock.Result.Wrong:
                     // A loud clank: robots with ears may come.
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Drop, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items, 0.6f);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Clank, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
                     EmitNoise(Tuning.Items.Safes.WrongNoise);
                     break;
                 case Items.SafeLock.Result.Digit:
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Pickup, host.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items, 1.3f);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Latch, host.position + Vector3.up, 0.9f, Audio.Sfx.Group.Items);
                     break;
                 case Items.SafeLock.Result.Opened:
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Stash, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.Unlock, host.position + Vector3.up, 1f, Audio.Sfx.Group.Items);
                     if (safe != null)
                     {
                         Link.SendUse(UseKind.Safe, safe.Index);

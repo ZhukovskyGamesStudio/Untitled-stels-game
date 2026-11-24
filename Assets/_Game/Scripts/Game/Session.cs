@@ -196,6 +196,8 @@ namespace Stealth.Game
         void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target);
         /// <summary>Server → everyone: the house is over — who did what in it and the titles (<see cref="HouseStats.Pack"/>).</summary>
         void BroadcastHouseStats(string packed);
+        /// <summary>Server → everyone: a sound somewhere (what only the server decides: a thing crafted, someone healed).</summary>
+        void BroadcastSound(Stealth.Audio.GameSound sound, Vector3 at);
     }
 
     /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>

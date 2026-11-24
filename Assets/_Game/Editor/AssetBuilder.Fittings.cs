@@ -54,6 +54,24 @@ namespace Stealth.EditorTools
                 return go;
             });
             Link(art, ref art.LightSwitch, lightSwitch);
+            // the way out of the storage room (ExitButton): a steel box on the wall with a big lit push button; +Z out of the
+            // wall, the pivot in the box's middle on the wall's face
+            var exitButton = Prefab($"{LevelPrefabs}/ExitButton.prefab", () =>
+            {
+                var go = new GameObject("ExitButton");
+                ChamferBox(go.transform, "Box", new Vector3(0f, 0f, 0.02f), new Vector3(0.11f, 0.15f, 0.04f), util[(int)UtilitySlot.Panel], 0.004f);
+                ChamferBox(go.transform, "Collar", new Vector3(0f, 0.01f, 0.043f), new Vector3(0.072f, 0.072f, 0.008f), util[(int)UtilitySlot.Dark], 0.003f);
+                var cap = new GameObject("Cap").transform;
+                cap.SetParent(go.transform, false);
+                cap.localPosition = new Vector3(0f, 0.01f, 0.047f);
+                ChamferBox(cap, "Button", new Vector3(0f, 0f, 0.006f), new Vector3(0.056f, 0.056f, 0.014f), util[(int)UtilitySlot.Plate], 0.004f);
+                var glow = Cube(cap, "Lamp", new Vector3(0f, 0f, 0.0135f), new Vector3(0.036f, 0.036f, 0.002f), led, collider: false);
+                var b = go.AddComponent<ExitButton>();
+                b.Cap = cap;
+                b.Lamp = glow.GetComponent<MeshRenderer>();
+                return go;
+            });
+            Link(art, ref art.ExitButton, exitButton);
             // a grate in a room's ceiling (VentGrate, the way into the crawl ducts): a frame in the ceiling board and a grille
             // on a hinge along one edge that swings down while a player is near; the pivot in the frame's middle on the ceiling
             var ventGrate = Prefab($"{LevelPrefabs}/VentGrate.prefab", () =>

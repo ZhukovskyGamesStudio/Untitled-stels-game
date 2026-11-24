@@ -1,3 +1,5 @@
+using Stealth.Level;
+using System.Linq;
 using Stealth.Enemies;
 using NUnit.Framework;
 using UnityEngine;
@@ -135,7 +137,64 @@ namespace Stealth.Tests
                 if (p.propertyType != SerializedPropertyType.ObjectReference || p.name == "m_Script") continue;
                 Assert.IsNotNull(p.objectReferenceValue, $"SoundBank.{p.propertyPath}");
             }
-            Assert.AreEqual(4, bank.Footsteps.Length);
+            foreach (StepSurface surface in System.Enum.GetValues(typeof(StepSurface)))
+                Assert.AreEqual(4, bank.Steps(surface).Distinct().Count(), $"{surface}: four different steps");
+            foreach (GameSound sound in System.Enum.GetValues(typeof(GameSound))) Assert.IsNotNull(bank.Of(sound), sound.ToString());
+            Assert.AreEqual(3, bank.GasCough.Length);
+            foreach (var takes in new[] { bank.WorkHack, bank.WorkPick, bank.WorkScrew, bank.WorkUnit }) Assert.GreaterOrEqual(takes.Length, 3);
+        }
+
+        [Test]
+        public void StepsOnEveryFloorAreAboutAsLoud()
+        {
+            // the surface is heard, it does not matter to anyone's ears: no floor's steps stand out
+            var bank = AssetDatabase.LoadAssetAtPath<SoundBank>("Assets/_Game/Data/SoundBank.asset");
+            var loud = new System.Collections.Generic.Dictionary<StepSurface, float>();
+            foreach (StepSurface surface in System.Enum.GetValues(typeof(StepSurface)))
+            {
+                float sum = 0f;
+                foreach (var clip in bank.Steps(surface))
+                {
+                    var data = new float[clip.samples * clip.channels];
+                    Assert.IsTrue(clip.GetData(data, 0), clip.name);
+                    float best = 0f;
+                    int n = clip.frequency / 20;
+                    for (int i = 0; i + n < data.Length; i += n / 4)
+                    {
+                        float e = 0f;
+                        for (int k = 0; k < n; k++) e += data[i + k] * data[i + k];
+                        best = Mathf.Max(best, Mathf.Sqrt(e / n));
+                    }
+                    sum += best;
+                }
+                loud[surface] = 20f * Mathf.Log10(sum / 4f);
+            }
+            Assert.Less(loud.Values.Max() - loud.Values.Min(), 5f, string.Join(", ", loud.Select(l => $"{l.Key} {l.Value:0.0}")));
+        }
+
+        [Test]
+        public void EveryFloorFinishOfTheGameHasItsStep()
+        {
+            Assert.AreEqual(StepSurface.Carpet, StepSurfaces.OfMaterial("Floor_CarpetBlue"));
+            Assert.AreEqual(StepSurface.Carpet, StepSurfaces.OfMaterial("Real_Carpet"));
+            Assert.AreEqual(StepSurface.Tile, StepSurfaces.OfMaterial("Real_CheckerTiles"));
+            Assert.AreEqual(StepSurface.Tile, StepSurfaces.OfMaterial("Real_Marble"));
+            Assert.AreEqual(StepSurface.Wood, StepSurfaces.OfMaterial("Real_Herringbone"));
+            Assert.AreEqual(StepSurface.Wood, StepSurfaces.OfMaterial("Home_Parquet"));
+            Assert.AreEqual(StepSurface.Soft, StepSurfaces.OfMaterial("Floor_Lino"));
+            Assert.AreEqual(StepSurface.Soft, StepSurfaces.OfMaterial("Clinic_Floor"));
+            Assert.AreEqual(StepSurface.Metal, StepSurfaces.OfMaterial("Dr_FloorPlate"));
+            Assert.AreEqual(StepSurface.Metal, StepSurfaces.OfMaterial("SewerGrate"));
+            Assert.AreEqual(StepSurface.Wet, StepSurfaces.OfMaterial("SewerConcrete"));
+            Assert.AreEqual(StepSurface.Concrete, StepSurfaces.OfMaterial("Real_ConcreteClean"));
+            Assert.AreEqual(StepSurface.Concrete, StepSurfaces.OfMaterial(null));
+            Assert.AreEqual(StepSurface.Metal, StepSurfaces.OfStairs(StairStyle.Steel));
+            // the styles' floors: only a bare slab is concrete by default
+            var styles = Resources.Load<Configs.GameConfig>(Configs.GameConfig.ResourcePath).Styles.Styles;
+            foreach (var style in styles)
+                foreach (var f in style.Geometry.RoomFloors)
+                    if (f.Material != null && !f.Material.name.Contains("Concrete"))
+                        Assert.AreNotEqual(StepSurface.Concrete, StepSurfaces.OfMaterial(f.Material.name), $"{style.name}: {f.Material.name} has no step of its own");
         }
 
         [Test]

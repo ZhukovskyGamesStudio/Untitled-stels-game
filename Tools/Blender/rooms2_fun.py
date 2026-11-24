@@ -273,8 +273,8 @@ def model_fume_hood():
 
 def model_printer_3d():
     """3D printer on a stand 0.7 x 0.7 x 1.6: a stand with a shelf of filament spools, a cube-frame printer (base with
-    a display, four posts, top rails, a gantry with the print head, Z rods carrying the glowing bed with a print on
-    it), a spool on a side holder feeding a filament tube to the head."""
+    a display, four posts, top rails, a gantry with the print head, Z rods and lead screws carrying the bed — a dark
+    build plate on its arms — with a print on it), a spool on a side holder feeding a filament tube to the head."""
     body = [s.rbox((0.7, 0.7, 0.04), (0, 0, 0.76), r=0.01, seg=2),
             s.rbox((0.66, 0.66, 0.025), (0, 0, 0.16), r=0.006, seg=1)]
     body += [s.rbox((0.045, 0.045, 0.745), (x, y, 0.3725), r=0.006, seg=1) for x in (-0.31, 0.31) for y in (-0.31, 0.31)]
@@ -290,7 +290,11 @@ def model_printer_3d():
     acc.append(s.rcyl(0.012, 0.03, (0.05, 0.0, 1.44), seg=10, r=0.002, radius2=0.004, bevel_seg=1))
     acc += [s.rcyl(0.006, 0.68, (x, 0.25, 1.21), seg=8, r=0.0) for x in (-0.12, 0.12)]            # Z rods
     acc.append(s.rbox((0.4, 0.03, 0.06), (0, 0.24, 1.09), r=0.006, seg=1))                        # Z carriage
-    acc += [s.rbox((0.03, 0.4, 0.025), (x, 0.04, 1.088), r=0.004, seg=1) for x in (-0.18, 0.18)]  # bed arms
+    acc += [s.rbox((0.045, 0.44, 0.03), (x, 0.03, 1.085), r=0.004, seg=1) for x in (-0.18, 0.18)]  # bed arms
+    acc.append(s.rbox((0.4, 0.045, 0.03), (0, -0.17, 1.085), r=0.004, seg=1))                     # …tied at the front
+    acc.append(s.rbox((0.46, 0.46, 0.014), (0, 0, 1.101), r=0.004, seg=1))                        # the bed: a dark textured build plate
+    acc += [s.rcyl(0.011, 0.66, (x, 0.25, 1.2), seg=10, r=0.0) for x in (-0.19, 0.19)]            # lead screws
+    acc += [s.rbox((0.05, 0.05, 0.05), (x, 0.25, 0.9), r=0.006, seg=1) for x in (-0.19, 0.19)]    # their motors on the base
     acc.append(s.rcyl(0.018, 0.02, (0.03, -0.285, 0.825), axis="Y", seg=12, r=0.004, bevel_seg=1))
     acc.append(s.rcyl(0.012, 0.11, (0.31, 0.26, 1.3), axis="X", seg=10, r=0.003, bevel_seg=1))   # spool holder
     acc.append(s.tube([(0.3, 0.22, 1.39), (0.25, 0.15, 1.585), (0.12, 0.05, 1.6), (0.05, 0.0, 1.525)], 0.005,
@@ -304,8 +308,8 @@ def model_printer_3d():
     trim.append(s.lathe([(0.0, 1.104), (0.05, 1.104), (0.06, 1.15), (0.045, 1.2), (0.035, 1.22), (0.0, 1.222)],
                         seg=16, loc=(-0.05, -0.03, 0)))
     s.part("Trim", trim)
-    s.part("Eye", [s.rbox((0.46, 0.46, 0.012), (0, 0, 1.1), r=0.004, seg=1),
-                   s.rbox((0.1, 0.01, 0.05), (-0.12, -0.28, 0.825), r=0.002, seg=1)])
+    # only the display on the base glows (the bed was in this part too: a sheet of blue light in mid-air)
+    s.part("Eye", [s.rbox((0.1, 0.01, 0.05), (-0.12, -0.28, 0.825), r=0.002, seg=1)])
     return export("printer_3d")
 
 
@@ -323,7 +327,11 @@ def model_component_shelf():
     body = [s.rbox((0.03, 0.03, 1.8), (x, y, 0.9), r=0.004, seg=1) for x in (-0.585, 0.585) for y in (-0.205, 0.205)]
     shelves = (0.08, 0.42, 0.76, 1.1, 1.44, 1.775)
     body += [s.rbox((1.17, 0.41, 0.03), (0, 0, z), r=0.005, seg=1) for z in shelves]
-    acc, trim = [], []
+    import machines as mc
+    goods, labels = [], []
+    colours = ("binred", "binblue", "binyellow", "binblue", "bingreen", "binred", "bingrey")
+    fill = ("chrome", "brass", "black", "copper", "tin", "white2", "rust", "orange")
+    n = 0
     for row, z in enumerate(shelves[:5]):
         z0 = z + 0.015 - 0.002
         if row < 2:
@@ -331,13 +339,14 @@ def model_component_shelf():
         else:
             xs, w, d, h = [-0.475 + k * 0.19 for k in range(6)], 0.175, 0.3, 0.17
         yf = -0.195
-        for k, x in enumerate(xs):
-            b = parts_bin(x, w, z0, yf, d, h)
-            (trim if (row + k) % 3 == 0 else acc).append(b)
-            body.append(s.rbox((w * 0.5, 0.004, 0.03), (x, yf - 0.0005, z0 + 0.25 * h), r=0))
+        for k, x in enumerate(xs):                                       # a shelf of one colour here, mixed there; every bin its parts and its label
+            goods.append((parts_bin(x, w, z0, yf, d, h), colours[row] if row % 2 else colours[(row * 3 + k) % 7]))
+            if (row * 5 + k * 3) % 7:
+                goods.append((s.rbox((w - 0.03, d * 0.62, h * 0.26), (x, yf + d * 0.62, z0 + 0.04 + h * 0.13), r=0.008, seg=1), fill[n % 8]))
+            labels.append(mc.Plate(f"binlabel{n % 8}", (x, yf - 0.002, z0 + 0.25 * h), w * 0.62, min(0.05, 0.3 * h), thick=0.004, rest="white2"))
+            n += 1
     s.part("Body", body)
-    s.part("Accent", acc)
-    s.part("Trim", trim)
+    mc.plates("Print", labels, goods)
     return export("component_shelf")
 
 
@@ -493,7 +502,7 @@ WHITE = (0, 2, 4, 5, 7, 9, 11)  # semitones of the white keys in an octave
 
 
 def model_synth_stand():
-    """Synth keyboard on an X-stand 1.3 x 0.5 x 0.95: a 61-key synth (red case, wooden-look end cheeks, white and
+    """Synth keyboard on an X-stand 1.3 x 0.5 x 0.95: a 73-key synth (red case, wooden-look end cheeks, white and
     black keys, pitch and mod wheels, a rear panel with knobs, buttons and a screen) on a double-tube X-stand with
     rubber-capped foot bars and padded arms."""
     acc = []
@@ -514,15 +523,15 @@ def model_synth_stand():
     acc += [s.rbox((0.03, 0.37, 0.1), (sx * 0.635, 0.0, 0.9), r=0.01, seg=1) for sx in (-1, 1)]
     trim = []
     kw, x_left, yk, zk = 0.0235, -0.47, -0.085, 0.923
-    for i in range(36):
+    for i in range(43):                                                                  # 73 keys: to the panel's end
         x = x_left + kw * (i + 0.5)
         trim.append(s.rbox((kw - 0.0015, 0.15, 0.02), (x, yk, zk + 0.01 - 0.004), r=0))
-    for octave in range(5):
+    for octave in range(7):
         for k, semi in enumerate(WHITE):
             if semi in (4, 11):
                 continue  # no black key after E and B
             i = octave * 7 + k
-            if i >= 35:
+            if i >= 42:
                 break
             x = x_left + kw * (i + 1)
             acc.append(s.rbox((0.012, 0.09, 0.012), (x, yk + 0.03, zk + 0.02 + 0.006 - 0.003), r=0))
@@ -697,7 +706,6 @@ def model_jukebox():
 
     acc = [s.rbox((0.8, 0.56, 0.08), (0, 0.025, 0.04), r=0.01, seg=2),
            arch(0.385, -0.255, 0.025, 0.022, 0.08),
-           s.rcyl(0.16, 0.02, (0, -0.195, 1.15), axis="Y", seg=28, r=0.003),
            rf.prism([(-0.245, 0.6), (-0.29, 0.62), (-0.29, 0.66), (-0.245, 0.8)], "X", -0.29, 0.29, bevel=0.008)]
     acc += [s.rbox((0.022, 0.02, 0.36), (x, -0.235, 0.36), r=0.006, seg=1) for x in (-0.18, -0.12, -0.06, 0, 0.06, 0.12, 0.18)]
     acc.append(s.rbox((0.012, 0.012, 0.045), (0.22, -0.292, 0.64), r=0))
@@ -712,7 +720,20 @@ def model_jukebox():
         t = 0.35 + 0.3 * (k // 3)
         p = Vector((-0.15 + (k % 3) * 0.075, -0.29 + 0.045 * t, 0.66 + 0.14 * t)) + n * 0.002
         buttons.append(s.rbox((0.05, 0.03, 0.008), tuple(p), r=0, rot=(slope, 0, 0)))
-    s.part("Eye", [arch(0.345, -0.27, 0.05, 0.06, 0.1), *buttons])
+    import machine_atlas as at
+    import machines as mc
+
+    def tube(n, c, co):                                                  # the light tubes: amber at the foot, violet at the crown
+        return mc.uv("tube", 0.5 + co.x * 1.1, 1 - min(1.0, max(0.0, (co.z - 0.1) / 1.5)), at.GLOW)
+    cards = mc.Plate("cards", (0, -0.212, 0.975), 0.44, 0.1, math.radians(18), at.GLOW)
+    glow = [(arch(0.345, -0.27, 0.05, 0.06, 0.1), tube)] + [(b, lambda n, c, co: mc.uv("button", 0.5, 0.5, at.GLOW)) for b in buttons]
+    mc.plates("Glow", [cards], glow)
+    disc = s.rcyl(0.16, 0.012, (0, -0.2, 1.2), axis="Y", seg=40, r=0.002, bevel_seg=1)
+    hub = s.rcyl(0.02, 0.03, (0, -0.208, 1.2), axis="Y", seg=16, r=0.004, bevel_seg=1)
+
+    def grooves(n, c, co):
+        return mc.uv("record", co.x / 0.33 + 0.5, (co.z - 1.2) / 0.33 + 0.5) if n.y < -0.6 else mc.plain("black")
+    mc.plates("Print", [], [(disc, grooves), (hub, "chrome"), (s.rbox((0.5, 0.01, 0.48), (0, -0.188, 1.16), r=0.002, seg=1), "red")])
     return export("jukebox")
 
 

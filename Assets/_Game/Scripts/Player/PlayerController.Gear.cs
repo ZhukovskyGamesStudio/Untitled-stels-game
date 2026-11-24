@@ -78,14 +78,14 @@ namespace Stealth.Player
             {
                 if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Medkit)) return true;
                 HealServer(HealthState.MaxHp - Hp);
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
+                GameManager.Instance?.SoundServer(Audio.GameSound.Heal, Hands);
                 return true;
             }
             if (e.Shape == ItemCatalog.Bandage)
             {
                 if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Bandage)) return true;
                 HealServer(Mathf.Min(Gear.BandageHp, HealthState.MaxHp - Hp));
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
+                GameManager.Instance?.SoundServer(Audio.GameSound.Bandage, Hands);
                 return true;
             }
             if (e.Shape == ItemCatalog.Espresso) return DrinkEspressoServer(inv);
@@ -93,6 +93,7 @@ namespace Stealth.Player
             {
                 if (!inv.TakeHeldServer(ItemCatalog.Coffee)) return true;
                 CoffeeUntil = System.Math.Max(CoffeeUntil, Session.ServerTime) + Gear.CoffeeSeconds;
+                GameManager.Instance?.SoundServer(Audio.GameSound.Drink, Hands + Vector3.up * 0.3f);
                 return true;
             }
             return false;
@@ -160,5 +161,9 @@ namespace Stealth.Player
 
         /// <summary>The keyboard is in this player's hand: robots can be hacked (devices need none).</summary>
         public bool HoldsKeyboard => GetComponent<PlayerInventory>() is { } inv && inv.Holds(ItemCatalog.Keyboard);
+        /// <summary>Robots and sensors are hacked by hand only with the keyboard in it (the autopilot of the scenarios hacks as it always did).</summary>
+        public bool CanHackByHand => HoldsKeyboard || DevFlags.AutoInteract;
+        /// <summary>Looking at a robot or a sensor one cannot hack now for want of the keyboard (and it carries nothing to search it for).</summary>
+        public bool HackNeedsKeyboard => HackTarget != null && !CanHackByHand && !Unscrewing && !(HackTarget is Enemies.RobotController && HackTarget.Cargo >= 0);
     }
 }

@@ -27,10 +27,10 @@ namespace Stealth.Level
         public static float CeilingGlow;
 
         /// <summary>
-        /// How bright this one light looks on this peer, × the style's scale (1: as set). Visual only, like
-        /// <see cref="VisualScale"/>: a fuel finder dims its flash in its own holder's eyes (<see cref="Items.FinderBlink"/>).
+        /// How much of this light is shown to the eye (1: all of it), on top of the style's scale: a lamp a hand's breadth from
+        /// the camera (the fuel finder's) would burn the picture out. Visual only: robots read the whole light.
         /// </summary>
-        [System.NonSerialized] public float LookScale = 1f;
+        [System.NonSerialized] public float VisualShare = 1f;
 
         Light m_Light;
         float m_Raw = -1f;      // the intensity the game set (lamp logic, flicker, alarm)
@@ -63,7 +63,7 @@ namespace Stealth.Level
             var l = Light;
             if (l == null) return;
             m_Raw = LightMath.RawIntensity(l.intensity, m_Raw, m_Shown);
-            m_Shown = m_Raw * VisualScale * LookScale;
+            m_Shown = m_Raw * VisualScale * VisualShare;
             l.intensity = m_Shown;
         }
 

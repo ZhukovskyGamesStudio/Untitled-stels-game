@@ -152,7 +152,11 @@ namespace Stealth.EditorTools
             Mat(props, "Rack", new Color(0.12f, 0.13f, 0.15f), smoothness: 0.5f);
             Mat(props, "RackLights", new Color(0.2f, 1f, 0.4f), new Color(0.06f, 0.48f, 0.15f));
             Mat(props, "Cardboard", new Color(0.62f, 0.47f, 0.3f));
-            Mat(props, "Water", new Color(0.4f, 0.7f, 1f), smoothness: 0.9f);
+            // a cooler's bottle: pale and see-through (it was a solid bright blue: a toy's)
+            var water = Mat(props, "Water", new Color(0.62f, 0.8f, 0.92f, 0.42f), smoothness: 0.92f);
+            water.SetColor("_BaseColor", new Color(0.62f, 0.8f, 0.92f, 0.42f));
+            Translucent(water);
+            EditorUtility.SetDirty(water);
             Mat(props, "Fabric", new Color(0.35f, 0.25f, 0.45f), smoothness: 0.05f);
             Mat(props, "Stall", new Color(0.55f, 0.65f, 0.6f), smoothness: 0.5f);
             Mat(props, "Wood", new Color(0.58f, 0.42f, 0.28f), smoothness: 0.35f);
@@ -171,6 +175,11 @@ namespace Stealth.EditorTools
             Mat(props, "CarBlue", new Color(0.1f, 0.22f, 0.48f), smoothness: 0.82f);
             Mat(props, "CarSilver", new Color(0.62f, 0.64f, 0.67f), smoothness: 0.86f);
             Mat(props, "CarGlass", new Color(0.05f, 0.07f, 0.09f), smoothness: 0.95f);
+            // a car's windows: tinted, and one sees the seats through them (CarGlass stays solid: the shop doors' panes)
+            var window = Mat(props, "CarWindow", new Color(0.05f, 0.08f, 0.09f, 0.5f), smoothness: 0.95f);
+            window.SetColor("_BaseColor", new Color(0.05f, 0.08f, 0.09f, 0.5f));
+            Translucent(window);
+            EditorUtility.SetDirty(window);
             Mat(props, "DoorGlass", new Color(0.58f, 0.68f, 0.72f), smoothness: 0.9f);      // satin glass of the sliding doors (opaque)
             Mat(props, "DoorFrameAlu", new Color(0.7f, 0.72f, 0.74f), smoothness: 0.6f);    // their anodised frames
             Mat(props, "DoorSeal", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.2f);       // the rubber on the meeting edge
@@ -194,7 +203,36 @@ namespace Stealth.EditorTools
             Mat(props, "BookBlack", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.35f);
             Mat(props, "BookCream", new Color(0.86f, 0.82f, 0.7f), smoothness: 0.25f);
             Mat(props, "BookTeal", new Color(0.12f, 0.42f, 0.44f), smoothness: 0.3f);
-            Mat(props, "BookPages", new Color(0.93f, 0.9f, 0.82f), smoothness: 0.1f);
+            Mat(props, "BookPages", Color.white, smoothness: 0.1f);
+            // machines (Tools/Blender/machines.py, keyboard.py; pictures: Tools/Art/generate_machines.py, set by PrintCovers)
+            Mat(props, "KeyCaps", Color.white, smoothness: 0.4f);
+            Mat(props, "MachinePrint", Color.white, smoothness: 0.5f);
+            Mat(props, "MachineLit", Color.white, new Color(0.3f, 0.31f, 0.32f), smoothness: 0.45f);   // a lit case and what is in it
+            Mat(props, "MachineGlow", new Color(0.25f, 0.25f, 0.25f), new Color(0.72f, 0.72f, 0.72f), smoothness: 0.7f); // screens, marquees, light tubes: dim, decor
+            Mat(props, "Displays", new Color(0.2f, 0.2f, 0.2f), new Color(0.7f, 0.7f, 0.7f), smoothness: 0.75f);         // the small displays of appliances
+            Translucent(Mat(props, "MachinePane", new Color(0.8f, 0.88f, 0.92f, 0.07f), smoothness: 0.95f));
+            Mat(props, "VaseGreen", new Color(0.16f, 0.27f, 0.22f), smoothness: 0.8f);
+            Mat(props, "VaseCream", new Color(0.78f, 0.72f, 0.6f), smoothness: 0.75f);
+            Mat(props, "VaseBlue", new Color(0.14f, 0.2f, 0.36f), smoothness: 0.8f);
+            Mat(props, "Wicker", new Color(0.46f, 0.32f, 0.18f), smoothness: 0.2f);
+            // what differs from piece to piece (Level.PropPictures; pictures: Tools/Art/generate_boards.py, set by PrintCovers)
+            Mat(props, "BoardSheet", Color.white, smoothness: 0.62f);
+            Mat(props, "ThingPrint", Color.white, smoothness: 0.4f); // what hangs on walls: prints, signs (wall_things.png)
+            var glass = Mat(props, "MirrorGlass", Color.white, smoothness: 0.94f);
+            glass.SetFloat("_Metallic", 0.55f);
+            EditorUtility.SetDirty(glass);
+            var cloth = Mat(props, "ProjectorCloth", Color.white, smoothness: 0.08f);
+            cloth.SetFloat("_AlphaClip", 1f);
+            cloth.SetFloat("_Cutoff", 0.5f);
+            cloth.EnableKeyword("_ALPHATEST_ON");
+            cloth.SetOverrideTag("RenderType", "TransparentCutout");
+            cloth.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            cloth.SetFloat("_Cull", 0f); // seen from behind through its tears
+            EditorUtility.SetDirty(cloth);
+            Mat(props, "GlobeMap", Color.white, smoothness: 0.5f);
+            Mat(props, "BookCharred", new Color(0.045f, 0.04f, 0.038f), smoothness: 0.12f);
+            Mat(props, "Sheets", Color.white, smoothness: 0.15f); // what is pinned to a notice board (PrintCovers)
+            Mat(props, "Printed", Color.white, smoothness: 0.35f); // magazines, book fronts, open pages (PrintCovers)
             Mat(props, "ClothNavy", new Color(0.12f, 0.15f, 0.28f), smoothness: 0.08f);
             Mat(props, "ClothGrey", new Color(0.42f, 0.43f, 0.45f), smoothness: 0.08f);
             Mat(props, "ClothBeige", new Color(0.7f, 0.62f, 0.48f), smoothness: 0.08f);
@@ -367,6 +405,20 @@ namespace Stealth.EditorTools
             cracked.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cracked.png"));
             cracked.SetTextureScale("_BaseMap", Vector2.one);
             EditorUtility.SetDirty(cracked);
+            // a computer with nothing to show: the monitor's box and the boot menu, whole on each screen (ScreenFaces)
+            foreach (var (name, picture, glow) in new[] { ("ScreenNoSignal", "screen_nosignal", 0.75f), ("ScreenBoot", "screen_boot", 0.7f) })
+            {
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{Root}/Art/Textures/Screens/{picture}.png");
+                if (tex != null && AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter ti && ti.wrapMode != TextureWrapMode.Clamp)
+                {
+                    ti.wrapMode = TextureWrapMode.Clamp; // (the box moves about: its picture's dark edge goes on past it)
+                    ti.SaveAndReimport();
+                }
+                var m = Mat("Props", name, new Color(0.04f, 0.042f, 0.046f), new Color(glow, glow, glow), smoothness: 0.85f);
+                m.SetTexture("_BaseMap", tex);
+                m.SetTexture("_EmissionMap", tex);
+                EditorUtility.SetDirty(m);
+            }
         }
 
         static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha, Vector4 border = default)

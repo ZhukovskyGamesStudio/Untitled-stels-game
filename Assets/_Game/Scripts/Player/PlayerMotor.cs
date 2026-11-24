@@ -129,6 +129,10 @@ namespace Stealth.Player
 
         void Awake() => m_Controller = GetComponent<CharacterController>();
 
+        // (desk monitors and the like: a body goes through them, PassableForPlayers)
+        void OnEnable() => Stealth.Level.PassableForPlayers.Register(m_Controller != null ? m_Controller : GetComponent<CharacterController>());
+        void OnDisable() => Stealth.Level.PassableForPlayers.Unregister(m_Controller);
+
         public void SetPitch(float pitch) => m_Pitch = pitch;
 
         /// <summary>Knockback: applied as velocity, horizontal part decays through normal deceleration.</summary>
@@ -227,6 +231,8 @@ namespace Stealth.Player
                 m_Controller.enabled = true;
                 if (m_Velocity.y < 0f) m_Velocity.y = -2f;
             }
+            if (m_StepOffset < 0f) m_StepOffset = m_Controller.stepOffset;
+            m_Controller.stepOffset = StepFor(m_Controller, step, m_StepOffset);
             var flags = Seated || !m_Controller.enabled ? CollisionFlags.None : m_Controller.Move(step);
             if ((flags & CollisionFlags.Above) != 0 && m_Velocity.y > 0f) m_Velocity.y = 0f;
 
@@ -279,6 +285,34 @@ namespace Stealth.Player
             m_Fov = Mathf.Lerp(m_Fov, targetFov, 1f - Mathf.Exp(-8f * dt));
             if (cam != null) cam.fieldOfView = m_Fov;
         }
+
+        float m_StepOffset = -1f; // the controller's own (the prefab's)
+        /// <summary>
+        /// How high the controller may step on this move. A CharacterController lifts itself by its step before it goes
+        /// sideways, so it needs that much headroom over its own height: crouched (1.1 m + 0.35) it was stopped by the edge
+        /// over a hole in a wall it fits into (1.25 m). With a ceiling that low over the body or just ahead, it does not step.
+        /// </summary>
+        public static float StepFor(CharacterController cc, Vector3 move, float step)
+        {
+            var dir = new Vector3(move.x, 0f, move.z);
+            if (dir.sqrMagnitude < 1e-8f || step <= LowStep) return step;
+            dir.Normalize();
+            var side = new Vector3(dir.z, 0f, -dir.x) * (cc.radius + 0.05f);
+            var middle = cc.transform.TransformPoint(cc.center);
+            float up = cc.height / 2f + step + cc.skinWidth + 0.02f;
+            for (int ahead = 0; ahead < 3; ahead++)
+                for (int s = -1; s <= 1; s++)
+                {
+                    var from = middle + dir * (ahead * (cc.radius + 0.05f)) + side * s;
+                    // (a ray that starts inside a wall does not see it: only what is over a free spot counts)
+                    if (Physics.Raycast(from, Vector3.up, out var hit, up, ~(1 << 2), QueryTriggerInteraction.Ignore)
+                        && hit.normal.y < -0.5f && !hit.collider.transform.IsChildOf(cc.transform)) return LowStep;
+                }
+            return step;
+        }
+
+        /// <summary>The step left under a low ceiling, metres.</summary>
+        const float LowStep = 0.03f;
 
         /// <summary>Pulls the controller down onto walkable ground right below (stairs, curbs, slopes).</summary>
         bool TrySnapToGround()

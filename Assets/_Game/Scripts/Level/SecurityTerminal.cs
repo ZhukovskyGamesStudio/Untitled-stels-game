@@ -41,8 +41,10 @@ namespace Stealth.Level
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
-        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
-            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
+        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f),
+            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f);
+        /// <summary>The storeroom locked and open: the same on its station and over its door (<see cref="AutoDoor.Pictures"/>).</summary>
+        public static readonly Color DoorsColor = new(1f, 0.25f, 0.15f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;
@@ -64,7 +66,39 @@ namespace Stealth.Level
             Show();
         }
 
-        void Update() => Show();
+        void Update()
+        {
+            Show();
+            Sound();
+        }
+
+        int m_Charges = -1, m_Open = -1;
+
+        /// <summary>What a terminal says when its work is done (every peer, from the replicated state; not on the first look at it).</summary>
+        void Sound()
+        {
+            if (Index < 0) return;
+            var bank = Audio.Sfx.Bank;
+            var at = transform.position + Vector3.up * 1.1f;
+            if (Kind == TerminalKind.Hacking)
+            {
+                int charges = Charges;
+                if (m_Charges >= 0 && charges < m_Charges) Audio.Sfx.At(bank == null ? null : bank.TerminalHackDone, at, 0.9f, Audio.Sfx.Group.Items);
+                m_Charges = charges;
+            }
+            else if (Kind == TerminalKind.Doors)
+            {
+                int open = Spent ? 1 : 0;
+                if (m_Open == 0 && open == 1)
+                {
+                    Audio.Sfx.At(bank == null ? null : bank.TerminalGranted, at, 1f, Audio.Sfx.Group.Items);
+                    // …and the door itself, rooms away: its bolts
+                    var door = AutoDoor.StorageDoor;
+                    if (door != null) Audio.Sfx.At(bank == null ? null : bank.UnlockUnit, door.transform.position + Vector3.up * 1.2f, 1f, Audio.Sfx.Group.Items, 0.8f);
+                }
+                m_Open = open;
+            }
+        }
 
         void Show()
         {

@@ -8,6 +8,8 @@ namespace Stealth.Enemies
     {
         /// <summary>No eye to glow (it feels a step: nothing to glow).</summary>
         public override bool GlowEyes => false;
+        /// <summary>Its border shows whether it is armed: a faint line (a trap — seen by who looks where they walk), red once stepped on, dark when hacked.</summary>
+        public override float StateLine => 1.4f; // (it really glows: at 0.3 an armed plate and a dead one looked alike)
 
         [Tooltip("Tuning (PressurePlateProfile) — a separate asset next to the prefab.")]
         public PressurePlateProfile Profile;

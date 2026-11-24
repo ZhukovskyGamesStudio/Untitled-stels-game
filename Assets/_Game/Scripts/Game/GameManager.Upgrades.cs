@@ -67,7 +67,7 @@ namespace Stealth.Game
             FitStash();
             NoteServer(player, StatKind.Pickups);
             Banner(Loc.Pack("banner.car_upgraded", player.Nick, "@" + UpgradeKey(upgrade), next));
-            Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Craft : null, player.transform.position + Vector3.up, 0.9f, Audio.Sfx.Group.Items);
+            SoundServer(Audio.GameSound.Craft, player.transform.position + Vector3.up); // (every peer hears it)
         }
 
         /// <summary>The table key of an upgrade's name (<c>upgrade.&lt;name&gt;</c>; its effect: the same key + <c>.what</c>).</summary>

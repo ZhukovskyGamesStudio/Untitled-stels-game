@@ -84,7 +84,7 @@ namespace Stealth.Player
             var c = AtConsole;
             if (c == null) return;
             bool away = c.Solved || (c.transform.position - transform.position).magnitude > Items.SafeBox.Reach + 0.8f;
-            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back)) { LeaveConsole(); return; }
+            if (away) { LeaveConsole(); return; } // (Esc leaves: LeaveModeOnEscape)
             var at = c.transform.position;
             int keys = Switches != null ? Switches.Count : Sequence != null ? Sequence.Lamps : 0;
             for (int i = 0; i < keys; i++)
@@ -92,7 +92,7 @@ namespace Stealth.Player
                 if (!Controls.DigitPressed(i + 1)) continue;
                 if (Switches != null)
                 {
-                    Audio.Sfx.At(Audio.Sfx.Bank?.Click, at, 0.7f, Audio.Sfx.Group.Items, 0.9f + 0.05f * i);
+                    Audio.Sfx.At(Audio.Sfx.Bank?.TerminalKey, at, 0.8f, Audio.Sfx.Group.Items, 0.9f + 0.05f * i);
                     if (Switches.Press(i)) { SolveConsole(c); LeaveConsole(); return; }
                 }
                 else if (Sequence != null)
@@ -100,12 +100,12 @@ namespace Stealth.Player
                     switch (Sequence.Press(i, Time.time))
                     {
                         case Items.SequenceLock.Result.Wrong:
-                            Audio.Sfx.At(Audio.Sfx.Bank?.Drop, at, 1f, Audio.Sfx.Group.Items, 0.6f);
+                            Audio.Sfx.At(Audio.Sfx.Bank?.Clank, at, 1f, Audio.Sfx.Group.Items);
                             EmitNoise(Tuning.Items.Objectives.WrongNoise);
                             ConsoleWrongTime = Time.time;
                             break;
                         case Items.SequenceLock.Result.Step:
-                            Audio.Sfx.At(Audio.Sfx.Bank?.Click, at, 0.8f, Audio.Sfx.Group.Items, 0.9f + 0.08f * i);
+                            Audio.Sfx.At(Audio.Sfx.Bank?.TerminalKey, at, 0.9f, Audio.Sfx.Group.Items, 0.9f + 0.08f * i);
                             break;
                         case Items.SequenceLock.Result.Opened:
                             SolveConsole(c);
@@ -120,7 +120,7 @@ namespace Stealth.Player
         void SolveConsole(VaultConsole c)
         {
             if (c == null) return;
-            Audio.Sfx.At(Audio.Sfx.Bank?.Stash, c.transform.position, 1f, Audio.Sfx.Group.Items);
+            Audio.Sfx.At(Audio.Sfx.Bank?.UnlockUnit, c.transform.position, 1f, Audio.Sfx.Group.Items);
             Link.SendUse(UseKind.VaultConsole, c.Index);
         }
     }

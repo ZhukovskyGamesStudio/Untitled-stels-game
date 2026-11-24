@@ -23,6 +23,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
 import shapes as s  # noqa: E402
 from rooms2_work import flat_ring, prism, revolve, rounded_rect, rod  # noqa: E402
@@ -83,6 +84,7 @@ def recentre(p, x=True, y=True):
     d = Vector((-(min(xs) + max(xs)) / 2 if x else 0.0, -(min(ys) + max(ys)) / 2 if y else 0.0, 0.0))
     for b in bms:
         bmesh.ops.translate(b, vec=d, verts=b.verts)
+    return d
 
 
 def hcaster(p, x, y, z_top, r=0.05, w=0.03):
@@ -326,8 +328,6 @@ def model_nurse_station():
               s.rbox((0.56, 0.035, 0.34), (x, 0.045, 1.12), r=0.01, seg=2),
               s.rbox((0.3, 0.03, 0.2), (x, 0.02, 1.11), r=0.012, seg=2))
         p.add("Eye", s.rbox((0.52, 0.006, 0.3), (x, 0.0625, 1.125), r=0.003, seg=1))
-        kb = s.rbox((0.44, 0.15, 0.02), (x, 0.3, 0.77), r=0.006, seg=1, taper=(0.99, 0.94))
-        p.add("Accent", kb, s.rbox((0.06, 0.1, 0.03), (x + 0.3, 0.3, 0.772), r=0.014, seg=2))
     # the phone
     p.add("Accent", s.rbox((0.19, 0.21, 0.05), (1.1, 0.2, 0.775), r=0.015, seg=2, taper=(1.0, 0.8)),
           s.rbox((0.055, 0.22, 0.045), (1.03, 0.2, 0.815), r=0.018, seg=2))
@@ -336,8 +336,10 @@ def model_nurse_station():
     for k in range(6):
         role = "Body" if k % 2 else "Accent"
         p.add(role, s.rbox((0.055, 0.27, 0.31), (-1.35 + k * 0.06, -0.06, 0.76 + 0.155), r=0.006, seg=1))
-    recentre(p)
+    d = recentre(p)
     p.finish()
+    for k, x in enumerate((-0.45, 0.55)):                                    # the sitter at +Y
+        keyboard.add(f"Keys{k}", (x + d.x, 0.3 + d.y, 0.7605 + d.z), yaw=math.pi, light=True)
     return export("nurse_station")
 
 

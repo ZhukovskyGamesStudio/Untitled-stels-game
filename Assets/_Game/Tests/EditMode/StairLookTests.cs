@@ -31,6 +31,31 @@ namespace Stealth.Tests
             Assert.IsNotNull(g.Trim, "its balusters the trim");
         }
 
+        [TestCase("stair_concrete")]
+        [TestCase("stair_wood")]
+        [TestCase("stair_glass")]
+        public void NothingShowsThroughUnderTheRailOverTheTreads(string look)
+        {
+            var go = new GameObject("Stair");
+            try
+            {
+                go.transform.position = new Vector3(0f, 700f, 0f);
+                go.AddComponent<MeshCollider>().sharedMesh = AssetDatabase.LoadAssetAtPath<Mesh>($"Assets/_Game/Art/Models/Stairs/{look}.asset");
+                Physics.SyncTransforms();
+                float rise = LevelMetrics.FloorHeight / 2f / LevelMetrics.StepsPerFlight;
+                for (int j = 0; j < LevelMetrics.StepsPerFlight; j++)
+                    foreach (float back in new[] { 0.15f, 0.5f, 0.9f })
+                        for (float up = 0.02f; up < rise * 0.95f; up += 0.05f)
+                        {
+                            // over this tread, from the middle of the flight towards its open side
+                            var from = new Vector3(LevelMetrics.LandingEnd + (j + back) * LevelMetrics.StepRun, 700f + LevelMetrics.FloorHeight / 2f + (j + 1) * rise + up, (StairGeometry.LaneB0 + StairGeometry.LaneB1) / 2f);
+                            if (from.y - 700f > LevelMetrics.FloorHeight / 2f + (j + back + 1f) * rise) continue; // over the nosing line: the railing's own
+                            Assert.IsTrue(Physics.Raycast(from, Vector3.forward, 1.5f), $"step {j}, {back:0.00} in, {up:0.00} m over it: one sees through");
+                        }
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         [TestCase("Stairs", false)]
         [TestCase("StairsMirrored", false)]
         [TestCase("RailingBay", true)]

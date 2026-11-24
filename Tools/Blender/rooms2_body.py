@@ -21,6 +21,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
 import shapes as s  # noqa: E402
 
@@ -542,42 +543,83 @@ def model_weighing_scale():
     return export("weighing_scale")
 
 
-def shoe():
-    """A sneaker with its heel at the origin and the toe towards +y: (upper, sole)."""
-    rings = [(0.0, 0.03, 0.042, 2.6, 0, -0.05), (0.03, 0.04, 0.05, 2.6, 0, -0.052),
-             (0.11, 0.045, 0.04, 2.8, 0, -0.042), (0.2, 0.044, 0.03, 3.0, 0, -0.032),
-             (0.26, 0.032, 0.02, 2.6, 0, -0.022), (0.275, 0.0, 0.0, 2.0, 0, -0.02)]
-    upper = s.loft(rings, seg=12, axis="Y")
-    upper = s.boolean(upper, s.ball(1.0, (0, 0.06, 0.11), seg=12, scale=(0.032, 0.055, 0.03)), "DIFFERENCE")
-    sole = s.rbox((0.094, 0.285, 0.018), (0, 0.138, 0.009), r=0.007, seg=1, taper=(1.0, 1.0))
-    return upper, sole
+def shoe(boot=False):
+    """A shoe with its heel at the origin and the toe towards +y, as (shape, what) pairs — what: "upper", "sole", "lace",
+    "dark" (the lining seen down the mouth), "trim" (the stripe and the heel tab). A sneaker — a thick rubber sole with a
+    toe bumper, the upper rising to a padded collar, an open mouth with the tongue standing in it, laces over the throat —
+    or an ankle boot with a shaft and a heel block."""
+    up = 0.016                                             # the upper sits on the sole
+    rings = [(0.004, 0.028, 0.042, 2.6, 0, -(0.05 + up)), (0.03, 0.04, 0.05, 2.6, 0, -(0.052 + up)), (0.085, 0.044, 0.046 if boot else 0.042, 2.8, 0, -(0.046 + up)),
+             (0.14, 0.046, 0.033, 2.9, 0, -(0.036 + up)), (0.2, 0.046, 0.026, 3.0, 0, -(0.03 + up)), (0.25, 0.038, 0.021, 2.6, 0, -(0.025 + up)), (0.276, 0.0, 0.0, 2.0, 0, -(0.02 + up))]
+    upper = s.loft(rings, seg=16, axis="Y")
+    h = 0.15 if boot else 0.0
+    if boot:                                               # the shaft round the ankle
+        upper = s.boolean(upper, s.loft([(0.06, 0.037, 0.047, 2.4, 0, 0.03), (h, 0.039, 0.05, 2.4, 0, 0.026), (h + 0.012, 0.037, 0.048, 2.4, 0, 0.026)], seg=16), "UNION")
+        mouth = s.ball(1.0, (0, 0.03, h + 0.012), seg=14, scale=(0.029, 0.04, 0.07))
+        lining = s.ball(1.0, (0, 0.03, h - 0.05), seg=12, scale=(0.031, 0.042, 0.012))
+    else:
+        mouth = s.ball(1.0, (0, 0.066, 0.132), seg=14, scale=(0.031, 0.058, 0.06))
+        lining = s.ball(1.0, (0, 0.066, 0.076), seg=12, scale=(0.033, 0.058, 0.012))
+    upper = s.boolean(upper, mouth, "DIFFERENCE")
+    s.bevel_edges(upper, 0.003, 1, angle=50)
+    out = [(upper, "upper"), (lining, "dark")]
+    # the sole: a thick slab a little wider than the upper, its toe turned up; a boot has a heel block under it
+    sole = s.loft([(-0.006, 0.032, 0.012, 3.5, 0, -0.012), (0.03, 0.045, 0.013, 3.5, 0, -0.013), (0.11, 0.046, 0.011, 3.5, 0, -0.011), (0.2, 0.05, 0.01, 3.5, 0, -0.01),
+                   (0.262, 0.041, 0.01, 3.5, 0, -0.012), (0.287, 0.014, 0.008, 3, 0, -0.015)], seg=16, axis="Y")
+    out.append((sole, "sole"))
+    if boot:
+        out.append((s.rbox((0.082, 0.085, 0.012), (0, 0.04, 0.004), r=0.004, seg=1), "dark"))
+        out.append((s.rbox((0.012, 0.004, 0.05), (0, -0.002, h - 0.01), r=0.002, seg=1), "trim"))                     # the pull loop
+        z0, n, y0, dy, dz = 0.094, 5, 0.1, 0.021, -0.003
+    else:
+        # the rubber toe bumper, the tongue standing in the mouth, the heel tab
+        out.append((s.loft([(0.222, 0.044, 0.016, 3.0, 0, -(0.016 + up)), (0.255, 0.039, 0.017, 2.8, 0, -(0.019 + up)), (0.281, 0.0, 0.0, 2, 0, -(0.018 + up))], seg=16, axis="Y"), "sole"))
+        out.append((s.rbox((0.044, 0.1, 0.011), (0, 0.15, 0.089), r=0.005, seg=2, rot=(-0.28, 0, 0)), "upper"))
+        out.append((s.rbox((0.024, 0.006, 0.03), (0, 0.004, 0.1), r=0.002, seg=1, rot=(0.15, 0, 0)), "trim"))
+        z0, n, y0, dy, dz = 0.103, 5, 0.122, 0.019, -0.0054
+    for sx in (-1, 1):                                     # the stripe along each flank
+        out.append((s.rbox((0.005, 0.085, 0.013), (sx * 0.0445, 0.125, 0.052 + (0.01 if boot else 0)), r=0.002, seg=1, rot=(0.32, 0, sx * -0.02)), "trim"))
+    for k in range(n):                                     # laces crossing over the throat
+        out.append((s.rbox((0.05, 0.006, 0.005), (0, y0 + k * dy, z0 + k * dz), r=0.002, seg=1, rot=(0.22, 0, 0.45 if k % 2 else -0.45)), "lace"))
+    return out
 
 
 def model_shoe_rack():
-    """Low shoe rack 1.0 x 0.36 x 0.6: two side panels, a top board, two sloping tiers of round bars, three pairs of
-    sneakers on each tier, heels out."""
+    """Low shoe rack 1.0 x 0.36 x 0.6: two side frames, a top board with a lip, two sloping tiers of five slats, on
+    each three pairs — sneakers and boots of different colours, one pair kicked askew, a shoe horn hung at the side."""
+    import machines as mc
     body = []
     for x in (-0.485, 0.485):
-        body.append(s.rbox((0.03, 0.36, 0.58), (x, 0, 0.29), r=0.008, seg=2))
-    body.append(s.rbox((1.0, 0.36, 0.025), (0, 0, 0.5875), r=0.008, seg=2))
+        body.append(s.rbox((0.028, 0.36, 0.58), (x, 0, 0.29), r=0.008, seg=2))
+    body.append(s.rbox((1.0, 0.36, 0.026), (0, 0, 0.5875), r=0.009, seg=3))
+    body.append(s.rbox((0.94, 0.014, 0.05), (0, 0.17, 0.62), r=0.004, seg=1))
+    body.append(s.rbox((0.94, 0.02, 0.06), (0, 0.165, 0.05), r=0.004, seg=1))
     slope = 0.25
     for z0 in (0.1, 0.33):
-        for y in (-0.12, 0.12):
-            z = z0 + (y + 0.12) * slope
-            body.append(bar((-0.475, y, z), (0.475, y, z), 0.011, seg=10))
+        for k in range(5):
+            y = -0.135 + k * 0.0675
+            body.append(s.rbox((0.945, 0.04, 0.014), (0, y, z0 + (y + 0.12) * slope), r=0.004, seg=1, rot=(math.atan(slope), 0, 0)))
     s.part("Body", body)
-    uppers, soles = [], []
     ang = math.atan(slope)
+    pairs = [("white2", "white2", False), ("black", "grey", True), ("navy", "white2", False), ("brown", "black", True), ("red", "white2", False), ("grey", "black", False)]
+    goods = []
+    n = 0
     for z0 in (0.1, 0.33):
-        z_heel = z0 + 0.011 + (-0.14 + 0.12) * slope - 0.004
+        z_heel = z0 + 0.007 + (-0.14 + 0.12) * slope + 0.004
         for k, x in enumerate((-0.31, 0.0, 0.31)):
+            upper_c, sole_c, boot = pairs[n]
+            colours = {"upper": upper_c, "sole": sole_c, "dark": "black", "lace": "white2" if upper_c != "white2" else "grey",
+                       "trim": {"white2": "navy", "black": "brown", "navy": "red", "brown": "kraft", "red": "white2", "grey": "orange"}[upper_c]}
             for d in (-1, 1):
-                u, so = shoe()
-                xx = x + d * 0.056 + 0.008 * ((k * 2 + d) % 3 - 1)
-                uppers += on([u], (xx, -0.14, z_heel), (ang, 0, 0.04 * d))
-                soles += on([so], (xx, -0.14, z_heel), (ang, 0, 0.04 * d))
-    s.part("Accent", uppers)
-    s.part("Trim", soles)
+                askew = 0.35 if n == 4 and d == 1 else 0.04 * d
+                xx = x + d * 0.058 + 0.008 * ((k * 2 + d) % 3 - 1)
+                for b, what in shoe(boot):
+                    s.place(b, (xx, -0.14, z_heel), (ang, 0, askew))
+                    goods.append((b, colours[what]))
+            n += 1
+    goods.append((s.rbox((0.012, 0.03, 0.28), (0.506, -0.08, 0.36), r=0.004, seg=1), "chrome"))     # the shoe horn on its hook
+    goods.append((s.rcyl(0.008, 0.02, (0.505, -0.08, 0.5), axis="X", seg=8, r=0.002, bevel_seg=1), "chrome"))
+    mc.plates("Print", [], goods)
     return export("shoe_rack")
 
 
@@ -723,9 +765,7 @@ def model_doctor_desk():
     acc.append(s.rbox((0.22, 0.16, 0.014), (0.1, 0.17, 0.764), r=0.005, seg=1))            # monitor foot
     acc.append(s.rbox((0.05, 0.03, 0.22), (0.1, 0.19, 0.87), r=0.008, seg=1))             # neck
     acc.append(s.rbox((0.56, 0.04, 0.34), (0.1, 0.16, 1.07), r=0.012, seg=2))             # housing
-    acc.append(s.rbox((0.44, 0.15, 0.02), (0.1, -0.13, 0.765), r=0.006, seg=1, taper=(1.0, 0.92)))  # keyboard
-    acc.append(s.loft([(0.755, 0.03, 0.05, 2.5), (0.77, 0.032, 0.052, 2.5), (0.785, 0.02, 0.04, 2.5)], seg=14,
-                      loc=(0.43, -0.12, 0)))                                                 # mouse
+    keyboard.add("Keys", (0.1, -0.13, 0.7545), light=True, mouse=0.33)
     # stethoscope tubing: chest piece -> Y joint, then the two ear tubes
     zs = 0.764
     acc.append(s.tube([(-0.36, -0.16, zs), (-0.24, -0.22, zs), (-0.13, -0.12, zs), (-0.17, 0.0, zs),

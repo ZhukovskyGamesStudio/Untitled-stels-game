@@ -75,7 +75,33 @@ namespace Stealth.Player
         readonly List<Detector> m_TerminalTargets = new();
         int m_TerminalIndex;
         float m_TerminalHold;
+        /// <summary>How long E has been down at the terminal (−1: this press does not count — it sat us down, or it hacked).</summary>
+        float m_TerminalPress = -1f;
+
+        /// <summary>E let go after a short press: the way out of a terminal (pure but for its one field; <see cref="TerminalRules.Tap"/> is the length).</summary>
+        bool TappedToLeave(bool held, float dt)
+        {
+            if (held)
+            {
+                if (m_TerminalPress >= 0f) m_TerminalPress += dt;
+                return false;
+            }
+            bool tap = TerminalRules.IsTap(m_TerminalPress);
+            m_TerminalPress = 0f;
+            return tap;
+        }
+
+        /// <summary>Owner: Esc pressed while at a terminal, a safe's dial or a vault console — it leaves that (true), the pause menu stays shut.</summary>
+        public bool LeaveModeOnEscape()
+        {
+            if (UsingTerminal == null && Cracking == null && AtConsole == null) return false;
+            LeaveAllModes();
+            return true;
+        }
         bool m_TerminalWaitRelease;
+
+        /// <summary>A key of the terminal pressed: sitting down at it, another camera, another floor.</summary>
+        void TerminalKeySound() => Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.TerminalKey : null, Hands, 0.7f, Audio.Sfx.Group.Items);
 
         /// <summary>
         /// Owner: E at a terminal sits down at it. A/D (or the mouse buttons) flip through what it shows, Space or S stands up.
@@ -90,12 +116,15 @@ namespace Stealth.Player
                 if (TerminalTarget != null && TerminalTarget.Kind == TerminalKind.Doors) TerminalTarget = null; // nothing to sit at: hold E to open the door
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
+                TerminalKeySound();
                 return;
             }
             var t = UsingTerminal;
             var to = t != null ? transform.position - t.transform.position : Vector3.positiveInfinity;
             to.y = 0;
-            if (t == null || to.magnitude > SecurityTerminal.Reach + 0.6f || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
+            // E again leaves — a tap of it: a hold is the hacking terminal's hack (Esc leaves too: LeaveModeOnEscape). The
+            // jump and back keys no longer do: a finger on them kicked one out.
+            if (t == null || to.magnitude > SecurityTerminal.Reach + 0.6f || TappedToLeave(Controls.Held(GameAction.Interact), Time.unscaledDeltaTime))
             {
                 StopTerminal();
                 return;
@@ -111,6 +140,7 @@ namespace Stealth.Player
                 int step = (Controls.Pressed(GameAction.Right) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || scroll > 0f ? 1 : 0)
                          - (Controls.Pressed(GameAction.Left) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || scroll < 0f ? 1 : 0);
                 int floors = Mathf.Max(1, ActiveLevel.Layout != null ? ActiveLevel.Layout.Floors : 1);
+                if (step != 0) TerminalKeySound();
                 TerminalFloor = Mathf.Clamp(TerminalFloor + step, 0, floors - 1);
                 return;
             }
@@ -119,8 +149,10 @@ namespace Stealth.Player
             // cameras: A/D and the mouse turn the camera, the mouse buttons and the wheel switch it; robots: A/D switch too
             bool steer = t.Kind == TerminalKind.Cameras;
             float wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+            int shown = m_TerminalIndex;
             if ((!steer && Controls.Pressed(GameAction.Right)) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || wheel < 0f) m_TerminalIndex++;
             if ((!steer && Controls.Pressed(GameAction.Left)) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || wheel > 0f) m_TerminalIndex--;
+            if (m_TerminalIndex != shown) TerminalKeySound();
             int n = m_TerminalTargets.Count;
             m_TerminalIndex = (m_TerminalIndex % n + n) % n;
             var view = m_TerminalTargets[m_TerminalIndex];
@@ -134,6 +166,7 @@ namespace Stealth.Player
             if (m_TerminalHold < m_Interaction.TerminalHackTime) return;
             m_TerminalHold = 0f;
             m_TerminalWaitRelease = true;
+            m_TerminalPress = -1f; // this press was a hack, not a tap
             Link.SendRemoteHack(view, t.Index);
         }
 
@@ -147,6 +180,7 @@ namespace Stealth.Player
             m_TerminalIndex = 0;
             m_TerminalHold = 0f;
             m_TerminalWaitRelease = waitRelease; // the E that sat us down is not a hack
+            m_TerminalPress = waitRelease ? -1f : 0f; // …nor a tap to leave
             TerminalFloor = Mathf.Max(0, LevelLayout.FloorOf(transform.position.y)); // the map opens on this floor
         }
 
@@ -309,25 +343,19 @@ namespace Stealth.Player
         T Aimed<T>() where T : Component => LookTarget.At<T>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius);
 
         /// <summary>The robot / device to hack: the one looked at (or, for the autopilot, the nearest in reach).</summary>
-        /// <summary>
-        /// What the hands can do to it: a device is hacked by hand; a robot only with the keyboard in the hand — without it a
-        /// robot carrying something (the cage's key, loot) can still be searched (<see cref="OnHackRequest"/>).
-        /// </summary>
-        bool HandsCanWork(Detector d) => d is not RobotController || HoldsKeyboard || d.Cargo >= 0;
-
         Detector FindHackTarget()
         {
             if (UseLook)
             {
                 var looked = Aimed<Detector>();
-                if (looked != null) return HandsCanWork(looked) && looked.CanBeHackedFrom(transform.position, HackReach) && looked.ReachableFrom(Hands) ? looked : null;
+                if (looked != null) return looked.CanBeHackedFrom(transform.position, HackReach) && looked.ReachableFrom(Hands) ? looked : null;
                 // devices without a body to hit (cameras, sensors, plates): the one closest to the crosshair, if close enough
                 Detector bestLook = null;
                 float bestAngle = m_Interaction.LookAngle;
                 var eye = Camera.transform;
                 foreach (var d in Detector.All)
                 {
-                    if (!HandsCanWork(d) || !d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
+                    if (!d.CanBeHackedFrom(transform.position, HackReach) || !d.ReachableFrom(Hands)) continue;
                     float angle = Vector3.Angle(eye.forward, d.Position - eye.position);
                     if (angle < bestAngle) { bestLook = d; bestAngle = angle; }
                 }
@@ -337,7 +365,7 @@ namespace Stealth.Player
             float bestDist = float.MaxValue;
             foreach (var d in Detector.All)
             {
-                if (!HandsCanWork(d) || !d.CanBeHackedFrom(transform.position, HackReach) || (View.HasValue && !View.Value.At(d.transform.position + Vector3.up * 0.1f, d.Position, 0.45f)) ||
+                if (!d.CanBeHackedFrom(transform.position, HackReach) || (View.HasValue && !View.Value.At(d.transform.position + Vector3.up * 0.1f, d.Position, 0.45f)) ||
                     !d.ReachableFrom(Hands)) continue;
                 float dist = (d.transform.position - transform.position).sqrMagnitude;
                 if (dist < bestDist) { best = d; bestDist = dist; }

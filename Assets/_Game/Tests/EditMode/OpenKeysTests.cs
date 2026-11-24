@@ -19,6 +19,8 @@ namespace Stealth.Tests
             {
                 Add(OpenKeys.Door(i), "door " + i);
                 Add(OpenKeys.Safe(i), "safe " + i);
+                Add(OpenKeys.DoorSwung(i, false), "swung " + i);
+                Add(OpenKeys.DoorSwung(i, true), "swung back " + i);
                 Add(OpenKeys.Escape(i), "escape " + i);
                 Add(OpenKeys.Crate(i), "crate " + i);
                 Add(OpenKeys.Dryer(i), "dryer " + i);

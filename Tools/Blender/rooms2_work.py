@@ -21,6 +21,7 @@ from mathutils import Vector, noise
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
 import shapes as s  # noqa: E402
 
@@ -236,34 +237,27 @@ def model_round_bench_planter():
     a small tree (trunk, branches, a lumpy crown) and low shrubs on the soil."""
     plinth = revolve(rounded_rect(0.52, 0.85, 0.0, 0.07, 0.01, n=1), seg=40)
     shell = revolve(rounded_rect(0.5, 0.88, 0.06, 0.31, 0.015, n=2), seg=40)
+    import plants
+    import plants
     planter = s.lathe([(0.0, 0.01), (0.51, 0.01), (0.505, 0.84), (0.53, 0.845), (0.535, 0.9), (0.47, 0.9),
                        (0.47, 0.88), (0.0, 0.88)], seg=40)
-    soil = s.rcyl(0.475, 0.03, (0, 0, 0.875), seg=32, r=0.005)
-    trunk = s.tube([(0, 0, 0.86), (0.02, 0.01, 1.15), (-0.01, 0.0, 1.45)], 0.035, segments_per=6, radii=[1.0, 0.75, 0.5])
-    br = [s.tube([(0.015, 0.008, 1.2), (0.12, 0.06, 1.38)], 0.016, segments_per=3, radii=[1.0, 0.6]),
-          s.tube([(0.0, 0.0, 1.3), (-0.12, 0.05, 1.45)], 0.015, segments_per=3, radii=[1.0, 0.6])]
-    s.part("Trim", [plinth, shell, planter, soil, trunk, *br])
+    wood, leaves = plants.tree((0.0, 0.0, 0.88), 0.95, seed=23, crown=0.4, branches=11, twigs=4, per_twig=10, leaf=(0.16, 0.075), trunk=0.036)
+    s.part("Trim", [plinth, shell, planter, *plants.soil(0.475, 0.89, seed=6, chips=24), *wood])
 
     cushions = []
     gap = math.radians(1.2)
     for k in range(6):
         a0 = k * math.pi / 3 + gap
         a1 = (k + 1) * math.pi / 3 - gap
-        cushions.append(revolve(rounded_rect(0.505, 0.9, 0.3, 0.46, 0.035, n=2), seg=10, a0=a0, a1=a1))
+        seat = revolve(rounded_rect(0.505, 0.9, 0.3, 0.46, 0.035, n=2), seg=10, a0=a0, a1=a1)
+        cushions.append(seat)
     s.part("Body", cushions)
 
-    # the crown: one lumpy leaf mass (five balls side by side showed seams between them)
-    balls = [((0.0, 0.0, 1.6), 0.24), ((0.17, 0.07, 1.5), 0.17), ((-0.16, 0.09, 1.54), 0.17), ((0.04, -0.17, 1.52), 0.16),
-             ((-0.02, 0.02, 1.76), 0.14)]
-    for k in range(7):                                       # small lumps round the rim: a ragged, leafy edge
-        a = 2 * math.pi * k / 7 + 0.4
-        balls.append(((0.24 * math.cos(a), 0.24 * math.sin(a), 1.56 + 0.06 * (k % 3)), 0.09 + 0.015 * (k % 2)))
-    leaves = [s.foliage(balls, 0.022, 1, 0.012, 2200)]
-    for k in range(7):
-        a = 2 * math.pi * k / 7 + 0.3
-        leaves.append(blob((0.32 * math.cos(a), 0.32 * math.sin(a), 0.93), (0.11, 0.11, 0.08), sub=2, amp=0.25,
-                           seed=10 + k))
-    s.part("Accent", leaves)
+    # round the trunk: clumps of arching leaves
+    for k in range(6):
+        a = 2 * math.pi * k / 6 + 0.3
+        leaves += plants.rosette((0.31 * math.cos(a), 0.31 * math.sin(a), 0.89), 11, 0.3, 0.065, seed=30 + k, lean=(0.3, 1.25))
+    s.part("Accent", leaves, sharp_angle=180)
     return export("round_bench_planter")
 
 
@@ -325,11 +319,9 @@ def model_standing_desk():
     acc.append(s.rbox((0.05, 0.03, 0.24), (0, 0.205, 1.215), r=0.008, seg=1))
     acc.append(s.rbox((0.3, 0.04, 0.2), (0, 0.185, 1.32), r=0.012, seg=2))
     acc.append(s.rbox((0.6, 0.04, 0.36), (0, 0.16, 1.32), r=0.008, seg=2))
-    kb = s.rbox((0.42, 0.13, 0.02), (0, -0.13, 1.107), r=0.006, seg=1, taper=(0.99, 0.94))
-    s.groove(kb, "X", 0.13, 0.004, 0.002)
-    acc += [kb, s.rbox((0.06, 0.1, 0.03), (0.3, -0.13, 1.108), r=0.014, seg=2)]
     s.part("Accent", acc)
     s.part("Eye", [s.rbox((0.57, 0.006, 0.32), (0, 0.139, 1.325), r=0.003, seg=1)])
+    keyboard.add("Keys", (-0.02, -0.13, 1.0995))
     return export("standing_desk")
 
 
@@ -352,10 +344,10 @@ def model_planter_divider():
             r = 0.03 if k % 2 else 0.012
             leaves.append(leaf((cx + r * math.cos(a), r * math.sin(a) * 0.6, 0.59), length, 0.03, lean, a + math.pi / 2,
                                    seg=10))
-    for k, cx in enumerate((-0.74, -0.26, 0.26, 0.74)):
-        rx = 0.065 if abs(cx) > 0.5 else 0.1
-        leaves.append(blob((cx, 0.0, 0.66), (rx, 0.12, 0.09), sub=2, amp=0.25, seed=20 + k))
-    s.part("Accent", leaves)
+    import plants
+    for k, cx in enumerate((-0.74, -0.26, 0.26, 0.74)):                  # between them: low clumps arching over the rim
+        leaves += plants.rosette((cx, 0.0, 0.6), 13, 0.17 if abs(cx) > 0.5 else 0.2, 0.05, seed=40 + k, lean=(0.3, 0.95))
+    s.part("Accent", leaves, sharp_angle=180)
     return export("planter_divider")
 
 

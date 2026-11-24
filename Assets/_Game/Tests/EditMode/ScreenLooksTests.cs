@@ -16,15 +16,32 @@ namespace Stealth.Tests
     public class ScreenLooksTests
     {
         [Test]
-        public void MostScreensAreOffSomeShowStaticSomeAreCracked()
+        public void TvsShowStaticAndComputersTheirBootMenuOrNoSignal()
         {
-            var counts = new int[3];
-            for (int i = 0; i < 4000; i++) counts[(int)ScreenLooks.Pick(LevelRandom.Mix(12345, Salt.Screens, i))]++;
-            Assert.That(counts[(int)ScreenLook.Off], Is.InRange(1900, 2500), "about 55 % off");
-            Assert.That(counts[(int)ScreenLook.Static], Is.InRange(800, 1200), "about 25 % static");
-            Assert.That(counts[(int)ScreenLook.Cracked], Is.InRange(600, 1000), "about 20 % cracked");
-            Assert.AreEqual(ScreenLooks.Pick(77), ScreenLooks.Pick(77), "the same on every peer");
-            Assert.IsTrue(System.Enum.IsDefined(typeof(ScreenLook), ScreenLooks.Pick(-12345)), "any seed, a negative one too");
+            foreach (ScreenKind kind in System.Enum.GetValues(typeof(ScreenKind)))
+            {
+                var counts = new int[System.Enum.GetValues(typeof(ScreenLook)).Length];
+                for (int i = 0; i < 4000; i++) counts[(int)ScreenLooks.Pick(LevelRandom.Mix(12345, Salt.Screens, i), kind)]++;
+                int On(ScreenLook look) => counts[(int)look];
+                Assert.Greater(On(ScreenLook.Off), 1200, $"{kind}: many are off");
+                Assert.Greater(On(ScreenLook.Cracked), 200, $"{kind}: some are broken");
+                Assert.AreEqual(kind == ScreenKind.Tv, On(ScreenLook.Static) > 0, $"{kind}: static is a TV's");
+                Assert.AreEqual(kind == ScreenKind.Computer, On(ScreenLook.NoSignal) > 800, $"{kind}: no signal");
+                Assert.AreEqual(kind == ScreenKind.Computer, On(ScreenLook.Boot) > 800, $"{kind}: the boot menu");
+                Assert.AreEqual(ScreenLooks.Pick(77, kind), ScreenLooks.Pick(77, kind), "the same on every peer");
+                Assert.IsTrue(System.Enum.IsDefined(typeof(ScreenLook), ScreenLooks.Pick(-12345, kind)), "any seed, a negative one too");
+            }
+            Assert.AreEqual(ScreenKind.Tv, ScreenLooks.KindOf(PropKind.TvStand));
+            Assert.AreEqual(ScreenKind.Computer, ScreenLooks.KindOf(PropKind.Desk));
+            Assert.AreEqual(ScreenKind.Appliance, ScreenLooks.KindOf(PropKind.Treadmill));
+            Assert.IsTrue(ScreenLooks.InUse(PropKind.Programmer), "what the players use stays lit");
+            // a "no signal" box moves about and stays whole on its screen
+            for (int k = 0; k < 40; k++)
+            {
+                var at = ScreenLooks.Drift(k);
+                Assert.LessOrEqual(Mathf.Abs(at.x) + ScreenLooks.BoxHalf.x, 0.5001f);
+                Assert.LessOrEqual(Mathf.Abs(at.y) + ScreenLooks.BoxHalf.y, 0.5001f);
+            }
             // the static jumps about the texture, staying on it
             var seen = new HashSet<Vector2>();
             for (int k = 0; k < 50; k++)
@@ -42,12 +59,127 @@ namespace Stealth.Tests
         {
             var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
             Assert.IsNotNull(art);
-            Assert.AreEqual(4, art.Screens.Length, "the models' screen, then off, static, cracked");
+            Assert.AreEqual(1 + System.Enum.GetValues(typeof(ScreenLook)).Length, art.Screens.Length, "the models' screen, then every look");
             foreach (var m in art.Screens) Assert.IsNotNull(m);
-            Assert.AreEqual(4, art.Screens.Distinct().Count());
+            Assert.AreEqual(art.Screens.Length, art.Screens.Distinct().Count());
             Assert.IsFalse(art.Screens[1 + (int)ScreenLook.Off].IsKeywordEnabled("_EMISSION"), "a screen switched off does not glow");
             Assert.IsNotNull(art.Screens[1 + (int)ScreenLook.Static].GetTexture("_EmissionMap"), "static glows through its noise");
             Assert.IsNotNull(art.Screens[1 + (int)ScreenLook.Cracked].GetTexture("_BaseMap"), "the cracks");
+            foreach (var look in new[] { ScreenLook.NoSignal, ScreenLook.Boot })
+            {
+                var picture = art.Screens[1 + (int)look].GetTexture("_EmissionMap");
+                Assert.IsNotNull(picture, $"{look}: its picture");
+                Assert.AreEqual(TextureWrapMode.Clamp, picture.wrapMode, $"{look}: once on a screen");
+            }
+        }
+
+        [Test]
+        public void APictureIsWholeOnEveryScreenTheRightWayRound()
+        {
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            int faces = 0;
+            foreach (PropKind kind in System.Enum.GetValues(typeof(PropKind)))
+            {
+                if (ScreenLooks.KindOf(kind) == ScreenKind.Appliance || art.Prop(kind) == null) continue;
+                int here = 0;
+                foreach (var r in art.Prop(kind).GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (r.sharedMaterial != art.Screens[0] || Mathf.Max(r.bounds.size.x, Mathf.Max(r.bounds.size.y, r.bounds.size.z)) < ScreenLooks.SmallScreen) continue;
+                    var mesh = r.GetComponent<MeshFilter>().sharedMesh;
+                    Vector3[] v = mesh.vertices;
+                    int[] t = mesh.triangles;
+                    var uv = ScreenFaces.Fit(v, t);
+                    for (int i = 0; i < t.Length; i += 3)
+                    {
+                        Vector2 a = uv[t[i]], b = uv[t[i + 1]], c = uv[t[i + 2]];
+                        if (Mathf.Abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) < 0.2f) continue; // an edge, a lamp
+                        here++;
+                        var n = Vector3.Cross(v[t[i + 1]] - v[t[i]], v[t[i + 2]] - v[t[i]]).normalized;
+                        var right = Vector3.Cross(n, Vector3.up);
+                        // v grows upwards, u to the right of whoever stands before it: from two corners that differ in each
+                        foreach (var (p, q) in new[] { (t[i], t[i + 1]), (t[i + 1], t[i + 2]), (t[i + 2], t[i]) })
+                        {
+                            float up = v[q].y - v[p].y, across = Vector3.Dot(v[q] - v[p], right);
+                            if (Mathf.Abs(up) > 0.05f) Assert.AreEqual(Mathf.Sign(up), Mathf.Sign(uv[q].y - uv[p].y), $"{kind}: upside down");
+                            if (Mathf.Abs(across) > 0.05f) Assert.AreEqual(Mathf.Sign(across), Mathf.Sign(uv[q].x - uv[p].x), $"{kind}: mirrored");
+                        }
+                        foreach (var k in new[] { a, b, c }) Assert.IsTrue(k.x >= -0.001f && k.x <= 1.001f && k.y >= -0.001f && k.y <= 1.001f, $"{kind}: whole");
+                    }
+                }
+                faces += here;
+                if (kind is PropKind.Desk or PropKind.TvStand or PropKind.StandingDesk or PropKind.SupervisorDesk or PropKind.DoctorDesk or PropKind.MonitorWall or PropKind.ReceptionDesk)
+                    Assert.Greater(here, 0, $"{kind}: a screen to show a picture on");
+            }
+            Assert.Greater(faces, 30);
+        }
+
+        [Test]
+        public void TheStylesOwnScreensTakeThePictureToo()
+        {
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            var styles = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
+            var families = styles.Styles.Select(st => st.Geometry.Family).Concat(styles.Houses.Select(h => h.Furniture)).ToHashSet(); // (those the game shows)
+            var dead = new List<string>();
+            foreach (PropKind kind in System.Enum.GetValues(typeof(PropKind)))
+            {
+                if (ScreenLooks.KindOf(kind) == ScreenKind.Appliance || art.Prop(kind) == null) continue;
+                foreach (var r in art.Prop(kind).GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (r.sharedMaterial != art.Screens[0] || Mathf.Max(r.bounds.size.x, Mathf.Max(r.bounds.size.y, r.bounds.size.z)) < ScreenLooks.SmallScreen) continue;
+                    var mesh = r.GetComponent<MeshFilter>().sharedMesh;
+                    bool Takes(Mesh m)
+                    {
+                        Assert.IsTrue(m.isReadable, $"{kind}: {AssetDatabase.GetAssetPath(m)} cannot be read in the game");
+                        return ScreenFaces.Fit(m.vertices, m.triangles).Any(uv => uv.x > 0.95f && uv.y > 0.95f);
+                    }
+                    if (!Takes(mesh)) continue; // (little displays: lit as they are on every model)
+                    foreach (var set in styles.Meshes.Where(m => families.Contains(m.Family)))
+                        for (int i = 0; i < set.From.Length; i++)
+                            if (set.From[i] == mesh && set.To[i] != null && !Takes(set.To[i])) dead.Add($"{kind} in {set.Family}");
+                    foreach (var set in styles.StyleModels.Where(m => styles.Styles.Contains(m.Style)))
+                        for (int i = 0; i < set.From.Length; i++)
+                            if (set.From[i] == mesh && set.To[i] != null && !Takes(set.To[i])) dead.Add($"{kind} in {set.Style.name}");
+                }
+            }
+            CollectionAssert.IsEmpty(dead, "screens whose every face is too small or curved for a picture: dark");
+        }
+
+        [Test]
+        public void NoScreenIsLeftHangingWhenAHousesOwnFurnitureStandsIn()
+        {
+            // a piece replaced as a whole: its glowing parts stay only where the stand-in has no screen of its own, and then
+            // only a lamp's bulb — never a screen's sheet in the air
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            var styles = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
+            var left = new List<string>();
+            foreach (PropKind kind in System.Enum.GetValues(typeof(PropKind)))
+            {
+                var prefab = art.Prop(kind);
+                if (prefab == null || prefab.GetComponentInChildren<Stealth.Items.Storage>(true) != null) continue;
+                var meshes = prefab.GetComponentsInChildren<MeshFilter>(true).Select(f => f.sharedMesh).ToHashSet();
+                foreach (var p in styles.Props.Where(p => p.Family is ModelFamily.Realistic or ModelFamily.Derelict && !p.HideGlow && meshes.Contains(p.Key)))
+                    foreach (var r in prefab.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("Eye") && r.sharedMaterial == art.Screens[0]))
+                    {
+                        // is it inside (or on) the stand-in?
+                        var stand = p.Prefab.GetComponentsInChildren<MeshFilter>(true);
+                        bool any = false;
+                        var b = new Bounds();
+                        foreach (var f in stand)
+                        {
+                            var m = Matrix4x4.TRS(p.Position, Quaternion.identity, p.Scale) * Matrix4x4.TRS(f.transform.localPosition, f.transform.localRotation, f.transform.localScale);
+                            for (int k = 0; k < 8; k++)
+                            {
+                                var e = f.sharedMesh.bounds.extents;
+                                var q = m.MultiplyPoint3x4(f.sharedMesh.bounds.center + new Vector3((k & 1) == 0 ? -e.x : e.x, (k & 2) == 0 ? -e.y : e.y, (k & 4) == 0 ? -e.z : e.z));
+                                if (!any) { b = new Bounds(q, Vector3.zero); any = true; } else b.Encapsulate(q);
+                            }
+                        }
+                        b.Expand(0.02f);
+                        var eye = r.bounds;
+                        if (!b.Contains(eye.min) || !b.Contains(eye.max)) left.Add($"{kind} ({p.Family}): {r.name} {eye.size:F2}");
+                    }
+            }
+            CollectionAssert.IsEmpty(left);
         }
 
         [Test]
@@ -97,6 +229,29 @@ namespace Stealth.Tests
             Assert.Less((at - eyes).magnitude, 1e-4f, "the eyes of the body are at the camera");
             Assert.Less(shift.z, 0f, "a body leaning forward is moved back under the eyes");
             Assert.LessOrEqual(HumanMath.EyeShift(eyes, eyes + Vector3.forward * 5f, Vector3.forward, 1f).magnitude, HumanMath.EyeReach + 1e-4f, "never far");
+            // looking out of it, the body stands behind the eyes, its feet on the floor whatever its height
+            var own = HumanMath.OwnShift(eyes, head, Vector3.forward, 1f, planted: true);
+            Assert.AreEqual(0f, own.y, 1e-5f, "standing: the feet stay on the floor");
+            Assert.Less((head + own).z, eyes.z - 0.25f, "the neck is behind the view: no look down the collar");
+            Assert.AreNotEqual(0f, HumanMath.OwnShift(eyes, head, Vector3.forward, 1f, planted: false).y, "in a seat: at the eyes' height");
+            // each person's own view: a skin without a head, an arm for a long thing and one for a compact one
+            foreach (var human in Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans)
+            {
+                var rig = human.GetComponent<HumanRig>();
+                Assert.IsNotNull(rig.Skin, human.name);
+                Assert.IsNotNull(rig.OwnSkin, human.name);
+                Assert.IsFalse(rig.OwnSkin.enabled, "only its owner sees it");
+                Assert.Less(rig.OwnSkin.sharedMesh.triangles.Length, rig.Skin.sharedMesh.triangles.Length * 0.75f, $"{human.name}: the head is cut out");
+                Assert.Greater(rig.OwnSkin.sharedMesh.triangles.Length, 3000, $"{human.name}: the hands are not");
+                foreach (var arm in new[] { rig.ViewFist, rig.ViewCup })
+                {
+                    Assert.IsNotNull(arm, human.name);
+                    var b = new Bounds();
+                    foreach (var f in arm.GetComponentsInChildren<MeshFilter>()) b.Encapsulate(f.sharedMesh.bounds);
+                    Assert.That(b.size.magnitude, Is.InRange(0.3f, 0.9f), $"{arm.name}: an arm");
+                    Assert.IsTrue(arm.GetComponentsInChildren<Transform>().Any(t => t.name == "AccentHead"), $"{arm.name}: its hand");
+                }
+            }
             // his own flashlight leaves his own body out
             var player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Player/Player.prefab").GetComponent<PlayerController>();
             Assert.AreEqual("OwnBody", LayerMask.LayerToName(PlayerController.OwnBodyLayer));

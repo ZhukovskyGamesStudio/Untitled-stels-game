@@ -83,6 +83,18 @@ namespace Stealth.Enemies
             }
         }
 
+        /// <summary>The state of a device with no eye and no ear (<see cref="Detector.StateLine"/>): its parts in the status colour, dimly lit of themselves; no light.</summary>
+        public void Line(Color status, float share)
+        {
+            if (Renderers == null) return;
+            m_Block ??= new MaterialPropertyBlock();
+            m_Block.SetColor("_BaseColor", Color.Lerp(SecurityPalette.Off, status, 0.5f));
+            m_Block.SetColor("_EmissionColor", status * Mathf.Clamp(share, 0f, 2f));
+            foreach (var r in Renderers)
+                if (r != null) r.SetPropertyBlock(m_Block);
+            Current = share > 0f ? status * Mathf.Clamp(share, 0f, 2f) : SecurityPalette.Off;
+        }
+
         void Paint(Renderer[] parts, Color c, bool glows)
         {
             if (parts == null) return;

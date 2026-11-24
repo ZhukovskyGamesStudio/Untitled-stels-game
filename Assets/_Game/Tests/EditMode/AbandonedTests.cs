@@ -55,21 +55,6 @@ namespace Stealth.Tests
             }
         }
 
-        static StyleKit[] Kits() => Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.Kits.Where(k => k != null).ToArray();
-
-        [Test]
-        public void EveryStylesKitCarriesTheDerelictLook()
-        {
-            var kits = Kits();
-            Assert.Greater(kits.Length, 0);
-            foreach (var kit in kits)
-            {
-                Assert.IsNotNull(kit.DerelictWall, $"{kit.name}: steel panels");
-                Assert.IsNotNull(kit.DerelictFloor, $"{kit.name}: floor plates");
-                Assert.Greater(kit.FloorDecay.Length + kit.WallDecay.Length, 0, $"{kit.name}: decay");
-            }
-        }
-
         [Test]
         public void OnlyTheStationIsDressedDerelict()
         {
@@ -79,15 +64,14 @@ namespace Stealth.Tests
                 .Select(k => { int seed = Enumerable.Range(1, 400).First(s => HouseKinds.Of(s, 2) == k); return TestHouses.Get(seed, 2); }).ToArray();
             foreach (var style in config.Styles.Where(s => s != null))
             {
-                var kit = config.KitFor(style.Geometry.Family);
-                if (kit == null) continue;
-                var dressed = HouseRules.Of(station).Look(style.Geometry, kit, station);
-                Assert.AreEqual(kit.DerelictWall, dressed.Wall, $"{style.name}: the station's walls are steel panels");
+                var dressed = VisualStyles.LookOf(station).Dress(style.Geometry);
+                Assert.AreEqual("Dr_SteelPanels", dressed.Wall.name, $"{style.name}: the station's walls are steel panels");
                 Assert.Greater(dressed.DecayDensity, 0f, $"{style.name}: the station decays");
+                Assert.Greater(dressed.FloorDecay.Length + dressed.WallDecay.Length, 0);
                 foreach (var l in others)
                 {
-                    var g = HouseRules.Of(l).Look(style.Geometry, kit, l);
-                    Assert.AreNotEqual(kit.DerelictWall, g.Wall, $"{style.name}, {l.Kind}: keeps its own walls");
+                    var g = VisualStyles.LookOf(l).Dress(style.Geometry);
+                    Assert.AreNotEqual(dressed.Wall, g.Wall, $"{style.name}, {l.Kind}: keeps its own walls");
                     Assert.AreEqual(0f, g.DecayDensity, $"{style.name}, {l.Kind}: no decay outside the station");
                     Assert.AreEqual(0f, g.PosterChance, $"{style.name}, {l.Kind}: no derelict posters outside the station");
                 }

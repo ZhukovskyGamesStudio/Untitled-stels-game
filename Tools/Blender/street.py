@@ -395,7 +395,8 @@ def m_sedan():
     """The repair shop's sedan (garage.sedan) parked on the street: its paint is the copy's livery."""
     p = CarParts()
     yf, yr = garage.sedan(p)
-    taillights(p, yr)
+    for sx in (-1, 1):                                      # red lenses over the wrapped tail lamps
+        p.add("CarRed", s.rbox((0.34, 0.09, 0.1), (sx * 0.49, yr + 0.005, 0.665), r=0.022, seg=2, rot=(0, 0, sx * -0.2)))
     hubcaps(p, (-garage.WHEELBASE / 2, garage.WHEELBASE / 2), garage.TRACK)
     p.finish()
     return export("sedan")

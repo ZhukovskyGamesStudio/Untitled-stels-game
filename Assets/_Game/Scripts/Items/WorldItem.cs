@@ -55,6 +55,10 @@ namespace Stealth.Items
 
         MaterialPropertyBlock m_Block;
         float m_HiddenUntil = -1f;
+        Storage m_RidesIn;          // server: the drawer it comes out in, until that has slid all the way
+        int m_RidesPart;
+        Vector3 m_RideEnd;
+        float m_RideUntil;
 
         /// <summary>Hidden locally while a pickup request is on its way (see <see cref="HideWhileTaking"/>).</summary>
         public bool Taking => m_HiddenUntil >= 0f;
@@ -91,15 +95,43 @@ namespace Stealth.Items
             bool physics = ItemCatalog.HasPhysics(Shape);
             if (Solid != null) Solid.enabled = physics && !hidden;
             if (Body == null) return;
-            bool dynamic = physics && !hidden && Game.Session.IsServer;
+            bool dynamic = physics && !hidden && m_RidesIn == null && Game.Session.IsServer;
             if (Body.isKinematic == !dynamic) return;
             Body.isKinematic = !dynamic;
             if (dynamic) Body.WakeUp();
         }
 
+        /// <summary>
+        /// Server: the item comes out with its drawer — it lies where the drawer carries it and starts to fall only once the
+        /// drawer has stopped. Let go at the spot the drawer would slide to, it fell past the floor of a drawer that was not
+        /// there yet and ended up under its board.
+        /// </summary>
+        public void RideServer(Storage drawers, int part)
+        {
+            if (drawers == null || !drawers.Drawers) return;
+            m_RidesIn = drawers;
+            m_RidesPart = part;
+            m_RideEnd = transform.position;
+            m_RideUntil = Time.time + StorageMath.OpenSeconds * 3f;
+            Ride();
+            ApplyPhysics(hidden: Taking);
+        }
+
+        void Ride()
+        {
+            if (m_RidesIn == null) return;
+            float left = m_RidesIn.Travel - m_RidesIn.OutBy(m_RidesPart);
+            transform.position = m_RideEnd - m_RidesIn.transform.forward * Mathf.Max(0f, left);
+            if (left > 0.002f && Time.time < m_RideUntil) return;
+            m_RidesIn = null;
+            transform.position = m_RideEnd;
+            ApplyPhysics(hidden: Taking);
+        }
+
         void Update()
         {
             UpdateMusic();
+            Ride();
             if (m_HiddenUntil < 0f || Time.time < m_HiddenUntil) return;
             m_HiddenUntil = -1f;
             if (Renderer != null) Renderer.enabled = true;

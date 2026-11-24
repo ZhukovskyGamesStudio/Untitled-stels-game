@@ -402,15 +402,23 @@ def model_cash_shelf():
                         y = -0.15 + j * 0.082 + (0.03 if ny < 3 else 0)
                         b, band = brick(x, y, z0 + layer * (size[2] - 0.002), size,
                                         rot_z=math.radians(((i * 5 + j * 3 + layer) % 5 - 2) * 1.5))
-                        cash.append(b)
-                        trim.append(band)
+                        zb, rz = z0 + layer * (size[2] - 0.002) - 0.002, math.radians(((i * 5 + j * 3 + layer) % 5 - 2) * 1.5)
+
+                        def notes(n, c, co, x=x, y=y, zb=zb):                # the top: a note; the sides: their edges
+                            if n.z > 0.7:
+                                return mc.uv("notes", (co.x - x) / size[0] + 0.5, (co.y - y) / size[1] + 0.5)
+                            return mc.uv("noteedge", ((co.x - x) if abs(n.y) > 0.5 else (co.y - y)) / size[0] + 0.5, (co.z - zb) / size[2])
+
+                        def strap(n, c, co, y=y, zb=zb):
+                            return mc.uv("band", 0.5, 0.5 + (co.y - y) / size[1] * 0.9) if n.z > 0.7 else mc.uv("band", 0.5, 0.08)
+                        cash.append((b, notes))
+                        cash.append((band, strap))
         for k, (x, y) in enumerate(bags):
             bag, tie = money_bag(x, y, z0, h=0.22 + 0.03 * (k % 2), w=0.08 + 0.01 * ((k + shelf) % 2),
                                  rot_z=0.4 * k + shelf)
-            bags_out += [bag, tie]
-    s.part("Accent", cash)
-    s.part("Trim", trim)
-    s.part("TrimBags", bags_out)
+            bags_out += [(bag, "canvas"), (tie, "brown")]
+    import machines as mc
+    mc.plates("Print", [], cash + bags_out)
     return export("cash_shelf")
 
 

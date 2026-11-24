@@ -43,7 +43,8 @@ namespace Stealth.Level
         void Update()
         {
             if (Lid == null || Index < 0) return;
-            m_Open.Step(World.IsOpened(OpenKeys.Crate(Index)), Time.deltaTime, 0.4f);
+            if (m_Open.Step(World.IsOpened(OpenKeys.Crate(Index)), Time.deltaTime, 0.4f) == OpenMove.StartedOpening)
+                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.CrateSearch : null, Point, 0.8f, Audio.Sfx.Group.Items);
             if (Mathf.Approximately(m_Open.Value, m_Shown)) return;
             m_Shown = m_Open.Value;
             Lid.localRotation = m_Rest * Quaternion.Euler(-105f * m_Shown, 0f, 0f);

@@ -32,6 +32,21 @@ namespace Stealth.Enemies
             return true;
         }
 
+        /// <summary>A wall, a slab or a shut door stands between two points (furniture and bodies do not count).</summary>
+        public static bool WallBetween(Vector3 from, Vector3 to)
+        {
+            var d = to - from;
+            float dist = d.magnitude;
+            if (dist < 1e-3f) return false;
+            int n = Physics.RaycastNonAlloc(from, d / dist, s_ReachHits, dist, SightMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var blocker = s_ReachHits[i].collider.GetComponentInParent<Stealth.Level.SoundBlocker>();
+                if (blocker != null && blocker.Material != Stealth.Level.SoundMaterial.Furniture) return true;
+            }
+            return false;
+        }
+
         /// <summary>Is <paramref name="target"/> inside a cone (full <paramref name="angle"/> in degrees) and range?</summary>
         public static bool InCone(Vector3 origin, Vector3 forward, Vector3 target, float range, float angle)
         {

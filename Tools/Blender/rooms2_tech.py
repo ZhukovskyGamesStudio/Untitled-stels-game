@@ -23,6 +23,7 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
 import shapes as s  # noqa: E402
 
@@ -290,17 +291,22 @@ def model_metal_shelving():
     s.part("Body", body)
 
     tops = [z + 0.009 for z in levels]
-    boxes = [carton(0.52, 0.4, 0.4, -0.58, 0.0, tops[0], 0.03), carton(0.44, 0.42, 0.34, -0.03, 0.01, tops[0], -0.04),
-             carton(0.56, 0.42, 0.38, 0.53, -0.01, tops[0]),
-             carton(0.6, 0.4, 0.32, 0.45, 0.0, tops[1], 0.02),
-             carton(0.45, 0.38, 0.36, -0.6, 0.0, tops[2], -0.03), carton(0.36, 0.4, 0.25, -0.12, 0.0, tops[2]),
-             carton(0.3, 0.32, 0.14, -0.1, 0.01, tops[2] + 0.25, 0.12), carton(0.55, 0.4, 0.38, 0.45, 0.0, tops[2], 0.02),
-             carton(0.6, 0.4, 0.3, -0.5, 0.0, tops[3], -0.02),
-             carton(0.4, 0.3, 0.18, -0.4, 0.0, tops[4], 0.05)]
-    s.part("Trim", boxes)
-    bins = [bin_box(0.3, 0.42, 0.2, x, 0.0, tops[1]) for x in (-0.72, -0.4, -0.08)]
-    bins += [bin_box(0.28, 0.42, 0.18, x, 0.0, tops[3]) for x in (0.14, 0.44, 0.74)]
-    s.part("Accent", bins)
+    import machines as mc
+    specs = [(0.52, 0.4, 0.4, -0.58, 0.0, tops[0], 0.03), (0.44, 0.42, 0.34, -0.03, 0.01, tops[0], -0.04), (0.56, 0.42, 0.38, 0.53, -0.01, tops[0], 0.0),
+             (0.6, 0.4, 0.32, 0.45, 0.0, tops[1], 0.02), (0.45, 0.38, 0.36, -0.6, 0.0, tops[2], -0.03), (0.36, 0.4, 0.25, -0.12, 0.0, tops[2], 0.0),
+             (0.3, 0.32, 0.14, -0.1, 0.01, tops[2] + 0.25, 0.12), (0.55, 0.4, 0.38, 0.45, 0.0, tops[2], 0.02), (0.6, 0.4, 0.3, -0.5, 0.0, tops[3], -0.02),
+             (0.4, 0.3, 0.18, -0.4, 0.0, tops[4], 0.05)]
+    goods, labels = [], []
+    for k, (w, d, h, x, y, zb, rz) in enumerate(specs):                  # cartons: tape, a label, this side up
+        goods.append((carton(w, d, h, x, y, zb, rz), mc.front("carton2" if k % 3 == 1 else "carton", x, zb, w, h, "kraft")))
+    colours = ("binblue", "binred", "bingrey", "binyellow", "binblue", "bingreen")
+    fill = ("chrome", "copper", "black", "brass", "tin", "white2")
+    spots = [(0.3, 0.2, x, tops[1]) for x in (-0.72, -0.4, -0.08)] + [(0.28, 0.18, x, tops[3]) for x in (0.14, 0.44, 0.74)]
+    for k, (w, h, x, zb) in enumerate(spots):                            # picking bins, each its colour, what is in it, its label
+        goods.append((bin_box(w, 0.42, h, x, 0.0, zb), colours[k]))
+        goods.append((s.rbox((w - 0.04, 0.36, h * 0.3), (x, 0.0, zb + h * 0.42), r=0.01, seg=1), fill[k]))
+        labels.append(mc.Plate(f"binlabel{k}", (x, -0.2155, zb + h * 0.45), 0.12, 0.06, thick=0.004, rest="white2"))
+    mc.plates("Print", labels, goods)
     return export("metal_shelving")
 
 
@@ -504,26 +510,27 @@ def model_supply_shelf():
     s.part("Body", body)
     tops = [z + 0.011 for z in shelves]
 
-    paper = []
-    for x in (-0.23, 0.23):
+    import machines as mc
+    goods = []
+    for x in (-0.23, 0.23):                                              # cases of paper
         c = s.rbox((0.43, 0.3, 0.27), (x, 0.0, tops[0] - 0.003 + 0.135), r=0.006, seg=1)
         s.groove(c, "Z", tops[0] + 0.22, 0.008, 0.003)
-        paper.append(c)
-    for x, n in ((-0.32, 4), (-0.06, 3), (0.2, 5)):
+        goods.append((c, mc.front("paperbox", x, tops[0], 0.43, 0.27, "white2")))
+    for x, n in ((-0.32, 4), (-0.06, 3), (0.2, 5)):                      # reams in their wrappers
         z = tops[1]
         for k in range(n):
-            paper.append(ream(x, 0.0, z, 1.5708 + 0.04 * ((k * 5) % 3 - 1), w=0.297, d=0.21))
+            goods.append((ream(x, 0.0, z, 1.5708 + 0.04 * ((k * 5) % 3 - 1), w=0.297, d=0.21), mc.front("ream", x, z, 0.21, 0.05, "white2")))
             z += 0.048
     z = tops[3]
     for k in range(3):
-        paper.append(ream(-0.28, 0.0, z, 1.5708 + 0.05 * (k % 2)))
+        goods.append((ream(-0.28, 0.0, z, 1.5708 + 0.05 * (k % 2)), mc.front("ream", -0.28, z, 0.21, 0.05, "white2")))
         z += 0.048
-    s.part("Trim", paper)
-
-    toner = [s.rbox((0.11, 0.3, 0.2), (-0.38 + k * 0.125, 0.0, tops[2] - 0.002 + 0.1), r=0.005, seg=1) for k in range(6)]
-    toner.append(s.rbox((0.4, 0.15, 0.13), (0.15, 0.0, tops[3] - 0.002 + 0.065), r=0.005, seg=1, rot=(0, 0, 0.05)))
-    toner.append(s.rbox((0.11, 0.3, 0.2), (0.4, 0.0, tops[3] - 0.002 + 0.1), r=0.005, seg=1))
-    s.part("Accent", toner)
+    for k in range(6):                                                   # toner, a colour a box
+        x = -0.38 + k * 0.125
+        goods.append((s.rbox((0.11, 0.3, 0.2), (x, 0.0, tops[2] - 0.002 + 0.1), r=0.005, seg=1), mc.front(f"toner{k % 4}", x, tops[2], 0.11, 0.2, "white2")))
+    goods.append((s.rbox((0.4, 0.15, 0.13), (0.15, 0.0, tops[3] - 0.002 + 0.065), r=0.005, seg=1, rot=(0, 0, 0.05)), mc.front("carton", 0.15, tops[3], 0.4, 0.13, "kraft")))
+    goods.append((s.rbox((0.11, 0.3, 0.2), (0.4, 0.0, tops[3] - 0.002 + 0.1), r=0.005, seg=1), mc.front("toner3", 0.4, tops[3], 0.11, 0.2, "white2")))
+    mc.plates("Print", [], goods)
     return export("supply_shelf")
 
 
@@ -703,12 +710,9 @@ def model_supervisor_desk():
         acc.append(s.place(housing, (x, 0.22, 1.37), (0, 0, -sx * math.radians(8))))
         screen = s.rbox((0.52, 0.008, 0.3), (0, -0.018, 0.005), r=0.003, seg=1)
         eye.append(s.place(screen, (x, 0.22, 1.37), (0, 0, -sx * math.radians(8))))
-    kb = s.rbox((0.44, 0.14, 0.022), (0, -0.18, 1.108), r=0.005, seg=1)
-    s.inset_faces(kb, s.facing((0, 0, 1), min_area=0.03), thickness=0.012, depth=-0.004)
-    acc.append(kb)
-    acc.append(s.rbox((0.04, 0.07, 0.024), (0.32, -0.17, 1.109), r=0.01, seg=2))
     s.part("Accent", acc)
     s.part("Eye", eye)
+    keyboard.add("Keys", (-0.03, -0.18, 1.0995))
     return export("supervisor_desk")
 
 
@@ -782,30 +786,16 @@ def model_display_case():
 
 
 def model_planter_large():
-    """Big indoor planter 1.0 x 1.0 x 1.8: a tapered pot with a rolled rim, soil, a slim crooked trunk branching into
-    a canopy of ten lumpy leaf clusters."""
-    pot = s.lathe([(0.0, 0.0), (0.26, 0.0), (0.275, 0.012), (0.33, 0.5), (0.345, 0.515), (0.345, 0.555), (0.33, 0.565),
-                   (0.31, 0.55), (0.31, 0.5), (0.0, 0.5)], seg=24)
+    """Big indoor planter 1.0 x 1.0 x 1.8: a tall fibre-stone pot on a recessed foot with a rolled rim, soil with bark
+    chips, a fig tree — a crooked trunk, branches, twigs and some four hundred leaves (plants.tree)."""
+    import plants
+    pot = s.lathe([(0.0, 0.0), (0.22, 0.0), (0.225, 0.03), (0.245, 0.035), (0.27, 0.06), (0.325, 0.5), (0.34, 0.515), (0.345, 0.545), (0.335, 0.565),
+                   (0.315, 0.56), (0.305, 0.5), (0.0, 0.5)], seg=32)
+    s.groove(pot, "Z", 0.44, 0.006, 0.003)
     s.part("Body", [pot])
-
-    trim = [s.rcyl(0.305, 0.02, (0, 0, 0.505), seg=24, r=0.004, bevel_seg=1)]
-    trim.append(s.tube([(0, 0, 0.48), (0.02, 0.01, 0.8), (-0.025, 0.0, 1.1), (0.0, 0.02, 1.38)], 0.04,
-                       radii=[1.0, 0.85, 0.7, 0.55], res=1, segments_per=5))
-    blobs = [((0, 0.02, 1.56), 0.26)]
-    for k in range(6):
-        ang = math.radians(60 * k)
-        blobs.append(((0.29 * math.cos(ang), 0.29 * math.sin(ang), 1.3 + 0.03 * (k % 2)), 0.2 + 0.005 * (k % 2)))
-    for k in range(3):
-        ang = math.radians(30 + 120 * k)
-        blobs.append(((0.17 * math.cos(ang), 0.17 * math.sin(ang), 1.52), 0.17))
-    for (x, y, z), r in blobs[1:7]:
-        trim.append(s.tube([(0, 0.01, 1.15), (x * 0.5, y * 0.5, (1.15 + z) / 2 + 0.03), (x * 0.8, y * 0.8, z - r * 0.3)],
-                           0.014, res=1, segments_per=3))
-    s.part("Trim", trim)
-
-    # the canopy: the clusters melted into one lumpy leaf mass (balls side by side showed seams between them)
-    leaves = [s.foliage([((x, y, z), r * 1.05) for (x, y, z), r in blobs], 0.035, 3, 0.012, 2400)]
-    s.part("Accent", leaves, sharp_angle=90)
+    wood, leaves = plants.tree((0.0, 0.0, 0.5), 1.28, seed=11, crown=0.42, branches=12, twigs=5, per_twig=11, leaf=(0.17, 0.08), trunk=0.04)
+    s.part("Trim", plants.soil(0.3, 0.515, seed=4) + wood)
+    s.part("Accent", leaves, sharp_angle=180)
     return export("planter_large")
 
 

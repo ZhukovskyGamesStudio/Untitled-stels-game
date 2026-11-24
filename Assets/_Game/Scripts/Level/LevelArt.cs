@@ -51,7 +51,11 @@ namespace Stealth.Level
         public CityMesh[] CityMeshes = new CityMesh[0];
         [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
         public Material[] UtilityMaterials = new Material[0];
-        [Tooltip("The furniture's screens: the glowing material the models carry, then what it becomes in a house — off, static, cracked (ScreenLook's order; ScreenLooks).")]
+        [Tooltip("The electrical panel on a corridor wall of every floor (UtilityPlan.PanelSpots; +Z out of the wall, its bottom's middle at the origin)")] public GameObject ElectricPanel;
+        [Tooltip("What differs from piece to piece (PropPictures), by PictureKind: whiteboards' writing, mirror glass, a projector's screen")] public Material[] Pictures = new Material[0];
+        [Tooltip("The mirrors' plain glass on the models: swapped for Pictures[Mirror] in a house")] public Material Mirror;
+        [Tooltip("The small displays of appliances and instruments: every picture on one texture (ScreenLooks.DisplayOf)")] public Material Displays;
+        [Tooltip("The furniture's screens: the glowing material the models carry, then what it becomes in a house — off, static, cracked, no signal, the boot menu (ScreenLook's order; ScreenLooks).")]
         public Material[] Screens = new Material[0];
         [Tooltip("A plain steel door-and-a-half on hinges (the shop, the plant room, storerooms): a louvre at the bottom, a wired-glass slot")] public GameObject ShopDoor;
         [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;
@@ -65,6 +69,7 @@ namespace Stealth.Level
         [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
+        [Tooltip("The push button inside the storage room that lets one out (ExitButton)")] public GameObject ExitButton;
         [Tooltip("A grate in a room's ceiling: the way into the crawl ducts (VentPlan).")]
         public GameObject VentGrate;
         [Tooltip("The lid over the shaft in the lobby (ShaftHatch), with the ladder's top under it (ShaftLadder).")]

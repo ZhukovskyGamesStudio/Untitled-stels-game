@@ -14,8 +14,8 @@ namespace Stealth.Level
         /// <summary>Its lid is screwed shut: only a screwdriver in hand takes it off (<see cref="VentGrate"/>).</summary>
         public bool Closed;
         /// <summary>
-        /// The way up to it (−1: none, only down): a crate stack right under it and a desk beside the stack on this side
-        /// (0 +x, 1 −x, 2 +z, 3 −z) — floor → desk → crates → a crouched jump into the duct (<see cref="VentPlan.ClimbSide"/>).
+        /// The way up to it (−1: none, only down): a chest-high piece right under it and a step beside it on this side
+        /// (0 +x, 1 −x, 2 +z, 3 −z) — floor → step → top → a crouched jump into the duct (<see cref="Furnisher.ClimbOf"/>).
         /// </summary>
         public int ClimbDir;
     }
@@ -159,11 +159,8 @@ namespace Stealth.Level
             return true;
         }
 
-        /// <summary>The side of a climb's desk (<see cref="DuctGrate.ClimbDir"/>) as a direction.</summary>
+        /// <summary>The side of a climb's step (<see cref="DuctGrate.ClimbDir"/>) as a direction.</summary>
         public static Vector3 ClimbSide(int dir) => dir switch { 0 => Vector3.right, 1 => Vector3.left, 2 => Vector3.forward, _ => Vector3.back };
-
-        /// <summary>The crate stack under the grate and the desk beside it: half their depth, the gap between them.</summary>
-        public const float StackHalf = 0.39f, DeskHalf = 0.4f;
 
         /// <summary>Half a ceiling lamp's fixture (two panels, 1.24 × 1.28 m) and the gap a grate keeps from it.</summary>
         public const float LampHalf = 0.65f, LampGap = 0.15f;
@@ -239,7 +236,7 @@ namespace Stealth.Level
                     var q = c + side * a + across * b;
                     if (l.Plan.SpaceAt(f, q) != r.Id || near.Near(q)) return false;
                 }
-            // clear of the room's middle (its patrol stop is kept free) and of the facade (the crates are tall: not before a window)
+            // clear of the room's middle (its patrol stop is kept free) and of the facade (the top is chest-high: not before a window)
             var mid = new Vector2(r.Center.x, r.Center.z);
             for (float a = -0.5f; a <= 1.8f; a += 0.45f)
             {

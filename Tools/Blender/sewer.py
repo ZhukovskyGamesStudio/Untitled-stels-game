@@ -1076,10 +1076,26 @@ def kit_passage_end():
     (the game puts the lights there)."""
     H, X1, top = PASS_HALF, 2 * PASS_HALF, SHAFT_TOP
 
+    # The shaft is exactly as wide as the hole in the house's floor (3 x 3 plan cells): up in the slab its brick would lie
+    # in the plane of the slab's cut edge and flicker with it. So the last NECK metres stand IN mm inside the hole
+    # (the alcove's shaft is narrower than its hole for the same reason), on a ledge that closes the step.
+    NECK, IN = 0.9, 0.012
+    low = top - NECK
+
     def walls(bm):
-        poly(bm, [(X1, -H, KIT_WALK), (X1, H, KIT_WALK), (X1, H, top), (X1, -H, top)], (-1, 0, 0))
-        passage_walls(bm, 0.0, X1, (1, -1), top)
-        poly(bm, [(0.0, -H, PASS_TOP), (0.0, H, PASS_TOP), (0.0, H, top), (0.0, -H, top)], (1, 0, 0))   # over the way in
+        poly(bm, [(X1, -H, KIT_WALK), (X1, H, KIT_WALK), (X1, H, low), (X1, -H, low)], (-1, 0, 0))
+        passage_walls(bm, 0.0, X1, (1, -1), low)
+        poly(bm, [(0.0, -H, PASS_TOP), (0.0, H, PASS_TOP), (0.0, H, low), (0.0, -H, low)], (1, 0, 0))   # over the way in
+        x0, x1, y0, y1 = IN, X1 - IN, -H + IN, H - IN
+        poly(bm, [(x1, y0, low), (x1, y1, low), (x1, y1, top), (x1, y0, top)], (-1, 0, 0))
+        poly(bm, [(x0, y0, low), (x0, y1, low), (x0, y1, top), (x0, y0, top)], (1, 0, 0))
+        poly(bm, [(x0, y1, low), (x1, y1, low), (x1, y1, top), (x0, y1, top)], (0, -1, 0))
+        poly(bm, [(x0, y0, low), (x1, y0, low), (x1, y0, top), (x0, y0, top)], (0, 1, 0))
+        # the ledge under the neck, seen from below
+        poly(bm, [(0.0, -H, low), (X1, -H, low), (X1, y0, low), (0.0, y0, low)], (0, 0, -1))
+        poly(bm, [(0.0, y1, low), (X1, y1, low), (X1, H, low), (0.0, H, low)], (0, 0, -1))
+        poly(bm, [(0.0, y0, low), (x0, y0, low), (x0, y1, low), (0.0, y1, low)], (0, 0, -1))
+        poly(bm, [(x1, y0, low), (X1, y0, low), (X1, y1, low), (x1, y1, low)], (0, 0, -1))
     part("Brick", walls).name = "BrickShaft"
     part("Concrete", lambda bm: poly(bm, [(0, -H, KIT_WALK), (X1, -H, KIT_WALK), (X1, H, KIT_WALK), (0, H, KIT_WALK)])).name = "ConcreteShaft"
 

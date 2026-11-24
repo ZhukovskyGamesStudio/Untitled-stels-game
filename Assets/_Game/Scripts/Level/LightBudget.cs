@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Stealth.Player;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace Stealth.Level
 {
@@ -38,6 +39,11 @@ namespace Stealth.Level
             return type == LightType.Point ? 6f * map : map;
         }
 
+        /// <summary>The same for a light whose own shadow map is bigger than its kind's (the local player's flashlight: a whole 1024² one).</summary>
+        static float CostOf(Light l) =>
+            l.type != LightType.Point && l.TryGetComponent<UniversalAdditionalLightData>(out var data) && !data.usePipelineSettings
+            && data.additionalLightsShadowResolutionTier == UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierHigh ? 1f : Cost(l.type, l.range);
+
         /// <summary>Which lights to draw, nearest first, while they fit the budget (pure).</summary>
         public static void Choose(IReadOnlyList<float> costsNearestFirst, float budget, bool[] into)
         {
@@ -50,6 +56,9 @@ namespace Stealth.Level
         }
 
         static readonly List<float> s_Costs = new();
+        RoomFillField m_Fill;
+
+        void OnDestroy() => m_Fill?.Dispose();
         bool[] m_On = new bool[0];
 
         /// <summary>Right after the level is built: the very first frame must not render every lamp with shadows.</summary>
@@ -63,6 +72,7 @@ namespace Stealth.Level
         void Update()
         {
             LiveScreens.Tick(Time.time); // (the house's screens of static: this runs wherever a house stands)
+            (m_Fill ??= new RoomFillField()).Tick(Time.time); // (and the soft light its lamps leave in their rooms)
             if (Time.time >= m_NextScan) Scan();
             if (Time.time < m_NextSort) return;
             m_NextSort = Time.time + 0.2f;
@@ -99,7 +109,7 @@ namespace Stealth.Level
             foreach (var l in FindObjectsByType<Light>())
             {
                 if (l.type == LightType.Directional || l.shadows == LightShadows.None || known.Contains(l)) continue;
-                m_Lights.Add(new Entry { Light = l, Shadows = l.shadows, Mask = l.cullingMask, Cost = Cost(l.type, l.range) });
+                m_Lights.Add(new Entry { Light = l, Shadows = l.shadows, Mask = l.cullingMask, Cost = CostOf(l) });
             }
         }
     }

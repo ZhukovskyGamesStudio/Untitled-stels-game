@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd98fef2f22701e4084ed7eff71d5d66, type: 3}
+  m_Name: Abandoned
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.HouseLook
+  Kind: 8
+  ShellIn: 
+  OwnTrim: 1
+  Doors: 1
+  Baseboard: 1
+  Crown: 0
+  WainscotHeight: 0
+  RailHeight: 0
+  Pipes: 1
+  Ceiling: 4
+  StripSpacing: 0
+  Stairs: 0
+  Floor: {fileID: 2100000, guid: 1970fa90906c4d7419f4b599af6ff9da, type: 2}
+  FloorTile: 2
+  Wall: {fileID: 2100000, guid: ac8971c9d710cbd489e0034097d98540, type: 2}
+  WallTile: 2.4
+  CeilingFinish: {fileID: 2100000, guid: f480f9497e498134f993e252e675effb, type: 2}
+  CeilingTile: 2.4
+  Trim: {fileID: 2100000, guid: d7d7b0e58a45eb8498698c6da5b20d91, type: 2}
+  Panel: {fileID: 0}
+  Column: {fileID: 0}
+  Beam: {fileID: 2100000, guid: 2f94013189462a0428236fcc47f9bf97, type: 2}
+  Pipe: {fileID: 2100000, guid: d7d7b0e58a45eb8498698c6da5b20d91, type: 2}
+  KeepStyleRooms: 0
+  RoomLooks:
+  - Room: 4
+    Wall: {fileID: 2100000, guid: ac8971c9d710cbd489e0034097d98540, type: 2}
+    WallTile: 2.4
+    Lower: {fileID: 2100000, guid: e5bc6b8e1106b694c9504b4c85373337, type: 2}
+    LowerTile: 1
+    LowerHeight: 1.4
+    Plain: 1
+    Ceiling: {fileID: 0}
+    CeilingTile: 1.2
+  - Room: 7
+    Wall: {fileID: 2100000, guid: ac8971c9d710cbd489e0034097d98540, type: 2}
+    WallTile: 2.4
+    Lower: {fileID: 2100000, guid: e5bc6b8e1106b694c9504b4c85373337, type: 2}
+    LowerTile: 1
+    LowerHeight: 1.4
+    Plain: 1
+    Ceiling: {fileID: 0}
+    CeilingTile: 1.2
+  - Room: 18
+    Wall: {fileID: 2100000, guid: ac8971c9d710cbd489e0034097d98540, type: 2}
+    WallTile: 2.4
+    Lower: {fileID: 2100000, guid: e5bc6b8e1106b694c9504b4c85373337, type: 2}
+    LowerTile: 1
+    LowerHeight: 1.4
+    Plain: 1
+    Ceiling: {fileID: 0}
+    CeilingTile: 1.2
+  RoomFloors:
+  - Room: 2
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 4
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 7
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 8
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 12
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 15
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 18
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 19
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  - Room: 30
+    Material: {fileID: 2100000, guid: 2b69f6adec7954a429cde9265a0ef876, type: 2}
+    Tile: 2
+  FloorDecay:
+  - {fileID: 2100000, guid: 9f930cd5933218144a524b3a9f3add0f, type: 2}
+  - {fileID: 2100000, guid: 39fc44c5e22368f4ab04c2d486a6afd2, type: 2}
+  - {fileID: 2100000, guid: 1ce6a1f7141b7374db455280d1b6ccda, type: 2}
+  - {fileID: 2100000, guid: 23f7f81d9af8e3942980a144a620ab4c, type: 2}
+  WallDecay:
+  - {fileID: 2100000, guid: b57689faea9824941ad37b6957285f1e, type: 2}
+  - {fileID: 2100000, guid: b57689faea9824941ad37b6957285f1e, type: 2}
+  - {fileID: 2100000, guid: a9efa74e17c12e14dbef047c60fea7c7, type: 2}
+  - {fileID: 2100000, guid: e6f66e08136038847909119711eaaff7, type: 2}
+  - {fileID: 2100000, guid: 771fbbf0da03b6e40a9c8688ddbdd3c6, type: 2}
+  - {fileID: 2100000, guid: 379753acd2ef19340970e96ffa441ed5, type: 2}
+  DecayDensity: 0.14
+  Posters:
+  - {fileID: 2100000, guid: ed98ac3e1bffcf74a976eb8a038a7238, type: 2}
+  - {fileID: 2100000, guid: bd233fd26e4f31647ba27c0a7b925c28, type: 2}
+  - {fileID: 2100000, guid: c8dbb1ecd293aba4b9c3b9e92569d1b2, type: 2}
+  - {fileID: 2100000, guid: b32bd24f91a2ccc43b0f5b1fb73dea29, type: 2}
+  - {fileID: 2100000, guid: db38c0bb8b5285d44825fc0a4db0fd43, type: 2}
+  - {fileID: 2100000, guid: 5db84c2d99df1834f82cc09b159c9cb7, type: 2}
+  PosterChance: 0.25
+  Furniture: 6
+  FurnitureIn: 05000000i
+  Surfaces: {fileID: 11400000, guid: 86810f7142661be47af957e24d32fabf, type: 2}
+  SurfacesIn: 05000000i
+  Materials: []
+  Grade:
+    Exposure: -0.05
+    Contrast: 0
+    Saturation: -8
+    Temperature: 0
+    Tint: -8
+    ColorFilter: {r: 0.93, g: 1, b: 0.95, a: 1}
+    SplitShadows: {r: 0.38, g: 0.52, b: 0.47, a: 1}
+    SplitHighlights: {r: 0.53, g: 0.54, b: 0.46, a: 1}
+    Split: 0.8
+    FilmGrain: 0.12
+    Vignette: 0.06
+  Air:
+    AmbientTint: {r: 0.9, g: 1.04, b: 0.97, a: 1}
+    Ambient: 1
+    Fog: {r: 0.011, g: 0.024, b: 0.019, a: 1}
+    FogColor: 1
+    FogDensity: 1.35
+    LightScale: 1
+    LampGlow: 1

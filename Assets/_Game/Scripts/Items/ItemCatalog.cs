@@ -346,7 +346,7 @@ namespace Stealth.Items
         public static int ColorOf(int shape, int color) => RarityOr(shape, color);
 
         /// <summary>Real items fall and tumble in the world (a Rigidbody on the server); the tetris pieces stay put.</summary>
-        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey
+        public static bool HasPhysics(int shape) => shape == Shovel || shape == Flashlight || shape == Battery || shape == Key || shape == CageKey || shape == Stun
             || shape is Book or Cans or Screwdriver or BeltBag or ShelterMap || shape >= Radio;
 
         /// <summary>How much larger than life the keys' models are (Tools/Blender/rooms2_special.py): found on a floor.</summary>
@@ -373,6 +373,7 @@ namespace Stealth.Items
             if (shape == Key) return new Vector3(0.086f, 0.012f, 0.024f) * KeyScale;
             if (shape == CageKey) return new Vector3(0.178f, 0.02f, 0.054f) * CageKeyScale;
             if (shape == ShelterMap) return new Vector3(0.30f, 0.025f, 0.22f); // folded (Tools/Blender/apartments.py item_map_model)
+            if (shape == Stun) return new Vector3(0.36f, 0.291f, 0.318f); // items_more.py item_stun_model
             if (shape == Book) return new Vector3(0.24f, 0.042f, 0.17f);
             if (shape == Cans) return new Vector3(0.159f, 0.111f, 0.101f);
             if (shape == Screwdriver) return new Vector3(0.23f, 0.033f, 0.035f);

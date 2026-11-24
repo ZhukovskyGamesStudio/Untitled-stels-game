@@ -344,27 +344,6 @@ def model_server_rack():
     export("server_rack")
 
 
-def model_cabinet():
-    """Office drawer cabinet 0.9 x 0.5 x 1.19 (waist-to-chest high next to a 1.8 m person): an open-fronted carcass and
-    three drawers that slide out (separate parts BodyDrawer0..2, each a tray with its front and handle: the game moves
-    them, Items.Storage)."""
-    H, P = 1.19, 0.37                      # height, drawer pitch
-    merge("Body", [box((0.02, 0.5, H), (x, 0, H / 2)) for x in (-0.44, 0.44)]          # sides
-          + [box((0.9, 0.5, 0.02), (0, 0, H - 0.01)), box((0.9, 0.5, 0.06), (0, 0, 0.03)),  # top, plinth
-             box((0.9, 0.02, H), (0, 0.24, H / 2))]                                    # back
-          + [box((0.86, 0.48, 0.02), (0, 0.01, 0.06 + k * P)) for k in range(1, 3)])   # runners between the drawers
-    for k in range(3):
-        z0 = 0.07 + k * P
-        merge(f"BodyDrawer{k}", [
-            box((0.86, 0.02, P - 0.03), (0, -0.24, z0 + (P - 0.03) / 2)),    # front
-            box((0.8, 0.4, 0.015), (0, -0.03, z0 + 0.02)),                   # bottom
-            box((0.015, 0.4, 0.19), (-0.4, -0.03, z0 + 0.105)), box((0.015, 0.4, 0.19), (0.4, -0.03, z0 + 0.105)),  # sides
-            box((0.8, 0.015, 0.19), (0, 0.17, z0 + 0.105)),                  # back
-            box((0.3, 0.03, 0.04), (0, -0.265, z0 + P - 0.1)),               # handle
-        ])
-    export("cabinet")
-
-
 def model_meeting_table():
     merge("Body", [box((3.2, 1.3, 0.06), (0, 0, 0.75))])
     merge("Accent", [
@@ -386,9 +365,11 @@ def model_plant():
 
 
 def model_kitchen_counter():
-    """Kitchen base cupboards 2.4 x 0.65 under a worktop at 0.93 with a microwave on it: an open carcass (a divider in
-    the middle, a shelf) on a kick plinth and four doors that swing open in two pairs from their meeting edges
-    (BodyDoor0..3, each with its pull: Items.Storage)."""
+    """Kitchen base cupboards 2.4 x 0.65 under a worktop at 0.93: an open carcass (a divider in the middle, a shelf) on a
+    kick plinth and four doors that swing open in two pairs from their meeting edges (BodyDoor0..3, each with its pull:
+    Items.Storage). The worktop is bare: what stands on it (the coffee machine, a microwave) are pieces of their own
+    (a microwave built into this model lost its casing to a second merge("Body") — "Body.001", which the prefab drops —
+    and its glass hung in the air where the coffee machine goes)."""
     merge("Body", [box((0.03, 0.63, 0.89), (x, 0.01, 0.445)) for x in (-1.185, 1.185)]      # sides (into the worktop), front edge y -0.305
           + [box((2.344, 0.6, 0.098), (0, 0.025, 0.051)),                                    # plinth and bottom
              box((2.344, 0.03, 0.776), (0, 0.307, 0.488)),                                   # back
@@ -399,11 +380,6 @@ def model_kitchen_counter():
         merge(f"BodyDoor{i}", [box((0.592, 0.022, 0.774), (x, -0.314, 0.488)),
                                box((0.14, 0.025, 0.02), (hx, -0.332, 0.8))])
     merge("Accent", [box((2.44, 0.7, 0.05), (0, 0, 0.905))])
-    # the microwave: a casing in the cupboards' colour on little feet, the glowing parts only its door window and display
-    # (it was one glowing box)
-    merge("Body", [box((0.5, 0.42, 0.3), (0.7, 0.01, 1.095)), box((0.46, 0.38, 0.02), (0.7, 0.01, 0.94))])
-    merge("Eye", [box((0.3, 0.012, 0.19), (0.63, -0.205, 1.095)), box((0.08, 0.012, 0.035), (0.89, -0.205, 1.18))])
-    merge("Accent", [box((0.02, 0.02, 0.2), (0.8, -0.215, 1.095))] + [box((0.03, 0.012, 0.03), (0.89, -0.207, z)) for z in (1.11, 1.06, 1.01)])
     export("kitchen_counter")
 
 
@@ -452,13 +428,14 @@ def model_toilet_stall():
     """1.0 wide, 1.5 deep cubicle walls (2.0 high, raised), door side open towards -Y."""
     merge("Body", [
         box((0.05, 1.5, 1.9), (-0.5, 0, 1.05)), box((0.05, 1.5, 1.9), (0.5, 0, 1.05)), box((1.0, 0.05, 1.9), (0, 0.75, 1.05)),
-    ] + [box((0.05, 0.05, 0.12), (x, y, 0.06)) for x in (-0.5, 0.5) for y in (-0.7, 0.0)])   # the raised walls stand on feet
+    ] + [box((0.05, 0.05, 0.12), (x, y, 0.06)) for x in (-0.5, 0.5) for y in (-0.7, 0.0)]    # the raised walls stand on feet
+          # the seat with its lid down, the cistern's lid and its button (one Body: a second merge is "Body.001", which the prefab drops)
+          + [cylinder(0.185, 0.03, (0, 0.42, 0.404), segments=16), box((0.4, 0.17, 0.03), (0, 0.655, 0.755)),
+             cylinder(0.025, 0.012, (0, 0.655, 0.776), segments=10)])
     # the toilet against the back wall: a foot, the bowl, the seat with its lid down, the cistern with a flush button
     merge("Accent", [cylinder(0.1, 0.26, (0, 0.42, 0.13), segments=14, radius2=0.12),
                      cylinder(0.12, 0.14, (0, 0.42, 0.32), segments=16, radius2=0.18),
                      box((0.38, 0.15, 0.34), (0, 0.655, 0.57)), box((0.06, 0.1, 0.1), (0, 0.57, 0.42))])
-    merge("Body", [cylinder(0.185, 0.03, (0, 0.42, 0.404), segments=16), box((0.4, 0.17, 0.03), (0, 0.655, 0.755)),
-                   cylinder(0.025, 0.012, (0, 0.655, 0.776), segments=10)])
     export("toilet_stall")
 
 
@@ -868,7 +845,6 @@ if __name__ == "__main__":
     model_terminal()
     model_chair()
     model_server_rack()
-    model_cabinet()
     model_meeting_table()
     model_plant()
     model_kitchen_counter()

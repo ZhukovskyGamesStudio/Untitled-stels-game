@@ -80,6 +80,7 @@ namespace Stealth.Enemies
             m_Agent.baseOffset = Traits.HoverHeight;
             m_Agent.Warp(transform.position);
             m_Agent.speed = Traits.PatrolSpeed;
+            SetUpAvoidance();
             // Everything random about this robot comes from its own stream of the house seed (the n-th robot spawned).
             var rng = LevelRandom.Next(RandomChannel.Robots);
             if (Senses.ColorSorter) SetVariant((sbyte)rng.Next(ItemCatalog.Colors.Length));
@@ -205,12 +206,14 @@ namespace Stealth.Enemies
                 return;
             }
             float now = Time.time, dt = Time.deltaTime;
+            ReadPath();
             if (GameManager.SensorsAllowed)
             {
                 m_Brain.OnSensed(Sense(), now, dt);
                 if (Senses.SeismicRange > 0f) Stomp(now, dt);
             }
             if (!Traits.MovesLoot || !UpdateLootErrandServer(now, dt)) m_Brain.Tick(now, dt);
+            UpdateDoorways(now, dt);
             HoldOnDock(dt);
             SetMode(ModeOf(m_Brain.State)); // (resting comes and goes without a change of state)
             if (m_HasPost && State == RobotState.Patrol && Arrived)
@@ -385,7 +388,7 @@ namespace Stealth.Enemies
 
         Vector3 IRobotBody.Position => transform.position;
 
-        public bool Arrived => !m_Agent.pathPending && m_Agent.remainingDistance <= m_Agent.stoppingDistance + 0.4f;
+        public bool Arrived => !m_Agent.pathPending && (m_Agent.remainingDistance <= m_Agent.stoppingDistance + 0.4f || GaveUp);
 
         public void MoveTo(Vector3 destination, float speed)
         {
@@ -412,7 +415,11 @@ namespace Stealth.Enemies
 
         public void Turn(float degrees) => transform.Rotate(0f, degrees, 0f);
 
-        public void Attack(IIntruder target) => target.HitServer(transform.position);
+        public void Attack(IIntruder target)
+        {
+            // not through a shut door (or a wall): what it reaches with is at the chest, what it hits too
+            if (!Perception.WallBetween(Feet + Vector3.up * 1.1f, Perception.AimPoint(target, 0.6f))) target.HitServer(transform.position);
+        }
 
         public void RaiseAlarm(Vector3 at, float radius)
         {
@@ -508,7 +515,7 @@ namespace Stealth.Enemies
             // Robots without legs patrol only their floor; walkers mostly stay but sometimes change floors.
             var rng = LevelRandom.Shared(RandomChannel.Patrol);
             bool sameFloorOnly = !Traits.CanUseStairs || rng.Value() < 0.75f;
-            var options = layout.PatrolPoints.FindAll(p => !sameFloorOnly || LevelLayout.FloorOf(p.y) == myFloor);
+            var options = layout.PatrolPoints.FindAll(p => (!sameFloorOnly || LevelLayout.FloorOf(p.y) == myFloor) && MayVisit(layout, p));
             if (options.Count == 0) options = layout.PatrolPoints;
             // Prefer nearby rooms so that robots keep "their" area.
             var here = transform.position;
@@ -518,7 +525,14 @@ namespace Stealth.Enemies
                 var p = options[rng.Next(options.Count)];
                 if (Vector3.Distance(p, here) < Vector3.Distance(best, here) && Vector3.Distance(p, here) > 3f) best = p;
             }
-            best += new Vector3(rng.Range(-2.5f, 2.5f), 0, rng.Range(-2.5f, 2.5f));
+            // a step aside from the point, but never a stop in a doorway
+            for (int i = 0; i < 4; i++)
+            {
+                var aside = best + new Vector3(rng.Range(-2.5f, 2.5f), 0, rng.Range(-2.5f, 2.5f));
+                if (!ClearOfDoorways(layout.Doorways, aside)) continue;
+                best = aside;
+                break;
+            }
             return NavMesh.SamplePosition(best, out var hit, 3f, m_Agent.areaMask) ? hit.position : transform.position;
         }
     }

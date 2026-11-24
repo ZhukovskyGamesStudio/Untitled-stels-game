@@ -12,11 +12,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9fc05612274c254bab035cb2b0514c4, type: 3}
   m_Name: SoundBank
   m_EditorClassIdentifier: Stealth.Game::Stealth.Audio.SoundBank
-  Footsteps:
-  - {fileID: 8300000, guid: 46e73cb0d62f05441b184b07d58553d6, type: 3}
-  - {fileID: 8300000, guid: dc86168edc1fbed46830ef99989556b2, type: 3}
-  - {fileID: 8300000, guid: f7a49027d8fa2ac4a8bf255e3fbb38da, type: 3}
-  - {fileID: 8300000, guid: b7c5c558c2b968f4f83711f20ca4cb38, type: 3}
+  StepConcrete:
+  - {fileID: 8300000, guid: c16dbb144c3673749ba32a2cd892b784, type: 3}
+  - {fileID: 8300000, guid: fd33715e81f37b24296a1d513f2054c3, type: 3}
+  - {fileID: 8300000, guid: f9db341fd1616514d9cc5a55683420a9, type: 3}
+  - {fileID: 8300000, guid: 4096e9a3299cd1f4e8c17b42ad198f8a, type: 3}
+  StepTile:
+  - {fileID: 8300000, guid: f794e211f05b8a4439c5774d3c634bdd, type: 3}
+  - {fileID: 8300000, guid: 43f37fb63246c794582894d29a4e3690, type: 3}
+  - {fileID: 8300000, guid: 03d37f4ca57f4e94cb9ad1e0c10d62e2, type: 3}
+  - {fileID: 8300000, guid: 89cdf50da9621d24b9987c3bf2c93f9e, type: 3}
+  StepWood:
+  - {fileID: 8300000, guid: 4358c8fa4632fc948bce48b4a4fdac87, type: 3}
+  - {fileID: 8300000, guid: e13218920251b10488945966346f3f62, type: 3}
+  - {fileID: 8300000, guid: 0f6e8fac40982284f88e6bc51da56a9e, type: 3}
+  - {fileID: 8300000, guid: dbe6b940cc3e8ba4a848cafe7fd633af, type: 3}
+  StepSoft:
+  - {fileID: 8300000, guid: c5453f1e526ee834e91ed12f1d1a6f7b, type: 3}
+  - {fileID: 8300000, guid: 376c40fc7b81bf04794a383fd3dc0664, type: 3}
+  - {fileID: 8300000, guid: 770acabc826183b45b9fe5872a0bae50, type: 3}
+  - {fileID: 8300000, guid: 6caa106783ee9e544841db0081011ed8, type: 3}
+  StepCarpet:
+  - {fileID: 8300000, guid: dc5b850126a1c444ca285388b51f0802, type: 3}
+  - {fileID: 8300000, guid: 86facbefe76f3f446927b5cb193d1ebc, type: 3}
+  - {fileID: 8300000, guid: ddcf7abc2f399b6478cc653823461070, type: 3}
+  - {fileID: 8300000, guid: 308a57cf033cb65479e974b089c8b120, type: 3}
+  StepMetal:
+  - {fileID: 8300000, guid: d5ed657a9e58fc74d863682de4ef9b7c, type: 3}
+  - {fileID: 8300000, guid: 52718ce3af503754484970882d75ce7b, type: 3}
+  - {fileID: 8300000, guid: 2c24695b184196e488e7bdd7ee3b436d, type: 3}
+  - {fileID: 8300000, guid: 15ac27afce408e346b6a6a7228492744, type: 3}
+  StepWet:
+  - {fileID: 8300000, guid: fe3daff9cedff374198840c5931e007e, type: 3}
+  - {fileID: 8300000, guid: 1c584ef5d9882b740a0b4d76ae3fde93, type: 3}
+  - {fileID: 8300000, guid: f5d3c7aa2a841e24c88a336175e3fdc6, type: 3}
+  - {fileID: 8300000, guid: 25cb35c81a7270743b2bd6e6ed6591ce, type: 3}
   Jump: {fileID: 8300000, guid: ac823ad4e30b02c48abf823e25f418a3, type: 3}
   Land: {fileID: 8300000, guid: 723148b86d6bf664f8b04874a5297141, type: 3}
   Hurt: {fileID: 8300000, guid: df557456d93340f42add1b123c73a1c3, type: 3}
@@ -72,10 +102,10 @@ MonoBehaviour:
   VoiceLost: {fileID: 8300000, guid: cde765e1f6d409b4bbca17f33496ef2f, type: 3}
   VoiceEliminated: {fileID: 8300000, guid: bbd89e1803f0bec468ab845a824185c3, type: 3}
   GasBreath: {fileID: 8300000, guid: 5face9dd6d2d62147a3c20c489c7ff06, type: 3}
-  GasLaugh:
-  - {fileID: 8300000, guid: 44a49bb6a0979fc45bd55e3a68f1feb6, type: 3}
-  - {fileID: 8300000, guid: 310e623370ab0c64088d1826ae5652a6, type: 3}
-  - {fileID: 8300000, guid: 6268553854e079f42ba82b8cbc972331, type: 3}
+  GasCough:
+  - {fileID: 8300000, guid: e456c96e30dcd5c488f733a21237795d, type: 3}
+  - {fileID: 8300000, guid: 0b95084b2e83c0b469e557823580f4ff, type: 3}
+  - {fileID: 8300000, guid: 01786330368e62c479cbf7d3d528d090, type: 3}
   HostageVoice:
   - {fileID: 8300000, guid: 27e4274a1673d1a488d4cc11aa69b2ca, type: 3}
   - {fileID: 8300000, guid: 445fe8759d5a8dc46bf966723926f31b, type: 3}
@@ -89,9 +119,54 @@ MonoBehaviour:
   GasWind: {fileID: 8300000, guid: 42207e46b484c7e4caf3f0a5b3c43c3f, type: 3}
   DoorOpen: {fileID: 8300000, guid: bc163b230e083e840a524d057c318d3a, type: 3}
   DoorShut: {fileID: 8300000, guid: 7326cc57cbdacef4d9bd331d08065930, type: 3}
-  WorkHack: {fileID: 8300000, guid: 4ffc7a8b189ff8a44b306f3b2faf9e2d, type: 3}
-  WorkPick: {fileID: 8300000, guid: 9136884a8ce81884ca0b11a33fba6782, type: 3}
-  WorkScrew: {fileID: 8300000, guid: dbb0b6b2e9a2cd54dba57047d75e8435, type: 3}
+  DoorHeavyOpen: {fileID: 8300000, guid: 08e89c6baf18e7c448fae6ce7136d3fd, type: 3}
+  DoorHeavyShut: {fileID: 8300000, guid: 37f4e6b5ef7b273488cb3b3ad9a3d064, type: 3}
+  DrawerOpen: {fileID: 8300000, guid: 90084293784fc2a4ea49ee3db7b4d186, type: 3}
+  DrawerClose: {fileID: 8300000, guid: 1daefa206d1963445a82bc21b9bfa07e, type: 3}
+  SteelDrawerOpen: {fileID: 8300000, guid: d2d1555fc939e03418e5104ef11ca5e4, type: 3}
+  SteelDrawerClose: {fileID: 8300000, guid: b86e5e6347a671f4f991ae7fc07bba20, type: 3}
+  CupboardOpen: {fileID: 8300000, guid: c423b2c2d084ba148b3a729b6b9eb360, type: 3}
+  CupboardClose: {fileID: 8300000, guid: 620a2f678240ee24bacb0be0de2c7b18, type: 3}
+  SteelCupboardOpen: {fileID: 8300000, guid: e04e5d654b6b37249978c10a21844612, type: 3}
+  SteelCupboardClose: {fileID: 8300000, guid: b94af75a07ee447428c52413a3cf6508, type: 3}
+  SwitchOn: {fileID: 8300000, guid: 8b795ef4066efec45a079e2b8af4336d, type: 3}
+  SwitchOff: {fileID: 8300000, guid: bf6d1a4f0ba92eb44ba208151bf85dbc, type: 3}
+  HatchOpen: {fileID: 8300000, guid: dc402e39933ea7f4fb4eaca721fc5949, type: 3}
+  GrilleOff: {fileID: 8300000, guid: ab5e2ab4c69016d4dba896492c027fe2, type: 3}
+  WorkHack:
+  - {fileID: 8300000, guid: c3bf10a799bd7674c815ed3b5ded1f34, type: 3}
+  - {fileID: 8300000, guid: 7152636767273b545b22d10866347807, type: 3}
+  - {fileID: 8300000, guid: e9bd3d55940d8494692b5bfa4e5bb2a7, type: 3}
+  - {fileID: 8300000, guid: 7afca20d659e68d4899800aa1746566c, type: 3}
+  WorkPick:
+  - {fileID: 8300000, guid: 6b11a135dc97a7244b2289a375484ef9, type: 3}
+  - {fileID: 8300000, guid: 540dcbd5a7284134ca0fbc57114577a6, type: 3}
+  - {fileID: 8300000, guid: 99abdd43c6b1d6c4db8f628ffb930601, type: 3}
+  - {fileID: 8300000, guid: 3258967fa07392e4383ef568c5e15345, type: 3}
+  WorkScrew:
+  - {fileID: 8300000, guid: 79051f75a2a6dfc44a595472c565ae58, type: 3}
+  - {fileID: 8300000, guid: 1b64cd7cf78409b46983cd0378e39b64, type: 3}
+  - {fileID: 8300000, guid: ee47f3a4e48fe5f4f972729167d56e58, type: 3}
+  WorkUnit:
+  - {fileID: 8300000, guid: 33330feda73daa24f8097ddc4b45bd3c, type: 3}
+  - {fileID: 8300000, guid: 1871c6fbf0810904b9fd7670505b1feb, type: 3}
+  - {fileID: 8300000, guid: 962d8128256eece4983ee03101ac17db, type: 3}
+  UnlockUnit: {fileID: 8300000, guid: 03f446e2048884b479184de5f142dadb, type: 3}
+  LadderRung:
+  - {fileID: 8300000, guid: b4e0d1c9b5d2ce947aa1afa550cbb8dd, type: 3}
+  - {fileID: 8300000, guid: 6e39d09c73132224ebab66c43c5c2549, type: 3}
+  - {fileID: 8300000, guid: 7499345149a88dd4e9ef7be685f3fd5a, type: 3}
+  - {fileID: 8300000, guid: 1f53b246bab4c144296b2657aa6bd56b, type: 3}
+  TerminalGranted: {fileID: 8300000, guid: 9611ffecf17de4647b857723fa9412ef, type: 3}
+  TerminalHackDone: {fileID: 8300000, guid: 12b93c702b3380248ae54e09b7fcf30b, type: 3}
+  ConsoleSolved: {fileID: 8300000, guid: e64dcd0d89ca900499cca2e25a2a257e, type: 3}
+  VaultUnlocked: {fileID: 8300000, guid: f91dbcbb70a6e174f9957a60efd33401, type: 3}
+  SafeTick: {fileID: 8300000, guid: fadfc3a6663cb0147a648c5f3be85db7, type: 3}
+  Clank: {fileID: 8300000, guid: c5cad43b723ea7e4b9e76f4214b8685e, type: 3}
+  Latch: {fileID: 8300000, guid: d104fdd935df33c4cb494bff063cc450, type: 3}
+  TerminalKey: {fileID: 8300000, guid: a31e42b78893e0349bcf71e036fde3a7, type: 3}
+  Bandage: {fileID: 8300000, guid: cacc4aa374c23244a94c86becc2c0c6a, type: 3}
+  Drink: {fileID: 8300000, guid: 4a3c9070197711848b6ae87345dcb5ef, type: 3}
   Grind: {fileID: 8300000, guid: 8ca96f96867d3f644a75164677e0ee4f, type: 3}
   HandDryer: {fileID: 8300000, guid: 5eccbc7feb7e3ca4190d4d0b1f515dd7, type: 3}
   MenuMusic: {fileID: 8300000, guid: 78f45ce6766df66468f704a7c3c82cea, type: 3}

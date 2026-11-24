@@ -39,6 +39,10 @@ namespace Stealth.EditorTools
             AddXrayFeature();
             AddWorldTextFeature();
             AddGasFeature();
+            AddBounceFeature();
+#if URP_SCREEN_SPACE_REFLECTION
+            AddReflectionFeature();
+#endif
 
             BuildKitMaterials();
             BuildExternalKitMaterials();
@@ -72,6 +76,9 @@ namespace Stealth.EditorTools
             config.Players = MaterialsIn("Player");
             config.Loot = MaterialsIn("Items");
             config.Kits = BuildStyleKits();
+            PrintCovers();
+            BuildSurfaceSets();
+            config.Houses = BuildHouseLooks();
             config.Batch = BuildBatchHolder();
             config.Meshes = BuildMeshVariants();
             config.Materials = BuildMaterialVariants();
@@ -334,6 +341,25 @@ namespace Stealth.EditorTools
             EditorUtility.SetDirty(data);
         }
 
+        /// <summary>
+        /// Bounced light from the screen (Art/Shaders/ScreenBounce.shader): a full-screen pass over the opaque things, before the
+        /// transparent ones and the gas; reads depth and normals. Its strength is the style's (StyleGrade.Bounce).
+        /// </summary>
+        static void AddBounceFeature()
+        {
+            const string path = StylesDir + "/ScreenBounce.mat";
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(Root + "/Art/Shaders/ScreenBounce.shader");
+            if (shader == null) { Debug.LogWarning("[Builder] bounce shader not found"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = "ScreenBounce" };
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
+            AddFullScreenFeature("ScreenBounce", mat, ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal, FullScreenPassRendererFeature.InjectionPoint.BeforeRenderingTransparents);
+        }
+
         const string GasMaterialPath = StylesDir + "/GasFog.mat";
         const string SkyDir = Root + "/Art/Textures/Sky";
         const string DerelictSkyPath = SkyDir + "/derelict_night.png";
@@ -408,6 +434,7 @@ namespace Stealth.EditorTools
             if ((a.Posters == null || a.Posters.Length == 0) && d.Posters.Length > 0) { a.Posters = d.Posters; dirty = true; }
             if (a.DecayDensity <= 0f && d.DecayDensity > 0f) { a.DecayDensity = d.DecayDensity; dirty = true; }
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
+            if (a.ThingChance <= 0f && d.ThingChance > 0f) { a.ThingChance = d.ThingChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
             if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
             if ((a.RoomLooks == null || a.RoomLooks.Length == 0) && d.RoomLooks.Length > 0) { a.RoomLooks = d.RoomLooks; dirty = true; }
@@ -460,11 +487,11 @@ namespace Stealth.EditorTools
                 });
 
             // Sasha's style (merged from feature_visual_style_11_prototype), now the mood without the decay: the abandoned
-            // station is a house of its own (HouseKind.Abandoned, Level.DerelictLook) in every style; here every house keeps
+            // station is a house of its own (HouseKind.Abandoned, Data/Styles/Houses) in every style; here every house keeps
             // its own look in realistic materials, each kind of room in its own finishes
             yield return Style("S16_Derelict", "Тихий комплекс", "Dead Space, SOMA, Alien: Isolation, Signalis", // loc-ok
                 "Ночной комплекс, где давно никого нет: настоящие материалы — бетон, краска, плитка, ковролин, у каждой комнаты свои. " + // loc-ok
-                "Почти темно — светят только лампы. Бирюзово-болезненная гамма, зерно, плотный сырой воздух, мёртвый город за окнами. " + // loc-ok
+                "Почти темно — светят только лампы. Свои цвета материалов, зерно, мёртвый город за окнами; у каждого дома свой вид. " + // loc-ok
                 "Модели реалистичные, люди похожи на людей.", // loc-ok
                 s =>
                 {
@@ -475,15 +502,18 @@ namespace Stealth.EditorTools
                     // saturation and tinting what was left green, the palette half of the rest: every room one grey-green.
                     var g = s.Grade;
                     g.Tonemap = StyleTonemap.Neutral; g.Exposure = 0.9f; g.Contrast = -4f; g.Saturation = -8f;
-                    g.ColorFilter = C(0.98f, 1f, 0.985f); g.Temperature = 4f; g.Tint = -2f;
-                    g.SplitShadows = C(0.44f, 0.5f, 0.53f); g.SplitHighlights = C(0.55f, 0.52f, 0.47f); g.SplitBalance = 0f; // cool shadows under warm lamps
+                    // (no green in it: that is the abandoned station's alone, its HouseLook)
+                    g.ColorFilter = C(1f, 1f, 1f); g.Temperature = 3f; g.Tint = 0f;
+                    g.SplitShadows = C(0.47f, 0.49f, 0.53f); g.SplitHighlights = C(0.55f, 0.52f, 0.47f); g.SplitBalance = 0f; // cool shadows under warm lamps
                     g.BloomIntensity = 0.3f; g.BloomThreshold = 1.2f; g.BloomScatter = 0.6f; // a little glow on what really shines, no halo over the room
-                    g.Vignette = 0.2f; g.VignetteColor = C(0f, 0.01f, 0.01f);
-                    g.ChromaticAberration = 0.08f; g.FilmGrain = 0.2f; g.LensDistortion = 0.03f;
+                    g.Vignette = 0.2f; g.VignetteColor = C(0f, 0f, 0f);
+                    g.ChromaticAberration = 0.08f; g.FilmGrain = 0.2f; g.Reflections = 1f; g.LensDistortion = 0.03f;
+                    g.Bounce = 0.6f; g.BounceReach = 1.6f; // lit surfaces light what is close and faces them (ScreenBounce): the underside of a desk over a lit floor
+                    g.RoomFill = 0.6f; // and the room's own lamps fill its shadows (RoomFill): never through a wall
                     // a small fill everywhere (sRGB: about 1 % of white) — a room whose lamps are off is dark, a flashlight's
                     // job; a lit room's fill is its own lamps' (CeilingGlow: they light its ceiling and the tops of its walls)
                     s.World.Ambient = C(0.10f, 0.103f, 0.108f);
-                    s.World.IndoorFog = C(0.012f, 0.02f, 0.02f); s.World.IndoorFogDensity = 0.02f;
+                    s.World.IndoorFog = C(0.014f, 0.016f, 0.019f); s.World.IndoorFogDensity = 0.02f;
                     s.World.LightScale = 1f;
                     // (what was tuned under the old exposure keeps its look: the tunnels' lamps, the gas and the sky outside)
                     s.World.UndergroundLights = 3.2f; s.World.GasFog = C(0.32f, 0.44f, 0.29f); s.World.SkyExposure = 2.3f;
@@ -502,10 +532,11 @@ namespace Stealth.EditorTools
                     geo.Floor = K("Real_ConcreteClean"); geo.FloorTile = 2.5f; geo.Wall = K("Real_BeigeWall"); geo.WallTile = 2.5f;
                     geo.CeilingFinish = K("Real_CeilingTiles"); geo.CeilingTile = 1.2f;
                     // (door casings and skirting in the doors' own dark wood, pipes and trays plain galvanised steel: tread
-                    // plate here read as rust on every doorway — that look is the abandoned station's alone, Level.DerelictLook)
+                    // plate here read as rust on every doorway — that look is the abandoned station's alone, Data/Styles/Houses)
                     geo.Trim = K("Real_DarkWood"); geo.Pipe = K("Trim_Metal"); geo.Beam = K("Trim_Metal"); geo.Glow = K("Glow_DimCyan");
                     geo.RoomLooks = RealisticRoomLooks();
                     geo.RoomFloors = RealisticRoomFloors();
+                    geo.ThingChance = 0.8f; // people hung things on these walls: prints, certificates, plans, signs (WallThings)
                 });
         }
     }

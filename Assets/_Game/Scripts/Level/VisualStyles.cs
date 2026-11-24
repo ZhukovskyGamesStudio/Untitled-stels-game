@@ -26,8 +26,31 @@ namespace Stealth.Level
         /// <summary>Style on screen now; null = the look the game is built with.</summary>
         public static VisualStyle Current => s_Current;
 
-        /// <summary>The air of the current style (the defaults when there is none).</summary>
-        public static StyleWorld World => s_Current != null ? s_Current.World : s_DefaultWorld;
+        /// <summary>The look of the kind of house now standing (null: no house, or none of its own).</summary>
+        public static HouseLook Look => LookOf(ActiveLevel.Layout);
+
+        /// <summary>The look of a house's kind (null: none of its own).</summary>
+        public static HouseLook LookOf(LevelLayout l) => l == null || Config == null ? null : Config.LookOf(l.PlanKind);
+
+        static StyleWorld s_HouseWorld;
+        static (VisualStyle style, HouseLook look) s_HouseWorldOf;
+
+        /// <summary>The air of the current style (the defaults when there is none) in the house now standing.</summary>
+        public static StyleWorld World
+        {
+            get
+            {
+                if (s_Current == null) return s_DefaultWorld;
+                var look = Look;
+                if (look == null) return s_Current.World;
+                if (s_HouseWorld == null || s_HouseWorldOf != (s_Current, look))
+                {
+                    s_HouseWorld = look.Air.Over(s_Current.World);
+                    s_HouseWorldOf = (s_Current, look);
+                }
+                return s_HouseWorld;
+            }
+        }
         static readonly StyleWorld s_DefaultWorld = new();
 
         /// <summary>The rigged human the current style shows instead of the player model (null = none of its own).</summary>
@@ -172,7 +195,8 @@ namespace Stealth.Level
         {
             PropBatches.Clear();
             UndoReplacements();
-            s_Family = ModelFamily.None;
+            s_Family = s_HouseFamily = ModelFamily.None;
+            s_HouseLook = null;
             foreach (var r in Object.FindObjectsByType<Renderer>()) DressRenderer(r);
             StyleDecor.Clear();
             foreach (var (mat, orig) in s_Originals)
@@ -204,6 +228,15 @@ namespace Stealth.Level
         // ------------------------------------------------------------------ geometry
 
         static ModelFamily s_Family;
+        /// <summary>The models the house itself is furnished with (its <see cref="HouseLook"/>; None: the style's), and that look.</summary>
+        static ModelFamily s_HouseFamily;
+        /// <summary>The family of models the house in place is furnished with (None: the style's own).</summary>
+        public static ModelFamily HouseFamily => s_HouseFamily;
+        static HouseLook s_HouseLook;
+
+        /// <summary>A renderer of the house (its shell and furniture — not what comes and goes: players, loot, robots, the car).</summary>
+        static bool InHouse(Transform t) => ActiveLevel.Root != null && t.root == ActiveLevel.Root.transform;
+
         static bool s_Loaded;
         static readonly Dictionary<Mesh, Mesh>[] s_MeshVariants = NewMaps<Mesh>();
         static readonly Dictionary<Mesh, Mesh> s_MeshOriginal = new();
@@ -270,6 +303,13 @@ namespace Stealth.Level
             return false;
         }
 
+        /// <summary>A copy of a mesh made for the house (<see cref="ScreenFaces"/>): a style swaps it as it would the mesh itself.</summary>
+        public static void KnowCopy(Mesh copy, Mesh of)
+        {
+            Load();
+            s_MeshOriginal[copy] = s_MeshOriginal.TryGetValue(of, out var original) ? original : of;
+        }
+
         /// <summary>The family of models on screen now.</summary>
         public static ModelFamily Family => s_Family;
 
@@ -281,9 +321,13 @@ namespace Stealth.Level
         static IEnumerable<bool> ApplyGeometrySteps(StyleGeometry g)
         {
             var family = g != null ? g.Family : ModelFamily.None;
+            var look = g != null ? Look : null;
+            var house = look != null ? look.FurnitureFor(family) : ModelFamily.None;
             PropBatches.Clear(); // the furniture is about to change: it draws itself until merged again
-            if (family != s_Family) UndoReplacements();
+            if (family != s_Family || house != s_HouseFamily) UndoReplacements();
             s_Family = family;
+            s_HouseFamily = house;
+            s_HouseLook = look;
             StyleParts.ShowAll(s_Current != null && g != null ? s_Current.name : null); // things with a model of their own in a style
             foreach (var r in Object.FindObjectsByType<Renderer>())
             {
@@ -293,7 +337,7 @@ namespace Stealth.Level
             GeometryChanged?.Invoke(); // (furniture dressed in variants picks its own parts or the style's)
             if (!Application.isPlaying) yield break;
             var holder = Config != null ? Config.Batch : null;
-            foreach (var step in StyleDecor.RebuildSteps(g, Config != null ? Config.KitFor(family) : null, holder)) yield return step;
+            foreach (var step in StyleDecor.RebuildSteps(g, Config != null ? Config.KitFor(house != ModelFamily.None ? house : family) : null, holder)) yield return step;
             foreach (var step in PropBatches.RebuildSteps(holder)) yield return step;
         }
 
@@ -389,17 +433,36 @@ namespace Stealth.Level
         /// <summary>The robots' own materials (the charging room): never recoloured by a style's palette.</summary>
         static bool RobotMade(Material m) => m.name.StartsWith("RobotShell") || m.name.StartsWith("RobotFlesh") || m.name.StartsWith("RobotGlow");
 
+        /// <summary>The house's own material in place of one of the models' (<see cref="HouseLook.Materials"/>).</summary>
+        static bool Swapped(Material original, out Material to)
+        {
+            to = null;
+            if (s_HouseLook == null || s_HouseLook.Materials == null) return false;
+            foreach (var m in s_HouseLook.Materials)
+                if (m.From == original && m.To != null)
+                {
+                    to = m.To;
+                    if (!s_MatOriginal.ContainsKey(to) && !s_MatVariants[(int)s_Family].ContainsKey(to)) s_MatOriginal[to] = original;
+                    return true;
+                }
+            return false;
+        }
+
         static void DressRenderer(Renderer r)
         {
             if (r == null || Invariant(r)) return;
             Load();
             LoadStyleMeshes();
-            int f = (int)s_Family;
+            bool inHouse = (s_HouseFamily != ModelFamily.None || s_HouseLook != null) && InHouse(r.transform);
+            bool own = inHouse && s_HouseFamily != ModelFamily.None; // furnished with models of its own, not the style's
+            int f = (int)(own ? s_HouseFamily : s_Family);
+            var surfaces = inHouse && s_HouseLook != null ? s_HouseLook.SurfacesFor(s_Family) : null;
+            Mesh model = null;
             if (r.TryGetComponent<MeshFilter>(out var mf) && mf.sharedMesh != null)
             {
                 var mesh = mf.sharedMesh;
-                var original = s_MeshOriginal.TryGetValue(mesh, out var o) ? o : mesh;
-                var target = StyleMesh(original, r.transform, out var own) ? own
+                var original = model = s_MeshOriginal.TryGetValue(mesh, out var o) ? o : mesh;
+                var target = !own && StyleMesh(original, r.transform, out var styled) ? styled
                            : s_MeshVariants[f].TryGetValue(original, out var v) ? v : original;
                 if (target != mesh) mf.sharedMesh = target;
                 if (s_Props[f].TryGetValue(original, out var prop)) Replace(mf.transform.parent, prop);
@@ -414,6 +477,12 @@ namespace Stealth.Level
                 var original = s_MatOriginal.TryGetValue(m, out var o) ? o : m;
                 if (RobotMade(original)) continue; // the robots' own make (the charging room): the same in every style
                 var target = s_MatVariants[f].TryGetValue(original, out var v) ? v : original;
+                if (surfaces != null && surfaces.TryGet(model, original, out var surface))
+                {
+                    target = surface;
+                    if (surface != original) s_MatOriginal.TryAdd(surface, original);
+                }
+                if (inHouse && Swapped(original, out var swap)) target = swap;
                 if (s_Wear.TryGetValue(target, out var levels))
                 {
                     if (wear < 0) wear = WearMath.PartLevel(ObjectRoot(r.transform).position, r.name, levels.Length);
@@ -433,7 +502,8 @@ namespace Stealth.Level
 
         /// <summary>
         /// Hides our model under <paramref name="root"/> and puts the replacement in its place (colliders stay). Glowing
-        /// parts (Eye*: monitors, bulbs) stay: a scanned desk still carries our monitor.
+        /// parts (Eye*: bulbs) stay, unless the replacement has its own (<see cref="PropReplacement.HideGlow"/>: the scanned
+        /// desk's monitor — ours, its casing hidden, hung over the desk as a glowing sheet).
         /// </summary>
         static void Replace(Transform root, PropReplacement prop)
         {
@@ -441,9 +511,27 @@ namespace Stealth.Level
             if (root.GetComponentInParent<Items.Storage>() != null) return; // opening furniture keeps its own moving parts
             foreach (var (r0, _, _) in s_Replaced) if (r0 == root) return;
             var hidden = new List<Renderer>();
+            Material screen = null; // what our screen shows in this house (off, static, the boot menu…): the replacement's shows it too
+            ScreenLook? look = null;
             foreach (var r in root.GetComponentsInChildren<Renderer>())
-                if (r.enabled && (prop.HideGlow || !r.gameObject.name.StartsWith("Eye"))) { r.enabled = false; hidden.Add(r); }
+                if (r.enabled && (prop.HideGlow || !r.gameObject.name.StartsWith("Eye")))
+                {
+                    if (r.gameObject.name.StartsWith("Eye"))
+                    {
+                        screen = r.sharedMaterial;
+                        if (LiveScreens.TryGet(r, out var shown)) look = shown;
+                    }
+                    r.enabled = false;
+                    hidden.Add(r);
+                }
             var go = Object.Instantiate(prop.Prefab, root);
+            if (screen != null)
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                    if (r.gameObject.name.StartsWith("EyeScreen"))
+                    {
+                        r.sharedMaterial = screen;
+                        if (look.HasValue) LiveScreens.Add(r, look.Value);
+                    }
             go.transform.localPosition = prop.Position;
             go.transform.localRotation = Quaternion.identity;
             go.transform.localScale = prop.Scale;
@@ -473,7 +561,9 @@ namespace Stealth.Level
             }
             if (style == null) { s_Volume.sharedProfile = s_BaseProfile; return; }
             if (s_Profile == null) s_Profile = Object.Instantiate(s_BaseProfile);
-            var g = style.Grade;
+            s_GradeShare = HouseShare;
+            var look = Look;
+            var g = look != null ? look.Grade.Over(style.Grade, s_GradeShare) : style.Grade;
 
             var bloom = Get<Bloom>(s_Profile);
             bloom.intensity.Override(g.BloomIntensity);
@@ -519,7 +609,40 @@ namespace Stealth.Level
 
             Get<LensDistortion>(s_Profile).intensity.Override(g.LensDistortion);
 
+            Reflect(s_Profile, g.Reflections);
+            Bounce(g.Bounce, g.BounceReach);
+            RoomFillField.Strength = g.RoomFill;
+
             s_Volume.sharedProfile = s_Profile;
+        }
+
+        static readonly int BounceStrengthId = Shader.PropertyToID("_BounceStrength"), BounceReachId = Shader.PropertyToID("_BounceReach");
+
+        /// <summary>Bounced light of the picture (Art/Shaders/ScreenBounce.shader, the pass ScreenBounce on the renderer): its strength and reach; 0 — the pass does nothing.</summary>
+        public static void Bounce(float strength, float reach)
+        {
+            Shader.SetGlobalFloat(BounceStrengthId, Mathf.Max(0f, strength));
+            Shader.SetGlobalFloat(BounceReachId, reach > 0f ? reach : 4.5f);
+        }
+
+        /// <summary>
+        /// Screen-space reflections of a profile: half resolution, blurred by roughness, only on what is smooth enough, never
+        /// the sky; a ray that leaves the screen finds nothing (RenderSettings.reflectionIntensity stays 0).
+        /// </summary>
+        public static void Reflect(VolumeProfile profile, float strength)
+        {
+#if URP_SCREEN_SPACE_REFLECTION
+            if (!profile.TryGet<ScreenSpaceReflectionVolumeSettings>(out var s)) s = profile.Add<ScreenSpaceReflectionVolumeSettings>(false);
+            s.active = true;
+            s.mode.Override(strength > 0f ? ScreenSpaceReflectionVolumeSettings.ReflectionMode.OpaquesOnly : ScreenSpaceReflectionVolumeSettings.ReflectionMode.Disabled);
+            s.reflectionStrength.Override(strength);
+            s.clampReflectedColor.Override(true);
+            s.maxColorValue.Override(4f); // a lamp in a steel door is bright, not a hole burnt in the picture
+            s.resolution.Override(ScreenSpaceReflectionVolumeSettings.Resolution.Half);
+            s.minimumSmoothness.Override(0.2f);
+            s.smoothnessFadeStart.Override(0.45f);
+            s.reflectSky.Override(false);
+#endif
         }
 
         static T Get<T>(VolumeProfile profile) where T : VolumeComponent
@@ -582,9 +705,20 @@ namespace Stealth.Level
         public static float Underground
         {
             get => s_Underground;
-            set { s_Underground = Mathf.Clamp01(value); LightSource.VisualScale = LampScale(World); }
+            set
+            {
+                s_Underground = Mathf.Clamp01(value);
+                LightSource.VisualScale = LampScale(World);
+                // the house's own colours fade out on the way down (and in on the way up)
+                if (s_Active && s_Current != null && s_Profile != null && Look != null && (Mathf.Abs(HouseShare - s_GradeShare) > 0.03f || (HouseShare != s_GradeShare && HouseShare is 0f or 1f)))
+                    ApplyVolume(s_Current);
+            }
         }
         static float s_Underground;
+        static float s_GradeShare;
+
+        /// <summary>How much of the house's own colours is on the picture: all of it in the house, none underground.</summary>
+        static float HouseShare => 1f - s_Underground;
 
         static float LampScale(StyleWorld w)
         {

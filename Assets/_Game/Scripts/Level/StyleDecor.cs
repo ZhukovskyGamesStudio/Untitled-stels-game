@@ -17,6 +17,18 @@ namespace Stealth.Level
         static readonly List<Mesh> s_Meshes = new();
         static readonly Dictionary<GameObject, List<(Mesh mesh, Matrix4x4 local, string name, Material[] materials, BatchLook look)>> s_Parts = new();
 
+        static StyleGeometry s_Look;   // the house's look as last laid (its floors)
+        static StyleKit s_LookKit;
+
+        /// <summary>The floor finish of a room as the house's look has it (null: the bare slab): what steps sound like there.</summary>
+        public static Material FloorMaterial(LevelLayout l, PlanRoom room)
+        {
+            if (s_Look == null || l == null || room == null) return null;
+            if (room.Id == l.VaultRoom) return s_LookKit != null && s_LookKit.VaultFloor != null ? s_LookKit.VaultFloor : s_Look.Floor;
+            int k = s_Look.RoomFloorOf(room.Type);
+            return k >= 0 ? s_Look.RoomFloors[k].Material : s_Look.Floor;
+        }
+
         /// <summary>Pieces in the house now.</summary>
         public static int Count { get; private set; }
         /// <summary>Renderers they are drawn with.</summary>
@@ -52,7 +64,10 @@ namespace Stealth.Level
                 foreach (var r in wallParts)
                     if (r != null) r.forceRenderingOff = false; // the bare wall's look until the finish takes over
             bool vault = ActiveLevel.Layout != null && ActiveLevel.Layout.VaultRoom >= 0; // dressed in steel in every style
-            if (ActiveLevel.Layout != null) g = HouseRules.Of(ActiveLevel.Layout).Look(g, kit, ActiveLevel.Layout); // a shop, a hospital, a block of flats dress as one in every style
+            var look = VisualStyles.Look;
+            if (look != null) g = look.Dress(g); // the kind of house dresses over the style (Data/Styles/Houses)
+            s_Look = g;
+            s_LookKit = kit;
             if (g == null || kit == null || holder == null || !(g.HasArchitecture || vault) || ActiveLevel.Root == null || ActiveLevel.Shell == null) yield break;
             s_Kit = kit;
             var root = ActiveLevel.Root.transform;
@@ -67,7 +82,10 @@ namespace Stealth.Level
                     if (run != s_Run || ActiveLevel.Root != levelRoot || root == null) yield break; // cleared, or another house meanwhile
                 }
                 bool finish = p.IsQuad;
-                var prefab = finish ? kit.Finish : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
+                bool thing = p.Kind == DecorKind.WallThing; // its own model with its own materials, whatever the style's trim
+                var prefab = finish ? kit.Finish
+                    : thing ? (kit.Things != null && p.Variant >= 0 && p.Variant < kit.Things.Length ? kit.Things[p.Variant] : null)
+                    : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
                 if (prefab == null) continue;
                 Count++;
                 if (!Mergeable(prefab)) { Place(prefab, p, g, root, finish); continue; }
@@ -102,7 +120,7 @@ namespace Stealth.Level
                         batcher.Add(chunk, part.look, paper ?? g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
                         continue;
                     }
-                    var style = MaterialFor(p.Kind, part.name, g);
+                    var style = thing ? null : MaterialFor(p.Kind, part.name, g);
                     // no wall finish to continue: the spandrels with their lap stand just proud of the wall (no z-fighting with it)
                     var place = p.Kind == DecorKind.Arch && part.name.StartsWith("Body")
                         ? Matrix4x4.Translate(p.Rotation * Vector3.forward * ArchitecturePlanner.FinishLift) * at * part.local
@@ -134,17 +152,33 @@ namespace Stealth.Level
                 if (r == null || !r.TryGetComponent<MeshFilter>(out var mf) || !MeshBatcher.CanMerge(mf.sharedMesh)) continue;
                 // the vault's side of its door wall is the vault's steel, the corridor's side the style's wall
                 bool inside = r.gameObject.name == "WallBack" && kit.VaultWall != null;
-                var mat = inside ? kit.VaultWall : g.Wall;
-                if (mat == null) continue;
                 var t = r.transform;
                 var n = t.forward; // the face looks out of the wall along the part's +Z
-                var wall = new WallProjection
+                // the finish of the room it faces: its wall, and the lower band up to its height
+                var (upper, lower, split) = ArchitecturePlanner.FinishInto(t.position - n * (LevelMetrics.WallThickness / 2f), n * (1f + LevelMetrics.WallThickness), g, ActiveLevel.Layout);
+                var (mat, tile) = inside ? (kit.VaultWall, kit.VaultWallTile) : upper >= 0 ? WallOf(upper, g) : (null, 1f);
+                var (band, bandTile) = !inside && lower >= 0 ? WallOf(lower, g) : (null, 1f);
+                if (mat == null && band == null) continue;
+                void Put(Mesh mesh, Material m, float size)
                 {
-                    Right = Vector3.Cross(Vector3.up, -n), Normal = n, Across = ArchitecturePlanner.Across(Vector3.Cross(Vector3.up, -n)),
-                    Tile = inside ? kit.VaultWallTile : g.WallTile, FloorY = t.position.y,
-                };
-                batcher.Add(MeshBatcher.ChunkOf(t.position), BatchLook.Of(r), mat, mf.sharedMesh, 0,
-                    Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * t.localToWorldMatrix, null, wall);
+                    if (mesh == null || m == null) return;
+                    var wall = new WallProjection
+                    {
+                        Right = Vector3.Cross(Vector3.up, -n), Normal = n, Across = ArchitecturePlanner.Across(Vector3.Cross(Vector3.up, -n)),
+                        Tile = size, FloorY = t.position.y,
+                    };
+                    batcher.Add(MeshBatcher.ChunkOf(t.position), BatchLook.Of(r), m, mesh, 0,
+                        Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * t.localToWorldMatrix, null, wall);
+                }
+                if (band == null) Put(mf.sharedMesh, mat, tile);
+                else
+                {
+                    var (under, over) = MeshSplit.AtHeight(mf.sharedMesh, split);
+                    if (under != null) s_Meshes.Add(under);
+                    if (over != null) s_Meshes.Add(over);
+                    Put(under, band, bandTile);
+                    Put(over, mat, tile);
+                }
                 r.forceRenderingOff = true;
             }
         }
@@ -174,6 +208,7 @@ namespace Stealth.Level
             s_Batches.Add(go);
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
             {
+                if (p.Kind == DecorKind.WallThing) continue;
                 if (!finish)
                 {
                     var m = MaterialFor(p.Kind, r.gameObject.name, g);
@@ -263,7 +298,7 @@ namespace Stealth.Level
             Material m = kind switch
             {
                 DecorKind.Wainscot => accent ? g.Panel : g.Trim,
-                DecorKind.Pipes or DecorKind.PipeClamp => g.Pipe,
+                DecorKind.Pipes or DecorKind.PipeClamp or DecorKind.PipeBend => g.Pipe,
                 DecorKind.Pilaster or DecorKind.Arch => accent ? g.Trim : g.Column,
                 DecorKind.Beam => g.Beam,
                 DecorKind.IBeam => accent ? g.Pipe : g.Beam,

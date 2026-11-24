@@ -3,7 +3,7 @@ namespace Stealth
     /// <summary>What a key of the house's replicated state (<see cref="IWorldState.IsOpened"/>) is about.</summary>
     public enum OpenKind : byte
     {
-        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage, Ajar, Hole,
+        Door = 1, Safe, Terminal, Storage, Crate, Med, Dryer, Console, Cage, Escape, HackSlot, Lights, Shaft, Vent, Crawl, Gate, Stage, Ajar, Hole, DoorSwung,
     }
 
     /// <summary>The stages of a house's main job kept with the opened things (<see cref="OpenKind.Stage"/>).</summary>
@@ -29,6 +29,8 @@ namespace Stealth
         public static int IndexOf(int key) => key & MaxIndex;
 
         public static int Door(int door) => Of(OpenKind.Door, door);
+        /// <summary>A door that stands open (its spot in the house; a both-ways door <paramref name="back"/>: to its −Z).</summary>
+        public static int DoorSwung(int spot, bool back) => Of(OpenKind.DoorSwung, spot * 2 + (back ? 1 : 0));
         public static int Safe(int safe) => Of(OpenKind.Safe, safe);
         /// <summary>The storage door held open from inside, for now.</summary>
         public static int Escape(int door) => Of(OpenKind.Escape, door);

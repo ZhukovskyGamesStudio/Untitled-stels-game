@@ -126,6 +126,7 @@ namespace Stealth.EditorTools
                     if (rig.Chest != null)
                         rig.ChestStanding = go.transform.InverseTransformPoint(rig.Chest.position) / Mathf.Max(1e-4f, model.transform.lossyScale.y);
                 }
+                AddOwnView(rig, who);
                 return go;
             });
         }
@@ -353,7 +354,7 @@ namespace Stealth.EditorTools
                          !imp.bakeAxisConversion || !imp.importAnimation || imp.clipAnimations.Length == 0 || imp.clipAnimations.Any(c => !c.loopTime || !c.lockRootRotation)
                          || imp.clipAnimations.Length != imp.defaultClipAnimations.Length // a take was added in Blender (Sit, Climb…)
                          || imp.importNormals != ModelImporterNormals.Import || imp.importTangents != ModelImporterTangents.CalculateMikk
-                         || imp.maxBonesPerVertex != 4;
+                         || imp.maxBonesPerVertex != 4 || !imp.isReadable;
             if (!dirty) return;
             // the Avatar: our bones mapped onto the humanoid ones, described in a T-pose worked out from the model itself
             var description = HumanDescriptionOf(imp.assetPath);
@@ -367,6 +368,7 @@ namespace Stealth.EditorTools
             imp.importNormals = ModelImporterNormals.Import;
             imp.importTangents = ModelImporterTangents.CalculateMikk;
             imp.maxBonesPerVertex = 4;
+            imp.isReadable = true; // the own view is cut out of these meshes (AssetBuilder.OwnView)
             imp.skinWeights = ModelImporterSkinWeights.Standard;
             imp.userData = HumanAvatarVersion;
             imp.SaveAndReimport();

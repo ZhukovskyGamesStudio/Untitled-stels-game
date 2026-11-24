@@ -16,10 +16,13 @@ import random
 import sys
 
 import bmesh
+from mathutils import Vector, Matrix
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir, category())
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
+import printed  # noqa: E402
 import shapes as s  # noqa: E402
 
 
@@ -209,6 +212,9 @@ def open_book(loc, yaw, w=0.34, d=0.24):
     return place_on([cover, *pages, spine], loc, (0, 0, yaw))
 
 
+OPEN_BOOKS = (((-0.55, -0.24, 0.758), math.radians(4)), ((0.45, 0.25, 0.758), math.radians(176)))
+
+
 def model_reading_table():
     """Library reading table 2.0 x 0.9, top at 0.76 with a molded edge, on four turned legs with an H-stretcher;
     two green banker's lamps on the centre line (shades glow), two open books and a closed stack."""
@@ -231,12 +237,23 @@ def model_reading_table():
     s.part("Accent", brass)
     s.part("Eye", glass)
 
-    books = open_book((-0.55, -0.24, 0.758), math.radians(4))
-    books += open_book((0.45, 0.25, 0.758), math.radians(176))
+    books = [b for loc, yaw in OPEN_BOOKS for b in open_book(loc, yaw)]
     rng = random.Random(4102)
     stack = []
     book_stack(rng, 0.0, 0.76, -0.2, 3, stack, stack)
-    s.part("Trim", books + stack)
+    opened = [Matrix.Translation(loc) @ Matrix.Rotation(yaw, 4, "Z") for loc, yaw in OPEN_BOOKS]
+
+    def print_on(n, c, co):                      # the open books' pages, the stack's cloth fronts, paper edges
+        if c.z > 0.758 and abs(c.x) > 0.2:
+            back = opened[0 if c.x < 0 else 1].inverted()
+            p = back @ co
+            if p.z > 0.0085 and n.z > 0.8:
+                return printed.cell_uv(printed.PAGE_L if p.x < 0 else printed.PAGE_R, abs(p.x) / 0.17 if p.x > 0 else 1 - abs(p.x) / 0.17, p.y / 0.224 + 0.5)
+            return printed.cell_uv(printed.PAPER if p.z > 0.0085 else printed.CLOTH, p.x * 2 + 0.5, p.y * 2 + 0.5)
+        if n.z > 0.8:
+            return printed.cell_uv(printed.BOOK, 0.5 - (co.y + 0.09) / 0.2, 0.5 + co.x / 0.24)
+        return printed.cell_uv(printed.CLOTH if n.y < -0.6 else printed.PAPER, co.x + 0.5, co.y + 0.5)
+    printed.paint(s.part("Trim", books + stack), print_on)
     return export("reading_table")
 
 
@@ -267,7 +284,24 @@ def model_globe():
 
     ball = s.ball(0.25, (0, 0, 0), seg=24)
     s.place(ball, (0, 0, zc), (0, tilt, 0))
-    s.part("Trim", [ball])
+    globe = s.part("Trim", [ball])
+    north = Vector((math.sin(tilt), 0, math.cos(tilt)))
+    east0 = Vector((math.cos(tilt), 0, -math.sin(tilt)))
+    side = north.cross(east0)
+
+    def lonlat(p):
+        d = (p - Vector((0, 0, zc))).normalized()
+        return math.atan2(d.dot(side), d.dot(east0)) / (2 * math.pi) + 0.5, math.asin(max(-1.0, min(1.0, d.dot(north)))) / math.pi + 0.5
+
+    def rule(n, c, co):                                                  # the map (Art/Textures/Covers/globe.png), whole round it
+        u, v = lonlat(co)
+        uc, _ = lonlat(c)
+        if u - uc > 0.5:
+            u -= 1.0
+        elif uc - u > 0.5:
+            u += 1.0
+        return u, v
+    printed.paint(globe, rule)
     return export("globe")
 
 
@@ -561,11 +595,8 @@ def model_console_desk():
         d, sc = monitor(cx, cy, yaw)
         dark += d
         screens.append(sc)
-    for x in (-0.35, 0.35):
-        kb = s.rbox((0.44, 0.15, 0.022), (x, -0.2, 0.768), r=0.006, seg=1, rot=(math.radians(-3), 0, 0))
-        s.inset_faces(kb, s.facing((0, 0, 1), min_area=0.03, tol=0.9), thickness=0.012, depth=-0.004)
-        dark.append(kb)
-        dark.append(s.rbox((0.06, 0.1, 0.03), (x + 0.32, -0.2, 0.772), r=0.012, seg=1))
+    for k, x in enumerate((-0.35, 0.35)):
+        keyboard.add(f"Keys{k}", (x, -0.2, 0.757), mouse=0.3)
     sub_panels = []
     for x in (-0.7, 0.0, 0.7):
         loc, rot = on_slope(0.45, x, (0.5, 0.26, 0.012))

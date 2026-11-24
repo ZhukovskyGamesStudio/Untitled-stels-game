@@ -12,6 +12,8 @@ namespace Stealth.Level
     {
         [Tooltip("The style (asset name, e.g. S06_Storybook) that has its own model")]
         public string Style;
+        [Tooltip("In a house furnished with models of its own (the abandoned facility) the Default parts show: its furniture takes their place")]
+        public bool NotWhereFurnished;
         public GameObject[] Own = new GameObject[0];
         public GameObject[] Default = new GameObject[0];
 
@@ -28,7 +30,7 @@ namespace Stealth.Level
         /// <summary>Shows the parts for the style named <paramref name="style"/> (null = the base look).</summary>
         public void Show(string style)
         {
-            bool own = style != null && style == Style;
+            bool own = style != null && style == Style && !(NotWhereFurnished && VisualStyles.HouseFamily != Stealth.Configs.ModelFamily.None);
             foreach (var go in Own)
                 if (go != null && go.activeSelf != own) go.SetActive(own);
             foreach (var go in Default)

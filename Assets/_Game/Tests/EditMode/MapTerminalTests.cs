@@ -50,7 +50,7 @@ namespace Stealth.Tests
         {
             var c = new PromptContext { AtTerminal = true, SittingKind = TerminalKind.Map };
             var hints = HintRules.Collect(c, new List<Hint>());
-            Assert.IsTrue(hints.Any(h => h.Key.Equals(Controls.Get(GameAction.Jump))), "stand up");
+            Assert.IsTrue(hints.Any(h => h.Key.Equals(Controls.Get(GameAction.Interact))), "stand up");
             Assert.AreEqual(2, hints.Count, "stand up and the floor: nothing to hack or mark");
         }
 

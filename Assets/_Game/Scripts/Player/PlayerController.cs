@@ -471,7 +471,8 @@ namespace Stealth.Player
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
             // the upgraded screwdriver (once per house): a device is taken apart instead — off for good, its innards fall out
             Unscrewing = HackTarget is SecurityDevice && CanUnscrew(m_Inventory);
-            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, HackHoldTime))
+            // (a hack needs the keyboard in the hand; taking a device apart needs only the screwdriver)
+            if (HackTarget != null && !HackNeedsKeyboard && holdE && m_HackHeld.Hold(HackTarget, WorkDt, HackHoldTime))
             {
                 if (Unscrewing) Link.SendGear(GearAction.Unscrew, HackTarget, HackTarget.Position);
                 else Link.SendHack(HackTarget);
@@ -646,10 +647,11 @@ namespace Stealth.Player
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            // a robot needs the keyboard in the hand; without it, one that carries something is only searched: it drops it
-            if (target is Enemies.RobotController robot && !HoldsKeyboard)
+            // every robot and sensor needs the keyboard in the hand (terminals hack for anyone); without it, a robot that
+            // carries something is only searched: it drops it
+            if (target is Enemies.Detector && !CanHackByHand)
             {
-                if (robot.Cargo >= 0) robot.SearchServer();
+                if (target is Enemies.RobotController robot && robot.Cargo >= 0) robot.SearchServer();
                 return;
             }
             if (target is Enemies.Detector d && GameManager.Instance != null) { GameManager.Instance.TeamHackServer(d); GameManager.Instance.NoteHackServer(this); }

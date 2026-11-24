@@ -24,7 +24,7 @@ namespace Stealth.Items
 
         float m_Phase, m_Period = 1f, m_NextLook;
         PlayerController m_Holder;
-        bool m_Lit;
+        float m_Glass = -1f;
         MaterialPropertyBlock m_Block;
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
@@ -39,8 +39,8 @@ namespace Stealth.Items
         void OnEnable()
         {
             m_Holder = GetComponentInParent<PlayerController>();
-            m_Lit = true;
-            SetLit(false);
+            m_Glass = 1f;
+            SetLit(false, 0f);
             DimForHolder(true);
             if (!Ring) return;
             m_SegmentAt = new Vector3[Segments.Length];
@@ -57,24 +57,22 @@ namespace Stealth.Items
 
         void OnDisable() => DimForHolder(false);
 
-        /// <summary>How bright the flash looks in its own holder's eyes (a light a hand's width off the finder was a photo flash).</summary>
-        const float OwnFlash = 0.12f;
-
         /// <summary>
-        /// The flash in its holder's own view is dim (<see cref="Level.LightSource.LookScale"/>): the teammates see it as
-        /// ever, and the robots read its true brightness on the server.
+        /// The flash in its holder's own view shows only <see cref="GadgetSettings.FinderLampShown"/> of its light
+        /// (<see cref="Level.LightSource.VisualShare"/>: a lamp a hand's breadth from the camera burnt the picture out): the
+        /// teammates see it as ever, and the robots read its true brightness on the server.
         /// </summary>
         void DimForHolder(bool on)
         {
             if (Lamp == null || !Lamp.TryGetComponent<Level.LightSource>(out var source)) return;
-            source.LookScale = on && m_Holder != null && m_Holder.IsOwner ? OwnFlash : 1f;
+            source.VisualShare = on && m_Holder != null && m_Holder.IsOwner ? Tuning.Items.Gadgets.FinderLampShown : 1f;
         }
 
         void Update()
         {
             if (m_Holder == null || m_Holder.Downed)
             {
-                SetLit(false);
+                SetLit(false, 0f);
                 if (Ring) ShowRing(0f);
                 return;
             }
@@ -96,9 +94,10 @@ namespace Stealth.Items
             }
             m_Phase += Time.deltaTime;
             if (m_Phase >= m_Period) m_Phase -= m_Period * Mathf.Floor(m_Phase / m_Period);
-            bool lit = GearRules.FinderLit(m_Phase, m_Period);
-            SetLit(lit);
-            if (Ring) ShowRing(lit ? 1f : Tuning.Items.Crafted.FinderSteady);
+            // (the glass comes up at once and dies away: no hard strobe before the eyes; the ring follows it)
+            float glass = GearRules.FinderGlass(m_Phase, m_Period);
+            SetLit(GearRules.FinderLit(m_Phase, m_Period), glass);
+            if (Ring) ShowRing(Mathf.Max(glass, Tuning.Items.Crafted.FinderSteady));
         }
 
         /// <summary>
@@ -166,12 +165,16 @@ namespace Stealth.Items
             r.SetPropertyBlock(m_Block);
         }
 
-        void SetLit(bool lit)
+        void SetLit(bool lit, float glass)
         {
-            if (lit == m_Lit && (Lamp == null || Lamp.enabled == lit)) return;
-            m_Lit = lit;
-            if (Lamp != null) Lamp.enabled = lit;
-            if (Glass != null) Paint(Glass, lit ? 1f : 0f);
+            if (Lamp != null && Lamp.enabled != lit) Lamp.enabled = lit;
+            if (Glass == null || Mathf.Approximately(glass, m_Glass)) return;
+            m_Glass = glass;
+            if (Ring) { Paint(Glass, glass); return; } // (the ring's middle lamp: its material's own glow)
+            m_Block ??= new MaterialPropertyBlock();
+            Glass.GetPropertyBlock(m_Block);
+            m_Block.SetColor(EmissionId, Color.Lerp(new Color(0.02f, 0.08f, 0.03f), new Color(0.15f, 1f, 0.22f) * Tuning.Items.Gadgets.FinderGlow, glass));
+            Glass.SetPropertyBlock(m_Block);
         }
     }
 }

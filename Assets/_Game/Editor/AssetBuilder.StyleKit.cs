@@ -134,7 +134,7 @@ namespace Stealth.EditorTools
             // the bank vault in every style: brushed steel panels, a clean steel floor plate
             Mat("Vault_Wall", new Color(0.74f, 0.76f, 0.8f), "vaultsteel", 0.6f, 0.35f);
             Mat("Vault_Floor", new Color(0.6f, 0.62f, 0.65f), "diamondplate", 0.5f, 0.35f);
-            // the auto repair shop (Level.ShopLook): painted block, a blue-grey band, epoxy, a metal deck; the paint booth
+            // the auto repair shop (Data/Styles/Houses/Garage): painted block, a blue-grey band, epoxy, a metal deck; the paint booth
             Mat("Shop_Wall", new Color(0.86f, 0.87f, 0.85f), "blockwall", 0.2f);
             Mat("Shop_WallLower", new Color(0.32f, 0.37f, 0.44f), "blockwall", 0.3f);
             Mat("Shop_Floor", new Color(0.62f, 0.64f, 0.66f), "epoxy", 0.55f);
@@ -142,7 +142,7 @@ namespace Stealth.EditorTools
             Mat("Booth_Wall", new Color(0.97f, 0.97f, 0.96f), "boothwall", 0.15f);
             Mat("Booth_Floor", new Color(0.55f, 0.57f, 0.6f), "grating", 0.45f, 0.6f);
             Mat("Booth_Ceiling", new Color(0.98f, 0.98f, 0.97f), "boothwall", 0.1f);
-            // the hospital (Level.ClinicLook)
+            // the hospital (Data/Styles/Houses/Hospital)
             Mat("Clinic_Wall", new Color(0.84f, 0.92f, 0.9f), "plaster", 0.3f);
             Mat("Clinic_WardWall", new Color(0.95f, 0.9f, 0.82f), "plaster", 0.3f);
             Mat("Clinic_Guard", new Color(0.6f, 0.71f, 0.78f), "panels", 0.5f);
@@ -150,7 +150,7 @@ namespace Stealth.EditorTools
             Mat("Clinic_Floor", new Color(0.8f, 0.84f, 0.86f), "vinyl", 0.5f);
             Mat("Theatre_Wall", new Color(0.9f, 0.96f, 0.93f), "panels", 0.45f);
             Mat("Theatre_Floor", new Color(0.55f, 0.7f, 0.65f), "vinyl", 0.6f);
-            // the apartment block (Level.HomeLook)
+            // the apartment block (Data/Styles/Houses/Apartments)
             Mat("Home_Wallpaper", new Color(0.86f, 0.76f, 0.6f), "damask", 0.15f);
             Mat("Home_WallpaperBed", new Color(0.72f, 0.76f, 0.84f), "damask", 0.15f);
             Mat("Home_WallpaperHall", new Color(0.62f, 0.5f, 0.4f), "damask", 0.15f);
@@ -195,6 +195,7 @@ namespace Stealth.EditorTools
                 [DecorKind.Strip] = "kit_strip", [DecorKind.Pilaster] = "kit_pilaster", [DecorKind.Casing] = "kit_casing",
                 [DecorKind.Arch] = "kit_arch", [DecorKind.Beam] = "kit_beam", [DecorKind.IBeam] = "kit_ibeam",
                 [DecorKind.Coffer] = "kit_coffer", [DecorKind.Tray] = "kit_tray", [DecorKind.TrayHanger] = "kit_tray_hanger",
+                [DecorKind.PipeBend] = "kit_pipe_bend",
             };
             var kit = AssetDatabase.LoadAssetAtPath<StyleKit>(asset);
             if (kit == null)
@@ -208,44 +209,6 @@ namespace Stealth.EditorTools
             kit.VaultWallTile = 2f;
             kit.VaultFloorTile = 1f;
             kit.Threshold = K("Threshold");
-            kit.ShopWall = K("Shop_Wall");
-            kit.ShopWallLower = K("Shop_WallLower");
-            kit.ShopFloor = K("Shop_Floor");
-            kit.ShopCeiling = K("Shop_Ceiling");
-            kit.BoothWall = K("Booth_Wall");
-            kit.BoothFloor = K("Booth_Floor");
-            kit.BoothCeiling = K("Booth_Ceiling");
-            kit.ClinicWall = K("Clinic_Wall");
-            kit.ClinicWardWall = K("Clinic_WardWall");
-            kit.ClinicGuard = K("Clinic_Guard");
-            kit.ClinicCeiling = K("Clinic_Ceiling");
-            kit.ClinicFloor = K("Clinic_Floor");
-            kit.TheatreWall = K("Theatre_Wall");
-            kit.TheatreFloor = K("Theatre_Floor");
-            kit.HomeWallpaper = K("Home_Wallpaper");
-            kit.HomeWallpaperBed = K("Home_WallpaperBed");
-            kit.HomeWallpaperHall = K("Home_WallpaperHall");
-            kit.HomeParquet = K("Home_Parquet");
-            kit.HomeCeiling = K("Home_Ceiling");
-            kit.HomeKitchenWall = K("Home_KitchenWall");
-            kit.HomeKitchenTile = K("Home_KitchenTile");
-            kit.HomeKitchenFloor = K("Home_KitchenFloor");
-            kit.HomeBathTile = K("Home_BathTile");
-            kit.HomeBathFloor = K("Home_BathFloor");
-            kit.HomeStairWall = K("Home_StairWall");
-            kit.HomeStairLower = K("Home_StairLower");
-            kit.HomeStairFloor = K("Home_StairFloor");
-            // the abandoned station (Level.DerelictLook): Sasha's derelict surfaces and decals, the same in every family
-            kit.DerelictWall = K("Dr_SteelPanels");
-            kit.DerelictFloor = K("Dr_FloorPlate");
-            kit.DerelictCeiling = K("Dr_CeilingVents");
-            kit.DerelictRust = K("Dr_Rust");
-            kit.DerelictPaint = K("Dr_PaintedMetal");
-            kit.DerelictTiles = K("Wall_TilesWhite");
-            kit.DerelictVinyl = K("Dr_Vinyl");
-            kit.FloorDecay = KitDecals("Dc_floor_rust", "Dc_floor_oil", "Dc_floor_scorch", "Dc_floor_rubble");
-            kit.WallDecay = KitDecals("Dc_wall_rust", "Dc_wall_rust", "Dc_wall_leak", "Dc_wall_mold", "Dc_wall_peel", "Dc_wall_scorch"); // rust twice as often
-            kit.Posters = KitDecals(Enumerable.Range(0, 6).Select(i => $"Dc_poster_{i}").ToArray());
             int count = System.Enum.GetValues(typeof(DecorKind)).Length;
             kit.Pieces = new GameObject[count];
             foreach (var (kind, file) in files)
@@ -264,6 +227,7 @@ namespace Stealth.EditorTools
                     return go;
                 });
             }
+            kit.Things = BuildWallThings();
             kit.Finish = Prefab($"{KitPrefabsDir}/Finish.prefab", () =>
             {
                 var go = new GameObject("Finish");
@@ -322,6 +286,52 @@ namespace Stealth.EditorTools
                 sets.Add(new MeshVariants { Family = f, From = from.ToArray(), To = to.ToArray() });
             }
             return sets.ToArray();
+        }
+
+        /// <summary>File names of the wall things (Tools/Blender/wall_things_atlas.THINGS), in <see cref="WallThing"/>'s order, and what frames each.</summary>
+        static readonly (string file, string body)[] WallThingFiles =
+        {
+            ("landscape_a", "wood"), ("landscape_b", "black"), ("abstract_a", "black"), ("abstract_b", "metal"), ("photo_a", "black"), ("photo_b", "wood"),
+            ("certificate", "wood"), ("calendar", "metal"), ("evac_plan", "metal"), ("first_aid", "metal"), ("tin_sign", "metal"), ("health", "metal"),
+            ("family", "wood"), ("botanical", "metal"), ("no_smoking", "metal"), ("thermostat", "white"), ("vent_grille", "white"),
+        };
+
+        /// <summary>
+        /// What hangs on walls (<see cref="WallThings"/>; Tools/Blender/wall_things.py → StyleKit/Things): one prefab each,
+        /// the same in every family's kit — frames of dark wood, black or bare metal, the picture from wall_things.png. No
+        /// colliders, no shadows; meshes readable (the style merges them into the house's decor).
+        /// </summary>
+        static GameObject[] BuildWallThings()
+        {
+            var things = new GameObject[WallThings.Count];
+            EnsureFolder($"{KitPrefabsDir}/Things");
+            for (int i = 0; i < things.Length; i++)
+            {
+                var (file, body) = WallThingFiles[i];
+                var path = $"{KitModelsDir}/Things/thing_{file}.fbx";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) { Debug.LogWarning($"[Builder] {path} missing: run Tools/Blender/wall_things.py"); continue; }
+                if (AssetImporter.GetAtPath(path) is ModelImporter importer && !importer.isReadable)
+                {
+                    importer.isReadable = true;
+                    importer.SaveAndReimport();
+                }
+                var kind = (WallThing)i;
+                things[i] = Prefab($"{KitPrefabsDir}/Things/{kind}.prefab", () =>
+                {
+                    var go = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+                    go.name = kind.ToString();
+                    var frame = body == "wood" ? K("Real_DarkWood") : body == "black" ? K("Trim_Metal") : body == "white" ? K("Trim_White") : M("Metal");
+                    bool device = body == "white";
+                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        string n = r.gameObject.name;
+                        r.shadowCastingMode = ShadowCastingMode.Off;
+                        r.sharedMaterial = n.StartsWith("Print") ? M("ThingPrint") : n.StartsWith("Accent") ? (device ? M("Rubber") : K("Trim_White")) : frame;
+                    }
+                    return go;
+                });
+            }
+            return things;
         }
     }
 }

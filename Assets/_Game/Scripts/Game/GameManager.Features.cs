@@ -109,6 +109,7 @@ namespace Stealth.Game
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
+                case UseKind.ExitButton: if (thing is ExitButton b) EscapeStorageServer(player, b.Door); break;
                 case UseKind.LiftCall: LiftServer(player, index, false); break;
                 case UseKind.LiftFloor: LiftServer(player, index, true); break;
                 case UseKind.VentGrille:
@@ -118,6 +119,7 @@ namespace Stealth.Game
                     break;
                 case UseKind.ShaftHatch: ToggleShaftServer(thing is ShaftHatch { Exit: true }); break;
                 case UseKind.VentGrate: UnscrewServer(player, index); break;
+                case UseKind.Door: if (thing is DoorHandle handle) ToggleDoorServer(player, handle.Door); break;
                 default: UseSewerServer(player, kind, index); break;
             }
         }
@@ -130,7 +132,6 @@ namespace Stealth.Game
             if (inv == null || !inv.Holds(ItemCatalog.Screwdriver)) return;
             m_Opened.Add(OpenKeys.Vent(grate));
             OpenedVersion++;
-            Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, player.transform.position + Vector3.up * 2f, 0.8f, Audio.Sfx.Group.Items);
         }
 
         /// <summary>Server: the lid over the shaft to the basement opens (or shuts) for everyone.</summary>
@@ -196,6 +197,7 @@ namespace Stealth.Game
             m_Opened.Add(OpenKeys.Med(player.ClientId));
             OpenedVersion++;
             player.HealServer(Gadgets.MedTableHp);
+            SoundServer(Audio.GameSound.Heal, player.transform.position + Vector3.up);
             Banner(Loc.Pack("banner.healed", player.Nick, Gadgets.MedTableHp));
         }
 
@@ -209,6 +211,13 @@ namespace Stealth.Game
             OpenedVersion++;
         }
 
+        /// <summary>Server: everyone hears it there.</summary>
+        public void SoundServer(Audio.GameSound sound, Vector3 at) => Link.BroadcastSound(sound, at);
+
+        /// <summary>Every peer: something the server told of is heard.</summary>
+        public void ReceiveSound(Audio.GameSound sound, Vector3 at) =>
+            Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Of(sound) : null, at, 1f, Audio.Sfx.Group.Items);
+
         /// <summary>Server: a player sets off the stun cube in the hand — every robot and camera of the house freezes.</summary>
         public void GadgetServer(PlayerController player)
         {
@@ -218,6 +227,7 @@ namespace Stealth.Game
             float seconds = Gadgets.StunDuration;
             foreach (var d in Detector.All.ToArray()) d.HackServer(seconds);
             StunnedUntil = Session.ServerTime + seconds;
+            SoundServer(Audio.GameSound.Stun, player.Hands);
             Banner(Loc.Pack("banner.stun", player.Nick, Mathf.RoundToInt(seconds)));
         }
 

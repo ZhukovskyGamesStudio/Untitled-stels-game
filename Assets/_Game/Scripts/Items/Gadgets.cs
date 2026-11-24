@@ -63,6 +63,10 @@ namespace Stealth.Items
         public float FinderFar = 30f;
         [Tooltip("Fuel finder: seconds between blinks, near and far.")]
         public float FinderFastPeriod = 0.18f, FinderSlowPeriod = 1.8f;
+        [Tooltip("Fuel finder: how bright the lamp's glass is at the top of a flash (1 = a lit screen; much over it blooms into a halo: it is right before the eyes).")]
+        public float FinderGlow = 1.15f;
+        [Tooltip("Fuel finder: the share of the flash's light shown to the eye. Robots see the holder by all of it.")]
+        [Range(0f, 1f)] public float FinderLampShown = 0.015f;
         [Tooltip("Fuel finder: loot right behind the holder reads as this many times further than the same loot straight ahead (it points where you look).")]
         public float FinderBehind = 4f;
         [Tooltip("Radio: a teammate speaking makes the radio in someone's hand sound — robots hear it within this radius, metres.")]
@@ -118,5 +122,12 @@ namespace Stealth.Items
 
         /// <summary>Whether the finder's lamp is lit at <paramref name="phase"/> seconds into a blink of <paramref name="period"/>: a short flash.</summary>
         public static bool FinderLit(float phase, float period) => phase < Mathf.Min(0.09f, period * 0.5f);
+
+        /// <summary>The glass of the lamp (0 dark … 1): it comes up at once and dies away over twice the flash — no hard strobe before the eyes.</summary>
+        public static float FinderGlass(float phase, float period)
+        {
+            float flash = Mathf.Min(0.09f, period * 0.5f);
+            return phase < 0f || period <= 0f ? 0f : phase < flash * 0.3f ? phase / (flash * 0.3f) : Mathf.Clamp01(1f - (phase - flash * 0.3f) / Mathf.Min(flash * 2f, period - flash * 0.3f));
+        }
     }
 }

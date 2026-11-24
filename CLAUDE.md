@@ -117,7 +117,7 @@ Resources/Strings/*.csv   все тексты      Scenes/Game.unity — еди�
 пути не меняются — GUID и сетевые хэши стабильны. Поменял структуру префаба в коде — пересобери и закоммить префабы вместе с кодом.
 Сцена в режиме «только недостающее» не пересобирается: новый объект сцены появится после `FORCE=1`.
 Модели — `Tools/Blender/*.py` (перед экспортом `meshfix.fix_objects`; после — откати неизменённые FBX:
-`git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`), звуки — `python Tools/Audio/generate_sounds.py`, иконки — `python Tools/Art/generate_icons.py`.
+`git diff --name-only Assets/_Game/Art/Models | xargs git checkout --`), звуки — CC0-записи `python Tools/Audio/import_cc0_sounds.py` + синтез `python Tools/Audio/generate_sounds.py` (порядок — `stealth-audio`), иконки — `python Tools/Art/generate_icons.py`.
 
 ## Тесты
 

@@ -217,6 +217,8 @@ namespace Stealth.UI
                 if (ControlsPanel.Rebinding) KeysPanel.Cancel();
                 else if (SettingsOpen) CloseSettings();
                 else if (ControlsOpen && !running) ControlsOpen = false;
+                // at a terminal, a safe or a vault console Esc leaves that first; the next one opens the menu
+                else if (running && !IsOpen && Stealth.Player.PlayerController.Local != null && Stealth.Player.PlayerController.Local.LeaveModeOnEscape()) { }
                 else if (running) IsOpen = !IsOpen;
             }
             if (running) ControlsOpen = false;

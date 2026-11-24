@@ -10,13 +10,18 @@ namespace Stealth.Level
 
     /// <summary>
     /// A door in a doorway: sliding leaves (<see cref="PanelA"/>/<see cref="PanelB"/>) or leaves on hinges (<see cref="Swing"/>,
-    /// <see cref="SwingB"/>; <see cref="DoorRules"/> decides the kind, the way it opens and the hinges' jamb). Opens when a player or a robot is close, closes behind them.
+    /// <see cref="SwingB"/>; <see cref="DoorRules"/> decides the kind, the way it opens and the hinges' jamb). Players open and shut it
+    /// with E (<see cref="DoorHandle"/>), a robot opens it after a moment at it and it shuts behind the robot: the server keeps the
+    /// door's word (<see cref="State"/>, <see cref="DoorState"/>) and every peer moves the leaves by it. With
+    /// <see cref="DoorSettings.Automatic"/> it opens by itself when a player or a robot is close and closes behind them, as it used to.
     /// A door-and-a-half opens its narrow leaf only for robots (<see cref="SecondForRobots"/>: they need the width); a both-ways
     /// door swings away from whoever comes (<see cref="BothWays"/>). A closed door blocks
-    /// vision (robots, cameras) but is ignored by the navmesh, so robots path through and open it on arrival.
-    /// Every peer runs it locally from replicated positions; the server's state is what sensors use.
+    /// vision (robots, cameras) but is ignored by the navmesh, so robots path through and open it on arrival
+    /// (<see cref="RobotController"/> waits at a shut one); only the vault's is a barrier to them (<see cref="Barrier"/>).
+    /// The server's state is what sensors use.
     /// A locked door (<see cref="LevelLayout.LockedDoors"/>) opens only for robots until a player hacks its lock
-    /// (hold E; the server keeps the list of unlocked doors, <see cref="World"/>). Its lamp is red, then green.
+    /// (hold E; the server keeps the list of unlocked doors, <see cref="World"/>): a padlock people left is picked, the robots'
+    /// electronic unit on the leaf is hacked (<see cref="LockKind"/>; its window and the lamps over the door: red, then green).
     /// A key door (<see cref="LevelLayout.KeyDoors"/>) cannot be hacked: it opens with a key block (<see cref="KeyLock"/>),
     /// its lamp is amber. The storage room's door (<see cref="LevelLayout.StorageDoor"/>) is locked unless: the door terminal
     /// unlocked it (for good); a worker is at the door or in the room (it lets them through — a player may slip in behind
@@ -123,9 +128,18 @@ namespace Stealth.Level
         public Transform Wheel;
         [Tooltip("Padlocks on both faces, hung on the panels' seam: shown while a hackable lock holds the door.")]
         public Transform[] Padlocks;
+        [Tooltip("The robots' electronic lock on both faces of the main leaf: shown on doors with such a lock, also once it is hacked.")]
+        public GameObject[] LockUnits;
+        [Tooltip("The units' status windows: red while locked, green once hacked.")]
+        public Renderer[] UnitLamps;
+        [Tooltip("The storage room's door: the picture on its sign, both sides — the same its terminal shows, locked and open — or empty.")]
+        public Renderer[] Pictures;
+        public Texture2D LockedPicture, OpenPicture;
         [Tooltip("Parts that are the wall itself (the corners round the vault's round door): dressed in the style's wall finish by StyleDecor.")]
         public MeshRenderer[] WallParts;
         public BoxCollider Blocker;
+        [Tooltip("The vault's door: carves its doorway out of the navmesh until a player has opened it (robots do not walk through it), or empty.")]
+        public UnityEngine.AI.NavMeshObstacle Barrier;
         public float Width = LevelMetrics.DoorWidth;
         [Tooltip("Lock lamps on both sides above the door (shown only on locked doors).")]
         public Renderer[] LockLamps;
@@ -155,11 +169,16 @@ namespace Stealth.Level
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
         static readonly Color LockedColor = new(1f, 0.12f, 0.08f), OpenColor = new(0.2f, 1f, 0.35f), KeyColor = new(1f, 0.62f, 0.05f);
 
         /// <summary>Index in <see cref="LevelLayout.AutoDoors"/> (-1: an outer door).</summary>
         public int Index { get; private set; } = -1;
+        /// <summary>Which door of the house this is for players and the server's word (inner doors first, then the outer ones); -1: none.</summary>
+        public int Spot { get; set; } = -1;
         public bool HasLock { get; private set; }
+        /// <summary>What holds it shut: a padlock of the people who lived here, or the robots' electronic unit.</summary>
+        public LockKind Lock { get; private set; } = LockKind.Electronic;
         /// <summary>Opens only with a key block (not hacked).</summary>
         public bool NeedsKey { get; private set; }
         /// <summary>The vault's door: opened by its three lock panels (not hacked, no key).</summary>
@@ -229,8 +248,10 @@ namespace Stealth.Level
         MaterialPropertyBlock m_Block;
         int m_ShownLock = -1;
 
-        public void Configure(int index, bool locked, bool keyed = false, bool vault = false, bool storage = false, Vector3 inward = default, Rect room = default)
+        public void Configure(int index, bool locked, bool keyed = false, bool vault = false, bool storage = false, Vector3 inward = default, Rect room = default,
+            LockKind kind = LockKind.Electronic)
         {
+            Lock = kind;
             Room = room;
             Index = index;
             HasLock = locked || keyed || vault || storage;
@@ -246,12 +267,96 @@ namespace Stealth.Level
             => ReachSearch.Nearest(All, player, player, reach, aim);
 
         // from outside the storage room's door: its terminal
-        bool IReachTarget.CanReach(Vector3 player) => Locked && !NeedsKey && (!Storage || IsInside(transform.position, Inward, player));
+        // (the storage room's door is no lock to work on: its terminal outside, its exit button inside)
+        bool IReachTarget.CanReach(Vector3 player) => Locked && !NeedsKey && !Storage;
         (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.2f, transform.position + Vector3.up * 2.1f, 0.6f);
         Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
         float IReachTarget.MaxReach => float.PositiveInfinity;
         Transform IReachTarget.ReachRoot => transform;
         Vector3? IReachTarget.HandsTo => null; // the door is the wall
+
+        /// <summary>Doors open by themselves (the config, or the autopilot, which has no hand for them).</summary>
+        public static bool Automatic => Configs.Tuning.Level.Doors.Automatic || Game.DevFlags.Autopilot.HasValue;
+
+        /// <summary>Server: the door's word and what moved it.</summary>
+        public DoorState State { get; } = new();
+        /// <summary>Server: which way a both-ways door was last opened (+1 to its +Z).</summary>
+        public float OpenedWay { get; private set; } = 1f;
+        float m_RobotUntil;
+
+        /// <summary>Server: a robot stands at the door, wanting through (said every frame it does).</summary>
+        public void RobotAtServer(Vector3 robot)
+        {
+            m_RobotUntil = Time.time + 0.15f;
+            if (!State.Open) OpenedWay = AwayFrom(transform.position, transform.forward, robot);
+        }
+
+        /// <summary>Server: one frame of the door's word; true when it changed.</summary>
+        public bool StepServer(float dt)
+        {
+            var here = transform.position;
+            bool robot = false;
+            foreach (var r in RobotController.Robots) if (r != null && !r.IsHacked && Near(here, r.Feet, RobotRadius)) { robot = true; break; }
+            var bot = Stealth.Game.StorageBot.Active; // the team's storage robot: the door opens for it at once, it does not stop
+            bool helper = bot != null && !bot.InDuct && Near(here, bot.transform.position);
+            if (helper && !State.Open) OpenedWay = AwayFrom(here, transform.forward, bot.transform.position);
+            return State.Step(new DoorInput
+            {
+                RobotWaits = Time.time < m_RobotUntil, HelperComes = helper, RobotNear = robot || helper, Occupied = Occupied(), Locked = Locked,
+            }, dt, Configs.Tuning.Level.Doors);
+        }
+
+        /// <summary>Server: a player opens or shuts it; false when it stays as it is (someone in the doorway).</summary>
+        public bool ToggleServer(Vector3 player)
+        {
+            if (!State.Open) OpenedWay = AwayFrom(transform.position, transform.forward, player);
+            return State.Toggle(Occupied());
+        }
+
+        /// <summary>A door a robot opened stays open while one is this near, metres.</summary>
+        const float RobotRadius = 1.7f;
+
+        /// <summary>Someone stands in the doorway.</summary>
+        bool Occupied()
+        {
+            foreach (var p in PlayerController.All) if (p != null && InDoorway(p.transform.position)) return true;
+            foreach (var r in RobotController.Robots) if (r != null && InDoorway(r.Feet)) return true;
+            var bot = Stealth.Game.StorageBot.Active;
+            return bot != null && !bot.InDuct && InDoorway(bot.transform.position);
+        }
+
+        bool InDoorway(Vector3 p)
+        {
+            var d = p - transform.position;
+            return Mathf.Abs(d.y) < 1.6f && Mathf.Abs(Vector3.Dot(d, transform.right)) < Width / 2f + 0.1f && Mathf.Abs(Vector3.Dot(d, transform.forward)) < 0.5f;
+        }
+
+        /// <summary>A robot can walk through it now: the leaves are out of its way.</summary>
+        public bool Passable => m_Open.Value >= 0.8f && (!SecondForRobots || m_OpenB.Value >= 0.8f);
+
+        /// <summary>The leaf a robot at <paramref name="at"/> must stand clear of while it opens (0: sliding, or swinging away from it).</summary>
+        public float LeafTowards(Vector3 at)
+        {
+            if (Swing == null || BothWays || Vector3.Dot(at - transform.position, transform.forward) < 0f) return 0f; // (leaves open to +Z)
+            float span = Width - 2f * DoorRules.Lining;
+            return SecondForRobots ? span * DoorRules.MainShare : span / 2f;
+        }
+
+        /// <summary>The middle of a leaf as it stands now: the one nearer <paramref name="view"/> (what E is aimed at on an open door).</summary>
+        public Vector3 LeafMiddle(Aim? view)
+        {
+            var best = transform.position + Vector3.up * 1.1f;
+            float miss = float.MaxValue;
+            foreach (var part in Swing != null ? new[] { Swing, SecondForRobots ? null : SwingB } : new[] { PanelA, PanelB })
+            {
+                var r = part != null ? part.GetComponentInChildren<MeshRenderer>() : null;
+                if (r == null) continue;
+                var c = r.bounds.center;
+                float m = view.HasValue ? view.Value.Miss(c, c) : 0f;
+                if (m < miss) { miss = m; best = c; }
+            }
+            return best;
+        }
 
         OpenTween m_Open; // 0 closed .. 1 open
         OpenTween m_OpenB; // a door-and-a-half's narrow leaf
@@ -335,24 +440,33 @@ namespace Stealth.Level
             bool locked = Locked;
             // a lock picked or opened from a terminal: its bolt is heard on every peer (not on the first frame: a house built so)
             if (m_WasLocked && !locked && HasLock && !Storage && Time.timeSinceLevelLoad > 1f && Index >= 0)
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, transform.position + Vector3.up * 1f, 0.8f, Audio.Sfx.Group.Items);
+                Audio.Sfx.At(Audio.Sfx.Bank == null ? null : Lock == LockKind.Electronic && !NeedsKey ? Audio.Sfx.Bank.UnlockUnit : Audio.Sfx.Bank.Unlock,
+                    transform.position + Vector3.up * 1f, 0.8f, Audio.Sfx.Group.Items);
             m_WasLocked = locked;
             if (!locked) foreach (var p in PlayerController.All) s_Agents.Add(p.transform.position); // a locked door ignores players
             int players = s_Agents.Count;
-            foreach (var r in RobotController.Robots) s_Agents.Add(r.transform.position);
+            foreach (var r in RobotController.Robots) if (r != null) s_Agents.Add(r.Feet); // (a drone hovers over the door's reach)
             var bot = Stealth.Game.StorageBot.Active; // the team's storage robot walks through doors like a robot (a locked one too)
             if (bot != null && !bot.InDuct) s_Agents.Add(bot.transform.position);
             ShowLock(locked, Swing == null || m_Open.Value < 0.03f); // a hinged leaf swung open (a robot went through) takes no padlock in the air with it
             var here = transform.position;
-            bool open = ShouldOpen(here, s_Agents);
+            bool automatic = Automatic || Spot < 0, back = false, open;
+            if (automatic) open = ShouldOpen(here, s_Agents);
+            else
+            {
+                // the server's word
+                back = World.IsOpened(OpenKeys.DoorSwung(Spot, true));
+                open = back || World.IsOpened(OpenKeys.DoorSwung(Spot, false));
+            }
             bool openB = open;
-            if (SecondForRobots)
+            if (SecondForRobots && open)
             {
                 // the narrow leaf: for a robot near (players fit through the main leaf)
                 openB = false;
                 for (int k = players; k < s_Agents.Count && !openB; k++) openB = Near(here, s_Agents[k]);
             }
-            if (BothWays && open && m_Open.Value < 0.02f && s_Agents.Count > 0)
+            if (BothWays && open && !automatic && m_Open.Value < 0.02f) m_Way = back ? -1f : 1f;
+            else if (BothWays && open && m_Open.Value < 0.02f && s_Agents.Count > 0)
             {
                 // from shut: away from the nearest agent
                 var nearest = s_Agents[0];
@@ -360,6 +474,7 @@ namespace Stealth.Level
                 m_Way = AwayFrom(here, transform.forward, nearest);
             }
             if (Swing != null && Vault) open = !locked && SwungOpen; // unlocked by the panels, opened by a player
+            if (Barrier != null && Barrier.enabled == open) Barrier.enabled = !open; // robots stay out of the vault until it is open
             float dt = Time.deltaTime, was = m_Open.Value;
             OpenMove move;
             if (Swing != null && Vault)
@@ -401,21 +516,49 @@ namespace Stealth.Level
             m_ShownLock = state;
             if (Padlocks != null)
             {
-                bool padlock = locked && shut && !NeedsKey; // a key door has its key panels, the vault its lamps
+                bool padlock = locked && shut && !NeedsKey && !Storage && Lock == LockKind.Mechanical; // a key door has its key panels, the vault its lamps
                 foreach (var p in Padlocks)
                     if (p != null && p.gameObject.activeSelf != padlock) p.gameObject.SetActive(padlock);
             }
-            if (LockLamps == null || lampsSame) return;
+            bool unit = HasLock && !NeedsKey && !Storage && Lock == LockKind.Electronic;
+            if (LockUnits != null)
+                foreach (var u in LockUnits)
+                    if (u != null && u.activeSelf != unit) u.SetActive(unit);
+            if (lampsSame) return;
             m_Block ??= new MaterialPropertyBlock();
             var c = locked ? (NeedsKey ? KeyColor : LockedColor) : OpenColor;
-            foreach (var r in LockLamps)
+            Show(LockLamps, HasLock && (unit || NeedsKey || Storage)); // a padlock has no lamps
+            Show(UnitLamps, unit);
+            if (Pictures == null) return;
+            foreach (var r in Pictures)
             {
+                // as its terminal's screen (SecurityTerminal.Show): the shut doorway in red, the open one in green
                 if (r == null) continue;
-                r.enabled = HasLock;
+                var picture = locked ? LockedPicture : OpenPicture;
                 r.GetPropertyBlock(m_Block);
-                m_Block.SetColor(BaseColorId, c);
-                m_Block.SetColor(EmissionId, c * 2.5f);
+                if (picture != null)
+                {
+                    m_Block.SetTexture(BaseMapId, picture);
+                    m_Block.SetTexture(EmissionMapId, picture);
+                }
+                var tint = locked ? SecurityTerminal.DoorsColor : SecurityTerminal.DoorsOpenColor;
+                m_Block.SetColor(BaseColorId, tint * 0.35f);
+                m_Block.SetColor(EmissionId, tint * 1.3f);
                 r.SetPropertyBlock(m_Block);
+            }
+
+            void Show(Renderer[] lamps, bool on)
+            {
+                if (lamps == null) return;
+                foreach (var r in lamps)
+                {
+                    if (r == null) continue;
+                    r.enabled = on;
+                    r.GetPropertyBlock(m_Block);
+                    m_Block.SetColor(BaseColorId, c);
+                    m_Block.SetColor(EmissionId, c * 2.5f);
+                    r.SetPropertyBlock(m_Block);
+                }
             }
         }
     }

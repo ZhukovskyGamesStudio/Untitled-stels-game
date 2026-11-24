@@ -1130,6 +1130,10 @@ namespace Stealth.Level
                     candidates.Add(r);
             if (candidates.Count == 0) foreach (var r in l.Rooms) if (r.Id != l.LobbyRoom) candidates.Add(r);
 
+            // robots are not shut in the vault or in the hidden room (they cannot get out of either)
+            var open = candidates.FindAll(r => r.Id != l.VaultRoom && r.Id != l.HiddenRoom);
+            if (open.Count == 0) open = candidates;
+
             // A bigger team gets a bigger house — and the guards to go with it.
             float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
             // (a hospital is built smaller than its area, BuildingSettings.HospitalSize: its guards are counted for the full size)
@@ -1142,14 +1146,14 @@ namespace Stealth.Level
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
             {
-                // Every floor gets at least one robot, then they spread (bigger rooms more likely).
+                // Every floor gets at least one robot, then they spread (bigger rooms more likely; nobody is shut in the vault).
                 PlanRoom room;
                 if (i < l.Floors)
                 {
-                    var onFloor = candidates.FindAll(c => c.Floor == i);
-                    room = onFloor.Count > 0 ? Weighted(onFloor, rng, l, s.DeepRoomWeight) : candidates[rng.Next(candidates.Count)];
+                    var onFloor = open.FindAll(c => c.Floor == i);
+                    room = onFloor.Count > 0 ? Weighted(onFloor, rng, l, s.DeepRoomWeight) : open[rng.Next(open.Count)];
                 }
-                else room = Weighted(candidates, rng, l, s.DeepRoomWeight);
+                else room = Weighted(open, rng, l, s.DeepRoomWeight);
                 var pos = SpotIn(l, room, rng, 1.2f);
                 if (room.Floor == 0 && Vector3.Distance(pos, l.HatchPosition) < MinDeviceDistanceToHatch) pos = room.Center;
                 var kind = RobotRoster.PickRobot(table, level, rng);
@@ -1159,7 +1163,7 @@ namespace Stealth.Level
                 if (kind == RobotKind.Worker && l.StorageRoom < 0) kind = RobotKind.Guard;
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
-            StorageWorkers(l, rng, s, candidates, storageWorkers, freshRobots.Count);
+            StorageWorkers(l, rng, s, open, storageWorkers, freshRobots.Count);
             if (!l.ClassicEnemies) DockGuards(l, s);
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
@@ -1270,7 +1274,7 @@ namespace Stealth.Level
 
         /// <summary>
         /// The ways up into the ducts (<see cref="DuctGrate.ClimbDir"/>): handed to the furnisher, which sets them first in
-        /// their room — a crate stack (1.4 m) right under the grate and a desk (0.92 m) along its side — checked like any
+        /// their room — a chest-high piece right under the grate and a step along its side (Furnisher.ClimbOf) — checked like any
         /// group (no overlap, the room still walkable). <see cref="DropFailedClimbs"/> after the furniture.
         /// </summary>
         static void PlaceClimbs(LevelLayout l, Furnisher furnisher)
@@ -1282,7 +1286,7 @@ namespace Stealth.Level
                         furnisher.Climbs[g.Room] = (new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z), VentPlan.ClimbSide(g.ClimbDir));
         }
 
-        /// <summary>A climb whose crates did not fit (or were taken out by the walkability check) is no way up.</summary>
+        /// <summary>A climb whose pieces did not fit (or were taken out by the walkability check) is no way up.</summary>
         static void DropFailedClimbs(LevelLayout l)
         {
             foreach (var net in l.Vents)
@@ -1291,14 +1295,7 @@ namespace Stealth.Level
                     var g = net.Grates[i];
                     if (g.ClimbDir < 0) continue;
                     var under = new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z);
-                    var desk = under + VentPlan.ClimbSide(g.ClimbDir) * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
-                    bool stack = false, table = false;
-                    foreach (var p in l.Props)
-                    {
-                        stack |= p.Kind == PropKind.CrateStack && (p.Position - under).sqrMagnitude < 0.01f;
-                        table |= p.Kind == PropKind.Desk && (p.Position - desk).sqrMagnitude < 0.01f;
-                    }
-                    if (stack && table) continue;
+                    if (g.Room >= 0 && Furnisher.HasClimb(l, l.Plan.Rooms[g.Room].Type, under, VentPlan.ClimbSide(g.ClimbDir))) continue;
                     g.ClimbDir = -1;
                     net.Grates[i] = g;
                 }

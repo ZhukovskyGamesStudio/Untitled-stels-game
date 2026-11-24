@@ -31,10 +31,13 @@ namespace Stealth.Player
         /// <summary>Server: a thing of the bench into the backpack.</summary>
         public void UnbenchServer(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (!AtBench(out var bench) || bench.IndexOf(from) < 0 || !CanPlace(from.Shape, rot, x, y)) return;
+            if (!AtBench(out var bench) || bench.IndexOf(from) < 0 || !CanTake(from.Shape, rot, x, y)) return;
             bench.Take(from);
-            m_Items.Add(new InventoryEntry { Shape = from.Shape, Color = from.Color, X = x, Y = y, Rot = rot });
-            Changed();
+            // (into a busy hand: the held thing makes way, like from the stash; with no room for it, it goes onto the bench)
+            PlaceTaken(from.Shape, from.Color, x, y, rot, out var evicted);
+            if (evicted is not { } held) return;
+            if (bench.AddAll(new[] { held }, out _) == 0)
+                GameManager.Instance?.SpawnItemServer(held.Shape, held.Color, transform.position + transform.forward * 0.6f + UnityEngine.Vector3.up * 0.3f, 0f);
         }
 
         public void BenchMoveServer(InventoryEntry from, byte x, byte y, byte rot)

@@ -35,8 +35,8 @@ namespace Stealth.EditorTools
             (PropKind.SleepPod, "sleep_pod", "Ceiling", "Fabric", "Fabric", "LampBulb"),
             (PropKind.Hammock, "hammock", "Metal", "Fabric", "Fabric", "Metal"),
             (PropKind.TallBookcase, "tall_bookcase", "Wood", "Folders", "PropAccent", "Folders"),
-            (PropKind.ReadingTable, "reading_table", "Wood", "Metal", "Folders", "LampBulb"),
-            (PropKind.Globe, "globe", "Wood", "Metal", "PropAccent", "Metal"),
+            (PropKind.ReadingTable, "reading_table", "Wood", "Metal", "Printed", "LampBulb"),
+            (PropKind.Globe, "globe", "Wood", "Metal", "GlobeMap", "Metal"),
             (PropKind.Copier, "copier", "Ceiling", "Rack", "Rack", "PropScreen"),
             (PropKind.PaperStack, "paper_stack", "Cardboard", "Ceiling", "Wood", "Ceiling"),
             (PropKind.MailShelf, "mail_shelf", "Wood", "Ceiling", "Cardboard", "Ceiling"),
@@ -88,12 +88,12 @@ namespace Stealth.EditorTools
             (PropKind.SanitaryBin, "sanitary_bin", "Metal", "PropAccent", "PropAccent", "PropScreen"),
             (PropKind.SectionalSofa, "sectional_sofa", "Fabric", "PropAccent", "BeanBag", "PropScreen"),
             (PropKind.EggChair, "egg_chair", "PropBody", "Metal", "Fabric", "PropScreen"),
-            (PropKind.SideTable, "side_table", "Wood", "Metal", "Folders", "LampBulb"),
-            (PropKind.MagazineRack, "magazine_rack", "Wood", "Metal", "Folders", "PropScreen"),
+            (PropKind.SideTable, "side_table", "Wood", "Metal", "Printed", "LampBulb"),
+            (PropKind.MagazineRack, "magazine_rack", "Wood", "Metal", "Printed", "PropScreen"),
             (PropKind.AreaRug, "area_rug", "Felt", "Fabric", "Fabric", "PropScreen"),
             (PropKind.CorridorBench, "corridor_bench", "Fabric", "Metal", "Wood", "PropScreen"),
             (PropKind.FireCabinet, "fire_cabinet", "PropBody", "Vending", "StairGlass", "PropScreen"),
-            (PropKind.NoticeBoard, "notice_board", "Cardboard", "Ceiling", "Wood", "PropScreen"),
+            (PropKind.NoticeBoard, "notice_board", "Cardboard", "Sheets", "Wood", "PropScreen"),
             (PropKind.BinPair, "bin_pair", "PropBody", "PropAccent", "Folders", "PropScreen"),
             (PropKind.UmbrellaStand, "umbrella_stand", "Metal", "PropAccent", "Fabric", "PropScreen"),
             (PropKind.NetworkCabinet, "network_cabinet", "Rack", "PropAccent", "StairGlass", "PropScreen"),
@@ -174,11 +174,11 @@ namespace Stealth.EditorTools
             (PropKind.ConduitGrowth, "conduit_growth", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
             (PropKind.CableMass, "cable_mass", "RobotShell", "RobotFlesh", "Rubber", "RobotGlow"),
             // the auto repair shop (Tools/Blender/garage.py)
-            (PropKind.CarParked, "car_parked", "CarRed", "Rubber", "CarGlass", "LampBulb"),
-            (PropKind.CarHoodOpen, "car_hood_open", "CarBlue", "Rubber", "CarGlass", "LampBulb"),
-            (PropKind.LiftCar, "lift_car", "CarSilver", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.CarParked, "car_parked", "CarRed", "Rubber", "CarWindow", "LampBulb"),
+            (PropKind.CarHoodOpen, "car_hood_open", "CarBlue", "Rubber", "CarWindow", "LampBulb"),
+            (PropKind.LiftCar, "lift_car", "CarSilver", "Rubber", "CarWindow", "LampBulb"),
             (PropKind.LiftEmpty, "lift_empty", "ShopYellow", "Rubber", "Metal", "LampBulb"),
-            (PropKind.CarOnStands, "car_on_stands", "Ceiling", "Rubber", "CarGlass", "LampBulb"),
+            (PropKind.CarOnStands, "car_on_stands", "Ceiling", "Rubber", "CarWindow", "LampBulb"),
             (PropKind.ToolChest, "tool_chest", "ToolRed", "Rubber", "Metal", "LampBulb"),
             (PropKind.TireChanger, "tire_changer", "ToolRed", "Rubber", "Metal", "PropScreen"),
             (PropKind.WheelBalancer, "wheel_balancer", "ToolRed", "Rubber", "Metal", "PropScreen"),
@@ -223,6 +223,7 @@ namespace Stealth.EditorTools
             (PropKind.ShoeCabinet, "shoe_cabinet", "Wood", "Fabric", "Metal", "PropScreen"),
             (PropKind.HallHooks, "hall_hooks_bare", "Wood", "Metal", "Metal", "PropScreen"), // Tools/Blender/variants.py: garments on its hooks (PropVariants)
             (PropKind.Mailboxes, "mailboxes", "PropBody", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.LowShelf, "low_shelf", "Wood", "Cardboard", "ClothNavy", "PropScreen"),
             (PropKind.ElevatorDoors, "elevator_doors", "Metal", "PropBody", "Metal", "LampBulb"),
         };
 
@@ -254,6 +255,8 @@ namespace Stealth.EditorTools
                     if (Opens.Contains(kind)) Opening(go);
                     if (kind == PropKind.ChargingDock) go.AddComponent<Stealth.Level.ChargingDock>(); // its glow pulses while a robot charges
                     if (kind == PropKind.TallBookcase) ShelfBooks(go); // its books differ every time
+                    if (kind == PropKind.LowShelf) CubeThings(go);
+                    if (kind == PropKind.BookCart) CartBooks(go);
                     if (kind == PropKind.HallHooks) HookGarments(go, "hall_hooks_bare");
                     return go;
                 });
@@ -327,7 +330,7 @@ namespace Stealth.EditorTools
         /// and wood where there are scans, the game's own tiles, padding and panels where there are none — a kitchen is
         /// tiled behind its counter, a toilet to head height, a gym padded, a library panelled in dark wood, a store bare
         /// concrete, a lobby with a wood dado, a corridor with a painted protection band. (Hospitals, garages, flats and the
-        /// abandoned station dress their own rooms over these: Level.ClinicLook, ShopLook, HomeLook, DerelictLook.)
+        /// abandoned station dress their own rooms over these: Data/Styles/Houses.)
         /// </summary>
         static RoomLook[] RealisticRoomLooks()
         {
@@ -338,29 +341,40 @@ namespace Stealth.EditorTools
             };
             return new[]
             {
-                R(RoomType.Restroom, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 2.0f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Restroom, "Paint_White", 2.5f, "Wall_TilesWhite", 2.0f, "Ceiling_Acoustic", 1.2f),
                 R(RoomType.LockerRoom, "Real_BeigeWall", 2.5f, "Wall_TilesMint", 1.6f, "Ceiling_Acoustic", 1.2f),
                 R(RoomType.Kitchen, "Real_Plaster", 2.5f, "Wall_TilesCream", 1.4f, "Real_CeilingTiles", 1.2f),
                 R(RoomType.Gym, "Real_ConcreteWall", 3f, "Wall_Padding", 1.2f, "Ceiling_Concrete", 3f),
-                R(RoomType.Infirmary, "Wall_PaintWhite", 2f, "Wall_TilesWhite", 1.2f, "Ceiling_Acoustic", 1.2f),
-                R(RoomType.Lab, "Wall_PaintWhite", 2f, null, 0f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Infirmary, "Paint_White", 2.5f, "Wall_TilesWhite", 1.2f, "Ceiling_Acoustic", 1.2f),
+                R(RoomType.Lab, "Paint_White", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f),
                 R(RoomType.Server, "Wall_Panels", 2f, null, 0f, "Ceiling_Acoustic", 1.2f),
                 R(RoomType.ControlRoom, "Wall_Panels", 2f, null, 0f, "Real_CeilingTiles", 1.2f),
                 R(RoomType.Storage, "Real_ConcreteWall", 3f, null, 0f, "Ceiling_Concrete", 3f),
                 R(RoomType.CopyRoom, "Real_BeigeWall", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f),
+                R(RoomType.CopyRoom, "Paint_Sage", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f),
                 R(RoomType.Studio, "Real_RawPlanks", 2f, null, 0f, null, 0f),
                 R(RoomType.GameRoom, "Real_Brick", 2f, null, 0f, null, 0f),
                 R(RoomType.Library, "Real_PaneledWood", 2f, null, 0f, null, 0f, plain: false),
                 R(RoomType.Meeting, "Real_Plaster", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f, plain: false),
+                R(RoomType.Meeting, "Real_Plaster", 2.5f, "Real_PaneledWood", 1.0f, "Real_CeilingTiles", 1.2f, plain: false),
+                R(RoomType.Meeting, "Paint_Slate", 2.5f, null, 0f, "Real_CeilingTiles", 1.2f, plain: false),
                 R(RoomType.Lounge, "Real_Plaster2", 2.5f, null, 0f, null, 0f, plain: false),
                 R(RoomType.NapRoom, "Real_Plaster2", 2.5f, null, 0f, null, 0f),
                 // the facility's own spaces: a lobby with a wood dado, corridors with a painted protection band to a
                 // trolley's height under acoustic tiles, offices under acoustic tiles, plant rooms in bare concrete
                 R(RoomType.Lobby, "Real_Plaster", 2.5f, "Real_PaneledWood", 1.1f, "Real_CeilingTiles", 1.2f, plain: false),
-                R(RoomType.Corridor, "Real_BeigeWall", 2.5f, "Wall_PlasterOld", 1.0f, "Ceiling_Acoustic", 1.2f, plain: false),
-                R(RoomType.Hall, "Real_BeigeWall", 2.5f, "Wall_PlasterOld", 1.0f, null, 0f, plain: false),
+                R(RoomType.Corridor, "Real_BeigeWall", 2.5f, "Paint_Band", 1.0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Corridor, "Real_Plaster", 2.5f, "Paint_Band", 1.0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Hall, "Real_BeigeWall", 2.5f, "Paint_Band", 1.0f, null, 0f, plain: false),
+                // (a type listed several times: each room of it wears one of these, by the house seed — StyleGeometry.RoomLookOf.
+                // Offices: plain beige, two-tone with a darker dado band and its rail, a sage wall, a slate one)
                 R(RoomType.Office, "Real_BeigeWall", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Office, "Real_BeigeWall", 2.5f, "Paint_Band", 0.9f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Office, "Paint_Sage", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.Office, "Paint_Slate", 2.5f, "Paint_White", 0.9f, "Ceiling_Acoustic", 1.2f, plain: false),
                 R(RoomType.OpenSpace, "Real_BeigeWall", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.OpenSpace, "Real_Plaster", 2.5f, "Paint_Band", 0.9f, "Ceiling_Acoustic", 1.2f, plain: false),
+                R(RoomType.OpenSpace, "Paint_Slate", 2.5f, null, 0f, "Ceiling_Acoustic", 1.2f, plain: false),
                 R(RoomType.Utility, "Real_ConcreteWall", 3f, null, 0f, "Ceiling_Concrete", 3f),
                 R(RoomType.ChargingStation, "Wall_Panels", 2f, null, 0f, "Ceiling_Concrete", 3f),
             };

@@ -47,6 +47,7 @@ namespace Stealth.Player
             {
                 if (m_Rig != null) Destroy(m_Rig.gameObject);
                 m_Rig = null;
+                if (IsOwner) UpdateViewArms(null);
                 m_RigPrefab = prefab;
                 if (Model != null)
                     foreach (var r in Model.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = prefab != null;
@@ -69,6 +70,8 @@ namespace Stealth.Player
             UpdateBodyPose();
             if (m_Rig == null) return;
             UpdateBootsWorn();
+            UpdateOwnLook();
+            UpdateViewArm();
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
             // the hand's thing: everyone sees it carried in the rig's right hand (the owner keeps the first-person one)
             var held = HeldThing != null ? HeldThing.transform.parent : null;
@@ -144,15 +147,81 @@ namespace Stealth.Player
             if (m_Rig == null) return;
             PlayerLooks.Paint(m_Rig.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
             if (!IsOwner) return;
+            if (!m_ShownCalling) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.gameObject.layer = OwnBodyLayer;
+            m_OwnLook = -1;
+            UpdateOwnLook();
+            UpdateViewArms(m_Rig);
+        }
+
+        int m_OwnLook = -1;
+
+        /// <summary>
+        /// Owner: how the own body is drawn now. Looking out of it: no head (a shadow only) and the skin without one
+        /// (<see cref="HumanRig.OwnSkin"/>); with the flashlight on, no shadow of it either — the beam starts at the head and
+        /// threw the owner's own shadow before him (the culling mask does not keep casters out of it in Forward+).
+        /// </summary>
+        void UpdateOwnLook()
+        {
+            if (!IsOwner || m_Rig == null) return;
+            int look = (m_BodyShown ? 1 : 0) | (FlashlightOn ? 2 : 0);
+            if (look == m_OwnLook) return;
+            m_OwnLook = look;
+            bool shown = m_BodyShown, beam = FlashlightOn && !shown;
             foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true))
             {
-                if (!m_ShownCalling) r.gameObject.layer = OwnBodyLayer;
-                r.shadowCastingMode = OwnShadow(r, m_BodyShown);
+                if (r == m_Rig.OwnSkin) { r.enabled = !shown; continue; }
+                bool head = !shown && (HumanMath.OnTheHead(r.name) || (r == m_Rig.Skin && m_Rig.OwnSkin != null));
+                r.forceRenderingOff = head && beam;
+                r.shadowCastingMode = head ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
+                    : beam ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
             }
         }
 
-        static UnityEngine.Rendering.ShadowCastingMode OwnShadow(Renderer r, bool shown) =>
-            !shown && HumanMath.OnTheHead(r.name) ? UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly : UnityEngine.Rendering.ShadowCastingMode.On;
+        GameObject m_ArmFist, m_ArmCup, m_ArmTorch;
+
+        /// <summary>
+        /// Owner: the right arm of the view is this person's own (<see cref="HumanRig.ViewFist"/>, <see cref="HumanRig.ViewCup"/>)
+        /// in place of the plain hand of the prefab: round the held thing at its anchor, and round the flashlight.
+        /// </summary>
+        void UpdateViewArms(HumanRig rig)
+        {
+            foreach (var old in new[] { m_ArmFist, m_ArmCup, m_ArmTorch }) if (old != null) Destroy(old);
+            m_ArmFist = m_ArmCup = m_ArmTorch = null;
+            bool own = rig != null && rig.ViewFist != null && rig.ViewCup != null && HeldThing != null && HeldThing.transform.parent != null;
+            // the plain hands step aside
+            foreach (var plain in new[] { HeldHand, ViewFlashlight })
+                if (plain != null)
+                    foreach (var r in plain.GetComponentsInChildren<Renderer>(true))
+                        if (plain == HeldHand || r.name.StartsWith("Body") || r.name.StartsWith("AccentSleeve")) r.enabled = !own;
+            if (!own) return;
+            var anchor = HeldThing.transform.parent;
+            m_ArmFist = Arm(rig.ViewFist, anchor);
+            m_ArmCup = Arm(rig.ViewCup, anchor);
+            if (ViewFlashlight != null)
+            {
+                m_ArmTorch = Arm(rig.ViewFist, ViewFlashlight.transform.parent);
+                m_ArmTorch.transform.SetLocalPositionAndRotation(ViewFlashlight.transform.localPosition, ViewFlashlight.transform.localRotation);
+            }
+            UpdateViewArm();
+
+            GameObject Arm(GameObject prefab, Transform parent)
+            {
+                var go = Instantiate(prefab, parent, false);
+                PlayerLooks.Paint(go.transform, PlayerLooks.SlotOf(ClientId), m_LookDepartment);
+                return go;
+            }
+        }
+
+        /// <summary>Which of the view's arms shows: under a compact thing the open palm, round anything else the fist.</summary>
+        void UpdateViewArm()
+        {
+            if (m_ArmFist == null) return;
+            bool cup = m_HeldShape >= 0 && Items.ItemCatalog.HeldPoseOf(m_HeldShape).Compact;
+            if (m_ArmFist.activeSelf == cup) m_ArmFist.SetActive(!cup);
+            if (m_ArmCup.activeSelf != cup) m_ArmCup.SetActive(cup);
+            bool torch = ViewFlashlight != null && ViewFlashlight.activeSelf;
+            if (m_ArmTorch != null && m_ArmTorch.activeSelf != torch) m_ArmTorch.SetActive(torch);
+        }
 
         /// <summary>
         /// What the body is busy with (the owner decides and replicates it; <see cref="HumanRig"/> plays a take for it): on a
@@ -160,7 +229,7 @@ namespace Stealth.Player
         /// reviving a teammate, anything held with E).
         /// </summary>
         public BodyPose Pose { get; private set; }
-        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil;
+        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil, m_RungCarry;
         Vector4 m_HoldWas;
 
         void UpdateBodyPose()
@@ -171,6 +240,9 @@ namespace Stealth.Player
             m_LastPoseY = y;
             m_ClimbSpeed = Pose == BodyPose.Ladder ? Mathf.Lerp(m_ClimbSpeed, climb, 1f - Mathf.Exp(-12f * dt)) : 0f;
             if (!IsOwner) return;
+            // a rung of a ladder is heard by the robots (the same rungs the others hear: AudioDirector)
+            if (Pose != BodyPose.Ladder) m_RungCarry = 0f;
+            else if (Audio.AudioRules.Rungs(ref m_RungCarry, climb * dt) > 0 && IsSpawned && Tuning.Player.Noise.LadderRadius > 0f) EmitNoise(Tuning.Player.Noise.LadderRadius);
             var hold = new Vector4(HackTarget != null ? HackProgress : 0f, DoorTarget != null ? DoorProgress : 0f,
                 UseTarget != null ? UseProgress : 0f, ReviveTarget != null ? ReviveProgress : 0f);
             if (HumanMath.Growing(hold.x, m_HoldWas.x) || HumanMath.Growing(hold.y, m_HoldWas.y) || HumanMath.Growing(hold.z, m_HoldWas.z)
@@ -193,7 +265,7 @@ namespace Stealth.Player
             m_BodyShown = shown;
             var mode = shown ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             foreach (var r in BodyRenderers) if (r != null) r.shadowCastingMode = mode;
-            if (m_Rig != null) foreach (var r in m_Rig.GetComponentsInChildren<Renderer>(true)) r.shadowCastingMode = OwnShadow(r, shown);
+            UpdateOwnLook();
         }
 
         Transform m_LegL, m_LegR;

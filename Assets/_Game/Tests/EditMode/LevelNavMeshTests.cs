@@ -17,6 +17,7 @@ namespace Stealth.Tests
         // one shared house, built and baked once for the fixture: every test only asks the navmesh
         readonly int Seed, Level;
         LevelLayout m_Layout;
+        bool m_VaultShut;
 
         public LevelNavMeshTests(int seed, int level)
         {
@@ -30,7 +31,33 @@ namespace Stealth.Tests
             var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
             Assert.IsNotNull(art, "run Stealth/Build Prototype Assets first");
             m_Layout = TestHouses.Get(Seed, Level);
-            ActiveLevel.Load(m_Layout, art).GetComponent<NavMeshSurface>().BuildNavMesh(); // configured in the LevelRoot prefab
+            if (m_Layout.VaultRoom >= 0)
+            {
+                // the house as the robots have it: the vault shut
+                ActiveLevel.Load(m_Layout, art).GetComponent<NavMeshSurface>().BuildNavMesh();
+                m_VaultShut = !Reach(m_Layout.HatchPosition, m_Layout.Plan.Rooms[m_Layout.VaultRoom].Center, NavMesh.AllAreas);
+                ActiveLevel.Clear();
+                NavMesh.RemoveAllNavMeshData();
+            }
+            var root = ActiveLevel.Load(m_Layout, art);
+            Vault(open: true); // (as a player leaves it: everything past it can be walked to)
+            root.GetComponent<NavMeshSurface>().BuildNavMesh(); // configured in the LevelRoot prefab
+        }
+
+        /// <summary>The vault's barrier to robots, off (a player has opened it) or on.</summary>
+        static void Vault(bool open)
+        {
+            foreach (var door in Object.FindObjectsByType<AutoDoor>())
+                if (door.Barrier != null) door.Barrier.enabled = !open;
+        }
+
+        [Test]
+        public void TheShutVaultIsOutOfTheRobotsReach()
+        {
+            if (m_Layout.VaultRoom < 0) Assert.Pass("no vault in this house");
+            var vault = m_Layout.Plan.Rooms[m_Layout.VaultRoom].Center;
+            Assert.IsTrue(Reach(m_Layout.HatchPosition, vault, NavMesh.AllAreas), "open: walked into");
+            Assert.IsTrue(m_VaultShut, "shut: no way in");
         }
 
         [OneTimeTearDown]

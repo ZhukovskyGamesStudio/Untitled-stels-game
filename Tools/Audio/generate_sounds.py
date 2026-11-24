@@ -16,6 +16,9 @@ import wave
 import numpy as np
 from scipy import signal
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from recorded import REPLACED  # noqa: E402  (made from recordings: rendered here for the noise stream, not written)
+
 SR = 44100
 rng = np.random.default_rng(1337)
 
@@ -138,6 +141,8 @@ def loop(render, length):
 
 
 def write(path, x, peak=0.9):
+    if "/".join(os.path.splitext(path)[0].replace("\\", "/").split("/")[-2:]) in REPLACED:
+        return  # a recording's (recorded.py)
     x = norm(np.asarray(x, dtype=np.float64), peak)
     data = (np.clip(x, -1, 1) * 32767).astype(np.int16)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -687,6 +692,32 @@ def work_screw():
     return fade(mix(at(click(1600), 0.0, d), at(click(1700), 0.045, d), at(click(1550), 0.09, d), at(squeak, 0.12, d)))
 
 
+def work_unit():
+    """Working at the robots' electronic lock: a relay's dry click, a probe scratching along the board, the coil's short hum."""
+    rnd = np.random.default_rng(0x10C1)                     # its own stream: the other sounds stay as they are
+    d = 0.3
+    def tick(f, n=0.02):
+        return bandpass(rnd.standard_normal(int(n * SR)), f, f * 2.0) * env(int(n * SR), 0.0004, 0.006, curve=6)
+    scratch = bandpass(rnd.standard_normal(int(0.11 * SR)), 2600, 6200) * env(int(0.11 * SR), 0.02, 0.07) * 0.16
+    hum = lowpass(np.sign(sine(100, 0.16)), 700) * env(int(0.16 * SR), 0.01, 0.12) * 0.10
+    return fade(mix(at(tick(1500), 0.0, d), at(tick(950) * 0.7, 0.018, d), at(hum, 0.02, d), at(scratch, 0.12, d), at(tick(3100) * 0.5, 0.24, d)))
+
+
+def unlock_unit():
+    """The robots' electronic lock gives up: the coil lets go, a motor draws the bolt back and it stops against its end."""
+    rnd = np.random.default_rng(0x10C2)
+    d = 0.75
+    def hit(n, hi, g):
+        return lowpass(rnd.standard_normal(int(n * SR)), hi) * env(int(n * SR), 0.0006, n * 0.4, curve=5) * g
+    clack = mix(hit(0.05, 2600, 0.8), at(hit(0.04, 900, 0.9), 0.0, 0.05))
+    n = int(0.34 * SR)
+    pitch = np.cumsum(np.linspace(210, 265, n)) / SR
+    motor = (signal.sawtooth(2 * np.pi * pitch) * 0.5 + rnd.standard_normal(n) * 0.35)
+    motor = bandpass(motor, 300, 2600) * env(n, 0.03, 0.25) * 0.28
+    stop = mix(hit(0.14, 420, 1.0), at(hit(0.03, 3800, 0.35), 0.0, 0.14))
+    return fade(mix(at(clack, 0.0, d), at(motor, 0.09, d), at(stop, 0.43, d)))
+
+
 def grind():
     """The car's shredder biting into a thing: a crunch of breaking, metal scraping on metal, a whine of the blades."""
     rnd = np.random.default_rng(0x6A1D)                     # its own stream: the other sounds stay as they are
@@ -1008,6 +1039,8 @@ def main():
     write(P("Items", "work_screw"), work_screw(), 0.6)
     write(P("Environment", "door_open"), door_open(), 0.6)
     write(P("Environment", "door_shut"), door_shut(), 0.7)
+    write(P("Items", "work_unit"), work_unit(), 0.55)
+    write(P("Items", "unlock_unit"), unlock_unit(), 0.75)
     write(P("Car", "grind"), grind(), 0.8)  # (last, with its own stream: the sounds above keep theirs)
 
 

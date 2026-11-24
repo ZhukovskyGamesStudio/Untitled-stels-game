@@ -70,9 +70,6 @@ namespace Stealth.Level
         /// <summary>The street door's kind, or null: the glass leaves.</summary>
         public virtual DoorKind? StreetDoor => null;
 
-        /// <summary>The style's geometry dressed for this house (the style's own where the location has no look of its own).</summary>
-        public virtual StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => g;
-
         /// <summary>The location's unique feature as a piece of furniture (<see cref="HouseFeatures.PointOfInterest"/>), or none.</summary>
         public abstract PropKind? PointOfInterest { get; }
 
@@ -145,7 +142,6 @@ namespace Stealth.Level
             return DoorKind.Clinic;
         }
 
-        public override StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => ClinicLook.For(g, kit, l);
     }
 
     sealed class GarageRules : HouseRules
@@ -176,7 +172,6 @@ namespace Stealth.Level
         public override DoorKind InnerDoor(LevelLayout l, Doorway d, PlanRoom a, PlanRoom b) =>
             Either(a, b, t => t is RoomType.Workshop or RoomType.PaintBooth or RoomType.Storage) ? DoorKind.Steel : DoorKind.Wood;
 
-        public override StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => ShopLook.For(g, kit, l);
     }
 
     sealed class ApartmentRules : HouseRules
@@ -206,7 +201,6 @@ namespace Stealth.Level
             return DoorKind.Wood;
         }
 
-        public override StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => HomeLook.For(g, kit, l);
 
         // the block's floors above the ground are one typical floor: the robots take a room down below
         public override bool ChargingRoomOn(PlanRoom r) => r.Floor == 0;
@@ -240,6 +234,5 @@ namespace Stealth.Level
             return DoorKind.Steel;
         }
 
-        public override StyleGeometry Look(StyleGeometry g, StyleKit kit, LevelLayout l) => DerelictLook.For(g, kit, l);
     }
 }

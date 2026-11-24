@@ -140,6 +140,9 @@ namespace Stealth.Tests
             me.Bind(new FakePlayerLink(), 1, false, true);
             plate.Spawned(new FakeDetectorLink(), 9, isServer: true);
             me.OnHackRequest(plate);
+            Assert.IsFalse(plate.IsHacked, "a sensor is hacked by hand only with the keyboard in it");
+            Assert.IsTrue(m_Player.GetComponent<PlayerInventory>().GiveToHandServer(ItemCatalog.Keyboard, 0));
+            me.OnHackRequest(plate);
             Assert.IsTrue(plate.IsHacked);
             Assert.AreEqual(SecurityPalette.Off, plate.Status.Current, "a plate senses with neither eyes nor ears: nothing glows on it");
         }

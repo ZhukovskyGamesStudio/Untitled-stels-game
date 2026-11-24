@@ -95,6 +95,15 @@ namespace Stealth.Tests
             Assert.AreEqual(10f * s.FinderBehind, GearRules.FinderReading(10f, -1f, s), 1e-3f);
             Assert.IsTrue(GearRules.FinderLit(0.01f, 1f));
             Assert.IsFalse(GearRules.FinderLit(0.5f, 1f));
+            // the glass comes up and dies away softly, dark again before the next flash, and does not bloom much
+            foreach (float period in new[] { s.FinderFastPeriod, s.FinderSlowPeriod })
+            {
+                float top = 0f;
+                for (float t = 0f; t < period; t += 0.002f) top = Mathf.Max(top, GearRules.FinderGlass(t, period));
+                Assert.Greater(top, 0.9f);
+                Assert.Less(GearRules.FinderGlass(period - 1e-3f, period), 0.05f);
+            }
+            Assert.LessOrEqual(s.FinderGlow, 1.3f, "before the eyes: no halo");
         }
 
         [Test]

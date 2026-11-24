@@ -100,7 +100,9 @@ namespace Stealth.Level
             bool open = World.IsOpened(Key);
             // (decided the first time it opens: by then the house round it is built)
             if (Exit && !m_Hinged && open && m_Open.Value <= 0f) { m_Hinged = true; HingeAgainstWall(); }
-            if (m_Open.Step(open, Time.deltaTime, SwingTime) != OpenMove.None) DoorSounds.Play(DoorSound.Heavy, transform.position, open);
+            var move = m_Open.Step(open, Time.deltaTime, SwingTime);
+            if (move == OpenMove.StartedOpening) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.HatchOpen : null, transform.position, 0.8f, Audio.Sfx.Group.Items);
+            else if (move == OpenMove.StartedShutting) DoorSounds.Play(DoorSound.Heavy, transform.position, false);
             Lid.localRotation = m_LidBase * Quaternion.Euler(m_Open.Smooth * m_OpenAngle, 0f, 0f);
             if (LidCollider != null) LidCollider.enabled = m_Open.Value < 0.1f;
             if (Link != null && Link.activated != open) Link.activated = open;
