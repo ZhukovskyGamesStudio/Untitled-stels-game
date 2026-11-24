@@ -75,6 +75,44 @@ namespace Stealth.Vehicles
 
         public bool Busy => m_Pile.Count > 0;
 
+        /// <summary>How far a thing going into the mouth leans off upright at most, degrees.</summary>
+        public const float MaxTilt = 12f;
+
+        /// <summary>
+        /// How a thing of <paramref name="size"/> (its box in its own axes) goes into the mouth: its smallest face down —
+        /// its longest side upright, as anyone would feed a long thing in (a shovel handle or blade first, never across) —
+        /// which end first, its turn about the upright and a lean of up to <see cref="MaxTilt"/> by <paramref name="seed"/>.
+        /// </summary>
+        public static Quaternion FeedTurn(Vector3 size, int seed)
+        {
+            // the longest side's axis to the upright
+            int longest = size.x >= size.y && size.x >= size.z ? 0 : size.y >= size.z ? 1 : 2;
+            var axis = longest == 0 ? Vector3.right : longest == 1 ? Vector3.up : Vector3.forward;
+            var upright = Quaternion.FromToRotation(axis, Vector3.up);
+            uint h = Hash((uint)seed);
+            if ((h & 1u) != 0u) upright = Quaternion.AngleAxis(180f, Vector3.forward) * upright; // the other end first
+            float yaw = (h >> 1 & 0x3FF) / 1024f * 360f;
+            float lean = (h >> 11 & 0x3FF) / 1023f * MaxTilt;
+            float leanTo = (h >> 21 & 0x3FF) / 1024f * 360f;
+            var tilt = Quaternion.AngleAxis(lean, Quaternion.AngleAxis(leanTo, Vector3.up) * Vector3.right);
+            return tilt * Quaternion.AngleAxis(yaw, Vector3.up) * upright;
+        }
+
+        /// <summary>Half the height of a box of <paramref name="size"/> turned by <paramref name="turn"/> (from its centre to its lowest point).</summary>
+        public static float HalfHeight(Quaternion turn, Vector3 size)
+        {
+            var x = turn * Vector3.right;
+            var y = turn * Vector3.up;
+            var z = turn * Vector3.forward;
+            return 0.5f * (Mathf.Abs(x.y) * size.x + Mathf.Abs(y.y) * size.y + Mathf.Abs(z.y) * size.z);
+        }
+
+        static uint Hash(uint x)
+        {
+            x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16;
+            return x;
+        }
+
         public void Clear()
         {
             System.Array.Clear(m_LaneFree, 0, Lanes);

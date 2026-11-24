@@ -12,7 +12,9 @@ namespace Stealth.Vehicles
     /// are grabbed by the shafts (up to <see cref="Shredder.Lanes"/> at once): they shudder, tip over and are pulled down
     /// into the funnel while chips of their colour fly up, and the heap settles down onto the shafts as they free up. A
     /// crunch as the shafts take a thing, a burst of fragments and a gulp when it is gone and its fuel is in the tank; the
-    /// shafts spin fast meanwhile (<see cref="Car.Grinding"/>).
+    /// shafts spin fast meanwhile (<see cref="Car.Grinding"/>). Each thing goes in smallest face down — its longest side
+    /// upright, leaning a little (<see cref="Shredder.FeedTurn"/>, by its box measured off its own model) — and the shafts
+    /// pull it down end first, its whole length into the funnel.
     /// </summary>
     public class CarShredder : MonoBehaviour
     {
@@ -35,8 +37,10 @@ namespace Stealth.Vehicles
             public CargoPiece Piece;
             public byte Shape, Color;
             public double Start;
-            public Vector3 Pos;          // mouth-local, eased towards its place
-            public Quaternion Spin;      // its tumble on the heap
+            public Vector3 Pos;          // mouth-local, eased towards its place (of its box's centre)
+            public Quaternion Spin;      // how it goes in: smallest face down (Shredder.FeedTurn)
+            public Vector3 Centre;       // its box's centre in its own axes (the model's origin is not always there)
+            public float Half, Height;   // half its height as it goes in, and its whole height
             public bool Taken;           // the shafts have it (crunch played)
             public Color Tint;
         }
@@ -73,12 +77,12 @@ namespace Stealth.Vehicles
                         s.Taken = true;
                         Sfx.At(Sfx.Bank?.Grind, Mouth.position, 0.9f, Sfx.Group.Items, 0.9f + 0.05f * (lane % 3));
                     }
-                    // grabbed by the teeth: it shudders, tips over towards the shafts and is pulled down out of sight
+                    // grabbed by the teeth: it shudders and is pulled down end first, its whole length out of sight
                     var spot = LaneSpots[lane++ % LaneSpots.Length];
                     float pull = Mathf.SmoothStep(0f, 1f, progress);
                     var shake = new Vector3(Mathf.Sin(Time.time * 47f + i), Mathf.Sin(Time.time * 61f + i * 1.7f), Mathf.Sin(Time.time * 53f + i * 2.3f)) * 0.02f * (1f - progress * 0.5f);
-                    place = spot + Vector3.down * (pull * PullDepth) + shake;
-                    turn = Quaternion.Euler(progress * 70f + Mathf.Sin(Time.time * 37f + i) * 8f, i * 67f, Mathf.Sin(Time.time * 29f + i) * 10f) * s.Spin;
+                    place = spot + Vector3.up * s.Half + Vector3.down * (pull * (PullDepth + s.Height)) + shake;
+                    turn = Quaternion.Euler(Mathf.Sin(Time.time * 37f + i) * 4f, 0f, Mathf.Sin(Time.time * 29f + i) * 4f) * s.Spin;
                     s.Pos = Vector3.Lerp(s.Pos, place, 1f - Mathf.Exp(-14f * dt));
                     s.Piece.gameObject.SetActive(progress < 0.98f);
                 }
@@ -88,14 +92,15 @@ namespace Stealth.Vehicles
                     int k = waiting++;
                     float a = k * 2.399f;                       // golden angle: spread round the mouth
                     float r = k == 0 ? 0.05f : 0.16f;
-                    place = new Vector3(Mathf.Cos(a) * r, 0.1f + 0.11f * (k / 3 + (k % 3) * 0.3f), Mathf.Sin(a) * r);
+                    // standing on its lower end (its box's centre half its height over where it rests)
+                    place = new Vector3(Mathf.Cos(a) * r, 0.1f + 0.11f * (k / 3 + (k % 3) * 0.3f) + s.Half, Mathf.Sin(a) * r);
                     turn = s.Spin;
                     // landing: from above the mouth, it falls onto the heap
                     s.Pos = Vector3.Lerp(s.Pos, place, 1f - Mathf.Exp(-9f * dt));
                     s.Piece.gameObject.SetActive(true);
                 }
-                t.position = Mouth.TransformPoint(s.Pos);
                 t.rotation = Mouth.rotation * turn;
+                t.position = Mouth.TransformPoint(s.Pos) - t.rotation * s.Centre;
             }
 
             // chips: by hand, in the colour of what is being torn
@@ -153,12 +158,16 @@ namespace Stealth.Vehicles
                 }
                 var piece = Take();
                 piece.Show(-1, new CargoItem { Shape = p.Shape, Color = p.Color }, Visuals);
-                int seed = p.Shape * 31 + p.Color * 7 + next.Count * 13;
+                // (the seed by the thing and its start: the same on every peer)
+                int seed = p.Shape * 31 + p.Color * 7 + (int)(p.Start * 1000.0 % 100000.0) * 13;
+                var box = LocalBox(piece);
+                var spin = Shredder.FeedTurn(box.size, seed);
+                float half = Shredder.HalfHeight(spin, box.size);
                 next.Add(new Shown
                 {
                     Piece = piece, Shape = p.Shape, Color = p.Color, Start = p.Start,
-                    Pos = new Vector3(0f, 0.9f + 0.15f * dropped++, 0f),
-                    Spin = Quaternion.Euler(seed * 23 % 360, seed * 67 % 360, seed * 11 % 360),
+                    Pos = new Vector3(0f, 0.9f + 0.15f * dropped++ + half, 0f),
+                    Spin = spin, Centre = box.center, Half = half, Height = 2f * half,
                     Tint = TintOf(p.Shape, p.Color),
                 });
             }
@@ -180,6 +189,30 @@ namespace Stealth.Vehicles
             }
             m_Shown.Clear();
             m_Shown.AddRange(next);
+        }
+
+        /// <summary>
+        /// The box of what a piece shows, in its own axes: its tinted mesh, or a tool's own model (the meshes that are drawn).
+        /// The shredder feeds a thing by it (<see cref="Shredder.FeedTurn"/>).
+        /// </summary>
+        static Bounds LocalBox(CargoPiece piece)
+        {
+            var toPiece = piece.transform.worldToLocalMatrix;
+            bool any = false;
+            var box = new Bounds(Vector3.zero, Vector3.one * 0.1f);
+            foreach (var f in piece.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (f.sharedMesh == null || !f.gameObject.activeInHierarchy || !f.TryGetComponent<MeshRenderer>(out var r) || !r.enabled || r.forceRenderingOff) continue;
+                var m = toPiece * f.transform.localToWorldMatrix;
+                var b = f.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var p = m.MultiplyPoint3x4(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+                    if (!any) { box = new Bounds(p, Vector3.zero); any = true; }
+                    else box.Encapsulate(p);
+                }
+            }
+            return box;
         }
 
         /// <summary>The colour its chips fly in: the loot's colour, a tool's grey.</summary>
