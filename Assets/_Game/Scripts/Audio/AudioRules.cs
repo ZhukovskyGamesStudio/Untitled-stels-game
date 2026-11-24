@@ -28,6 +28,21 @@ namespace Stealth.Audio
         public static MusicTrack ChooseMusic(bool inGame, float secondsSinceDanger, float chaseHold, bool levelMusic = true) =>
             !inGame ? MusicTrack.Menu : !levelMusic ? MusicTrack.None : secondsSinceDanger <= chaseHold ? MusicTrack.Chase : MusicTrack.Explore;
 
+        /// <summary>Rungs of a ladder are this far apart, metres: a hand and a boot sound on each.</summary>
+        public const float RungSpacing = 0.3f;
+
+        /// <summary>
+        /// Rungs passed by a climb of <paramref name="dy"/> metres, up or down: the height carried over from before is
+        /// added, what is left of a rung is kept for the next call (hanging still passes none).
+        /// </summary>
+        public static int Rungs(ref float carried, float dy, float spacing = RungSpacing)
+        {
+            carried += Mathf.Abs(dy);
+            int n = Mathf.FloorToInt(carried / spacing);
+            carried -= n * spacing;
+            return Mathf.Min(n, 3); // (a teleport is no drum roll)
+        }
+
         /// <summary>Seconds between footsteps at <paramref name="speed"/> m/s; infinity when standing.</summary>
         public static float StepInterval(float speed, float stepLength) =>
             speed < 0.6f ? float.PositiveInfinity : Mathf.Clamp(stepLength / speed, 0.18f, 0.9f);

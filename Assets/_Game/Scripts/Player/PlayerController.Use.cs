@@ -143,10 +143,13 @@ namespace Stealth.Player
             if (ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || Cracking != null || Camera == null) return;
             var storage = LookTarget.At<Items.Storage>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius, out var hit);
             if (storage == null || storage.Index < 0) return;
+            // only the very front looked at, a small drawer's too: the carcass, a glass top, the worktop offer nothing
+            // (the nearest door used to answer for them — the hand showed on what does not open)
+            int part = storage.PartUnder(Camera.transform.position, Camera.transform.forward);
+            if (part < 0) return;
             StorageTarget = storage;
-            StoragePart = storage.PartUnder(Camera.transform.position, Camera.transform.forward); // the very front looked at, a small drawer's too
-            if (StoragePart < 0) StoragePart = storage.PartOf(hit.collider, hit.point);
-            if (StoragePart < 0 || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
+            StoragePart = part;
+            if (CursorMode || !Controls.Pressed(GameAction.Interact)) return;
             Link.SendUse(UseKind.StoragePart, OpenKeys.StoragePart(storage.Index, StoragePart));
         }
 

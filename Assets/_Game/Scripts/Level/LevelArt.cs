@@ -67,6 +67,7 @@ namespace Stealth.Level
         [Tooltip("The storage room's door: steel leaves with a hazard band and a big lit sign (red: locked, green: open)")] public GameObject StorageDoor;
         [Tooltip("A light switch beside a doorway (UtilityPlan.SwitchSpots): switches its room's lamps.")]
         public GameObject LightSwitch;
+        [Tooltip("The push button inside the storage room that lets one out (ExitButton)")] public GameObject ExitButton;
         [Tooltip("A grate in a room's ceiling: the way into the crawl ducts (VentPlan).")]
         public GameObject VentGrate;
         [Tooltip("The lid over the shaft in the lobby (ShaftHatch), with the ladder's top under it (ShaftLadder).")]

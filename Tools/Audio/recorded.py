@@ -471,6 +471,47 @@ def alarm():
 
 # ---------------------------------------------------------------- the list: (group/name, recipe, peak)
 
+def ladder_rung(i):
+    """A hand and a boot on a steel rung: the bar's short ring (thinner than a grate's: higher), the glove's slap, the sole after it."""
+    bar = norm(pitch(src("metalsteps/metal_steps_%s" % ["03", "07", "14", "19"][i]), 1.22))
+    hand = norm(lp(src("rpg50/cloth%d" % (1 + i % 4)), 2600))
+    sole = norm(lp(src(KENNEY[[2, 5, 1, 6][i]]), 3200))
+    return step(mix((hand[:int(0.12 * SR)], 0, 0.35), (bar, 0.01, 0.8), (sole, 0.09, 0.45)), 0.36, 0.13)
+
+
+def tone(freq, dur, attack=0.004):
+    """A plain electronic beep (a terminal's speaker): a sine with a soft third harmonic, a quick decay."""
+    t = np.arange(int(dur * SR)) / SR
+    x = np.sin(2 * np.pi * freq * t) + 0.18 * np.sin(2 * np.pi * freq * 3 * t)
+    return x * np.minimum(1.0, t / attack) * np.exp(-t * 6.0 / dur)
+
+
+def terminal_granted():
+    """Access granted: two rising beeps and the relay that lets go."""
+    relay = norm(src("breaker/switch off", 0.43, 0.62))
+    return edges(mix((norm(tone(880, 0.13)), 0, 0.5), (norm(tone(1318, 0.22)), 0.13, 0.55), (relay, 0.34, 0.8),
+                     (norm(pitch(src("metalwood/metal_close_01"), 1.1)), 0.42, 0.4)), 0.002, 0.12)
+
+
+def terminal_hack_done():
+    """A machine taken over from the desk: a run of quick blips, a low confirming note."""
+    blips = [(norm(tone(1500 + 220 * k, 0.045)), 0.05 * k, 0.4) for k in range(4)]
+    return edges(mix(*blips, (norm(tone(520, 0.28)), 0.24, 0.6), (norm(src("breaker/switch off", 0.43, 0.55)), 0.24, 0.35)), 0.002, 0.1)
+
+
+def console_solved():
+    """One of the vault's consoles gives in: a confirming note, a heavy latch drawn back."""
+    return edges(mix((norm(tone(660, 0.2)), 0, 0.5), (norm(src("metalwood/lock_open_01")), 0.14, 0.9), (norm(lp(src("metalwood/metal_slam_01"), 1800)), 0.42, 0.55)), 0.002, 0.15)
+
+
+def vault_unlocked():
+    """The last console: three bolts drawn one after another along the door, the mechanism winding down."""
+    bolt = norm(lp(src("metalwood/metal_slam_01"), 2600))
+    run = edges(norm(lp(hp(src("loops30/machine_04", 0.0, 0.9), 120), 1800)), 0.05, 0.3)
+    return edges(mix((norm(tone(440, 0.3)), 0, 0.35), (bolt, 0.25, 0.9), (norm(pitch(bolt, 0.9)), 0.62, 0.9), (norm(pitch(bolt, 0.8)), 1.0, 1.0),
+                     (run, 0.2, 0.3), (norm(src("metalwood/metal_open_01")), 1.25, 0.6)), 0.003, 0.3)
+
+
 CLIPS = []
 for _name, _fn in (("concrete", step_concrete), ("tile", step_tile), ("wood", step_wood), ("soft", step_soft), ("carpet", step_carpet), ("metal", step_metal), ("wet", step_wet)):
     for _i in range(4):
@@ -495,6 +536,10 @@ CLIPS += [
     ("Items/safe_tick", safe_tick, 0.45), ("Items/clank", clank, 0.85), ("Items/latch", latch, 0.6), ("Items/terminal_key", terminal_key, 0.5),
     ("Items/pickup", pickup, 0.55), ("Items/drop", drop, 0.65), ("Items/stash", stash, 0.55),
     ("Items/heal", heal, 0.6), ("Items/bandage", bandage, 0.35), ("Items/drink", drink, 0.55), ("Items/craft", craft, 0.75), ("Items/stun_blast", stun_blast, 0.9),
+    ("Player/ladder_rung_0", lambda: ladder_rung(0), None), ("Player/ladder_rung_1", lambda: ladder_rung(1), None),
+    ("Player/ladder_rung_2", lambda: ladder_rung(2), None), ("Player/ladder_rung_3", lambda: ladder_rung(3), None),
+    ("Items/terminal_granted", terminal_granted, 0.7), ("Items/terminal_hack_done", terminal_hack_done, 0.65),
+    ("Items/console_solved", console_solved, 0.75), ("Items/vault_unlocked", vault_unlocked, 0.9),
     ("Robots/robot_hacked", robot_hacked, 0.8), ("Robots/guard_patrol", guard_patrol, 0.55), ("Robots/guard_chase", guard_chase, 0.65),
 ]
 

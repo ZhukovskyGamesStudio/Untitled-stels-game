@@ -103,6 +103,14 @@ namespace Stealth.EditorTools
             VisualStyles.Reflect(profile, style.Grade.Reflections);
             // BOUNCE=0: without the bounced light, to set the two side by side
             VisualStyles.Bounce(float.TryParse(System.Environment.GetEnvironmentVariable("BOUNCE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bounce) ? bounce : style.Grade.Bounce, style.Grade.BounceReach);
+            // the room's fill, as a house would give it: one room of the plan under these four lamps (FILL=0: without)
+            RoomFillField.Strength = float.TryParse(System.Environment.GetEnvironmentVariable("FILL"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float fill) ? fill : style.Grade.RoomFill;
+            var plan = new HousePlan(1, 14, 12);
+            for (int cz = 0; cz < 12; cz++) for (int cx = 0; cx < 14; cx++) plan.Set(0, cx, cz, CellKind.Room, 0);
+            plan.Rooms.Add(new PlanRoom { Id = 0, Area = 42f });
+            bool lampsOff = System.Environment.GetEnvironmentVariable("DARK") == "1";
+            // (a room this size has two ceiling lamps in the game)
+            using var field = RoomFillField.Show(plan, new[] { RoomFill.Level(lampsOff ? Color.black : warm.linear * (2f * LightMath.RoomIntensity), 42f, 1f) }, new Vector2(-3.5f, -3f));
             var volume = new GameObject("Volume").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.sharedProfile = profile;

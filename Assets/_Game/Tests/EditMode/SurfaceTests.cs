@@ -179,6 +179,9 @@ namespace Stealth.Tests
                 if (style.name == "S16_Derelict") Assert.That(style.Grade.Bounce, Is.InRange(0.3f, 2f), "the default style bounces light");
                 else Assert.AreEqual(0f, style.Grade.Bounce, $"{style.name}: a drawn style has its own shading");
                 Assert.Greater(style.Grade.BounceReach, 1f);
+                // the steady half of it: a room's own lamps fill its shadows (RoomFill)
+                if (style.name == "S16_Derelict") Assert.That(style.Grade.RoomFill, Is.InRange(0.3f, 3f), "the default style fills a lit room's shadows");
+                else Assert.AreEqual(0f, style.Grade.RoomFill, $"{style.name}: a drawn style has its own shading");
             }
             // (a dark room stays black with it: Stealth → Surface Room Pictures with DARK=1 prints the brightest pixel — 0)
         }

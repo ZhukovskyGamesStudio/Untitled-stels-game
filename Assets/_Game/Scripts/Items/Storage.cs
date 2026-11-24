@@ -176,22 +176,6 @@ namespace Stealth.Items
             return b;
         }
 
-        /// <summary>The part a collider belongs to; the carcass itself gives the part closest to <paramref name="point"/>.</summary>
-        public int PartOf(Collider c, Vector3 point)
-        {
-            for (int i = 0; i < m_Parts.Count; i++)
-                foreach (var pc in m_Parts[i].Colliders)
-                    if (pc == c) return i;
-            int best = -1;
-            float bestD = float.MaxValue;
-            for (int i = 0; i < m_Parts.Count; i++)
-            {
-                float d = (m_Parts[i].Closed.ClosestPoint(point) - point).sqrMagnitude;
-                if (d < bestD) { best = i; bestD = d; }
-            }
-            return best;
-        }
-
         /// <summary>
         /// The part under the crosshair (a ray of the view): the one whose front — where it stands now — the ray meets first,
         /// however small it is and whatever the thin cast that found the piece touched beside it; −1 when it meets none.
@@ -204,7 +188,8 @@ namespace Stealth.Items
             for (int i = 0; i < m_Parts.Count; i++)
             {
                 var b = WorldBounds(m_Parts[i].T);
-                b.Expand(0.015f);
+                // a little room round every front, more round a small one (a pencil drawer is hard to point at)
+                b.Expand(Mathf.Min(b.size.x, b.size.y) < 0.2f || Mathf.Max(b.size.x, b.size.z) < 0.3f ? 0.03f : 0.015f);
                 if (!b.IntersectRay(ray, out float d) || d >= nearest) continue;
                 nearest = d;
                 best = i;

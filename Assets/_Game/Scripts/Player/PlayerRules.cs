@@ -155,6 +155,8 @@ namespace Stealth.Player
         public float WalkRadius = 6f;
         public float SprintRadius = 13f;
         public float CrouchRadius = 2f;
+        [UnityEngine.Tooltip("How far robots hear a rung of a ladder being climbed, metres (0 = a climb is silent to them)")]
+        public float LadderRadius = 5f;
     }
 
     /// <summary>Tuning of holding E: reviving teammates and hacking robots (PlayerConfig).</summary>

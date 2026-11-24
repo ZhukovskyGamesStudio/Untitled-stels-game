@@ -174,7 +174,7 @@ namespace Stealth.Player
         /// reviving a teammate, anything held with E).
         /// </summary>
         public BodyPose Pose { get; private set; }
-        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil;
+        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil, m_RungCarry;
         Vector4 m_HoldWas;
 
         void UpdateBodyPose()
@@ -185,6 +185,9 @@ namespace Stealth.Player
             m_LastPoseY = y;
             m_ClimbSpeed = Pose == BodyPose.Ladder ? Mathf.Lerp(m_ClimbSpeed, climb, 1f - Mathf.Exp(-12f * dt)) : 0f;
             if (!IsOwner) return;
+            // a rung of a ladder is heard by the robots (the same rungs the others hear: AudioDirector)
+            if (Pose != BodyPose.Ladder) m_RungCarry = 0f;
+            else if (Audio.AudioRules.Rungs(ref m_RungCarry, climb * dt) > 0 && IsSpawned && Tuning.Player.Noise.LadderRadius > 0f) EmitNoise(Tuning.Player.Noise.LadderRadius);
             var hold = new Vector4(HackTarget != null ? HackProgress : 0f, DoorTarget != null ? DoorProgress : 0f,
                 UseTarget != null ? UseProgress : 0f, ReviveTarget != null ? ReviveProgress : 0f);
             if (HumanMath.Growing(hold.x, m_HoldWas.x) || HumanMath.Growing(hold.y, m_HoldWas.y) || HumanMath.Growing(hold.z, m_HoldWas.z)

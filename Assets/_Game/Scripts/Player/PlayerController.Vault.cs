@@ -84,7 +84,7 @@ namespace Stealth.Player
             var c = AtConsole;
             if (c == null) return;
             bool away = c.Solved || (c.transform.position - transform.position).magnitude > Items.SafeBox.Reach + 0.8f;
-            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back)) { LeaveConsole(); return; }
+            if (away) { LeaveConsole(); return; } // (Esc leaves: LeaveModeOnEscape)
             var at = c.transform.position;
             int keys = Switches != null ? Switches.Count : Sequence != null ? Sequence.Lamps : 0;
             for (int i = 0; i < keys; i++)

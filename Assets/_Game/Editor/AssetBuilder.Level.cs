@@ -1393,8 +1393,20 @@ namespace Stealth.EditorTools
             if (collider)
                 foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true))
                     if (MachineMaterial(mf.name) is null or "MachinePrint") mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh; // (a keyboard, glass, a glow: nothing to bump into)
+            // a desk's monitor and its stand: a player's body goes through them (they stood in the way into the duct over the desk)
+            if (collider && ScreensOnDesks.Contains(name))
+            {
+                var screens = model.GetComponentsInChildren<MeshCollider>(true).Where(c => c.name.StartsWith("Eye")).Cast<Collider>().ToArray();
+                if (screens.Length > 0) root.AddComponent<PassableForPlayers>().Parts = screens;
+            }
             return root;
         }
+
+        /// <summary>Desks that carry screens: the screens are <see cref="PassableForPlayers"/>.</summary>
+        static readonly HashSet<string> ScreensOnDesks = new()
+        {
+            "Desk", "StandingDesk", "SupervisorDesk", "ExecutiveDesk", "DoctorDesk", "ReceptionDesk", "NurseStationDesk", "ConsoleDesk", "WorkTable", "StudyCarrel",
+        };
 
         /// <summary>The material of a part printed or shining through a picture of its own (Tools/Blender/machines.py, keyboard.py), by how its name begins; null: none of these.</summary>
         static string MachineMaterial(string part) =>

@@ -775,8 +775,11 @@ def reception_desk(L):
     for x in (-1.0, 0, 1.0):
         P.add("Accent", [s.rcyl(.012, .05, (x, -.39, .55), axis="Y", seg=8, r=.003, bevel_seg=1)])
     P.add("Accent", L.slab((2.5, .3, .05), (0, -.33, 1.12)) + L.slab((2.3, .7, .04), (0, .02, .74)))
-    acc, glow = L.screen((.4, .3), (.4, .0, .96), "-Y")
-    P.add("Eye", glow + acc + [s.rcyl(.07, .05, (.4, .1, .78), seg=16, r=.008, bevel_seg=1)])
+    # the CRT faces whoever sits behind the desk (+Y), its hood towards the high front; only its glass is the screen (Eye:
+    # the game lays the screen's picture on every flat face of that part — the housing wore it on all sides)
+    acc, glow = L.screen((.4, .3), (.4, .1, .96), "+Y")
+    P.add("Accent", acc + [s.rcyl(.07, .05, (.4, -.05, .78), seg=16, r=.008, bevel_seg=1)])
+    P.add("Eye", glow)
     return P
 
 

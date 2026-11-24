@@ -128,7 +128,7 @@ namespace Stealth.UI
             {
                 m_HintControls = Controls.Version;
                 m_HintLoc = Loc.Version;
-                Hint.text = Loc.F("safe.hint", Loc.T("key.mouse"), Loc.T("key.lmb"), Controls.Label(GameAction.Interact), Controls.Label(GameAction.Jump));
+                Hint.text = Loc.F("safe.hint", Loc.T("key.mouse"), Loc.T("key.lmb"), Controls.Label(GameAction.Interact), Loc.T("key.esc"));
             }
         }
 

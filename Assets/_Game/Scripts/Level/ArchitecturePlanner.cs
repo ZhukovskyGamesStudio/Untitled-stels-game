@@ -352,6 +352,7 @@ namespace Stealth.Level
                         if (s < 0.5f) continue;
                         float x = rng.Range(r.Min.x + s * 0.5f, r.Max.x - s * 0.5f), z = rng.Range(r.Min.y + s * 0.5f, r.Max.y - s * 0.5f);
                         if (layout.VaultRoom >= 0 && layout.Plan.RoomAt(new Vector3(x, r.Y + 0.3f, z))?.Id == layout.VaultRoom) continue;
+                        if (OverPlate(layout, new Vector3(x, r.Y, z), s * 0.5f)) continue; // a stain over a pressure plate hid what it is
                         list.Add(new DecorPiece
                         {
                             Kind = DecorKind.FloorDecal, Variant = rng.Next(nf),
@@ -461,6 +462,15 @@ namespace Stealth.Level
                     list.Add(piece);
                 }
             }
+        }
+
+        /// <summary>A floor decal of this half size here would lie over a pressure plate.</summary>
+        static bool OverPlate(LevelLayout layout, Vector3 at, float half)
+        {
+            foreach (var spawn in layout.RobotSpawns)
+                if (spawn.Kind == RobotKind.PressurePlate && Mathf.Abs(spawn.Position.y - at.y) < 1f &&
+                    Mathf.Abs(spawn.Position.x - at.x) < half + 0.7f && Mathf.Abs(spawn.Position.z - at.z) < half + 0.7f) return true;
+            return false;
         }
 
         /// <summary>What hangs on the walls or stands tall against them, as floor plan rectangles: no poster under or behind it.</summary>

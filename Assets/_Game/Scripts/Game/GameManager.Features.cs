@@ -110,6 +110,7 @@ namespace Stealth.Game
                 case UseKind.Cage: FreeHostageServer(player, index); break;
                 case UseKind.HandDryer: RunDryerServer(player, index, thing.Point); break;
                 case UseKind.LightSwitch: if (thing is LightSwitch s) SwitchLightsServer(s.Room); break;
+                case UseKind.ExitButton: if (thing is ExitButton b) EscapeStorageServer(player, b.Door); break;
                 case UseKind.LiftCall: LiftServer(player, index, false); break;
                 case UseKind.LiftFloor: LiftServer(player, index, true); break;
                 case UseKind.VentGrille:

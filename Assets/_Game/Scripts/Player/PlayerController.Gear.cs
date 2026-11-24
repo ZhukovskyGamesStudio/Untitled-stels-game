@@ -160,5 +160,9 @@ namespace Stealth.Player
 
         /// <summary>The keyboard is in this player's hand: robots can be hacked (devices need none).</summary>
         public bool HoldsKeyboard => GetComponent<PlayerInventory>() is { } inv && inv.Holds(ItemCatalog.Keyboard);
+        /// <summary>Robots and sensors are hacked by hand only with the keyboard in it (the autopilot of the scenarios hacks as it always did).</summary>
+        public bool CanHackByHand => HoldsKeyboard || DevFlags.AutoInteract;
+        /// <summary>Looking at a robot or a sensor one cannot hack now for want of the keyboard (and it carries nothing to search it for).</summary>
+        public bool HackNeedsKeyboard => HackTarget != null && !CanHackByHand && !(HackTarget is Enemies.RobotController && HackTarget.Cargo >= 0);
     }
 }

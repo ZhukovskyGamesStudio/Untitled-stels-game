@@ -342,6 +342,25 @@ namespace Stealth.Level
                         room = l.Plan.Rooms[l.StorageRoom].Bounds;
                     }
                     door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room, DoorRules.LockOf(l.PlanKind, spec.Kind));
+                    if (storage && m_Art.ExitButton != null)
+                    {
+                        // the way out for whoever is locked in: a push button on the room's side of the wall, on the side of
+                        // the doorway that is this room's wall and has no light switch
+                        var along = Vector3.Cross(Vector3.up, inward);
+                        float clear = LevelMetrics.ClearWidth(LevelMetrics.DoorWidth);
+                        float side = 1f, best = float.MinValue;
+                        foreach (float s in new[] { 1f, -1f })
+                        {
+                            var at = ExitButton.Spot(d.position, inward, along, clear, s);
+                            float score = l.Plan.RoomAt(at + inward * 0.4f)?.Id == l.StorageRoom ? 10f : 0f;
+                            float nearest = 3f;
+                            foreach (var sw in UtilityPlan.SwitchSpots(l, Shell)) nearest = Mathf.Min(nearest, (sw.Position - at).magnitude);
+                            score += nearest;
+                            if (score > best) { best = score; side = s; }
+                        }
+                        var button = Place(m_Art.ExitButton, "ExitButton", ExitButton.Spot(d.position, inward, along, clear, side), Quaternion.LookRotation(inward));
+                        if (button.TryGetComponent<ExitButton>(out var exit)) exit.Setup(0, i);
+                    }
                     if (door.WallParts != null)
                         foreach (var part in door.WallParts)
                             if (part != null) Shell.WallParts.Add(part);

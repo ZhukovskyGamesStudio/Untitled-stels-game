@@ -273,8 +273,8 @@ def model_fume_hood():
 
 def model_printer_3d():
     """3D printer on a stand 0.7 x 0.7 x 1.6: a stand with a shelf of filament spools, a cube-frame printer (base with
-    a display, four posts, top rails, a gantry with the print head, Z rods carrying the glowing bed with a print on
-    it), a spool on a side holder feeding a filament tube to the head."""
+    a display, four posts, top rails, a gantry with the print head, Z rods and lead screws carrying the bed — a dark
+    build plate on its arms — with a print on it), a spool on a side holder feeding a filament tube to the head."""
     body = [s.rbox((0.7, 0.7, 0.04), (0, 0, 0.76), r=0.01, seg=2),
             s.rbox((0.66, 0.66, 0.025), (0, 0, 0.16), r=0.006, seg=1)]
     body += [s.rbox((0.045, 0.045, 0.745), (x, y, 0.3725), r=0.006, seg=1) for x in (-0.31, 0.31) for y in (-0.31, 0.31)]
@@ -290,7 +290,11 @@ def model_printer_3d():
     acc.append(s.rcyl(0.012, 0.03, (0.05, 0.0, 1.44), seg=10, r=0.002, radius2=0.004, bevel_seg=1))
     acc += [s.rcyl(0.006, 0.68, (x, 0.25, 1.21), seg=8, r=0.0) for x in (-0.12, 0.12)]            # Z rods
     acc.append(s.rbox((0.4, 0.03, 0.06), (0, 0.24, 1.09), r=0.006, seg=1))                        # Z carriage
-    acc += [s.rbox((0.03, 0.4, 0.025), (x, 0.04, 1.088), r=0.004, seg=1) for x in (-0.18, 0.18)]  # bed arms
+    acc += [s.rbox((0.045, 0.44, 0.03), (x, 0.03, 1.085), r=0.004, seg=1) for x in (-0.18, 0.18)]  # bed arms
+    acc.append(s.rbox((0.4, 0.045, 0.03), (0, -0.17, 1.085), r=0.004, seg=1))                     # …tied at the front
+    acc.append(s.rbox((0.46, 0.46, 0.014), (0, 0, 1.101), r=0.004, seg=1))                        # the bed: a dark textured build plate
+    acc += [s.rcyl(0.011, 0.66, (x, 0.25, 1.2), seg=10, r=0.0) for x in (-0.19, 0.19)]            # lead screws
+    acc += [s.rbox((0.05, 0.05, 0.05), (x, 0.25, 0.9), r=0.006, seg=1) for x in (-0.19, 0.19)]    # their motors on the base
     acc.append(s.rcyl(0.018, 0.02, (0.03, -0.285, 0.825), axis="Y", seg=12, r=0.004, bevel_seg=1))
     acc.append(s.rcyl(0.012, 0.11, (0.31, 0.26, 1.3), axis="X", seg=10, r=0.003, bevel_seg=1))   # spool holder
     acc.append(s.tube([(0.3, 0.22, 1.39), (0.25, 0.15, 1.585), (0.12, 0.05, 1.6), (0.05, 0.0, 1.525)], 0.005,
@@ -304,8 +308,8 @@ def model_printer_3d():
     trim.append(s.lathe([(0.0, 1.104), (0.05, 1.104), (0.06, 1.15), (0.045, 1.2), (0.035, 1.22), (0.0, 1.222)],
                         seg=16, loc=(-0.05, -0.03, 0)))
     s.part("Trim", trim)
-    s.part("Eye", [s.rbox((0.46, 0.46, 0.012), (0, 0, 1.1), r=0.004, seg=1),
-                   s.rbox((0.1, 0.01, 0.05), (-0.12, -0.28, 0.825), r=0.002, seg=1)])
+    # only the display on the base glows (the bed was in this part too: a sheet of blue light in mid-air)
+    s.part("Eye", [s.rbox((0.1, 0.01, 0.05), (-0.12, -0.28, 0.825), r=0.002, seg=1)])
     return export("printer_3d")
 
 

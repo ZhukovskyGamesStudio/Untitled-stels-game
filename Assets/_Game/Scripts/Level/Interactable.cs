@@ -9,7 +9,7 @@ namespace Stealth.Level
     /// are not <see cref="Interactable"/>s: a locked door's lock (index: the door), a safe's dial (the prop), a storage part
     /// (<see cref="OpenKeys.StoragePart"/>: the prop and its part).
     /// </summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, Door }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, Door, ExitButton }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the

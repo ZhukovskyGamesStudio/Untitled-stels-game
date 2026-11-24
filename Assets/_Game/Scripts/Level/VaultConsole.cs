@@ -45,6 +45,18 @@ namespace Stealth.Level
                     if (Faces[i] != null && Faces[i].activeSelf != (i == (int)Game)) Faces[i].SetActive(i == (int)Game);
             int state = Solved ? 1 : 0;
             if (state == m_Shown || Screen == null) return;
+            if (m_Shown == 0 && state == 1)
+            {
+                // solved just now (not on the first look at a house already played): its latch — and, if it was the last
+                // one, the vault's bolts drawn at the door
+                var bank = Audio.Sfx.Bank;
+                Audio.Sfx.At(bank == null ? null : bank.ConsoleSolved, Point, 1f, Audio.Sfx.Group.Items);
+                bool all = true;
+                foreach (var other in All) if (other is VaultConsole console && !console.Solved) all = false;
+                if (all)
+                    foreach (var door in AutoDoor.All)
+                        if (door.Vault) Audio.Sfx.At(bank == null ? null : bank.VaultUnlocked, door.transform.position + Vector3.up * 1.2f, 1f, Audio.Sfx.Group.Items);
+            }
             m_Shown = state;
             m_Block ??= new MaterialPropertyBlock();
             var c = state == 1 ? Open : Locked;

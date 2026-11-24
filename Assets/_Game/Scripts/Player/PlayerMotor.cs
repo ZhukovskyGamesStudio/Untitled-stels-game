@@ -126,6 +126,10 @@ namespace Stealth.Player
 
         void Awake() => m_Controller = GetComponent<CharacterController>();
 
+        // (desk monitors and the like: a body goes through them, PassableForPlayers)
+        void OnEnable() => Stealth.Level.PassableForPlayers.Register(m_Controller != null ? m_Controller : GetComponent<CharacterController>());
+        void OnDisable() => Stealth.Level.PassableForPlayers.Unregister(m_Controller);
+
         public void SetPitch(float pitch) => m_Pitch = pitch;
 
         /// <summary>Knockback: applied as velocity, horizontal part decays through normal deceleration.</summary>

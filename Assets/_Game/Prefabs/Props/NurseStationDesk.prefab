@@ -159,6 +159,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5286783896934676373}
+  - component: {fileID: 356725231863042609}
   m_Layer: 0
   m_Name: NurseStationDesk
   m_TagString: Untagged
@@ -182,6 +183,20 @@ Transform:
   - {fileID: 360764083680336239}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &356725231863042609
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2847647420334839414}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6972de79adb2b74c9eb538a23c8c772, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Level.PassableForPlayers
+  Parts:
+  - {fileID: 3667588858260213127}
 --- !u!1 &2978127169553007833
 GameObject:
   m_ObjectHideFlags: 0

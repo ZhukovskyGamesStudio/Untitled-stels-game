@@ -574,6 +574,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2796519083162196534}
+  - component: {fileID: 9215150752891737752}
   - component: {fileID: 888178455824673418}
   m_Layer: 0
   m_Name: ExecutiveDesk
@@ -598,6 +599,20 @@ Transform:
   - {fileID: 5830863043898157386}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9215150752891737752
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6460183028511198914}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6972de79adb2b74c9eb538a23c8c772, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Level.PassableForPlayers
+  Parts:
+  - {fileID: 4100962390926211086}
 --- !u!114 &888178455824673418
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -610,6 +625,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b186c430b5f9c94fb676d1e6f55f422, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Stealth.Game::Stealth.Items.Storage
+  Individual: 0
 --- !u!1 &6639243768468164983
 GameObject:
   m_ObjectHideFlags: 0

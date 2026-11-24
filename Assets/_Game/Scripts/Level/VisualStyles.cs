@@ -611,6 +611,7 @@ namespace Stealth.Level
 
             Reflect(s_Profile, g.Reflections);
             Bounce(g.Bounce, g.BounceReach);
+            RoomFillField.Strength = g.RoomFill;
 
             s_Volume.sharedProfile = s_Profile;
         }

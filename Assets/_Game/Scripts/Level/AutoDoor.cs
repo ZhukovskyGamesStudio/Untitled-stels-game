@@ -267,7 +267,8 @@ namespace Stealth.Level
             => ReachSearch.Nearest(All, player, player, reach, aim);
 
         // from outside the storage room's door: its terminal
-        bool IReachTarget.CanReach(Vector3 player) => Locked && !NeedsKey && (!Storage || IsInside(transform.position, Inward, player));
+        // (the storage room's door is no lock to work on: its terminal outside, its exit button inside)
+        bool IReachTarget.CanReach(Vector3 player) => Locked && !NeedsKey && !Storage;
         (Vector3, Vector3, float) IReachTarget.AimSpan => (transform.position + Vector3.up * 0.2f, transform.position + Vector3.up * 2.1f, 0.6f);
         Vector3 IReachTarget.ReachPoint => transform.position + Vector3.up * ReachSearch.Middle;
         float IReachTarget.MaxReach => float.PositiveInfinity;

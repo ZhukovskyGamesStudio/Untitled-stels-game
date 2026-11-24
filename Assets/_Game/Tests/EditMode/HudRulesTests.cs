@@ -191,7 +191,15 @@ namespace Stealth.Tests
             var t = new PromptContext { AtTerminal = true, SittingKind = TerminalKind.Cameras };
             var keys = Hints(t).Select(h => h.Key).ToList();
             CollectionAssert.Contains(keys, Controls.Get(GameAction.Mark), "cameras: mark a robot");
-            CollectionAssert.Contains(keys, Controls.Get(GameAction.Jump), "and stand up");
+            CollectionAssert.Contains(keys, Controls.Get(GameAction.Interact), "and stand up: the use key again");
+            // (a tap of it; a hold is the hacking terminal's hack)
+            Assert.IsTrue(TerminalRules.IsTap(0.1f));
+            Assert.IsFalse(TerminalRules.IsTap(0f), "the key was not down");
+            Assert.IsFalse(TerminalRules.IsTap(-1f), "that press sat us down, or hacked");
+            Assert.IsFalse(TerminalRules.IsTap(TerminalRules.Tap + 0.2f), "a hold");
+            var keyless = new PromptContext { CanHack = true, NeedsKeyboard = true };
+            Assert.AreEqual(ReticleIcon.Hack, ReticleRules.Choose(keyless).Icon);
+            Assert.IsFalse(ReticleRules.Choose(keyless).Available, "robots and sensors: not without the keyboard");
         }
 
         [Test]

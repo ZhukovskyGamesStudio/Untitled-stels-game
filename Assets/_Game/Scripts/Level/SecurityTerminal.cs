@@ -66,7 +66,39 @@ namespace Stealth.Level
             Show();
         }
 
-        void Update() => Show();
+        void Update()
+        {
+            Show();
+            Sound();
+        }
+
+        int m_Charges = -1, m_Open = -1;
+
+        /// <summary>What a terminal says when its work is done (every peer, from the replicated state; not on the first look at it).</summary>
+        void Sound()
+        {
+            if (Index < 0) return;
+            var bank = Audio.Sfx.Bank;
+            var at = transform.position + Vector3.up * 1.1f;
+            if (Kind == TerminalKind.Hacking)
+            {
+                int charges = Charges;
+                if (m_Charges >= 0 && charges < m_Charges) Audio.Sfx.At(bank == null ? null : bank.TerminalHackDone, at, 0.9f, Audio.Sfx.Group.Items);
+                m_Charges = charges;
+            }
+            else if (Kind == TerminalKind.Doors)
+            {
+                int open = Spent ? 1 : 0;
+                if (m_Open == 0 && open == 1)
+                {
+                    Audio.Sfx.At(bank == null ? null : bank.TerminalGranted, at, 1f, Audio.Sfx.Group.Items);
+                    // …and the door itself, rooms away: its bolts
+                    var door = AutoDoor.StorageDoor;
+                    if (door != null) Audio.Sfx.At(bank == null ? null : bank.UnlockUnit, door.transform.position + Vector3.up * 1.2f, 1f, Audio.Sfx.Group.Items, 0.8f);
+                }
+                m_Open = open;
+            }
+        }
 
         void Show()
         {

@@ -18,6 +18,8 @@ namespace Stealth.UI
         public bool CanHack;
         /// <summary>The hack target is a robot and no keyboard is in the hand: E only searches it (what it carries falls off).</summary>
         public bool SearchOnly;
+        /// <summary>The robot or sensor looked at is hacked only with the keyboard in the hand, and it is not there.</summary>
+        public bool NeedsKeyboard;
         public float HackProgress;
         public bool Playing, NearHatch;
         /// <summary>The hatch in reach is the exit (the way down), not the entry.</summary>
@@ -194,6 +196,7 @@ namespace Stealth.UI
             if (c.MenuOpen || c.CursorMode || c.Downed || c.Cracking || c.AtTerminal || c.InHatch) return Reticle.Hidden;
             if (c.Driving || c.Passenger) return new Reticle(ReticleIcon.Dot);
             if (c.CanRevive) return new Reticle(ReticleIcon.Revive, true, c.ReviveProgress);
+            if (c.CanHack && c.NeedsKeyboard) return new Reticle(ReticleIcon.Hack, false); // dim: not with these hands
             if (c.CanHack) return new Reticle(c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
             if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
             if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
@@ -218,6 +221,7 @@ namespace Stealth.UI
             Level.UseKind.Cage => ReticleIcon.Key,
             Level.UseKind.HandDryer => ReticleIcon.Hand,
             Level.UseKind.LightSwitch => ReticleIcon.Hand,
+            Level.UseKind.ExitButton => ReticleIcon.Hand,
             Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
             Level.UseKind.VentGrille => ReticleIcon.Vent,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
@@ -256,7 +260,7 @@ namespace Stealth.UI
             if (c.AtTerminal)
             {
                 bool cams = c.SittingKind == Level.TerminalKind.Cameras;
-                into.Add(new Hint(K(GameAction.Jump), Loc.T("hint.leave")));
+                into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.leave"))); // (a tap; Esc too)
                 if (c.SittingKind == Level.TerminalKind.Map)
                 {
                     into.Add(new Hint(Wheel, Loc.T("hint.map.floor"))); // (A / D and the mouse buttons too)
@@ -264,7 +268,7 @@ namespace Stealth.UI
                 }
                 into.Add(new Hint(Lmb, Rmb, Loc.T(cams ? "hint.terminal.next_camera" : "hint.terminal.next_target")));
                 if (cams) into.Add(new Hint(K(GameAction.Mark), Loc.T("hint.mark")));
-                else if (c.SittingCanHack) into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.hack")));
+                else if (c.SittingCanHack) into.Add(new Hint(K(GameAction.Interact), Loc.T("hint.hack_hold")));
                 return into;
             }
             if (c.Driving || c.Passenger)
@@ -305,6 +309,7 @@ namespace Stealth.UI
             var e = K(GameAction.Interact);
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
+            if (c.CanHack && c.NeedsKeyboard) return new Hint(e, Loc.T("hint.need_keyboard"), true);
             if (c.CanHack) return new Hint(e, Loc.T(c.SearchOnly ? "hint.search" : "hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T(c.LockedByUnit ? "hint.hack" : "hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));

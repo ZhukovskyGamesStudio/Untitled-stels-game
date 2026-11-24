@@ -291,9 +291,17 @@ namespace Stealth.Enemies
         /// <summary>It hears: its ear lamps glow (yellow when calm).</summary>
         public virtual bool GlowEars => false;
 
+        /// <summary>
+        /// A device that neither sees nor hears still shows its state — armed, hacked, tripped — by a faint line of its
+        /// status colour on its glowing parts (this share of the colour: well under a glow, no light cast); 0 — nothing.
+        /// </summary>
+        public virtual float StateLine => 0f;
+
         protected void RefreshStatus()
         {
-            Status.Apply(IsHacked ? SecurityPalette.Hacked : StatusColor, !IsHacked && AtEase, GlowEyes, GlowEars);
+            var colour = IsHacked ? SecurityPalette.Hacked : StatusColor;
+            Status.Apply(colour, !IsHacked && AtEase, GlowEyes, GlowEars);
+            if (!GlowEyes && !GlowEars && StateLine > 0f) Status.Line(colour, IsHacked ? 0f : StateLine);
             OnStatusChanged();
         }
 

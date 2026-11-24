@@ -36,6 +36,14 @@ namespace Stealth.Level
         int m_Room = -1;
         bool m_Dark;
         MaterialPropertyBlock m_Block, m_GlowBlock;
+
+        /// <summary>Every ceiling lamp that stands in the world (the room fill sums them: RoomFillField).</summary>
+        public static readonly System.Collections.Generic.List<RoomLight> All = new();
+        /// <summary>What the lamp gives now, steady (linear colour × intensity; no flicker, no alarm pulse): black when off.</summary>
+        public Color Output { get; private set; }
+
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
         float m_LastGlow = -1f, m_LastSoft = -1f;
         Color m_LastColor;
 
@@ -56,6 +64,7 @@ namespace Stealth.Level
             m_LitIntensity = litIntensity;
             Flicker = flicker;
             Seed = seed;
+            Output = color.linear * intensity;
             Apply(color, intensity);
         }
 
@@ -70,6 +79,7 @@ namespace Stealth.Level
             float ownIntensity = !switched ? m_BaseIntensity : LightMath.SwitchedOn(m_Dark, true) ? m_LitIntensity : 0f;
             var color = alarm ? Color.Lerp(own, AlarmColor, 0.8f) : own;
             float baseIntensity = alarm ? Mathf.Max(ownIntensity, LightMath.AlarmIntensity) : ownIntensity; // alarm lights even dark rooms
+            Output = color.linear * (baseIntensity * (alarm ? 0.7f : 1f));
             Apply(color, baseIntensity * k * (alarm ? 0.7f + 0.3f * Mathf.Sin(Time.time * 6f) : 1f));
         }
 

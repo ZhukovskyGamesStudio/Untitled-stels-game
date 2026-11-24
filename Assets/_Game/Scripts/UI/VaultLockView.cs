@@ -96,7 +96,7 @@ namespace Stealth.UI
                 m_HintControls = Controls.Version;
                 m_HintLoc = Loc.Version;
                 m_HintKeys = count;
-                Hint.text = Loc.F("vault.hint", 1, count, Controls.Label(GameAction.Jump));
+                Hint.text = Loc.F("vault.hint", 1, count, Loc.T("key.esc"));
             }
         }
     }

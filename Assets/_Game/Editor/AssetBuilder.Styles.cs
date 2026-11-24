@@ -508,7 +508,8 @@ namespace Stealth.EditorTools
                     g.BloomIntensity = 0.3f; g.BloomThreshold = 1.2f; g.BloomScatter = 0.6f; // a little glow on what really shines, no halo over the room
                     g.Vignette = 0.2f; g.VignetteColor = C(0f, 0f, 0f);
                     g.ChromaticAberration = 0.08f; g.FilmGrain = 0.2f; g.Reflections = 1f; g.LensDistortion = 0.03f;
-                    g.Bounce = 1f; g.BounceReach = 4.5f; // lit floors and walls light what faces them (ScreenBounce)
+                    g.Bounce = 0.6f; g.BounceReach = 1.6f; // lit surfaces light what is close and faces them (ScreenBounce): the underside of a desk over a lit floor
+                    g.RoomFill = 0.6f; // and the room's own lamps fill its shadows (RoomFill): never through a wall
                     // a small fill everywhere (sRGB: about 1 % of white) — a room whose lamps are off is dark, a flashlight's
                     // job; a lit room's fill is its own lamps' (CeilingGlow: they light its ceiling and the tops of its walls)
                     s.World.Ambient = C(0.10f, 0.103f, 0.108f);

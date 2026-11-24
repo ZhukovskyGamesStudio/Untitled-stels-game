@@ -48,7 +48,7 @@ namespace Stealth.Audio
         float m_BannerMuteUntil;
         bool m_WasCursor;
 
-        class Walker { public Vector3 Pos; public float NextStep; public readonly AirState Air = new(); public bool Downed; public float NextGas; }
+        class Walker { public Vector3 Pos; public float NextStep; public float Climb; public readonly AirState Air = new(); public bool Downed; public float NextGas; }
         float m_NextHostage;
         int m_HostageSaid, m_HostageLast = -1;
         class Watched
@@ -287,6 +287,15 @@ namespace Stealth.Audio
                     }
                 }
                 // riding in the car (or on a ladder) the body moves without its feet: no steps, no jumps
+                if (p.Pose == Stealth.Player.BodyPose.Ladder)
+                {
+                    // on a ladder: a hand and a boot on every rung passed, softer on the way down
+                    // (the height climbed this frame: delta's own y is flattened above for the steps)
+                    for (int rungs = AudioRules.Rungs(ref w.Climb, vy * dt); rungs > 0; rungs--)
+                        Sfx.At(SoundBank.Any(Bank.LadderRung), pos + Vector3.up * 0.9f, volume * (vy < 0f ? 0.6f : 0.85f), Sfx.Group.Footsteps,
+                            0.94f + 0.12f * ((Time.frameCount + rungs) % 3) / 2f);
+                }
+                else w.Climb = 0f;
                 if (p.SeatIndex >= 0 || p.Pose == Stealth.Player.BodyPose.Ladder) { w.NextStep = Time.time + 0.3f; continue; }
                 switch (w.Air.Step(vy, dt, Time.time))
                 {

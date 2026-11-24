@@ -461,7 +461,7 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
+            if (HackTarget != null && !HackNeedsKeyboard && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
             {
                 Link.SendHack(HackTarget);
             }
@@ -635,10 +635,11 @@ namespace Stealth.Player
         public void OnHackRequest(IHackable target)
         {
             if (Downed || target == null || !target.CanBeHackedFrom(transform.position, HackReach + 0.5f) || !target.ReachableFrom(Hands)) return;
-            // a robot needs the keyboard in the hand; without it, one that carries something is only searched: it drops it
-            if (target is Enemies.RobotController robot && !HoldsKeyboard)
+            // every robot and sensor needs the keyboard in the hand (terminals hack for anyone); without it, a robot that
+            // carries something is only searched: it drops it
+            if (target is Enemies.Detector && !CanHackByHand)
             {
-                if (robot.Cargo >= 0) robot.SearchServer();
+                if (target is Enemies.RobotController robot && robot.Cargo >= 0) robot.SearchServer();
                 return;
             }
             if (target is Enemies.Detector d && GameManager.Instance != null) { GameManager.Instance.TeamHackServer(d); GameManager.Instance.NoteHackServer(this); }

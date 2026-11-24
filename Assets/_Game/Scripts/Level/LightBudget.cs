@@ -56,6 +56,9 @@ namespace Stealth.Level
         }
 
         static readonly List<float> s_Costs = new();
+        RoomFillField m_Fill;
+
+        void OnDestroy() => m_Fill?.Dispose();
         bool[] m_On = new bool[0];
 
         /// <summary>Right after the level is built: the very first frame must not render every lamp with shadows.</summary>
@@ -69,6 +72,7 @@ namespace Stealth.Level
         void Update()
         {
             LiveScreens.Tick(Time.time); // (the house's screens of static: this runs wherever a house stands)
+            (m_Fill ??= new RoomFillField()).Tick(Time.time); // (and the soft light its lamps leave in their rooms)
             if (Time.time >= m_NextScan) Scan();
             if (Time.time < m_NextSort) return;
             m_NextSort = Time.time + 0.2f;

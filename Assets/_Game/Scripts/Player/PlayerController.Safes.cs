@@ -70,7 +70,7 @@ namespace Stealth.Player
             var host = safe != null ? safe.transform : CrackingConsole != null ? CrackingConsole.transform : null;
             bool away = host == null || (safe != null && safe.Opened) || (CrackingConsole != null && CrackingConsole.Solved)
                         || (host.position - transform.position).magnitude > Items.SafeBox.Reach + 0.6f;
-            if (away || Controls.Pressed(GameAction.Jump) || Controls.Pressed(GameAction.Back))
+            if (away) // (Esc leaves: LeaveModeOnEscape; E tries a number here)
             {
                 StopCracking();
                 return;

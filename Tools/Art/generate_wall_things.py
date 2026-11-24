@@ -221,20 +221,78 @@ def tin_sign(i, rng):
     return img
 
 
+SKIN, SKIN_LINE, WATER, BLUE = (236, 190, 160), (170, 120, 96), (70, 160, 220), (30, 110, 170)
+
+
+def hand(d, cx, cy, r, mirror=False, colour=SKIN):
+    """A hand seen flat, fingers up: a palm, four fingers of their own lengths, a thumb to the side."""
+    k = -1 if mirror else 1
+    pw, ph = r * 0.62, r * 0.6
+    d.rounded_rectangle((cx - pw / 2, cy - ph * 0.15, cx + pw / 2, cy + ph * 0.85), radius=int(r * 0.14), fill=colour, outline=SKIN_LINE, width=2)
+    fw = pw / 4
+    for j, ln in enumerate((0.42, 0.56, 0.6, 0.5)):
+        x = cx - k * (pw / 2 - fw * (j + 0.5))
+        d.rounded_rectangle((x - fw * 0.42, cy - ph * 0.1 - r * ln, x + fw * 0.42, cy + ph * 0.1), radius=int(fw * 0.4), fill=colour, outline=SKIN_LINE, width=2)
+    tx = cx - k * (pw / 2 + r * 0.02)
+    d.polygon([(tx, cy + ph * 0.15), (tx - k * r * 0.3, cy - ph * 0.12), (tx - k * r * 0.22, cy - ph * 0.3), (tx + k * r * 0.08, cy - ph * 0.02), (tx + k * r * 0.08, cy + ph * 0.5)],
+              fill=colour, outline=SKIN_LINE)
+    d.rounded_rectangle((cx - pw / 2 + 3, cy + ph * 0.1, cx + pw / 2 - 3, cy + ph * 0.8), radius=int(r * 0.12), fill=colour)   # (the fingers' roots: one palm)
+
+
+def drop(d, x, y, r, colour=WATER):
+    d.polygon([(x, y - r * 1.5), (x - r * 0.8, y), (x + r * 0.8, y)], fill=colour)
+    d.ellipse((x - r * 0.82, y - r * 0.7, x + r * 0.82, y + r * 0.9), fill=colour)
+
+
+def bubbles(d, cx, cy, r, rng, n=9):
+    for _ in range(n):
+        x, y, b = cx + rng.uniform(-r, r), cy + rng.uniform(-r * 0.6, r * 0.6), rng.uniform(r * 0.12, r * 0.26)
+        d.ellipse((x - b, y - b, x + b, y + b), fill=(255, 255, 255), outline=(150, 200, 235), width=2)
+
+
 def health(i, rng):
+    """How to wash one's hands, in four pictures and no words (it reads in any language): wet them under the tap, soap,
+    rub the two together, dry on a towel."""
     img, d, w, h = canvas(i, (236, 244, 248))
-    d.rectangle((0, 0, w, h * 0.16), fill=(30, 110, 170))
-    d.text((w / 2, h * 0.08), "WASH YOUR HANDS", font=font("arialbd.ttf", w * 0.085), fill=(250, 250, 250), anchor="mm")
+    d.rectangle((0, 0, w, h * 0.16), fill=BLUE)
+    hand(d, w * 0.4, h * 0.095, h * 0.085, colour=(250, 250, 250))                 # the heading: a hand and water
+    for k in range(3):
+        drop(d, w * (0.56 + 0.07 * k), h * (0.1 if k != 1 else 0.075), h * 0.022, (190, 225, 250))
     for k in range(4):
-        cx, cy = w * (0.28 + 0.44 * (k % 2)), h * (0.34 + 0.3 * (k // 2))
-        r = w * 0.15
-        d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(30, 110, 170), width=5, fill=(250, 252, 252))
-        d.rounded_rectangle((cx - r * 0.45, cy - r * 0.2, cx + r * 0.45, cy + r * 0.55), radius=10, fill=(236, 190, 160))
-        for j in range(3):
-            x = cx - r * 0.3 + j * r * 0.3
-            d.polygon([(x, cy - r * 0.7), (x - 7, cy - r * 0.42), (x + 7, cy - r * 0.42)], fill=(70, 160, 220))
-        d.text((cx - r * 0.95, cy - r * 0.95), str(k + 1), font=font("arialbd.ttf", r * 0.5), fill=(30, 110, 170), anchor="mm")
-    lines(d, w * 0.12, w * 0.88, h * 0.9, 2, 14, rng)
+        cx, cy = w * (0.26 + 0.48 * (k % 2)), h * (0.4 + 0.34 * (k // 2))
+        r = w * 0.2
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=BLUE, width=5, fill=(250, 252, 252))
+        if k == 0:                                                                  # under the tap
+            d.rounded_rectangle((cx - r * 0.1, cy - r * 0.88, cx + r * 0.55, cy - r * 0.7), radius=6, fill=(150, 156, 164))
+            d.rounded_rectangle((cx - r * 0.12, cy - r * 0.88, cx + r * 0.06, cy - r * 0.52), radius=6, fill=(150, 156, 164))
+            for j in range(3):
+                drop(d, cx - r * 0.03 + (j - 1) * r * 0.16, cy - r * (0.3 - 0.12 * (j % 2)), r * 0.07)
+            hand(d, cx, cy + r * 0.38, r * 0.62)
+        elif k == 1:                                                                # soap from the bottle
+            d.rounded_rectangle((cx + r * 0.2, cy - r * 0.5, cx + r * 0.62, cy + r * 0.1), radius=8, fill=(120, 190, 150), outline=(70, 130, 100), width=2)
+            d.rectangle((cx + r * 0.36, cy - r * 0.72, cx + r * 0.46, cy - r * 0.5), fill=(90, 96, 104))
+            d.rounded_rectangle((cx + r * 0.08, cy - r * 0.8, cx + r * 0.5, cy - r * 0.7), radius=4, fill=(90, 96, 104))
+            drop(d, cx + r * 0.1, cy - r * 0.5, r * 0.08, (150, 215, 175))
+            hand(d, cx - r * 0.22, cy + r * 0.42, r * 0.6)
+            bubbles(d, cx - r * 0.22, cy + r * 0.5, r * 0.22, rng, 4)
+        elif k == 2:                                                                # the two rubbed together, in a lather
+            hand(d, cx - r * 0.2, cy + r * 0.25, r * 0.62)
+            hand(d, cx + r * 0.2, cy + r * 0.25, r * 0.62, mirror=True)
+            bubbles(d, cx, cy + r * 0.1, r * 0.55, rng, 12)
+        else:                                                                       # dried on a towel
+            d.rounded_rectangle((cx - r * 0.62, cy - r * 0.7, cx + r * 0.62, cy - r * 0.56), radius=5, fill=(150, 156, 164))
+            d.rectangle((cx - r * 0.48, cy - r * 0.62, cx + r * 0.48, cy + r * 0.2), fill=(250, 214, 120), outline=(200, 160, 70), width=2)
+            for j in range(4):
+                y = cy - r * 0.45 + j * r * 0.16
+                d.line((cx - r * 0.48, y, cx + r * 0.48, y), fill=(232, 190, 96), width=3)
+            hand(d, cx, cy + r * 0.45, r * 0.58)
+        d.ellipse((cx - r * 1.05, cy - r * 1.05, cx - r * 0.55, cy - r * 0.55), fill=BLUE)
+        d.text((cx - r * 0.8, cy - r * 0.8), str(k + 1), font=font("arialbd.ttf", r * 0.4), fill=(250, 250, 250), anchor="mm")
+    for k in range(3):                                                              # the way through: 1 → 2, 2 → 3, 3 → 4
+        if k == 1:
+            continue
+        y = h * (0.4 + 0.34 * (k // 2))
+        d.polygon([(w * 0.475, y - 9), (w * 0.525, y), (w * 0.475, y + 9)], fill=BLUE)
     return grain(img, rng, 3)
 
 

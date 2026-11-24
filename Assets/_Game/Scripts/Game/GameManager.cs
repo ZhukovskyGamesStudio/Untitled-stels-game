@@ -924,17 +924,20 @@ namespace Stealth.Game
                 // the storage room's door: from its terminal, or by hand from inside
                 bool terminal = SecurityTerminal.All.Any(t => t.Kind == TerminalKind.Doors
                     && ServerReach.WithinFlat(at, t.transform.position, SecurityTerminal.Reach) && Mathf.Abs(t.transform.position.y - at.y) < 2f);
-                if (!terminal)
-                {
-                    // by hand from inside: open for now, so the player gets out; locked again behind them (UpdateStorageDoor)
-                    if (!byHand || !AutoDoor.IsInside(d.transform.position, d.Inward, at)) return;
-                    m_EscapeSeen = Time.time;
-                    if (m_Opened.Add(OpenKeys.Escape(door))) OpenedVersion++;
-                    return;
-                }
+                if (!terminal) return; // (from inside: the exit button, EscapeStorageServer)
             }
             else if (!byHand) return;
             if (m_Opened.Add(OpenKeys.Door(door))) { OpenedVersion++; NoteServer(player, StatKind.Locks); }
+        }
+
+        /// <summary>Server: the exit button inside the storage room — the door opens for now, so who is in gets out; it locks again behind them (<see cref="UpdateStorageDoor"/>).</summary>
+        public void EscapeStorageServer(PlayerController player, int door)
+        {
+            if (Phase != RunPhase.Playing || player == null || player.Downed) return;
+            var d = AutoDoor.All.FirstOrDefault(a => a.Index == door && a.Storage);
+            if (d == null || !AutoDoor.IsInside(d.transform.position, d.Inward, player.transform.position)) return;
+            m_EscapeSeen = Time.time;
+            if (m_Opened.Add(OpenKeys.Escape(door))) OpenedVersion++;
         }
 
         static Vector3 Flat(Vector3 p) => new(p.x, 0f, p.z);
