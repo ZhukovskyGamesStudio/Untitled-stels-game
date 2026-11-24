@@ -88,6 +88,7 @@ namespace Stealth.UI
         UiPool<Image> m_Highlights, m_StashHighlights;
         UiPool<Image> m_Icons, m_GhostIcons, m_StashIcons; // pictures of real items over their cells (ItemVisuals.Icons)
         UiPool<InventoryBlockView> m_HandBlocks;
+        Color m_HandColor; // the hand slot's own colour
         UiPool<Image> m_HandIcons;
         float m_FullChargeUntil = -1f;
 
@@ -424,12 +425,14 @@ namespace Stealth.UI
             switch (over)
             {
                 case Target.Hand:
-                    if (!ItemCatalog.Holdable(m_DragShape)) return;
-                    if (m_Source == DragSource.World && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) Take(inv, PlayerInventory.HandX, 0, 0);
+                    if (!HandTakes(inv)) return;
+                    // from outside (the floor, the car's bed, the stash): the held thing makes way on the server
+                    if (m_Source == DragSource.World) Take(inv, PlayerInventory.HandX, 0, 0);
+                    else if (m_Source == DragSource.Cargo) { inv.RequestTakeCargo(m_DragCargo, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    else if (m_Source == DragSource.Stash) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
                     // the hand is busy: the two swap (the held one where this one was, if there is room)
                     else if (m_Source == DragSource.Inventory && inv.CanSwapHand(m_DragIndex, out _, out _, out _)) { inv.RequestSwapHand(m_DragIndex); Sfx.Ui(bank?.Click, 0.5f); }
-                    else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0)) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     return;
                 case Target.Backpack:
                 case Target.Belt:
@@ -475,6 +478,14 @@ namespace Stealth.UI
                 if (inv.FindSpot(m_DragShape, out var fx, out var fy, out var fr)) Take(inv, fx, fy, fr);
                 else m_FullUntil = Time.time + 1.5f;
             }
+        }
+
+        /// <summary>Whether the dragged thing can be let go on the hand slot (the same from everywhere; a held thing swaps).</summary>
+        bool HandTakes(PlayerInventory inv)
+        {
+            if (m_Source == DragSource.Inventory)
+                return inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex) || inv.CanSwapHand(m_DragIndex, out _, out _, out _);
+            return inv.CanTake(m_DragShape, 0, PlayerInventory.HandX, 0);
         }
 
         /// <summary>The whole backpack onto the team stash (the server puts in what fits).</summary>
@@ -624,6 +635,12 @@ namespace Stealth.UI
             if (HandSlot != null)
             {
                 Ui.Alpha(HandBackground, Mathf.Lerp(0.55f, 0.85f, m_Expand));
+                // something dragged over it: green if it can be held, red if not
+                var back = HandBackground.color;
+                bool overHand = m_Source != DragSource.None && MouseTarget(me, out _) == Target.Hand;
+                if (m_HandColor.a <= 0f) m_HandColor = new Color(back.r, back.g, back.b, 1f);
+                var tint = !overHand ? m_HandColor : HandTakes(inv) ? new Color(0.35f, 0.75f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
+                HandBackground.color = new Color(tint.r, tint.g, tint.b, back.a);
                 SetIfChanged(HandLabel, $"{Loc.T("inventory.hand")} [{Controls.Label(GameAction.UseHand)}]");
             }
 

@@ -217,15 +217,16 @@ namespace Stealth.Level
         /// over several frames while the drive scene goes on (<see cref="ActiveLevel.LoadSteps"/>).
         /// </summary>
         /// <summary>
-        /// A piece's screens with nothing to show (the models' glowing screen material): off, static or cracked, by the
-        /// house's seed (<see cref="ScreenLooks"/>) — before the style dresses the piece. Little displays keep their glow.
+        /// A piece's screens with nothing to show (the models' glowing screen material): off, static, no signal, the boot menu
+        /// or cracked, by whose screen it is and the house's seed (<see cref="ScreenLooks"/>) — before the style dresses the
+        /// piece. Little displays keep their glow.
         /// </summary>
-        void DressScreens(GameObject go, int seed)
+        void DressScreens(GameObject go, PropKind kind, int seed)
         {
             var screens = m_Art.Screens;
-            if (screens == null || screens.Length < 4 || screens[0] == null) return;
-            var look = ScreenLooks.Pick(seed);
-            var to = screens[1 + (int)look];
+            if (screens == null || screens.Length == 0 || screens[0] == null || ScreenLooks.InUse(kind)) return;
+            var look = ScreenLooks.Pick(seed, ScreenLooks.KindOf(kind));
+            var to = 1 + (int)look < screens.Length ? screens[1 + (int)look] : null;
             if (to == null) return;
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
             {
@@ -233,7 +234,7 @@ namespace Stealth.Level
                 var size = r.bounds.size;
                 if (Mathf.Max(size.x, Mathf.Max(size.y, size.z)) < ScreenLooks.SmallScreen) continue;
                 r.sharedMaterial = to;
-                if (look == ScreenLook.Static) LiveScreens.Add(r);
+                LiveScreens.Add(r, look);
             }
         }
 
@@ -295,6 +296,7 @@ namespace Stealth.Level
                 var door = Place(prefab, vault ? "VaultDoor" : $"Door{spec.Kind}", d.position, rot).GetComponent<AutoDoor>();
                 if (door != null)
                 {
+                    door.Spot = i;
                     if (hinged && spec.HingeRight) door.HingeRight();
                     if (door.Number != null) door.Number.text = FlatNumber(l, i);
                     bool keyed = false;
@@ -312,7 +314,7 @@ namespace Stealth.Level
                         inward.Normalize();
                         room = l.Plan.Rooms[l.StorageRoom].Bounds;
                     }
-                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room);
+                    door.Configure(i, l.LockedDoors.Contains(i), keyed, i == l.VaultDoor, storage, inward, room, DoorRules.LockOf(l.PlanKind, spec.Kind));
                     if (door.WallParts != null)
                         foreach (var part in door.WallParts)
                             if (part != null) Shell.WallParts.Add(part);
@@ -351,7 +353,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Interactable>(out var use)) use.Configure(i);
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
-                DressScreens(go, LevelRandom.Mix(l.Seed, Salt.Screens, i));
+                DressScreens(go, p.Kind, LevelRandom.Mix(l.Seed, Salt.Screens, i));
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
@@ -819,7 +821,7 @@ namespace Stealth.Level
                     if (m_Floor > 0)
                     {
                         // a balcony's door (glazed leaves opening into the room) and the balcony outside
-                        if (m_Art.WoodDoubleDoor != null) Place(m_Art.WoodDoubleDoor, "BalconyDoor", mid, Quaternion.LookRotation(-outward));
+                        if (m_Art.WoodDoubleDoor != null) OuterDoor(Place(m_Art.WoodDoubleDoor, "BalconyDoor", mid, Quaternion.LookRotation(-outward)));
                         if (m_Art.Balcony != null) Place(m_Art.Balcony, "Balcony", mid + outward * (LevelMetrics.WallThickness / 2f), Quaternion.LookRotation(outward));
                         from = o1;
                         cornerA = false;
@@ -828,6 +830,7 @@ namespace Stealth.Level
                     var street = DoorRules.StreetKind(m_Layout);
                     var prefab = street.HasValue ? m_Art.Door(street.Value, false) : m_Art.ExteriorDoor;
                     var go = Place(prefab != null ? prefab : m_Art.AutoDoor, "ExteriorDoor", mid, Quaternion.LookRotation(outward));
+                    OuterDoor(go);
                     if (street.HasValue && go.TryGetComponent<AutoDoor>(out var exit) && (LevelRandom.Mix(m_Layout.Seed, Salt.StreetDoors, index * 31 + cut.opening) & 1) == 1)
                         exit.HingeRight();
                 }
@@ -839,6 +842,14 @@ namespace Stealth.Level
             WallPiece(m_Art.WallBlock, a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height);
             RecordFaces(a3 + d3 * from, a3 + d3 * (len - t / 2f), 0f, height, w.Exterior, inner, cornerA, !jointB,
                 jointA && from <= t / 2f + 0.001f, jointB);
+        }
+
+        int m_OuterDoors;
+
+        /// <summary>An outer door (the street's, a balcony's): its spot comes after the inner doors', in the order they are built.</summary>
+        void OuterDoor(GameObject go)
+        {
+            if (go != null && go.TryGetComponent<AutoDoor>(out var door)) door.Spot = m_Layout.AutoDoors.Count + m_OuterDoors++;
         }
 
         /// <summary>The doorway (index in <see cref="LevelLayout.Doorways"/>) whose opening is at <paramref name="at"/> on this floor.</summary>

@@ -278,6 +278,11 @@ namespace Stealth.Net
         public void BroadcastBanner(string text) => BannerRpc(text);
         public void BroadcastHouseStats(string packed) => HouseStatsRpc(packed);
 
+        public void BroadcastSound(Stealth.Audio.GameSound sound, Vector3 at) => SoundRpc((byte)sound, at);
+
+        [Rpc(SendTo.Everyone)]
+        void SoundRpc(byte sound, Vector3 at) => m_Game.ReceiveSound((Stealth.Audio.GameSound)sound, at);
+
         [Rpc(SendTo.Everyone)]
         void HouseStatsRpc(string packed) => m_Game.ReceiveHouseStats(packed);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => PingRpc(owner, kind, position, target);

@@ -32,8 +32,8 @@ namespace Stealth.Configs
         public float LoopMaxDistance = 11f;
         [Tooltip("Share of a sound that gets through one floor slab (robots upstairs / downstairs are muffled, not loud).")]
         public float ThroughFloor = 0.12f;
-        [Tooltip("Automatic doors opening and closing (they do it all the time: keep it low).")]
-        public float Doors = 0.18f;
+        [Tooltip("Doors opening and shutting (robots work them all the time: not too loud).")]
+        public float Doors = 0.35f;
 
         [Header("Footsteps")]
         [Tooltip("Metres per step: the faster you go, the quicker the steps.")]

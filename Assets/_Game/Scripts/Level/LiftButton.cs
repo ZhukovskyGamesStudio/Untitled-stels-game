@@ -41,7 +41,7 @@ namespace Stealth.Level
             var s = World.State.Lift;
             int lit = s.To == Index ? 1 : 0;
             if (lit == m_Shown) return;
-            if (m_Shown >= 0 && lit == 1) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Click : null, Point, 0.5f, Audio.Sfx.Group.Items);
+            if (m_Shown >= 0 && lit == 1) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.SwitchOn : null, Point, 0.7f, Audio.Sfx.Group.Items);
             m_Shown = lit;
             Lamp.enabled = lit == 1;
         }

@@ -34,6 +34,8 @@ OUT = os.path.abspath(argv[0] if argv else os.path.join(os.getcwd(), "Assets", "
 MODELS = os.path.abspath(argv[1] if len(argv) > 1 else os.path.join(os.getcwd(), "Assets", "_Game", "Art", "Models"))
 CELL = 128
 
+PRINTED = "printed.png"          # a picture of Art/Textures/Covers in place of a colour
+
 # id: (cells wide, cells tall, model file (Items/ unless a folder is given), {part prefix: (colour, metallic, roughness,
 # emission)}, view: "top" — lying things seen from above, "tilted" — the same seen more from the near end (a book shows
 # its pages), "front" — standing things seen three-quarter from the front)
@@ -49,8 +51,7 @@ ITEMS = {
         "Body": ((0.1, 0.38, 0.85), 0.0, 0.35, 0.0),
         "Accent": ((0.7, 0.72, 0.74), 0.9, 0.3, 0.0)}),
     "book": (2, 2, "item_book_model", {
-        "Body": ((0.45, 0.08, 0.07), 0.0, 0.55, 0.0),                     # cloth cover
-        "AccentLabel": ((0.85, 0.66, 0.25), 0.8, 0.3, 0.0),              # gilt title plate
+        "Body": (PRINTED, 0.0, 0.55, 0.0),                               # cloth cover with its gilt title
         "Accent": ((0.9, 0.86, 0.74), 0.0, 0.8, 0.0)}, "tilted"),        # pages
     "cans": (2, 2, "item_cans_model", {
         "Body": ((0.8, 0.22, 0.1), 0.0, 0.5, 0.0),                       # paper labels
@@ -71,7 +72,13 @@ ITEMS = {
     "cagekey": (1, 2, "item_cagekey_model", {
         "Body": ((0.2, 0.19, 0.18), 0.8, 0.5, 0.0),
         "Accent": ((0.95, 0.72, 0.2), 0.95, 0.25, 0.0)}),
-    "stun": (2, 2, "item_stun", {"Body": ((0.15, 0.75, 0.85), 0.3, 0.3, 0.35)}, "front"),
+    "stun": (2, 2, "item_stun_model", {
+        "Body": ((0.2, 0.24, 0.23), 0.0, 0.5, 0.0),                      # painted steel case
+        "Accent": ((0.05, 0.05, 0.052), 0.0, 0.7, 0.0),                  # rubber
+        "AccentSteel": ((0.62, 0.64, 0.66), 0.8, 0.35, 0.0),
+        "AccentCoil": ((0.85, 0.42, 0.2), 0.8, 0.3, 0.0),                # copper
+        "Trim": ((0.9, 0.66, 0.06), 0.0, 0.5, 0.0),
+        "Eye": ((0.1, 0.85, 0.95), 0.0, 0.3, 1.6)}, "front"),
     "speaker": (2, 1, "Props/lure_speaker", {
         "Body": ((0.14, 0.15, 0.16), 0.2, 0.5, 0.0),
         "EyeLed": ((0.3, 1.0, 0.6), 0.0, 0.3, 2.0),
@@ -117,8 +124,7 @@ ITEMS = {
         "Body": ((0.32, 0.17, 0.08), 0.0, 0.4, 0.0),                     # dark wood
         "Accent": ((0.9, 0.85, 0.72), 0.0, 0.35, 0.0)}, "tilted"),       # squares, pieces, hinges
     "magazine": (2, 2, "item_magazine_model", {
-        "Body": ((0.85, 0.2, 0.45), 0.0, 0.15, 0.0),                     # glossy cover
-        "Trim": ((0.97, 0.97, 0.95), 0.0, 0.3, 0.0),                     # masthead, cover lines
+        "Body": (PRINTED, 0.0, 0.25, 0.0),                               # glossy cover
         "Accent": ((0.92, 0.9, 0.86), 0.0, 0.7, 0.0)}, "tilted"),        # pages
     "pills": (1, 1, "item_pills_model", {
         "Body": ((0.3, 0.55, 0.9), 0.0, 0.5, 0.0),
@@ -191,6 +197,11 @@ def material(name, colour, metallic, roughness, emission):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    if isinstance(colour, str):
+        tex = m.node_tree.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(os.path.join(MODELS, "..", "Textures", "Covers", colour))
+        m.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        colour = (1.0, 1.0, 1.0)
     bsdf.inputs["Base Color"].default_value = (*colour, 1.0)
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Roughness"].default_value = roughness

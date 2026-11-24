@@ -19,19 +19,20 @@ namespace Stealth.Items
 
         float m_Phase, m_Period = 1f, m_NextLook;
         PlayerController m_Holder;
-        bool m_Lit;
+        float m_Glass = -1f;
         MaterialPropertyBlock m_Block;
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         void OnEnable()
         {
             m_Holder = GetComponentInParent<PlayerController>();
-            SetLit(false);
+            if (Lamp != null && Lamp.TryGetComponent<Level.LightSource>(out var source)) source.VisualShare = Tuning.Items.Gadgets.FinderLampShown;
+            SetLit(false, 0f);
         }
 
         void Update()
         {
-            if (m_Holder == null || m_Holder.Downed) { SetLit(false); return; }
+            if (m_Holder == null || m_Holder.Downed) { SetLit(false, 0f); return; }
             if (Time.time >= m_NextLook)
             {
                 m_NextLook = Time.time + 0.25f;
@@ -40,7 +41,7 @@ namespace Stealth.Items
             }
             m_Phase += Time.deltaTime;
             if (m_Phase >= m_Period) m_Phase -= m_Period * Mathf.Floor(m_Phase / m_Period);
-            SetLit(GearRules.FinderLit(m_Phase, m_Period));
+            SetLit(GearRules.FinderLit(m_Phase, m_Period), GearRules.FinderGlass(m_Phase, m_Period));
         }
 
         /// <summary>
@@ -65,15 +66,14 @@ namespace Stealth.Items
             return best;
         }
 
-        void SetLit(bool lit)
+        void SetLit(bool lit, float glass)
         {
-            if (lit == m_Lit && Lamp != null && Lamp.enabled == lit) return;
-            m_Lit = lit;
-            if (Lamp != null) Lamp.enabled = lit;
-            if (Glass == null) return;
+            if (Lamp != null && Lamp.enabled != lit) Lamp.enabled = lit;
+            if (Glass == null || (glass == m_Glass && m_Block != null)) return;
+            m_Glass = glass;
             m_Block ??= new MaterialPropertyBlock();
             Glass.GetPropertyBlock(m_Block);
-            m_Block.SetColor(EmissionId, lit ? new Color(0.4f, 3f, 0.6f) : new Color(0.02f, 0.08f, 0.03f));
+            m_Block.SetColor(EmissionId, Color.Lerp(new Color(0.02f, 0.08f, 0.03f), new Color(0.15f, 1f, 0.22f) * Tuning.Items.Gadgets.FinderGlow, glass));
             Glass.SetPropertyBlock(m_Block);
         }
     }

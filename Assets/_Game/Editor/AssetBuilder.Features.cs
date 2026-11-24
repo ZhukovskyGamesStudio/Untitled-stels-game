@@ -158,6 +158,16 @@ namespace Stealth.EditorTools
             door.Blocker = DoorBlocker(root, 0f, 0f, w, h, wall + 0.1f);
             door.LockLamps = new Renderer[0];
             door.Padlocks = new Transform[0];
+            door.LockUnits = new GameObject[0];
+            door.UnitLamps = new Renderer[0];
+            // robots do not walk through the shut vault: its doorway is cut out of the navmesh until a player has opened it
+            var barrier = root.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            barrier.shape = UnityEngine.AI.NavMeshObstacleShape.Box;
+            barrier.center = new Vector3(0f, h / 2f, 0f);
+            barrier.size = new Vector3(w + 0.4f, h, wall + 0.5f);
+            barrier.carving = true;
+            barrier.carveOnlyStationary = false;
+            door.Barrier = barrier;
             Muffles(root, SoundMaterial.Door);
             return root;
         }
@@ -314,6 +324,9 @@ namespace Stealth.EditorTools
             door.Blocker = DoorBlocker(root, 0f, 0f, clear, height, 0.14f);
             door.LockLamps = new Renderer[0];
             door.Padlocks = new Transform[0];
+            door.LockUnits = new GameObject[0];
+            door.UnitLamps = new Renderer[0];
+            root.AddComponent<DoorHandle>().Door = door;
             Muffles(root, SoundMaterial.Door);
             return root;
         }
@@ -460,7 +473,8 @@ namespace Stealth.EditorTools
             ["boots"] = new[] { ("Body", new Color(0.36f, 0.22f, 0.12f), 0.4f, false), ("Accent", new Color(0.08f, 0.08f, 0.08f), 0.2f, false), ("Trim", new Color(0.8f, 0.65f, 0.3f), 0.3f, false) },
             ["tomatoes"] = new[] { ("Body", new Color(0.82f, 0.14f, 0.08f), 0.5f, false), ("Accent", new Color(0.7f, 0.72f, 0.74f), 0.7f, false) },
             ["chess"] = new[] { ("Body", new Color(0.32f, 0.17f, 0.08f), 0.6f, false), ("Accent", new Color(0.9f, 0.85f, 0.72f), 0.65f, false) },
-            ["magazine"] = new[] { ("Body", new Color(0.85f, 0.2f, 0.45f), 0.85f, false), ("Accent", new Color(0.92f, 0.9f, 0.86f), 0.3f, false), ("Trim", new Color(0.97f, 0.97f, 0.95f), 0.7f, false) },
+            ["magazine"] = new[] { ("Body", Color.white, 0.75f, false), ("Accent", new Color(0.92f, 0.9f, 0.86f), 0.3f, false) }, // its cover: PrintCovers
+            ["stun"] = new[] { ("Body", new Color(0.17f, 0.2f, 0.19f), 0.42f, false), ("Accent", new Color(0.05f, 0.05f, 0.052f), 0.25f, false), ("AccentSteel", new Color(0.6f, 0.62f, 0.64f), 0.65f, false), ("AccentCoil", new Color(0.72f, 0.36f, 0.18f), 0.6f, false), ("Trim", new Color(0.86f, 0.62f, 0.06f), 0.4f, false), ("Eye", new Color(0.1f, 0.85f, 0.95f), 0.6f, true) },
             ["pills"] = new[] { ("Body", new Color(0.3f, 0.55f, 0.9f), 0.5f, false), ("Accent", new Color(0.78f, 0.8f, 0.82f), 0.75f, false) },
             ["toothpaste"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.97f), 0.7f, false), ("Accent", new Color(0.15f, 0.4f, 0.85f), 0.65f, false) },
             ["tape"] = new[] { ("Body", new Color(0.5f, 0.52f, 0.54f), 0.5f, false), ("Accent", new Color(0.62f, 0.45f, 0.27f), 0.2f, false) },
@@ -602,8 +616,8 @@ namespace Stealth.EditorTools
                 return m;
             });
             // the book, canned food, the screwdriver, the belt bag (Tools/Blender/poi.py item_<id>_model)
-            Mat("Items", "BookCover", new Color(0.45f, 0.12f, 0.1f), smoothness: 0.25f);
-            Mat("Items", "BookPages", new Color(0.92f, 0.88f, 0.76f), smoothness: 0.1f);
+            Mat("Items", "BookCover", Color.white, smoothness: 0.25f);
+            Mat("Items", "BookPagesFlat", Color.white, smoothness: 0.1f);
             Mat("Items", "CanTin", new Color(0.72f, 0.74f, 0.76f), smoothness: 0.75f);
             Mat("Items", "CanLabel", new Color(0.85f, 0.32f, 0.12f), smoothness: 0.35f);
             Mat("Items", "ScrewHandle", new Color(0.95f, 0.72f, 0.08f), smoothness: 0.6f);
@@ -617,12 +631,13 @@ namespace Stealth.EditorTools
                 if (extra is var (part, mat)) foreach (var r in Parts(m, part)) r.sharedMaterial = M(mat);
                 return m;
             });
-            // parts: book — Body cover, Accent pages, AccentLabel the gilt title; cans — Body labels, Accent the tins;
+            // parts: book — Body the printed cover, Accent pages; cans — Body labels, Accent the tins;
             // screwdriver — Body handle, Accent steel; belt bag — Body nylon, Accent strap and buckle, AccentZip the zips
-            var book = ItemModel("item_book_model", "BookModel", "BookCover", "BookPages", "BookPages", ("AccentLabel", "KeyBrass"));
+            var book = ItemModel("item_book_model", "BookModel", "BookCover", "BookPagesFlat", "BookPagesFlat");
             var cans = ItemModel("item_cans_model", "CansModel", "CanLabel", "CanTin", "CanTin");
             var screwdriver = ItemModel("item_screwdriver_model", "ScrewdriverModel", "ScrewHandle", "ShovelSteel", "ShovelSteel");
             var beltBag = ItemModel("item_beltbag_model", "BeltBagModel", "BagFabric", "BagStrap", "ShovelSteel", ("AccentZip", "ShovelSteel"));
+            var stun = GearModel("stun"); // the robots' stunner off the programming console (Tools/Blender/items_more.py)
             var icons = new Sprite[ItemCatalog.Shapes.Length];
             icons[ItemCatalog.Book] = ItemIcon("book");
             icons[ItemCatalog.Cans] = ItemIcon("cans");
@@ -646,6 +661,7 @@ namespace Stealth.EditorTools
                 gear[shape] = GearModel(id);
                 icons[shape] = ItemIcon(id);
             }
+            PrintCovers();
             var meshes = ItemCatalog.Shapes.Select(s =>
             {
                 // the speaker's piece in a grid is a domino; the cage's key looks like the door keys; the shovel's piece in
@@ -653,7 +669,7 @@ namespace Stealth.EditorTools
                 return ItemPieceMesh(s.Id);
             }).ToArray();
             if (visuals.Meshes != null && visuals.Meshes.SequenceEqual(meshes) && visuals.Models != null && visuals.Models.Length == ItemCatalog.Shapes.Length
-                && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Shovel] == shovel
+                && visuals.Models[ItemCatalog.Speaker] == lure && visuals.Models[ItemCatalog.Stun] == stun && visuals.Models[ItemCatalog.Shovel] == shovel
                 && visuals.Models[ItemCatalog.Flashlight] == flashlight && visuals.Models[ItemCatalog.Battery] == battery
                 && visuals.Models[ItemCatalog.Key] == key && visuals.Models[ItemCatalog.CageKey] == cageKey && visuals.Models[ItemCatalog.ShelterMap] == map
                 && visuals.Models[ItemCatalog.Book] == book && visuals.Models[ItemCatalog.Cans] == cans
@@ -663,6 +679,7 @@ namespace Stealth.EditorTools
             visuals.Meshes = meshes;
             visuals.Models = new GameObject[ItemCatalog.Shapes.Length];
             visuals.Models[ItemCatalog.Speaker] = lure;
+            visuals.Models[ItemCatalog.Stun] = stun;
             visuals.Models[ItemCatalog.Shovel] = shovel;
             visuals.Models[ItemCatalog.Flashlight] = flashlight;
             visuals.Models[ItemCatalog.Battery] = battery;

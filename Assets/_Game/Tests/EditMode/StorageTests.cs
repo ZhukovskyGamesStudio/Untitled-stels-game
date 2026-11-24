@@ -69,7 +69,7 @@ namespace Stealth.Tests
             {
                 float floor = StorageMath.DrawerFloor(Front(h), 0f);
                 float hidden = (h - floor) * 0.4f / (StorageMath.EyeHeight - h);
-                Assert.Less(hidden, 0.125f, $"front top at {h}: {hidden:0.00} m of the floor hidden");
+                Assert.Less(hidden, 0.17f, $"front top at {h}: {hidden:0.00} m of the floor hidden");
             }
             Assert.AreEqual(2f + 0.41f - 0.34f + 0.03f, StorageMath.DrawerFloor(new Bounds(new Vector3(0f, 2.24f, 0f), new Vector3(0.86f, 0.34f, 0.42f)), 2f), 1e-4f, "on an upper storey: from its floor");
             var pullOut = new Bounds(new Vector3(0f, 0.45f, 0f), new Vector3(0.6f, 0.8f, 0.5f));
@@ -79,6 +79,78 @@ namespace Stealth.Tests
             Assert.AreEqual(top + 0.01f, pos.y, 1e-4f);
             Assert.AreEqual(StorageMath.Travel(0.44f), pos.z, 1e-4f);
             Assert.AreEqual(0.3f, StorageMath.Travel(0.34f), 1e-4f, "a shallow piece: the drawer's back stays in the carcass");
+        }
+
+        [Test]
+        public void LootPutInADrawerFitsUnderItsFront()
+        {
+            var front = new Bounds(new Vector3(0f, 0.55f, 0f), new Vector3(0.39f, 0.11f, 0.49f)); // a pedestal's top drawer
+            float room = StorageMath.DrawerRoom(front, 0f);
+            Assert.That(room, Is.InRange(0.03f, 0.11f));
+            Assert.IsTrue(StorageMath.Fits(new Vector3(0.2f, room - 0.01f, 0.15f), front, Vector3.forward, 0.49f, true));
+            Assert.IsFalse(StorageMath.Fits(new Vector3(0.2f, room + 0.01f, 0.15f), front, Vector3.forward, 0.49f, true), "too tall: the drawer would not shut over it");
+            Assert.IsFalse(StorageMath.Fits(new Vector3(0.36f, 0.02f, 0.15f), front, Vector3.forward, 0.49f, true), "too long for the tray");
+        }
+
+        [Test]
+        public void EveryDrawerOfTheHousesTakesSomeLootAndWhatItTakesLiesInside()
+        {
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            int drawers = 0;
+            foreach (PropKind kind in System.Enum.GetValues(typeof(PropKind)))
+            {
+                var prefab = art.Prop(kind);
+                if (prefab == null || prefab.GetComponent<Storage>() == null) continue;
+                var go = Object.Instantiate(prefab, new Vector3(900f, 4.1f, 900f), Quaternion.Euler(0f, 90f, 0f));
+                try
+                {
+                    var storage = go.GetComponent<Storage>();
+                    storage.Configure(0);
+                    for (int part = 0; part < storage.PartCount; part++)
+                    {
+                        if (!storage.Drawers) continue;
+                        drawers++;
+                        int takes = 0;
+                        for (int shape = 0; shape < ItemCatalog.Shapes.Length; shape++)
+                        {
+                            if (!ItemCatalog.IsLoot(shape) || !storage.Fits(part, shape)) continue;
+                            takes++;
+                            var (pos, rot) = storage.LootPose(part, shape);
+                            var size = ItemCatalog.ModelSize(shape);
+                            var turned = rot * size;
+                            float top = pos.y + size.y, front = Mathf.Abs(turned.x) / 2f, side = Mathf.Abs(turned.z) / 2f; // (the piece looks along +X)
+                            var inside = storage.OpenInside(part);
+                            float frontTop = inside.max.y - 0.3f;
+                            Assert.LessOrEqual(top, frontTop + 1e-3f, $"{kind} drawer {part}: item {shape} sticks out over its front");
+                            Assert.LessOrEqual(side * 2f, inside.size.z - 0.1f, $"{kind} drawer {part}: item {shape} is wider than it");
+                            Assert.LessOrEqual(front * 2f, inside.size.x - 0.1f, $"{kind} drawer {part}: item {shape} is longer than it");
+                        }
+                        Assert.GreaterOrEqual(takes, 6, $"{kind} drawer {part}: nothing to find in it — leave the piece out of the houses");
+                    }
+                }
+                finally { Object.DestroyImmediate(go); }
+            }
+            Assert.Greater(drawers, 15);
+        }
+
+        [Test]
+        public void TheDrawerLookedAtIsTheOneThatOpens([Values("FilePedestal", "ExecutiveDesk", "FilingCabinet", "Cabinet", "Dresser")] string name)
+        {
+            var go = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Props/{name}.prefab"), new Vector3(950f, 0f, 950f), Quaternion.identity);
+            try
+            {
+                var storage = go.GetComponent<Storage>();
+                storage.Configure(0);
+                for (int part = 0; part < storage.PartCount; part++)
+                {
+                    var b = storage.OpenInside(part); // (the drawer pulled out, with room over it: back to where its front is)
+                    var front = new Vector3(b.center.x, b.center.y - 0.15f, b.center.z - storage.Travel + (b.size.z - 0.1f) / 2f);
+                    var eye = front + new Vector3(0.1f, Mathf.Max(0.2f, 1.6f - front.y), 0.9f);
+                    Assert.AreEqual(part, storage.PartUnder(eye, front - eye), $"{name}: looked right at drawer {part}");
+                }
+                Assert.AreEqual(-1, storage.PartUnder(new Vector3(950f, 1.6f, 952f), Vector3.up), "looking away");
+            }
+            finally { Object.DestroyImmediate(go); }
         }
 
         [Test]

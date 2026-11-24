@@ -27,6 +27,8 @@ namespace Stealth.UI
         public bool InHatch;
         /// <summary>A locked door in reach and how far its hack is (0..1).</summary>
         public bool LockedDoor;
+        /// <summary>Its lock is the robots' electronic unit (hacked, not picked).</summary>
+        public bool LockedByUnit;
         public float DoorProgress;
         /// <summary>A closed safe in reach.</summary>
         public bool SafeNear;
@@ -222,6 +224,7 @@ namespace Stealth.UI
             Level.UseKind.VentGrate => ReticleIcon.Vent,
             Level.UseKind.ShaftHatch => ReticleIcon.Lever,
             Level.UseKind.DoorLock => ReticleIcon.Lock,
+            Level.UseKind.Door => ReticleIcon.Door,
             Level.UseKind.Safe => ReticleIcon.Safe,
             Level.UseKind.StoragePart => ReticleIcon.Search,
             _ => ReticleIcon.Dot,
@@ -303,7 +306,7 @@ namespace Stealth.UI
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
             if (c.CanHack) return new Hint(e, Loc.T(c.SearchOnly ? "hint.search" : "hint.hack"));
-            if (c.LockedDoor) return new Hint(e, Loc.T("hint.pick_lock"));
+            if (c.LockedDoor) return new Hint(e, Loc.T(c.LockedByUnit ? "hint.hack" : "hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
             if (c.Storage != null) return new Hint(e, c.Storage);
             if (c.HasUse && !string.IsNullOrEmpty(c.UseText)) return new Hint(e, c.UseText, !c.UseAvailable);

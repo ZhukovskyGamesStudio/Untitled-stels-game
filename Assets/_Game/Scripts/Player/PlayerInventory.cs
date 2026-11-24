@@ -221,6 +221,38 @@ namespace Stealth.Player
             return FindSpotIn(held.Shape, occupied, out x, out y, out rot);
         }
 
+        /// <summary>
+        /// Whether a thing from outside the backpack (the floor, the car's bed, the team stash) can go to this place: a free one,
+        /// or the hand whatever it holds — the held thing makes way (<see cref="PlaceTaken"/>).
+        /// </summary>
+        public bool CanTake(int shape, int rot, int x, int y) =>
+            x == HandX ? ItemCatalog.Holdable(shape) : CanPlace(shape, rot, x, y);
+
+        /// <summary>
+        /// Puts a thing taken from outside at its place. Into a busy hand: the held one goes to the first free spot of the
+        /// backpack or the belt; with none, it is <paramref name="evicted"/> — the caller leaves it where the taken one was.
+        /// </summary>
+        bool PlaceTaken(byte shape, byte color, byte x, byte y, byte rot, out InventoryEntry? evicted)
+        {
+            evicted = null;
+            if (!CanTake(shape, rot, x, y)) return false;
+            int hand = x == HandX ? HandIndex() : -1;
+            if (hand >= 0)
+            {
+                var held = m_Items[hand];
+                m_Items.RemoveAt(hand);
+                if (FindSpotIn(held.Shape, Occupied(), out var hx, out var hy, out var hr))
+                {
+                    held.X = hx; held.Y = hy; held.Rot = hr;
+                    m_Items.Add(held);
+                }
+                else evicted = held;
+            }
+            m_Items.Add(new InventoryEntry { Shape = shape, Color = color, X = x, Y = y, Rot = rot });
+            Changed();
+            return true;
+        }
+
         // ------------------------------------------------------------------ requests (owner → server)
 
         public void RequestSwapHand(int index) => Link.RequestSwapHand(index);
@@ -241,10 +273,10 @@ namespace Stealth.Player
             var game = GameManager.Instance;
             var car = Vehicles.Car.Active;
             if (game == null || car == null || !CanAct || game.Phase is not (RunPhase.Sewer or RunPhase.Playing)) return;
-            if ((car.transform.position - transform.position).magnitude > CarReach || !CanPlace(item.Shape, rot, x, y)) return;
+            if ((car.transform.position - transform.position).magnitude > CarReach || !CanTake(item.Shape, rot, x, y)) return;
             if (!game.Cargo.Remove(item)) return; // taken by somebody else meanwhile
-            m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
-            Changed();
+            PlaceTaken(item.Shape, item.Color, x, y, rot, out var evicted);
+            if (evicted is { } held) game.Cargo.Add(held.Shape, held.Color, item.X, item.Z, item.Yaw);
         }
 
         /// <summary>How far from the car's middle its bed and hopper are within reach.</summary>
@@ -330,10 +362,11 @@ namespace Stealth.Player
             if (!ServerReach.Within(transform.position, item.transform.position, ReachDistance)) return;
             // a belt bag is put on (its belt's grid appears), wherever it was dropped in the backpack
             if (item.Shape == ItemCatalog.BeltBag && !HasBelt) { x = WornX; y = 0; rot = 0; }
-            if (!CanPlace(item.Shape, rot, x, y)) return;
-            m_Items.Add(new InventoryEntry { Shape = item.Shape, Color = item.Color, X = x, Y = y, Rot = rot });
-            Changed();
+            if (!PlaceTaken(item.Shape, item.Color, x, y, rot, out var evicted)) return;
+            var at = item.transform.position;
+            float yaw = item.transform.eulerAngles.y;
             Session.Despawn(item.gameObject);
+            if (evicted is { } held) GameManager.Instance?.SpawnItemServer(held.Shape, held.Color, at, yaw);
             GameManager.Instance?.NoteServer(GetComponent<PlayerController>(), StatKind.Pickups);
         }
 
@@ -526,10 +559,12 @@ namespace Stealth.Player
 
         public void UnstashServer(InventoryEntry from, byte x, byte y, byte rot)
         {
-            if (!AtHatch(out var stash) || stash.IndexOf(from) < 0 || !CanPlace(from.Shape, rot, x, y)) return;
+            if (!AtHatch(out var stash) || stash.IndexOf(from) < 0 || !CanTake(from.Shape, rot, x, y)) return;
             stash.Take(from);
-            m_Items.Add(new InventoryEntry { Shape = from.Shape, Color = from.Color, X = x, Y = y, Rot = rot });
-            Changed();
+            PlaceTaken(from.Shape, from.Color, x, y, rot, out var evicted);
+            if (evicted is not { } held) return;
+            if (stash.AddAll(new[] { held }, out _) == 0) // (no room for its shape there either: at the feet)
+                GameManager.Instance?.SpawnItemServer(held.Shape, held.Color, transform.position + transform.forward * 0.6f + Vector3.up * 0.3f, 0f);
         }
 
         public void StashMoveServer(InventoryEntry from, byte x, byte y, byte rot)

@@ -112,12 +112,25 @@ namespace Stealth.Items
             {
                 var p = m_Parts[i];
                 float was = p.Tween.Value, wasAjar = p.Ajar.Value;
-                p.Tween.Step(World.IsOpened(OpenKeys.Storage(Index, i)), Time.deltaTime, StorageMath.OpenSeconds);
+                var move = p.Tween.Step(World.IsOpened(OpenKeys.Storage(Index, i)), Time.deltaTime, StorageMath.OpenSeconds);
+                if (move != OpenMove.None) Sound(p, move == OpenMove.StartedOpening);
                 if (Drawers) p.Ajar.Step(World.IsOpened(OpenKeys.Ajar(Index, i)), Time.deltaTime, StorageMath.OpenSeconds);
                 if (p.Posed && p.Tween.Value == was && p.Ajar.Value == wasAjar) continue;
                 p.Posed = true;
                 Pose(p, p.Tween.Smooth, p.Ajar.Smooth);
             }
+        }
+
+        /// <summary>A drawer or a door opening or shutting, wood or steel, heard by everyone near.</summary>
+        void Sound(Part p, bool open)
+        {
+            var bank = Audio.Sfx.Bank;
+            if (bank == null) return;
+            var layout = ActiveLevel.Layout;
+            bool steel = layout != null && Index >= 0 && Index < layout.Props.Count && StorageMath.Steel(layout.Props[Index].Kind);
+            var clip = Drawers ? steel ? (open ? bank.SteelDrawerOpen : bank.SteelDrawerClose) : open ? bank.DrawerOpen : bank.DrawerClose
+                : steel ? (open ? bank.SteelCupboardOpen : bank.SteelCupboardClose) : open ? bank.CupboardOpen : bank.CupboardClose;
+            Audio.Sfx.At(clip, p.Closed.center, 0.7f, Audio.Sfx.Group.Items, LevelRandom.Shared(RandomChannel.Audio).Range(0.95f, 1.06f));
         }
 
         void Pose(Part p, float t, float ajar)
@@ -133,6 +146,10 @@ namespace Stealth.Items
         }
 
         public bool IsOpen(int part) => Index >= 0 && World.IsOpened(OpenKeys.Storage(Index, part));
+
+        /// <summary>How far out a drawer stands now as shown here, metres (0 shut … <see cref="Travel"/>); its loot rides on it (WorldItem.RideServer).</summary>
+        public float OutBy(int part) =>
+            !Drawers || part < 0 || part >= m_Parts.Count ? Travel : StorageMath.Slide(m_Parts[part].Tween.Smooth, m_Parts[part].Ajar.Smooth, Travel);
 
         /// <summary>How far this piece's drawers come out, metres (<see cref="StorageMath.Travel"/>).</summary>
         public float Travel => StorageMath.Travel(m_Depth);
@@ -175,6 +192,26 @@ namespace Stealth.Items
             return best;
         }
 
+        /// <summary>
+        /// The part under the crosshair (a ray of the view): the one whose front — where it stands now — the ray meets first,
+        /// however small it is and whatever the thin cast that found the piece touched beside it; −1 when it meets none.
+        /// </summary>
+        public int PartUnder(Vector3 eye, Vector3 look)
+        {
+            var ray = new Ray(eye, look);
+            int best = -1;
+            float nearest = float.MaxValue;
+            for (int i = 0; i < m_Parts.Count; i++)
+            {
+                var b = WorldBounds(m_Parts[i].T);
+                b.Expand(0.015f);
+                if (!b.IntersectRay(ray, out float d) || d >= nearest) continue;
+                nearest = d;
+                best = i;
+            }
+            return best;
+        }
+
         /// <summary>Where hidden loot appears when a part opens: in the pulled-out drawer, or at the bottom of the locker.</summary>
         public Vector3 LootSpot(int part)
         {
@@ -191,7 +228,7 @@ namespace Stealth.Items
 
         /// <summary>An item of this shape fits behind this part (a shovel stands only in a tall compartment).</summary>
         public bool Fits(int part, int shape) =>
-            part >= 0 && part < m_Parts.Count && StorageMath.Fits(ItemCatalog.ModelSize(shape), m_Parts[part].Closed, transform.forward, m_Depth, Drawers);
+            part >= 0 && part < m_Parts.Count && StorageMath.Fits(ItemCatalog.ModelSize(shape), m_Parts[part].Closed, transform.forward, m_Depth, Drawers, transform.position.y);
 
         /// <summary>A part named <c>&lt;Role&gt;Door{k}</c> (not the door itself, <c>BodyDoor{k}</c>) belongs to door k.</summary>
         public static bool Follows(string name, string what, out int k)
@@ -224,6 +261,10 @@ namespace Stealth.Items
     /// <summary>How storage parts move and where hidden loot goes (pure, unit tested).</summary>
     public static class StorageMath
     {
+        /// <summary>Furniture of sheet steel (the rest is wood): what it sounds like.</summary>
+        public static bool Steel(PropKind kind) => kind is PropKind.Cabinet or PropKind.Lockers or PropKind.FilingCabinet or PropKind.FilePedestal or PropKind.PartsCabinet
+            or PropKind.MedicineCabinet or PropKind.Fridge or PropKind.Dishwasher;
+
         /// <summary>Seconds to open or close a part.</summary>
         public const float OpenSeconds = 0.35f;
         /// <summary>How far a drawer comes out at most, metres (nearly all of its tray: at 0.32 a wide item lay half under the top).</summary>
@@ -251,12 +292,12 @@ namespace Stealth.Items
         /// <summary>A front taller than this is no drawer's (a dishwasher's pull-out, a deep bin): its floor stays where the model has it.</summary>
         public const float TallFront = 0.5f;
         /// <summary>The least depth of a drawer under its front's top, metres.</summary>
-        public const float ShallowDrawer = 0.09f;
+        public const float ShallowDrawer = 0.12f;
         /// <summary>
         /// How deep under its front's top a drawer's floor may lie for every metre the eyes are over that top: looking
         /// down over the front from a step away, this much of the floor behind it is hidden for each such metre.
         /// </summary>
-        public const float SightDrop = 0.3f;
+        public const float SightDrop = 0.4f;
 
         /// <summary>
         /// The height of a drawer's floor (world), where its loot lies: the model's own bottom in a low drawer; in a high
@@ -270,6 +311,12 @@ namespace Stealth.Items
             float drop = Mathf.Max(ShallowDrawer, SightDrop * (EyeHeight - (part.max.y - floorY)));
             return Mathf.Max(bottom, part.max.y - drop);
         }
+
+        /// <summary>How much narrower a drawer's tray is inside than its front, metres.</summary>
+        public const float TraySides = 0.07f;
+
+        /// <summary>The height inside a drawer, metres: from its floor to a finger under its front's top (what is taller keeps it from shutting).</summary>
+        public static float DrawerRoom(Bounds part, float floorY) => part.max.y - DrawerFloor(part, floorY) - 0.02f;
 
         /// <summary>Two drawers of one column: one over the other (they overlap across by over half the narrower one).</summary>
         public static bool SameColumn(Bounds a, Bounds b, Vector3 right)
@@ -350,17 +397,17 @@ namespace Stealth.Items
 
         /// <summary>
         /// An item of this model size fits behind a part (pure): lying in a drawer — its length across the drawer's width,
-        /// its width front to back; on end behind a door — its length up the door's height, its width across the door,
-        /// its thickness within the compartment's depth.
+        /// its width front to back, its thickness under the front's top (the drawer shuts over it); on end behind a door — its
+        /// length up the door's height, its width across the door, its thickness within the compartment's depth.
         /// </summary>
-        public static bool Fits(Vector3 size, Bounds part, Vector3 forward, float depth, bool drawer)
+        public static bool Fits(Vector3 size, Bounds part, Vector3 forward, float depth, bool drawer, float floorY = 0f)
         {
             forward.y = 0;
             forward.Normalize();
             var right = Vector3.Cross(Vector3.up, forward);
             float width = Mathf.Abs(part.size.x * right.x) + Mathf.Abs(part.size.z * right.z);
             float along = Mathf.Max(size.x, size.z), across = Mathf.Min(size.x, size.z);
-            if (drawer) return along <= width - 0.04f && across <= depth;
+            if (drawer) return along <= width - TraySides && across <= Mathf.Min(depth, Travel(depth) + 0.06f) && size.y <= DrawerRoom(part, floorY);
             return along <= part.size.y - 0.04f && across <= width - 0.02f && size.y <= depth;
         }
 

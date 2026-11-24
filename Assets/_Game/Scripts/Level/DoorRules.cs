@@ -13,6 +13,9 @@ namespace Stealth.Level
     /// </summary>
     public enum DoorKind : byte { Slide, Wood, WoodDouble, Entry, Entrance, Steel, Clinic, ClinicSwing, Storage, Vehicle, Vault }
 
+    /// <summary>What holds a locked door (values are part of no save or message): a padlock people left, or the unit the robots put on.</summary>
+    public enum LockKind : byte { Mechanical, Electronic }
+
     /// <summary>
     /// One door of the house (<see cref="LevelLayout.DoorLooks"/>, parallel to <see cref="LevelLayout.AutoDoors"/>): its kind,
     /// which way it opens (<see cref="Back"/>: towards −Z of its doorway's pose; the builder turns the prefab, whose leaves open
@@ -306,6 +309,14 @@ namespace Stealth.Level
             }
             return total;
         }
+
+        /// <summary>
+        /// Who put the lock on (pure): the people's own doors — a flat's, wooden and plain steel ones of the apartment block —
+        /// have a padlock to pick; everywhere else, and all over the abandoned complex, the robots' electronic unit.
+        /// </summary>
+        public static LockKind LockOf(HouseKind house, DoorKind door) =>
+            house == HouseKind.Apartments && (door is DoorKind.Wood or DoorKind.WoodDouble or DoorKind.Entry or DoorKind.Entrance or DoorKind.Steel)
+                ? LockKind.Mechanical : LockKind.Electronic;
 
         /// <summary>The spec of the inner door <paramref name="i"/>: planned with the house, else (a hand-made layout) its kind, opening to +Z.</summary>
         public static DoorSpec Of(LevelLayout l, int i)

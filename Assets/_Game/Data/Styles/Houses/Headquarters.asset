@@ -1,0 +1,116 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd98fef2f22701e4084ed7eff71d5d66, type: 3}
+  m_Name: Headquarters
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.HouseLook
+  Kind: 4
+  ShellIn: 05000000i
+  OwnTrim: 0
+  Doors: 1
+  Baseboard: 1
+  Crown: 0
+  WainscotHeight: 0
+  RailHeight: 0
+  Pipes: 0
+  Ceiling: 0
+  StripSpacing: 0
+  Stairs: 0
+  Floor: {fileID: 0}
+  FloorTile: 2
+  Wall: {fileID: 0}
+  WallTile: 2
+  CeilingFinish: {fileID: 0}
+  CeilingTile: 1.2
+  Trim: {fileID: 2100000, guid: 1cfb7f990153b4049a1f4b93d9d62928, type: 2}
+  Panel: {fileID: 0}
+  Column: {fileID: 0}
+  Beam: {fileID: 0}
+  Pipe: {fileID: 0}
+  KeepStyleRooms: 1
+  RoomLooks:
+  - Room: 0
+    Wall: {fileID: 2100000, guid: 35f38a835b24bb54d8b99b8bd7919d56, type: 2}
+    WallTile: 2
+    Lower: {fileID: 0}
+    LowerTile: 1
+    LowerHeight: 0
+    Plain: 0
+    Ceiling: {fileID: 2100000, guid: 4118717e0364e7845b4f809288d1d7e9, type: 2}
+    CeilingTile: 2
+  - Room: 3
+    Wall: {fileID: 2100000, guid: 35f38a835b24bb54d8b99b8bd7919d56, type: 2}
+    WallTile: 2
+    Lower: {fileID: 0}
+    LowerTile: 1
+    LowerHeight: 0
+    Plain: 0
+    Ceiling: {fileID: 2100000, guid: 4118717e0364e7845b4f809288d1d7e9, type: 2}
+    CeilingTile: 2
+  - Room: 2
+    Wall: {fileID: 2100000, guid: e62b58a35f1267f4089c10e42d374a76, type: 2}
+    WallTile: 2.5
+    Lower: {fileID: 2100000, guid: 35f38a835b24bb54d8b99b8bd7919d56, type: 2}
+    LowerTile: 1
+    LowerHeight: 1
+    Plain: 0
+    Ceiling: {fileID: 2100000, guid: 4118717e0364e7845b4f809288d1d7e9, type: 2}
+    CeilingTile: 2
+  - Room: 9
+    Wall: {fileID: 2100000, guid: e62b58a35f1267f4089c10e42d374a76, type: 2}
+    WallTile: 2.5
+    Lower: {fileID: 2100000, guid: 35f38a835b24bb54d8b99b8bd7919d56, type: 2}
+    LowerTile: 1
+    LowerHeight: 1
+    Plain: 0
+    Ceiling: {fileID: 2100000, guid: 4118717e0364e7845b4f809288d1d7e9, type: 2}
+    CeilingTile: 2
+  RoomFloors:
+  - Room: 9
+    Material: {fileID: 2100000, guid: 749c82b564578224297b382e5fd17c11, type: 2}
+    Tile: 2
+  - Room: 10
+    Material: {fileID: 2100000, guid: 749c82b564578224297b382e5fd17c11, type: 2}
+    Tile: 2
+  - Room: 3
+    Material: {fileID: 2100000, guid: 2e91595d7df1e9642b7cd7bf8bebf17a, type: 2}
+    Tile: 1
+  - Room: 2
+    Material: {fileID: 2100000, guid: 2e91595d7df1e9642b7cd7bf8bebf17a, type: 2}
+    Tile: 1
+  FloorDecay: []
+  WallDecay: []
+  DecayDensity: 0
+  Posters: []
+  PosterChance: 0
+  Furniture: 0
+  FurnitureIn: 05000000i
+  Materials: []
+  Grade:
+    Exposure: 0
+    Contrast: 4
+    Saturation: 0
+    Temperature: 5
+    Tint: 0
+    ColorFilter: {r: 1, g: 1, b: 1, a: 1}
+    SplitShadows: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    SplitHighlights: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    Split: 0
+    FilmGrain: 0
+    Vignette: 0
+  Air:
+    AmbientTint: {r: 1, g: 1, b: 1, a: 1}
+    Ambient: 0.9
+    Fog: {r: 0, g: 0, b: 0, a: 1}
+    FogColor: 0
+    FogDensity: 1
+    LightScale: 1
+    LampGlow: 1

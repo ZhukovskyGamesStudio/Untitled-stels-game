@@ -93,10 +93,19 @@ namespace Stealth.Audio
     /// <summary>The voices of people: a player in the laughing gas, the hostage (pure).</summary>
     public static class PeopleSounds
     {
+        /// <summary>The recorded voice's pitch for a person (pure): one man's coughs and groans, higher for the tester and the designer.</summary>
+        public static float VoicePitch(Stealth.Player.Department who) => who switch
+        {
+            Stealth.Player.Department.Qa => 1.2f,
+            Stealth.Player.Department.Sysadmin => 0.92f,
+            Stealth.Player.Department.Designer => 1.24f,
+            _ => 1f,
+        };
+
         /// <summary>
-        /// A player in the gas: <paramref name="share"/> of the way to passing out, laughing from <paramref name="laughAt"/>.
-        /// First heavy breathing, then the laughing — a giggle, a laugh, a helpless fit — ever louder and more often.
-        /// <c>clip</c> −2 silence, −1 a breath, 0..2 a laugh; <c>gap</c> the pause after it (seconds).
+        /// A player in the gas: <paramref name="share"/> of the way to passing out, coughing from <paramref name="laughAt"/>.
+        /// First heavy breathing, then the coughing — a couple, hard ones, a fit — ever louder and more often.
+        /// <c>clip</c> −2 silence, −1 a breath, 0..2 a cough; <c>gap</c> the pause after it (seconds).
         /// </summary>
         public static (int clip, float volume, float gap) Gas(float share, float laughAt)
         {

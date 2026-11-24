@@ -18,11 +18,12 @@ import os
 import sys
 
 import bmesh
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
 import meshfix  # noqa: E402
+import printed  # noqa: E402
 import shapes as s  # noqa: E402
 from rooms_wet import bar_handle, frame  # noqa: E402  (shared helpers, read only)
 
@@ -441,7 +442,14 @@ def model_side_table():
     shade = s.lathe([(0.0, 0.79), (0.115, 0.79), (0.112, 0.8), (0.08, 0.95), (0.0, 0.95)], seg=28, loc=(lx, ly, 0))
     s.part("Eye", [shade])
     book = s.rbox((0.15, 0.2, 0.028), (-0.1, -0.06, 0.562), r=0.005, seg=1, rot=(0, 0, 18 * DEG))
-    s.part("Trim", [book])
+    turn = Matrix.Rotation(-18 * DEG, 3, "Z")
+
+    def cover(n, c, co):                         # a novel lying face up, its spine to the left
+        p = turn @ (co - Vector((-0.1, -0.06, 0.562)))
+        if n.z > 0.7:
+            return printed.cell_uv(printed.BOOK, p.x / 0.15 + 0.5, p.y / 0.2 + 0.5)
+        return printed.cell_uv(printed.CLOTH if (turn @ n).x < -0.5 or n.z < -0.5 else printed.PAPER, p.x + 0.5, p.y + 0.5)
+    printed.paint(s.part("Trim", [book]), cover)
     return export("side_table")
 
 
@@ -456,7 +464,7 @@ def model_magazine_rack():
         sp = s.boolean(sp, prism(hole_poly, x - 0.05, x + 0.05, axis="X"), "DIFFERENCE")
         s.bevel_edges(sp, 0.006, 2, angle=30)
         sides.append(sp)
-    body, lips, mags = [], [], []
+    body, lips, mags, spots = [], [], [], []
     tilt = -12 * DEG
     for k, zb in enumerate((0.08, 0.4, 0.72)):
         yf = -0.17 + 0.16 * zb + 0.012
@@ -469,10 +477,17 @@ def model_magazine_rack():
             mx += 0.02 * ((k + j) % 2)
             yb, zb2 = yf + 0.108, zb + 0.012
             c = (mx, yb + 0.5 * mh * math.sin(13 * DEG), zb2 + 0.5 * mh * math.cos(13 * DEG))
+            spots.append((c[0], w, c[2], mh))
             mags.append(s.rbox((w, 0.01, mh), c, r=0.003, seg=1, rot=(-13 * DEG, 0, (j - 0.5) * 3 * DEG)))
     s.part("Body", [*sides, *body])
     s.part("Accent", lips)
-    s.part("Trim", mags)
+    def cover(n, c, co):                         # each magazine's front shows a cover of its own, the rest is paper
+        k = min(range(len(spots)), key=lambda i: abs(spots[i][0] - c.x) + abs(spots[i][2] - c.z))
+        mx, w, mz, mh = spots[k]
+        if n.y < -0.6:
+            return printed.cell_uv(k, (co.x - mx) / w + 0.5, (co.z - mz) / (mh * math.cos(13 * DEG)) + 0.5)
+        return printed.cell_uv(printed.PAPER, 0.5 + co.x, 0.5 + co.y)
+    printed.paint(s.part("Trim", mags), cover)
     return export("magazine_rack")
 
 

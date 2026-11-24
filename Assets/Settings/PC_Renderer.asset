@@ -250,7 +250,8 @@ MonoBehaviour:
   - {fileID: 4739043123170908920}
   - {fileID: -7286244957583121396}
   - {fileID: 7899965770110007457}
-  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c820f47c6ae54871200b8885769de5eca577c6671bd1acbbbf82def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1cbc79cbf7c6a87378822f37ef959e6810f81adcab9c76c4410ce4c6b4d00ee29aa1f826190351a26dl
+  - {fileID: 3394077684430185262}
+  m_RendererFeatureMap: ad6b866f10d7b46cb4c722d6cc9ff7c820f47c6ae54871200b8885769de5eca577c6671bd1acbbbf82def970b8ab72b9e3081d71f619f78e8bcf8507d81b6b1cbc79cbf7c6a87378822f37ef959e6810f81adcab9c76c4410ce4c6b4d00ee29aa1f826190351a26d2ea38ae0ab2f1a2fl
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 3
@@ -408,6 +409,20 @@ MonoBehaviour:
       offset: {x: 0, y: 0, z: 0, w: 0}
       cameraFieldOfView: 60
     depthInputAttachment: 0
+--- !u!114 &3394077684430185262
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb9f2fe3baf0e8c46bf390df937e6187, type: 3}
+  m_Name: ScreenSpaceReflection
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.ScreenSpaceReflectionRendererFeature
+  m_Active: 1
+  afterOpaque: 0
 --- !u!114 &4739043123170908920
 MonoBehaviour:
   m_ObjectHideFlags: 1

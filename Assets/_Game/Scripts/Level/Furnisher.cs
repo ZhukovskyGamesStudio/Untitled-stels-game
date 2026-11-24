@@ -155,6 +155,7 @@ namespace Stealth.Level
             [PropKind.MetalShelving] = Rect.MinMaxRect(-0.9f, -0.25f, 0.9f, 0.25f),
             [PropKind.DrumPair] = Rect.MinMaxRect(-0.45f, -0.3f, 0.45f, 0.3f),
             [PropKind.HandTruck] = Rect.MinMaxRect(-0.24f, -0.26f, 0.24f, 0.25f),
+            [PropKind.LowShelf] = Rect.MinMaxRect(-0.45f, -0.23f, 0.45f, 0.23f),
             [PropKind.CrateStack] = Rect.MinMaxRect(-0.6f, -0.39f, 0.6f, 0.39f),
             [PropKind.RollingCage] = Rect.MinMaxRect(-0.44f, -0.34f, 0.44f, 0.34f),
             [PropKind.Plotter] = Rect.MinMaxRect(-0.75f, -0.3f, 0.75f, 0.3f),

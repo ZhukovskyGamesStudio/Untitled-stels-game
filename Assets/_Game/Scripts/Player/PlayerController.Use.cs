@@ -65,7 +65,7 @@ namespace Stealth.Player
         /// Owner: the sound of the hands at work while E is held — keys tapped hacking a robot, a pick ticking in a lock, a
         /// screwdriver's ratchet at a grille (the end of it has its own sound: the robot's, the lock's, the grille's).
         /// </summary>
-        Vector3 m_WorkWas;
+        Vector4 m_WorkWas;
 
         void WorkSounds()
         {
@@ -74,14 +74,16 @@ namespace Stealth.Player
             // so it is the progress growing this frame that sounds, not its being there
             float hack = HackTarget != null ? HackProgress : 0f, pick = DoorTarget != null ? DoorProgress : 0f;
             float screw = UseTarget != null && UseTarget.Kind is UseKind.VentGrille or UseKind.VentGrate ? UseProgress : 0f;
-            bool hacking = hack > m_WorkWas.x, picking = pick > m_WorkWas.y, screwing = screw > m_WorkWas.z;
-            m_WorkWas = new Vector3(hack, pick, screw);
+            float desk = UsingTerminal != null ? TerminalHackShare : 0f; // at a hacking terminal
+            bool hacking = hack > m_WorkWas.x || desk > m_WorkWas.w, picking = pick > m_WorkWas.y, screwing = screw > m_WorkWas.z;
+            m_WorkWas = new Vector4(hack, pick, screw, desk);
             if (bank == null || Time.time < m_NextWorkTick) return;
             AudioClip clip = null;
             float gap = 0.3f;
-            if (hacking) { clip = bank.WorkHack; gap = 0.22f; }
-            else if (picking) { clip = bank.WorkPick; gap = 0.16f; }
-            else if (screwing) { clip = bank.WorkScrew; gap = 0.3f; }
+            if (hacking) { clip = Audio.SoundBank.Any(bank.WorkHack); gap = 0.22f; }
+            else if (picking && DoorTarget.Lock == LockKind.Electronic) { clip = Audio.SoundBank.Any(bank.WorkUnit); gap = 0.34f; }
+            else if (picking) { clip = Audio.SoundBank.Any(bank.WorkPick); gap = 0.2f; }
+            else if (screwing) { clip = Audio.SoundBank.Any(bank.WorkScrew); gap = 0.42f; }
             if (clip == null) return;
             m_NextWorkTick = Time.time + gap * Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.85f, 1.15f);
             Audio.Sfx.At(clip, Hands, 0.7f, Audio.Sfx.Group.Items, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.93f, 1.07f));
@@ -99,7 +101,7 @@ namespace Stealth.Player
         /// <summary>Owner: press (or hold) E at a crate, the med table, the workbench, a key lock, a lever, the car.</summary>
         void UpdateUse(bool holdE)
         {
-            bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null
+            bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null || StorageTarget != null
                         || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0;
             UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
@@ -142,7 +144,8 @@ namespace Stealth.Player
             var storage = LookTarget.At<Items.Storage>(Camera.transform, transform, m_Interaction.LookReach, m_Interaction.LookRadius, out var hit);
             if (storage == null || storage.Index < 0) return;
             StorageTarget = storage;
-            StoragePart = storage.PartOf(hit.collider, hit.point);
+            StoragePart = storage.PartUnder(Camera.transform.position, Camera.transform.forward); // the very front looked at, a small drawer's too
+            if (StoragePart < 0) StoragePart = storage.PartOf(hit.collider, hit.point);
             if (StoragePart < 0 || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
             Link.SendUse(UseKind.StoragePart, OpenKeys.StoragePart(storage.Index, StoragePart));
         }

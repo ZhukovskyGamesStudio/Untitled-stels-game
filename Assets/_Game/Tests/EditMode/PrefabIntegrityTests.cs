@@ -40,6 +40,9 @@ namespace Stealth.Tests
             "AutoDoor.PanelB",
             "AutoDoor.SwingB",               // only the street doors have a second leaf
             "AutoDoor.Wheel",                // only the vault's door has a wheel to spin
+            "AutoDoor.LockedPicture",        // only the storage room's door shows its terminal's picture
+            "AutoDoor.OpenPicture",
+            "AutoDoor.Barrier",              // only the vault's door keeps robots out by itself
             "AutoDoor.BlockerB",             // only a door-and-a-half's narrow leaf has a blocker of its own
             "LiftButton.Cab",                // a call button on a landing is not in the cab
             "AutoDoor.Number",               // only a flat's entry door carries its number

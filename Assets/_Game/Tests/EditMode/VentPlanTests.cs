@@ -3,6 +3,7 @@ using System.Linq;
 using NUnit.Framework;
 using Stealth.Configs;
 using Stealth.Level;
+using UnityEditor;
 using UnityEngine;
 
 namespace Stealth.Tests
@@ -156,6 +157,7 @@ namespace Stealth.Tests
         public void SomeGratesHaveAWayUpButNeverTheFirstRoom()
         {
             int climbs = 0, grates = 0;
+            var kinds = new System.Collections.Generic.HashSet<PropKind>();
             foreach (var l in Houses())
             {
                 Assert.AreEqual(-1, l.Vents[0].Grates[0].ClimbDir, $"seed {l.Seed}: a way up in the team's first room");
@@ -168,28 +170,88 @@ namespace Stealth.Tests
                         if (g.ClimbDir < 0) continue;
                         climbs++;
                         Assert.AreNotEqual(l.LobbyRoom, g.Room, "never in the lobby");
-                        // the crates right under the grate, the desk beside them
+                        // the room's own furniture: the top right under the grate, the step beside it
                         var under = new Vector3(g.Position.x, LevelLayout.FloorY(net.Floor), g.Position.z);
-                        var desk = under + VentPlan.ClimbSide(g.ClimbDir) * (VentPlan.StackHalf + VentPlan.DeskHalf + 0.02f);
-                        bool stack = l.Props.Any(p => p.Kind == PropKind.CrateStack && (p.Position - under).sqrMagnitude < 0.01f);
-                        bool table = l.Props.Any(p => p.Kind == PropKind.Desk && (p.Position - desk).sqrMagnitude < 0.01f);
-                        if (stack) Assert.IsTrue(table, $"seed {l.Seed}: crates without their desk");
+                        var type = l.Plan.Rooms[g.Room].Type;
+                        Assert.IsTrue(Furnisher.HasClimb(l, type, under, VentPlan.ClimbSide(g.ClimbDir)), $"seed {l.Seed}: half a way up in a {type}");
+                        kinds.Add(Furnisher.ClimbOf(type).Top);
                     }
             }
             // (corridors, halls, the lobby, the exit and the robots' rooms never have one; a busy room may have no place for it)
             // (the whole-room walk check keeps a busy room's way up out more often than it used to; grates clear of the lamps and
             // the smaller hospitals leave fewer rooms with a place for one: a thirtieth at least)
             Assert.That(climbs, Is.InRange(grates / 30, grates * 3 / 4), $"{climbs} of {grates} grates have a way up");
+            Assert.GreaterOrEqual(kinds.Count, 3, "not the same pile everywhere: " + string.Join(", ", kinds));
+            Assert.IsFalse(kinds.Contains(PropKind.CrateStack), "crates only where crates are kept");
+        }
+
+        /// <summary>The highest solid top of a piece at a point of its own floor plan (0: nothing there).</summary>
+        static float TopAt(GameObject go, float x, float z)
+        {
+            float top = 0f;
+            foreach (var c in go.GetComponentsInChildren<Collider>())
+                if (c.Raycast(new Ray(go.transform.position + new Vector3(x, 4f, z), Vector3.down), out var hit, 5f)) top = Mathf.Max(top, hit.point.y - go.transform.position.y);
+            return top;
+        }
+
+        [Test]
+        public void EveryRoomsWayUpCanBeClimbed()
+        {
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            const float jump = 1.05f;
+            foreach (RoomType type in System.Enum.GetValues(typeof(RoomType)))
+            {
+                var set = Furnisher.ClimbOf(type);
+                float Height(PropKind kind, float at)
+                {
+                    var prefab = art.Prop(kind);
+                    Assert.IsNotNull(prefab, $"{type}: no {kind}");
+                    var go = Object.Instantiate(prefab, new Vector3(700f, 0f, 700f), Quaternion.identity);
+                    try
+                    {
+                        Physics.SyncTransforms();
+                        // most of what is under the feet (a bench's slats have gaps between them)
+                        var tops = new System.Collections.Generic.List<float>();
+                        for (float x = -0.2f; x <= 0.21f; x += 0.08f)
+                            for (float z = -0.14f; z <= 0.15f; z += 0.07f) tops.Add(TopAt(go, at + x, z));
+                        tops.Sort();
+                        return tops[tops.Count / 2];
+                    }
+                    finally { Object.DestroyImmediate(go); }
+                }
+                // (a desk's middle holds its screen: beside it)
+                float step = Height(set.Step, set.Step is PropKind.Desk or PropKind.DoctorDesk or PropKind.WorkTable or PropKind.ReadingTable ? 0.55f : 0f);
+                if (set.Top == PropKind.CrateStack) continue; // as it always was
+                float top = Height(set.Top, 0.1f);
+                Assert.That(step, Is.InRange(0.4f, 1.0f), $"{type}: from the floor onto the {set.Step}");
+                Assert.LessOrEqual(top - step, jump - 0.05f, $"{type}: from the {set.Step} onto the {set.Top}");
+                Assert.IsTrue(VentGrate.IntoDuct(new Vector3(0f, top + jump, 0f), new Vector3(0f, LevelMetrics.WallHeight, 0f), true, true), $"{type}: from the {set.Top} ({top:0.00} m) into the duct");
+                Assert.Less(top + 1.1f, LevelMetrics.WallHeight, $"{type}: crouched on the {set.Top}, under the ceiling");
+                // the pieces stand side by side: touching, not in one another, the top under the grate
+                foreach (bool flip in new[] { false, true })
+                {
+                    var pieces = Furnisher.ClimbPieces(type, Vector3.zero, Vector3.right, flip);
+                    for (int i = 0; i < pieces.Count; i++)
+                        for (int j = 0; j < i; j++)
+                        {
+                            var a = Furnisher.FootAt(pieces[i].kind, pieces[i].pos, pieces[i].yaw);
+                            var b = Furnisher.FootAt(pieces[j].kind, pieces[j].pos, pieces[j].yaw);
+                            a = new Rect(a.x + 0.005f, a.y + 0.005f, a.width - 0.01f, a.height - 0.01f);
+                            Assert.IsFalse(a.Overlaps(b), $"{type}: {pieces[i].kind} in {pieces[j].kind}");
+                        }
+                    Assert.Less(Mathf.Abs(pieces[pieces.Count - 1].pos.x), 1.6f, $"{type}: the step within reach");
+                }
+            }
         }
 
         [Test]
         public void ACrouchedJumpFromTheCratesGetsIntoTheDuct()
         {
             var grate = new Vector3(0f, LevelMetrics.WallHeight, 0f);
-            float crates = 1.385f, jump = 1.05f;
+            float crates = 1.3f, jump = 1.05f; // (the lowest top: a filing cabinet)
             Assert.IsTrue(VentGrate.IntoDuct(new Vector3(0.1f, crates + jump, 0f), grate, true, true), "the top of the jump from the crates");
             Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.1f, crates + jump, 0f), grate, false, true), "standing: the head bumps");
-            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.1f, 0.92f + jump, 0f), grate, true, true), "from the desk: too low");
+            Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.1f, 0.92f + jump, 0f), grate, true, true), "from the step: too low");
             Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.8f, crates + jump, 0f), grate, true, true), "beside the hole");
             Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0f, crates + jump, 0f), grate, true, false), "falling back down");
         }

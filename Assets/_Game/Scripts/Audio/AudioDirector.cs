@@ -160,16 +160,17 @@ namespace Stealth.Audio
 
             UpdateMusic(me, gm, me != null && gm != null); // the sewer is part of the game too (not the menu track)
             UpdateAmbience(me, gm, inGame);
+            // people are heard wherever they are: in the sewer too, where no house stands yet (or any more)
+            if (me != null && gm != null) UpdatePlayers(me);
+            else m_Players.Clear();
             if (!inGame)
             {
-                m_Players.Clear();
                 m_Detectors.Clear();
                 m_LastCollected = -1;
                 m_LastLevel = -1;
                 return;
             }
             UpdateRun(gm);
-            UpdatePlayers(me);
             UpdateHostage(me);
             UpdateDetectors();
             UpdateBackpack(me);
@@ -268,20 +269,21 @@ namespace Stealth.Audio
 
                 if (p.Downed != w.Downed)
                 {
-                    Sfx.At(p.Downed ? Bank.Downed : Bank.Revive, pos + Vector3.up, 1f, Sfx.Group.Items);
+                    Sfx.At(p.Downed ? Bank.Downed : Bank.Revive, pos + Vector3.up, 1f, Sfx.Group.Items, p.Downed ? PeopleSounds.VoicePitch(p.Department) : 1f);
                     w.Downed = p.Downed;
                 }
                 if (p.Downed) continue;
 
-                // the laughing gas: heavy breathing, then laughing ever harder (everyone hears it, from the replicated share)
+                // the gas: heavy breathing, then coughing ever harder (everyone hears it, from the replicated share)
                 var (gasClip, gasVolume, gasGap) = PeopleSounds.Gas(p.GasShare, p.GasLaughShare);
                 if (gasClip > -2 && Time.time >= w.NextGas)
                 {
-                    var clip = gasClip < 0 ? Bank.GasBreath : Bank.GasLaugh != null && gasClip < Bank.GasLaugh.Length ? Bank.GasLaugh[gasClip] : null;
+                    var clip = gasClip < 0 ? Bank.GasBreath : Bank.GasCough != null && gasClip < Bank.GasCough.Length ? Bank.GasCough[gasClip] : null;
                     if (clip != null)
                     {
-                        Sfx.At(clip, pos + Vector3.up * 1.6f, volume * gasVolume, Sfx.Group.Footsteps);
-                        w.NextGas = Time.time + clip.length + gasGap;
+                        float voice = PeopleSounds.VoicePitch(p.Department);
+                        Sfx.At(clip, pos + Vector3.up * 1.6f, volume * gasVolume, Sfx.Group.Footsteps, voice);
+                        w.NextGas = Time.time + clip.length / voice + gasGap;
                     }
                 }
                 // riding in the car (or on a ladder) the body moves without its feet: no steps, no jumps
@@ -291,6 +293,7 @@ namespace Stealth.Audio
                     case AirEvent.Jump: Sfx.At(Bank.Jump, pos, volume * 0.8f, Sfx.Group.Footsteps); break;
                     case AirEvent.Land:
                         Sfx.At(Bank.Land, pos, volume, Sfx.Group.Footsteps);
+                        Sfx.At(SoundBank.Any(Bank.Steps(StepSurfaces.At(pos))), pos, volume * 0.8f, Sfx.Group.Footsteps, 0.86f); // on what they came down
                         w.NextStep = Time.time + 0.25f;
                         break;
                 }
@@ -300,9 +303,7 @@ namespace Stealth.Audio
                 if (float.IsInfinity(interval)) { w.NextStep = Mathf.Max(w.NextStep, Time.time + 0.12f); continue; }
                 if (Time.time < w.NextStep) continue;
                 w.NextStep = Time.time + interval;
-                var clips = Bank.Footsteps;
-                if (clips == null || clips.Length == 0) continue;
-                Sfx.At(clips[Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Next(clips.Length)], pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
+                Sfx.At(SoundBank.Any(Bank.Steps(StepSurfaces.At(pos))), pos, volume * AudioRules.StepVolume(speed, p.Crouching, m_Mix), Sfx.Group.Footsteps, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));
             }
             Prune(m_Players, PlayerController.All);
         }

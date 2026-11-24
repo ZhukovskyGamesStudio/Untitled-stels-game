@@ -9,7 +9,7 @@ namespace Stealth.Level
     /// are not <see cref="Interactable"/>s: a locked door's lock (index: the door), a safe's dial (the prop), a storage part
     /// (<see cref="OpenKeys.StoragePart"/>: the prop and its part).
     /// </summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, Door }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the
@@ -33,6 +33,8 @@ namespace Stealth.Level
         public virtual Vector3 Point => transform.position + Vector3.up * 0.8f;
         /// <summary>How close to <see cref="Point"/> the crosshair must pass for the player to be looking at it, metres.</summary>
         public virtual float AimRadius => 0.45f;
+        /// <summary>The span the crosshair must pass near (its point, unless the thing is bigger than that).</summary>
+        protected virtual (Vector3 from, Vector3 to, float radius) Span { get { var p = Point; return (p, p, AimRadius); } }
         /// <summary>Colliders under this do not stand between the hands and <see cref="Point"/> (the thing's own body: a car's cab).</summary>
         public virtual Transform ReachRoot => transform;
 
@@ -63,7 +65,7 @@ namespace Stealth.Level
         bool IReachTarget.CanReach(Vector3 player) => Index >= 0 && isActiveAndEnabled;
         Vector3 IReachTarget.ReachPoint => Point;
         float IReachTarget.MaxReach => Reach;
-        (Vector3, Vector3, float) IReachTarget.AimSpan { get { var p = Point; return (p, p, AimRadius); } }
+        (Vector3, Vector3, float) IReachTarget.AimSpan => Span;
         Vector3? IReachTarget.HandsTo => Point;
         Transform IReachTarget.ReachRoot => ReachRoot;
     }

@@ -63,7 +63,7 @@ namespace Stealth.Level
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (layout != null) PlanRoomCeilings(list, shell, layout, g);
             if (layout != null) PlanThresholds(list, shell, layout, g);
-            // (rooms with a floor of their own get it even where the style keeps the bare slab: the shop's epoxy, ShopLook)
+            // (rooms with a floor of their own get it even where the style keeps the bare slab: the shop's epoxy, Data/Styles/Houses/Garage)
             if (layout != null && (layout.VaultRoom >= 0 || g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
             else if (g.Floor != null)
                 foreach (var r in shell.Floors)
@@ -534,12 +534,16 @@ namespace Stealth.Level
         /// (<see cref="DecorPiece.Variant"/>: 0 the style's, 1 + 2k a room look's, −1 none), of its lower band (−1 none) and
         /// the band's top.
         /// </summary>
-        static (int upper, int lower, float split) SideFinish(WallOpening o, Vector3 into, StyleGeometry g, LevelLayout layout)
+        static (int upper, int lower, float split) SideFinish(WallOpening o, Vector3 into, StyleGeometry g, LevelLayout layout) =>
+            FinishInto(o.Center, into, g, layout);
+
+        /// <summary>The same for any spot of a wall (on the floor, in the wall's middle).</summary>
+        public static (int upper, int lower, float split) FinishInto(Vector3 at, Vector3 into, StyleGeometry g, LevelLayout layout)
         {
             int k = -1;
             if (layout != null && layout.Plan != null && g.RoomLooks != null && g.RoomLooks.Length > 0)
             {
-                var room = layout.Plan.RoomAt(o.Center + into * 0.5f + Vector3.up * 0.5f);
+                var room = layout.Plan.RoomAt(at + into * 0.5f + Vector3.up * 0.5f);
                 if (room != null) k = g.RoomLookOf(room.Type);
             }
             if (k < 0) return (g.Wall != null ? 0 : -1, -1, 0f);

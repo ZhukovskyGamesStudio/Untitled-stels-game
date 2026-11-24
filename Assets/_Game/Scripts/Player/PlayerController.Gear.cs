@@ -78,20 +78,21 @@ namespace Stealth.Player
             {
                 if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Medkit)) return true;
                 HealServer(HealthState.MaxHp - Hp);
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
+                GameManager.Instance?.SoundServer(Audio.GameSound.Heal, Hands);
                 return true;
             }
             if (e.Shape == ItemCatalog.Bandage)
             {
                 if (Hp >= HealthState.MaxHp || !inv.TakeHeldServer(ItemCatalog.Bandage)) return true;
                 HealServer(Mathf.Min(Gear.BandageHp, HealthState.MaxHp - Hp));
-                Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Pickup : null, transform.position + Vector3.up, 0.8f, Audio.Sfx.Group.Items);
+                GameManager.Instance?.SoundServer(Audio.GameSound.Bandage, Hands);
                 return true;
             }
             if (e.Shape == ItemCatalog.Coffee)
             {
                 if (!inv.TakeHeldServer(ItemCatalog.Coffee)) return true;
                 CoffeeUntil = System.Math.Max(CoffeeUntil, Session.ServerTime) + Gear.CoffeeSeconds;
+                GameManager.Instance?.SoundServer(Audio.GameSound.Drink, Hands + Vector3.up * 0.3f);
                 return true;
             }
             return false;

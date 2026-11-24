@@ -41,8 +41,10 @@ namespace Stealth.Level
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
         static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly int BaseMapId = Shader.PropertyToID("_BaseMap"), EmissionMapId = Shader.PropertyToID("_EmissionMap");
-        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f), DoorsColor = new(1f, 0.25f, 0.15f),
-            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
+        static readonly Color CamerasColor = new(0.3f, 1f, 0.45f), HackingColor = new(0.3f, 0.65f, 1f),
+            MapColor = new(1f, 0.72f, 0.25f), SpentColor = new(0.25f, 0.27f, 0.3f);
+        /// <summary>The storeroom locked and open: the same on its station and over its door (<see cref="AutoDoor.Pictures"/>).</summary>
+        public static readonly Color DoorsColor = new(1f, 0.25f, 0.15f), DoorsOpenColor = new(0.3f, 1f, 0.45f);
 
         MaterialPropertyBlock m_Block;
         int m_Shown = -1;

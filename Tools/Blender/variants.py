@@ -35,6 +35,7 @@ from mathutils import Matrix, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import meshfix  # noqa: E402
+import printed  # noqa: E402
 import shapes as s  # noqa: E402
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -806,7 +807,7 @@ def book(h, t, d, ridges=0, paper=False, simple=False):
 def model_book(k):
     h, t, d, ridges, paper = BOOKS[k]
     covers, pages = book(h, t, d, ridges, paper)
-    s.part("Body", covers)
+    printed.paint(s.part("Body", covers), printed.spine_rule(k, h, t))
     s.part("Accent", pages, sharp_angle=30)
     name = f"book_{k}"
     info = export(name, floor=True)
@@ -822,7 +823,7 @@ def model_book_lean():
     mat = Matrix.Rotation(lean * DEG, 4, "Y") @ Matrix.Translation((-t / 2, 0, 0))
     for bm in covers + pages:
         transform(bm, mat)
-    s.part("Body", covers)
+    printed.paint(s.part("Body", covers), printed.spine_rule(6, h, t, mat.inverted()))
     s.part("Accent", pages, sharp_angle=30)
     info = export("book_lean", floor=True)
     info.update({"width": t, "height": h, "depth": d, "lean_deg": lean, "lean_dir": [-1.0, 0.0, 0.0],
@@ -836,7 +837,7 @@ def model_book_stack():
     """Four books lying flat, largest at the bottom, each a little offset and turned, spines to -Y."""
     specs = [(0.29, 0.042, 0.21, 0.0, 0.0, 0), (0.26, 0.03, 0.18, 0.014, 4.0, 0), (0.24, 0.036, 0.17, -0.01, -3.0, 0),
              (0.2, 0.024, 0.14, 0.006, 6.0, 0)]
-    covers_all, pages_all = [], []
+    covers_all, pages_all, rules = [], [], []
     z = 0.0
     for h, t, d, dx, yaw, ridges in specs:
         covers, pages = book(h, t, d, ridges, False, simple=True)
@@ -846,9 +847,10 @@ def model_book_stack():
             transform(bm, mat)
         covers_all += covers
         pages_all += pages
+        rules.append((z + t, printed.spine_rule(len(rules), h, t, mat.inverted())))
         z += t - 0.0005                  # a hair of overlap, clear of the page block under the board
-    s.part("Body", covers_all)
-    s.part("Accent", pages_all, sharp_angle=30)
+    printed.paint(s.part("Body", covers_all), lambda n, c, co: next(r for top, r in rules if c.z <= top + 0.002)(n, c, co))
+    printed.swap_uv(s.part("Accent", pages_all, sharp_angle=30))
     info = export("book_stack", floor=True)
     lo, hi = info["bounds_min"], info["bounds_max"]
     info.update({"width": round(hi[0] - lo[0], 3), "height": round(hi[1] - lo[1], 3), "depth": round(hi[2] - lo[2], 3)})

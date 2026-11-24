@@ -686,6 +686,7 @@ namespace Stealth.Game
             UpdateHacks();
             UpdateDryers();
             UpdateStorageDoor();
+            UpdateDoorsServer();
             UpdateLift();
             UpdateObjective();
             UpdateHouseEntry();
@@ -793,7 +794,7 @@ namespace Stealth.Game
             float bestScore = -1f;
             foreach (var p in layout.PatrolPoints)
             {
-                if (LevelLayout.FloorOf(p.y) != 0) continue;
+                if (LevelLayout.FloorOf(p.y) != 0 || layout.IsVault(p)) continue;
                 float score = float.MaxValue;
                 foreach (var pl in PlayerController.All) score = Mathf.Min(score, Vector3.Distance(p, pl.transform.position));
                 if (score > bestScore) { bestScore = score; best = p; }
@@ -1001,7 +1002,8 @@ namespace Stealth.Game
             OpenedVersion++;
             if (!open || !m_Hidden.Remove(key, out var loot)) return;
             var (pos, rot) = storage.LootPose(part, loot.shape);
-            Session.Spawn(ItemPrefab, pos, rot, go => go.GetComponent<WorldItem>().SetLook(loot.shape, loot.color));
+            var item = Session.Spawn(ItemPrefab, pos, rot, go => go.GetComponent<WorldItem>().SetLook(loot.shape, loot.color));
+            if (item != null) item.GetComponent<WorldItem>().RideServer(storage, part);
         }
 
         /// <summary>

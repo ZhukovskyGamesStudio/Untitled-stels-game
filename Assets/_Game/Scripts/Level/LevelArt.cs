@@ -49,7 +49,7 @@ namespace Stealth.Level
         public CityMesh[] CityMeshes = new CityMesh[0];
         [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
         public Material[] UtilityMaterials = new Material[0];
-        [Tooltip("The furniture's screens: the glowing material the models carry, then what it becomes in a house — off, static, cracked (ScreenLook's order; ScreenLooks).")]
+        [Tooltip("The furniture's screens: the glowing material the models carry, then what it becomes in a house — off, static, cracked, no signal, the boot menu (ScreenLook's order; ScreenLooks).")]
         public Material[] Screens = new Material[0];
         [Tooltip("A plain steel door-and-a-half on hinges (the shop, the plant room, storerooms): a louvre at the bottom, a wired-glass slot")] public GameObject ShopDoor;
         [Tooltip("The paint booth's sliding door, wide enough for a car (LevelMetrics.VehicleDoorWidth)")] public GameObject VehicleDoor;

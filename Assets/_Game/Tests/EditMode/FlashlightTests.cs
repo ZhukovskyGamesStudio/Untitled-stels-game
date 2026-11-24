@@ -117,6 +117,32 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void AThingFromOutsideGoesStraightIntoTheHand()
+        {
+            var inv = Inventory();
+            inv.Bind(null);
+            for (int shape = 0; shape < ItemCatalog.Shapes.Length; shape++)
+            {
+                Assert.AreEqual(ItemCatalog.Holdable(shape), inv.CanTake(shape, 0, PlayerInventory.HandX, 0), $"shape {shape}: an empty hand");
+                inv.ApplyReplicated(new[] { new InventoryEntry { Shape = ItemCatalog.Flashlight, Color = 50, X = PlayerInventory.HandX } });
+                Assert.AreEqual(ItemCatalog.Holdable(shape), inv.CanTake(shape, 0, PlayerInventory.HandX, 0), $"shape {shape}: a busy hand");
+                inv.ApplyReplicated(new InventoryEntry[0]);
+            }
+            // a thing lying on the floor, the hand busy: the held one goes into the backpack
+            inv.ApplyReplicated(new[] { new InventoryEntry { Shape = ItemCatalog.Flashlight, Color = 50, X = PlayerInventory.HandX } });
+            var go = new GameObject("Item");
+            go.SetActive(false);
+            var item = go.AddComponent<WorldItem>();
+            item.SetLook(ItemCatalog.Screwdriver, 0);
+            go.transform.position = inv.transform.position;
+            inv.PickupServer(item, PlayerInventory.HandX, 0, 0);
+            Assert.AreEqual(ItemCatalog.Screwdriver, inv.Items[inv.HandIndex()].Shape);
+            Assert.AreEqual(2, inv.Items.Count, "nothing is lost");
+            Assert.IsFalse(PlayerInventory.InHand(inv.Items.First(e => e.Shape == ItemCatalog.Flashlight)));
+            if (go != null) Object.DestroyImmediate(go);
+        }
+
+        [Test]
         public void ABatteryRechargesAFlashlightThatIsNotFull()
         {
             var inv = Inventory();

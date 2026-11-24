@@ -106,11 +106,8 @@ namespace Stealth.Tests
         [Test]
         public void TheShopIsDressedAsAWorkshopInEveryStyle()
         {
-            var kit = AssetDatabase.LoadAssetAtPath<StyleKit>("Assets/_Game/Data/Styles/StyleKit.asset");
-            Assert.IsNotNull(kit.ShopWall);
-            Assert.IsNotNull(kit.BoothFloor);
             var style = new StyleGeometry { Doors = DoorTrim.Arch, Crown = true, WainscotHeight = 1f, RailHeight = 0.9f };
-            var shop = ShopLook.For(style, kit, TestHouses.Get(7, 1));
+            var shop = VisualStyles.LookOf(TestHouses.Get(7, 1)).Dress(style);
             Assert.AreNotSame(style, shop, "a copy: the style itself stays as it is");
             Assert.AreEqual(DoorTrim.Arch, style.Doors);
             Assert.AreEqual(DoorTrim.Casing, shop.Doors, "plain steel frames, no arches or pilasters");
@@ -119,13 +116,13 @@ namespace Stealth.Tests
             Assert.AreEqual(0f, shop.RailHeight);
             Assert.IsTrue(shop.Pipes, "services in the open");
             var hall = shop.RoomLooks[shop.RoomLookOf(RoomType.Workshop)];
-            Assert.AreSame(kit.ShopWall, hall.Wall, "painted block");
-            Assert.AreSame(kit.ShopWallLower, hall.Lower, "a dark band low");
-            Assert.AreSame(kit.ShopCeiling, hall.Ceiling, "a metal deck overhead");
-            Assert.AreSame(kit.ShopFloor, shop.RoomFloors[shop.RoomFloorOf(RoomType.Workshop)].Material, "an epoxy floor");
-            Assert.AreSame(kit.BoothWall, shop.RoomLooks[shop.RoomLookOf(RoomType.PaintBooth)].Wall, "filter panels in the booth");
-            Assert.AreSame(kit.BoothFloor, shop.RoomFloors[shop.RoomFloorOf(RoomType.PaintBooth)].Material, "a grating underfoot");
-            Assert.AreSame(style, ShopLook.For(style, kit, TestHouses.Get(42, 2)), "an office keeps the style");
+            Assert.AreEqual("Shop_Wall", hall.Wall.name, "painted block");
+            Assert.AreEqual("Shop_WallLower", hall.Lower.name, "a dark band low");
+            Assert.AreEqual("Shop_Ceiling", hall.Ceiling.name, "a metal deck overhead");
+            Assert.AreEqual("Shop_Floor", shop.RoomFloors[shop.RoomFloorOf(RoomType.Workshop)].Material.name, "an epoxy floor");
+            Assert.AreEqual("Booth_Wall", shop.RoomLooks[shop.RoomLookOf(RoomType.PaintBooth)].Wall.name, "filter panels in the booth");
+            Assert.AreEqual("Booth_Floor", shop.RoomFloors[shop.RoomFloorOf(RoomType.PaintBooth)].Material.name, "a grating underfoot");
+            Assert.AreSame(style, VisualStyles.LookOf(TestHouses.Get(42, 2)).Dress(style), "an office keeps the style (one that is not made of scans)");
         }
 
         [Test]

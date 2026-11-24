@@ -77,6 +77,9 @@ namespace Stealth.Player
         float m_TerminalHold;
         bool m_TerminalWaitRelease;
 
+        /// <summary>A key of the terminal pressed: sitting down at it, another camera, another floor.</summary>
+        void TerminalKeySound() => Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.TerminalKey : null, Hands, 0.7f, Audio.Sfx.Group.Items);
+
         /// <summary>
         /// Owner: E at a terminal sits down at it. A/D (or the mouse buttons) flip through what it shows, Space or S stands up.
         /// At a hacking terminal holding E hacks the robot on the screen (a charge of the terminal is spent on the server).
@@ -90,6 +93,7 @@ namespace Stealth.Player
                 if (TerminalTarget != null && TerminalTarget.Kind == TerminalKind.Doors) TerminalTarget = null; // nothing to sit at: hold E to open the door
                 if (TerminalTarget == null || CursorMode || !Controls.Pressed(GameAction.Interact)) return;
                 StartTerminal(TerminalTarget);
+                TerminalKeySound();
                 return;
             }
             var t = UsingTerminal;
@@ -111,6 +115,7 @@ namespace Stealth.Player
                 int step = (Controls.Pressed(GameAction.Right) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || scroll > 0f ? 1 : 0)
                          - (Controls.Pressed(GameAction.Left) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || scroll < 0f ? 1 : 0);
                 int floors = Mathf.Max(1, ActiveLevel.Layout != null ? ActiveLevel.Layout.Floors : 1);
+                if (step != 0) TerminalKeySound();
                 TerminalFloor = Mathf.Clamp(TerminalFloor + step, 0, floors - 1);
                 return;
             }
@@ -119,8 +124,10 @@ namespace Stealth.Player
             // cameras: A/D and the mouse turn the camera, the mouse buttons and the wheel switch it; robots: A/D switch too
             bool steer = t.Kind == TerminalKind.Cameras;
             float wheel = mouse != null ? mouse.scroll.ReadValue().y : 0f;
+            int shown = m_TerminalIndex;
             if ((!steer && Controls.Pressed(GameAction.Right)) || (mouse != null && mouse.leftButton.wasPressedThisFrame) || wheel < 0f) m_TerminalIndex++;
             if ((!steer && Controls.Pressed(GameAction.Left)) || (mouse != null && mouse.rightButton.wasPressedThisFrame) || wheel > 0f) m_TerminalIndex--;
+            if (m_TerminalIndex != shown) TerminalKeySound();
             int n = m_TerminalTargets.Count;
             m_TerminalIndex = (m_TerminalIndex % n + n) % n;
             var view = m_TerminalTargets[m_TerminalIndex];

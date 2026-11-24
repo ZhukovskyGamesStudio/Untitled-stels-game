@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd98fef2f22701e4084ed7eff71d5d66, type: 3}
+  m_Name: Warehouse
+  m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.HouseLook
+  Kind: 3
+  ShellIn: 05000000i
+  OwnTrim: 1
+  Doors: 1
+  Baseboard: 1
+  Crown: 0
+  WainscotHeight: 0
+  RailHeight: 0
+  Pipes: 1
+  Ceiling: 4
+  StripSpacing: 0
+  Stairs: 0
+  Floor: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+  FloorTile: 3
+  Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+  WallTile: 2
+  CeilingFinish: {fileID: 0}
+  CeilingTile: 1.2
+  Trim: {fileID: 2100000, guid: 7cf11b547c85dcc439d6448d65c3c66b, type: 2}
+  Panel: {fileID: 0}
+  Column: {fileID: 0}
+  Beam: {fileID: 0}
+  Pipe: {fileID: 0}
+  KeepStyleRooms: 1
+  RoomLooks:
+  - Room: 6
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 00b3d7d2f50bd634ea3660e2b20036d1, type: 2}
+    CeilingTile: 1.5
+  - Room: 9
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 0a096f9837bbed7489136d3079953263, type: 2}
+    CeilingTile: 1.5
+  - Room: 10
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 00b3d7d2f50bd634ea3660e2b20036d1, type: 2}
+    CeilingTile: 1.5
+  - Room: 0
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 0a096f9837bbed7489136d3079953263, type: 2}
+    CeilingTile: 1.5
+  - Room: 1
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 00b3d7d2f50bd634ea3660e2b20036d1, type: 2}
+    CeilingTile: 1.5
+  - Room: 13
+    Wall: {fileID: 2100000, guid: 527b6a2c17c822b40abbd604342a1f8a, type: 2}
+    WallTile: 2
+    Lower: {fileID: 2100000, guid: eff32206e67c085418925e8279b79803, type: 2}
+    LowerTile: 2
+    LowerHeight: 1.2
+    Plain: 1
+    Ceiling: {fileID: 2100000, guid: 00b3d7d2f50bd634ea3660e2b20036d1, type: 2}
+    CeilingTile: 1.5
+  RoomFloors:
+  - Room: 6
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  - Room: 9
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  - Room: 10
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  - Room: 0
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  - Room: 1
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  - Room: 13
+    Material: {fileID: 2100000, guid: f193083d729673a479d3bb25c442215f, type: 2}
+    Tile: 3
+  FloorDecay: []
+  WallDecay: []
+  DecayDensity: 0
+  Posters: []
+  PosterChance: 0
+  Furniture: 0
+  FurnitureIn: 05000000i
+  Materials: []
+  Grade:
+    Exposure: 0
+    Contrast: 3
+    Saturation: -5
+    Temperature: 0
+    Tint: 0
+    ColorFilter: {r: 1, g: 1, b: 1, a: 1}
+    SplitShadows: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    SplitHighlights: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    Split: 0
+    FilmGrain: 0
+    Vignette: 0
+  Air:
+    AmbientTint: {r: 1, g: 1, b: 1, a: 1}
+    Ambient: 1
+    Fog: {r: 0, g: 0, b: 0, a: 1}
+    FogColor: 0
+    FogDensity: 1
+    LightScale: 1
+    LampGlow: 1

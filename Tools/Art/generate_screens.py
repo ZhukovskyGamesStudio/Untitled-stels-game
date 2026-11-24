@@ -10,7 +10,7 @@ import math
 import os
 import random
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 W, H, SS = 256, 160, 4
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "Assets", "_Game", "Art", "Textures", "Screens")
@@ -291,6 +291,56 @@ def screen_map():
     finish(img, "screen_map")
 
 
+def font(size, bold=False):
+    """A monospaced face for what a computer prints (Windows' Consolas; any other machine: PIL's own)."""
+    for name in (("consolab.ttf",) if bold else ()) + ("consola.ttf", "DejaVuSansMono.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            pass
+    return ImageFont.load_default(size)
+
+
+def screen_nosignal():
+    """A monitor with no computer behind it: its own little box on black (512 x 320; the game moves it about). The box is
+    0.48 x 0.34 of the picture (ScreenLooks.BoxHalf)."""
+    w, h = 512, 320
+    img = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(img)
+    bw, bh = 0.44 * w, 0.30 * h
+    x0, y0 = (w - bw) / 2, (h - bh) / 2
+    d.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], radius=6, fill=(16, 40, 120), outline=(120, 150, 230), width=3)
+    d.text((w / 2, y0 + bh * 0.38), "NO SIGNAL", font=font(34, True), fill=(235, 240, 255), anchor="mm")
+    d.text((w / 2, y0 + bh * 0.74), "HDMI 1  -  entering power save", font=font(12), fill=(170, 190, 240), anchor="mm")
+    img.save(os.path.join(OUT, "screen_nosignal.png"))
+    print("wrote screen_nosignal")
+
+
+def screen_boot():
+    """A computer waiting at its boot menu (512 x 320): the firmware's lines, the list of drives with one picked, the keys."""
+    w, h = 512, 320
+    img = Image.new("RGB", (w, h), (2, 3, 5))
+    d = ImageDraw.Draw(img)
+    f, b = font(13), font(15, True)
+    grey, white = (168, 174, 182), (236, 240, 245)
+    y = 18
+    for line in ("System firmware 4.12        Memory test: 16384 MB OK", "Keyboard ....... not found", "Disk 0 ......... no boot record", "Network ........ no link"):
+        d.text((24, y), line, font=f, fill=grey)
+        y += 17
+    x0, y0, x1, y1 = 84, 106, w - 84, 262
+    d.rectangle([x0, y0, x1, y1], fill=(10, 22, 74), outline=(200, 206, 216), width=2)
+    d.text((w / 2, y0 + 18), "Please select boot device:", font=b, fill=white, anchor="mm")
+    d.line([x0, y0 + 34, x1, y0 + 34], fill=(200, 206, 216), width=2)
+    for k, item in enumerate(("Disk 0: system (no boot record)", "Removable drive", "Network boot", "Enter setup")):
+        yy = y0 + 46 + k * 25
+        if k == 0:
+            d.rectangle([x0 + 10, yy - 2, x1 - 10, yy + 18], fill=(198, 204, 214))
+        d.text((x0 + 20, yy), item, font=f, fill=(8, 14, 40) if k == 0 else white)
+    d.text((w / 2, h - 34), "Up / Down: move   Enter: boot   Esc: defaults", font=f, fill=grey, anchor="mm")
+    img.save(os.path.join(OUT, "screen_boot.png"))
+    print("wrote screen_boot")
+
+
 if __name__ == "__main__":
     screen_vault(False)
     screen_vault(True)
@@ -300,4 +350,6 @@ if __name__ == "__main__":
     screen_doors(opened=True)
     screen_static()
     screen_cracked()
+    screen_nosignal()
+    screen_boot()
     screen_map()

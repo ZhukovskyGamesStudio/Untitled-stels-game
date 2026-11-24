@@ -194,7 +194,8 @@ namespace Stealth.EditorTools
             Mat(props, "BookBlack", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.35f);
             Mat(props, "BookCream", new Color(0.86f, 0.82f, 0.7f), smoothness: 0.25f);
             Mat(props, "BookTeal", new Color(0.12f, 0.42f, 0.44f), smoothness: 0.3f);
-            Mat(props, "BookPages", new Color(0.93f, 0.9f, 0.82f), smoothness: 0.1f);
+            Mat(props, "BookPages", Color.white, smoothness: 0.1f);
+            Mat(props, "Printed", Color.white, smoothness: 0.35f); // magazines, book fronts, open pages (PrintCovers)
             Mat(props, "ClothNavy", new Color(0.12f, 0.15f, 0.28f), smoothness: 0.08f);
             Mat(props, "ClothGrey", new Color(0.42f, 0.43f, 0.45f), smoothness: 0.08f);
             Mat(props, "ClothBeige", new Color(0.7f, 0.62f, 0.48f), smoothness: 0.08f);
@@ -367,6 +368,20 @@ namespace Stealth.EditorTools
             cracked.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_cracked.png"));
             cracked.SetTextureScale("_BaseMap", Vector2.one);
             EditorUtility.SetDirty(cracked);
+            // a computer with nothing to show: the monitor's box and the boot menu, whole on each screen (ScreenFaces)
+            foreach (var (name, picture, glow) in new[] { ("ScreenNoSignal", "screen_nosignal", 0.75f), ("ScreenBoot", "screen_boot", 0.7f) })
+            {
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{Root}/Art/Textures/Screens/{picture}.png");
+                if (tex != null && AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter ti && ti.wrapMode != TextureWrapMode.Clamp)
+                {
+                    ti.wrapMode = TextureWrapMode.Clamp; // (the box moves about: its picture's dark edge goes on past it)
+                    ti.SaveAndReimport();
+                }
+                var m = Mat("Props", name, new Color(0.04f, 0.042f, 0.046f), new Color(glow, glow, glow), smoothness: 0.85f);
+                m.SetTexture("_BaseMap", tex);
+                m.SetTexture("_EmissionMap", tex);
+                EditorUtility.SetDirty(m);
+            }
         }
 
         static void Sprite(string name, int w, int h, System.Func<float, float, float> alpha, Vector4 border = default)

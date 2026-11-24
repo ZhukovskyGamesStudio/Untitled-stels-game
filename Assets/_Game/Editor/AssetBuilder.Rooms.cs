@@ -35,7 +35,7 @@ namespace Stealth.EditorTools
             (PropKind.SleepPod, "sleep_pod", "Ceiling", "Fabric", "Fabric", "LampBulb"),
             (PropKind.Hammock, "hammock", "Metal", "Fabric", "Fabric", "Metal"),
             (PropKind.TallBookcase, "tall_bookcase", "Wood", "Folders", "PropAccent", "Folders"),
-            (PropKind.ReadingTable, "reading_table", "Wood", "Metal", "Folders", "LampBulb"),
+            (PropKind.ReadingTable, "reading_table", "Wood", "Metal", "Printed", "LampBulb"),
             (PropKind.Globe, "globe", "Wood", "Metal", "PropAccent", "Metal"),
             (PropKind.Copier, "copier", "Ceiling", "Rack", "Rack", "PropScreen"),
             (PropKind.PaperStack, "paper_stack", "Cardboard", "Ceiling", "Wood", "Ceiling"),
@@ -88,8 +88,8 @@ namespace Stealth.EditorTools
             (PropKind.SanitaryBin, "sanitary_bin", "Metal", "PropAccent", "PropAccent", "PropScreen"),
             (PropKind.SectionalSofa, "sectional_sofa", "Fabric", "PropAccent", "BeanBag", "PropScreen"),
             (PropKind.EggChair, "egg_chair", "PropBody", "Metal", "Fabric", "PropScreen"),
-            (PropKind.SideTable, "side_table", "Wood", "Metal", "Folders", "LampBulb"),
-            (PropKind.MagazineRack, "magazine_rack", "Wood", "Metal", "Folders", "PropScreen"),
+            (PropKind.SideTable, "side_table", "Wood", "Metal", "Printed", "LampBulb"),
+            (PropKind.MagazineRack, "magazine_rack", "Wood", "Metal", "Printed", "PropScreen"),
             (PropKind.AreaRug, "area_rug", "Felt", "Fabric", "Fabric", "PropScreen"),
             (PropKind.CorridorBench, "corridor_bench", "Fabric", "Metal", "Wood", "PropScreen"),
             (PropKind.FireCabinet, "fire_cabinet", "PropBody", "Vending", "StairGlass", "PropScreen"),
@@ -223,6 +223,7 @@ namespace Stealth.EditorTools
             (PropKind.ShoeCabinet, "shoe_cabinet", "Wood", "Fabric", "Metal", "PropScreen"),
             (PropKind.HallHooks, "hall_hooks_bare", "Wood", "Metal", "Metal", "PropScreen"), // Tools/Blender/variants.py: garments on its hooks (PropVariants)
             (PropKind.Mailboxes, "mailboxes", "PropBody", "PropAccent", "Metal", "PropScreen"),
+            (PropKind.LowShelf, "low_shelf", "Wood", "Cardboard", "ClothNavy", "PropScreen"),
             (PropKind.ElevatorDoors, "elevator_doors", "Metal", "PropBody", "Metal", "LampBulb"),
         };
 
@@ -327,7 +328,7 @@ namespace Stealth.EditorTools
         /// and wood where there are scans, the game's own tiles, padding and panels where there are none — a kitchen is
         /// tiled behind its counter, a toilet to head height, a gym padded, a library panelled in dark wood, a store bare
         /// concrete, a lobby with a wood dado, a corridor with a painted protection band. (Hospitals, garages, flats and the
-        /// abandoned station dress their own rooms over these: Level.ClinicLook, ShopLook, HomeLook, DerelictLook.)
+        /// abandoned station dress their own rooms over these: Data/Styles/Houses.)
         /// </summary>
         static RoomLook[] RealisticRoomLooks()
         {

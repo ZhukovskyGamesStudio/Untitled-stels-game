@@ -78,7 +78,7 @@ namespace Stealth.EditorTools
             v.Palette = Palette(BookColours);
             v.AccentPalette = Palette(new[] { "BookPages" });
             v.Frame = root.GetComponentsInChildren<MeshFilter>(true).FirstOrDefault(f => f.name.StartsWith("Body"));
-            v.Own = root.GetComponentsInChildren<Renderer>(true).Where(r => r.name.StartsWith("Accent")).ToArray();
+            v.Own = root.GetComponentsInChildren<Renderer>(true).Where(r => r.name.StartsWith("Accent") || r.name.StartsWith("Trim")).ToArray();
             var slots = new List<Transform>();
             var rng = new System.Random(root.name.GetHashCode() & 0x7fffffff);
             for (int s = 0; s < shelves.Count; s++)

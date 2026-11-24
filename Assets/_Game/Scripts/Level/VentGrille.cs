@@ -42,7 +42,7 @@ namespace Stealth.Level
         {
             int open = Open ? 1 : 0;
             if (open == m_Shown) return;
-            if (m_Shown == 0 && open == 1) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.Unlock : null, Point, 0.8f, Audio.Sfx.Group.Items);
+            if (m_Shown == 0 && open == 1) Audio.Sfx.At(Audio.Sfx.Bank != null ? Audio.Sfx.Bank.GrilleOff : null, Point, 0.8f, Audio.Sfx.Group.Items);
             m_Shown = open;
             if (Mounted != null) Mounted.SetActive(open == 0);
             if (Removed != null) Removed.SetActive(open == 1);

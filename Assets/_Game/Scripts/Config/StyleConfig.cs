@@ -13,6 +13,12 @@ namespace Stealth.Configs
         [Tooltip("The look of the game: applied when the game starts (none = the plain look). the F8 picker and -style still switch it")]
         public VisualStyle Default;
 
+        [Tooltip("How each kind of house differs from the style (Data/Styles/Houses; index = HouseKind)")]
+        public HouseLook[] Houses = new HouseLook[0];
+
+        /// <summary>The look of a kind of house, or null.</summary>
+        public HouseLook LookOf(Stealth.Level.HouseKind kind) => Houses != null && (int)kind < Houses.Length ? Houses[(int)kind] : null;
+
         [Header("Materials by kind (filled by the asset builder)")]
         public Material[] Building = new Material[0];
         public Material[] Furniture = new Material[0];

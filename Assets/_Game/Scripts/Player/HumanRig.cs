@@ -46,6 +46,13 @@ namespace Stealth.Player
         [Tooltip("Where the chest's bone is when standing, in the body's space (metres for the model's own size; the builder measures it in the Idle take)")]
         public Vector3 ChestStanding = new(0f, 1.25f, 0f);
 
+        [Tooltip("The skin (head, neck, hands): the owner, looking out of the head, sees OwnSkin instead and this one is a shadow only")]
+        public SkinnedMeshRenderer Skin;
+        [Tooltip("The skin without the head and the neck, on the same bones (off but for the owner's own view)")]
+        public SkinnedMeshRenderer OwnSkin;
+        [Tooltip("The right arm in the first-person view, posed round a long thing / under a compact one (origin: the held thing's anchor)")]
+        public GameObject ViewFist, ViewCup;
+
         /// <summary>The held thing's anchor this rig carries in its right hand (another player's; null: nothing to place).</summary>
         [System.NonSerialized] public Transform Held;
         /// <summary>
@@ -152,7 +159,7 @@ namespace Stealth.Player
                 if (m_ArmR.localScale != scale) m_ArmR.localScale = scale;
             }
             if (Eyes == null || HeadBone == null || Hips == null) return;
-            Hips.position += HumanMath.EyeShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y);
+            Hips.position += HumanMath.OwnShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y, m_Planted);
         }
 
         /// <summary>
@@ -267,9 +274,27 @@ namespace Stealth.Player
             Vector3.ClampMagnitude(eyes - (head + Vector3.up * (EyesUp * size) + forward * (EyesAhead * size)), EyeReach);
 
         /// <summary>
+        /// How far behind its owner's eyes his own body stands, metres: with the neck right under the camera one looked down
+        /// into an empty collar between two huge shoulders; this far back one sees the chest from above, the arms and the feet.
+        /// </summary>
+        public const float OwnBack = 0.28f, OwnBackBusy = 0.2f;
+
+        /// <summary>
+        /// How to move the owner's own body under his view (pure): its head <see cref="OwnBack"/> behind the eyes, level.
+        /// Standing (<paramref name="planted"/>), its feet stay on the floor whatever the person's height; in a seat or on a
+        /// ladder it is brought to the eyes' height too, and less far back — the hands are at something.
+        /// </summary>
+        public static Vector3 OwnShift(Vector3 eyes, Vector3 head, Vector3 forward, float size, bool planted)
+        {
+            var shift = EyeShift(eyes - forward * ((planted ? OwnBack : OwnBackBusy) * size), head, forward, size);
+            if (planted) shift.y = 0f;
+            return shift;
+        }
+
+        /// <summary>
         /// A part of the body its owner must not see from inside his own head (pure, by the renderer's name, "part.slot"):
-        /// the eyeballs and what is worn on the head — hair, beard, a hat, glasses. They still cast their shadow. The skin
-        /// of the head itself is seen from inside: its faces look away.
+        /// the eyeballs and what is worn on the head — hair, beard, a hat, glasses. They still cast their shadow. (The skin of
+        /// the head is <see cref="HumanRig.Skin"/>: a shadow too, the hands are seen on <see cref="HumanRig.OwnSkin"/>.)
         /// </summary>
         public static bool OnTheHead(string renderer)
         {

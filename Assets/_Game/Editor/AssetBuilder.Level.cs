@@ -278,7 +278,7 @@ namespace Stealth.EditorTools
             Link(levelArt, ref levelArt.VehicleDoor, vehicleDoor);
             Link(levelArt, ref levelArt.ClinicDoor, clinicDoor);
             Link(levelArt, ref levelArt.StorageDoor, storageDoor);
-            LinkAll(levelArt, ref levelArt.Screens, new[] { M("PropScreen"), M("ScreenOff"), M("ScreenStatic"), M("ScreenCracked") });
+            LinkAll(levelArt, ref levelArt.Screens, new[] { M("PropScreen"), M("ScreenOff"), M("ScreenStatic"), M("ScreenCracked"), M("ScreenNoSignal"), M("ScreenBoot") });
             BuildFeatureArt(levelArt);
             BuildCityArt(levelArt);
             BuildRoomProps(levelArt);
@@ -400,6 +400,9 @@ namespace Stealth.EditorTools
             return root;
         }
 
+        /// <summary>The wall the models of Tools/Blender/ruins.py were made for, metres thick: the prefabs stretch them across today's.</summary>
+        const float RuinWall = 0.2f;
+
         /// <summary>
         /// The ruin round a breach or a hole knocked through a wall (Tools/Blender/ruins.py): broken edges up both sides and
         /// along the top, a pile of rubble at the foot on either face; along local X, no colliders (the wall pieces keep the
@@ -421,10 +424,11 @@ namespace Stealth.EditorTools
                 Paint(m, "Wall", "Wall", "Wall");
             }
             // the sides: the rim stands on the cut line and juts into the gap (+X); the right one turned round
-            Piece("breach_rim", "EdgeLeft", new Vector3(-w / 2f, 0f, 0f), Quaternion.identity, new Vector3(1f, height / rimHeight, 1f));
-            Piece("breach_rim", "EdgeRight", new Vector3(w / 2f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1f, height / rimHeight, 1f));
+            float deep = LevelMetrics.WallThickness / RuinWall; // (a little proud of both faces of today's wall)
+            Piece("breach_rim", "EdgeLeft", new Vector3(-w / 2f, 0f, 0f), Quaternion.identity, new Vector3(1f, height / rimHeight, deep));
+            Piece("breach_rim", "EdgeRight", new Vector3(w / 2f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1f, height / rimHeight, deep));
             // the top: the same rim lying along the gap, jutting down
-            Piece("breach_rim", "EdgeTop", new Vector3(-w / 2f, height, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(1f, w / rimHeight, 1f));
+            Piece("breach_rim", "EdgeTop", new Vector3(-w / 2f, height, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(1f, w / rimHeight, deep));
             // rubble at the foot, one pile on each face, against the jambs
             float face = LevelMetrics.WallThickness / 2f + 0.22f;
             Piece("rubble", "RubbleA", new Vector3(-w / 2f + 0.05f, 0f, face), Quaternion.Euler(0f, 20f, 0f), Vector3.one);
@@ -458,6 +462,7 @@ namespace Stealth.EditorTools
             var m = Model("inner_window_frame");
             m.name = "Frame";
             m.transform.SetParent(root.transform, false);
+            m.transform.localScale = new Vector3(1f, 1f, LevelMetrics.WallThickness / RuinWall); // on both faces of today's wall
             Paint(m, "WindowFrame", "WindowFrame", "WindowFrame");
             return root;
         }
@@ -535,17 +540,34 @@ namespace Stealth.EditorTools
             else
             {
                 var lamps = new List<Renderer>();
+                var pictures = new List<Renderer>();
                 float face = LevelMetrics.WallThickness / 2f;
                 foreach (float side in new[] { 1f, -1f })
                 {
                     // the sign: a steel housing on the wall over the door, its whole face lit
                     ChamferBox(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"));
-                    lamps.Add(Cube(root.transform, side > 0 ? "SignLampA" : "SignLampB", new Vector3(0f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.96f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
+                    foreach (float end in new[] { -1f, 1f })
+                        lamps.Add(Cube(root.transform, $"SignLamp{(side > 0 ? "A" : "B")}{(end < 0f ? "L" : "R")}", new Vector3(end * 0.395f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.2f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
+                    // between the lamps: the picture its terminal shows (the shut doorway and padlock, or the open one)
+                    var picture = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    picture.name = side > 0 ? "SignPictureA" : "SignPictureB";
+                    Object.DestroyImmediate(picture.GetComponent<Collider>());
+                    picture.transform.SetParent(root.transform, false);
+                    picture.transform.localPosition = new Vector3(0f, h + 0.34f, side * (face + 0.0745f));
+                    picture.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);
+                    picture.transform.localScale = new Vector3(0.448f, 0.28f, 1f);
+                    var pr = picture.GetComponent<MeshRenderer>();
+                    pr.sharedMaterial = TerminalScreenMaterial();
+                    pr.shadowCastingMode = ShadowCastingMode.Off;
+                    pictures.Add(pr);
                     // a band across each leaf, on the leaf (it slides with it), in front of its frame
                     foreach (var panel in new[] { door.PanelA, door.PanelB })
                         lamps.Add(Cube(panel, $"Band{(side > 0 ? "A" : "B")}", new Vector3(0f, 1.9f, side * 0.04f), new Vector3(0.62f, 0.07f, 0.01f), M("LockLamp"), false).GetComponent<Renderer>());
                 }
                 door.LockLamps = lamps.ToArray();
+                door.Pictures = pictures.ToArray();
+                door.LockedPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors.png");
+                door.OpenPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_doors_open.png");
             }
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
             // a locked (hackable) door: a hasp across the seam with a padlock hanging from it, on both faces
@@ -568,8 +590,41 @@ namespace Stealth.EditorTools
             // (on leaf A by the meeting edge, on both faces of the 6 cm leaf: it slides away with it)
             keyLock.Panels = KeyLockPanels(door.PanelA, root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, 0.035f)),
                 root.transform.TransformPoint(new Vector3(-0.17f, KeyLockY, -0.035f)));
+            if (sign) { door.LockUnits = new GameObject[0]; door.UnitLamps = new Renderer[0]; }
+            else LockUnits(door, door.PanelA, root.transform.TransformPoint(new Vector3(-0.165f, KeyLockY, 0.03f)), root.transform.TransformPoint(new Vector3(-0.165f, KeyLockY, -0.03f)));
+            root.AddComponent<DoorHandle>().Door = door;
             Muffles(root, SoundMaterial.Door); // only while closed: the blocker collider is off when open
             return root;
+        }
+
+        /// <summary>
+        /// The robots' electronic lock (Tools/Blender/lock_unit.py) on both faces of a leaf: at the world points
+        /// <paramref name="front"/> (+Z face) and <paramref name="back"/>, its bolt towards the leaf's free edge on +X. Shown on
+        /// doors with such a lock (<see cref="AutoDoor.LockUnits"/>); it moves with the leaf.
+        /// </summary>
+        static void LockUnits(AutoDoor door, Transform leaf, Vector3 front, Vector3 back)
+        {
+            var lamps = new List<Renderer>();
+            door.LockUnits = new[] { 1f, -1f }.Select(side =>
+            {
+                var unit = Model("lock_unit");
+                unit.name = side > 0 ? "LockUnitA" : "LockUnitB";
+                unit.transform.SetParent(leaf, false);
+                unit.transform.position = side > 0 ? front : back;
+                unit.transform.rotation = leaf.root.rotation * Quaternion.Euler(0f, side > 0 ? 0f : 180f, 0f);
+                var ls = leaf.lossyScale;
+                // the model's bolt is on its −X: on the +Z face mirrored, on the other turned round
+                unit.transform.localScale = new Vector3((side > 0 ? -1f : 1f) / Mathf.Abs(ls.x), 1f / Mathf.Abs(ls.y), 1f / Mathf.Abs(ls.z));
+                Paint(unit, "Metal", "PropAccent", "LockLamp");
+                foreach (var r in unit.GetComponentsInChildren<Renderer>())
+                {
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    if (r.gameObject.name.StartsWith("Eye")) lamps.Add(r);
+                }
+                unit.SetActive(false);
+                return unit;
+            }).ToArray();
+            door.UnitLamps = lamps.ToArray();
         }
 
         /// <summary>The height of a key lock's panel on a leaf: over the handle, at the hand.</summary>
@@ -747,6 +802,9 @@ namespace Stealth.EditorTools
             DoorLocks(root, door, nominal, LevelMetrics.DoorHeight - 0.02f, twin ? 0f : seam, both ? t / 2f : hingeZ, both ? -t / 2f : hingeZ - t,
                 door.Swing, door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ + t / 2f + 0.002f)),
                 door.Swing.TransformPoint(new Vector3(keyX, KeyLockY, leafZ - t / 2f - 0.002f)));
+            float unitY = kind == DoorKind.ClinicSwing ? 0.86f : KeyLockY; // (under a swing door's push plate)
+            LockUnits(door, door.Swing, door.Swing.TransformPoint(new Vector3(keyX, unitY, leafZ + t / 2f)), door.Swing.TransformPoint(new Vector3(keyX, unitY, leafZ - t / 2f)));
+            root.AddComponent<DoorHandle>().Door = door;
             Muffles(root, SoundMaterial.Door); // only while closed: the blockers are off when open
             return root;
         }

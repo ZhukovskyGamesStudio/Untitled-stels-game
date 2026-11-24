@@ -75,5 +75,6 @@ namespace Stealth.Game
         public void BroadcastBanner(string text) => m_G.ShowBanner(text);
         public void BroadcastPing(ulong owner, PingKind kind, Vector3 position, ulong target) => m_G.ReceivePing(owner, kind, position, target);
         public void BroadcastHouseStats(string packed) => m_G.ReceiveHouseStats(packed);
+        public void BroadcastSound(Stealth.Audio.GameSound sound, Vector3 at) => m_G.ReceiveSound(sound, at);
     }
 }

@@ -119,19 +119,17 @@ namespace Stealth.Tests
         [Test]
         public void TheHospitalIsDressedAsOneInEveryStyle()
         {
-            var kit = AssetDatabase.LoadAssetAtPath<StyleKit>("Assets/_Game/Data/Styles/StyleKit.asset");
-            Assert.IsNotNull(kit.ClinicWall);
             var style = new StyleGeometry { Doors = DoorTrim.Arch, Crown = true, WainscotHeight = 1f };
-            var clinic = ClinicLook.For(style, kit, Hospitals()[0]);
+            var clinic = VisualStyles.LookOf(Hospitals()[0]).Dress(style);
             Assert.AreEqual(DoorTrim.Casing, clinic.Doors, "plain frames");
             Assert.IsFalse(clinic.Crown);
             var ward = clinic.RoomLooks[clinic.RoomLookOf(RoomType.Ward)];
-            Assert.AreSame(kit.ClinicWardWall, ward.Wall, "warm paint in the wards");
-            Assert.AreSame(kit.ClinicGuard, ward.Lower, "a wall-protection band");
+            Assert.AreEqual("Clinic_WardWall", ward.Wall.name, "warm paint in the wards");
+            Assert.AreEqual("Clinic_Guard", ward.Lower.name, "a wall-protection band");
             Assert.AreEqual(1f, ward.LowerHeight, 1e-4f, "to a metre, with its bumper rail on top");
-            Assert.AreSame(kit.TheatreWall, clinic.RoomLooks[clinic.RoomLookOf(RoomType.Operating)].Wall, "white panels in the theatres");
-            Assert.AreSame(kit.ClinicFloor, clinic.RoomFloors[clinic.RoomFloorOf(RoomType.Corridor)].Material, "sheet vinyl in the corridors");
-            Assert.AreSame(style, ClinicLook.For(style, kit, TestHouses.Get(42, 2)), "an office keeps the style");
+            Assert.AreEqual("Theatre_Wall", clinic.RoomLooks[clinic.RoomLookOf(RoomType.Operating)].Wall.name, "white panels in the theatres");
+            Assert.AreEqual("Clinic_Floor", clinic.RoomFloors[clinic.RoomFloorOf(RoomType.Corridor)].Material.name, "sheet vinyl in the corridors");
+            Assert.AreSame(style, VisualStyles.LookOf(TestHouses.Get(42, 2)).Dress(style), "an office keeps the style (one that is not made of scans)");
         }
     }
 }

@@ -23,6 +23,7 @@ from mathutils import Matrix, Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir, category())
 import meshfix  # noqa: E402
+import printed  # noqa: E402
 import poi  # noqa: E402  (ring(), sweep_rect(), _tin())
 import shapes as s  # noqa: E402
 
@@ -405,8 +406,8 @@ def model_item_chess_model():
 
 def model_item_magazine_model():
     """A glossy magazine lying flat, 0.28 x 0.21, 7 mm thick (its top end at -X): the cover wrapped round a square
-    spine at -Y, the front cover's free corner curling up (Body), the page block between the covers (Accent), the
-    printed masthead, cover lines and barcode (Trim)."""
+    spine at -Y, the front cover's free corner curling up (Body, printed: printed.py), the page block between the
+    covers (Accent)."""
     L, W = 0.28, 0.21
     top = s.rbox((L, W, 0.0012), (0, 0, 0.0064), r=0.0005, seg=1)
     slice_grid(top, "X", [0.03 + k * 0.022 for k in range(6)])
@@ -417,16 +418,15 @@ def model_item_magazine_model():
         v.co.z += 0.016 * (fx * fy) ** 1.6
     bottom = s.rbox((L, W, 0.0012), (0, 0, 0.0006), r=0.0005, seg=1)
     spine = s.rbox((L - 0.001, 0.006, 0.0064), (0, -W / 2 + 0.002, 0.0035), r=0.002, seg=2)
-    s.part("Body", [top, bottom, spine])
+
+    def print_on(n, c, co):                                   # the top end at -X, the spine (-Y) on the left
+        if abs(n.z) > 0.6:
+            u, v = co.y / W + 0.5, 0.5 - co.x / L
+            return printed.cell_uv(0, u, v) if n.z > 0 else printed.cell_uv(printed.BACK, 1 - u, v)
+        return printed.cell_uv(0, 0.02, 0.5 - co.x / L)
+    printed.paint(s.part("Body", [top, bottom, spine]), print_on)
     pages = s.rbox((L - 0.004, W - 0.005, 0.0048), (-0.001, 0.0015, 0.0032), r=0.0006, seg=1)   # into the spine
     s.part("Accent", [pages])
-    # the cover's print: the masthead across the top end (-X), cover lines down the spine side, a barcode corner
-    z = 0.0071
-    trim = [s.rbox((0.034, 0.18, 0.0006), (-0.112, 0.0, z), r=0.0002, seg=1)]
-    trim += [s.rbox((0.009, w, 0.0006), (x, -0.07 + w / 2, z), r=0.0002, seg=1)
-             for x, w in ((-0.06, 0.07), (-0.04, 0.05), (-0.02, 0.06), (0.08, 0.055), (0.1, 0.04))]
-    trim.append(s.rbox((0.02, 0.03, 0.0006), (0.11, -0.075, z), r=0.0002, seg=1))
-    s.part("Trim", trim)
     return export("item_magazine_model")
 
 
@@ -886,7 +886,61 @@ def model_item_bandage_model():
     return export("item_bandage_model")
 
 
+def model_item_stun_model():
+    """The stun device, a portable jammer 0.30 square: a painted steel case with two seams (Body), rubber corner bumpers,
+    feet and carry handles (Accent), steel side vents, the emitter's collar, guard ring, toggle and its bezel
+    (AccentSteel), the copper coil on its core (AccentCoil), the yellow warning plate and the stripes on its lid (Trim),
+    the glowing orb on top and the arming lamp (Eye)."""
+    case = s.rbox((0.28, 0.28, 0.15), (0, 0, 0.085), r=0.018, seg=3)
+    s.groove(case, "Z", 0.034, width=0.004, depth=0.002)
+    s.groove(case, "Z", 0.132, width=0.004, depth=0.002)
+    lid = s.rbox((0.24, 0.24, 0.016), (0, 0, 0.164), r=0.006, seg=2)
+    s.part("Body", [case, lid])
+
+    rubber = [s.rbox((0.05, 0.05, 0.16), (x * 0.126, y * 0.126, 0.086), r=0.012, seg=3) for x in (-1, 1) for y in (-1, 1)]
+    rubber += [s.rcyl(0.016, 0.014, (x * 0.1, y * 0.1, 0.007), seg=14, r=0.003) for x in (-1, 1) for y in (-1, 1)]
+    for x in (-1, 1):                                          # two handles over the sides
+        rubber.append(s.tube([(x * 0.137, -0.06, 0.11), (x * 0.158, -0.05, 0.118), (x * 0.158, 0.05, 0.118), (x * 0.137, 0.06, 0.11)],
+                             0.008, res=3, segments_per=5))
+    s.part("Accent", rubber)
+
+    steel = [poi.ring(0.098, 0.074, 0.018, (0, 0, 0.178), seg=28, r=0.003),        # the emitter's collar
+             s.lathe([(0.0, 0.168), (0.075, 0.168), (0.072, 0.178), (0.058, 0.182), (0.0, 0.182)], seg=32)]
+    for k in range(4):                                          # the guard: four struts up to a ring
+        a = math.pi / 4 + k * math.pi / 2
+        c, n = math.cos(a), math.sin(a)
+        steel.append(s.tube([(0.086 * c, 0.086 * n, 0.182), (0.092 * c, 0.092 * n, 0.22), (0.078 * c, 0.078 * n, 0.262)], 0.0048,
+                            res=3, segments_per=6))
+    steel.append(s.tube([(0.078 * math.cos(t), 0.078 * math.sin(t), 0.262) for t in [2 * math.pi * k / 24 for k in range(25)]], 0.0055,
+                        res=2, smooth=False, segments_per=1))
+    for y in (-1, 1):                                           # vents
+        steel += [s.rbox((0.09, 0.006, 0.006), (0.045, y * 0.1405, 0.068 + k * 0.014), r=0.0022, seg=1) for k in range(4)]
+    steel += [s.rcyl(0.014, 0.006, (-0.062, -0.1415, 0.1), axis="Y", seg=20, r=0.0015),
+              s.rcyl(0.0045, 0.024, (-0.062, -0.152, 0.104), axis="Y", seg=12, r=0.0015)]
+    for x in (-1, 1):
+        for y in (-1, 1):                                       # the lid's screws
+            steel.append(s.rcyl(0.0055, 0.004, (x * 0.09, y * 0.1, 0.1725), seg=12, r=0.001))
+    s.part("AccentSteel", steel)
+
+    coil = [s.lathe([(0.0, 0.18), (0.03, 0.18), (0.03, 0.238), (0.022, 0.246), (0.0, 0.246)], seg=28)]
+    turns, steps = 6, 12
+    pts = [(0.033 * math.cos(2 * math.pi * k / steps), 0.033 * math.sin(2 * math.pi * k / steps), 0.186 + 0.046 * k / (turns * steps))
+           for k in range(turns * steps + 1)]
+    coil.append(s.tube(pts, 0.0042, res=1, smooth=False, segments_per=1))
+    s.part("AccentCoil", coil)
+
+    plate = s.rbox((0.066, 0.004, 0.046), (-0.062, -0.1402, 0.062), r=0.0015, seg=1)
+    stripes = [s.rbox((0.01, 0.15, 0.004), (x, 0, 0.1718), r=0.001, seg=1) for x in (-0.109, 0.109)]
+    s.part("Trim", [plate, *stripes])
+
+    orb = s.ball(0.027, (0, 0, 0.264), seg=20)
+    lamp = s.rcyl(0.006, 0.006, (-0.028, -0.1415, 0.1), axis="Y", seg=14, r=0.0015)
+    s.part("Eye", [orb, lamp])
+    return export("item_stun_model")
+
+
 MODELS = {
+    "item_stun_model": model_item_stun_model,
     "item_radio_model": model_item_radio_model,
     "item_keyboard_model": model_item_keyboard_model,
     "item_tablet_model": model_item_tablet_model,

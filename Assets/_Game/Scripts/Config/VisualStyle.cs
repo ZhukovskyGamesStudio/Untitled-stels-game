@@ -144,7 +144,7 @@ namespace Stealth.Configs
             return -1;
         }
 
-        /// <summary>A copy (the arrays shared until replaced): a house kind dresses itself on top of the style (Level.ShopLook).</summary>
+        /// <summary>A copy (the arrays shared until replaced): a house dresses itself on top of the style (<see cref="HouseLook"/>).</summary>
         public StyleGeometry Clone() => (StyleGeometry)MemberwiseClone();
 
         public bool HasArchitecture => CeilingFinish != null || Baseboard || Crown || WainscotHeight > 0f || RailHeight > 0f || Pipes || StripSpacing > 0f ||
@@ -175,7 +175,10 @@ namespace Stealth.Configs
         public Color VignetteColor = Color.black;
         [Range(0, 1)] public float ChromaticAberration;
         [Range(0, 1)] public float FilmGrain;
+        [Range(0, 1), Tooltip("Shiny and metal things mirror what is on the screen (0 = not at all). Nothing else is mirrored: a dark room stays dark")] public float Reflections;
         [Range(-1, 1)] public float LensDistortion;
+
+        public StyleGrade Clone() => (StyleGrade)MemberwiseClone();
     }
 
     /// <summary>The whole-screen filter (Art/Shaders/StyleScreen.shader). Zero = that part is off.</summary>
@@ -277,6 +280,8 @@ namespace Stealth.Configs
         [Tooltip("Height above the ground the gas stays full, metres")] public float GasLayer = 8f;
         [Tooltip("Above that it thins out over this many metres (exponentially): the sky shows overhead and from upper floors")]
         public float GasFalloff = 4f;
+
+        public StyleWorld Clone() => (StyleWorld)MemberwiseClone();
     }
 
     /// <summary>How the colours of the world change, by kind of material.</summary>

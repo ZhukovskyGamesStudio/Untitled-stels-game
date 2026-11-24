@@ -159,14 +159,19 @@ namespace Stealth.EditorTools
             k.Span(sub, SStart, SSize + 0.08f, SH - thick, SH, B0, B1);
         }
 
+        /// <summary>From the nosing line down to under the backs of the treads.</summary>
+        const float UnderTreads = SRise + 0.05f;
+
         /// <summary>
         /// A slab leaning along the upper flight's outer edge: its lower edge <paramref name="above"/> over the nosing line,
-        /// <paramref name="height"/> tall measured straight up (from the first tread to the last).
+        /// <paramref name="height"/> tall measured straight up (from the first tread to the end of the flight). The nosing line
+        /// runs through the treads' fronts: at a tread's back it is a whole step over it, so a panel closing the side starts
+        /// more than a step under it (<see cref="UnderTreads"/>) — else each step has an open triangle over its back.
         /// </summary>
         static void InclinedPanel(MeshKit k, int sub, float v, float thick, float above, float height)
         {
             var a = new Vector3(SLand, LineB(SLand) + above, v);
-            var b = new Vector3(SStart - SRun, LineB(SStart - SRun) + above, v);
+            var b = new Vector3(SStart, LineB(SStart) + above, v);
             var dir = (b - a).normalized;
             // local x along the flight, y across the slope (in the u-y plane), z across the panel
             var q = Quaternion.FromToRotation(Vector3.right, dir);
@@ -200,7 +205,7 @@ namespace Stealth.EditorTools
             // a solid parapet along the open edge: blocks up to the treads, a slab leaning along the flight, a cap
             for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(0, u0, u1, 0f, TreadB(j), B1, Edge + 0.06f); }
             k.Span(0, 0.12f, SLand, 0f, SHalf + 0.95f, B1, Edge + 0.06f);
-            InclinedPanel(k, 0, Edge, 0.12f, -0.05f, 1.0f);
+            InclinedPanel(k, 0, Edge, 0.124f, -UnderTreads, 0.95f + UnderTreads); // (2 mm proud of the blocks: no face in their plane)
             RailB(k, 2, Edge, 0.97f, 0.16f, 0.05f, false);
             k.Span(2, 0.1f, SLand, SHalf + 0.95f, SHalf + 1.0f, B1 - 0.02f, Edge + 0.08f);
             // the spine wall between the flights
@@ -220,7 +225,7 @@ namespace Stealth.EditorTools
             SolidSteps(k, 0, 0.04f);
             Treads(k, 1, 0.04f, 0.035f);
             // a closed stringer board along the open edge and panelling battens under the flight
-            InclinedPanel(k, 3, B1 + 0.03f, 0.05f, -0.28f, 0.34f);
+            InclinedPanel(k, 3, B1 + 0.03f, 0.05f, -UnderTreads, 0.06f + UnderTreads);
             for (float u = 0.3f; u < SStart; u += 0.6f) k.Span(3, u - 0.02f, u + 0.02f, 0.05f, Mathf.Min(SHalf, LineB(Mathf.Max(u, SLand))) - 0.35f, B1, B1 + 0.02f);
             // balusters two per step, a newel at each end, the handrail
             for (int j = 0; j < SSteps; j++)
@@ -307,7 +312,7 @@ namespace Stealth.EditorTools
             SolidSteps(k, 0);
             // glass along the open edge (blocks of white up to the treads below it), a steel cap rail
             for (int j = 0; j < SSteps; j++) { var (u0, u1) = StepB(j); k.Span(0, u0, u1, 0f, TreadB(j), B1, Edge); }
-            InclinedPanel(k, 1, Edge - 0.02f, 0.02f, -0.06f, 1.0f);
+            InclinedPanel(k, 1, Edge - 0.02f, 0.02f, -UnderTreads, 0.94f + UnderTreads);
             RailB(k, 2, Edge - 0.02f, 0.96f, 0.05f, 0.03f, false);
             k.Span(1, 0.12f, SLand, SHalf, SHalf + 0.95f, Edge - 0.03f, Edge - 0.01f);
             k.Span(2, 0.12f, SLand, SHalf + 0.95f, SHalf + 0.98f, Edge - 0.04f, Edge);

@@ -3,27 +3,51 @@ using UnityEngine;
 
 namespace Stealth.Level
 {
-    /// <summary>What a screen with nothing to show looks like (a TV, a desk monitor): the house is empty at night.</summary>
-    public enum ScreenLook { Off, Static, Cracked }
+    /// <summary>What a screen with nothing to show looks like (the house is empty at night). In the order of <see cref="LevelArt.Screens"/>: append only.</summary>
+    public enum ScreenLook { Off, Static, Cracked, NoSignal, Boot }
+
+    /// <summary>Whose screen it is: a television, a computer's monitor, a display of some other machine.</summary>
+    public enum ScreenKind { Appliance, Tv, Computer }
 
     /// <summary>
-    /// The look of the furniture's screens (pure): a house's TVs and monitors are not all one glowing blue panel — most are
-    /// switched off (dark glass), some are left on with nothing but static, some are broken (cracked glass). Chosen per
-    /// piece from the house's seed, so every peer sees the same (LevelBuilder swaps the screen's material:
-    /// <see cref="LevelArt.Screens"/>). Screens that are used — terminals, consoles — have their own pictures.
+    /// The look of the furniture's screens (pure): a house's TVs and monitors are not all one glowing blue panel — many are
+    /// switched off (dark glass), a TV is left on with nothing but static, a computer waits at its boot menu or its monitor
+    /// says it has no signal, some are broken (cracked glass). Chosen per piece from the house's seed, so every peer sees
+    /// the same (LevelBuilder swaps the screen's material: <see cref="LevelArt.Screens"/>). Screens that are used —
+    /// terminals, consoles — have their own pictures.
     /// </summary>
     public static class ScreenLooks
     {
-        /// <summary>Of a hundred screens: this many are off, this many show static; the rest are cracked.</summary>
-        public const int OffShare = 55, StaticShare = 25;
         /// <summary>A glowing part smaller than this (its longest side, metres) is a display on an appliance, not a screen: it keeps its dim glow.</summary>
         public const float SmallScreen = 0.2f;
 
+        static readonly HashSet<PropKind> Tvs = new()
+        {
+            PropKind.TvStand, PropKind.GamingCorner, PropKind.AvCredenza, PropKind.ArcadeMachine, PropKind.Pinball,
+        };
+
+        static readonly HashSet<PropKind> Computers = new()
+        {
+            PropKind.Desk, PropKind.ReceptionDesk, PropKind.StandingDesk, PropKind.SupervisorDesk, PropKind.ExecutiveDesk, PropKind.DoctorDesk,
+            PropKind.NurseStationDesk, PropKind.ConsoleDesk, PropKind.MixingDesk, PropKind.LabBench, PropKind.MonitorWall, PropKind.InfoKiosk,
+            PropKind.LogoTotem,
+        };
+
+        public static ScreenKind KindOf(PropKind kind) => Tvs.Contains(kind) ? ScreenKind.Tv : Computers.Contains(kind) ? ScreenKind.Computer : ScreenKind.Appliance;
+
+        /// <summary>The piece's screens are used by the players: they are lit as they are.</summary>
+        public static bool InUse(PropKind kind) => kind is PropKind.Terminal or PropKind.Programmer or PropKind.MedTable;
+
         /// <summary>The look of a piece's screens, from its own stream of the house's seed.</summary>
-        public static ScreenLook Pick(int seed)
+        public static ScreenLook Pick(int seed, ScreenKind kind)
         {
             int roll = (int)((uint)seed % 100u);
-            return roll < OffShare ? ScreenLook.Off : roll < OffShare + StaticShare ? ScreenLook.Static : ScreenLook.Cracked;
+            return kind switch
+            {
+                ScreenKind.Tv => roll < 45 ? ScreenLook.Off : roll < 85 ? ScreenLook.Static : ScreenLook.Cracked,
+                ScreenKind.Computer => roll < 35 ? ScreenLook.Off : roll < 62 ? ScreenLook.NoSignal : roll < 88 ? ScreenLook.Boot : ScreenLook.Cracked,
+                _ => roll < 80 ? ScreenLook.Off : ScreenLook.Cracked,
+            };
         }
 
         /// <summary>Where a screen's static is on its texture at a step (pure): it jumps about, never drifting one way.</summary>
@@ -32,53 +56,109 @@ namespace Stealth.Level
             float x = step * 0.61803398f, y = step * 0.75487766f;
             return new Vector2(x - Mathf.Floor(x), y - Mathf.Floor(y));
         }
+
+        /// <summary>
+        /// How far a monitor's "no signal" box stands off the screen's middle at a step, in screens (pure): it moves about, as
+        /// monitors do so it does not burn in, its whole box (<see cref="BoxHalf"/>) staying on the screen.
+        /// </summary>
+        public static Vector2 Drift(int step)
+        {
+            var j = Jump(step);
+            return new Vector2((j.x - 0.5f) * 2f * (0.5f - BoxHalf.x), (j.y - 0.5f) * 2f * (0.5f - BoxHalf.y));
+        }
+
+        /// <summary>Half the "no signal" box on its picture, in screens (Tools/Art/generate_screens.py screen_nosignal).</summary>
+        public static readonly Vector2 BoxHalf = new(0.24f, 0.17f);
     }
 
     /// <summary>
-    /// The screens showing static in the built house: their noise jumps a dozen times a second (a property block per
-    /// screen — which also keeps them out of the merged furniture — only on the ones in view). Picture only, on every peer.
+    /// The screens of the built house: their pictures fitted to each screen's face (<see cref="ScreenFaces"/>, again whenever
+    /// a style swaps the furniture's models), the static jumping a dozen times a second and the "no signal" boxes moving
+    /// every few seconds (a property block per screen — which also keeps them out of the merged furniture — only on the
+    /// ones in view). Picture only, on every peer.
     /// </summary>
     public static class LiveScreens
     {
-        /// <summary>How many times the noise texture repeats over a metre of screen, and how often it jumps, seconds.</summary>
-        public const float Tiling = 4f, Interval = 0.08f;
+        /// <summary>How many times the noise texture repeats over a screen, how often it jumps and how often a "no signal" box moves, seconds.</summary>
+        public const float Tiling = 3f, Interval = 0.08f, DriftEvery = 4f;
 
-        static readonly List<Renderer> s_Static = new();
+        static readonly List<(Renderer r, ScreenLook look)> s_Screens = new();
         static readonly int StId = Shader.PropertyToID("_BaseMap_ST");
         static MaterialPropertyBlock s_Block;
-        static float s_Next;
-        static int s_Step;
+        static float s_Next, s_NextDrift;
+        static int s_Step, s_DriftStep;
 
-        public static int Count => s_Static.Count;
+        static LiveScreens() => VisualStyles.GeometryChanged += Fit;
 
-        public static void Clear() => s_Static.Clear();
+        /// <summary>Screens that move: static and "no signal".</summary>
+        public static int Count
+        {
+            get
+            {
+                int n = 0;
+                foreach (var (_, look) in s_Screens) if (Moves(look)) n++;
+                return n;
+            }
+        }
 
-        public static void Add(Renderer r)
+        static bool Moves(ScreenLook look) => look is ScreenLook.Static or ScreenLook.NoSignal;
+
+        public static void Clear() => s_Screens.Clear();
+
+        /// <summary>What this screen shows, if it is one of the house's.</summary>
+        public static bool TryGet(Renderer r, out ScreenLook look)
+        {
+            foreach (var s in s_Screens)
+                if (s.r == r) { look = s.look; return true; }
+            look = default;
+            return false;
+        }
+
+        public static void Add(Renderer r, ScreenLook look)
         {
             if (r == null) return;
-            s_Static.Add(r);
-            Set(r, ScreenLooks.Jump(s_Static.Count));
+            s_Screens.Add((r, look));
+            Fit(r);
+            if (look == ScreenLook.Static) Set(r, look, ScreenLooks.Jump(s_Screens.Count));
+            else if (look == ScreenLook.NoSignal) Set(r, look, ScreenLooks.Drift(s_Screens.Count));
+        }
+
+        /// <summary>The screens' models were swapped: their pictures are fitted to the new faces.</summary>
+        static void Fit()
+        {
+            foreach (var (r, _) in s_Screens) Fit(r);
+        }
+
+        static void Fit(Renderer r)
+        {
+            if (r == null || !r.TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null) return;
+            var fitted = ScreenFaces.Of(mf.sharedMesh);
+            if (fitted != mf.sharedMesh) mf.sharedMesh = fitted;
         }
 
         /// <summary>One frame (called by the level's light budget, which runs wherever a house stands).</summary>
         public static void Tick(float time)
         {
-            if (s_Static.Count == 0 || (time >= s_Next - Interval && time < s_Next)) return;
-            s_Next = time + Interval;
-            s_Step++;
-            for (int i = s_Static.Count - 1; i >= 0; i--)
+            if (s_Screens.Count == 0) return;
+            bool snow = !(time >= s_Next - Interval && time < s_Next), drift = !(time >= s_NextDrift - DriftEvery && time < s_NextDrift);
+            if (!snow && !drift) return;
+            if (snow) { s_Next = time + Interval; s_Step++; }
+            if (drift) { s_NextDrift = time + DriftEvery; s_DriftStep++; }
+            for (int i = s_Screens.Count - 1; i >= 0; i--)
             {
-                var r = s_Static[i];
-                if (r == null) { s_Static.RemoveAt(i); continue; }
-                if (r.isVisible) Set(r, ScreenLooks.Jump(s_Step * 7 + i));
+                var (r, look) = s_Screens[i];
+                if (r == null) { s_Screens.RemoveAt(i); continue; }
+                if (snow && look == ScreenLook.Static && r.isVisible) Set(r, look, ScreenLooks.Jump(s_Step * 7 + i));
+                else if (drift && look == ScreenLook.NoSignal) Set(r, look, ScreenLooks.Drift(s_DriftStep * 5 + i));
             }
         }
 
-        static void Set(Renderer r, Vector2 at)
+        static void Set(Renderer r, ScreenLook look, Vector2 at)
         {
             s_Block ??= new MaterialPropertyBlock();
             r.GetPropertyBlock(s_Block);
-            s_Block.SetVector(StId, new Vector4(Tiling, Tiling, at.x, at.y));
+            float tiling = look == ScreenLook.Static ? Tiling : 1f;
+            s_Block.SetVector(StId, new Vector4(tiling, tiling, at.x, at.y));
             r.SetPropertyBlock(s_Block);
         }
     }

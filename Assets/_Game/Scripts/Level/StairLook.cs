@@ -61,6 +61,8 @@ namespace Stealth.Level
             m_Style = VisualStyles.Current;
             if (Variants == null || Variants.Length < StairStyles.Count) return;
             var g = m_Style != null ? m_Style.Geometry : null;
+            var look = VisualStyles.Look;
+            if (look != null) g = look.Dress(g); // the house's own stairs and finishes
             Current = m_Forced >= 0 && m_Forced < StairStyles.Count ? (StairStyle)m_Forced
                 : StairStyles.Pick(g != null ? g.Stairs : StairChoice.Auto, VisualStyles.Family, m_Seed);
             for (int i = 0; i < Variants.Length; i++)

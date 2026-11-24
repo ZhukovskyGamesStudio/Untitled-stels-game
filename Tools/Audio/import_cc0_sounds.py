@@ -15,12 +15,17 @@ Run:  python Tools/Audio/import_cc0_sounds.py
   fuller one with its ring-out is kept.
 """
 import os
+import sys
 import urllib.request
 import wave
 
 import numpy as np
 from scipy import signal
 from scipy.io import wavfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cc0_sources  # noqa: E402
+import recorded  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 CACHE = os.path.join(ROOT, "Tools", "Audio", "cache")
@@ -59,7 +64,8 @@ def load(path):
 
 
 def write(path, x, peak):
-    x = x / max(1e-9, np.abs(x).max()) * peak
+    if peak is not None:
+        x = x / max(1e-9, np.abs(x).max()) * peak
     data = (np.clip(x, -1, 1) * 32767).astype(np.int16)
     with wave.open(path, "wb") as w:
         w.setnchannels(1)
@@ -108,9 +114,19 @@ CUTS = {"car_engine": engine, "car_horn": horn}
 def main():
     rows = []
     for group, name, url, page, author, title, peak in SOUNDS:
-        x = CUTS[name](load(fetch(url)))
-        write(os.path.join(AUDIO, group, name + ".wav"), x, peak)
+        if "--recorded" not in sys.argv:
+            x = CUTS[name](load(fetch(url)))
+            write(os.path.join(AUDIO, group, name + ".wav"), x, peak)
         rows.append(f"| {group}/{name}.wav | {title} | {author} | {page} |")
+    for name, x, peak in recorded.render():
+        write(os.path.join(AUDIO, name + ".wav"), x, peak)
+    by_set = {}
+    for clip, sets in recorded.USED.items():
+        for s in sets:
+            by_set.setdefault(s, []).append(clip)
+    for name, page, title, author, _ in cc0_sources.SETS:
+        if name in by_set:
+            rows.append(f"| {', '.join(sorted(by_set[name]))} | {title} | {author or 'see the page'} | {cc0_sources.SITE}/content/{page} |")
     with open(os.path.join(AUDIO, "CREDITS.md"), "w", encoding="utf-8") as c:
         c.write("# Recorded sounds\n\nEverything else here is generated (Tools/Audio/generate_sounds.py, generate_voices.py). "
                 "These are recordings, licence [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain, "

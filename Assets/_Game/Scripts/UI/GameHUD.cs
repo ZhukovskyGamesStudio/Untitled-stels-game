@@ -595,6 +595,7 @@ namespace Stealth.UI
                 NearTrade = gm.CanTradeAt(me.transform.position),
                 InHatch = me.InHatch,
                 LockedDoor = me.DoorTarget != null,
+                LockedByUnit = me.DoorTarget != null && me.DoorTarget.Lock == LockKind.Electronic,
                 DoorProgress = me.DoorShare,
                 SafeNear = me.SafeTarget != null && me.Cracking == null,
                 Storage = me.StorageTarget != null

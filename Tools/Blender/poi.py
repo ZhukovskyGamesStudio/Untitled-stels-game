@@ -22,6 +22,7 @@ from mathutils import Vector
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir, category(), set_pivot(), ITEM_CELL)
 import meshfix  # noqa: E402
+import printed  # noqa: E402
 import shapes as s  # noqa: E402
 
 MOVING = ("AccentWheel", "AccentHead", "AccentLid")  # parts the game moves: meshfix must not shift them off their pivots
@@ -641,16 +642,21 @@ def model_item_battery_model():
 
 def model_item_book_model():
     """A hardback lying flat, 0.24 x 0.17, 0.04 thick: two cover boards and a rounded spine (at -Y) with two raised
-    bands, the page block inset between the boards (page lines on its edges), a title label on the front cover."""
+    bands, the page block inset between the boards (page lines on its edges); the cover is printed (printed.py)."""
     boards = [s.rbox((0.24, 0.16, 0.0045), (0, 0.005, z), r=0.0018, seg=2) for z in (0.00225, 0.03775)]
     spine = s.rbox((0.24, 0.02, 0.04), (0, -0.075, 0.02), r=0.009, seg=3)
     bands = [s.rbox((0.007, 0.012, 0.034), (x, -0.0795, 0.02), r=0.003, seg=2) for x in (-0.085, 0.085)]
-    s.part("Body", [*boards, spine, *bands])
+    cover = s.part("Body", [*boards, spine, *bands])
+
+    def print_on(n, c, co):                      # the top end is at -X, the spine (-Y) on the left
+        if n.z > 0.7 and c.z > 0.03:
+            return printed.cell_uv(printed.BOOK, (co.y + 0.075) / 0.16, 0.5 - co.x / 0.24)
+        return printed.cell_uv(printed.CLOTH, 0.5 + co.x * 2, 0.5 + (co.y + co.z) * 2)
+    printed.paint(cover, print_on)
     pages = s.rbox((0.232, 0.15, 0.033), (0, 0.004, 0.02), r=0.0015, seg=1)
     for z in (0.011, 0.0165, 0.0235, 0.029):
         s.groove(pages, "Z", z, width=0.0012, depth=0.0006)
     s.part("Accent", [pages])
-    s.part("AccentLabel", [s.rbox((0.13, 0.08, 0.002), (0.01, 0.012, 0.0405), r=0.0008, seg=1)])
     return export("item_book_model")
 
 
