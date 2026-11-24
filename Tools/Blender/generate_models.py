@@ -344,27 +344,6 @@ def model_server_rack():
     export("server_rack")
 
 
-def model_cabinet():
-    """Office drawer cabinet 0.9 x 0.5 x 1.19 (waist-to-chest high next to a 1.8 m person): an open-fronted carcass and
-    three drawers that slide out (separate parts BodyDrawer0..2, each a tray with its front and handle: the game moves
-    them, Items.Storage)."""
-    H, P = 1.19, 0.37                      # height, drawer pitch
-    merge("Body", [box((0.02, 0.5, H), (x, 0, H / 2)) for x in (-0.44, 0.44)]          # sides
-          + [box((0.9, 0.5, 0.02), (0, 0, H - 0.01)), box((0.9, 0.5, 0.06), (0, 0, 0.03)),  # top, plinth
-             box((0.9, 0.02, H), (0, 0.24, H / 2))]                                    # back
-          + [box((0.86, 0.48, 0.02), (0, 0.01, 0.06 + k * P)) for k in range(1, 3)])   # runners between the drawers
-    for k in range(3):
-        z0 = 0.07 + k * P
-        merge(f"BodyDrawer{k}", [
-            box((0.86, 0.02, P - 0.03), (0, -0.24, z0 + (P - 0.03) / 2)),    # front
-            box((0.8, 0.4, 0.015), (0, -0.03, z0 + 0.02)),                   # bottom
-            box((0.015, 0.4, 0.19), (-0.4, -0.03, z0 + 0.105)), box((0.015, 0.4, 0.19), (0.4, -0.03, z0 + 0.105)),  # sides
-            box((0.8, 0.015, 0.19), (0, 0.17, z0 + 0.105)),                  # back
-            box((0.3, 0.03, 0.04), (0, -0.265, z0 + P - 0.1)),               # handle
-        ])
-    export("cabinet")
-
-
 def model_meeting_table():
     merge("Body", [box((3.2, 1.3, 0.06), (0, 0, 0.75))])
     merge("Accent", [
@@ -847,7 +826,6 @@ if __name__ == "__main__":
     model_terminal()
     model_chair()
     model_server_rack()
-    model_cabinet()
     model_meeting_table()
     model_plant()
     model_kitchen_counter()

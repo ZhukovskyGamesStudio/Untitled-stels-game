@@ -44,6 +44,31 @@ def _settle(objs):
         o.data.update()
 
 
+def label_wrap(row, x0, length, zc):
+    """A label round a can lying along X (its top at +X): labels.png's row `row`, once round (the sheet repeats sideways)."""
+    def rule(n, c, co):
+        if abs(n.x) > 0.7:
+            return (0.01, 1 - (row + 0.5) / 4)                    # the label's edge: its ground colour
+        a, ac = math.atan2(co.z - zc, co.y), math.atan2(c.z - zc, c.y)
+        if a - ac > math.pi:
+            a -= 2 * math.pi
+        elif ac - a > math.pi:
+            a += 2 * math.pi
+        v = min(max((co.x - x0) / length, 0.02), 0.98)
+        return (a / (2 * math.pi) + 0.5, 1 - (row + 1 - v) / 4)
+    return rule
+
+
+def label_face(half, cx, cy, w, d):
+    """A printed face on top of a box lying flat (w along X, d along Y, centred at cx, cy): a half of labels.png's last row."""
+    def rule(n, c, co):
+        u, v = (co.x - cx) / w + 0.5, (co.y - cy) / d + 0.5
+        if n.z < 0.7:
+            u, v = 0.5, 0.03                                      # the sides: the face's ground colour
+        return ((half + min(max(u, 0.02), 0.98)) / 2, 1 - (4 - min(max(v, 0.03), 0.97)) / 4)
+    return rule
+
+
 def export(filename):
     """Settle the model, meshfix (floor as support), FBX into <root>/Items/; prints the bounds."""
     import bpy
@@ -310,7 +335,7 @@ def model_item_coffee_model():
                    (0.0345, 0.1025), (0.031, 0.105), (0.031, 0.109), (0.0, 0.109)], seg=32, axis="X", loc=(-0.067, 0, zc))
     s.part("Body", [jar])
     label = s.rcyl(0.0416, 0.062, (-0.067 + 0.048, 0, zc), axis="X", seg=32, r=0.0005, bevel_seg=1)
-    s.part("Trim", [label])
+    printed.paint(s.part("Trim", [label]), label_wrap(0, -0.067 + 0.048 - 0.031, 0.062, zc))
     lid = s.lathe([(0.0, 0.0), (0.0345, 0.0), (0.0358, 0.0015), (0.0358, 0.0205), (0.0345, 0.0222), (0.0, 0.0225)],
                   seg=32, axis="X", loc=(-0.067 + 0.1035, 0, zc))
     for k in range(4):
@@ -326,7 +351,7 @@ def model_item_tomatoes_model():
     for b in steel + labels:
         s.place(b, (0, 0, -0.055))
         s.place(b, (0, 0, 0.0398), rot=(0, math.pi / 2, 0))
-    s.part("Body", labels)
+    printed.paint(s.part("Body", labels), label_wrap(1, -0.0465, 0.093, 0.0398))
     s.part("Accent", steel)
     return export("item_tomatoes_model")
 
@@ -337,7 +362,7 @@ def model_item_pills_model():
     box = s.rbox((0.1, 0.05, 0.022), (0, 0.03, 0.011), r=0.002, seg=2)
     s.groove(box, "X", 0.043, width=0.0012, depth=0.0006)
     s.groove(box, "X", -0.043, width=0.0012, depth=0.0006)
-    s.part("Body", [box])
+    printed.paint(s.part("Body", [box]), label_face(0, 0.0, 0.03, 0.1, 0.05))
     blister = [s.rbox((0.09, 0.042, 0.0012), (0, 0, 0.0006), r=0.0005, seg=1)]
     for k in range(5):
         for j in (-1, 1):
@@ -356,7 +381,7 @@ def model_item_matches_model():
     sleeve = rect_tube(H, W, L, t, (0, 0, H / 2), axis="X", r=0.0005)
     strikers = [s.rbox((L - 0.012, 0.0012, H - 0.008), (0, sy * (W / 2 + 0.0002), H / 2), r=0.0004, seg=1)
                 for sy in (-1, 1)]
-    s.part("Body", [sleeve, *strikers])
+    printed.paint(s.part("Body", [sleeve, *strikers]), label_face(1, 0.0, 0.0, L, W))
     out = 0.03                                                    # how far the drawer is slid out
     x0, x1 = -L / 2 + 0.002 + out, L / 2 - 0.002 + out
     cx = (x0 + x1) / 2

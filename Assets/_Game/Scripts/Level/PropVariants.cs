@@ -62,6 +62,7 @@ namespace Stealth.Level
                     if (!on) continue;
                     foreach (var r in child.GetComponentsInChildren<MeshRenderer>(true))
                     {
+                        if (r.name.StartsWith("Fixed")) continue; // (as built: a burnt book stays burnt)
                         if (r.name.StartsWith("Accent")) { if (AccentPalette.Length > 0) r.sharedMaterial = AccentPalette[accent]; }
                         else if (!r.name.StartsWith("Eye") && Palette.Length > 0) r.sharedMaterial = Palette[PerPart ? parts.Next(Palette.Length) : paint];
                     }

@@ -67,6 +67,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _ReliefMap:
+        m_Texture: {fileID: 2800000, guid: 27ade1d9bc3a5294b90c926b3dae1b0f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -97,6 +101,8 @@ Material:
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _Clouds: 0.032
+    - _Contact: 0
     - _Corners: 0.9
     - _Cull: 2
     - _Cutoff: 0.5
@@ -116,6 +122,9 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _Relief: 0.525
+    - _ReliefTile: 1.6
+    - _RoomHeight: 2.75
     - _Scratches: 0.95
     - _ScreenSpaceReflections: 1
     - _ScreenSpaceReflectionsContributeTransparent: 1
@@ -128,7 +137,8 @@ Material:
     - _Stains: 0.61
     - _Streaks: 0.6
     - _Surface: 0
-    - _WearMetal: 0.7
+    - _WallBand: 0
+    - _WearMetal: 0.4
     - _WearSmooth: 0.5
     - _WearTile: 1.15
     - _WorkflowMode: 1
@@ -140,7 +150,7 @@ Material:
     - _DirtColor: {r: 0.27, g: 0.24, b: 0.2, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _WearColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+    - _WearColor: {r: 0.64, g: 0.64, b: 0.64, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &5527581267563389710

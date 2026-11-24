@@ -32,12 +32,19 @@ half _WearSmooth;
 half _Corners;
 half _FloorDirt;
 float _FloorHeight;
+float _ReliefTile;
+half _Relief;
+half _Clouds;
+half _WallBand;
+half _Contact;
+float _RoomHeight;
 UNITY_TEXTURE_STREAMING_DEBUG_VARS;
 CBUFFER_END
 
 TEXTURE2D(_OcclusionMap);       SAMPLER(sampler_OcclusionMap);
 TEXTURE2D(_MetallicGlossMap);   SAMPLER(sampler_MetallicGlossMap);
 TEXTURE2D(_WearMap);            SAMPLER(sampler_WearMap);
+TEXTURE2D(_ReliefMap);          SAMPLER(sampler_ReliefMap);
 
 half4 SampleMetallicSpecGloss(float2 uv, half albedoAlpha)
 {

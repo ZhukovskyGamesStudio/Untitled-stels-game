@@ -145,6 +145,17 @@ def stone():
     save("stone", a, grit, 0.22 + 0.02 * cloud, strength=0.35)
 
 
+def wallpaint():
+    """Painted plaster, a tile of 2.5 m: the stipple of the roller, the plasterer's slow unevenness."""
+    roll = band(171, 90, 260, sx=0.8, fall=0.3)
+    lap = band(172, 10, 70, sx=2.2, sy=0.35, fall=0.8)                  # the roller's passes, up and down
+    trowel = band(173, 3, 18, fall=1.1)
+    h = 1.0 * roll + 0.5 * lap + 6.0 * trowel
+    a = BASE + 0.006 * roll + 0.004 * lap + 0.008 * trowel
+    a *= BASE / a.mean()
+    save("wallpaint", a, h, 0.3 + 0.012 * lap + 0.02 * trowel - 0.02 * np.clip(roll, 0, 3), strength=0.06)
+
+
 # ------------------------------------------------------------------------------------------------- scanned surfaces
 
 def grey(path):
@@ -289,8 +300,24 @@ def wear():
     print(f"wrote wear: smudges {r.mean():.2f} scratches {g.mean():.2f} stains {b.mean():.2f} runs {a.mean():.2f}")
 
 
+def relief():
+    """What lies under every grain, Stealth/Surface's relief map (a tile of 1.6 m): RG the slopes (x, y, over 0.2) of slow
+    waves and a few dents, B clouds."""
+    n = 512
+    wave = band(181, 1.6, 11, fall=1.1)
+    dent = ndimage.gaussian_filter(blobs(182, 5, 12, 0.006, 0.3), 16, mode="wrap")
+    h = wave - 0.12 * dent / (dent.std() + 1e-9)
+    h = h[::2, ::2]
+    dx, dy = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 0.5, (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 0.5
+    k = 0.035 / np.sqrt((dx ** 2 + dy ** 2).mean())                     # about 2 degrees, to strengthen or weaken per surface
+    clouds = np.clip(0.5 + 0.17 * band(183, 1.0, 7, fall=1.2)[::2, ::2], 0, 1)
+    img = np.stack([0.5 - dx * k / 0.4, 0.5 + dy * k / 0.4, clouds, np.ones((n, n))], -1)
+    Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8), "RGBA").save(os.path.join(OUT, "relief.png"), optimize=True)
+    print(f"wrote relief: slope {np.sqrt(((dx * k) ** 2 + (dy * k) ** 2).mean()):.3f}")
+
+
 SURFACES = [powdercoat, gloss, plastic, plastic_rough, laminate, fabric, wool, cloth, felt, leather, rubber, steel, ceramic, cardboard, paper, wood, oak,
-            timber, leaf, stone]
+            timber, leaf, stone, wallpaint]
 
 
 def sheet(path):
@@ -320,3 +347,5 @@ if __name__ == "__main__":
                 f()
         if not args or "wear" in args:
             wear()
+        if not args or "relief" in args:
+            relief()

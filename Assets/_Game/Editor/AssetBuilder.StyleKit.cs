@@ -195,6 +195,7 @@ namespace Stealth.EditorTools
                 [DecorKind.Strip] = "kit_strip", [DecorKind.Pilaster] = "kit_pilaster", [DecorKind.Casing] = "kit_casing",
                 [DecorKind.Arch] = "kit_arch", [DecorKind.Beam] = "kit_beam", [DecorKind.IBeam] = "kit_ibeam",
                 [DecorKind.Coffer] = "kit_coffer", [DecorKind.Tray] = "kit_tray", [DecorKind.TrayHanger] = "kit_tray_hanger",
+                [DecorKind.PipeBend] = "kit_pipe_bend",
             };
             var kit = AssetDatabase.LoadAssetAtPath<StyleKit>(asset);
             if (kit == null)
@@ -226,6 +227,7 @@ namespace Stealth.EditorTools
                     return go;
                 });
             }
+            kit.Things = BuildWallThings();
             kit.Finish = Prefab($"{KitPrefabsDir}/Finish.prefab", () =>
             {
                 var go = new GameObject("Finish");
@@ -284,6 +286,52 @@ namespace Stealth.EditorTools
                 sets.Add(new MeshVariants { Family = f, From = from.ToArray(), To = to.ToArray() });
             }
             return sets.ToArray();
+        }
+
+        /// <summary>File names of the wall things (Tools/Blender/wall_things_atlas.THINGS), in <see cref="WallThing"/>'s order, and what frames each.</summary>
+        static readonly (string file, string body)[] WallThingFiles =
+        {
+            ("landscape_a", "wood"), ("landscape_b", "black"), ("abstract_a", "black"), ("abstract_b", "metal"), ("photo_a", "black"), ("photo_b", "wood"),
+            ("certificate", "wood"), ("calendar", "metal"), ("evac_plan", "metal"), ("first_aid", "metal"), ("tin_sign", "metal"), ("health", "metal"),
+            ("family", "wood"), ("botanical", "metal"), ("no_smoking", "metal"), ("thermostat", "white"), ("vent_grille", "white"),
+        };
+
+        /// <summary>
+        /// What hangs on walls (<see cref="WallThings"/>; Tools/Blender/wall_things.py → StyleKit/Things): one prefab each,
+        /// the same in every family's kit — frames of dark wood, black or bare metal, the picture from wall_things.png. No
+        /// colliders, no shadows; meshes readable (the style merges them into the house's decor).
+        /// </summary>
+        static GameObject[] BuildWallThings()
+        {
+            var things = new GameObject[WallThings.Count];
+            EnsureFolder($"{KitPrefabsDir}/Things");
+            for (int i = 0; i < things.Length; i++)
+            {
+                var (file, body) = WallThingFiles[i];
+                var path = $"{KitModelsDir}/Things/thing_{file}.fbx";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) { Debug.LogWarning($"[Builder] {path} missing: run Tools/Blender/wall_things.py"); continue; }
+                if (AssetImporter.GetAtPath(path) is ModelImporter importer && !importer.isReadable)
+                {
+                    importer.isReadable = true;
+                    importer.SaveAndReimport();
+                }
+                var kind = (WallThing)i;
+                things[i] = Prefab($"{KitPrefabsDir}/Things/{kind}.prefab", () =>
+                {
+                    var go = (GameObject)Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(path));
+                    go.name = kind.ToString();
+                    var frame = body == "wood" ? K("Real_DarkWood") : body == "black" ? K("Trim_Metal") : body == "white" ? K("Trim_White") : M("Metal");
+                    bool device = body == "white";
+                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
+                    {
+                        string n = r.gameObject.name;
+                        r.shadowCastingMode = ShadowCastingMode.Off;
+                        r.sharedMaterial = n.StartsWith("Print") ? M("ThingPrint") : n.StartsWith("Accent") ? (device ? M("Rubber") : K("Trim_White")) : frame;
+                    }
+                    return go;
+                });
+            }
+            return things;
         }
     }
 }

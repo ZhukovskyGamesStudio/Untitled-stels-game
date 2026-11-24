@@ -230,6 +230,8 @@ namespace Stealth.Level
         static ModelFamily s_Family;
         /// <summary>The models the house itself is furnished with (its <see cref="HouseLook"/>; None: the style's), and that look.</summary>
         static ModelFamily s_HouseFamily;
+        /// <summary>The family of models the house in place is furnished with (None: the style's own).</summary>
+        public static ModelFamily HouseFamily => s_HouseFamily;
         static HouseLook s_HouseLook;
 
         /// <summary>A renderer of the house (its shell and furniture — not what comes and goes: players, loot, robots, the car).</summary>
@@ -608,8 +610,18 @@ namespace Stealth.Level
             Get<LensDistortion>(s_Profile).intensity.Override(g.LensDistortion);
 
             Reflect(s_Profile, g.Reflections);
+            Bounce(g.Bounce, g.BounceReach);
 
             s_Volume.sharedProfile = s_Profile;
+        }
+
+        static readonly int BounceStrengthId = Shader.PropertyToID("_BounceStrength"), BounceReachId = Shader.PropertyToID("_BounceReach");
+
+        /// <summary>Bounced light of the picture (Art/Shaders/ScreenBounce.shader, the pass ScreenBounce on the renderer): its strength and reach; 0 — the pass does nothing.</summary>
+        public static void Bounce(float strength, float reach)
+        {
+            Shader.SetGlobalFloat(BounceStrengthId, Mathf.Max(0f, strength));
+            Shader.SetGlobalFloat(BounceReachId, reach > 0f ? reach : 4.5f);
         }
 
         /// <summary>

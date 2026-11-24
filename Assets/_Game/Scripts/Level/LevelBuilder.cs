@@ -225,6 +225,19 @@ namespace Stealth.Level
         {
             var screens = m_Art.Screens;
             if (screens == null || screens.Length == 0 || screens[0] == null || ScreenLooks.InUse(kind)) return;
+            int picture = ScreenLooks.DisplayOf(kind);
+            if (picture >= 0 && m_Art.Displays != null)
+            {
+                // an appliance's own little display: what such a thing shows, or dark
+                bool dark = ScreenLooks.DisplayDark(seed);
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (r.sharedMaterial != screens[0]) continue;
+                    r.sharedMaterial = dark ? screens[1 + (int)ScreenLook.Off] : m_Art.Displays;
+                    if (!dark) LiveScreens.AddDisplay(r, picture);
+                }
+                return;
+            }
             var look = ScreenLooks.Pick(seed, ScreenLooks.KindOf(kind));
             var to = 1 + (int)look < screens.Length ? screens[1 + (int)look] : null;
             if (to == null) return;
@@ -235,6 +248,20 @@ namespace Stealth.Level
                 if (Mathf.Max(size.x, Mathf.Max(size.y, size.z)) < ScreenLooks.SmallScreen) continue;
                 r.sharedMaterial = to;
                 LiveScreens.Add(r, look);
+            }
+        }
+
+        /// <summary>The piece's own picture (<see cref="PropPictures"/>): its board's writing, its mirror's state.</summary>
+        void DressPictures(GameObject go, PropKind kind, int seed)
+        {
+            if (m_Art.Pictures == null || !PropPictures.TryPick(kind, m_Layout.Kind, seed, out var pick) || (int)pick.Kind >= m_Art.Pictures.Length) return;
+            var material = m_Art.Pictures[(int)pick.Kind];
+            if (material == null) return;
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (pick.Part != null ? !r.name.StartsWith(pick.Part, System.StringComparison.Ordinal) : r.sharedMaterial != m_Art.Mirror) continue;
+                r.sharedMaterial = material;
+                LiveScreens.AddPicture(r, pick.Faces);
             }
         }
 
@@ -319,12 +346,21 @@ namespace Stealth.Level
                         foreach (var part in door.WallParts)
                             if (part != null) Shell.WallParts.Add(part);
                 }
+                // what is mounted over the doorway stays in sight: the pipes along the wall keep off it (StyleDecor)
+                var over = i == l.VaultDoor ? VaultSign : spec.Kind == DoorKind.Storage ? StorageSign : default;
+                if (over.HalfWidth > 0f)
+                {
+                    over.Center = d.position + Vector3.up * over.Center.y;
+                    over.Along = d.rotation * Vector3.right;
+                    over.Floor = LevelLayout.FloorOf(d.position.y);
+                    Shell.Signs.Add(over);
+                }
                 if (i == l.VaultDoor && m_Art.VaultPanel != null)
                 {
                     // the vault's plate with its three lamps over the doorway, on both faces of the wall
                     var across = d.rotation * Vector3.forward;
                     foreach (float side in new[] { 1f, -1f })
-                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * (LevelMetrics.DoorHeight + 0.56f) + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
+                        Place(m_Art.VaultPanel, "VaultPanel", d.position + Vector3.up * VaultSign.Center.y + across * (side * (LevelMetrics.WallThickness / 2f + 0.01f)),
                             Quaternion.LookRotation(across * side));
                 }
             }
@@ -354,6 +390,7 @@ namespace Stealth.Level
                 if (go.TryGetComponent<Items.Storage>(out var storage)) storage.Configure(i);
                 if (go.TryGetComponent<PropVariants>(out var variants)) variants.Dress(LevelRandom.Mix(l.Seed, Salt.PropVariants, i)); // its coats, its books
                 DressScreens(go, p.Kind, LevelRandom.Mix(l.Seed, Salt.Screens, i));
+                DressPictures(go, p.Kind, LevelRandom.Mix(l.Seed, Salt.Pictures, i));
                 if (go.TryGetComponent<SecurityTerminal>(out var terminal))
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
@@ -449,7 +486,7 @@ namespace Stealth.Level
             foreach (var r in Rectangles(plan.NX, plan.NZ, Board))
                 SlabPiece("CeilingBoard", m_Art.FloorSlab, r, ceiling + LevelMetrics.CeilingBoard / 2f, LevelMetrics.CeilingBoard, floor, false);
             foreach (var g in net.Grates)
-                Shell.CeilingHoles.Add(new Rect(g.Cell.x * VentPlan.Res, g.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res));
+                Shell.CeilingHoles.Add(new CeilingHole { Floor = floor - 1, Area = new Rect(g.Cell.x * VentPlan.Res, g.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res) });
         }
 
         /// <summary>
@@ -676,7 +713,36 @@ namespace Stealth.Level
                 var at = new Vector2(p.x, p.z);
                 var rot = SmoothJoint(at, out float yaw) ? Quaternion.Euler(0f, yaw, 0f) : (Quaternion?)null;
                 Block(m_Art.WallBlock, "WallPost", p + Vector3.up * (y + h / 2f), new Vector3(t, h, t), rot);
+                RecordPost(kv.Key, p + Vector3.up * y, h, rot ?? Quaternion.identity);
             }
+        }
+
+        /// <summary>The faces of a post that no wall goes on from (<see cref="LevelShell.Posts"/>).</summary>
+        void RecordPost(Vector3 key, Vector3 at, float height, Quaternion rot)
+        {
+            const float half = LevelMetrics.WallThickness / 2f;
+            foreach (var axis in new[] { Vector3.forward, Vector3.right, Vector3.back, Vector3.left })
+            {
+                var n = rot * axis;
+                if (GoesOn(key, new Vector2(n.x, n.z))) continue;
+                var along = rot * new Vector3(axis.z, 0f, -axis.x);
+                Shell.Posts.Add(new WallFace { A = at - along * half, B = at + along * half, Y0 = 0f, Y1 = height, Normal = n, Floor = m_Floor });
+            }
+        }
+
+        /// <summary>A wall leaves this end point in that direction (the post's face is inside it).</summary>
+        bool GoesOn(Vector3 key, Vector2 way)
+        {
+            if (!m_Ends.TryGetValue(key, out var walls)) return false;
+            foreach (int i in walls)
+            {
+                var w = m_Plan.Walls[i];
+                if (Vector2.Dot(EndKey(w.A) == key ? w.Dir : -w.Dir, way) < 0.99f) continue;
+                bool open = false;
+                foreach (var op in m_Plan.OpeningsOf(i)) open |= op.Kind == EdgeType.Open;
+                if (!open) return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -811,8 +877,13 @@ namespace Stealth.Level
                     if (frame.TryGetComponent<VentGrille>(out var grille)) grille.Configure(DoorwayIndex(mid));
                 }
                 else if (window) { if (m_Art.InnerWindowFrame != null) Place(m_Art.InnerWindowFrame, "InnerWindow", mid, along); }
-                else if (breach) { if (m_Art.BreachFrame != null) Place(m_Art.BreachFrame, "Breach", mid, along); }
-                else if (hole) { if (m_Art.HoleFrame != null) Place(m_Art.HoleFrame, "Hole", mid, along); }
+                else if (breach || hole)
+                {
+                    // one of the ways it broke, by the house's seed; the plaster round it is wall (each room's own finish)
+                    var prefab = breach ? m_Art.BreachFrame : m_Art.HoleFrame;
+                    if (prefab != null && Place(prefab, breach ? "Breach" : "Hole", mid, along).TryGetComponent<RuinFrame>(out var ruin))
+                        ruin.Show(LevelRandom.Mix(m_Layout.Seed, Salt.Ruins, Shell.Openings.Count), Shell.WallParts);
+                }
                 else if (w.Exterior)
                 {
                     // the street door's +Z out of the house: its leaves swing outwards (the apartment block's: thick steel with an
@@ -835,7 +906,7 @@ namespace Stealth.Level
                         exit.HingeRight();
                 }
                 else if (squeeze) { if (m_Art.SqueezeFrame != null) Place(m_Art.SqueezeFrame, "SqueezeFrame", mid, along); }
-                else if (m_Art.ExitSign != null && !vault && OnEscapeRoute(w)) Place(m_Art.ExitSign, "ExitSign", mid + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along);
+                else if (m_Art.ExitSign != null && !vault && OnEscapeRoute(w)) Place(m_Art.ExitSign, "ExitSign", mid + d3 * (LampOver(mid) ? 0.36f : 0f) + Vector3.up * (LevelMetrics.DoorHeight + 0.14f), along); // (beside the door's lock lamp)
                 from = o1;
                 cornerA = false;
             }
@@ -844,7 +915,27 @@ namespace Stealth.Level
                 jointA && from <= t / 2f + 0.001f, jointB);
         }
 
+        /// <summary>The door in this doorway may have a lock lamp over it: it is locked, or opens to a key.</summary>
+        bool LampOver(Vector3 mid)
+        {
+            for (int i = 0; i < m_Layout.AutoDoors.Count; i++)
+            {
+                var at = m_Layout.AutoDoors[i].position;
+                if (Mathf.Abs(at.y - mid.y) > 1f || new Vector2(at.x - mid.x, at.z - mid.z).sqrMagnitude > 0.04f) continue;
+                if (m_Layout.LockedDoors.Contains(i)) return true;
+                foreach (var k in m_Layout.KeyDoors) if (k.Door == i) return true;
+            }
+            return false;
+        }
+
         int m_OuterDoors;
+
+        /// <summary>
+        /// Over the doorways, between their trim and the ceiling: the storage room's lit sign and the vault's plate of lamps
+        /// (the middle's height over the floor, half the size; AssetBuilder builds them to these).
+        /// </summary>
+        public static readonly WallSign StorageSign = new() { Center = new Vector3(0f, LevelMetrics.WallHeight - 0.15f, 0f), HalfWidth = 0.55f, HalfHeight = 0.13f };
+        public static readonly WallSign VaultSign = new() { Center = new Vector3(0f, LevelMetrics.WallHeight - 0.13f, 0f), HalfWidth = 0.37f, HalfHeight = 0.1f };
 
         /// <summary>An outer door (the street's, a balcony's): its spot comes after the inner doors', in the order they are built.</summary>
         void OuterDoor(GameObject go)
@@ -1134,6 +1225,8 @@ namespace Stealth.Level
 
         void BuildUtilities()
         {
+            if (m_Art.ElectricPanel != null)
+                foreach (var (at, facing) in UtilityPlan.PanelSpots(m_Layout, Shell)) Place(m_Art.ElectricPanel, "ElectricPanel", at, Quaternion.LookRotation(facing));
             var mats = m_Art.UtilityMaterials;
             if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
             var parts = UtilityPlan.Make(m_Layout, Shell);
@@ -1155,6 +1248,7 @@ namespace Stealth.Level
                 if (tris[i].Count > 0 && i < mats.Length && mats[i] != null) { used.Add(mats[i]); subs.Add(tris[i]); }
             mesh.subMeshCount = subs.Count;
             for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
+            mesh.RecalculateTangents(); // (their surfaces have relief)
             mesh.RecalculateBounds();
             Meshes.Add(mesh);
             var go = Place(m_Art.CityPiece, "Utilities", Vector3.zero, Quaternion.identity);

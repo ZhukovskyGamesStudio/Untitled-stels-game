@@ -16,6 +16,12 @@ def cell_uv(cell, u, v):
     return ((cell % 4 + u) / 4, 1 - (cell // 4 + 1 - v) / 3)
 
 
+def sheet_uv(k, u, v):
+    """Atlas UV of sheet k of sheets.png (3 x 2 cells, cell 0 top left)."""
+    u, v = EDGE + min(max(u, 0.0), 1.0) * (1 - 2 * EDGE), EDGE + min(max(v, 0.0), 1.0) * (1 - 2 * EDGE)
+    return ((k % 3 + u) / 3, 1 - (k // 3 + 1 - v) / 2)
+
+
 def spine_uv(k, u, v):
     """Atlas UV of spine k of spines_<colour>.png."""
     return ((k + 0.03 + 0.94 * min(max(u, 0.0), 1.0)) / 8, 0.253 + 0.744 * min(max(v, 0.0), 1.0))

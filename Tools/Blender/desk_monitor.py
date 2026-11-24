@@ -5,12 +5,13 @@ Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blend
       (lands in <root>/Props/desk_monitor.fbx)
 
 Origin on the desk's top under the screen's foot; the screen faces Blender -Y (the side one sits at). Parts: Body (the
-casing, foot, keyboard, mouse), EyeScreen (the picture: UV 0..1 over it).
+casing, foot), Keys (keyboard and mouse: keyboard.py), EyeScreen (the picture: UV 0..1 over it).
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import keyboard  # noqa: E402
 import meshfix  # noqa: E402
 import shapes as s  # noqa: E402
 
@@ -23,12 +24,8 @@ def build():
     bms = [s.rbox((W, 0.03, H), (0, 0, MID), r=0.008, seg=2),                                   # the casing
            s.rbox((W * 0.6, 0.03, H * 0.55), (0, 0.022, MID), r=0.012, seg=2, taper=(0.92, 0.92)),   # its back
            s.rbox((0.06, 0.022, 0.26), (0, 0.045, 0.14), r=0.006, seg=2),                        # the neck
-           s.rbox((0.23, 0.18, 0.014), (0, 0.03, 0.006), r=0.006, seg=2),                        # the foot
-           s.rbox((0.44, 0.135, 0.018), (-0.03, -0.24, 0.008), r=0.005, seg=2),                  # the keyboard
-           s.rbox((0.062, 0.105, 0.03), (0.28, -0.235, 0.011), r=0.011, seg=3)]                   # the mouse
-    for row in range(5):                                                                          # its keys, in rows
-        for k in range(14):
-            bms.append(s.rbox((0.0245, 0.0195, 0.01), (-0.03 - 0.19 + 0.0292 * k, -0.288 + 0.0238 * row, 0.0185), r=0.002, seg=1))
+           s.rbox((0.23, 0.18, 0.014), (0, 0.03, 0.006), r=0.006, seg=2)]                         # the foot
+    keyboard.add("Keys", (-0.03, -0.24, 0))
     s.part("Body", bms)
     picture = s.part("EyeScreen", [s.rbox((W - 0.03, 0.004, H - 0.042), (0, -0.0145, MID + 0.005), r=0.0005, seg=1)])
     uv = picture.data.uv_layers.active.data

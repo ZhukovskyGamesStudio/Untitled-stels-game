@@ -67,6 +67,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _ReliefMap:
+        m_Texture: {fileID: 2800000, guid: 27ade1d9bc3a5294b90c926b3dae1b0f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -97,6 +101,8 @@ Material:
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _Clouds: 0.03
+    - _Contact: 0
     - _Corners: 0.5
     - _Cull: 2
     - _Cutoff: 0.5
@@ -116,6 +122,9 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _Relief: 0.6
+    - _ReliefTile: 1.6
+    - _RoomHeight: 2.75
     - _Scratches: 0.4
     - _ScreenSpaceReflections: 1
     - _ScreenSpaceReflectionsContributeTransparent: 1
@@ -128,6 +137,7 @@ Material:
     - _Stains: 0.06
     - _Streaks: 0
     - _Surface: 0
+    - _WallBand: 0
     - _WearMetal: 0
     - _WearSmooth: 0.6
     - _WearTile: 1.15

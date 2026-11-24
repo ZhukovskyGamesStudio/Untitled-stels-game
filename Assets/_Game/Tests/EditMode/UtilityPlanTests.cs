@@ -36,7 +36,7 @@ namespace Stealth.Tests
             Assert.IsTrue(parts.Any(p => p.Slot == UtilitySlot.Plate), "sockets");
             for (int f = 0; f < l.Floors; f++)
                 if (l.Rooms.Any(r => r.Floor == f && r.Type is RoomType.Corridor or RoomType.Hall))
-                    Assert.IsTrue(parts.Any(p => p.Slot == UtilitySlot.Panel && LevelLayout.FloorOf(p.Center.y) == f), $"an electrical panel on floor {f}");
+                    Assert.IsTrue(UtilityPlan.PanelSpots(l, ActiveLevel.Shell).Any(p => LevelLayout.FloorOf(p.at.y) == f), $"an electrical panel on floor {f}");
             // ducts run between the doors' tops and the ceiling
             foreach (var p in parts.Where(p => p.Slot == UtilitySlot.Duct))
             {

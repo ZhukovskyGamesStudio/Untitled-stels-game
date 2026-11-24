@@ -640,21 +640,26 @@ def vending_machine(L):
 
 
 def water_cooler(L):
-    """A floor cooler: an enamel cabinet with a rounded crown, a recessed tap niche with a drip grille, a ribbed
-    bottle upside down on top."""
+    """A floor cooler: a steel cabinet on feet with a side vent, a recessed dispensing niche with two lever taps over a
+    drip tray with its grate, a cup tube at the side, a collar on top and a 19-litre bottle upside down in it — smooth
+    shoulders, a few grip rings, the neck."""
     P = D.Parts()
-    P.add("Body", L.carcass((.34, .34, .94), (0, 0, 0), kick=.05))
-    P.add("Body", [s.rbox((.35, .35, .1), (0, 0, .95), r=.04, seg=3)])
-    P.add("Body", [s.rbox((.24, .06, .3), (0, -.17, .66), r=.02, seg=2)])
-    P.add("Body", [s.rbox((.22, .07, .025), (0, -.185, .52), r=.008, seg=1)])
-    for x in (-.06, .06):
-        P.add("Body", [bent([(x, -.18, .79), (x, -.205, .79), (x, -.205, .75)], .011, bend=.012)])
-    prof = [(0, 0), (.05, 0), (.05, .06), (.13, .11), (.15, .15)]
-    for k in range(4):
-        z = .17 + k * .055
-        prof += [(.15, z), (.142, z + .015), (.15, z + .03)]
-    prof += [(.15, .40), (.12, .44), (.05, .46), (0, .46)]
-    P.add("Eye", [s.lathe(prof, seg=24, loc=(0, 0, .99))])
+    cab = s.rbox((.34, .34, .9), (0, 0, .49), r=.022, seg=3)
+    cab = s.boolean(cab, s.rbox((.25, .12, .3), (0, -.17, .7), r=.02, seg=2), "DIFFERENCE")       # the niche
+    s.bevel_edges(cab, .004, 1, angle=50)
+    s.groove(cab, "Z", .42, .006, .003)                                                           # the door's top edge
+    P.add("Body", [cab, s.rbox((.35, .35, .07), (0, 0, .955), r=.03, seg=3)])
+    P.add("Body", [s.rcyl(.02, .05, (x, y, .025), seg=10, r=.004, bevel_seg=1) for x in (-.13, .13) for y in (-.13, .13)])
+    P.add("Body", [s.rbox((.24, .1, .022), (0, -.15, .565), r=.006, seg=1)])                      # the tray
+    P.add("Body", [s.rbox((.2, .008, .006), (0, -.19 + k * .02, .578), r=.002, seg=1) for k in range(5)])
+    for x in (-.06, .06):                                                                          # taps: a spout and a lever
+        P.add("Body", [s.rcyl(.014, .06, (x, -.14, .8), axis="Y", seg=10, r=.003, bevel_seg=1), s.rcyl(.011, .04, (x, -.165, .78), seg=10, r=.003, bevel_seg=1),
+                       s.rbox((.03, .012, .05), (x, -.172, .815), r=.004, seg=1, rot=(math.radians(-18), 0, 0))])
+    P.add("Body", [s.rbox((.006, .2, .012), (.171, 0, .2 + k * .03), r=.002, seg=1) for k in range(6)])          # the vent's louvres
+    P.add("Body", [s.rcyl(.042, .4, (-.19, .05, .6), seg=14, r=.006, bevel_seg=1), s.rbox((.03, .05, .04), (-.178, .05, .7), r=.006, seg=1)])  # the cup tube
+    prof = [(0, 0), (.028, 0), (.03, .05), (.05, .07), (.115, .12), (.135, .15), (.136, .2), (.13, .206), (.136, .212), (.136, .285), (.13, .291), (.136, .297),
+            (.136, .36), (.128, .4), (.09, .425), (.05, .422), (0, .415)]
+    P.add("Eye", [s.lathe(prof, seg=28, loc=(0, 0, .985))])
     return P
 
 
@@ -815,14 +820,18 @@ def armchair(L):
 
 
 def meeting_table(L):
-    """A conference table: a thick laminate top on two bent-tube sled frames tied by a tube stretcher."""
+    """A conference table: a boat-shaped laminate top with a thick radiused edge, a cable trough with two flip lids down
+    its middle, on two steel T-legs (a column, a long foot with levellers, a plate under the top) tied by a cable tray."""
     P = D.Parts()
-    P.add("Body", L.slab((3.2, 1.3, .06), (0, 0, .75)))
-    r = .022
+    top = s.loft([(-1.6, .028, .5, 6), (-1.3, .03, .61, 6), (0, .03, .65, 6), (1.3, .03, .61, 6), (1.6, .028, .5, 6)], seg=28, axis="X", loc=(0, 0, .75), round_caps=.03)
+    P.add("Body", [top])
+    for x in (-.45, .45):                                                                          # the cable lids, a finger notch each
+        P.add("Accent", [s.rbox((.42, .13, .012), (x, 0, .7785), r=.004, seg=1), s.rbox((.08, .03, .014), (x, -.05, .779), r=.004, seg=1)])
     for x in (-1.1, 1.1):
-        P.add("Accent", [bent([(x, -.48, .725), (x, -.48, r), (x, .48, r), (x, .48, .725)], r, bend=.09)])
-        P.add("Accent", [s.tube([(x, -.48, .7), (x, .48, .7)], r * .8, res=2, smooth=False)])
-    P.add("Accent", [s.tube([(-1.1, 0, .7), (1.1, 0, .7)], r * .8, res=2, smooth=False)])
+        P.add("Accent", [s.rbox((.09, .16, .68), (x, 0, .38), r=.012, seg=2), s.rbox((.1, 1.0, .04), (x, 0, .02), r=.012, seg=2),
+                         s.rbox((.2, .5, .012), (x, 0, .716), r=.004, seg=1)])
+        P.add("Accent", [s.rcyl(.022, .012, (x, y, .004), seg=10, r=.003, bevel_seg=1) for y in (-.45, .45)])
+    P.add("Accent", [s.rbox((2.12, .14, .05), (0, 0, .62), r=.01, seg=1)])                         # the tray under the top
     return P
 
 

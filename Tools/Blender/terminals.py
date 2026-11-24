@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rooms2_special as rs  # noqa: E402  (export(), torus())
+import keyboard  # noqa: E402
 import shapes as s  # noqa: E402
 
 DESK_TOP = 0.76
@@ -61,10 +62,7 @@ def model_terminal_console():
     body.append(s.rbox((0.74, 0.02, 0.4), (0, 0.36, 0.42), r=0.004, seg=1))                         # modesty panel
     for x, y, yaw in ((-0.5, 0.18, -22), (0.0, 0.24, 0), (0.5, 0.18, 22)):
         _monitor(x, y, yaw, body, accent, screens, frames=frames)
-    accent.append(s.rbox((0.46, 0.15, 0.022), (-0.08, -0.2, DESK_TOP + 0.011), r=0.006, seg=2))     # keyboard
-    for k in range(10):
-        for j in range(3):
-            accent.append(s.rbox((0.032, 0.03, 0.008), (-0.27 + k * 0.042, -0.24 + j * 0.04, DESK_TOP + 0.025), r=0.002, seg=1))
+    keyboard.add("Keys", (-0.1, -0.2, DESK_TOP - 0.0005), mouse=0.0)
     # the console panel: a sloped box with buttons and a joystick
     body.append(s.rbox((0.3, 0.22, 0.06), (0.5, -0.2, DESK_TOP + 0.03), r=0.01, seg=2, rot=(math.radians(12), 0, 0)))
     for k in range(3):

@@ -570,7 +570,15 @@ def model_notice_board():
     s.part("Trim", [board, *pins])
     cork = s.rbox((1.13, 0.03, 0.73), (0, 0.013, 1.5), r=0.003, seg=1)
     s.part("Body", [cork])
-    s.part("Accent", papers)
+    sheets = s.part("Accent", papers)
+
+    def rule(n, c, co):                                                  # each its own sheet of Art/Textures/Covers/sheets.png
+        k = min(range(len(specs)), key=lambda i: (c.x - specs[i][0]) ** 2 + (c.z - specs[i][1]) ** 2)
+        x, z, w, h, a = specs[k]
+        dx, dz, t = co.x - x, co.z - z, a * DEG
+        u, v = dx * math.cos(t) - dz * math.sin(t), dx * math.sin(t) + dz * math.cos(t)
+        return printed.sheet_uv(k, u / w + 0.5, v / h + 0.5)
+    printed.paint(sheets, rule)
     return export("notice_board")
 
 

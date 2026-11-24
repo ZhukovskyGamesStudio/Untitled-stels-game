@@ -21,11 +21,19 @@ namespace Stealth.Tests
         {
             Assert.AreEqual(Set("Clean"), Styles.LookOf(HouseKind.Office).SurfacesFor(ModelFamily.Realistic));
             Assert.AreEqual(Set("Worn"), Styles.LookOf(HouseKind.Abandoned).SurfacesFor(ModelFamily.Realistic));
+            Assert.AreEqual(Set("Used"), Styles.LookOf(HouseKind.Garage).SurfacesFor(ModelFamily.Realistic));
+            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
+                Assert.IsNotNull(Styles.LookOf(kind).SurfacesFor(ModelFamily.Realistic), $"{kind}: its things are still plain colours");
+            // used things are scuffed more than kept ones and less than abandoned ones
+            var kept = Set("Clean").Materials.First(m => m.From.name == "PropBody").To;
+            var used = Set("Used").Materials.First(m => m.From.name == "PropBody").To;
+            Assert.Greater(used.GetFloat("_FloorDirt"), kept.GetFloat("_FloorDirt"));
+            Assert.Less(used.GetFloat("_FloorDirt"), 0.9f);
             Assert.IsNull(Styles.LookOf(HouseKind.Office).SurfacesFor(ModelFamily.Clean), "the drawn style keeps its drawn colours");
         }
 
         [Test]
-        public void EverySurfaceHasItsRelief([Values("Clean", "Worn")] string name)
+        public void EverySurfaceHasItsRelief([Values("Clean", "Used", "Worn")] string name)
         {
             var set = Set(name);
             Assert.Greater(set.Materials.Length, 25);
@@ -38,13 +46,39 @@ namespace Stealth.Tests
                 Assert.IsNotNull(to.GetTexture("_MetallicGlossMap"), $"{to.name}: no sheen");
                 Assert.AreEqual("Stealth/Surface", to.shader.name, to.name);
                 Assert.IsNotNull(to.GetTexture("_WearMap"), $"{to.name}: no wear");
+                Assert.IsNotNull(to.GetTexture("_ReliefMap"), $"{to.name}: flat from across the room");
                 StringAssert.DoesNotContain("rust", AssetDatabase.GetAssetPath(to.GetTexture("_BaseMap")).ToLowerInvariant(), "wear without rust");
                 Assert.IsFalse(from.name is "Wall" or "Floor" or "Ceiling" && set.Materials.Any(m => m.From == from), "the slabs are stretched cubes: no texture fits them");
             }
         }
 
         [Test]
-        public void ASurfaceStandsForOneMaterialOnly([Values("Clean", "Worn")] string name)
+        public void PaintedWallsAreNotOneFlatColour()
+        {
+            foreach (var name in new[] { "Real_BeigeWall", "Real_Plaster", "Real_Plaster2", "Paint_White", "Paint_Band", "Real_CeilingTiles" })
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Data/Styles/Kit/{name}.mat");
+                Assert.AreEqual("Stealth/Surface", m.shader.name, name);
+                Assert.IsNotNull(m.GetTexture("_BumpMap"), name);
+                Assert.Greater(m.GetFloat("_Clouds"), 0f, name);
+                Assert.Greater(m.GetFloat("_Relief"), 0f, name);
+            }
+            // the map of slopes is read as numbers: not a colour texture, not squeezed into blocks
+            var relief = (TextureImporter)AssetImporter.GetAtPath("Assets/_Game/Art/Textures/Surfaces/relief.png");
+            Assert.IsFalse(relief.sRGBTexture);
+            Assert.AreEqual(TextureImporterCompression.Uncompressed, relief.textureCompression);
+        }
+
+        [Test]
+        public void TheHousesServicesAreMadeOfSomething([Values("Clean", "Used", "Worn")] string name)
+        {
+            var art = AssetDatabase.LoadAssetAtPath<LevelArt>("Assets/_Game/Data/LevelArt.asset");
+            foreach (var m in art.UtilityMaterials)
+                Assert.IsTrue(Set(name).TryGet(null, m, out _), $"{m.name}: a flat colour");
+        }
+
+        [Test]
+        public void ASurfaceStandsForOneMaterialOnly([Values("Clean", "Used", "Worn")] string name)
         {
             var set = Set(name);
             foreach (var g in set.Materials.Select(m => (m.From, m.To)).Concat(set.Parts.Select(p => (p.From, p.To))).GroupBy(m => m.To))
@@ -123,8 +157,30 @@ namespace Stealth.Tests
             foreach (var prop in new[] { "MagazineRack", "SideTable", "ReadingTable" })
                 Assert.IsTrue(AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Props/{prop}.prefab").GetComponentsInChildren<MeshRenderer>(true)
                     .Any(r => r.sharedMaterial.name == "Printed"), prop);
+            var board = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/NoticeBoard.prefab").GetComponentsInChildren<MeshRenderer>(true).First(r => r.name.StartsWith("Accent"));
+            Assert.AreEqual("Sheets", board.sharedMaterial.name);
+            Assert.IsNotNull(board.sharedMaterial.GetTexture("_BaseMap"));
             var bookcase = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/TallBookcase.prefab").GetComponent<PropVariants>();
             Assert.IsTrue(bookcase.Own.Any(r => r.name.StartsWith("Trim")), "the model's own blank books give way to the printed ones");
+        }
+
+        [Test]
+        public void LitSurfacesBounceTheirLightInTheDefaultStyleOnly()
+        {
+            var renderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRendererData>("Assets/Settings/PC_Renderer.asset");
+            var pass = renderer.rendererFeatures.OfType<UnityEngine.Rendering.Universal.FullScreenPassRendererFeature>().FirstOrDefault(f => f.name == "ScreenBounce");
+            Assert.IsNotNull(pass, "no bounce pass on the renderer");
+            Assert.IsTrue(pass.isActive);
+            Assert.AreEqual("Stealth/ScreenBounce", pass.passMaterial.shader.name);
+            Assert.AreEqual(UnityEngine.Rendering.Universal.FullScreenPassRendererFeature.InjectionPoint.BeforeRenderingTransparents, pass.injectionPoint, "glass and the gas are not lit twice");
+            Assert.IsTrue((pass.requirements & UnityEngine.Rendering.Universal.ScriptableRenderPassInput.Normal) != 0 && (pass.requirements & UnityEngine.Rendering.Universal.ScriptableRenderPassInput.Depth) != 0);
+            foreach (var style in Styles.Styles)
+            {
+                if (style.name == "S16_Derelict") Assert.That(style.Grade.Bounce, Is.InRange(0.3f, 2f), "the default style bounces light");
+                else Assert.AreEqual(0f, style.Grade.Bounce, $"{style.name}: a drawn style has its own shading");
+                Assert.Greater(style.Grade.BounceReach, 1f);
+            }
+            // (a dark room stays black with it: Stealth → Surface Room Pictures with DARK=1 prints the brightest pixel — 0)
         }
     }
 }

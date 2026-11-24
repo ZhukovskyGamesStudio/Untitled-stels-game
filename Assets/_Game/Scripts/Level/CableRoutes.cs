@@ -17,7 +17,7 @@ namespace Stealth.Level
         public const float DoorDrop = 2.4f;
 
         /// <summary>The cables of a house: the vault's (three) and the storage door's (one), as pipes of the services' mesh.</summary>
-        public static void Lay(List<UtilityPart> parts, LevelLayout l)
+        public static void Lay(List<UtilityPart> parts, LevelLayout l, LevelShell shell = null)
         {
             if (l?.Plan == null) return;
             // the vault: every lock panel to the vault's doorway, on the panel's side of the wall
@@ -28,7 +28,7 @@ namespace Stealth.Level
                 {
                     var facing = console.rotation * Vector3.forward;
                     var start = console.position + facing * OffWall;
-                    Add(parts, l, start, Flat(facing), console.position.y + 0.35f, door, l.VaultRoom);
+                    Add(parts, l, start, Flat(facing), console.position.y + 0.35f, door, l.VaultRoom, shell);
                 }
             }
             // the storage room: its access terminal (a stand) to its door
@@ -36,14 +36,14 @@ namespace Stealth.Level
             {
                 var t = l.Props[l.StorageTerminal];
                 var facing = Quaternion.Euler(0f, t.RotationY, 0f) * Vector3.forward;
-                Add(parts, l, t.Position - facing * 0.12f, Flat(facing), t.Position.y + 1.25f, l.Doorways[l.StorageDoorway], l.StorageRoom);
+                Add(parts, l, t.Position - facing * 0.12f, Flat(facing), t.Position.y + 1.25f, l.Doorways[l.StorageDoorway], l.StorageRoom, shell);
             }
         }
 
         static Vector2 Flat(Vector3 v) => new Vector2(v.x, v.z).normalized;
 
         /// <summary>One cable: up from <paramref name="start"/> (from <paramref name="riseFrom"/> high), along the ceiling to the doorway's outer side, down over the door.</summary>
-        static void Add(List<UtilityPart> parts, LevelLayout l, Vector3 start, Vector2 facing, float riseFrom, Doorway door, int insideRoom)
+        static void Add(List<UtilityPart> parts, LevelLayout l, Vector3 start, Vector2 facing, float riseFrom, Doorway door, int insideRoom, LevelShell shell)
         {
             int floor = LevelLayout.FloorOf(start.y + 0.1f);
             if (door.Floor != floor) return; // (on another storey: no cable between floors)
@@ -55,7 +55,28 @@ namespace Stealth.Level
             int inside = l.Plan.IdAt(floor, HousePlan.CellOf(mid + a2 * 0.4f).x, HousePlan.CellOf(mid + a2 * 0.4f).y);
             if (inside == insideRoom) a2 = -a2;
             var doorFace = mid + a2 * (LevelMetrics.WallThickness / 2f + OffWall);
-            var route = Route(l.Plan, floor, new Vector2(start.x, start.z) + facing * 0.3f, mid + a2 * 0.3f);
+            // beside what is mounted over the doorway, never across it (nor across another's on the way)
+            var along2 = new Vector2(-a2.y, a2.x);
+            var keepOff = new List<Rect>();
+            float sign = 0f;
+            if (shell != null)
+                foreach (var s in shell.Signs)
+                {
+                    if (s.Floor != floor) continue;
+                    var c = new Vector2(s.Center.x, s.Center.z);
+                    if ((c - mid).sqrMagnitude < 0.04f) sign = s.HalfWidth;
+                    var half = new Vector2(Mathf.Abs(s.Along.x) * s.HalfWidth + Mathf.Abs(s.Along.z) * 0.6f, Mathf.Abs(s.Along.z) * s.HalfWidth + Mathf.Abs(s.Along.x) * 0.6f);
+                    keepOff.Add(new Rect(c - half, 2f * half));
+                }
+            float near = Vector2.Dot(new Vector2(start.x, start.z) - mid, along2) >= 0f ? 1f : -1f;
+            List<Vector2> route = null;
+            foreach (float at in sign > 0f ? new[] { near * (sign + 0.4f), -near * (sign + 0.4f), near * (sign + 0.15f), -near * (sign + 0.15f), 0f } : new[] { 0f })
+            {
+                route = Route(l.Plan, floor, new Vector2(start.x, start.z) + facing * 0.3f, mid + along2 * at + a2 * 0.3f, keepOff);
+                if (route == null) continue;
+                doorFace += along2 * at;
+                break;
+            }
             if (route == null) return;
             var points = new List<Vector3> { new(start.x, riseFrom, start.z), new(start.x, ceiling, start.z) };
             foreach (var p in route) points.Add(new Vector3(p.x, ceiling, p.y));
@@ -68,7 +89,7 @@ namespace Stealth.Level
         /// The path along the ceiling between two points of a floor: cell to cell (4 ways) through the rooms and their
         /// openings, keeping by the walls and turning seldom; the turning points (cell centres), or null when unreachable.
         /// </summary>
-        public static List<Vector2> Route(HousePlan plan, int floor, Vector2 from, Vector2 to)
+        public static List<Vector2> Route(HousePlan plan, int floor, Vector2 from, Vector2 to, List<Rect> keepOff = null)
         {
             var a = HousePlan.CellOf(from);
             var b = HousePlan.CellOf(to);
@@ -99,6 +120,9 @@ namespace Stealth.Level
                     if (!Open(plan, floor, x2, z2) || !Passes(plan, floor, x, z, x2, z2)) continue;
                     float step = 1f + (ByWall(plan, floor, x2, z2) ? 0f : 1.2f) + (d != dir ? 2.5f : 0f);
                     int n2 = (z2 * nx + x2) * 4 + d;
+                    if (keepOff != null)
+                        foreach (var r in keepOff)
+                            if (r.Contains(HousePlan.CellCenter(x2, z2))) { step += 30f; break; }
                     float c2 = c + step;
                     if (c2 >= cost[n2]) continue;
                     if (!float.IsInfinity(cost[n2])) heap.Remove((cost[n2], n2));

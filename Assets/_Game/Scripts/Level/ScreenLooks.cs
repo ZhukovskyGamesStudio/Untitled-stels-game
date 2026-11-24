@@ -29,9 +29,36 @@ namespace Stealth.Level
         static readonly HashSet<PropKind> Computers = new()
         {
             PropKind.Desk, PropKind.ReceptionDesk, PropKind.StandingDesk, PropKind.SupervisorDesk, PropKind.ExecutiveDesk, PropKind.DoctorDesk,
-            PropKind.NurseStationDesk, PropKind.ConsoleDesk, PropKind.MixingDesk, PropKind.LabBench, PropKind.MonitorWall, PropKind.InfoKiosk,
-            PropKind.LogoTotem,
+            PropKind.NurseStationDesk, PropKind.ConsoleDesk, PropKind.MixingDesk, PropKind.LabBench, PropKind.MonitorWall,
         };
+
+        /// <summary>Pictures of small displays on their texture, columns and rows (Tools/Blender/machine_atlas.py DISPLAYS, in this order).</summary>
+        public const int DisplayCols = 4, DisplayRows = 6;
+        static readonly string[] Displays =
+        {
+            "synth", "clock", "program", "printer", "treadmill", "score", "vitals", "wave", "server", "power", "temp", "plain", "scan", "turnstile", "welder",
+            "balance", "kiosk", "game", "rower", "bars", "paint", "plot", "print3d", "ok",
+        };
+
+        static readonly Dictionary<PropKind, string> Shows = new()
+        {
+            [PropKind.SynthStand] = "synth", [PropKind.Microwave] = "clock", [PropKind.Stove] = "clock", [PropKind.Dishwasher] = "program", [PropKind.WashingMachine] = "program",
+            [PropKind.Copier] = "printer", [PropKind.Printer] = "printer", [PropKind.Treadmill] = "treadmill", [PropKind.ExerciseBike] = "treadmill", [PropKind.AirHockey] = "score",
+            [PropKind.AnesthesiaMachine] = "vitals", [PropKind.CrashCart] = "vitals", [PropKind.ScopeCart] = "wave", [PropKind.RadioRack] = "wave",
+            [PropKind.NetworkCabinet] = "server", [PropKind.TapeLibrary] = "server", [PropKind.UpsUnit] = "power", [PropKind.CracUnit] = "temp", [PropKind.CtScanner] = "scan",
+            [PropKind.XrayMachine] = "scan", [PropKind.WeldingCart] = "welder", [PropKind.WheelBalancer] = "balance",
+            [PropKind.InfoKiosk] = "kiosk", [PropKind.RowingMachine] = "rower", [PropKind.PaintRack] = "paint", [PropKind.Plotter] = "plot",
+            [PropKind.Printer3d] = "print3d", [PropKind.SurgicalTable] = "ok", [PropKind.RobotTable] = "bars",
+        };
+
+        /// <summary>The plain glow on the displays' texture: lamps, strips of light, rings — what is no display.</summary>
+        public static int PlainDisplay => System.Array.IndexOf(Displays, "plain");
+
+        /// <summary>Which picture this machine's display shows (its place on the texture), −1: it has no display of its own.</summary>
+        public static int DisplayOf(PropKind kind) => Shows.TryGetValue(kind, out var name) ? System.Array.IndexOf(Displays, name) : -1;
+
+        /// <summary>The display is off, by the piece's stream of the house's seed.</summary>
+        public static bool DisplayDark(int seed) => (uint)seed % 100u < 30u;
 
         public static ScreenKind KindOf(PropKind kind) => Tvs.Contains(kind) ? ScreenKind.Tv : Computers.Contains(kind) ? ScreenKind.Computer : ScreenKind.Appliance;
 
@@ -103,7 +130,11 @@ namespace Stealth.Level
 
         static bool Moves(ScreenLook look) => look is ScreenLook.Static or ScreenLook.NoSignal;
 
-        public static void Clear() => s_Screens.Clear();
+        public static void Clear()
+        {
+            s_Screens.Clear();
+            s_Displays.Clear();
+        }
 
         /// <summary>What this screen shows, if it is one of the house's.</summary>
         public static bool TryGet(Renderer r, out ScreenLook look)
@@ -123,10 +154,35 @@ namespace Stealth.Level
             else if (look == ScreenLook.NoSignal) Set(r, look, ScreenLooks.Drift(s_Screens.Count));
         }
 
+        static readonly List<(Renderer r, PictureSheet picture)> s_Displays = new();
+
+        /// <summary>A small display showing its picture (<see cref="ScreenLooks.DisplayOf"/>).</summary>
+        public static void AddDisplay(Renderer r, int picture) => AddPicture(r, new PictureSheet
+        {
+            Cols = ScreenLooks.DisplayCols, Rows = ScreenLooks.DisplayRows, Cell = picture, Rest = ScreenLooks.PlainDisplay, MinSide = ScreenFaces.DisplaySide, Lying = true,
+        });
+
+        /// <summary>A part showing its own picture of a sheet (<see cref="PropPictures"/>): fitted again whenever the models change.</summary>
+        public static void AddPicture(Renderer r, PictureSheet picture)
+        {
+            if (r == null) return;
+            s_Displays.Add((r, picture));
+            Fit(r, picture);
+        }
+
         /// <summary>The screens' models were swapped: their pictures are fitted to the new faces.</summary>
         static void Fit()
         {
             foreach (var (r, _) in s_Screens) Fit(r);
+            s_Displays.RemoveAll(d => d.r == null);
+            foreach (var (r, picture) in s_Displays) Fit(r, picture);
+        }
+
+        static void Fit(Renderer r, PictureSheet picture)
+        {
+            if (r == null || !r.TryGetComponent<MeshFilter>(out var mf) || mf.sharedMesh == null) return;
+            var fitted = ScreenFaces.Of(mf.sharedMesh, picture);
+            if (fitted != mf.sharedMesh) mf.sharedMesh = fitted;
         }
 
         static void Fit(Renderer r)

@@ -27,6 +27,13 @@ Shader "Stealth/Surface"
         _Corners("Dirt in corners", Range(0, 1)) = 0.5
         _FloorDirt("Dirt near the floor", Range(0, 1)) = 0.4
         _FloorHeight("From a floor to the next, metres", Float) = 4.5
+        _ReliefMap("Relief (soft waves and dents RG, clouds B)", 2D) = "gray" {}
+        _ReliefTile("Metres a tile of it covers", Float) = 1.6
+        _Relief("Waves and dents", Range(0, 2)) = 0
+        _Clouds("Uneven colour and sheen", Range(0, 0.3)) = 0
+        _WallBand("Marks where hands and feet reach only (walls)", Range(0, 1)) = 0
+        _Contact("Darker at the floor and the ceiling (walls)", Range(0, 1)) = 0
+        _RoomHeight("From a floor to its ceiling, metres", Float) = 2.75
         _DirtColor("Dirt", Color) = (0.36, 0.32, 0.27, 1)
         [HideInInspector] _Cull("__cull", Float) = 2
     }

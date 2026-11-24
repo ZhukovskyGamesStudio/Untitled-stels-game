@@ -31,10 +31,10 @@ namespace Stealth.EditorTools
         static readonly Dictionary<string, string> RealisticProps = new()
         {
             ["metal_office_desk"] = "desk", ["modern_arm_chair_01"] = "chair", ["drawer_cabinet"] = "cabinet",
-            ["potted_plant_02"] = "plant", ["wooden_bookshelf_worn"] = "bookshelf", ["steel_frame_shelves_01"] = "shelf",
+            ["potted_plant_02"] = "plant", ["steel_frame_shelves_01"] = "shelf",
             ["cardboard_box_01"] = "boxes", ["sofa_02"] = "sofa", ["ArmChair_01"] = "armchair",
             ["modern_coffee_table_01"] = "coffee_table", ["round_wooden_table_01"] = "round_table",
-            ["metal_trash_can"] = "trash_bin", ["desk_lamp_arm_01"] = "desk_lamp",
+            // (not the street's rusted trash can, the chipped desk lamp and the scuffed bookshelf: the style's own stand there)
         };
 
         // ------------------------------------------------------------------ textures
@@ -51,7 +51,12 @@ namespace Stealth.EditorTools
                 var file = Path.GetFileNameWithoutExtension(path);
                 bool pixel = path.StartsWith(PixelTextures);
                 var type = file == "normal" ? TextureImporterType.NormalMap : TextureImporterType.Default;
-                bool srgb = file != "mask" && file != "normal";
+                bool srgb = file != "mask" && file != "normal" && file != "relief";
+                if (file == "relief" && imp.textureCompression != TextureImporterCompression.Uncompressed) // slopes of a degree or two: no blocks
+                {
+                    imp.textureCompression = TextureImporterCompression.Uncompressed;
+                    imp.SaveAndReimport();
+                }
                 var filter = pixel ? FilterMode.Point : FilterMode.Trilinear;
                 bool decal = path.StartsWith(DerelictDecals);            // single images with edges: never repeat
                 var wrap = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
@@ -175,19 +180,34 @@ namespace Stealth.EditorTools
             }
             // realistic office / bank (PAYDAY)
             Pbr("Real_Marble", "marble_01", Color.white);
-            Pbr("Real_Plaster", "plastered_wall_04", new Color(1f, 0.97f, 0.92f));
-            Pbr("Real_CeilingTiles", "ceiling_interior", Color.white);
-            Pbr("Real_DarkWood", "dark_wood", Color.white);
+            // (painted walls and ceilings, skirting and door casings, pipes and trays: surfaces of the game's own — the scans were
+            // a flat colour (beige_wall_001), lumpy brown plaster (ceiling_interior) and orange stripes (dark_wood))
+            WallPaint("Real_BeigeWall", "9E8C78", 0.95f);
+            WallPaint("Real_Plaster", "A9A39A", 0.8f);
+            WallPaint("Real_Plaster2", "B0A898", 0.8f);
+            WallPaint("Paint_White", "C9CBC8", 1f);
+            WallPaint("Paint_Band", "837E6C", 1.5f);
+            // (rooms of one kind are not all one beige: a sage and a slate-blue wall among them, RealisticRoomLooks)
+            WallPaint("Paint_Sage", "8C9882", 1f);
+            WallPaint("Paint_Slate", "7F8D9A", 1f);
+            WallPaint("Real_CeilingTiles", "B9B6AE", 0.6f, true);
+            void Made(string name, string surface, string hex)
+            {
+                var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+                SetSurface(m, surface, Hex(hex));
+                EditorUtility.SetDirty(m);
+                s_Kit[name] = m;
+            }
+            Made("Real_DarkWood", "wood", "51341F");
+            Made("Trim_Metal", "powdercoat", "62666B");
             Pbr("Real_Carpet", "dirty_carpet", new Color(0.75f, 0.8f, 0.9f));
             Pbr("Real_Laminate", "laminate_floor_02", Color.white);
-            Pbr("Real_BeigeWall", "beige_wall_001", Color.white);
             Pbr("Real_MetalPlate", "metal_plate", Color.white);
             // realistic old English house (Sir, You Are Being Hunted)
             Pbr("Real_OldFloor", "old_wooden_floor_01", Color.white);
             Pbr("Real_Peeling", "peeling_painted_wall", Color.white);
             Pbr("Real_Brick", "large_red_bricks", Color.white);
             Pbr("Real_DarkPlanks", "dark_planks", Color.white);
-            Pbr("Real_Plaster2", "plastered_wall", new Color(0.92f, 0.9f, 0.8f));
             // the mansion of R.E.P.O.
             Pbr("Real_Wallpaper", "decrepit_wallpaper", Color.white);
             Pbr("Real_PaneledWood", "dark_paneled_wood", Color.white);
@@ -453,7 +473,7 @@ namespace Stealth.EditorTools
             EditorUtility.SetDirty(plastic);
             foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true))
             {
-                r.sharedMaterial = r.name.StartsWith("Eye") ? M("PropScreen") : plastic;
+                r.sharedMaterial = r.name.StartsWith("Eye") ? M("PropScreen") : MachineMaterial(r.name) is { } made ? M(made) : plastic;
                 r.shadowCastingMode = r.name.StartsWith("Eye") ? ShadowCastingMode.Off : ShadowCastingMode.On;
             }
             foreach (var c in m.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);

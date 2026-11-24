@@ -135,6 +135,16 @@ namespace Stealth.EditorTools
             util[(int)UtilitySlot.Warning] = Mat("UtilWarning", new Color(0.95f, 0.75f, 0.1f), null, 0.3f);
             var led = Mat("UtilLed", new Color(0.35f, 1f, 0.55f), null, 0.5f, 0f, null, new Color(0.5f, 2.4f, 1f)); // a light switch's lamp
             BuildFittings(art, util, led); // the house's own fittings (switches, grates, the shaft) use the services' materials
+            var panel = !HasModel("electric_panel") ? null : Prefab($"{LevelPrefabs}/ElectricPanel.prefab", () =>
+            {
+                var go = new GameObject("ElectricPanel");
+                var model = Model("electric_panel");
+                model.transform.SetParent(go.transform, false);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true)) r.sharedMaterial = util[(int)(r.name.StartsWith("Accent") ? UtilitySlot.Dark : UtilitySlot.Panel)];
+                MachinePaint(model);
+                return go;
+            });
+            if (panel != null) Link(art, ref art.ElectricPanel, panel);
             Link(art, ref art.CityPiece, piece);
             Link(art, ref art.CityLamp, lamp);
             LinkAll(art, ref art.CityMaterials, mats);

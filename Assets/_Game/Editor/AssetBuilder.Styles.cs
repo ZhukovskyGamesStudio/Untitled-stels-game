@@ -39,6 +39,7 @@ namespace Stealth.EditorTools
             AddXrayFeature();
             AddWorldTextFeature();
             AddGasFeature();
+            AddBounceFeature();
 #if URP_SCREEN_SPACE_REFLECTION
             AddReflectionFeature();
 #endif
@@ -340,6 +341,25 @@ namespace Stealth.EditorTools
             EditorUtility.SetDirty(data);
         }
 
+        /// <summary>
+        /// Bounced light from the screen (Art/Shaders/ScreenBounce.shader): a full-screen pass over the opaque things, before the
+        /// transparent ones and the gas; reads depth and normals. Its strength is the style's (StyleGrade.Bounce).
+        /// </summary>
+        static void AddBounceFeature()
+        {
+            const string path = StylesDir + "/ScreenBounce.mat";
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(Root + "/Art/Shaders/ScreenBounce.shader");
+            if (shader == null) { Debug.LogWarning("[Builder] bounce shader not found"); return; }
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = "ScreenBounce" };
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            else if (mat.shader != shader) { mat.shader = shader; EditorUtility.SetDirty(mat); }
+            AddFullScreenFeature("ScreenBounce", mat, ScriptableRenderPassInput.Depth | ScriptableRenderPassInput.Normal, FullScreenPassRendererFeature.InjectionPoint.BeforeRenderingTransparents);
+        }
+
         const string GasMaterialPath = StylesDir + "/GasFog.mat";
         const string SkyDir = Root + "/Art/Textures/Sky";
         const string DerelictSkyPath = SkyDir + "/derelict_night.png";
@@ -414,6 +434,7 @@ namespace Stealth.EditorTools
             if ((a.Posters == null || a.Posters.Length == 0) && d.Posters.Length > 0) { a.Posters = d.Posters; dirty = true; }
             if (a.DecayDensity <= 0f && d.DecayDensity > 0f) { a.DecayDensity = d.DecayDensity; dirty = true; }
             if (a.PosterChance <= 0f && d.PosterChance > 0f) { a.PosterChance = d.PosterChance; dirty = true; }
+            if (a.ThingChance <= 0f && d.ThingChance > 0f) { a.ThingChance = d.ThingChance; dirty = true; }
             if (a.PlayerRig == null && d.PlayerRig != null) { a.PlayerRig = d.PlayerRig; dirty = true; }
             if ((a.RoomFloors == null || a.RoomFloors.Length == 0) && d.RoomFloors.Length > 0) { a.RoomFloors = d.RoomFloors; dirty = true; }
             if ((a.RoomLooks == null || a.RoomLooks.Length == 0) && d.RoomLooks.Length > 0) { a.RoomLooks = d.RoomLooks; dirty = true; }
@@ -487,6 +508,7 @@ namespace Stealth.EditorTools
                     g.BloomIntensity = 0.3f; g.BloomThreshold = 1.2f; g.BloomScatter = 0.6f; // a little glow on what really shines, no halo over the room
                     g.Vignette = 0.2f; g.VignetteColor = C(0f, 0f, 0f);
                     g.ChromaticAberration = 0.08f; g.FilmGrain = 0.2f; g.Reflections = 1f; g.LensDistortion = 0.03f;
+                    g.Bounce = 1f; g.BounceReach = 4.5f; // lit floors and walls light what faces them (ScreenBounce)
                     // a small fill everywhere (sRGB: about 1 % of white) — a room whose lamps are off is dark, a flashlight's
                     // job; a lit room's fill is its own lamps' (CeilingGlow: they light its ceiling and the tops of its walls)
                     s.World.Ambient = C(0.10f, 0.103f, 0.108f);
@@ -513,6 +535,7 @@ namespace Stealth.EditorTools
                     geo.Trim = K("Real_DarkWood"); geo.Pipe = K("Trim_Metal"); geo.Beam = K("Trim_Metal"); geo.Glow = K("Glow_DimCyan");
                     geo.RoomLooks = RealisticRoomLooks();
                     geo.RoomFloors = RealisticRoomFloors();
+                    geo.ThingChance = 0.8f; // people hung things on these walls: prints, certificates, plans, signs (WallThings)
                 });
         }
     }

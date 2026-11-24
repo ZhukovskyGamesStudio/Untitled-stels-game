@@ -20,6 +20,8 @@ namespace Stealth.Configs
         public float VaultWallTile = 2f, VaultFloorTile = 1f;
         [Tooltip("The metal strip over a doorway where two different floors meet")]
         public Material Threshold;
+        [Tooltip("What hangs on walls for the look of it, indexed by Level.WallThing (framed prints, signs, a thermostat, a grille)")]
+        public GameObject[] Things = new GameObject[0];
     }
 
     /// <summary>Every model mesh and its variant in one family (Art/Models/Styles/&lt;Family&gt;).</summary>

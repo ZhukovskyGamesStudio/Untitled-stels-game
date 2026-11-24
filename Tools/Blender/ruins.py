@@ -2,18 +2,16 @@
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/ruins.py -- Assets/_Game/Art/Models [derelict]
 
-With `derelict` it writes the derelict family's versions instead (Styles/Derelict/Level/<name>__derelict.fbx, the same single
-Body part, swapped in by mesh name): a breach torn through a station's steel wall panels (petals of sheet metal bent out to
-both faces, a buckled wall stud), a pile of fallen ceiling panels with a length of duct and cable, and a heavy bolted steel
-inspection-window frame with one bent bar left of its grille.
+With `derelict` it writes the derelict family's inspection-window frame instead (Styles/Derelict/Level/inner_window_frame__derelict.fbx,
+the same single Body part, swapped in by mesh name).
 
-Writes Level/breach_rim.fbx, Level/rubble.fbx and Level/inner_window_frame.fbx (prefabs Level/BreachFrame, HoleFrame,
+Writes Level/breach_0..2.fbx, Level/hole_0..2.fbx and Level/inner_window_frame.fbx (prefabs Level/BreachFrame, HoleFrame,
 InnerWindowFrame, AssetBuilder.Level). All decor: no colliders in the game, the wall pieces keep the shape.
 
-- breach_rim: the broken edge of a wall along one side of a hole knocked through it — irregular chunks of concrete
-  standing 2-9 cm into the gap and a little proud of both faces. 2.3 m tall (the game scales it to the opening; lying
-  down it is the broken top). Origin at the foot of the cut line; +X into the gap, the wall's thickness along Y.
-- rubble: a low pile of broken concrete (about 0.9 x 0.5 m, 0.3 m high), origin on the floor in its middle.
+- breach_k, hole_k (opening()): a hole knocked through a plastered brick wall 0.3 m thick, each in three variants the house
+  picks by its seed — toothed brickwork standing out of both jambs, the head hanging in steps, the mortar bed, heaps of grit,
+  fallen bricks, mortar and plaster shards on both faces, the cut ends of a conduit. Parts Brick / Mortar / Plaster / Metal;
+  the plaster skin round the hole on each face is the game's (AssetBuilder.RuinSkin: each room's own wall finish).
 - inner_window_frame: a window between two rooms, its glass long gone: a frame on both faces round a 1.4 x 1.25 m
   opening whose sill is 0.9 m above the floor, a sill board and a stub of the broken mullion. Origin on the floor under
   the middle of the opening, along X.
@@ -49,49 +47,198 @@ def export(path, floor):
     print("exported", path)
 
 
-def breach_rim():
-    """Chunks stacked up the cut line, overlapping each other by a few centimetres (one piece of broken wall)."""
-    rnd = random.Random(7)
-    bms = []
-    z = 0.0
-    while z < RIM_H - 0.05:
-        h = rnd.uniform(0.14, 0.32)
-        h = min(h, RIM_H - z)
-        out = rnd.uniform(0.02, 0.09)            # into the gap
-        back = 0.06                               # into the wall (hidden in its block)
-        deep = WALL + rnd.uniform(0.0, 0.05)      # a little proud of the faces, now one, now both
-        y = rnd.uniform(-0.015, 0.015)
-        bms.append(s.rbox((out + back, deep, h + 0.04), loc=((out - back) / 2, y, z + h / 2),
-                          r=0.012, seg=1, rot=deg(rnd.uniform(-6, 6), rnd.uniform(-8, 8), rnd.uniform(-10, 10))))
-        # a smaller broken lump on one face now and then
-        if rnd.random() < 0.45:
-            side = rnd.choice((-1, 1))
-            bms.append(s.rbox((rnd.uniform(0.05, 0.1), 0.06, rnd.uniform(0.06, 0.12)),
-                              loc=(rnd.uniform(-0.02, 0.04), side * (WALL / 2 + 0.005), z + h * rnd.uniform(0.2, 0.8)),
-                              r=0.01, seg=1, rot=deg(rnd.uniform(-20, 20), rnd.uniform(-20, 20), rnd.uniform(-20, 20))))
-        z += h
-    s.part("Body", bms)
+# --------------------------------------------------------------------------- a hole knocked through a brick wall
+
+TRUE_WALL = 0.3                  # LevelMetrics.WallThickness: these are modelled at the wall's real thickness
+BRICK = (0.25, 0.12, 0.065)      # a brick: along the wall, across it, its height
+COURSE = 0.075                   # a brick and its bed of mortar
 
 
-def rubble():
-    """A pile grown chunk by chunk, each leaning on one already there: big ones low in the middle, small ones round them."""
-    rnd = random.Random(11)
-    bms = []
-    placed = [(0.0, 0.0, 0.22)]
-    bms.append(s.rbox((0.26, 0.2, 0.15), loc=(0, 0, 0.063), r=0.012, seg=1, rot=deg(4, -3, 20)))
-    for i in range(15):
-        px, py, ps = placed[rnd.randrange(len(placed))]
+def snapped(bm, at, normal):
+    """Breaks the shape off at a plane: what lies beyond it (along normal) is gone, the break is a face."""
+    import bmesh
+    from mathutils import Vector
+    cut = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=Vector(at), plane_no=Vector(normal).normalized(), clear_outer=True)
+    edges = [g for g in cut["geom_cut"] if isinstance(g, bmesh.types.BMEdge)]
+    if edges:
+        bmesh.ops.edgeloop_fill(bm, edges=edges)
+    return bm
+
+
+def brick(rnd, x0, x1, y, z, way=1, lean=0.0):
+    """A brick lying along the wall from x0 (inside the wall) to its broken end at x1 (way = which way the gap is)."""
+    length = abs(x1 - x0)
+    bm = s.rbox((length + 0.05, BRICK[1], BRICK[2]), (0, 0, 0), r=0.0, seg=1)
+    # its end broken off askew, sometimes in two facets
+    snapped(bm, (length / 2, 0, 0), (1, rnd.uniform(-0.55, 0.55), rnd.uniform(-0.5, 0.5)))
+    if rnd.random() < 0.4:
+        snapped(bm, (length / 2 - 0.012, rnd.choice((-1, 1)) * 0.03, 0), (1, rnd.choice((-1, 1)) * rnd.uniform(0.8, 1.6), rnd.uniform(-0.3, 0.3)))
+    if way < 0:
+        s.place(bm, rot=(0, 0, math.pi))
+    return s.place(bm, ((x0 + x1) / 2 - way * 0.025, y, z), (rnd.uniform(-0.02, 0.02) + lean, rnd.uniform(-0.02, 0.02), rnd.uniform(-0.03, 0.03)))
+
+
+def loose_brick(rnd, loc, rot, half=False):
+    """A fallen brick, whole or a broken half."""
+    bm = s.rbox(BRICK, (0, 0, 0), r=0.006, seg=1)
+    if half:
+        snapped(bm, (rnd.uniform(-0.04, 0.05), 0, 0), (1, rnd.uniform(-0.6, 0.6), rnd.uniform(-0.5, 0.5)))
+    return s.place(bm, loc, rot)
+
+
+def chunk(rnd, loc, size):
+    """A lump of mortar: a low-poly ball knocked into facets."""
+    bm = s.ball(1.0, (0, 0, 0), seg=6, scale=(size, size * rnd.uniform(0.6, 1.0), size * rnd.uniform(0.45, 0.8)))
+    for _ in range(3):
+        n = (rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.2, 1))
+        snapped(bm, tuple(k * size * 0.55 for k in n), n)
+    return s.place(bm, loc, (rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), rnd.uniform(0, 3.1)))
+
+
+def flake(rnd, loc):
+    """A shard of plaster lying on the floor."""
+    w, d = rnd.uniform(0.05, 0.13), rnd.uniform(0.04, 0.09)
+    bm = s.rbox((w, d, 0.014), (0, 0, 0), r=0.0, seg=1)
+    for _ in range(2):
         a = rnd.uniform(0, 2 * math.pi)
-        x = max(-0.42, min(0.42, px + math.cos(a) * ps * 0.45))
-        y = max(-0.2, min(0.2, py + math.sin(a) * ps * 0.35))
-        d = min(1.0, math.hypot(x / 0.45, y / 0.22))
-        size = 0.22 * (1.0 - 0.5 * d) * rnd.uniform(0.7, 1.05)
-        h = size * rnd.uniform(0.45, 0.75)
-        lift = (1.0 - d) * 0.07
-        bms.append(s.rbox((size, size * rnd.uniform(0.6, 1.0), h), loc=(x, y, h / 2 - 0.012 + lift),
-                          r=0.012, seg=1, rot=deg(rnd.uniform(-15, 15), rnd.uniform(-15, 15), rnd.uniform(0, 180))))
-        placed.append((x, y, size))
-    s.part("Body", bms)
+        snapped(bm, (math.cos(a) * w * 0.3, math.sin(a) * d * 0.3, 0), (math.cos(a), math.sin(a), 0))
+    return s.place(bm, loc, (rnd.uniform(-0.12, 0.12), rnd.uniform(-0.12, 0.12), rnd.uniform(0, 3.1)))
+
+
+def mound(rnd, cx, cy, a, b, height, n=9):
+    """A heap of grit and dust: a low dome with a rough back, flat on the floor. Returns (shape, height at (x, y))."""
+    import bmesh
+
+    def h(x, y):
+        q = ((x - cx) / a) ** 2 + ((y - cy) / b) ** 2
+        return height * max(0.0, 1 - q) ** 1.5
+
+    bm = bmesh.new()
+    rows = []
+    p1, p2, p3 = rnd.uniform(0, 6.28), rnd.uniform(0, 6.28), rnd.uniform(0, 6.28)
+
+    def ragged(u, v):
+        """The outline is no ellipse: it bulges and runs out in tongues."""
+        t = math.atan2(v, u)
+        return 1 + 0.22 * math.sin(2 * t + p1) + 0.16 * math.sin(3 * t + p2) + 0.1 * math.sin(7 * t + p3)
+    for i in range(n + 1):
+        row = []
+        for j in range(n + 1):
+            u, v = i / n * 2 - 1, j / n * 2 - 1
+            r = max(abs(u), abs(v))
+            k = (1 / math.hypot(u, v) * r) if r > 1e-6 else 0.0          # the square grid squeezed into the ellipse
+            f = ragged(u, v) if r > 1e-6 else 1.0
+            x, y = cx + u * k * a * f, cy + v * k * b * f
+            edge = i in (0, n) or j in (0, n)
+            z = 0.0 if edge else h(cx + u * k * a, cy + v * k * b) * rnd.uniform(0.7, 1.2) + rnd.uniform(0.0, 0.01)
+            row.append(bm.verts.new((x, y, z)))
+        rows.append(row)
+    for i in range(n):
+        for j in range(n):
+            bm.faces.new((rows[i][j], rows[i + 1][j], rows[i + 1][j + 1], rows[i][j + 1]))
+    rim = [rows[0][j] for j in range(n)] + [rows[i][n] for i in range(n)] + [rows[n][j] for j in range(n, 0, -1)] + [rows[i][0] for i in range(n, 0, -1)]
+    bm.faces.new(rim)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm, h
+
+
+def opening(width, height, seed, tooth, steps, conduit):
+    """A hole knocked through a plastered brick wall, the clear opening width x height (the game's wall pieces keep that
+    shape): the two wythes of brick standing toothed out of both jambs — every course ends where it broke, now a
+    stretcher's stub, now a snapped half —, the head hanging in steps from the corners (`steps` courses), the bed of
+    mortar behind them, heaps of grit with fallen bricks, lumps of mortar and shards of plaster against the jambs on
+    both faces, and (`conduit`) the cut ends of a conduit that ran in the wall. Parts: Brick, Mortar, Plaster, Metal.
+    The plaster skin on the two faces is not here: the game lays it on in each room's own wall finish. Along x, the
+    wall's thickness along y, origin on the floor in the middle."""
+    rnd = random.Random(seed)
+    T = TRUE_WALL
+    bricks, mortar, plaster, metal = [], [], [], []
+    wythes = (-(BRICK[1] / 2 + 0.005), BRICK[1] / 2 + 0.005)
+    courses = int(height / COURSE)
+    # the jambs: toothing, the odd courses half a brick further out
+    for way, x_edge in ((1, -width / 2), (-1, width / 2)):
+        mortar.append(s.rbox((0.03, T - 0.03, height + 0.02), (x_edge - way * 0.003, 0, height / 2), r=0.0, seg=1))
+        for k in range(courses):
+            z = k * COURSE + BRICK[2] / 2 + 0.005
+            for y in wythes:
+                if rnd.random() < 0.07:
+                    continue                                    # this one came out whole
+                out = rnd.uniform(0.02, tooth * 0.5) if k % 2 == 0 else rnd.uniform(tooth * 0.45, tooth)
+                if rnd.random() < 0.18:
+                    out = rnd.uniform(0.012, 0.03)              # snapped at the wall's face
+                bricks.append(brick(rnd, x_edge - way * 0.03, x_edge + way * out, y, z, way))
+                if rnd.random() < 0.3:                           # mortar squeezed out of the bed above it
+                    mortar.append(chunk(rnd, (x_edge + way * out * rnd.uniform(0.2, 0.7), y, z + BRICK[2] / 2 + 0.004), rnd.uniform(0.012, 0.022)))
+    # the head: bricks left hanging, stepping down towards the corners
+    mortar.append(s.rbox((width + 0.04, T - 0.03, 0.03), (0, 0, height + 0.003), r=0.0, seg=1))
+    for row in range(steps):
+        z = height - row * COURSE - BRICK[2] / 2 - 0.005
+        reach = (0.16 + 0.12 * (steps - 1 - row)) * rnd.uniform(0.8, 1.15)       # how far from each corner this course still hangs
+        x = -width / 2 + (0.0 if row % 2 else -0.12)
+        while x < width / 2:
+            x1 = x + BRICK[0] + 0.01
+            mid = (x + x1) / 2
+            near = min(mid + width / 2, width / 2 - mid)
+            if near < reach or (row == 0 and rnd.random() < 0.45):
+                for y in wythes:
+                    if rnd.random() < 0.15:
+                        continue
+                    bm = s.rbox((BRICK[0], BRICK[1], BRICK[2]), (0, 0, 0), r=0.0, seg=1)
+                    if rnd.random() < 0.5:                       # its underside broken away
+                        snapped(bm, (0, 0, -BRICK[2] * rnd.uniform(0.0, 0.3)), (rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), -1))
+                    lo, hi = max(x, -width / 2 - 0.03), min(x1 - 0.01, width / 2 + 0.03)
+                    if hi - lo > 0.06:
+                        s.place(bm, scale=((hi - lo) / BRICK[0], 1, 1))
+                        bricks.append(s.place(bm, ((lo + hi) / 2, y + rnd.uniform(-0.004, 0.004), z - rnd.uniform(0.001, 0.005)), (rnd.uniform(-0.03, 0.03), rnd.uniform(-0.04, 0.04), rnd.uniform(-0.03, 0.03))))
+            x = x1
+    # what fell: a heap against each jamb on each face, thinning out along the wall; grit across the threshold
+    grit, _ = mound(rnd, 0.0, 0.0, width / 2 + 0.05, T / 2 + 0.12, 0.022, n=7)
+    mortar.append(grit)
+    for face, x_side in ((-1, -1), (1, 1), (-1, 1), (1, -1)):
+        big = face * x_side > 0
+        a, b, top = (0.5, 0.36, 0.2) if big else (0.3, 0.24, 0.1)
+        if height < 1.6:
+            a, b, top = a * 0.8, b * 0.8, top * 0.75
+        cx = x_side * (width / 2 + 0.05 - a * 0.35)
+        cy = face * (T / 2 + b * 0.75)
+        heap, h = mound(rnd, cx, cy, a, b, top)
+        mortar.append(heap)
+        for _ in range(9 if big else 4):
+            q, t = math.sqrt(rnd.random()) * 0.8, rnd.uniform(0, 2 * math.pi)
+            x, y = cx + math.cos(t) * q * a, cy + math.sin(t) * q * b
+            if abs(y) < T / 2 + 0.07:
+                y = face * (T / 2 + 0.07 + rnd.uniform(0, 0.05))
+            flat = rnd.random() < 0.6
+            rot = (rnd.uniform(-0.25, 0.25), rnd.uniform(-0.3, 0.3), rnd.uniform(0, 3.1)) if flat else (rnd.uniform(0.5, 1.1), rnd.uniform(-0.3, 0.3), rnd.uniform(0, 3.1))
+            bricks.append(loose_brick(rnd, (x, y, h(x, y) + (0.022 if flat else 0.04)), rot, half=rnd.random() < 0.5))
+        for _ in range(8 if big else 4):
+            q, t = math.sqrt(rnd.random()), rnd.uniform(0, 2 * math.pi)
+            x, y = cx + math.cos(t) * q * a * 1.05, cy + math.sin(t) * q * b * 1.05
+            mortar.append(chunk(rnd, (x, y, h(x, y) + 0.012), rnd.uniform(0.02, 0.045)))
+        for _ in range(7 if big else 4):                       # plaster shards, flung furthest
+            q, t = 0.5 + rnd.random() * 0.8, rnd.uniform(0, 2 * math.pi)
+            x, y = cx + math.cos(t) * q * a, cy + math.sin(t) * q * b
+            if abs(y) > T / 2 + 0.03:
+                plaster.append(flake(rnd, (x, y, max(0.008, h(x, y) + 0.006))))
+    if conduit:
+        # a steel conduit ran across here inside the wall: both cut ends bent out of the jambs, wires hanging from one
+        z = height * rnd.uniform(0.62, 0.8)
+        for way, x_edge in ((1, -width / 2), (-1, width / 2)):
+            end = (x_edge + way * rnd.uniform(0.16, 0.26), rnd.uniform(-0.05, 0.05), z - rnd.uniform(0.03, 0.1))
+            metal.append(s.tube([(x_edge - way * 0.04, 0, z), (x_edge + way * 0.07, 0, z), end], 0.011, res=1, segments_per=3))
+            if way > 0:
+                for dy in (-0.006, 0.006):
+                    metal.append(s.tube([end, (end[0] + 0.03, end[1] + dy * 4, end[2] - 0.12), (end[0] + 0.02 + dy * 6, end[1] + dy * 8, end[2] - 0.3)], 0.0035, res=1, segments_per=3))
+    s.part("Brick", bricks)
+    s.part("Mortar", mortar)
+    if plaster:
+        s.part("Plaster", plaster)
+    if metal:
+        s.part("Metal", metal)
+
+
+OPENINGS = [("breach", 1.6, 2.3, 0.12, 4), ("hole", 0.9, 1.25, 0.085, 2)]   # name, clear width (LevelMetrics.ClearWidth), height, how far the teeth stand, head steps
+VARIANTS = 3
 
 
 def inner_window_frame():
@@ -113,51 +260,6 @@ def inner_window_frame():
 
 
 # --------------------------------------------------------------------------- derelict family
-
-def derelict_breach_rim():
-    """Torn steel panels along the cut line: petals of sheet metal bent out to one face or the other, the buckled wall
-    stud standing in the gap, a cut cable end (all Body: the game paints the rim with the wall's material)."""
-    rnd = random.Random(23)
-    bms = []
-    # the wall stud at the edge of the gap, buckled half way up (the two halves overlap at the kink)
-    bms.append(s.rbox((0.05, 0.1, 1.1), loc=(0.02, 0, 0.55), r=0.004, seg=1))
-    bms.append(s.rbox((0.05, 0.1, RIM_H - 1.0), loc=(0.045, 0, 1.0 + (RIM_H - 1.0) / 2), r=0.004, seg=1, rot=deg(0, 4, 0)))
-    z = 0.0
-    side = 1
-    while z < RIM_H - 0.04:
-        h = min(rnd.uniform(0.22, 0.42), RIM_H - z)
-        out = rnd.uniform(0.04, 0.14)                     # how far the sheet sticks into the gap
-        bend = rnd.uniform(18, 48)                         # bent out of the wall's face
-        side = -side if rnd.random() < 0.7 else side
-        y = side * (WALL / 2 - 0.004)
-        bms.append(s.rbox((out + 0.08, 0.012, h), loc=((out - 0.08) / 2 + 0.01, y + side * out * 0.25, z + h / 2),
-                          r=0.003, seg=1, rot=deg(rnd.uniform(-5, 5), rnd.uniform(-6, 6), side * bend * 0.5)))
-        if rnd.random() < 0.5:                             # a jagged tooth at the top of the petal
-            bms.append(s.rbox((0.05, 0.012, 0.1), loc=(out * 0.6, y + side * out * 0.2, z + h - 0.03),
-                              r=0.003, seg=1, rot=deg(0, rnd.uniform(-35, 35), side * bend * 0.5)))
-        z += h * 0.9                                        # overlap the next petal
-    # a cut cable hanging out of the wall's cavity, from inside the stud
-    bms.append(s.tube([(0.02, 0.0, 1.58), (0.08, 0.01, 1.42), (0.11, -0.02, 1.25)], 0.009, res=1, segments_per=6))
-    s.part("Body", bms)
-
-
-def derelict_rubble():
-    """Fallen ceiling panels lying on each other, a dented length of square duct over them and broken bits round it."""
-    rnd = random.Random(31)
-    bms = []
-    for k in range(4):
-        w, d = rnd.uniform(0.3, 0.4), rnd.uniform(0.22, 0.28)
-        bms.append(s.rbox((w, d, 0.03), loc=(rnd.uniform(-0.07, 0.07), rnd.uniform(-0.03, 0.03), 0.015 + k * 0.02),
-                          r=0.004, seg=1, rot=deg(rnd.uniform(-4, 4), rnd.uniform(-5, 5), rnd.uniform(0, 180))))
-    bms.append(s.rbox((0.44, 0.13, 0.12), loc=(0.03, 0.01, 0.11), r=0.01, seg=1, rot=deg(0, 8, 28)))   # the duct
-    for k in range(6):
-        size = rnd.uniform(0.06, 0.1)
-        a = k / 6 * 2 * math.pi + rnd.uniform(-0.3, 0.3)
-        bms.append(s.rbox((size, size * 0.8, size * 0.6), loc=(math.cos(a) * 0.19, math.sin(a) * 0.1, size * 0.25),
-                          r=0.008, seg=1, rot=deg(rnd.uniform(-15, 15), rnd.uniform(-15, 15), rnd.uniform(0, 180))))
-    bms.append(s.tube([(-0.25, -0.08, 0.01), (-0.14, 0.0, 0.08), (0.04, 0.04, 0.15), (0.21, -0.06, 0.02)], 0.008, res=1, segments_per=6))
-    s.part("Body", bms)
-
 
 def derelict_inner_window_frame():
     """A heavy steel inspection-window frame on both faces (rounded corners, bolts), a sill plate through the wall, and one
@@ -184,18 +286,20 @@ def main():
     if DERELICT:
         out = os.path.join(MODELS, "Styles", "Derelict", "Level")
         os.makedirs(out, exist_ok=True)
-        for name, build, floor in (("breach_rim", derelict_breach_rim, True), ("rubble", derelict_rubble, True),
-                                   ("inner_window_frame", derelict_inner_window_frame, False)):
-            s.clear_scene()
-            build()
-            export(os.path.join(out, name + "__derelict.fbx"), floor)
+        s.clear_scene()
+        derelict_inner_window_frame()
+        export(os.path.join(out, "inner_window_frame__derelict.fbx"), False)
         return
     out = os.path.join(MODELS, "Level")
     os.makedirs(out, exist_ok=True)
-    for name, build, floor in (("breach_rim", breach_rim, True), ("rubble", rubble, True), ("inner_window_frame", inner_window_frame, False)):
-        s.clear_scene()
-        build()
-        export(os.path.join(out, name + ".fbx"), floor)
+    for name, width, height, tooth, steps in OPENINGS:
+        for k in range(VARIANTS):
+            s.clear_scene()
+            opening(width, height, 31 + 17 * k + (0 if name == "breach" else 100), tooth, steps, conduit=k != 1)
+            export(os.path.join(out, f"{name}_{k}.fbx"), True)
+    s.clear_scene()
+    inner_window_frame()
+    export(os.path.join(out, "inner_window_frame.fbx"), False)
 
 
 main()

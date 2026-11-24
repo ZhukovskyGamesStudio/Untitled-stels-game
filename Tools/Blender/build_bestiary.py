@@ -41,6 +41,9 @@ LEVEL = ("hatch", "window", "ceiling_lamp", "exit_sign")
 # Furniture that opens in the game (drawers and doors are separate moving parts, Items.Storage): every style shows its
 # model family's version, which has those parts; the designs here are single closed bodies and are not built.
 OPENING = ("cabinet", "lockers", "fridge", "kitchen_counter", "tv_stand")
+# Pieces a style leaves to its model family: the bookshelf holds the printed books (AssetBuilder.Variants), which stand on
+# the family's shelves only (the style's own carried a row of blank blue box files).
+LEFT = {"S16_Derelict": ("bookshelf",)}
 
 
 def category(name):
@@ -325,7 +328,7 @@ def main():
         L, own = load_style(style)
         L.name = style
         for name, design in catalogue.items():
-            if (only and name not in only) or name in OPENING:
+            if (only and name not in only) or name in OPENING or name in LEFT.get(style, ()):
                 continue
             objs = build(name, L, own.get(name, design))
             errors += check_contract(name, objs, print)

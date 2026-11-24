@@ -19,26 +19,27 @@ namespace Stealth.EditorTools
         /// <summary>A surface: how many metres one tile covers (the models' UVs are metres), how light its texture is.</summary>
         static readonly Dictionary<string, SurfaceLook> Surfaces = new()
         {
-            ["powdercoat"] = new(0.6f) { Under = 0.58f, UnderMetal = 0.7f, UnderSmooth = 0.5f, Smudges = 0.5f, Scratches = 0.45f, Edges = 0.45f },
-            ["gloss"] = new(1f) { Under = 0.55f, UnderMetal = 0.7f, UnderSmooth = 0.5f, Smudges = 0.75f, Scratches = 0.5f, Edges = 0.35f },
-            ["plastic"] = new(0.9f) { Lighter = 1.25f, UnderSmooth = 0.6f, Smudges = 0.5f, Scratches = 0.4f, Edges = 0.35f },
-            ["plastic_rough"] = new(0.9f) { Lighter = 1.2f, UnderSmooth = 0.55f, Smudges = 0.6f, Scratches = 0.6f, Edges = 0.5f },
-            ["laminate"] = new(0.8f) { Lighter = 0.62f, UnderSmooth = 0.2f, Smudges = 0.55f, Scratches = 0.5f, Edges = 0.4f },
-            ["fabric"] = new(0.35f) { Lighter = 1.25f, UnderSmooth = 0.08f, Edges = 0.3f, Stains = 0.25f },
-            ["wool"] = new(0.4f) { Lighter = 1.2f, UnderSmooth = 0.06f, Edges = 0.25f, Stains = 0.2f },
-            ["cloth"] = new(0.22f) { Lighter = 1.15f, UnderSmooth = 0.1f, Edges = 0.15f, Stains = 0.15f },
-            ["felt"] = new(0.5f) { Lighter = 1.2f, UnderSmooth = 0.08f, Edges = 0.3f, Stains = 0.2f },
-            ["leather"] = new(0.45f) { Lighter = 1.28f, UnderSmooth = 0.55f, Smudges = 0.45f, Scratches = 0.25f, Edges = 0.5f },
-            ["rubber"] = new(0.25f) { Lighter = 1.2f, UnderSmooth = 0.3f, Smudges = 0.2f, Scratches = 0.25f, Edges = 0.2f, Stains = 0.25f },
-            ["steel"] = new(0.6f) { Lighter = 1.2f, UnderMetal = 0.8f, UnderSmooth = 0.7f, Smudges = 0.6f, Scratches = 0.5f, Edges = 0.3f },
-            ["ceramic"] = new(0.9f) { Lighter = 1f, UnderSmooth = 0.8f, Smudges = 0.35f, Scratches = 0.1f, Edges = 0.05f, Runs = 0.25f },
-            ["cardboard"] = new(0.6f) { Lighter = 1.2f, UnderSmooth = 0.15f, Edges = 0.5f, Stains = 0.3f, Scratches = 0.2f },
-            ["paper"] = new(0.8f) { Lighter = 1f, UnderSmooth = 0.2f, Edges = 0.15f, Stains = 0.1f },
-            ["wood"] = new(0.9f) { Lighter = 1.35f, UnderSmooth = 0.25f, Smudges = 0.5f, Scratches = 0.45f, Edges = 0.5f },
-            ["oak"] = new(1.1f) { Lighter = 1.25f, UnderSmooth = 0.25f, Smudges = 0.5f, Scratches = 0.4f, Edges = 0.45f },
-            ["timber"] = new(1.1f) { Lighter = 1.2f, UnderSmooth = 0.15f, Scratches = 0.4f, Edges = 0.55f, Stains = 0.35f },
-            ["leaf"] = new(0.25f) { Lighter = 1.1f, UnderSmooth = 0.4f, Edges = 0f },
-            ["stone"] = new(0.3f) { Lighter = 1.2f, UnderSmooth = 0.3f, Edges = 0.4f, Stains = 0.3f, Runs = 0.3f, Smudges = 0.1f },
+            ["powdercoat"] = new(0.6f) { Relief = 1.0f, Clouds = 0.035f, Under = 0.66f, UnderMetal = 0.4f, UnderSmooth = 0.5f, Smudges = 0.5f, Scratches = 0.45f, Edges = 0.45f },
+            ["gloss"] = new(1f) { Relief = 0.35f, Clouds = 0.02f, Under = 0.64f, UnderMetal = 0.4f, UnderSmooth = 0.5f, Smudges = 0.75f, Scratches = 0.5f, Edges = 0.35f },
+            ["plastic"] = new(0.9f) { Relief = 0.6f, Clouds = 0.03f, Lighter = 1.25f, UnderSmooth = 0.6f, Smudges = 0.5f, Scratches = 0.4f, Edges = 0.35f },
+            ["plastic_rough"] = new(0.9f) { Relief = 0.6f, Clouds = 0.05f, Lighter = 1.2f, UnderSmooth = 0.55f, Smudges = 0.6f, Scratches = 0.6f, Edges = 0.5f },
+            ["laminate"] = new(0.8f) { Relief = 0.35f, Clouds = 0.025f, Lighter = 0.62f, UnderSmooth = 0.2f, Smudges = 0.55f, Scratches = 0.5f, Edges = 0.4f },
+            ["fabric"] = new(0.35f) { Relief = 1.6f, Clouds = 0.06f, Lighter = 1.25f, UnderSmooth = 0.08f, Edges = 0.3f, Stains = 0.25f },
+            ["wool"] = new(0.4f) { Relief = 1.6f, Clouds = 0.05f, Lighter = 1.2f, UnderSmooth = 0.06f, Edges = 0.25f, Stains = 0.2f },
+            ["cloth"] = new(0.22f) { Relief = 0.7f, Clouds = 0.05f, Lighter = 1.15f, UnderSmooth = 0.1f, Edges = 0.15f, Stains = 0.15f },
+            ["felt"] = new(0.5f) { Relief = 0.5f, Clouds = 0.06f, Lighter = 1.2f, UnderSmooth = 0.08f, Edges = 0.3f, Stains = 0.2f },
+            ["leather"] = new(0.45f) { Relief = 1.8f, Clouds = 0.06f, Lighter = 1.28f, UnderSmooth = 0.55f, Smudges = 0.45f, Scratches = 0.25f, Edges = 0.5f },
+            ["rubber"] = new(0.25f) { Relief = 0.8f, Clouds = 0.05f, Lighter = 1.2f, UnderSmooth = 0.3f, Smudges = 0.2f, Scratches = 0.25f, Edges = 0.2f, Stains = 0.25f },
+            ["steel"] = new(0.6f) { Relief = 0.8f, Clouds = 0.03f, Lighter = 1.2f, UnderMetal = 0.8f, UnderSmooth = 0.7f, Smudges = 0.6f, Scratches = 0.5f, Edges = 0.3f },
+            ["ceramic"] = new(0.9f) { Relief = 0.5f, Clouds = 0.01f, Lighter = 1f, UnderSmooth = 0.8f, Smudges = 0.35f, Scratches = 0.1f, Edges = 0.05f, Runs = 0.25f },
+            ["cardboard"] = new(0.6f) { Relief = 1.4f, Clouds = 0.05f, Lighter = 1.2f, UnderSmooth = 0.15f, Edges = 0.5f, Stains = 0.3f, Scratches = 0.2f },
+            ["paper"] = new(0.8f) { Relief = 0.8f, Clouds = 0.03f, Lighter = 1f, UnderSmooth = 0.2f, Edges = 0.15f, Stains = 0.1f },
+            ["wood"] = new(0.9f) { Relief = 0.3f, Clouds = 0.05f, Lighter = 1.35f, UnderSmooth = 0.25f, Smudges = 0.5f, Scratches = 0.45f, Edges = 0.5f },
+            ["oak"] = new(1.1f) { Relief = 0.3f, Clouds = 0.05f, Lighter = 1.25f, UnderSmooth = 0.25f, Smudges = 0.5f, Scratches = 0.4f, Edges = 0.45f },
+            ["timber"] = new(1.1f) { Relief = 0.6f, Clouds = 0.06f, Lighter = 1.2f, UnderSmooth = 0.15f, Scratches = 0.4f, Edges = 0.55f, Stains = 0.35f },
+            ["leaf"] = new(0.25f) { Relief = 0.0f, Clouds = 0.05f, Lighter = 1.1f, UnderSmooth = 0.4f, Edges = 0f },
+            ["wallpaint"] = new(2.5f) { Lighter = 1.1f, UnderSmooth = 0.2f, Smudges = 0.22f, Scratches = 0.25f, Stains = 0.02f, Edges = 0f, Relief = 0.5f, Clouds = 0.022f },
+            ["stone"] = new(0.3f) { Relief = 0.6f, Clouds = 0.06f, Lighter = 1.2f, UnderSmooth = 0.3f, Edges = 0.4f, Stains = 0.3f, Runs = 0.3f, Smudges = 0.1f },
         };
 
         /// <summary>
@@ -49,6 +50,8 @@ namespace Stealth.EditorTools
         {
             public readonly float Tile;
             public float Under, Lighter = 1.2f, UnderMetal, UnderSmooth = 0.5f, Smudges, Scratches, Stains = 0.06f, Runs, Edges = 0.3f;
+            /// <summary>Slow waves and dents (1: about two degrees), how uneven its colour and sheen are from across the room.</summary>
+            public float Relief, Clouds;
             public SurfaceLook(float tile) => Tile = tile;
         }
 
@@ -74,6 +77,11 @@ namespace Stealth.EditorTools
             ["PingPong"] = ("laminate", null), ["CarRed"] = ("gloss", null), ["CarBlue"] = ("gloss", null), ["CarSilver"] = ("gloss", null), ["Gold"] = ("steel", null),
             ["Rope"] = ("cloth", null), ["CageWood"] = ("wood", null), ["CageBrass"] = ("steel", null), ["LiftFloor"] = ("rubber", null),
             ["ClothNavy"] = ("cloth", null), ["ClothGrey"] = ("cloth", null), ["ClothBeige"] = ("cloth", null), ["ClothBlack"] = ("cloth", null),
+            // the house's services (UtilityPlan)
+            ["UtilDuct"] = ("steel", "8A8D90"), ["UtilGrille"] = ("powdercoat", null), ["UtilPipe"] = ("gloss", "A9A8A2"), ["UtilCopper"] = ("steel", null),
+            ["UtilConduit"] = ("powdercoat", "7C7E80"), ["UtilPlate"] = ("plastic", "C9C8C2"), ["UtilDark"] = ("rubber", null), ["UtilPanel"] = ("powdercoat", "8E9290"),
+            ["UtilWarning"] = ("gloss", "C9961C"),
+            ["VaseGreen"] = ("ceramic", null), ["VaseCream"] = ("ceramic", null), ["VaseBlue"] = ("ceramic", null), ["Wicker"] = ("timber", null),
             ["ClothRed"] = ("cloth", null), ["ClothOlive"] = ("cloth", null), ["ClothBrown"] = ("cloth", null), ["ClothDenim"] = ("cloth", null),
         };
 
@@ -100,7 +108,7 @@ namespace Stealth.EditorTools
             ["BookCart/Trim"] = ("cardboard", "6C4A3A"), ["MailCart/Trim"] = ("paper", null), ["MailShelf/Accent"] = ("paper", null), ["SupplyShelf/Trim"] = ("paper", null),
             ["PaperStack/Accent"] = ("paper", null), ["PaperBin/Trim"] = ("paper", "D8D4C8"), ["Lectern/Trim"] = ("paper", null), ["FilePedestal/Accent"] = ("plastic", null),
             // paper, boards and signs
-            ["Flipchart/Trim"] = ("paper", null), ["NoticeBoard/Body"] = ("cardboard", "8C6A42"), ["NoticeBoard/Accent"] = ("paper", null), ["MapBoard/Body"] = ("cardboard", "8C6A42"),
+            ["Flipchart/Trim"] = ("paper", null), ["NoticeBoard/Body"] = ("cardboard", "8C6A42"), ["MapBoard/Body"] = ("cardboard", "8C6A42"),
             ["MapBoard/Trim"] = ("paper", null), ["Whiteboard/Body"] = ("gloss", "D8DAD8"), ["MobileWhiteboard/Trim"] = ("gloss", "D8DAD8"), ["ProjectorScreen/Trim"] = ("cloth", "DCDCD8"),
             ["DirectoryBoard/Trim"] = ("paper", null), ["WallClock/Body"] = ("plastic", null), ["DartBoard/Accent"] = ("felt", null),
             // glazed ware and enamel
@@ -112,6 +120,7 @@ namespace Stealth.EditorTools
             ["Dishwasher/Body"] = ("gloss", "CFD0CE"), ["WashingMachine/Body"] = ("gloss", "D6D6D4"), ["HandDryer/Body"] = ("gloss", "D6D6D4"), ["MedTable/Body"] = ("gloss", "CFD2D2"),
             ["DefibCabinet/Body"] = ("gloss", null), ["FireCabinet/Body"] = ("gloss", "8E1B18"), ["GuitarStand/Body"] = ("gloss", null), ["SynthStand/Body"] = ("gloss", null),
             ["HandTruck/Body"] = ("powdercoat", "9C2A1E"), ["PaintRack/Body"] = ("powdercoat", null), ["PokerTable/Trim"] = ("leather", null),
+            ["TrashBin/Body"] = ("powdercoat", "34373A"), ["TrashBin/Accent"] = ("steel", null),
             // moulded plastic
             ["Copier/Body"] = ("plastic", "CACAC4"), ["Printer/Body"] = ("plastic", "CACAC4"), ["Plotter/Body"] = ("plastic", "B8B8B2"), ["Printer3d/Body"] = ("plastic", null),
             ["WaterCooler/Body"] = ("plastic", "D0D0CA"), ["InfoKiosk/Body"] = ("gloss", "B4B6B6"), ["LogoTotem/Body"] = ("gloss", "B4B6B6"), ["BinPair/Body"] = ("plastic", null),
@@ -123,6 +132,8 @@ namespace Stealth.EditorTools
             ["BunkBed/Trim"] = ("cloth", "D4D2CC"), ["SurgicalTable/Body"] = ("powdercoat", null), ["CashShelf/Accent"] = ("paper", "5F7A5A"), ["MoneyCart/Trim"] = ("paper", "5F7A5A"),
             ["DrumKit/Body"] = ("gloss", "C8C6C0"), ["Sculpture/Body"] = ("stone", "C6C4BC"), ["CarOnStands/Body"] = ("gloss", "C4C6C8"), ["GarageDoor/Body"] = ("powdercoat", "B6B8B8"),
             ["Programmer/Body"] = ("powdercoat", null), ["Cage/"] = (null, null),
+            // the hospital's scrub trough is stainless steel (it was the dark grey of plastic)
+            ["ScrubSink/Body"] = ("steel", "B6BABC"),
         };
 
         /// <summary>The surface in a house long left (nothing: the house's own paint, with its own wear, stays).</summary>
@@ -134,8 +145,11 @@ namespace Stealth.EditorTools
         };
 
         /// <summary>The surface on a material: its textures, its own colour, the wear of a kept thing — or, worn, of one left for years.</summary>
-        static void SetSurface(Material m, string surface, Color color, float scale = 1f, bool worn = false, bool thing = false)
+        static void SetSurface(Material m, string surface, Color color, float scale = 1f, float wear = 0f, bool thing = false)
         {
+            // wear: 0 kept, 0.5 in daily hard use, 1 years without care
+            bool worn = wear >= 0.99f;
+            float W(float kept, float left) => Mathf.Lerp(kept, left, wear);
             var s = Surfaces[surface];
             m.shader = Shader.Find("Stealth/Surface");
             float lit = Mathf.GammaToLinearSpace(SurfaceLight);
@@ -144,26 +158,61 @@ namespace Stealth.EditorTools
             SetPbr(m, $"{SurfaceTextures}/{surface}", Tint(1f), 1f, 1f / (s.Tile * scale));
             foreach (var map in new[] { "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" }) m.SetTextureScale(map, m.GetTextureScale("_BaseMap"));
             m.SetTexture("_WearMap", Tex($"{SurfaceTextures}/wear.png"));
+            m.SetTexture("_ReliefMap", Tex($"{SurfaceTextures}/relief.png"));
+            m.SetFloat("_ReliefTile", thing ? 0.35f : 1.6f);
+            m.SetFloat("_Relief", s.Relief * (thing ? 0.6f : W(1f, 1.5f)));
+            m.SetFloat("_Clouds", s.Clouds * W(1f, 1.6f));
+            m.SetFloat("_WallBand", 0f);
+            m.SetFloat("_Contact", 0f);
+            m.SetFloat("_RoomHeight", Stealth.Level.LevelMetrics.WallHeight);
             m.SetFloat("_WearTile", thing ? 0.38f : 1.15f);
-            float k = worn ? 1.9f : 1f;
+            float k = W(1f, 1.9f);
             m.SetFloat("_Smudges", Mathf.Clamp01(s.Smudges * (worn || thing ? 1.2f : 1f)));
             m.SetFloat("_Scratches", Mathf.Clamp01(s.Scratches * k));
-            m.SetFloat("_Stains", Mathf.Clamp01(worn ? 0.55f + s.Stains : s.Stains));
-            m.SetFloat("_Streaks", Mathf.Clamp01(worn ? 0.6f + s.Runs : s.Runs));
-            m.SetFloat("_EdgeWear", Mathf.Clamp01(s.Edges * (worn ? 1.9f : thing ? 1.4f : 1.1f)));
+            m.SetFloat("_Stains", Mathf.Clamp01(W(0f, 0.55f) + s.Stains));
+            m.SetFloat("_Streaks", Mathf.Clamp01(W(0f, 0.6f) + s.Runs));
+            m.SetFloat("_EdgeWear", Mathf.Clamp01(s.Edges * (thing ? 1.4f : W(1.1f, 1.9f))));
             var under = s.Under > 0f ? new Color(s.Under, s.Under, s.Under) : s.Lighter < 1f ? color * s.Lighter : Color.Lerp(color, new Color(0.86f, 0.84f, 0.8f), (s.Lighter - 1f) * 1.1f); // scuffed paler
             m.SetColor("_WearColor", under);
             m.SetFloat("_WearMetal", s.UnderMetal);
             m.SetFloat("_WearSmooth", s.UnderSmooth);
-            m.SetFloat("_Corners", worn ? 0.9f : 0.5f);
-            m.SetFloat("_FloorDirt", thing ? 0f : worn ? 0.95f : 0.45f);
+            m.SetFloat("_Corners", W(0.5f, 0.9f));
+            m.SetFloat("_FloorDirt", thing ? 0f : W(0.45f, 0.95f));
             m.SetFloat("_FloorHeight", Stealth.Level.LevelMetrics.FloorHeight);
-            m.SetColor("_DirtColor", worn ? new Color(0.27f, 0.24f, 0.2f) : new Color(0.4f, 0.36f, 0.31f));
+            m.SetColor("_DirtColor", Color.Lerp(new Color(0.4f, 0.36f, 0.31f), new Color(0.27f, 0.24f, 0.2f), wear));
+        }
+
+        /// <summary>
+        /// A painted wall of the style's kit (a ceiling: clean, nothing reaches it): plaster under roller paint, uneven from
+        /// across the room, marked where hands, chairs and feet reach, a little darker where it meets the floor and the ceiling.
+        /// </summary>
+        static void WallPaint(string name, string hex, float sheen, bool ceiling = false)
+        {
+            var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+            SetSurface(m, "wallpaint", Hex(hex));
+            m.SetFloat("_Smoothness", sheen);
+            m.SetFloat("_WearTile", 1.7f);
+            m.SetFloat("_WallBand", 1f);
+            m.SetFloat("_Contact", ceiling ? 0f : 0.16f);
+            m.SetFloat("_Corners", ceiling ? 0.15f : 0.3f);
+            if (ceiling)
+                foreach (var p in new[] { "_Smudges", "_Scratches", "_FloorDirt", "_Streaks" }) m.SetFloat(p, 0f);
+            EditorUtility.SetDirty(m);
+            s_Kit[name] = m;
         }
 
         static Color Hex(string hex) => ColorUtility.TryParseHtmlString("#" + hex, out var c) ? c : Color.magenta;
 
         /// <summary>The material of a surface in a set, one for each material it stands for (a style change must find the way back).</summary>
+        /// <summary>What a broken wall is made of (brick, mortar, plaster shards): one material of a surface and a colour, the same in every house.</summary>
+        static Material RuinMaterial(string name, string surface, string hex)
+        {
+            var m = LitAsset($"{KitMaterialsDir}/{name}.mat");
+            SetSurface(m, surface, Hex(hex), 1f, 1f);
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         static Material SurfaceMaterial(string set, Material from, string surface, string hex)
         {
             if (!AssetDatabase.IsValidFolder($"{SurfaceTextures}/{surface}")) return null;
@@ -172,26 +221,29 @@ namespace Stealth.EditorTools
             m.shaderKeywords = from.shaderKeywords;
             var color = hex != null ? Hex(hex) : from.GetColor("_BaseColor");
             if (set == "Worn") color = Saturate(color, 0.55f, 0.8f); // faded
-            SetSurface(m, surface, color, 1f, set == "Worn");
+            SetSurface(m, surface, color, 1f, set == "Worn" ? 1f : set == "Used" ? 0.5f : 0f);
             EditorUtility.SetDirty(m);
             return m;
         }
 
-        /// <summary>The two sets: clean (kept things: a little handled) and worn (years without care; scuffs and dirt, no rust).</summary>
+        /// <summary>The three sets: clean (kept things: a little handled), used (worked with every day: scuffed, grimy at the floor, its colours whole)
+        /// and worn (years without care; faded, scuffs and dirt, no rust).</summary>
         static Dictionary<string, SurfaceSet> BuildSurfaceSets()
         {
             var sets = new Dictionary<string, SurfaceSet>();
             if (!AssetDatabase.IsValidFolder(SurfaceTextures)) return sets;
-            foreach (var name in new[] { "Clean", "Worn" })
+            foreach (var name in new[] { "Clean", "Used", "Worn" })
             {
                 EnsureFolder($"{SurfacesDir}/{name}");
                 string Of(string surface) => surface == null ? null : name == "Worn" ? Worn(surface) : surface;
                 var swaps = new List<MaterialSwap>();
                 foreach (var kv in MaterialSurfaces)
                 {
-                    var from = new[] { "Props", "Environment" }.Select(d => AssetDatabase.LoadAssetAtPath<Material>($"{MaterialsDir}/{d}/{kv.Key}.mat")).FirstOrDefault(m => m != null);
-                    if (from == null || Of(kv.Value.surface) == null) continue;
-                    var to = SurfaceMaterial(name, from, Of(kv.Value.surface), kv.Value.color);
+                    var from = new[] { "Props", "Environment", "City" }.Select(d => AssetDatabase.LoadAssetAtPath<Material>($"{MaterialsDir}/{d}/{kv.Key}.mat")).FirstOrDefault(m => m != null);
+                    // (the services have no paint of the facility's own to keep)
+                    string surface = kv.Key.StartsWith("Util") ? kv.Value.surface : Of(kv.Value.surface);
+                    if (from == null || surface == null) continue;
+                    var to = SurfaceMaterial(name, from, surface, kv.Value.color);
                     if (to != null) swaps.Add(new MaterialSwap { From = from, To = to });
                 }
                 var parts = new List<PartSurface>();
@@ -240,11 +292,16 @@ namespace Stealth.EditorTools
             return best >= 0;
         }
 
-        /// <summary>The sets the houses of the sample wear (a house that names its set by hand keeps it): the office — clean, the abandoned facility — worn.</summary>
+        /// <summary>The set every kind of house wears (a house that names its set by hand keeps it): kept places — clean, the repair shop and the warehouse — used, the abandoned facility — worn.</summary>
         static SurfaceSet SurfacesOf(Stealth.Level.HouseKind kind)
         {
-            string name = kind == Stealth.Level.HouseKind.Office ? "Clean" : kind == Stealth.Level.HouseKind.Abandoned ? "Worn" : null;
-            return name == null ? null : AssetDatabase.LoadAssetAtPath<SurfaceSet>($"{SurfacesDir}/{name}.asset");
+            string name = kind switch
+            {
+                Stealth.Level.HouseKind.Abandoned => "Worn",
+                Stealth.Level.HouseKind.Garage or Stealth.Level.HouseKind.Warehouse => "Used",
+                _ => "Clean",
+            };
+            return AssetDatabase.LoadAssetAtPath<SurfaceSet>($"{SurfacesDir}/{name}.asset");
         }
 
         // ------------------------------------------------------------------ items
@@ -254,12 +311,11 @@ namespace Stealth.EditorTools
         {
             ["Gear_radio_Body"] = ("plastic", 0.5f), ["Gear_radio_Accent"] = ("rubber", 0.5f), ["Gear_keyboard_Body"] = ("plastic", 0.5f), ["Gear_keyboard_Accent"] = ("plastic", 0.4f),
             ["Gear_tablet_Body"] = ("rubber", 0.5f), ["Gear_tablet_Accent"] = ("plastic", 0.5f), ["Gear_medkit_Body"] = ("plastic", 0.7f), ["Gear_medkit_Accent"] = ("steel", 0.4f),
-            ["Gear_medkit_Trim"] = ("plastic", 0.7f), ["Gear_coffee_Body"] = ("ceramic", 0.4f), ["Gear_coffee_Accent"] = ("steel", 0.3f), ["Gear_coffee_Trim"] = ("paper", 0.5f),
-            ["Gear_finder_Body"] = ("powdercoat", 0.4f), ["Gear_finder_Accent"] = ("steel", 0.3f), ["Gear_boots_Body"] = ("leather", 0.5f), ["Gear_boots_Accent"] = ("rubber", 0.5f),
-            ["Gear_boots_Trim"] = ("cloth", 0.5f), ["Gear_tomatoes_Body"] = ("paper", 0.5f), ["Gear_tomatoes_Accent"] = ("steel", 0.3f), ["Gear_chess_Body"] = ("wood", 0.4f),
-            ["Gear_chess_Accent"] = ("wood", 0.3f), ["Gear_magazine_Accent"] = ("paper", 0.5f), ["Gear_pills_Body"] = ("paper", 0.5f), ["Gear_pills_Accent"] = ("steel", 0.2f),
+            ["Gear_medkit_Trim"] = ("plastic", 0.7f), ["Gear_coffee_Body"] = ("ceramic", 0.4f), ["Gear_coffee_Accent"] = ("steel", 0.3f),             ["Gear_finder_Body"] = ("powdercoat", 0.4f), ["Gear_finder_Accent"] = ("steel", 0.3f), ["Gear_boots_Body"] = ("leather", 0.5f), ["Gear_boots_Accent"] = ("rubber", 0.5f),
+            ["Gear_boots_Trim"] = ("cloth", 0.5f), ["Gear_tomatoes_Accent"] = ("steel", 0.3f), ["Gear_chess_Body"] = ("wood", 0.4f),
+            ["Gear_chess_Accent"] = ("wood", 0.3f), ["Gear_magazine_Accent"] = ("paper", 0.5f), ["Gear_pills_Accent"] = ("steel", 0.2f),
             ["Gear_toothpaste_Body"] = ("plastic", 0.5f), ["Gear_toothpaste_Accent"] = ("plastic", 0.4f), ["Gear_tape_Body"] = ("cloth", 0.5f), ["Gear_tape_Accent"] = ("cardboard", 0.4f),
-            ["Gear_matches_Body"] = ("cardboard", 0.3f), ["Gear_matches_Accent"] = ("timber", 0.15f), ["Gear_matches_Trim"] = ("rubber", 0.3f), ["Gear_toiletpaper_Body"] = ("paper", 0.4f),
+            ["Gear_matches_Accent"] = ("timber", 0.15f), ["Gear_matches_Trim"] = ("rubber", 0.3f), ["Gear_toiletpaper_Body"] = ("paper", 0.4f),
             ["Gear_toiletpaper_Accent"] = ("cardboard", 0.4f), ["Gear_applecore_Body"] = ("leaf", 0.3f), ["Gear_applecore_Accent"] = ("leaf", 0.4f), ["Gear_applecore_Trim"] = ("timber", 0.1f),
             ["Gear_soap_Body"] = ("ceramic", 0.3f), ["Gear_soap_Accent"] = ("plastic", 0.4f), ["Gear_ssd_Body"] = ("powdercoat", 0.3f), ["Gear_ssd_Accent"] = ("steel", 0.2f),
             ["Gear_ssd_Trim"] = ("paper", 0.4f), ["Gear_gamepad_Body"] = ("plastic", 0.4f), ["Gear_gamepad_Accent"] = ("rubber", 0.4f), ["Gear_gamepad_Trim"] = ("plastic", 0.4f),
@@ -292,8 +348,27 @@ namespace Stealth.EditorTools
             foreach (var c in BookColours.Where(s_Mats.ContainsKey)) Print(c, "spines_" + c.Substring("Book".Length).ToLowerInvariant());
             Print("Printed", "printed");
             Print("Gear_magazine_Body", "printed");
+            // labels of the small things (labels.png, Tools/Art/generate_labels.py): they keep their print in every look
+            foreach (var label in new[] { "Gear_coffee_Trim", "Gear_tomatoes_Body", "Gear_pills_Body", "Gear_matches_Body" }) Print(label, "labels");
             Print("BookCover", "printed");
             Print("BookPagesFlat", "pages_flat", false, 8f);
+            Print("Sheets", "sheets");
+            Print("KeyCaps", "keyboard");
+            Print("BoardSheet", "boards");
+            Print("ThingPrint", "wall_things");
+            Print("MirrorGlass", "mirror");
+            Print("ProjectorCloth", "projector");
+            Print("GlobeMap", "globe");
+            Print("MachinePrint", "machines");
+            // what shines through its own picture
+            foreach (var (material, texture) in new[] { ("MachineLit", "machines"), ("MachineGlow", "machine_glow"), ("Displays", "displays") })
+            {
+                Print(material, texture, true);
+                var tex = Tex($"{CoverTextures}/{texture}.png");
+                if (!s_Mats.TryGetValue(material, out var m) || tex == null || m.GetTexture("_EmissionMap") == tex) continue;
+                m.SetTexture("_EmissionMap", tex);
+                EditorUtility.SetDirty(m);
+            }
             Print("BookPages", "pages", false, 8f);
         }
     }

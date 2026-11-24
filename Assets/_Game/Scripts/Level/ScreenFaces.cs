@@ -16,6 +16,37 @@ namespace Stealth.Level
 
         static readonly Dictionary<Mesh, Mesh> s_Fitted = new();
         static readonly HashSet<Mesh> s_Copies = new();
+        static readonly Dictionary<(Mesh, int), Mesh> s_Pictures = new();
+
+        /// <summary>A display smaller than this either way is a lamp or an edge, metres; longer than this many times its height: a strip of light.</summary>
+        public const float DisplaySide = 0.012f, DisplayStretch = 5f;
+
+        /// <summary>The mesh of small displays, every face of it showing one picture of the displays' texture.</summary>
+        public static Mesh Of(Mesh mesh, int picture) => Of(mesh, new PictureSheet
+        {
+            Cols = ScreenLooks.DisplayCols, Rows = ScreenLooks.DisplayRows, Cell = picture, Rest = ScreenLooks.PlainDisplay, MinSide = DisplaySide, Lying = true,
+        });
+
+        /// <summary>The mesh with one picture of a sheet on each of its flat faces (<see cref="PictureSheet"/>).</summary>
+        public static Mesh Of(Mesh mesh, PictureSheet sheet)
+        {
+            if (mesh == null || s_Copies.Contains(mesh) || !mesh.isReadable) return mesh;
+            int key = ((sheet.Cols * 31 + sheet.Rows) * 31 + sheet.Cell) * 31 + sheet.Rest + (sheet.Lying ? 1 << 20 : 0);
+            if (s_Pictures.TryGetValue((mesh, key), out var known) && known != null) return known;
+            var uv = Fit(mesh.vertices, mesh.triangles, sheet.MinSide, sheet.Lying, true);
+            float w = 1f / sheet.Cols, h = 1f / sheet.Rows;
+            var rest = new Vector2((sheet.Rest % sheet.Cols + 0.5f) * w, 1f - (sheet.Rest / sheet.Cols + 0.5f) * h);
+            float x = sheet.Cell % sheet.Cols * w, y = 1f - (sheet.Cell / sheet.Cols + 1) * h;
+            for (int i = 0; i < uv.Length; i++) uv[i] = uv[i].x < 0f ? rest : new Vector2(x + (0.02f + 0.96f * uv[i].x) * w, y + (0.02f + 0.96f * uv[i].y) * h);
+            var copy = Object.Instantiate(mesh);
+            copy.name = mesh.name;
+            copy.hideFlags = HideFlags.DontSave;
+            copy.uv = uv;
+            s_Pictures[(mesh, key)] = copy;
+            s_Copies.Add(copy);
+            VisualStyles.KnowCopy(copy, mesh);
+            return copy;
+        }
 
         /// <summary>The mesh with its screens' pictures fitted (made once; the mesh itself when it already is, or cannot be read).</summary>
         public static Mesh Of(Mesh mesh)
@@ -37,9 +68,11 @@ namespace Stealth.Level
         /// The texture coordinates (pure): triangles in one plane that touch are a face; a face turned to the side (not up or
         /// down) at least <see cref="MinSide"/> both ways gets 0..1, u to the right and v up as seen from in front of it.
         /// </summary>
-        public static Vector2[] Fit(Vector3[] v, int[] tris)
+        /// <param name="lying">A face that lies flat counts too, seen from the model's front (a panel's display).</param>
+        public static Vector2[] Fit(Vector3[] v, int[] tris, float minSide = MinSide, bool lying = false, bool mark = false)
         {
             var uv = new Vector2[v.Length]; // the corner: dark
+            if (lying || mark) System.Array.Fill(uv, new Vector2(-1f, -1f)); // (no face of a picture: marked for the caller)
             int n = tris.Length / 3;
             var normal = new Vector3[n];
             var parent = new int[n];
@@ -73,8 +106,9 @@ namespace Stealth.Level
             foreach (var face in faces.Values)
             {
                 var f = normal[face[0]];
-                if (Mathf.Abs(f.y) > 0.9f) continue; // lies flat: a tray, a top
-                var right = Vector3.Cross(f, Vector3.up).normalized; // of whoever looks at it
+                bool flat = Mathf.Abs(f.y) > 0.9f;
+                if (flat && (!lying || f.y < 0f)) continue; // lies flat: a tray, a top
+                var right = flat ? Vector3.left : Vector3.Cross(f, Vector3.up).normalized; // of whoever looks at it (from +Z)
                 var up = Vector3.Cross(right, f).normalized;
                 float u0 = float.MaxValue, u1 = float.MinValue, w0 = float.MaxValue, w1 = float.MinValue;
                 foreach (int t in face)
@@ -85,7 +119,14 @@ namespace Stealth.Level
                         u0 = Mathf.Min(u0, u); u1 = Mathf.Max(u1, u);
                         w0 = Mathf.Min(w0, w); w1 = Mathf.Max(w1, w);
                     }
-                if (u1 - u0 < MinSide || w1 - w0 < MinSide) continue;
+                if (u1 - u0 < minSide || w1 - w0 < minSide || lying && (u1 - u0 > (w1 - w0) * DisplayStretch || w1 - w0 > (u1 - u0) * DisplayStretch)) continue;
+                if (lying)
+                {
+                    // a ring, a sign's shape, a printer's lit bed: no display either
+                    float area = 0f;
+                    foreach (int t in face) area += Vector3.Cross(v[tris[t * 3 + 1]] - v[tris[t * 3]], v[tris[t * 3 + 2]] - v[tris[t * 3]]).magnitude / 2f;
+                    if (area < 0.75f * (u1 - u0) * (w1 - w0) || flat && Mathf.Max(u1 - u0, w1 - w0) > 0.25f) continue;
+                }
                 foreach (int t in face)
                     for (int k = 0; k < 3; k++)
                     {

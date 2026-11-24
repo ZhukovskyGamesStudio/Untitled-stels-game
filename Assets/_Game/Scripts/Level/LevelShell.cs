@@ -64,9 +64,24 @@ namespace Stealth.Level
     public sealed class LevelShell
     {
         public readonly List<WallFace> Walls = new();
+        /// <summary>
+        /// The faces of the posts at the walls' ends, but where a wall goes on from them: the planner dresses what the walls'
+        /// own faces leave bare (the joints of angled and round walls, free ends at open passages).
+        /// </summary>
+        public readonly List<WallFace> Posts = new();
+        /// <summary>What is mounted on a wall over a doorway, under the ceiling: lamps, panels, signs. Nothing of the decor may cover it.</summary>
+        public readonly List<WallSign> Signs = new();
         public readonly List<FloorRect> Floors = new();
-        /// <summary>Holes in the ceilings (the duct grates): no ceiling finish there.</summary>
-        public readonly List<Rect> CeilingHoles = new();
+        /// <summary>Holes in the ceilings (the duct grates), each in the ceiling of its floor's rooms: no ceiling finish there.</summary>
+        public readonly List<CeilingHole> CeilingHoles = new();
+
+        /// <summary>The holes in the ceiling of a floor's rooms.</summary>
+        public List<Rect> HolesOver(int floor)
+        {
+            var list = new List<Rect>();
+            foreach (var h in CeilingHoles) if (h.Floor == floor) list.Add(h.Area);
+            return list;
+        }
         public readonly List<WallOpening> Openings = new();
         /// <summary>Renderers that are the wall itself (<see cref="AutoDoor.WallParts"/>): <see cref="StyleDecor"/> dresses them in the wall finish.</summary>
         public readonly List<MeshRenderer> WallParts = new();
@@ -74,6 +89,21 @@ namespace Stealth.Level
         public readonly List<(Vector3 pos, float yaw)> Windows = new();
         /// <summary>Furniture footprints for the map (x/z in metres, from the placed models).</summary>
         public readonly List<MapProp> Props = new();
+    }
+
+    /// <summary>A hole in the ceiling of a floor's rooms (x/z in metres).</summary>
+    public struct CeilingHole
+    {
+        public int Floor;
+        public Rect Area;
+    }
+
+    /// <summary>Something mounted over a doorway on both faces of its wall: its middle on the wall's centre line, half its size along the wall and up.</summary>
+    public struct WallSign
+    {
+        public Vector3 Center, Along;
+        public float HalfWidth, HalfHeight;
+        public int Floor;
     }
 
     /// <summary>The footprint of a piece of furniture on the map.</summary>

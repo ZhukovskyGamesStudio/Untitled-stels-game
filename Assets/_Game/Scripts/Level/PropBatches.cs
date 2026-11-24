@@ -23,7 +23,7 @@ namespace Stealth.Level
         public static int Renderers => s_Batches.Count;
 
         /// <summary>Names of the house's pieces (children of the level root, <see cref="LevelBuilder"/>) that never change once built.</summary>
-        static readonly string[] ShellNames = { "Wall", "Floor", "Slab", "Roof", "Fence", "OutsideGround", "Window", "VentFrame", "SqueezeFrame", "ExitSign", "Light_" };
+        static readonly string[] ShellNames = { "Wall", "Floor", "Slab", "Roof", "Fence", "OutsideGround", "Window", "VentFrame", "SqueezeFrame", "ExitSign", "Light_", "ElectricPanel", "Breach", "Hole" };
 
         static bool IsShellName(string name)
         {

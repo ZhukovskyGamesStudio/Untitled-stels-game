@@ -3,12 +3,11 @@ would not belong — a home, a lounge, a ward, a locker room. Its whole top carr
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/low_shelf.py -- Assets/_Game/Art/Models
 
-Two columns of three open cubes on a plinth: baskets, folded towels, books, a vase. Front to Blender -Y (Unity +Z), origin on
-the floor in the middle of the footprint. Parts: Body (the wood), Accent (baskets, boxes), Trim (books, towels, the vase).
+Two columns of three open cubes on a plinth (low_shelf: the wood alone) and what may stand in a cube (cube_box_0/1, cube_towels, cube_vase,
+cube_basket; the books are variants.py's): AssetBuilder.Variants.CubeThings. Front to Blender -Y (Unity +Z), origin on the floor in
+the middle of the footprint.
 """
-import math
 import os
-import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +22,6 @@ PLINTH, SIDE, TOP, BOARD, BACK = 0.07, 0.034, 0.042, 0.026, 0.014
 
 def build():
     import bpy
-    rnd = random.Random(16)
     s.clear_scene()
     body = [s.rbox((W, D, TOP), (0, 0, H - TOP / 2), r=0.008, seg=3)]
     for x in (-1, 1):
@@ -37,46 +35,6 @@ def build():
     body.append(s.rbox((BOARD, D - 0.03, inner1 - inner0), (0, 0.004, (inner0 + inner1) / 2), r=0.004, seg=2))
     s.part("Body", body)
 
-    cell = (W - 2 * SIDE - BOARD) / 2
-    cx = (BOARD + cell) / 2 + 0.002
-    floor = [inner0 + BOARD - 0.001, inner0 + step + BOARD / 2 - 0.001, inner0 + 2 * step + BOARD / 2 - 0.001]
-    accent, trim = [], []
-
-    def basket(x, z, h):
-        w, d = cell - 0.036, D - 0.11
-        b = s.rbox((w, d, h), (x, -0.012, z + h / 2), r=0.018, seg=3, taper=(0.96, 0.96))
-        accent.append(b)
-        accent.append(s.rbox((w + 0.012, d + 0.012, 0.024), (x, -0.012, z + h - 0.006), r=0.010, seg=2))
-        trim.append(s.rbox((0.085, 0.008, 0.026), (x, -0.012 - d / 2 - 0.004, z + h * 0.62), r=0.006, seg=2))        # its label
-
-    def books(x, z):
-        u = x - cell / 2 + 0.018
-        while u < x + cell / 2 - 0.10:
-            t, h = rnd.uniform(0.022, 0.044), rnd.uniform(0.21, 0.29)
-            (trim if rnd.random() < 0.6 else accent).append(s.rbox((t, 0.19, h), (u + t / 2, -0.06, z + h / 2 - 0.001), r=0.004, seg=1))
-            u += t + 0.0015
-        lean = s.rbox((0.03, 0.19, 0.235), (u + 0.045, -0.06, z + 0.118), r=0.004, seg=1, rot=(0, math.radians(-13), 0))
-        accent.append(lean)
-
-    def towels(x, z):
-        for k in range(4):
-            t = 0.062
-            trim.append(s.rbox((cell - 0.10 - 0.012 * (k % 2), 0.25, t), (x + 0.006 * (k % 2), -0.04, z + t * 0.93 * k + t / 2), r=0.028, seg=4))
-
-    def vase(x, z):
-        trim.append(s.lathe([(0.0, 0.0), (0.042, 0.0), (0.062, 0.05), (0.068, 0.11), (0.045, 0.18), (0.028, 0.215), (0.036, 0.24), (0.030, 0.24), (0.0, 0.20)],
-                            seg=20, loc=(x - 0.06, -0.05, z)))
-        accent.append(s.rbox((0.15, 0.20, 0.035), (x + 0.09, -0.04, z + 0.017), r=0.006, seg=2))
-        accent.append(s.rbox((0.13, 0.18, 0.028), (x + 0.085, -0.045, z + 0.047), r=0.006, seg=2, rot=(0, 0, 0.16)))
-
-    basket(-cx, floor[0], 0.27)
-    basket(cx, floor[0], 0.24)
-    books(-cx, floor[1])
-    towels(cx, floor[1])
-    vase(-cx, floor[2])
-    basket(cx, floor[2], 0.25)
-    s.part("Accent", accent)
-    s.part("Trim", trim)
     bpy.context.view_layer.update()
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     meshfix.fix_objects(objs, floor=True, name="low_shelf")
@@ -84,4 +42,68 @@ def build():
     print("exported low_shelf")
 
 
+# what stands in a cube (origin: the middle of its floor's front edge, going back to +Y; AssetBuilder.Variants puts it there)
+CELL, DEEP = (W - 2 * SIDE - BOARD) / 2, D - 0.06
+
+
+def content(name, fn):
+    s.clear_scene()
+    fn()
+    mc.export(name, floor=False)
+
+
+def box(label):
+    """A lidded archive box with a hand hole and a label."""
+    def make():
+        w, d, h = CELL - 0.05, DEEP - 0.05, 0.25
+        b = s.rbox((w, d, h), (0, 0.03 + d / 2, h / 2), r=0.006, seg=2, taper=(0.985, 0.985))
+        b = s.boolean(b, s.rbox((0.09, 0.05, 0.03), (0, 0.03, h * 0.66), r=0.012, seg=3))
+        lid = s.rbox((w + 0.012, d + 0.012, 0.055), (0, 0.03 + d / 2, h - 0.012), r=0.006, seg=2)
+        s.part("Body", [b, lid])
+        mc.plates("Print", [mc.Plate(label, (0, 0.0285, h * 0.34), 0.13, 0.062, thick=0.003, rest="white")],
+                  [(s.rbox((0.1, 0.02, 0.04), (0, 0.05, h * 0.66), r=0), "black")])
+    return make
+
+
+def towels():
+    """A stack of folded towels: each fold a soft roll at the front, hems at the sides."""
+    b = []
+    for k in range(4):
+        w, t = CELL - 0.11 - 0.014 * (k % 2), 0.058
+        z = k * t * 0.95
+        b.append(s.loft([(-w / 2, 0.115, t / 2, 3.2), (-w / 2 + 0.01, 0.125, t / 2, 3.0), (w / 2 - 0.01, 0.125, t / 2, 3.0), (w / 2, 0.115, t / 2, 3.2)], seg=24, axis="X",
+                        loc=(0.006 * (k % 2), 0.16, z + t / 2)))
+        b.append(s.rbox((w - 0.02, 0.22, 0.004), (0.006 * (k % 2), 0.15, z + t / 2), r=0.001, seg=1))
+    s.part("Body", b)
+
+
+def vase():
+    """A glazed vase."""
+    s.part("Body", [s.lathe([(0.0, 0.0), (0.045, 0.0), (0.05, 0.006), (0.066, 0.05), (0.072, 0.1), (0.06, 0.15), (0.036, 0.19), (0.028, 0.215), (0.034, 0.24), (0.04, 0.246),
+                                     (0.034, 0.244), (0.024, 0.215), (0.0, 0.205)], seg=28, loc=(-0.05, 0.16, 0))])
+
+
+def basket():
+    """A woven basket: rows of weave round a tapered body, a rolled rim, two handles."""
+    w, d, h = CELL - 0.06, DEEP - 0.08, 0.19
+    rows = []
+    n = 9
+    for k in range(n):
+        z = 0.008 + k * (h - 0.016) / (n - 1)
+        g = 0.94 + 0.06 * z / h
+        rows.append(s.rbox((w * g, d * g, h / n * 1.12), (0, 0.03 + d / 2, z), r=0.009, seg=3))
+    rim = s.rbox((w + 0.016, d + 0.016, 0.022), (0, 0.03 + d / 2, h), r=0.01, seg=3)
+    body = s.rbox((w * 0.95, d * 0.95, h - 0.01), (0, 0.03 + d / 2, h / 2), r=0.01, seg=2)
+    s.part("Body", [body, *rows, rim])
+    s.part("Accent", [s.tube([(-0.05, 0.022, h - 0.02), (-0.045, 0.006, h + 0.01), (0.045, 0.006, h + 0.01), (0.05, 0.022, h - 0.02)], 0.006)])
+
+
 build()
+import machines as mc  # noqa: E402
+
+mc.ROOT = ROOT
+content("cube_box_0", box("boxlabel"))
+content("cube_box_1", box("boxlabel2"))
+content("cube_towels", towels)
+content("cube_vase", vase)
+content("cube_basket", basket)

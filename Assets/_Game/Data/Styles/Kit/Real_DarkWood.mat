@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Real_DarkWood
-  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
+  m_Shader: {fileID: 4800000, guid: ef53875a1056464428d015476f2ef834, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
@@ -20,8 +20,7 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap:
-    RenderType: Opaque
+  stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -29,12 +28,12 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 09c64b2a3a177144489e28c12d4f5928, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: f95d96efe055e5e4a80146d26c423e28, type: 3}
+        m_Scale: {x: 1.1111112, y: 1.1111112}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 2800000, guid: 7367ea32dabded84082e853d7953ed54, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: d17cd00ab093d1547a908cfba46548df, type: 3}
+        m_Scale: {x: 1.1111112, y: 1.1111112}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
         m_Texture: {fileID: 0}
@@ -57,19 +56,27 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
-        m_Texture: {fileID: 2800000, guid: 68a084d14652ff049ac35a75da8c49f6, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: c80113a42d76c63468ff153088aeadfd, type: 3}
+        m_Scale: {x: 1.1111112, y: 1.1111112}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
-        m_Texture: {fileID: 2800000, guid: 68a084d14652ff049ac35a75da8c49f6, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Texture: {fileID: 2800000, guid: c80113a42d76c63468ff153088aeadfd, type: 3}
+        m_Scale: {x: 1.1111112, y: 1.1111112}
         m_Offset: {x: 0, y: 0}
     - _ParallaxMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _ReliefMap:
+        m_Texture: {fileID: 2800000, guid: 27ade1d9bc3a5294b90c926b3dae1b0f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WearMap:
+        m_Texture: {fileID: 2800000, guid: 788f7e9f8b6eaa245a91f0a1c3a0385b, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -94,13 +101,19 @@ Material:
     - _BumpScale: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _Clouds: 0.05
+    - _Contact: 0
+    - _Corners: 0.5
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _DstBlendAlpha: 0
+    - _EdgeWear: 0.55
     - _EnvironmentReflections: 1
+    - _FloorDirt: 0.45
+    - _FloorHeight: 4.1
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -109,22 +122,35 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _Relief: 0.3
+    - _ReliefTile: 1.6
+    - _RoomHeight: 2.75
+    - _Scratches: 0.45
     - _ScreenSpaceReflections: 1
     - _ScreenSpaceReflectionsContributeTransparent: 1
-    - _Smoothness: 0.9
+    - _Smoothness: 1
     - _SmoothnessTextureChannel: 0
+    - _Smudges: 0.5
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
+    - _Stains: 0.06
+    - _Streaks: 0
     - _Surface: 0
+    - _WallBand: 0
+    - _WearMetal: 0
+    - _WearSmooth: 0.25
+    - _WearTile: 1.15
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColor: {r: 0.374664, g: 0.24353793, b: 0.14858451, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DirtColor: {r: 0.4, g: 0.36, b: 0.31, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
+    - _WearColor: {r: 0.52645296, g: 0.44881177, b: 0.38276473, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &993918553412680416

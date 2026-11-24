@@ -57,6 +57,19 @@ namespace Stealth.Level
             var parts = new List<UtilityPart>();
             if (l == null || l.Plan == null || shell == null) return parts;
             var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Utilities, 0));
+            var faces = Faces(l, shell);
+            Ducts(parts, l, shell);
+            Panels(parts, l, shell, faces);
+            Sockets(parts, l, shell, faces, rng);
+            Pipes(parts, l, shell, faces);
+            Drains(parts, l);
+            CableRoutes.Lay(parts, l, shell); // the vault's locks and the storage door's terminal wired to their doors
+            return parts;
+        }
+
+        /// <summary>The walls from floor to ceiling something may hang on, with the rooms they look into.</summary>
+        static List<(WallFace f, PlanRoom room)> Faces(LevelLayout l, LevelShell shell)
+        {
             var faces = new List<(WallFace f, PlanRoom room)>();
             foreach (var f in shell.Walls)
             {
@@ -65,13 +78,7 @@ namespace Stealth.Level
                 if (room == null || room.Id == l.VaultRoom || room.Levels > 1) continue;
                 faces.Add((f, room));
             }
-            Ducts(parts, l, shell);
-            Panels(parts, l, shell, faces);
-            Sockets(parts, l, shell, faces, rng);
-            Pipes(parts, l, shell, faces);
-            Drains(parts, l);
-            CableRoutes.Lay(parts, l); // the vault's locks and the storage door's terminal wired to their doors
-            return parts;
+            return faces;
         }
 
         /// <summary>A spot on a wall face (u along it, half a width either side) clear of its doorways, vents and windows.</summary>
@@ -136,6 +143,13 @@ namespace Stealth.Level
                         float off = alongX ? o.Center.z : o.Center.x, at = alongX ? o.Center.x : o.Center.z;
                         if (Mathf.Abs(off - edge) < 0.3f) cuts.Add((at - o.Width / 2f - 0.3f, at + o.Width / 2f + 0.3f));
                     }
+                    // and what is mounted over the doorways in that wall
+                    foreach (var s in shell.Signs)
+                    {
+                        if (s.Floor != room.Floor || Mathf.Abs(alongX ? s.Along.z : s.Along.x) > 0.1f) continue;
+                        float off = alongX ? s.Center.z - r.yMin : s.Center.x - r.xMin, at = alongX ? s.Center.x : s.Center.z;
+                        if (Mathf.Abs(off) < 0.3f) cuts.Add((at - s.HalfWidth - 0.3f, at + s.HalfWidth + 0.3f));
+                    }
                     // and so do the grates in the ceiling (a duct along under a grate hid the way up)
                     foreach (var g in ArchitecturePlanner.GratesOf(l, room))
                     {
@@ -179,8 +193,24 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ the electrical panels
 
-        static void Panels(List<UtilityPart> parts, LevelLayout l, LevelShell shell, List<(WallFace f, PlanRoom room)> faces)
+        /// <summary>Where the electrical panels hang (one a floor): the middle of each one's bottom edge on its wall, and the way it faces.</summary>
+        public static List<(Vector3 at, Vector3 facing)> PanelSpots(LevelLayout l, LevelShell shell)
         {
+            var spots = new List<(Vector3, Vector3)>();
+            if (l == null || l.Plan == null || shell == null) return spots;
+            foreach (var (face, at) in PanelFaces(l, shell, Faces(l, shell)))
+            {
+                var p = face.At(at);
+                spots.Add((new Vector3(p.x, face.A.y + PanelY, p.z), face.Normal));
+            }
+            return spots;
+        }
+
+        const float PanelY = 1.2f, PanelHeight = 0.9f;
+
+        static List<(WallFace face, float at)> PanelFaces(LevelLayout l, LevelShell shell, List<(WallFace f, PlanRoom room)> faces)
+        {
+            var found = new List<(WallFace, float)>();
             for (int floor = 0; floor < l.Floors; floor++)
             {
                 (WallFace f, float u)? best = null;
@@ -195,15 +225,19 @@ namespace Stealth.Level
                     best = (f, u);
                     bestLen = f.Length;
                 }
-                if (best == null) continue;
-                var (face, at) = best.Value;
-                parts.Add(OnFace(face, at, 1.2f, 0.62f, 0.9f, 0.16f, UtilitySlot.Panel));                    // the box
-                parts.Add(OnFace(face, at, 1.24f, 0.56f, 0.82f, 0.012f, UtilitySlot.Panel, 0.16f));         // its door
-                parts.Add(OnFace(face, at + 0.18f, 1.62f, 0.03f, 0.12f, 0.02f, UtilitySlot.Dark, 0.172f));  // the handle
-                parts.Add(OnFace(face, at - 0.12f, 1.82f, 0.13f, 0.12f, 0.004f, UtilitySlot.Warning, 0.172f)); // the warning sign
+                if (best != null) found.Add(best.Value);
+            }
+            return found;
+        }
+
+        /// <summary>What goes with the panels (themselves models: <see cref="LevelArt.ElectricPanel"/>).</summary>
+        static void Panels(List<UtilityPart> parts, LevelLayout l, LevelShell shell, List<(WallFace f, PlanRoom room)> faces)
+        {
+            foreach (var (face, at) in PanelFaces(l, shell, faces))
+            {
                 // the conduit up to the ceiling, the cable tray along the wall under it
                 var top = face.At(at) + face.Normal * 0.06f;
-                parts.Add(UtilityPart.Pipe(new Vector3(top.x, face.A.y + 2.1f, top.z), new Vector3(top.x, face.A.y + LevelMetrics.WallHeight, top.z), 0.03f, UtilitySlot.Conduit));
+                parts.Add(UtilityPart.Pipe(new Vector3(top.x, face.A.y + PanelY + PanelHeight + 0.03f, top.z), new Vector3(top.x, face.A.y + LevelMetrics.WallHeight, top.z), 0.03f, UtilitySlot.Conduit));
                 float t0 = 0.3f, t1 = face.Length - 0.3f;
                 if (t1 - t0 > 0.6f) parts.Add(OnFace(face, (t0 + t1) / 2f, 2.66f, t1 - t0, 0.06f, 0.16f, UtilitySlot.Conduit, 0.02f));
             }
@@ -409,7 +443,7 @@ namespace Stealth.Level
                     var a = p.Center + n * half;
                     var b = Rim(k, s);
                     var c = Rim(k + 1, s);
-                    foreach (var q in new[] { a, b, c }) { verts.Add(q); normals.Add(n); uvs.Add(Vector2.zero); }
+                    foreach (var q in new[] { a, b, c }) { verts.Add(q); normals.Add(n); uvs.Add(new Vector2(Vector3.Dot(q, e1), Vector3.Dot(q, e2))); }
                     if (Vector3.Dot(Vector3.Cross(b - a, c - a), n) > 0f) { t.Add(i); t.Add(i + 1); t.Add(i + 2); }
                     else { t.Add(i); t.Add(i + 2); t.Add(i + 1); }
                 }

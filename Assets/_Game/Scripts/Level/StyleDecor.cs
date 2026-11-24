@@ -82,7 +82,10 @@ namespace Stealth.Level
                     if (run != s_Run || ActiveLevel.Root != levelRoot || root == null) yield break; // cleared, or another house meanwhile
                 }
                 bool finish = p.IsQuad;
-                var prefab = finish ? kit.Finish : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
+                bool thing = p.Kind == DecorKind.WallThing; // its own model with its own materials, whatever the style's trim
+                var prefab = finish ? kit.Finish
+                    : thing ? (kit.Things != null && p.Variant >= 0 && p.Variant < kit.Things.Length ? kit.Things[p.Variant] : null)
+                    : (int)p.Kind < kit.Pieces.Length ? kit.Pieces[(int)p.Kind] : null;
                 if (prefab == null) continue;
                 Count++;
                 if (!Mergeable(prefab)) { Place(prefab, p, g, root, finish); continue; }
@@ -117,7 +120,7 @@ namespace Stealth.Level
                         batcher.Add(chunk, part.look, paper ?? g.Wall, part.mesh, 0, Matrix4x4.Translate(n * ArchitecturePlanner.FinishLift) * at * part.local, null, wall);
                         continue;
                     }
-                    var style = MaterialFor(p.Kind, part.name, g);
+                    var style = thing ? null : MaterialFor(p.Kind, part.name, g);
                     // no wall finish to continue: the spandrels with their lap stand just proud of the wall (no z-fighting with it)
                     var place = p.Kind == DecorKind.Arch && part.name.StartsWith("Body")
                         ? Matrix4x4.Translate(p.Rotation * Vector3.forward * ArchitecturePlanner.FinishLift) * at * part.local
@@ -205,6 +208,7 @@ namespace Stealth.Level
             s_Batches.Add(go);
             foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
             {
+                if (p.Kind == DecorKind.WallThing) continue;
                 if (!finish)
                 {
                     var m = MaterialFor(p.Kind, r.gameObject.name, g);
@@ -294,7 +298,7 @@ namespace Stealth.Level
             Material m = kind switch
             {
                 DecorKind.Wainscot => accent ? g.Panel : g.Trim,
-                DecorKind.Pipes or DecorKind.PipeClamp => g.Pipe,
+                DecorKind.Pipes or DecorKind.PipeClamp or DecorKind.PipeBend => g.Pipe,
                 DecorKind.Pilaster or DecorKind.Arch => accent ? g.Trim : g.Column,
                 DecorKind.Beam => g.Beam,
                 DecorKind.IBeam => accent ? g.Pipe : g.Beam,

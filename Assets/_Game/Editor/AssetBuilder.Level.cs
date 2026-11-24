@@ -51,8 +51,8 @@ namespace Stealth.EditorTools
             var vent = Prefab($"{LevelPrefabs}/VentFrame.prefab", () => BuildVentFrame(false));
             var highVent = Prefab($"{LevelPrefabs}/HighVentFrame.prefab", () => BuildVentFrame(true));
             var squeeze = Prefab($"{LevelPrefabs}/SqueezeFrame.prefab", BuildSqueezeFrame);
-            var breach = Prefab($"{LevelPrefabs}/BreachFrame.prefab", () => BuildRuin("BreachFrame", LevelMetrics.BreachWidth, LevelMetrics.DoorHeight, false));
-            var hole = Prefab($"{LevelPrefabs}/HoleFrame.prefab", () => BuildRuin("HoleFrame", LevelMetrics.HoleWidth, LevelMetrics.HoleHeight, true));
+            var breach = Prefab($"{LevelPrefabs}/BreachFrame.prefab", () => BuildRuin("BreachFrame", "breach", LevelMetrics.BreachWidth, LevelMetrics.DoorHeight, false));
+            var hole = Prefab($"{LevelPrefabs}/HoleFrame.prefab", () => BuildRuin("HoleFrame", "hole", LevelMetrics.HoleWidth, LevelMetrics.HoleHeight, true));
             var innerWindow = Prefab($"{LevelPrefabs}/InnerWindowFrame.prefab", BuildInnerWindowFrame);
             var railingBay = Prefab($"{LevelPrefabs}/RailingBay.prefab", BuildRailingBay);
             var railingBlock = Prefab($"{LevelPrefabs}/RailingBlock.prefab", BuildRailingBlock);
@@ -121,6 +121,7 @@ namespace Stealth.EditorTools
             var pVendingMachine = Prefab(p + "VendingMachine.prefab", () =>
             {
                 var go = PropObject("VendingMachine", "vending_machine", "Vending", "PropAccent", "VendingGlass");
+                VendingGoods(go, RealisticModel(go, "vending_window", "Vending", "PropAccent"));
                 // Shines forward and a bit down, away from the wall it stands at: nothing reaches the next room or floor.
                 var glow = Lamp(go.transform, "Glow", new Vector3(0f, 1.2f, 0.5f), Quaternion.Euler(25f, 0f, 0f), LightType.Spot, new Color(0.7f, 0.85f, 1f), 0.8f, 2.6f);
                 glow.spotAngle = 120f;
@@ -129,7 +130,12 @@ namespace Stealth.EditorTools
             });
             var pPingPong = Prefab(p + "PingPongTable.prefab", () => PropObject("PingPongTable", "ping_pong_table", "PingPong", "Ceiling", "Ceiling"));
             var pBeanBag = Prefab(p + "BeanBag.prefab", () => PropObject("BeanBag", "bean_bag", "BeanBag", "BeanBag", "BeanBag"));
-            var pArcade = Prefab(p + "ArcadeMachine.prefab", () => PropObject("ArcadeMachine", "arcade_machine", "Arcade", "PropAccent", "PropScreen"));
+            var pArcade = Prefab(p + "ArcadeMachine.prefab", () =>
+            {
+                var go = PropObject("ArcadeMachine", "arcade_machine", "Arcade", "PropAccent", "PropScreen");
+                RealisticModel(go, "arcade_cabinet", "Arcade", "PropAccent");
+                return go;
+            });
             var pSafe = Prefab(p + "Safe.prefab", () =>
             {
                 var go = PropObject("Safe", "safe", "SafeMetal", "Metal", "Keypad");
@@ -278,6 +284,9 @@ namespace Stealth.EditorTools
             Link(levelArt, ref levelArt.VehicleDoor, vehicleDoor);
             Link(levelArt, ref levelArt.ClinicDoor, clinicDoor);
             Link(levelArt, ref levelArt.StorageDoor, storageDoor);
+            Link(levelArt, ref levelArt.Displays, M("Displays"));
+            Link(levelArt, ref levelArt.Mirror, M("Mirror"));
+            LinkAll(levelArt, ref levelArt.Pictures, new[] { M("BoardSheet"), M("MirrorGlass"), M("ProjectorCloth") });
             LinkAll(levelArt, ref levelArt.Screens, new[] { M("PropScreen"), M("ScreenOff"), M("ScreenStatic"), M("ScreenCracked"), M("ScreenNoSignal"), M("ScreenBoot") });
             BuildFeatureArt(levelArt);
             BuildCityArt(levelArt);
@@ -400,39 +409,55 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        /// <summary>The wall the models of Tools/Blender/ruins.py were made for, metres thick: the prefabs stretch them across today's.</summary>
+        /// <summary>The wall the inner window's frame (Tools/Blender/ruins.py) was made for, metres thick: the prefab stretches it across today's.</summary>
         const float RuinWall = 0.2f;
+        /// <summary>How many ways a hole in a wall broke (ruins.py VARIANTS).</summary>
+        const int RuinVariants = 3;
 
         /// <summary>
-        /// The ruin round a breach or a hole knocked through a wall (Tools/Blender/ruins.py): broken edges up both sides and
-        /// along the top, a pile of rubble at the foot on either face; along local X, no colliders (the wall pieces keep the
-        /// shape). A hole also keeps robots out with a navmesh volume: a player crawls through, a robot does not.
+        /// A breach or a hole knocked through a wall (Tools/Blender/ruins.py breach_k / hole_k): toothed brickwork in the
+        /// wall's thickness, the mortar behind it, heaps of rubble on both faces — in <see cref="RuinVariants"/> variants
+        /// (<see cref="RuinFrame"/>: the house shows one) — and on each face the torn plaster round the hole
+        /// (<see cref="RuinSkin"/>), which the style dresses in the room's wall finish. Along local X, no colliders (the wall
+        /// pieces keep the shape). A hole also keeps robots out with a navmesh volume: a player crawls through, a robot does not.
         /// </summary>
-        static GameObject BuildRuin(string name, float nominal, float height, bool robotsOut)
+        static GameObject BuildRuin(string name, string model, float nominal, float height, bool robotsOut)
         {
-            const float rimHeight = 2.3f; // breach_rim.fbx is modelled at the door height
             var root = new GameObject(name);
-            float w = LevelMetrics.ClearWidth(nominal);
-            void Piece(string file, string child, Vector3 pos, Quaternion rot, Vector3 scale)
+            float w = LevelMetrics.ClearWidth(nominal), wall = LevelMetrics.WallThickness;
+            var brick = RuinMaterial("Ruin_Brick", "stone", "8A4A36");
+            var mortar = RuinMaterial("Ruin_Mortar", "stone", "8C8880");
+            var plaster = RuinMaterial("Ruin_Plaster", "paper", "CFCBC0");
+            var frame = root.AddComponent<RuinFrame>();
+            frame.Variants = new GameObject[RuinVariants];
+            frame.Skins = new MeshRenderer[RuinVariants * 2];
+            for (int k = 0; k < RuinVariants; k++)
             {
-                var m = Model(file);
-                m.name = child;
-                m.transform.SetParent(root.transform, false);
-                m.transform.localPosition = pos;
-                m.transform.localRotation = rot;
-                m.transform.localScale = scale;
-                Paint(m, "Wall", "Wall", "Wall");
+                var variant = Child(root.transform, $"V{k}", Vector3.zero);
+                var m = Model($"{model}_{k}");
+                m.name = "Rubble";
+                m.transform.SetParent(variant.transform, false);
+                foreach (var r in m.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    r.sharedMaterial = n.StartsWith("Brick") ? brick : n.StartsWith("Mortar") ? mortar : n.StartsWith("Plaster") ? plaster : M("Metal");
+                }
+                // the plaster skin on both faces: the bare wall's material here, the room's wall finish once StyleDecor
+                // dresses it (its +Z looks out of the wall)
+                var skin = RuinSkin(w, height, 7919 * (k + 1) + (robotsOut ? 104729 : 0), $"{model}_skin_{k}");
+                for (int f = 0; f < 2; f++)
+                {
+                    var part = Child(variant.transform, f == 0 ? "SkinFront" : "SkinBack", new Vector3(0f, 0f, f == 0 ? -wall / 2f : wall / 2f));
+                    if (f == 0) part.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                    part.AddComponent<MeshFilter>().sharedMesh = skin;
+                    var r = part.AddComponent<MeshRenderer>();
+                    r.sharedMaterial = M("Wall");
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    frame.Skins[2 * k + f] = r;
+                }
+                frame.Variants[k] = variant;
+                variant.SetActive(k == 0);
             }
-            // the sides: the rim stands on the cut line and juts into the gap (+X); the right one turned round
-            float deep = LevelMetrics.WallThickness / RuinWall; // (a little proud of both faces of today's wall)
-            Piece("breach_rim", "EdgeLeft", new Vector3(-w / 2f, 0f, 0f), Quaternion.identity, new Vector3(1f, height / rimHeight, deep));
-            Piece("breach_rim", "EdgeRight", new Vector3(w / 2f, 0f, 0f), Quaternion.Euler(0f, 180f, 0f), new Vector3(1f, height / rimHeight, deep));
-            // the top: the same rim lying along the gap, jutting down
-            Piece("breach_rim", "EdgeTop", new Vector3(-w / 2f, height, 0f), Quaternion.Euler(0f, 0f, -90f), new Vector3(1f, w / rimHeight, deep));
-            // rubble at the foot, one pile on each face, against the jambs
-            float face = LevelMetrics.WallThickness / 2f + 0.22f;
-            Piece("rubble", "RubbleA", new Vector3(-w / 2f + 0.05f, 0f, face), Quaternion.Euler(0f, 20f, 0f), Vector3.one);
-            Piece("rubble", "RubbleB", new Vector3(w / 2f - 0.05f, 0f, -face), Quaternion.Euler(0f, 200f, 0f), Vector3.one * 0.85f);
             if (robotsOut)
             {
                 var block = root.AddComponent<NavMeshModifierVolume>();
@@ -441,6 +466,69 @@ namespace Stealth.EditorTools
                 block.area = 1; // Not Walkable
             }
             return root;
+        }
+
+        /// <summary>
+        /// The plaster left round a hole in a wall, on one face: a strip from the opening's straight edge (up one jamb, along
+        /// the head, down the other) into the gap to a torn line — a few centimetres here, nothing there — with the thickness
+        /// of the coat along the tear. In the face's own frame: x along the wall, y up, the face at z 0 looking along +Z.
+        /// </summary>
+        static Mesh RuinSkin(float width, float height, int seed, string asset)
+        {
+            const float step = 0.045f, coat = 0.014f;
+            var rng = new System.Random(seed);
+            float hw = width / 2f;
+            // the path round the opening and the way into the gap at every point of it
+            var path = new List<(Vector2 at, Vector2 into)>();
+            for (float y = 0f; y < height - 0.001f; y += step) path.Add((new Vector2(-hw, y), Vector2.right));
+            path.Add((new Vector2(-hw, height), new Vector2(1f, -1f).normalized));
+            for (float x = -hw + step; x < hw - 0.001f; x += step) path.Add((new Vector2(x, height), Vector2.down));
+            path.Add((new Vector2(hw, height), new Vector2(-1f, -1f).normalized));
+            for (float y = height - step; y > 0.001f; y -= step) path.Add((new Vector2(hw, y), Vector2.left));
+            path.Add((new Vector2(hw, 0f), Vector2.left));
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            void Tri(Vector3 a, Vector3 b, Vector3 c, Vector3 facing)
+            {
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), facing) < 0f) (b, c) = (c, b);
+                int n = verts.Count;
+                verts.Add(a); verts.Add(b); verts.Add(c);
+                tris.Add(n); tris.Add(n + 1); tris.Add(n + 2);
+            }
+            float depth = 0.02f, target = 0.03f;
+            Vector3 lastOuter = default, lastInner = default;
+            for (int i = 0; i < path.Count; i++)
+            {
+                // the tear wanders: stretches where the coat held, bites where it came away to the edge
+                if (rng.NextDouble() < 0.22) target = rng.NextDouble() < 0.3 ? 0.004f : 0.015f + (float)rng.NextDouble() * 0.06f;
+                depth = Mathf.Clamp(Mathf.Lerp(depth, target, 0.55f) + ((float)rng.NextDouble() - 0.5f) * 0.016f, 0.003f, 0.08f);
+                var (at, into) = path[i];
+                Vector3 outer = at, inner = at + into * depth;
+                if (i > 0)
+                {
+                    Tri(lastOuter, outer, inner, Vector3.forward);
+                    Tri(lastOuter, inner, lastInner, Vector3.forward);
+                    // the coat's thickness along the tear, looking into the gap
+                    var back = Vector3.back * coat;
+                    var gap = (Vector3)((path[i - 1].into + into) * 0.5f);
+                    Tri(lastInner, inner, inner + back, gap);
+                    Tri(lastInner, inner + back, lastInner + back, gap);
+                }
+                lastOuter = outer;
+                lastInner = inner;
+            }
+            var mesh = new Mesh { name = asset };
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            var uv = new List<Vector2>(verts.Count);
+            foreach (var v in verts) uv.Add(new Vector2(v.x, v.y));
+            mesh.SetUVs(0, uv);
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            mesh.RecalculateBounds();
+            EnsureFolder(Root + "/Art/Models/Level");
+            return SaveMesh(mesh, Root + $"/Art/Models/Level/{asset}.asset");
         }
 
         /// <summary>
@@ -532,30 +620,27 @@ namespace Stealth.EditorTools
             door.Blocker = DoorBlocker(root, 0f, 0f, w, h, 0.1f);
             // Lock lamps above the door on both sides: red while locked, green once hacked (hidden on doors without a lock).
             if (!sign)
-                door.LockLamps = new Renderer[]
-                {
-                    ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
-                    ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
-                };
+                door.LockLamps = OverDoorLamps(root, h);
             else
             {
                 var lamps = new List<Renderer>();
                 var pictures = new List<Renderer>();
                 float face = LevelMetrics.WallThickness / 2f;
+                var over = LevelBuilder.StorageSign; // between the door's trim and the ceiling
                 foreach (float side in new[] { 1f, -1f })
                 {
                     // the sign: a steel housing on the wall over the door, its whole face lit
-                    ChamferBox(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, h + 0.34f, side * (face + 0.035f)), new Vector3(1.1f, 0.32f, 0.07f), M("ShopSteel"));
+                    ChamferBox(root.transform, side > 0 ? "SignHousingA" : "SignHousingB", new Vector3(0f, over.Center.y, side * (face + 0.035f)), new Vector3(2f * over.HalfWidth, 2f * over.HalfHeight, 0.07f), M("ShopSteel"));
                     foreach (float end in new[] { -1f, 1f })
-                        lamps.Add(Cube(root.transform, $"SignLamp{(side > 0 ? "A" : "B")}{(end < 0f ? "L" : "R")}", new Vector3(end * 0.395f, h + 0.34f, side * (face + 0.072f)), new Vector3(0.2f, 0.2f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
+                        lamps.Add(Cube(root.transform, $"SignLamp{(side > 0 ? "A" : "B")}{(end < 0f ? "L" : "R")}", new Vector3(end * 0.395f, over.Center.y, side * (face + 0.072f)), new Vector3(0.2f, 0.17f, 0.012f), M("LockLamp"), false).GetComponent<Renderer>());
                     // between the lamps: the picture its terminal shows (the shut doorway and padlock, or the open one)
                     var picture = GameObject.CreatePrimitive(PrimitiveType.Quad);
                     picture.name = side > 0 ? "SignPictureA" : "SignPictureB";
                     Object.DestroyImmediate(picture.GetComponent<Collider>());
                     picture.transform.SetParent(root.transform, false);
-                    picture.transform.localPosition = new Vector3(0f, h + 0.34f, side * (face + 0.0745f));
+                    picture.transform.localPosition = new Vector3(0f, over.Center.y, side * (face + 0.0745f));
                     picture.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);
-                    picture.transform.localScale = new Vector3(0.448f, 0.28f, 1f);
+                    picture.transform.localScale = new Vector3(0.368f, 0.23f, 1f);
                     var pr = picture.GetComponent<MeshRenderer>();
                     pr.sharedMaterial = TerminalScreenMaterial();
                     pr.shadowCastingMode = ShadowCastingMode.Off;
@@ -1035,6 +1120,17 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
+        /// A lock lamp over a door on either face of its wall, on the head of the style's casing and proud of it (walls grew
+        /// from 20 to 30 cm: at the old depth the lamps were inside the lintel).
+        /// </summary>
+        static Renderer[] OverDoorLamps(GameObject root, float h)
+        {
+            const float proud = 0.07f; // past the casing's keystone and cornice (4-5 cm)
+            return new[] { 1f, -1f }.Select(side => ChamferBox(root.transform, side > 0f ? "LockLampA" : "LockLampB",
+                new Vector3(0f, h + 0.1f, side * (LevelMetrics.WallThickness / 2f + proud / 2f)), new Vector3(0.22f, 0.07f, proud), M("LockLamp")).GetComponent<Renderer>()).ToArray();
+        }
+
+        /// <summary>
         /// The locks every door has: lock lamps over it on both sides (red while locked, green once hacked; hidden on doors
         /// without a lock), a hasp with a padlock across the leaves' seam at <paramref name="seam"/> on both faces
         /// (<paramref name="front"/>, <paramref name="back"/>: the faces' z), and the key panels on the main leaf
@@ -1043,11 +1139,7 @@ namespace Stealth.EditorTools
         static void DoorLocks(GameObject root, AutoDoor door, float w, float h, float seam, float front, float back,
             Transform keyLeaf = null, Vector3 keyFront = default, Vector3 keyBack = default)
         {
-            door.LockLamps = new Renderer[]
-            {
-                ChamferBox(root.transform, "LockLampA", new Vector3(0, h + 0.1f, 0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
-                ChamferBox(root.transform, "LockLampB", new Vector3(0, h + 0.1f, -0.08f), new Vector3(0.22f, 0.07f, 0.03f), M("LockLamp")).GetComponent<Renderer>(),
-            };
+            door.LockLamps = OverDoorLamps(root, h);
             foreach (var lamp in door.LockLamps) lamp.shadowCastingMode = ShadowCastingMode.Off;
             door.Padlocks = new[] { 1f, -1f }.Select(side =>
             {
@@ -1240,6 +1332,8 @@ namespace Stealth.EditorTools
             var model = Model("exit_sign");
             model.transform.SetParent(root.transform, false);
             Paint(model, "PropAccent", "ExitSignMark", "ExitSign");
+            // made for a 20 cm wall (its faces 15 cm off the middle): out of today's, past the casing's cornice
+            model.transform.localScale = new Vector3(1f, 1f, (LevelMetrics.WallThickness / 2f + 0.08f) / 0.15f);
             NoShadows(model);
             // Shines down into the doorway (both rooms): nothing goes up to the floor above.
             var glow = Lamp(root.transform, "Glow", new Vector3(0f, -0.12f, 0f), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, new Color(0.35f, 1f, 0.5f), 0.35f, 2.6f);
@@ -1295,10 +1389,62 @@ namespace Stealth.EditorTools
             var model = Model(file);
             model.transform.SetParent(root.transform, false);
             Paint(model, body, accent, eye);
+            MachinePaint(model);
             if (collider)
                 foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true))
-                    mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    if (MachineMaterial(mf.name) is null or "MachinePrint") mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh; // (a keyboard, glass, a glow: nothing to bump into)
             return root;
+        }
+
+        /// <summary>The material of a part printed or shining through a picture of its own (Tools/Blender/machines.py, keyboard.py), by how its name begins; null: none of these.</summary>
+        static string MachineMaterial(string part) =>
+            part.StartsWith("Keys") ? "KeyCaps" : part.StartsWith("Print") ? "MachinePrint" : part.StartsWith("Glow") ? "MachineGlow"
+            : part.StartsWith("Lit") ? "MachineLit" : part.StartsWith("Pane") ? "MachinePane" : null;
+
+        static void MachinePaint(GameObject model)
+        {
+            foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var m = MachineMaterial(r.name);
+                if (m == null) continue;
+                r.sharedMaterial = M(m);
+                if (m is "MachinePane" or "MachineGlow") r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+        }
+
+        /// <summary>
+        /// A second model for the realistic style under a prop: the prop's own model shows in the other styles and in a house
+        /// furnished with models of its own (<see cref="Stealth.Level.StyleParts"/>). One box stops players and sight for both.
+        /// </summary>
+        static GameObject RealisticModel(GameObject go, string file, string body, string accent)
+        {
+            if (!HasModel(file)) return null;
+            var old = go.transform.GetChild(0).gameObject;
+            old.name = "Plain";
+            foreach (var c in old.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            var model = Model(file);
+            model.name = "Realistic";
+            model.transform.SetParent(go.transform, false);
+            Paint(model, body, accent, body);
+            MachinePaint(model);
+            bool first = true;
+            var bounds = new Bounds();
+            foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true))
+                foreach (var v in mf.sharedMesh.vertices)
+                {
+                    var p = go.transform.InverseTransformPoint(mf.transform.TransformPoint(v));
+                    if (first) { bounds = new Bounds(p, Vector3.zero); first = false; }
+                    else bounds.Encapsulate(p);
+                }
+            var box = go.AddComponent<BoxCollider>();
+            box.center = bounds.center;
+            box.size = bounds.size;
+            var parts = go.AddComponent<Stealth.Level.StyleParts>();
+            parts.Style = "S16_Derelict";
+            parts.NotWhereFurnished = true;
+            parts.Own = new[] { model };
+            parts.Default = new[] { old };
+            return model;
         }
     }
 }

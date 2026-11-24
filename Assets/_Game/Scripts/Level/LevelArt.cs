@@ -49,6 +49,10 @@ namespace Stealth.Level
         public CityMesh[] CityMeshes = new CityMesh[0];
         [Tooltip("The house's services (UtilityPlan): materials by UtilitySlot (drawn with CityPiece).")]
         public Material[] UtilityMaterials = new Material[0];
+        [Tooltip("The electrical panel on a corridor wall of every floor (UtilityPlan.PanelSpots; +Z out of the wall, its bottom's middle at the origin)")] public GameObject ElectricPanel;
+        [Tooltip("What differs from piece to piece (PropPictures), by PictureKind: whiteboards' writing, mirror glass, a projector's screen")] public Material[] Pictures = new Material[0];
+        [Tooltip("The mirrors' plain glass on the models: swapped for Pictures[Mirror] in a house")] public Material Mirror;
+        [Tooltip("The small displays of appliances and instruments: every picture on one texture (ScreenLooks.DisplayOf)")] public Material Displays;
         [Tooltip("The furniture's screens: the glowing material the models carry, then what it becomes in a house — off, static, cracked, no signal, the boot menu (ScreenLook's order; ScreenLooks).")]
         public Material[] Screens = new Material[0];
         [Tooltip("A plain steel door-and-a-half on hinges (the shop, the plant room, storerooms): a louvre at the bottom, a wired-glass slot")] public GameObject ShopDoor;

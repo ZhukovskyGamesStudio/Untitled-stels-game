@@ -54,6 +54,24 @@ namespace Stealth.EditorTools
                 g.transform.localScale = size;
                 g.GetComponent<Renderer>().sharedMaterial = m;
             }
+            // the walls and the ceiling of an office: quads with UVs in metres, as the game's finishes have them
+            var faces = new List<(MeshRenderer r, string kit, Color flat)>();
+            void Face(Vector3 at, Vector3 normal, float fw, float fh, string kit, Color flat)
+            {
+                var g = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                g.transform.SetPositionAndRotation(at, Quaternion.LookRotation(-normal));
+                g.transform.localScale = new Vector3(fw, fh, 1f);
+                var mesh = Object.Instantiate(g.GetComponent<MeshFilter>().sharedMesh);
+                mesh.uv = mesh.uv.Select(q => new Vector2(q.x * fw, q.y * fh)).ToArray();
+                g.GetComponent<MeshFilter>().sharedMesh = mesh;
+                faces.Add((g.GetComponent<MeshRenderer>(), kit, flat));
+            }
+            var beige = new Color(0.62f, 0.55f, 0.47f);
+            Face(new Vector3(0f, 1.375f, -2.94f), Vector3.forward, 7f, 2.75f, "Real_BeigeWall", beige);
+            Face(new Vector3(0f, 1.375f, 2.94f), Vector3.back, 7f, 2.75f, "Real_BeigeWall", beige);
+            Face(new Vector3(-3.44f, 1.375f, 0f), Vector3.right, 6f, 2.75f, "Real_BeigeWall", beige);
+            Face(new Vector3(3.44f, 1.375f, 0f), Vector3.left, 6f, 2.75f, "Real_BeigeWall", beige);
+            Face(new Vector3(0f, 2.75f, 0f), Vector3.down, 7f, 6f, "Real_CeilingTiles", new Color(0.48f, 0.43f, 0.4f));
             var wall = Lit(new Color(0.55f, 0.53f, 0.49f), 0.15f);
             Box(new Vector3(0f, -0.05f, 0f), new Vector3(7f, 0.1f, 6f), AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Data/Styles/Kit/Real_Laminate.mat"));
             Box(new Vector3(0f, 3.05f, 0f), new Vector3(7f, 0.1f, 6f), Lit(new Color(0.7f, 0.7f, 0.68f), 0.1f));
@@ -65,7 +83,7 @@ namespace Stealth.EditorTools
             foreach (float x in new[] { -1.6f, 1.6f })
                 foreach (float z in new[] { -1.2f, 1.4f })
                 {
-                    Box(new Vector3(x, 2.98f, z), new Vector3(1.2f, 0.04f, 0.3f), Lit(Color.white, 0.1f, warm * 2.5f));
+                    Box(new Vector3(x, 2.73f, z), new Vector3(1.2f, 0.04f, 0.3f), Lit(Color.white, 0.1f, warm * 2.5f));
                     var l = new GameObject("Lamp").AddComponent<Light>();
                     l.type = LightType.Spot;
                     l.spotAngle = 160f;
@@ -74,7 +92,7 @@ namespace Stealth.EditorTools
                     l.intensity = 8f;
                     l.color = warm;
                     l.shadows = LightShadows.Soft;
-                    l.transform.SetPositionAndRotation(new Vector3(x, 2.9f, z), Quaternion.Euler(90f, 0f, 0f));
+                    l.transform.SetPositionAndRotation(new Vector3(x, 2.65f, z), Quaternion.Euler(90f, 0f, 0f));
                 }
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.Add<Tonemapping>(true).mode.Override(TonemappingMode.Neutral);
@@ -83,6 +101,8 @@ namespace Stealth.EditorTools
             bloom.intensity.Override(style.Grade.BloomIntensity);
             bloom.threshold.Override(style.Grade.BloomThreshold);
             VisualStyles.Reflect(profile, style.Grade.Reflections);
+            // BOUNCE=0: without the bounced light, to set the two side by side
+            VisualStyles.Bounce(float.TryParse(System.Environment.GetEnvironmentVariable("BOUNCE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bounce) ? bounce : style.Grade.Bounce, style.Grade.BounceReach);
             var volume = new GameObject("Volume").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.sharedProfile = profile;
@@ -107,7 +127,8 @@ namespace Stealth.EditorTools
                     var go = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Props/{p}.prefab"), new Vector3(p.Length - 11f, 0f, -2.2f), Quaternion.identity);
                     foreach (var l in go.GetComponentsInChildren<Light>(true)) l.enabled = false;
                     SurfaceSheet.Dress(go, config, style, config.LookOf(HouseKind.Office), true);
-                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true)) if (r.name.StartsWith("Eye")) r.enabled = false;
+                    foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                        if (r.name.StartsWith("Eye") || r.sharedMaterial.IsKeywordEnabled("_EMISSION")) r.enabled = false; // (what glows of itself: a machine's lit front)
                 }
                 cam.transform.position = new Vector3(0f, 1.6f, 2f);
                 cam.transform.LookAt(new Vector3(0f, 1f, -2f));
@@ -146,6 +167,12 @@ namespace Stealth.EditorTools
                     Put("Lockers", -2.9f, -0.6f, 90f);
                     Put("SectionalSofa", -1.9f, 1.6f, 120f);
                     Put("TrashBin", 0.2f, -2.4f, 0f);
+                    Put("Cabinet", 2.4f, 2.5f, 180f);
+                    Put("WaterCooler", 1.4f, 2.6f, 180f);
+                    Put("SynthStand", -0.4f, 2.3f, 180f);
+                    Put("NoticeBoard", 0.3f, -2.91f, 0f);
+                    foreach (var (r, kit, flat) in faces) // (before: the old paint was one flat colour, like this)
+                        r.sharedMaterial = after ? AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Data/Styles/Kit/{kit}.mat") : Lit(flat, 0.35f);
                     var visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>("Assets/_Game/Data/ItemVisuals.asset");
                     void Item(int shape, float x, float y, float z, float yaw)
                     {
@@ -166,12 +193,41 @@ namespace Stealth.EditorTools
                         ("items", new Vector3(-0.85f, 1.2f, -0.35f), new Vector3(-0.9f, 0.8f, -0.9f), 50f),
                         ("lockers", new Vector3(-1.3f, 1.5f, 0.4f), new Vector3(-2.9f, 0.95f, -0.5f), 60f),
                         ("wall", new Vector3(1.0f, 1.5f, -0.9f), new Vector3(1.5f, 1.0f, -2.6f), 55f),
+                        ("corner", new Vector3(0.4f, 1.6f, 0.6f), new Vector3(2.6f, 1.2f, 2.9f), 65f),
+                        ("board", new Vector3(0.5f, 1.6f, -1.6f), new Vector3(0.3f, 1.5f, -2.9f), 55f),
+                        ("stand", new Vector3(0.3f, 1.5f, 1.2f), new Vector3(-0.4f, 0.75f, 2.4f), 50f),
+                        ("flash", new Vector3(1.2f, 1.6f, 0.9f), new Vector3(2.2f, 0.9f, 2.6f), 60f),
                     })
                     {
                         cam.transform.position = at;
                         cam.transform.LookAt(look);
                         cam.fieldOfView = fov;
+                        bool flash = view == "flash"; // the lamps off, the player's flashlight on
+                        var lamps = Object.FindObjectsByType<Light>().Where(l => l.name == "Lamp").ToList();
+                        foreach (var l in lamps) l.enabled = !flash;
+                        Light beam = null;
+                        if (flash)
+                        {
+                            beam = new GameObject("Beam").AddComponent<Light>();
+                            beam.type = LightType.Spot;
+                            beam.spotAngle = 55f;
+                            beam.innerSpotAngle = 16f;
+                            beam.range = 18f;
+                            beam.intensity = 8f;
+                            beam.color = new Color(1f, 0.93f, 0.8f);
+                            beam.shadows = LightShadows.Soft;
+                            beam.shadowBias = 0.03f;
+                            beam.shadowNormalBias = 0.2f;
+                            var data = beam.gameObject.AddComponent<UniversalAdditionalLightData>();
+                            var so = new SerializedObject(data);
+                            so.FindProperty("m_UsePipelineSettings").boolValue = false;
+                            so.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue = after ? 2 : 1;
+                            so.ApplyModifiedPropertiesWithoutUndo();
+                            beam.transform.SetPositionAndRotation(cam.transform.TransformPoint(0.15f, -0.19f, 0.48f), cam.transform.rotation);
+                        }
                         for (int i = 0; i < 4; i++) cam.Render();
+                        if (beam != null) Object.DestroyImmediate(beam.gameObject);
+                        foreach (var l in lamps) l.enabled = true;
                         RenderTexture.active = rt;
                         tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
                         tex.Apply();

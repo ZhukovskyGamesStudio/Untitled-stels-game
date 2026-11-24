@@ -326,7 +326,92 @@ def pages():
     img.rotate(90).save(os.path.join(OUT, "pages_flat.png"), optimize=True)
 
 
+def sheets():
+    """What is pinned to a notice board (3 x 2 cells of 256 x 341, each drawn in its sheet's own shape): a safety poster, a duty
+    rota, a memo, a price list of the canteen, a lost-and-found slip, a phone list."""
+    INK, RED, BLUE = (34, 36, 40), (176, 36, 28), (40, 70, 130)
+
+    def blank(w, h, c=(238, 236, 228)):
+        img = Image.new("RGB", (w * K, h * K), c)
+        return img, ImageDraw.Draw(img)
+
+    def scribble(d, x, y, w, rows, gap, seed, c=INK):
+        r = np.random.default_rng(seed)
+        for i in range(rows):
+            cx, end = x, x + w * (0.55 + 0.45 * r.random())
+            while cx < end:
+                n = 4 + r.random() * 16
+                rect(d, cx, y + i * gap, min(cx + n, end), y + i * gap + gap * 0.3, fill=c)
+                cx += n + 3
+
+    def poster():
+        img, d = blank(300, 400, (232, 214, 60))
+        rect(d, 12, 12, 288, 388, outline=INK, width=5)
+        poly(d, [(150, 40), (246, 200), (54, 200)], fill=INK)
+        poly(d, [(150, 66), (224, 188), (76, 188)], fill=(232, 214, 60))
+        rect(d, 143, 104, 157, 156, fill=INK)
+        oval(d, 142, 162, 158, 178, fill=INK)
+        text(d, (150, 222), "LOOK UP", fit(d, "LOOK UP", "impact.ttf", 250, 64), INK, "ma")
+        text(d, (150, 290), "SERVICE ROBOTS AT WORK", fit(d, "SERVICE ROBOTS AT WORK", "arialbd.ttf", 250, 22), INK, "ma")
+        scribble(d, 40, 328, 220, 3, 14, 3)
+        return img
+
+    def rota():
+        img, d = blank(210, 280)
+        text(d, (12, 10), "DUTY ROTA", font("arialbd.ttf", 20), INK)
+        r = np.random.default_rng(8)
+        for c in range(6):
+            line(d, [(12 + c * 37, 44), (12 + c * 37, 264)], INK, 1)
+        for q in range(9):
+            line(d, [(12, 44 + q * 27.5), (197, 44 + q * 27.5)], INK, 1)
+        for q in range(1, 8):
+            for c in range(5):
+                if r.random() < 0.62:
+                    rect(d, 16 + c * 37, 50 + q * 27.5, 16 + c * 37 + 10 + r.random() * 18, 60 + q * 27.5, fill=(BLUE if r.random() < 0.3 else (90, 92, 96)))
+        return img
+
+    def memo():
+        img, d = blank(250, 180)
+        text(d, (12, 10), "To all floors", font("georgiab.ttf", 19), INK)
+        scribble(d, 12, 46, 226, 7, 15, 5)
+        d.line([(150 * K, 160 * K), (168 * K, 148 * K), (180 * K, 166 * K), (204 * K, 150 * K), (226 * K, 160 * K)], fill=BLUE, width=2 * K)
+        return img
+
+    def prices():
+        img, d = blank(210, 300, (236, 224, 206))
+        rect(d, 0, 0, 210, 48, fill=(120, 44, 34))
+        text(d, (105, 8), "CANTEEN", font("bahnschrift.ttf", 28), (244, 236, 220), "ma")
+        for i, (a, b) in enumerate((("Soup", "1.20"), ("Pasta", "2.80"), ("Stew", "3.10"), ("Salad", "2.20"), ("Tea", "0.60"), ("Coffee", "0.90"), ("Bun", "0.70"))):
+            text(d, (16, 64 + i * 32), a, font("georgia.ttf", 19), INK)
+            text(d, (194, 64 + i * 32), b, font("georgia.ttf", 19), RED, "ra")
+        return img
+
+    def slip():
+        img, d = blank(160, 160, (244, 224, 120))
+        text(d, (80, 12), "FOUND", font("comicbd.ttf" if os.path.exists(FONTS + "comicbd.ttf") else "arialbd.ttf", 28), RED, "ma")
+        text(d, (80, 56), "one blue glove", font("georgiai.ttf", 17), INK, "ma")
+        text(d, (80, 80), "ask at the desk", font("georgiai.ttf", 17), INK, "ma")
+        scribble(d, 24, 118, 112, 2, 14, 9, BLUE)
+        return img
+
+    def phones():
+        img, d = blank(180, 120)
+        text(d, (10, 6), "IN CASE OF FIRE", font("arialbd.ttf", 15), RED)
+        for i, a in enumerate(("Desk  100", "Guard  104", "Doctor  112")):
+            text(d, (10, 34 + i * 26), a, font("consola.ttf", 19), INK)
+        return img
+
+    atlas = Image.new("RGB", (3 * 256, 2 * 341))
+    for i, f in enumerate((poster, rota, memo, prices, slip, phones)):
+        atlas.paste(grain(f().resize((256, 341), Image.LANCZOS), 60 + i, 2.2), (i % 3 * 256, i // 3 * 341))
+    atlas.save(os.path.join(OUT, "sheets.png"), optimize=True)
+
+
 if __name__ == "__main__":
+    if len(__import__("sys").argv) > 1:                  # just these (sheets)
+        for name in __import__("sys").argv[1:]:
+            globals()[name]()
+        raise SystemExit
     os.makedirs(OUT, exist_ok=True)
     printed()
     spines()

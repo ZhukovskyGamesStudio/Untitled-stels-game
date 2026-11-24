@@ -130,7 +130,7 @@ namespace Stealth.Tests
                         foreach (var grate in net.Grates)
                         {
                             var h = new Rect(grate.Cell.x * VentPlan.Res, grate.Cell.y * VentPlan.Res, VentPlan.Res, VentPlan.Res);
-                            shell.CeilingHoles.Add(h);
+                            shell.CeilingHoles.Add(new CeilingHole { Floor = net.Floor, Area = h });
                             holes.Add((new Rect(h.x + 0.02f, h.y + 0.02f, h.width - 0.04f, h.height - 0.04f), grate.Position.y));
                         }
                     foreach (var piece in ArchitecturePlanner.Plan(shell, l, g))

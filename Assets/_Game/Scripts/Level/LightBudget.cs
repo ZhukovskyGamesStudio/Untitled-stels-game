@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Stealth.Player;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace Stealth.Level
 {
@@ -37,6 +38,11 @@ namespace Stealth.Level
             float map = range >= 4f ? 0.25f : 0.0625f;
             return type == LightType.Point ? 6f * map : map;
         }
+
+        /// <summary>The same for a light whose own shadow map is bigger than its kind's (the local player's flashlight: a whole 1024² one).</summary>
+        static float CostOf(Light l) =>
+            l.type != LightType.Point && l.TryGetComponent<UniversalAdditionalLightData>(out var data) && !data.usePipelineSettings
+            && data.additionalLightsShadowResolutionTier == UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierHigh ? 1f : Cost(l.type, l.range);
 
         /// <summary>Which lights to draw, nearest first, while they fit the budget (pure).</summary>
         public static void Choose(IReadOnlyList<float> costsNearestFirst, float budget, bool[] into)
@@ -99,7 +105,7 @@ namespace Stealth.Level
             foreach (var l in FindObjectsByType<Light>())
             {
                 if (l.type == LightType.Directional || l.shadows == LightShadows.None || known.Contains(l)) continue;
-                m_Lights.Add(new Entry { Light = l, Shadows = l.shadows, Mask = l.cullingMask, Cost = Cost(l.type, l.range) });
+                m_Lights.Add(new Entry { Light = l, Shadows = l.shadows, Mask = l.cullingMask, Cost = CostOf(l) });
             }
         }
     }

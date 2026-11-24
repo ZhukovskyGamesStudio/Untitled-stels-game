@@ -305,6 +305,13 @@ namespace Stealth.Player
             if (Flashlight.enabled != on) Flashlight.enabled = on;
             if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, 0f, 0f); // the head of a remote player does not pitch
             if (!on) return;
+            if (IsOwner && !m_FlashSharp)
+            {
+                // one's own beam: its shadows are right before the eyes (4 mm steps of a 512² map showed on every cabinet)
+                m_FlashSharp = true;
+                if (Flashlight.TryGetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalLightData>(out var data))
+                    data.additionalLightsShadowResolutionTier = UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierHigh;
+            }
             // close to a surface the lamp dims (no white blown-out spot): the nearest thing in front that is not this player
             if (m_FlashBase < 0f)
             {
@@ -322,6 +329,7 @@ namespace Stealth.Player
 
         Quaternion? m_HeldMapRot;              // the held map's pose as built (a remote holder's pitch is added to it)
         const float FlashNear = 1.6f;          // closer than this the flashlight dims (metres)
+        bool m_FlashSharp;
         float m_FlashBase = -1f;               // its intensity as built
         static readonly RaycastHit[] s_FlashHits = new RaycastHit[8];
     }

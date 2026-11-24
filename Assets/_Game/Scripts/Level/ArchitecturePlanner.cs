@@ -11,6 +11,10 @@ namespace Stealth.Level
         FloorFinish, WallFinish, CeilingFinish,
         /// <summary>Decals: a quad with one of the style's decay / poster materials (<see cref="DecorPiece.Variant"/>).</summary>
         FloorDecal, WallDecal, Poster,
+        /// <summary>Where the pipes along a wall turn up into the ceiling (before a lamp or a panel over a door).</summary>
+        PipeBend,
+        /// <summary>Something hung on a wall for the look of it: <see cref="DecorPiece.Variant"/> is its <see cref="WallThing"/> (<see cref="StyleKit.Things"/>).</summary>
+        WallThing,
     }
 
     /// <summary>One piece to place: a kit prefab (or a finish quad) and its transform; finishes carry their size in metres.</summary>
@@ -56,6 +60,7 @@ namespace Stealth.Level
             foreach (var face in shell.Walls)
                 if (InVault(face, layout)) PlanVaultFace(list, face);
                 else PlanFace(list, face, shell, g, LookOf(face, layout, g));
+            PlanPosts(list, shell, g, layout);
             foreach (var o in shell.Openings) PlanOpening(list, o, g, layout);
             if (g.Wall != null || (g.RoomLooks != null && g.RoomLooks.Length > 0))
                 foreach (var o in shell.Openings) PlanReveals(list, o, g, layout);
@@ -63,6 +68,7 @@ namespace Stealth.Level
             if (g.CeilingFinish != null && layout != null) PlanCeilingFinish(list, shell, layout);
             if (layout != null) PlanRoomCeilings(list, shell, layout, g);
             if (layout != null) PlanThresholds(list, shell, layout, g);
+            if (layout != null && g.ThingChance > 0f) PlanThings(list, shell, layout, g);
             // (rooms with a floor of their own get it even where the style keeps the bare slab: the shop's epoxy, Data/Styles/Houses/Garage)
             if (layout != null && (layout.VaultRoom >= 0 || g.RoomFloors != null && g.RoomFloors.Length > 0)) PlanFloors(list, shell, layout, g);
             else if (g.Floor != null)
@@ -192,13 +198,16 @@ namespace Stealth.Level
         {
             if (g.RoomLooks == null || g.RoomLooks.Length == 0) return -1;
             var room = RoomOf(f, layout);
-            return room != null ? g.RoomLookOf(room.Type) : -1;
+            return room != null ? g.RoomLookOf(room.Type, LookPick(room, layout)) : -1;
         }
 
+        /// <summary>Which of a room type's several looks this very room wears (<see cref="StyleGeometry.RoomLookOf"/>): from the house seed.</summary>
+        public static int LookPick(PlanRoom room, LevelLayout layout) => layout != null && room != null ? LevelRandom.Mix(layout.Seed, Salt.RoomLooks, room.Id) & 0x7FFFFFFF : 0;
+
         /// <summary>The look of a room type with a ceiling of its own, or −1.</summary>
-        static int CeilingLookOf(PlanRoom room, StyleGeometry g)
+        static int CeilingLookOf(PlanRoom room, StyleGeometry g, LevelLayout layout)
         {
-            int k = g != null ? g.RoomLookOf(room.Type) : -1;
+            int k = g != null ? g.RoomLookOf(room.Type, LookPick(room, layout)) : -1;
             return k >= 0 && g.RoomLooks[k].Ceiling != null && room.Levels == 1 ? k : -1;
         }
 
@@ -208,12 +217,14 @@ namespace Stealth.Level
             if (g.RoomLooks == null || g.RoomLooks.Length == 0) return;
             foreach (var room in l.Rooms)
             {
-                int k = CeilingLookOf(room, g);
+                int k = CeilingLookOf(room, g, l);
                 if (k < 0) continue;
                 float y = LevelLayout.FloorY(room.Floor + room.Levels - 1) + LevelMetrics.WallHeight - 0.014f; // (a hall's: on its top storey)
                 // (round the duct grates' holes: a grate under a ceiling of tiles was a lid hanging from a ceiling with no way up)
-                foreach (var whole in CeilingRects(l, room))
-                    foreach (var (a, b) in CutHoles(whole.min, whole.max, shell.CeilingHoles))
+                var holes = shell.HolesOver(room.Floor);
+                foreach (var s in l.Stairs) if (s.Floor == room.Floor) holes.Add(PlanGenerator.HoleOf(s));
+                foreach (var whole in CeilingAreas(l, room))
+                    foreach (var (a, b) in CutHoles(whole.min, whole.max, holes))
                     {
                         var r = Rect.MinMaxRect(a.x, a.y, b.x, b.y);
                         list.Add(new DecorPiece
@@ -226,6 +237,74 @@ namespace Stealth.Level
                         });
                     }
             }
+        }
+
+        /// <summary>
+        /// The whole ceiling of a room as rectangles (pure): its cells and those of its pockets behind slanted and round
+        /// walls — the wall cuts them at an angle, and the half on the room's side is its ceiling too. (The trays' rectangles,
+        /// <see cref="CeilingRects"/>, leave the narrow parts and the pockets out: the style's plaster showed there.)
+        /// </summary>
+        public static List<Rect> CeilingAreas(LevelLayout l, PlanRoom room)
+        {
+            var plan = l.Plan;
+            const int margin = 2;
+            int x0 = Mathf.FloorToInt(room.Bounds.xMin / HousePlan.Res) - margin, z0 = Mathf.FloorToInt(room.Bounds.yMin / HousePlan.Res) - margin;
+            int nx = Mathf.RoundToInt(room.Bounds.width / HousePlan.Res) + 2 * margin, nz = Mathf.RoundToInt(room.Bounds.height / HousePlan.Res) + 2 * margin;
+            bool Ours(int x, int z) => plan.KindAt(room.Floor, x0 + x, z0 + z) is CellKind.Room or CellKind.Pocket && plan.IdAt(room.Floor, x0 + x, z0 + z) == room.Id;
+            var list = new List<Rect>();
+            foreach (var r in LevelBuilder.Rectangles(nx, nz, Ours))
+                list.Add(new Rect((x0 + r.x) * HousePlan.Res, (z0 + r.y) * HousePlan.Res, r.width * HousePlan.Res, r.height * HousePlan.Res));
+            return list;
+        }
+
+        /// <summary>
+        /// The walls' posts where no wall's finish covers them: the room's finish, its tiles, the skirting on the rest of each
+        /// face (a pale bare strip stood at both ends of every angled wall).
+        /// </summary>
+        static void PlanPosts(List<DecorPiece> list, LevelShell shell, StyleGeometry g, LevelLayout layout)
+        {
+            if (layout == null || layout.Plan == null) return;
+            var none = new List<(float, float)>();
+            foreach (var post in shell.Posts)
+            {
+                var room = RoomOf(post, layout);
+                if (room == null) continue;
+                bool vault = room.Id == layout.VaultRoom;
+                int k = vault ? -1 : g.RoomLooks != null && g.RoomLooks.Length > 0 ? g.RoomLookOf(room.Type, LookPick(room, layout)) : -1;
+                foreach (var (a, b) in Around(0f, post.Length, Covered(post, shell)))
+                {
+                    if (vault) { PlanWallFinish(list, post, a, b, none, true); continue; }
+                    var look = k >= 0 ? g.RoomLooks[k] : default;
+                    bool tiled = k >= 0 && look.Lower != null;
+                    if (g.Baseboard && !tiled)
+                        list.Add(new DecorPiece { Kind = DecorKind.Baseboard, Position = post.At((a + b) / 2f), Rotation = Quaternion.LookRotation(post.Normal), Scale = new Vector3(b - a, 1f, 1f) });
+                    int upper = k >= 0 && look.Wall != null ? 1 + 2 * k : g.Wall != null ? 0 : -1;
+                    float split = tiled ? look.LowerHeight : 0f;
+                    if (tiled) PlanWallFinish(list, post, a, b, none, false, 0f, Mathf.Min(post.Y1, split), 2 + 2 * k);
+                    if (upper >= 0 && post.Y1 > split) PlanWallFinish(list, post, a, b, none, false, split, post.Y1, upper);
+                }
+            }
+        }
+
+        /// <summary>The stretches of a post's face that the walls in the same plane dress already (metres from its A).</summary>
+        static List<(float, float)> Covered(WallFace post, LevelShell shell)
+        {
+            var spans = new List<(float, float)>();
+            var dir = post.Along;
+            foreach (var f in shell.Walls)
+            {
+                if (f.Floor != post.Floor || f.Y0 > 0.001f || f.Y1 < LevelMetrics.WallHeight - 0.05f) continue;
+                if (Vector3.Dot(f.Normal, post.Normal) < 0.999f) continue;
+                var d = new Vector3(f.A.x - post.A.x, 0f, f.A.z - post.A.z);
+                if (Mathf.Abs(Vector3.Dot(d, post.Normal)) > 0.02f) continue; // another plane
+                var (u0, u1) = Reach(f);
+                var a = f.A + f.Along * u0 - post.A;
+                var b = f.A + f.Along * u1 - post.A;
+                float p = Vector3.Dot(a, dir), q = Vector3.Dot(b, dir);
+                if (p > q) (p, q) = (q, p);
+                if (q > -0.01f && p < post.Length + 0.01f) spans.Add((p, q));
+            }
+            return spans;
         }
 
         /// <summary>The face looks into the bank vault (<see cref="LevelLayout.VaultRoom"/>).</summary>
@@ -259,6 +338,7 @@ namespace Stealth.Level
             if ((g.DecayDensity <= 0f || nf + nw == 0) && (g.PosterChance <= 0f || np == 0)) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Decor, 0));
             int layer = 0;
+            List<(int floor, Rect area)> mounted = null;
             float Lift() => 0.002f * (layer++ % 6);              // overlapping decals never fight for the same depth
 
             if (nf > 0 && g.DecayDensity > 0f)
@@ -284,7 +364,9 @@ namespace Stealth.Level
 
             foreach (var f in shell.Walls)
             {
-                if (f.Y0 > 0.001f || f.Length < 1.2f || InVault(f, layout)) continue; // full-height faces only; the vault is clean steel
+                // full-height faces only (the wall under an inner window or a crawl way stands on the floor too: a poster hung in
+                // the opening over it); the vault is clean steel
+                if (f.Y0 > 0.001f || f.Y1 < LevelMetrics.WallHeight - 0.05f || f.Length < 1.2f || InVault(f, layout)) continue;
                 var holes = WindowHoles(f, shell);
                 var rot = Quaternion.LookRotation(-f.Normal);
                 if (nw > 0 && g.DecayDensity > 0f)
@@ -311,14 +393,98 @@ namespace Stealth.Level
                 {
                     float u = rng.Range(0.6f, f.Length - 0.6f);
                     if (Inside(holes, u, 0.4f)) continue;
-                    list.Add(new DecorPiece
+                    var poster = new DecorPiece
                     {
                         Kind = DecorKind.Poster, Variant = rng.Next(np),
                         Rotation = rot * Quaternion.Euler(0f, 0f, rng.Range(-4f, 4f)),
                         Position = f.At(u) + f.Normal * 0.03f + Vector3.up * rng.Range(1.5f, 1.65f), Scale = new Vector3(0.75f, 1.06f, 1f),
-                    });
+                    };
+                    mounted ??= Mounted(shell, layout);
+                    if (!CoversMounted(poster, f, mounted)) list.Add(poster);
                 }
             }
+        }
+
+        // ------------------------------------------------------------------ things hung on the walls
+
+        /// <summary>
+        /// What people hang on their walls (<see cref="WallThings"/>: prints, certificates, calendars, signs, a thermostat, a
+        /// grille by the floor), by whose house it is and what the room is for; from the house seed. Only on walls from the
+        /// floor to the ceiling, clear of windows, of the ends of the wall (door frames, corners), of what is mounted or
+        /// stands tall there, of posters and of each other, and above a tiled or panelled band.
+        /// </summary>
+        static void PlanThings(List<DecorPiece> list, LevelShell shell, LevelLayout layout, StyleGeometry g)
+        {
+            var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.WallThings, 0));
+            var mounted = Mounted(shell, layout);
+            var low = new List<(int, Rect)>();                 // anything standing there hides a grille by the floor
+            foreach (var p in shell.Props) low.Add((p.Floor, p.Area));
+            var posters = new List<DecorPiece>();
+            foreach (var p in list) if (p.Kind == DecorKind.Poster) posters.Add(p);
+            foreach (var f in shell.Walls)
+            {
+                if (f.Y0 > 0.001f || f.Y1 < LevelMetrics.WallHeight - 0.05f || f.Length < 1.4f || InVault(f, layout)) continue;
+                var room = RoomOf(f, layout);
+                if (room == null) continue;
+                var choice = WallThings.For(layout.PlanKind, room.Type);
+                int n = choice.Length == 0 ? 0 : Count(rng, g.ThingChance * f.Length / 4f);
+                if (n == 0) continue;
+                int k = g.RoomLooks != null && g.RoomLooks.Length > 0 ? g.RoomLookOf(room.Type, LookPick(room, layout)) : -1;
+                float band = k >= 0 && g.RoomLooks[k].Lower != null ? g.RoomLooks[k].LowerHeight : 0f;
+                var holes = WindowHoles(f, shell);
+                var taken = new List<(float a, float b)>();
+                for (int i = 0; i < n; i++)
+                {
+                    var thing = choice[rng.Next(choice.Length)];
+                    var size = WallThings.Size(thing);
+                    float half = size.x / 2f, yc = WallThings.Height(thing);
+                    float margin = half + 0.4f;
+                    if (f.Length < 2f * margin + 0.05f) continue;
+                    float u = rng.Range(margin, f.Length - margin);
+                    bool floorLevel = yc < 1f;
+                    // on the band or above it, never across its top edge (a rail runs there)
+                    if (band > 0f && yc - size.y / 2f < band + 0.08f && yc + size.y / 2f > band - 0.08f) continue;
+                    if (Inside(holes, u, half + 0.1f) || Inside(taken, u, half + 0.25f)) continue;
+                    var piece = new DecorPiece
+                    {
+                        Kind = DecorKind.WallThing, Variant = (int)thing, Rotation = Quaternion.LookRotation(f.Normal),
+                        Position = f.At(u) + f.Normal * 0.008f + Vector3.up * yc, Scale = new Vector3(size.x, size.y, 1f),
+                    };
+                    if (CoversMounted(piece, f, floorLevel ? low : mounted)) continue;
+                    bool onPoster = false;
+                    foreach (var p in posters)
+                        if (Mathf.Abs(p.Position.y - piece.Position.y) < 1.2f && Vector3.Dot(p.Rotation * Vector3.forward, f.Normal) < -0.9f &&
+                            (new Vector2(p.Position.x, p.Position.z) - new Vector2(piece.Position.x, piece.Position.z)).magnitude < half + 0.6f) onPoster = true;
+                    if (onPoster) continue;
+                    taken.Add((u - half, u + half));
+                    piece.Scale = Vector3.one;                 // (the size above was for the checks: the model has its own)
+                    list.Add(piece);
+                }
+            }
+        }
+
+        /// <summary>What hangs on the walls or stands tall against them, as floor plan rectangles: no poster under or behind it.</summary>
+        static List<(int floor, Rect area)> Mounted(LevelShell shell, LevelLayout layout)
+        {
+            var list = new List<(int, Rect)>();
+            foreach (var p in shell.Props)
+                if (Furnisher.OnWall.Contains(p.Kind) || Furnisher.Tall.Contains(p.Kind)) list.Add((p.Floor, p.Area));
+            void Spot(Vector3 at, float half) => list.Add((LevelLayout.FloorOf(at.y), new Rect(at.x - half, at.z - half, 2f * half, 2f * half)));
+            foreach (var s in UtilityPlan.SwitchSpots(layout, shell)) Spot(s.Position, 0.08f);
+            foreach (var (at, _) in UtilityPlan.PanelSpots(layout, shell)) Spot(at, 0.36f);
+            return list;
+        }
+
+        static bool CoversMounted(DecorPiece p, WallFace f, List<(int floor, Rect area)> mounted)
+        {
+            // the strip of floor in front of the poster, half a metre out of the wall
+            float half = p.Scale.x / 2f;
+            var a = p.Position - f.Along * half - f.Normal * 0.05f;
+            var b = p.Position + f.Along * half + f.Normal * 0.45f;
+            var strip = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.z, b.z), Mathf.Max(a.x, b.x), Mathf.Max(a.z, b.z));
+            foreach (var (floor, area) in mounted)
+                if (floor == f.Floor && area.Overlaps(strip)) return true;
+            return false;
         }
 
         /// <summary>Whole decals for an expected count (the fraction is a chance of one more).</summary>
@@ -337,14 +503,20 @@ namespace Stealth.Level
 
         // ------------------------------------------------------------------ walls
 
+        /// <summary>
+        /// From where to where a face's decoration runs along it: into the room's corners, past the corner post on that side;
+        /// at the joint of a bent wall exactly to the joint. A post in the middle of a straight wall is shared with the face
+        /// that runs on behind it: half each.
+        /// </summary>
+        static (float, float) Reach(WallFace f) =>
+            (f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f,
+             f.Length + (f.CornerB ? (f.StraightB ? T / 2f : T) : f.JointB ? T / 2f : 0f));
+
         static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g, int lookIndex = -1)
         {
             var look = lookIndex >= 0 ? g.RoomLooks[lookIndex] : default;
             bool plain = lookIndex >= 0 && look.Plain, tiled = lookIndex >= 0 && look.Lower != null;
-            // Reach into the room's corners: past the corner post on that side; at the joint of a bent wall exactly to the joint.
-            // A post in the middle of a straight wall is shared with the face that runs on behind it: half each.
-            float u0 = f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f;
-            float u1 = f.Length + (f.CornerB ? (f.StraightB ? T / 2f : T) : f.JointB ? T / 2f : 0f);
+            var (u0, u1) = Reach(f);
             float len = u1 - u0;
             if (len < 0.05f) return;
             var rot = Quaternion.LookRotation(f.Normal);
@@ -382,9 +554,18 @@ namespace Stealth.Level
                 }
             if (g.Pipes && f.Y0 < 2.5f && toTop)
             {
-                Run(DecorKind.Pipes, 0f, u0, u1);
-                for (float u = u0 + 0.6f; u < u1 - 0.4f; u += 1.5f)
-                    list.Add(new DecorPiece { Kind = DecorKind.PipeClamp, Position = At(u, 0f), Rotation = rot, Scale = Vector3.one });
+                // before a lamp or a panel over a doorway they turn up into the ceiling, and come down past it
+                foreach (var (a, b) in Around(u0, u1, SignSpans(f, shell)))
+                {
+                    bool bendA = a > u0 + 0.01f, bendB = b < u1 - 0.01f;
+                    Run(DecorKind.Pipes, 0f, a, b);
+                    for (float u = a + (bendA ? 0.3f : 0.6f); u < b - 0.2f; u += 1.5f)
+                        list.Add(new DecorPiece { Kind = DecorKind.PipeClamp, Position = At(u, 0f), Rotation = rot, Scale = Vector3.one });
+                    // (the kit's bend ends a run towards +X; turned to the other end it is mirrored. The face's own +X may run against A → B.)
+                    float way = Vector3.Dot(rot * Vector3.right, f.Along) > 0f ? 1f : -1f;
+                    if (bendB) list.Add(new DecorPiece { Kind = DecorKind.PipeBend, Position = At(b, 0f), Rotation = rot, Scale = new Vector3(way, 1f, 1f) });
+                    if (bendA) list.Add(new DecorPiece { Kind = DecorKind.PipeBend, Position = At(a, 0f), Rotation = rot, Scale = new Vector3(-way, 1f, 1f) });
+                }
             }
             if (fullHeight && toTop && g.StripSpacing > 0f)
             {
@@ -429,6 +610,8 @@ namespace Stealth.Level
 
         /// <summary>A pilaster's centre from the opening's edge, and half its base's width (kit_pilaster).</summary>
         const float PilasterOffset = 0.3f, PilasterHalfWidth = 0.23f;
+        /// <summary>The height kit_pilaster is modelled at (style_kit.py), metres.</summary>
+        const float PilasterHeight = 3f;
         /// <summary>The cornice hangs this far under the ceiling (kit_crown): pilasters stop under it.</summary>
         public const float CrownDrop = 0.23f;
 
@@ -449,6 +632,24 @@ namespace Stealth.Level
                 float u = Vector3.Dot(d, dir), half = o.Width / 2f + reach;
                 if (u + half < -T || u - half > f.Length + T) continue;
                 spans.Add((u - half, u + half));
+            }
+            return spans;
+        }
+
+        /// <summary>How far the pipes keep off what is mounted over a doorway (their bends' radius and a hand's width).</summary>
+        public const float SignClear = 0.2f;
+
+        /// <summary>Along-wall spans of this face under what is mounted over its doorways (<see cref="LevelShell.Signs"/>).</summary>
+        static List<(float, float)> SignSpans(WallFace f, LevelShell shell)
+        {
+            var spans = new List<(float, float)>();
+            foreach (var s in shell.Signs)
+            {
+                if (s.Floor != f.Floor || Mathf.Abs(Vector3.Dot(s.Along, f.Along)) < 0.99f) continue;
+                var d = new Vector3(s.Center.x - f.A.x, 0f, s.Center.z - f.A.z);
+                if (Mathf.Abs(Vector3.Dot(d, f.Normal)) > 0.05f) continue; // another wall
+                float u = Vector3.Dot(d, f.Along), half = s.HalfWidth + SignClear;
+                if (u + half > -T && u - half < f.Length + T) spans.Add((u - half, u + half));
             }
             return spans;
         }
@@ -544,7 +745,7 @@ namespace Stealth.Level
             if (layout != null && layout.Plan != null && g.RoomLooks != null && g.RoomLooks.Length > 0)
             {
                 var room = layout.Plan.RoomAt(at + into * 0.5f + Vector3.up * 0.5f);
-                if (room != null) k = g.RoomLookOf(room.Type);
+                if (room != null) k = g.RoomLookOf(room.Type, LookPick(room, layout));
             }
             if (k < 0) return (g.Wall != null ? 0 : -1, -1, 0f);
             var look = g.RoomLooks[k];
@@ -577,7 +778,7 @@ namespace Stealth.Level
                             {
                                 // full height, or up to the cornice that then runs over its capital
                                 Kind = DecorKind.Pilaster, Position = at + o.Along * (s * (o.Width / 2f + PilasterOffset)), Rotation = rot,
-                                Scale = new Vector3(1f, g.Crown ? (LevelMetrics.WallHeight - CrownDrop) / LevelMetrics.WallHeight : 1f, 1f),
+                                Scale = new Vector3(1f, (g.Crown ? LevelMetrics.WallHeight - CrownDrop : LevelMetrics.WallHeight) / PilasterHeight, 1f),
                             });
                         break;
                 }
@@ -643,7 +844,7 @@ namespace Stealth.Level
             var alongX = Quaternion.LookRotation(Vector3.forward); // local X → world X
             foreach (var room in l.Rooms)
             {
-                if (CeilingLookOf(room, g) >= 0) continue; // a ceiling of its own: nothing hangs under it
+                if (CeilingLookOf(room, g, l) >= 0) continue; // a ceiling of its own: nothing hangs under it
                 var lamps = LevelBuilder.LightSpots(l, room);
                 lamps.AddRange(GratesOf(l, room)); // and of the duct grates (a tray over a grate shut the way up)
                 // a beam along z at x (or along x at z) keeps clear of the lamps it passes; shifted aside or left out
@@ -744,17 +945,17 @@ namespace Stealth.Level
                 });
             }
             // (the ceilings have holes where the duct grates are: the finish goes round them)
-            void Holed(Vector2 min, Vector2 max, float y)
+            void Holed(Vector2 min, Vector2 max, float y, int floor)
             {
-                foreach (var (a, b) in CutHoles(min, max, shell.CeilingHoles)) Quad(a, b, y);
+                foreach (var (a, b) in CutHoles(min, max, shell.HolesOver(floor))) Quad(a, b, y);
             }
             foreach (var r in shell.Floors)
-                if (r.Floor >= 1) Holed(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness);
+                if (r.Floor >= 1) Holed(r.Min, r.Max, r.Y - LevelMetrics.SlabThickness, r.Floor - 1);
             // under the roof: the top floor's rooms, pockets and atrium tops
             var plan = l.Plan;
             int top = l.Floors - 1;
             foreach (var r in LevelBuilder.Rectangles(plan.NX, plan.NZ, (x, z) => plan.KindAt(top, x, z) != CellKind.Outside))
-                Holed(new Vector2(r.xMin, r.yMin) * HousePlan.Res, new Vector2(r.xMax, r.yMax) * HousePlan.Res, LevelLayout.FloorY(top) + LevelMetrics.WallHeight);
+                Holed(new Vector2(r.xMin, r.yMin) * HousePlan.Res, new Vector2(r.xMax, r.yMax) * HousePlan.Res, LevelLayout.FloorY(top) + LevelMetrics.WallHeight, top);
         }
 
         /// <summary>A rectangle minus holes (pure): the pieces left, at most four round each hole.</summary>
