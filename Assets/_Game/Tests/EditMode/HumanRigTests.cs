@@ -214,6 +214,43 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>
+        /// Standing still (Idle, CrouchIdle) through the humanoid retargeting onto each person: the balls of the feet stay
+        /// where they stand while the body sways over them. (The Idle take bent the legs by their angles under a drifting
+        /// pelvis: the feet skated 7 cm to and fro and the start screen's row floated, its legs dangling; without Foot IK on
+        /// the legs' states the retargeting alone still slid them 2-3 cm. What is left is the ball's bone as the heel lifts.)
+        /// </summary>
+        [Test]
+        public void TheFeetStayPutStandingStill([Values(0, 1, 2, 3)] int department, [Values(false, true)] bool crouching)
+        {
+            var prefab = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans[department];
+            var go = Object.Instantiate(prefab);
+            try
+            {
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                var rig = go.GetComponent<HumanRig>();
+                var animator = rig.Animator;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // (no camera sees it here: culled, the bones stood still)
+                animator.Rebind();
+                animator.SetBool("Crouch", crouching);
+                animator.Update(0f);
+                animator.Update(1f); // (into the crouch: past its transition)
+                var feet = new[] { rig.ToeL, rig.ToeR };
+                var start = feet.Select(f => new Vector2(f.position.x, f.position.z)).ToArray();
+                float worst = 0f;
+                for (int i = 0; i < 48; i++) // the whole 8 s of Idle (CrouchIdle: three of its cycles)
+                {
+                    animator.Update(1f / 6f);
+                    for (int s = 0; s < 2; s++) worst = Mathf.Max(worst, Vector2.Distance(start[s], new Vector2(feet[s].position.x, feet[s].position.z)));
+                }
+                Assert.Less(worst * 100f, 0.5f, $"a foot slides {worst * 100f:0.0} cm over the floor while the body stands still");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
         [Test]
         public void EveryStyleShowsTheDepartments()
         {
@@ -330,6 +367,7 @@ namespace Stealth.Tests
                 // standing: the Animator itself plays the Idle state through the humanoid Avatar (the retargeting is what is
                 // checked: a wrong T-pose in the Avatar's description twists the arms out or up)
                 var animator = go.GetComponent<HumanRig>().Animator;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // (no camera sees it here: culled, it kept the rest pose)
                 animator.Rebind();
                 animator.Update(0f);
                 animator.Update(0.5f);
