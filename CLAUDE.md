@@ -6,7 +6,7 @@
 
 - Unity **6000.6.0f1**, URP Forward+, новый Input System (через `Controls`, не `Keyboard.current`).
 - Сеть: Netcode for GameObjects 2.13, транспорт Steam (Steamworks.NET, AppID 480) или UnityTransport UDP 7777.
-- UI: uGUI (legacy `Text`, `LegacyRuntime.ttf`). Тексты для игрока — только ключами из `Resources/Strings/*.csv` (`key,ru,en`), см. `stealth-ui`.
+- UI: uGUI (legacy `Text`), вид «бумажные бланки и стикеры»: цвета — только `UiPalette`, шрифты — `Art/Fonts` (PT Sans/Narrow/Mono, Caveat). Тексты для игрока — только ключами из `Resources/Strings/*.csv` (`key,ru,en`), см. `stealth-ui`.
 - Навмеш: com.unity.ai.navigation, запекается в рантайме; зона `Stairs` — только роботам с ногами, `Ladder` — только мулу.
 
 ## Ветки

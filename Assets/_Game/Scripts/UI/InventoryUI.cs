@@ -696,12 +696,12 @@ namespace Stealth.UI
             if (board)
             {
                 m_StashHighlights.End();
-                Board.SellBackground.color = overSell ? new Color(1f, 0.75f, 0.1f, 0.85f) : new Color(1f, 0.75f, 0.1f, 0.45f);
+                Board.SellBackground.color = overSell ? UiPalette.MarkYellow : UiPalette.NoteYellow;
                 if (Board.StashAllZone != null)
                 {
                     bool overAll = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.StashAll;
                     bool any = inv.Items.Count > 0;
-                    Board.StashAllBackground.color = !any ? new Color(0.3f, 0.75f, 1f, 0.15f) : overAll ? new Color(0.3f, 0.75f, 1f, 0.85f) : new Color(0.3f, 0.75f, 1f, 0.45f);
+                    Board.StashAllBackground.color = !any ? UiPalette.NoteBlue.A(0.45f) : overAll ? UiPalette.MarkBlue : UiPalette.NoteBlue;
                     SetIfChanged(Board.StashAllLabel, Loc.F("stash.all", Controls.Label(GameAction.StashAll)));
                 }
             }
@@ -747,7 +747,7 @@ namespace Stealth.UI
             {
                 var h = pool.Next();
                 h.rectTransform.anchoredPosition = new Vector2((UiColumn(target.x) + cc.x) * Cell + 1, -((target.y + cc.y) * Cell + 1));
-                h.color = ok ? new Color(0.3f, 1f, 0.4f, 0.35f) : new Color(1f, 0.25f, 0.2f, 0.4f);
+                h.color = ok ? UiPalette.MarkGreen.A(0.45f) : UiPalette.Stamp.A(0.4f);
             }
         }
 

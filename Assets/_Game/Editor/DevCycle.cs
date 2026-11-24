@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
@@ -88,9 +89,12 @@ namespace Stealth.EditorTools
             }
         }
 
-        /// <summary>The EditMode tests, synchronously, in this process. True when none failed.</summary>
+        /// <summary>The EditMode tests, synchronously, in this process. True when they ran and none failed.</summary>
         static bool RunTests()
         {
+            // The asset step leaves an unsaved scene behind: the test runner then asks to save it — a dialog batchmode
+            // cannot show — and quietly ran no test at all, while the cycle reported success. An empty scene, unsaved.
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var api = ScriptableObject.CreateInstance<TestRunnerApi>();
             var results = new Results();
             api.RegisterCallbacks(results);
@@ -102,7 +106,8 @@ namespace Stealth.EditorTools
             Debug.Log($"[Cycle] tests: total={results.Total} passed={results.Passed} failed={results.Failed} in {results.Times.Sum(t => t.seconds):0} s");
             WriteTimes(results.Times);
             foreach (var f in results.Failures) Debug.Log("[Cycle] " + f);
-            return results.Failed == 0;
+            if (results.Total == 0) Debug.Log("[Cycle] no test ran: the cycle fails");
+            return results.Failed == 0 && results.Total > 0;
         }
 
         /// <summary>Logs/test_times.txt: the classes by their total time, then the slowest tests.</summary>

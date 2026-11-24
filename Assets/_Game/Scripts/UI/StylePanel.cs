@@ -24,7 +24,7 @@ namespace Stealth.UI
         [Tooltip("The button copied for every style (UI/Elements/Button)")]
         public Button Template;
         [Tooltip("Tint of the current style's button")]
-        public Color CurrentColor = new(1f, 0.78f, 0.3f);
+        public Color CurrentColor = UiPalette.NoteYellow;
 
         readonly List<Button> m_Buttons = new();
         readonly List<VisualStyle> m_Styles = new();

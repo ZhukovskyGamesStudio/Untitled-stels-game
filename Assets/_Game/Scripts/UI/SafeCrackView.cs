@@ -38,8 +38,10 @@ namespace Stealth.UI
         public Image[] TraceLine, TraceGlow;
         public Text Hint;
 
-        static readonly Color Gold = new(1f, 0.78f, 0.32f), Green = new(0.35f, 1f, 0.5f), Red = new(1f, 0.25f, 0.18f),
-            LedOff = new(0.22f, 0.24f, 0.27f), TraceCold = new(0.25f, 0.75f, 0.7f);
+        // on paper: numbers written in pen, a highlighter over the box being listened for, green ink once found, the
+        // recorder's pen blue far off and red close by
+        static readonly Color Gold = UiPalette.Pen, Mark = UiPalette.MarkYellow, Green = UiPalette.Good, Red = UiPalette.Stamp,
+            LedOff = UiPalette.PaperShade, TraceCold = UiPalette.Pen;
 
         /// <summary>How fast a pulse runs across the scope (its widths per second), and how many are remembered.</summary>
         const float ScopeSpeed = 0.55f;
@@ -89,7 +91,7 @@ namespace Stealth.UI
                 m_PulseNext = (m_PulseNext + 1) % Pulses;
             }
             DrawScope(now, close);
-            ReadoutGlow.color = new Color(Gold.r, Gold.g, Gold.b, 0.12f + 0.25f * close);
+            ReadoutGlow.color = Mark.A(0.08f + 0.3f * close);
 
             // The code windows: the numbers found so far; the one being listened for blinks its LED.
             for (int i = 0; i < Slots.Length; i++)
@@ -100,8 +102,8 @@ namespace Stealth.UI
                 bool found = i < dial.Found, current = i == dial.Found;
                 SlotTexts[i].text = found ? dial.CodeAt(i).ToString("00") : current ? "--" : "";
                 SlotTexts[i].color = found ? Green : new Color(Gold.r, Gold.g, Gold.b, 0.35f + 0.25f * Mathf.Sin(now * 5f));
-                SlotGlows[i].color = found ? new Color(Green.r, Green.g, Green.b, 0.35f) : current ? new Color(Gold.r, Gold.g, Gold.b, 0.1f) : Color.clear;
-                SlotLeds[i].color = found ? Green : current ? Color.Lerp(LedOff, Gold, 0.5f + 0.5f * Mathf.Sin(now * 7f)) : LedOff;
+                SlotGlows[i].color = found ? UiPalette.MarkGreen.A(0.6f) : current ? Mark.A(0.55f) : Color.clear;
+                SlotLeds[i].color = found ? UiPalette.MarkGreen : current ? Color.Lerp(LedOff, Mark, 0.5f + 0.5f * Mathf.Sin(now * 7f)) : LedOff;
             }
 
             // A try: red shake for a wrong number, a green ring for a right one.
@@ -140,8 +142,8 @@ namespace Stealth.UI
         {
             int n = TraceLine.Length;
             var size = Trace.rect.size;
-            var line = Color.Lerp(TraceCold, Green, close);
-            var glow = new Color(line.r, line.g, line.b, 0.22f + 0.2f * close);
+            var line = Color.Lerp(TraceCold, Red, close * close);
+            var glow = line.A(0.06f + 0.12f * close); // ink does not glow: just a little bleed into the paper
             Vector2 prev = default;
             for (int i = 0; i <= n; i++)
             {
@@ -201,7 +203,7 @@ namespace Stealth.UI
                 tick.rectTransform.anchoredPosition = dir * (TickRadius - (major ? 8f : 4.5f));
                 tick.rectTransform.localRotation = Quaternion.Euler(0, 0, rot);
                 tick.rectTransform.sizeDelta = major ? new Vector2(3f, 16f) : new Vector2(1.5f, 9f);
-                tick.color = major ? new Color(1f, 0.86f, 0.5f) : new Color(0.78f, 0.8f, 0.82f, 0.85f);
+                tick.color = major ? UiPalette.Ink : UiPalette.InkSoft.A(0.8f);
                 tick.transform.SetAsFirstSibling();                       // under the knob
                 m_Marks.Add(tick.gameObject);
                 if (!major) continue;

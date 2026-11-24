@@ -51,7 +51,7 @@ namespace Stealth.UI
                 foreach (var p in PlayerController.All)
                     if (gm.Votes.All.TryGetValue(p.ClientId, out int l) && l == lane)
                         voters += (voters.Length > 0 ? ", " : "") +
-                                  $"<color=#{ColorUtility.ToHtmlStringRGB(PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId)))}>{p.Nick}</color>";
+                                  $"<color=#{ColorUtility.ToHtmlStringRGB(UiPalette.InkOf(PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId))))}>{p.Nick}</color>";
                 bool going = gm.GoAt > 0 && gm.ChosenLane == lane;
                 bool waiting = !going && gm.ChosenLane == lane; // chosen: the car waits for everyone to get in
                 string status = going ? Loc.F("route.going", Mathf.CeilToInt(Mathf.Max(0f, (float)(gm.GoAt - Session.ServerTime))))
@@ -59,7 +59,7 @@ namespace Stealth.UI
                     : voters.Length > 0 ? Loc.F("route.here", voters) : "";
                 sign.Votes.text = status;
                 sign.Body.enabled = status.Length == 0; // the countdown takes the body's line
-                sign.Frame.color = going || waiting ? new Color(1f, 0.8f, 0.25f) : voters.Length > 0 ? new Color(0.45f, 0.85f, 1f) : new Color(1f, 1f, 1f, 0.35f);
+                sign.Frame.color = going || waiting ? UiPalette.MarkOrange : voters.Length > 0 ? UiPalette.MarkBlue : UiPalette.PaperShade;
 
                 // Fully visible when looked at, otherwise only a hint of it.
                 float target = 0.6f;

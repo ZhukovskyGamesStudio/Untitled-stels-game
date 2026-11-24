@@ -23,9 +23,9 @@ namespace Stealth.UI
 
         public const float IconRange = 25f;
         /// <summary>Where the "+N" of fuel starts, next to the fuel bar.</summary>
-        public const float GainX = 310f, GainY = -36f;
-        /// <summary>How opaque the hint stack is: there, but not calling for attention.</summary>
-        public const float HintAlpha = 0.6f;
+        public const float GainX = 310f, GainY = -47f;
+        /// <summary>How opaque the hint stack is: there, but not calling for attention (its slips are paper: much less and they wash out).</summary>
+        public const float HintAlpha = 0.88f;
 
         [Header("Root")]
         public RectTransform Canvas;
@@ -98,7 +98,7 @@ namespace Stealth.UI
         [Tooltip("Tired arms: this player has swung a hammer in this house (it cannot again; a teammate can).")]
         public Image TiredArms;
         [Header("The house's clock")]
-        [Tooltip("Its panel: tinted from calm blue to red as extra robots come.")]
+        [Tooltip("Its time card: from plain paper through the pink copy to a reddish sheet as extra robots come.")]
         public Image ClockPanel;
         public Text ClockTime, ClockNext, ClockCount;
         [Tooltip("From the last extra robot to the next.")]
@@ -121,8 +121,12 @@ namespace Stealth.UI
         public BarView QuotaBar;
         public RectTransform GainRect;
         public Text GainLabel;
-        [Tooltip("The house's tasks and how far along they are, under the fuel bar.")]
-        public Text ObjectiveLabel;
+        [Tooltip("The house's tasks on a sticky note under the house's card (hidden when there are none).")]
+        public GameObject ObjectiveNote;
+        [Tooltip("Where the task lines go (the note itself: it grows with them).")]
+        public RectTransform TaskRows;
+        public TaskRowView TaskRowPrefab;
+        UiPool<TaskRowView> m_TaskRows;
         [Tooltip("Sitting at a security terminal: what is on the screen.")]
         public Text TerminalLabel;
         [Tooltip("The hacking terminal: a list of every robot and device but the cameras (no view through them).")]
@@ -134,8 +138,9 @@ namespace Stealth.UI
         [Tooltip("The kinds' pictures (robot_*), one per RobotKind.")]
         public Sprite[] HackKindPictures;
         UiPool<HackRowView> m_HackRows;
+        [Tooltip("The roster card top right (hidden while playing alone).")]
         public RectTransform TeamList;
-        public Text TeamRowPrefab;
+        public TeamRowView TeamRowPrefab;
         public CanvasGroup Banner;
         public RectTransform BannerRect;
         public Text BannerLabel;
@@ -155,8 +160,8 @@ namespace Stealth.UI
         public RectTransform CalloutLayer;
         public CalloutMarkerView CalloutPrefab;
 
-        static readonly Color[] NoiseColors = { new(1f, 1f, 1f, 0.45f), new(0.6f, 0.9f, 1f), new(1f, 0.85f, 0.35f), new(1f, 0.35f, 0.25f) };
-        static readonly Color QuotaGreen = new(0.45f, 1f, 0.5f);
+        // The status card's icons are outlined pictures on paper: their fill is the colour (a pale one is "nothing").
+        static readonly Color[] NoiseColors = { UiPalette.PaperShade, UiPalette.NoteBlue, UiPalette.MarkOrange, UiPalette.Danger };
 
         readonly BannerQueue m_Banners = new();
         readonly GainTracker m_Gain = new();
@@ -165,7 +170,7 @@ namespace Stealth.UI
         UiPool<ArcView> m_Arcs;
         UiPool<SuspicionMarkerView> m_Icons;
         UiPool<TeamMarkerView> m_Markers;
-        UiPool<Text> m_TeamRows;
+        UiPool<TeamRowView> m_TeamRows;
         UiPool<CalloutMarkerView> m_Callouts;
         UiPool<HintView> m_HintRows;
         bool m_ForceMap;
@@ -187,7 +192,8 @@ namespace Stealth.UI
             m_Arcs = new UiPool<ArcView>(ArcPrefab, ArcLayer);
             m_Icons = new UiPool<SuspicionMarkerView>(SuspicionPrefab, IconLayer);
             m_Markers = new UiPool<TeamMarkerView>(TeamMarkerPrefab, MarkerLayer);
-            m_TeamRows = new UiPool<Text>(TeamRowPrefab, TeamList);
+            m_TeamRows = new UiPool<TeamRowView>(TeamRowPrefab, TeamList);
+            m_TaskRows = new UiPool<TaskRowView>(TaskRowPrefab, TaskRows);
             m_Callouts = new UiPool<CalloutMarkerView>(CalloutPrefab, CalloutLayer);
             m_HintRows = new UiPool<HintView>(HintPrefab, HintStack);
             // the tablet's screen lives in the world (on the tablet in the hand), not under the HUD's overlay canvas
@@ -278,9 +284,9 @@ namespace Stealth.UI
         // ------------------------------------------------------------------ the house's clock, its first moment, its titles
 
         /// <summary>
-        /// The house's clock, top middle: it counts up from when the team came up into the house, shows when the next
-        /// extra robot comes (not a countdown: the clock's second it comes at) with a bar to it, and gets redder with every
-        /// robot that has come (<see cref="HouseClockRules"/>).
+        /// The house's clock, a time card under the house's card: it counts up from when the team came up into the house,
+        /// shows when the next extra robot comes (not a countdown: the clock's second it comes at) with a bar to it, and the
+        /// card gets redder with every robot that has come (<see cref="HouseClockRules.Heat"/>, <see cref="UiPalette.HeatPaper"/>).
         /// </summary>
         void ShowHouseClock(GameManager gm)
         {
@@ -293,13 +299,12 @@ namespace Stealth.UI
             float next = HouseClockRules.NextAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
             float prev = HouseClockRules.PreviousAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
             int came = RobotRoster.ReinforcementsDue(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
-            var color = HouseClockRules.ColorOf(HouseClockRules.Heat(came));
-            color.a = 0.82f;
+            var color = UiPalette.HeatPaper(HouseClockRules.Heat(came));
             if (ClockPanel.color != color) ClockPanel.color = color;
             string time = HouseClockRules.Format(t), at = HouseClockRules.Format(next);
             if (ClockTime.text != time) ClockTime.text = time;
             if (ClockNext.text != at) ClockNext.text = at;
-            if (ClockBar != null) ClockBar.Set(Mathf.InverseLerp(prev, next, t), new Color(1f, 1f, 1f, 0.9f));
+            if (ClockBar != null) ClockBar.Set(Mathf.InverseLerp(prev, next, t), came > 0 ? UiPalette.Stamp.A(0.75f) : UiPalette.MarkPink);
             if (ClockCount != null)
             {
                 string n = came > 0 ? "+" + came : "";
@@ -341,7 +346,7 @@ namespace Stealth.UI
             bool on = gm.DriveUntil > 0 && gm.LastTitles.Count > 0 && gm.LastTitlesAt >= 0f && Time.time - gm.LastTitlesAt < 240f;
             Ui.Show(StatsPanel, on);
             if (!on || StatsRows == null) return;
-            Ui.Set(StatsHeader, Loc.F("stats.header", gm.LastTitlesHouse), Color.white);
+            Ui.Set(StatsHeader, Loc.F("stats.header", gm.LastTitlesHouse), UiPalette.Ink);
             for (int i = 0; i < StatsRows.Length; i++)
             {
                 var row = StatsRows[i];
@@ -351,10 +356,10 @@ namespace Stealth.UI
                 var t = gm.LastTitles[i];
                 var who = PlayerController.Find(t.Player);
                 var team = PlayerLooks.TeamColor(PlayerLooks.SlotOf(t.Player));
-                Ui.Set(row.Name, who != null ? who.Nick : "—", team);
-                Ui.Set(row.Title, Loc.T(HouseStats.TitleKey(t.Kind)), new Color(1f, 0.84f, 0.35f));
-                Ui.Set(row.Did, t.Kind == StatKind.None ? Loc.T(HouseStats.DidKey(t.Kind)) : string.Format(Loc.Plural(HouseStats.DidKey(t.Kind), Mathf.RoundToInt(t.Value)), Mathf.RoundToInt(t.Value)), new Color(1f, 1f, 1f, 0.85f));
-                Ui.Set(row.Numbers, Loc.F("stats.numbers", t.Fuel, t.Downs, t.Revives, t.Metres), new Color(1f, 1f, 1f, 0.6f));
+                Ui.Set(row.Name, who != null ? who.Nick : "—", UiPalette.InkOf(team));
+                Ui.Set(row.Title, Loc.T(HouseStats.TitleKey(t.Kind)), UiPalette.Pen);
+                Ui.Set(row.Did, t.Kind == StatKind.None ? Loc.T(HouseStats.DidKey(t.Kind)) : string.Format(Loc.Plural(HouseStats.DidKey(t.Kind), Mathf.RoundToInt(t.Value)), Mathf.RoundToInt(t.Value)), UiPalette.InkSoft);
+                Ui.Set(row.Numbers, Loc.F("stats.numbers", t.Fuel, t.Downs, t.Revives, t.Metres), UiPalette.InkFaint);
                 if (row.Bar != null) row.Bar.color = team;
             }
         }
@@ -511,7 +516,7 @@ namespace Stealth.UI
                 if (!marked || cam == null) continue;
                 var top = d.Position + Vector3.up * 0.7f;
                 float left = d.MarkedUntil - Session.ServerTimeF;
-                var red = new Color(1f, 0.25f, 0.18f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
+                var red = UiPalette.Danger.A(left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
                 Callout(cam, size, top, red, Loc.F("hud.metres", Vector3.Distance(me.transform.position, d.Position)), false, 0f);
             }
             // marked things: lit through walls (their layer) and a yellow-green marker over each
@@ -522,7 +527,7 @@ namespace Stealth.UI
                 s_ThingMarks.Add(p.Position);
                 if (cam == null) continue;
                 float left = p.Until - now;
-                var green = new Color(0.8f, 1f, 0.25f, left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
+                var green = UiPalette.MarkYellow.A(left < 2f ? 0.5f + 0.5f * Mathf.Sin(now * 14f) : 1f);
                 Callout(cam, size, p.Position + Vector3.up * 0.35f, green, Loc.F("hud.metres", Vector3.Distance(me.transform.position, p.Position)), p.Age(now) < 0.6f, p.Age(now));
             }
             MarkedThings.Show(s_ThingMarks);
@@ -649,7 +654,7 @@ namespace Stealth.UI
             if (arcAlpha > 0f && me.Camera != null)
             {
                 var cam = me.Camera.transform;
-                HitArc.Set(UiMath.ScreenAngle(cam.position, cam.forward, cam.position + m_Hit.Direction), 120f, new Color(1f, 0.15f, 0.1f, arcAlpha));
+                HitArc.Set(UiMath.ScreenAngle(cam.position, cam.forward, cam.position + m_Hit.Direction), 120f, UiPalette.Danger.A(arcAlpha));
             }
 
             // The coffee: running, streaks rush past the edges of the view (the motor widens the view too)
@@ -700,7 +705,7 @@ namespace Stealth.UI
             Ui.Show(AlarmFrame, alarm);
             if (!alarm) return;
             float left = (float)(gm.AlarmUntil - Session.ServerTime);
-            var red = new Color(1f, 0.15f, 0.1f, 0.35f + 0.25f * Mathf.Sin(now * 7f));
+            var red = UiPalette.Danger.A(0.35f + 0.25f * Mathf.Sin(now * 7f));
             foreach (var e in AlarmEdges) e.color = red;
             AlarmLabel.text = Loc.F("hud.alarm", Mathf.Max(0, Mathf.CeilToInt(left)));
         }
@@ -727,8 +732,8 @@ namespace Stealth.UI
                     if (Mathf.Abs(to.y) > 2.5f || new Vector2(to.x, to.z).magnitude > DetectionArcRange) continue;
                     bool detected = a >= 0.99f;
                     var color = detected
-                        ? new Color(1f, 0.12f, 0.08f, 0.75f + 0.25f * Mathf.Sin(now * 12f))
-                        : Color.Lerp(new Color(1f, 0.95f, 0.4f, 0.35f), new Color(1f, 0.55f, 0.1f, 0.95f), a);
+                        ? UiPalette.Danger.A(0.75f + 0.25f * Mathf.Sin(now * 12f))
+                        : Color.Lerp(UiPalette.MarkYellow.A(0.35f), UiPalette.MarkOrange.A(0.95f), a);
                     m_Arcs.Next().Set(UiMath.ScreenAngle(cam.position, cam.forward, d.Position), 70f + (1f - a) * 25f, color);
                 }
             }
@@ -764,9 +769,9 @@ namespace Stealth.UI
                     var (text, color) = icon switch
                     {
                         0 => (null, Color.clear),
-                        1 => ("?", new Color(1f, 0.9f, 0.3f)),
-                        2 => ("?", new Color(1f, 0.55f, 0.15f)),
-                        _ => ("!", new Color(1f, 0.15f, 0.1f)),
+                        1 => ("?", UiPalette.Caution),
+                        2 => ("?", UiPalette.MarkOrange),
+                        _ => ("!", UiPalette.Danger),
                     };
                     bool detected = mine >= 0.99f;
                     m_Icons.Next().Show(Ui.FromViewport(vp, size), Mathf.Lerp(1.15f, 0.7f, dist / IconRange), bar, mine,
@@ -789,7 +794,7 @@ namespace Stealth.UI
             if (ReticleGlyph.sprite != sprite) ReticleGlyph.sprite = sprite;
             float size = dot ? 5f : 30f;
             if (!Mathf.Approximately(ReticleGlyph.rectTransform.sizeDelta.x, size)) ReticleGlyph.rectTransform.sizeDelta = new Vector2(size, size);
-            var color = dot ? new Color(1f, 1f, 1f, 0.8f) : r.Available ? new Color(1f, 1f, 1f, 0.92f) : new Color(1f, 1f, 1f, 0.38f);
+            var color = dot ? UiPalette.OnWorld.A(0.85f) : r.Available ? UiPalette.OnWorld : UiPalette.OnWorld.A(0.4f);
             if (ReticleGlyph.color != color) ReticleGlyph.color = color;
             if (r.Progress > 0f) ReticleRing.fillAmount = Mathf.Clamp01(r.Progress);
         }
@@ -806,7 +811,7 @@ namespace Stealth.UI
             var stamina = me.Motor.Stamina;
             bool visible = stamina.Value < 0.999f && !me.Downed;
             Ui.Show(Stamina, visible);
-            if (visible) Stamina.Set(stamina.Value, stamina.Exhausted ? new Color(1f, 0.35f, 0.25f, 0.9f) : new Color(1f, 1f, 1f, 0.75f));
+            if (visible) Stamina.Set(stamina.Value, stamina.Exhausted ? UiPalette.Danger.A(0.9f) : UiPalette.OnWorld.A(0.8f));
         }
 
         float m_NextLight, m_Visibility;
@@ -826,7 +831,8 @@ namespace Stealth.UI
             }
             int frame = Mathf.Clamp(Mathf.RoundToInt(m_Visibility * (EyeSprites.Length - 1)), 0, EyeSprites.Length - 1);
             if (Eye.sprite != EyeSprites[frame]) Eye.sprite = EyeSprites[frame];
-            var color = Color.Lerp(new Color(0.75f, 0.8f, 0.9f, 0.6f), new Color(1f, 0.92f, 0.6f, 1f), m_Visibility);
+            // a pale eye in the dark, a highlighter-yellow one in full light (the picture itself opens too)
+            var color = Color.Lerp(UiPalette.PaperShade, UiPalette.MarkYellow, m_Visibility);
             if (Eye.color != color) Eye.color = color;
         }
 
@@ -841,7 +847,7 @@ namespace Stealth.UI
             int level = fresh ? UiMath.NoiseBars(me.LastNoiseRadius) : 0;
             if (Speaker.sprite != SpeakerSprites[level]) Speaker.sprite = SpeakerSprites[level];
             var color = NoiseColors[level];
-            if (level > 0) color.a = Mathf.Lerp(0.6f, 1f, Mathf.Clamp01(1f - age / 0.9f));
+            if (level > 0) color = Color.Lerp(UiPalette.PaperShade, color, Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(1f - age / 0.9f))); // fading on paper: towards the pale fill, not see-through
             if (Speaker.color != color) Speaker.color = color;
         }
 
@@ -854,7 +860,7 @@ namespace Stealth.UI
                 // the start of the run: the car comes with a full tank and the first drive costs nothing — no quota yet
                 if (HouseLabel.text != Loc.T("hud.sewer")) HouseLabel.text = Loc.T("hud.sewer");
                 Ui.Show(QuotaLabel, false);
-                QuotaBar.Set(1f, new Color(0.3f, 0.9f, 0.4f));
+                QuotaBar.Set(1f, UiPalette.MarkGreen);
                 Ui.Show(GainLabel, false);
                 ShowObjective(gm);
                 ShowTerminal(PlayerController.Local);
@@ -864,15 +870,15 @@ namespace Stealth.UI
             var layout = ActiveLevel.Layout;
             string house = InTheSewer(gm) || layout == null ? Loc.T("hud.sewer") : HouseKinds.Title(gm.Level.Seed, layout.Kind);
             if (HouseLabel.text != house) HouseLabel.text = house;
-            Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? QuotaGreen : Color.white);
-            QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? new Color(0.3f, 0.9f, 0.4f) : new Color(1f, 0.8f, 0.2f));
+            Ui.Set(QuotaLabel, $"{collected} / {quota}", met ? UiPalette.Good : UiPalette.Ink);
+            QuotaBar.Set(quota > 0 ? collected / (float)quota : 0f, met ? UiPalette.MarkGreen : UiPalette.MarkOrange);
             bool gain = m_Gain.Visible(now);
             Ui.Show(GainLabel, gain);
             if (gain)
             {
                 float age = now - m_Gain.Time;
                 GainRect.anchoredPosition = new Vector2(GainX, GainY + age * 8f);
-                Ui.Set(GainLabel, $"+{m_Gain.Amount}", new Color(QuotaGreen.r, QuotaGreen.g, QuotaGreen.b, Mathf.Clamp01(2f - age)));
+                Ui.Set(GainLabel, $"+{m_Gain.Amount}", UiPalette.Exit.A(Mathf.Clamp01(2f - age)));
             }
             ShowObjective(gm);
             ShowTerminal(PlayerController.Local);
@@ -893,7 +899,7 @@ namespace Stealth.UI
             if (HackList.activeSelf != on) HackList.SetActive(on);
             if (!on) return;
             m_HackRows ??= new UiPool<HackRowView>(HackRowTemplate, HackRows);
-            Ui.Set(HackTitle, Loc.F("hud.hack.title", t.Charges), t.Charges > 0 ? Color.white : new Color(1f, 0.5f, 0.4f));
+            Ui.Set(HackTitle, Loc.F("hud.hack.title", t.Charges), t.Charges > 0 ? UiPalette.Ink : UiPalette.Stamp);
             var list = me.TerminalTargets;
             int pick = list.Count > 0 ? Mathf.Clamp(me.TerminalIndex, 0, list.Count - 1) : -1;
             int start = HackListRules.FirstShown(pick, list.Count, HackRowsShown);
@@ -906,13 +912,14 @@ namespace Stealth.UI
                 bool picked = i == pick;
                 var icon = HackKindPictures != null && (int)d.Kind < HackKindPictures.Length ? HackKindPictures[(int)d.Kind] : null;
                 if (row.Icon.sprite != icon) row.Icon.sprite = icon;
-                var tone = d.IsHacked ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
-                row.Icon.color = tone;
-                Ui.Set(row.Name, HackListRules.Label(d.DisplayName, list, i, x => x.Kind), tone);
+                row.Icon.color = d.IsHacked ? Color.white.A(0.4f) : Color.white;
+                Ui.Set(row.Name, HackListRules.Label(d.DisplayName, list, i, x => x.Kind), d.IsHacked ? UiPalette.InkFaint : UiPalette.Ink);
                 float share = picked && !d.IsHacked ? me.TerminalHackShare : 0f;
                 string state = d.IsHacked ? Loc.T("hud.terminal.hacked") : share > 0f ? $"{Mathf.RoundToInt(share * 100f)}%" : "";
-                Ui.Set(row.State, state, d.IsHacked ? new Color(1f, 1f, 1f, 0.45f) : new Color(1f, 0.85f, 0.4f));
-                row.Back.color = picked ? new Color(0.25f, 0.6f, 1f, 0.35f) : new Color(1f, 1f, 1f, 0.04f);
+                Ui.Set(row.State, state, d.IsHacked ? UiPalette.InkFaint : UiPalette.Good);
+                // the pick: a highlighter stroke over the line
+                var back = picked ? UiPalette.MarkYellow.A(0.75f) : Color.clear;
+                if (row.Back.color != back) row.Back.color = back;
                 row.Fill.rectTransform.anchorMax = new Vector2(share, 1f);
                 Ui.Show(row.Fill, share > 0f);
             }
@@ -930,41 +937,32 @@ namespace Stealth.UI
             var shown = me.TerminalView;
             string text = me.TerminalViewCount == 0 ? "—"
                 : $"{(shown != null ? shown.DisplayName : "")} · {me.TerminalViewNumber} / {me.TerminalViewCount}";
-            if (t.Kind == TerminalKind.Hacking)
-            {
-                float hack = me.TerminalHackShare;
-                text += shown != null && shown.IsHacked ? " · " + Loc.T("hud.terminal.hacked")
-                    : hack > 0f ? $" · {Mathf.RoundToInt(hack * 100f)}%"
-                    : " · " + Loc.F("hud.terminal.charges", t.Charges);
-            }
             if (TerminalLabel.text != text) TerminalLabel.text = text;
         }
 
         /// <summary>
-        /// The task list under the fuel: in a house find the exit, then the main job (gold once done); in the sewer open
-        /// the way, fuel the car, choose a tunnel. Done tasks stay, ticked and dim (<see cref="ObjectiveRules.Tasks"/>).
+        /// The task list on a sticky note under the house's card: in a house find the exit, then the main job; in the sewer
+        /// open the way, fuel the car, choose a tunnel. Done tasks stay, ticked and faded (<see cref="ObjectiveRules.Tasks"/>).
         /// </summary>
         void ShowObjective(GameManager gm)
         {
-            if (ObjectiveLabel == null) return;
+            if (ObjectiveNote == null) return;
             var l = ActiveLevel.Layout;
             bool sewer = InTheSewer(gm);
-            if (!sewer && (gm.Phase != RunPhase.Playing || l == null)) { Ui.Show(ObjectiveLabel, false); return; }
+            if (!sewer && (gm.Phase != RunPhase.Playing || l == null)) { Ui.Show(ObjectiveNote, false); return; }
             bool exitSeen = !sewer && gm.Exploration != null && MapSketch.AnyRevealed(gm.Exploration, 0,
                 new Rect(l.ExitHatchPosition.x - 0.8f, l.ExitHatchPosition.z - 0.8f, 1.6f, 1.6f));
             var tasks = ObjectiveRules.Tasks(sewer, exitSeen, sewer ? default : gm.ObjectiveStage, gm.GateOpen, gm.QuotaMet);
-            m_TaskText.Clear();
+            Ui.Show(ObjectiveNote, tasks.Count > 0);
+            m_TaskRows.Begin();
             foreach (var (line, done) in tasks)
             {
-                if (m_TaskText.Length > 0) m_TaskText.Append('\n');
-                m_TaskText.Append(done ? "<color=#8CE69Acc>✓ " : "<color=#ffffffcc>• ").Append(line).Append("</color>");
+                var row = m_TaskRows.Next();
+                Ui.Show(row.Tick, done);
+                Ui.Set(row.Label, line, done ? UiPalette.InkFaint : UiPalette.Pen);
             }
-            Ui.Show(ObjectiveLabel, tasks.Count > 0);
-            string text = m_TaskText.ToString();
-            if (ObjectiveLabel.text != text) ObjectiveLabel.text = text;
+            m_TaskRows.End();
         }
-
-        readonly System.Text.StringBuilder m_TaskText = new();
 
         /// <summary>
         /// The local player is in the sewer: between houses, or under the house past the basement's gate (the basement the
@@ -993,7 +991,7 @@ namespace Stealth.UI
             var vp = me.Camera.WorldToViewportPoint(exit + Vector3.up * 0.4f);
             var gui = UiMath.EdgeMarker(vp, size.x, size.y, 48f, out bool clamped);
             HatchMarker.anchoredPosition = new Vector2(gui.x, size.y - gui.y);
-            var c = new Color(0.45f, 1f, 0.5f, clamped ? 0.9f : 0.75f);
+            var c = UiPalette.Exit.A(clamped ? 0.95f : 0.85f);
             HatchDiamond.color = c;
             Ui.Set(HatchLabel, Loc.F("hud.metres", Vector3.Distance(me.transform.position, exit)), c);
         }
@@ -1023,7 +1021,7 @@ namespace Stealth.UI
                 int kind = layout[i];
                 var sprite = kind < 0 || HackKindIcons == null || kind >= HackKindIcons.Length || HackKindIcons[kind] == null ? HackFree : HackKindIcons[kind];
                 if (sprite != null && HackSlots[i].sprite != sprite) HackSlots[i].sprite = sprite;
-                var color = kind < 0 ? new Color(0.35f, 0.75f, 1f, 1f) : new Color(0.62f, 0.64f, 0.68f, 0.85f);
+                var color = kind < 0 ? UiPalette.MarkBlue : UiPalette.PaperShade;
                 if (HackSlots[i].color != color) HackSlots[i].color = color;
             }
         }
@@ -1039,14 +1037,14 @@ namespace Stealth.UI
                 bool full = i < me.Hp;
                 var sprite = full ? HeartFull : HeartEmpty;
                 if (Hearts[i].sprite != sprite) Hearts[i].sprite = sprite;
-                var color = !full ? new Color(1f, 1f, 1f, 0.35f) : i >= HealthState.MaxHp ? new Color(1f, 0.8f, 0.2f) : new Color(0.95f, 0.25f, 0.25f);
+                var color = !full ? UiPalette.PaperShade : i >= HealthState.MaxHp ? UiPalette.MarkOrange : UiPalette.Danger;
                 if (Hearts[i].color != color) Hearts[i].color = color;
             }
         }
 
         /// <summary>
-        /// Teammates: a compact list under the minimap (health as squares, or a word: down / in the hatch); names over heads
-        /// only when close and visible; a downed teammate gets a red marker through walls so the team can come and help.
+        /// Teammates: the roster card top right (the name in their ink, then hearts, or a word: down / in the hatch); names
+        /// over heads only when close and visible; a downed teammate gets a red marker through walls so the team can come and help.
         /// </summary>
         void ShowTeam(PlayerController me, float now)
         {
@@ -1058,8 +1056,20 @@ namespace Stealth.UI
             {
                 if (p == me) continue;
                 bool down = p.Downed;
-                string state = down ? Loc.T("hud.team.down") : p.InHatch ? Loc.T("hud.team.hatch") : new string('■', Mathf.Max(0, p.Hp));
-                Ui.Set(m_TeamRows.Next(), $"{p.Nick}  {state}", down ? new Color(1f, 0.35f, 0.3f) : p.InHatch ? new Color(0.6f, 1f, 0.65f, 0.85f) : new Color(1, 1, 1, 0.8f));
+                var row = m_TeamRows.Next();
+                Ui.Set(row.Name, p.Nick, UiPalette.InkOf(PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId))));
+                string state = down ? Loc.T("hud.team.down") : p.InHatch ? Loc.T("hud.team.hatch") : "";
+                Ui.Show(row.State, state.Length > 0);
+                if (state.Length > 0) Ui.Set(row.State, state, down ? UiPalette.Stamp : UiPalette.Good);
+                for (int i = 0; i < row.Hearts.Length; i++)
+                {
+                    bool shown = state.Length == 0 && i < Mathf.Max(HealthState.MaxHp, p.Hp);
+                    Ui.Show(row.Hearts[i], shown);
+                    if (!shown) continue;
+                    bool full = i < p.Hp;
+                    if (row.Hearts[i].sprite != (full ? HeartFull : HeartEmpty)) row.Hearts[i].sprite = full ? HeartFull : HeartEmpty;
+                    row.Hearts[i].color = !full ? UiPalette.PaperShade : i >= HealthState.MaxHp ? UiPalette.MarkOrange : UiPalette.Danger;
+                }
                 if (cam == null) continue;
 
                 var head = p.transform.position + Vector3.up * (down ? 0.6f : p.Height + 0.25f);
@@ -1071,10 +1081,10 @@ namespace Stealth.UI
                     var m = m_Markers.Next();
                     m.Rect.anchoredPosition = new Vector2(gui.x, size.y - gui.y);
                     Ui.Show(m.Cross, true);
-                    var red = new Color(1f, 0.25f, 0.2f, 0.7f + 0.3f * Mathf.Sin(now * 6f));
+                    var red = UiPalette.Danger.A(0.7f + 0.3f * Mathf.Sin(now * 6f));
                     foreach (var bar in m.CrossBars) bar.color = red;
                     m.Label.rectTransform.anchoredPosition = new Vector2(0f, -21f);
-                    Ui.Set(m.Label, $"{p.Nick} · {Loc.F("hud.metres", dist)}", new Color(1f, 0.5f, 0.45f));
+                    Ui.Set(m.Label, $"{p.Nick} · {Loc.F("hud.metres", dist)}", UiPalette.Danger);
                 }
                 else if (vp.z > 0f && dist < 14f && !Physics.Linecast(cam.transform.position, head, Perception.SightMask, QueryTriggerInteraction.Ignore))
                 {
@@ -1082,9 +1092,10 @@ namespace Stealth.UI
                     m.Rect.anchoredPosition = Ui.FromViewport(vp, size);
                     Ui.Show(m.Cross, false);
                     m.Label.rectTransform.anchoredPosition = new Vector2(0f, 9f);
-                    Ui.Set(m.Label, p.Nick, new Color(1, 1, 1, Mathf.Clamp01((14f - dist) / 4f) * 0.8f));
+                    Ui.Set(m.Label, p.Nick, UiPalette.OnWorld.A(Mathf.Clamp01((14f - dist) / 4f) * 0.9f));
                 }
             }
+            Ui.Show(TeamList, m_TeamRows.Used > 0); // alone: no empty card
             m_TeamRows.End();
             m_Markers.End();
         }

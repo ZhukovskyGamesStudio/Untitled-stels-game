@@ -33,21 +33,22 @@ namespace Stealth.UI
         [Tooltip("The picture of each robot / device kind (indexed by RobotKind): the map terminal tells them apart.")]
         public Sprite[] KindIcons;
 
+        // A plan drawn on the sheet: rooms shaded, walls in ink, doors in pen blue, stairs in highlighter, furniture faint.
         static readonly Color[] PartColors =
         {
-            new(0.32f, 0.38f, 0.44f, 0.6f),  // Floor
-            new(0.92f, 0.94f, 0.97f, 0.95f), // Wall
-            new(0.5f, 0.8f, 1f, 0.95f),      // Door
-            new(0.75f, 0.7f, 0.6f, 0.9f),    // Vent
-            new(0.95f, 0.78f, 0.3f, 0.55f),  // Stairs
-            new(0.72f, 0.78f, 0.85f, 0.42f), // Prop
-            new(0.4f, 0.72f, 1f, 0.95f),     // Hatch (the way in: blue)
-            new(0.7f, 0.85f, 0.95f, 0.6f),   // Railing (the edge of a gallery)
-            new(0.05f, 0.07f, 0.1f, 0.55f),  // Void (an atrium seen from above)
-            new(0.22f, 0.3f, 0.22f, 0.45f),  // Ground (the yard outside, seen up close in the gas)
-            new(0.45f, 1f, 0.5f, 0.95f),     // ExitHatch (the way out: green, like its marker in the HUD)
+            UiPalette.PaperShade.A(0.9f),    // Floor
+            UiPalette.Ink.A(0.95f),          // Wall
+            UiPalette.Pen.A(0.9f),           // Door
+            UiPalette.Warn.A(0.8f),          // Vent
+            UiPalette.MarkYellow.A(0.8f),    // Stairs
+            UiPalette.InkFaint.A(0.35f),     // Prop
+            UiPalette.MarkBlue,              // Hatch (the way in: blue)
+            UiPalette.InkSoft.A(0.6f),       // Railing (the edge of a gallery)
+            UiPalette.InkFaint.A(0.25f),     // Void (an atrium seen from above)
+            UiPalette.NoteGreen.A(0.55f),    // Ground (the yard outside, seen up close in the gas)
+            UiPalette.MarkGreen,             // ExitHatch (the way out: green, like its marker in the HUD)
         };
-        static readonly Color Marked = new(1f, 0.22f, 0.15f);
+        static readonly Color Marked = UiPalette.Stamp;
 
         readonly List<MapRect> m_Rects = new();
         UiPool<Image> m_Images;
@@ -76,9 +77,10 @@ namespace Stealth.UI
             return m_Full;
         }
 
-        static readonly Color RobotColor = new(1f, 0.3f, 0.22f), DeviceColor = new(1f, 0.6f, 0.2f), HackedColor = new(0.55f, 0.6f, 0.65f),
-            LaserColor = new(1f, 0.15f, 0.3f), TerminalColor = new(0.35f, 0.9f, 1f), StorageColor = new(1f, 0.85f, 0.3f),
-            DoorColor = new(0.5f, 0.8f, 1f), EntryColor = new(0.4f, 0.72f, 1f), ExitColor = new(0.45f, 1f, 0.5f);
+        // the icons' fills (outlined pictures and marks in ink colours that read on the paper)
+        static readonly Color RobotColor = UiPalette.Stamp, DeviceColor = UiPalette.MarkOrange, HackedColor = UiPalette.InkFaint.A(0.7f),
+            LaserColor = UiPalette.MarkPink, TerminalColor = UiPalette.MarkBlue, StorageColor = UiPalette.MarkYellow,
+            DoorColor = UiPalette.Pen, EntryColor = UiPalette.MarkBlue, ExitColor = UiPalette.MarkGreen;
 
         void Awake()
         {
@@ -130,7 +132,7 @@ namespace Stealth.UI
             {
                 if (p.Kind == PingKind.Thing)
                 {
-                    Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, new Color(0.8f, 1f, 0.25f), null, IconShape.Diamond, 1f, 0f);
+                    Icon(Flat(p.Position), LevelLayout.FloorOf(p.Position.y), floor, me2, scale, radius, turn, UiPalette.MarkYellow, null, IconShape.Diamond, 1f, 0f);
                     continue;
                 }
                 if (p.Kind is not (PingKind.Here or PingKind.Help)) continue;
@@ -149,11 +151,11 @@ namespace Stealth.UI
             foreach (var p in PlayerController.All)
             {
                 if (p == me) continue;
-                var color = p.Downed ? new Color(1f, 0.3f, 0.25f) : PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId));
+                var color = p.Downed ? UiPalette.Stamp : UiPalette.InkOf(PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId)));
                 Icon(Flat(p.transform.position), LevelLayout.FloorOf(p.transform.position.y), floor, me2, scale, radius, turn, color,
                     FollowPlayer ? null : p.Nick, p.Downed ? IconShape.Dot : IconShape.Arrow, 1f, p.transform.eulerAngles.y);
             }
-            Icon(me2, myFloor, floor, me2, scale, radius, turn, Color.white, null, IconShape.Arrow, 1.15f, yaw);
+            Icon(me2, myFloor, floor, me2, scale, radius, turn, UiPalette.Ink, null, IconShape.Arrow, 1.15f, yaw);
             m_Icons.End();
 
             if (Caption != null)
@@ -240,7 +242,7 @@ namespace Stealth.UI
             }
         }
 
-        static readonly Color LockedColor = new(1f, 0.25f, 0.3f);
+        static readonly Color LockedColor = UiPalette.Stamp;
 
         void Draw(ExplorationMap map, int floor, float scale)
         {
@@ -293,7 +295,7 @@ namespace Stealth.UI
             if (shape == IconShape.Arrow) image.rectTransform.localRotation = Quaternion.Euler(0f, 0f, turn - yaw);
             string text = label == null ? null : itsFloor == floor ? label : $"{label} {(itsFloor > floor ? "↑" : "↓")}";
             Ui.Show(icon.Label, text != null);
-            if (text != null) Ui.Set(icon.Label, text, new Color(color.r, color.g, color.b, Mathf.Max(0.6f, color.a)));
+            if (text != null) Ui.Set(icon.Label, text, UiPalette.Ink.A(Mathf.Max(0.6f, color.a))); // labels in ink: a pale fill colour does not read as text
         }
     }
 }

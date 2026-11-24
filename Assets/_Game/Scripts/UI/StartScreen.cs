@@ -80,11 +80,14 @@ namespace Stealth.UI
                 if (cam != null)
                 {
                     var vp = cam.WorldToViewportPoint(p.transform.position);
-                    if (vp.z > 0f) view.Rect.anchoredPosition = new Vector2(vp.x * size.x, vp.y * size.y);
+                    // (kept whole on the screen: on a narrow screen the figures at the ends stand near its edges)
+                    var half = view.Rect.rect.size;
+                    if (vp.z > 0f) view.Rect.anchoredPosition = UiMath.KeepOnScreen(new Vector2(vp.x * size.x, vp.y * size.y), size,
+                        new Vector2(half.x * 0.5f, half.y), new Vector2(half.x * 0.5f, 0f), 8f);
                 }
                 Fill(view, p, p == me);
             }
-            Ui.Set(Waiting, Loc.F("start.waiting", ready, count), new Color(1f, 1f, 1f, 0.8f));
+            Ui.Set(Waiting, Loc.F("start.waiting", ready, count), UiPalette.Ink);
             if (ReadyButtonLabel != null) ReadyButtonLabel.text = Loc.T(me.LoadoutReady ? "start.not_ready" : "start.ready");
         }
 
@@ -93,9 +96,9 @@ namespace Stealth.UI
             byte tool = ItemCatalog.ClassTools[Mathf.Clamp(p.LoadoutClass, 0, ItemCatalog.ClassTools.Length - 1)];
             byte extra = ItemCatalog.StartItems[Mathf.Clamp(p.LoadoutItem, 0, ItemCatalog.StartItems.Length - 1)];
             var team = PlayerLooks.TeamColor(PlayerLooks.SlotOf(p.ClientId));
-            Ui.Set(v.Name, p.Nick, team);
-            Ui.Set(v.ClassName, Loc.T(ClassKey(p.LoadoutClass)), Color.white);
-            Ui.Set(v.ItemName, ItemCatalog.Describe(extra, ItemCatalog.FreshColor(extra, 0)), new Color(1f, 1f, 1f, 0.85f));
+            Ui.Set(v.Name, p.Nick, UiPalette.InkOf(team));
+            Ui.Set(v.ClassName, Loc.T(ClassKey(p.LoadoutClass)), UiPalette.Ink);
+            Ui.Set(v.ItemName, ItemCatalog.Describe(extra, ItemCatalog.FreshColor(extra, 0)), UiPalette.InkSoft);
             Picture(v.ClassIcon, tool);
             Picture(v.ItemIcon, extra);
             bool arrows = mine && !p.LoadoutReady;
@@ -103,8 +106,8 @@ namespace Stealth.UI
             Ui.Show(v.ClassNext, arrows);
             Ui.Show(v.ItemPrev, arrows);
             Ui.Show(v.ItemNext, arrows);
-            if (v.ReadyMark != null) v.ReadyMark.color = p.LoadoutReady ? new Color(0.45f, 1f, 0.5f, 0.95f) : new Color(1f, 1f, 1f, 0.15f);
-            Ui.Set(v.ReadyLabel, Loc.T(p.LoadoutReady ? "start.is_ready" : "start.choosing"), p.LoadoutReady ? new Color(0.45f, 1f, 0.5f) : new Color(1f, 1f, 1f, 0.6f));
+            if (v.ReadyMark != null) v.ReadyMark.color = p.LoadoutReady ? UiPalette.MarkGreen : UiPalette.PaperShade;
+            Ui.Set(v.ReadyLabel, Loc.T(p.LoadoutReady ? "start.is_ready" : "start.choosing"), p.LoadoutReady ? UiPalette.Good : UiPalette.InkFaint);
         }
 
         /// <summary>The table key of a class's name (<c>start.class.&lt;n&gt;</c>).</summary>

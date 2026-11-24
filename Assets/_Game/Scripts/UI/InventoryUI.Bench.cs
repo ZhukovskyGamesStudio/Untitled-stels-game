@@ -120,7 +120,7 @@ namespace Stealth.UI
             {
                 var h = m_BenchHighlights.Next();
                 h.rectTransform.anchoredPosition = new Vector2((target.x + cc.x) * Cell + 1, -((target.y + cc.y) * Cell + 1));
-                h.color = ok ? new Color(0.3f, 1f, 0.4f, 0.35f) : new Color(1f, 0.25f, 0.2f, 0.4f);
+                h.color = ok ? UiPalette.MarkGreen.A(0.45f) : UiPalette.Stamp.A(0.4f);
             }
         }
 
@@ -194,7 +194,7 @@ namespace Stealth.UI
             bool can = BenchRules.CanCombine(bench.Items.Count);
             bool over = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.Combine;
             if (CombineBackground != null)
-                CombineBackground.color = !can ? new Color(0.95f, 0.55f, 0.1f, 0.2f) : over ? new Color(1f, 0.62f, 0.15f, 0.95f) : new Color(0.95f, 0.55f, 0.1f, 0.6f);
+                CombineBackground.color = !can ? UiPalette.PaperShade : over ? UiPalette.MarkOrange : UiPalette.NoteOrange;
             if (InfoTip != null)
             {
                 bool tip = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.Info;

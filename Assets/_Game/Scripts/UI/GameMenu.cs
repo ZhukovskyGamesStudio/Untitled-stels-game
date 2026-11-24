@@ -335,7 +335,7 @@ namespace Stealth.UI
             MicLevel.SetValueWithoutNotify(Mathf.InverseLerp(-70f, 0f, db));
             var fill = MicLevel.fillRect != null ? MicLevel.fillRect.GetComponent<Graphic>() : null;
             bool open = live && db >= VoiceGate.ThresholdDb(VoicePrefs.Sensitivity, Tuning.Audio.Voice);
-            if (fill != null) fill.color = open ? new Color(0.35f, 0.85f, 0.45f) : new Color(0.55f, 0.58f, 0.62f);
+            if (fill != null) fill.color = open ? UiPalette.MarkGreen : UiPalette.Rule;
         }
 
         static void SetLabel(Button button, string text)

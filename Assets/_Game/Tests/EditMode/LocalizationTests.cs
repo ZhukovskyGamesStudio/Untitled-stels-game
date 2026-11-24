@@ -60,7 +60,7 @@ namespace Stealth.Tests
 
         /// <summary>
         /// No Russian string literal in the code: texts for the player come from the tables. Allowed: inspector tooltips and
-        /// headers, comments, the autopilot's logs (DevAutomation*), and a line marked <c>// loc-ok</c> (a dev-only text).
+        /// headers, comments, the autopilot's logs (DevAutomation*), the sample states of the editor's UI pictures (UiSheet), and a line marked <c>// loc-ok</c> (a dev-only text).
         /// </summary>
         [Test]
         public void NoPlayerTextIsLeftInTheCode()
@@ -70,7 +70,7 @@ namespace Stealth.Tests
             foreach (var file in SourceFiles("Scripts", "Editor"))
             {
                 string name = Path.GetFileName(file);
-                if (name.StartsWith("DevAutomation")) continue;
+                if (name.StartsWith("DevAutomation") || name == "UiSheet.cs") continue; // (the UI sheet fills the screens with sample Russian text: a picture, not the game)
                 var lines = File.ReadAllLines(file);
                 for (int i = 0; i < lines.Length; i++)
                 {
