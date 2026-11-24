@@ -79,7 +79,30 @@ namespace Stealth.Player
             bool inside = IsOwner && !m_BodyShown;
             m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
             m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
+            HoldTheWheel();
             m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside);
+        }
+
+        /// <summary>
+        /// In the driver's seat: both hands on the steering wheel's rim, at ten to two, turning with the wheel
+        /// (<see cref="Vehicles.CarLook.HandTurn"/>); every peer, by the car's own steering (the driver's, or the replicated one).
+        /// </summary>
+        void HoldTheWheel()
+        {
+            var car = Vehicles.Car.Active;
+            if (SeatIndex != 0 || Downed || car == null || car.Steering == null)
+            {
+                m_Rig.LetGoOfWheel();
+                return;
+            }
+            float turn = Vehicles.CarLook.HandTurn(car.WheelTurn), at = Vehicles.CarLook.HandsAt;
+            var a = car.WheelGrip(-at, turn, out var hub, out var column);
+            var b = car.WheelGrip(at, turn, out _, out _);
+            var a0 = car.WheelGrip(-at, 0f, out _, out _);
+            var b0 = car.WheelGrip(at, 0f, out _, out _);
+            // (which point is the left hand's by where it is: the mirrored car has the wheel's own right on the driver's left)
+            if (Vector3.Dot(a0 - hub, m_Rig.transform.right) > 0f) { (a, b) = (b, a); (a0, b0) = (b0, a0); }
+            m_Rig.HoldWheel(a, b, a0, b0, hub, column);
         }
 
         HumanWardrobe m_Wardrobe;

@@ -19,7 +19,7 @@ namespace Stealth.Player
         public bool Driving => SeatIndex == 0;
 
         /// <summary>Feet this far under the seat's cushion: a sitting player's eyes are ~0.8 m above it.</summary>
-        const float SeatDrop = 0.72f;
+        public const float SeatDrop = 0.72f;
         /// <summary>
         /// The model's feet this far under the cushion when sitting: its hips (the legs' pivot, 0.92 m over the feet,
         /// <c>generate_models.LEG_PIVOT</c>) rest on the seat, so the head stays under the cab's roof (1.85 m).

@@ -46,6 +46,73 @@ namespace Stealth.Tests
             return go;
         }
 
+        /// <summary>Every mesh vertex of a prefab, set where <paramref name="place"/> puts its root.</summary>
+        static Vector3[] Vertices(GameObject root, Matrix4x4 place)
+        {
+            var toRoot = root.transform.worldToLocalMatrix;
+            return root.GetComponentsInChildren<MeshFilter>(true).Where(f => f.sharedMesh != null)
+                .SelectMany(f => { var m = place * toRoot * f.transform.localToWorldMatrix; return f.sharedMesh.vertices.Select(v => m.MultiplyPoint3x4(v)); })
+                .ToArray();
+        }
+
+        /// <summary>Every mesh triangle of a prefab (its three corners), in the prefab root's space.</summary>
+        static Vector3[][] Triangles(GameObject root)
+        {
+            var toRoot = root.transform.worldToLocalMatrix;
+            return root.GetComponentsInChildren<MeshFilter>(true).Where(f => f.sharedMesh != null).SelectMany(f =>
+            {
+                var m = toRoot * f.transform.localToWorldMatrix;
+                var v = f.sharedMesh.vertices.Select(p => m.MultiplyPoint3x4(p)).ToArray();
+                var t = f.sharedMesh.triangles;
+                return Enumerable.Range(0, t.Length / 3).Select(i => new[] { v[t[3 * i]], v[t[3 * i + 1]], v[t[3 * i + 2]] });
+            }).ToArray();
+        }
+
+        /// <summary>Where a ray from the hall along +X at (y, z) first meets the triangles (+∞: nothing there).</summary>
+        static float FirstAlongX(Vector3[][] tris, float y, float z)
+        {
+            float best = float.PositiveInfinity;
+            foreach (var t in tris)
+            {
+                // barycentric in the (z, y) plane: the ray is a point there
+                float d = (t[1].z - t[0].z) * (t[2].y - t[0].y) - (t[2].z - t[0].z) * (t[1].y - t[0].y);
+                if (Mathf.Abs(d) < 1e-9f) continue; // edge-on to the ray
+                float u = ((z - t[0].z) * (t[2].y - t[0].y) - (t[2].z - t[0].z) * (y - t[0].y)) / d;
+                float w = ((t[1].z - t[0].z) * (y - t[0].y) - (z - t[0].z) * (t[1].y - t[0].y)) / d;
+                if (u < 0f || w < 0f || u + w > 1f) continue;
+                best = Mathf.Min(best, t[0].x + u * (t[1].x - t[0].x) + w * (t[2].x - t[0].x));
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// A tunnel's route sign stands clear of its mouth's wall where the game puts it (<see cref="SewerLocation.SignSpot"/>):
+        /// the board, its posts and their base plates in front of the stone frame round the mouth and the plinth at the wall's
+        /// foot. (At 0.75 m off the wall the board lay in the frame's face — it stands 15 cm proud of the brick — and flickered
+        /// through it, and the base plates sat in the plinth.)
+        /// </summary>
+        [Test]
+        public void TheRouteSignStandsClearOfTheMouthsWall()
+        {
+            var place = Matrix4x4.TRS(new Vector3(SewerLocation.SignSpot.x, 0f, SewerLocation.SignSpot.z), Quaternion.Euler(0f, 90f, 0f), Vector3.one);
+            var stand = Vertices(Load("RouteSignStand"), place);
+            Assert.Less(stand.Min(v => v.x), -SewerHall.Wall - 0.15f, "the board faces the hall, in front of the wall");
+            float z0 = stand.Min(v => v.z) - 0.05f, z1 = stand.Max(v => v.z) + 0.05f, top = stand.Max(v => v.y) + 0.05f;
+            for (int h = 0; h < 2; h++)
+            {
+                // the wall's faces beside the sign that look into the hall (from 2 m out to the wall's outer face)
+                var tris = Triangles(Load($"HallMouth{h}")).Where(t => t.Max(p => p.z) > z0 && t.Min(p => p.z) < z1 && t.Min(p => p.y) < top && t.Min(p => p.x) > -2f).ToArray();
+                float worst = float.PositiveInfinity;
+                string where = "";
+                foreach (var v in stand)
+                {
+                    float gap = FirstAlongX(tris, v.y, v.z) - v.x; // from this point of the stand to the wall behind it
+                    if (gap < worst) { worst = gap; where = $"({v.x:0.000}, {v.y:0.000}, {v.z:0.000})"; }
+                }
+                Assert.Greater(worst, 0.01f, $"HallMouth{h}: the sign's stand at {where} is {worst * 100f:0.0} cm in front of the wall (in it, if negative)");
+            }
+        }
+
         [Test]
         public void SegmentsRunAlongPlusX()
         {

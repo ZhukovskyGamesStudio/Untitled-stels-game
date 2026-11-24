@@ -87,8 +87,13 @@ namespace Stealth.Level
         public Stealth.UI.RouteSignView SignPrefab;
         [Tooltip("The route sign's stand (Tools/Blender/road_sign.py): origin on the floor under the board, its face to −Z like the panel's.")]
         public GameObject SignStandPrefab;
-        /// <summary>How far in front of the tunnels' mouths the route panels hang: the end wall of the hall is 0.6 m of brick.</summary>
-        public const float SignOffWall = 0.75f;
+        /// <summary>
+        /// How far in front of a tunnel's mouth (its wall's outer face) the route panel's face stands: the wall is 0.6 m of
+        /// brick, the stone frame round the mouth 15 cm proud of it, the plinth 6 cm, and the stand's posts and base plates
+        /// reach 17.5 cm behind the face — at 0.75 the board lay in the frame's face and flickered through it
+        /// (SewerKitTests.TheRouteSignStandsClearOfTheMouthsWall).
+        /// </summary>
+        public const float SignOffWall = 0.86f;
         /// <summary>Where a tunnel's panel stands, in its mouth's frame (+X into the tunnel): eye level, beside the car's lane.</summary>
         public static readonly Vector3 SignSpot = new(-SignOffWall, 1.75f, 2.2f);
 
@@ -288,7 +293,7 @@ namespace Stealth.Level
                     sign = Instantiate(SignPrefab, transform);
                     sign.name = $"Sign{i}";
                     // at eye level in the mouth, on the driver's side (left-hand drive: +Z looking in), clear of the car's lane,
-                    // 15 cm in front of the hall's end wall (its brick is 0.6 m thick: x −0.6..0 from the mouth), its face to the
+                    // in front of the mouth's stone frame and the wall's plinth (SignOffWall), its face to the
                     // hall (a world-space canvas reads along its +Z: into the tunnel) — over the mouth the car's roof hid it
                     sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * SignSpot, mouth.rotation * Quaternion.Euler(0f, 90f, 0f));
                     // a road sign: the panel is the face of a board standing on two posts on the floor, not a plate on the wall

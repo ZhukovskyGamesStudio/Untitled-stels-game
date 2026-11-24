@@ -58,6 +58,18 @@ namespace Stealth.Player
         [System.NonSerialized] public bool HideRightArm;
         Transform m_ArmR;
 
+        /// <summary>
+        /// The car's steering wheel this body drives with, in the world (<see cref="HoldWheel"/>, every frame; <see cref="LetGoOfWheel"/>):
+        /// where each hand holds its rim now and where it would with the wheel straight, the hub and the steering column
+        /// (from the wheel's face to the driver). Both hands go there by IK and turn with the wheel.
+        /// </summary>
+        struct WheelHands { public Vector3 Left, Right, Left0, Right0, Hub, Column; }
+        WheelHands m_WheelAt;
+        bool m_Driving;
+        float m_Wheel;
+        /// <summary>How far the body was moved under the eyes last frame (<see cref="FirstPerson"/>): the hands' targets allow for it.</summary>
+        Vector3 m_EyeShift;
+
         static readonly int SpeedId = Animator.StringToHash("Speed");
         static readonly int CrouchId = Animator.StringToHash("Crouch");
         static readonly int DownId = Animator.StringToHash("Down");
@@ -71,6 +83,16 @@ namespace Stealth.Player
         [System.NonSerialized] public bool Cupped;
 
         float m_Pitch, m_Ground, m_Hold;
+
+        /// <summary>The driver's hands on the wheel this frame (world points; see <see cref="HumanMath.WheelWrist"/>).</summary>
+        public void HoldWheel(Vector3 left, Vector3 right, Vector3 left0, Vector3 right0, Vector3 hub, Vector3 column)
+        {
+            m_WheelAt = new WheelHands { Left = left, Right = right, Left0 = left0, Right0 = right0, Hub = hub, Column = column.normalized };
+            m_Driving = true;
+        }
+
+        /// <summary>Not driving: the hands go back to what the take does with them.</summary>
+        public void LetGoOfWheel() => m_Driving = false;
         bool m_Planted, m_Holding;
         static readonly RaycastHit[] s_Floor = new RaycastHit[6];
 
@@ -82,6 +104,7 @@ namespace Stealth.Player
             m_Planted = HumanMath.Planted(downed, seated, pose);
             m_Holding = HumanMath.Carries(holding, downed, seated, pose);
             m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
+            m_Wheel = Mathf.MoveTowards(m_Wheel, m_Driving && seated && !downed ? 1f : 0f, Time.deltaTime * HumanMath.WheelReachRate);
             m_Pitch = HumanMath.HeadPitch(pitch, HumanMath.HeadShare(HeadFollow, pose), downed);
             if (Animator == null || !Animator.isActiveAndEnabled) return;
             // in a seat the body rides with the car: its speed is the car's, not a walk
@@ -94,16 +117,18 @@ namespace Stealth.Player
             Animator.SetBool(SitId, seated && !downed);
             Animator.SetInteger(PoseId, (int)pose);
             Animator.SetFloat(ClimbId, HumanMath.ClimbRate(climb), 0.08f, Time.deltaTime);
-            if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
-            Animator.SetFloat(CupId, Cupped ? 1f : 0f, 0.08f, Time.deltaTime);
+            // the right fingers close round the wheel's rim as they do round a handle (the fist, not the cupped palm)
+            if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, Mathf.Max(m_Hold, m_Wheel));
+            Animator.SetFloat(CupId, Cupped && m_Wheel <= 0f ? 1f : 0f, 0.08f, Time.deltaTime);
         }
 
         /// <summary>Skips the blend of the hold (a still picture: Stealth → Human Pose Pictures).</summary>
         public void Settle()
         {
             m_Hold = m_Holding ? 1f : 0f;
-            if (Animator != null && Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
-            if (Animator != null) Animator.SetFloat(CupId, Cupped ? 1f : 0f);
+            m_Wheel = m_Driving ? 1f : 0f;
+            if (Animator != null && Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, Mathf.Max(m_Hold, m_Wheel));
+            if (Animator != null) Animator.SetFloat(CupId, Cupped && m_Wheel <= 0f ? 1f : 0f);
         }
 
         /// <summary>
@@ -118,8 +143,16 @@ namespace Stealth.Player
             // before the chest where the take has it now (the bones still hold the last frame's pose here: near enough)
             var chest = Chest != null && size > 1e-4f ? body.InverseTransformPoint(Chest.position) / size : ChestStanding;
             Vector3 At(Vector3 standing) => body.position + body.rotation * (HumanSkeleton.CarryAt(standing, chest, ChestStanding) * size);
+            if (layer == HumanLayers.UpperBody && m_Wheel > 0f)
+            {
+                OnTheWheel(size);
+                return;
+            }
             if (layer == HumanLayers.UpperBody)
             {
+                Animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, 0f);
+                Animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, 0f);
+                Animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
                 Animator.SetIKPositionWeight(AvatarIKGoal.RightHand, m_Hold);
                 Animator.SetIKRotationWeight(AvatarIKGoal.RightHand, m_Hold);
                 Animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, m_Hold);
@@ -130,6 +163,43 @@ namespace Stealth.Player
             }
             // (the head's look is not an IK look-at: on this Avatar it bowed every head — the head is turned after the
             // animation instead, LateUpdate)
+        }
+
+        /// <summary>
+        /// Both hands on the wheel's rim (the IK pass of the upper body): the wrists where the fingers close round the rim
+        /// (<see cref="HumanMath.WheelWrist"/>), turned with the wheel from the way the Sit take holds them, the elbows low and
+        /// out. The owner's body is moved under the eyes after the animation: the targets allow for last frame's shift.
+        /// </summary>
+        void OnTheWheel(float size)
+        {
+            var w = m_WheelAt;
+            var shift = Eyes != null ? m_EyeShift : Vector3.zero;
+            var body = transform;
+            var chest = Chest != null ? Chest.position : body.position + body.up * (ChestStanding.y * 0.75f * size);
+            Hand(AvatarIKGoal.LeftHand, AvatarIKHint.LeftElbow, w.Left, w.Left0, -1f, HumanBodyBones.LeftHand, HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleDistal);
+            Hand(AvatarIKGoal.RightHand, AvatarIKHint.RightElbow, w.Right, w.Right0, 1f, HumanBodyBones.RightHand, HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleDistal);
+
+            void Hand(AvatarIKGoal goal, AvatarIKHint hint, Vector3 at, Vector3 at0, float side, HumanBodyBones wristBone, HumanBodyBones knuckleBone, HumanBodyBones tipBone)
+            {
+                // the wrist where the fist's hollow goes round the rim: the hollow from the hand's own bones (last frame's
+                // pose: the hand turns slowly), or the rule of thumb before the bones are there
+                var wrist = HumanMath.WheelWrist(at, w.Hub, w.Column, size);
+                var hand = Animator.GetBoneTransform(wristBone);
+                var knuckle = Animator.GetBoneTransform(knuckleBone);
+                var tip = Animator.GetBoneTransform(tipBone);
+                if (hand != null && knuckle != null && tip != null)
+                    wrist = at - (HumanMath.FistHollow(hand.position, knuckle.position, tip.position) - hand.position);
+                // (the take's hand as it holds a wheel, turned as far as the rim turned under it)
+                var turn = Quaternion.FromToRotation(at0 - w.Hub, at - w.Hub);
+                var rotation = turn * Animator.GetIKRotation(goal);
+                var elbow = HumanSkeleton.WheelElbow;
+                Animator.SetIKPositionWeight(goal, m_Wheel);
+                Animator.SetIKRotationWeight(goal, m_Wheel);
+                Animator.SetIKHintPositionWeight(hint, m_Wheel);
+                Animator.SetIKPosition(goal, wrist - shift);
+                Animator.SetIKRotation(goal, rotation);
+                Animator.SetIKHintPosition(hint, chest - shift + (body.right * (side * elbow.x) + body.up * elbow.y + body.forward * elbow.z) * size);
+            }
         }
 
         void LateUpdate()
@@ -152,7 +222,8 @@ namespace Stealth.Player
                 if (m_ArmR.localScale != scale) m_ArmR.localScale = scale;
             }
             if (Eyes == null || HeadBone == null || Hips == null) return;
-            Hips.position += HumanMath.EyeShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y);
+            m_EyeShift = HumanMath.EyeShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y);
+            Hips.position += m_EyeShift;
         }
 
         /// <summary>
@@ -289,6 +360,33 @@ namespace Stealth.Player
         /// lies that much lower.
         /// </summary>
         public const float GripAlong = 0.9f, GripOverPalm = 0f, CupAlong = 0.62f, CupOverPalm = -0.022f;
+
+        /// <summary>
+        /// Where the wrist goes for the fingers to close round the wheel's rim at <paramref name="rim"/>: the fist lies on the
+        /// rim with the hand reaching forward over it (towards the wheel's face, down the column), so the wrist is
+        /// <see cref="WheelWristBack"/> back towards the driver and <see cref="WheelWristOut"/> out from the hub — the rim
+        /// in the palm, not under the wrist. Metres for the model's own size (<paramref name="size"/>: a person's height).
+        /// </summary>
+        public static Vector3 WheelWrist(Vector3 rim, Vector3 hub, Vector3 column, float size)
+        {
+            column = column.normalized;
+            var outward = Vector3.ProjectOnPlane(rim - hub, column);
+            outward = outward.sqrMagnitude > 1e-8f ? outward.normalized : Vector3.zero;
+            return rim + (column * WheelWristBack + outward * WheelWristOut) * size;
+        }
+
+        /// <summary>
+        /// The hollow of a closed fist (what a rim or a bar goes through): halfway between the knuckles' line (most of the
+        /// way from the wrist to the middle finger's first joint) and that finger's last joint, curled in under it.
+        /// </summary>
+        public static Vector3 FistHollow(Vector3 wrist, Vector3 knuckle, Vector3 fingerTip) =>
+            (Vector3.Lerp(wrist, knuckle, 0.9f) + fingerTip) * 0.5f;
+
+        /// <summary>The wrist from the rim it holds: along the column towards the driver and out from the hub, metres.</summary>
+        public const float WheelWristBack = 0.07f, WheelWristOut = 0.02f;
+
+        /// <summary>How fast the hands go to the wheel when the driver sits down (and back when getting out), per second.</summary>
+        public const float WheelReachRate = 3f;
 
         /// <summary>Standing on its feet: not lying, not seated, not on a ladder — the feet are put on the floor.</summary>
         public static bool Planted(bool downed, bool seated, BodyPose pose) => !downed && !seated && pose != BodyPose.Ladder;

@@ -135,6 +135,12 @@ namespace Stealth.Player
         public static readonly Quaternion CarryHand = Quaternion.Euler(0f, 0f, 180f) * Quaternion.Euler(0f, 90f, 0f);
 
         /// <summary>
+        /// The elbows' IK hint on the wheel, from the chest in the body's space (x out to the elbow's side, y up, z forward;
+        /// metres for the model's own size): low and a little out, the forearms reaching up to the rim.
+        /// </summary>
+        public static readonly Vector3 WheelElbow = new(0.3f, -0.32f, 0.12f);
+
+        /// <summary>
         /// The right hand's grip as humanoid finger muscles (curve names of a humanoid clip; −1 bent .. 1 stretched): the
         /// four fingers closed round a handle, each joint curled, the little finger tightest; the thumb comes in over them.
         /// </summary>

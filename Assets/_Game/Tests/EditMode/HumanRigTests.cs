@@ -251,6 +251,19 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>The wrist behind the rim it holds (towards the driver) and a little out from the hub: the rim in the palm.</summary>
+        [Test]
+        public void TheWristIsBehindTheRimItHolds()
+        {
+            var hub = new Vector3(0.4f, 1.1f, 0.5f);
+            var column = new Vector3(0f, 0.42f, -0.9f).normalized;
+            var rim = hub + Vector3.Cross(column, Vector3.right).normalized * -0.18f;
+            var wrist = HumanMath.WheelWrist(rim, hub, column, 1f);
+            Assert.AreEqual(HumanMath.WheelWristBack, Vector3.Dot(wrist - rim, column), 1e-4f, "towards the driver along the column");
+            Assert.Greater(Vector3.Distance(wrist, hub), Vector3.Distance(rim, hub), "out from the hub, not into the wheel");
+            Assert.AreEqual(2f * Vector3.Distance(wrist, rim), Vector3.Distance(HumanMath.WheelWrist(rim, hub, column, 2f), rim), 1e-4f, "by the person's size");
+        }
+
         [Test]
         public void EveryStyleShowsTheDepartments()
         {
