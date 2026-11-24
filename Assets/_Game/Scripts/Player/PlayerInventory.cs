@@ -657,28 +657,6 @@ namespace Stealth.Player
             return true;
         }
 
-        /// <summary>Server: the workbench turns groups of one colour into diamonds (<see cref="Crafting"/>). Returns how many were made.</summary>
-        public int CraftServer(GadgetSettings settings)
-        {
-            var recipes = Crafting.Plan(m_Items, settings);
-            if (recipes.Count == 0) return 0;
-            var used = new HashSet<int>();
-            foreach (var r in recipes) used.UnionWith(r.Items);
-            var kept = new List<InventoryEntry>();
-            for (int i = 0; i < m_Items.Count; i++) if (!used.Contains(i)) kept.Add(m_Items[i]);
-            m_Items.Clear();
-            m_Items.AddRange(kept);
-            int made = 0;
-            foreach (var r in recipes)
-            {
-                if (!FindSpot(ItemCatalog.Diamond, out var x, out var y, out var rot)) break; // one cell: it fits where its parts were
-                m_Items.Add(new InventoryEntry { Shape = ItemCatalog.Diamond, Color = (byte)r.Color, X = x, Y = y, Rot = rot });
-                made++;
-            }
-            Changed();
-            return made;
-        }
-
         public void ClearServer()
         {
             m_Items.Clear();

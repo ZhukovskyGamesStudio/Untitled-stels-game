@@ -103,7 +103,6 @@ namespace Stealth.Game
             {
                 case UseKind.Crate: SearchCrateServer(index, thing.transform); break;
                 case UseKind.MedTable: HealServer(player); break;
-                case UseKind.Workbench: CraftServer(player); break;
                 case UseKind.KeyDoor: UnlockWithKeyServer(player, index); break;
                 case UseKind.VaultConsole: SolveConsoleServer(player, index); break;
                 case UseKind.VaultDoor: OpenVaultServer(index); break;
@@ -198,14 +197,6 @@ namespace Stealth.Game
             OpenedVersion++;
             player.HealServer(Gadgets.MedTableHp);
             Banner(Loc.Pack("banner.healed", player.Nick, Gadgets.MedTableHp));
-        }
-
-        void CraftServer(PlayerController player)
-        {
-            var inventory = player.GetComponent<PlayerInventory>();
-            if (inventory == null) return;
-            int made = inventory.CraftServer(Gadgets);
-            if (made > 0) Banner(Loc.Pack("banner.crafted", player.Nick, made));
         }
 
         void UnlockWithKeyServer(PlayerController player, int door)

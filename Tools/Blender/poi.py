@@ -272,85 +272,432 @@ def model_med_table():
     return export("med_table")
 
 
-# --------------------------------------------------------------------------- workbench
+# --------------------------------------------------------------------------- workbench (the car upgrade bench)
 
-def screwdriver(x, z_top, length, r):
-    handle = s.lathe([(0.0, z_top - 0.1), (r * 0.8, z_top - 0.098), (r, z_top - 0.085), (r, z_top - 0.02),
-                      (r * 0.85, z_top), (0.0, z_top + 0.003)], seg=10, loc=(x, 0.355, 0))
-    shaft = s.rcyl(0.004, length, (x, 0.355, z_top - 0.1 - length / 2 + 0.01), seg=8, r=0.001)
-    return [handle, shaft]
+WB_TOP = 0.95              # worktop surface
+WB_X0, WB_X1 = -0.88, 1.52  # worktop ends (the engine, its dolly and hoist take x -1.55 .. -0.90)
+WB_Y0, WB_Y1 = -0.41, 0.462
+BOARD_Y = 0.47             # tool wall centre plane (board 0.458 .. 0.482); tools hang just in front of it
+BOARD_F = 0.458            # its front face
+SHELF_Z = 1.865            # top shelf centre (1.85 .. 1.88)
+ENG = Vector((-1.21, -0.12, 0.0))  # engine centre in plan: crank along Y, pulleys to the front (-Y)
+ENG_K = 1.2                # the engine is modelled 1:1 and shown 20 % bigger: the bench's main "car" cue
+ENG_Z0 = 0.33              # its oil pan's bottom, on the dolly's saddles
 
 
-def wrench(x, z, length, r):
-    shaft = s.rbox((0.022 * r / 0.03, 0.012, length), (x, 0.362, z), r=0.004, seg=1)
-    ends = []
-    for dz in (-1, 1):
-        e = s.rcyl(r, 0.012, (x, 0.362, z + dz * length / 2), axis="Y", seg=16, r=0.002)
-        e = s.boolean(e, s.rbox((r * 0.8, 0.05, r * 1.2), (x, 0.362, z + dz * (length / 2 + r * 0.55)), r=0), "DIFFERENCE")
-        ends.append(e)
-    return [shaft, *ends]
+def _cyl(radius, depth, loc=(0, 0, 0), axis="Z", seg=12, r=0.006, rot=(0, 0, 0), bevel_seg=1):
+    """shapes.rcyl at two thirds of the segments and one bevel step (none under 2.5 cm): the bench has dozens of small
+    round parts."""
+    if radius < 0.025:
+        r = 0.0                                         # a chamfer on a part this small never shows
+    return s.rcyl(radius, depth, loc, axis=axis, seg=max(6, round(seg * 0.67)), r=r, bevel_seg=bevel_seg, rot=rot)
+
+
+def _wrench(x, z_top, length, w):
+    """A combination spanner hanging by its ring end: flat shank, a ring at the top, an open jaw at the bottom."""
+    y = BOARD_F - 0.006
+    shank = s.rbox((w, 0.007, length), (x, y, z_top - length / 2), r=0.0025, seg=1)
+    ring_end = s.rcyl(w * 1.15, 0.009, (x, y, z_top), axis="Y", seg=8, r=0.0)
+    jaw = s.rbox((w * 2.2, 0.009, w * 1.4), (x, y, z_top - length), r=0.002, seg=1, taper=(1.25, 1.0))  # open end
+    return [shank, ring_end, jaw]
+
+
+def _hook(x, z):
+    y = BOARD_F
+    return s.tube([(x, y + 0.004, z), (x, y - 0.03, z), (x, y - 0.038, z + 0.012)], 0.0035, res=1, smooth=False)
+
+
+def _eng_pt(x, y, z):
+    """A point of the engine as modelled (around ENG at the old height) -> where it ends up: scaled by ENG_K about the
+    oil pan's bottom and set down on the dolly's saddles."""
+    return Vector((ENG.x + (x - ENG.x) * ENG_K, ENG.y + (y - ENG.y) * ENG_K, ENG_Z0 + (z - 0.49) * ENG_K))
+
+
+def _engine():
+    """An inline four hanging on the hoist over its dolly: oil pan, ribbed block, head, valve cover with coil packs,
+    intake runners and plenum on the left (-x), exhaust manifold on the right, timing cover, pulleys and the belt at
+    the front, a flywheel at the back and two lifting brackets. Modelled at 1:1 around z 0.49, then scaled by ENG_K."""
+    cx, cy = ENG.x, ENG.y
+    y0 = cy - 0.22                                      # block front face
+    pan = s.rbox((0.22, 0.40, 0.11), (cx, cy + 0.01, 0.545), r=0.025, seg=1, taper=(1.18, 1.06))
+    block = s.rbox((0.245, 0.44, 0.30), (cx, cy, 0.735), r=0.022, seg=2, taper=(1.1, 1.0))  # skirt narrower than the deck
+    for y in (cy - 0.11, cy, cy + 0.11):
+        s.groove(block, "Y", y, 0.012, 0.006)           # cylinder ribs
+    head = s.rbox((0.29, 0.45, 0.10), (cx, cy, 0.925), r=0.02, seg=2)
+    s.groove(head, "Z", 0.905, 0.01, 0.005)
+    cover = s.loft([(0.965, 0.10, 0.21, 4), (1.01, 0.095, 0.205, 4), (1.045, 0.075, 0.19, 3)], seg=20,
+                   round_caps=0.015, loc=(cx, cy, 0))
+    parts = [pan, block, head, cover]
+    for k in range(4):                                  # coil packs on the cover's ridge
+        y = cy - 0.15 + k * 0.1
+        parts.append(s.rbox((0.05, 0.035, 0.05), (cx, y, 1.06), r=0.008, seg=1))
+    parts.append(_cyl(0.022, 0.03, (cx + 0.05, cy + 0.15, 1.045), seg=12, r=0.004))   # oil filler cap
+    for dy in (-0.05, 0.06):                            # freeze plugs on the left of the block
+        parts.append(_cyl(0.018, 0.012, (cx - 0.13, cy + dy, 0.70), axis="X", seg=10, r=0.003))
+    for sy in (-1, 1):                                  # lifting brackets bolted to the head's ends
+        parts.append(s.rbox((0.06, 0.02, 0.09), (cx + sy * 0.03, cy + sy * 0.23, 0.995), r=0.006, seg=1))
+    # intake: four runners curving out of the head's left side down into a plenum along Y, throttle body at the front
+    px, pz = cx - 0.215, 0.80
+    for k in range(4):
+        y = cy - 0.165 + k * 0.11
+        parts.append(s.tube([(cx - 0.13, y, 0.93), (cx - 0.20, y, 0.95), (cx - 0.225, y, 0.88), (px, y, pz + 0.02)],
+                            0.022, res=1, segments_per=2))
+    parts.append(_cyl(0.05, 0.42, (px, cy - 0.01, pz), axis="Y", seg=14, r=0.012))
+    parts.append(_cyl(0.036, 0.06, (px, cy - 0.245, pz), axis="Y", seg=14, r=0.006))
+    # exhaust: four pipes out of the right side of the head into a collector, the down pipe flange below
+    ex = cx + 0.20
+    for k in range(4):
+        y = cy - 0.165 + k * 0.11
+        yc = cy + 0.02 + (k - 1.5) * 0.03
+        parts.append(s.tube([(cx + 0.13, y, 0.91), (cx + 0.19, y, 0.90), (ex, yc, 0.80), (ex - 0.005, yc, 0.70)],
+                            0.019, res=1, segments_per=2))
+    parts.append(_cyl(0.045, 0.1, (ex - 0.005, cy + 0.02, 0.66), seg=14, r=0.01))
+    parts.append(_cyl(0.062, 0.016, (ex - 0.005, cy + 0.02, 0.605), seg=14, r=0.004))
+    # oil filter on the left, low
+    parts.append(_cyl(0.042, 0.10, (cx - 0.16, cy + 0.08, 0.62), axis="X", seg=14, r=0.008))
+    # front: timing cover, crank / cam / alternator pulleys and the belt round them
+    parts.append(s.rbox((0.22, 0.04, 0.34), (cx, y0 - 0.012, 0.79), r=0.02, seg=1, taper=(0.8, 1.0)))
+    crank = Vector((cx, y0 - 0.05, 0.63))
+    cam = Vector((cx, y0 - 0.05, 0.93))
+    alt = Vector((cx - 0.11, y0 - 0.05, 0.76))
+    for c, r in ((crank, 0.07), (cam, 0.06), (alt, 0.042)):
+        parts.append(s.lathe([(0.0, -0.022), (r, -0.022), (r * 0.86, 0.0), (r, 0.022), (0.0, 0.022)], seg=14,
+                             axis="Y", loc=tuple(c)))
+        parts.append(_cyl(r * 0.45, 0.06, tuple(c + Vector((0, 0.03, 0))), axis="Y", seg=10, r=0.003))
+    parts.append(_cyl(0.06, 0.12, (alt.x - 0.005, y0 + 0.04, alt.z), axis="Y", seg=14, r=0.012))  # alternator
+    belt = []
+    for c, r, a0, a1 in ((crank, 0.074, 200, 340), (cam, 0.064, -20, 160), (alt, 0.046, 120, 240)):
+        for k in range(4):
+            a = math.radians(a0 + (a1 - a0) * k / 3)
+            belt.append((c.x + r * math.cos(a), c.y, c.z + r * math.sin(a)))
+    belt.append(belt[0])
+    parts.append(s.tube(belt, 0.006, res=1, smooth=False))
+    # back: the flywheel with its ring gear on the crank, the bell face of the block behind it
+    parts.append(s.lathe([(0.0, 0.0), (0.13, 0.0), (0.14, 0.006), (0.14, 0.024), (0.13, 0.03), (0.0, 0.03)], seg=20,
+                         axis="Y", loc=(cx, cy + 0.215, 0.63)))
+    for b in parts:
+        s.place(b, (-cx, -cy, -0.49))
+        s.place(b, scale=(ENG_K, ENG_K, ENG_K))
+        s.place(b, (cx, cy, ENG_Z0))
+    return parts
+
+
+def _dolly():
+    """The low engine dolly under the hanging engine: a frame on four casters and two saddles under the oil pan."""
+    cx, cy = ENG.x, ENG.y
+    parts, wheels = [], []
+    for sx in (-1, 1):
+        parts.append(s.rbox((0.045, 0.60, 0.045), (cx + sx * 0.17, cy, 0.115), r=0.008, seg=1))         # side rails
+    for sy in (-1, 1):
+        parts.append(s.rbox((0.39, 0.045, 0.045), (cx, cy + sy * 0.26, 0.115), r=0.008, seg=1))         # cross rails
+        for sx in (-1, 1):
+            parts.append(s.rbox((0.04, 0.04, 0.20), (cx + sx * 0.17, cy + sy * 0.15, 0.225), r=0.006, seg=1))  # posts
+        parts.append(s.rbox((0.40, 0.07, 0.04), (cx, cy + sy * 0.15, ENG_Z0 - 0.017), r=0.008, seg=1))  # saddle
+        for sx in (-1, 1):
+            x, y = cx + sx * 0.17, cy + sy * 0.26
+            wheels.append(_cyl(0.042, 0.03, (x, y, 0.042), axis="X", seg=12, r=0.008))
+            wheels.append(s.rbox((0.05, 0.05, 0.05), (x, y, 0.085), r=0.006, seg=1))                     # fork
+    return parts + wheels
+
+
+def _hoist():
+    """A jib crane behind the engine: a round column on a floor plate, a boom out over the engine with a brace, a
+    trolley with a chain block, the chain down to the hook and two lifting chains from the hook to the engine's
+    brackets; the hand chain loop beside it."""
+    cx, cy = ENG.x, ENG.y
+    col = Vector((cx - 0.02, 0.43, 0))
+    top = 2.03
+    parts = [s.rbox((0.30, 0.20, 0.025), (col.x, col.y, 0.0125), r=0.006, seg=1),          # floor plate
+             _cyl(0.045, top - 0.02, (col.x, col.y, (top - 0.02) / 2 + 0.01), seg=16, r=0.006),
+             _cyl(0.06, 0.05, (col.x, col.y, 0.05), seg=16, r=0.008),                     # foot collar
+             _cyl(0.06, 0.06, (col.x, col.y, top - 0.04), seg=16, r=0.008)]               # pivot collar
+    for sx in (-1, 1):                                                                     # gussets on the plate
+        parts.append(s.rbox((0.012, 0.08, 0.08), (col.x + sx * 0.06, col.y, 0.06), r=0.003, seg=1))
+    y_end = -0.47
+    boom_y0 = col.y + 0.06
+    boom_c = (boom_y0 + y_end) / 2
+    parts.append(s.rbox((0.022, boom_y0 - y_end, 0.10), (col.x, boom_c, top - 0.04), r=0.004, seg=1))   # web
+    for dz in (-0.05, 0.05):                                                                          # flanges
+        parts.append(s.rbox((0.07, boom_y0 - y_end, 0.016), (col.x, boom_c, top - 0.04 + dz), r=0.004, seg=1))
+    parts.append(s.rbox((0.08, 0.02, 0.12), (col.x, y_end + 0.004, top - 0.04), r=0.004, seg=1))      # end stop
+    parts.append(s.tube([(col.x, col.y - 0.03, 1.55), (col.x, -0.05, top - 0.095)], 0.016, res=1, smooth=False))
+    # trolley on the lower flange, chain block under it
+    ty = cy
+    parts.append(s.rbox((0.09, 0.10, 0.04), (col.x, ty, top - 0.105), r=0.008, seg=1))
+    parts.append(s.rbox((0.12, 0.13, 0.12), (col.x, ty, top - 0.18), r=0.03, seg=1))
+    parts.append(_cyl(0.07, 0.03, (col.x + 0.075, ty, top - 0.18), axis="X", seg=16, r=0.006))      # hand wheel
+    chain = []
+    z = top - 0.25
+    k = 0
+    while z > 1.42:
+        link = ring(0.017, 0.0095, 0.006, axis="Y", seg=6, r=0.0)
+        s.place(link, scale=(1, 1, 2.0))
+        if k % 2:
+            s.place(link, rot=(0, 0, math.pi / 2))
+        s.place(link, (col.x, ty, z))
+        chain.append(link)
+        z -= 0.055
+        k += 1
+    hook_top = z + 0.03
+    parts.append(_cyl(0.022, 0.05, (col.x, ty, hook_top - 0.02), seg=12, r=0.005))                 # swivel
+    bowl = Vector((col.x, ty - 0.035, hook_top - 0.155))
+    parts.append(s.tube([(col.x, ty, hook_top - 0.04), (col.x, ty, hook_top - 0.10), tuple(bowl),
+                         (col.x, ty - 0.075, hook_top - 0.11), (col.x, ty - 0.07, hook_top - 0.08)], 0.011,
+                        res=1, segments_per=2, radii=[1.0, 1.0, 0.9, 0.7, 0.5]))
+    for sy in (-1, 1):                                  # lifting chains to the brackets, taut
+        b = _eng_pt(cx + sy * 0.03, cy + sy * 0.23, 1.03)
+        parts.append(s.tube([tuple(bowl + Vector((0, 0, -0.005))), tuple(b)], 0.007, res=1, smooth=False))
+    # hand chain loop hanging off the hand wheel
+    hx = col.x + 0.09
+    parts.append(s.tube([(hx, ty - 0.05, top - 0.2), (hx, ty - 0.06, 1.45), (hx, ty, 1.38), (hx, ty + 0.06, 1.45),
+                         (hx, ty + 0.05, top - 0.2)], 0.005, res=1, segments_per=3))
+    return parts + chain
+
+
+def _bench_frame():
+    """Heavy steel frame: square legs with feet, rails, the tool wall's uprights and top bar, the worktop nosing."""
+    parts = []
+    for x, y in ((-0.835, -0.36), (1.475, -0.36), (0.245, -0.36)):
+        parts.append(s.rbox((0.07, 0.07, 0.875), (x, y, 0.4375), r=0.01, seg=1))
+        parts.append(s.rbox((0.10, 0.10, 0.02), (x, y, 0.01), r=0.005, seg=1))                    # foot plate
+    for x in (-0.85, 1.49):                                                                         # wall uprights
+        parts.append(s.rbox((0.06, 0.06, 2.07), (x, BOARD_Y, 1.035), r=0.01, seg=1))
+        parts.append(s.rbox((0.10, 0.10, 0.02), (x, BOARD_Y, 0.01), r=0.005, seg=1))
+    parts.append(s.rbox((2.42, 0.07, 0.06), (0.32, BOARD_Y, 2.07), r=0.012, seg=1))                # top bar
+    for x in (-0.84, 1.48):                                                                         # side rails
+        for z in (0.12, 0.83):
+            parts.append(s.rbox((0.045, 0.80, 0.05), (x, 0.055, z), r=0.008, seg=1))
+    parts.append(s.rbox((2.30, 0.045, 0.07), (0.32, -0.365, 0.83), r=0.008, seg=1))                 # front apron
+    parts.append(s.rbox((2.30, 0.045, 0.06), (0.32, BOARD_Y - 0.02, 0.83), r=0.008, seg=1))         # back rail
+    parts.append(s.rbox((1.06, 0.045, 0.045), (-0.30, -0.365, 0.12), r=0.008, seg=1))               # shelf front rail
+    parts.append(s.rbox((WB_X1 - WB_X0 + 0.01, 0.025, 0.09), ((WB_X0 + WB_X1) / 2, WB_Y0 - 0.002, WB_TOP - 0.04),
+                        r=0.006, seg=1))                                                            # steel nosing
+    for x in (-0.70, 1.25):                                                                         # shelf brackets
+        parts.append(s.rbox((0.02, 0.17, 0.12), (x, 0.375, SHELF_Z - 0.075), r=0.004, seg=1))
+    return parts
+
+
+def _vise():
+    x, y = 1.28, -0.25
+    t = WB_TOP - 0.004
+    parts = [s.rbox((0.16, 0.20, 0.04), (x, y + 0.02, t + 0.02), r=0.012, seg=1),
+             s.rbox((0.19, 0.06, 0.12), (x, y + 0.07, t + 0.085), r=0.012, seg=1),
+             s.rbox((0.19, 0.06, 0.10), (x, y - 0.09, t + 0.08), r=0.012, seg=1),
+             s.rbox((0.08, 0.18, 0.05), (x, y - 0.01, t + 0.05), r=0.01, seg=1),
+             _cyl(0.012, 0.12, (x, y - 0.18, t + 0.075), axis="Y", seg=10, r=0.002),
+             _cyl(0.007, 0.17, (x, y - 0.235, t + 0.075), axis="X", seg=8, r=0.002)]
+    parts += [s.ball(0.013, (x + d * 0.085, y - 0.235, t + 0.075), seg=8) for d in (-1, 1)]
+    return parts
+
+
+def _coilover(x, y):
+    """A coil-over strut standing on the bench: damper body, spring seats and a coil spring round it."""
+    t = WB_TOP - 0.004
+    parts = [_cyl(0.032, 0.30, (x, y, t + 0.15), seg=14, r=0.006),
+             _cyl(0.012, 0.12, (x, y, t + 0.34), seg=10, r=0.003),
+             _cyl(0.058, 0.014, (x, y, t + 0.06), seg=16, r=0.004),
+             _cyl(0.058, 0.014, (x, y, t + 0.35), seg=16, r=0.004),
+             _cyl(0.03, 0.03, (x, y, t + 0.395), seg=12, r=0.005),
+             s.lathe([(0.0, 0.0), (0.03, 0.0), (0.03, 0.03), (0.018, 0.05), (0.0, 0.05)], seg=12, loc=(x, y, t))]
+    pts = []
+    turns, z0, z1, r = 4.5, t + 0.068, t + 0.343, 0.048
+    n = int(turns * 7)
+    for k in range(n + 1):
+        a = 2 * math.pi * turns * k / n
+        pts.append((x + r * math.cos(a), y + r * math.sin(a), z0 + (z1 - z0) * k / n))
+    parts.append(s.tube(pts, 0.008, res=1, smooth=False))
+    return parts
+
+
+def _tyre(c, rad=0.30, w=0.21):
+    """A wheel standing on its tread, face to the front: a fat tyre (rounded shoulders, two tread grooves, sidewall
+    bulge) with a clear step down to a steel rim, its dish, a raised hub ring and five nuts."""
+    hw = w / 2
+    prof = [(0.0, -hw + 0.06), (0.06, -hw + 0.06), (0.075, -hw + 0.035), (0.13, -hw + 0.035), (0.165, -hw + 0.012),
+            (0.185, -hw + 0.012), (0.19, -hw - 0.004), (0.196, -hw + 0.01),          # rim flange, the bead seat
+            (0.212, -hw + 0.004), (rad - 0.05, -hw - 0.016), (rad - 0.012, -hw + 0.012), (rad, -hw + 0.045),
+            (rad, hw - 0.045), (rad - 0.012, hw - 0.012), (rad - 0.05, hw + 0.016), (0.212, hw - 0.004),
+            (0.196, hw - 0.01), (0.19, hw + 0.004), (0.185, hw - 0.012), (0.0, hw - 0.012)]
+    tyre = s.lathe(prof, seg=22, axis="Y", loc=tuple(c))
+    for dy in (-0.035, 0.035):
+        s.groove(tyre, "Y", c.y + dy, 0.014, 0.01)
+    nuts = [_cyl(0.012, 0.03, (c.x + 0.045 * math.cos(a), c.y - hw + 0.05, c.z + 0.045 * math.sin(a)), axis="Y",
+                 seg=6, r=0.0) for a in (math.radians(90 + 72 * k) for k in range(5))]
+    return [tyre, *nuts]
+
+
+def _battery(x, y, z):
+    box = s.rbox((0.26, 0.17, 0.19), (x, y, z + 0.095), r=0.012, seg=1)
+    lid = s.rbox((0.27, 0.18, 0.025), (x, y, z + 0.19), r=0.008, seg=1)
+    posts = [_cyl(0.013, 0.03, (x + sx * 0.09, y - 0.04, z + 0.21), seg=10, r=0.003) for sx in (-1, 1)]
+    handle = s.tube([(x - 0.07, y + 0.03, z + 0.2), (x - 0.05, y + 0.03, z + 0.25), (x + 0.05, y + 0.03, z + 0.25),
+                     (x + 0.07, y + 0.03, z + 0.2)], 0.006, res=1, segments_per=2)
+    return [box, lid, handle], posts
+
+
+def _jerrycan(x, y, z):
+    """A fuel jerrycan standing on the low shelf: pressed X panels on its flanks, three-bar handle, the spout."""
+    w, d, h = 0.17, 0.36, 0.44
+    body = s.rbox((w, d, h), (x, y, z + h / 2), r=0.022, seg=1)
+    s.inset_faces(body, s.facing((1, 0, 0), 0.05), 0.03, -0.008)
+    s.inset_faces(body, s.facing((-1, 0, 0), 0.05), 0.03, -0.008)
+    parts = [body]
+    for dy in (-0.07, 0.0, 0.07):                       # handle posts
+        parts.append(s.rbox((0.03, 0.02, 0.05), (x, y + 0.04 + dy, z + h + 0.02), r=0.006, seg=1))
+    parts.append(s.rbox((0.03, 0.18, 0.025), (x, y + 0.04, z + h + 0.05), r=0.01, seg=1))      # handle bar
+    spout = _cyl(0.026, 0.07, (0, 0, 0), seg=10, r=0.005)
+    s.place(spout, (x, y - 0.135, z + h + 0.02), (math.radians(-30), 0, 0))
+    parts.append(spout)
+    return parts
+
+
+def _screen():
+    """The diagnostic scanner: a monitor on the tool wall, a cable down to the OBD plug lying on the bench."""
+    x, z = 1.08, 1.43
+    yb = BOARD_F
+    bezel = s.rbox((0.44, 0.05, 0.31), (x, yb - 0.085, z), r=0.018, seg=1)
+    back = s.rbox((0.24, 0.10, 0.16), (x, yb - 0.048, z), r=0.012, seg=1)
+    knobs = [_cyl(0.011, 0.012, (x + 0.13 + k * 0.035, yb - 0.112, z - 0.13), axis="Y", seg=10, r=0.002)
+             for k in range(2)]
+    cable = s.tube([(x - 0.18, yb - 0.08, z - 0.15), (x - 0.24, yb - 0.10, z - 0.3), (x - 0.30, yb - 0.25, WB_TOP + 0.02),
+                    (x - 0.40, yb - 0.30, WB_TOP + 0.008)], 0.006, res=1, segments_per=3)
+    plug = s.rbox((0.05, 0.03, 0.022), (x - 0.43, yb - 0.30, WB_TOP + 0.008), r=0.006, seg=1)
+    glass = s.rbox((0.38, 0.012, 0.23), (x, yb - 0.111, z + 0.012), r=0.006, seg=1)
+    return [bezel, back, cable, plug] + knobs, [glass]
+
+
+def _wall_tools():
+    """Few, big, car-shaped things on the tool wall: a licence plate, a lug wrench, a hubcap, a torque wrench, a
+    drive belt on a hook, four big spanners on a rail and a hammer."""
+    parts = []
+    y = BOARD_F - 0.006
+    # licence plate screwed to the board, its face pressed in inside the border
+    plate = s.rbox((0.52, 0.014, 0.12), (-0.45, BOARD_F - 0.005, 1.74), r=0.008, seg=1)
+    s.inset_faces(plate, s.facing((0, -1, 0), 0.01), 0.014, -0.004)
+    parts.append(plate)
+    parts += [_cyl(0.008, 0.014, (-0.45 + sx * 0.19, BOARD_F - 0.012, 1.74), axis="Y", seg=8) for sx in (-1, 1)]
+    # four-way lug wrench
+    cx, cz, arm = -0.58, 1.43, 0.22
+    for a in (45, -45):
+        bar = _cyl(0.011, 2 * arm + 0.01, (0, 0, 0), axis="X", seg=8)
+        s.place(bar, (cx, y - 0.014, cz), (0, math.radians(a), 0))
+        parts.append(bar)
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        parts.append(_cyl(0.019, 0.04, (cx + arm * math.cos(a), y - 0.014, cz + arm * math.sin(a)), axis="X", seg=10,
+                          rot=(0, -a, 0)))
+    parts.append(_cyl(0.026, 0.035, (cx, y - 0.014, cz), axis="Y", seg=10))
+    parts.append(_hook(cx, cz + 0.026))
+    # hubcap: a shallow dish with a raised centre
+    parts.append(s.lathe([(0.0, 0.0), (0.165, 0.0), (0.17, 0.012), (0.155, 0.03), (0.07, 0.042), (0.05, 0.055),
+                          (0.0, 0.058)], seg=20, axis="-Y", loc=(-0.13, BOARD_F + 0.004, 1.45)))
+    # torque wrench lying on two hooks: square drive head, long tube, knurled grip
+    tz = 1.19
+    parts.append(_cyl(0.012, 0.50, (-0.44, y - 0.02, tz), axis="X", seg=8))
+    parts.append(_cyl(0.019, 0.15, (-0.13, y - 0.02, tz), axis="X", seg=10))
+    parts.append(_cyl(0.026, 0.03, (-0.71, y - 0.02, tz), axis="Y", seg=10))
+    parts.append(s.rbox((0.05, 0.03, 0.04), (-0.685, y - 0.02, tz), r=0.006, seg=1))
+    parts += [_hook(x, tz - 0.026) for x in (-0.58, -0.30)]
+    # a drive belt hanging on a hook
+    bx, bz = 0.20, 1.42
+    pts = [(bx + 0.12 * math.sin(2 * math.pi * k / 12), BOARD_F - 0.03, bz - 0.17 + 0.17 * math.cos(2 * math.pi * k / 12))
+           for k in range(13)]
+    parts.append(s.tube(pts, 0.009, res=1, smooth=False))
+    parts.append(s.tube([(bx, BOARD_F + 0.004, bz + 0.0), (bx, BOARD_F - 0.04, bz + 0.0), (bx, BOARD_F - 0.045, bz + 0.02)],
+                        0.0045, res=1, smooth=False))
+    # four big spanners on a rail
+    parts.append(s.rbox((0.30, 0.02, 0.02), (0.50, BOARD_F - 0.008, 1.775), r=0.005, seg=1))
+    for k in range(4):
+        parts += _wrench(0.40 + k * 0.066, 1.755, 0.19 + k * 0.03, 0.02 + k * 0.003)
+    # hammer
+    x = 0.74
+    parts.append(s.rbox((0.03, 0.022, 0.28), (x, y - 0.006, 1.31), r=0.01, seg=1))
+    parts.append(s.rbox((0.14, 0.035, 0.045), (x + 0.01, y - 0.01, 1.465), r=0.01, seg=1))
+    parts.append(_hook(x - 0.035, 1.425))
+    parts.append(_hook(x + 0.045, 1.425))
+    return parts
+
+
+def _shelf_stuff():
+    z = SHELF_Z + 0.015 - 0.004                           # top shelf surface (things sink in a little)
+    parts = []
+    for x in (-0.68, -0.55):                              # oil jugs: rounded body, cap
+        parts.append(s.rbox((0.11, 0.15, 0.15), (x, 0.35, z + 0.075), r=0.03, seg=1, taper=(0.85, 0.9)))
+        parts.append(_cyl(0.02, 0.03, (x + 0.02, 0.32, z + 0.16), seg=10, r=0.004))
+    for x in (-0.22, -0.16, -0.10):                       # spray cans
+        parts.append(s.lathe([(0.0, 0.0), (0.03, 0.0), (0.032, 0.006), (0.032, 0.12), (0.022, 0.14), (0.01, 0.155),
+                              (0.0, 0.155)], seg=8, loc=(x, 0.35, z)))
+    parts.append(s.rbox((0.38, 0.17, 0.11), (0.45, 0.36, z + 0.055), r=0.012, seg=1))       # parts bin
+    parts.append(s.rbox((0.39, 0.025, 0.05), (0.45, 0.273, z + 0.04), r=0.006, seg=1))      # its label lip
+    parts.append(s.rbox((0.24, 0.18, 0.08), (1.15, 0.36, z + 0.04), r=0.015, seg=1))        # filter boxes
+    parts.append(s.rbox((0.17, 0.14, 0.07), (1.13, 0.36, z + 0.11), r=0.012, seg=1))
+    return parts
+
+
+def _cabinet():
+    """A rolling tool cabinet under the middle of the bench: carcass on four casters, a top lip, four drawers with
+    full-width pulls and a push bar on its side."""
+    x0, x1 = 0.29, 0.89
+    xc = (x0 + x1) / 2
+    zb, zt = 0.10, 0.76
+    carcass = s.rbox((x1 - x0, 0.74, zt - zb), (xc, 0.04, (zb + zt) / 2), r=0.012, seg=2)
+    lip = s.rbox((x1 - x0 + 0.02, 0.77, 0.03), (xc, 0.035, zt + 0.005), r=0.01, seg=1)
+    fronts, steel = [], []
+    z = zt - 0.015
+    for h in (0.11, 0.13, 0.17, 0.22):
+        fronts.append(s.rbox((x1 - x0 - 0.04, 0.022, h - 0.012), (xc, -0.335, z - h / 2), r=0.008, seg=1))
+        steel.append(s.rbox((x1 - x0 - 0.10, 0.03, 0.018), (xc, -0.352, z - 0.028), r=0.007, seg=1))
+        z -= h
+    for x in (x0 + 0.05, x1 - 0.05):
+        for y in (-0.28, 0.36):
+            steel.append(_cyl(0.04, 0.03, (x, y, 0.04), axis="X", seg=12, r=0.008))
+            steel.append(s.rbox((0.05, 0.06, 0.04), (x, y, 0.085), r=0.006, seg=1))
+    steel.append(s.tube([(x1 - 0.01, -0.25, 0.70), (x1 + 0.05, -0.23, 0.70), (x1 + 0.05, 0.33, 0.70),
+                         (x1 - 0.01, 0.35, 0.70)], 0.012, res=1, smooth=False))
+    return [carcass, lip, *fronts], steel
+
+
+def _toolbox(x, y):
+    t = WB_TOP - 0.004
+    box = s.rbox((0.40, 0.20, 0.14), (x, y, t + 0.07), r=0.018, seg=1)
+    s.groove(box, "Z", t + 0.105, 0.008, 0.004)
+    handle = s.tube([(x - 0.12, y, t + 0.135), (x - 0.10, y, t + 0.19), (x + 0.10, y, t + 0.19), (x + 0.12, y, t + 0.135)],
+                    0.01, smooth=False, segments_per=1)
+    latches = [s.rbox((0.03, 0.012, 0.04), (x + sx * 0.12, y - 0.105, t + 0.105), r=0.004, seg=1) for sx in (-1, 1)]
+    return [box], [handle, *latches]
 
 
 def model_workbench():
-    """Garage workbench 2.0 x 0.8, wooden top at 0.95: steel frame with a three-drawer cabinet on the right and a low
-    shelf, a vise on the front-left corner, a pegboard at the back (+Y) with hanging tools and a clamp work lamp."""
-    legs = [s.rbox((0.06, 0.06, 0.9), (-0.95, y * 0.35, 0.45), r=0.01, seg=2) for y in (-1, 1)]
-    shelf = s.rbox((1.44, 0.7, 0.03), (-0.25, 0, 0.18), r=0.008, seg=1)
-    apron = s.rbox((1.42, 0.03, 0.08), (-0.25, -0.36, 0.845), r=0.008, seg=1)
-    cabinet = s.rbox((0.52, 0.74, 0.88), (0.71, 0, 0.45), r=0.012, seg=2)
-    drawers = [s.rbox((0.48, 0.02, 0.255), (0.71, -0.375, z), r=0.008, seg=2) for z in (0.73, 0.465, 0.2)]
-    board = s.rbox((1.96, 0.025, 0.84), (0, 0.385, 1.36), r=0.008, seg=1)
-    posts = [s.rbox((0.05, 0.045, 0.92), (x * 0.965, 0.385, 1.39), r=0.01, seg=2) for x in (-1, 1)]
-    ledge = s.rbox((0.6, 0.12, 0.02), (-0.15, 0.32, 1.52), r=0.005, seg=1)
-    ledge_lip = s.rbox((0.6, 0.012, 0.04), (-0.15, 0.265, 1.535), r=0.004, seg=1)
-    # vise: base on the top, fixed jaw at the back, sliding jaw and screw toward the front edge
-    vise = [s.rbox((0.17, 0.2, 0.05), (-0.72, -0.27, 0.97), r=0.012, seg=2),
-            s.rbox((0.19, 0.06, 0.12), (-0.72, -0.21, 1.045), r=0.012, seg=2),
-            s.rbox((0.19, 0.06, 0.1), (-0.72, -0.37, 1.04), r=0.012, seg=2),
-            s.rbox((0.08, 0.16, 0.05), (-0.72, -0.29, 1.0), r=0.01, seg=1),
-            s.rcyl(0.012, 0.2, (-0.72, -0.43, 1.03), axis="Y", seg=10, r=0.002),
-            s.rcyl(0.007, 0.16, (-0.72, -0.53, 1.03), axis="X", seg=8, r=0.002)]
-    vise += [s.ball(0.013, (-0.72 + d * 0.08, -0.53, 1.03), seg=10) for d in (-1, 1)]
-    lamp_arm = s.tube([(0.62, 0.39, 1.8), (0.62, 0.3, 1.86), (0.62, 0.14, 1.83), (0.62, 0.06, 1.76)], 0.011,
-                      segments_per=6)
-    clamp = s.rbox((0.06, 0.07, 0.07), (0.62, 0.39, 1.79), r=0.01, seg=2)
-    s.part("Body", [*legs, shelf, apron, cabinet, *drawers, board, *posts, ledge, ledge_lip, *vise, lamp_arm, clamp])
+    """The car upgrade bench of the auto repair shop: 3.1 x 1.1 m, worktop 0.95, tool wall to 2.1. A heavy steel
+    frame with a thick solid top banded in steel, a rolling tool cabinet in the middle, a battery and a jerrycan on the
+    low shelf, a wheel standing under the right end; a vise, a coil-over strut and a toolbox on top; a tool wall with a
+    licence plate, a lug wrench, a hubcap, a torque wrench, a drive belt, spanners, a hammer, a diagnostic screen and a
+    strip light under the top shelf. On the left an inline four hanging from a jib hoist over its dolly.
+    Footprint x -1.55..1.55, y -0.55..0.55 (front -Y, back against the wall), origin on the floor at its centre.
+    Body = the wooden parts (top, shelves, tool board, cabinet), Accent = steel, Eye = the screen and the strip light."""
+    wood = [s.rbox((WB_X1 - WB_X0, WB_Y1 - WB_Y0, 0.08), ((WB_X0 + WB_X1) / 2, (WB_Y0 + WB_Y1) / 2, WB_TOP - 0.04),
+                   r=0.01, seg=2)]
+    wood.append(s.rbox((1.08, 0.80, 0.03), (-0.29, 0.04, 0.155), r=0.006, seg=1))                      # low shelf
+    wood.append(s.rbox((2.32, 0.024, SHELF_Z - 0.93), (0.32, BOARD_Y, (SHELF_Z + 0.93) / 2), r=0.006, seg=1))  # board
+    wood.append(s.rbox((2.34, 0.22, 0.03), (0.32, 0.37, SHELF_Z), r=0.006, seg=1))                     # top shelf
+    wood.append(s.rbox((2.34, 0.02, 0.05), (0.32, 0.26, SHELF_Z + 0.01), r=0.005, seg=1))              # its lip
+    cab_wood, cab_steel = _cabinet()
+    wood += cab_wood
+    box, box_steel = _toolbox(-0.45, 0.02)
+    wood += box
 
-    top = s.rbox((2.0, 0.8, 0.06), (0, 0, 0.92), r=0.012, seg=2)
-    for x in (-0.6, -0.2, 0.2, 0.6):
-        s.groove(top, "X", x, 0.008, 0.003)
-    handles = [s.rbox((0.2, 0.03, 0.025), (0.71, -0.392, z + 0.07), r=0.008, seg=1) for z in (0.73, 0.465, 0.2)]
-    tools = []
-    # hammer
-    tools += [s.rbox((0.03, 0.022, 0.3), (-0.75, 0.36, 1.32), r=0.01, seg=1),
-              s.rbox((0.14, 0.035, 0.045), (-0.74, 0.358, 1.48), r=0.01, seg=1)]
-    tools += wrench(-0.58, 1.33, 0.24, 0.032)
-    tools += wrench(-0.48, 1.36, 0.18, 0.025)
-    for k, x in enumerate((-0.34, -0.28, -0.22)):
-        tools += screwdriver(x, 1.48 - k * 0.02, 0.13 + k * 0.02, 0.016)
-    # saw: tapered blade with a closed grip
-    blade = s.rbox((0.38, 0.006, 0.11), (0.08, 0.365, 1.3), r=0.002, seg=1, taper=(1, 1))
-    for v in blade.verts:
-        if v.co.x > 0.08:
-            v.co.z = 1.3 + (v.co.z - 1.3) * (1 - 0.55 * (v.co.x - 0.08) / 0.19)
-    grip = s.rbox((0.11, 0.025, 0.13), (-0.14, 0.36, 1.33), r=0.02, seg=2)
-    grip = s.boolean(grip, s.rbox((0.05, 0.1, 0.06), (-0.135, 0.36, 1.335), r=0.01), "DIFFERENCE")
-    tools += [blade, grip]
-    # pliers: two crossed handles and jaws
-    tools += [s.rbox((0.018, 0.014, 0.2), (0.34 + d * 0.02, 0.362, 1.3), r=0.006, seg=1, rot=(0, d * 0.18, 0))
-              for d in (-1, 1)]
-    tools += [s.rcyl(0.016, 0.02, (0.34, 0.362, 1.39), axis="Y", seg=12, r=0.003)]
-    cans = [s.rcyl(0.045, 0.11, (x, 0.32, 1.585), seg=16, r=0.006) for x in (-0.35, -0.22)]
-    cans += [s.rcyl(0.035, 0.08, (0.0, 0.32, 1.57), seg=14, r=0.005)]
-    toolbox = s.rbox((0.42, 0.2, 0.16), (0.25, 0.1, 1.03), r=0.02, seg=2)
-    box_handle = s.tube([(0.12, 0.1, 1.1), (0.14, 0.1, 1.15), (0.36, 0.1, 1.15), (0.38, 0.1, 1.1)], 0.01,
-                        smooth=False, segments_per=1)
-    shade = s.lathe([(0.03, 0.0), (0.034, 0.02), (0.06, 0.08), (0.075, 0.12), (0.07, 0.122)], seg=20,
-                    axis="-Z", loc=(0.62, 0.05, 1.78))
-    s.part("Accent", [top, *handles, *tools, *cans, toolbox, box_handle, shade])
-
-    bulb = s.rcyl(0.064, 0.01, (0.62, 0.05, 1.664), seg=20, r=0.003)
-    s.part("EyeLamp", [bulb])
+    steel = _bench_frame() + _vise() + _coilover(0.02, 0.10) + _wall_tools() + _shelf_stuff() + cab_steel + box_steel
+    steel += _engine() + _dolly() + _hoist()
+    steel += _tyre(Vector((1.195, 0.06, 0.2965)))  # the 22-gon tread rests on its flat
+    bat, posts = _battery(-0.62, 0.10, 0.166)
+    steel += bat + posts + _jerrycan(-0.20, 0.10, 0.166)
+    scr, glass = _screen()
+    steel += scr
+    steel.append(s.rbox((1.20, 0.08, 0.035), (0.32, 0.40, SHELF_Z - 0.0325), r=0.008, seg=1))          # light housing
+    s.part("Body", wood)
+    s.part("Accent", steel)
+    s.part("EyeLamp", [s.rcyl(0.014, 1.10, (0.32, 0.395, SHELF_Z - 0.062), axis="X", seg=10, r=0.004)])
+    s.part("EyeScreen", glass)
     return export("workbench")
 
 

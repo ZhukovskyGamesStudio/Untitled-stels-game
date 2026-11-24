@@ -181,6 +181,8 @@ namespace Stealth.Game
         void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot);
         /// <summary>«Combine»: what lies on the bench becomes its recipe's result (or may break).</summary>
         void RequestCombine();
+        /// <summary>Raise a car upgrade one level at the garage's upgrade bench (Vehicles.CarUpgrade).</summary>
+        void RequestCarUpgrade(byte upgrade);
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>

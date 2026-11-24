@@ -67,6 +67,7 @@ namespace Stealth.Game
         public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => m_I.UnbenchServer(from, x, y, rot);
         public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => m_I.BenchMoveServer(from, x, y, rot);
         public void RequestCombine() => m_I.CombineServer();
+        public void RequestCarUpgrade(byte upgrade) => m_I.CarUpgradeServer(upgrade);
     }
 
     /// <summary>The run's requests and broadcasts on a peer that is its own server (<see cref="OfflinePlayerLink"/>).</summary>

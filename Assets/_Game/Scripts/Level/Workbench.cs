@@ -1,30 +1,30 @@
-using Stealth.Configs;
-using Stealth.Items;
 using Stealth.Player;
 using UnityEngine;
 
 namespace Stealth.Level
 {
     /// <summary>
-    /// The garage's point of interest (prefab Props/Workbench): hold E and the things of one colour in your backpack become
-    /// diamonds (<see cref="Crafting"/>): one cell instead of many, and worth more.
+    /// The garage's unique feature, the car upgrade bench (prefab Props/Workbench, Tools/Blender/poi.py model_workbench):
+    /// E opens its screen on this peer (UI.CarUpgradeScreen) — the car's upgrades, what each gives and the things its next
+    /// level takes this run; the server raises them (Game.GameManager.CarUpgradeServer).
     /// </summary>
     public class Workbench : Interactable
     {
+        /// <summary>The house's upgrade bench (only the garage has one), or null.</summary>
+        public static Workbench Active { get; private set; }
+
         public override UseKind Kind => UseKind.Workbench;
-        public override float HoldTime => 1.5f;
-        public override float Reach => 2.0f;
-        public override float AimRadius => 0.7f; // a whole bench
+        public override float Reach => 2.3f;
+        public override float AimRadius => 1.2f; // a whole station
+        public override Vector3 Point => transform.position + Vector3.up * 1f;
+
+        void OnEnable() => Active = this;
+        void OnDisable() { if (Active == this) Active = null; }
 
         public override string Prompt(PlayerController player, out bool available)
         {
-            var inventory = player.GetComponent<PlayerInventory>();
-            var s = Tuning.Items.Gadgets;
-            int count = inventory != null ? Crafting.Plan(inventory.Items, s).Count : 0;
-            available = count > 0;
-            return available
-                ? Loc.F("use.workbench", count)
-                : Loc.T("use.workbench.none");
+            available = true;
+            return Loc.T("use.upgrades");
         }
     }
 }

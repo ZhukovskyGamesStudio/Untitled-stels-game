@@ -294,12 +294,14 @@ namespace Stealth.Player
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
             UpdateBench(menu);
+            UpdateUpgrades(menu);
+            if (AtUpgrades) cracking = true; // at the car upgrade bench: the mouse picks, nobody walks
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
                           (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode || AtBench);
             // the run's start screen: the team stands in a row, the mouse picks a class and an item, nobody walks
             bool pickingNow = GameManager.Instance != null && GameManager.Instance.Picking;
             if (pickingNow) cracking = true;
-            bool freeCursor = menu || CursorMode || pickingNow;
+            bool freeCursor = menu || CursorMode || pickingNow || AtUpgrades;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 

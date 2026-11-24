@@ -14,12 +14,29 @@ namespace Stealth.Game
     public sealed class TeamStash
     {
         public const int Width = 8, Height = 4;
+        /// <summary>The most rows the storage robot's box gets (the kennel's top level: Vehicles.CarUpgradeSettings.KennelStashRows).</summary>
+        public const int MaxHeight = 6;
 
         readonly List<InventoryEntry> m_Items = new();
 
         /// <summary>This grid's size in cells (the hatch's stash: <see cref="Width"/> x <see cref="Height"/>; the car's workbench: 4 x 4).</summary>
         public int Columns { get; }
-        public int Rows { get; }
+        public int Rows { get; private set; }
+
+        /// <summary>
+        /// The grid's rows now (the storage robot's box grows with the kennel: Vehicles.CarUpgrades.StashRows). It never
+        /// shrinks under a thing lying in it: those rows stay until it is empty.
+        /// </summary>
+        public void SetRows(int rows)
+        {
+            int lowest = 0;
+            foreach (var e in m_Items)
+                foreach (var c in e.Cells) lowest = Mathf.Max(lowest, e.Y + c.y + 1);
+            rows = Mathf.Max(Mathf.Max(1, rows), lowest);
+            if (rows == Rows) return;
+            Rows = rows;
+            Version++;
+        }
 
         public TeamStash() : this(Width, Height) { }
 

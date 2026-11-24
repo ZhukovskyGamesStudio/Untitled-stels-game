@@ -29,6 +29,12 @@ namespace Stealth.UI
         public RectTransform StashAllZone;
         public Image StashAllBackground;
         public Text StashAllLabel;
+        [Tooltip("The grid's graph paper and its frame: sized to the rows the stash has now (Fit).")]
+        public RectTransform GraphPaper, GridBox;
+        [Tooltip("Rows the board is built for (the biggest box: the kennel's top level).")]
+        public int BuiltRows = Game.TeamStash.MaxHeight;
+
+        int m_Rows = -1;
 
         public bool Visible => Canvas.enabled;
 
@@ -46,6 +52,33 @@ namespace Stealth.UI
         public void Show(bool on)
         {
             if (Canvas.enabled != on) Canvas.enabled = on;
+        }
+
+        /// <summary>
+        /// The board for a stash of <paramref name="rows"/> rows (the storage robot's box grows with the kennel): the cells
+        /// past them hidden, the paper, the frame, the burn note and the board itself that much shorter, the button under
+        /// the last row. Built for <see cref="BuiltRows"/>.
+        /// </summary>
+        public void Fit(int rows)
+        {
+            rows = Mathf.Clamp(rows, 1, BuiltRows);
+            if (rows == m_Rows) return;
+            float delta = (rows - (m_Rows < 0 ? BuiltRows : m_Rows)) * InventoryUI.Cell;
+            m_Rows = rows;
+            int columns = Cells.Length / Mathf.Max(1, BuiltRows);
+            for (int i = 0; i < Cells.Length; i++)
+                if (Cells[i] != null) Cells[i].gameObject.SetActive(i / Mathf.Max(1, columns) < rows);
+            Grow(Root, delta);
+            Grow(Grid, delta);
+            Grow(GraphPaper, delta);
+            Grow(GridBox, delta);
+            Grow(SellZone, delta);
+            if (StashAllZone != null) StashAllZone.anchoredPosition -= new Vector2(0f, delta);
+        }
+
+        static void Grow(RectTransform rt, float delta)
+        {
+            if (rt != null) rt.sizeDelta += new Vector2(0f, delta);
         }
 
         /// <summary>Hangs above the hatch, turned towards the viewer (yaw only).</summary>

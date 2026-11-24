@@ -125,20 +125,9 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheWorkbenchMakesDiamondsOfOneColour()
+        public void DiamondsAreWorthMoreThanTheirCellAndToolsBurnGrey()
         {
-            var items = new List<InventoryEntry>
-            {
-                new() { Shape = 3, Color = 1 }, new() { Shape = 4, Color = 1 }, // 4 + 4 cells of green: one diamond
-                new() { Shape = 0, Color = 1 },                                  // left over
-                new() { Shape = 2, Color = 2 },                                  // 3 cells of blue: not enough
-                new() { Shape = ItemCatalog.Key, Color = 1 },                    // a tool is never used up
-            };
-            var plan = Crafting.Plan(items, new GadgetSettings { DiamondInputCells = 8 });
-            Assert.AreEqual(1, plan.Count);
-            Assert.AreEqual(1, plan[0].Color);
-            CollectionAssert.AreEquivalent(new[] { 0, 1 }, plan[0].Items);
-            Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1) + ItemCatalog.Value(4, 1) - 1, "worth more than what went in");
+            Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1), "a one-cell diamond is worth more than a 4-cell thing of its colour");
             Assert.AreEqual(ItemCatalog.Cells(ItemCatalog.Key) * ItemCatalog.Value(0, 0), ItemCatalog.Value(ItemCatalog.Key, 4), "tools burn at the grey rate, whatever their colour");
             Assert.IsFalse(ItemCatalog.IsLoot(ItemCatalog.Stun));
         }

@@ -2,6 +2,7 @@ using System.Linq;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.UI;
+using Stealth.Vehicles;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -303,6 +304,90 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
+        /// The garage's car upgrade bench, open: a sheet with the title, a close button and an index card per upgrade
+        /// (<see cref="CarUpgradeCardView"/>) — the three levelled ones on top, the unique ones under them. Outside the HUD's
+        /// content, with its own canvas and raycaster (the HUD's takes no clicks).
+        /// </summary>
+        static void BuildUpgradeScreen(UiElements e, Transform root)
+        {
+            var holder = Stretch(root, "UpgradeScreen");
+            holder.gameObject.AddComponent<Canvas>();
+            holder.gameObject.AddComponent<GraphicRaycaster>();
+            var view = holder.gameObject.AddComponent<CarUpgradeScreen>();
+            var screen = Stretch(holder, "Screen");
+            view.Root = screen.gameObject;
+            view.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            view.Tick = PaperSprite("tick");
+            view.Cross = PaperSprite("cross");
+            var (sheet, _) = Sheet(screen, "Sheet", Center, Center, new Vector2(0, -6), new Vector2(1180, 650));
+            Clip(sheet, new Vector2(0, 8));
+            Ink(R(sheet, "Title", TopCenter, TopCenter, new Vector2(0, -22), new Vector2(700, 40)), L("upgrade.title"), 30, TextAnchor.MiddleCenter, Face.Caps);
+            RuleLine(sheet, TopCenter, TopCenter, new Vector2(0, -64), 1100, UiPalette.Ink, 1.5f);
+            view.Close = Instance<Button>(e.Button, sheet, "Close");
+            var cb = (RectTransform)view.Close.transform;
+            cb.anchorMin = cb.anchorMax = new Vector2(1, 1);
+            cb.pivot = new Vector2(1, 1);
+            cb.anchoredPosition = new Vector2(-18, -18);
+            cb.sizeDelta = new Vector2(40, 40);
+            var ct = view.Close.GetComponentInChildren<Text>();
+            if (ct != null) { ct.text = ""; ct.enabled = false; }
+            Img(R(cb, "Glyph", Center, Center, Vector2.zero, new Vector2(22, 22)), UiPalette.Ink, PaperSprite("cross")).raycastTarget = false;
+            string[] icons = { "upgrade_engine", "upgrade_trunk", "upgrade_kennel", "upgrade_teleport", "upgrade_planned", "upgrade_planned" };
+            view.Cards = new CarUpgradeCardView[icons.Length];
+            for (int i = 0; i < icons.Length; i++)
+            {
+                int col = i % 3, row = i / 3;
+                var card = R(sheet, $"Card{i}", Center, Center, new Vector2(-376 + col * 376, 132 - row * 296), new Vector2(356, 272));
+                var v = card.gameObject.AddComponent<CarUpgradeCardView>();
+                Card(card, row == 0 ? UiPalette.Paper : UiPalette.PaperShade);
+                Tape(card, TopCenter, new Vector2(0, -2), 64, (i % 2 == 0 ? -1 : 1) * 3f);
+                v.Icon = Img(R(card, "Icon", TopLeft, TopLeft, new Vector2(14, -16), new Vector2(64, 64)), UiPalette.Paper, Icon(icons[i]));
+                v.Icon.preserveAspect = true;
+                v.Name = Ink(R(card, "Name", TopLeft, TopLeft, new Vector2(90, -16), new Vector2(252, 28)), "—", 21, TextAnchor.MiddleLeft, Face.Bold);
+                v.Boxes = new Image[CarUpgrades.MaxLevelled];
+                v.Ticks = new Image[CarUpgrades.MaxLevelled];
+                for (int b = 0; b < CarUpgrades.MaxLevelled; b++)
+                {
+                    v.Boxes[b] = Img(R(card, $"Box{b}", TopLeft, TopLeft, new Vector2(92 + b * 32, -50), new Vector2(26, 26)), UiPalette.Ink, PaperSprite("checkbox"));
+                    v.Ticks[b] = Img(R(v.Boxes[b].rectTransform, "Tick", Center, Center, new Vector2(2, 3), new Vector2(26, 26)), UiPalette.Good, PaperSprite("tick"));
+                }
+                RuleLine(card, TopCenter, TopCenter, new Vector2(0, -90), 326, UiPalette.Rule);
+                v.What = Ink(R(card, "What", TopLeft, TopLeft, new Vector2(16, -96), new Vector2(326, 40)), "—", 14, TextAnchor.UpperLeft, Face.Sans, UiPalette.InkSoft);
+                v.Now = Ink(R(card, "Now", TopLeft, TopLeft, new Vector2(16, -138), new Vector2(326, 20)), "—", 14, TextAnchor.MiddleLeft, Face.Bold);
+                var recipe = R(card, "Recipe", TopLeft, TopLeft, new Vector2(16, -158), new Vector2(326, 52));
+                v.Recipe = recipe.gameObject;
+                Ink(R(recipe, "Need", TopLeft, TopLeft, Vector2.zero, new Vector2(70, 18)), L("upgrade.need"), 13, TextAnchor.MiddleLeft, Face.Caps, UiPalette.InkSoft);
+                int things = CarUpgrades.MostThings;
+                v.Things = new Image[things];
+                v.Marks = new Image[things];
+                for (int k = 0; k < things; k++)
+                {
+                    var spot = R(recipe, $"Thing{k}", TopLeft, TopLeft, new Vector2(74 + k * 60, 0), new Vector2(50, 50));
+                    FormBox(spot, UiPalette.PaperShade);
+                    v.Things[k] = Img(R(spot, "Picture", Center, Center, Vector2.zero, new Vector2(42, 42)), UiPalette.Paper);
+                    v.Things[k].preserveAspect = true;
+                    v.Marks[k] = Img(R(spot, "Mark", BottomRight, Center, new Vector2(-4, 6), new Vector2(22, 22)), UiPalette.Good, PaperSprite("tick"));
+                }
+                v.Raise = Instance<Button>(e.Button, card, "Raise");
+                var rb = (RectTransform)v.Raise.transform;
+                rb.anchorMin = rb.anchorMax = BottomCenter;
+                rb.pivot = BottomCenter;
+                rb.anchoredPosition = new Vector2(0, 10);
+                rb.sizeDelta = new Vector2(220, 34);
+                v.RaiseLabel = v.Raise.GetComponentInChildren<Text>();
+                v.RaiseLabel.resizeTextMaxSize = 16;
+                v.RaiseLabel.fontSize = 16;
+                SetText(v.RaiseLabel, L("upgrade.raise"));
+                v.Done = Stamp(card, "Done", BottomCenter, BottomCenter, new Vector2(0, 26), new Vector2(170, 56), L("upgrade.top"), 30, -7f).transform.parent.gameObject;
+                var planned = Note(card, "Planned", BottomCenter, BottomCenter, new Vector2(0, 20), new Vector2(190, 70), UiPalette.NoteYellow, 3f);
+                Ink(Stretch(planned, "Text", 8f), L("upgrade.planned"), 26, TextAnchor.MiddleCenter, Face.Hand, UiPalette.Pen);
+                v.Planned = planned.gameObject;
+                view.Cards[i] = v;
+            }
+            screen.gameObject.SetActive(false);
+        }
+
+        /// <summary>
         /// A small square arrow button of the start screen: a paper button with a drawn chevron (Tools/Art/generate_icons.py),
         /// highlighter yellow and a little bigger under the mouse (<see cref="UiHover"/>).
         /// </summary>
@@ -514,6 +599,7 @@ namespace Stealth.EditorTools
             BuildEntryBanner(hud, root.transform);
             BuildStatsPanel(hud, root.transform);
             BuildStartScreen(e, root.transform);
+            BuildUpgradeScreen(e, root.transform);
             // the screen goes black between the drive to the next house and the house itself (GameHUD.ShowLoadingFade):
             // over everything, outside Content (which fades out on its own while the drive scene plays)
             hud.LoadingFade = Img(Stretch(root.transform, "LoadingFade"), Color.black);

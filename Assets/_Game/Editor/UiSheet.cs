@@ -77,6 +77,7 @@ namespace Stealth.EditorTools
             Shot("safe", "Builds/shots/tour_5_5/tour_04_f0_Kitchen_27_16m.png", Safe);
             Shot("vault", "Builds/shots/tour_5_5/tour_04_f0_Kitchen_27_16m.png", Vault);
             Shot("start", "Builds/shots/tour_5_5/tour_03_f0_Restroom_24_20m.png", Start);
+            Shot("upgrades", "Builds/shots/tour_5_5/tour_03_f0_Restroom_24_20m.png", Upgrades);
             Shot("inventory", "Builds/shots/tour_5_5/tour_05_f0_Kitchen_33_54m.png", Inventory);
             Shot("menu_main", null, MenuMain);
             Shot("menu_pause", "Builds/shots/tour_5_5/tour_02_f0_Meeting_21_16m.png", MenuPause);
@@ -527,6 +528,48 @@ namespace Stealth.EditorTools
                 v.ReadyLabel.color = ready ? UiPalette.Good : UiPalette.InkFaint;
             }
             view.Waiting.text = "Готовы 1 из 3";
+            return new List<GameObject> { go };
+        }
+
+        /// <summary>The car upgrade bench: the engine half way, the trunk at its top, the kennel short of things, the teleport, the planned two.</summary>
+        static List<GameObject> Upgrades()
+        {
+            var hud = Hud(out var go);
+            On(hud.Content, false);
+            var view = go.GetComponentInChildren<CarUpgradeScreen>(true);
+            On(view.Root);
+            var book = new Vehicles.CarUpgradeBook(7, null, null);
+            int[] levels = { 1, 3, 0, 0, 0, 0 };
+            for (int i = 0; i < view.Cards.Length; i++)
+            {
+                var v = view.Cards[i];
+                var u = (Vehicles.CarUpgrade)i;
+                int max = Vehicles.CarUpgrades.MaxLevel(u), level = levels[i];
+                bool planned = max == 0, top = !planned && level >= max;
+                v.Name.text = Loc.T(Game.GameManager.UpgradeKey(u));
+                v.What.text = Loc.F(Game.GameManager.UpgradeKey(u) + ".what", 10);
+                v.Now.text = i switch { 0 => Loc.F("upgrade.engine.now", 10), 1 => Loc.F("upgrade.trunk.now", 3), 2 => Loc.T("upgrade.kennel.now.none"), 3 => Loc.T("upgrade.teleport.now.none"), _ => "" };
+                for (int b = 0; b < v.Boxes.Length; b++) { On(v.Boxes[b], b < max); On(v.Ticks[b], b < level); }
+                On(v.Planned, planned);
+                On(v.Done, top);
+                var recipe = planned || top ? null : book.Recipe(u, level + 1);
+                On(v.Recipe, recipe != null);
+                On(v.Raise, recipe != null);
+                if (recipe == null) continue;
+                bool all = i != 2;
+                for (int k = 0; k < v.Things.Length; k++)
+                {
+                    On(v.Things[k], k < recipe.Length);
+                    On(v.Marks[k], k < recipe.Length);
+                    if (k >= recipe.Length) continue;
+                    v.Things[k].sprite = ItemIcon(recipe[k]);
+                    bool got = all || k == 0;
+                    v.Marks[k].sprite = got ? view.Tick : view.Cross;
+                    v.Marks[k].color = got ? UiPalette.Good : UiPalette.Stamp;
+                }
+                v.Raise.interactable = all;
+                v.RaiseLabel.text = Loc.T(all ? "upgrade.raise" : "upgrade.missing");
+            }
             return new List<GameObject> { go };
         }
 

@@ -137,6 +137,7 @@ namespace Stealth.Tests
         public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unbench {from.X},{from.Y} {x},{y},{rot}");
         public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"bench-move {from.X},{from.Y} {x},{y},{rot}");
         public void RequestCombine() => Requests.Add("combine");
+        public void RequestCarUpgrade(byte upgrade) => Requests.Add($"upgrade {upgrade}");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

@@ -72,6 +72,7 @@ namespace Stealth.Net
         readonly NetworkVariable<Vector4> m_DriveFrom = new();
         readonly NetworkVariable<double> m_HouseClock = new();
         readonly NetworkVariable<bool> m_Picking = new();
+        readonly NetworkVariable<uint> m_Upgrades = new();
         readonly NetworkVariable<sbyte> m_DriveBranch = new(-1);
         readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
@@ -149,6 +150,8 @@ namespace Stealth.Net
             m_Game.ApplyHouseClock(m_HouseClock.Value);
             m_Picking.OnValueChanged += (_, v) => m_Game.ApplyPicking(v);
             m_Game.ApplyPicking(m_Picking.Value);
+            m_Upgrades.OnValueChanged += (_, v) => m_Game.ApplyUpgrades(v);
+            m_Game.ApplyUpgrades(m_Upgrades.Value);
             m_Explored.OnListChanged += _ => PullExplored();
         }
 
@@ -200,6 +203,7 @@ namespace Stealth.Net
             NetSync.Set(m_Lift, NetLift.Of(m_Game.Lift));
             NetSync.Set(m_HouseClock, m_Game.HouseClockAt);
             NetSync.Set(m_Picking, m_Game.Picking);
+            NetSync.Set(m_Upgrades, m_Game.Upgrades.Pack());
         }
 
         /// <summary>Sends only the changed chunks, a few times a second; a new house resends the whole list.</summary>

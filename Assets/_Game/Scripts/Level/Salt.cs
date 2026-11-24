@@ -22,5 +22,7 @@ namespace Stealth.Level
         public const int Sewer = 0x5E3E, SewerHall = 0x5E4A, CarUnload = 0xCA60, CarLoad = 0xCA61, RouteFuel = 0xF0E1;
         // crafting: the run's recipes, what breaks at a failed combine, the blueprints and chess pieces of a house, what an unscrewed device drops
         public const int Recipes = 0xC4AF, CraftBreak = 0xC4B0, Blueprints = 0xB1E9, ChessPieces = 0xC4E5, Unscrewed = 0x5C3E;
+        // the car upgrade bench: the run's recipe of every upgrade and level
+        public const int CarUpgrades = 0xCA67;
     }
 }

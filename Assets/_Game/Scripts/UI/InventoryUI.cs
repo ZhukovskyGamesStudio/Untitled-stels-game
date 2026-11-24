@@ -207,6 +207,7 @@ namespace Stealth.UI
             bool on = StashActive(me), was = Board.Visible;
             Board.Show(on);
             if (!on) return;
+            Board.Fit(Stash.Rows); // (the storage robot's box grows with the kennel)
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
             bool burn = GameManager.Instance.CanBurnStashAt(me.transform.position, Stash); // (the storage robot's crate: no fire)
             if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);

@@ -145,7 +145,8 @@ namespace Stealth.Game
         public int Collected => m_Run.Collected;
 
         /// <summary>The fuel the drive to the house in row <paramref name="lane"/> of the next column costs (every peer works it out the same way).</summary>
-        public int CostOf(int lane) => RunState.RouteCost(Quota, RunState.RouteShare(Level.RunSeed, Level.Index + 1, lane, m_Run.Settings.RouteFuel));
+        public int CostOf(int lane) => Vehicles.CarUpgrades.EngineCost(RunState.RouteCost(Quota, RunState.RouteShare(Level.RunSeed, Level.Index + 1, lane, m_Run.Settings.RouteFuel)),
+            Upgrades.Level(Vehicles.CarUpgrade.Engine), UpgradeSettings); // (the upgraded engine burns less)
 
         /// <summary>The cheapest way on from here (what the team must at least get).</summary>
         public int CheapestCost
@@ -490,7 +491,9 @@ namespace Stealth.Game
             m_Reinforcements = 0;
             if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
             else UnloadCarServer();
-            SpawnStorageBotServer(layout);
+            // the storage robot waits in the basement — or, with its kennel on the car, gets out when the car stops
+            m_MuleInKennel = MuleRidesIn(arriving);
+            if (!m_MuleInKennel) SpawnStorageBotServer(layout);
             foreach (var p in PlayerController.All) p.ResetForLevelServer(); // (the team arrives down in the basement)
             if (arriving) ArriveCarServer(layout);
             else SpawnBasementCarServer(layout);
@@ -676,6 +679,7 @@ namespace Stealth.Game
             {
                 DriveUntil = 0; // the car stands at the gate: the team gets out
                 UnloadCarServer();
+                ReleaseMuleServer();
                 Banner(Loc.Pack("banner.house", Level.Index + 1));
             }
             UpdateShredderServer();
@@ -897,6 +901,7 @@ namespace Stealth.Game
             Stash.Clear();
             ExitStash.Clear();
             ClearCraftingServer();
+            ClearUpgradesServer();
             CancelArrival();
             DriveUntil = 0;
             m_Opened.Add(OpenKeys.Gate); // the start of the run: no gate to open

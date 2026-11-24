@@ -716,6 +716,65 @@ def robot_warden(g):
     g.line([(0.32, 0.46), (0.50, 0.60), (0.68, 0.46)], 0.07, on="d")
 
 
+# ------------------------------------------------------------------ car upgrades (the garage's upgrade bench, 96 px)
+
+def upgrade_engine(g):
+    """An engine block from the side: the block with cooling fins, a cylinder head on top, a pulley at the front."""
+    g.rrect((0.16, 0.36, 0.78, 0.82), 0.06)                       # the block
+    g.rrect((0.22, 0.22, 0.72, 0.38), 0.04)                       # the cylinder head
+    for x in (0.30, 0.42, 0.54, 0.66):
+        g.line([(x, 0.46), (x, 0.74)], 0.035, on="d")             # fins
+    g.ellipse((0.74, 0.50, 0.94, 0.70))                           # the pulley
+    g.ellipse((0.81, 0.57, 0.87, 0.63), on="d")
+    g.rrect((0.30, 0.10, 0.40, 0.24), 0.02)                       # an intake stub
+    g.rrect((0.50, 0.10, 0.60, 0.24), 0.02)
+    g.line([(0.20, 0.90), (0.74, 0.90)], 0.06)                    # the stand under it
+
+
+def upgrade_trunk(g):
+    """Shelves in a pickup's bed: the bed's walls seen from behind and three shelf boards across it."""
+    g.line([(0.10, 0.20), (0.10, 0.88), (0.90, 0.88), (0.90, 0.20)], 0.08)
+    for y in (0.36, 0.56, 0.74):
+        g.rrect((0.16, y - 0.035, 0.84, y + 0.035), 0.015)
+    g.rrect((0.22, 0.20, 0.38, 0.32), 0.02)                       # boxes on the shelves
+    g.rrect((0.56, 0.42, 0.74, 0.52), 0.02)
+    g.rrect((0.30, 0.60, 0.44, 0.70), 0.02)
+
+
+def upgrade_kennel(g):
+    """A dog-house: a pitched roof over a box with a round-topped door."""
+    g.poly([(0.06, 0.46), (0.50, 0.10), (0.94, 0.46), (0.86, 0.50), (0.50, 0.22), (0.14, 0.50)])
+    g.rrect((0.18, 0.44, 0.82, 0.90), 0.03)
+    door = mask_of(g.size, lambda m: (m.rrect((0.36, 0.60, 0.64, 0.92), 0.02), m.ellipse((0.36, 0.48, 0.64, 0.74))))
+    g.cut(door)
+    g.rrect((0.40, 0.34, 0.60, 0.40), 0.01, on="d")               # the name plate
+
+
+def upgrade_teleport(g):
+    """The panic button: a big round button on a square plate, rays around it."""
+    g.rrect((0.20, 0.48, 0.80, 0.88), 0.06)
+    g.ellipse((0.30, 0.30, 0.70, 0.70))
+    g.ellipse((0.38, 0.38, 0.62, 0.62), on="d")
+    for a in (200, 240, 270, 300, 340):
+        r = math.radians(a)
+        g.line([(0.50 + math.cos(r) * 0.30, 0.50 + math.sin(r) * 0.30), (0.50 + math.cos(r) * 0.44, 0.50 + math.sin(r) * 0.44)], 0.05)
+
+
+def upgrade_planned(g):
+    """Not made yet: a padlock with a question mark on its body."""
+    g.arc((0.30, 0.10, 0.70, 0.56), 180, 360, 0.08)
+    g.line([(0.30, 0.33), (0.30, 0.46)], 0.08)
+    g.line([(0.70, 0.33), (0.70, 0.46)], 0.08)
+    g.rrect((0.18, 0.44, 0.82, 0.92), 0.08)
+    g.arc((0.40, 0.52, 0.60, 0.70), 200, 380, 0.05, on="d")
+    g.line([(0.50, 0.70), (0.50, 0.76)], 0.05, on="d")
+    g.ellipse((0.47, 0.81, 0.53, 0.87), on="d")
+
+
+UPGRADES = {"upgrade_engine": upgrade_engine, "upgrade_trunk": upgrade_trunk, "upgrade_kennel": upgrade_kennel,
+            "upgrade_teleport": upgrade_teleport, "upgrade_planned": upgrade_planned}
+
+
 ROBOTS = {
     "robot_guard": robot_guard, "robot_listener": robot_listener, "robot_drone": robot_drone, "robot_spider": robot_spider,
     "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, "robot_hound": robot_hound,
@@ -763,6 +822,8 @@ def main(only=None):
         jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
     for name, draw in ROBOTS.items():
         jobs.append((name, lambda n=name, d=draw: make(n, d)))
+    for name, draw in UPGRADES.items():
+        jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
     for level in range(4):
         jobs.append((f"noise_{level}", lambda lv=level: make(f"noise_{lv}", speaker(lv))))
     frames = 8

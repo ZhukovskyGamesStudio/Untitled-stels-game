@@ -1056,7 +1056,8 @@ namespace Stealth.EditorTools
         static GameObject BuildStashBoard(UiElements e)
         {
             const float c = InventoryUI.Cell, pad = 10f, gap = 12f, header = 30f, sellW = 96f, buttonH = 32f;
-            float gw = TeamStash.Width * c, gh = TeamStash.Height * c;
+            // (built for the biggest box, the kennel's top level: StashBoard.Fit shows the rows the stash has)
+            float gw = TeamStash.Width * c, gh = TeamStash.MaxHeight * c;
             var go = new GameObject("StashBoard", typeof(RectTransform));
             var canvas = go.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
@@ -1073,11 +1074,14 @@ namespace Stealth.EditorTools
                 "0", 17, TextAnchor.LowerLeft, Face.Mono);
             RuleLine(go.transform, TopLeft, TopLeft, new Vector2(pad, -header + 1), gw + gap + sellW, UiPalette.Ink, 1.5f);
             board.Grid = R(go.transform, "Grid", TopLeft, TopLeft, new Vector2(pad, -(header + pad)), new Vector2(gw, gh));
-            FormBox(R(board.Grid, "Box", Center, Center, Vector2.zero, new Vector2(gw + 4, gh + 4)), UiPalette.PaperShade);
+            board.GridBox = R(board.Grid, "Box", Center, Center, Vector2.zero, new Vector2(gw + 4, gh + 4));
+            FormBox(board.GridBox, UiPalette.PaperShade);
             var paper = Img(R(board.Grid, "Graph", Center, Center, Vector2.zero, new Vector2(gw, gh)), UiPalette.Rule.A(0.8f), PaperSprite("graph"));
             paper.type = Image.Type.Tiled;
+            board.GraphPaper = paper.rectTransform;
+            board.BuiltRows = TeamStash.MaxHeight;
             var cells = new List<Image>();
-            for (int y = 0; y < TeamStash.Height; y++)
+            for (int y = 0; y < TeamStash.MaxHeight; y++)
                 for (int x = 0; x < TeamStash.Width; x++)
                     cells.Add(Img(R(board.Grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), UiPalette.Ink.A(0.05f)));
             board.Cells = cells.ToArray();

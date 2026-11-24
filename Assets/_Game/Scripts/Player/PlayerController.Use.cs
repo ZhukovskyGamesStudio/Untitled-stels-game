@@ -100,7 +100,7 @@ namespace Stealth.Player
         void UpdateUse(bool holdE)
         {
             bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null
-                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0;
+                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0 || AtUpgrades;
             UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
             UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;
@@ -114,6 +114,7 @@ namespace Stealth.Player
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
             if (UseTarget.Kind == UseKind.CarBench) { AtBench = true; return; }      // the bench opens here; its moves are asked of the server
+            if (UseTarget.Kind == UseKind.Workbench) { OpenUpgrades(); return; }   // the car upgrade bench: its screen here, the upgrades asked of the server
             Link.SendUse(UseTarget.Kind, UseTarget.Index);
         }
 
