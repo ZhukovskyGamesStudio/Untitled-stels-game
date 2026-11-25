@@ -89,7 +89,7 @@ namespace Stealth.Tests
         /// a dim emission just looks like a material that ignores the lamps. Unlit only for effects and the gas behind windows.
         /// </summary>
         /// <summary>Things that only decorate (desk monitors, lamp shades and bulbs, server lights, a vending machine's glass): a faint glow, below the bloom — they must not draw the eye away from what the player can use.</summary>
-        public static readonly HashSet<string> DimDecor = new() { "PropScreen", "ScreenStatic", "ScreenNoSignal", "ScreenBoot", "LampShade", "LampBulb", "RackLights", "VendingGlass", "MachineLit", "MachineGlow", "Displays" };
+        public static readonly HashSet<string> DimDecor = new() { "PropScreen", "ScreenStatic", "ScreenNoSignal", "ScreenBoot", "LampShade", "LampBulb", "RackLights", "VendingGlass", "MachineLit", "MachineGlow", "Displays", "MedGlow" };
 
         [Test]
         public void MaterialsEitherTakeLightOrReallyGlow()

@@ -28,6 +28,9 @@ namespace Stealth.EditorTools
             {
                 var go = PropObject("MedTable", "med_table", "Ceiling", "Metal", "PropScreen");
                 go.AddComponent<MedTable>();
+                // the cross and the scan band are green; the vitals screen shows its picture (ScreenLooks.Shows)
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                    if (r.name.StartsWith("EyeSign")) r.sharedMaterial = M("MedGlow");
                 return go;
             });
             var bench = Prefab(p + "Workbench.prefab", () =>
@@ -36,7 +39,18 @@ namespace Stealth.EditorTools
                 go.AddComponent<Workbench>();
                 return go;
             });
-            var programmer = Prefab(p + "Programmer.prefab", () => PropObject("Programmer", "programmer_console", "PropBody", "PropAccent", "PropScreen"));
+            var programmer = Prefab(p + "Programmer.prefab", () =>
+            {
+                var go = PropObject("Programmer", "programmer_console", "PropBody", "PropAccent", "PropScreen");
+                // the three monitors show the console's own picture; its small lamps keep the plain glow
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                    if (r.name.StartsWith("EyeScreen"))
+                    {
+                        r.sharedMaterial = M("ProgrammerScreen");
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    }
+                return go;
+            });
             var illusion = Prefab($"{LevelPrefabs}/IllusionBlock.prefab", () =>
             {
                 // a wall block to look at, nothing to bump into; robots keep out (they would give it away)

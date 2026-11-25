@@ -273,5 +273,31 @@ namespace Stealth.Tests
             Assert.Less(quiet.World.Ambient.maxColorComponent, 0.13f, "a room with its lamps off needs a flashlight");
             Assert.Greater(quiet.World.CeilingGlow, 0f, "a lit room's own lamps light its ceiling");
         }
+    
+        /// <summary>The pieces the players use had plain glowing blue sheets for screens: nobody had given them pictures.</summary>
+        [Test]
+        public void TheScreensOfWhatThePlayersUseShowSomething()
+        {
+            var console = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/Programmer.prefab");
+            var monitors = console.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.StartsWith("EyeScreen")).ToArray();
+            Assert.IsNotEmpty(monitors, "the programming console has no monitors of its own");
+            foreach (var r in monitors)
+            {
+                Assert.AreEqual("ProgrammerScreen", r.sharedMaterial.name);
+                Assert.IsNotNull(r.sharedMaterial.GetTexture("_EmissionMap"), "its monitors glow with no picture");
+                var uv = r.GetComponent<MeshFilter>().sharedMesh.uv;
+                // three monitors, each its own third of the picture: their corners lie on the thirds' borders
+                foreach (float border in new[] { 0f, 1f / 3f, 2f / 3f, 1f })
+                    Assert.IsTrue(uv.Any(t => Mathf.Abs(t.x - border) < 0.02f), $"no monitor's side at {border:0.00} of the picture");
+                Assert.IsTrue(uv.All(t => t.x > -0.001f && t.x < 1.001f && t.y > -0.001f && t.y < 1.001f), "a monitor reads past the picture");
+            }
+            Assert.IsTrue(console.GetComponentsInChildren<MeshRenderer>(true).Any(r => r.name.StartsWith("Eye") && !r.name.StartsWith("EyeScreen")),
+                "the dock lamps are lamps, not part of the monitors");
+
+            var table = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/MedTable.prefab");
+            Assert.IsTrue(table.GetComponentsInChildren<MeshRenderer>(true).Any(r => r.name.StartsWith("EyeSign") && r.sharedMaterial.name == "MedGlow"), "the medical cross is green");
+            Assert.GreaterOrEqual(ScreenLooks.DisplayOf(PropKind.MedTable), 0, "the medical table's screen shows the patient's vitals");
+            Assert.IsTrue(ScreenLooks.InUse(PropKind.MedTable), "…and is never switched off");
+        }
     }
 }

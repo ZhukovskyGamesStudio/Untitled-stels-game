@@ -178,6 +178,17 @@ namespace Stealth.EditorTools
             Mat(props, "Mirror", new Color(0.7f, 0.78f, 0.82f), smoothness: 0.98f);
             Mat(props, "Vending", new Color(0.75f, 0.12f, 0.12f), smoothness: 0.6f);
             Mat(props, "VendingGlass", new Color(0.6f, 0.85f, 1f), new Color(0.33f, 0.45f, 0.57f), smoothness: 0.9f); // lit display, dim
+            // the medical table's cross and scan band: the green of a pharmacy sign, dim (decor)
+            Mat(props, "MedGlow", new Color(0.25f, 0.8f, 0.45f), new Color(0.2f, 0.62f, 0.33f), smoothness: 0.6f);
+            // the programming console's monitors: one picture three screens wide (generate_screens.py screen_program), really lit — it is used
+            var program = Mat(props, "ProgrammerScreen", new Color(0.3f, 0.3f, 0.3f), Color.white * 1.1f, smoothness: 0.85f);
+            var programPicture = AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/Art/Textures/Screens/screen_program.png");
+            if (program.GetTexture("_BaseMap") != programPicture || program.GetTexture("_EmissionMap") != programPicture)
+            {
+                program.SetTexture("_BaseMap", programPicture);
+                program.SetTexture("_EmissionMap", programPicture);
+                EditorUtility.SetDirty(program);
+            }
             // the themed rooms' furniture (AssetBuilder.Rooms)
             Mat(props, "Rubber", new Color(0.1f, 0.1f, 0.11f), smoothness: 0.15f);
             Mat(props, "Felt", new Color(0.1f, 0.4f, 0.28f), smoothness: 0.05f);

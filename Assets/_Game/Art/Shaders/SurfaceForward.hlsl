@@ -9,7 +9,7 @@
 
 // How much of an outer edge a pixel is (0 a face or a hollow .. 1 a right angle): the normals and places a few millimetres
 // to either side, from the normals the ambient occlusion has drawn already — nothing is baked, any shape will do, whether
-// whether its bevels are smooth, faceted or missing. Fades out where the edge is thinner than a pixel. A thin rod is not all
+// whether its bevels are smooth, faceted or missing. Fades out before the edge is as thin as a pixel. A thin rod is not all
 // edge: round, it bends twice as much over twice the distance, an edge no more than it did (a stand's tubes, chair legs and
 // handles were worn in blotches all over).
 half Bend(float2 uv, float2 d, float3 positionWS, float limit)
@@ -28,7 +28,10 @@ half OuterEdge(float2 uv, float3 positionWS)
     float away = max(dot(positionWS - GetCameraPositionWS(), -UNITY_MATRIX_V[2].xyz), 0.05);
     float tall = reach * abs(UNITY_MATRIX_P._m11) / (2.0 * away);       // the reach, share of the picture's height
     float px = tall * _ScaledScreenParams.y;
-    half fade = saturate(px * 1.1 - 0.35);
+    // Gone before the rubbed strip is a pixel wide (full from two pixels, none under 0.8: about 2 m and 5 m at 1080p). Drawn
+    // at a pixel's width it was found in one frame and missed in the next as the view moved: edges of furniture across the
+    // room sparkled.
+    half fade = saturate((px - 0.8) / 1.2);
     if (fade <= 0.0) return 0.0;
     float2 o = max(px, 1.0) * (_ScaledScreenParams.zw - 1.0);
     half across = Bend(uv, float2(o.x, 0.0), positionWS, reach * 4.0), along = Bend(uv, float2(0.0, o.y), positionWS, reach * 4.0);

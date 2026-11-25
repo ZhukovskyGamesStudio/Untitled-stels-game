@@ -341,6 +341,94 @@ def screen_boot():
     print("wrote screen_boot")
 
 
+def screen_program():
+    """The robot programming console's three monitors side by side, one picture three screens wide (poi.py
+    model_programmer_console gives each monitor its third): a program listing with the running line, the four cube
+    docks and how full each is, the arm with its joint angles. No words: bars, numbers of dots, shapes."""
+    s = SS
+    img = Image.new("RGB", (3 * W * s, H * s), (5, 9, 12))
+    d = ImageDraw.Draw(img)
+    cyan, dim, amber, green, red = (110, 220, 235), (40, 96, 110), (240, 180, 70), (110, 225, 130), (235, 90, 70)
+    rnd = random.Random(23)
+
+    def box(x0, y0, x1, y1, **kw):
+        d.rectangle([x0 * s, y0 * s, x1 * s, y1 * s], **kw)
+
+    for k in range(3):                                   # each screen's frame and title bar
+        box(k * W + 5, 5, (k + 1) * W - 5, H - 5, outline=dim, width=s)
+        box(k * W + 5, 5, (k + 1) * W - 5, 16, fill=dim)
+        for i in range(3):
+            box(k * W + 10 + i * 9, 8, k * W + 15 + i * 9, 13, fill=cyan if i == k else (20, 50, 58))
+
+    # 1: the listing — line numbers as ticks, indented bars of code, the running line lit, a breakpoint
+    y, line = 24, 0
+    while y < H - 14:
+        indent = rnd.choice((0, 0, 10, 10, 20))
+        box(12, y + 1, 18, y + 3, fill=dim)
+        running = line == 5
+        if running:
+            box(22, y - 2, W - 12, y + 6, fill=(60, 48, 16))
+        if line == 9:
+            d.ellipse([20 * s, (y - 1) * s, 26 * s, (y + 5) * s], fill=red)
+        x = 30 + indent
+        while x < W - 60 - rnd.randint(0, 80):
+            w = rnd.randint(8, 30)
+            box(x, y, x + w, y + 4, fill=amber if running else rnd.choice((cyan, cyan, dim, green)))
+            x += w + 5
+        y += 9
+        line += 1
+
+    # 2: the docks — four cubes in a row, a level in each, a mark under it: ready, charging, empty
+    for i, (level, state) in enumerate(((1.0, "ok"), (0.62, "busy"), (1.0, "ok"), (0.0, "none"))):
+        cx = W + 38 + i * 60
+        colour = green if state == "ok" else amber if state == "busy" else dim
+        box(cx - 22, 34, cx + 22, 98, outline=colour, width=2 * s)
+        if level > 0:
+            box(cx - 17, 93 - 54 * level, cx + 17, 93, fill=colour)
+        for j in range(4):                                # the dock's number: dots
+            if j <= i:
+                d.ellipse([(cx - 15 + j * 9) * s, 106 * s, (cx - 9 + j * 9) * s, 112 * s], fill=cyan)
+        if state == "ok":
+            d.line([(cx - 10) * s, 128 * s, (cx - 3) * s, 136 * s, (cx + 11) * s, 121 * s], fill=green, width=3 * s, joint="curve")
+        elif state == "busy":
+            for j in range(3):
+                box(cx - 13 + j * 10, 126, cx - 7 + j * 10, 132, fill=amber if j < 2 else dim)
+        else:
+            box(cx - 10, 128, cx + 10, 131, fill=dim)
+
+    # 3: the arm — base, two links and a gripper, an arc and a tick scale at each joint, a target cross
+    ox = 2 * W
+    base, elbow, wrist = (ox + 62, 128), (ox + 112, 70), (ox + 178, 92)
+    box(ox + 38, 128, ox + 86, 138, fill=dim)
+    for a, b in ((base, elbow), (elbow, wrist)):
+        d.line([a[0] * s, a[1] * s, b[0] * s, b[1] * s], fill=cyan, width=7 * s)
+    for (jx, jy), (a0, a1) in ((base, (230, 310)), (elbow, (330, 60)), (wrist, (300, 40))):
+        d.ellipse([(jx - 8) * s, (jy - 8) * s, (jx + 8) * s, (jy + 8) * s], fill=(5, 9, 12), outline=amber, width=2 * s)
+        d.arc([(jx - 22) * s, (jy - 22) * s, (jx + 22) * s, (jy + 22) * s], a0, a1, fill=amber, width=2 * s)
+    for side in (-1, 1):                                  # the gripper's two fingers
+        d.line([wrist[0] * s, wrist[1] * s, (wrist[0] + 20) * s, (wrist[1] + side * 9) * s, (wrist[0] + 32) * s, (wrist[1] + side * 6) * s],
+               fill=cyan, width=3 * s)
+    tx, ty = ox + 226, 96
+    box(tx - 12, ty - 12, tx + 12, ty + 12, outline=green, width=s)
+    d.line([(tx - 18) * s, ty * s, (tx + 18) * s, ty * s], fill=green, width=s)
+    d.line([tx * s, (ty - 18) * s, tx * s, (ty + 18) * s], fill=green, width=s)
+    for i in range(12):                                   # a scale along the bottom
+        box(ox + 18 + i * 19, 146, ox + 19 + i * 19, 150 if i % 3 else 153, fill=dim)
+
+    img = img.resize((6 * W, 2 * H), Image.LANCZOS)      # (twice the terminals' size: these monitors are looked at up close)
+    glow = img.filter(ImageFilter.GaussianBlur(6))
+    img = Image.blend(img, Image.eval(glow, lambda v: min(255, v * 2)), 0.25)
+    px = img.load()
+    for y in range(2 * H):                                # scanlines
+        if y % 6 < 2:
+            for x in range(6 * W):
+                r, g, b = px[x, y]
+                px[x, y] = (int(r * 0.78), int(g * 0.78), int(b * 0.78))
+    os.makedirs(OUT, exist_ok=True)
+    img.save(os.path.join(OUT, "screen_program.png"))
+    print("wrote screen_program")
+
+
 if __name__ == "__main__":
     screen_vault(False)
     screen_vault(True)
@@ -353,3 +441,4 @@ if __name__ == "__main__":
     screen_nosignal()
     screen_boot()
     screen_map()
+    screen_program()

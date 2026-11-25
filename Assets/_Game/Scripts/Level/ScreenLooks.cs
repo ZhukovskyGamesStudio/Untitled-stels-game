@@ -48,7 +48,7 @@ namespace Stealth.Level
             [PropKind.NetworkCabinet] = "server", [PropKind.TapeLibrary] = "server", [PropKind.UpsUnit] = "power", [PropKind.CracUnit] = "temp", [PropKind.CtScanner] = "scan",
             [PropKind.XrayMachine] = "scan", [PropKind.WeldingCart] = "welder", [PropKind.WheelBalancer] = "balance",
             [PropKind.InfoKiosk] = "kiosk", [PropKind.RowingMachine] = "rower", [PropKind.PaintRack] = "paint", [PropKind.Plotter] = "plot",
-            [PropKind.Printer3d] = "print3d", [PropKind.SurgicalTable] = "ok", [PropKind.RobotTable] = "bars",
+            [PropKind.Printer3d] = "print3d", [PropKind.SurgicalTable] = "ok", [PropKind.RobotTable] = "bars", [PropKind.MedTable] = "vitals",
         };
 
         /// <summary>The plain glow on the displays' texture: lamps, strips of light, rings — what is no display.</summary>
@@ -62,7 +62,7 @@ namespace Stealth.Level
 
         public static ScreenKind KindOf(PropKind kind) => Tvs.Contains(kind) ? ScreenKind.Tv : Computers.Contains(kind) ? ScreenKind.Computer : ScreenKind.Appliance;
 
-        /// <summary>The piece's screens are used by the players: they are lit as they are.</summary>
+        /// <summary>The piece's screens are used by the players: never switched off or broken; a display of its own still shows its picture.</summary>
         public static bool InUse(PropKind kind) => kind is PropKind.Terminal or PropKind.Programmer or PropKind.MedTable;
 
         /// <summary>The look of a piece's screens, from its own stream of the house's seed.</summary>

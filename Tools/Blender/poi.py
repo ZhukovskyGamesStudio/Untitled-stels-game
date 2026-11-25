@@ -269,7 +269,9 @@ def model_med_table():
         cross.append(s.rbox((0.15, 0.012, 0.05), (ARCH_X, y * 0.036, 1.78), r=0.004, seg=1))
         cross.append(s.rbox((0.05, 0.012, 0.15), (ARCH_X, y * 0.036, 1.78), r=0.004, seg=1))
     screen = s.rbox((0.17, 0.008, 0.18), (ARCH_X, -ARCH_R - 0.079, 1.05), r=0.003, seg=1)
-    s.part("EyeScreen", [band, *cross, screen])
+    # the sign and the scan band glow green (their own material); the vitals screen shows its picture
+    s.part("EyeSign", [band, *cross])
+    s.part("EyeScreen", [screen])
     return export("med_table")
 
 
@@ -430,7 +432,17 @@ def model_programmer_console():
     leds = [s.rbox((0.08, 0.01, 0.022), (x, 0.448, 1.33), r=0.004, seg=1) for x in SLOTS_X]
     code = s.rbox((0.3, 0.012, 0.1), (0, 0, 0), r=0.003, seg=1)
     s.place(code, on_slope(0.0, -0.08, 0.012), (tilt, 0, 0))
-    s.part("EyeScreen", [*screens, *leds, code])
+    s.part("Eye", [*leds, code])
+    # the three monitors: each its own third of one picture (Tools/Art/generate_screens.py screen_program), left to right
+    obj = s.part("EyeScreen", screens)
+    up = Vector((0, -math.sin(0.17), math.cos(0.17)))
+    uv = obj.data.uv_layers.active.data
+    for loop in obj.data.loops:
+        w = obj.matrix_world @ obj.data.vertices[loop.vertex_index].co
+        k = min(range(3), key=lambda i: abs(w.x - (-0.64 + 0.64 * i)))
+        d = w - (Vector((-0.64 + 0.64 * k, 0.415, 1.73)) + n * 0.024)
+        u = min(1.0, max(0.0, d.x / 0.54 + 0.5))
+        uv[loop.index].uv = ((k + u) / 3.0, min(1.0, max(0.0, d.dot(up) / 0.3 + 0.5)))
     return export("programmer_console")
 
 

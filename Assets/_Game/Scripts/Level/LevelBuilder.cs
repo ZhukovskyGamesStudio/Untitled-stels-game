@@ -224,12 +224,14 @@ namespace Stealth.Level
         void DressScreens(GameObject go, PropKind kind, int seed)
         {
             var screens = m_Art.Screens;
-            if (screens == null || screens.Length == 0 || screens[0] == null || ScreenLooks.InUse(kind)) return;
+            if (screens == null || screens.Length == 0 || screens[0] == null) return;
             int picture = ScreenLooks.DisplayOf(kind);
+            bool used = ScreenLooks.InUse(kind);
+            if (used && picture < 0) return; // (its screens are its own business: the terminal's pictures, the console's)
             if (picture >= 0 && m_Art.Displays != null)
             {
-                // an appliance's own little display: what such a thing shows, or dark
-                bool dark = ScreenLooks.DisplayDark(seed);
+                // an appliance's own little display: what such a thing shows, or dark (never dark on what the players use)
+                bool dark = !used && ScreenLooks.DisplayDark(seed);
                 foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
                 {
                     if (r.sharedMaterial != screens[0]) continue;
