@@ -332,7 +332,7 @@ namespace Stealth.EditorTools
             var ct = view.Close.GetComponentInChildren<Text>();
             if (ct != null) { ct.text = ""; ct.enabled = false; }
             Img(R(cb, "Glyph", Center, Center, Vector2.zero, new Vector2(22, 22)), UiPalette.Ink, PaperSprite("cross")).raycastTarget = false;
-            string[] icons = { "upgrade_engine", "upgrade_trunk", "upgrade_kennel", "upgrade_teleport", "upgrade_planned", "upgrade_planned" };
+            string[] icons = { "upgrade_engine", "upgrade_trunk", "upgrade_backpack", "upgrade_teleport", "upgrade_radio", "upgrade_planned" };
             view.Cards = new CarUpgradeCardView[icons.Length];
             for (int i = 0; i < icons.Length; i++)
             {
@@ -573,7 +573,7 @@ namespace Stealth.EditorTools
             hud.TeamList.gameObject.SetActive(false);
 
             // The banner: a typed slip taped across the top.
-            hud.BannerRect = R(content, "Banner", TopCenter, TopCenter, new Vector2(0, -115), new Vector2(700, 34));
+            hud.BannerRect = R(content, "Banner", TopCenter, TopCenter, new Vector2(0, -GameHUD.BannerTop), new Vector2(700, 34));
             hud.Banner = hud.BannerRect.gameObject.AddComponent<CanvasGroup>();
             hud.Banner.blocksRaycasts = false;
             hud.BannerLabel = Ink(Stretch(hud.BannerRect, "Label"), "—", 17, TextAnchor.MiddleCenter, Face.Bold);

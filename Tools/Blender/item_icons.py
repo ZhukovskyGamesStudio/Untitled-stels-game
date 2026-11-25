@@ -259,6 +259,12 @@ ITEMS = {
         "Accent": ((0.1, 0.3, 0.85), 0.0, 0.45, 0.0),                    # blue wire
         "TrimCopper": ((0.85, 0.45, 0.25), 0.9, 0.3, 0.0),
         "Trim": ((0.05, 0.05, 0.05), 0.0, 0.5, 0.0)}),                   # cable tie
+    "cassette": (1, 1, "item_cassette_model", {
+        "Body": ((0.08, 0.08, 0.09), 0.0, 0.45, 0.0),                    # shell
+        "Trim": ((0.92, 0.88, 0.78), 0.0, 0.6, 0.0),                     # label
+        "AccentStripe": ((0.9, 0.35, 0.12), 0.0, 0.5, 0.0),
+        "AccentReel": ((0.95, 0.95, 0.95), 0.0, 0.4, 0.0),
+        "Accent": ((0.15, 0.13, 0.12), 0.0, 0.15, 0.0)}, "tilted"),       # smoked window
     "chip": (1, 1, "item_chip_model", {
         "Body": ((0.06, 0.06, 0.06), 0.0, 0.5, 0.0),                     # epoxy package
         "Trim": ((0.95, 0.75, 0.25), 0.9, 0.3, 0.0),                     # gold pins

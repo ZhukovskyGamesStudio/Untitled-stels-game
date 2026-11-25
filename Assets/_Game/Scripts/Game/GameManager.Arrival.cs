@@ -267,7 +267,7 @@ namespace Stealth.Game
                 double ms = watch.Elapsed.TotalMilliseconds;
                 total += ms;
                 worst = System.Math.Max(worst, ms);
-                if (ms > SlowStepMs && Debug.isDebugBuild) Debug.Log($"[Perf] {what}: step {n} took {ms:0} ms");
+                if (ms > SlowStepMs && Debug.isDebugBuild) Debug.Log($"[Perf] {what}: step {n} took {ms:0} ms ({FrameBudget.Step})");
                 n++;
                 if (!more) break;
                 yield return steps.Current;

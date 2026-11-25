@@ -345,6 +345,9 @@ namespace Stealth.Player
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
+            // seated, the body is put on its seat again now that the player is (UpdateModelPose ran before the seat moved
+            // the player with the car: the body, and the view held to it, trailed by a frame's drive — the car shook)
+            if (SeatIndex >= 0) FollowRig();
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
 

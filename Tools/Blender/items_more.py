@@ -782,6 +782,26 @@ def model_item_ssd_model():
     return export("item_ssd_model")
 
 
+def model_item_cassette_model():
+    """A compact cassette lying flat, 0.10 x 0.064 x 0.012: the dark shell with its tapered head (Body), the cream label
+    with a coloured stripe (Trim, AccentStripe), the smoked window over the tape (Accent), the two reels' white hubs
+    with their teeth (AccentReel), five screws (AccentReel too)."""
+    L, W, H = 0.1, 0.064, 0.012
+    shell = s.rbox((L, W, H), (0, 0, H / 2), r=0.0025, seg=2)
+    head = s.rbox((0.06, 0.012, H * 0.8), (0, -W / 2 - 0.004, H * 0.42), r=0.002, seg=1, taper=(0.86, 1.0))
+    s.part("Body", [shell, head])
+    s.part("Trim", [s.rbox((0.088, 0.04, 0.0012), (0, 0.006, H + 0.0003), r=0.0008, seg=1)])
+    s.part("AccentStripe", [s.rbox((0.088, 0.008, 0.0013), (0, 0.021, H + 0.0006), r=0.0005, seg=1)])
+    s.part("Accent", [s.rbox((0.046, 0.017, 0.0016), (0, 0.002, H + 0.0008), r=0.003, seg=1)])
+    reels = []
+    for x in (-0.0155, 0.0155):
+        reels.append(s.rcyl(0.0062, 0.0018, (x, 0.002, H + 0.0012), seg=14, r=0.0005, bevel_seg=1))
+    reels += [s.rcyl(0.0018, 0.0014, (x, y, H + 0.0004), seg=8, r=0.0003, bevel_seg=1)
+              for x, y in ((-0.044, 0.026), (0.044, 0.026), (-0.044, -0.026), (0.044, -0.026), (0, -0.027))]
+    s.part("AccentReel", reels)
+    return export("item_cassette_model")
+
+
 def model_item_gamepad_model():
     """A game controller lying face up, 0.16 x 0.10 x 0.045, its grips toward -Y: one shell - a thick middle running
     out into the two grips (Body), two low thumbsticks, the d-pad, the shoulder triggers and the middle pad (Accent),
@@ -1689,6 +1709,7 @@ MODELS = {
     "item_plush_model": model_item_plush_model,
     "item_socks_model": model_item_socks_model,
     "item_ssd_model": model_item_ssd_model,
+    "item_cassette_model": model_item_cassette_model,
     "item_gamepad_model": model_item_gamepad_model,
     "item_gamekeyboard_model": model_item_gamekeyboard_model,
     "item_canister_model": model_item_canister_model,

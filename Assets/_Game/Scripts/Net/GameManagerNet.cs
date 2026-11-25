@@ -73,6 +73,8 @@ namespace Stealth.Net
         readonly NetworkVariable<double> m_HouseClock = new();
         readonly NetworkVariable<bool> m_Picking = new();
         readonly NetworkVariable<uint> m_Upgrades = new();
+        readonly NetworkVariable<byte> m_TeleportCharge = new();
+        readonly NetworkVariable<sbyte> m_Cassette = new(-1);
         readonly NetworkVariable<sbyte> m_DriveBranch = new(-1);
         readonly NetworkVariable<NetLift> m_Lift = new(NetLift.Of(Stealth.Level.LiftState.ParkedAt(0)));
         int m_PushedExitStash = -1, m_PushedCargo = -1;
@@ -152,6 +154,10 @@ namespace Stealth.Net
             m_Game.ApplyPicking(m_Picking.Value);
             m_Upgrades.OnValueChanged += (_, v) => m_Game.ApplyUpgrades(v);
             m_Game.ApplyUpgrades(m_Upgrades.Value);
+            m_TeleportCharge.OnValueChanged += (_, v) => m_Game.ApplyTeleportCharge(v);
+            m_Game.ApplyTeleportCharge(m_TeleportCharge.Value);
+            m_Cassette.OnValueChanged += (_, v) => m_Game.ApplyCassette(v);
+            m_Game.ApplyCassette(m_Cassette.Value);
             m_Explored.OnListChanged += _ => PullExplored();
         }
 
@@ -204,6 +210,8 @@ namespace Stealth.Net
             NetSync.Set(m_HouseClock, m_Game.HouseClockAt);
             NetSync.Set(m_Picking, m_Game.Picking);
             NetSync.Set(m_Upgrades, m_Game.Upgrades.Pack());
+            NetSync.Set(m_TeleportCharge, (byte)m_Game.TeleportChargePercent);
+            NetSync.Set(m_Cassette, (sbyte)m_Game.Cassette);
         }
 
         /// <summary>Sends only the changed chunks, a few times a second; a new house resends the whole list.</summary>

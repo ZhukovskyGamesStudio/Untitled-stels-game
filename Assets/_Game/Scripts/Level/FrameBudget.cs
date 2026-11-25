@@ -13,6 +13,9 @@ namespace Stealth.Level
         /// <summary>Milliseconds of a frame such work may take (the drive goes on at 60+ fps around it).</summary>
         public const double Milliseconds = 6.0;
 
+        /// <summary>What the stepped work is doing now (a development build's slow-step log names it: GameManager.Timed).</summary>
+        public static string Step = "";
+
         static readonly Stopwatch s_Watch = Stopwatch.StartNew();
         static int s_Frame = -1;
 

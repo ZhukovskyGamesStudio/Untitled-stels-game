@@ -297,6 +297,26 @@ namespace Stealth.Player
             Link.RequestDeposit(index);
         }
 
+        /// <summary>Owner: a cassette dragged onto the car's radio.</summary>
+        public void RequestCassette(int index)
+        {
+            Link.RequestCassette(index);
+        }
+
+        /// <summary>Server: the radio takes a cassette of this backpack (GameManager.InsertCassetteServer checks the radio and the car).</summary>
+        public void CassetteServer(int index) => GameManager.Instance?.InsertCassetteServer(GetComponent<PlayerController>(), index);
+
+        /// <summary>Server: the cassette at <paramref name="index"/> leaves the backpack for the radio (false: not a cassette, or not now).</summary>
+        public bool TakeCassetteServer(int index, out int song)
+        {
+            song = -1;
+            if (index < 0 || index >= m_Items.Count || !CanAct || Locked(index) || m_Items[index].Shape != ItemCatalog.Cassette) return false;
+            song = Mathf.Clamp(m_Items[index].Color, 0, ItemCatalog.CassetteSongs - 1);
+            m_Items.RemoveAt(index);
+            Changed();
+            return true;
+        }
+
         public void RequestStash(int index, byte x, byte y, byte rot)
         {
             Link.RequestStash(index, x, y, rot);

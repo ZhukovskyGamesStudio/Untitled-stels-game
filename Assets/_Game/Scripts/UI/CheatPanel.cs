@@ -41,10 +41,10 @@ namespace Stealth.UI
         public Button[] Houses = new Button[0];
 
         [Header("Items")]
-        [Tooltip("Spawn this item in front of you (index = ItemCatalog shape); the label is the item's name.")]
+        [Tooltip("Spawn this item in front of you (index = ItemCatalog shape; none for the old tetris pieces): its icon and, small, its name.")]
         public Button[] Items = new Button[0];
-        [Tooltip("The colour the items spawn with (index = ItemCatalog colour; a blueprint: that recipe).")]
-        public Button[] ItemColors = new Button[0];
+        [Tooltip("The check box 'only the interactive': hides the things that are only fuel (ItemCatalog.Interactive).")]
+        public Button OnlyInteractive;
 
         [Header("Car")]
         [Tooltip("A row per upgrade (index = CarUpgrade); hidden for the ones not designed yet.")]
@@ -54,7 +54,8 @@ namespace Stealth.UI
 
         bool m_Invulnerable, m_Invisible;
         Tab m_Tab;
-        int m_Color, m_LocVersion = -1, m_UpgradesVersion = -1;
+        int m_LocVersion = -1, m_UpgradesVersion = -1;
+        bool m_OnlyInteractive;
 
         const int LevelsPerRow = CarUpgrades.MaxLevelled + 1;
 
@@ -84,13 +85,9 @@ namespace Stealth.UI
             for (int i = 0; i < Items.Length; i++)
             {
                 int shape = i;
-                if (Items[i] != null) Items[i].onClick.AddListener(() => Me?.RequestCheat(Cheat.SpawnItem, CheatArgs.Item(shape, m_Color)));
+                if (Items[i] != null) Items[i].onClick.AddListener(() => Me?.RequestCheat(Cheat.SpawnItem, CheatArgs.Item(shape, 0))); // (its colour: its own rarity)
             }
-            for (int i = 0; i < ItemColors.Length; i++)
-            {
-                int color = i;
-                if (ItemColors[i] != null) ItemColors[i].onClick.AddListener(() => { m_Color = color; m_LocVersion = -1; });
-            }
+            if (OnlyInteractive != null) OnlyInteractive.onClick.AddListener(() => { m_OnlyInteractive = !m_OnlyInteractive; m_LocVersion = -1; });
             for (int i = 0; i < UpgradeLevels.Length; i++)
             {
                 var upgrade = (CarUpgrade)(i / LevelsPerRow);
@@ -174,20 +171,24 @@ namespace Stealth.UI
             }
         }
 
-        /// <summary>The items' names and the colours (in the player's language), the chosen colour highlighted.</summary>
+        /// <summary>The items' names (in the player's language); with "only the interactive" ticked, the fuel-only things hidden.</summary>
         void RefreshItems()
         {
             if (m_LocVersion == Loc.Version) return;
             m_LocVersion = Loc.Version;
             for (int i = 0; i < Items.Length && i < ItemCatalog.Shapes.Length; i++)
-                if (Items[i] != null) Label(Items[i], ItemCatalog.ShortName(i));
-            for (int c = 0; c < ItemColors.Length; c++)
             {
-                if (ItemColors[c] == null) continue;
-                Label(ItemColors[c], c < ItemCatalog.Colors.Length ? ItemCatalog.ColorName(c) : c.ToString());
-                if (ItemColors[c].image != null) ItemColors[c].image.color = c == m_Color ? CurrentColor : Color.white;
+                if (Items[i] == null) continue;
+                Label(Items[i], ItemCatalog.ShortName(i));
+                Items[i].gameObject.SetActive(Shown(i, m_OnlyInteractive));
             }
+            if (OnlyInteractive == null) return;
+            Label(OnlyInteractive, Loc.T("cheats.only_interactive"));
+            if (OnlyInteractive.image != null) OnlyInteractive.image.color = m_OnlyInteractive ? CurrentColor : Color.white; // (ticked: lit like an open tab)
         }
+
+        /// <summary>An item's button is shown (pure): never an old tetris piece; with the filter, only what does something.</summary>
+        public static bool Shown(int shape, bool onlyInteractive) => !ItemCatalog.IsPiece(shape) && (!onlyInteractive || ItemCatalog.Interactive(shape));
 
         /// <summary>Each upgrade's current level highlighted.</summary>
         void RefreshUpgrades()

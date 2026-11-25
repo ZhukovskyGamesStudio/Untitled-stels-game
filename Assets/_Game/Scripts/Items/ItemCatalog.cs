@@ -133,6 +133,8 @@ namespace Stealth.Items
             new Shape { Id = "queen_b",  Cells = new[] { V(0, 0), V(0, 1) } },
             new Shape { Id = "king_w",   Cells = new[] { V(0, 0), V(0, 1) } },
             new Shape { Id = "king_b",   Cells = new[] { V(0, 0), V(0, 1) } },
+            // a cassette for the car's radio (the unique upgrade): its colour byte is its song
+            new Shape { Id = "cassette", Cells = new[] { V(0, 0) } },
         };
 
         /// <summary>The first shapes are the loot of the houses (what lies around, robots carry, crates hold).</summary>
@@ -167,6 +169,12 @@ namespace Stealth.Items
         public const byte Circuit = 59, Wires = 60, Chip = 61;
         /// <summary>The chess pieces, white then black of each: pawn, knight, bishop, rook, queen, king.</summary>
         public const byte FirstChess = 62, LastChess = 73;
+        /// <summary>A cassette for the car's radio: its colour byte is its song, 0..<see cref="CassetteSongs"/> − 1 (shown in that colour).</summary>
+        public const byte Cassette = 74;
+        public const int CassetteSongs = 4;
+
+        /// <summary>The table key of a cassette's song name.</summary>
+        public static string CassetteKey(int song) => "cassette.song" + Mathf.Clamp(song, 0, CassetteSongs - 1);
 
         /// <summary>The thing an upgraded one is made from and works as (the upgraded screwdriver is a screwdriver too), else itself.</summary>
         public static byte BaseOf(int shape) => shape switch
@@ -506,6 +514,12 @@ namespace Stealth.Items
         public static bool IsTool(int shape) => shape == Key || shape == Stun || shape == Speaker || shape == CageKey || shape == Screwdriver || shape == BeltBag || shape == ShelterMap
             || shape is >= Radio and <= Boots || IsCrafted(shape);
 
+        /// <summary>Does something besides burning: a tool, the flashlight and its battery, bandages, a blueprint (its recipe) — the rest is only fuel.</summary>
+        public static bool Interactive(int shape) => IsTool(shape) || shape is Flashlight or Battery or Bandage or Blueprint or Cassette;
+
+        /// <summary>One of the old tetris-shaped pieces of loot (no longer handed out: the game has real things now).</summary>
+        public static bool IsPiece(int shape) => shape >= 0 && shape < LootShapes;
+
         /// <summary>Never becomes fuel, not even one by one at the hatch or the hopper: the shelter map.</summary>
         public static bool Unburnable(int shape) => shape == ShelterMap;
 
@@ -682,6 +696,7 @@ namespace Stealth.Items
             Screwdriver => Loc.T("item.screwdriver"),
             BeltBag => Loc.T("item.beltbag"),
             Blueprint => Loc.F("item.blueprint", ColorName(RarityOr(shape, color)), Value(shape, color), BlueprintList(color)),
+            Cassette => Loc.F("item.cassette", Loc.T(CassetteKey(color)), Value(shape, color)),
             _ when IsCrafted(shape) => Loc.F("item.crafted", Loc.T(NameKey(shape)), ColorName(RarityOr(shape, color)), Value(shape, color)),
             _ when IsTool(shape) => Loc.T(NameKey(shape)),
             _ when IsJunk(shape) || IsTrinket(shape) => Loc.F("item.junk", Loc.T(NameKey(shape)), ColorName(Rarity(shape)), Value(shape, color)),

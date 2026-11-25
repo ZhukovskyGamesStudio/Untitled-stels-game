@@ -82,6 +82,7 @@ namespace Stealth.EditorTools
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
             var model = RaccoonModel(out var animator, out _);
             model.transform.SetParent(root.transform, false);
+            root.AddComponent<StorageBotSounds>(); // (his paws, the backpack, the ducts, his chatter: recorded.py mule_*)
             var anim = root.AddComponent<StorageBotAnimator>();
             anim.Model = model.transform;
             anim.Animator = animator;

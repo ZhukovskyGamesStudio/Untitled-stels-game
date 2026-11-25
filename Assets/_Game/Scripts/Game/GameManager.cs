@@ -395,12 +395,14 @@ namespace Stealth.Game
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.LevelOf(HouseKinds.Of(info.Seed, info.Index)); // (the test rooms: their own settings)
             ItemCatalog.ConfigureLoot(level.Loot.Table); // what this house's loot is (every peer: the same table)
+            FrameBudget.Step = "the plan (generated in the background, else here)";
             var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
                 LevelGenerator.Classic, info.ClassicEnemies);
             foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
             ApplyAtmosphere();
+            FrameBudget.Step = "style: dressing, architecture, merging";
             foreach (var _ in VisualStyles.ReapplySteps()) yield return null; // (a piece of a frame at a time: FrameBudget)
             if (PlayerController.Local != null) PlayerController.Local.SnapAir(); // under the house in the sewer: its air at once
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {HouseKinds.Name(layout.Kind)} ({layout.Mass}) {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms, {layout.Floors} floors for {layout.Players} players");
@@ -437,6 +439,7 @@ namespace Stealth.Game
         {
             m_HouseEntered = false;
             HouseClockAt = 0;
+            FrameBudget.Step = "the old house's things despawned";
             BeginHouseStatsServer();
             foreach (var obj in m_Spawned.ToArray())
             {
@@ -468,7 +471,10 @@ namespace Stealth.Game
             var surface = ActiveLevel.Root.GetComponent<NavMeshSurface>();
             if (arriving)
             {
-                var bake = BakeNavMeshAsync(surface);
+                FrameBudget.Step = "navmesh: sources gathered a piece at a time";
+                AsyncOperation bake = null;
+                foreach (var _ in NavBake.Steps(surface, op => bake = op)) yield return null;
+                FrameBudget.Step = "navmesh: baking on worker threads";
                 while (bake != null && !bake.isDone) yield return null;
                 yield return null;
             }
@@ -487,6 +493,7 @@ namespace Stealth.Game
             Votes.Clear();
             Level = info;
             var counted = new int[1];
+            FrameBudget.Step = "the house's content spawned (robots, loot)";
             foreach (var _ in SpawnContentSteps(layout, seed, counted)) if (arriving) yield return null; // (a piece of a frame at a time)
             int totalValue = counted[0];
             m_Run.BeginLevel(index, totalValue, players);
@@ -503,18 +510,6 @@ namespace Stealth.Game
             if (!m_MuleInKennel) SpawnStorageBotServer(layout);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
-        }
-
-        /// <summary>Server: the navmesh of a just built house baked on worker threads (the sources are gathered now), or null.</summary>
-        static AsyncOperation BakeNavMeshAsync(NavMeshSurface surface)
-        {
-            if (surface == null) return null;
-            if (surface.navMeshData == null)
-            {
-                surface.navMeshData = new NavMeshData(surface.agentTypeID) { position = surface.transform.position, rotation = surface.transform.rotation };
-                surface.AddData();
-            }
-            return surface.UpdateNavMesh(surface.navMeshData);
         }
 
         int SpawnContent(LevelLayout layout, int seed)

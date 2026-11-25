@@ -79,6 +79,7 @@ namespace Stealth.Level
                 _ => 0,
             };
             Anchor(room);
+            Station(room);
             if (climbLate) Climb(room);
             Islands(room, islands);
             if (room.Type == RoomType.Meeting) MeetingTable(room);

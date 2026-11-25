@@ -469,6 +469,77 @@ def alarm():
     return seamless(y, k / SR)
 
 
+
+# ---------------------------------------------------------------- Linus the raccoon (StorageBotSounds)
+
+RACCOON = ["raccoon/raccoon_chatter", "raccoon/raccoon_chatter_baby_01", "raccoon/raccoon_chatter_baby_02"]
+
+
+def mule_step(i):
+    """A paw on the floor: a boot's step made small (higher, softer, no heel), a claw's tick on top."""
+    pad = lp(pitch(src(KENNEY[[1, 4, 6, 9][i]]), 1.75), 2400)
+    claw = hp(pitch(src("diffsteps/stone01"), 1.6), 3200)
+    return step(mix((norm(pad), 0, 1.0), (norm(trim(claw))[:int(0.05 * SR)], 0.004, 0.12)), 0.16, 0.07)
+
+
+def mule_pack(i):
+    """The backpack on the run: canvas rustling, the mug and the keys on their carabiners clinking."""
+    cloth = lp(hp(src("rpg50/cloth%d" % (1 + i)), 300), 5000)
+    keys = pitch(src("metalwood/keys_0%d" % [2, 4, 6][i]), 1.15)
+    return edges(level(mix((norm(trim(cloth))[:int(0.32 * SR)], 0, 0.6), (norm(trim(keys))[:int(0.3 * SR)], 0.03, 0.5)), 0.08), 0.004, 0.08)
+
+
+def mule_chatter(i):
+    """His chatter when he answers a call: the raccoon's own (the adult, and the two young ones)."""
+    return edges(level(quiet(src(RACCOON[i], 0.0, 0.92)), 0.15), 0.004, 0.08)
+
+
+def mule_happy():
+    """Petted: a pleased young chatter and a little coo."""
+    return edges(level(mix((norm(quiet(src(RACCOON[2], 0.0, 0.8))), 0, 0.8), (norm(pitch(src("creature80/cute_03"), 1.08)), 0.45, 0.6)), 0.14), 0.004, 0.1)
+
+
+def mule_snore():
+    """Asleep, curled in the trunk: a small snore."""
+    return edges(level(lp(pitch(src("creature80/snore"), 1.35), 3000), 0.06), 0.02, 0.1)
+
+
+def mule_sniff():
+    """Sat waiting: a sniff about."""
+    return edges(level(pitch(src("creature80/nose"), 1.2), 0.07), 0.004, 0.06)
+
+
+def mule_squeak():
+    """The alarm: a startled squeak as he bolts for the car."""
+    return edges(level(mix((norm(src("squeakyrat/qubodupSqueakyRatAttack")), 0, 0.8), (norm(quiet(src(RACCOON[1], 0.0, 0.5))), 0.12, 0.5)), 0.15), 0.003, 0.08)
+
+
+def mule_leap():
+    """Up into a grate: an effort chirp, the grate's sheet ringing under the paws."""
+    chirp = pitch(src("creature80/cute_07"), 1.15)
+    sheet = lp(src("metalwood/metal_sheet_02"), 4200)
+    return edges(level(mix((norm(chirp), 0, 0.55), (norm(trim(sheet))[:int(0.4 * SR)], 0.16, 0.8)), 0.14), 0.003, 0.1)
+
+
+def mule_drop():
+    """Out of a grate onto the floor: the sheet's knock, the pads landing, the backpack bumping."""
+    sheet = lp(src("metalwood/metal_sheet_05"), 3500)
+    land = lp(pitch(src(KENNEY[3]), 1.3), 1800)
+    return edges(level(mix((norm(trim(sheet))[:int(0.3 * SR)], 0, 0.6), (norm(land), 0.28, 0.9), (norm(lp(src("rpg50/cloth2"), 3000))[:int(0.25 * SR)], 0.3, 0.35)), 0.13), 0.003, 0.1)
+
+
+def mule_duct(i):
+    """Crawling along a duct: the thin steel giving under the paws, dull through the ceiling."""
+    knock = lp(pitch(src("metalwood/metal_sheet_0%d" % [1, 3, 4][i]), 0.92 + 0.06 * i), 1600)
+    return edges(level(norm(trim(knock))[:int(0.28 * SR)], 0.08), 0.003, 0.08)
+
+
+def mule_hop():
+    """Into or out of the car's bed: a thump on its steel floor."""
+    thud = lp(pitch(src(KENNEY[0]), 1.2), 1500)
+    bed = lp(src("metalwood/metal_hit_02"), 2500)
+    return edges(level(mix((norm(thud), 0, 1.0), (norm(trim(bed))[:int(0.3 * SR)], 0.005, 0.35)), 0.12), 0.003, 0.1)
+
 # ---------------------------------------------------------------- the list: (group/name, recipe, peak)
 
 def ladder_rung(i):
@@ -542,6 +613,14 @@ CLIPS += [
     ("Items/console_solved", console_solved, 0.75), ("Items/vault_unlocked", vault_unlocked, 0.9),
     ("Robots/robot_hacked", robot_hacked, 0.8), ("Robots/guard_patrol", guard_patrol, 0.55), ("Robots/guard_chase", guard_chase, 0.65),
 ]
+# Linus the raccoon
+CLIPS += [(f"Mule/mule_step_{i}", lambda i=i: mule_step(i), None) for i in range(4)]
+CLIPS += [(f"Mule/mule_pack_{i}", lambda i=i: mule_pack(i), None) for i in range(3)]
+CLIPS += [(f"Mule/mule_chatter_{i}", lambda i=i: mule_chatter(i), None) for i in range(3)]
+CLIPS += [(f"Mule/mule_duct_{i}", lambda i=i: mule_duct(i), None) for i in range(3)]
+CLIPS += [("Mule/mule_happy", mule_happy, None), ("Mule/mule_snore", mule_snore, None), ("Mule/mule_sniff", mule_sniff, None),
+          ("Mule/mule_squeak", mule_squeak, None), ("Mule/mule_leap", mule_leap, None), ("Mule/mule_drop", mule_drop, None),
+          ("Mule/mule_hop", mule_hop, None)]
 
 # what the generator no longer writes (the recordings' names, and those they replaced)
 REPLACED = {name for name, _, _ in CLIPS} | {f"Player/gas_laugh_{i}" for i in range(3)} | {f"Player/footstep_{i}" for i in range(4)} | {

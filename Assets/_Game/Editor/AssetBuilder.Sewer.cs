@@ -543,6 +543,8 @@ namespace Stealth.EditorTools
             ("TrimHandle", new Color(0.8f, 0.15f, 0.1f), 0.5f, false), ("EyeLamp", new Color(1f, 0.85f, 0.6f), 0.5f, true),
             ("TrimChrome", new Color(0.85f, 0.87f, 0.9f), 0.92f, false), ("Hazard", new Color(0.95f, 0.75f, 0.1f), 0.4f, false),
             ("Dark", new Color(0.08f, 0.08f, 0.09f), 0.35f, false), ("EyeBeacon", new Color(1f, 0.5f, 0.1f), 0.6f, true),
+            ("AccentWindow", new Color(0.12f, 0.1f, 0.09f), 0.9f, false), ("EyeRadio", new Color(0.35f, 1f, 0.45f), 0.7f, true),
+            ("BluePaint", new Color(0.15f, 0.3f, 0.58f), 0.45f, false),
         };
 
         /// <summary>
@@ -572,7 +574,7 @@ namespace Stealth.EditorTools
 
         /// <summary>
         /// Linus asleep in the trunk, in the car's frame: where the real one sleeps (StorageBot.TrunkSpot: the bed's
-        /// tailgate end + (0.45, 0.02, 0.4)), facing the tailgate — in the kennel once there is one.
+        /// tailgate end + (0.45, 0.02, 0.4)), facing the tailgate.
         /// </summary>
         static readonly Vector3 KennelMuleAt = new(0.45f, 0.88f, -1.95f);
 
@@ -633,19 +635,48 @@ namespace Stealth.EditorTools
                 shredder.name = "ShredderLevels";
                 look.Shredder = Levels(shredder, "Engine");
             }
+            var car = root.GetComponent<Car>();
             var panic = Part("car_panic", pickup);
             if (panic != null)
             {
                 panic.name = "PanicButton";
+                // pressed by looking at its red mushroom (E from a front seat: CarPanicButton)
+                var dome = panic.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("TrimHandle"));
+                var press = new GameObject("Press");
+                press.transform.SetParent(panic.transform, false);
+                press.transform.position = dome != null ? dome.bounds.center : panic.transform.position;
+                press.AddComponent<CarPanicButton>().Car = car;
                 panic.SetActive(false);
                 look.PanicButton = panic;
             }
-            var kennel = Part("car_kennel", body);
-            if (kennel != null)
+            var radio = Part("car_radio", body);
+            if (radio != null)
             {
-                kennel.name = "Kennel";
-                kennel.SetActive(false);
-                look.Kennel = kennel;
+                radio.name = "Radio";
+                // its songs from the dash (CarRadio), the front a cassette is let go on (a trigger: nothing bumps into it)
+                var all = radio.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.bounds).ToArray();
+                var b = all.Length > 0 ? all[0] : new Bounds(radio.transform.position, Vector3.one * 0.2f);
+                foreach (var x in all) b.Encapsulate(x);
+                var slot = radio.AddComponent<BoxCollider>();
+                slot.isTrigger = true;
+                slot.center = radio.transform.InverseTransformPoint(b.center);
+                slot.size = b.size + new Vector3(0.04f, 0.04f, 0.04f);
+                var source = radio.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.loop = true;
+                source.spatialBlend = 1f;
+                var player = radio.AddComponent<CarRadio>();
+                player.Source = source;
+                player.Slot = slot;
+                radio.SetActive(false);
+                look.Radio = radio;
+            }
+            // the front doors from inside: E at the door gets one out (E anywhere else does not)
+            for (int seat = 0; seat < 2; seat++)
+            {
+                var door = Child(root, $"Door{seat}").AddComponent<CarDoor>();
+                door.Car = car;
+                door.Seat = seat;
             }
             // Linus asleep in the trunk: curled up (a still pose, no animator), his own size and pack, where the real one sleeps
             var mule = RaccoonModel(out var muleAnimator, out _);
@@ -656,6 +687,7 @@ namespace Stealth.EditorTools
             mule.transform.SetParent(body, false);
             mule.transform.SetLocalPositionAndRotation(KennelMuleAt, Quaternion.Euler(0f, 180f, 0f) * mule.transform.localRotation);
             foreach (var c in mule.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            mule.AddComponent<Stealth.Game.StorageBotSounds>().Asleep = true; // (it snores)
             mule.SetActive(false);
             look.KennelMule = mule;
         }

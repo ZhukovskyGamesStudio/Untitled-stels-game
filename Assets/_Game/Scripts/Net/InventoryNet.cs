@@ -72,6 +72,7 @@ namespace Stealth.Net
         public void RequestSwapHand(int index) => SwapHandRpc(index);
         public void RequestDrop(int index, Vector3 position, float yaw) => DropRpc(index, position, yaw);
         public void RequestDeposit(int index) => DepositRpc(index);
+        public void RequestCassette(int index) => CassetteRpc(index);
         public void RequestStash(int index, byte x, byte y, byte rot) => StashRpc(index, x, y, rot);
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => UnstashRpc(NetInventoryEntry.From(from), x, y, rot);
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => StashMoveRpc(NetInventoryEntry.From(from), x, y, rot);
@@ -140,6 +141,9 @@ namespace Stealth.Net
 
         [Rpc(SendTo.Server)]
         void DepositRpc(int index) => m_Inventory.DepositServer(index);
+
+        [Rpc(SendTo.Server)]
+        void CassetteRpc(int index) => m_Inventory.CassetteServer(index);
 
         [Rpc(SendTo.Server)]
         void StashRpc(int index, byte x, byte y, byte rot) => m_Inventory.StashServer(index, x, y, rot);

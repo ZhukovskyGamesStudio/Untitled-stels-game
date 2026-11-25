@@ -1102,13 +1102,16 @@ namespace Stealth.UI
             m_Markers.End();
         }
 
+        /// <summary>The banner's gap under the screen's top edge, canvas units (it is anchored to the top, not to the middle: lower, it sat in the view).</summary>
+        public const float BannerTop = 26f;
+
         void ShowBannerLine(float now)
         {
             float a = m_Banners.Alpha(now);
             Ui.Show(Banner, a > 0f);
             if (a <= 0f) return;
             Banner.alpha = a;
-            BannerRect.anchoredPosition = new Vector2(0f, -115f + (1f - a) * 10f);
+            BannerRect.anchoredPosition = new Vector2(0f, -BannerTop + (1f - a) * 10f);
             if (BannerLabel.text != m_Banners.Current) BannerLabel.text = m_Banners.Current;
         }
     }

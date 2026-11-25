@@ -44,6 +44,27 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void HisSoundsFollowWhatHeDoes()
+        {
+            Assert.AreEqual(StorageBotRules.Cue.Leap, StorageBotRules.CueOf(BotMotion.Floor, BotMotion.VentUp), "up into a grate");
+            Assert.AreEqual(StorageBotRules.Cue.Drop, StorageBotRules.CueOf(BotMotion.Duct, BotMotion.VentDown), "out of one");
+            Assert.AreEqual(StorageBotRules.Cue.Hop, StorageBotRules.CueOf(BotMotion.Floor, BotMotion.Curled), "into the trunk");
+            Assert.AreEqual(StorageBotRules.Cue.Hop, StorageBotRules.CueOf(BotMotion.Curled, BotMotion.Floor), "and out of it");
+            Assert.AreEqual(StorageBotRules.Cue.None, StorageBotRules.CueOf(BotMotion.Floor, BotMotion.Floor));
+            Assert.AreEqual(StorageBotRules.Cue.None, StorageBotRules.CueOf(BotMotion.Floor, BotMotion.Sit), "sitting down: quiet");
+            Assert.AreEqual(StorageBotRules.Cue.Chatter, StorageBotRules.CueOf(BotMode.Waiting, BotMode.Coming), "answers a call");
+            Assert.AreEqual(StorageBotRules.Cue.Squeak, StorageBotRules.CueOf(BotMode.Coming, BotMode.Hiding), "bolts at an alarm");
+            Assert.AreEqual(StorageBotRules.Cue.None, StorageBotRules.CueOf(BotMode.Coming, BotMode.Coming), "called again on the way: no second chatter");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(BotPrefab);
+            Assert.IsNotNull(prefab.GetComponent<StorageBotSounds>(), "he is heard");
+            var bank = AssetDatabase.LoadAssetAtPath<Stealth.Audio.SoundBank>("Assets/_Game/Data/SoundBank.asset");
+            Assert.IsNotNull(bank);
+            foreach (var set in new[] { bank.MuleStep, bank.MulePack, bank.MuleDuct, bank.MuleChatter })
+                Assert.IsTrue(set.Length > 0 && set.All(c => c != null), "every take of his sounds");
+            Assert.IsTrue(new[] { bank.MuleHappy, bank.MuleSnore, bank.MuleSniff, bank.MuleSqueak, bank.MuleLeap, bank.MuleDrop, bank.MuleHop }.All(c => c != null));
+        }
+
+        [Test]
         public void TheStashGridWrapsRoundThePacksSidesTopAndBack()
         {
             var box = new PackWrap.Box(0.3f, 0.3f, 0.2f);
@@ -94,6 +115,49 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void AThingsModelLiesOnItsThinnestSideWithItsLengthAsOnTheGrid()
+        {
+            // a canister stands on a floor 46 cm tall: on the pack it lies on its flat side, not out of it by its height
+            var upright = new Vector3(0.29f, 0.46f, 0.16f);
+            var turn = RaccoonPack.LieFlat(upright, 2, 2);
+            var laid = Abs(turn * Vector3.Scale(Vector3.one, upright));
+            Assert.AreEqual(0.16f, Mathf.Min(laid.x, Mathf.Min(laid.y, laid.z)), 1e-4f);
+            Assert.AreEqual(0.16f, Mathf.Abs((turn * new Vector3(0f, 0f, 0.16f)).y), 1e-4f, "the thin side up");
+            // a shovel modelled lying along X, 1 x 4 on the grid (rows): its length goes along the rows (Z)
+            var shovel = new Vector3(1.1f, 0.06f, 0.22f);
+            var t2 = RaccoonPack.LieFlat(shovel, 1, 4);
+            Assert.AreEqual(1f, Mathf.Abs((t2 * Vector3.right).z), 1e-4f, "its length along the rows");
+            Assert.AreEqual(1f, Mathf.Abs((t2 * Vector3.up).y), 1e-4f, "its thin side stays up");
+        }
+
+        static Vector3 Abs(Vector3 v) => new(Mathf.Abs(v.x), Mathf.Abs(v.y), Mathf.Abs(v.z));
+
+        [Test]
+        public void AStrapGoesRoundAThingsMiddleTheShortWayAndItSwingsOnlyALittle()
+        {
+            var (turn, span) = PackSway.StrapAcross(new Vector3(0.6f, 0.05f, 0.1f));
+            Assert.AreEqual(0.1f, span, 1e-5f, "a long thing: round its narrow side");
+            Assert.AreEqual(1f, Mathf.Abs((turn * Vector3.right).z), 1e-4f, "the strap runs across the thing's length");
+            Assert.AreEqual(0.08f, PackSway.StrapAcross(new Vector3(0.08f, 0.05f, 0.3f)).span, 1e-5f);
+            float most = 0f;
+            for (float t = 0f; t < 20f; t += 0.05f)
+            {
+                var (x, z) = PackSway.Angles(t, 3, 3.5f);
+                most = Mathf.Max(most, Mathf.Abs(x), Mathf.Abs(z));
+            }
+            Assert.LessOrEqual(most, 3.5f, "never more than the sway");
+            Assert.Greater(most, 1f, "but it does swing");
+            Assert.AreNotEqual(PackSway.Angles(1f, 0, 3f), PackSway.Angles(1f, 1, 3f), "each thing its own phase");
+            Assert.AreEqual((0f, 0f), PackSway.Angles(5f, 2, 0f), "at rest: still");
+            // round a thin handle: as narrow as the handle, over its top, its sides down below the pack's face
+            var hug = PackSway.Hug(new Vector4(0.01f, 0.012f, 0.03f, 1f), 0.09f, lengthAlongX: true);
+            Assert.AreEqual(0.012f, hug.HalfWidth, 1e-5f, "as wide as the slice, not the whole thing");
+            Assert.AreEqual(0.01f, hug.Middle.z, 1e-5f, "over the slice's middle");
+            Assert.Less(hug.Low, 0.09f * PackWrap.Sink, "its ends in the pack");
+            Assert.GreaterOrEqual(hug.Top, 0.03f);
+        }
+
+        [Test]
         public void ThingsThatOverlapOnAFacePileUpAndKeepTheirSize()
         {
             var box = new PackWrap.Box(0.2f, 0.2f, 0.15f);
@@ -101,7 +165,8 @@ namespace Stealth.Tests
             var laid = PackWrap.Lay(items, 3, 5, box, _ => 0.06f);
             Assert.AreEqual(PackWrap.Face.Top, laid[0].Face);
             Assert.AreEqual(PackWrap.Face.Top, laid[1].Face);
-            Assert.Greater(laid[1].Position.y, laid[0].Position.y + 0.05f, "the second lies on the first");
+            Assert.AreEqual(0.004f - 0.06f * PackWrap.Sink, laid[0].Position.y, 1e-4f, "a third of it pressed into the pack");
+            Assert.AreEqual(laid[0].Position.y + 0.06f * (1f - PackWrap.Sink), laid[1].Position.y, 1e-4f, "the second lies on the first, a third pressed into it");
             Assert.AreEqual(Vector3.one, laid[0].Scale, "its own size");
         }
 
@@ -252,6 +317,8 @@ namespace Stealth.Tests
                         Assert.AreEqual(rows * Stealth.UI.InventoryUI.Cell, board.Grid.sizeDelta.y, 1e-3f);
                         Assert.AreEqual(columns * Stealth.UI.InventoryUI.Cell, board.Grid.sizeDelta.x, 1e-3f);
                         if (sell) Assert.GreaterOrEqual(Corners(board.SellZone, board.Root).xMin, grid.xMax, "the burn note right of the grid");
+                        Assert.IsTrue(board.ValueLabel.resizeTextForBestFit, "the title shrinks to fit a narrow board");
+                        Assert.AreEqual(board.Grid.sizeDelta.x + (sell ? board.SellSpan : 0f), board.ValueLabel.rectTransform.sizeDelta.x, 1e-3f, "the title as wide as the board's content");
                         if (sell) Assert.GreaterOrEqual(paper.xMax, Corners(board.SellZone, board.Root).xMax, "the burn note on the paper");
                     }
             }
@@ -305,6 +372,12 @@ namespace Stealth.Tests
                 Assert.Greater(packed.Boxes[i].x * packed.Boxes[i].y * packed.Boxes[i].z, packed.Boxes[i - 1].x * packed.Boxes[i - 1].y * packed.Boxes[i - 1].z,
                     $"the pack of level {i} is bigger than the one before");
             Assert.AreEqual(TeamStash.MaxWidth * TeamStash.MaxHeight, packed.Pieces.Length, "a piece for every stash cell");
+            Assert.AreEqual(packed.Pieces.Length, packed.Straps.Length);
+            Assert.IsTrue(packed.Straps.All(t => t != null && t.Find("Strap_Top") != null && t.Find("Metal_Buckle") != null), "a strap for every piece");
+            // the hammer's strap goes round its handle, much narrower than its head
+            var hammer = packed.StrapFits[ItemCatalog.Hammer];
+            Assert.Greater(hammer.w, 0f, "the hammer's slice read off its model");
+            Assert.Less(hammer.y, 0.04f, "round the handle (a couple of centimetres), not the head");
             Assert.GreaterOrEqual(prefab.GetComponentsInChildren<Dangle>(true).Length, 2, "charms swing");
             Assert.IsTrue(backpack.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.enabled).All(r => r.sharedMaterial != null), "every pack part painted");
             // on its paws: the lowest point of the pack stays above its back, the head is about half a metre up

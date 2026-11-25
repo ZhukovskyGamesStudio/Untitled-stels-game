@@ -52,6 +52,7 @@ namespace Stealth.Game
             foreach (var (shape, color) in m_Chewed) fuel += ItemCatalog.Value(shape, color);
             if (fuel > 0)
             {
+                ChargeTeleport(Collected, fuel); // (what is over the drive's need recharges the red button)
                 m_Run.Deposit(fuel);
                 m_StrandedAt = -1f;
                 m_ChewFuel += fuel;
@@ -265,6 +266,9 @@ namespace Stealth.Game
                     break;
                 case UseKind.CarSeat:
                     if (car != null && DriveUntil <= 0) car.SitServer(player, index);
+                    break;
+                case UseKind.CarPanic:
+                    TeleportServer(player);
                     break;
                 case UseKind.CarHopper:
                     FeedServer(player);

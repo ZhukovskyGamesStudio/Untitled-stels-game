@@ -75,7 +75,8 @@ namespace Stealth.Player
         bool m_Driving;
         float m_Wheel;
         /// <summary>How far the body was moved under the eyes last frame (<see cref="FirstPerson"/>): the hands' targets allow for it.</summary>
-        Vector3 m_EyeShift;
+        Vector3 m_EyeShift, m_SeatEye;
+        bool m_Seated, m_SeatEyeSet;
 
         static readonly int SpeedId = Animator.StringToHash("Speed");
         static readonly int CrouchId = Animator.StringToHash("Crouch");
@@ -112,6 +113,7 @@ namespace Stealth.Player
             pose = HumanMath.Shown(pose, downed, seated);
             m_Yaw = HumanMath.HeadYaw(yaw, pose, downed);
             m_Planted = HumanMath.Planted(downed, seated, pose);
+            m_Seated = seated && !downed;
             m_Holding = HumanMath.Carries(holding, downed, seated, pose);
             m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
             m_Wheel = Mathf.MoveTowards(m_Wheel, m_Driving && seated && !downed ? 1f : 0f, Time.deltaTime * HumanMath.WheelReachRate);
@@ -237,6 +239,20 @@ namespace Stealth.Player
                 if (m_ArmR.localScale != scale) m_ArmR.localScale = scale;
             }
             if (Eyes == null || HeadBone == null || Hips == null) return;
+            if (m_Seated)
+            {
+                // in a seat the body stays on it (pulled under the standing eyes it went back through the backrest and up off
+                // the cushion): the view moves to the sitting head instead, a little ahead of it and over it — held in the
+                // body's frame (it sits still in the car) and eased: the Sit take's breathing moved the head, and the head
+                // the camera, so the whole dashboard shook back and forth on the drive
+                m_EyeShift = Vector3.zero;
+                var want = transform.InverseTransformPoint(HumanMath.SeatEyes(HeadBone.position, transform.forward, transform.up, transform.lossyScale.y));
+                m_SeatEye = m_SeatEyeSet ? Vector3.Lerp(m_SeatEye, want, 1f - Mathf.Exp(-HumanMath.SeatEyeEase * Time.deltaTime)) : want;
+                m_SeatEyeSet = true;
+                Eyes.position = transform.TransformPoint(m_SeatEye);
+                return;
+            }
+            m_SeatEyeSet = false;
             // (kept: the wheel's IK targets allow for last frame's shift)
             m_EyeShift = HumanMath.OwnShift(Eyes.position, HeadBone.position, transform.forward, transform.lossyScale.y, m_Planted);
             Hips.position += m_EyeShift;
@@ -381,6 +397,16 @@ namespace Stealth.Player
             if (planted) shift.y = 0f;
             return shift;
         }
+
+        /// <summary>
+        /// Where the owner's view is while he sits (pure): at his sitting head's eyes, <see cref="OwnBackBusy"/> ahead of where
+        /// they would be (so he sees his chest and lap, not into his collar) — the body is not moved: it sits on the seat.
+        /// </summary>
+        /// <summary>How fast the seated view follows the head, 1/s: slow — it settles where the head sits, not where it breathes.</summary>
+        public const float SeatEyeEase = 1.5f;
+
+        public static Vector3 SeatEyes(Vector3 head, Vector3 forward, Vector3 up, float size) =>
+            head + up * (EyesUp * size) + forward * ((EyesAhead + OwnBackBusy) * size);
 
         /// <summary>
         /// A part of the body its owner must not see from inside his own head (pure, by the renderer's name, "part.slot"):

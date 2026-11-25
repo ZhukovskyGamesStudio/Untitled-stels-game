@@ -16,8 +16,8 @@ namespace Stealth.Vehicles
         Kennel,
         /// <summary>Unique: the panic button on the glovebox (nominal for now: bought, does nothing yet).</summary>
         Teleport,
-        /// <summary>Unique, not designed yet: shown, cannot be bought.</summary>
-        Unique5,
+        /// <summary>Unique: the car radio — cassettes lie in the houses; one put in plays near the car and on the drive.</summary>
+        Radio,
         /// <summary>Unique, not designed yet: shown, cannot be bought.</summary>
         Unique6,
     }
@@ -30,10 +30,14 @@ namespace Stealth.Vehicles
         [Range(0f, 0.3f)] public float EngineCutPerLevel = 0.1f;
         [Tooltip("How many things a levelled upgrade's recipe asks for, for level 1, 2 and 3 (random loot of the run, CraftingSettings.Pool).")]
         public int[] RecipeSize = { 2, 3, 4 };
+        [Tooltip("The teleport recharges on this much fuel put into the shredder over what the drive needs.")]
+        public int TeleportRecharge = 150;
+        [Tooltip("With the radio: cassettes lying in each house (each a random song).")]
+        public int CassettesPerHouse = 1;
         [Tooltip("How many things a unique upgrade's recipe asks for.")]
         public int UniqueRecipeSize = 4;
-        [Tooltip("The storage robot's box (Linus's backpack), columns x rows, by the upgrade's level 0..3 (at most Game.TeamStash.MaxWidth x MaxHeight).")]
-        public Vector2Int[] KennelStash = { new(3, 5), new(4, 5), new(4, 7), new(6, 7) };
+        [Tooltip("The storage robot's box (Linus's backpack), columns x rows — wide, not tall — by the upgrade's level 0..3 (at most Game.TeamStash.MaxWidth x MaxHeight).")]
+        public Vector2Int[] KennelStash = { new(5, 3), new(5, 4), new(7, 4), new(7, 6) };
     }
 
     /// <summary>
@@ -58,7 +62,7 @@ namespace Stealth.Vehicles
         public static int MaxLevel(CarUpgrade u) => u switch
         {
             CarUpgrade.Engine or CarUpgrade.Trunk or CarUpgrade.Kennel => MaxLevelled,
-            CarUpgrade.Teleport => 1,
+            CarUpgrade.Teleport or CarUpgrade.Radio => 1,
             _ => 0,
         };
 

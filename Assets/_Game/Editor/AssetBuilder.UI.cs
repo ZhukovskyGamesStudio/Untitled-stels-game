@@ -641,12 +641,26 @@ namespace Stealth.EditorTools
             panel.Houses = System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Cast<Stealth.Level.HouseKind>()
                 .Select(k => CheatButton(e, houses, "House" + k, L(Stealth.Level.HouseKinds.NameKey(k)), 17)).ToArray();
 
-            // 3: an item of any kind in front of you, in the colour chosen above (the labels are the items' names, set by the panel)
-            int colorCount = ItemCatalog.DefaultColors().Length;
-            var colors = CheatGrid(pages[2], "Colors", Vector2.zero, new Vector2(900, 30), new Vector2(170, 30), colorCount);
-            panel.ItemColors = Enumerable.Range(0, colorCount).Select(c => CheatButton(e, colors, "Color" + c, "", 15)).ToArray();
-            var items = CheatGrid(pages[2], "Items", new Vector2(0, -40), new Vector2(900, 448), new Vector2(145, 27), 6, 4f);
-            panel.Items = ItemCatalog.Shapes.Select(s => CheatButton(e, items, "Item_" + s.Id, "", 13)).ToArray();
+            // 3: an item of any kind in front of you (its own rarity), its icon left of its name (set by the panel); no old
+            // tetris pieces; the check box over them hides what is only fuel
+            var filter = CheatGrid(pages[2], "Filter", Vector2.zero, new Vector2(900, 30), new Vector2(320, 30), 1);
+            filter.GetComponent<GridLayoutGroup>().childAlignment = TextAnchor.UpperLeft;
+            panel.OnlyInteractive = CheatButton(e, filter, "OnlyInteractive", "", 15);
+            var items = CheatGrid(pages[2], "Items", new Vector2(0, -38), new Vector2(900, 450), new Vector2(145, 36), 6, 4f);
+            var visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            panel.Items = ItemCatalog.Shapes.Select((s, i) =>
+            {
+                if (ItemCatalog.IsPiece(i)) return null;
+                var b = CheatButton(e, items, "Item_" + s.Id, "", 11);
+                var icon = visuals != null && visuals.Icons != null && i < visuals.Icons.Length ? visuals.Icons[i] : null;
+                var img = Img(R(b.transform, "Icon", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(19, 0), new Vector2(30, 30)), Color.white, icon);
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+                var text = b.GetComponentInChildren<Text>();
+                text.rectTransform.offsetMin = new Vector2(38, text.rectTransform.offsetMin.y);
+                text.alignment = TextAnchor.MiddleLeft;
+                return b;
+            }).ToArray();
 
             // 4: the car's upgrades at any level (a row per upgrade: its name, then a button per level 0..3)
             const int levels = Stealth.Vehicles.CarUpgrades.MaxLevelled + 1;
@@ -1126,6 +1140,12 @@ namespace Stealth.EditorTools
             Sliced(Img(Stretch(go.transform, "Background"), UiPalette.PaperDim, SheetSprite));
             board.ValueLabel = Ink(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(pad, -2f), new Vector2(gw, header - 4)),
                 "0", 17, TextAnchor.LowerLeft, Face.Mono);
+            // «Рюкзак Линуса · N очк.» on one line, as wide as the grid: smaller type on a narrow board, never wrapped or cut
+            board.ValueLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
+            board.ValueLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            board.ValueLabel.resizeTextForBestFit = true;
+            board.ValueLabel.resizeTextMinSize = 8;
+            board.ValueLabel.resizeTextMaxSize = 17;
             board.TitleRule = RuleLine(go.transform, TopLeft, TopLeft, new Vector2(pad, -header + 1), gw + gap + sellW, UiPalette.Ink, 1.5f).rectTransform;
             board.SellSpan = gap + sellW;
             board.Grid = R(go.transform, "Grid", TopLeft, TopLeft, new Vector2(pad, -(header + pad)), new Vector2(gw, gh));

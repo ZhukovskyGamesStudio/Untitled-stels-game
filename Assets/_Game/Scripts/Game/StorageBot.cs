@@ -232,8 +232,9 @@ namespace Stealth.Game
                 else legs.Clear();
             }
             legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = home, Room = -1 });
-            float floor = FloorWay(home);
-            if (floor >= 0f && (m_InDuct ? false : floor <= StorageBotRules.Length(Here, legs) * StorageBotRules.DuctDetour))
+            // the same rule as a call: on foot unless the floor does not lead there or goes round twice as far
+            bool ducts = legs.Exists(x => x.Kind == BotLegKind.Crawl);
+            if (StorageBotRules.Way(false, FloorWay(home), ducts ? StorageBotRules.Length(Here, legs) : -1f) == StorageBotRules.Route.Walk)
             {
                 legs.Clear();
                 legs.Add(new BotLeg { Kind = BotLegKind.Walk, To = home, Room = -1 });

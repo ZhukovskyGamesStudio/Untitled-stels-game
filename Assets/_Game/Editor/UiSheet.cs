@@ -531,7 +531,7 @@ namespace Stealth.EditorTools
             return new List<GameObject> { go };
         }
 
-        /// <summary>The car upgrade bench: the engine half way, the trunk at its top, Linus's backpack (3 x 5) short of things, the teleport, the planned two.</summary>
+        /// <summary>The car upgrade bench: the engine half way, the trunk at its top, Linus's backpack (5 x 3) short of things, the teleport, the planned two.</summary>
         static List<GameObject> Upgrades()
         {
             var hud = Hud(out var go);
@@ -548,7 +548,7 @@ namespace Stealth.EditorTools
                 bool planned = max == 0, top = !planned && level >= max;
                 v.Name.text = Loc.T(Game.GameManager.UpgradeKey(u));
                 v.What.text = Loc.F(Game.GameManager.UpgradeKey(u) + ".what", 10);
-                v.Now.text = i switch { 0 => Loc.F("upgrade.engine.now", 10), 1 => Loc.F("upgrade.trunk.now", 3), 2 => Loc.F("upgrade.kennel.now", 3, 5), 3 => Loc.T("upgrade.teleport.now.none"), _ => "" };
+                v.Now.text = i switch { 0 => Loc.F("upgrade.engine.now", 10), 1 => Loc.F("upgrade.trunk.now", 3), 2 => Loc.F("upgrade.kennel.now", 5, 3), 3 => Loc.T("upgrade.teleport.now.none"), _ => "" };
                 for (int b = 0; b < v.Boxes.Length; b++) { On(v.Boxes[b], b < max); On(v.Ticks[b], b < level); }
                 On(v.Planned, planned);
                 On(v.Done, top);

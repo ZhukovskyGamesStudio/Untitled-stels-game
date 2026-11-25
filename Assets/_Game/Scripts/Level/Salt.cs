@@ -24,5 +24,6 @@ namespace Stealth.Level
         public const int Recipes = 0xC4AF, CraftBreak = 0xC4B0, Blueprints = 0xB1E9, ChessPieces = 0xC4E5, Unscrewed = 0x5C3E;
         // the car upgrade bench: the run's recipe of every upgrade and level
         public const int CarUpgrades = 0xCA67;
+        public const int Cassettes = 0xCA55;
     }
 }

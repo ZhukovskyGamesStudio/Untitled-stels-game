@@ -751,13 +751,27 @@ def upgrade_trunk(g):
     g.rrect((0.30, 0.60, 0.44, 0.70), 0.02)
 
 
-def upgrade_kennel(g):
-    """A dog-house: a pitched roof over a box with a round-topped door."""
-    g.poly([(0.06, 0.46), (0.50, 0.10), (0.94, 0.46), (0.86, 0.50), (0.50, 0.22), (0.14, 0.50)])
-    g.rrect((0.18, 0.44, 0.82, 0.90), 0.03)
-    door = mask_of(g.size, lambda m: (m.rrect((0.36, 0.60, 0.64, 0.92), 0.02), m.ellipse((0.36, 0.48, 0.64, 0.74))))
-    g.cut(door)
-    g.rrect((0.40, 0.34, 0.60, 0.40), 0.01, on="d")               # the name plate
+def upgrade_backpack(g):
+    """Linus's backpack: a rounded pack with a carry loop, a flap over its top with a buckle, a pocket on its front."""
+    g.arc((0.38, 0.06, 0.62, 0.30), 180, 360, 0.06)                # the carry loop
+    g.rrect((0.20, 0.20, 0.80, 0.92), 0.14)
+    g.rrect((0.20, 0.20, 0.80, 0.46), 0.12, on="d")                 # the flap's edge
+    g.rrect((0.24, 0.24, 0.76, 0.42), 0.10)
+    g.rrect((0.44, 0.38, 0.56, 0.52), 0.02, on="d")                 # the buckle
+    g.rrect((0.32, 0.60, 0.68, 0.84), 0.05, on="d")                 # the pocket
+    g.rrect((0.36, 0.64, 0.64, 0.80), 0.04)
+
+
+def upgrade_radio(g):
+    """The car radio: a deck with a cassette window (two reels), a display bar and two knobs."""
+    g.rrect((0.06, 0.26, 0.94, 0.78), 0.06)
+    g.rrect((0.28, 0.36, 0.72, 0.68), 0.03, fill=False, width=0.045, on="d")   # the cassette window's frame
+    g.ellipse((0.35, 0.44, 0.47, 0.56), on="d")                     # its two reels
+    g.ellipse((0.53, 0.44, 0.65, 0.56), on="d")
+    g.rrect((0.40, 0.31, 0.60, 0.35), 0.01, on="d")                 # the display
+    g.ellipse((0.11, 0.42, 0.25, 0.56), on="d")                     # the knobs
+    g.ellipse((0.75, 0.42, 0.89, 0.56), on="d")
+    g.line([(0.62, 0.26), (0.84, 0.06)], 0.035)                     # the antenna
 
 
 def upgrade_teleport(g):
@@ -781,7 +795,7 @@ def upgrade_planned(g):
     g.ellipse((0.47, 0.81, 0.53, 0.87), on="d")
 
 
-UPGRADES = {"upgrade_engine": upgrade_engine, "upgrade_trunk": upgrade_trunk, "upgrade_kennel": upgrade_kennel,
+UPGRADES = {"upgrade_engine": upgrade_engine, "upgrade_trunk": upgrade_trunk, "upgrade_backpack": upgrade_backpack, "upgrade_radio": upgrade_radio,
             "upgrade_teleport": upgrade_teleport, "upgrade_planned": upgrade_planned}
 
 

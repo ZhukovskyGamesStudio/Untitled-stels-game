@@ -13,7 +13,7 @@ description: "Звук USG: откуда звуки (CC0-записи, recorded.
 `Tools/Audio/decode_cc0.py` (в Blender: его `aud` читает ogg/mp3/flac), `python Tools/Audio/import_cc0_sounds.py` (рецепты клипов — `recorded.py`,
 мотор и гудок машины; список — `Art/Audio/CREDITS.md`; `--recorded` — только рецепты); остальное (музыка, интерфейс, часть роботов) —
 `python Tools/Audio/generate_sounds.py` (детерминированно, с сидом; имена из `recorded.REPLACED` не пишет), послушать всё — `python Tools/Audio/sound_board.py`,
-голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос).
+голос роботов — `python Tools/Audio/generate_voices.py` (Windows, ru-RU голос). Наборы не из CC0 (`cc0_sources.LICENCES`, сейчас — настоящий енот, CC-BY) в CREDITS.md подписаны автором и лицензией. Скачать только нужные наборы — `cc0_sources.py <набор> …`; нарезать только свои рецепты — `import_cc0_sounds.py --only Mule/` (CREDITS.md сливается, остальные наборы не нужны). Звуки Линуса — `stealth-robots`.
 
 ## Звук роботов
 

@@ -122,6 +122,7 @@ namespace Stealth.Tests
         public void RequestSwapHand(int index) => Requests.Add($"swap-hand {index}");
         public void RequestDrop(int index, Vector3 position, float yaw) => Requests.Add($"drop {index}");
         public void RequestDeposit(int index) => Requests.Add($"deposit {index}");
+        public void RequestCassette(int index) => Requests.Add($"cassette {index}");
         public void RequestStash(int index, byte x, byte y, byte rot) => Requests.Add($"stash {index} {x},{y},{rot}");
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unstash {from.X},{from.Y} {x},{y},{rot}");
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"stash-move {from.X},{from.Y} {x},{y},{rot}");

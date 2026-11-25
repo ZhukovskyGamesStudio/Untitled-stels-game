@@ -251,6 +251,15 @@ namespace Stealth.Game
             var spots = LootPlanner.Extras(layout, rng, things.Count, loot, Tuning.Level.Loot.MinSpacing);
             for (int i = 0; i < things.Count && i < spots.Count; i++)
                 total += SpawnItemServer(things[i].shape, things[i].color, spots[i], rng.Next(360)).Value;
+            // with the car's radio: cassettes, each a random song (a stream of their own: the rest keeps its places)
+            if (Upgrades.Level(Vehicles.CarUpgrade.Radio) > 0)
+            {
+                var tapes = new System.Random(LevelRandom.Mix(seed, Salt.Cassettes, 0));
+                int n = Mathf.Max(0, UpgradeSettings.CassettesPerHouse);
+                var at = LootPlanner.Extras(layout, tapes, n, loot, Tuning.Level.Loot.MinSpacing);
+                for (int i = 0; i < n && i < at.Count; i++)
+                    total += SpawnItemServer(ItemCatalog.Cassette, (byte)tapes.Next(ItemCatalog.CassetteSongs), at[i], tapes.Next(360)).Value;
+            }
             return total;
         }
 

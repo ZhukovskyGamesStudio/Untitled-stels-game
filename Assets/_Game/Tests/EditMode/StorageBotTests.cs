@@ -122,7 +122,9 @@ namespace Stealth.Tests
             Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(true, 6f, 5f), "beside the caller: on foot");
             Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 12f, 8f), "another room near by: on foot, not up into the vents");
             Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 30f, 26f), "far, but the ducts are hardly shorter: on foot");
-            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(false, 40f, 15f), "the floor goes round the house: the ducts");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 40f, 15f), "the ducts a bit shorter, but the leap up and down: on foot");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 60f, 25f), "from the trunk up the shaft to a far room: on foot");
+            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(false, 90f, 20f), "the floor goes round the house, more than twice the ducts: the ducts");
             Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(true, -1f, 10f), "up in the ducts already: no way on the floor");
             Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 40f, -1f), "no open grate leads there: on foot after all");
             Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(false, StorageBotRules.WalkFurthest + 5f, -1f), "and too far on foot");

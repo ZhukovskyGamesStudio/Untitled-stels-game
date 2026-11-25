@@ -224,6 +224,7 @@ namespace Stealth.UI
             Level.UseKind.KeyDoor => ReticleIcon.Key,
             Level.UseKind.GateLever => ReticleIcon.Lever,
             Level.UseKind.CarSeat => ReticleIcon.Seat,
+            Level.UseKind.CarPanic => ReticleIcon.Hand,
             Level.UseKind.CarHopper => ReticleIcon.Fuel,
             Level.UseKind.CarCargo => ReticleIcon.Hand,
             Level.UseKind.VaultConsole => ReticleIcon.Terminal,

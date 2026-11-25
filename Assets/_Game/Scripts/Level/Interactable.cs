@@ -10,7 +10,7 @@ namespace Stealth.Level
     /// door's lock (index: the door), a safe's dial (the prop), a storage part (<see cref="OpenKeys.StoragePart"/>: the prop
     /// and its part). <see cref="CarBench"/> — the car's workbench — opens the bench on this peer, the server is not asked.
     /// </summary>
-    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, CarBench, Door, ExitButton, PetBot }
+    public enum UseKind : byte { Crate, MedTable, Workbench, KeyDoor, GateLever, CarSeat, CarHopper, CarCargo, VaultConsole, Cage, HandDryer, VaultDoor, LightSwitch, VentGrate, ShaftHatch, LiftCall, LiftFloor, VentGrille, DoorLock, Safe, StoragePart, CarBench, Door, ExitButton, PetBot, CarPanic }
 
     /// <summary>
     /// Something in the world a player uses with E — press, or hold for <see cref="HoldTime"/>: a crate to search, the
@@ -45,6 +45,9 @@ namespace Stealth.Level
         /// <summary>Taken by E at all just now (an open vent grate is climbed through, not used).</summary>
         public virtual bool Usable(PlayerController player) => true;
 
+        /// <summary>Used from a car's seat (its door, the glovebox's button); everything else is not, and these only from the seat.</summary>
+        public virtual bool FromSeat => false;
+
         public void Configure(int index)
         {
             Index = index;
@@ -61,7 +64,7 @@ namespace Stealth.Level
         /// under the crosshair; nearest first; null if none.
         /// </summary>
         public static Interactable Near(PlayerController player, Vector3 hands, Aim? aim = null)
-            => ReachSearch.Nearest(All, player.transform.position, hands, float.PositiveInfinity, aim, i => i.Usable(player));
+            => ReachSearch.Nearest(All, player.transform.position, hands, float.PositiveInfinity, aim, i => i.FromSeat == (player.SeatIndex >= 0) && i.Usable(player));
 
         bool IReachTarget.CanReach(Vector3 player) => Index >= 0 && isActiveAndEnabled;
         Vector3 IReachTarget.ReachPoint => Point;

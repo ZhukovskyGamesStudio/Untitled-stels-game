@@ -467,7 +467,13 @@ namespace Stealth.UI
                     else if (m_Source == DragSource.Stash) inv.RequestSellStashed(m_DragStashed);
                     return;
             }
-            if (m_Source == DragSource.Inventory && AtHopper(me, mouseRay))
+            if (m_Source == DragSource.Inventory && m_DragShape == ItemCatalog.Cassette && AtRadio(mouseRay))
+            {
+                // onto the car's radio: it goes in and plays (the one in it comes out into the backpack)
+                inv.RequestCassette(m_DragIndex);
+                Sfx.At(bank?.Pickup, Vehicles.CarRadio.Active.transform.position, 0.8f, Sfx.Group.Items);
+            }
+            else if (m_Source == DragSource.Inventory && AtHopper(me, mouseRay))
             {
                 // into the shredder: this one thing burns into fuel
                 inv.RequestDeposit(m_DragIndex);
@@ -537,6 +543,14 @@ namespace Stealth.UI
             }
             if (stashed) inv.RequestDropStashed(m_DragStashed, at, yaw);
             else inv.RequestDrop(m_DragIndex, at, yaw);
+        }
+
+        /// <summary>The mouse is over the car's radio (fitted, within reach): a cassette let go there goes in.</summary>
+        static bool AtRadio(Ray ray)
+        {
+            var radio = Vehicles.CarRadio.Active;
+            return radio != null && radio.Slot != null && radio.isActiveAndEnabled
+                   && radio.Slot.Raycast(ray, out _, PlayerInventory.ReachDistance + 0.5f);
         }
 
         void CancelDrag()

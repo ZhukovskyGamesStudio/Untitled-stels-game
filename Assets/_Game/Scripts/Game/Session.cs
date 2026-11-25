@@ -161,6 +161,8 @@ namespace Stealth.Game
         void RequestSwapHand(int index);
         void RequestDrop(int index, Vector3 position, float yaw);
         void RequestDeposit(int index);
+        /// <summary>A cassette from the backpack into the car's radio.</summary>
+        void RequestCassette(int index);
         // Team stash at the hatch. Stash entries are named by value: another player may have changed the list meanwhile.
         void RequestStash(int index, byte x, byte y, byte rot);
         void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot);

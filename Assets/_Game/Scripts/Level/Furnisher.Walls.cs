@@ -64,6 +64,28 @@ namespace Stealth.Level
 
         readonly List<Rect> m_Probe = new();
 
+        /// <summary>Set: <see cref="WallGroup"/> puts just this piece (one reserved before the room's own set, see <see cref="Station"/>).</summary>
+        PropKind? m_Only;
+
+        /// <summary>
+        /// The garage's car upgrade station whole (4.9 m, a gantry over a bench): against the hall's longest wall it fits,
+        /// before the hall's own benches and racks take the walls. Put in later in the place of a piece, a crowded hall
+        /// had no wall left for it and it shrank to a toy (<see cref="HouseFeatures.PointOfInterest"/> keeps it as it is).
+        /// </summary>
+        void Station(PlanRoom room)
+        {
+            if (room.Type != RoomType.Workshop || HouseFeatures.PointOfInterestKind(HouseFeatures.LocationOf(m_L.Kind)) != PropKind.Workbench) return;
+            if (m_L.Props.Exists(p => p.Kind == PropKind.Workbench)) return;
+            float need = FootprintOf(PropKind.Workbench).width + 2f * RunStart;
+            m_Only = PropKind.Workbench;
+            try
+            {
+                foreach (var (w, n) in RunsOf(room))
+                    if (w.Length >= need && AlongWall(room, w, n, Aisle + 0.1f, 1, false, () => true)) return;
+            }
+            finally { m_Only = null; }
+        }
+
         /// <summary>
         /// Where along a wall the next try goes after nothing fitted at <paramref name="t"/>: just past the furniture or the
         /// kept spot (a doorway's step, a stair's approach) standing at the wall there, else a quarter of a metre on. Stepping
@@ -200,6 +222,7 @@ namespace Stealth.Level
                 if (Chance(0.3)) b.Add(PropKind.WallClock, f.P(0, BackOf(PropKind.WallClock)), f.Face, solid: false); // over something low
                 return w;
             }
+            if (m_Only is PropKind only) return Single(only, FootprintOf(only).width + 0.05f);
             int roll = m_Rng.Next(100);
             switch (room.Type)
             {

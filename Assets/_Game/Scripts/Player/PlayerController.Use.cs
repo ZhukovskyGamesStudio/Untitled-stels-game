@@ -57,7 +57,9 @@ namespace Stealth.Player
             transform.position = car.Seats[seat].position - Vector3.up * SeatDrop;
             // the body sits facing the road (turned on the seat a little at most, Motor.BodyYaw), turning with the car
             transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y + Motor.BodyYaw, 0f);
-            if (!menu && !CursorMode && Controls.Pressed(GameAction.Interact))
+            // the front seats get out through their door (CarDoor: look at it, E — E is also the glovebox's button); the bed's
+            // seats have no door: E anywhere
+            if (seat >= 2 && !menu && !CursorMode && Controls.Pressed(GameAction.Interact))
             {
                 // this press is spent: on the host the seat is freed at once, and the same E must not sit us down again
                 // on the seat we are still standing on (UpdateUse runs later this frame)
@@ -135,7 +137,7 @@ namespace Stealth.Player
         void UpdateUse(bool holdE)
         {
             bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null || StorageTarget != null
-                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0 || AtUpgrades;
+                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 2 || AtUpgrades; // (in a front seat: its door, the button)
             UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
             UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;

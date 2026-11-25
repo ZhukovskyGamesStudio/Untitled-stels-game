@@ -668,46 +668,122 @@ def _toolbox(x, y):
     return [box], [handle, *latches]
 
 
+ST_W, ST_D = 4.7, 1.5         # the station's footprint: x -2.35..2.35, y -0.75..0.75 (front -Y, back against the wall)
+ST_TOP = 0.95                  # the worktop
+ST_BENCH = (-1.75, 1.6)        # the bench's ends along x
+ST_BACK = 0.62                 # the tool wall's plane (y)
+ST_BEAM_Z = 2.36               # the gantry beam's underside (its top 2.66: under the 2.75 m ceiling)
+
+
 def model_workbench():
-    """The car upgrade bench of the auto repair shop: 3.1 x 1.1 m, worktop 0.95, tool wall to 2.1. A heavy steel
-    frame with a thick solid top banded in steel, a rolling tool cabinet in the middle, a battery and a jerrycan on the
-    low shelf, a wheel standing under the right end; a vise, a coil-over strut and a toolbox on top; a tool wall with a
-    licence plate, a lug wrench, a hubcap, a torque wrench, a drive belt, spanners, a hammer, a diagnostic screen and a
-    strip light under the top shelf. On the left an inline four hanging from a jib hoist over its dolly.
-    Footprint x -1.55..1.55, y -0.55..0.55 (front -Y, back against the wall), origin on the floor at its centre.
-    Body = the wooden parts (top, shelves, tool board, cabinet), Accent = steel, Eye = the screen and the strip light."""
-    wood = [s.rbox((WB_X1 - WB_X0, WB_Y1 - WB_Y0, 0.08), ((WB_X0 + WB_X1) / 2, (WB_Y0 + WB_Y1) / 2, WB_TOP - 0.04),
-                   r=0.01, seg=2)]
-    wood.append(s.rbox((1.08, 0.80, 0.03), (-0.29, 0.04, 0.155), r=0.006, seg=1))                      # low shelf
-    wood.append(s.rbox((2.32, 0.024, SHELF_Z - 0.93), (0.32, BOARD_Y, (SHELF_Z + 0.93) / 2), r=0.006, seg=1))  # board
-    wood.append(s.rbox((2.34, 0.22, 0.03), (0.32, 0.37, SHELF_Z), r=0.006, seg=1))                     # top shelf
-    wood.append(s.rbox((2.34, 0.02, 0.05), (0.32, 0.26, SHELF_Z + 0.01), r=0.005, seg=1))              # its lip
-    cab_wood, cab_steel = _cabinet()
-    wood += cab_wood
-    box, box_steel = _toolbox(-0.45, 0.02)
-    wood += box
-
-    steel = _bench_frame() + _vise() + _coilover(0.02, 0.10) + _wall_tools() + _shelf_stuff() + cab_steel + box_steel
-    steel += _engine() + _dolly() + _hoist()
-    steel += _tyre(Vector((1.195, 0.06, 0.2965)))  # the 22-gon tread rests on its flat
-    bat, posts = _battery(-0.62, 0.10, 0.166)
-    steel += bat + posts + _jerrycan(-0.20, 0.10, 0.166)
-    scr, glass = _screen()
-    steel += scr
-    steel.append(s.rbox((1.20, 0.08, 0.035), (0.32, 0.40, SHELF_Z - 0.0325), r=0.008, seg=1))          # light housing
-    s.part("Body", wood)
+    """The car upgrade station of the auto repair shop (concept Logs/comfy/upgrades/bench_800.png): a big construction
+    4.8 x 1.5 m and 2.66 m tall (the rooms' ceiling is at 2.75). A blue steel gantry (two posts at the ends, an I-beam across) with a yellow chain hoist
+    holding an engine over the bench; a long steel bench with three drawer cabinets and a black-and-yellow edge; a tall
+    pegboard tool wall with spanners, a hammer, red tools, a shelf of cans and a strip light; on the left an engine on its
+    stand, on the right a diagnostic cart with a screen on an arm and a tyre leaning on it.
+    Footprint x -2.35..2.35, y -0.75..0.75, origin on the floor at its centre.
+    Parts: Body / Accent steel, BluePaint the gantry, Hazard the warning yellow, Dark black paint and rubber, TrimChrome
+    bright steel, TrimHandle red, AccentBoard the pegboard, EyeLamp / EyeScreen glow."""
+    x0, x1 = ST_BENCH
+    bx, bw = (x0 + x1) / 2, x1 - x0
+    by0, by1 = -0.42, ST_BACK - 0.02            # the bench's depth
+    body, steel, blue, hazard, dark, chrome, red, board = [], [], [], [], [], [], [], []
+    # the bench: a thick top, three drawer cabinets under it, a low shelf, legs between the cabinets
+    steel.append(s.rbox((bw, by1 - by0, 0.06), (bx, (by0 + by1) / 2, ST_TOP - 0.03), r=0.012, seg=2))
+    for cx in (x0 + 0.42, bx, x1 - 0.42):
+        body.append(s.rbox((0.78, by1 - by0 - 0.06, ST_TOP - 0.12), (cx, (by0 + by1) / 2 + 0.02, (ST_TOP - 0.06) / 2 + 0.03), r=0.02, seg=2))
+        for k in range(4):                                              # drawer fronts: seams and handles
+            z = 0.16 + k * 0.19
+            dark.append(s.rbox((0.74, 0.008, 0.012), (cx, by0 + 0.035, z + 0.09), r=0.003, seg=1))
+            chrome.append(s.rbox((0.22, 0.03, 0.02), (cx, by0 + 0.03, z + 0.03), r=0.006, seg=1))
+        dark.append(s.rbox((0.8, by1 - by0 - 0.04, 0.04), (cx, (by0 + by1) / 2 + 0.02, 0.02), r=0.01, seg=1))   # plinth
+    for k in range(int(bw / 0.12)):                                     # the black-and-yellow front edge
+        (hazard if k % 2 == 0 else dark).append(s.rbox((0.12, 0.012, 0.05), (x0 + 0.06 + k * 0.12, by0 - 0.004, ST_TOP - 0.035), r=0.002, seg=1))
+    # the tool wall: a light pegboard in a steel frame, a shelf on top with cans, a strip light under it, tools on hooks
+    board.append(s.rbox((bw - 0.1, 0.03, 1.55), (bx, ST_BACK + 0.04, ST_TOP + 0.85), r=0.01, seg=1))
+    steel.append(s.rbox((bw - 0.04, 0.06, 0.05), (bx, ST_BACK + 0.04, ST_TOP + 1.65), r=0.01, seg=1))
+    for xx in (x0 + 0.02, x1 - 0.02):
+        steel.append(s.rbox((0.06, 0.06, 1.7), (xx, ST_BACK + 0.04, ST_TOP + 0.83), r=0.01, seg=1))
+    steel.append(s.rbox((bw - 0.2, 0.24, 0.03), (bx, ST_BACK - 0.08, ST_TOP + 1.42), r=0.006, seg=1))    # the shelf
+    for k, xx in enumerate((x0 + 0.4, x0 + 0.55, x0 + 0.7, bx + 0.6, bx + 0.75, x1 - 0.5)):
+        (red if k % 3 == 0 else body).append(s.rcyl(0.045, 0.14 + 0.04 * (k % 2), (xx, ST_BACK - 0.08, ST_TOP + 1.51 + 0.02 * (k % 2)), seg=14, r=0.006))
+    lamp = [s.rcyl(0.016, bw - 0.6, (bx, ST_BACK - 0.12, ST_TOP + 1.38), axis="X", seg=10, r=0.004)]
+    for k in range(9):                                                  # spanners, big to small
+        xx, l = x0 + 0.3 + k * 0.09, 0.32 - k * 0.022
+        chrome.append(s.rbox((0.022, 0.012, l), (xx, ST_BACK + 0.01, ST_TOP + 1.05 - l / 2 + 0.2), r=0.004, seg=1))
+        chrome.append(s.rcyl(0.03 - k * 0.001, 0.012, (xx, ST_BACK + 0.01, ST_TOP + 1.05 + 0.2), axis="Y", seg=12, r=0.003))
+    red += [s.rbox((0.04, 0.03, 0.24), (bx - 0.2 + k * 0.12, ST_BACK + 0.005, ST_TOP + 0.55), r=0.012, seg=2) for k in range(4)]   # screwdriver grips
+    chrome += [s.rcyl(0.007, 0.16, (bx - 0.2 + k * 0.12, ST_BACK + 0.005, ST_TOP + 0.35), seg=8, r=0.002) for k in range(4)]
+    body.append(s.rbox((0.03, 0.03, 0.34), (bx + 0.45, ST_BACK + 0.005, ST_TOP + 0.5), r=0.01, seg=1))           # hammer
+    steel.append(s.rbox((0.16, 0.05, 0.05), (bx + 0.45, ST_BACK + 0.005, ST_TOP + 0.68), r=0.01, seg=1))
+    dark.append(s.tube([(bx + 0.8 + 0.12 * math.cos(a), ST_BACK + 0.01, ST_TOP + 0.8 + 0.12 * math.sin(a))
+                        for a in [k * 0.5 for k in range(14)]], 0.012, res=1, smooth=False))                       # a coiled hose
+    # on the bench: a vise, a toolbox, a coil-over strut
+    steel.append(s.rbox((0.2, 0.14, 0.1), (x1 - 0.25, by0 + 0.12, ST_TOP + 0.05), r=0.01, seg=1))
+    red.append(s.rbox((0.42, 0.2, 0.18), (bx - 0.6, (by0 + by1) / 2, ST_TOP + 0.09), r=0.02, seg=2))
+    chrome.append(s.rbox((0.3, 0.03, 0.03), (bx - 0.6, (by0 + by1) / 2, ST_TOP + 0.2), r=0.01, seg=1))
+    red.append(s.rcyl(0.035, 0.36, (bx + 0.2, by0 + 0.2, ST_TOP + 0.18), seg=14, r=0.008))
+    dark.append(s.tube([(bx + 0.2 + 0.05 * math.cos(a), by0 + 0.2 + 0.05 * math.sin(a), ST_TOP + 0.04 + a * 0.012)
+                        for a in [k * 0.6 for k in range(48)]], 0.008, res=1, smooth=False))                       # its spring
+    # the gantry: two blue posts on foot plates, an I-beam across, braces, warning stripes low on the posts
+    for xx in (-ST_W / 2 + 0.1, ST_W / 2 - 0.1):
+        blue.append(s.rbox((0.16, 0.16, ST_BEAM_Z + 0.02), (xx, 0.05, (ST_BEAM_Z + 0.02) / 2), r=0.012, seg=2))
+        steel.append(s.rbox((0.34, 0.34, 0.03), (xx, 0.05, 0.015), r=0.008, seg=1))
+        for k in range(3):
+            hazard.append(s.rbox((0.17, 0.17, 0.05), (xx, 0.05, 0.12 + k * 0.12), r=0.006, seg=1))
+        blue.append(s.tube([(xx, 0.05, ST_BEAM_Z - 0.55), (xx + (0.55 if xx < 0 else -0.55), 0.05, ST_BEAM_Z + 0.05)], 0.04, res=1, smooth=False))
+    blue.append(s.rbox((ST_W, 0.2, 0.06), (0, 0.05, ST_BEAM_Z + 0.03), r=0.01, seg=1))                  # the I-beam's flanges
+    blue.append(s.rbox((ST_W, 0.2, 0.06), (0, 0.05, ST_BEAM_Z + 0.27), r=0.01, seg=1))
+    blue.append(s.rbox((ST_W - 0.02, 0.05, 0.22), (0, 0.05, ST_BEAM_Z + 0.15), r=0.008, seg=1))
+    # the hoist: a yellow body on a trolley, its chain, a hook, an engine hanging over the bench
+    hx = -0.35
+    H = ST_BEAM_Z - 0.38                                               # the hook
+    hazard.append(s.rbox((0.3, 0.26, 0.22), (hx, 0.05, ST_BEAM_Z - 0.14), r=0.03, seg=2))
+    steel.append(s.rbox((0.34, 0.24, 0.06), (hx, 0.05, ST_BEAM_Z - 0.01), r=0.01, seg=1))
+    dark.append(s.tube([(hx, 0.05, ST_BEAM_Z - 0.25), (hx, 0.05, H - 0.02)], 0.012, res=1, smooth=False))
+    steel.append(s.tube([(hx, 0.05, H), (hx + 0.04, 0.05, H - 0.09), (hx, 0.05, H - 0.15), (hx - 0.035, 0.05, H - 0.11)], 0.014, res=2))
+    for sx in (-0.18, 0.18):                                           # the lifting chains to the engine
+        dark.append(s.tube([(hx, 0.05, H - 0.14), (hx + sx, 0.05, H - 0.35)], 0.008, res=1, smooth=False))
+    engine = [s.rbox((0.5, 0.32, 0.28), (hx, 0.05, H - 0.51), r=0.03, seg=2),                               # block
+              s.rbox((0.46, 0.22, 0.12), (hx, 0.05, H - 0.31), r=0.02, seg=2)]                              # head
+    dark += [s.rcyl(0.075, 0.03, (hx - 0.27, 0.05 - 0.02, H - 0.57), axis="X", seg=18, r=0.006),                # pulley, sump
+             s.rbox((0.42, 0.24, 0.08), (hx, 0.05, H - 0.68), r=0.02, seg=1)]
+    steel += engine
+    red += [s.rcyl(0.022, 0.05, (hx - 0.15 + k * 0.1, 0.05, H - 0.24), seg=10, r=0.004) for k in range(4)]   # the plug caps
+    # the engine stand on the left: an upright on castors, a block bolted to its plate
+    ex = -ST_W / 2 + 0.55
+    dark.append(s.rbox((0.08, 0.08, 0.95), (ex, -0.35, 0.5), r=0.01, seg=1))
+    dark.append(s.rbox((0.7, 0.08, 0.06), (ex, -0.35, 0.06), r=0.01, seg=1))
+    dark.append(s.rbox((0.08, 0.6, 0.06), (ex, -0.35, 0.06), r=0.01, seg=1))
+    for wx, wy in ((ex - 0.32, -0.35), (ex + 0.32, -0.35), (ex, -0.63), (ex, -0.07)):
+        dark.append(s.rcyl(0.04, 0.035, (wx, wy, 0.04), axis="X", seg=12, r=0.006))
+    steel.append(s.rbox((0.38, 0.3, 0.3), (ex, -0.35, 1.08), r=0.03, seg=2))
+    red.append(s.rbox((0.34, 0.22, 0.08), (ex, -0.35, 1.27), r=0.02, seg=1))
+    # the diagnostic cart on the right: a cabinet on castors, an arm, a screen, a keyboard; a tyre leaning on it
+    cx = ST_W / 2 - 0.42
+    body.append(s.rbox((0.42, 0.44, 0.9), (cx, -0.2, 0.5), r=0.02, seg=2))
+    for wx in (cx - 0.16, cx + 0.16):
+        for wy in (-0.38, -0.02):
+            dark.append(s.rcyl(0.035, 0.03, (wx, wy, 0.035), axis="X", seg=12, r=0.005))
+    hazard.append(s.rbox((0.42, 0.012, 0.06), (cx, -0.425, 0.88), r=0.003, seg=1))
+    dark.append(s.rbox((0.4, 0.2, 0.025), (cx, -0.3, 0.97), r=0.006, seg=1))                            # keyboard
+    steel.append(s.rbox((0.04, 0.04, 0.55), (cx, -0.05, 1.22), r=0.008, seg=1))                         # the arm
+    dark.append(s.rbox((0.46, 0.05, 0.32), (cx, -0.08, 1.58), r=0.015, seg=2))                          # the screen's case
+    screen = [s.rbox((0.4, 0.01, 0.26), (cx, -0.106, 1.58), r=0.004, seg=1)]
+    tyre = s.rcyl(0.34, 0.22, (cx - 0.05, -0.62, 0.34), axis="Y", seg=28, r=0.06, bevel_seg=3)
+    dark.append(tyre)
+    chrome.append(s.rcyl(0.2, 0.235, (cx - 0.05, -0.62, 0.34), axis="Y", seg=20, r=0.02))
+    s.part("Body", body)
     s.part("Accent", steel)
-    s.part("EyeLamp", [s.rcyl(0.014, 1.10, (0.32, 0.395, SHELF_Z - 0.062), axis="X", seg=10, r=0.004)])
-    s.part("EyeScreen", glass)
+    s.part("BluePaint", blue)
+    s.part("Hazard", hazard)
+    s.part("Dark", dark)
+    s.part("TrimChrome", chrome)
+    s.part("TrimHandle", red)
+    s.part("AccentBoard", board)
+    s.part("EyeLamp", lamp)
+    s.part("EyeScreen", screen)
     return export("workbench")
-
-
-# --------------------------------------------------------------------------- programming console
-
-SHELF_TOP = 1.0
-SLOT_PITCH = 0.47
-SLOT_Y = 0.215
-SLOTS_X = [(-1.5 + k) * SLOT_PITCH for k in range(4)]  # -0.705, -0.235, 0.235, 0.705
 
 
 def model_programmer_console():

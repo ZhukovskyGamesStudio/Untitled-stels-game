@@ -14,9 +14,9 @@ namespace Stealth.Game
     public sealed class TeamStash
     {
         /// <summary>The storage robot's box with its backpack at level 0 (Vehicles.CarUpgradeSettings.KennelStash).</summary>
-        public const int Width = 3, Height = 5;
+        public const int Width = 5, Height = 3;
         /// <summary>The biggest box (the backpack's top level): the stash board and the pack's load are built for it.</summary>
-        public const int MaxWidth = 6, MaxHeight = 7;
+        public const int MaxWidth = 7, MaxHeight = 6;
 
         readonly List<InventoryEntry> m_Items = new();
 

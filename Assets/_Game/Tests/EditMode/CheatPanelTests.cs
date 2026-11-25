@@ -89,7 +89,7 @@ namespace Stealth.Tests
             Assert.IsFalse(u.Set(CarUpgrade.Kennel, 1), "the same level: nothing changes");
             u.Set(CarUpgrade.Teleport, 3);
             Assert.AreEqual(1, u.Level(CarUpgrade.Teleport), "a unique one: 1 at most");
-            Assert.IsFalse(u.Set(CarUpgrade.Unique5, 2), "not designed yet: stays 0");
+            Assert.IsFalse(u.Set(CarUpgrade.Unique6, 2), "not designed yet: stays 0");
             u.Set(CarUpgrade.Engine, -4);
             Assert.AreEqual(0, u.Level(CarUpgrade.Engine));
             var peer = new CarUpgrades();
@@ -109,9 +109,20 @@ namespace Stealth.Tests
             Assert.AreEqual(tabs, panel.Pages.Length);
             Assert.IsTrue(panel.Tabs.All(t => t != null) && panel.Pages.All(p => p != null));
             Assert.IsTrue(panel.Pages[0].activeSelf && panel.Pages.Skip(1).All(p => !p.activeSelf), "the cheats first");
-            Assert.AreEqual(ItemCatalog.Shapes.Length, panel.Items.Length, "a button for every item");
-            Assert.IsTrue(panel.Items.All(b => b != null && b.transform.IsChildOf(panel.Pages[(int)CheatPanel.Tab.Items].transform)));
-            Assert.AreEqual(ItemCatalog.DefaultColors().Length, panel.ItemColors.Length, "a button for every colour");
+            Assert.AreEqual(ItemCatalog.Shapes.Length, panel.Items.Length, "a place for every item");
+            for (int i = 0; i < panel.Items.Length; i++)
+            {
+                if (ItemCatalog.IsPiece(i)) { Assert.IsNull(panel.Items[i], "no old tetris pieces"); continue; }
+                Assert.IsNotNull(panel.Items[i], ItemCatalog.Shapes[i].Id);
+                Assert.IsTrue(panel.Items[i].transform.IsChildOf(panel.Pages[(int)CheatPanel.Tab.Items].transform));
+                var icon = panel.Items[i].transform.Find("Icon")?.GetComponent<UnityEngine.UI.Image>();
+                Assert.IsTrue(icon != null && icon.sprite != null, $"{ItemCatalog.Shapes[i].Id}: its icon left of its name");
+            }
+            Assert.IsNotNull(panel.OnlyInteractive, "the check box 'only the interactive'");
+            Assert.IsTrue(CheatPanel.Shown(ItemCatalog.Screwdriver, true), "a tool stays");
+            Assert.IsFalse(CheatPanel.Shown(ItemCatalog.FirstJunk, true), "junk is only fuel");
+            Assert.IsTrue(CheatPanel.Shown(ItemCatalog.FirstJunk, false));
+            Assert.IsFalse(CheatPanel.Shown(0, false), "never a tetris piece");
             int upgrades = System.Enum.GetValues(typeof(CarUpgrade)).Length;
             Assert.AreEqual(upgrades, panel.UpgradeRows.Length);
             Assert.AreEqual(upgrades * (CarUpgrades.MaxLevelled + 1), panel.UpgradeLevels.Length, "a button for every level of every upgrade");

@@ -118,6 +118,8 @@ namespace Stealth.UI
                 CarUpgrade.Trunk => Loc.F(key, level),
                 CarUpgrade.Kennel => Loc.F(key, CarUpgrades.StashSize(level, s).x, CarUpgrades.StashSize(level, s).y),
                 CarUpgrade.Teleport => Loc.T(level > 0 ? key : key + ".none"),
+                CarUpgrade.Radio => level == 0 ? "" : GameManager.Instance != null && GameManager.Instance.Cassette >= 0
+                    ? Loc.F(key, Loc.T(Items.ItemCatalog.CassetteKey(GameManager.Instance.Cassette))) : Loc.T(key + ".none"),
                 _ => "",
             };
         }

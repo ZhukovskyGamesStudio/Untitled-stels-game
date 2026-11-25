@@ -17,6 +17,8 @@
                    its rim (1), a second electric motor in front of the funnel with a belt to the grinder's drum (2), a heavy
                    black housing round the funnel's foot with hazard stripes, hydraulic rams and two chrome stacks on the
                    fenders with a beacon (3).
+  car_radio.fbx    the car radio (unique upgrade «Магнитола»): a chrome cassette deck set into the dash's middle, a green
+                   display, two knobs (concept: Logs/comfy/upgrades/radio_700.png).
   car_panic.fbx    the teleport's big red mushroom button in a yellow-and-black housing with a steel guard hoop, on the dash
                    top over the glovebox (the passenger's side of the right-hand-drive model).
 
@@ -36,7 +38,7 @@ workbench (car_bench.py) takes y 0.36..0.91 at the front.
   shelves:  x 0.58..0.85, y 0.97..2.33; level 1 top z 1.06, level 2 top z 1.30, level 3 top shelf z 1.625, rail to z 1.70
 Parts (the game colours car parts by name prefix): Body painted steel (also the kennel's lining), Accent wood, AccentBoard light board, Trim bare
 steel, TrimHandle red grips / straps / the panic button, TrimChrome polished steel, Hazard warning yellow, Dark black rubber
-and paint, EyeLamp the glowing bulb, EyeBeacon the orange beacon. Every object is <Prefix>_<Thing>.
+and paint, AccentWindow smoked plastic, EyeLamp the glowing bulb, EyeBeacon the orange beacon, EyeRadio the radio's green display. Every object is <Prefix>_<Thing>.
 """
 import math
 import os
@@ -525,6 +527,29 @@ def build_panic():
             s.part("TrimHandle_Panic_Button", [dome]), s.part("Trim_Panic_Guard", [hoop])]
 
 
+RADIO = Vector((0.0, -0.528, 1.045))   # the middle of the dash's face towards the seats (car.dark: the dashboard, its face at y -0.54)
+
+
+def build_radio():
+    """The car radio (the unique upgrade «Магнитола», concept Logs/comfy/upgrades/radio_700.png): a DIN deck set into the
+    dash's face — its dark housing, a chrome faceplate, the cassette door with a smoked window over the reels, a green
+    glowing display, two chrome knobs, a row of push buttons. Faces the seats (+Y)."""
+    s.clear_scene()
+    x, y, z = RADIO
+    house = [s.rbox((0.30, 0.05, 0.095), (x, y - 0.012, z), r=0.006, seg=2)]
+    face = [s.rbox((0.288, 0.012, 0.085), (x, y + 0.016, z), r=0.005, seg=2)]
+    door = [s.rbox((0.12, 0.008, 0.05), (x - 0.01, y + 0.024, z + 0.002), r=0.004, seg=2)]
+    window = [s.rbox((0.074, 0.004, 0.022), (x - 0.01, y + 0.029, z + 0.006), r=0.003, seg=1)]
+    reels = [s.rcyl(0.007, 0.004, (x - 0.01 + dx, y + 0.031, z + 0.006), axis="Y", seg=12, r=0.001, bevel_seg=1) for dx in (-0.018, 0.018)]
+    display = [s.rbox((0.07, 0.004, 0.022), (x + 0.088, y + 0.024, z + 0.016), r=0.002, seg=1)]
+    knobs = [s.rcyl(0.016, 0.018, (x + sx, y + 0.03, z - 0.012), axis="Y", seg=20, r=0.003, bevel_seg=2) for sx in (-0.115, 0.088)]
+    buttons = [s.rbox((0.014, 0.008, 0.01), (x + 0.058 + 0.02 * k, y + 0.025, z - 0.03), r=0.002, seg=1) for k in range(3)]
+    buttons += [s.rbox((0.04, 0.006, 0.008), (x - 0.01, y + 0.025, z - 0.031), r=0.002, seg=1)]       # the eject bar
+    return [s.part("Dark_Radio_Housing", house + buttons), s.part("TrimChrome_Radio_Face", face + knobs),
+            s.part("Dark_Radio_Door", door), s.part("Trim_Radio_Reels", reels), s.part("AccentWindow_Radio", window),
+            s.part("EyeRadio_Display", display)]
+
+
 def build_shredder():
     s.clear_scene()
     return [engine1(), engine2(), engine3()]
@@ -540,11 +565,7 @@ def bounds(objs):
 
 
 def export(root):
-    objs = build_kennel()
-    bpy.context.view_layer.update()
-    meshfix.fix_objects(objs, floor=False, name="car_kennel")
-    print("KENNEL blender lo", *bounds(objs))
-    s.export_fbx(os.path.join(root, "Car", "car_kennel.fbx"), objs)
+    # (the kennel, build_kennel, is not exported any more: Linus sleeps in the open bed, his backpack is the upgrade)
     levels = build_shelves()
     bpy.context.view_layer.update()
     for k, objs in enumerate(levels, 1):          # each level on its own: meshfix must not pull one level onto another
@@ -557,6 +578,11 @@ def export(root):
         meshfix.fix_objects(objs, floor=False, name=f"car_shredder level {k}")
         print(f"ENGINE{k} blender lo", *bounds(objs))
     s.export_fbx(os.path.join(root, "Car", "car_shredder.fbx"), [o for lv in levels for o in lv])
+    objs = build_radio()
+    bpy.context.view_layer.update()
+    meshfix.fix_objects(objs, floor=False, name="car_radio")
+    print("RADIO blender lo", *bounds(objs))
+    s.export_fbx(os.path.join(root, "Car", "car_radio.fbx"), objs)
     objs = build_panic()
     bpy.context.view_layer.update()
     meshfix.fix_objects(objs, floor=False, name="car_panic")
@@ -574,7 +600,7 @@ def review(scratch, sheet_path):
         if with_car:
             bpy.ops.import_scene.fbx(filepath=os.path.join(car, "pickup.fbx"))
             bpy.ops.import_scene.fbx(filepath=os.path.join(car, "car_workbench.fbx"))
-        for f in ("car_kennel.fbx", "car_shelves.fbx"):
+        for f in ("car_shelves.fbx", "car_shredder.fbx", "car_panic.fbx"):
             bpy.ops.import_scene.fbx(filepath=os.path.join(scratch, "Car", f))
         new = [o for o in bpy.context.scene.objects if o not in before and o.type == "MESH"]
         for o in [o for o in new if "Shelf" in o.name and o.name.split("Shelf")[1][0] not in levels]:

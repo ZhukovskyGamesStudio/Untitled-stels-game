@@ -38,6 +38,7 @@ namespace Stealth.Game
         {
             if (!Upgrades.Set(upgrade, level)) return;
             FitStash();
+            if (upgrade == CarUpgrade.Teleport) FillTeleport();
         }
     }
 }

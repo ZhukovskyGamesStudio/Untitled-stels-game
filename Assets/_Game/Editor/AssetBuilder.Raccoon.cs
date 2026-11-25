@@ -20,6 +20,7 @@ namespace Stealth.EditorTools
         const string RaccoonModelsDir = ModelsDir + "/Raccoon";
         const string RaccoonFbx = RaccoonModelsDir + "/raccoon.fbx";
         const string RaccoonPackFbx = RaccoonModelsDir + "/raccoon_pack.fbx";
+        const string RaccoonStrapFbx = RaccoonModelsDir + "/raccoon_strap.fbx";
         const string RaccoonTextures = Root + "/Art/Textures/Raccoon";
         const string RaccoonDataDir = Root + "/Data/Raccoon";
         const string RaccoonControllerPath = RaccoonDataDir + "/Raccoon.controller";
@@ -62,6 +63,14 @@ namespace Stealth.EditorTools
                     }).ToArray();
                     imp.SaveAndReimport();
                 }
+            }
+            if (AssetImporter.GetAtPath(RaccoonStrapFbx) is ModelImporter strapImp
+                && (strapImp.materialImportMode != ModelImporterMaterialImportMode.None || strapImp.importAnimation || strapImp.animationType != ModelImporterAnimationType.None))
+            {
+                strapImp.materialImportMode = ModelImporterMaterialImportMode.None;
+                strapImp.importAnimation = false;
+                strapImp.animationType = ModelImporterAnimationType.None;
+                strapImp.SaveAndReimport();
             }
             if (AssetImporter.GetAtPath(RaccoonPackFbx) is ModelImporter pack
                 && (pack.materialImportMode != ModelImporterMaterialImportMode.None || pack.importAnimation || pack.animationType != ModelImporterAnimationType.None))
@@ -257,6 +266,8 @@ namespace Stealth.EditorTools
                 levels[lv] = holder.gameObject;
             }
             var pieces = new List<MeshFilter>();
+            var straps = new List<Transform>();
+            bool hasStrap = AssetDatabase.LoadAssetAtPath<GameObject>(RaccoonStrapFbx) != null;
             for (int i = 0; i < TeamStash.MaxWidth * TeamStash.MaxHeight; i++)
             {
                 var piece = new GameObject($"Piece{i}");
@@ -265,6 +276,21 @@ namespace Stealth.EditorTools
                 var renderer = piece.AddComponent<MeshRenderer>();
                 renderer.enabled = false;
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
+                // the strap round its thing (RaccoonPack.Fit sizes it): unit boxes, their turn dropped (a cube is a cube)
+                if (!hasStrap) { straps.Add(null); continue; }
+                var strap = Model("raccoon_strap");
+                strap.name = "Strap";
+                strap.transform.SetParent(piece.transform, false);
+                foreach (var r in strap.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    var kind = r.name.Split('_')[0];
+                    if (mats.TryGetValue(kind, out var m)) r.sharedMaterial = m;
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    if (r.name.StartsWith("Strap_")) r.transform.localRotation = Quaternion.identity;
+                }
+                foreach (var col in strap.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
+                strap.SetActive(false);
+                straps.Add(strap.transform);
             }
             // a rigged file faces -Z (like the people's): turned round to face +Z, the way the agent walks
             model.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -272,8 +298,18 @@ namespace Stealth.EditorTools
             pack.Levels = levels;
             pack.Loads = loads;
             pack.Boxes = boxes;
+            pack.Straps = straps.ToArray();
             pack.Pieces = pieces.ToArray();
             pack.Visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>(DataDir + "/ItemVisuals.asset");
+            // where each thing's strap goes round it (its slice at the middle: a hammer's handle), read off the models here
+            var vis = pack.Visuals;
+            pack.StrapFits = new Vector4[ItemCatalog.Shapes.Length];
+            for (int shape = 0; vis != null && shape < pack.StrapFits.Length; shape++)
+            {
+                var thing = vis.Models != null && shape < vis.Models.Length ? vis.Models[shape] : null;
+                var piece = vis.Meshes != null && shape < vis.Meshes.Length ? vis.Meshes[shape] : null;
+                if (thing != null) pack.StrapFits[shape] = RaccoonPack.StrapFit(thing, RaccoonPack.RestOf(shape, thing, piece));
+            }
             return model;
         }
     }

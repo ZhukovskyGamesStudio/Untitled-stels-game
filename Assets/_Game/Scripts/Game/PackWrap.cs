@@ -34,6 +34,13 @@ namespace Stealth.Game
 
         public enum Face : byte { Left, Top, Right, Back }
 
+        /// <summary>How far round the back corner a side column's things go, as a share of half the pack's width.</summary>
+        public const float CornerReach = 0.55f;
+        /// <summary>Things overlap on a face only by more than this share of their footprint before one is laid on the other.</summary>
+        public const float Snug = 0.7f;
+        /// <summary>The share of a thing's thickness pressed into the pack (or into what it lies on): strapped down, not floating on it.</summary>
+        public const float Sink = 1f / 3f;
+
         /// <summary>A point of the wrapped grid on the box and the face's frame there.</summary>
         public struct Spot
         {
@@ -58,8 +65,9 @@ namespace Stealth.Game
             {
                 // the left side, going up
                 float y = -b.H + s;
+                // (round the back corner it stays near it: sliding on to the middle, every side column met there in a heap)
                 return back
-                    ? new Spot { Face = Face.Back, Point = new Vector3(Mathf.Min(-hw + past, 0f), y, -hl), Normal = Vector3.back, Across = Vector3.up, Down = Vector3.right }
+                    ? new Spot { Face = Face.Back, Point = new Vector3(-hw + Mathf.Min(past, hw * CornerReach), y, -hl), Normal = Vector3.back, Across = Vector3.up, Down = Vector3.right }
                     : new Spot { Face = Face.Left, Point = new Vector3(-hw, y, hl - t), Normal = Vector3.left, Across = Vector3.up, Down = Vector3.back };
             }
             if (s <= b.H + b.W)
@@ -73,7 +81,7 @@ namespace Stealth.Game
                 // the right side, going down
                 float y = -(s - b.H - b.W);
                 return back
-                    ? new Spot { Face = Face.Back, Point = new Vector3(Mathf.Max(hw - past, 0f), y, -hl), Normal = Vector3.back, Across = Vector3.down, Down = Vector3.left }
+                    ? new Spot { Face = Face.Back, Point = new Vector3(hw - Mathf.Min(past, hw * CornerReach), y, -hl), Normal = Vector3.back, Across = Vector3.down, Down = Vector3.left }
                     : new Spot { Face = Face.Right, Point = new Vector3(hw, y, hl - t), Normal = Vector3.right, Across = Vector3.down, Down = Vector3.back };
             }
         }
@@ -119,17 +127,18 @@ namespace Stealth.Game
                 var spanDown = spot.Down * (size.y * StashCart.Cell);
                 var c = new Vector2(Vector3.Dot(spot.Point, ax), Vector3.Dot(spot.Point, ay));
                 var half = new Vector2(Mathf.Abs(Vector3.Dot(spanAcross, ax)) + Mathf.Abs(Vector3.Dot(spanDown, ax)),
-                                       Mathf.Abs(Vector3.Dot(spanAcross, ay)) + Mathf.Abs(Vector3.Dot(spanDown, ay))) * 0.5f * 0.9f;
+                                       Mathf.Abs(Vector3.Dot(spanAcross, ay)) + Mathf.Abs(Vector3.Dot(spanDown, ay))) * 0.5f * Snug;
                 var area = new Rect(c - half, half * 2f);
                 float under = 0f;
                 foreach (var (face, other, top) in piles)
                     if (face == spot.Face && other.Overlaps(area)) under = Mathf.Max(under, top);
                 float thick = Mathf.Max(0.01f, thickness != null ? thickness(e.Shape) : 0.08f);
-                piles.Add((spot.Face, area, under + thick));
+                float floor = under - thick * Sink;               // (a third of it pressed into what is under it)
+                piles.Add((spot.Face, area, floor + thick));
                 var (_, turn, scale) = StashCart.Place(e);
                 placed.Add(new Placed
                 {
-                    Position = spot.Point + spot.Normal * (lift + under),
+                    Position = spot.Point + spot.Normal * (lift + floor),
                     Rotation = Facing(spot) * turn,
                     Scale = scale,
                     Face = spot.Face,

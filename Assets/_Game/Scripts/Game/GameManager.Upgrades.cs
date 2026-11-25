@@ -65,6 +65,7 @@ namespace Stealth.Game
             if (!CarUpgrades.Gather(m_Carried, recipe, m_Take) || !inv.TakeServer(m_Take)) return;
             Upgrades.Raise(upgrade);
             FitStash();
+            if (upgrade == CarUpgrade.Teleport) FillTeleport(); // (it comes charged)
             NoteServer(player, StatKind.Pickups);
             Banner(Loc.Pack("banner.car_upgraded", player.Nick, "@" + UpgradeKey(upgrade), next));
             SoundServer(Audio.GameSound.Craft, player.transform.position + Vector3.up); // (every peer hears it)
@@ -78,6 +79,8 @@ namespace Stealth.Game
         {
             Upgrades.Clear();
             FitStash();
+            FillTeleport();
+            ClearRadioServer();
         }
 
         /// <summary>Server: Linus rides in the arriving car — he is spawned asleep in its trunk once it stops (<see cref="ReleaseMuleServer"/>).</summary>

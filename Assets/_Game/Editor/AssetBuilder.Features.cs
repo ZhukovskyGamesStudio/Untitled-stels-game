@@ -32,7 +32,15 @@ namespace Stealth.EditorTools
             });
             var bench = Prefab(p + "Workbench.prefab", () =>
             {
-                var go = PropObject("Workbench", "workbench", "Wood", "Metal", "LampBulb");
+                var go = PropObject("Workbench", "workbench", "Metal", "Metal", "LampBulb");
+                // the station's paints by part (poi.py model_workbench): the gantry's blue, warning yellow, black, chrome, red tools, the pegboard
+                foreach (var (part, color, smooth, glow) in CarBenchLooks)
+                    Mat("Props", $"CarBench_{part}", color, glow ? color * 1.4f : (Color?)null, smoothness: smooth);
+                foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string part = CarBenchLooks.Where(x => x.part is not ("Body" or "Accent") && r.gameObject.name.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault();
+                    if (part != null && !part.StartsWith("Eye")) r.sharedMaterial = M($"CarBench_{part}");
+                }
                 go.AddComponent<Workbench>();
                 return go;
             });
@@ -482,6 +490,8 @@ namespace Stealth.EditorTools
             ["toiletpaper"] = new[] { ("Body", new Color(0.95f, 0.95f, 0.93f), 0.1f, false), ("Accent", new Color(0.6f, 0.45f, 0.28f), 0.15f, false) },
             ["applecore"] = new[] { ("Body", new Color(0.95f, 0.9f, 0.72f), 0.4f, false), ("Accent", new Color(0.72f, 0.08f, 0.06f), 0.7f, false), ("Trim", new Color(0.3f, 0.18f, 0.08f), 0.3f, false) },
             ["soap"] = new[] { ("Body", new Color(0.95f, 0.8f, 0.85f), 0.6f, false), ("Accent", new Color(0.25f, 0.55f, 0.75f), 0.4f, false) },
+            ["cassette"] = new[] { ("Body", new Color(0.08f, 0.08f, 0.09f), 0.45f, false), ("Trim", new Color(0.92f, 0.88f, 0.78f), 0.3f, false),
+                ("AccentStripe", new Color(0.9f, 0.35f, 0.12f), 0.4f, false), ("AccentReel", new Color(0.95f, 0.95f, 0.95f), 0.5f, false), ("Accent", new Color(0.15f, 0.13f, 0.12f), 0.85f, false) },
             ["ssd"] = new[] { ("Body", new Color(0.1f, 0.1f, 0.11f), 0.55f, false), ("Accent", new Color(0.78f, 0.62f, 0.2f), 0.8f, false), ("Trim", new Color(0.85f, 0.2f, 0.15f), 0.5f, false) },
             ["gamepad"] = new[] { ("Body", new Color(0.16f, 0.17f, 0.2f), 0.45f, false), ("Accent", new Color(0.06f, 0.06f, 0.07f), 0.35f, false), ("Trim", new Color(0.85f, 0.25f, 0.2f), 0.5f, false), ("Eye", new Color(0.3f, 0.7f, 1f), 0.6f, true) },
             ["gamekeyboard"] = new[] { ("Body", new Color(0.07f, 0.07f, 0.08f), 0.5f, false), ("Accent", new Color(0.2f, 0.21f, 0.23f), 0.4f, false), ("Trim", new Color(0.92f, 0.92f, 0.94f), 0.45f, false), ("Eye", new Color(0.9f, 0.25f, 0.95f), 0.6f, true) },

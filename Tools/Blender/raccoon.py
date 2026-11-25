@@ -8,7 +8,7 @@ Two models, so the backpack can grow with the kennel upgrades and its gear can s
                     VentUp (the leap up into a ceiling grate), VentDown (the drop out of one), Pet (the reaction to a pat),
                     Curl (asleep in the car's trunk). The bone "pack" (on the spine, not deforming) carries the backpack in the game.
   raccoon_pack.fbx  the backpacks in the raccoon's rest-pose space, one per level of the backpack upgrade (the game shows
-                    one), parts named <Material>_L<level>[Group]: L0 a scruffy sack, L1 the plaid pack, L2 a hiking pack with
+                    one), parts named <Material>_L<level>[Group]: L0 a small soft rucksack, L1 the plaid pack, L2 a hiking pack with
                     side pouches and a bedroll, L3 a frame pack in an aluminium cage (concepts: Logs/comfy/upgrades/pack*.png);
                     groups DangleA / DangleB / DangleC (a carabiner with a mug / with keys, a lantern, a tin can: the game
                     swings each from its highest point). The stash wraps round each level's main body — Sack_L0 /
@@ -545,7 +545,7 @@ def animate(rig):
 BACK_Z = 0.49                                                    # the raccoon's back under the pack (the bone "pack" at z 0.50)
 # each level's main body: centre and size (across, along the body, up); the stash wraps round Canvas_L<n>'s / Sack_L0's box
 PACKS = {
-    0: ((0.0, 0.0, BACK_Z + 0.115), (0.27, 0.26, 0.23)),        # a scruffy sack (concept Logs/comfy/upgrades/pack0_100.png)
+    0: ((0.0, 0.0, BACK_Z + 0.105), (0.27, 0.25, 0.21)),        # a small soft rucksack (concept Logs/comfy/upgrades/pack0_100.png)
     1: ((0.0, -0.02, 0.615), (0.32, 0.32, 0.25)),               # the plaid pack (Logs/comfy/raccoon/03_karabiny.png)
     2: ((0.0, -0.02, BACK_Z + 0.2), (0.35, 0.34, 0.40)),        # a tall hiking pack with pouches and a bedroll (pack2_200.png)
     3: ((0.0, -0.02, BACK_Z + 0.225), (0.43, 0.41, 0.42)),      # a frame pack in an aluminium cage (pack3_301.png)
@@ -579,31 +579,29 @@ def dangles(level, rear, z, sx=0.095, k=1.5):
 
 
 def pack0():
-    """Level 0: a scruffy sack — a soft bag gathered at the neck with a rope, a plaid flap over it buckled down the rear,
-    sewn plaid patches, a tin can on a string."""
+    """Level 0: a small soft canvas rucksack (concept Logs/comfy/upgrades/pack0_100.png) — a plump, rounded body a little
+    narrower at the top, a plaid flap over the top falling down the rear face with a strap and buckle, a plaid pocket on
+    the rear, a patch on the side, a rope loop with a tin can on a string."""
     (cx, cy, cz), (w, d, h) = PACKS[0]
     z0 = BACK_Z
-    body = S.loft([(z0, 0.10, 0.10, 2.6), (z0 + 0.03, 0.128, 0.122, 2.5), (z0 + 0.11, 0.138, 0.13, 2.3), (z0 + 0.17, 0.124, 0.117, 2.1),
-                   (z0 + 0.2, 0.09, 0.086, 2.0), (z0 + 0.214, 0.072, 0.07, 2.0), (z0 + 0.23, 0.095, 0.09, 2.2), (z0 + 0.242, 0.0, 0.0)],
-                  seg=28, loc=(cx, cy, 0), round_caps=0.0)
+    top, rear = z0 + h, cy + d / 2
+    body = S.rbox((w - 0.02, d - 0.02, h), (cx, cy, z0 + h / 2), r=0.07, seg=4, taper=(0.86, 0.88))
     objs = [S.part("Sack_L0", [body])]
-    top = z0 + 0.205
-    # the flap: from under the rope at the neck down over the rear bulge (tipped out to follow it)
-    a0, a1 = Vector((cx, cy + 0.02, top + 0.03)), Vector((cx, cy + 0.145, z0 + 0.07))
-    tip = math.atan2(a1.y - a0.y, a0.z - a1.z)
-    flap = [S.rbox((0.2, 0.024, (a0 - a1).length + 0.02), (a0 + a1) / 2, r=0.011, seg=2, rot=(tip, 0, 0))]
-    patches = [S.rbox((0.065, 0.01, 0.06), (cx - 0.06, cy + 0.128, z0 + 0.075), r=0.004, seg=1, rot=(0, math.radians(12), 0)),
-               S.rbox((0.01, 0.07, 0.055), (cx + 0.135, cy - 0.02, z0 + 0.1), r=0.004, seg=1, rot=(math.radians(-10), 0, 0))]
-    objs.append(S.part("Canvas_L0", flap + patches))
-    straps = [harness(0, w, d), S.rbox((0.03, 0.014, 0.13), (cx, cy + 0.137, z0 + 0.12), r=0.004, seg=1)]
+    # the flap: over the top and down the rear face, its edge rounded, one piece in two parts that overlap at the bend
+    flap = [S.rbox((w * 0.8, d * 0.78, 0.024), (cx, cy + 0.012, top - 0.006), r=0.011, seg=2),
+            S.rbox((w * 0.72, 0.024, 0.09), (cx, rear - 0.012, top - 0.05), r=0.011, seg=2, rot=(math.radians(-6), 0, 0))]
+    pocket = [S.rbox((0.13, 0.03, 0.075), (cx, rear - 0.006, z0 + 0.06), r=0.014, seg=2)]
+    patch = [S.rbox((0.008, 0.07, 0.06), (cx + (w - 0.02) / 2 - 0.012, cy - 0.02, z0 + 0.09), r=0.003, seg=1, rot=(math.radians(-8), 0, 0))]
+    objs.append(S.part("Canvas_L0", flap + pocket + patch))
+    straps = [harness(0, w, d), S.rbox((0.026, 0.012, 0.12), (cx, rear + 0.002, top - 0.06), r=0.004, seg=1),
+              S.tube([(cx - 0.035, cy + 0.01, top + 0.004), (cx - 0.03, cy + 0.01, top + 0.04), (cx + 0.03, cy + 0.01, top + 0.04), (cx + 0.035, cy + 0.01, top + 0.004)], 0.009, res=3)]
     objs.append(S.part("Strap_L0", straps))
-    objs.append(S.part("Metal_L0", [S.rbox((0.042, 0.014, 0.03), (cx, cy + 0.146, z0 + 0.135), r=0.004, seg=1)]))
-    rope = [S.tube([(cx + 0.066 * math.cos(TAU * i / 12), cy + 0.064 * math.sin(TAU * i / 12), top + 0.013) for i in range(13)], 0.009, res=1, segments_per=2),
-            S.tube([(cx + 0.06, cy - 0.03, top + 0.012), (cx + 0.09, cy - 0.05, top - 0.02), (cx + 0.1, cy - 0.06, top - 0.06)], 0.006, res=2)]
-    objs.append(S.part("Rope_L0", rope))
-    # DangleA: a tin can on a string from the rope's tail (it swings)
-    objs.append(S.part("Rope_L0DangleA", [S.tube([(cx + 0.1, cy - 0.06, top - 0.055), (cx + 0.105, cy - 0.06, top - 0.1)], 0.003, res=1)]))
-    can = S.lathe([(0.0, 0.0), (0.026, 0.0), (0.028, 0.004), (0.028, 0.05), (0.026, 0.054), (0.0, 0.054)], seg=16, loc=(cx + 0.105, cy - 0.06, top - 0.152))
+    objs.append(S.part("Metal_L0", [S.rbox((0.038, 0.012, 0.028), (cx, rear + 0.008, top - 0.085), r=0.004, seg=1)]))
+    # a rope loop on the left side with a tin can on a string hanging from it (it swings: DangleA)
+    sx = cx - (w - 0.02) / 2 + 0.006
+    objs.append(S.part("Rope_L0", [S.tube([(sx, cy - 0.04, top - 0.03), (sx - 0.022, cy - 0.04, top - 0.05), (sx, cy - 0.04, top - 0.07)], 0.006, res=2)]))
+    objs.append(S.part("Rope_L0DangleA", [S.tube([(sx - 0.02, cy - 0.04, top - 0.05), (sx - 0.022, cy - 0.04, top - 0.1)], 0.003, res=1)]))
+    can = S.lathe([(0.0, 0.0), (0.024, 0.0), (0.026, 0.004), (0.026, 0.048), (0.024, 0.052), (0.0, 0.052)], seg=16, loc=(sx - 0.022, cy - 0.04, top - 0.15))
     objs.append(S.part("Mug_L0DangleA", [can]))
     return objs
 
@@ -716,6 +714,16 @@ def pack3():
     objs.append(S.part("Mug_L3DangleC", [S.rcyl(0.026, 0.09, loc=(lx - 0.02, ly, lz - 0.08), axis="Z", seg=14, r=0.008)]))
     objs += dangles(3, rear, cz + 0.16, sx=0.12)
     return objs
+
+
+def strap():
+    """raccoon_strap.fbx: the strap that holds a thing to the pack (RaccoonPack sizes it to each thing): three unit boxes
+    the game scales — Strap_Top over the thing, Strap_SideL / Strap_SideR down its sides into the pack — and a buckle on
+    the top (Metal_Buckle, its own size). All at the origin; nothing here is placed."""
+    unit = lambda: S.rbox((1.0, 1.0, 1.0), (0, 0, 0), r=0.18, seg=1)
+    buckle = [S.rbox((0.034, 0.03, 0.006), (0, 0, 0), r=0.002, seg=1),
+              S.rbox((0.004, 0.032, 0.009), (0, 0, 0.002), r=0.0012, seg=1)]
+    return [S.part("Strap_Top", [unit()]), S.part("Strap_SideL", [unit()]), S.part("Strap_SideR", [unit()]), S.part("Metal_Buckle", buckle)]
 
 
 def carabiner(x, y, z):
@@ -873,6 +881,7 @@ def main():
             o.color = (*PACK_COLOURS[o.name.split("_")[0]], 1)
         print("PACK " + ", ".join(f"{o.name} {sdf.tri_count(o)}" for o in objs) + f" | total {sum(sdf.tri_count(o) for o in objs)} tris")
         S.export_fbx(os.path.join(OUT, "raccoon_pack.fbx"), objs)
+        S.export_fbx(os.path.join(OUT, "raccoon_strap.fbx"), strap())
         os.makedirs(TEX, exist_ok=True)
         write_plaid(os.path.join(TEX, "raccoon_plaid.png"))
         if PREVIEW:

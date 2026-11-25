@@ -719,6 +719,7 @@ SHAPES = {
     "rook_w": [(0, 0)], "rook_b": [(0, 0)],
     "queen_w": [(0, 0), (0, 1)], "queen_b": [(0, 0), (0, 1)],     # (1 x 2)
     "king_w": [(0, 0), (0, 1)], "king_b": [(0, 0), (0, 1)],       # (1 x 2)
+    "cassette": [(0, 0)],                                         # a cassette for the car's radio
 }
 
 

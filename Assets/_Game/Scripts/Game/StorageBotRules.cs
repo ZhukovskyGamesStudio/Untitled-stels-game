@@ -46,8 +46,11 @@ namespace Stealth.Game
         public const float StashReach = 2.4f;
         /// <summary>Called, it stops this close to the player who called it.</summary>
         public const float Arrive = 1.6f;
-        /// <summary>The longest way it walks on the floor when the ducts do not lead there at all (metres).</summary>
-        public const float WalkFurthest = 45f;
+        /// <summary>
+        /// The longest way it walks on the floor, metres: a whole house from the car's trunk (the basement, up the shaft,
+        /// across the storeys) — at 45 m a call from the trunk to a far room always sent it up into the ducts.
+        /// </summary>
+        public const float WalkFurthest = 140f;
 
         /// <summary>How it gets somewhere.</summary>
         public enum Route { Walk, Ducts, None }
@@ -66,15 +69,18 @@ namespace Stealth.Game
             return ra != null && rb != null && ra.Id == rb.Id && ra.Floor == rb.Floor;
         }
 
-        /// <summary>Up to this far it runs on the floor even to another room, metres.</summary>
-        public const float WalkNear = 18f;
-        /// <summary>Further than that it still runs if the floor is no longer than the way through the ducts times this.</summary>
-        public const float DuctDetour = 1.25f;
+        /// <summary>Up to this far it always runs on the floor, metres (more than a few rooms).</summary>
+        public const float WalkNear = 30f;
+        /// <summary>Further than that it still runs unless the floor is longer than the ducts' way (with <see cref="DuctOverhead"/>) times this.</summary>
+        public const float DuctDetour = 2f;
+        /// <summary>The leap up into a grate and the drop out of one (crouch, hang, the climb), as metres of running.</summary>
+        public const float DuctOverhead = 12f;
 
         /// <summary>
-        /// The way it takes (pure): on foot whenever the floor leads there and is short — in its own room, near by, or not
-        /// much longer than the ducts; through the ducts only when they are the clearly shorter way or the floor does not
-        /// lead there; on foot after all when there are no ducts, if the way is not too long.
+        /// The way it takes (pure): on foot whenever the floor leads there — in its own room, within <see cref="WalkNear"/>, or
+        /// not more than <see cref="DuctDetour"/> times the ducts' way with the leap up and the drop down
+        /// (<see cref="DuctOverhead"/>); through the ducts only when the floor does not lead there (a locked door, it is up
+        /// in them already) or goes round twice as far.
         /// </summary>
         /// <param name="sameRoom">Start and end are in one room (<see cref="SameRoom"/>).</param>
         /// <param name="floorWay">The length of the way on the floor, metres; negative: there is none (or it is up in the ducts).</param>
@@ -82,7 +88,7 @@ namespace Stealth.Game
         public static Route Way(bool sameRoom, float floorWay, float ductWay)
         {
             bool walkable = floorWay >= 0f && floorWay <= WalkFurthest;
-            if (walkable && (sameRoom || floorWay <= WalkNear || ductWay < 0f || floorWay <= ductWay * DuctDetour)) return Route.Walk;
+            if (walkable && (sameRoom || floorWay <= WalkNear || ductWay < 0f || floorWay <= (ductWay + DuctOverhead) * DuctDetour)) return Route.Walk;
             return ductWay >= 0f ? Route.Ducts : Route.None;
         }
 
@@ -275,6 +281,34 @@ namespace Stealth.Game
 
         /// <summary>A player may pet it: on the floor (waiting, sat down, or walking over to someone), not up in a duct.</summary>
         public static bool CanPet(BotMode mode, BotMotion motion) => mode is BotMode.Waiting or BotMode.Coming && motion is BotMotion.Floor or BotMotion.Sit;
+
+        // ------------------------------------------------------------------ sounds (StorageBotSounds)
+
+        /// <summary>A one-off sound of Linus.</summary>
+        public enum Cue : byte { None, Leap, Drop, Hop, Chatter, Squeak }
+
+        /// <summary>A paw on the floor every this many metres; the backpack clinks every <see cref="PackEvery"/> paws; a duct's steel gives every <see cref="DuctKnockSpacing"/>.</summary>
+        public const float PawSpacing = 0.22f, DuctKnockSpacing = 0.45f;
+        public const int PackEvery = 3;
+        /// <summary>Asleep: a snore every this many seconds; sat waiting: a sniff between these.</summary>
+        public const float SnoreEvery = 3.8f, SniffMin = 5f, SniffMax = 11f;
+
+        /// <summary>
+        /// The sound of his body changing what it does (pure): the leap up into a grate, the drop out of one, the hop into
+        /// or out of the car's bed.
+        /// </summary>
+        public static Cue CueOf(BotMotion was, BotMotion now)
+        {
+            if (was == now) return Cue.None;
+            if (now == BotMotion.VentUp) return Cue.Leap;
+            if (now == BotMotion.VentDown) return Cue.Drop;
+            if (now == BotMotion.Curled || was == BotMotion.Curled) return Cue.Hop;
+            return Cue.None;
+        }
+
+        /// <summary>The sound of what he is told to do (pure): his chatter answering a call, a squeak as he bolts at an alarm.</summary>
+        public static Cue CueOf(BotMode was, BotMode now) =>
+            was == now ? Cue.None : now == BotMode.Coming ? Cue.Chatter : now == BotMode.Hiding ? Cue.Squeak : Cue.None;
 
         /// <summary>A player may call it now (it is in the house, not on its way out).</summary>
         public static bool CanCall(BotMode mode) => mode is not (BotMode.ToExit or BotMode.Gone);
