@@ -85,17 +85,16 @@ namespace Stealth.Level
         [Tooltip("A tunnel leading on with its bars, the lights and the zone inside, the stop wall (SewerBranch).")]
         public SewerBranch BranchPrefab;
         public Stealth.UI.RouteSignView SignPrefab;
-        [Tooltip("The route sign's stand (Tools/Blender/road_sign.py): origin on the floor under the board, its face to −Z like the panel's.")]
+        [Tooltip("The route sign's hanger (Tools/Blender/road_sign.py): origin on the floor under the board, its face to −Z like the panel's, two rods up to the tunnel's vault.")]
         public GameObject SignStandPrefab;
         /// <summary>
-        /// How far in front of a tunnel's mouth (its wall's outer face) the route panel's face stands: the wall is 0.6 m of
-        /// brick, the stone frame round the mouth 15 cm proud of it, the plinth 6 cm, and the stand's posts and base plates
-        /// reach 17.5 cm behind the face — at 0.75 the board lay in the frame's face and flickered through it
-        /// (SewerKitTests.TheRouteSignStandsClearOfTheMouthsWall).
+        /// Where a tunnel's panel hangs, in its mouth's frame (+X into the tunnel): a little inside the tunnel, over the
+        /// middle of the road, its face to the hall — high enough that the car's roof, roll bar and spot lamps pass under its
+        /// board (the branch's vault: walls to 2.6, crown 3.8; SewerKitTests.TheRouteSignHangsInsideTheTunnelFromItsVault).
         /// </summary>
-        public const float SignOffWall = 0.86f;
-        /// <summary>Where a tunnel's panel stands, in its mouth's frame (+X into the tunnel): eye level, beside the car's lane.</summary>
-        public static readonly Vector3 SignSpot = new(-SignOffWall, 1.75f, 2.2f);
+        public static readonly Vector3 SignSpot = new(1.5f, 2.75f, 0f);
+        /// <summary>The branch tunnel's vault (sewer.py KIT_BRANCH): half width, wall height, rise of the elliptic arch.</summary>
+        public const float BranchHalf = 2.3f, BranchWall = 2.6f, BranchRise = 1.2f;
 
         // built at run time by Build (not in the prefab)
         [NonSerialized] public Transform Water;
@@ -292,11 +291,10 @@ namespace Stealth.Level
                 {
                     sign = Instantiate(SignPrefab, transform);
                     sign.name = $"Sign{i}";
-                    // at eye level in the mouth, on the driver's side (left-hand drive: +Z looking in), clear of the car's lane,
-                    // in front of the mouth's stone frame and the wall's plinth (SignOffWall), its face to the
-                    // hall (a world-space canvas reads along its +Z: into the tunnel) — over the mouth the car's roof hid it
+                    // hanging a little inside the tunnel over the road, framed by its arch as the car comes up to it, its face to
+                    // the hall (a world-space canvas reads along its +Z: into the tunnel)
                     sign.transform.SetLocalPositionAndRotation(at + mouth.rotation * SignSpot, mouth.rotation * Quaternion.Euler(0f, 90f, 0f));
-                    // a road sign: the panel is the face of a board standing on two posts on the floor, not a plate on the wall
+                    // a road sign: the panel is the face of a board hung on two rods from the vault, not a plate on the wall
                     if (SignStandPrefab != null)
                     {
                         stand = Instantiate(SignStandPrefab, transform);

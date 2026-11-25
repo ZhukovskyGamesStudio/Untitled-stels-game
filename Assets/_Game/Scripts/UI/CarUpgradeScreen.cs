@@ -116,7 +116,7 @@ namespace Stealth.UI
             {
                 CarUpgrade.Engine => Loc.F(key, Mathf.RoundToInt((1f - CarUpgrades.FuelFactor(level, s)) * 100f)),
                 CarUpgrade.Trunk => Loc.F(key, level),
-                CarUpgrade.Kennel => level == 0 ? Loc.T(key + ".none") : Loc.F(key, CarUpgrades.StashRows(level, s) * TeamStash.Width),
+                CarUpgrade.Kennel => Loc.F(key, CarUpgrades.StashSize(level, s).x, CarUpgrades.StashSize(level, s).y),
                 CarUpgrade.Teleport => Loc.T(level > 0 ? key : key + ".none"),
                 _ => "",
             };

@@ -90,9 +90,12 @@ namespace Stealth.Game
     // The game component talks to the twin only through these interfaces.
 
     /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
-    /// <summary>The test cheats of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server.</summary>
-    /// <summary>A cheat (F4 panel). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.</summary>
-    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, StartHouse = 32 }
+    /// <summary>
+    /// A test cheat of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server, with its argument
+    /// (<see cref="CheatArgs"/>): on/off, an item and its colour (<see cref="SpawnItem"/>), an upgrade and its level
+    /// (<see cref="SetUpgrade"/>). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.
+    /// </summary>
+    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, SpawnItem, SetUpgrade, StartHouse = 32 }
 
     /// <summary>What a thing made at the workbench does on request (<see cref="IPlayerLink.SendGear"/>).</summary>
     public enum GearAction : byte { Ram, Unscrew, Hammer }
@@ -114,8 +117,8 @@ namespace Stealth.Game
         /// <summary>Owner → server: a command to the team's storage robot (0: come to me, 1: go to the exit).</summary>
         void SendBot(byte command);
 
-        /// <summary>Owner → server: a cheat from the F4 panel.</summary>
-        void SendCheat(Cheat cheat, bool on);
+        /// <summary>Owner → server: a cheat from the F4 panel and its argument (<see cref="CheatArgs"/>).</summary>
+        void SendCheat(Cheat cheat, int arg);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>
         void Teleport(Vector3 position, Quaternion rotation);
         /// <summary>Server → owner: stand here (a player who came back: where they left, or by the host).</summary>
@@ -198,6 +201,13 @@ namespace Stealth.Game
         void BroadcastHouseStats(string packed);
         /// <summary>Server → everyone: a sound somewhere (what only the server decides: a thing crafted, someone healed).</summary>
         void BroadcastSound(Stealth.Audio.GameSound sound, Vector3 at);
+    }
+
+    /// <summary>The storage mule → network: its one-shot reactions shown on every peer.</summary>
+    public interface IStorageBotLink
+    {
+        /// <summary>Server → everyone: a player petted it (<see cref="StorageBot.ReceivePet"/>).</summary>
+        void BroadcastPet();
     }
 
     /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>

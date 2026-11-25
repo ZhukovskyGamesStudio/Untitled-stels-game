@@ -86,30 +86,22 @@ namespace Stealth.Tests
         }
 
         /// <summary>
-        /// A tunnel's route sign stands clear of its mouth's wall where the game puts it (<see cref="SewerLocation.SignSpot"/>):
-        /// the board, its posts and their base plates in front of the stone frame round the mouth and the plinth at the wall's
-        /// foot. (At 0.75 m off the wall the board lay in the frame's face — it stands 15 cm proud of the brick — and flickered
-        /// through it, and the base plates sat in the plinth.)
+        /// A tunnel's route sign hangs inside the tunnel where the game puts it (<see cref="SewerLocation.SignSpot"/>): past
+        /// the mouth, within the tunnel's width, its board over the car's roof and lamps, its rods ending in the vault.
         /// </summary>
         [Test]
-        public void TheRouteSignStandsClearOfTheMouthsWall()
+        public void TheRouteSignHangsInsideTheTunnelFromItsVault()
         {
             var place = Matrix4x4.TRS(new Vector3(SewerLocation.SignSpot.x, 0f, SewerLocation.SignSpot.z), Quaternion.Euler(0f, 90f, 0f), Vector3.one);
-            var stand = Vertices(Load("RouteSignStand"), place);
-            Assert.Less(stand.Min(v => v.x), -SewerHall.Wall - 0.15f, "the board faces the hall, in front of the wall");
-            float z0 = stand.Min(v => v.z) - 0.05f, z1 = stand.Max(v => v.z) + 0.05f, top = stand.Max(v => v.y) + 0.05f;
-            for (int h = 0; h < 2; h++)
+            var sign = Vertices(Load("RouteSignStand"), place);
+            Assert.Greater(sign.Min(v => v.x), 0.3f, "inside the tunnel, past its mouth");
+            Assert.Less(sign.Max(v => Mathf.Abs(v.z)), SewerLocation.BranchHalf - 0.3f, "within the tunnel's width");
+            Assert.Greater(sign.Min(v => v.y), 2.3f, "the car's roof, roll bar and spot lamps pass under it");
+            float top = sign.Max(v => v.y);
+            foreach (var v in sign.Where(v => v.y > top - 0.02f))
             {
-                // the wall's faces beside the sign that look into the hall (from 2 m out to the wall's outer face)
-                var tris = Triangles(Load($"HallMouth{h}")).Where(t => t.Max(p => p.z) > z0 && t.Min(p => p.z) < z1 && t.Min(p => p.y) < top && t.Min(p => p.x) > -2f).ToArray();
-                float worst = float.PositiveInfinity;
-                string where = "";
-                foreach (var v in stand)
-                {
-                    float gap = FirstAlongX(tris, v.y, v.z) - v.x; // from this point of the stand to the wall behind it
-                    if (gap < worst) { worst = gap; where = $"({v.x:0.000}, {v.y:0.000}, {v.z:0.000})"; }
-                }
-                Assert.Greater(worst, 0.01f, $"HallMouth{h}: the sign's stand at {where} is {worst * 100f:0.0} cm in front of the wall (in it, if negative)");
+                float vault = SewerLocation.BranchWall + SewerLocation.BranchRise * Mathf.Sqrt(Mathf.Max(0f, 1f - Mathf.Pow(v.z / SewerLocation.BranchHalf, 2f)));
+                Assert.AreEqual(vault, v.y, 0.12f, $"the rods end in the vault (at z {v.z:0.00})");
             }
         }
 

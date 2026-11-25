@@ -561,7 +561,7 @@ namespace Stealth.EditorTools
                 // the house's kind on the left (office, hospital, garage…), its main job (vault / hostage) on the right
                 const float ix = 62f, jw = 42f;
                 view.KindIcon = Img(R(go.transform, "KindIcon", Left, Left, new Vector2(8, 0), new Vector2(48, 48)), Color.white, Icon("house_office"));
-                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage", "house_apartments", "house_abandoned" }
+                view.KindIcons = new[] { "house_office", "house_business", "house_datacenter", "house_warehouse", "house_hq", "house_hospital", "house_garage", "house_apartments", "house_abandoned", "house_testrooms" }
                     .Select(n => Icon(n)).ToArray();
                 if (view.KindIcons.Length != System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Length)
                     throw new System.InvalidOperationException("RouteSign: one icon per HouseKind");
@@ -599,65 +599,117 @@ namespace Stealth.EditorTools
             return e;
         }
 
-        /// <summary>The F4 cheat panel: its own canvas with a raycaster (the HUD takes no clicks), hidden until opened.</summary>
+        /// <summary>
+        /// The F4 cheat panel: its own canvas with a raycaster (the HUD takes no clicks), hidden until opened; five tabs along
+        /// the top, a page each (<see cref="CheatPanel.Tab"/>): the cheats, the locations, the items, the car, the visual style.
+        /// </summary>
         static void BuildCheatPanel(UiElements e, Transform content)
         {
             var holder = R(content, "Cheats", Center, Center, Vector2.zero, Vector2.zero);
             holder.gameObject.AddComponent<Canvas>();
             holder.gameObject.AddComponent<GraphicRaycaster>();
             var panel = holder.gameObject.AddComponent<CheatPanel>();
-            var root = R(holder, "Panel", Center, Center, new Vector2(0, 0), new Vector2(820, 430));
+            var root = R(holder, "Panel", Center, Center, Vector2.zero, new Vector2(960, 580));
             Card(root, UiPalette.CarbonYellow).raycastTarget = true;
             Clip(root, new Vector2(0, 0));
             panel.Root = root.gameObject;
-            var col = Column(root, "Column", new Vector2(-200, -18), 370, 7f);
-            ColumnTitle(col, L("cheats.title"), 20);
-            Spacer(col, 4);
+
+            // the tabs along the top
+            var tabs = R(root, "Tabs", TopCenter, TopCenter, new Vector2(0, -18), new Vector2(900, 36));
+            var row = tabs.gameObject.AddComponent<HorizontalLayoutGroup>();
+            row.spacing = 8;
+            row.childControlWidth = row.childControlHeight = true;
+            row.childForceExpandWidth = row.childForceExpandHeight = true;
+            var tabKeys = new[] { "cheats.tab_cheats", "cheats.tab_houses", "cheats.tab_items", "cheats.tab_car", "cheats.tab_visual" };
+            if (tabKeys.Length != System.Enum.GetValues(typeof(CheatPanel.Tab)).Length) throw new System.InvalidOperationException("CheatPanel: a label per tab");
+            panel.Tabs = tabKeys.Select((k, i) => ButtonIn(e, tabs, "Tab" + (CheatPanel.Tab)i, L(k), 36)).ToArray();
+            RuleLine(root, TopCenter, TopCenter, new Vector2(0, -64), 900, UiPalette.Ink, 2f);
+            var pages = tabKeys.Select((_, i) => R(root, "Page" + (CheatPanel.Tab)i, TopCenter, TopCenter, new Vector2(0, -76), new Vector2(900, 488))).ToArray();
+            panel.Pages = pages.Select(p => p.gameObject).ToArray();
+
+            // 1: the cheats
+            var col = Column(pages[0], "Column", Vector2.zero, 420, 7f);
             panel.KillRobots = ButtonIn(e, col, "KillRobots", L("cheats.kill_robots"), 36);
             panel.Invulnerable = ButtonIn(e, col, "Invulnerable", "", 36);
             panel.Invisible = ButtonIn(e, col, "Invisible", "", 36);
             panel.Quota = ButtonIn(e, col, "Quota", L("cheats.quota"), 36);
             panel.ToHatch = ButtonIn(e, col, "ToHatch", L("cheats.to_hatch"), 36);
             panel.RevealMap = ButtonIn(e, col, "RevealMap", L("cheats.reveal_map"), 36);
-            // the second column: start a house of any kind right now (one button per HouseKind, in its order)
-            var houses = Column(root, "Houses", new Vector2(200, -18), 370, 5f);
-            ColumnTitle(houses, L("cheats.start_house"), 20);
-            Spacer(houses, 4);
+
+            // 2: start a house of any kind right now (one button per HouseKind, in its order)
+            var houses = CheatGrid(pages[1], "Houses", Vector2.zero, new Vector2(900, 300), new Vector2(288, 40), 3);
             panel.Houses = System.Enum.GetValues(typeof(Stealth.Level.HouseKind)).Cast<Stealth.Level.HouseKind>()
-                .Select(k => ButtonIn(e, houses, "House" + k, L(Stealth.Level.HouseKinds.NameKey(k)), 32)).ToArray();
+                .Select(k => CheatButton(e, houses, "House" + k, L(Stealth.Level.HouseKinds.NameKey(k)), 17)).ToArray();
+
+            // 3: an item of any kind in front of you, in the colour chosen above (the labels are the items' names, set by the panel)
+            int colorCount = ItemCatalog.DefaultColors().Length;
+            var colors = CheatGrid(pages[2], "Colors", Vector2.zero, new Vector2(900, 30), new Vector2(170, 30), colorCount);
+            panel.ItemColors = Enumerable.Range(0, colorCount).Select(c => CheatButton(e, colors, "Color" + c, "", 15)).ToArray();
+            var items = CheatGrid(pages[2], "Items", new Vector2(0, -40), new Vector2(900, 448), new Vector2(145, 27), 6, 4f);
+            panel.Items = ItemCatalog.Shapes.Select(s => CheatButton(e, items, "Item_" + s.Id, "", 13)).ToArray();
+
+            // 4: the car's upgrades at any level (a row per upgrade: its name, then a button per level 0..3)
+            const int levels = Stealth.Vehicles.CarUpgrades.MaxLevelled + 1;
+            var upgrades = Column(pages[3], "Upgrades", Vector2.zero, 640, 8f);
+            var all = System.Enum.GetValues(typeof(Stealth.Vehicles.CarUpgrade)).Cast<Stealth.Vehicles.CarUpgrade>().ToArray();
+            panel.UpgradeRows = new GameObject[all.Length];
+            panel.UpgradeLevels = new Button[all.Length * levels];
+            foreach (var u in all)
+            {
+                var line = R(upgrades, u.ToString(), Center, Center, Vector2.zero, Vector2.zero);
+                Fixed(line, 36);
+                var h = line.gameObject.AddComponent<HorizontalLayoutGroup>();
+                h.spacing = 8;
+                h.childControlWidth = h.childControlHeight = true;
+                h.childForceExpandWidth = false;
+                h.childForceExpandHeight = true;
+                var name = Ink(R(line, "Name", Center, Center, Vector2.zero, Vector2.zero), "", 18, TextAnchor.MiddleLeft, Face.Caps);
+                SetText(name, L(Stealth.Game.GameManager.UpgradeKey(u)));
+                Fixed(name, 36, 280);
+                for (int level = 0; level < levels; level++)
+                {
+                    var b = ButtonIn(e, line, "Level" + level, level.ToString(), 36);
+                    Fixed(b, 36, 76);
+                    panel.UpgradeLevels[(int)u * levels + level] = b;
+                }
+                panel.UpgradeRows[(int)u] = line.gameObject;
+            }
+
+            // 5: the visual style (the page makes a button per style from the template)
+            var styles = pages[4].gameObject.AddComponent<StylePanel>();
+            styles.List = CheatGrid(pages[4], "List", Vector2.zero, new Vector2(900, 488), new Vector2(288, 36), 3);
+            styles.Template = Instance<Button>(e.Button, pages[4], "Template");
+            SetText(styles.Template.GetComponentInChildren<Text>(), "");
+            styles.Template.gameObject.SetActive(false);
+
+            for (int i = 1; i < pages.Length; i++) pages[i].gameObject.SetActive(false);
             root.gameObject.SetActive(false);
         }
 
-        /// <summary>
-        /// The F8 style picker: its own canvas over the menu with a raycaster, a grid the panel fills with a button per style
-        /// (copies of a hidden template), hidden until opened.
-        /// </summary>
-        static void BuildStylePanel(UiElements e, Transform parent)
+        /// <summary>A grid of equal buttons on a cheat panel page, top centre.</summary>
+        static RectTransform CheatGrid(Transform page, string name, Vector2 pos, Vector2 size, Vector2 cell, int columns, float gap = 8f)
         {
-            var holder = R(parent, "Styles", Center, Center, Vector2.zero, Vector2.zero);
-            var canvas = holder.gameObject.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = 50;
-            holder.gameObject.AddComponent<GraphicRaycaster>();
-            var panel = holder.gameObject.AddComponent<StylePanel>();
-            var root = R(holder, "Panel", Center, Center, Vector2.zero, new Vector2(770, 480));
-            Card(root).raycastTarget = true;
-            Clip(root, new Vector2(0, 0));
-            panel.Root = root.gameObject;
-            Ink(R(root, "Title", TopCenter, TopCenter, new Vector2(0, -16), new Vector2(720, 32)), L("styles.panel_title"), 22, TextAnchor.LowerCenter, Face.Caps);
-            RuleLine(root, TopCenter, TopCenter, new Vector2(0, -52), 720, UiPalette.Ink, 2f);
-            var list = R(root, "List", TopCenter, TopCenter, new Vector2(0, -64), new Vector2(720, 400));
-            var grid = list.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(232, 36);
-            grid.spacing = new Vector2(12, 8);
+            var rt = R(page, name, TopCenter, TopCenter, pos, size);
+            var grid = rt.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = cell;
+            grid.spacing = new Vector2(gap, gap);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 3;
+            grid.constraintCount = columns;
             grid.childAlignment = TextAnchor.UpperCenter;
-            panel.List = list;
-            panel.Template = Instance<Button>(e.Button, root, "Template");
-            SetText(panel.Template.GetComponentInChildren<Text>(), "");
-            panel.Template.gameObject.SetActive(false);
-            root.gameObject.SetActive(false);
+            return rt;
+        }
+
+        /// <summary>A button of a cheat grid: its label shrinks to fit (long item names).</summary>
+        static Button CheatButton(UiElements e, Transform grid, string name, string label, int size)
+        {
+            var b = Instance<Button>(e.Button, grid, name);
+            var t = b.GetComponentInChildren<Text>();
+            SetText(t, label);
+            t.fontSize = size;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 9;
+            t.resizeTextMaxSize = size;
+            return b;
         }
 
         // ------------------------------------------------------------------ minigames
@@ -1050,39 +1102,43 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
-        /// Team stash above the hatch: a world-space clipboard with the stash grid on graph paper and two sticky notes —
-        /// "sell" and "stash everything". Same units as the inventory (<see cref="InventoryUI.Cell"/> per cell), scaled to metres.
+        /// Team stash over Linus: a world-space clipboard with the stash grid on graph paper and a "burn" sticky note
+        /// beside it ("put everything in" is the key in the hint stack). Same units as the inventory
+        /// (<see cref="InventoryUI.Cell"/> per cell), scaled to metres; <see cref="StashBoard.Fit"/> sizes the paper to its rows.
         /// </summary>
         static GameObject BuildStashBoard(UiElements e)
         {
-            const float c = InventoryUI.Cell, pad = 10f, gap = 12f, header = 30f, sellW = 96f, buttonH = 32f;
-            // (built for the biggest box, the kennel's top level: StashBoard.Fit shows the rows the stash has)
-            float gw = TeamStash.Width * c, gh = TeamStash.MaxHeight * c;
+            const float c = InventoryUI.Cell, pad = 10f, gap = 12f, header = 30f, sellW = 96f;
+            // (built for the biggest box, the backpack's top level: StashBoard.Fit shows the columns and rows the stash has)
+            float gw = TeamStash.MaxWidth * c, gh = TeamStash.MaxHeight * c;
             var go = new GameObject("StashBoard", typeof(RectTransform));
             var canvas = go.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             go.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 3f;
             var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(pad + gw + gap + sellW + pad, header + gh + pad * 3f + buttonH);
-            rt.localScale = Vector3.one * 0.0065f; // ~2.5 m wide
+            rt.sizeDelta = StashBoard.Size(new Vector2(pad, -(header + pad)), gw, gh, gap + sellW, pad);
+            rt.localScale = Vector3.one * 0.0042f; // ~1.6 m wide with the burn note, 1.15 m without (over Linus: no burning)
             var board = go.AddComponent<StashBoard>();
             board.Canvas = canvas;
             board.Root = rt;
+            board.Pad = pad;
 
             Sliced(Img(Stretch(go.transform, "Background"), UiPalette.PaperDim, SheetSprite));
             board.ValueLabel = Ink(R(go.transform, "Title", TopLeft, TopLeft, new Vector2(pad, -2f), new Vector2(gw, header - 4)),
                 "0", 17, TextAnchor.LowerLeft, Face.Mono);
-            RuleLine(go.transform, TopLeft, TopLeft, new Vector2(pad, -header + 1), gw + gap + sellW, UiPalette.Ink, 1.5f);
+            board.TitleRule = RuleLine(go.transform, TopLeft, TopLeft, new Vector2(pad, -header + 1), gw + gap + sellW, UiPalette.Ink, 1.5f).rectTransform;
+            board.SellSpan = gap + sellW;
             board.Grid = R(go.transform, "Grid", TopLeft, TopLeft, new Vector2(pad, -(header + pad)), new Vector2(gw, gh));
             board.GridBox = R(board.Grid, "Box", Center, Center, Vector2.zero, new Vector2(gw + 4, gh + 4));
             FormBox(board.GridBox, UiPalette.PaperShade);
             var paper = Img(R(board.Grid, "Graph", Center, Center, Vector2.zero, new Vector2(gw, gh)), UiPalette.Rule.A(0.8f), PaperSprite("graph"));
             paper.type = Image.Type.Tiled;
             board.GraphPaper = paper.rectTransform;
+            board.BuiltColumns = TeamStash.MaxWidth;
             board.BuiltRows = TeamStash.MaxHeight;
             var cells = new List<Image>();
             for (int y = 0; y < TeamStash.MaxHeight; y++)
-                for (int x = 0; x < TeamStash.Width; x++)
+                for (int x = 0; x < TeamStash.MaxWidth; x++)
                     cells.Add(Img(R(board.Grid, $"Cell_{x}_{y}", TopLeft, TopLeft, new Vector2(x * c + 1, -(y * c + 1)), new Vector2(c - 2, c - 2)), UiPalette.Ink.A(0.05f)));
             board.Cells = cells.ToArray();
             board.ItemLayer = Stretch(board.Grid, "Items");
@@ -1096,9 +1152,6 @@ namespace Stealth.EditorTools
             sell.resizeTextForBestFit = true; // whole words on the narrow note: «сжечь в топливо» never splits a word
             sell.resizeTextMinSize = 12;
             sell.resizeTextMaxSize = 26;
-            board.StashAllZone = R(go.transform, "StashAll", TopLeft, TopLeft, new Vector2(pad, -(header + gh + pad * 2f)), new Vector2(gw + gap + sellW, buttonH));
-            board.StashAllBackground = Sliced(Img(board.StashAllZone, UiPalette.NoteBlue, StickySprite));
-            board.StashAllLabel = Ink(Stretch(board.StashAllZone, "Label", 2f), "G", 22, TextAnchor.MiddleCenter, Face.Hand, UiPalette.Pen);
             SetLayerRecursive(go, Stealth.Level.LevelMetrics.WorldTextLayer); // drawn after the style filter: readable in every style
             return go;
         }
@@ -1127,7 +1180,6 @@ namespace Stealth.EditorTools
             Spacer(col, 10);
             menu.LocalCaption = ColumnText(col, "LocalCaption", "LAN", 14, 22, Face.Caps, color: UiPalette.InkSoft);
             menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
-            menu.TestRooms = ToggleIn(e, col, "TestRooms", L("menu.test_rooms")); // off: the main game
             menu.ClassicRooms = ToggleIn(e, col, "ClassicRooms", L("menu.classic_rooms")); // off: the room program
             menu.ClassicEnemies = ToggleIn(e, col, "ClassicEnemies", L("menu.classic_enemies")); // off: the new enemies
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);

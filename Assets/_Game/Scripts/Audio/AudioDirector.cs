@@ -179,7 +179,8 @@ namespace Stealth.Audio
         void UpdateMusic(PlayerController me, GameManager gm, bool inGame)
         {
             if (inGame && (gm.AlarmActive || InDanger(me))) m_LastDanger = Time.time;
-            var track = AudioRules.ChooseMusic(inGame, Time.time - m_LastDanger, m_Mix.ChaseHold, m_Mix.LevelMusic);
+            var track = AudioRules.ChooseMusic(inGame, Time.time - m_LastDanger, m_Mix.ChaseHold,
+                m_Mix.LevelMusic && (Stealth.Level.ActiveLevel.Layout == null || Stealth.Level.HouseKinds.HasMusic(Stealth.Level.ActiveLevel.Layout.Kind)));
             if (track != m_Track)
             {
                 m_Track = track;

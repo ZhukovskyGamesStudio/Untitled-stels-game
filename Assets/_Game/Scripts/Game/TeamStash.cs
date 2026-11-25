@@ -13,27 +13,34 @@ namespace Stealth.Game
     /// </summary>
     public sealed class TeamStash
     {
-        public const int Width = 8, Height = 4;
-        /// <summary>The most rows the storage robot's box gets (the kennel's top level: Vehicles.CarUpgradeSettings.KennelStashRows).</summary>
-        public const int MaxHeight = 6;
+        /// <summary>The storage robot's box with its backpack at level 0 (Vehicles.CarUpgradeSettings.KennelStash).</summary>
+        public const int Width = 3, Height = 5;
+        /// <summary>The biggest box (the backpack's top level): the stash board and the pack's load are built for it.</summary>
+        public const int MaxWidth = 6, MaxHeight = 7;
 
         readonly List<InventoryEntry> m_Items = new();
 
-        /// <summary>This grid's size in cells (the hatch's stash: <see cref="Width"/> x <see cref="Height"/>; the car's workbench: 4 x 4).</summary>
-        public int Columns { get; }
+        /// <summary>This grid's size in cells (the storage robot's box: by its backpack's level; the car's workbench: 4 x 4).</summary>
+        public int Columns { get; private set; }
         public int Rows { get; private set; }
 
         /// <summary>
-        /// The grid's rows now (the storage robot's box grows with the kennel: Vehicles.CarUpgrades.StashRows). It never
-        /// shrinks under a thing lying in it: those rows stay until it is empty.
+        /// The grid's size now (the storage robot's box grows with its backpack: Vehicles.CarUpgrades.StashSize). It never
+        /// shrinks under a thing lying in it: those columns and rows stay until it is empty.
         /// </summary>
-        public void SetRows(int rows)
+        public void SetSize(int columns, int rows)
         {
-            int lowest = 0;
+            int right = 0, lowest = 0;
             foreach (var e in m_Items)
-                foreach (var c in e.Cells) lowest = Mathf.Max(lowest, e.Y + c.y + 1);
+                foreach (var c in e.Cells)
+                {
+                    right = Mathf.Max(right, e.X + c.x + 1);
+                    lowest = Mathf.Max(lowest, e.Y + c.y + 1);
+                }
+            columns = Mathf.Max(Mathf.Max(1, columns), right);
             rows = Mathf.Max(Mathf.Max(1, rows), lowest);
-            if (rows == Rows) return;
+            if (columns == Columns && rows == Rows) return;
+            Columns = columns;
             Rows = rows;
             Version++;
         }

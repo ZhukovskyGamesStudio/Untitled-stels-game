@@ -42,8 +42,6 @@ namespace Stealth.UI
         public Button HostSteam;
         public Text LocalCaption;
         public Button HostLocal;
-        [Tooltip("Main game (off) or the test rooms (on): small houses of 3–4 rooms with no guards, to tune rooms in.")]
-        public Toggle TestRooms;
         [Tooltip("The classic generator: rooms cut first, their types guessed from size (LevelGenerator.Classic).")]
         public Toggle ClassicRooms;
         [Tooltip("The old enemies: guards on patrol, wardens, hounds, the hunter (LevelGenerator.ClassicEnemies).")]
@@ -119,12 +117,6 @@ namespace Stealth.UI
             RefreshFriends.onClick.AddListener(() => m_NextFriendsRefresh = 0f);
             HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());
             HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
-            // "-testrooms" on the command line: start with the switch on (every peer passes it, like the switch itself)
-            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-testrooms") >= 0 && !Configs.Tuning.TestRooms)
-            {
-                Configs.Tuning.SetTestRooms(true);
-                Level.VisualStyles.UseConfig(Configs.Tuning.Styles);
-            }
             // "-classicrooms": the classic generator (every peer passes it, like the switch itself)
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-classicrooms") >= 0) Level.LevelGenerator.Classic = true;
             if (ClassicRooms != null)
@@ -138,15 +130,6 @@ namespace Stealth.UI
             {
                 ClassicEnemies.SetIsOnWithoutNotify(Level.LevelGenerator.ClassicEnemies);
                 ClassicEnemies.onValueChanged.AddListener(on => Level.LevelGenerator.ClassicEnemies = on);
-            }
-            if (TestRooms != null)
-            {
-                TestRooms.SetIsOnWithoutNotify(Configs.Tuning.TestRooms);
-                TestRooms.onValueChanged.AddListener(on =>
-                {
-                    Configs.Tuning.SetTestRooms(on);
-                    Level.VisualStyles.UseConfig(Configs.Tuning.Styles); // the test rooms: «Заброшенный комплекс» only
-                });
             }
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);

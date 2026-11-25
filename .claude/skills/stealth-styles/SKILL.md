@@ -15,7 +15,7 @@ description: "Визуальные стили USG: VisualStyle и экранны
 `VisualStyle` (`Data/Styles/*.asset`) — один вид игры: грейдинг на URP-объёме, экранный фильтр `Art/Shaders/StyleScreen.shader`
 (пиксели, цел-ступени, «масло», контуры, штриховка, бумага, 1 бит, камкордер, неон — `FullScreenPassRendererFeature` на `PC_Renderer` после пост-обработки),
 воздух (эмбиент, дымка, цвет газа) и палитра материалов по видам (`StyleConfig`). `VisualStyles.Apply` меняет только картинку на этом пире: роботы считают
-свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. F8 открывает выбор стиля, по умолчанию — `S16_Derelict` «Тихий комплекс» (`StyleConfig.Default`), `-style <имя>` включает при запуске,
+свет по `LightSource` и `VisualStyles.GameplayAmbient`, плотность газа — геймплей и не меняется. стиль выбирают на вкладке «Визуал» чит-панели F4, по умолчанию — `S16_Derelict` «Тихий комплекс» (`StyleConfig.Default`), `-style <имя>` включает при запуске,
 сценарий `styles` снимает одни и те же замороженные кадры во всех стилях. Ассеты стилей создаются один раз из `AssetBuilder.Styles`
 и дальше правятся руками; `REBUILD_STYLES=1 Tools/dev.sh assets` пересоздаёт их из кода (виды домов `HouseLook` — `REBUILD_LOOKS`, ниже).
 Стиль меняет и форму мира (`StyleGeometry`): **семейство моделей** `Family` — лоуполи / игрушки / PS1 / чистые / реализм: свой вариант каждой модели

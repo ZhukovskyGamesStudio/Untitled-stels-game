@@ -128,6 +128,9 @@ namespace Stealth.Tests
             p.ApplyOwnerState(false, 0, "", BodyPose.Ladder);
             Assert.AreEqual("Игрок 5", p.Nick, "a default name without Steam");
             Assert.AreEqual(BodyPose.Ladder, p.Pose, "what the owner's body is busy with (the rigged human plays its take)");
+            p.ApplyOwnerState(false, 10, "", BodyPose.Ladder, -70);
+            Assert.AreEqual(-70, p.LookYaw, "the head's turn off the body held on the ladder comes over the network");
+            Assert.AreEqual(0f, p.ShownLookYaw, 1e-4f, "eased in, not snapped");
         }
 
         [Test]

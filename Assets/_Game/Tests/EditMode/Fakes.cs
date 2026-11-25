@@ -100,8 +100,8 @@ namespace Stealth.Tests
         public void SendGear(GearAction action, Detector target, Vector3 point) => Gear.Add((action, target, point));
         public readonly List<(byte cls, byte item, bool ready)> Loadouts = new();
         public void SendLoadout(byte cls, byte item, bool ready) => Loadouts.Add((cls, item, ready));
-        public readonly List<(Cheat cheat, bool on)> Cheats = new();
-        public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
+        public readonly List<(Cheat cheat, int arg)> Cheats = new();
+        public void SendCheat(Cheat cheat, int arg) => Cheats.Add((cheat, arg));
         public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();
         public void SendUse(Stealth.Level.UseKind kind, int index) => Uses.Add((kind, index));
         public int Gadgets;

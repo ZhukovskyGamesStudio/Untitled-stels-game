@@ -66,7 +66,7 @@ namespace Stealth.Game
                 if (m_PreparedFor.Equals(info) || DriveUntil > 0) return;
                 m_Prepared = null; // another way chosen meanwhile (or the team changed): that one finishes unused
             }
-            var level = Tuning.Level;
+            var level = Tuning.LevelOf(HouseKinds.Of(info.Seed, info.Index));
             var (building, security, features, classic) = (level.Building, level.Security, level.Features, LevelGenerator.Classic);
             m_PreparedFor = info;
             m_Prepared = Task.Run(() =>

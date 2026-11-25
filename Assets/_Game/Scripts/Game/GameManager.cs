@@ -393,7 +393,8 @@ namespace Stealth.Game
             // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
-            var level = Tuning.Level;
+            var level = Tuning.LevelOf(HouseKinds.Of(info.Seed, info.Index)); // (the test rooms: their own settings)
+            ItemCatalog.ConfigureLoot(level.Loot.Table); // what this house's loot is (every peer: the same table)
             var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
                 LevelGenerator.Classic, info.ClassicEnemies);
             foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
@@ -404,6 +405,9 @@ namespace Stealth.Game
             if (PlayerController.Local != null) PlayerController.Local.SnapAir(); // under the house in the sewer: its air at once
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {HouseKinds.Name(layout.Kind)} ({layout.Mass}) {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms, {layout.Floors} floors for {layout.Players} players");
         }
+
+        /// <summary>The level settings of the house now standing (<see cref="Tuning.LevelOf"/>: the test rooms have their own).</summary>
+        static LevelConfig HouseLevel => Tuning.LevelOf(ActiveLevel.Layout != null ? ActiveLevel.Layout.Kind : HouseKind.Office);
 
         static void ApplyAtmosphere()
         {
@@ -491,12 +495,12 @@ namespace Stealth.Game
             m_Reinforcements = 0;
             if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
             else UnloadCarServer();
-            // the storage robot waits in the basement — or, with its kennel on the car, gets out when the car stops
-            m_MuleInKennel = MuleRidesIn(arriving);
-            if (!m_MuleInKennel) SpawnStorageBotServer(layout);
+            // Linus rides in the car's trunk: arriving, he is there once the car stops; the first house's car is parked already
+            m_MuleInKennel = arriving;
             foreach (var p in PlayerController.All) p.ResetForLevelServer(); // (the team arrives down in the basement)
             if (arriving) ArriveCarServer(layout);
             else SpawnBasementCarServer(layout);
+            if (!m_MuleInKennel) SpawnStorageBotServer(layout);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
         }
@@ -541,8 +545,9 @@ namespace Stealth.Game
             m_Hidden.Clear();
             HideShelterMap(layout, free, parts, hideRng);
             int total = 0;
-            float inStorage = Tuning.Level.Loot.InStorageChance;
-            var planned = LootPlanner.Plan(layout, rng, Tuning.Level.Loot);
+            var lootSettings = HouseLevel.Loot;
+            float inStorage = lootSettings.InStorageChance;
+            var planned = LootPlanner.Plan(layout, rng, lootSettings);
             foreach (var loot in planned)
             {
                 float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
@@ -787,7 +792,7 @@ namespace Stealth.Game
             if (m_Reinforcements >= due) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
             m_Reinforcements++;
-            var roster = Tuning.Level.Security.Roster.Robots;
+            var roster = HouseLevel.Security.Roster.Robots;
             var table = layout.ClassicEnemies ? roster : RobotRoster.NewEnemies(roster);
             var kind = RobotRoster.PickReinforcement(table, layout.LevelIndex, rng);
             var at = FurthestEntry(layout);

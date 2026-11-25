@@ -45,6 +45,8 @@ namespace Stealth.Level
         public Vector3 TopExit { get; private set; }
         /// <summary>The way a climber faces: to the ladder (flat, unit).</summary>
         public Vector3 Facing { get; private set; }
+        /// <summary>A point on the rungs' line (at the ladder's bottom): <see cref="LadderMath.ColumnToRungs"/> past the column.</summary>
+        public Vector3 Rungs => Column + Facing * LadderMath.ColumnToRungs;
         /// <summary>The shaft's hole in the lobby's floor: its middle (on the floor) and half its side.</summary>
         public Vector3 Shaft { get; private set; }
         public float ShaftHalf { get; private set; } = Basement.ShaftHalf;
@@ -76,6 +78,8 @@ namespace Stealth.Level
     {
         /// <summary>How far from the rungs' column a body takes hold, metres.</summary>
         public const float Reach = 0.5f;
+        /// <summary>From the column a climber is held on to the rungs, metres (the basement's and the exit passage's ladders alike).</summary>
+        public const float ColumnToRungs = 0.4f;
         /// <summary>Climbing speed, metres a second (8 m of shaft in about 3 s).</summary>
         public const float Speed = 2.6f;
 

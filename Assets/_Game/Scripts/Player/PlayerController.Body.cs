@@ -83,7 +83,7 @@ namespace Stealth.Player
             m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
             m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
             HoldTheWheel();
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside);
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside, ShownLookYaw);
         }
 
         /// <summary>
@@ -317,10 +317,11 @@ namespace Stealth.Player
             if (IsOwner) SwingLegs(Motor.HorizontalSpeed);
             if (IsOwner || Time.deltaTime <= 0f) { FollowRig(); return; }
 
-            // Remote players: tilt the head to the synced pitch and bob a little while walking.
+            // Remote players: turn and tilt the head to the synced look and bob a little while walking.
+            m_ShownYaw = Mathf.Lerp(m_ShownYaw, LookYaw, 1f - Mathf.Exp(-12f * Time.deltaTime));
             if (HeadPivot != null)
                 HeadPivot.localRotation = Quaternion.Slerp(HeadPivot.localRotation,
-                    Quaternion.Euler(Mathf.Clamp(LookPitch, -60, 60), 0, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
+                    Quaternion.Euler(Mathf.Clamp(LookPitch, -60, 60), m_ShownYaw, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
             var pos = transform.position;
             var delta = pos - m_LastModelPos;
             m_LastModelPos = pos;
@@ -357,6 +358,9 @@ namespace Stealth.Player
             m_PitchSyncTimer = 0.1f;
             var pitch = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.Pitch), -88, 88);
             if (Mathf.Abs(pitch - LookPitch) >= 2) LookPitch = pitch;
+            // the head's turn off the held body (the ladder, a seat): back to 0 exactly when let go
+            var yaw = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.HeadYaw), -127, 127);
+            if (Mathf.Abs(yaw - LookYaw) >= 2 || (yaw == 0 && LookYaw != 0)) LookYaw = yaw;
         }
     }
 }

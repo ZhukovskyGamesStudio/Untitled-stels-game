@@ -954,7 +954,7 @@ namespace Stealth.UI
             if (!sewer && (gm.Phase != RunPhase.Playing || l == null)) { Ui.Show(ObjectiveNote, false); return; }
             bool exitSeen = !sewer && gm.Exploration != null && MapSketch.AnyRevealed(gm.Exploration, 0,
                 new Rect(l.ExitHatchPosition.x - 0.8f, l.ExitHatchPosition.z - 0.8f, 1.6f, 1.6f));
-            var tasks = ObjectiveRules.Tasks(sewer, exitSeen, sewer ? default : gm.ObjectiveStage, gm.GateOpen, gm.QuotaMet);
+            var tasks = ObjectiveRules.Tasks(sewer, exitSeen, sewer ? default : gm.ObjectiveStage, gm.GateOpen, gm.QuotaMet, sewer && gm.Level.Index < 0);
             Ui.Show(ObjectiveNote, tasks.Count > 0);
             m_TaskRows.Begin();
             foreach (var (line, done) in tasks)

@@ -80,7 +80,7 @@ namespace Stealth.UI
             if (m_Previews.TryGetValue(node.Seed, out var text)) return text;
             if (!m_Making.TryGetValue(node.Seed, out var making))
             {
-                var level = Tuning.Level;
+                var level = Tuning.LevelOf(node.Kind);
                 var (building, security, features) = (level.Building, level.Security, level.Features);
                 int seed = node.Seed, depth = node.Depth, players = Mathf.Max(1, PlayerController.All.Count);
                 m_Making[seed] = Task.Run(() =>

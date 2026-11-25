@@ -275,7 +275,7 @@ namespace Stealth.Player
             }
             var mate = s_Mates[(m_WatchIndex % s_Mates.Count + s_Mates.Count) % s_Mates.Count];
             float eye = mate.InHatch ? 0.25f : mate.Downed ? 0.35f : mate.Crouching ? 0.95f : 1.6f;
-            var look = mate.transform.rotation * Quaternion.Euler(mate.LookPitch, 0f, 0f);
+            var look = mate.transform.rotation * Quaternion.Euler(mate.LookPitch, mate.ShownLookYaw, 0f); // (their head turned off the held body too)
             m_WatchRotation = Watching == mate ? Quaternion.Slerp(m_WatchRotation, look, 1f - Mathf.Exp(-12f * Time.deltaTime)) : look;
             Watching = mate;
             // A little in front of their face: the camera does not look out from inside their head.

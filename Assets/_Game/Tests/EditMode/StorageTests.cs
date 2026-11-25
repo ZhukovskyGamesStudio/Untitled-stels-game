@@ -197,9 +197,8 @@ namespace Stealth.Tests
             Assert.AreEqual(MusicTrack.None, AudioRules.ChooseMusic(true, 99f, 5f, levelMusic: false));
             Assert.AreEqual(MusicTrack.None, AudioRules.ChooseMusic(true, 0f, 5f, levelMusic: false), "no chase music either");
             Assert.AreEqual(MusicTrack.Explore, AudioRules.ChooseMusic(true, 99f, 5f));
-            var audio = AssetDatabase.LoadAssetAtPath<Configs.AudioConfig>("Assets/_Game/Data/Config/RoomsTest/Audio.asset");
-            Assert.IsNotNull(audio);
-            Assert.IsFalse(audio.Mix.LevelMusic, "the test level is quiet");
+            Assert.IsFalse(HouseKinds.HasMusic(HouseKind.TestRooms), "the test rooms are quiet");
+            Assert.IsTrue(HouseKinds.HasMusic(HouseKind.Office));
         }
 
         [TestCase("Cabinet", "BodyDrawer", 3)]

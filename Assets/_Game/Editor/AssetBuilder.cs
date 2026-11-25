@@ -315,6 +315,7 @@ namespace Stealth.EditorTools
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
                 if (path.StartsWith(ModelsDir + "/Humans/")) continue; // rigged and animated: AssetBuilder.Humans sets them up
+                if (path.StartsWith(ModelsDir + "/Raccoon/")) continue; // the rigged raccoon and its pack: AssetBuilder.Raccoon
                 var importer = (ModelImporter)AssetImporter.GetAtPath(path);
                 bool dirty = false;
                 if (importer.materialImportMode != ModelImporterMaterialImportMode.None) { importer.materialImportMode = ModelImporterMaterialImportMode.None; dirty = true; }

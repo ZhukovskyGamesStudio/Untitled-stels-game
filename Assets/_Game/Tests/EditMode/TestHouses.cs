@@ -204,7 +204,7 @@ namespace Stealth.Tests
         /// <paramref name="house"/> for a team of <paramref name="players"/>: the same houses for every test of that level.
         /// </summary>
         public static Spec RoomsTestSpec(int k, int house = 0, int players = 1) =>
-            new(7919 * (k + 1) + house, house, RoomsTestLevel.Building, RoomsTestLevel.Security, players, RoomsTestLevel.Features);
+            new(HouseKinds.TestRoomsSeed(7919 * (k + 1) + house), house, RoomsTestLevel.Building, RoomsTestLevel.Security, players, RoomsTestLevel.Features);
 
         public static LevelLayout RoomsTest(int k, int house = 0, int players = 1) => Many(new[] { RoomsTestSpec(k, house, players) })[0];
 

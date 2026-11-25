@@ -69,7 +69,7 @@ namespace Stealth.UI
         public Text HandLabel;
 
         enum DragSource { None, Inventory, World, Stash, Cargo, Bench }
-        enum Target { None, Backpack, Stash, Sell, StashAll, Hand, Belt, Bench, Combine, Info }
+        enum Target { None, Backpack, Stash, Sell, Hand, Belt, Bench, Combine, Info }
 
         DragSource m_Source;
         int m_DragIndex = -1;
@@ -158,9 +158,6 @@ namespace Stealth.UI
             if (CellIn(Board.Grid, me.Camera, MouseScreen, out cell)) return Target.Stash;
             if (Board.SellZone.gameObject.activeInHierarchy && RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
                 Board.SellZone.rect.Contains(local)) return Target.Sell;
-            if (Board.StashAllZone != null &&
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.StashAllZone, MouseScreen, me.Camera, out var all) &&
-                Board.StashAllZone.rect.Contains(all)) return Target.StashAll;
             return Target.None;
         }
 
@@ -208,10 +205,10 @@ namespace Stealth.UI
             bool on = StashActive(me), was = Board.Visible;
             Board.Show(on);
             if (!on) return;
-            Board.Fit(Stash.Rows); // (the storage robot's box grows with the kennel)
+            Board.Fit(Stash.Columns, Stash.Rows); // (the storage robot's box grows with its backpack)
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
             bool burn = GameManager.Instance.CanBurnStashAt(me.transform.position, Stash); // (the storage robot's crate: no fire)
-            if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
+            Board.SetSell(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
             {
@@ -333,11 +330,6 @@ namespace Stealth.UI
             else if (over == Target.Sell)
             {
                 m_Tooltip = null;
-            }
-            else if (over == Target.StashAll)
-            {
-                m_Tooltip = null;
-                if (press) StashAll(PlayerController.Local, inv);
             }
             else if (m_Hover != null)
             {
@@ -715,13 +707,6 @@ namespace Stealth.UI
             {
                 m_StashHighlights.End();
                 Board.SellBackground.color = overSell ? UiPalette.MarkYellow : UiPalette.NoteYellow;
-                if (Board.StashAllZone != null)
-                {
-                    bool overAll = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.StashAll;
-                    bool any = inv.Items.Count > 0;
-                    Board.StashAllBackground.color = !any ? UiPalette.NoteBlue.A(0.45f) : overAll ? UiPalette.MarkBlue : UiPalette.NoteBlue;
-                    SetIfChanged(Board.StashAllLabel, Loc.F("stash.all", Controls.Label(GameAction.StashAll)));
-                }
             }
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);

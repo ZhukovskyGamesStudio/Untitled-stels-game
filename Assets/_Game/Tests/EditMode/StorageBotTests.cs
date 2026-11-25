@@ -117,14 +117,46 @@ namespace Stealth.Tests
             Assert.AreEqual(-1, Stealth.Audio.GuardSounds.Pick(false, Stealth.Enemies.RobotState.Chase, true).clip, "hacked: silent");
         }
         [Test]
-        public void InItsOwnRoomItWalksAndToAnotherRoomItTakesTheDucts()
+        public void ItRunsOnTheFloorUnlessTheDuctsAreClearlyShorter()
         {
-            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(true, 6f, true), "beside the caller: on foot");
-            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(false, 6f, true), "another room, however near: the ducts");
-            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(true, -1f, true), "up in the ducts already: no way on the floor");
-            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 20f, false), "no duct leads there: on foot after all");
-            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(false, StorageBotRules.WalkFurthest + 5f, false), "and too far on foot");
-            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(true, -1f, false));
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(true, 6f, 5f), "beside the caller: on foot");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 12f, 8f), "another room near by: on foot, not up into the vents");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 30f, 26f), "far, but the ducts are hardly shorter: on foot");
+            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(false, 40f, 15f), "the floor goes round the house: the ducts");
+            Assert.AreEqual(StorageBotRules.Route.Ducts, StorageBotRules.Way(true, -1f, 10f), "up in the ducts already: no way on the floor");
+            Assert.AreEqual(StorageBotRules.Route.Walk, StorageBotRules.Way(false, 40f, -1f), "no open grate leads there: on foot after all");
+            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(false, StorageBotRules.WalkFurthest + 5f, -1f), "and too far on foot");
+            Assert.AreEqual(StorageBotRules.Route.None, StorageBotRules.Way(true, -1f, -1f));
+        }
+
+        [Test]
+        public void AWayIsMeasuredAlongItsLegs()
+        {
+            var legs = new System.Collections.Generic.List<BotLeg>
+            {
+                new() { Kind = BotLegKind.Walk, To = new Vector3(3f, 0f, 4f) },                         // 5 on the floor
+                new() { Kind = BotLegKind.ClimbUp, To = new Vector3(3f, 3f, 4f) },                      // 3 up
+                new() { Kind = BotLegKind.Crawl, Route = new System.Collections.Generic.List<Vector3> { new(3f, 3f, 6f), new(7f, 3f, 6f) } }, // 2 + 4
+                new() { Kind = BotLegKind.ClimbDown, To = new Vector3(7f, 0f, 6f) },                    // 3 down
+            };
+            Assert.AreEqual(17f, StorageBotRules.Length(Vector3.zero, legs), 1e-4f);
+        }
+
+        [Test]
+        public void ItGoesOnlyThroughGratesWhoseLidsAreOff()
+        {
+            var l = TestHouses.Get(1, 0);
+            var net = l.Vents[0];
+            Assert.Greater(net.Grates.Count, 1);
+            var under = net.Grates[0].Position + new Vector3(0.2f, -2f, 0.1f);
+            Assert.AreEqual(net.Grates[0].Cell, StorageBotRules.NearestGrate(net, under, i => true).Value.Cell);
+            var other = StorageBotRules.NearestGrate(net, under, i => i != 0);
+            Assert.IsTrue(other.HasValue && other.Value.Cell != net.Grates[0].Cell, "its lid is on: the next open one");
+            Assert.IsFalse(StorageBotRules.NearestGrate(net, under, i => false).HasValue, "every lid on: no way through the ducts");
+            // the lids' keys count the grates of every storey in order (as the level builds them)
+            int upstairs = l.Vents.Count > 1 ? StorageBotRules.GrateIndex(l.Vents, 1, 0) : -1;
+            if (l.Vents.Count > 1) Assert.AreEqual(net.Grates.Count, upstairs);
+            Assert.AreEqual(2, StorageBotRules.GrateIndex(l.Vents, 0, 2));
         }
 
         [Test]

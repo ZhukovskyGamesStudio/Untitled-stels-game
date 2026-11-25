@@ -21,7 +21,7 @@ namespace Stealth.Game
         public void SendUse(UseKind kind, int index) => Game?.UseServer(m_P, kind, index);
         public void SendGadget() => Game?.GadgetServer(m_P);
         public void SendBot(byte command) => Game?.BotCommandServer(m_P, command);
-        public void SendCheat(Cheat cheat, bool on) => m_P.CheatServer(cheat, on);
+        public void SendCheat(Cheat cheat, int arg) => m_P.CheatServer(cheat, arg);
         public void Teleport(Vector3 position, Quaternion rotation) { } // nothing to smooth: the transform is already there
         public void PlaceOwner(Vector3 position, float yaw) => m_P.PlaceFromServer(position, yaw);
         public void SendNoise(Vector3 position, float radius) => m_P.OnNoiseRequest(position, radius);

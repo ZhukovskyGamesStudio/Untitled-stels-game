@@ -12,7 +12,7 @@ namespace Stealth.Game
     /// The car's upgrades (server-decided, replicated by the network twin): the garage's upgrade bench
     /// (<see cref="Workbench"/>) raises them one level at a time for the things of the run's recipe
     /// (<see cref="CarUpgradeServer"/>, <see cref="UpgradeBook"/>); the engine cuts every drive's fuel (<see cref="CostOf"/>),
-    /// the kennel lets the storage robot ride along and grows its box (<see cref="TeamStash.SetRows"/>), the trunk's shelves
+    /// Linus's backpack grows his box (<see cref="TeamStash.SetSize"/>), the trunk's shelves
     /// and the kennel show on the car (Vehicles.CarUpgradeLook). A new run: all back to nothing.
     /// </summary>
     public partial class GameManager
@@ -32,12 +32,12 @@ namespace Stealth.Game
             FitStash();
         }
 
-        /// <summary>The storage robot's box: as many rows as the kennel gives.</summary>
+        /// <summary>The storage robot's box: as big as its backpack's level gives.</summary>
         void FitStash()
         {
-            int rows = CarUpgrades.StashRows(Upgrades.Level(CarUpgrade.Kennel), UpgradeSettings);
-            Stash.SetRows(rows);
-            ExitStash.SetRows(rows); // (what it carried down the exit hatch: the same box)
+            var size = CarUpgrades.StashSize(Upgrades.Level(CarUpgrade.Kennel), UpgradeSettings);
+            Stash.SetSize(size.x, size.y);
+            ExitStash.SetSize(size.x, size.y); // (what it carried down the exit hatch: the same box)
         }
 
         /// <summary>Whether a player at <paramref name="position"/> can work at the garage's upgrade bench.</summary>
@@ -80,15 +80,10 @@ namespace Stealth.Game
             FitStash();
         }
 
-        /// <summary>
-        /// Server, a house starts: whether the storage robot comes with the car (its kennel) — then it is spawned only when
-        /// the car stops in the basement (<see cref="ReleaseMuleServer"/>), not waiting there before the team arrives.
-        /// </summary>
-        bool MuleRidesIn(bool arriving) => arriving && CarUpgrades.MuleRides(Upgrades.Level(CarUpgrade.Kennel));
-
+        /// <summary>Server: Linus rides in the arriving car — he is spawned asleep in its trunk once it stops (<see cref="ReleaseMuleServer"/>).</summary>
         bool m_MuleInKennel;
 
-        /// <summary>Server: the car stopped in the basement — the storage robot riding in its kennel gets out.</summary>
+        /// <summary>Server: the car stopped in the basement — Linus, asleep in its trunk, is there.</summary>
         void ReleaseMuleServer()
         {
             if (!m_MuleInKennel) return;

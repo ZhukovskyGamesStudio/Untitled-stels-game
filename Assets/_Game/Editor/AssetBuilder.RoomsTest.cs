@@ -1,4 +1,3 @@
-using System.Linq;
 using Stealth.Configs;
 using UnityEditor;
 using UnityEngine;
@@ -6,9 +5,9 @@ using UnityEngine;
 namespace Stealth.EditorTools
 {
     /// <summary>
-    /// The test rooms: the game with its own tuning (Data/Config/RoomsTest) — small procedural houses of three or four
-    /// rooms on one floor, to tune rooms and generation in. One scene for both: the main menu's switch picks it
-    /// (<see cref="Tuning.SetTestRooms"/>, through GameConfig.TestRooms); the main game is the default.
+    /// The test rooms (<see cref="Stealth.Level.HouseKind.TestRooms"/>, started from the cheat panel F4): a kind of house
+    /// with its own level settings (Data/Config/RoomsTest/Level.asset) — small quiet houses of one floor, to tune rooms and
+    /// generation in. The rest of the tuning is the game's (<see cref="Tuning.LevelOf"/>).
     /// </summary>
     public static partial class AssetBuilder
     {
@@ -17,38 +16,22 @@ namespace Stealth.EditorTools
 
         static void BuildRoomsTest()
         {
-            var root = BuildRoomsTestConfigs();
+            var level = BuildRoomsTestLevel();
             var main = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
-            if (main != null && main.TestRooms != root) { main.TestRooms = root; EditorUtility.SetDirty(main); }
-            // the test rooms play only «Заброшенный комплекс» (S16): their own style list, a copy of the game's with one style
-            if (main != null && main.Styles != null)
-            {
-                const string path = StylesDir + "/StylesTestRooms.asset";
-                var styles = AssetDatabase.LoadAssetAtPath<StyleConfig>(path);
-                if (styles == null)
-                {
-                    styles = ScriptableObject.CreateInstance<StyleConfig>();
-                    AssetDatabase.CreateAsset(styles, path);
-                }
-                EditorUtility.CopySerialized(main.Styles, styles);
-                styles.name = "StylesTestRooms";
-                var derelict = main.Styles.Styles.FirstOrDefault(s => s != null && s.name == "S16_Derelict");
-                styles.Styles = derelict != null ? new[] { derelict } : main.Styles.Styles;
-                styles.Default = derelict != null ? derelict : main.Styles.Default;
-                EditorUtility.SetDirty(styles);
-                if (root.Styles != styles) { root.Styles = styles; EditorUtility.SetDirty(root); }
-            }
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(RoomsTestScenePath) != null) AssetDatabase.DeleteAsset(RoomsTestScenePath);
+            if (main != null && main.TestRoomsLevel != level) { main.TestRoomsLevel = level; EditorUtility.SetDirty(main); }
+            // the test rooms were a game of their own once (a root with its own run rules, sound and styles): no more
+            foreach (var old in new[] { RoomsTestConfigDir + "/GameConfig.asset", RoomsTestConfigDir + "/Run.asset", RoomsTestConfigDir + "/Audio.asset",
+                         StylesDir + "/StylesTestRooms.asset", RoomsTestScenePath })
+                if (AssetDatabase.LoadMainAssetAtPath(old) != null) AssetDatabase.DeleteAsset(old);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();
         }
 
         /// <summary>
-        /// Data/Config/RoomsTest: a GameConfig that shares every config of the game but the level — its own Level.asset,
-        /// made once from the game's (then tuned by hand, never overwritten): one floor, a plain bar, no annex, rooms a
-        /// bit bigger, 3–4 rooms (plans outside that are redrawn), no guards; and its own Run.asset without the hunter.
+        /// Data/Config/RoomsTest/Level.asset, made once from the game's (then tuned by hand, never overwritten): one floor, a
+        /// plain bar, no annex, rooms a bit bigger, a corridor between them, no guards.
         /// </summary>
-        static GameConfig BuildRoomsTestConfigs()
+        static LevelConfig BuildRoomsTestLevel()
         {
             var main = AssetDatabase.LoadAssetAtPath<GameConfig>(GameConfigPath);
             var levelPath = RoomsTestConfigDir + "/Level.asset";
@@ -100,43 +83,8 @@ namespace Stealth.EditorTools
                 EditorUtility.SetDirty(level);
             }
 
-            // its own run rules, made once from the game's: no hunter and no countdown
-            var runPath = RoomsTestConfigDir + "/Run.asset";
-            var run = AssetDatabase.LoadAssetAtPath<RunConfig>(runPath);
-            if (run == null)
-            {
-                var source = main != null && main.Run != null ? AssetDatabase.GetAssetPath(main.Run) : null;
-                if (source != null) AssetDatabase.CopyAsset(source, runPath);
-                run = AssetDatabase.LoadAssetAtPath<RunConfig>(runPath) ?? TuningAsset<RunConfig>(runPath);
-                run.Rules.Hunter = false;
-                EditorUtility.SetDirty(run);
-            }
-
-            // its own sound mix, made once from the game's: no music in the house
-            var audioPath = RoomsTestConfigDir + "/Audio.asset";
-            var audio = AssetDatabase.LoadAssetAtPath<AudioConfig>(audioPath);
-            if (audio == null)
-            {
-                var source = main != null && main.Audio != null ? AssetDatabase.GetAssetPath(main.Audio) : null;
-                if (source != null) AssetDatabase.CopyAsset(source, audioPath);
-                audio = AssetDatabase.LoadAssetAtPath<AudioConfig>(audioPath) ?? TuningAsset<AudioConfig>(audioPath);
-                audio.Mix.LevelMusic = false;
-                EditorUtility.SetDirty(audio);
-            }
-
-            var root = TuningAsset<GameConfig>(RoomsTestConfigDir + "/GameConfig.asset");
-            if (main != null)
-            {
-                // everything but the level and the run rules is the game's own: tuning the game tunes the test scene too
-                root.Player = main.Player; root.Items = main.Items;
-                root.Perception = main.Perception; root.Styles = main.Styles;
-            }
-            root.Level = level;
-            root.Run = run;
-            root.Audio = audio;
-            EditorUtility.SetDirty(root);
             AssetDatabase.SaveAssets();
-            return root;
+            return level;
         }
     }
 }

@@ -169,6 +169,9 @@ namespace Stealth.EditorTools
             // marked things (loot, crates, panels…): the same three passes on their own layer, in yellow-green
             AddXray(MaterialsDir + "/FX/MarkedThingXray.mat", "MarkedThingXray", new[] { "MarkedThingVisible", "MarkedThing", "MarkedThingOutline", "MarkedThingFill" },
                 Stealth.Level.MarkedThings.XrayLayer, new Color(0.75f, 1f, 0.2f, 0.36f), new Color(0.85f, 1f, 0.35f, 1f));
+            // Linus crawling in a duct: the team sees where he is, in pale blue
+            AddXray(MaterialsDir + "/FX/MuleXray.mat", "MuleXray", new[] { "MuleXrayVisible", "MuleXray", "MuleXrayOutline", "MuleXrayFill" },
+                Stealth.Game.StorageBotAnimator.XrayLayer, new Color(0.35f, 0.75f, 1f, 0.34f), new Color(0.55f, 0.88f, 1f, 1f));
         }
 
         /// <summary>

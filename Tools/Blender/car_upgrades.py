@@ -11,6 +11,15 @@
                    shelf at the wall top (level 2), a raised rack above the wall with a top shelf and a tie-down rail
                    (level 3).
 
+  car_shredder.fbx the engine's three levels as the shredder on the hood grows (concept: Logs/comfy/upgrades/shredder_*.png),
+                   each level its own objects (names contain Engine1 / Engine2 / Engine3; the game shows every level up to the
+                   engine's): a riveted steel band round the funnel with gussets down to the hood and a jagged steel crown on
+                   its rim (1), a second electric motor in front of the funnel with a belt to the grinder's drum (2), a heavy
+                   black housing round the funnel's foot with hazard stripes, hydraulic rams and two chrome stacks on the
+                   fenders with a beacon (3).
+  car_panic.fbx    the teleport's big red mushroom button in a yellow-and-black housing with a steel guard hoop, on the dash
+                   top over the glovebox (the passenger's side of the right-hand-drive model).
+
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/car_upgrades.py -- Assets/_Game/Art/Models
       (writes <root>/Car/car_kennel.fbx and <root>/Car/car_shelves.fbx)
 Look: blender.exe -b --factory-startup --python Tools/Blender/car_upgrades.py -- <scratch> --review <sheet.png>
@@ -26,7 +35,8 @@ workbench (car_bench.py) takes y 0.36..0.91 at the front.
             top 1.55 with 13 cm corners (the crate's top corners at x +-0.25, z 1.49 clear them)
   shelves:  x 0.58..0.85, y 0.97..2.33; level 1 top z 1.06, level 2 top z 1.30, level 3 top shelf z 1.625, rail to z 1.70
 Parts (the game colours car parts by name prefix): Body painted steel (also the kennel's lining), Accent wood, AccentBoard light board, Trim bare
-steel, TrimHandle red grips / straps, EyeLamp the glowing bulb. Every object is <Prefix>_<Thing>.
+steel, TrimHandle red grips / straps / the panic button, TrimChrome polished steel, Hazard warning yellow, Dark black rubber
+and paint, EyeLamp the glowing bulb, EyeBeacon the orange beacon. Every object is <Prefix>_<Thing>.
 """
 import math
 import os
@@ -371,6 +381,155 @@ def build_shelves():
     return levels
 
 
+# --------------------------------------------------------------------------- the shredder (engine levels) and the panic button
+
+HOP = Vector((0.0, -1.55, 0.0))    # car.HOPPER: the funnel's axis
+RIM = 1.56                         # car.RIM_Z: the mouth
+DRUM = Vector((0.0, -1.23, 1.30))  # car.MOTOR: the grinder's motor drum behind the funnel (axis x)
+
+
+def ring(r0, r1, z0, z1, seg=28):
+    """A band round the funnel: a closed (r, z) quad revolved about the hopper's axis (inner face inside the funnel wall)."""
+    import car as c
+    return s.place(c.revolve([(r0, z0), (r1, z0 + 0.004), (r1, z1 - 0.004), (r0, z1)], seg), HOP)
+
+
+def engine1():
+    """A riveted steel band round the funnel, four gussets down to the hood, a jagged steel crown inside the rim."""
+    import car as c
+    band = [ring(0.25, 0.30, 1.39, 1.47)]
+    rivets, steel = [], []
+    for k in range(12):
+        t = 2 * math.pi * (k + 0.5) / 12
+        d = Vector((math.cos(t), math.sin(t), 0))
+        rivets.append(c.orient(s.rcyl(0.011, 0.016, (0, 0, 0), seg=8, r=0.003, bevel_seg=1), d, HOP + d * 0.302 + Vector((0, 0, 1.43))))
+    for k in range(4):
+        t = 2 * math.pi * (k + 0.5) / 4
+        d = Vector((math.cos(t), math.sin(t), 0))
+        # a strut from the band down onto the grinder housing's top (z 1.27), a foot plate under it
+        band.append(s.tube([HOP + d * 0.285 + Vector((0, 0, 1.40)), HOP + d * 0.32 + Vector((0, 0, 1.262))], 0.02, res=1, smooth=False))
+        band.append(s.rbox((0.07, 0.07, 0.016), HOP + d * 0.32 + Vector((0, 0, 1.268)), r=0.004, seg=1, rot=(0, 0, t)))
+    # the crown: a steel ring on the rim, taller, sharper teeth on it between the car's own (car.accent: 10 at the rim),
+    # held to the band by four straps down the funnel's outside
+    steel.append(s.place(c.torus(0.36, 0.022, 28, 6), HOP + Vector((0, 0, RIM + 0.018))))
+    for k in range(10):
+        t = 2 * math.pi * k / 10
+        cc, sn = math.cos(t), math.sin(t)
+        steel.append(c.spike(HOP + Vector((0.35 * cc, 0.35 * sn, RIM + 0.01)), HOP + Vector((0.24 * cc, 0.24 * sn, RIM + 0.09)), 0.03, seg=4))
+    for k in range(4):
+        t = 2 * math.pi * k / 4
+        d = Vector((math.cos(t), math.sin(t), 0))
+        steel.append(s.tube([HOP + d * 0.29 + Vector((0, 0, 1.45)), HOP + d * 0.385 + Vector((0, 0, RIM + 0.01))], 0.012, res=1, smooth=False))
+    return [s.part("Body_Engine1_Band", band), s.part("Trim_Engine1_Rivets", rivets), s.part("TrimChrome_Engine1_Crown", steel)]
+
+
+MOTOR2 = Vector((-0.40, -1.95, 1.31))   # the second motor: in front of the funnel, axis x, left of the middle
+BELT_X = -0.62                          # the belt's plane, outside the hood's bulge
+
+
+def engine2():
+    """A second electric motor (finned, a fan cover) on a mount in front of the funnel, its shaft out to a pulley that
+    drives a belt to a pulley on the grinder drum's end; a junction box and a cable to the firewall."""
+    body, dark, trim = [], [], []
+    x0, x1 = MOTOR2.x - 0.15, MOTOR2.x + 0.15
+    prof = [(0.0, -0.152)] + [(0.098 if i % 2 == 0 else 0.086, -0.15 + i * 0.3 / 8) for i in range(9)] + [(0.0, 0.152)]
+    body.append(s.lathe(prof, seg=20, axis="X", loc=MOTOR2))
+    body.append(s.rbox((0.32, 0.16, 0.05), (MOTOR2.x, MOTOR2.y, 1.215), r=0.012, seg=1))                       # the mount plate
+    for dx in (-0.09, 0.09):
+        body.append(s.rbox((0.05, 0.1, 0.1), (MOTOR2.x + dx, MOTOR2.y, 1.25), r=0.01, seg=1))                  # its feet
+    body.append(s.rbox((0.09, 0.07, 0.06), (MOTOR2.x, MOTOR2.y + 0.02, 1.43), r=0.01, seg=1))                  # junction box
+    dark += s.grille((x1 + 0.01, MOTOR2.y, MOTOR2.z), 0.14, 0.14, n=4, bar=0.01, proud=0.012, axis="X", frame=0.012)  # fan cover
+    # pulleys: on the motor's shaft and on the drum's end (its cap at x -0.385)
+    trim.append(s.rcyl(0.018, abs(BELT_X - x0) + 0.03, ((BELT_X + x0) / 2, MOTOR2.y, MOTOR2.z), axis="X", seg=10, r=0.004, bevel_seg=1))
+    trim.append(s.rcyl(0.022, abs(BELT_X + 0.385) + 0.03, ((BELT_X - 0.385) / 2, DRUM.y, DRUM.z), axis="X", seg=10, r=0.004, bevel_seg=1))
+    small, big = 0.055, 0.08
+    trim.append(s.rcyl(small, 0.05, (BELT_X, MOTOR2.y, MOTOR2.z), axis="X", seg=20, r=0.006, bevel_seg=1))
+    trim.append(s.rcyl(big, 0.05, (BELT_X, DRUM.y, DRUM.z), axis="X", seg=24, r=0.006, bevel_seg=1))
+    # the belt round both pulleys (open-belt halves joined by straight runs, in the y-z plane)
+    pts = []
+    for (cy, cz, rr, a0, a1) in ((MOTOR2.y, MOTOR2.z, small + 0.006, math.pi / 2, 3 * math.pi / 2),
+                                 (DRUM.y, DRUM.z, big + 0.006, -math.pi / 2, math.pi / 2)):
+        for i in range(7):
+            a = a0 + (a1 - a0) * i / 6
+            pts.append((BELT_X, cy + rr * math.cos(a), cz + rr * math.sin(a)))
+    pts.append(pts[0])
+    dark.append(s.tube(pts, 0.009, res=1, smooth=False))
+    # the cable from the junction box back to the firewall, along the hood
+    dark.append(s.tube([(MOTOR2.x, MOTOR2.y + 0.05, 1.44), (MOTOR2.x - 0.12, MOTOR2.y + 0.25, 1.30), (-0.55, -1.2, 1.235), (-0.55, -0.8, 1.245)], 0.012, res=2))
+    return [s.part("Body_Engine2_Motor", body), s.part("Dark_Engine2_Belt", dark), s.part("Trim_Engine2_Pulleys", trim)]
+
+
+def engine3():
+    """A heavy black housing round the funnel's foot with hazard stripes, two hydraulic rams up to the rim, two chrome
+    stacks on the fenders with slanted tips, an orange beacon on the housing's corner."""
+    dark, hazard, chrome, trim, beacon = [], [], [], [], []
+    hw, hd, z0, z1 = 0.40, 0.36, 1.22, 1.38          # the housing: a frame round the funnel's foot on the hood
+    for sy in (-1, 1):
+        dark.append(s.rbox((2 * hw, 0.06, z1 - z0), (0, HOP.y + sy * (hd - 0.03), (z0 + z1) / 2), r=0.012, seg=2))
+    for sx in (-1, 1):
+        dark.append(s.rbox((0.06, 2 * hd - 0.06, z1 - z0), (sx * (hw - 0.03), HOP.y, (z0 + z1) / 2), r=0.012, seg=2))
+    # hazard stripes on the front face and the sides: yellow bars slanted 40 deg, proud of the black
+    for k in range(-3, 4):
+        hazard.append(s.rbox((0.05, 0.012, 0.13), (k * 0.1, HOP.y - hd - 0.002, (z0 + z1) / 2), r=0.003, seg=1, rot=(0, math.radians(40), 0)))
+    for sx in (-1, 1):
+        for k in range(-2, 3):
+            hazard.append(s.rbox((0.012, 0.05, 0.13), (sx * (hw + 0.002), HOP.y + k * 0.11, (z0 + z1) / 2), r=0.003, seg=1, rot=(math.radians(-40 * sx), 0, 0)))
+    # two hydraulic rams from the housing's front corners up to the rim's band
+    for sx in (-1, 1):
+        a = Vector((sx * 0.33, HOP.y - 0.30, z1 - 0.02))
+        b = Vector((sx * 0.21, HOP.y - 0.21, RIM - 0.10))
+        mid = a.lerp(b, 0.55)
+        trim.append(s.tube([a, mid], 0.026, res=1, smooth=False))
+        chrome.append(s.tube([mid - (b - a) * 0.1, b], 0.013, res=1, smooth=False))
+    # chrome stacks on the fenders (beside the windshield's foot, clear of the driver's view), slanted tips
+    for sx in (-1, 1):
+        x, y = sx * 0.80, -1.02
+        chrome.append(s.rcyl(0.045, 0.62, (x, y, 1.21 + 0.31), seg=16, r=0.006, bevel_seg=1))
+        chrome.append(s.tube([(x, y, 1.80), (x, y + 0.03, 1.86), (x, y + 0.09, 1.9)], 0.045, res=1))
+        dark.append(s.rbox((0.12, 0.12, 0.03), (x, y, 1.215), r=0.01, seg=1))                         # the foot plate
+        dark.append(s.rcyl(0.05, 0.05, (x, y, 1.42), seg=16, r=0.006, bevel_seg=1))                   # a clamp band
+    # the beacon on the housing's front right corner
+    dark.append(s.rcyl(0.05, 0.03, (hw - 0.05, HOP.y - hd + 0.05, z1 + 0.012), seg=16, r=0.006, bevel_seg=1))
+    beacon.append(s.lathe([(0.0, 0.0), (0.04, 0.0), (0.04, 0.05), (0.032, 0.075), (0.0, 0.085)], seg=16,
+                          loc=(hw - 0.05, HOP.y - hd + 0.05, z1 + 0.02)))
+    return [s.part("Dark_Engine3_Housing", dark), s.part("Hazard_Engine3_Stripes", hazard), s.part("TrimChrome_Engine3_Stacks", chrome),
+            s.part("Trim_Engine3_Rams", trim), s.part("EyeBeacon_Engine3", beacon)]
+
+
+PANIC = Vector((0.42, -0.62, 1.18))    # the dash's top over the glovebox (car.dark: the dashboard's top at z 1.18)
+PANIC_TILT = math.radians(28)          # tipped back towards the seats
+
+
+def build_panic():
+    """The teleport's button: a yellow-and-black housing on the dash top, a big red mushroom on a chrome stem, a steel
+    guard hoop over it (the concept's clear flip cover reads as a hoop at this size)."""
+    from mathutils import Euler
+    s.clear_scene()
+    tilt = (-PANIC_TILT, 0, 0)
+
+    def at(dx, dy, dz):
+        """A point in the housing's tipped frame (y towards the seats, z up out of its face)."""
+        v = Vector((dx, dy, dz))
+        v.rotate(Euler(tilt))
+        return PANIC + v
+
+    housing = [s.rbox((0.15, 0.13, 0.05), at(0, 0, 0.02), r=0.012, seg=2, rot=tilt)]
+    # black stripes on its face towards the seats, slanted, inside its edges
+    stripes = [s.rbox((0.014, 0.006, 0.026), at(-0.045 + k * 0.03, 0.064, 0.02), r=0.002, seg=1, rot=(tilt[0], math.radians(35), 0)) for k in range(4)]
+    stem = [s.rcyl(0.026, 0.05, at(0, 0, 0.06), seg=16, r=0.004, bevel_seg=1, rot=tilt)]
+    dome = s.lathe([(0.0, 0.0), (0.052, 0.0), (0.056, 0.012), (0.05, 0.03), (0.032, 0.046), (0.0, 0.052)], seg=24)
+    dome = s.place(dome, at(0, 0, 0.082), tilt)
+    hoop = s.tube([at(-0.07, -0.045, 0.04), at(-0.07, -0.02, 0.15), at(0.07, -0.02, 0.15), at(0.07, -0.045, 0.04)], 0.007, res=2)
+    feet = [s.rbox((0.02, 0.02, 0.012), at(sx * 0.07, -0.045, 0.045), r=0.003, seg=1, rot=tilt) for sx in (-1, 1)]
+    return [s.part("Hazard_Panic_Housing", housing), s.part("Dark_Panic_Stripes", stripes), s.part("TrimChrome_Panic_Stem", stem + feet),
+            s.part("TrimHandle_Panic_Button", [dome]), s.part("Trim_Panic_Guard", [hoop])]
+
+
+def build_shredder():
+    s.clear_scene()
+    return [engine1(), engine2(), engine3()]
+
+
 # --------------------------------------------------------------------------- run
 
 def bounds(objs):
@@ -392,6 +551,17 @@ def export(root):
         meshfix.fix_objects(objs, floor=False, name=f"car_shelves level {k}")
         print(f"SHELF{k} blender lo", *bounds(objs))
     s.export_fbx(os.path.join(root, "Car", "car_shelves.fbx"), [o for lv in levels for o in lv])
+    levels = build_shredder()
+    bpy.context.view_layer.update()
+    for k, objs in enumerate(levels, 1):
+        meshfix.fix_objects(objs, floor=False, name=f"car_shredder level {k}")
+        print(f"ENGINE{k} blender lo", *bounds(objs))
+    s.export_fbx(os.path.join(root, "Car", "car_shredder.fbx"), [o for lv in levels for o in lv])
+    objs = build_panic()
+    bpy.context.view_layer.update()
+    meshfix.fix_objects(objs, floor=False, name="car_panic")
+    print("PANIC blender lo", *bounds(objs))
+    s.export_fbx(os.path.join(root, "Car", "car_panic.fbx"), objs)
 
 
 def review(scratch, sheet_path):

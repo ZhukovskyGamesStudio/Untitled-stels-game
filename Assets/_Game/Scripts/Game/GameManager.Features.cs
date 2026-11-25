@@ -49,7 +49,7 @@ namespace Stealth.Game
         int SpawnFeatures(LevelLayout l)
         {
             foreach (var k in l.KeyDoors) SpawnItemServer(ItemCatalog.Key, 4, k.Key + Vector3.up * 0.02f, 0f);
-            bool gadgets = Tuning.Level.Features.Gadgets;
+            bool gadgets = HouseLevel.Features.Gadgets;
             if (gadgets)
                 for (int i = 0; i < l.LureSpots.Count; i++) SpawnItemServer(ItemCatalog.Speaker, 1, l.LureSpots[i] + Vector3.up * 0.02f, i * 70f);
             if (gadgets && l.PointOfInterest >= 0 && l.Props[l.PointOfInterest].Kind == PropKind.Programmer)
@@ -67,7 +67,7 @@ namespace Stealth.Game
             }
             int value = 0;
             foreach (int c in l.Crates)
-                foreach (var (shape, color) in CrateContents(l, c, Gadgets, Tuning.Level.Loot)) value += ItemCatalog.Value(shape, color);
+                foreach (var (shape, color) in CrateContents(l, c, Gadgets, HouseLevel.Loot)) value += ItemCatalog.Value(shape, color);
             return value;
         }
 
@@ -120,6 +120,7 @@ namespace Stealth.Game
                 case UseKind.ShaftHatch: ToggleShaftServer(thing is ShaftHatch { Exit: true }); break;
                 case UseKind.VentGrate: UnscrewServer(player, index); break;
                 case UseKind.Door: if (thing is DoorHandle handle) ToggleDoorServer(player, handle.Door); break;
+                case UseKind.PetBot: if (thing is StorageBotPet pet && pet.TryGetComponent<StorageBot>(out var bot)) bot.PetServer(); break;
                 default: UseSewerServer(player, kind, index); break;
             }
         }
@@ -181,7 +182,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || l == null || IsOpened(OpenKeys.Crate(prop))) return;
             m_Opened.Add(OpenKeys.Crate(prop));
             OpenedVersion++;
-            var items = CrateContents(l, prop, Gadgets, Tuning.Level.Loot);
+            var items = CrateContents(l, prop, Gadgets, HouseLevel.Loot);
             // inside the crate, on its floor: rows front to back, layers up (lengthwise, along the crate)
             for (int i = 0; i < items.Count; i++)
             {

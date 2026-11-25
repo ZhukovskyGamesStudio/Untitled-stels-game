@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Stealth.Game;
 using Stealth.Items;
 using Stealth.Vehicles;
+using UnityEngine;
 
 namespace Stealth.Tests
 {
@@ -55,13 +56,10 @@ namespace Stealth.Tests
             Assert.AreEqual(5, CarUpgrades.EngineCost(5, 3, s), "never below the smallest fare");
             Assert.AreEqual(0, CarUpgrades.EngineCost(0, 3, s), "a free drive stays free");
             Assert.AreEqual(0, CarUpgrades.EngineCost(85, 2, s) % 5, "in fives like every fare");
-            Assert.AreEqual(TeamStash.Height, CarUpgrades.StashRows(0, s));
-            Assert.AreEqual(TeamStash.Height, CarUpgrades.StashRows(1, s), "level 1: it rides along, the same box");
-            Assert.Less(CarUpgrades.StashRows(1, s), CarUpgrades.StashRows(2, s));
-            Assert.Less(CarUpgrades.StashRows(2, s), CarUpgrades.StashRows(3, s));
-            Assert.LessOrEqual(CarUpgrades.StashRows(3, s), TeamStash.MaxHeight, "the board is built for it");
-            Assert.IsFalse(CarUpgrades.MuleRides(0));
-            Assert.IsTrue(CarUpgrades.MuleRides(1));
+            CollectionAssert.AreEqual(new[] { new Vector2Int(3, 5), new Vector2Int(4, 5), new Vector2Int(4, 7), new Vector2Int(6, 7) },
+                Enumerable.Range(0, 4).Select(l => CarUpgrades.StashSize(l, s)), "Linus's backpack: 3x5, 4x5, 4x7, 6x7");
+            Assert.AreEqual(new Vector2Int(TeamStash.Width, TeamStash.Height), CarUpgrades.StashSize(0, s), "level 0 is the box's own size");
+            Assert.AreEqual(new Vector2Int(TeamStash.MaxWidth, TeamStash.MaxHeight), CarUpgrades.StashSize(3, s), "the board is built for the top level");
         }
 
         [Test]
@@ -109,15 +107,20 @@ namespace Stealth.Tests
         {
             var stash = new TeamStash();
             Assert.AreEqual(TeamStash.Height, stash.Rows);
-            stash.SetRows(6);
-            Assert.AreEqual(6, stash.Rows);
-            Assert.IsTrue(stash.Add(ItemCatalog.Book, 0, 0, 4, 0), "the new rows take things");
-            stash.SetRows(4);
-            Assert.AreEqual(4 + ItemCatalog.Size(ItemCatalog.RotatedCells(ItemCatalog.Book, 0)).y, stash.Rows, "a thing lies in the new rows: they stay");
+            Assert.AreEqual(TeamStash.Width, stash.Columns);
+            stash.SetSize(6, 7);
+            Assert.AreEqual(7, stash.Rows);
+            Assert.AreEqual(6, stash.Columns);
+            Assert.IsTrue(stash.Add(ItemCatalog.Book, 0, 4, 5, 0), "the new cells take things");
+            stash.SetSize(3, 5);
+            var book = ItemCatalog.Size(ItemCatalog.RotatedCells(ItemCatalog.Book, 0));
+            Assert.AreEqual(5 + book.y, stash.Rows, "a thing lies in the new rows: they stay");
+            Assert.AreEqual(4 + book.x, stash.Columns, "and in the new columns");
             stash.Clear();
-            stash.SetRows(4);
-            Assert.AreEqual(4, stash.Rows);
-            Assert.IsFalse(stash.CanPlace(ItemCatalog.Book, 0, 0, 4), "back to its own size");
+            stash.SetSize(3, 5);
+            Assert.AreEqual(5, stash.Rows);
+            Assert.AreEqual(3, stash.Columns);
+            Assert.IsFalse(stash.CanPlace(ItemCatalog.Book, 0, 4, 5), "back to its own size");
         }
     }
 }

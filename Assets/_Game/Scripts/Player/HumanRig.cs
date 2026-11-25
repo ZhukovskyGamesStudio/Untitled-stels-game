@@ -89,7 +89,8 @@ namespace Stealth.Player
         /// <summary>The held thing is a compact one: it lies in the open palm (a long one goes through the fist).</summary>
         [System.NonSerialized] public bool Cupped;
 
-        float m_Pitch, m_Ground, m_Hold;
+        float m_Pitch, m_Yaw, m_Ground, m_Hold;
+        Transform m_Neck;
 
         /// <summary>The driver's hands on the wheel this frame (world points; see <see cref="HumanMath.WheelWrist"/>).</summary>
         public void HoldWheel(Vector3 left, Vector3 right, Vector3 left0, Vector3 right0, Vector3 hub, Vector3 column)
@@ -104,10 +105,12 @@ namespace Stealth.Player
         static readonly RaycastHit[] s_Floor = new RaycastHit[6];
 
         /// <summary>The state of the player this frame. <paramref name="climb"/>: metres a second up the ladder (negative: down).</summary>
+        /// <param name="yaw">The head's turn off the body, degrees, + to the right (the body held on the ladder or in a seat: <see cref="PlayerMotor.HeadYaw"/>).</param>
         public void Pose(float speed, bool crouching, bool downed, float pitch, bool seated = false, BodyPose pose = BodyPose.None, float climb = 0f,
-                         bool holding = false)
+                         bool holding = false, float yaw = 0f)
         {
             pose = HumanMath.Shown(pose, downed, seated);
+            m_Yaw = HumanMath.HeadYaw(yaw, pose, downed);
             m_Planted = HumanMath.Planted(downed, seated, pose);
             m_Holding = HumanMath.Carries(holding, downed, seated, pose);
             m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
@@ -214,9 +217,14 @@ namespace Stealth.Player
             PlantFeet();
             FirstPerson();
             PlaceHeld();
-            // the head follows the look after the animation (over whatever the Head layer's take does)
-            if (HeadBone == null || Mathf.Approximately(m_Pitch, 0f)) return;
-            HeadBone.rotation = Quaternion.AngleAxis(m_Pitch, transform.right) * HeadBone.rotation;
+            // the head follows the look after the animation (over whatever the Head layer's take does): turned with the neck
+            // (a share of the turn), then tipped about its own turned right
+            if (HeadBone == null || (Mathf.Approximately(m_Pitch, 0f) && Mathf.Approximately(m_Yaw, 0f))) return;
+            if (m_Neck == null && Animator != null && Animator.isHuman) m_Neck = Animator.GetBoneTransform(HumanBodyBones.Neck);
+            float neck = m_Neck != null ? m_Yaw * HumanMath.NeckShare : 0f;
+            if (m_Neck != null && !Mathf.Approximately(neck, 0f)) m_Neck.rotation = Quaternion.AngleAxis(neck, transform.up) * m_Neck.rotation;
+            var right = Quaternion.AngleAxis(m_Yaw, transform.up) * transform.right;
+            HeadBone.rotation = Quaternion.AngleAxis(m_Pitch, right) * Quaternion.AngleAxis(m_Yaw - neck, transform.up) * HeadBone.rotation;
         }
 
         /// <summary>After the animation and the feet: the owner's own body under his eyes (<see cref="Eyes"/>, <see cref="HideRightArm"/>).</summary>
@@ -301,6 +309,17 @@ namespace Stealth.Player
         /// <summary>How far the head tilts for a look pitch (degrees, + looks down): a share of it, clamped; none when lying.</summary>
         public static float HeadPitch(float lookPitch, float follow, bool downed) =>
             downed ? 0f : Mathf.Clamp(lookPitch * follow, -45f, 45f);
+
+        /// <summary>
+        /// How far the head turns off the body for the look's yaw (degrees, + to the right: the body held on the ladder or in
+        /// a seat while the player looks round): all of it, within <see cref="MaxHeadYaw"/>; none lying, at a terminal or at
+        /// work (the take moves the head there).
+        /// </summary>
+        public static float HeadYaw(float lookYaw, BodyPose pose, bool downed) =>
+            downed || pose is BodyPose.Terminal or BodyPose.Work ? 0f : Mathf.Clamp(lookYaw, -MaxHeadYaw, MaxHeadYaw);
+
+        /// <summary>The head's turn at most, degrees; the neck takes <see cref="NeckShare"/> of it, the head the rest.</summary>
+        public const float MaxHeadYaw = 110f, NeckShare = 0.4f;
 
         /// <summary>The speed the walk blend gets: none in a seat (riding in the car is not walking) or busy with the hands.</summary>
         public static float WalkSpeed(float speed, bool seated) => seated ? 0f : speed;

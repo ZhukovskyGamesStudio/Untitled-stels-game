@@ -92,15 +92,18 @@ namespace Stealth.Game
 
         StorageBot m_Bot;
 
-        /// <summary>Server, a house starts: the storage robot waits in the basement (with what the car brought).</summary>
+        /// <summary>Server, a house starts (the car parked in the basement): Linus sleeps curled up in the car's trunk until called (on the basement floor without a car).</summary>
         void SpawnStorageBotServer(LevelLayout l)
         {
             if (StorageBotPrefab == null) return;
-            var at = Basement.StashSpot(l.Cellar);
-            var go = Session.Spawn(StorageBotPrefab, at, Quaternion.LookRotation(Vector3.left));
+            var trunk = StorageBot.TrunkSpot();
+            var at = trunk ?? Basement.StashSpot(l.Cellar);
+            var facing = Car.Active != null && Car.Active.Bed != null ? -Car.Active.Bed.forward : Vector3.left;
+            facing.y = 0f;
+            var go = Session.Spawn(StorageBotPrefab, at, Quaternion.LookRotation(facing.sqrMagnitude > 1e-4f ? facing : Vector3.left));
             m_Spawned.Add(go);
             m_Bot = go.GetComponent<StorageBot>();
-            m_Bot?.BeginServer();
+            m_Bot?.BeginServer(trunk != null);
         }
 
         /// <summary>Server: a player's command to the storage robot — 0: come to me; 1: go to the exit through the ducts.</summary>
@@ -393,7 +396,7 @@ namespace Stealth.Game
             if (Phase == RunPhase.Playing && house != null)
                 foreach (int c in house.Crates)
                     if (!IsOpened(OpenKeys.Crate(c)))
-                        foreach (var (shape, color) in CrateContents(house, c, Gadgets, Tuning.Level.Loot)) burnable += ItemCatalog.Value(shape, color);
+                        foreach (var (shape, color) in CrateContents(house, c, Gadgets, HouseLevel.Loot)) burnable += ItemCatalog.Value(shape, color);
             if (RunState.CanStillGo(Collected, cheapest, burnable)) { m_StrandedAt = -1f; return; }
             if (m_StrandedAt < 0f)
             {

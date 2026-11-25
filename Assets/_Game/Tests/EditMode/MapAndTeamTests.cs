@@ -316,7 +316,7 @@ namespace Stealth.Tests
                 Assert.IsFalse(info.Default.IsNone, info.Title);
                 Assert.IsNotEmpty(info.Title);
             }
-            Assert.AreEqual("F8", Controls.Name(Controls.All[(int)GameAction.Style].Default), "the style key is listed");
+            Assert.AreEqual("F4", Controls.Name(Controls.All[(int)GameAction.Cheats].Default), "the cheat panel's key is listed (the styles are its page: no F8)");
         }
 
         [Test]

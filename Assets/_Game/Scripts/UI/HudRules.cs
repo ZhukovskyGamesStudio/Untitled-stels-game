@@ -171,11 +171,17 @@ namespace Stealth.UI
 
         /// <summary>
         /// The task list in the top left corner, in order (pure): in a house — find the exit first, then the house's main
-        /// job; in the sewer — open the way for the car, fuel it, then choose a tunnel. Each line with whether it is done.
+        /// job; in the sewer — open the way for the car, fuel it, then choose a tunnel; in the run's first sewer (no gate, the
+        /// first drive free: <paramref name="runStart"/>) only choose a tunnel. Each line with whether it is done.
         /// </summary>
-        public static List<(string text, bool done)> Tasks(bool sewer, bool exitSeen, in ObjectiveState job, bool gateOpen, bool fueled)
+        public static List<(string text, bool done)> Tasks(bool sewer, bool exitSeen, in ObjectiveState job, bool gateOpen, bool fueled, bool runStart = false)
         {
             var list = new List<(string, bool)>();
+            if (sewer && runStart)
+            {
+                list.Add((Loc.T("hud.task.tunnel"), false));
+                return list;
+            }
             if (sewer)
             {
                 list.Add((Loc.T("hud.task.gate"), gateOpen));
@@ -225,6 +231,7 @@ namespace Stealth.UI
             Level.UseKind.HandDryer => ReticleIcon.Hand,
             Level.UseKind.LightSwitch => ReticleIcon.Hand,
             Level.UseKind.ExitButton => ReticleIcon.Hand,
+            Level.UseKind.PetBot => ReticleIcon.Hand,
             Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
             Level.UseKind.VentGrille => ReticleIcon.Vent,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
@@ -295,9 +302,10 @@ namespace Stealth.UI
                 into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.out")));
                 return into;
             }
-            if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)
+            // at Linus with things on us: G puts everything in his backpack — with the cursor out too (the board has no button for it)
+            if (c.NearTrade && c.CarriedItems > 0)
             {
-                into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
+                if (!c.CursorMode) into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
                 into.Add(new Hint(K(GameAction.StashAll), Loc.T("hint.stash_all")));
             }
             if (c.Playing && c.NearHatch) into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.in")));

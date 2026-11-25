@@ -250,17 +250,5 @@ namespace Stealth.Tests
             Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0.8f, crates + jump, 0f), grate, true, true), "beside the hole");
             Assert.IsFalse(VentGrate.IntoDuct(new Vector3(0f, crates + jump, 0f), grate, true, false), "falling back down");
         }
-
-        [Test]
-        public void TheStorageRobotWaddlesAndTiltsAsItClimbs()
-        {
-            var still = Stealth.Game.StorageBotAnimator.Pose(0f, 0f, 1f);
-            Assert.AreEqual(0f, still.roll, 1e-4f);
-            Assert.AreEqual(0f, still.bob, 1e-4f);
-            var walk = Stealth.Game.StorageBotAnimator.Pose(2.5f, 0f, 1f);
-            Assert.Greater(Mathf.Abs(walk.roll), 1f, "it sways walking");
-            Assert.Less(Stealth.Game.StorageBotAnimator.Pose(0f, 1.8f, 0f).pitch, -30f, "nose up climbing up");
-            Assert.Greater(Stealth.Game.StorageBotAnimator.Pose(0f, -1.8f, 0f).pitch, 30f, "nose down climbing down");
-        }
     }
 }

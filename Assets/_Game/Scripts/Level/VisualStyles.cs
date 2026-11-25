@@ -93,17 +93,6 @@ namespace Stealth.Level
 
         public static IReadOnlyList<VisualStyle> All => Config != null ? Config.Styles : System.Array.Empty<VisualStyle>();
 
-        /// <summary>
-        /// Another list of styles (the test rooms play only «Заброшенный комплекс»): its default goes on at once. The model
-        /// and material variants are the same in every list, so nothing else reloads.
-        /// </summary>
-        public static void UseConfig(StyleConfig config)
-        {
-            if (config == null || config == s_Config) return;
-            s_Config = config;
-            if (config.Default != null) Apply(config.Default);
-        }
-
         /// <summary>The game's own look (StyleConfig.Default) is on from the first frame of the scene.</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void ApplyDefault()

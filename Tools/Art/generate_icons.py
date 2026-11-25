@@ -479,6 +479,16 @@ def house_abandoned(g):
     g.poly([(0.50, 0.62), (0.60, 0.80), (0.40, 0.80)], on="d")
 
 
+def house_testrooms(g):
+    # the rooms test seen from above: a floor plan of three rooms off a corridor, a door gap in each wall
+    g.rrect((0.12, 0.16, 0.88, 0.84), 0.03)
+    g.rrect((0.19, 0.23, 0.45, 0.50), 0.01, on="d")
+    g.rrect((0.52, 0.23, 0.81, 0.50), 0.01, on="d")
+    g.rrect((0.19, 0.57, 0.81, 0.77), 0.01, on="d")
+    g.rrect((0.27, 0.48, 0.36, 0.59), 0.0)
+    g.rrect((0.62, 0.48, 0.71, 0.59), 0.0)
+
+
 def job_vault(g):
     g.rrect((0.12, 0.12, 0.88, 0.88), 0.08)
     g.ellipse((0.24, 0.24, 0.76, 0.76), fill=False, width=0.06, on="d")
@@ -818,7 +828,7 @@ def main(only=None):
         jobs.append((name, lambda n=name, d=draw: make(n, d)))
     for name, draw in {"house_office": house_office, "house_business": house_business, "house_datacenter": house_datacenter,
                        "house_warehouse": house_warehouse, "house_hq": house_hq, "house_hospital": house_hospital,
-                       "house_garage": house_garage, "house_apartments": house_apartments, "house_abandoned": house_abandoned, "job_vault": job_vault, "job_hostage": job_hostage}.items():
+                       "house_garage": house_garage, "house_apartments": house_apartments, "house_abandoned": house_abandoned, "house_testrooms": house_testrooms, "job_vault": job_vault, "job_hostage": job_hostage}.items():
         jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
     for name, draw in ROBOTS.items():
         jobs.append((name, lambda n=name, d=draw: make(n, d)))

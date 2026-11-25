@@ -42,14 +42,21 @@ namespace Stealth.Player
                 m_WasSeated = seated;
                 // getting out beside the car
                 if (!seated && car != null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
-                if (seated) { transform.rotation = car.transform.rotation; Motor.SetPitch(6f); } // sitting down: eyes on the road
+                if (seated)
+                {
+                    // sitting down: eyes on the road
+                    Motor.ResetLook();
+                    transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y, 0f);
+                    Motor.SetPitch(6f);
+                }
                 m_Controller.enabled = !seated;
                 Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);
             }
             if (!seated) return;
             m_LastSeat = seat;
             transform.position = car.Seats[seat].position - Vector3.up * SeatDrop;
-            transform.Rotate(0f, car.YawDelta, 0f);
+            // the body sits facing the road (turned on the seat a little at most, Motor.BodyYaw), turning with the car
+            transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y + Motor.BodyYaw, 0f);
             if (!menu && !CursorMode && Controls.Pressed(GameAction.Interact))
             {
                 // this press is spent: on the host the seat is freed at once, and the same E must not sit us down again
@@ -57,6 +64,32 @@ namespace Stealth.Player
                 m_UseWaitRelease = true;
                 Link.SendUse(UseKind.CarSeat, seat);
             }
+        }
+
+        /// <summary>
+        /// Owner, before the motor: the body held while it hangs on the ladder (facing the rungs, hands and feet on them) or
+        /// sits in the car (facing the road) — the mouse turns the head within <see cref="LookSettings"/>, never round the
+        /// back (<see cref="PlayerMotor.LookHeld"/>). Climbing out over the top, the body is free again.
+        /// </summary>
+        void HoldLook()
+        {
+            var s = Tuning.Player.Look;
+            var car = Vehicles.Car.Active;
+            if (Climbing && !m_ClimbingOut && m_Ladder != null)
+            {
+                Motor.LookHeld = true;
+                Motor.HoldYaw = Mathf.Atan2(m_Ladder.Facing.x, m_Ladder.Facing.z) * Mathf.Rad2Deg;
+                Motor.HoldHead = s.LadderHead;
+                Motor.HoldBody = 0f;
+            }
+            else if (SeatIndex >= 0 && car != null)
+            {
+                Motor.LookHeld = true;
+                Motor.HoldYaw = car.transform.eulerAngles.y;
+                Motor.HoldHead = s.SeatHead;
+                Motor.HoldBody = s.SeatBody;
+            }
+            else Motor.LookHeld = false;
         }
 
         float m_NextWorkTick;

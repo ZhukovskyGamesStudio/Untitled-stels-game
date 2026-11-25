@@ -136,6 +136,18 @@ namespace Stealth.Level
         [Tooltip("Biggest room, m² (corridors and stair halls not counted; 0 = any): the splitter aims below it, a plan with a bigger room is redrawn.")]
         public float RoomAreaMax;
 
+        /// <summary>
+        /// With <see cref="EveryRoomType"/> (the test rooms): every type of the room program is in the plan (pure). The plan
+        /// may not fit a programmed room (rarely: the server room in one test rooms house of about 180) — it is redrawn.
+        /// </summary>
+        public bool TypesOk(LevelLayout l)
+        {
+            if (!EveryRoomType) return true;
+            foreach (var t in RoomRules.Programmed)
+                if (!l.Plan.Rooms.Exists(r => r.Type == t)) return false;
+            return true;
+        }
+
         /// <summary>Every room (not the corridors and stair halls) is inside the area limits (pure).</summary>
         public bool RoomAreasOk(LevelLayout l)
         {
@@ -453,7 +465,7 @@ namespace Stealth.Level
                 HouseRules.Of(l).AfterDoorways(l);
                 l.HatchPosition = EntryHatch(l);
                 long planMs = watch.ElapsedMilliseconds;
-                bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l);
+                bool countOk = building.RoomCountOk(BuildingSettings.CountRooms(l)) && building.RoomAreasOk(l) && building.CorridorsOk(l) && building.TypesOk(l);
                 h.Checker = o.Unreached == 0 && countOk ? new Furnisher(l, new System.Random(0)) : null;
                 bool ok = h.Checker != null && h.Checker.Unreached().Count == 0;
                 Timing.Plan += planMs; Timing.Check += watch.ElapsedMilliseconds - planMs;

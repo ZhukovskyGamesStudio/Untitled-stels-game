@@ -12,6 +12,8 @@ description: "Люди-игроки USG: модели четырёх отдел�
 Капсула игрока тонкая, по фигуре (`PlayerController.BodyRadius` = 0,25 м, запас 2,5 см): к ящику и стене подходят вплотную. Выносливость выключена (`StaminaSettings.Enabled`). Ноги игроков — отдельные части `BodyLegL/BodyLegR` (поворот у бедра `generate_models.LEG_PIVOT`)
 качаются в шаг (`PlayerController.SwingLegs`, `PlayerRules.LegSwing`), сидя в машине — согнуты. Оставленный лежать в доме возвращается с пустым рюкзаком.
 
+Поворот головы при удержанном теле (лестница, сиденье): `PlayerMotor.HeadYaw` — рыскание головы (камеры) относительно тела, тело — `HoldYaw + BodyYaw`. Поворот головы идёт по сети, как наклон: `PlayerController.LookYaw` (sbyte, ~10 раз в секунду в `SyncLookPitch`, при отпускании — ровно 0) → `PlayerNet.m_LookYaw` → `ApplyOwnerState`; у чужих он сглажен (`ShownLookYaw`) и поворачивает шею и голову скелета (`HumanRig.Pose(..., yaw)`, `HumanMath.HeadYaw`: до `MaxHeadYaw`, шее — `NeckShare`, лёжа, у терминала и за работой — 0), `HeadPivot`, фонарь и взгляд при наблюдении за товарищем.
+
 ## Люди: модели, гардероб, скелет, дубли
 
 Игроки — айтишники четырёх отделов (`PlayerLooks`: бэкенд, тестирование, сисадмины, дизайн; отдел — от класса, `PlayerLooks.DepartmentOfClass`: монтажник — сисадмин, хакер — бэкенд, связист — тестировщик, картограф — дизайнер; до выбора — `DefaultClass` слота; цвет команды и лицо — от слота; `VisualStyles.SetVariant`

@@ -595,7 +595,6 @@ namespace Stealth.EditorTools
             BuildSafeCrack(e, content);
             BuildVaultLock(content);
             BuildCheatPanel(e, content);
-            BuildStylePanel(e, root.transform); // outside Content: F8 works in the menu too, where the HUD is hidden
             BuildEntryBanner(hud, root.transform);
             BuildStatsPanel(hud, root.transform);
             BuildStartScreen(e, root.transform);

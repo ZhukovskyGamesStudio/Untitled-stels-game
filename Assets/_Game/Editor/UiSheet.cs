@@ -531,7 +531,7 @@ namespace Stealth.EditorTools
             return new List<GameObject> { go };
         }
 
-        /// <summary>The car upgrade bench: the engine half way, the trunk at its top, the kennel short of things, the teleport, the planned two.</summary>
+        /// <summary>The car upgrade bench: the engine half way, the trunk at its top, Linus's backpack (3 x 5) short of things, the teleport, the planned two.</summary>
         static List<GameObject> Upgrades()
         {
             var hud = Hud(out var go);
@@ -548,7 +548,7 @@ namespace Stealth.EditorTools
                 bool planned = max == 0, top = !planned && level >= max;
                 v.Name.text = Loc.T(Game.GameManager.UpgradeKey(u));
                 v.What.text = Loc.F(Game.GameManager.UpgradeKey(u) + ".what", 10);
-                v.Now.text = i switch { 0 => Loc.F("upgrade.engine.now", 10), 1 => Loc.F("upgrade.trunk.now", 3), 2 => Loc.T("upgrade.kennel.now.none"), 3 => Loc.T("upgrade.teleport.now.none"), _ => "" };
+                v.Now.text = i switch { 0 => Loc.F("upgrade.engine.now", 10), 1 => Loc.F("upgrade.trunk.now", 3), 2 => Loc.F("upgrade.kennel.now", 3, 5), 3 => Loc.T("upgrade.teleport.now.none"), _ => "" };
                 for (int b = 0; b < v.Boxes.Length; b++) { On(v.Boxes[b], b < max); On(v.Ticks[b], b < level); }
                 On(v.Planned, planned);
                 On(v.Done, top);
@@ -661,11 +661,14 @@ namespace Stealth.EditorTools
             return new List<GameObject> { go };
         }
 
+        /// <summary>The cheat panel's «Визуал» page (the style picker).</summary>
         static List<GameObject> Styles()
         {
             Hud(out var go);
-            var styles = go.GetComponentInChildren<StylePanel>(true);
-            On(styles.Root);
+            var cheats = go.GetComponentInChildren<CheatPanel>(true);
+            On(cheats.Root);
+            for (int k = 0; k < cheats.Pages.Length; k++) cheats.Pages[k].SetActive(k == (int)CheatPanel.Tab.Visual);
+            var styles = cheats.Pages[(int)CheatPanel.Tab.Visual].GetComponent<StylePanel>();
             int i = 0;
             foreach (var n in new[] { "Тихий комплекс", "Заброшенный", "Пиксели", "Комикс", "Нуар", "VHS", "Чертёж", "Акварель" })
             {
@@ -695,7 +698,6 @@ namespace Stealth.EditorTools
                 view.Frame.color = UiPalette.MarkBlue;
                 var b = board.GetComponent<StashBoard>();
                 b.ValueLabel.text = "Склад: 86 очк.";
-                b.StashAllLabel.text = "G — сложить всё";
                 foreach (var c in new[] { board.GetComponent<Canvas>(), sign.GetComponent<Canvas>() }) c.worldCamera = s_Camera;
                 s_Camera.transform.position = Vector3.zero;
                 s_Camera.transform.rotation = Quaternion.identity;

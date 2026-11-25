@@ -541,6 +541,8 @@ namespace Stealth.EditorTools
             ("Body", new Color(0.18f, 0.3f, 0.24f), 0.45f, false), ("Accent", new Color(0.7f, 0.5f, 0.3f), 0.3f, false),
             ("AccentBoard", new Color(0.75f, 0.74f, 0.7f), 0.2f, false), ("Trim", new Color(0.65f, 0.67f, 0.7f), 0.7f, false),
             ("TrimHandle", new Color(0.8f, 0.15f, 0.1f), 0.5f, false), ("EyeLamp", new Color(1f, 0.85f, 0.6f), 0.5f, true),
+            ("TrimChrome", new Color(0.85f, 0.87f, 0.9f), 0.92f, false), ("Hazard", new Color(0.95f, 0.75f, 0.1f), 0.4f, false),
+            ("Dark", new Color(0.08f, 0.08f, 0.09f), 0.35f, false), ("EyeBeacon", new Color(1f, 0.5f, 0.1f), 0.6f, true),
         };
 
         /// <summary>
@@ -568,20 +570,22 @@ namespace Stealth.EditorTools
             Child(root, "BenchUse", CarBenchTop).AddComponent<CarWorkbench>();
         }
 
-        /// <summary>The storage robot riding in its kennel, in the car's frame (car_upgrades.py: the kennel's floor and middle), facing out of its door.</summary>
-        static readonly Vector3 KennelMuleAt = new(0.45f, KennelFloor, -1.95f);
-        /// <summary>The kennel's floor top over the ground (car_upgrades.py: on the bed's floor, 0.85).</summary>
-        const float KennelFloor = 0.868f;
+        /// <summary>
+        /// Linus asleep in the trunk, in the car's frame: where the real one sleeps (StorageBot.TrunkSpot: the bed's
+        /// tailgate end + (0.45, 0.02, 0.4)), facing the tailgate — in the kennel once there is one.
+        /// </summary>
+        static readonly Vector3 KennelMuleAt = new(0.45f, 0.88f, -1.95f);
 
         /// <summary>
         /// The car's upgrades as they look (Tools/Blender/car_upgrades.py, modelled in the car's frame like the bench): the
-        /// trunk's three shelves and the kennel on the car's body, the storage robot's model sitting in the kennel, all shown
-        /// by <see cref="CarUpgradeLook"/> from the replicated levels.
+        /// engine's shredder levels, the trunk's three shelves and the kennel on the car's body, the teleport's panic button on
+        /// the pickup's own model (it moves to the other side with the steering wheel: CarLook.Mirror), and Linus curled up
+        /// asleep in the trunk, all shown by <see cref="CarUpgradeLook"/> from the replicated levels.
         /// </summary>
-        static void BuildCarUpgrades(Transform root, Transform body)
+        static void BuildCarUpgrades(Transform root, Transform body, Transform pickup)
         {
             var look = root.gameObject.AddComponent<CarUpgradeLook>();
-            GameObject Part(string file)
+            GameObject Part(string file, Transform parent)
             {
                 if (AssetDatabase.FindAssets($"{file} t:Model", new[] { ModelsDir }).Length == 0)
                 {
@@ -589,7 +593,7 @@ namespace Stealth.EditorTools
                     return null;
                 }
                 var model = Model(file);
-                model.transform.SetParent(body, false);
+                model.transform.SetParent(parent, false);
                 foreach (var (part, color, smooth, glow) in CarBenchLooks)
                     Mat("Props", $"CarBench_{part}", color, glow ? color * 1.4f : (Color?)null, smoothness: smooth);
                 foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
@@ -602,37 +606,58 @@ namespace Stealth.EditorTools
                 foreach (var c in model.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
                 return model;
             }
-            var shelves = Part("car_shelves");
+            // a holder per level: the level's objects (named …<tag>1…, …<tag>2…, …<tag>3…) under it, hidden
+            GameObject[] Levels(GameObject model, string tag)
+            {
+                var levels = new GameObject[3];
+                var parts = model.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray();
+                for (int i = 0; i < 3; i++)
+                {
+                    var holder = new GameObject($"{tag}{i + 1}").transform;
+                    holder.SetParent(model.transform, false);
+                    foreach (var t in parts.Where(t => t.name.Contains($"{tag}{i + 1}"))) t.SetParent(holder, true);
+                    holder.gameObject.SetActive(false);
+                    levels[i] = holder.gameObject;
+                }
+                return levels;
+            }
+            var shelves = Part("car_shelves", body);
             if (shelves != null)
             {
                 shelves.name = "Shelves";
-                // a holder per level: the level's objects (named …Shelf1…, …Shelf2…, …Shelf3…) under it
-                look.Shelves = new GameObject[3];
-                var parts = shelves.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray();
-                for (int i = 0; i < 3; i++)
-                {
-                    var holder = new GameObject($"Shelf{i + 1}").transform;
-                    holder.SetParent(shelves.transform, false);
-                    foreach (var t in parts.Where(t => t.name.Contains($"Shelf{i + 1}"))) t.SetParent(holder, true);
-                    holder.gameObject.SetActive(false);
-                    look.Shelves[i] = holder.gameObject;
-                }
+                look.Shelves = Levels(shelves, "Shelf");
             }
-            var kennel = Part("car_kennel");
+            var shredder = Part("car_shredder", body);
+            if (shredder != null)
+            {
+                shredder.name = "ShredderLevels";
+                look.Shredder = Levels(shredder, "Engine");
+            }
+            var panic = Part("car_panic", pickup);
+            if (panic != null)
+            {
+                panic.name = "PanicButton";
+                panic.SetActive(false);
+                look.PanicButton = panic;
+            }
+            var kennel = Part("car_kennel", body);
             if (kennel != null)
             {
                 kennel.name = "Kennel";
                 kennel.SetActive(false);
                 look.Kennel = kennel;
-                var mule = Model("robot_storage");
-                mule.name = "KennelMule";
-                mule.transform.SetParent(body, false);
-                mule.transform.SetLocalPositionAndRotation(KennelMuleAt, Quaternion.Euler(0f, 180f, 0f));
-                Paint(mule, "RobotBody", "RobotAccent", "SensorGlow");
-                foreach (var c in mule.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
-                mule.SetActive(false);
-                look.KennelMule = mule;
             }
+            // Linus asleep in the trunk: curled up (a still pose, no animator), his own size and pack, where the real one sleeps
+            var mule = RaccoonModel(out var muleAnimator, out _);
+            var curl = AssetDatabase.LoadAllAssetsAtPath(RaccoonFbx).OfType<AnimationClip>().FirstOrDefault(c => c.name == "Curl");
+            if (curl != null) curl.SampleAnimation(muleAnimator.gameObject, 0f);
+            Object.DestroyImmediate(muleAnimator);
+            mule.name = "KennelMule";
+            mule.transform.SetParent(body, false);
+            mule.transform.SetLocalPositionAndRotation(KennelMuleAt, Quaternion.Euler(0f, 180f, 0f) * mule.transform.localRotation);
+            foreach (var c in mule.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            mule.SetActive(false);
+            look.KennelMule = mule;
         }
 
         static GameObject BuildCar(CargoPiece piece)
@@ -687,7 +712,7 @@ namespace Stealth.EditorTools
             shredder.Chips = ShredderChips(hopper.transform);
             car.Bed = Child(root.transform, "Bed", new Vector3(0f, 0.86f, -2.35f)).transform;
             BuildCarBench(root.transform, body.transform);
-            BuildCarUpgrades(root.transform, body.transform);
+            BuildCarUpgrades(root.transform, body.transform, model.transform);
             car.CargoRoot = Child(root.transform, "Cargo").transform;
 
             // solid: the chassis with the bed walls and the cab; the hull (for the walls ahead) is not a collider of its own

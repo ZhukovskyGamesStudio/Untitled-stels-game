@@ -20,6 +20,15 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void HeadTurnsWhereTheHeldBodysOwnerLooks()
+        {
+            Assert.AreEqual(-80f, HumanMath.HeadYaw(-80f, BodyPose.Ladder, false), 1e-4f, "on the ladder: the head turns as the player looks");
+            Assert.AreEqual(HumanMath.MaxHeadYaw, HumanMath.HeadYaw(170f, BodyPose.None, false), 1e-4f, "never round the back");
+            Assert.AreEqual(0f, HumanMath.HeadYaw(60f, BodyPose.None, true), "lying: still");
+            Assert.AreEqual(0f, HumanMath.HeadYaw(60f, BodyPose.Terminal, false), "at a terminal the take moves the head");
+        }
+
+        [Test]
         public void ASeatedBodyDoesNotWalk()
         {
             Assert.AreEqual(0f, HumanMath.WalkSpeed(9f, true), "riding in the car is not walking");

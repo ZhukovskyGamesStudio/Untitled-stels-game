@@ -75,7 +75,31 @@ namespace Stealth
             if (string.IsNullOrEmpty(key)) return "";
             if (!Table.TryGetValue(key, out var row)) return key;
             int i = (int)l;
-            return i < row.Length && !string.IsNullOrEmpty(row[i]) ? row[i] : row[0];
+            return Embed(i < row.Length && !string.IsNullOrEmpty(row[i]) ? row[i] : row[0], l, 0);
+        }
+
+        /// <summary>
+        /// A text may carry another key's text as <c>{=key}</c> (a name used in many texts lives in one place: Linus's,
+        /// <c>name.raccoon</c> and its cases); embedded keys may embed in turn, a few deep.
+        /// </summary>
+        static string Embed(string text, Language l, int depth)
+        {
+            int at = text.IndexOf("{=", StringComparison.Ordinal);
+            if (at < 0 || depth > 3) return text;
+            var sb = new StringBuilder(text.Length + 16);
+            int from = 0;
+            while (at >= 0)
+            {
+                int end = text.IndexOf('}', at + 2);
+                if (end < 0) break;
+                sb.Append(text, from, at - from);
+                string inner = text.Substring(at + 2, end - at - 2);
+                sb.Append(Table.TryGetValue(inner, out var row) ? Embed(row[Math.Min((int)l, row.Length - 1)] is { Length: > 0 } t ? t : row[0], l, depth + 1) : inner);
+                from = end + 1;
+                at = text.IndexOf("{=", from, StringComparison.Ordinal);
+            }
+            sb.Append(text, from, text.Length - from);
+            return sb.ToString();
         }
 
         /// <summary><see cref="T(string)"/> formatted with <paramref name="args"/> (<c>{0}</c>, <c>{1:0}</c>…).</summary>

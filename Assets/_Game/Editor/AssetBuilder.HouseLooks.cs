@@ -70,6 +70,7 @@ namespace Stealth.EditorTools
             switch (h.Kind)
             {
                 case HouseKind.Office:
+                case HouseKind.TestRooms: // (laid out and furnished as an office)
                     // the style's own: beige paint, carpet, acoustic ceilings
                     h.ShellIn = scanned;
                     break;

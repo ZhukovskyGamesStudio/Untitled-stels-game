@@ -12,7 +12,7 @@ namespace Stealth.Vehicles
         Engine,
         /// <summary>Levels 1–3: shelves in the cargo bed (only to look at for now).</summary>
         Trunk,
-        /// <summary>Levels 1–3: the storage robot's kennel on the car — it rides along; higher levels, a bigger box.</summary>
+        /// <summary>Levels 1–3: Linus's backpack — a bigger pack on his back, a bigger stash grid (<see cref="CarUpgradeSettings.KennelStash"/>).</summary>
         Kennel,
         /// <summary>Unique: the panic button on the glovebox (nominal for now: bought, does nothing yet).</summary>
         Teleport,
@@ -32,8 +32,8 @@ namespace Stealth.Vehicles
         public int[] RecipeSize = { 2, 3, 4 };
         [Tooltip("How many things a unique upgrade's recipe asks for.")]
         public int UniqueRecipeSize = 4;
-        [Tooltip("Rows of the storage robot's box by the kennel's level 0..3 (8 cells a row).")]
-        public int[] KennelStashRows = { 4, 4, 5, 6 };
+        [Tooltip("The storage robot's box (Linus's backpack), columns x rows, by the upgrade's level 0..3 (at most Game.TeamStash.MaxWidth x MaxHeight).")]
+        public Vector2Int[] KennelStash = { new(3, 5), new(4, 5), new(4, 7), new(6, 7) };
     }
 
     /// <summary>
@@ -81,6 +81,20 @@ namespace Stealth.Vehicles
             return true;
         }
 
+        /// <summary>
+        /// Any level at once, up or down (the cheat panel), clamped to the upgrade's own 0..<see cref="MaxLevel"/>. False
+        /// if nothing changed.
+        /// </summary>
+        public bool Set(CarUpgrade u, int level)
+        {
+            if ((int)u >= Count) return false;
+            byte to = (byte)Mathf.Clamp(level, 0, MaxLevel(u));
+            if (m_Levels[(int)u] == to) return false;
+            m_Levels[(int)u] = to;
+            Version++;
+            return true;
+        }
+
         public void Clear()
         {
             System.Array.Clear(m_Levels, 0, Count);
@@ -123,16 +137,14 @@ namespace Stealth.Vehicles
             return Mathf.Max(5, Mathf.RoundToInt(cost * FuelFactor(level, s) / 5f) * 5);
         }
 
-        /// <summary>Rows of the storage robot's box with the kennel at <paramref name="level"/>.</summary>
-        public static int StashRows(int level, CarUpgradeSettings s)
+        /// <summary>The storage robot's box (columns, rows) with its backpack at <paramref name="level"/>.</summary>
+        public static Vector2Int StashSize(int level, CarUpgradeSettings s)
         {
-            var rows = (s ?? new CarUpgradeSettings()).KennelStashRows;
-            if (rows == null || rows.Length == 0) return Game.TeamStash.Height;
-            return Mathf.Max(1, rows[Mathf.Clamp(level, 0, rows.Length - 1)]);
+            var sizes = (s ?? new CarUpgradeSettings()).KennelStash;
+            if (sizes == null || sizes.Length == 0) return new Vector2Int(Game.TeamStash.Width, Game.TeamStash.Height);
+            var v = sizes[Mathf.Clamp(level, 0, sizes.Length - 1)];
+            return new Vector2Int(Mathf.Clamp(v.x, 1, Game.TeamStash.MaxWidth), Mathf.Clamp(v.y, 1, Game.TeamStash.MaxHeight));
         }
-
-        /// <summary>The storage robot rides in its kennel on the car (and comes out of it in the basement).</summary>
-        public static bool MuleRides(int kennelLevel) => kennelLevel >= 1;
 
         /// <summary>
         /// Which things of <paramref name="carried"/> (shapes, -1: not to be taken — worn, in the hand) a recipe takes: each

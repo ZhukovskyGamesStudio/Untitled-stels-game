@@ -7,11 +7,13 @@ using UnityEngine;
 
 namespace Stealth.Tests
 {
-    /// <summary>The rooms-test level: a house of one floor with every room type at least once, its size unlimited; workers only.</summary>
+    /// <summary>
+    /// The test rooms (<see cref="HouseKind.TestRooms"/>): a kind of house with its own level — one floor with every room type
+    /// at least once, its size unlimited, workers only — started from the cheat panel, its kind carried by its seed.
+    /// </summary>
     public class RoomsTestTests
     {
         const string LevelPath = "Assets/_Game/Data/Config/RoomsTest/Level.asset";
-        const string RootPath = "Assets/_Game/Data/Config/RoomsTest/GameConfig.asset";
 
         [Test]
         public void RoomCountLimitsAreChecked()
@@ -25,30 +27,52 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheMainGameIsTheDefaultTheTestRoomsAreASwitch()
+        public void TheTestRoomsAreAKindOfHouseCarriedByItsSeed()
+        {
+            // the sign bit marks a test rooms house: every seed a run makes is non-negative, so no route ever rolls one
+            for (int run = 1; run < 40; run++)
+            {
+                var map = new Stealth.Game.RunMap(run * 7919);
+                for (int depth = 0; depth < 6; depth++)
+                {
+                    Assert.That(LevelRandom.LevelSeed(run, depth), Is.GreaterThan(0));
+                    for (int lane = 0; lane < map.LanesAt(depth); lane++)
+                        Assert.AreNotEqual(HouseKind.TestRooms, map.Node(depth, lane).Kind, $"run {run}: the route never has the test rooms");
+                }
+            }
+            foreach (int seed in new[] { 1, 42, 7919, int.MaxValue })
+            {
+                int test = HouseKinds.TestRoomsSeed(seed);
+                Assert.AreNotEqual(0, test);
+                Assert.IsTrue(HouseKinds.IsTestRooms(test));
+                for (int house = 0; house < 6; house++) Assert.AreEqual(HouseKind.TestRooms, HouseKinds.Of(test, house), "at any depth");
+                Assert.AreNotEqual(HouseKind.TestRooms, HouseKinds.Of(seed, 2));
+            }
+            Assert.IsFalse(HouseKinds.OwnPlan(HouseKind.TestRooms), "laid out by the office generator");
+            Assert.AreSame(HouseRules.Office, HouseRules.For(HouseKind.TestRooms));
+            var b = new BuildingSettings();
+            Assert.AreSame(b, HouseKinds.Apply(HouseKind.TestRooms, b), "the test rooms' own settings as they are");
+        }
+
+        [Test]
+        public void TheTestRoomsAreBuiltByTheirOwnLevelTheRestIsTheGames()
         {
             var scenes = EditorBuildSettings.scenes.Select(s => s.path).ToArray();
             CollectionAssert.AreEqual(new[] { "Assets/_Game/Scenes/Game.unity" }, scenes, "one scene: the main game");
-            var root = AssetDatabase.LoadAssetAtPath<GameConfig>(RootPath);
             var main = Resources.Load<GameConfig>(GameConfig.ResourcePath);
-            Assert.IsNotNull(root);
-            Assert.AreEqual(root, main.TestRooms, "the switch plays this root");
-            Assert.IsFalse(Tuning.TestRooms, "the main game by default");
-            try
-            {
-                Tuning.SetTestRooms(true);
-                Assert.AreEqual(root.Level, Tuning.Level, "the switch on: the test rooms' level");
-                Tuning.SetTestRooms(false);
-                Assert.AreEqual(main.Level, Tuning.Level, "off again: the main game");
-            }
-            finally { Tuning.SetTestRooms(false); }
-            Assert.AreEqual(AssetDatabase.LoadAssetAtPath<LevelConfig>(LevelPath), root.Level, "the test scene plays its own level");
-            Assert.AreNotEqual(main.Level, root.Level);
-            Assert.AreEqual(main.Player, root.Player, "the rest of the tuning is the game's own");
-            Assert.AreNotEqual(main.Styles, root.Styles, "the test rooms have their own style list…");
-            CollectionAssert.AreEqual(new[] { "S16_Derelict" }, root.Styles.Styles.Select(s => s.name).ToArray(), "…with the abandoned facility only");
-            Assert.AreEqual("S16_Derelict", root.Styles.Default.name);
-            Assert.Greater(main.Styles.Styles.Length, 1, "the main game has all the styles (F8)");
+            var level = AssetDatabase.LoadAssetAtPath<LevelConfig>(LevelPath);
+            Assert.IsNotNull(level);
+            Assert.AreEqual(level, main.TestRoomsLevel);
+            Assert.AreNotEqual(main.Level, level);
+            Assert.AreEqual(level, Tuning.LevelOf(HouseKind.TestRooms), "a test rooms house: its own level");
+            foreach (HouseKind k in System.Enum.GetValues(typeof(HouseKind)))
+                if (k != HouseKind.TestRooms) Assert.AreEqual(main.Level, Tuning.LevelOf(k), $"{k}: the game's level");
+            foreach (var gone in new[] { "GameConfig", "Run", "Audio" })
+                Assert.IsNull(AssetDatabase.LoadMainAssetAtPath($"Assets/_Game/Data/Config/RoomsTest/{gone}.asset"), $"no {gone} of their own: the game's");
+            Assert.IsNull(AssetDatabase.LoadMainAssetAtPath("Assets/_Game/Data/Styles/StylesTestRooms.asset"), "every style, like any house");
+            var menu = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/UI/Menu.prefab");
+            Assert.IsNotNull(menu);
+            Assert.IsFalse(menu.GetComponentsInChildren<Transform>(true).Any(t => t.name == "TestRooms"), "no switch in the main menu: the cheat panel starts them");
         }
 
         [Test]
@@ -67,6 +91,7 @@ namespace Stealth.Tests
                     {
                         var l = TestHouses.RoomsTest(seed - 1, house, players);
                         string at = $"seed {seed} house {house} players {players}";
+                        Assert.AreEqual(HouseKind.TestRooms, l.Kind, at);
                         foreach (var t in RoomRules.Programmed)
                             Assert.IsTrue(l.Rooms.Any(r => r.Type == t), $"{at}: a {t}");
                         Assert.AreEqual(1, l.Floors);
@@ -77,6 +102,17 @@ namespace Stealth.Tests
                         Assert.IsEmpty(l.LaserSpots);
                         foreach (var t in l.Terminals) Assert.That(t.kind, Is.EqualTo(TerminalKind.Doors).Or.EqualTo(TerminalKind.Map), "only the storage room's door terminal and the map terminals");
                     }
+        }
+
+        [Test]
+        public void APlanMissingAProgrammedTypeIsRedrawn()
+        {
+            var every = new BuildingSettings { EveryRoomType = true };
+            Assert.IsTrue(every.TypesOk(TestHouses.RoomsTest(0, 2)), "the test rooms house that once lost its server room");
+            var office = TestHouses.OfKind(HouseKind.Office, 0);
+            Assert.IsFalse(RoomRules.Programmed.All(t => office.Plan.Rooms.Any(r => r.Type == t)), "(a small office has not every type)");
+            Assert.IsFalse(every.TypesOk(office), "a plan without every type: redrawn");
+            Assert.IsTrue(new BuildingSettings().TypesOk(office), "the game's houses: any types");
         }
 
         [Test]
@@ -100,19 +136,17 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void NoHunterAndNoCountdownInTheTestLevel()
+        public void NoHunterAndNoCountdown()
         {
-            var root = AssetDatabase.LoadAssetAtPath<GameConfig>(RootPath);
+            // the test rooms play by the game's run rules: its hunter by time and alarms is off (the reinforcements took its place)
             var main = Resources.Load<GameConfig>(GameConfig.ResourcePath);
-            Assert.AreNotEqual(main.Run, root.Run, "the test level has its own run rules");
-            Assert.IsFalse(root.Run.Rules.Hunter);
+            Assert.IsFalse(main.Run.Rules.Hunter, "no hunter in the game");
             for (int house = 0; house < 4; house++)
             {
-                Assert.AreEqual((-1f, -1), Stealth.Game.RunState.HunterForecast(0, 9999f, house, 0, root.Run.Rules), "no countdown");
-                Assert.IsFalse(Stealth.Game.RunState.HunterDue(10, 9999f, house, 0, root.Run.Rules), "the hunter never comes");
+                Assert.AreEqual((-1f, -1), Stealth.Game.RunState.HunterForecast(0, 9999f, house, 0, main.Run.Rules), "no countdown");
+                Assert.IsFalse(Stealth.Game.RunState.HunterDue(10, 9999f, house, 0, main.Run.Rules), "the hunter never comes");
             }
-            // the game's hunter by time and alarms is off too (the reinforcements took its place); the rule still works when on
-            Assert.IsFalse(main.Run.Rules.Hunter, "no hunter in the game");
+            // the rule still works when on
             Assert.IsTrue(Stealth.Game.RunState.HunterDue(0, 9999f, 0, 0, new Stealth.Game.RunSettings()), "on, it would come");
         }
     }
