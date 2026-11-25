@@ -145,7 +145,8 @@ namespace Stealth.Game
         public int Collected => m_Run.Collected;
 
         /// <summary>The fuel the drive to the house in row <paramref name="lane"/> of the next column costs (every peer works it out the same way).</summary>
-        public int CostOf(int lane) => RunState.RouteCost(Quota, RunState.RouteShare(Level.RunSeed, Level.Index + 1, lane, m_Run.Settings.RouteFuel));
+        public int CostOf(int lane) => Vehicles.CarUpgrades.EngineCost(RunState.RouteCost(Quota, RunState.RouteShare(Level.RunSeed, Level.Index + 1, lane, m_Run.Settings.RouteFuel)),
+            Upgrades.Level(Vehicles.CarUpgrade.Engine), UpgradeSettings); // (the upgraded engine burns less)
 
         /// <summary>The cheapest way on from here (what the team must at least get).</summary>
         public int CheapestCost
@@ -392,16 +393,22 @@ namespace Stealth.Game
             // Every peer: the streams of this house restart from its seed (cosmetic rolls match across peers too).
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
-            var level = Tuning.Level;
+            var level = Tuning.LevelOf(HouseKinds.Of(info.Seed, info.Index)); // (the test rooms: their own settings)
+            ItemCatalog.ConfigureLoot(level.Loot.Table); // what this house's loot is (every peer: the same table)
+            FrameBudget.Step = "the plan (generated in the background, else here)";
             var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
             foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
             ApplyAtmosphere();
+            FrameBudget.Step = "style: dressing, architecture, merging";
             foreach (var _ in VisualStyles.ReapplySteps()) yield return null; // (a piece of a frame at a time: FrameBudget)
             if (PlayerController.Local != null) PlayerController.Local.SnapAir(); // under the house in the sewer: its air at once
             Debug.Log($"[Game] Level {info.Index} built: seed {info.Seed}, {HouseKinds.Name(layout.Kind)} ({layout.Mass}) {layout.SizeX:0}x{layout.SizeZ:0} m, {layout.Rooms.Count} rooms, {layout.Floors} floors for {layout.Players} players");
         }
+
+        /// <summary>The level settings of the house now standing (<see cref="Tuning.LevelOf"/>: the test rooms have their own).</summary>
+        static LevelConfig HouseLevel => Tuning.LevelOf(ActiveLevel.Layout != null ? ActiveLevel.Layout.Kind : HouseKind.Office);
 
         static void ApplyAtmosphere()
         {
@@ -432,6 +439,7 @@ namespace Stealth.Game
         {
             m_HouseEntered = false;
             HouseClockAt = 0;
+            FrameBudget.Step = "the old house's things despawned";
             BeginHouseStatsServer();
             foreach (var obj in m_Spawned.ToArray())
             {
@@ -463,7 +471,10 @@ namespace Stealth.Game
             var surface = ActiveLevel.Root.GetComponent<NavMeshSurface>();
             if (arriving)
             {
-                var bake = BakeNavMeshAsync(surface);
+                FrameBudget.Step = "navmesh: sources gathered a piece at a time";
+                AsyncOperation bake = null;
+                foreach (var _ in NavBake.Steps(surface, op => bake = op)) yield return null;
+                FrameBudget.Step = "navmesh: baking on worker threads";
                 while (bake != null && !bake.isDone) yield return null;
                 yield return null;
             }
@@ -482,6 +493,7 @@ namespace Stealth.Game
             Votes.Clear();
             Level = info;
             var counted = new int[1];
+            FrameBudget.Step = "the house's content spawned (robots, loot)";
             foreach (var _ in SpawnContentSteps(layout, seed, counted)) if (arriving) yield return null; // (a piece of a frame at a time)
             int totalValue = counted[0];
             m_Run.BeginLevel(index, totalValue, players);
@@ -490,24 +502,14 @@ namespace Stealth.Game
             m_Reinforcements = 0;
             if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
             else UnloadCarServer();
-            SpawnStorageBotServer(layout);
+            // Linus rides in the car's trunk: arriving, he is there once the car stops; the first house's car is parked already
+            m_MuleInKennel = arriving;
             foreach (var p in PlayerController.All) p.ResetForLevelServer(); // (the team arrives down in the basement)
             if (arriving) ArriveCarServer(layout);
             else SpawnBasementCarServer(layout);
+            if (!m_MuleInKennel) SpawnStorageBotServer(layout);
             SyncLocation();
             Debug.Log($"[Game] Level {index} (lane {lane}) started (run seed {m_RunSeed}, house seed {seed}): items worth {totalValue}, quota {Quota}, robots {layout.RobotSpawns.Count}, cameras {layout.CameraSpots.Count}, lasers {layout.LaserSpots.Count}");
-        }
-
-        /// <summary>Server: the navmesh of a just built house baked on worker threads (the sources are gathered now), or null.</summary>
-        static AsyncOperation BakeNavMeshAsync(NavMeshSurface surface)
-        {
-            if (surface == null) return null;
-            if (surface.navMeshData == null)
-            {
-                surface.navMeshData = new NavMeshData(surface.agentTypeID) { position = surface.transform.position, rotation = surface.transform.rotation };
-                surface.AddData();
-            }
-            return surface.UpdateNavMesh(surface.navMeshData);
         }
 
         int SpawnContent(LevelLayout layout, int seed)
@@ -538,8 +540,10 @@ namespace Stealth.Game
             m_Hidden.Clear();
             HideShelterMap(layout, free, parts, hideRng);
             int total = 0;
-            float inStorage = Tuning.Level.Loot.InStorageChance;
-            foreach (var loot in LootPlanner.Plan(layout, rng, Tuning.Level.Loot))
+            var lootSettings = HouseLevel.Loot;
+            float inStorage = lootSettings.InStorageChance;
+            var planned = LootPlanner.Plan(layout, rng, lootSettings);
+            foreach (var loot in planned)
             {
                 float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
                 // a part it fits in: a shovel only stands in a tall compartment, small things go in drawers and cupboards too
@@ -555,6 +559,7 @@ namespace Stealth.Game
                 if (FrameBudget.Over) yield return true;
             }
             total += SpawnFeatures(layout);
+            total += SpawnCraftingLoot(layout, seed, planned);
             yield return true;
             SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
             counted[0] = total;
@@ -664,6 +669,8 @@ namespace Stealth.Game
         {
             Pings.Expire(Time.time);
             RevealMap();
+            _ = Book; // this run's recipes on every peer (a blueprint's worth reads them)
+            UpdateHoles();
             PrepareNextHouse();
             UpdateDrive();
             EnsureHouseSewer();
@@ -672,6 +679,7 @@ namespace Stealth.Game
             {
                 DriveUntil = 0; // the car stands at the gate: the team gets out
                 UnloadCarServer();
+                ReleaseMuleServer();
                 Banner(Loc.Pack("banner.house", Level.Index + 1));
             }
             UpdateShredderServer();
@@ -684,6 +692,7 @@ namespace Stealth.Game
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
             UpdateLures();
             UpdateHacks();
+            UpdateRoboSensorsServer();
             UpdateDryers();
             UpdateStorageDoor();
             UpdateDoorsServer();
@@ -778,7 +787,7 @@ namespace Stealth.Game
             if (m_Reinforcements >= due) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
             m_Reinforcements++;
-            var roster = Tuning.Level.Security.Roster.Robots;
+            var roster = HouseLevel.Security.Roster.Robots;
             var table = layout.ClassicEnemies ? roster : RobotRoster.NewEnemies(roster);
             var kind = RobotRoster.PickReinforcement(table, layout.LevelIndex, rng);
             var at = FurthestEntry(layout);
@@ -892,6 +901,8 @@ namespace Stealth.Game
             Cargo.Clear();
             Stash.Clear();
             ExitStash.Clear();
+            ClearCraftingServer();
+            ClearUpgradesServer();
             CancelArrival();
             DriveUntil = 0;
             m_Opened.Add(OpenKeys.Gate); // the start of the run: no gate to open

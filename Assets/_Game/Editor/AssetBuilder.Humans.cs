@@ -520,6 +520,7 @@ namespace Stealth.EditorTools
             if (existing != null && !s_Force && existing.layers.Length == HumanLayers.Count && !existing.layers[HumanLayers.Head].iKPass
                 && existing.parameters.Any(p => p.name == "Pose") && existing.parameters.Any(p => p.name == "Cup")
                 && existing.parameters.Any(p => p.name == "Stride")
+                && existing.layers[HumanLayers.Legs].stateMachine.states.All(s => s.state.iKOnFeet)
                 && existing.animationClips.All(c => c != null) && (idle == null || existing.animationClips.Contains(idle))) return existing;
             AssetDatabase.DeleteAsset(HumanControllerPath);      // generated, never tuned by hand
             var c = AnimatorController.CreateAnimatorControllerAtPath(HumanControllerPath);
@@ -650,6 +651,10 @@ namespace Stealth.EditorTools
             Busy("Climb", climb, BodyPose.Ladder, 0.2f, byClimbSpeed: true);
             Busy("Terminal", terminal, BodyPose.Terminal, 0.3f);
             Busy("Work", work, BodyPose.Work, 0.22f);
+            // the legs' layer puts the feet where the take put them (Foot IK): the humanoid retargeting alone rebuilds the
+            // legs from their muscles and the standing feet slid 2-3 cm under a swaying body (HumanRigTests.TheFeetStayPutStandingStill)
+            if (layer == HumanLayers.Legs)
+                foreach (var s in sm.states) s.state.iKOnFeet = true;
         }
 
         /// <summary>A humanoid avatar mask with just these body parts (an asset next to the controller, rewritten each time).</summary>

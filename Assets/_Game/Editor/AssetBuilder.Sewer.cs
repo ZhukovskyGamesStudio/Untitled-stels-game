@@ -532,6 +532,166 @@ namespace Stealth.EditorTools
             return ps;
         }
 
+        /// <summary>Where the workbench's top is in the car's frame (Tools/Blender/car_bench.py): the hands go there.</summary>
+        static readonly Vector3 CarBenchTop = new(0f, 1.2f, -0.585f);
+
+        /// <summary>The bench's paint by part (car_bench.py): a green steel frame, a wooden top, the pegboard, steel tools, red grips, the lamp.</summary>
+        static readonly (string part, Color color, float smooth, bool glow)[] CarBenchLooks =
+        {
+            ("Body", new Color(0.18f, 0.3f, 0.24f), 0.45f, false), ("Accent", new Color(0.7f, 0.5f, 0.3f), 0.3f, false),
+            ("AccentBoard", new Color(0.75f, 0.74f, 0.7f), 0.2f, false), ("Trim", new Color(0.65f, 0.67f, 0.7f), 0.7f, false),
+            ("TrimHandle", new Color(0.8f, 0.15f, 0.1f), 0.5f, false), ("EyeLamp", new Color(1f, 0.85f, 0.6f), 0.5f, true),
+            ("TrimChrome", new Color(0.85f, 0.87f, 0.9f), 0.92f, false), ("Hazard", new Color(0.95f, 0.75f, 0.1f), 0.4f, false),
+            ("Dark", new Color(0.08f, 0.08f, 0.09f), 0.35f, false), ("EyeBeacon", new Color(1f, 0.5f, 0.1f), 0.6f, true),
+            ("AccentWindow", new Color(0.12f, 0.1f, 0.09f), 0.9f, false), ("EyeRadio", new Color(0.35f, 1f, 0.45f), 0.7f, true),
+            ("BluePaint", new Color(0.15f, 0.3f, 0.58f), 0.45f, false),
+        };
+
+        /// <summary>
+        /// The workbench at the cab's end of the bed (Tools/Blender/car_bench.py, modelled in the car's frame): its model on
+        /// the car's body (it sways with it), the place E opens it (<see cref="CarWorkbench"/>) at its top.
+        /// </summary>
+        static void BuildCarBench(Transform root, Transform body)
+        {
+            if (AssetDatabase.FindAssets("car_workbench t:Model", new[] { ModelsDir }).Length > 0)
+            {
+                var model = Model("car_workbench");
+                model.name = "Workbench";
+                model.transform.SetParent(body, false);
+                foreach (var (part, color, smooth, glow) in CarBenchLooks)
+                    Mat("Props", $"CarBench_{part}", color, glow ? color * 1.4f : (Color?)null, smoothness: smooth);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    string part = CarBenchLooks.Where(x => n.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
+                    r.sharedMaterial = M($"CarBench_{part}");
+                    if (n.StartsWith("Eye")) r.shadowCastingMode = ShadowCastingMode.Off;
+                }
+            }
+            else Debug.LogWarning("[Builder] car_workbench.fbx missing: run Tools/Blender/car_bench.py");
+            Child(root, "BenchUse", CarBenchTop).AddComponent<CarWorkbench>();
+        }
+
+        /// <summary>
+        /// Linus asleep in the trunk, in the car's frame: where the real one sleeps (StorageBot.TrunkSpot: the bed's
+        /// tailgate end + (0.45, 0.02, 0.4)), facing the tailgate.
+        /// </summary>
+        static readonly Vector3 KennelMuleAt = new(0.45f, 0.88f, -1.95f);
+
+        /// <summary>
+        /// The car's upgrades as they look (Tools/Blender/car_upgrades.py, modelled in the car's frame like the bench): the
+        /// engine's shredder levels, the trunk's three shelves and the kennel on the car's body, the teleport's panic button on
+        /// the pickup's own model (it moves to the other side with the steering wheel: CarLook.Mirror), and Linus curled up
+        /// asleep in the trunk, all shown by <see cref="CarUpgradeLook"/> from the replicated levels.
+        /// </summary>
+        static void BuildCarUpgrades(Transform root, Transform body, Transform pickup)
+        {
+            var look = root.gameObject.AddComponent<CarUpgradeLook>();
+            GameObject Part(string file, Transform parent)
+            {
+                if (AssetDatabase.FindAssets($"{file} t:Model", new[] { ModelsDir }).Length == 0)
+                {
+                    Debug.LogWarning($"[Builder] {file}.fbx missing: run Tools/Blender/car_upgrades.py");
+                    return null;
+                }
+                var model = Model(file);
+                model.transform.SetParent(parent, false);
+                foreach (var (part, color, smooth, glow) in CarBenchLooks)
+                    Mat("Props", $"CarBench_{part}", color, glow ? color * 1.4f : (Color?)null, smoothness: smooth);
+                foreach (var r in model.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    string n = r.gameObject.name;
+                    string part = CarBenchLooks.Where(x => n.StartsWith(x.part)).OrderByDescending(x => x.part.Length).Select(x => x.part).FirstOrDefault() ?? "Body";
+                    r.sharedMaterial = M($"CarBench_{part}");
+                    if (n.StartsWith("Eye")) r.shadowCastingMode = ShadowCastingMode.Off;
+                }
+                foreach (var c in model.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+                return model;
+            }
+            // a holder per level: the level's objects (named …<tag>1…, …<tag>2…, …<tag>3…) under it, hidden
+            GameObject[] Levels(GameObject model, string tag)
+            {
+                var levels = new GameObject[3];
+                var parts = model.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.transform).ToArray();
+                for (int i = 0; i < 3; i++)
+                {
+                    var holder = new GameObject($"{tag}{i + 1}").transform;
+                    holder.SetParent(model.transform, false);
+                    foreach (var t in parts.Where(t => t.name.Contains($"{tag}{i + 1}"))) t.SetParent(holder, true);
+                    holder.gameObject.SetActive(false);
+                    levels[i] = holder.gameObject;
+                }
+                return levels;
+            }
+            var shelves = Part("car_shelves", body);
+            if (shelves != null)
+            {
+                shelves.name = "Shelves";
+                look.Shelves = Levels(shelves, "Shelf");
+            }
+            var shredder = Part("car_shredder", body);
+            if (shredder != null)
+            {
+                shredder.name = "ShredderLevels";
+                look.Shredder = Levels(shredder, "Engine");
+            }
+            var car = root.GetComponent<Car>();
+            var panic = Part("car_panic", pickup);
+            if (panic != null)
+            {
+                panic.name = "PanicButton";
+                // pressed by looking at its red mushroom (E from a front seat: CarPanicButton)
+                var dome = panic.GetComponentsInChildren<MeshRenderer>(true).FirstOrDefault(r => r.name.StartsWith("TrimHandle"));
+                var press = new GameObject("Press");
+                press.transform.SetParent(panic.transform, false);
+                press.transform.position = dome != null ? dome.bounds.center : panic.transform.position;
+                press.AddComponent<CarPanicButton>().Car = car;
+                panic.SetActive(false);
+                look.PanicButton = panic;
+            }
+            var radio = Part("car_radio", body);
+            if (radio != null)
+            {
+                radio.name = "Radio";
+                // its songs from the dash (CarRadio), the front a cassette is let go on (a trigger: nothing bumps into it)
+                var all = radio.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.bounds).ToArray();
+                var b = all.Length > 0 ? all[0] : new Bounds(radio.transform.position, Vector3.one * 0.2f);
+                foreach (var x in all) b.Encapsulate(x);
+                var slot = radio.AddComponent<BoxCollider>();
+                slot.isTrigger = true;
+                slot.center = radio.transform.InverseTransformPoint(b.center);
+                slot.size = b.size + new Vector3(0.04f, 0.04f, 0.04f);
+                var source = radio.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.loop = true;
+                source.spatialBlend = 1f;
+                var player = radio.AddComponent<CarRadio>();
+                player.Source = source;
+                player.Slot = slot;
+                radio.SetActive(false);
+                look.Radio = radio;
+            }
+            // the front doors from inside: E at the door gets one out (E anywhere else does not)
+            for (int seat = 0; seat < 2; seat++)
+            {
+                var door = Child(root, $"Door{seat}").AddComponent<CarDoor>();
+                door.Car = car;
+                door.Seat = seat;
+            }
+            // Linus asleep in the trunk: curled up (a still pose, no animator), his own size and pack, where the real one sleeps
+            var mule = RaccoonModel(out var muleAnimator, out _);
+            var curl = AssetDatabase.LoadAllAssetsAtPath(RaccoonFbx).OfType<AnimationClip>().FirstOrDefault(c => c.name == "Curl");
+            if (curl != null) curl.SampleAnimation(muleAnimator.gameObject, 0f);
+            Object.DestroyImmediate(muleAnimator);
+            mule.name = "KennelMule";
+            mule.transform.SetParent(body, false);
+            mule.transform.SetLocalPositionAndRotation(KennelMuleAt, Quaternion.Euler(0f, 180f, 0f) * mule.transform.localRotation);
+            foreach (var c in mule.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(c);
+            mule.AddComponent<Stealth.Game.StorageBotSounds>().Asleep = true; // (it snores)
+            mule.SetActive(false);
+            look.KennelMule = mule;
+        }
+
         static GameObject BuildCar(CargoPiece piece)
         {
             var root = new GameObject("Car");
@@ -583,6 +743,8 @@ namespace Stealth.EditorTools
             shredder.Car = car;
             shredder.Chips = ShredderChips(hopper.transform);
             car.Bed = Child(root.transform, "Bed", new Vector3(0f, 0.86f, -2.35f)).transform;
+            BuildCarBench(root.transform, body.transform);
+            BuildCarUpgrades(root.transform, body.transform, model.transform);
             car.CargoRoot = Child(root.transform, "Cargo").transform;
 
             // solid: the chassis with the bed walls and the cab; the hull (for the walls ahead) is not a collider of its own

@@ -65,7 +65,7 @@ namespace Stealth.Game
                 if (m_PreparedFor.Equals(info) || DriveUntil > 0) return;
                 m_Prepared = null; // another way chosen meanwhile (or the team changed): that one finishes unused
             }
-            var level = Tuning.Level;
+            var level = Tuning.LevelOf(HouseKinds.Of(info.Seed, info.Index));
             var (building, security, features) = (level.Building, level.Security, level.Features);
             m_PreparedFor = info;
             m_Prepared = Task.Run(() =>
@@ -266,7 +266,7 @@ namespace Stealth.Game
                 double ms = watch.Elapsed.TotalMilliseconds;
                 total += ms;
                 worst = System.Math.Max(worst, ms);
-                if (ms > SlowStepMs && Debug.isDebugBuild) Debug.Log($"[Perf] {what}: step {n} took {ms:0} ms");
+                if (ms > SlowStepMs && Debug.isDebugBuild) Debug.Log($"[Perf] {what}: step {n} took {ms:0} ms ({FrameBudget.Step})");
                 n++;
                 if (!more) break;
                 yield return steps.Current;

@@ -66,9 +66,10 @@ namespace Stealth.EditorTools
         }
 
         /// <summary>
-        /// The team's storage robot (network prefab): the hermit crab in its crate (Tools/Blender/creatures), a server
-        /// NetworkTransform, a navmesh agent (on the server), <see cref="StorageBot"/> and its twin. No collider: the house's
-        /// robots and the players walk past it.
+        /// The team's storage mule (network prefab): the raccoon with its backpack (<see cref="RaccoonModel"/>), a server
+        /// NetworkTransform, a navmesh agent (on the server; the shaft's ladder link it climbs itself), <see cref="StorageBot"/>,
+        /// its twin, its body language (<see cref="StorageBotAnimator"/>) and the pat (<see cref="StorageBotPet"/>). No
+        /// collider: the house's robots and the players walk past it.
         /// </summary>
         static GameObject BuildStorageBot()
         {
@@ -79,36 +80,27 @@ namespace Stealth.EditorTools
             nt.SyncRotAngleX = false;
             nt.SyncRotAngleZ = false;
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
-            var model = Model("robot_storage");
+            var model = RaccoonModel(out var animator, out _);
             model.transform.SetParent(root.transform, false);
-            Paint(model, "RobotBody", "RobotAccent", "SensorGlow");
-            // the crate's lid (BodyLid, EyeLid) on a hinge at its back top edge: it opens while a player stands by
-            var lids = model.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name.Contains("Lid")).ToArray();
-            Transform lidPivot = null;
-            if (lids.Length > 0)
-            {
-                var b = lids[0].bounds;
-                foreach (var r in lids) b.Encapsulate(r.bounds);
-                lidPivot = new GameObject("LidPivot").transform;
-                lidPivot.SetParent(model.transform, false);
-                lidPivot.position = new Vector3(b.center.x, b.min.y, b.min.z);
-                foreach (var r in lids) r.transform.SetParent(lidPivot, true);
-            }
-            WalkingLegs(root, model); // its crab legs (cut at the knee) walk by inverse kinematics
+            root.AddComponent<StorageBotSounds>(); // (his paws, the backpack, the ducts, his chatter: recorded.py mule_*)
             var anim = root.AddComponent<StorageBotAnimator>();
             anim.Model = model.transform;
-            anim.LidPivot = lidPivot;
+            anim.Animator = animator;
+            anim.Neck = Find(model, "neck");
+            anim.Head = Find(model, "head");
             var agent = root.AddComponent<NavMeshAgent>();
             agent.enabled = false;
-            agent.radius = 0.4f;
+            agent.radius = 0.35f;
             agent.height = 0.7f;
             agent.speed = 2.8f;
             agent.angularSpeed = 360f;
             agent.acceleration = 10f;
             agent.stoppingDistance = 0.3f;
+            agent.autoTraverseOffMeshLink = false;          // (StorageBot climbs the ladder link at its own pace)
             agent.obstacleAvoidanceType = ObstacleAvoidanceType.LowQualityObstacleAvoidance;
             root.AddComponent<StorageBot>();
             root.AddComponent<StorageBotNet>();
+            root.AddComponent<StorageBotPet>();
             return root;
         }
 

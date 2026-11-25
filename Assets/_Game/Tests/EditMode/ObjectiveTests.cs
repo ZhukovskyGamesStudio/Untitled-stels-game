@@ -108,7 +108,7 @@ namespace Stealth.Tests
             for (int seed = 1; seed < 40 && found < 1; seed++)
             {
                 if (HouseFeatures.VaultFirst(seed, 2, new FeatureSettings())) continue;
-                var l = LevelGenerator.Generate(seed, 2, null, calm);
+                var l = TestHouses.Make(seed, 2, null, calm);
                 if (l.Objective != ObjectiveKind.Hostage) continue;
                 found++;
                 if (l.RobotSpawns.Count > 0) continue; // wardens still walk

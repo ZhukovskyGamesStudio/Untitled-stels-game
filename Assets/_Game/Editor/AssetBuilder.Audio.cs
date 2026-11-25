@@ -153,11 +153,13 @@ namespace Stealth.EditorTools
         static AudioClip[] Takes(string path, int count) => Enumerable.Range(0, count).Select(i => Clip($"{path}_{i}")).ToArray();
 
         static bool RecordedClipsMissing(SoundBank b) =>
-            new[] { b.StepConcrete, b.StepTile, b.StepWood, b.StepSoft, b.StepCarpet, b.StepMetal, b.StepWet, b.GasCough, b.WorkHack, b.WorkPick, b.WorkScrew, b.WorkUnit, b.LadderFoot, b.LadderHand }
+            new[] { b.StepConcrete, b.StepTile, b.StepWood, b.StepSoft, b.StepCarpet, b.StepMetal, b.StepWet, b.GasCough, b.WorkHack, b.WorkPick, b.WorkScrew, b.WorkUnit, b.LadderFoot, b.LadderHand,
+                     b.MuleStep, b.MulePack, b.MuleDuct, b.MuleChatter, b.Cassettes }
                 .Any(a => a == null || a.Length == 0 || a.Any(c => c == null))
             || new[] { b.UnlockUnit, b.DoorHeavyOpen, b.DoorHeavyShut, b.DrawerOpen, b.DrawerClose, b.SteelDrawerOpen, b.SteelDrawerClose, b.CupboardOpen, b.CupboardClose,
                 b.SteelCupboardOpen, b.SteelCupboardClose, b.SwitchOn, b.SwitchOff, b.HatchOpen, b.GrilleOff, b.SafeTick, b.Clank, b.Latch, b.TerminalKey, b.Bandage, b.Drink,
-                b.TerminalGranted, b.TerminalHackDone, b.ConsoleSolved, b.VaultUnlocked }
+                b.TerminalGranted, b.TerminalHackDone, b.ConsoleSolved, b.VaultUnlocked,
+                b.MuleHappy, b.MuleSnore, b.MuleSniff, b.MuleSqueak, b.MuleLeap, b.MuleDrop, b.MuleHop }
                 .Any(c => c == null);
 
         /// <summary>The clips cut from recordings (Tools/Audio/recorded.py) that have no older generated namesake.</summary>
@@ -178,6 +180,18 @@ namespace Stealth.EditorTools
             b.UnlockUnit = Clip("Items/unlock_unit");
             b.LadderFoot = Takes("Player/ladder_foot", 4);
             b.LadderHand = Takes("Player/ladder_hand", 4);
+            b.Cassettes = Takes("Music/cassette", Stealth.Items.ItemCatalog.CassetteSongs);
+            b.MuleStep = Takes("Mule/mule_step", 4);
+            b.MulePack = Takes("Mule/mule_pack", 3);
+            b.MuleDuct = Takes("Mule/mule_duct", 3);
+            b.MuleChatter = Takes("Mule/mule_chatter", 3);
+            b.MuleHappy = Clip("Mule/mule_happy");
+            b.MuleSnore = Clip("Mule/mule_snore");
+            b.MuleSniff = Clip("Mule/mule_sniff");
+            b.MuleSqueak = Clip("Mule/mule_squeak");
+            b.MuleLeap = Clip("Mule/mule_leap");
+            b.MuleDrop = Clip("Mule/mule_drop");
+            b.MuleHop = Clip("Mule/mule_hop");
             b.TerminalGranted = Clip("Items/terminal_granted");
             b.TerminalHackDone = Clip("Items/terminal_hack_done");
             b.ConsoleSolved = Clip("Items/console_solved");

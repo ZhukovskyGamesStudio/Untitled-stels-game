@@ -13,14 +13,14 @@ namespace Stealth.Tests
     /// </summary>
     public class StorageAndFloorLootTests
     {
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void SomeLootLiesOnTheFloorClearOfTheFurniture()
         {
             int all = 0, floor = 0;
-            for (int seed = 1; seed <= 16; seed++)
+            int seed = 0;
+            foreach (var l in TestHouses.Corpus(24).Where(h => h.LevelIndex is >= 1 and <= 4))
             {
-                var l = LevelGenerator.Generate(seed * 613, 1 + seed % 4, null, null, 2);
+                seed++;
                 foreach (var x in LootPlanner.Plan(l, new System.Random(seed)))
                 {
                     all++;
@@ -56,14 +56,14 @@ namespace Stealth.Tests
             Assert.AreEqual(-1, LootErrands.Nearest(Vector3.zero, new[] { items[1] }, 6f));
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomHasEmptyRacksWithPlacesForLoot()
         {
             int rooms = 0;
-            for (int seed = 1; seed <= 40 && rooms < 8; seed++)
+            foreach (var l in TestHouses.Corpus(TestHouses.CorpusSize))
             {
-                var l = LevelGenerator.Generate(seed * 271, 2 + seed % 3, null, null, 2);
+                if (rooms == 8) break;
+                int seed = l.Seed;
                 if (l.StorageRoom < 0) continue;
                 rooms++;
                 var inRoom = l.Props.Where(p => l.Plan.RoomAt(p.Position + Vector3.up * 0.3f)?.Id == l.StorageRoom).Select(p => p.Kind).ToList();

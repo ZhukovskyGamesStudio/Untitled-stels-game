@@ -161,6 +161,44 @@ namespace Stealth.Items
         }
 
         /// <summary>
+        /// Spots for <paramref name="count"/> more things (the blueprints, the chess detector's pieces): loot spots no loot
+        /// took, at least <paramref name="spacing"/> from the loot and from each other, spread over the floors (the same
+        /// draw on every run of the house).
+        /// </summary>
+        public static List<Vector3> Extras(LevelLayout l, System.Random rng, int count, IReadOnlyList<Loot> loot, float spacing)
+        {
+            var result = new List<Vector3>();
+            if (count <= 0 || l == null) return result;
+            var free = new List<Vector3>();
+            foreach (var p in l.ItemSpots)
+            {
+                bool near = false;
+                if (loot != null) foreach (var t in loot) if ((t.Position - p).sqrMagnitude < spacing * spacing) { near = true; break; }
+                if (!near) free.Add(p);
+            }
+            // first a spot per floor in turn, then any
+            int floor = rng.Next(Mathf.Max(1, l.Floors)), misses = 0;
+            while (result.Count < count && free.Count > 0 && misses <= l.Floors)
+            {
+                var onFloor = free.FindAll(p => LevelLayout.FloorOf(p.y) == floor);
+                floor = (floor + 1) % Mathf.Max(1, l.Floors);
+                if (onFloor.Count == 0) { misses++; continue; }
+                misses = 0;
+                var pick = onFloor[rng.Next(onFloor.Count)];
+                free.Remove(pick);
+                if (result.Exists(r => (r - pick).sqrMagnitude < spacing * spacing)) continue;
+                result.Add(pick);
+            }
+            while (result.Count < count && free.Count > 0)
+            {
+                int i = rng.Next(free.Count);
+                result.Add(free[i]);
+                free.RemoveAt(i);
+            }
+            return result;
+        }
+
+        /// <summary>
         /// Spots on the open floor for <see cref="LootSettings.FloorShare"/>, by floor: one per room (not the lobby with its
         /// hatch, the storage room — the workers' — or the vault), not by a hatch.
         /// </summary>

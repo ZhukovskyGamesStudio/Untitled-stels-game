@@ -10,6 +10,8 @@ namespace Stealth.Level
         public static GameObject Root { get; private set; }
         /// <summary>Surfaces of the house (walls, floors, openings) that visual styles dress.</summary>
         public static LevelShell Shell { get; private set; }
+        /// <summary>The prefabs the level was built from (the hammer's hole cuts its slab with them).</summary>
+        public static LevelArt Art { get; private set; }
         /// <summary>The furniture placed in the house (one object per prop).</summary>
         public static IReadOnlyList<GameObject> Props => s_Props;
         static readonly List<GameObject> s_Props = new();
@@ -31,8 +33,10 @@ namespace Stealth.Level
         /// </summary>
         public static IEnumerable<bool> LoadSteps(LevelLayout layout, LevelArt art)
         {
+            FrameBudget.Step = "the house before taken down";
             foreach (var step in ClearSteps()) yield return step; // the house before comes down a piece at a time (on the drive)
             Layout = layout;
+            Art = art;
             var builder = new LevelBuilder(art, layout);
             Shell = builder.Shell;
             foreach (var _ in builder.Steps())
@@ -276,6 +280,7 @@ namespace Stealth.Level
             LiveScreens.Clear();
 
             float W = l.SizeX, H = l.SizeZ;
+            FrameBudget.Step = "house: slabs, roof, ground";
             // Ground under the building, slabs between floors (holes for stairs and atriums), the roof, the yard and its fence.
             for (int f = 0; f < l.Floors; f++) BuildSlab(f);
             BuildRoof();
@@ -294,6 +299,7 @@ namespace Stealth.Level
             Block(m_Art.Fence, "Fence", new Vector3(W + yard + 0.5f, 4f, H / 2), new Vector3(1f, 8f, H + 2f * yard + 2f));
             yield return true;
 
+            FrameBudget.Step = "house: window cuts";
             m_WindowCuts.Clear();
             foreach (var cut in WindowCuts(l))
             {
@@ -303,9 +309,11 @@ namespace Stealth.Level
             for (int f = 0; f < l.Floors; f++)
             {
                 m_Floor = f;
+                FrameBudget.Step = $"house: walls of floor {f}";
                 BuildWalls(f);
                 yield return true;
             }
+            FrameBudget.Step = "house: lights, stairs";
             foreach (var r in l.Rooms) BuildLights(r);
             if (m_Art.RoomProbe != null)
                 foreach (var r in l.Rooms) // the room's own reflections (RoomProbes): a picture, robots do not read it
@@ -315,6 +323,7 @@ namespace Stealth.Level
                 }
             foreach (var s in l.Stairs) BuildStair(s);
             yield return true;
+            FrameBudget.Step = "house: doors, consoles, facade";
             for (int i = 0; i < l.AutoDoors.Count; i++)
             {
                 var d = l.AutoDoors[i];
@@ -396,13 +405,19 @@ namespace Stealth.Level
                     Place(m_Art.VaultConsole, $"VaultConsole{i}", l.VaultConsoles[i].position, l.VaultConsoles[i].rotation).GetComponent<VaultConsole>()?.Configure(i);
             BuildFacade();
             yield return true;
-            if (Application.isPlaying) CombineStatic(root);
+            // static batching a piece at a time (the whole house in one call was the drive's longest frame, ~0.5 s)
+            if (Application.isPlaying)
+                foreach (var step in CombineStaticSteps(root)) yield return step;
             yield return true;
-            BuildCity(W, H); // one mesh of its own: not static-batched
+            FrameBudget.Step = "house: city";
+            foreach (var step in BuildCitySteps(W, H)) yield return step; // one mesh of its own: not static-batched
             yield return true;
+            FrameBudget.Step = "house: utilities, switches";
             BuildUtilities();
+            yield return true;
             BuildSwitches();
             yield return true;
+            FrameBudget.Step = "house: props";
 
             for (int i = 0; i < l.Props.Count; i++)
             {
@@ -422,7 +437,7 @@ namespace Stealth.Level
                     foreach (var t in l.Terminals)
                         if (t.prop == i) terminal.Configure(i, t.kind, l.KioskTerminals.Contains(i));
                 Props.Add(go);
-                if (i % 80 == 79) yield return true;
+                if (FrameBudget.Over) yield return true; // (by the frame's budget: 80 at a time was a 50 ms step)
             }
             BuildBasement(); // after the props: the lid over the shaft is one
         }
@@ -1284,10 +1299,15 @@ namespace Stealth.Level
         }
 
         /// <summary>The city round the yard (<see cref="CityPlan"/>): one mesh, a submesh per material, and the street lamps' lights.</summary>
-        void BuildCity(float w, float h)
+        /// <summary>
+        /// The city round the house a piece of the frame at a time (<see cref="FrameBudget"/>): its plan, the invisible
+        /// blocks, the models' faces into one mesh (the models' vertices are read once per game: <see cref="s_CityMeshData"/>)
+        /// — one call was a 0.37 s frame on the drive.
+        /// </summary>
+        IEnumerable<bool> BuildCitySteps(float w, float h)
         {
             var mats = m_Art.CityMaterials;
-            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) return;
+            if (m_Art.CityPiece == null || mats == null || mats.Length == 0) yield break;
             var house = new Rect(0f, 0f, w, h);
             var lobby = m_Layout.Lobby.Center;
             var city = CityPlan.Make(house, CityPlan.SideNearest(house, new Vector2(lobby.x, lobby.z)), m_Layout.Floors, m_Layout.Seed);
@@ -1303,10 +1323,12 @@ namespace Stealth.Level
             foreach (var hole in m_Layout.ShaftHoles) CityPlan.CutHole(city, hole);
             // what players reach (inside the invisible wall and a bit): the pavements to stand on, the buildings, cars, posts to bump into
             var reach = new Bounds(new Vector3(w / 2f, 0f, h / 2f), new Vector3(w + 2f * CityPlan.Yard + 2f, 100f, h + 2f * CityPlan.Yard + 2f));
+            if (FrameBudget.Over) yield return true;
             foreach (var b in city.Ground)
                 if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
             foreach (var b in city.Solids)
                 if (b.Intersects(reach)) Block(m_Art.Fence, "Fence", b.center, b.size);
+            if (FrameBudget.Over) yield return true;
             int slots = System.Enum.GetValues(typeof(CitySlot)).Length;
             var verts = new List<Vector3>();
             var normals = new List<Vector3>();
@@ -1314,7 +1336,8 @@ namespace Stealth.Level
             var tris = new List<int>[slots];
             for (int i = 0; i < slots; i++) tris[i] = new List<int>();
             foreach (var b in city.Boxes) CityPlan.AddFaces(b, verts, normals, uvs, tris);
-            AddCityModels(city, verts, normals, uvs, tris);
+            if (FrameBudget.Over) yield return true;
+            foreach (var step in AddCityModels(city, verts, normals, uvs, tris)) yield return step;
             var mesh = new Mesh { name = "City", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
             mesh.SetVertices(verts);
             mesh.SetNormals(normals);
@@ -1327,6 +1350,7 @@ namespace Stealth.Level
             for (int i = 0; i < subs.Count; i++) mesh.SetTriangles(subs[i], i, false);
             mesh.RecalculateBounds();
             Meshes.Add(mesh);
+            if (FrameBudget.Over) yield return true;
             var go = Place(m_Art.CityPiece, "City", Vector3.zero, Quaternion.identity);
             go.GetComponent<MeshFilter>().sharedMesh = mesh;
             go.GetComponent<MeshRenderer>().sharedMaterials = used.ToArray();
@@ -1339,15 +1363,19 @@ namespace Stealth.Level
         /// vertex lists: each part of its <see cref="CityMesh"/> posed and drawn with its slot (Livery / Pane from the copy).
         /// The models' meshes are read once per build.
         /// </summary>
-        void AddCityModels(City city, List<Vector3> verts, List<Vector3> normals, List<Vector2> uvs, List<int>[] tris)
+        /// <summary>The city models' vertices, normals and triangles, read once per game (they are assets: the same every house).</summary>
+        static readonly Dictionary<Mesh, (Vector3[] v, Vector3[] n, int[] t)> s_CityMeshData = new();
+
+        IEnumerable<bool> AddCityModels(City city, List<Vector3> verts, List<Vector3> normals, List<Vector2> uvs, List<int>[] tris)
         {
-            if (m_Art.CityMeshes == null || m_Art.CityMeshes.Length == 0) return;
+            if (m_Art.CityMeshes == null || m_Art.CityMeshes.Length == 0) yield break;
             var models = new Dictionary<CityPropKind, CityMesh>();
             foreach (var m in m_Art.CityMeshes)
                 if (m != null && m.Meshes != null) models[m.Kind] = m;
-            var cache = new Dictionary<Mesh, (Vector3[] v, Vector3[] n, int[] t)>();
+            var cache = s_CityMeshData;
             foreach (var p in city.Props)
             {
+                if (FrameBudget.Over) yield return true;
                 if (!models.TryGetValue(p.Kind, out var model)) continue;
                 var pose = p.Pose;
                 for (int i = 0; i < model.Meshes.Length; i++)
@@ -1468,8 +1496,12 @@ namespace Stealth.Level
         /// </summary>
         public static bool KeepsMoving(Renderer r) => r.GetComponentInParent<AutoDoor>(true) != null || r.GetComponentInParent<KeepUnmerged>(true) != null;
 
-        static void CombineStatic(GameObject root)
+        /// <summary>Renderers static-batched per call: each call is its own batch, so the work can be split over frames.</summary>
+        public const int CombinePerStep = 160;
+
+        static IEnumerable<bool> CombineStaticSteps(GameObject root)
         {
+            FrameBudget.Step = "house: static batching";
             var list = new List<GameObject>();
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>())
             {
@@ -1478,7 +1510,12 @@ namespace Stealth.Level
                 if (PropBatches.IsShell(r, root.transform) && MeshBatcher.CanMerge(r, out _)) continue;
                 list.Add(r.gameObject);
             }
-            StaticBatchingUtility.Combine(list.ToArray(), root);
+            yield return true;
+            for (int i = 0; i < list.Count; i += CombinePerStep)
+            {
+                StaticBatchingUtility.Combine(list.GetRange(i, Mathf.Min(CombinePerStep, list.Count - i)).ToArray(), root);
+                yield return true;
+            }
         }
     }
 }

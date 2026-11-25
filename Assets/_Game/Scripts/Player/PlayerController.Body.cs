@@ -57,8 +57,10 @@ namespace Stealth.Player
                     go.transform.SetLocalPositionAndRotation(Model.localPosition, Quaternion.identity);
                     m_Rig = go.GetComponent<HumanRig>();
                     // the department's outfit (the person's own unless the config dresses them otherwise); later swaps repaint
+                    m_BootsWorn = -1;
                     if (go.TryGetComponent<HumanWardrobe>(out var wardrobe))
                     {
+                        m_Wardrobe = wardrobe;
                         wardrobe.Dress(VisualStyles.OutfitFor(m_LookDepartment), VisualStyles.Wardrobe);
                         wardrobe.Changed += DressRig;
                     }
@@ -67,6 +69,7 @@ namespace Stealth.Player
             }
             UpdateBodyPose();
             if (m_Rig == null) return;
+            UpdateBootsWorn();
             UpdateOwnLook();
             UpdateViewArm();
             float speed = IsOwner ? Motor.HorizontalSpeed : m_RemoteSpeed;
@@ -79,7 +82,59 @@ namespace Stealth.Player
             bool inside = IsOwner && !m_BodyShown;
             m_Rig.Eyes = inside && Camera != null ? Camera.transform : null;
             m_Rig.HideRightArm = inside && ((HeldHand != null && HeldHand.activeSelf) || (ViewFlashlight != null && ViewFlashlight.activeSelf));
-            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside);
+            HoldTheWheel();
+            m_Rig.Pose(speed, Crouching, Downed, IsOwner ? Motor.Pitch : LookPitch, SeatIndex >= 0, Pose, m_ClimbSpeed, holding && !inside, ShownLookYaw);
+        }
+
+        /// <summary>
+        /// In the driver's seat: both hands on the steering wheel's rim, at ten to two, turning with the wheel
+        /// (<see cref="Vehicles.CarLook.HandTurn"/>); every peer, by the car's own steering (the driver's, or the replicated one).
+        /// </summary>
+        void HoldTheWheel()
+        {
+            var car = Vehicles.Car.Active;
+            if (SeatIndex != 0 || Downed || car == null || car.Steering == null)
+            {
+                m_Rig.LetGoOfWheel();
+                return;
+            }
+            float turn = Vehicles.CarLook.HandTurn(car.WheelTurn), at = Vehicles.CarLook.HandsAt;
+            var a = car.WheelGrip(-at, turn, out var hub, out var column);
+            var b = car.WheelGrip(at, turn, out _, out _);
+            var a0 = car.WheelGrip(-at, 0f, out _, out _);
+            var b0 = car.WheelGrip(at, 0f, out _, out _);
+            // (which point is the left hand's by where it is: the mirrored car has the wheel's own right on the driver's left)
+            if (Vector3.Dot(a0 - hub, m_Rig.transform.right) > 0f) { (a, b) = (b, a); (a0, b0) = (b0, a0); }
+            m_Rig.HoldWheel(a, b, a0, b0, hub, column);
+        }
+
+        HumanWardrobe m_Wardrobe;
+        int m_BootsWorn = -1;
+
+        /// <summary>
+        /// Boots (plain or jump boots) anywhere on the player are on their feet: the wardrobe's boots made for this person;
+        /// without them, the outfit's own shoes again (every peer: backpacks are replicated).
+        /// </summary>
+        void UpdateBootsWorn()
+        {
+            if (m_Wardrobe == null) return;
+            int want = m_Inventory != null && m_Inventory.Carries(Items.ItemCatalog.Boots) ? 1 : 0;
+            if (want == m_BootsWorn) return;
+            m_BootsWorn = want;
+            const string slot = "feet", boots = "boots";
+            if (want == 1)
+            {
+                if (m_Wardrobe.ItemIn(slot) == boots) return;
+                WearPiece piece = null;
+                foreach (var p in VisualStyles.Wardrobe)
+                    if (p != null && p.Who == m_Wardrobe.Who && p.Item == boots) { piece = p; break; }
+                if (piece != null) m_Wardrobe.Wear(piece);
+                else m_Wardrobe.WearOwn(slot); // (the person whose own shoes are the boots)
+                return;
+            }
+            var outfit = VisualStyles.OutfitFor(m_LookDepartment);
+            if (outfit != null && outfit.Count > 0) m_Wardrobe.Dress(outfit, VisualStyles.Wardrobe);
+            else m_Wardrobe.WearOwn(slot);
         }
 
         /// <summary>
@@ -269,10 +324,11 @@ namespace Stealth.Player
             if (IsOwner) SwingLegs(Motor.HorizontalSpeed);
             if (IsOwner || Time.deltaTime <= 0f) { FollowRig(); return; }
 
-            // Remote players: tilt the head to the synced pitch and bob a little while walking.
+            // Remote players: turn and tilt the head to the synced look and bob a little while walking.
+            m_ShownYaw = Mathf.Lerp(m_ShownYaw, LookYaw, 1f - Mathf.Exp(-12f * Time.deltaTime));
             if (HeadPivot != null)
                 HeadPivot.localRotation = Quaternion.Slerp(HeadPivot.localRotation,
-                    Quaternion.Euler(Mathf.Clamp(LookPitch, -60, 60), 0, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
+                    Quaternion.Euler(Mathf.Clamp(LookPitch, -60, 60), m_ShownYaw, 0), 1f - Mathf.Exp(-12f * Time.deltaTime));
             var pos = transform.position;
             var delta = pos - m_LastModelPos;
             m_LastModelPos = pos;
@@ -309,6 +365,9 @@ namespace Stealth.Player
             m_PitchSyncTimer = 0.1f;
             var pitch = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.Pitch), -88, 88);
             if (Mathf.Abs(pitch - LookPitch) >= 2) LookPitch = pitch;
+            // the head's turn off the held body (the ladder, a seat): back to 0 exactly when let go
+            var yaw = (sbyte)Mathf.Clamp(Mathf.RoundToInt(Motor.HeadYaw), -127, 127);
+            if (Mathf.Abs(yaw - LookYaw) >= 2 || (yaw == 0 && LookYaw != 0)) LookYaw = yaw;
         }
     }
 }

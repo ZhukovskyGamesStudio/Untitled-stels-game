@@ -21,9 +21,10 @@ namespace Stealth.UI
         public Text Hint;
         public Button Reset;
 
-        static readonly Color KeyNormal = new(0.2f, 0.22f, 0.26f, 0.95f);
-        static readonly Color KeyWaiting = new(0.95f, 0.75f, 0.2f, 1f);
-        static readonly Color KeyConflict = new(0.75f, 0.2f, 0.18f, 0.95f);
+        // the key's paper: plain, highlighter yellow while it waits for a press, the pink copy when two actions share it
+        static readonly Color KeyNormal = UiPalette.Paper;
+        static readonly Color KeyWaiting = UiPalette.MarkYellow;
+        static readonly Color KeyConflict = UiPalette.NotePink;
         static ControlsPanel s_Waiting;
 
         readonly List<(GameAction action, ControlRowView row)> m_Rows = new();
@@ -79,8 +80,8 @@ namespace Stealth.UI
                 m_Labels.Add((row.Title, title));
                 m_Labels.Add((row.KeyLabel, key));
                 row.Key.interactable = false;
-                row.KeyBackground.color = new Color(0.12f, 0.13f, 0.15f, 0.9f);
-                row.KeyLabel.color = new Color(1f, 1f, 1f, 0.8f);
+                row.KeyBackground.color = UiPalette.PaperShade;
+                row.KeyLabel.color = UiPalette.InkSoft;
             }
         }
 
@@ -121,13 +122,13 @@ namespace Stealth.UI
                 string label = waiting ? Loc.T("controls.waiting") : Controls.Label(action);
                 if (row.KeyLabel.text != label) row.KeyLabel.text = label;
                 row.KeyBackground.color = waiting ? KeyWaiting : clash ? KeyConflict : KeyNormal;
-                row.KeyLabel.color = waiting ? Color.black : Color.white;
+                row.KeyLabel.color = clash && !waiting ? UiPalette.Stamp : UiPalette.Ink;
             }
             string hint = s_Waiting == this
                 ? Loc.F("controls.rebinding", Controls.All[(int)m_Target].Title)
                 : conflict ?? Loc.T("controls.hint");
             if (Hint.text != hint) Hint.text = hint;
-            Hint.color = s_Waiting != this && conflict != null ? new Color(1f, 0.55f, 0.45f) : new Color(1, 1, 1, 0.65f);
+            Hint.color = s_Waiting != this && conflict != null ? UiPalette.Stamp : UiPalette.InkSoft;
         }
     }
 }

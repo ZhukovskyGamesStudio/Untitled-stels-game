@@ -12,14 +12,8 @@ namespace Stealth.Tests
     /// </summary>
     public class FurnishingTests
     {
-        static IEnumerable<LevelLayout> Houses()
-        {
-            for (int seed = 1; seed <= 12; seed++)
-                for (int house = 0; house < 6; house += 2)
-                    yield return LevelGenerator.Generate(seed * 7919 + house + (seed % 2), house + (seed % 2), null, null, 2);
-        }
+        static IEnumerable<LevelLayout> Houses() => TestHouses.Corpus(36);
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void RoomsHaveWhatMakesThemThatRoom()
         {
@@ -46,22 +40,17 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheFinalWalkabilityCheckHasLittleToTakeOut()
         {
             // nine houses of the office generator (the locations' are checked by their own tests), whatever share of the
             // seeds the other kinds take
             int removed = 0, houses = 0;
-            for (int seed = 1; houses < 9 && seed <= 60; seed++)
-                for (int house = 0; house < 6 && houses < 9; house += 2)
-                {
-                    int s = seed * 7919 + house + (seed % 2), h = house + (seed % 2);
-                    if (HouseKinds.OwnPlan(HouseKinds.Of(s, h))) continue;
-                    LevelGenerator.Generate(s, h, null, null, 2);
-                    houses++;
-                    removed += Furnisher.LastRemoved;
-                }
+            foreach (var l in TestHouses.Offices(9))
+            {
+                houses++;
+                removed += TestHouses.Removed(l);
+            }
             Assert.AreEqual(9, houses);
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
             // against the far side of a wall from a room out of reach

@@ -5,7 +5,9 @@ Run:  python Tools/Audio/import_cc0_sounds.py
 1. Raw downloads go to Tools/Audio/cache/ (ignored by git), once.
 2. Each is cut and converted to what generate_sounds.py writes (mono, 16 bit, 44.1 kHz, the same peak) and written over
    the generated clip in Assets/_Game/Art/Audio/<group>/ (generate_sounds.py no longer writes these names).
-3. Assets/_Game/Art/Audio/CREDITS.md lists every recording with its source page (CC0: no attribution required).
+3. Assets/_Game/Art/Audio/CREDITS.md lists every recording with its source page (CC0: no attribution required; a set of
+   another licence — cc0_sources.LICENCES — has its licence named by its author).
+   `--only <prefix>` (e.g. `--only Mule/`): only those recipes, CREDITS.md merged — the other sets need not be downloaded.
 
 - car_engine: domasx2, "racing car engine sound loops" (OpenGameArt), loop_0.wav — an idle loop; the game pitches it
   with the revs (Car.Sound). Its level creeps up by ~2 dB along the loop, which pulsed at every wrap: the slow
@@ -111,7 +113,34 @@ def horn(x):
 CUTS = {"car_engine": engine, "car_horn": horn}
 
 
+NL = chr(10)
+HEADER = ("# Recorded sounds" + NL + NL + "Everything else here is generated (Tools/Audio/generate_sounds.py, generate_voices.py). "
+          "These are recordings, licence [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain, "
+          "no attribution required — listed for reference) unless the author's cell names another licence: those are "
+          "credited here as their licence asks; cut by Tools/Audio/import_cc0_sounds.py." + NL + NL +
+          "| Clip | Source | Author | Page |" + NL + "| --- | --- | --- | --- |" + NL)
+
+
+def set_rows(used):
+    """CREDITS.md rows of the recordings the recipes in `used` (clip -> sets) were cut from, the author's licence named."""
+    by_set = {}
+    for clip, sets in used.items():
+        for s in sets:
+            by_set.setdefault(s, []).append(clip)
+    rows = []
+    for name, page, title, author, _ in cc0_sources.SETS:
+        if name in by_set:
+            who = author or "see the page"
+            if name in cc0_sources.LICENCES:
+                who += f" — licence {cc0_sources.LICENCES[name]}"
+            rows.append(f"| {', '.join(sorted(by_set[name]))} | {title} | {who} | {cc0_sources.SITE}/content/{page} |")
+    return rows
+
+
 def main():
+    if "--only" in sys.argv:
+        only_some(sys.argv[sys.argv.index("--only") + 1])
+        return
     rows = []
     for group, name, url, page, author, title, peak in SOUNDS:
         if "--recorded" not in sys.argv:
@@ -120,20 +149,37 @@ def main():
         rows.append(f"| {group}/{name}.wav | {title} | {author} | {page} |")
     for name, x, peak in recorded.render():
         write(os.path.join(AUDIO, name + ".wav"), x, peak)
-    by_set = {}
-    for clip, sets in recorded.USED.items():
-        for s in sets:
-            by_set.setdefault(s, []).append(clip)
-    for name, page, title, author, _ in cc0_sources.SETS:
-        if name in by_set:
-            rows.append(f"| {', '.join(sorted(by_set[name]))} | {title} | {author or 'see the page'} | {cc0_sources.SITE}/content/{page} |")
+    rows += set_rows(recorded.USED)
     with open(os.path.join(AUDIO, "CREDITS.md"), "w", encoding="utf-8") as c:
-        c.write("# Recorded sounds\n\nEverything else here is generated (Tools/Audio/generate_sounds.py, generate_voices.py). "
-                "These are recordings, licence [CC0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain, "
-                "no attribution required — listed for reference); cut by Tools/Audio/import_cc0_sounds.py.\n\n"
-                "| Clip | Source | Author | Page |\n| --- | --- | --- | --- |\n")
-        c.write("\n".join(rows) + "\n")
+        c.write(HEADER)
+        c.write(NL.join(rows) + NL)
     print("DONE")
+
+
+def only_some(prefix):
+    """Only the recipes whose name starts with `prefix` (their sets alone need downloading); CREDITS.md keeps its other
+    rows and gets these sets' rows (a set already listed is merged: its clips added)."""
+    for name, fn, peak in recorded.CLIPS:
+        if not name.startswith(prefix):
+            continue
+        recorded._now[0] = name
+        os.makedirs(os.path.dirname(os.path.join(AUDIO, name + ".wav")), exist_ok=True)
+        write(os.path.join(AUDIO, name + ".wav"), fn(), peak)
+    path = os.path.join(AUDIO, "CREDITS.md")
+    old = [l for l in open(path, encoding="utf-8").read().splitlines() if l.startswith("| ") and not l.startswith("| Clip")]
+    rows = {l.split(" | ")[-1].rstrip(" |"): l for l in old}
+    for row in set_rows(recorded.USED):
+        page = row.split(" | ")[-1].rstrip(" |")
+        if page in rows:
+            had = set(rows[page][2:].split(" | ")[0].split(", "))
+            mine = row[2:].split(" | ")
+            mine[0] = ", ".join(sorted(had | set(mine[0].split(", "))))
+            row = "| " + " | ".join(mine)
+        rows[page] = row
+    with open(path, "w", encoding="utf-8") as c:
+        c.write(HEADER)
+        c.write(NL.join(rows.values()) + NL)
+    print("DONE", prefix)
 
 
 if __name__ == "__main__":

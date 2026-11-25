@@ -82,6 +82,8 @@ namespace Stealth.Level
             foreach (var h in CeilingHoles) if (h.Floor == floor) list.Add(h.Area);
             return list;
         }
+        /// <summary>Holes knocked in a floor (the heavy hammer, <see cref="FloorHoles"/>): x/z in metres and the floor whose slab it is.</summary>
+        public readonly List<(Rect hole, int floor)> FloorHoles = new();
         public readonly List<WallOpening> Openings = new();
         /// <summary>Renderers that are the wall itself (<see cref="AutoDoor.WallParts"/>): <see cref="StyleDecor"/> dresses them in the wall finish.</summary>
         public readonly List<MeshRenderer> WallParts = new();

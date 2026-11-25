@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using Stealth.Level;
 using UnityEngine;
@@ -156,9 +157,8 @@ namespace Stealth.Tests
         [Test]
         public void EveryHouseButTheHospitalAndTheAbandonedStationHasTheWarmLight()
         {
-            foreach (HouseKind kind in System.Enum.GetValues(typeof(HouseKind)))
+            foreach (var (kind, _, l) in TestHouses.Kinds(1, 3).Where(k => k.level == 3)) // (the map terminals' and the furniture's houses too)
             {
-                var l = TestHouses.Get(HouseKinds.SeedOf(kind, 3, 5), 3);
                 Assert.AreEqual(kind, HouseKinds.Of(l.Seed, 3));
                 bool cold = kind is HouseKind.Hospital or HouseKind.Abandoned;
                 Assert.AreEqual(!cold, RoomLighting.MoodOf(l) != null, kind.ToString());

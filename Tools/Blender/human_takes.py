@@ -6,7 +6,8 @@ Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blend
 A line per take: the lowest sole over the take (cm over the floor), the same after the game plants the feet by the ankle
 alone (what HumanRig did before it looked at the ball of the foot), and for each foot the frames it is down in, how many of
 them it moves back / forward in and its mean speed (metres a second: the speed the game plays the take for —
-HumanMath.WalkTakeSpeed, RunTakeSpeed, CrouchTakeSpeed). `frames` also prints heel, ball, tip and ankle frame by frame.
+HumanMath.WalkTakeSpeed, RunTakeSpeed, CrouchTakeSpeed) and how far its ball slides over the floor while it is down
+(a standing take — Idle, CrouchIdle — keeps it under a few millimetres: the feet do not skate). `frames` also prints heel, ball, tip and ankle frame by frame.
 """
 import math
 import os
@@ -70,17 +71,20 @@ for act in acts:
     for sd in "LR":
         down = [r[sd][0] < 0.012 for r in rows]
         vy = [(rows[i][sd][5].y - rows[i - 1][sd][5].y) * fps for i in range(1, len(rows)) if down[i] and down[i - 1]]
-        spans, start = [], None
+        spans, start, slide = [], None, 0.0
         for i, d in enumerate(down + [False]):
             if d and start is None:
                 start = i
             if not d and start is not None:
                 spans.append(f"{rows[start]['f']}-{rows[i - 1]['f']}")
+                # how far the ball wanders over the floor while the foot is down (a standing take: it should not)
+                b0 = rows[start][sd][5]
+                slide = max([slide] + [math.hypot(rows[j][sd][5].x - b0.x, rows[j][sd][5].y - b0.y) for j in range(start, i)])
                 start = None
         back = sum(1 for v in vy if v > 0.05)
         fwd = sum(1 for v in vy if v < -0.05)
         mean = sum(vy) / len(vy) if vy else 0.0
-        out.append(f"{sd} down {','.join(spans) or '-'} moving back {back} fwd {fwd} mean {mean:+.2f} m/s")
+        out.append(f"{sd} down {','.join(spans) or '-'} moving back {back} fwd {fwd} mean {mean:+.2f} m/s slide {slide * 100:.1f} cm")
     print(f"TAKE {name:10s} {f0}-{f1} | lowest sole {min(low) * 100:+5.1f}..{max(low) * 100:+5.1f} cm | in game (planted) {min(planted) * 100:+5.1f}..{max(planted) * 100:+5.1f} cm | {out[0]} | {out[1]}")
     if verbose:
         for r in rows[::max(1, len(rows) // 16)]:

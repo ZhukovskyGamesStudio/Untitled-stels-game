@@ -21,7 +21,7 @@ namespace Stealth.Game
         public void SendUse(UseKind kind, int index) => Game?.UseServer(m_P, kind, index);
         public void SendGadget() => Game?.GadgetServer(m_P);
         public void SendBot(byte command) => Game?.BotCommandServer(m_P, command);
-        public void SendCheat(Cheat cheat, bool on) => m_P.CheatServer(cheat, on);
+        public void SendCheat(Cheat cheat, int arg) => m_P.CheatServer(cheat, arg);
         public void Teleport(Vector3 position, Quaternion rotation) { } // nothing to smooth: the transform is already there
         public void PlaceOwner(Vector3 position, float yaw) => m_P.PlaceFromServer(position, yaw);
         public void SendNoise(Vector3 position, float radius) => m_P.OnNoiseRequest(position, radius);
@@ -37,6 +37,7 @@ namespace Stealth.Game
         public void SendUseHand() => m_P.UseHandServer();
         public void SendHitFeedback(Vector3 awayFromSource) => m_P.OnHitFeedback(awayFromSource);
         public void SendFallHurt() => m_P.OnFallHurtRequest();
+        public void SendGear(GearAction action, Detector target, Vector3 point) => m_P.OnGearRequest(action, target, point);
         public void SendLoadout(byte cls, byte item, bool ready) => m_P.OnLoadoutRequest(cls, item, ready);
     }
 
@@ -51,6 +52,7 @@ namespace Stealth.Game
         public void RequestSwapHand(int index) => m_I.SwapHandServer(index);
         public void RequestDrop(int index, Vector3 position, float yaw) => m_I.DropServer(index, position, yaw);
         public void RequestDeposit(int index) => m_I.DepositServer(index);
+        public void RequestCassette(int index) => m_I.CassetteServer(index);
         public void RequestStash(int index, byte x, byte y, byte rot) => m_I.StashServer(index, x, y, rot);
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => m_I.UnstashServer(from, x, y, rot);
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => m_I.StashMoveServer(from, x, y, rot);
@@ -62,6 +64,11 @@ namespace Stealth.Game
         public void RequestRecharge(int battery, int flashlight) => m_I.RechargeServer(battery, flashlight);
         public void RequestRechargeWorld(WorldItem battery, int flashlight) => m_I.RechargeWorldServer(battery, flashlight);
         public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => m_I.DropStashedServer(from, position, yaw);
+        public void RequestBench(int index, byte x, byte y, byte rot) => m_I.BenchServer(index, x, y, rot);
+        public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => m_I.UnbenchServer(from, x, y, rot);
+        public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => m_I.BenchMoveServer(from, x, y, rot);
+        public void RequestCombine() => m_I.CombineServer();
+        public void RequestCarUpgrade(byte upgrade) => m_I.CarUpgradeServer(upgrade);
     }
 
     /// <summary>The run's requests and broadcasts on a peer that is its own server (<see cref="OfflinePlayerLink"/>).</summary>

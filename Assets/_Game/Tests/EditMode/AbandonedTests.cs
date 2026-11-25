@@ -19,12 +19,7 @@ namespace Stealth.Tests
         static List<LevelLayout> Stations()
         {
             if (s_Stations.Count > 0) return s_Stations;
-            for (int seed = 1; s_Stations.Count < 4 && seed < 2000; seed++)
-            {
-                int house = 1 + seed % 4;
-                if (HouseKinds.Of(seed, house) != HouseKind.Abandoned) continue;
-                s_Stations.Add(TestHouses.Get(seed, house));
-            }
+            s_Stations.AddRange(TestHouses.First(HouseKind.Abandoned, 4, seed => 1 + seed % 4, 2000));
             return s_Stations;
         }
 
@@ -60,7 +55,6 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void OnlyTheStationIsDressedDerelict()
         {

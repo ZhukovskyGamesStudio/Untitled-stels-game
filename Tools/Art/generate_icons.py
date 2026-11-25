@@ -1,4 +1,4 @@
-"""HUD icons: the reticle's interaction glyphs, robot and device markers (robot_<kind>), the noise speaker, the visibility eye, hearts, key caps and mouse buttons.
+"""HUD icons: the reticle's interaction glyphs, hint/button glyphs (info, question, tired_arms, combine), robot and device markers (robot_<kind>), the noise speaker, the visibility eye, hearts, key caps and mouse buttons.
 
     python Tools/Art/generate_icons.py                  # everything
     python Tools/Art/generate_icons.py --only robot_    # only the icons whose name starts with the prefix
@@ -244,6 +244,55 @@ def door(g):
     g.ellipse((0.60, 0.48, 0.68, 0.56))
 
 
+# ------------------------------------------------------------------ hints and buttons (64 px)
+
+def info(g):
+    """An "i" in a circle."""
+    g.ellipse((0.10, 0.10, 0.90, 0.90), fill=False, width=STROKE)
+    g.ellipse((0.435, 0.235, 0.565, 0.365))
+    g.rrect((0.44, 0.43, 0.56, 0.76), 0.035)
+    g.rrect((0.37, 0.43, 0.56, 0.50), 0.02)          # the serif on the stem's top
+    g.rrect((0.37, 0.70, 0.63, 0.77), 0.02)          # and its foot
+
+
+def question(g):
+    """A bold question mark."""
+    w = STROKE * 1.7
+    cx, cy, r = 0.5, 0.33, 0.23                       # the hook's box; PIL strokes the arc inside it
+    g.arc((cx - r, cy - r, cx + r, cy + r), 160, 405, w)
+    rc = r - w / 2                                    # the stroke's centre line
+    end = (cx + rc * math.cos(math.radians(45)), cy + rc * math.sin(math.radians(45)))
+    g.line([end, (0.505, 0.56), (0.50, 0.65)], w)
+    g.ellipse((0.42, 0.75, 0.58, 0.91))
+
+
+def tired_arms(g):
+    """A status glyph: an arm seen from the side, the biceps slack and the forearm hanging down, sweat dripping."""
+    g.line([(0.08, 0.50), (0.50, 0.54)], 0.17)                     # upper arm out from the shoulder
+    g.ellipse((0.18, 0.37, 0.44, 0.55))                            # the slack biceps, low and soft
+    g.line([(0.50, 0.54), (0.55, 0.78)], 0.14)                     # forearm hanging
+    g.ellipse((0.44, 0.72, 0.68, 0.94))                            # loose fist
+    g.line([(0.08, 0.40), (0.08, 0.60)], 0.05, on="d")            # the sleeve's edge at the shoulder
+    for cx, cy, s in ((0.70, 0.14, 1.0), (0.84, 0.32, 0.85), (0.66, 0.40, 0.7)):
+        pts = []
+        for i in range(40):
+            t = i / 40 * 2 * math.pi
+            pts.append((cx + 0.075 * s * math.sin(t) * (1 - math.cos(t)) * 0.5 * 1.25,
+                        cy - 0.07 * s + 0.16 * s * (1 - math.cos(t)) / 2))
+        g.poly(pts)
+
+
+def combine(g):
+    """Two pieces going into one: two small squares on the left, their paths meeting in an arrow, a big square."""
+    g.rrect((0.06, 0.10, 0.30, 0.34), 0.05)
+    g.rrect((0.06, 0.66, 0.30, 0.90), 0.05)
+    g.line([(0.30, 0.26), (0.46, 0.50), (0.30, 0.74)], STROKE * 0.9)
+    g.line([(0.46, 0.50), (0.56, 0.50)], STROKE * 0.9)
+    g.poly([(0.52, 0.38), (0.64, 0.50), (0.52, 0.62)])
+    g.rrect((0.66, 0.30, 0.95, 0.70), 0.06)
+    g.line([(0.805, 0.30), (0.805, 0.70)], 0.03, on="d")          # the seam where the two became one
+
+
 # ------------------------------------------------------------------ status icons (64 px)
 
 def speaker(level):
@@ -428,6 +477,16 @@ def house_abandoned(g):
     g.line([(0.24, 0.56), (0.40, 0.42)], 0.05, on="d")
     g.rrect((0.58, 0.40, 0.76, 0.56), 0.01, on="d")
     g.poly([(0.50, 0.62), (0.60, 0.80), (0.40, 0.80)], on="d")
+
+
+def house_testrooms(g):
+    # the rooms test seen from above: a floor plan of three rooms off a corridor, a door gap in each wall
+    g.rrect((0.12, 0.16, 0.88, 0.84), 0.03)
+    g.rrect((0.19, 0.23, 0.45, 0.50), 0.01, on="d")
+    g.rrect((0.52, 0.23, 0.81, 0.50), 0.01, on="d")
+    g.rrect((0.19, 0.57, 0.81, 0.77), 0.01, on="d")
+    g.rrect((0.27, 0.48, 0.36, 0.59), 0.0)
+    g.rrect((0.62, 0.48, 0.71, 0.59), 0.0)
 
 
 def job_vault(g):
@@ -667,6 +726,79 @@ def robot_warden(g):
     g.line([(0.32, 0.46), (0.50, 0.60), (0.68, 0.46)], 0.07, on="d")
 
 
+# ------------------------------------------------------------------ car upgrades (the garage's upgrade bench, 96 px)
+
+def upgrade_engine(g):
+    """An engine block from the side: the block with cooling fins, a cylinder head on top, a pulley at the front."""
+    g.rrect((0.16, 0.36, 0.78, 0.82), 0.06)                       # the block
+    g.rrect((0.22, 0.22, 0.72, 0.38), 0.04)                       # the cylinder head
+    for x in (0.30, 0.42, 0.54, 0.66):
+        g.line([(x, 0.46), (x, 0.74)], 0.035, on="d")             # fins
+    g.ellipse((0.74, 0.50, 0.94, 0.70))                           # the pulley
+    g.ellipse((0.81, 0.57, 0.87, 0.63), on="d")
+    g.rrect((0.30, 0.10, 0.40, 0.24), 0.02)                       # an intake stub
+    g.rrect((0.50, 0.10, 0.60, 0.24), 0.02)
+    g.line([(0.20, 0.90), (0.74, 0.90)], 0.06)                    # the stand under it
+
+
+def upgrade_trunk(g):
+    """Shelves in a pickup's bed: the bed's walls seen from behind and three shelf boards across it."""
+    g.line([(0.10, 0.20), (0.10, 0.88), (0.90, 0.88), (0.90, 0.20)], 0.08)
+    for y in (0.36, 0.56, 0.74):
+        g.rrect((0.16, y - 0.035, 0.84, y + 0.035), 0.015)
+    g.rrect((0.22, 0.20, 0.38, 0.32), 0.02)                       # boxes on the shelves
+    g.rrect((0.56, 0.42, 0.74, 0.52), 0.02)
+    g.rrect((0.30, 0.60, 0.44, 0.70), 0.02)
+
+
+def upgrade_backpack(g):
+    """Linus's backpack: a rounded pack with a carry loop, a flap over its top with a buckle, a pocket on its front."""
+    g.arc((0.38, 0.06, 0.62, 0.30), 180, 360, 0.06)                # the carry loop
+    g.rrect((0.20, 0.20, 0.80, 0.92), 0.14)
+    g.rrect((0.20, 0.20, 0.80, 0.46), 0.12, on="d")                 # the flap's edge
+    g.rrect((0.24, 0.24, 0.76, 0.42), 0.10)
+    g.rrect((0.44, 0.38, 0.56, 0.52), 0.02, on="d")                 # the buckle
+    g.rrect((0.32, 0.60, 0.68, 0.84), 0.05, on="d")                 # the pocket
+    g.rrect((0.36, 0.64, 0.64, 0.80), 0.04)
+
+
+def upgrade_radio(g):
+    """The car radio: a deck with a cassette window (two reels), a display bar and two knobs."""
+    g.rrect((0.06, 0.26, 0.94, 0.78), 0.06)
+    g.rrect((0.28, 0.36, 0.72, 0.68), 0.03, fill=False, width=0.045, on="d")   # the cassette window's frame
+    g.ellipse((0.35, 0.44, 0.47, 0.56), on="d")                     # its two reels
+    g.ellipse((0.53, 0.44, 0.65, 0.56), on="d")
+    g.rrect((0.40, 0.31, 0.60, 0.35), 0.01, on="d")                 # the display
+    g.ellipse((0.11, 0.42, 0.25, 0.56), on="d")                     # the knobs
+    g.ellipse((0.75, 0.42, 0.89, 0.56), on="d")
+    g.line([(0.62, 0.26), (0.84, 0.06)], 0.035)                     # the antenna
+
+
+def upgrade_teleport(g):
+    """The panic button: a big round button on a square plate, rays around it."""
+    g.rrect((0.20, 0.48, 0.80, 0.88), 0.06)
+    g.ellipse((0.30, 0.30, 0.70, 0.70))
+    g.ellipse((0.38, 0.38, 0.62, 0.62), on="d")
+    for a in (200, 240, 270, 300, 340):
+        r = math.radians(a)
+        g.line([(0.50 + math.cos(r) * 0.30, 0.50 + math.sin(r) * 0.30), (0.50 + math.cos(r) * 0.44, 0.50 + math.sin(r) * 0.44)], 0.05)
+
+
+def upgrade_planned(g):
+    """Not made yet: a padlock with a question mark on its body."""
+    g.arc((0.30, 0.10, 0.70, 0.56), 180, 360, 0.08)
+    g.line([(0.30, 0.33), (0.30, 0.46)], 0.08)
+    g.line([(0.70, 0.33), (0.70, 0.46)], 0.08)
+    g.rrect((0.18, 0.44, 0.82, 0.92), 0.08)
+    g.arc((0.40, 0.52, 0.60, 0.70), 200, 380, 0.05, on="d")
+    g.line([(0.50, 0.70), (0.50, 0.76)], 0.05, on="d")
+    g.ellipse((0.47, 0.81, 0.53, 0.87), on="d")
+
+
+UPGRADES = {"upgrade_engine": upgrade_engine, "upgrade_trunk": upgrade_trunk, "upgrade_backpack": upgrade_backpack, "upgrade_radio": upgrade_radio,
+            "upgrade_teleport": upgrade_teleport, "upgrade_planned": upgrade_planned}
+
+
 ROBOTS = {
     "robot_guard": robot_guard, "robot_listener": robot_listener, "robot_drone": robot_drone, "robot_spider": robot_spider,
     "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, "robot_hound": robot_hound,
@@ -710,10 +842,12 @@ def main(only=None):
         jobs.append((name, lambda n=name, d=draw: make(n, d)))
     for name, draw in {"house_office": house_office, "house_business": house_business, "house_datacenter": house_datacenter,
                        "house_warehouse": house_warehouse, "house_hq": house_hq, "house_hospital": house_hospital,
-                       "house_garage": house_garage, "house_apartments": house_apartments, "house_abandoned": house_abandoned, "job_vault": job_vault, "job_hostage": job_hostage}.items():
+                       "house_garage": house_garage, "house_apartments": house_apartments, "house_abandoned": house_abandoned, "house_testrooms": house_testrooms, "job_vault": job_vault, "job_hostage": job_hostage}.items():
         jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
     for name, draw in ROBOTS.items():
         jobs.append((name, lambda n=name, d=draw: make(n, d)))
+    for name, draw in UPGRADES.items():
+        jobs.append((name, lambda n=name, d=draw: make(n, d, size=96)))
     for level in range(4):
         jobs.append((f"noise_{level}", lambda lv=level: make(f"noise_{lv}", speaker(lv))))
     frames = 8
@@ -722,6 +856,8 @@ def main(only=None):
     jobs.append(("heart_full", lambda: make("heart_full", heart(True))))
     jobs.append(("heart_empty", lambda: make("heart_empty", heart(False))))
     jobs.append(("keycap", keycap))
+    for name, draw in {"info": info, "question": question, "tired_arms": tired_arms, "combine": combine}.items():
+        jobs.append((name, lambda n=name, d=draw: make(n, d)))
     jobs.append(("arrow_left", lambda: make("arrow_left", arrow_left)))
     jobs.append(("arrow_right", lambda: make("arrow_right", arrow_right)))
     for b in ("lmb", "rmb", "mmb", "wheel"):

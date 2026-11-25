@@ -91,8 +91,18 @@ namespace Stealth.Audio
         [Tooltip("A restroom's hand dryer running (4 s, loud: robots come to check).")]
         public AudioClip HandDryer;
 
+        [Header("Linus")]
+        [Tooltip("Linus's paws on the floor; the backpack's canvas and charms as he runs; a duct's steel under him (Tools/Audio/recorded.py mule_*).")]
+        public AudioClip[] MuleStep = new AudioClip[0], MulePack = new AudioClip[0], MuleDuct = new AudioClip[0];
+        [Tooltip("His chatter answering a call (the raccoon's own: CC-BY, see CREDITS.md).")]
+        public AudioClip[] MuleChatter = new AudioClip[0];
+        [Tooltip("Petted; asleep in the trunk; a sniff sat waiting; a squeak at an alarm; the leap into a grate, the drop out of one; the hop into or out of the car's bed.")]
+        public AudioClip MuleHappy, MuleSnore, MuleSniff, MuleSqueak, MuleLeap, MuleDrop, MuleHop;
+
         [Header("Music")]
         public AudioClip MenuMusic, ExploreMusic, ChaseMusic;
+        [Tooltip("The car radio's cassettes, one song each (Tools/Audio/generate_cassettes.py; index = the cassette's colour byte).")]
+        public AudioClip[] Cassettes = new AudioClip[0];
 
         /// <summary>The steps on a surface.</summary>
         public AudioClip[] Steps(StepSurface surface) => surface switch

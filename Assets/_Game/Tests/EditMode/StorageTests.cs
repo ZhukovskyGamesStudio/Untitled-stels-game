@@ -197,9 +197,8 @@ namespace Stealth.Tests
             Assert.AreEqual(MusicTrack.None, AudioRules.ChooseMusic(true, 99f, 5f, levelMusic: false));
             Assert.AreEqual(MusicTrack.None, AudioRules.ChooseMusic(true, 0f, 5f, levelMusic: false), "no chase music either");
             Assert.AreEqual(MusicTrack.Explore, AudioRules.ChooseMusic(true, 99f, 5f));
-            var audio = AssetDatabase.LoadAssetAtPath<Configs.AudioConfig>("Assets/_Game/Data/Config/RoomsTest/Audio.asset");
-            Assert.IsNotNull(audio);
-            Assert.IsFalse(audio.Mix.LevelMusic, "the test level is quiet");
+            Assert.IsFalse(HouseKinds.HasMusic(HouseKind.TestRooms), "the test rooms are quiet");
+            Assert.IsTrue(HouseKinds.HasMusic(HouseKind.Office));
         }
 
         [TestCase("Cabinet", "BodyDrawer", 3)]
@@ -213,15 +212,15 @@ namespace Stealth.Tests
             foreach (var p in parts) Assert.IsNotNull(p.GetComponent<Collider>(), $"{p.name}: can't be looked at");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TestHousesHaveFurnitureToOpen()
         {
             var level = AssetDatabase.LoadAssetAtPath<Configs.LevelConfig>("Assets/_Game/Data/Config/RoomsTest/Level.asset");
             int withStorage = 0;
+            TestHouses.RoomsTests(24); // (made at once, the same as the other tests of the rooms test's houses)
             for (int seed = 1; seed <= 20; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 104729, 0, level.Building, level.Security, 1);
+                var l = TestHouses.RoomsTest(seed - 1);
                 if (l.Props.Any(p => p.Kind is PropKind.Cabinet or PropKind.Lockers)) withStorage++;
             }
             Assert.Greater(withStorage, 10, "most small houses have drawers or lockers");

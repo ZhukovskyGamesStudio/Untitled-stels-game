@@ -233,7 +233,13 @@ namespace Stealth.Tests
             var own = HumanMath.OwnShift(eyes, head, Vector3.forward, 1f, planted: true);
             Assert.AreEqual(0f, own.y, 1e-5f, "standing: the feet stay on the floor");
             Assert.Less((head + own).z, eyes.z - 0.25f, "the neck is behind the view: no look down the collar");
-            Assert.AreNotEqual(0f, HumanMath.OwnShift(eyes, head, Vector3.forward, 1f, planted: false).y, "in a seat: at the eyes' height");
+            Assert.AreNotEqual(0f, HumanMath.OwnShift(eyes, head, Vector3.forward, 1f, planted: false).y, "on a ladder: at the eyes' height");
+            // in a seat the body stays on the seat (pulled back under the standing eyes it sank into the backrest): the view
+            // goes to the sitting head, ahead of it and over it — the chest and the lap in sight, not the collar
+            var sat = HumanMath.SeatEyes(head, Vector3.forward, Vector3.up, 1f);
+            Assert.Greater(sat.z, head.z + HumanMath.OwnBackBusy, "the view ahead of the sitting head");
+            Assert.Greater(sat.y, head.y, "and over it");
+            Assert.Less((sat - head).magnitude, 0.4f, "but by the head, not where a standing one's eyes would be");
             // each person's own view: a skin without a head, an arm for a long thing and one for a compact one
             foreach (var human in Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans)
             {

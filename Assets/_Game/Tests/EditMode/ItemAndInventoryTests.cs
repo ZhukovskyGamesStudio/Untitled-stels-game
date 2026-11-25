@@ -24,7 +24,7 @@ namespace Stealth.Tests
             Assert.AreEqual(1, ItemCatalog.Turned(0));
             Assert.AreEqual(0, ItemCatalog.Turned(3), "four turns come back");
             Assert.AreEqual(0, ItemCatalog.Mirrored(ItemCatalog.Mirrored(0)));
-            var stash = new TeamStash();
+            var stash = new TeamStash(8, 4);
             Assert.IsTrue(stash.Add((byte)tetL, 0, 0, 0, (byte)ItemCatalog.Mirrored(0)));
             Assert.AreEqual(0, stash.IndexAt(new Vector2Int(1, 2)), "the mirrored L takes the mirrored cells");
             Assert.AreEqual(-1, stash.IndexAt(new Vector2Int(0, 2)));
@@ -66,9 +66,9 @@ namespace Stealth.Tests
         [Test]
         public void TeamStashIsARectangularGrid()
         {
-            var stash = new TeamStash();
-            Assert.IsTrue(stash.CanPlace(0, 0, TeamStash.Width - 1, TeamStash.Height - 1));
-            Assert.IsFalse(stash.CanPlace(0, 0, TeamStash.Width, 0), "right of the grid");
+            var stash = new TeamStash(8, 4);
+            Assert.IsTrue(stash.CanPlace(0, 0, 8 - 1, 4 - 1));
+            Assert.IsFalse(stash.CanPlace(0, 0, 8, 0), "right of the grid");
             Assert.IsFalse(stash.CanPlace(0, 0, 0, -1), "above the grid");
             int v = stash.Version;
             Assert.IsTrue(stash.Add(3, 4, 0, 0, 0)); // I piece, gold
@@ -82,7 +82,7 @@ namespace Stealth.Tests
         [Test]
         public void TeamStashActsOnTheEntryARequestNames()
         {
-            var stash = new TeamStash();
+            var stash = new TeamStash(8, 4);
             stash.Add(0, 1, 2, 1, 0);
             stash.Add(0, 2, 5, 1, 0);
             var second = stash.Items[1];
@@ -156,17 +156,17 @@ namespace Stealth.Tests
         [Test]
         public void StashAllPutsWhatFitsAndKeepsTheRest()
         {
-            var stash = new TeamStash();
+            var stash = new TeamStash(8, 4);
             var items = new List<InventoryEntry>();
             // More single cells than the stash holds: the extra ones stay in the backpack.
-            for (int i = 0; i < TeamStash.Width * TeamStash.Height + 3; i++) items.Add(new InventoryEntry { Shape = 0, Color = 1, X = (byte)(i % 8), Y = (byte)(i / 8) });
+            for (int i = 0; i < 8 * 4 + 3; i++) items.Add(new InventoryEntry { Shape = 0, Color = 1, X = (byte)(i % 8), Y = (byte)(i / 8) });
             int added = stash.AddAll(items, out var left);
-            Assert.AreEqual(TeamStash.Width * TeamStash.Height, added);
+            Assert.AreEqual(8 * 4, added);
             Assert.AreEqual(3, left.Count);
             Assert.IsFalse(stash.FindSpot(0, out _, out _, out _), "the stash is full");
 
             // A big piece goes in before the small ones fill the gaps.
-            var fresh = new TeamStash();
+            var fresh = new TeamStash(8, 4);
             var mixed = new List<InventoryEntry> { new() { Shape = 0 }, new() { Shape = 3 }, new() { Shape = 0 } };
             Assert.AreEqual(3, fresh.AddAll(mixed, out var rest));
             Assert.AreEqual(0, rest.Count);

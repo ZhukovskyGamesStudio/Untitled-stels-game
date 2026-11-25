@@ -103,7 +103,6 @@ namespace Stealth.Tests
             Assert.GreaterOrEqual(l.MapFlat, 0, $"{seed}/{seed % 5}: the shelter map is its find");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {
@@ -111,7 +110,7 @@ namespace Stealth.Tests
             // wardens are the old enemies' (LevelGenerator.Generate's classicEnemies)
             foreach (var (seed, level) in TestHouses.SampleKeys)
             {
-                var l = LevelGenerator.Generate(seed, level, null, null, 1, null, false, true);
+                var l = TestHouses.Make(seed, level, null, null, 1, null, false, true);
                 foreach (var w in l.Wardens)
                 {
                     wardens++;
@@ -126,20 +125,9 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheWorkbenchMakesDiamondsOfOneColour()
+        public void DiamondsAreWorthMoreThanTheirCellAndToolsBurnGrey()
         {
-            var items = new List<InventoryEntry>
-            {
-                new() { Shape = 3, Color = 1 }, new() { Shape = 4, Color = 1 }, // 4 + 4 cells of green: one diamond
-                new() { Shape = 0, Color = 1 },                                  // left over
-                new() { Shape = 2, Color = 2 },                                  // 3 cells of blue: not enough
-                new() { Shape = ItemCatalog.Key, Color = 1 },                    // a tool is never used up
-            };
-            var plan = Crafting.Plan(items, new GadgetSettings { DiamondInputCells = 8 });
-            Assert.AreEqual(1, plan.Count);
-            Assert.AreEqual(1, plan[0].Color);
-            CollectionAssert.AreEquivalent(new[] { 0, 1 }, plan[0].Items);
-            Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1) + ItemCatalog.Value(4, 1) - 1, "worth more than what went in");
+            Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1), "a one-cell diamond is worth more than a 4-cell thing of its colour");
             Assert.AreEqual(ItemCatalog.Cells(ItemCatalog.Key) * ItemCatalog.Value(0, 0), ItemCatalog.Value(ItemCatalog.Key, 4), "tools burn at the grey rate, whatever their colour");
             Assert.IsFalse(ItemCatalog.IsLoot(ItemCatalog.Stun));
         }

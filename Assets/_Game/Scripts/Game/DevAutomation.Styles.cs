@@ -15,7 +15,7 @@ namespace Stealth.Game
     {
         bool m_StyleArgApplied;
 
-        /// <summary>-style &lt;name&gt; picks a visual style at start (F8 opens the picker, <see cref="UI.StylePanel"/>).</summary>
+        /// <summary>-style &lt;name&gt; picks a visual style at start (the cheat panel's «Визуал» page picks one in the game, <see cref="UI.StylePanel"/>).</summary>
         void Update()
         {
             if (!m_StyleArgApplied)

@@ -42,8 +42,6 @@ namespace Stealth.UI
         public Button HostSteam;
         public Text LocalCaption;
         public Button HostLocal;
-        [Tooltip("Main game (off) or the test rooms (on): small houses of 3–4 rooms with no guards, to tune rooms in.")]
-        public Toggle TestRooms;
         public InputField Address;
         public Button Join;
         public Text NetStatus;
@@ -122,21 +120,6 @@ namespace Stealth.UI
             RefreshFriends.onClick.AddListener(() => m_NextFriendsRefresh = 0f);
             HostSteam.onClick.AddListener(() => Session.Launcher.HostSteam());
             HostLocal.onClick.AddListener(() => Session.Launcher.HostLocal());
-            // "-testrooms" on the command line: start with the switch on (every peer passes it, like the switch itself)
-            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-testrooms") >= 0 && !Configs.Tuning.TestRooms)
-            {
-                Configs.Tuning.SetTestRooms(true);
-                Level.VisualStyles.UseConfig(Configs.Tuning.Styles);
-            }
-            if (TestRooms != null)
-            {
-                TestRooms.SetIsOnWithoutNotify(Configs.Tuning.TestRooms);
-                TestRooms.onValueChanged.AddListener(on =>
-                {
-                    Configs.Tuning.SetTestRooms(on);
-                    Level.VisualStyles.UseConfig(Configs.Tuning.Styles); // the test rooms: «Заброшенный комплекс» only
-                });
-            }
             Join.onClick.AddListener(() => Session.Launcher.JoinLocal(Address.text));
             MainSettings.onClick.AddListener(OpenSettings);
             MainControls.onClick.AddListener(() => ControlsOpen = true);
@@ -331,7 +314,7 @@ namespace Stealth.UI
             MicLevel.SetValueWithoutNotify(Mathf.InverseLerp(-70f, 0f, db));
             var fill = MicLevel.fillRect != null ? MicLevel.fillRect.GetComponent<Graphic>() : null;
             bool open = live && db >= VoiceGate.ThresholdDb(VoicePrefs.Sensitivity, Tuning.Audio.Voice);
-            if (fill != null) fill.color = open ? new Color(0.35f, 0.85f, 0.45f) : new Color(0.55f, 0.58f, 0.62f);
+            if (fill != null) fill.color = open ? UiPalette.MarkGreen : UiPalette.Rule;
         }
 
         static void SetLabel(Button button, string text)

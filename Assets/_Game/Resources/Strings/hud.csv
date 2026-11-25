@@ -18,7 +18,7 @@ hint.terminal,терминал,terminal
 hint.take,взять,take
 hint.hatch.in,в люк,hide in hatch
 hint.hatch.out,вылезти,climb out
-hint.stash,склад,stash
+hint.stash,рюкзак {=name.raccoon.gen},{=name.raccoon}'s backpack
 hint.stash_all,сложить всё,stash all
 hint.stun,оглушитель,stun
 hint.horn,гудок,horn
@@ -39,10 +39,10 @@ use.crate.empty,пусто,empty
 use.med,лечиться,heal
 use.med.used,уже лечился,already healed
 use.med.full,здоров,full health
-use.workbench,собрать алмаз ×{0},craft diamond ×{0}
-use.workbench.none,нечего собрать,nothing to craft
+use.upgrades,автоверстак,upgrade bench
 use.keydoor,открыть ключом,unlock
 use.exit_button,открыть дверь,open the door
+use.pet_bot,погладить {=name.raccoon.gen},pet {=name.raccoon}
 use.keydoor.nokey,нужен ключ,needs a key
 use.keydoor.hand,ключ — в руку,take the key in hand
 use.cage.hand,ключ — в руку,take the key in hand
@@ -87,7 +87,7 @@ hud.hack.title,Взлом · зарядов: {0},Hacking · charges: {0}
 hud.team.down,упал,down
 hud.team.hatch,в люке,in hatch
 hud.run_over,Забег окончен,Run over
-hud.objective,★ {0},★ {0}
+hud.objective,<b>{0}</b>,<b>{0}</b>
 hud.task.exit,Найдите выход,Find the exit
 hud.task.gate,Откройте проезд,Open the way
 hud.task.fuel,Заправьте автомобиль,Fuel the car
@@ -180,3 +180,49 @@ start.class.0,Монтажник,Fitter
 start.class.1,Хакер,Hacker
 start.class.2,Связист,Radio operator
 start.class.3,Картограф,Cartographer
+# the car's workbench (InventoryUI.Bench)
+use.bench,верстак,workbench
+bench.title,Верстак,Workbench
+bench.combine,Соединить,Combine
+bench.unknown,Результат неизвестен,Result unknown
+bench.made,Готово: {0},Made: {0}
+bench.broke,Не вышло — сломалось: {0},Failed — broke: {0}
+bench.failed,Не вышло,Nothing came of it
+bench.info,"Каждый забег рецепты разные.
+Находите чертежи, чтобы узнать новые рецепты.
+При неудачном объединении один из предметов ломается с шансом 50%.","Recipes are different every run.
+Find blueprints to learn new recipes.
+A failed combine breaks one of the items with a 50% chance."
+hint.espresso,выпить эспрессо,drink espresso
+hint.hammer,пробить пол,break the floor
+hint.robosensor,поставить датчик,put the sensor down
+hint.take_apart,разобрать,take apart
+# автоверстак (улучшения машины)
+upgrade.title,АВТОВЕРСТАК,CAR UPGRADES
+upgrade.engine,Двигатель,Engine
+upgrade.engine.what,Каждый уровень: поездка дешевле на {0}% топлива,Each level: the drive costs {0}% less fuel
+upgrade.engine.now,Сейчас: топлива на {0}% меньше,Now: {0}% less fuel
+upgrade.trunk,Багажник,Cargo bed
+upgrade.trunk.what,Дополнительные полки в кузове,Extra shelves in the bed
+upgrade.trunk.now,Полок: {0},Shelves: {0}
+upgrade.kennel,Рюкзак {=name.raccoon.gen},{=name.raccoon}'s backpack
+upgrade.kennel.what,"Рюкзак {=name.raccoon.gen} больше: в него влезает больше вещей","A bigger backpack for {=name.raccoon}: more things fit in it"
+upgrade.kennel.now,"Рюкзак: {0} × {1} клеток","Backpack: {0} × {1} cells"
+upgrade.teleport,Телепорт,Teleport
+upgrade.teleport.what,Красная кнопка на бардачке: все игроки в машину,A red button on the glovebox: every player into the car
+upgrade.teleport.now,"Кнопка на бардачке: заряжается топливом сверх нужного на поездку","The button on the glovebox: charged by fuel over what the drive needs"
+upgrade.teleport.now.none,"Нажал водитель или штурман — все игроки в машину","Pressed from a front seat — every player into the car"
+upgrade.radio,Магнитола,Car radio
+upgrade.radio.what,"В домах лежат кассеты: вставь в магнитолу — у машины и в дороге играет музыка","Cassettes lie in the houses: put one in — music plays by the car and on the drive"
+upgrade.radio.now,"Кассета: {0}","Cassette: {0}"
+upgrade.radio.now.none,Кассеты нет,No cassette
+upgrade.unique6,Улучшение 6,Upgrade 6
+upgrade.unique6.what,Ещё не придумано,Not designed yet
+upgrade.raise,Улучшить,Upgrade
+upgrade.missing,Не хватает вещей,Missing things
+upgrade.need,нужно:,needs:
+upgrade.top,МАКС,MAX
+upgrade.planned,скоро,coming soon
+use.seat.out,выйти,get out
+use.teleport,телепорт: все в машину,teleport: everyone into the car
+use.teleport.charging,заряжается: {0}%,charging: {0}%

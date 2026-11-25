@@ -37,6 +37,8 @@ namespace Stealth.Level
         public GameObject WallBlock;
         public GameObject TrimBlock;
         public GameObject FloorSlab;
+        [Tooltip("A hole the heavy hammer knocked in a floor (a unit square scaled to it): the broken edge, rubble below, a navmesh obstacle.")]
+        public GameObject FloorHole;
         public GameObject Roof;
         public GameObject OutsideGround;
         [Tooltip("The land round the house to the horizon (looks only): flat in the middle, mounds, rubble, far ridges")]

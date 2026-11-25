@@ -19,7 +19,7 @@ namespace Stealth.Player
         public bool Driving => SeatIndex == 0;
 
         /// <summary>Feet this far under the seat's cushion: a sitting player's eyes are ~0.8 m above it.</summary>
-        const float SeatDrop = 0.72f;
+        public const float SeatDrop = 0.72f;
         /// <summary>
         /// The model's feet this far under the cushion when sitting: its hips (the legs' pivot, 0.92 m over the feet,
         /// <c>generate_models.LEG_PIVOT</c>) rest on the seat, so the head stays under the cab's roof (1.85 m).
@@ -42,21 +42,56 @@ namespace Stealth.Player
                 m_WasSeated = seated;
                 // getting out beside the car
                 if (!seated && car != null) TeleportOwner(car.ExitPoint(m_LastSeat), transform.rotation);
-                if (seated) { transform.rotation = car.transform.rotation; Motor.SetPitch(6f); } // sitting down: eyes on the road
+                if (seated)
+                {
+                    // sitting down: eyes on the road
+                    Motor.ResetLook();
+                    transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y, 0f);
+                    Motor.SetPitch(6f);
+                }
                 m_Controller.enabled = !seated;
                 Audio.Sfx.At(Audio.Sfx.Bank?.Land, transform.position, 0.6f, Audio.Sfx.Group.Footsteps);
             }
             if (!seated) return;
             m_LastSeat = seat;
             transform.position = car.Seats[seat].position - Vector3.up * SeatDrop;
-            transform.Rotate(0f, car.YawDelta, 0f);
-            if (!menu && !CursorMode && Controls.Pressed(GameAction.Interact))
+            // the body sits facing the road (turned on the seat a little at most, Motor.BodyYaw), turning with the car
+            transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y + Motor.BodyYaw, 0f);
+            // the front seats get out through their door (CarDoor: look at it, E — E is also the glovebox's button); the bed's
+            // seats have no door: E anywhere
+            if (seat >= 2 && !menu && !CursorMode && Controls.Pressed(GameAction.Interact))
             {
                 // this press is spent: on the host the seat is freed at once, and the same E must not sit us down again
                 // on the seat we are still standing on (UpdateUse runs later this frame)
                 m_UseWaitRelease = true;
                 Link.SendUse(UseKind.CarSeat, seat);
             }
+        }
+
+        /// <summary>
+        /// Owner, before the motor: the body held while it hangs on the ladder (facing the rungs, hands and feet on them) or
+        /// sits in the car (facing the road) — the mouse turns the head within <see cref="LookSettings"/>, never round the
+        /// back (<see cref="PlayerMotor.LookHeld"/>). Climbing out over the top, the body is free again.
+        /// </summary>
+        void HoldLook()
+        {
+            var s = Tuning.Player.Look;
+            var car = Vehicles.Car.Active;
+            if (Climbing && !m_ClimbingOut && m_Ladder != null)
+            {
+                Motor.LookHeld = true;
+                Motor.HoldYaw = Mathf.Atan2(m_Ladder.Facing.x, m_Ladder.Facing.z) * Mathf.Rad2Deg;
+                Motor.HoldHead = s.LadderHead;
+                Motor.HoldBody = 0f;
+            }
+            else if (SeatIndex >= 0 && car != null)
+            {
+                Motor.LookHeld = true;
+                Motor.HoldYaw = car.transform.eulerAngles.y;
+                Motor.HoldHead = s.SeatHead;
+                Motor.HoldBody = s.SeatBody;
+            }
+            else Motor.LookHeld = false;
         }
 
         float m_NextWorkTick;
@@ -102,7 +137,7 @@ namespace Stealth.Player
         void UpdateUse(bool holdE)
         {
             bool busy = ReviveTarget != null || HackTarget != null || DoorTarget != null || SafeTarget != null || TerminalTarget != null || StorageTarget != null
-                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 0;
+                        || Cracking != null || AtConsole != null || CursorMode || SeatIndex >= 2 || AtUpgrades; // (in a front seat: its door, the button)
             UseTarget = busy ? null : Interactable.Near(this, Hands, View);
             bool available = false;
             UsePrompt = UseTarget != null ? UseTarget.Prompt(this, out available) : null;
@@ -115,6 +150,8 @@ namespace Stealth.Player
             if (!done) return;
             m_UseWaitRelease = true; // one use per press
             if (UseTarget is VaultConsole console) { StartConsole(console); return; } // its minigame, here; the server hears when solved
+            if (UseTarget.Kind == UseKind.CarBench) { AtBench = true; return; }      // the bench opens here; its moves are asked of the server
+            if (UseTarget.Kind == UseKind.Workbench) { OpenUpgrades(); return; }   // the car upgrade bench: its screen here, the upgrades asked of the server
             Link.SendUse(UseTarget.Kind, UseTarget.Index);
         }
 

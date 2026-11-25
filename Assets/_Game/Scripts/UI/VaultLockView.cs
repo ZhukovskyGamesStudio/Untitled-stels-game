@@ -28,8 +28,9 @@ namespace Stealth.UI
         public Text Hint;
         public float LampSpacing = 100f;
 
-        static readonly Color Off = new(0.17f, 0.18f, 0.21f, 1f), On = new(1f, 0.8f, 0.32f), Done = new(0.35f, 1f, 0.5f), Red = new(1f, 0.25f, 0.18f),
-            LedOff = new(0.22f, 0.24f, 0.27f);
+        // round stickers on the sheet: a pale one off, highlighter yellow lit, green once a step is done
+        static readonly Color Off = UiPalette.PaperShade, On = UiPalette.MarkYellow, Done = UiPalette.MarkGreen, Red = UiPalette.Stamp,
+            LedOff = UiPalette.PaperShade;
         int m_HintControls = -1, m_HintLoc = -1, m_HintKeys = -1;
         float[] m_Glow;
         float m_OpenedAt;
@@ -67,9 +68,8 @@ namespace Stealth.UI
                 // a bulb: up fast, down slowly
                 m_Glow[i] = Mathf.MoveTowards(m_Glow[i], on ? 1f : 0f, Time.deltaTime * (on ? 14f : 4f));
                 float g = m_Glow[i];
-                float flicker = 1f + 0.04f * Mathf.Sin(now * 31f + i * 1.7f) * g;
-                Lamps[i].color = Color.Lerp(Off, On, g) * flicker;
-                Halos[i].color = new Color(On.r, On.g, On.b, 0.75f * g);
+                Lamps[i].color = Color.Lerp(Off, On, g);
+                Halos[i].color = On.A(0.55f * g);
                 Halos[i].rectTransform.localScale = Vector3.one * (0.85f + 0.15f * g);
             }
             for (int i = 0; i < Dots.Length; i++)

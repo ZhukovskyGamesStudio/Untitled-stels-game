@@ -21,17 +21,8 @@ namespace Stealth.Tests
         {
             if (s_Houses.Count > 0) return s_Houses;
             s_Houses.AddRange(TestHouses.Sample);
-            foreach (var kind in new[] { HouseKind.Apartments, HouseKind.Hospital, HouseKind.Garage })
-            {
-                int found = 0;
-                for (int seed = 1; found < 2 && seed < 400; seed++)
-                {
-                    int house = seed % 5;
-                    if (HouseKinds.Of(seed, house) != kind) continue;
-                    s_Houses.Add(TestHouses.Get(seed, house));
-                    found++;
-                }
-            }
+            s_Houses.AddRange(TestHouses.Many(new[] { HouseKind.Apartments, HouseKind.Hospital, HouseKind.Garage }
+                .SelectMany(kind => TestHouses.FirstKeys(kind, 2, seed => seed % 5))));
             return s_Houses;
         }
 

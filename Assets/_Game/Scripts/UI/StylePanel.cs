@@ -2,60 +2,34 @@ using System.Collections.Generic;
 using Stealth.Configs;
 using Stealth.Game;
 using Stealth.Level;
-using Stealth.Player;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Stealth.UI
 {
     /// <summary>
-    /// The visual style picker (prefab UI/HUD, F8 — <see cref="GameAction.Style"/>): a button per style of the list in use
-    /// (<see cref="VisualStyles.All"/>, made from <see cref="Template"/> when the panel opens), the current one highlighted.
-    /// A click switches the whole team in a session (<see cref="GameManager.RequestStyle"/>), only this window in the menu,
-    /// and closes the panel; F8 or Escape closes it too. The panel frees the cursor while it is open.
+    /// The visual style picker — the «Визуал» page of the cheat panel (<see cref="CheatPanel"/>, F4): a button per style of
+    /// the list (<see cref="VisualStyles.All"/>, made from <see cref="Template"/> when the page first shows), the current one
+    /// highlighted. A click switches the whole team (<see cref="GameManager.RequestStyle"/>).
     /// </summary>
     public class StylePanel : MonoBehaviour
     {
-        public static bool IsOpen { get; private set; }
-
-        public GameObject Root;
         [Tooltip("Where the style buttons go (a grid layout)")]
         public Transform List;
         [Tooltip("The button copied for every style (UI/Elements/Button)")]
         public Button Template;
         [Tooltip("Tint of the current style's button")]
-        public Color CurrentColor = new(1f, 0.78f, 0.3f);
+        public Color CurrentColor = UiPalette.NoteYellow;
 
         readonly List<Button> m_Buttons = new();
         readonly List<VisualStyle> m_Styles = new();
         int m_Shown = -2, m_LocVersion = -1;
 
-        void Awake() => Root.SetActive(false);
+        void OnEnable() => Fill();
 
-        void OnDestroy() => IsOpen = false;
+        void Update() => Refresh();
 
-        /// <summary>Test hook (autopilot): open or close the panel.</summary>
-        public void SetOpen(bool open) => Show(open);
-
-        void Update()
-        {
-            if (ControlsPanel.Rebinding) return;
-            bool blocked = GameMenu.IsOpen || CheatPanel.IsOpen;
-            if (IsOpen && blocked) { Show(false); return; }
-            if (!blocked && Controls.Pressed(GameAction.Style)) Show(!IsOpen);
-            if (!IsOpen) return;
-            if (UnityEngine.InputSystem.Keyboard.current?.escapeKey.wasPressedThisFrame == true) { Show(false); return; }
-            Refresh();
-        }
-
-        void Show(bool on)
-        {
-            if (on) Fill();
-            IsOpen = on;
-            if (Root.activeSelf != on) Root.SetActive(on);
-        }
-
-        /// <summary>A button for every style of the list in use (the test rooms have their own list).</summary>
+        /// <summary>A button for every style of the list.</summary>
         void Fill()
         {
             var all = VisualStyles.All;
@@ -99,11 +73,10 @@ namespace Stealth.UI
 
         void Choose(int index)
         {
-            // In a session the whole team switches (GameManager replicates the choice); in the menu only this window.
+            // in a session the whole team switches (GameManager replicates the choice)
             var gm = GameManager.Instance;
             if (gm != null) gm.RequestStyle(index);
             else VisualStyles.Apply(VisualStyles.At(index));
-            Show(false);
         }
     }
 }

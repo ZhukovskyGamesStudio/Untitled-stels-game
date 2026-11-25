@@ -57,6 +57,34 @@ namespace Stealth.Vehicles
         /// </summary>
         public static Quaternion SteeringWheel(float steer, float ratio) => Quaternion.AngleAxis(steer * ratio, SteeringAxis);
 
+        /// <summary>The steering wheel's rim: its radius about the hub (car.py steering(): the ring's torus), metres.</summary>
+        public const float RimRadius = 0.18f;
+
+        /// <summary>The driver's hands on the rim with the wheel straight: this many degrees either side of its top (ten to two).</summary>
+        public const float HandsAt = 60f;
+
+        /// <summary>
+        /// The hands turn with the wheel this far (degrees of the wheel); past it the wheel slides on in the palms. At full
+        /// lock it turns 136°: hands that followed all the way crossed the arms and pulled one elbow through the body.
+        /// </summary>
+        public const float HandsFollow = 90f;
+
+        /// <summary>How far the hands turn for the wheel's turn (degrees, + clockwise as the driver sees it): with it, up to <see cref="HandsFollow"/>.</summary>
+        public static float HandTurn(float wheelTurn) => Mathf.Clamp(wheelTurn, -HandsFollow, HandsFollow);
+
+        /// <summary>
+        /// A point of the rim in the steering wheel's own space (pivot at the hub, the column along <see cref="SteeringAxis"/>):
+        /// <paramref name="degrees"/> clockwise from its top as the driver sees it (+90: the driver's right, the model's +X).
+        /// </summary>
+        public static Vector3 RimPoint(float degrees)
+        {
+            var axis = SteeringAxis;
+            var top = (Vector3.up - axis * Vector3.Dot(Vector3.up, axis)).normalized;
+            var right = Vector3.Cross(axis, top);
+            float r = degrees * Mathf.Deg2Rad;
+            return (top * Mathf.Cos(r) + right * Mathf.Sin(r)) * RimRadius;
+        }
+
         /// <summary>The rotation seen in a mirror across the YZ plane (M·R·M).</summary>
         public static Quaternion Mirror(Quaternion q) => new(q.x, -q.y, -q.z, q.w);
     }

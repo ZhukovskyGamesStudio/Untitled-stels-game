@@ -16,10 +16,8 @@ namespace Stealth.Tests
     {
         static FeatureSettings WithStorage(float chance = 1f) => new() { StorageChance = chance, StorageFromHouse = 0 };
 
-        static IEnumerable<LevelLayout> Houses(FeatureSettings f, int count = 14, int house = 2)
-        {
-            for (int seed = 1; seed <= count; seed++) yield return LevelGenerator.Generate(seed * 7919, house, features: f);
-        }
+        static IEnumerable<LevelLayout> Houses(FeatureSettings f, int count = 14, int house = 2) =>
+            TestHouses.Many(Enumerable.Range(1, count).Select(seed => new TestHouses.Spec(seed * 7919, house, features: f)));
 
         [Test]
         public void ARuleSaysWhatRoomFits()
@@ -38,7 +36,6 @@ namespace Stealth.Tests
             Assert.IsTrue(RoomRules.LootFits(RoomRules.For(RoomType.Storage, RoomRules.Defaults()), 9), "storage: anything");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void KitchensFitTheirRuleAndHaveAFridgeAndATable()
         {
@@ -46,7 +43,7 @@ namespace Stealth.Tests
             int kitchens = 0, tables = 0, bare = 0;
             var missing = new List<string>();
             var noTable = new List<string>();
-            foreach (var l in Houses(new FeatureSettings { StorageChance = 0f }, 20))
+            foreach (var l in Houses(WithStorage(0f)))
                 foreach (var r in l.Rooms)
                 {
                     if (r.Type != RoomType.Kitchen || r.Flat >= 0) continue; // (a flat's kitchen is a home's: small, its table where it fits)
@@ -74,7 +71,6 @@ namespace Stealth.Tests
             Assert.That(tables, Is.GreaterThan(kitchens / 2), $"most kitchens have their table ({tables} of {kitchens}; a small one with doors all round may have no room for it): " + string.Join("; ", noTable));
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomIsBehindOneLockedDoorWithItsTerminalElsewhere()
         {
@@ -108,7 +104,6 @@ namespace Stealth.Tests
             Assert.That(found, Is.GreaterThan(4), "most houses find a room for it");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheStorageRoomHasShelvesAndAPileForTheWorkers()
         {
@@ -136,29 +131,27 @@ namespace Stealth.Tests
             Assert.That(piles, Is.GreaterThan(0));
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void WorkersComeOnlyWithAStorageRoomAndWorkOnItsFloor()
         {
             int withWorkers = 0;
-            for (int house = 3; house <= 5; house++)
-                for (int seed = 1; seed <= 8; seed++)
+            foreach (var none in Houses(WithStorage(0f)))
+            {
+                Assert.AreEqual(-1, none.StorageRoom);
+                foreach (var r in none.RobotSpawns) Assert.AreNotEqual(RobotKind.Worker, r.Kind, $"seed {none.Seed}: no storage, no workers");
+            }
+            foreach (var l in Houses(WithStorage()))
+            {
+                if (l.StorageRoom < 0) continue;
+                int floor = l.Plan.Rooms[l.StorageRoom].Floor, workers = 0;
+                foreach (var r in l.RobotSpawns)
                 {
-                    var none = LevelGenerator.Generate(seed * 104729, house, features: WithStorage(0f));
-                    Assert.AreEqual(-1, none.StorageRoom);
-                    foreach (var r in none.RobotSpawns) Assert.AreNotEqual(RobotKind.Worker, r.Kind, $"seed {seed} house {house}: no storage, no workers");
-
-                    var l = LevelGenerator.Generate(seed * 104729, house, features: WithStorage());
-                    if (l.StorageRoom < 0) continue;
-                    int floor = l.Plan.Rooms[l.StorageRoom].Floor, workers = 0;
-                    foreach (var r in l.RobotSpawns)
-                    {
-                        if (r.Kind != RobotKind.Worker) continue;
-                        workers++;
-                        Assert.AreEqual(floor, r.Floor, "wheels: on the storage room's floor");
-                    }
-                    if (workers > 0) withWorkers++;
+                    if (r.Kind != RobotKind.Worker) continue;
+                    workers++;
+                    Assert.AreEqual(floor, r.Floor, "wheels: on the storage room's floor");
                 }
+                if (workers > 0) withWorkers++;
+            }
             Assert.That(withWorkers, Is.GreaterThan(3), "a storage room brings its workers");
         }
 
@@ -187,24 +180,23 @@ namespace Stealth.Tests
             foreach (var t in RoomRules.Programmed) Assert.IsTrue(every.Floors[0].Exists(r => r.Type == t), $"every type: {t}");
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void EveryRoomOfAHouseIsAtLeastItsTypesSmallest()
         {
             var rules = RoomRules.Defaults();
-            foreach (var l in Houses(new FeatureSettings(), 10, 3))
+            foreach (var l in TestHouses.Offices()) // (a location's own plan cuts its rooms by its layout: the hospital's, the flats')
                 foreach (var r in l.Rooms)
                 {
                     if (r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby || r.Flat >= 0) continue; // (a flat's rooms are a home's: its kitchen is small)
+                    if (r.Kept) continue; // the exit's and the entry's rooms keep the type they were given, whatever its rule (PlanRoom.Kept)
                     Assert.That(r.Area, Is.GreaterThanOrEqualTo(RoomRules.MinArea(r.Type, rules) - 0.01f), $"seed {l.Seed}: {r.Type} #{r.Id} {r.Area} m²");
                 }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void CorridorsAreNeverRooms()
         {
-            foreach (var l in Houses(new FeatureSettings(), 6, 2))
+            foreach (var l in TestHouses.Corpus(12))
             {
                 float rooms = 0f;
                 int count = 0;
@@ -215,7 +207,6 @@ namespace Stealth.Tests
             }
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void TheClassicGeneratorGuessesTypesAndStillHasItsStorageRoom()
         {
@@ -223,8 +214,8 @@ namespace Stealth.Tests
             int storage = 0, houses = 0, typed = 0;
             for (int seed = 1; seed <= 10; seed++)
             {
-                var l = LevelGenerator.Generate(seed * 6151, 1, null, null, 1, f, classic: true);
-                var program = LevelGenerator.Generate(seed * 6151, 1, null, null, 1, f, classic: false);
+                var l = TestHouses.Make(seed * 6151, 1, null, null, 1, f, classic: true);
+                var program = TestHouses.Make(seed * 6151, 1, null, null, 1, f, classic: false);
                 if (HouseKinds.OwnPlan(l.Kind)) continue; // a location's own plan: the classic switch is about the office generator
                 houses++;
                 if (l.StorageRoom >= 0) storage++;

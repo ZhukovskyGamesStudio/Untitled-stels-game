@@ -20,13 +20,27 @@ namespace Stealth.Tests
         static List<LevelLayout> Garages()
         {
             if (s_Garages.Count > 0) return s_Garages;
-            for (int seed = 1; s_Garages.Count < 5 && seed < 400; seed++)
-            {
-                int house = 1 + seed % 4;
-                if (HouseKinds.Of(seed, house) != HouseKind.Garage) continue;
-                s_Garages.Add(TestHouses.Get(seed, house));
-            }
+            s_Garages.AddRange(TestHouses.First(HouseKind.Garage, 5, seed => 1 + seed % 4));
             return s_Garages;
+        }
+
+        [Test]
+        public void TheCarUpgradeStationStandsWholeAndClearOfTheFurniture()
+        {
+            var need = Furnisher.FootprintOf(PropKind.Workbench);
+            Assert.Greater(need.width, 4f, "a big construction: wider than four metres");
+            int whole = 0;
+            foreach (var l in Garages())
+            {
+                string name = $"{l.Seed}/{l.LevelIndex}";
+                int i = l.Props.FindIndex(p => p.Kind == PropKind.Workbench);
+                Assert.GreaterOrEqual(i, 0, $"{name}: the shop has its station");
+                if (l.Props[i].Scale is > 0f and < 0.999f) continue; // (0 = 1)
+                whole++;
+                // put back where it stands, it still fits whole: in its room, on nothing, clear of the doors
+                Assert.IsNotNull(HouseFeatures.WholeAt(l, i, need), $"{name}: the station at full size where it stands");
+            }
+            Assert.AreEqual(Garages().Count, whole, "never shrunk to the place of a smaller piece");
         }
 
         [Test]

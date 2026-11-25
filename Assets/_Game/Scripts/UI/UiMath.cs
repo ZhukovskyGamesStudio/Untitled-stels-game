@@ -125,8 +125,27 @@ namespace Stealth.UI
         /// <summary>Bar colour: yellow → orange as it fills; red and blinking once it has detected you (the warning moment).</summary>
         public static Color SuspicionColor(float fill, bool detected, float time) =>
             detected
-                ? new Color(1f, 0.15f, 0.1f, 0.7f + 0.3f * Mathf.Sin(time * 14f))
-                : Color.Lerp(new Color(1f, 0.92f, 0.35f), new Color(1f, 0.45f, 0.1f), Mathf.Clamp01(fill));
+                ? UiPalette.Danger.A(0.7f + 0.3f * Mathf.Sin(time * 14f))
+                : Color.Lerp(UiPalette.MarkYellow, UiPalette.MarkOrange, Mathf.Clamp01(fill));
+
+        /// <summary>Where words <paramref name="content"/> wide start in a rect (its left edge and width) for a text alignment.</summary>
+        public static float AlignedLeft(float left, float width, float content, TextAnchor alignment) => alignment switch
+        {
+            TextAnchor.UpperCenter or TextAnchor.MiddleCenter or TextAnchor.LowerCenter => left + (width - content) / 2f,
+            TextAnchor.UpperRight or TextAnchor.MiddleRight or TextAnchor.LowerRight => left + width - content,
+            _ => left,
+        };
+
+        /// <summary>
+        /// A point (canvas units, bottom-left origin) moved inside the canvas so an element of <paramref name="half"/> its
+        /// size round it (and <paramref name="margin"/>) stays whole on any screen shape.
+        /// </summary>
+        public static Vector2 KeepOnScreen(Vector2 at, Vector2 canvas, Vector2 halfLeftBottom, Vector2 halfRightTop, float margin)
+        {
+            float x0 = halfLeftBottom.x + margin, x1 = canvas.x - halfRightTop.x - margin;
+            float y0 = halfLeftBottom.y + margin, y1 = canvas.y - halfRightTop.y - margin;
+            return new Vector2(x0 <= x1 ? Mathf.Clamp(at.x, x0, x1) : canvas.x / 2f, y0 <= y1 ? Mathf.Clamp(at.y, y0, y1) : canvas.y / 2f);
+        }
 
         /// <summary>UI scale: the layout is designed for 720p and scaled up for bigger windows (clamped).</summary>
         public static float Scale(float screenHeight) => Mathf.Clamp(screenHeight / 720f, 0.75f, 3f);

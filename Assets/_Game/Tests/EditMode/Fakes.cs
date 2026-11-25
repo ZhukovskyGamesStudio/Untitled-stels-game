@@ -96,10 +96,12 @@ namespace Stealth.Tests
         public void SendUseHand() => HandUses++;
         public int FallHurts;
         public void SendFallHurt() => FallHurts++;
+        public readonly List<(GearAction action, Detector target, Vector3 point)> Gear = new();
+        public void SendGear(GearAction action, Detector target, Vector3 point) => Gear.Add((action, target, point));
         public readonly List<(byte cls, byte item, bool ready)> Loadouts = new();
         public void SendLoadout(byte cls, byte item, bool ready) => Loadouts.Add((cls, item, ready));
-        public readonly List<(Cheat cheat, bool on)> Cheats = new();
-        public void SendCheat(Cheat cheat, bool on) => Cheats.Add((cheat, on));
+        public readonly List<(Cheat cheat, int arg)> Cheats = new();
+        public void SendCheat(Cheat cheat, int arg) => Cheats.Add((cheat, arg));
         public readonly List<(Stealth.Level.UseKind kind, int index)> Uses = new();
         public void SendUse(Stealth.Level.UseKind kind, int index) => Uses.Add((kind, index));
         public int Gadgets;
@@ -120,6 +122,7 @@ namespace Stealth.Tests
         public void RequestSwapHand(int index) => Requests.Add($"swap-hand {index}");
         public void RequestDrop(int index, Vector3 position, float yaw) => Requests.Add($"drop {index}");
         public void RequestDeposit(int index) => Requests.Add($"deposit {index}");
+        public void RequestCassette(int index) => Requests.Add($"cassette {index}");
         public void RequestStash(int index, byte x, byte y, byte rot) => Requests.Add($"stash {index} {x},{y},{rot}");
         public void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unstash {from.X},{from.Y} {x},{y},{rot}");
         public void RequestStashMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"stash-move {from.X},{from.Y} {x},{y},{rot}");
@@ -131,6 +134,11 @@ namespace Stealth.Tests
         public void RequestRecharge(int battery, int flashlight) => Requests.Add($"recharge {battery} {flashlight}");
         public void RequestRechargeWorld(WorldItem battery, int flashlight) => Requests.Add($"recharge-world {flashlight}");
         public void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw) => Requests.Add($"drop-stashed {from.X},{from.Y}");
+        public void RequestBench(int index, byte x, byte y, byte rot) => Requests.Add($"bench {index} {x},{y},{rot}");
+        public void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"unbench {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot) => Requests.Add($"bench-move {from.X},{from.Y} {x},{y},{rot}");
+        public void RequestCombine() => Requests.Add("combine");
+        public void RequestCarUpgrade(byte upgrade) => Requests.Add($"upgrade {upgrade}");
     }
 
     /// <summary>Stands in for a detector's network twin.</summary>

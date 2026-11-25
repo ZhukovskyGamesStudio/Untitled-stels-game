@@ -88,6 +88,7 @@ namespace Stealth.Player
                 GameManager.Instance?.SoundServer(Audio.GameSound.Bandage, Hands);
                 return true;
             }
+            if (e.Shape == ItemCatalog.Espresso) return DrinkEspressoServer(inv);
             if (e.Shape == ItemCatalog.Coffee)
             {
                 if (!inv.TakeHeldServer(ItemCatalog.Coffee)) return true;
@@ -163,6 +164,6 @@ namespace Stealth.Player
         /// <summary>Robots and sensors are hacked by hand only with the keyboard in it (the autopilot of the scenarios hacks as it always did).</summary>
         public bool CanHackByHand => HoldsKeyboard || DevFlags.AutoInteract;
         /// <summary>Looking at a robot or a sensor one cannot hack now for want of the keyboard (and it carries nothing to search it for).</summary>
-        public bool HackNeedsKeyboard => HackTarget != null && !CanHackByHand && !(HackTarget is Enemies.RobotController && HackTarget.Cargo >= 0);
+        public bool HackNeedsKeyboard => HackTarget != null && !CanHackByHand && !Unscrewing && !(HackTarget is Enemies.RobotController && HackTarget.Cargo >= 0);
     }
 }

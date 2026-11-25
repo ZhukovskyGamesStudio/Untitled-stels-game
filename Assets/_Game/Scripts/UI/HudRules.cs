@@ -18,6 +18,8 @@ namespace Stealth.UI
         public bool CanHack;
         /// <summary>The hack target is a robot and no keyboard is in the hand: E only searches it (what it carries falls off).</summary>
         public bool SearchOnly;
+        /// <summary>The upgraded screwdriver: E at the device in reach takes it apart (not a hack).</summary>
+        public bool Unscrew;
         /// <summary>The robot or sensor looked at is hacked only with the keyboard in the hand, and it is not there.</summary>
         public bool NeedsKeyboard;
         public float HackProgress;
@@ -169,11 +171,17 @@ namespace Stealth.UI
 
         /// <summary>
         /// The task list in the top left corner, in order (pure): in a house — find the exit first, then the house's main
-        /// job; in the sewer — open the way for the car, fuel it, then choose a tunnel. Each line with whether it is done.
+        /// job; in the sewer — open the way for the car, fuel it, then choose a tunnel; in the run's first sewer (no gate, the
+        /// first drive free: <paramref name="runStart"/>) only choose a tunnel. Each line with whether it is done.
         /// </summary>
-        public static List<(string text, bool done)> Tasks(bool sewer, bool exitSeen, in ObjectiveState job, bool gateOpen, bool fueled)
+        public static List<(string text, bool done)> Tasks(bool sewer, bool exitSeen, in ObjectiveState job, bool gateOpen, bool fueled, bool runStart = false)
         {
             var list = new List<(string, bool)>();
+            if (sewer && runStart)
+            {
+                list.Add((Loc.T("hud.task.tunnel"), false));
+                return list;
+            }
             if (sewer)
             {
                 list.Add((Loc.T("hud.task.gate"), gateOpen));
@@ -196,8 +204,8 @@ namespace Stealth.UI
             if (c.MenuOpen || c.CursorMode || c.Downed || c.Cracking || c.AtTerminal || c.InHatch) return Reticle.Hidden;
             if (c.Driving || c.Passenger) return new Reticle(ReticleIcon.Dot);
             if (c.CanRevive) return new Reticle(ReticleIcon.Revive, true, c.ReviveProgress);
-            if (c.CanHack && c.NeedsKeyboard) return new Reticle(ReticleIcon.Hack, false); // dim: not with these hands
-            if (c.CanHack) return new Reticle(c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
+            if (c.CanHack && c.NeedsKeyboard && !c.Unscrew) return new Reticle(ReticleIcon.Hack, false); // dim: not with these hands
+            if (c.CanHack) return new Reticle(c.Unscrew ? ReticleIcon.Vent : c.SearchOnly ? ReticleIcon.Search : ReticleIcon.Hack, true, c.HackProgress);
             if (c.LockedDoor) return new Reticle(ReticleIcon.Lock, true, c.DoorProgress);
             if (c.SafeNear) return new Reticle(ReticleIcon.Safe);
             if (c.Storage != null) return new Reticle(ReticleIcon.Hand);
@@ -212,9 +220,11 @@ namespace Stealth.UI
             Level.UseKind.Crate => ReticleIcon.Crate,
             Level.UseKind.MedTable => ReticleIcon.Heal,
             Level.UseKind.Workbench => ReticleIcon.Craft,
+            Level.UseKind.CarBench => ReticleIcon.Craft,
             Level.UseKind.KeyDoor => ReticleIcon.Key,
             Level.UseKind.GateLever => ReticleIcon.Lever,
             Level.UseKind.CarSeat => ReticleIcon.Seat,
+            Level.UseKind.CarPanic => ReticleIcon.Hand,
             Level.UseKind.CarHopper => ReticleIcon.Fuel,
             Level.UseKind.CarCargo => ReticleIcon.Hand,
             Level.UseKind.VaultConsole => ReticleIcon.Terminal,
@@ -222,6 +232,7 @@ namespace Stealth.UI
             Level.UseKind.HandDryer => ReticleIcon.Hand,
             Level.UseKind.LightSwitch => ReticleIcon.Hand,
             Level.UseKind.ExitButton => ReticleIcon.Hand,
+            Level.UseKind.PetBot => ReticleIcon.Hand,
             Level.UseKind.LiftCall or Level.UseKind.LiftFloor => ReticleIcon.Hand,
             Level.UseKind.VentGrille => ReticleIcon.Vent,
             Level.UseKind.VaultDoor => ReticleIcon.Lever,
@@ -292,9 +303,10 @@ namespace Stealth.UI
                 into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.out")));
                 return into;
             }
-            if (c.NearTrade && c.CarriedItems > 0 && !c.CursorMode)
+            // at Linus with things on us: G puts everything in his backpack — with the cursor out too (the board has no button for it)
+            if (c.NearTrade && c.CarriedItems > 0)
             {
-                into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
+                if (!c.CursorMode) into.Add(new Hint(K(GameAction.Hands), Loc.T("hint.stash")));
                 into.Add(new Hint(K(GameAction.StashAll), Loc.T("hint.stash_all")));
             }
             if (c.Playing && c.NearHatch) into.Add(new Hint(K(GameAction.Hatch), Loc.T("hint.hatch.in")));
@@ -309,8 +321,8 @@ namespace Stealth.UI
             var e = K(GameAction.Interact);
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
-            if (c.CanHack && c.NeedsKeyboard) return new Hint(e, Loc.T("hint.need_keyboard"), true);
-            if (c.CanHack) return new Hint(e, Loc.T(c.SearchOnly ? "hint.search" : "hint.hack"));
+            if (c.CanHack && c.NeedsKeyboard && !c.Unscrew) return new Hint(e, Loc.T("hint.need_keyboard"), true);
+            if (c.CanHack) return new Hint(e, Loc.T(c.Unscrew ? "hint.take_apart" : c.SearchOnly ? "hint.search" : "hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T(c.LockedByUnit ? "hint.hack" : "hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
             if (c.Storage != null) return new Hint(e, c.Storage);

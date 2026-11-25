@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
@@ -16,15 +17,12 @@ namespace Stealth.EditorTools
     /// launches paid that three times. The player is a development build, and when nothing but code changed since the last
     /// one it is a scripts-only build (seconds instead of minutes): every content file's size and time go into a stamp next
     /// to the exe, and a different stamp means a full build. Env: FILTER (tests), FORCE / REBUILD / REBUILD_UI (assets),
-    /// NOASSETS / NOTESTS / NOPLAYER = 1 to skip a step, FULL = 1 to force a full player build. The tests marked
-    /// <c>[Category("Slow")]</c> (they generate dozens of houses: ~90% of the time) are left out unless SLOW = 1 or a FILTER
-    /// names them; run them before a commit and after changes to the generator.
+    /// NOASSETS / NOTESTS / NOPLAYER = 1 to skip a step, FULL = 1 to force a full player build. Every test runs every
+    /// time (the houses they look at are shared and made on several threads: Tests/EditMode/TestHouses.cs).
     /// </summary>
     public static class DevCycle
     {
         const string StampPath = "Builds/Windows/dev_build_stamp.txt";
-        /// <summary>The tests left out of the everyday run (SLOW = 1 runs them too).</summary>
-        const string SlowCategory = "Slow";
 
         static bool Env(string name) => Environment.GetEnvironmentVariable(name) == "1";
 
@@ -91,24 +89,25 @@ namespace Stealth.EditorTools
             }
         }
 
-        /// <summary>The EditMode tests, synchronously, in this process. True when none failed.</summary>
+        /// <summary>The EditMode tests, synchronously, in this process. True when they ran and none failed.</summary>
         static bool RunTests()
         {
+            // The asset step leaves an unsaved scene behind: the test runner then asks to save it — a dialog batchmode
+            // cannot show — and quietly ran no test at all, while the cycle reported success. An empty scene, unsaved.
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var api = ScriptableObject.CreateInstance<TestRunnerApi>();
             var results = new Results();
             api.RegisterCallbacks(results);
             var filter = new Filter { testMode = TestMode.EditMode };
             var only = Environment.GetEnvironmentVariable("FILTER");
             if (!string.IsNullOrEmpty(only)) filter.groupNames = new[] { only };
-            else if (!Env("SLOW")) filter.categoryNames = new[] { "!" + SlowCategory };
             api.Execute(new ExecutionSettings(filter) { runSynchronously = true });
             api.UnregisterCallbacks(results);
-            bool slow = Env("SLOW") || !string.IsNullOrEmpty(only);
-            Debug.Log($"[Cycle] tests: total={results.Total} passed={results.Passed} failed={results.Failed} in {results.Times.Sum(t => t.seconds):0} s" +
-                      (slow ? "" : " (without the slow ones: SLOW=1 runs them)"));
+            Debug.Log($"[Cycle] tests: total={results.Total} passed={results.Passed} failed={results.Failed} in {results.Times.Sum(t => t.seconds):0} s");
             WriteTimes(results.Times);
             foreach (var f in results.Failures) Debug.Log("[Cycle] " + f);
-            return results.Failed == 0;
+            if (results.Total == 0) Debug.Log("[Cycle] no test ran: the cycle fails");
+            return results.Failed == 0 && results.Total > 0;
         }
 
         /// <summary>Logs/test_times.txt: the classes by their total time, then the slowest tests.</summary>

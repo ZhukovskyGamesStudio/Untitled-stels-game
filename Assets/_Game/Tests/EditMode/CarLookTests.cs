@@ -67,5 +67,71 @@ namespace Stealth.Tests
             Assert.AreEqual(1f, Quaternion.Dot(part.localRotation, part.localRotation), 1e-4f, "a unit quaternion");
             Object.DestroyImmediate(root);
         }
+
+        /// <summary>
+        /// The driver's hands follow the wheel up to a quarter turn, then it slides on in the palms (full lock is 136°: hands
+        /// that followed crossed the arms); the points they hold lie on the rim of the wheel's own model.
+        /// </summary>
+        [Test]
+        public void TheHandsHoldTheRimOfTheWheelsModel()
+        {
+            Assert.AreEqual(40f, CarLook.HandTurn(40f));
+            Assert.AreEqual(CarLook.HandsFollow, CarLook.HandTurn(136f));
+            Assert.AreEqual(-CarLook.HandsFollow, CarLook.HandTurn(-136f));
+            Assert.Greater(CarLook.RimPoint(90f).x, 0.17f, "+90: the driver's right (the model's +X)");
+            Assert.Greater(CarLook.RimPoint(0f).y, 0.15f, "0: the top");
+            Assert.AreEqual(0f, Vector3.Dot(CarLook.RimPoint(37f), CarLook.SteeringAxis), 1e-5f, "across the column");
+
+            var car = AssetDatabase.LoadAssetAtPath<Car>("Assets/_Game/Prefabs/Vehicles/Car.prefab");
+            Assert.IsNotNull(car.Steering, "the car's steering wheel");
+            var toWheel = car.Steering.worldToLocalMatrix;
+            var rim = new System.Collections.Generic.List<Vector3>();
+            foreach (var f in car.Steering.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var m = toWheel * f.transform.localToWorldMatrix;
+                foreach (var v in f.sharedMesh.vertices) rim.Add(m.MultiplyPoint3x4(v));
+            }
+            Assert.IsNotEmpty(rim, "the wheel's mesh");
+            for (float deg = -180f; deg < 180f; deg += 15f)
+            {
+                var p = CarLook.RimPoint(deg);
+                float nearest = float.PositiveInfinity;
+                foreach (var v in rim) nearest = Mathf.Min(nearest, (v - p).magnitude);
+                // (the ring is a 2.2 cm tube of 20 sections: its vertices lie within a few centimetres of its centre line)
+                Assert.Less(nearest, 0.045f, $"{deg}°: no rim there ({nearest * 100f:0.0} cm to the mesh)");
+            }
+        }
+
+        /// <summary>
+        /// Where a hand holds the wheel (<see cref="Car.WheelGrip"/>) is the same point of the rim as the turned model shows
+        /// it, in the right-hand car and in the mirrored left-hand one; the hands at ten to two are either side of the hub.
+        /// </summary>
+        [Test]
+        public void TheGripTurnsWithTheWheelAsItIsShown([Values(false, true)] bool leftHand)
+        {
+            var car = Object.Instantiate(AssetDatabase.LoadAssetAtPath<Car>("Assets/_Game/Prefabs/Vehicles/Car.prefab"));
+            try
+            {
+                car.ApplySides(new CarSettings { LeftHandDrive = leftHand });
+                car.WheelGrip(0f, 0f, out var hub, out var column); // (reads the wheel's rest pose)
+                var rest = car.Steering.localRotation;
+                var left = car.WheelGrip(-CarLook.HandsAt, 0f, out _, out _);
+                var right = car.WheelGrip(CarLook.HandsAt, 0f, out _, out _);
+                Assert.AreEqual(CarLook.RimRadius, (left - hub).magnitude, 0.01f, "on the rim");
+                Assert.Greater(Vector3.Dot(left - hub, Vector3.up), 0f, "ten to two: over the hub");
+                Assert.Greater(Mathf.Abs(Vector3.Dot(left - right, car.transform.right)), 0.25f, "either side of the hub");
+                Assert.Less(Vector3.Dot(column, car.transform.forward), -0.8f, "the column points back at the driver");
+                foreach (float turn in new[] { -70f, 25f, 90f })
+                {
+                    car.Steering.localRotation = rest * CarLook.SteeringWheel(turn, 1f);
+                    var shown = car.Steering.TransformPoint(CarLook.RimPoint(CarLook.HandsAt));
+                    Assert.Less((car.WheelGrip(CarLook.HandsAt, turn, out _, out _) - shown).magnitude, 1e-3f, $"turned {turn}°: the hand holds the rim where it is");
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(car.gameObject);
+            }
+        }
     }
 }

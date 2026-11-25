@@ -43,11 +43,12 @@ namespace Stealth.Game
                 }
                 if (p.Kind == PropKind.Workbench)
                 {
-                    inv.GiveServer(3, 1); inv.GiveServer(4, 1); inv.GiveServer(0, 2);
+                    // the car upgrade bench: the engine's first level for its recipe
+                    foreach (byte shape in gm.UpgradeBook.Recipe(Vehicles.CarUpgrade.Engine, 1)) inv.GiveServer(shape, 0);
                     Me.TeleportOwner(Front(p, 1.2f), Quaternion.identity);
                     yield return new WaitForSeconds(0.3f);
-                    gm.UseServer(Me, UseKind.Workbench, l.PointOfInterest);
-                    Log($"workbench: backpack {string.Join(",", inv.Items.Select(e => ItemCatalog.Shapes[e.Shape].Id))}");
+                    gm.CarUpgradeServer(Me, Vehicles.CarUpgrade.Engine);
+                    Log($"upgrade bench: engine level {gm.Upgrades.Level(Vehicles.CarUpgrade.Engine)}, backpack {string.Join(",", inv.Items.Select(e => ItemCatalog.Shapes[e.Shape].Id))}");
                 }
                 if (p.Kind == PropKind.Programmer)
                     Log($"programmer: stun cubes lying {WorldItem.All.Count(w => w.Shape == ItemCatalog.Stun)}");

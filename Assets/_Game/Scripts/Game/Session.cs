@@ -90,9 +90,15 @@ namespace Stealth.Game
     // The game component talks to the twin only through these interfaces.
 
     /// <summary>Player → network: owner requests to the server and server events for the owner.</summary>
-    /// <summary>The test cheats of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server.</summary>
-    /// <summary>A cheat (F4 panel). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.</summary>
-    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, StartHouse = 32 }
+    /// <summary>
+    /// A test cheat of the F4 panel (<see cref="Stealth.UI.CheatPanel"/>), carried out by the server, with its argument
+    /// (<see cref="CheatArgs"/>): on/off, an item and its colour (<see cref="SpawnItem"/>), an upgrade and its level
+    /// (<see cref="SetUpgrade"/>). <see cref="StartHouse"/> + a <see cref="Stealth.Level.HouseKind"/>: start a house of that kind now.
+    /// </summary>
+    public enum Cheat : byte { KillRobots, Invulnerable, Invisible, FillQuota, SpawnItem, SetUpgrade, StartHouse = 32 }
+
+    /// <summary>What a thing made at the workbench does on request (<see cref="IPlayerLink.SendGear"/>).</summary>
+    public enum GearAction : byte { Ram, Unscrew, Hammer }
 
     public interface IPlayerLink
     {
@@ -111,8 +117,8 @@ namespace Stealth.Game
         /// <summary>Owner → server: a command to the team's storage robot (0: come to me, 1: go to the exit).</summary>
         void SendBot(byte command);
 
-        /// <summary>Owner → server: a cheat from the F4 panel.</summary>
-        void SendCheat(Cheat cheat, bool on);
+        /// <summary>Owner → server: a cheat from the F4 panel and its argument (<see cref="CheatArgs"/>).</summary>
+        void SendCheat(Cheat cheat, int arg);
         /// <summary>Owner: move without interpolation (respawn, test teleports).</summary>
         void Teleport(Vector3 position, Quaternion rotation);
         /// <summary>Server → owner: stand here (a player who came back: where they left, or by the host).</summary>
@@ -140,6 +146,8 @@ namespace Stealth.Game
         void SendHitFeedback(Vector3 awayFromSource);
         /// <summary>Owner → server: I fell from too high (it hurts).</summary>
         void SendFallHurt();
+        /// <summary>The workbench's things: ram a robot (double espresso), take a robot or a device apart (upgraded screwdriver), break the floor (hammer).</summary>
+        void SendGear(GearAction action, Detector target, Vector3 point);
         /// <summary>Owner → server: the class and the extra item picked on the run's start screen, and whether I am ready.</summary>
         void SendLoadout(byte cls, byte item, bool ready);
     }
@@ -153,6 +161,8 @@ namespace Stealth.Game
         void RequestSwapHand(int index);
         void RequestDrop(int index, Vector3 position, float yaw);
         void RequestDeposit(int index);
+        /// <summary>A cassette from the backpack into the car's radio.</summary>
+        void RequestCassette(int index);
         // Team stash at the hatch. Stash entries are named by value: another player may have changed the list meanwhile.
         void RequestStash(int index, byte x, byte y, byte rot);
         void RequestUnstash(InventoryEntry from, byte x, byte y, byte rot);
@@ -170,6 +180,14 @@ namespace Stealth.Game
         void RequestRechargeWorld(WorldItem battery, int flashlight);
         /// <summary>An item of the team stash dropped into the world.</summary>
         void RequestDropStashed(InventoryEntry from, Vector3 position, float yaw);
+        // The car's workbench (its entries named by value, like the stash's).
+        void RequestBench(int index, byte x, byte y, byte rot);
+        void RequestUnbench(InventoryEntry from, byte x, byte y, byte rot);
+        void RequestBenchMove(InventoryEntry from, byte x, byte y, byte rot);
+        /// <summary>«Combine»: what lies on the bench becomes its recipe's result (or may break).</summary>
+        void RequestCombine();
+        /// <summary>Raise a car upgrade one level at the garage's upgrade bench (Vehicles.CarUpgrade).</summary>
+        void RequestCarUpgrade(byte upgrade);
     }
 
     /// <summary>Run state → network: requests from any player and banners for everyone.</summary>
@@ -185,6 +203,13 @@ namespace Stealth.Game
         void BroadcastHouseStats(string packed);
         /// <summary>Server → everyone: a sound somewhere (what only the server decides: a thing crafted, someone healed).</summary>
         void BroadcastSound(Stealth.Audio.GameSound sound, Vector3 at);
+    }
+
+    /// <summary>The storage mule → network: its one-shot reactions shown on every peer.</summary>
+    public interface IStorageBotLink
+    {
+        /// <summary>Server → everyone: a player petted it (<see cref="StorageBot.ReceivePet"/>).</summary>
+        void BroadcastPet();
     }
 
     /// <summary>Robot / device → network: one-shot visual effects shown on every peer.</summary>

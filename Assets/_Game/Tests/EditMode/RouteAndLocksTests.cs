@@ -197,7 +197,7 @@ namespace Stealth.Tests
         public void LockedDoorsDoNotChangeTheRestOfTheHouse()
         {
             var a = TestHouses.Get(1337, 3);
-            var b = LevelGenerator.Generate(1337, 3, new BuildingSettings { LockedDoorChance = 0f });
+            var b = TestHouses.Make(1337, 3, new BuildingSettings { LockedDoorChance = 0f });
             Assert.IsEmpty(b.LockedDoors);
             CollectionAssert.AreEqual(a.Rooms.Select(r => (r.Type, r.Area)), b.Rooms.Select(r => (r.Type, r.Area)));
             Assert.AreEqual(a.AutoDoors.Count, b.AutoDoors.Count);

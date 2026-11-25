@@ -19,7 +19,7 @@ namespace Stealth.UI
     /// </list>
     /// Works on the local player's <see cref="PlayerInventory"/>; the server validates every request.
     /// </summary>
-    public class InventoryUI : MonoBehaviour
+    public partial class InventoryUI : MonoBehaviour
     {
         public static InventoryUI Instance { get; private set; }
 
@@ -68,8 +68,8 @@ namespace Stealth.UI
         public RectTransform HandItems;
         public Text HandLabel;
 
-        enum DragSource { None, Inventory, World, Stash, Cargo }
-        enum Target { None, Backpack, Stash, Sell, StashAll, Hand, Belt }
+        enum DragSource { None, Inventory, World, Stash, Cargo, Bench }
+        enum Target { None, Backpack, Stash, Sell, Hand, Belt, Bench, Combine, Info }
 
         DragSource m_Source;
         int m_DragIndex = -1;
@@ -114,6 +114,7 @@ namespace Stealth.UI
                 m_HandBlocks = new UiPool<InventoryBlockView>(BlockPrefab, HandItems);
                 m_HandIcons = new UiPool<Image>(HighlightPrefab, HandItems);
             }
+            AwakeBench();
         }
 
         void OnDestroy()
@@ -151,13 +152,12 @@ namespace Stealth.UI
                 return Target.Belt;
             }
             if (HandSlot != null && RectTransformUtility.RectangleContainsScreenPoint(HandSlot, MouseScreen, null)) return Target.Hand;
+            var bench = BenchTarget(me, out var benchCell);
+            if (bench != Target.None) { cell = benchCell; return bench; }
             if (!StashActive(me) || !Board.Visible) return Target.None;
             if (CellIn(Board.Grid, me.Camera, MouseScreen, out cell)) return Target.Stash;
             if (Board.SellZone.gameObject.activeInHierarchy && RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.SellZone, MouseScreen, me.Camera, out var local) &&
                 Board.SellZone.rect.Contains(local)) return Target.Sell;
-            if (Board.StashAllZone != null &&
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(Board.StashAllZone, MouseScreen, me.Camera, out var all) &&
-                Board.StashAllZone.rect.Contains(all)) return Target.StashAll;
             return Target.None;
         }
 
@@ -205,9 +205,10 @@ namespace Stealth.UI
             bool on = StashActive(me), was = Board.Visible;
             Board.Show(on);
             if (!on) return;
+            Board.Fit(Stash.Columns, Stash.Rows); // (the storage robot's box grows with its backpack)
             // the entry hatch is the tank's filler: its board has a zone that burns what is dropped on it; the exit's has none
             bool burn = GameManager.Instance.CanBurnStashAt(me.transform.position, Stash); // (the storage robot's crate: no fire)
-            if (Board.SellZone != null && Board.SellZone.gameObject.activeSelf != burn) Board.SellZone.gameObject.SetActive(burn);
+            Board.SetSell(burn);
             // Turns towards the viewer while the camera moves freely; stays still under the cursor.
             if (!me.CursorMode || !was)
             {
@@ -262,6 +263,7 @@ namespace Stealth.UI
             if (m_Source == DragSource.World && (m_DragWorld == null || !m_DragWorld.isActiveAndEnabled)) { CancelDrag(); return; }
             if (m_Source == DragSource.Stash && (Stash == null || Stash.IndexOf(m_DragStashed) < 0)) { CancelDrag(); return; }
             if (m_Source == DragSource.Cargo && !InBed(m_DragCargo)) { CancelDrag(); return; }
+            if (m_Source == DragSource.Bench && (BenchStash == null || BenchStash.IndexOf(m_DragBenched) < 0)) { CancelDrag(); return; }
 
             m_DragTravel += mouse.delta.ReadValue().magnitude;
             if (Controls.Pressed(GameAction.Rotate))
@@ -321,14 +323,13 @@ namespace Stealth.UI
                 m_GrabCell = Vector2Int.zero;
                 m_DragTravel = 0f;
             }
+            else if (over is Target.Bench or Target.Combine or Target.Info)
+            {
+                BeginBenchDrag(over, cell, inv, press);
+            }
             else if (over == Target.Sell)
             {
                 m_Tooltip = null;
-            }
-            else if (over == Target.StashAll)
-            {
-                m_Tooltip = null;
-                if (press) StashAll(PlayerController.Local, inv);
             }
             else if (m_Hover != null)
             {
@@ -430,6 +431,7 @@ namespace Stealth.UI
                     if (m_Source == DragSource.World) Take(inv, PlayerInventory.HandX, 0, 0);
                     else if (m_Source == DragSource.Cargo) { inv.RequestTakeCargo(m_DragCargo, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     else if (m_Source == DragSource.Stash) { inv.RequestUnstash(m_DragStashed, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    else if (m_Source == DragSource.Bench) { inv.RequestUnbench(m_DragBenched, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, 0, PlayerInventory.HandX, 0, m_DragIndex)) { inv.RequestMove(m_DragIndex, PlayerInventory.HandX, 0, 0); Sfx.Ui(bank?.Click, 0.5f); }
                     // the hand is busy: the two swap (the held one where this one was, if there is room)
                     else if (m_Source == DragSource.Inventory && inv.CanSwapHand(m_DragIndex, out _, out _, out _)) { inv.RequestSwapHand(m_DragIndex); Sfx.Ui(bank?.Click, 0.5f); }
@@ -441,6 +443,14 @@ namespace Stealth.UI
                     else if (m_Source == DragSource.Inventory && inv.CanPlace(m_DragShape, rot, x, y, m_DragIndex)) { inv.RequestMove(m_DragIndex, x, y, rot); Sfx.Ui(bank?.Click, 0.5f); }
                     else if (m_Source == DragSource.Stash && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestUnstash(m_DragStashed, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
                     else if (m_Source == DragSource.Cargo && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestTakeCargo(m_DragCargo, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    else if (m_Source == DragSource.Bench && inv.CanPlace(m_DragShape, rot, x, y)) { inv.RequestUnbench(m_DragBenched, x, y, rot); Sfx.Ui(bank?.Pickup, 0.8f, Sfx.Group.Items); }
+                    return;
+                case Target.Bench:
+                    if (inside) DropOnBench(inv, x, y, rot);
+                    return;
+                case Target.Combine:
+                case Target.Info:
+                    if (m_Source == DragSource.Bench) BenchToBackpack(inv);
                     return;
                 case Target.Stash:
                     if (!inside || Stash == null) return;
@@ -457,7 +467,13 @@ namespace Stealth.UI
                     else if (m_Source == DragSource.Stash) inv.RequestSellStashed(m_DragStashed);
                     return;
             }
-            if (m_Source == DragSource.Inventory && AtHopper(me, mouseRay))
+            if (m_Source == DragSource.Inventory && m_DragShape == ItemCatalog.Cassette && AtRadio(mouseRay))
+            {
+                // onto the car's radio: it goes in and plays (the one in it comes out into the backpack)
+                inv.RequestCassette(m_DragIndex);
+                Sfx.At(bank?.Pickup, Vehicles.CarRadio.Active.transform.position, 0.8f, Sfx.Group.Items);
+            }
+            else if (m_Source == DragSource.Inventory && AtHopper(me, mouseRay))
             {
                 // into the shredder: this one thing burns into fuel
                 inv.RequestDeposit(m_DragIndex);
@@ -472,6 +488,8 @@ namespace Stealth.UI
             }
             // from the team stash straight onto the floor, the same way as from the backpack
             else if (m_Source == DragSource.Stash) DropIntoWorld(me, inv, mouseRay, stashed: true);
+            // off the bench anywhere but a grid: into the backpack's first free spot
+            else if (m_Source == DragSource.Bench) BenchToBackpack(inv);
             // A world item released anywhere but a grid (a click, or a drag that missed): into the first free spot.
             else if (m_Source == DragSource.World)
             {
@@ -525,6 +543,14 @@ namespace Stealth.UI
             }
             if (stashed) inv.RequestDropStashed(m_DragStashed, at, yaw);
             else inv.RequestDrop(m_DragIndex, at, yaw);
+        }
+
+        /// <summary>The mouse is over the car's radio (fitted, within reach): a cassette let go there goes in.</summary>
+        static bool AtRadio(Ray ray)
+        {
+            var radio = Vehicles.CarRadio.Active;
+            return radio != null && radio.Slot != null && radio.isActiveAndEnabled
+                   && radio.Slot.Raycast(ray, out _, PlayerInventory.ReachDistance + 0.5f);
         }
 
         void CancelDrag()
@@ -639,17 +665,19 @@ namespace Stealth.UI
                 var back = HandBackground.color;
                 bool overHand = m_Source != DragSource.None && MouseTarget(me, out _) == Target.Hand;
                 if (m_HandColor.a <= 0f) m_HandColor = new Color(back.r, back.g, back.b, 1f);
-                var tint = !overHand ? m_HandColor : HandTakes(inv) ? new Color(0.35f, 0.75f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
+                var tint = !overHand ? m_HandColor : HandTakes(inv) ? UiPalette.Good : UiPalette.Stamp;
                 HandBackground.color = new Color(tint.r, tint.g, tint.b, back.a);
                 SetIfChanged(HandLabel, $"{Loc.T("inventory.hand")} [{Controls.Label(GameAction.UseHand)}]");
             }
 
             bool board = Board != null && Board.Visible && m_StashItems != null;
             if (board) DrawStashItems();
+            DrawBench(me, inv);
 
             m_Highlights.Begin();
             m_GhostBlocks.Begin();
             m_GhostIcons.Begin();
+            m_BenchHighlights?.Begin();
             if (board) m_StashHighlights.Begin();
             bool dragging = m_Source != DragSource.None;
             string hint = null;
@@ -664,6 +692,11 @@ namespace Stealth.UI
                         ? inv.CanPlace(m_DragShape, m_DragRot, target.x, target.y, m_DragIndex)
                         : inv.CanPlace(m_DragShape, m_DragRot, target.x, target.y);
                     Highlight(m_Highlights, target, ok);
+                }
+                else if (over == Target.Bench && BenchStash != null)
+                {
+                    int ignore = m_Source == DragSource.Bench ? BenchStash.IndexOf(m_DragBenched) : -1;
+                    HighlightBench(target, BenchStash.CanPlace(m_DragShape, m_DragRot, target.x, target.y, ignore));
                 }
                 else if (over == Target.Stash && board)
                 {
@@ -683,17 +716,11 @@ namespace Stealth.UI
             m_Highlights.End();
             m_GhostBlocks.End();
             m_GhostIcons.End();
+            m_BenchHighlights?.End();
             if (board)
             {
                 m_StashHighlights.End();
-                Board.SellBackground.color = overSell ? new Color(1f, 0.75f, 0.1f, 0.85f) : new Color(1f, 0.75f, 0.1f, 0.45f);
-                if (Board.StashAllZone != null)
-                {
-                    bool overAll = !dragging && me.CursorMode && MouseTarget(me, out _) == Target.StashAll;
-                    bool any = inv.Items.Count > 0;
-                    Board.StashAllBackground.color = !any ? new Color(0.3f, 0.75f, 1f, 0.15f) : overAll ? new Color(0.3f, 0.75f, 1f, 0.85f) : new Color(0.3f, 0.75f, 1f, 0.45f);
-                    SetIfChanged(Board.StashAllLabel, Loc.F("stash.all", Controls.Label(GameAction.StashAll)));
-                }
+                Board.SellBackground.color = overSell ? UiPalette.MarkYellow : UiPalette.NoteYellow;
             }
 
             string tip = hint ?? (me.CursorMode && !dragging ? m_Tooltip : null);
@@ -737,7 +764,7 @@ namespace Stealth.UI
             {
                 var h = pool.Next();
                 h.rectTransform.anchoredPosition = new Vector2((UiColumn(target.x) + cc.x) * Cell + 1, -((target.y + cc.y) * Cell + 1));
-                h.color = ok ? new Color(0.3f, 1f, 0.4f, 0.35f) : new Color(1f, 0.25f, 0.2f, 0.4f);
+                h.color = ok ? UiPalette.MarkGreen.A(0.45f) : UiPalette.Stamp.A(0.4f);
             }
         }
 
@@ -764,6 +791,7 @@ namespace Stealth.UI
             rt.localScale = new Vector3(ItemCatalog.IsMirrored(rot) ? -1f : 1f, 1f, 1f);
             rt.localRotation = Quaternion.Euler(0f, 0f, -90f * (rot & 3)); // a quarter turn clockwise per step (RotatedCells)
             rt.SetAsLastSibling();                                         // over the cells
+            if (shape == ItemCatalog.Blueprint) { DrawBlueprint(icons, origin, color, turned, alpha); return; }
             if (shape != ItemCatalog.Flashlight) return;
             // the flashlight's charge: a thin bar along the bottom of its cells, green when full, red when nearly empty
             float k = Mathf.Clamp01(color / (float)ItemCatalog.FullCharge);
@@ -801,6 +829,7 @@ namespace Stealth.UI
             m_HandBlocks?.Begin(); m_HandBlocks?.End();
             m_HandIcons?.Begin(); m_HandIcons?.End();
             m_Highlights.Begin(); m_Highlights.End();
+            HideBench();
             Ui.Show(Tooltip, false);
         }
     }

@@ -1,6 +1,8 @@
-"""The CC0 recordings the game's sounds are cut from (all from OpenGameArt, licence CC0 1.0), and their download.
+"""The recordings the game's sounds are cut from (all from OpenGameArt; licence CC0 1.0 unless LICENCES says otherwise —
+those need their author named in CREDITS.md), and their download.
 
-    python -I Tools/Audio/cc0_sources.py       downloads what is missing into Tools/Audio/cache/<set>/ (ignored by git) and unpacks it
+    python -I Tools/Audio/cc0_sources.py [set ...]   downloads what is missing into Tools/Audio/cache/<set>/ (ignored by git)
+                                                     and unpacks it — every set, or only the named ones
 
 import_cc0_sounds.py cuts the clips out of them and lists those it used in Assets/_Game/Art/Audio/CREDITS.md.
 """
@@ -42,11 +44,20 @@ SETS = [
     ("breaker", "sfx-circuit-breaker", "SFX - Circuit breaker", "CleytonKauffman", ["Circuit%20Breaker.zip"]),
     ("loops30", "30-cc0-sfx-loops", "30 CC0 SFX loops", "rubberduck", ["sfx_loops.zip"]),
     ("sirens", "sirens-and-alarm-noise", "Sirens and Alarm Noise", "aquinn", ["siren_0.mp3"]),
+    # Linus the raccoon (recorded.py mule_*)
+    ("raccoon", "raccoon-chatter", "Raccoon Chatter", "AntumDeluge (from video by jnargus)", ["raccoon_chatter.zip"]),
+    ("creature80", "80-cc0-creature-sfx", "80 CC0 creature SFX", "rubberduck", ["80-CC0-creature-SFX_0.zip"]),
+    ("squeakyrat", "squeaky-rat", "Squeaky rat", "qubodup", ["qubodupSqueakyRat.7z"]),
 ]
 
+# sets that are not CC0: their licence (CREDITS.md names the author, as the licence asks)
+LICENCES = {"raccoon": "CC-BY 3.0"}
 
-def main():
+
+def main(only=()):
     for name, page, title, _, files in SETS:
+        if only and name not in only:
+            continue
         folder = os.path.join(CACHE, name)
         os.makedirs(folder, exist_ok=True)
         for f in files:
@@ -70,4 +81,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1:])

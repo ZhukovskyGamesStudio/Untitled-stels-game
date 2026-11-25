@@ -28,6 +28,8 @@ namespace Stealth.Tests
         {
             "SecurityCamera.Status.Light",  // the spot light shows the camera's status instead
             "GameNetwork.SteamTransport",
+            "CheatPanel.Items.Array.data[0]", "CheatPanel.Items.Array.data[1]", "CheatPanel.Items.Array.data[2]", "CheatPanel.Items.Array.data[3]",
+            "CheatPanel.Items.Array.data[4]", "CheatPanel.Items.Array.data[5]", "CheatPanel.Items.Array.data[6]", "CheatPanel.Items.Array.data[7]", // (no buttons for the old tetris pieces)
             "RobotController.Lidar",         // only the sweeper has a floor lidar
             "RobotController.CargoMesh",     // only workers carry loot
             "RobotController.CargoRenderer",

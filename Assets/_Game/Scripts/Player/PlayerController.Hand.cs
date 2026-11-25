@@ -39,6 +39,7 @@ namespace Stealth.Player
             // the tablet opens and closes its map on this peer only
             var inv = GetComponent<PlayerInventory>();
             if (inv != null && inv.Holds(Items.ItemCatalog.Tablet)) { TabletOpen = !TabletOpen; return; }
+            if (UseCraftedInHand(inv)) return;
             Link.SendUseHand();
         }
 
@@ -303,7 +304,7 @@ namespace Stealth.Player
             if (Flashlight == null) return;
             bool on = FlashlightOn && !Downed && !InHatch;
             if (Flashlight.enabled != on) Flashlight.enabled = on;
-            if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, 0f, 0f); // the head of a remote player does not pitch
+            if (on && !IsOwner) Flashlight.transform.localRotation = Quaternion.Euler(LookPitch, ShownLookYaw, 0f); // the head of a remote player does not pitch or turn
             if (!on) return;
             if (IsOwner && !m_FlashSharp)
             {

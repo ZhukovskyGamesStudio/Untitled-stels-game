@@ -19,5 +19,7 @@ namespace Stealth.Configs
         public TeamSettings Team = new();
         [Tooltip("Smoothing of edges over time (temporal anti-aliasing).")]
         public SmoothingSettings Picture = new();
+        [Tooltip("How far the head turns with the body held: on the shaft's ladder, in a seat of the car.")]
+        public LookSettings Look = new();
     }
 }

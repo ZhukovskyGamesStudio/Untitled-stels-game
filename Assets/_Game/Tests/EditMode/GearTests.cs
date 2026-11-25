@@ -250,7 +250,10 @@ namespace Stealth.Tests
             Assert.AreEqual("gamekeyboard", ItemCatalog.Shapes[ItemCatalog.GameKeyboard].Id);
             Assert.AreEqual("canister", ItemCatalog.Shapes[ItemCatalog.Canister].Id);
             Assert.AreEqual("bandage", ItemCatalog.Shapes[ItemCatalog.Bandage].Id);
-            Assert.AreEqual(ItemCatalog.Shapes.Length - 1, ItemCatalog.LastJunk, "the junk runs to the end of the catalogue");
+            Assert.AreEqual(ItemCatalog.FirstCrafted - 1, ItemCatalog.LastJunk, "the junk runs up to the workbench's things");
+            Assert.AreEqual(ItemCatalog.Cassette - 1, ItemCatalog.LastChess, "the chess pieces, then the radio's cassette");
+            Assert.AreEqual(ItemCatalog.Shapes.Length - 1, ItemCatalog.Cassette, "the cassette ends the catalogue");
+            Assert.AreEqual("cassette", ItemCatalog.Shapes[ItemCatalog.Cassette].Id);
             Assert.AreEqual(4, ItemCatalog.Rarity(ItemCatalog.Canister), "fuel is gold");
             int best = Enumerable.Range(ItemCatalog.FirstJunk, ItemCatalog.LastJunk - ItemCatalog.FirstJunk + 1).Max(s => ItemCatalog.Value(s, 0));
             Assert.AreEqual(best, ItemCatalog.Value(ItemCatalog.Canister, 0), "a canister of fuel burns best of all the junk");

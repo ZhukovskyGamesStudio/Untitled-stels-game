@@ -224,6 +224,8 @@ namespace Stealth.Level
                 // (round the duct grates' holes: a grate under a ceiling of tiles was a lid hanging from a ceiling with no way up)
                 var holes = shell.HolesOver(room.Floor);
                 foreach (var s in l.Stairs) if (s.Floor == room.Floor) holes.Add(PlanGenerator.HoleOf(s));
+                // (and round the hammer's holes in the floor above it)
+                foreach (var (hole, floor) in shell.FloorHoles) if (floor == room.Floor + room.Levels) holes.Add(hole);
                 foreach (var whole in CeilingAreas(l, room))
                     foreach (var (a, b) in CutHoles(whole.min, whole.max, holes))
                     {

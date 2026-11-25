@@ -45,5 +45,37 @@ namespace Stealth.Tests
                 Assert.AreEqual(s.Pile[i].Start, peer.Pile[i].Start, 0.001, "the schedule survives the wire");
             }
         }
+
+        /// <summary>
+        /// A thing goes into the mouth smallest face down: its longest side upright within the lean (a shovel handle or blade
+        /// first, never across), either end first and turned any way about the upright by its seed, the same every time.
+        /// </summary>
+        [Test]
+        public void ThingsGoInSmallestFaceDown()
+        {
+            var up = UnityEngine.Vector3.up;
+            var shovel = new UnityEngine.Vector3(0.22f, 0.06f, 1.15f); // long along Z
+            var plank = new UnityEngine.Vector3(0.9f, 0.3f, 0.04f);    // long along X
+            var can = new UnityEngine.Vector3(0.1f, 0.18f, 0.1f);      // long along Y
+            bool down = false, upEnd = false;
+            for (int seed = 0; seed < 64; seed++)
+            {
+                var a = Shredder.FeedTurn(shovel, seed);
+                float lean = UnityEngine.Vector3.Angle(a * UnityEngine.Vector3.forward, up);
+                Assert.That(UnityEngine.Mathf.Min(lean, 180f - lean), Is.LessThanOrEqualTo(Shredder.MaxTilt + 0.01f), $"seed {seed}: the shovel's length upright");
+                if (lean < 90f) upEnd = true; else down = true;
+                float plankLean = UnityEngine.Vector3.Angle(Shredder.FeedTurn(plank, seed) * UnityEngine.Vector3.right, up);
+                Assert.That(UnityEngine.Mathf.Min(plankLean, 180f - plankLean), Is.LessThanOrEqualTo(Shredder.MaxTilt + 0.01f), $"seed {seed}: the plank on its narrow end");
+                float canLean = UnityEngine.Vector3.Angle(Shredder.FeedTurn(can, seed) * UnityEngine.Vector3.up, up);
+                Assert.That(UnityEngine.Mathf.Min(canLean, 180f - canLean), Is.LessThanOrEqualTo(Shredder.MaxTilt + 0.01f), $"seed {seed}: the can standing");
+                // standing on its end: half its height is about half its length (a little less as it leans)
+                float half = Shredder.HalfHeight(a, shovel);
+                Assert.That(half, Is.InRange(0.5f * shovel.z * 0.97f, 0.5f * shovel.z + 0.5f * (shovel.x + shovel.y) * 0.25f), $"seed {seed}: its height in the mouth");
+            }
+            Assert.IsTrue(down && upEnd, "either end goes in first");
+            Assert.AreEqual(Shredder.FeedTurn(shovel, 7), Shredder.FeedTurn(shovel, 7), "the same on every peer");
+            Assert.AreNotEqual(Shredder.FeedTurn(shovel, 7), Shredder.FeedTurn(shovel, 8), "each its own way");
+            Assert.AreEqual(0.5f, Shredder.HalfHeight(UnityEngine.Quaternion.identity, new UnityEngine.Vector3(3f, 1f, 2f)), 1e-5f);
+        }
     }
 }

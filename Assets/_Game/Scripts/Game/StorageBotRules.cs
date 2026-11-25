@@ -7,13 +7,21 @@ namespace Stealth.Game
     /// <summary>What the team's storage robot is doing (replicated, append only).</summary>
     public enum BotMode : byte { Waiting, Coming, ToGrate, InDucts, ToExit, Gone, WaitingAbove, Hiding }
 
+    /// <summary>
+    /// What the raccoon's body is doing (the server decides, every peer plays the matching take): on the floor, up or down
+    /// the basement shaft's ladder, leaping up into a ceiling grate (or into the car's trunk), dropping out of one (or out
+    /// of the trunk), crawling in a duct, curled up asleep in the trunk, sat on its bottom where it was called (waiting
+    /// for the next word). Append only (replicated).
+    /// </summary>
+    public enum BotMotion : byte { Floor, Ladder, VentUp, VentDown, Duct, Curled, Sit }
+
     /// <summary>One stretch of the storage robot's way.</summary>
-    public enum BotLegKind : byte { Walk, ClimbUp, Crawl, ClimbDown, LeaveByHatch }
+    public enum BotLegKind : byte { Walk, ClimbUp, Crawl, ClimbDown, LeaveByHatch, HopOut, HopIn }
 
     public struct BotLeg
     {
         public BotLegKind Kind;
-        /// <summary>Walk: where to; ClimbUp/ClimbDown: the grate's middle on the ceiling.</summary>
+        /// <summary>Walk: where to; ClimbUp/ClimbDown: the grate's middle on the ceiling; HopOut: the floor beside the car; HopIn: the trunk.</summary>
         public Vector3 To;
         /// <summary>Crawl: the duct's floor, cell by cell.</summary>
         public List<Vector3> Route;
@@ -38,8 +46,11 @@ namespace Stealth.Game
         public const float StashReach = 2.4f;
         /// <summary>Called, it stops this close to the player who called it.</summary>
         public const float Arrive = 1.6f;
-        /// <summary>The longest way it walks on the floor when the ducts do not lead there at all (metres).</summary>
-        public const float WalkFurthest = 45f;
+        /// <summary>
+        /// The longest way it walks on the floor, metres: a whole house from the car's trunk (the basement, up the shaft,
+        /// across the storeys) — at 45 m a call from the trunk to a far room always sent it up into the ducts.
+        /// </summary>
+        public const float WalkFurthest = 140f;
 
         /// <summary>How it gets somewhere.</summary>
         public enum Route { Walk, Ducts, None }
@@ -58,20 +69,66 @@ namespace Stealth.Game
             return ra != null && rb != null && ra.Id == rb.Id && ra.Floor == rb.Floor;
         }
 
+        /// <summary>Up to this far it always runs on the floor, metres (more than a few rooms).</summary>
+        public const float WalkNear = 30f;
+        /// <summary>Further than that it still runs unless the floor is longer than the ducts' way (with <see cref="DuctOverhead"/>) times this.</summary>
+        public const float DuctDetour = 2f;
+        /// <summary>The leap up into a grate and the drop out of one (crouch, hang, the climb), as metres of running.</summary>
+        public const float DuctOverhead = 12f;
+
         /// <summary>
-        /// The way it takes (pure): on the floor within its own room; to another room through the ducts, never across the
-        /// house on foot — unless the ducts do not lead there, then on foot after all if the way is not too long.
+        /// The way it takes (pure): on foot whenever the floor leads there — in its own room, within <see cref="WalkNear"/>, or
+        /// not more than <see cref="DuctDetour"/> times the ducts' way with the leap up and the drop down
+        /// (<see cref="DuctOverhead"/>); through the ducts only when the floor does not lead there (a locked door, it is up
+        /// in them already) or goes round twice as far.
         /// </summary>
         /// <param name="sameRoom">Start and end are in one room (<see cref="SameRoom"/>).</param>
         /// <param name="floorWay">The length of the way on the floor, metres; negative: there is none (or it is up in the ducts).</param>
-        /// <param name="ducts">The ducts lead there.</param>
-        public static Route Way(bool sameRoom, float floorWay, bool ducts)
+        /// <param name="ductWay">The length of the way through the ducts, metres; negative: they do not lead there (or a grate is shut).</param>
+        public static Route Way(bool sameRoom, float floorWay, float ductWay)
         {
             bool walkable = floorWay >= 0f && floorWay <= WalkFurthest;
-            if (sameRoom && walkable) return Route.Walk;
-            if (ducts) return Route.Ducts;
-            return walkable ? Route.Walk : Route.None;
+            if (walkable && (sameRoom || floorWay <= WalkNear || ductWay < 0f || floorWay <= (ductWay + DuctOverhead) * DuctDetour)) return Route.Walk;
+            return ductWay >= 0f ? Route.Ducts : Route.None;
         }
+
+        /// <summary>
+        /// The length of a way of legs from <paramref name="from"/> (pure; the walks straight, the crawls along the duct,
+        /// the climbs up and down), metres — to weigh the ducts against the floor.
+        /// </summary>
+        public static float Length(Vector3 from, IReadOnlyList<BotLeg> legs)
+        {
+            float sum = 0f;
+            var at = from;
+            foreach (var leg in legs)
+            {
+                switch (leg.Kind)
+                {
+                    case BotLegKind.Crawl:
+                        foreach (var p in leg.Route) { sum += Vector3.Distance(at, p); at = p; }
+                        break;
+                    case BotLegKind.ClimbUp:
+                    case BotLegKind.ClimbDown:
+                        sum += Flat(leg.To - at) + Mathf.Abs(leg.To.y - at.y);
+                        at = leg.To;
+                        break;
+                    default:
+                        sum += Flat(leg.To - at);
+                        at = leg.To;
+                        break;
+                }
+            }
+            return sum;
+        }
+
+        /// <summary>The house-wide index of a storey's grate (the grates of every storey counted in order: the lid's open-key, <see cref="OpenKeys.Vent"/>).</summary>
+        public static int GrateIndex(IReadOnlyList<VentNet> vents, int floor, int i)
+        {
+            int index = i;
+            for (int f = 0; f < floor && f < vents.Count; f++) index += vents[f].Grates.Count;
+            return index;
+        }
+
         /// <summary>Crawling through the ducts, metres a second; climbing through a grate, the same.</summary>
         public const float DuctSpeed = 1.8f;
         /// <summary>Seen in a room by a robot or a camera for this long, the alarm goes off, seconds.</summary>
@@ -93,6 +150,166 @@ namespace Stealth.Game
             return mode is BotMode.Waiting or BotMode.Coming && flat <= StashReach && Mathf.Abs(up) < 1.8f;
         }
 
+        // ------------------------------------------------------------------ the raccoon's body
+
+        /// <summary>Up into a grate: it crouches this long, then leaps (seconds; the VentUp take crouches as long).</summary>
+        public const float LeapCrouch = 0.3f;
+        /// <summary>The leap from the floor into the duct, seconds.</summary>
+        public const float LeapTime = 0.55f;
+        /// <summary>Out of a grate: it hangs nose down this long, then drops (seconds; the VentDown take matches).</summary>
+        public const float DropHang = 0.3f;
+        /// <summary>The drop from the duct to the floor, seconds.</summary>
+        public const float DropTime = 0.45f;
+        /// <summary>Out of the car's trunk and back into it: the drop (<see cref="DropLower"/>) and the leap (<see cref="LeapLift"/>) carried sideways to the floor beside the tailgate, metres behind it.</summary>
+        public const float TailgateStep = 1.0f;
+
+        /// <summary>The reaction to a pat on the head (the Pet take), seconds.</summary>
+        public const float PetTime = 2.2f;
+
+        /// <summary>The share of the way up into the duct <paramref name="t"/> seconds after it started at the grate: still while it crouches, then a leap that slows at the top.</summary>
+        public static float LeapLift(float t)
+        {
+            float u = Mathf.Clamp01((t - LeapCrouch) / LeapTime);
+            return 1f - (1f - u) * (1f - u);
+        }
+
+        /// <summary>The share of the way down to the floor <paramref name="t"/> seconds after it started: still while it hangs, then a fall that quickens.</summary>
+        public static float DropLower(float t)
+        {
+            float u = Mathf.Clamp01((t - DropHang) / DropTime);
+            return u * u;
+        }
+
+        /// <summary>Up or down the basement shaft's ladder (the navmesh link), metres a second.</summary>
+        public const float LadderSpeed = 1.1f;
+        /// <summary>The takes' own speeds (Tools/Blender/raccoon.py): the walk's and the bound's feet keep pace with the floor at these, the climb with the rungs, m/s.</summary>
+        public const float WalkTakeSpeed = 0.55f, RunTakeSpeed = 2.4f, ClimbTakeSpeed = 1.0f;
+
+        /// <summary>The raccoon's takes (the animator's states of the same names).</summary>
+        public enum Take : byte { Move, Climb, VentUp, VentDown, Pet, Curl, Sit }
+
+        /// <summary>The take for what its body does; a pat shows only on the floor (standing or sat).</summary>
+        public static Take TakeOf(BotMotion motion, bool petted) => motion switch
+        {
+            BotMotion.Ladder => Take.Climb,
+            BotMotion.VentUp => Take.VentUp,
+            BotMotion.VentDown => Take.VentDown,
+            BotMotion.Floor or BotMotion.Sit when petted => Take.Pet,
+            BotMotion.Curled => Take.Curl,
+            BotMotion.Sit => Take.Sit,
+            _ => Take.Move,
+        };
+
+        /// <summary>
+        /// It sits down: it has come to where it was called (the call's walk is over), it is on the floor and has nothing
+        /// more to do — and it stays sat until the next word sets it off.
+        /// </summary>
+        public static bool SitsDown(bool called, bool onFloor, bool legsLeft) => called && onFloor && !legsLeft;
+
+        // ------------------------------------------------------------------ the head turned to a player
+
+        /// <summary>
+        /// How it turns its head (pure): towards a player while it sits, <c>x</c> degrees of yaw (positive to its right) and
+        /// <c>y</c> of pitch (positive up), within the neck's reach. A player out of its look's range or behind it — further
+        /// round than <see cref="MuleSettings.NeckGiveUp"/> — gets no turn at all (the neck never twists round to the back);
+        /// one off to the side past the neck's reach is followed only as far as it goes.
+        /// </summary>
+        /// <param name="forward">Where its body faces (flat is enough).</param>
+        /// <param name="head">Its head.</param>
+        /// <param name="target">The player's eyes.</param>
+        public static Vector2 HeadTurn(Vector3 forward, Vector3 head, Vector3 target, MuleSettings s)
+        {
+            s ??= new MuleSettings();
+            var to = target - head;
+            var flatTo = new Vector3(to.x, 0f, to.z);
+            var flatForward = new Vector3(forward.x, 0f, forward.z);
+            if (to.magnitude > s.LookRange || flatTo.sqrMagnitude < 1e-4f || flatForward.sqrMagnitude < 1e-6f) return Vector2.zero;
+            float yaw = Vector3.SignedAngle(flatForward, flatTo, Vector3.up);
+            if (Mathf.Abs(yaw) > s.NeckGiveUp) return Vector2.zero;
+            float pitch = Mathf.Atan2(to.y, flatTo.magnitude) * Mathf.Rad2Deg;
+            return new Vector2(Mathf.Clamp(yaw, -s.NeckYaw, s.NeckYaw), Mathf.Clamp(pitch, -s.NeckPitch, s.NeckPitch));
+        }
+
+        // ------------------------------------------------------------------ on its paws, up the shaft's ladder
+
+        /// <summary>
+        /// How far to lower (or raise) the body so its paws stand on the floor under it, metres (pure): the navmesh it walks
+        /// on lies a little above the real floor. No floor under it, or one further than a step away — the shaft's hole, a
+        /// stair's edge — leaves it as it is.
+        /// </summary>
+        public static float Ground(float body, float? floor)
+        {
+            if (floor is not float f) return 0f;
+            float d = f - body;
+            return d < -GroundReach || d > GroundLift ? 0f : d;
+        }
+
+        /// <summary>Its paws reach down to a floor at most this far under its body, and up at most <see cref="GroundLift"/> (metres).</summary>
+        public const float GroundReach = 0.3f, GroundLift = 0.1f;
+
+        /// <summary>
+        /// Up or down the shaft's ladder its middle is this far past the rungs (towards the wall, metres): the Climb take
+        /// holds the forepaws about this far behind its middle (Tools/Blender/raccoon.py, measured), so they grip the rungs.
+        /// </summary>
+        public const float ClimbGrip = 0.12f;
+
+        /// <summary>
+        /// Its way along the shaft's navmesh link (pure): across to the ladder at the height it starts at, straight up or
+        /// down the rungs (<paramref name="rungs"/>: on the rungs' line; <paramref name="facing"/>: towards them, flat), off
+        /// to the link's end. The leg from the first point to the second is the climb; the one along the top, over the
+        /// shaft's hole, is a hop (<see cref="HopArc"/>).
+        /// </summary>
+        public static Vector3[] LadderWay(Vector3 from, Vector3 to, Vector3 rungs, Vector3 facing)
+        {
+            facing.y = 0f;
+            facing = facing.sqrMagnitude > 1e-6f ? facing.normalized : Vector3.forward;
+            var grip = rungs + facing * ClimbGrip;
+            return new[] { new Vector3(grip.x, from.y, grip.z), new Vector3(grip.x, to.y, grip.z), to };
+        }
+
+        /// <summary>The hop's height over its straight line, metres, at share <paramref name="u"/> of a hop <paramref name="length"/> long.</summary>
+        public static float HopArc(float u, float length) => Mathf.Sin(Mathf.Clamp01(u) * Mathf.PI) * Mathf.Min(0.35f, length * 0.2f);
+
+        /// <summary>Across to the ladder and off it (hopping over the hole at the top), metres a second.</summary>
+        public const float LadderStepSpeed = 1.6f;
+
+        /// <summary>How fast the walking takes play at a floor speed: as is up to the bound's own speed, quicker beyond it.</summary>
+        public static float Stride(float speed) => Mathf.Max(1f, speed / RunTakeSpeed);
+
+        /// <summary>How fast the climb plays at a vertical speed: backwards on the way down, still while hanging.</summary>
+        public static float ClimbRate(float verticalSpeed) => Mathf.Clamp(verticalSpeed / ClimbTakeSpeed, -3f, 3f);
+
+        /// <summary>A player may pet it: on the floor (waiting, sat down, or walking over to someone), not up in a duct.</summary>
+        public static bool CanPet(BotMode mode, BotMotion motion) => mode is BotMode.Waiting or BotMode.Coming && motion is BotMotion.Floor or BotMotion.Sit;
+
+        // ------------------------------------------------------------------ sounds (StorageBotSounds)
+
+        /// <summary>A one-off sound of Linus.</summary>
+        public enum Cue : byte { None, Leap, Drop, Hop, Chatter, Squeak }
+
+        /// <summary>A paw on the floor every this many metres; the backpack clinks every <see cref="PackEvery"/> paws; a duct's steel gives every <see cref="DuctKnockSpacing"/>.</summary>
+        public const float PawSpacing = 0.22f, DuctKnockSpacing = 0.45f;
+        public const int PackEvery = 3;
+        /// <summary>Asleep: a snore every this many seconds; sat waiting: a sniff between these.</summary>
+        public const float SnoreEvery = 3.8f, SniffMin = 5f, SniffMax = 11f;
+
+        /// <summary>
+        /// The sound of his body changing what it does (pure): the leap up into a grate, the drop out of one, the hop into
+        /// or out of the car's bed.
+        /// </summary>
+        public static Cue CueOf(BotMotion was, BotMotion now)
+        {
+            if (was == now) return Cue.None;
+            if (now == BotMotion.VentUp) return Cue.Leap;
+            if (now == BotMotion.VentDown) return Cue.Drop;
+            if (now == BotMotion.Curled || was == BotMotion.Curled) return Cue.Hop;
+            return Cue.None;
+        }
+
+        /// <summary>The sound of what he is told to do (pure): his chatter answering a call, a squeak as he bolts at an alarm.</summary>
+        public static Cue CueOf(BotMode was, BotMode now) =>
+            was == now ? Cue.None : now == BotMode.Coming ? Cue.Chatter : now == BotMode.Hiding ? Cue.Squeak : Cue.None;
+
         /// <summary>A player may call it now (it is in the house, not on its way out).</summary>
         public static bool CanCall(BotMode mode) => mode is not (BotMode.ToExit or BotMode.Gone);
 
@@ -100,12 +317,14 @@ namespace Stealth.Game
         public static bool CanSendToExit(BotMode mode, bool exitSeen) => exitSeen && CanCall(mode) && mode != BotMode.ToGrate;
 
         /// <summary>The grate of a storey's ducts nearest a point (flat distance), or null.</summary>
-        public static DuctGrate? NearestGrate(VentNet net, Vector3 p)
+        public static DuctGrate? NearestGrate(VentNet net, Vector3 p, System.Func<int, bool> open = null)
         {
             DuctGrate? best = null;
             float d = float.MaxValue;
-            foreach (var g in net.Grates)
+            for (int i = 0; i < net.Grates.Count; i++)
             {
+                var g = net.Grates[i];
+                if (open != null && !open(i)) continue;                // (a shut lid: no way through it)
                 float dd = Flat(g.Position - p);
                 if (dd < d) { d = dd; best = g; }
             }
@@ -176,5 +395,21 @@ namespace Stealth.Game
         }
 
         static float Flat(Vector3 d) => new Vector2(d.x, d.z).magnitude;
+    }
+
+    /// <summary>Tuning of Linus the mule (Data/Config/Run → Mule): how he turns his head to the team while he sits and waits.</summary>
+    [System.Serializable]
+    public class MuleSettings
+    {
+        [Tooltip("Sat waiting, he turns his head to the nearest player within this, metres.")]
+        public float LookRange = 8f;
+        [Tooltip("The furthest his neck and head turn to the side, degrees (a player further round is followed only this far).")]
+        public float NeckYaw = 60f;
+        [Tooltip("A player further round than this (behind him), degrees: he does not turn his head at all — the neck never twists to the back.")]
+        public float NeckGiveUp = 115f;
+        [Tooltip("The furthest he looks up or down at a player, degrees.")]
+        public float NeckPitch = 25f;
+        [Tooltip("How fast the head turns to its aim, degrees a second.")]
+        public float NeckSpeed = 150f;
     }
 }

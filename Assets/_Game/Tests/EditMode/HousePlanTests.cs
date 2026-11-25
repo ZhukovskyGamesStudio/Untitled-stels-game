@@ -25,7 +25,6 @@ namespace Stealth.Tests
             CollectionAssert.IsSubsetOf(new[] { "bar", "L", "T", "U", "courtyard", "H" }, kinds.ToList(), string.Join(", ", kinds));
         }
 
-        [Category("Slow")] // generates many houses (Tools/dev.sh: SLOW=1 runs it)
         [Test]
         public void HousesAreVeryDifferent()
         {

@@ -8,7 +8,7 @@ namespace Stealth.Vehicles
     public struct CargoItem : System.IEquatable<CargoItem>
     {
         public byte Shape, Color;
-        /// <summary>Across the bed (−85 … 85 cm) and along it (0 = the tailgate … 200 cm = the cab), cm.</summary>
+        /// <summary>Across the bed (−85 … 85 cm) and along it (0 = the tailgate … 135 cm = the workbench before the cab), cm.</summary>
         public short X, Z;
         /// <summary>Turn on the bed, degrees.</summary>
         public short Yaw;
@@ -34,7 +34,8 @@ namespace Stealth.Vehicles
     public sealed class Cargo
     {
         /// <summary>The bed's inner area, cm: x across, z along (0 = tailgate).</summary>
-        public const short HalfWidth = 85, Length = 200;
+        /// <summary>The heap's room: across the bed, and along it up to the workbench at the cab's end (it takes the last half metre).</summary>
+        public const short HalfWidth = 85, Length = 135;
         /// <summary>A thing's radius on the bed (cm) for heaping: its cells are 22 cm.</summary>
         const float Radius = 14f;
 

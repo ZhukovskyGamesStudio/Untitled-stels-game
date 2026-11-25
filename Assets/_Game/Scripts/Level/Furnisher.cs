@@ -62,7 +62,7 @@ namespace Stealth.Level
             [PropKind.ShaftHatch] = Rect.MinMaxRect(-0.9f, -0.9f, 0.9f, 0.9f),
             [PropKind.Crate] = Rect.MinMaxRect(-0.4f, -0.3f, 0.4f, 0.3f),
             [PropKind.MedTable] = Rect.MinMaxRect(-0.97f, -0.53f, 0.97f, 0.53f),
-            [PropKind.Workbench] = Rect.MinMaxRect(-1.0f, -0.43f, 1.0f, 0.55f),
+            [PropKind.Workbench] = Rect.MinMaxRect(-2.45f, -0.76f, 2.45f, 0.76f), // the car upgrade station (poi.py model_workbench: 4.8 x 1.5, a gantry over a bench)
             [PropKind.Programmer] = Rect.MinMaxRect(-0.99f, -0.5f, 0.99f, 0.42f),
             [PropKind.Cage] = Rect.MinMaxRect(-1.0f, -1.0f, 1.0f, 1.0f),
             // the themed rooms (Tools/Blender/rooms_*.py)

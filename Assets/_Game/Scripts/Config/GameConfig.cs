@@ -19,9 +19,9 @@ namespace Stealth.Configs
         public AudioConfig Audio;
         public PerceptionConfig Perception;
         public StyleConfig Styles;
-        [Tooltip("The test rooms: a root with its own level (small houses of 3–4 rooms, no guards, Data/Config/RoomsTest). " +
-                 "The main menu's switch plays it instead of this one (Tuning.TestRooms).")]
-        public GameConfig TestRooms;
+        [Tooltip("The level settings of the test rooms houses (HouseKind.TestRooms, started from the cheat panel F4): a quiet house of " +
+                 "one floor with every room type, workers only (Data/Config/RoomsTest/Level.asset). The rest of the tuning is this root's.")]
+        public LevelConfig TestRoomsLevel;
     }
 
     /// <summary>
@@ -49,22 +49,12 @@ namespace Stealth.Configs
         /// <summary>Visual styles (an empty list without the asset: the game keeps its base look).</summary>
         public static StyleConfig Styles => Pick(Root != null ? Root.Styles : null, ref s_Styles);
 
-        /// <summary>Playing the test rooms (the main menu's switch) instead of the main game. Off by default.</summary>
-        public static bool TestRooms { get; private set; }
-
         /// <summary>
-        /// The main game or the test rooms: the test rooms swap the root for Resources/GameConfig's TestRooms (its own
-        /// level), the main game goes back to Resources/GameConfig. Set before a game is started; every peer must match.
+        /// The level settings a house of <paramref name="kind"/> is built and filled by: the test rooms' own
+        /// (<see cref="GameConfig.TestRoomsLevel"/>), every other kind the game's <see cref="Level"/>.
         /// </summary>
-        public static void SetTestRooms(bool on)
-        {
-            var main = Resources.Load<GameConfig>(GameConfig.ResourcePath);
-            var test = main != null ? main.TestRooms : null;
-            TestRooms = on && test != null;
-            s_Root = TestRooms ? test : main;
-            s_Loaded = true;
-            Apply();
-        }
+        public static LevelConfig LevelOf(Stealth.Level.HouseKind kind) =>
+            kind == Stealth.Level.HouseKind.TestRooms && Root != null && Root.TestRoomsLevel != null ? Root.TestRoomsLevel : Level;
 
         static GameConfig Root
         {

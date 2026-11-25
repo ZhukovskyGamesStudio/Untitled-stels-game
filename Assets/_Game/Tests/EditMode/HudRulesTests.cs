@@ -161,6 +161,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void PuttingEverythingInIsAKeyInTheStackEvenWithTheCursorOut()
+        {
+            var c = Idle;
+            c.NearTrade = true;
+            c.CarriedItems = 3;
+            c.CursorMode = true; // the backpack's board open under the cursor: it has no button for it any more
+            var hints = Hints(c);
+            var all = hints.FirstOrDefault(h => h.Key.Equals(Controls.Get(GameAction.StashAll)));
+            Assert.AreEqual("сложить всё", all.Text, "[G] сложить всё");
+            CollectionAssert.DoesNotContain(hints.Select(h => h.Key), Controls.Get(GameAction.Hands), "the cursor is out already");
+            c.NearTrade = false;
+            CollectionAssert.DoesNotContain(Hints(c).Select(h => h.Key), Controls.Get(GameAction.StashAll), "away from Linus");
+        }
+
+        [Test]
         public void DrivingHintsOnlyWhatIsNotObvious()
         {
             var c = Idle;
@@ -200,6 +215,11 @@ namespace Stealth.Tests
             var keyless = new PromptContext { CanHack = true, NeedsKeyboard = true };
             Assert.AreEqual(ReticleIcon.Hack, ReticleRules.Choose(keyless).Icon);
             Assert.IsFalse(ReticleRules.Choose(keyless).Available, "robots and sensors: not without the keyboard");
+            // the upgraded screwdriver takes a robot or a sensor apart: not a hack — no keyboard, its own word
+            var apart = new PromptContext { CanHack = true, NeedsKeyboard = true, Unscrew = true };
+            Assert.IsTrue(ReticleRules.Choose(apart).Available, "taking apart needs no keyboard");
+            CollectionAssert.Contains(Hints(apart).Select(h => h.Text), Loc.T("hint.take_apart"));
+            CollectionAssert.DoesNotContain(Hints(apart).Select(h => h.Text), Loc.T("hint.hack"));
         }
 
         [Test]
@@ -306,6 +326,9 @@ namespace Stealth.Tests
             var ready = ObjectiveRules.Tasks(true, false, default, true, true);
             Assert.AreEqual(3, ready.Count, "both done: choose a tunnel");
             Assert.IsTrue(ready[0].done && ready[1].done && !ready[2].done);
+
+            var start = ObjectiveRules.Tasks(true, false, default, true, false, runStart: true);
+            CollectionAssert.AreEqual(new[] { Loc.T("hud.task.tunnel") }, start.Select(t => t.text), "the run's first sewer: only choose a tunnel");
         }
 
         [Test]

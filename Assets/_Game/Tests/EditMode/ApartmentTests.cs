@@ -19,12 +19,7 @@ namespace Stealth.Tests
         static List<LevelLayout> Blocks()
         {
             if (s_Blocks.Count > 0) return s_Blocks;
-            for (int seed = 1; s_Blocks.Count < 4 && seed < 400; seed++)
-            {
-                int house = seed % 5;
-                if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
-                s_Blocks.Add(TestHouses.Get(seed, house));
-            }
+            s_Blocks.AddRange(TestHouses.First(HouseKind.Apartments, 4, seed => seed % 5));
             return s_Blocks;
         }
 

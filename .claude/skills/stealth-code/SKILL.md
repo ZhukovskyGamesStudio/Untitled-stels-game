@@ -80,7 +80,7 @@ description: How to write and change code in the USG (untitled stels game) Unity
 
 ## Чек-лист: звук
 
-1. Клип — функция в `Tools/Audio/generate_sounds.py` + `write(...)` в `main()`, запусти скрипт.
+1. Клип — из CC0-записи (рецепт в `Tools/Audio/recorded.py`, `import_cc0_sounds.py`) или синтезом — функция в `Tools/Audio/generate_sounds.py` + `write(...)` в `main()`, запусти скрипт (подробно — `stealth-audio`).
 2. Поле в `SoundBank` + строка в `AssetBuilder.Audio.cs` (`BuildSoundBank`), `FORCE=1 Tools/dev.sh assets` (`AudioTests.SoundBankHasEveryClip`).
 3. Разовый звук — `Sfx.At(Sfx.Bank?.Clip, позиция, громкость, группа)` там, где событие видно **на каждом пире** (реплицированное состояние,
    пульс детектора), или `Sfx.Ui(...)` для своего игрока. Слежение за состоянием (смены, переходы) — в `AudioDirector`, решения — в `AudioRules` с тестом.

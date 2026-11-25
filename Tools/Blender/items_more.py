@@ -1,7 +1,11 @@
 """More pickup items as they lie in the world: a walkie-talkie, a keyboard, a rugged tablet, a first-aid box, a jar of
 coffee, the fuel finder, a pair of boots, a tin of tomatoes, a folded chessboard, a magazine, pills, toothpaste, duct
 tape, matches, a toilet roll, an apple core, soap, work gloves, a necklace, a mop, a teddy bear, rolled-up socks, an
-SSD drive, a game controller, a gaming keyboard, a fuel canister and a roll of bandages.
+SSD drive, a game controller, a gaming keyboard, a fuel canister and a roll of bandages; the upgraded tools (a power
+screwdriver, a mechanical keyboard with a radio, a field tablet), a double espresso, spring boots, a gas mask, a
+sledgehammer, a floor motion sensor, a chess-piece detector, a field detector with a ring of lamps (the upgraded
+fuel finder), the crafting parts (a blueprint, a circuit board, wires,
+a chip) and collectible Staunton chess pieces (each exported twice: item_<piece>_w_model and _b_model).
 
 Run:  blender.exe -b --factory-startup --python-exit-code 1 --python Tools/Blender/items_more.py -- Assets/_Game/Art/Models [--only a,b]
       (--only takes model names: item_radio_model,item_mop_model; files land in <root>/Items/item_<id>_model.fbx)
@@ -778,6 +782,26 @@ def model_item_ssd_model():
     return export("item_ssd_model")
 
 
+def model_item_cassette_model():
+    """A compact cassette lying flat, 0.10 x 0.064 x 0.012: the dark shell with its tapered head (Body), the cream label
+    with a coloured stripe (Trim, AccentStripe), the smoked window over the tape (Accent), the two reels' white hubs
+    with their teeth (AccentReel), five screws (AccentReel too)."""
+    L, W, H = 0.1, 0.064, 0.012
+    shell = s.rbox((L, W, H), (0, 0, H / 2), r=0.0025, seg=2)
+    head = s.rbox((0.06, 0.012, H * 0.8), (0, -W / 2 - 0.004, H * 0.42), r=0.002, seg=1, taper=(0.86, 1.0))
+    s.part("Body", [shell, head])
+    s.part("Trim", [s.rbox((0.088, 0.04, 0.0012), (0, 0.006, H + 0.0003), r=0.0008, seg=1)])
+    s.part("AccentStripe", [s.rbox((0.088, 0.008, 0.0013), (0, 0.021, H + 0.0006), r=0.0005, seg=1)])
+    s.part("Accent", [s.rbox((0.046, 0.017, 0.0016), (0, 0.002, H + 0.0008), r=0.003, seg=1)])
+    reels = []
+    for x in (-0.0155, 0.0155):
+        reels.append(s.rcyl(0.0062, 0.0018, (x, 0.002, H + 0.0012), seg=14, r=0.0005, bevel_seg=1))
+    reels += [s.rcyl(0.0018, 0.0014, (x, y, H + 0.0004), seg=8, r=0.0003, bevel_seg=1)
+              for x, y in ((-0.044, 0.026), (0.044, 0.026), (-0.044, -0.026), (0.044, -0.026), (0, -0.027))]
+    s.part("AccentReel", reels)
+    return export("item_cassette_model")
+
+
 def model_item_gamepad_model():
     """A game controller lying face up, 0.16 x 0.10 x 0.045, its grips toward -Y: one shell - a thick middle running
     out into the two grips (Body), two low thumbsticks, the d-pad, the shoulder triggers and the middle pad (Accent),
@@ -911,6 +935,702 @@ def model_item_bandage_model():
     return export("item_bandage_model")
 
 
+# --------------------------------------------------------------------------- upgraded tools, gadgets, parts
+
+def _flute(bm, x0, x1, zc, n, depth, phase=0.0):
+    """Presses n soft flutes into a round part along X between x0 and x1 (the axis at y = 0, z = zc)."""
+    for v in bm.verts:
+        if x0 < v.co.x < x1:
+            t = (v.co.x - x0) / (x1 - x0)
+            ang = math.atan2(v.co.z - zc, v.co.y)
+            k = 1 - depth * max(0.0, math.cos(n * ang + phase)) ** 1.5 * math.sin(math.pi * t) ** 0.5
+            v.co.y *= k
+            v.co.z = zc + (v.co.z - zc) * k
+    return bm
+
+
+def model_item_proscrewdriver_model():
+    """A cordless power screwdriver lying along X, 0.25 m, the bit at +X: the orange housing swelling over the motor
+    and narrowing to the nose (Body), the black battery pack at the butt and the ribbed rubber grip with the
+    forward/reverse rocker (Accent), the brass ratchet collar with its knurling and a brass band (Trim), the steel hex
+    chuck and a Phillips bit (TrimSteel), the LED ring round the nose (EyeLed)."""
+    R = 0.0245
+    zc = R
+    x0 = -0.125
+    housing = s.lathe([(0.0, 0.042), (0.0215, 0.0425), (0.0222, 0.046), (0.0212, 0.05), (0.0212, 0.118),
+                       (0.0228, 0.13), (0.0226, 0.142), (0.0198, 0.155), (0.0178, 0.165), (0.0172, 0.168),
+                       (0.0, 0.1682)], seg=32, axis="X", loc=(x0, 0, zc))
+    s.part("Body", [housing])
+    battery = s.lathe([(0.0, 0.0), (0.015, 0.0004), (0.021, 0.0035), (0.0245, 0.011), (0.0245, 0.04), (0.0232, 0.046),
+                       (0.0, 0.0462)], seg=32, axis="X", loc=(x0, 0, zc))
+    s.groove(battery, "X", x0 + 0.03, width=0.002, depth=0.001)               # the pack's release seam
+    grip = s.rcyl(0.0226, 0.062, (x0 + 0.086, 0, zc), axis="X", seg=32, r=0.004, bevel_seg=2)
+    _flute(grip, x0 + 0.057, x0 + 0.115, zc, 8, 0.07)
+    rocker = s.rbox((0.022, 0.011, 0.009), (x0 + 0.135, 0, zc + 0.0215), r=0.003, seg=2, rot=(0, math.radians(-8), 0))
+    s.part("Accent", [battery, grip, rocker])
+    collar = s.lathe([(0.0, 0.0), (0.0185, 0.0), (0.0198, 0.0015), (0.0198, 0.0145), (0.0175, 0.017), (0.0, 0.017)],
+                     seg=32, axis="X", loc=(x0 + 0.166, 0, zc))
+    _flute(collar, x0 + 0.166, x0 + 0.183, zc, 16, 0.06)
+    band = s.rcyl(0.0249, 0.006, (x0 + 0.0445, 0, zc), axis="X", seg=32, r=0.0012, bevel_seg=1)
+    s.part("Trim", [collar, band])
+    chuck = s.rcyl(0.0085, 0.03, (x0 + 0.196, 0, zc), axis="X", seg=6, r=0.0012, bevel_seg=1,
+                   rot=(math.pi / 6, 0, 0))
+    shank = s.rcyl(0.0042, 0.03, (x0 + 0.222, 0, zc), axis="X", seg=6, r=0.0005, bevel_seg=1)
+    tip = s.loft([(0.0, 0.0042, 0.0042, 2.0), (0.009, 0.0034, 0.0034, 2.0), (0.0145, 0.0011, 0.0011, 2.0)],
+                 seg=8, axis="X", loc=(x0 + 0.2355, 0, zc))
+    for k in range(4):                                                        # the Phillips cross
+        a = k * math.pi / 2 + math.pi / 4
+        for v in tip.verts:
+            ang = math.atan2(v.co.z - zc, v.co.y)
+            if abs(math.atan2(math.sin(ang - a), math.cos(ang - a))) < 0.3 and v.co.x > x0 + 0.24:
+                f = 0.55
+                v.co.y *= f
+                v.co.z = zc + (v.co.z - zc) * f
+    s.part("TrimSteel", [chuck, shank, tip])
+    s.part("EyeLed", [poi.ring(0.0186, 0.0128, 0.003, (x0 + 0.1675, 0, zc), axis="X", seg=24, r=0.0006)])
+    return export("item_proscrewdriver_model")
+
+
+def model_item_prokeyboard_model():
+    """A compact mechanical keyboard lying flat, 0.38 m with its radio: a 60 % case on a raised back (Body), tall
+    keycaps with a glowing plate under them and a light strip round the case (Eye), the space bar at -Y; a radio
+    dongle plugged into its +X end with a stubby folding antenna lying along +X (Accent with the keycaps), the
+    dongle's ring LED (EyeLed)."""
+    total = 15 * KEY_U
+    xs = -total / 2
+    case = s.rbox((total + 0.014, 0.105, 0.02), (0, 0, 0.012), r=0.006, seg=2, taper=(1.0, 0.97))   # z 0.002 .. 0.022
+    s.groove(case, "Z", 0.01, width=0.0016, depth=0.0008)
+    back = s.rbox((total + 0.01, 0.018, 0.024), (0, 0.044, 0.014), r=0.006, seg=2)
+    feet = [s.rbox((0.04, 0.012, 0.004), (x, 0.04, 0.002), r=0.0015, seg=1) for x in (-0.1, 0.1)]
+    s.part("Body", [case, back, *feet])
+    s.part("Eye", [s.rbox((total + 0.002, 0.0965, 0.0024), (0, -0.002, 0.0222), r=0.0008, seg=1),
+                   s.rbox((total + 0.0164, 0.1074, 0.003), (0, 0, 0.0055), r=0.0012, seg=1)])
+    z0 = 0.0228
+    y_of = lambda r: -0.0405 + r * KEY_U  # noqa: E731
+    keys = []
+
+    def row(r, widths):
+        x = xs
+        for w in widths:
+            if w > 0:
+                keys.append(_keycap(x + w * KEY_U / 2, y_of(r), w, 1.0, z0))
+            x += abs(w) * KEY_U
+
+    row(0, [1.25, 1.25, 1.25, 6.25, 1.25, 1.25, 1.25, 1.25])
+    row(1, [2.25] + [1] * 10 + [2.75])
+    row(2, [1.75] + [1] * 11 + [2.25])
+    row(3, [1.5] + [1] * 12 + [1.5])
+    row(4, [1] * 13 + [2])
+    xe = total / 2 + 0.007
+    dongle = s.rbox((0.03, 0.024, 0.013), (xe + 0.012, 0.02, 0.0115), r=0.004, seg=2)
+    hinge = s.rcyl(0.0068, 0.016, (xe + 0.03, 0.02, 0.0115), axis="Y", seg=14, r=0.0018)
+    antenna = s.rcyl(0.0055, 0.062, (xe + 0.062, 0.02, 0.0115), axis="X", seg=12, r=0.002, radius2=0.0042)
+    tip = s.ball(0.0052, (xe + 0.093, 0.02, 0.0115), seg=12)
+    s.part("Accent", keys + [dongle, hinge, antenna, tip])
+    s.part("EyeLed", [s.rcyl(0.0032, 0.003, (xe + 0.01, 0.02, 0.0182), seg=12, r=0.0008)])
+    return export("item_prokeyboard_model")
+
+
+def model_item_protablet_model():
+    """A field-upgraded rugged tablet lying face up, 0.30 x 0.21: the case inside a continuous rubber bumper with
+    thick corners and grip ridges (Body), the bezel, a sensor pod clamped to its -X side with a lens, and a whip
+    antenna hinged at the +X +Y corner, folded back along the +Y edge (Accent), the pod's lens (EyeSensor), the screen face (EyeScreen: its own 0..1
+    UVs, u along +X, v along +Y, like the plain tablet)."""
+    dz = 0.0015
+    case = s.rbox((0.25, 0.175, 0.02), (0, 0, 0.01 + dz), r=0.008, seg=3)
+    s.groove(case, "Z", 0.008 + dz, width=0.0016, depth=0.0008)
+    bumper_ring = []
+    for sy in (-1, 1):                                                       # the long sides of the bumper frame
+        bumper_ring.append(s.rbox((0.21, 0.016, 0.024), (0, sy * 0.0905, 0.012), r=0.006, seg=2))
+    for sx in (-1, 1):
+        bumper_ring.append(s.rbox((0.016, 0.15, 0.024), (sx * 0.1305, 0, 0.012), r=0.006, seg=2))
+    corners = [s.rbox((0.054, 0.054, 0.0275), (sx * 0.12, sy * 0.0835, 0.01375), r=0.012, seg=3)
+               for sx in (-1, 1) for sy in (-1, 1)]
+    ridges = [s.rbox((0.006, 0.006, 0.026), (x, sy * 0.0985, 0.012), r=0.0022, seg=1)
+              for x in (-0.06, -0.045, -0.03, 0.03, 0.045, 0.06) for sy in (-1, 1)]
+    keys = [s.rbox((0.016, 0.006, 0.006), (x, 0.0985, 0.02), r=0.0022, seg=1) for x in (-0.012, 0.008)]
+    s.part("Body", [case, *bumper_ring, *corners, *ridges, *keys])
+    bezel = s.rbox((0.226, 0.152, 0.0045), (0, 0, 0.02 + dz), r=0.0018, seg=2)
+    button = s.rcyl(0.005, 0.0016, (0.104, 0, 0.0224 + dz), seg=14, r=0.0005)
+    pod = s.rbox((0.034, 0.06, 0.03), (-0.148, 0.025, 0.015), r=0.008, seg=2)              # sensor pod on the -X side
+    clamp = s.rbox((0.03, 0.07, 0.008), (-0.132, 0.025, 0.028), r=0.003, seg=1)             # its clamp over the bumper
+    lens_ring = poi.ring(0.0115, 0.0075, 0.005, (-0.165, 0.025, 0.015), axis="X", seg=20, r=0.0012)
+    hinge = s.rcyl(0.0085, 0.02, (0.128, 0.1, 0.017), seg=16, r=0.002)                        # folded along +Y
+    whip = s.rcyl(0.0052, 0.085, (0.128 - 0.0425, 0.1065, 0.017), axis="X", seg=10, r=0.0015, radius2=0.0062)
+    whip_tip = s.ball(0.0046, (0.128 - 0.087, 0.1065, 0.017), seg=10)
+    s.part("Accent", [bezel, button, pod, clamp, lens_ring, hinge, whip, whip_tip])
+    s.part("EyeSensor", [s.lathe([(0.0085, 0.0), (0.008, 0.003), (0.005, 0.0055), (0.0, 0.0065)], seg=16, axis="-X",
+                                 loc=(-0.163, 0.025, 0.015))])
+    screen = s.part("EyeScreen", [s.rbox((0.19, 0.13, 0.0015), (0, 0, 0.0226 + dz), r=0.0005, seg=1)])
+    unit_uvs(screen)
+    return export("item_protablet_model")
+
+
+def model_item_espresso_model():
+    """A double espresso to go lying on its side along X, 0.105 m, the lid at +X (as the coffee jar lies): a small
+    insulated paper cup (Body), its card sleeve (Trim) with two bold stripes round it - the 'double' (TrimBand), the
+    snap-on lid with the sip spout (Accent)."""
+    zc = 0.039
+    cup = s.lathe([(0.0, 0.0), (0.028, 0.0), (0.0302, 0.002), (0.0315, 0.006), (0.0362, 0.088), (0.0372, 0.092),
+                   (0.0, 0.0922)], seg=32, axis="X", loc=(-0.05, 0, zc))
+    s.part("Body", [cup])
+    # the sleeve follows the cup's taper: r 0.0322 .. 0.0352 between 0.018 and 0.075 from the base
+    sleeve = s.lathe([(0.0, 0.018), (0.0333, 0.018), (0.0337, 0.0195), (0.0365, 0.0735), (0.0362, 0.075),
+                      (0.0, 0.075)], seg=32, axis="X", loc=(-0.05, 0, zc))
+    s.part("Trim", [sleeve])
+    sleeve_r = lambda z: 0.0337 + 0.0519 * (z - 0.0195) + 0.0008  # noqa: E731  (just proud of the sleeve)
+    bands = [s.lathe([(0.0, z), (sleeve_r(z), z), (sleeve_r(z + 0.006), z + 0.006), (0.0, z + 0.006)],
+                     seg=32, axis="X", loc=(-0.05, 0, zc)) for z in (0.034, 0.046)]
+    s.part("TrimBand", bands)
+    lid = s.lathe([(0.0, 0.0), (0.0385, 0.0), (0.0392, 0.0025), (0.0388, 0.006), (0.034, 0.0075), (0.033, 0.0105),
+                   (0.0, 0.0108)], seg=32, axis="X", loc=(-0.05 + 0.0895, 0, zc))
+    spout = s.rbox((0.006, 0.014, 0.008), (-0.05 + 0.1025, 0, zc + 0.024), r=0.0025, seg=2)
+    s.part("Accent", [lid, spout])
+    return export("item_espresso_model")
+
+
+def _helix(cx, cy, r, z0, z1, turns, per_turn=10, phase=0.0):
+    n = int(turns * per_turn) + 1
+    return [(cx + r * math.cos(phase + 2 * math.pi * turns * k / (n - 1)),
+             cy + r * math.sin(phase + 2 * math.pi * turns * k / (n - 1)),
+             z0 + (z1 - z0) * k / (n - 1)) for k in range(n)]
+
+
+def model_item_jumpboots_model():
+    """A pair of spring boots standing side by side, toes at +X, 0.31 x 0.26 x 0.29: the boots' leather uppers (Body)
+    lifted on their lugged soles (Accent) over two coil springs each with a piston inside (TrimSpring, steel) onto a
+    thick rubber foot plate (Accent), laces (Trim)."""
+    lift = 0.062
+    parts = {"Body": [], "Accent": [], "Trim": [], "TrimSpring": []}
+    for side, y, yaw, dx in ((1, -0.064, math.radians(4), 0.0), (-1, 0.064, math.radians(-6), 0.014)):
+        upper, accent, trim = _boot(side)
+        for b in upper + accent + trim:
+            s.place(b, (0, 0, lift))
+        foot = xloft([(-0.13, 0.011, 0.048, 5.0, 0.011), (-0.03, 0.011, 0.056, 5.0, 0.011),
+                      (0.06, 0.011, 0.057, 5.0, 0.011), (0.15, 0.011, 0.044, 5.0, 0.011)], seg=16, round_caps=0.009)
+        tread = [s.rbox((0.012, 0.09, 0.006), (x, 0, 0.003), r=0.002, seg=1) for x in (-0.1, -0.06, 0.04, 0.08, 0.12)]
+        springs = []
+        for x in (-0.075, 0.075):
+            springs.append(s.tube(_helix(x, 0, 0.029, 0.016, lift + 0.006, 3.5, 7), 0.0048, res=1, smooth=False))
+            springs.append(s.rcyl(0.011, lift - 0.006, (x, 0, (lift + 0.016) / 2), seg=12, r=0.002, bevel_seg=1))  # piston
+            springs.append(s.rcyl(0.0175, 0.008, (x, 0, lift + 0.002), seg=12, r=0.002, bevel_seg=1))           # top cup
+            springs.append(s.rcyl(0.0175, 0.008, (x, 0, 0.02), seg=12, r=0.002, bevel_seg=1))                   # bottom cup
+        for key, bms in (("Body", upper), ("Accent", accent + [foot] + tread), ("Trim", trim), ("TrimSpring", springs)):
+            parts[key] += moved(bms, (dx, y, 0), (0, 0, yaw))
+    for key, bms in parts.items():
+        s.part(key, bms)
+    return export("item_jumpboots_model")
+
+
+def _interp(pts, x):
+    for (x0, v0), (x1, v1) in zip(pts, pts[1:]):
+        if x <= x1:
+            t = max(0.0, (x - x0) / (x1 - x0))
+            return v0 + (v1 - v0) * (0.5 - 0.5 * math.cos(math.pi * t))
+    return pts[-1][1]
+
+
+GASMASK_H = [(-0.115, 0.03), (-0.085, 0.07), (-0.055, 0.086), (-0.02, 0.074), (0.02, 0.066), (0.06, 0.06),
+             (0.095, 0.042), (0.115, 0.024)]     # the face piece's height along X (chin -> forehead)
+GASMASK_W = [(-0.115, 0.05), (-0.07, 0.075), (-0.02, 0.09), (0.04, 0.1), (0.09, 0.09), (0.115, 0.07)]   # half width
+GASMASK_N = 2.3
+
+
+def _mask_z(x, y):
+    hz, hy = _interp(GASMASK_H, x), _interp(GASMASK_W, x)
+    q = max(0.0, 1 - abs(y / hy) ** GASMASK_N)
+    return hz * q ** (1 / GASMASK_N)
+
+
+def _mask_frame(x, y):
+    """The point on the face piece above (x, y) and the Euler rotation taking +Z onto its outward normal."""
+    d = 0.002
+    z = _mask_z(x, y)
+    n = Vector((-(_mask_z(x + d, y) - _mask_z(x - d, y)) / (2 * d), -(_mask_z(x, y + d) - _mask_z(x, y - d)) / (2 * d),
+                1.0)).normalized()
+    return Vector((x, y, z)), Vector((0, 0, 1)).rotation_difference(n).to_euler(), n
+
+
+def model_item_gasmask_model():
+    """A gas mask lying face up, chin at -X, forehead at +X, 0.25 x 0.24 x 0.10: the rubber face piece rising to the
+    snout over the mouth, with a flat lip round its edge (Body), two big round eye lenses (Accent, tinted glass) in
+    pressed rims, the speech diaphragm on the snout and the filter's threaded port (Trim), the round filter canister
+    screwed on at the left cheek, pointing out to the side (AccentFilter), the head harness straps lying out round it
+    (BodyStrap: rubber like the face)."""
+    xs = [-0.115 + 0.23 * k / 16 for k in range(17)]
+    face = xloft([(x, _interp(GASMASK_H, x), _interp(GASMASK_W, x), GASMASK_N, 0.0) for x in xs], seg=28,
+                 round_caps=0.01)
+    lip = xloft([(x, 0.012, _interp(GASMASK_W, x) + 0.008, GASMASK_N, 0.0) for x in xs], seg=28, round_caps=0.008)
+    for bm, floor in ((face, -0.003), (lip, -0.0015)):                 # flat backs: it lies on its edge
+        for v in bm.verts:
+            v.co.z = max(v.co.z, floor)
+    s.part("Body", [face, lip])
+    lenses, trim = [], []
+    for sy in (-1, 1):
+        p, rot, n = _mask_frame(0.045, sy * 0.046)
+        trim.append(s.place(poi.ring(0.031, 0.0225, 0.012, seg=28, r=0.002), p + n * 0.001, rot))
+        lenses.append(s.place(s.rcyl(0.0235, 0.008, seg=28, r=0.0015), p + n * 0.0005, rot))
+    s.part("Accent", lenses)
+    p, rot, n = _mask_frame(-0.06, 0.0)                                  # the speech diaphragm on the snout
+    trim.append(s.place(s.lathe([(0.025, -0.006), (0.025, 0.008), (0.021, 0.012), (0.0, 0.0125)], seg=24), p, rot))
+    trim += [s.place(s.rbox((0.003, 0.03, 0.003), (-0.008 + k * 0.0055, 0, 0.0125), r=0.0008, seg=1), p, rot)
+             for k in range(4)]
+    p, rot, n = _mask_frame(-0.05, -0.068)                               # the filter port on the left cheek
+    out = Vector((-0.25, -1.0, 0.25)).normalized()
+    out_rot = Vector((0, 0, 1)).rotation_difference(out).to_euler()
+    trim.append(s.place(s.rcyl(0.021, 0.034, seg=24, r=0.003), p + out * 0.004, out_rot))
+    s.part("Trim", trim)
+    canister = s.lathe([(0.0, 0.0), (0.04, 0.0), (0.043, 0.003), (0.043, 0.036), (0.04, 0.04), (0.0, 0.04)], seg=32)
+    for zz in (0.009, 0.015, 0.021, 0.027, 0.033):
+        s.groove(canister, "Z", zz, width=0.0018, depth=0.0009)
+    s.place(canister, p + out * 0.016, out_rot)
+    holes = s.place(s.rcyl(0.013, 0.004, seg=16, r=0.001), p + out * 0.057, out_rot)
+    s.part("AccentFilter", [canister, holes])
+    straps = []
+    for sy in (-1, 1):
+        straps.append(s.tube([(0.085, sy * 0.088, 0.01), (0.105, sy * 0.1, 0.004), (0.13, sy * 0.07, 0.003),
+                              (0.14, 0.0, 0.003)], 0.004, res=1, segments_per=4))
+        straps.append(s.tube([(-0.065, sy * 0.082, 0.01), (-0.085, sy * 0.1, 0.003), (-0.115, sy * 0.095, 0.003)],
+                             0.004, res=1, segments_per=4))
+    s.part("BodyStrap", straps)
+    return export("item_gasmask_model")
+
+
+def model_item_hammer_model():
+    """A sledgehammer lying on its side, 0.9 m, the head at +X: an oval hickory handle swelling to a knob at the butt
+    and thickening into the head's eye (Body), the forged steel head with chamfered striking faces (Accent), the black
+    rubber grip at the butt and the wedge in the eye (Trim)."""
+    hh = 0.046                                                           # the head's half height: the axis height
+    handle = xloft([(-0.45, 0.019, 0.016, 2.2, hh), (-0.44, 0.022, 0.018, 2.2, hh), (-0.425, 0.019, 0.015, 2.2, hh),
+                    (-0.2, 0.017, 0.0135, 2.2, hh), (0.15, 0.0175, 0.0135, 2.2, hh), (0.3, 0.021, 0.015, 2.2, hh),
+                    (0.36, 0.024, 0.016, 2.2, hh), (0.4, 0.024, 0.016, 2.2, hh)], seg=20, round_caps=0.006)
+    s.part("Body", [handle])
+    head = s.loft([(-0.09, 0.037, 0.037, 7.0), (-0.083, 0.044, 0.044, 7.0), (-0.055, 0.046, 0.046, 7.0),
+                   (-0.025, 0.042, 0.044, 6.0), (0.025, 0.042, 0.044, 6.0), (0.055, 0.046, 0.046, 7.0),
+                   (0.083, 0.044, 0.044, 7.0), (0.09, 0.037, 0.037, 7.0)], seg=24, axis="Y", loc=(0.38, 0, hh))
+    s.groove(head, "Y", 0.07, width=0.004, depth=0.0018)
+    s.groove(head, "Y", -0.07, width=0.004, depth=0.0018)
+    s.part("Accent", [head])
+    grip = xloft([(-0.428, 0.0205, 0.0165, 2.2, hh), (-0.3, 0.0188, 0.015, 2.2, hh)], seg=20, round_caps=0.004)
+    for x in (-0.4, -0.38, -0.36, -0.34, -0.32):
+        s.groove(grip, "X", x, width=0.0035, depth=0.0012)
+    wedge = s.rbox((0.034, 0.006, 0.006), (0.38, 0, 2 * hh - 0.0015), r=0.0015, seg=1)
+    s.part("Trim", [grip, wedge])
+    return export("item_hammer_model")
+
+
+def model_item_robosensor_model():
+    """A portable motion sensor for robots standing on the floor, 0.18 m tall: a squat weighted base on three short
+    splayed legs, a short neck and a wide head housing (Body), the faceted PIR dome on top (Accent, milky plastic),
+    the legs' rubber feet and a bright collar under the dome (Trim), the status LED on the head (EyeLed)."""
+    up = 0.014
+    base = s.lathe([(0.0, 0.028 + up), (0.052, 0.028 + up), (0.058, 0.033 + up), (0.06, 0.045 + up),
+                    (0.056, 0.058 + up), (0.045, 0.064 + up), (0.03, 0.068 + up), (0.0, 0.068 + up)], seg=32)
+    s.groove(base, "Z", 0.047 + up, width=0.0025, depth=0.0012)
+    neck = s.rcyl(0.015, 0.026, (0, 0, 0.076 + up), seg=20, r=0.003)
+    head = s.lathe([(0.0, 0.084 + up), (0.03, 0.084 + up), (0.042, 0.089 + up), (0.047, 0.099 + up),
+                    (0.047, 0.115 + up), (0.0, 0.115 + up)], seg=32)
+    s.groove(head, "Z", 0.104 + up, width=0.002, depth=0.001)
+    legs = []
+    for k in range(3):
+        a = 2 * math.pi * k / 3 + math.pi / 2
+        c, sn = math.cos(a), math.sin(a)
+        legs.append(s.tube([(0.03 * c, 0.03 * sn, 0.034 + up), (0.06 * c, 0.06 * sn, 0.026), (0.074 * c, 0.074 * sn, 0.012)],
+                           0.0065, res=1, segments_per=3))
+    s.part("Body", [base, neck, head, *legs])
+    feet = []
+    for k in range(3):
+        a = 2 * math.pi * k / 3 + math.pi / 2
+        feet.append(s.rcyl(0.012, 0.012, (0.075 * math.cos(a), 0.075 * math.sin(a), 0.006), seg=14, r=0.003))
+    collar = s.rcyl(0.0465, 0.006, (0, 0, 0.115 + up), seg=32, r=0.0015)
+    s.part("Trim", [*feet, collar])
+    dome = s.lathe([(0.042, 0.114 + up), (0.042, 0.122 + up), (0.039, 0.136 + up), (0.031, 0.149 + up),
+                    (0.018, 0.159 + up), (0.0, 0.1625 + up)], seg=12)
+    s.part("Accent", [dome])
+    s.part("EyeLed", [s.rcyl(0.0045, 0.004, (0, -0.0465, 0.1075 + up), axis="Y", seg=12, r=0.001)])
+    return export("item_robosensor_model")
+
+
+KNIGHT_SIDE = [  # the knight's head in profile (forward u, up v), muzzle at +u
+    (-0.018, 0.028), (-0.0205, 0.048), (-0.0195, 0.064), (-0.016, 0.079), (-0.0105, 0.091), (-0.0075, 0.1),
+    (-0.004, 0.109), (0.0005, 0.1045), (0.005, 0.0985), (0.0115, 0.095), (0.0195, 0.089), (0.0265, 0.0805),
+    (0.0315, 0.0725), (0.0335, 0.066), (0.0305, 0.0605), (0.0235, 0.0615), (0.0205, 0.0565), (0.0125, 0.0525),
+    (0.0115, 0.046), (0.016, 0.038), (0.0185, 0.028)]
+
+
+def model_item_chessdetector_model():
+    """A handheld chess-piece detector lying on its side (the pistol's flank up), 0.24 m, the scan dish at +X: a
+    pistol body with a rubber grip falling to -Y (Body), the trigger, the grip's battery cap and the scanner dish's
+    collar (Accent), a coil ring in the dish, a gold knight emblem on the flank and the dish's rim (Trim), the small
+    screen at the back of the barrel and a LED (Eye)."""
+    zc = 0.03
+    barrel = xloft([(-0.1, 0.017, 0.024, 3.0, zc), (-0.07, 0.02, 0.027, 3.2, zc), (0.0, 0.02, 0.028, 3.4, zc),
+                    (0.05, 0.018, 0.024, 3.2, zc), (0.075, 0.016, 0.019, 3.0, zc)], seg=24, round_caps=0.008)
+    s.groove(barrel, "Z", zc, width=0.0016, depth=0.0008)                    # clamshell seam
+    grip = s.loft([(0.0, 0.016, 0.022, 3.0), (0.04, 0.017, 0.02, 3.0), (0.075, 0.019, 0.021, 3.0)], seg=20,
+                  round_caps=0.007)
+    s.place(grip, rot=(math.pi / 2, 0, 0))                                   # along -Y
+    s.place(grip, rot=(0, 0, math.radians(-14)))
+    s.place(grip, (-0.06, -0.01, zc))
+    guard = s.tube([(-0.035, -0.022, zc), (-0.02, -0.05, zc), (0.0, -0.05, zc), (0.01, -0.024, zc)], 0.0045,
+                   res=1, segments_per=4)
+    s.part("Body", [barrel, grip, guard])
+    trigger = s.rbox((0.009, 0.022, 0.012), (-0.024, -0.034, zc), r=0.003, seg=2, rot=(0, 0, math.radians(-10)))
+    cap = s.place(s.rbox((0.036, 0.008, 0.034), r=0.004, seg=2), (-0.06 - 0.0775 * math.sin(math.radians(14)),
+                                                                  -0.01 - 0.0775 * math.cos(math.radians(14)), zc),
+                  (0, 0, math.radians(-14)))
+    collar = s.rcyl(0.021, 0.018, (0.08, 0, zc), axis="X", seg=24, r=0.003, radius2=0.027)
+    dish = s.lathe([(0.0, 0.0), (0.03, 0.0), (0.03, 0.006), (0.028, 0.007), (0.012, 0.004), (0.0, 0.0035)], seg=32,
+                   axis="X", loc=(0.088, 0, zc))
+    s.part("Accent", [trigger, cap, collar, dish])
+    coil = poi.ring(0.022, 0.016, 0.004, (0.094, 0, zc), axis="X", seg=28, r=0.0008)
+    rim = poi.ring(0.0305, 0.0272, 0.004, (0.095, 0, zc), axis="X", seg=32, r=0.0008)
+    knight = prism([(u * 0.5, (v - 0.069) * 0.5) for u, v in KNIGHT_SIDE], 0.0, 0.0018, r=0.0005)
+    bmesh.ops.triangulate(knight, faces=[f for f in knight.faces if len(f.verts) > 4], ngon_method="EAR_CLIP")
+    s.place(knight, (0.01, 0.0, zc + 0.0188))
+    s.part("Trim", [coil, rim, knight])
+    screen = s.rbox((0.026, 0.018, 0.002), (-0.082, 0.0, zc + 0.0168), r=0.0006, seg=1)
+    led = s.rcyl(0.0024, 0.002, (-0.05, 0.012, zc + 0.0196), seg=10, r=0.0006)
+    s.part("Eye", [screen, led])
+    return export("item_chessdetector_model")
+
+
+PROFINDER_SEGMENTS = 16
+PROFINDER_HEAD = (0.055, 0.0)    # the dial's centre (Blender x, y)
+
+
+def _profinder_outline(x0=-0.115, w=0.046, head_r=0.058, corner=0.014, n_arc=48, n_corner=6):
+    """The casing seen from above: a round head (the dial) at +X on a narrower panel that ends square, corners rounded."""
+    hx, hy = PROFINDER_HEAD
+    a = math.asin(w / head_r)
+    pts = []
+    # back-right corner (x0, -w), rounded
+    for k in range(n_corner + 1):
+        t = math.pi + (math.pi / 2) * k / n_corner          # 180..270 degrees
+        pts.append((x0 + corner + corner * math.cos(t), -w + corner + corner * math.sin(t)))
+    # along the side to the head, round the head (counter-clockwise, through +X), back along the other side
+    for k in range(n_arc + 1):
+        t = -(math.pi - a) + 2 * (math.pi - a) * k / n_arc
+        pts.append((hx + head_r * math.cos(t), hy + head_r * math.sin(t)))
+    for k in range(n_corner + 1):
+        t = math.pi / 2 + (math.pi / 2) * k / n_corner      # 90..180 degrees
+        pts.append((x0 + corner + corner * math.cos(t), w - corner + corner * math.sin(t)))
+    return pts
+
+
+def _arc_pad(r0, r1, a0, a1, z0, z1, centre, n=5):
+    """A flat pad shaped as a sector of a ring (one lamp of the dial)."""
+    cx, cy = centre
+    outer = [(cx + r1 * math.cos(a0 + (a1 - a0) * k / n), cy + r1 * math.sin(a0 + (a1 - a0) * k / n)) for k in range(n + 1)]
+    inner = [(cx + r0 * math.cos(a1 - (a1 - a0) * k / n), cy + r0 * math.sin(a1 - (a1 - a0) * k / n)) for k in range(n + 1)]
+    return prism(outer + inner, z0, z1, r=0.0005, seg=1)
+
+
+def model_item_profinder_model():
+    """The upgraded fuel finder, a handheld field detector lying flat, 0.23 m: a casing with a round head (Body, red
+    plastic), the head's ring of sixteen lamps around a lamp in the middle — the lit one shows which way the loot lies
+    (EyeSeg00..15 and EyeLed: each its own part, lit in the game one by one), a toothed bezel round them and the face
+    plate of the panel (Accent, grey metal), the dial's black bed, the screws, a ribbed knob and three mode buttons
+    (Trim), a small LCD on the panel (TrimLcd)."""
+    hx, hy = PROFINDER_HEAD
+    top = 0.034
+    body = prism(_profinder_outline(), 0.0, top, r=0.006, seg=3)
+    s.groove(body, "Z", 0.012, width=0.0018, depth=0.0009)                                # shell seam
+    s.part("Body", [body])
+    # the toothed bezel round the dial, the panel's face plate
+    accent = [poi.ring(0.0545, 0.0445, 0.007, (hx, hy, top + 0.0035), seg=48, r=0.0012)]
+    teeth = 40
+    for k in range(teeth):
+        t = 2 * math.pi * k / teeth
+        accent.append(s.rbox((0.0055, 0.0036, 0.0075), (hx + 0.0535 * math.cos(t), hy + 0.0535 * math.sin(t), top + 0.0035),
+                             r=0.0008, seg=1, rot=(0, 0, t)))
+    accent.append(s.rbox((0.098, 0.074, 0.003), (-0.056, 0.0, top + 0.0015), r=0.003, seg=2))
+    accent.append(s.rcyl(0.0035, 0.004, (hx, hy - 0.0505, top + 0.0055), seg=10, r=0.001))     # the bezel's index mark
+    s.part("Accent", accent)
+    # the dial's bed with its grid rings, the screws, the knob, the buttons
+    trim = [s.rcyl(0.0447, 0.004, (hx, hy, top + 0.002), seg=48, r=0.0006),
+            poi.ring(0.0205, 0.0195, 0.001, (hx, hy, top + 0.0042), seg=40, r=0.0002),
+            poi.ring(0.0425, 0.0415, 0.001, (hx, hy, top + 0.0042), seg=48, r=0.0002)]
+    for x, y in ((-0.1, -0.031), (-0.1, 0.031), (-0.012, -0.031), (-0.012, 0.031)):
+        trim.append(s.rcyl(0.0032, 0.002, (x, y, top + 0.004), seg=10, r=0.0008))
+    knob = s.rcyl(0.0115, 0.011, (-0.072, 0.019, top + 0.0085), seg=24, r=0.002)
+    trim.append(knob)
+    trim.append(s.rcyl(0.0035, 0.0115, (-0.072, 0.019 - 0.0085, top + 0.0095), axis="Y", seg=8, r=0.0008))  # knob's pointer
+    for y in (-0.024, -0.010, 0.004):
+        trim.append(s.rbox((0.009, 0.0085, 0.004), (-0.098, y - 0.004, top + 0.004), r=0.0012, seg=2))
+    s.part("Trim", trim)
+    s.part("TrimLcd", [s.rbox((0.034, 0.028, 0.0016), (-0.034, -0.014, top + 0.0035), r=0.0006, seg=1)])
+    # the ring of lamps: segment k is centred at angle 2πk/n from +X (counter-clockwise from above)
+    n = PROFINDER_SEGMENTS
+    step = 2 * math.pi / n
+    gap = math.radians(3.5)
+    for k in range(n):
+        a = step * k
+        s.part(f"EyeSeg{k:02d}", [_arc_pad(0.0225, 0.0395, a - step / 2 + gap / 2, a + step / 2 - gap / 2,
+                                            top + 0.0038, top + 0.0058, (hx, hy))])
+    lamp = s.lathe([(0.0115, 0.0), (0.0114, 0.003), (0.0098, 0.0068), (0.006, 0.0094), (0.0, 0.0104)], seg=24,
+                   loc=(hx, hy, top + 0.0038))
+    s.part("EyeLed", [lamp])
+    return export("item_profinder_model")
+
+
+def model_item_blueprint_model():
+    """A technical blueprint sheet lying flat, 0.30 x 0.20, two opposite corners curling up (Body, blue paper), a
+    border, a title block and a faint floor plan in thin white lines on its flat middle (Accent)."""
+    L, W, T = 0.3, 0.2, 0.0007
+    sheet = s.rbox((L, W, T), (0, 0, T / 2), r=0.0, seg=1)
+    slice_grid(sheet, "X", [-0.15 + k * 0.015 for k in range(1, 20)])
+    slice_grid(sheet, "Y", [-0.1 + k * 0.0125 for k in range(1, 16)])
+    for v in sheet.verts:
+        for sx in (-1, 1):
+            t = 1 + (sx * v.co.x - 0.15) / 0.07 + (sx * v.co.y - 0.1) / 0.05   # 0 on the curl's line, 1 at the corner
+            if t > 0 and sx * v.co.y > 0:
+                v.co.z += 0.02 * t ** 2
+    s.part("Body", [sheet], sharp_angle=80.0)
+    lw = 0.0012
+    z = T
+    lines = []
+
+    def seg(x0, y0, x1, y1, w=lw):
+        i = len(lines) % 7                                   # touching lines never share a plane (z-fighting):
+        h, w = 0.0006 + 0.0002 * i, 0.001 + 0.0002 * i       # each a little higher and wider than its neighbour
+        lines.append(s.rbox((abs(x1 - x0) + w, abs(y1 - y0) + w, h), ((x0 + x1) / 2, (y0 + y1) / 2, z), r=0.0))
+
+    # border (inside the flat part: the curled corners are at +X+Y and -X-Y)
+    x0, x1, y0, y1 = -0.125, 0.125, -0.075, 0.08
+    seg(x0, y1, x1 - 0.04, y1)
+    seg(x0 + 0.04, y0, x1, y0)
+    seg(x0, y0 + 0.035, x0, y1)
+    seg(x1, y0, x1, y1 - 0.035)
+    # title block at the lower right
+    seg(0.06, y0, 0.06, -0.035)
+    seg(0.06, -0.035, x1, -0.035)
+    seg(0.07, -0.05, 0.115, -0.05, 0.0008)
+    # a floor plan: an outer wall, inner walls with door gaps
+    seg(-0.1, 0.07, 0.04, 0.07)
+    seg(-0.1, -0.05, -0.1, 0.07)
+    seg(-0.1, -0.05, 0.04, -0.05)
+    seg(0.04, -0.05, 0.04, 0.07)
+    seg(-0.03, 0.07, -0.03, 0.03)
+    seg(-0.03, 0.005, -0.03, -0.05)
+    seg(-0.1, 0.0, -0.06, 0.0)
+    seg(-0.045, 0.0, -0.03, 0.0)
+    seg(-0.03, 0.02, 0.0, 0.02)
+    seg(0.018, 0.02, 0.04, 0.02)
+    s.part("Accent", lines, flat=True)
+    return export("item_blueprint_model")
+
+
+def model_item_circuit_model():
+    """A green circuit board lying flat, 0.14 x 0.07: the board with its mounting holes (Body), black chips and a pin
+    header (Accent), aluminium capacitors and a crystal (Trim), gold edge contacts along -X (TrimGold), a red LED
+    (EyeLed)."""
+    L, W, T = 0.14, 0.07, 0.0016
+    board = s.rbox((L, W, T), (0, 0, T / 2), r=0.0006, seg=1)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            board = s.boolean(board, s.rcyl(0.0018, 0.01, (sx * 0.064, sy * 0.029, 0.0), seg=12, r=0.0))
+    s.part("Body", [board])
+    acc = [s.rbox((0.024, 0.024, 0.003), (0.008, 0.004, T + 0.0012), r=0.0006, seg=1),           # the processor
+           s.rbox((0.018, 0.009, 0.0024), (-0.028, 0.018, T + 0.001), r=0.0005, seg=1),
+           s.rbox((0.018, 0.009, 0.0024), (-0.028, -0.008, T + 0.001), r=0.0005, seg=1),
+           s.rbox((0.011, 0.007, 0.002), (0.044, -0.022, T + 0.0008), r=0.0004, seg=1),
+           s.rbox((0.04, 0.0055, 0.0085), (0.03, 0.0305, T + 0.0038), r=0.0006, seg=1)]              # pin header
+    for yc in (0.018, -0.008):                                              # the two small chips' legs
+        for k in range(6):
+            for sy in (-1, 1):
+                acc.append(s.rbox((0.0011, 0.0026, 0.0012), (-0.028 - 0.0055 + k * 0.0022, yc + sy * 0.0052,
+                                                             T + 0.0002), r=0.0))
+    s.part("Accent", acc)
+    trim = []
+    for x, y, r, h in ((0.05, 0.012, 0.004, 0.009), (0.058, 0.002, 0.003, 0.007), (-0.052, -0.022, 0.0035, 0.008),
+                       (0.03, -0.018, 0.0028, 0.006)):
+        trim.append(s.lathe([(0.0, 0.0), (r, 0.0), (r, h - 0.0008), (r - 0.0006, h), (0.0, h)], seg=14,
+                            loc=(x, y, T - 0.0003)))
+    trim.append(s.rbox((0.009, 0.0035, 0.0032), (-0.006, -0.022, T + 0.0013), r=0.0012, seg=1))   # crystal
+    s.part("Trim", trim)
+    s.part("TrimGold", [s.rbox((0.0065, 0.0028, 0.0008), (-L / 2 + 0.0045, -0.026 + k * 0.0042, T - 0.0001), r=0.0)
+                        for k in range(13)])
+    s.part("EyeLed", [s.rbox((0.003, 0.002, 0.0016), (0.058, -0.026, T + 0.0006), r=0.0004, seg=1)])
+    return export("item_circuit_model")
+
+
+def model_item_wires_model():
+    """A tangled bundle of wires lying on the floor, about 0.09 m across: three insulated wires in loose loops - red
+    (Body), blue (Accent), yellow (AccentYellow) - their stripped copper ends (TrimCopper), a black cable tie
+    holding the bundle in the middle (Trim)."""
+    wires = {"Body": [], "Accent": [], "AccentYellow": []}
+    ends = []
+    r = 0.0026
+    for k, key in enumerate(("Body", "Accent", "AccentYellow")):
+        pts = []
+        n = 15
+        ph = k * 2.1
+        for j in range(n):
+            t = j / (n - 1) * 2 * math.pi * 1.6 + ph
+            rad = 0.026 + 0.01 * math.sin(2.3 * t + k)
+            pts.append((rad * math.cos(t) * 1.2, rad * math.sin(t), 0.008 + 0.006 * math.sin(3 * t + k) + 0.002 * k))
+        pts[n // 2] = (0.0, 0.0, 0.009 + 0.0035 * (k - 1))                 # all pass through the tie
+        wires[key].append(s.tube(pts, r, res=1, segments_per=4))
+        for p, q in ((pts[0], pts[1]), (pts[-1], pts[-2])):
+            d = (Vector(p) - Vector(q)).normalized()
+            ends.append(s.tube([tuple(Vector(p) - d * 0.002), tuple(Vector(p) + d * 0.008)], 0.0012, res=1,
+                               smooth=False))
+    for key, bms in wires.items():
+        s.part(key, bms)
+    s.part("TrimCopper", ends)
+    tie = poi.ring(0.0105, 0.0078, 0.005, (0.0, 0.0, 0.009), axis="X", seg=16, r=0.0008)
+    head = s.rbox((0.006, 0.007, 0.006), (0.0, 0.0, 0.0205), r=0.0012, seg=1)
+    s.part("Trim", [tie, head])
+    return export("item_wires_model")
+
+
+def model_item_chip_model():
+    """A single processor chip lying flat, 0.04 x 0.04: the black epoxy package (Body) on gull-wing gold pins along
+    all four sides (Trim), the silver heat spreader on top with a pin-1 dot (Accent)."""
+    P, H = 0.03, 0.004
+    pkg = s.rbox((P, P, H), (0, 0, 0.001 + H / 2), r=0.0006, seg=1)
+    s.part("Body", [pkg])
+    pins = []
+    n = 7
+    for k in range(n):
+        c = -P / 2 + 0.003 + k * (P - 0.006) / (n - 1)
+        for side in range(4):
+            prof = s.tube([(P / 2 - 0.001, 0, 0.0025), (P / 2 + 0.0018, 0, 0.0022), (P / 2 + 0.0026, 0, 0.0005),
+                           (P / 2 + 0.0048, 0, 0.0003)], 0.0004, res=1, smooth=False)
+            s.place(prof, (0, 0, 0))
+            s.place(prof, rot=(0, 0, side * math.pi / 2))
+            off = Vector((0, c, 0)) if side % 2 == 0 else Vector((c, 0, 0))
+            s.place(prof, tuple(off))
+            pins.append(prof)
+    s.part("Trim", pins)
+    s.part("Accent", [s.rbox((0.02, 0.02, 0.0009), (0, 0, 0.001 + H + 0.0002), r=0.0004, seg=1),
+                      s.rcyl(0.0012, 0.0006, (-0.011, -0.011, 0.001 + H), seg=10, r=0.0002)])
+    return export("item_chip_model")
+
+
+# --------------------------------------------------------------------------- collectible chess pieces (Staunton)
+
+def _chess_base(r, h):
+    """The turned foot every piece stands on: a bevelled plinth, a bead and a cove, up to height h (r: its radius)."""
+    k = r / 0.026
+    return [(0.0, 0.0), (r, 0.0), (r * 1.015, h * 0.12), (r * 0.87, h * 0.24), (r * 0.77, h * 0.33),
+            (r * 0.8, h * 0.44), (r * 0.78, h * 0.5), (r * 0.62, h * 0.6)], k
+
+
+def _felt(r):
+    return s.rcyl(r * 0.93, 0.0026, (0, 0, 0.0011), seg=28, r=0.0006, bevel_seg=1)
+
+
+def _chess_piece(kind):
+    """bmesh lists (body, felt) of one piece, scaled to its height (pawn 0.08 … king 0.14 m)."""
+    body = []
+    if kind == "pawn":
+        prof, _ = _chess_base(0.022, 0.03)
+        prof += [(0.0105, 0.021), (0.0085, 0.032), (0.0072, 0.044), (0.0112, 0.0465), (0.0118, 0.049),
+                 (0.0075, 0.051), (0.0, 0.0512)]
+        body = [s.lathe(prof, seg=24), s.ball(0.0135, (0, 0, 0.0635), seg=20)]
+        height, r = 0.08, 0.022
+    elif kind == "rook":
+        prof, _ = _chess_base(0.026, 0.034)
+        prof += [(0.0145, 0.024), (0.0125, 0.06), (0.0158, 0.0645), (0.0168, 0.068), (0.0158, 0.07), (0.0178, 0.072),
+                 (0.0182, 0.097), (0.0, 0.097)]
+        tower = s.lathe(prof, seg=24)
+        tower = s.boolean(tower, s.rcyl(0.0124, 0.02, (0, 0, 0.1), seg=24, r=0.0))
+        for a in (0.0, math.pi / 2):
+            tower = s.boolean(tower, s.rbox((0.05, 0.0062, 0.014), (0, 0, 0.1), r=0.0, rot=(0, 0, a + math.pi / 4)))
+        s.bevel_edges(tower, 0.0007, 1, angle=50)
+        body = [tower]
+        height, r = 0.1, 0.026
+    elif kind == "bishop":
+        prof, _ = _chess_base(0.025, 0.034)
+        prof += [(0.0135, 0.026), (0.0098, 0.045), (0.0078, 0.06), (0.0122, 0.063), (0.0128, 0.0655), (0.0082, 0.0675),
+                 (0.0092, 0.07), (0.0122, 0.0765), (0.0128, 0.084), (0.0108, 0.0925), (0.0066, 0.0995),
+                 (0.0022, 0.1025), (0.0, 0.103)]
+        mitre = s.lathe(prof, seg=24)
+        mitre = s.boolean(mitre, s.rbox((0.03, 0.04, 0.0028), (0.012, 0, 0.0905), r=0.0, rot=(0, math.radians(-42), 0)))
+        s.bevel_edges(mitre, 0.0005, 1, angle=50)
+        body = [mitre, s.ball(0.0036, (0, 0, 0.1055), seg=12)]
+        height, r = 0.11, 0.025
+    elif kind == "queen":
+        prof, _ = _chess_base(0.028, 0.036)
+        prof += [(0.0145, 0.028), (0.0108, 0.05), (0.0086, 0.074), (0.0142, 0.0775), (0.0148, 0.0805), (0.0098, 0.083),
+                 (0.0102, 0.087), (0.0138, 0.1), (0.016, 0.1095), (0.0148, 0.1115), (0.009, 0.1125), (0.0068, 0.1145),
+                 (0.0, 0.1155)]
+        crown = [s.lathe(prof, seg=24)]
+        crown += [s.ball(0.0029, (0.0148 * math.cos(2 * math.pi * k / 8), 0.0148 * math.sin(2 * math.pi * k / 8), 0.1115),
+                         seg=10) for k in range(8)]
+        crown.append(s.ball(0.0058, (0, 0, 0.1205), seg=14))
+        body = crown
+        height, r = 0.13, 0.028
+    elif kind == "king":
+        prof, _ = _chess_base(0.029, 0.037)
+        prof += [(0.015, 0.029), (0.0112, 0.052), (0.009, 0.078), (0.0148, 0.0815), (0.0154, 0.0845), (0.0102, 0.087),
+                 (0.0106, 0.091), (0.0142, 0.104), (0.0158, 0.112), (0.0128, 0.1145), (0.0062, 0.1165), (0.0062, 0.119),
+                 (0.0045, 0.1205), (0.0, 0.1207)]
+        body = [s.lathe(prof, seg=24),
+                s.rbox((0.0058, 0.0052, 0.024), (0, 0, 0.13), r=0.0012, seg=1),
+                s.rbox((0.0158, 0.0052, 0.0058), (0, 0, 0.1335), r=0.0012, seg=1)]
+        height, r = 0.14, 0.029
+    else:  # knight
+        prof, _ = _chess_base(0.026, 0.034)
+        prof += [(0.0155, 0.026), (0.0152, 0.03), (0.0178, 0.0325), (0.0168, 0.035), (0.0, 0.035)]
+        base = s.lathe(prof, seg=24)
+        head = prism(KNIGHT_SIDE, -0.0135, 0.0135, r=0.0055, seg=3)
+        bmesh.ops.triangulate(head, faces=[f for f in head.faces if len(f.verts) > 4], ngon_method="EAR_CLIP")
+        s.place(head, rot=(math.pi / 2, 0, 0))                    # outline (u, v) in XY -> XZ, thickness along Y
+        for v in head.verts:                                       # the muzzle narrower than the jowls, the ears thin
+            k = 1 - 0.38 * max(0.0, (v.co.x - 0.006) / 0.028) - 0.35 * max(0.0, (v.co.z - 0.096) / 0.013)
+            v.co.y *= max(0.45, k)
+        mane = s.tube([(-0.0178, 0.0, 0.042), (-0.0182, 0.0, 0.062), (-0.0138, 0.0, 0.082), (-0.0078, 0.0, 0.095)],
+                      0.0052, res=1, segments_per=4)
+        eyes = [s.ball(0.0024, (0.0115, sy * 0.0105, 0.084), seg=10) for sy in (-1, 1)]
+        nostrils = [s.ball(0.0018, (0.0295, sy * 0.0062, 0.0695), seg=8) for sy in (-1, 1)]
+        body = [base, head, mane, *eyes, *nostrils]
+        height, r = 0.105, 0.026
+    felt = [_felt(r)]
+    top = max(v.co.z for b in body for v in b.verts)
+    k = height / top
+    for b in body + felt:
+        s.place(b, scale=(k, k, k))
+    for b in body:                                                 # the felt is let into the plinth's underside
+        s.place(b, (0, 0, 0.0008 * k))
+    return body, felt
+
+
+def _chess_model(kind, colour):
+    body, felt = _chess_piece(kind)
+    s.part("Body", body)
+    s.part("Accent", felt)
+    return export(f"item_{kind}_{colour}_model")
+
+
+for _kind in ("pawn", "knight", "bishop", "rook", "queen", "king"):
+    for _colour in ("w", "b"):
+        globals()[f"model_item_{_kind}_{_colour}_model"] = (lambda k=_kind, c=_colour: _chess_model(k, c))
+
+
+NEW_MODELS = {
+    "item_proscrewdriver_model": model_item_proscrewdriver_model,
+    "item_prokeyboard_model": model_item_prokeyboard_model,
+    "item_protablet_model": model_item_protablet_model,
+    "item_espresso_model": model_item_espresso_model,
+    "item_jumpboots_model": model_item_jumpboots_model,
+    "item_gasmask_model": model_item_gasmask_model,
+    "item_hammer_model": model_item_hammer_model,
+    "item_robosensor_model": model_item_robosensor_model,
+    "item_chessdetector_model": model_item_chessdetector_model,
+    "item_profinder_model": model_item_profinder_model,
+    "item_blueprint_model": model_item_blueprint_model,
+    "item_circuit_model": model_item_circuit_model,
+    "item_wires_model": model_item_wires_model,
+    "item_chip_model": model_item_chip_model,
+}
+for _kind in ("pawn", "knight", "bishop", "rook", "queen", "king"):
+    for _colour in ("w", "b"):
+        NEW_MODELS[f"item_{_kind}_{_colour}_model"] = globals()[f"model_item_{_kind}_{_colour}_model"]
+
+
 def model_item_stun_model():
     """The stun device, a portable jammer 0.30 square: a painted steel case with two seams (Body), rubber corner bumpers,
     feet and carry handles (Accent), steel side vents, the emitter's collar, guard ring, toggle and its bezel
@@ -989,11 +1709,13 @@ MODELS = {
     "item_plush_model": model_item_plush_model,
     "item_socks_model": model_item_socks_model,
     "item_ssd_model": model_item_ssd_model,
+    "item_cassette_model": model_item_cassette_model,
     "item_gamepad_model": model_item_gamepad_model,
     "item_gamekeyboard_model": model_item_gamekeyboard_model,
     "item_canister_model": model_item_canister_model,
     "item_bandage_model": model_item_bandage_model,
 }
+MODELS.update(NEW_MODELS)
 
 
 if __name__ == "__main__":

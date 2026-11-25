@@ -287,6 +287,7 @@ namespace Stealth.EditorTools
             Link(levelArt, ref levelArt.VehicleDoor, vehicleDoor);
             Link(levelArt, ref levelArt.ClinicDoor, clinicDoor);
             Link(levelArt, ref levelArt.StorageDoor, storageDoor);
+            Link(levelArt, ref levelArt.FloorHole, Prefab($"{LevelPrefabs}/FloorHole.prefab", BuildFloorHole));
             Link(levelArt, ref levelArt.Displays, M("Displays"));
             Link(levelArt, ref levelArt.Mirror, M("Mirror"));
             LinkAll(levelArt, ref levelArt.Pictures, new[] { M("BoardSheet"), M("MirrorGlass"), M("ProjectorCloth") });
@@ -298,6 +299,52 @@ namespace Stealth.EditorTools
         }
 
         // ------------------------------------------------------------------ structure
+
+        /// <summary>
+        /// The heavy hammer's hole in a floor (a unit square, scaled to the hole by <see cref="FloorHoles.Cut"/>; its top is
+        /// the floor's level): broken lips of concrete round the edge, a little rubble on the floor below, and a carving
+        /// navmesh obstacle through both floors — robots go round the hole above and round the rubble under it.
+        /// </summary>
+        static GameObject BuildFloorHole()
+        {
+            var root = new GameObject("FloorHole");
+            var mat = M("Floor");
+            var rng = new System.Random(0x401E);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            float thick = LevelMetrics.SlabThickness;
+            // the broken edge: chunks of concrete sticking a few centimetres into the hole on every side, ragged at the top
+            for (int side = 0; side < 4; side++)
+                for (int k = 0; k < 5; k++)
+                {
+                    float along = -0.4f + k * 0.2f + R(-0.04f, 0.04f);
+                    float into = R(0.02f, 0.07f), h = R(0.25f, thick * 0.8f);
+                    var at = side switch
+                    {
+                        0 => new Vector3(along, -h / 2f - R(0f, 0.04f), -0.5f + into / 2f),
+                        1 => new Vector3(along, -h / 2f - R(0f, 0.04f), 0.5f - into / 2f),
+                        2 => new Vector3(-0.5f + into / 2f, -h / 2f - R(0f, 0.04f), along),
+                        _ => new Vector3(0.5f - into / 2f, -h / 2f - R(0f, 0.04f), along),
+                    };
+                    var size = side < 2 ? new Vector3(R(0.12f, 0.2f), h, into) : new Vector3(into, h, R(0.12f, 0.2f));
+                    var chunk = Cube(root.transform, $"Lip{side}_{k}", at, size, mat, collider: false);
+                    chunk.transform.localRotation = Quaternion.Euler(R(-12f, 12f), R(-8f, 8f), R(-12f, 12f));
+                }
+            // rubble on the floor below
+            for (int k = 0; k < 9; k++)
+            {
+                float sz = R(0.06f, 0.18f);
+                var at = new Vector3(R(-0.55f, 0.55f), -LevelMetrics.FloorHeight + sz * 0.4f, R(-0.55f, 0.55f));
+                var chunk = Cube(root.transform, $"Rubble{k}", at, new Vector3(sz, sz * R(0.5f, 0.9f), sz * R(0.7f, 1.2f)), mat, collider: false);
+                chunk.transform.localRotation = Quaternion.Euler(R(0f, 40f), R(0f, 360f), R(0f, 40f));
+            }
+            var obstacle = root.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            obstacle.shape = UnityEngine.AI.NavMeshObstacleShape.Box;
+            obstacle.center = new Vector3(0f, -LevelMetrics.FloorHeight / 2f, 0f);
+            obstacle.size = new Vector3(1.1f, LevelMetrics.FloorHeight + 0.6f, 1.1f);
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = false;
+            return root;
+        }
 
         static GameObject BuildLevelRoot()
         {

@@ -60,6 +60,14 @@ namespace Stealth.Player
         public bool Crouching { get; private set; }
         /// <summary>Owner-owned: camera pitch in degrees (updated ~10 times per second) so teammates see where you look.</summary>
         public sbyte LookPitch { get; private set; }
+        /// <summary>
+        /// Owner-owned: the head's turn off the body in degrees, + to the right (updated with the pitch): the body held on the
+        /// ladder or in a seat (<see cref="PlayerMotor.HeadYaw"/>), so teammates see the head turn where the player looks.
+        /// </summary>
+        public sbyte LookYaw { get; private set; }
+        /// <summary>The head's turn as shown here: the owner's own, a remote player's eased to what came over the network.</summary>
+        public float ShownLookYaw => IsOwner && Motor != null ? Motor.HeadYaw : m_ShownYaw;
+        float m_ShownYaw;
         /// <summary>Owner-owned: Steam name or empty.</summary>
         public string DisplayName { get; private set; } = "";
         public string Nick => DisplayName.Length > 0 ? DisplayName : Loc.F("player.nick", ClientId + 1);
@@ -87,7 +95,11 @@ namespace Stealth.Player
         /// <summary>0..1 of holding E over a downed teammate.</summary>
         public float ReviveShare => ReviveProgress / m_Interaction.ReviveTime;
         /// <summary>0..1 of holding E at a robot / device.</summary>
-        public float HackShare => HackProgress / m_Interaction.HackHoldTime;
+        public float HackShare => HackProgress / HackHoldTime;
+        /// <summary>Seconds of E the target in reach takes: a hack, or the upgraded screwdriver taking a device apart.</summary>
+        float HackHoldTime => Unscrewing ? Configs.Tuning.Items.Crafted.UnscrewTime : m_Interaction.HackHoldTime;
+        /// <summary>Owner: E at <see cref="HackTarget"/> (a robot or a device) takes it apart with the upgraded screwdriver (not a hack).</summary>
+        public bool Unscrewing { get; private set; }
         public float HackReach => m_Interaction.HackReach;
         public float Height => Crouching ? CrouchHeight : StandHeight;
         public bool IsSprinting => Motor != null && Motor.IsSprinting;
@@ -128,23 +140,41 @@ namespace Stealth.Player
         public bool Invisible { get; private set; }
 
         /// <summary>Owner: a cheat from the F4 panel (the server carries it out).</summary>
-        public void RequestCheat(Cheat cheat, bool on)
+        public void RequestCheat(Cheat cheat, bool on) => RequestCheat(cheat, on ? 1 : 0);
+
+        /// <summary>Owner: a cheat from the F4 panel with its argument (<see cref="CheatArgs"/>).</summary>
+        public void RequestCheat(Cheat cheat, int arg)
         {
             // the owner runs its own gas and footsteps: it keeps the flags too (the server's copy is what robots use)
-            if (cheat == Cheat.Invulnerable) Invulnerable = on;
-            if (cheat == Cheat.Invisible) Invisible = on;
-            Link.SendCheat(cheat, on);
+            if (cheat == Cheat.Invulnerable) Invulnerable = arg != 0;
+            if (cheat == Cheat.Invisible) Invisible = arg != 0;
+            Link.SendCheat(cheat, arg);
         }
 
-        public void CheatServer(Cheat cheat, bool on)
+        public void CheatServer(Cheat cheat, bool on) => CheatServer(cheat, on ? 1 : 0);
+
+        public void CheatServer(Cheat cheat, int arg)
         {
             var gm = GameManager.Instance;
+            bool on = arg != 0;
             switch (cheat)
             {
                 case Cheat.Invulnerable: Invulnerable = on; break;
                 case Cheat.Invisible: Invisible = on; break;
                 case Cheat.KillRobots: gm?.KillAllRobotsServer(); break;
                 case Cheat.FillQuota: gm?.FillQuotaServer(); break;
+                case Cheat.SpawnItem:
+                {
+                    var (shape, color) = CheatArgs.ItemOf(arg);
+                    gm?.CheatItemServer(this, shape, color);
+                    break;
+                }
+                case Cheat.SetUpgrade:
+                {
+                    var (upgrade, level) = CheatArgs.UpgradeOf(arg);
+                    gm?.CheatUpgradeServer(upgrade, level);
+                    break;
+                }
                 default:
                     if (cheat >= Cheat.StartHouse) gm?.StartHouseServer((Stealth.Level.HouseKind)(cheat - Cheat.StartHouse));
                     break;
@@ -249,10 +279,11 @@ namespace Stealth.Player
         public int HatchIndex { get; private set; }
 
         /// <summary>Other peers: what the owner reports.</summary>
-        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName, BodyPose pose = BodyPose.None)
+        public void ApplyOwnerState(bool crouching, sbyte lookPitch, string displayName, BodyPose pose = BodyPose.None, sbyte lookYaw = 0)
         {
             Crouching = crouching;
             LookPitch = lookPitch;
+            LookYaw = lookYaw;
             DisplayName = displayName ?? "";
             Pose = pose;
         }
@@ -285,16 +316,19 @@ namespace Stealth.Player
             if (!IsOwner) return;
 
             PlaceOnLevelIfNeeded();
-            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen || StylePanel.IsOpen;
+            bool menu = GameMenu.IsOpen || CheatPanel.IsOpen;
             if (Keyboard.current == null) return;
 
             bool cracking = Cracking != null || UsingTerminal != null || AtConsole != null; // busy at a dial, a lock or a terminal: no walking
+            UpdateBench(menu);
+            UpdateUpgrades(menu);
+            if (AtUpgrades) cracking = true; // at the car upgrade bench: the mouse picks, nobody walks
             CursorMode = !menu && !Downed && !cracking && // in the hatch too: the stash and the sell area are in reach
-                          (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode);
+                          (Controls.Held(GameAction.Hands) || HoldCursor || DevFlags.ForceHandsMode || AtBench);
             // the run's start screen: the team stands in a row, the mouse picks a class and an item, nobody walks
             bool pickingNow = GameManager.Instance != null && GameManager.Instance.Picking;
             if (pickingNow) cracking = true;
-            bool freeCursor = menu || CursorMode || pickingNow;
+            bool freeCursor = menu || CursorMode || pickingNow || AtUpgrades;
             Cursor.lockState = freeCursor ? CursorLockMode.None : CursorLockMode.Locked;
             Cursor.visible = freeCursor;
 
@@ -305,10 +339,15 @@ namespace Stealth.Player
             Motor.InHatch = InHatch;
             UpdateLadder(input, Time.deltaTime);
             Motor.Seated = SeatIndex >= 0 || Climbing; // on the ladder: the view turns, the ladder moves the body
+            HoldLook();
             UpdateGearMotion();
+            UpdateCrafted();
             Motor.Tick(input, !menu && !Downed && !cracking, Downed, Head, Camera, Time.deltaTime);
             IntoDuctIfJumping();
             UpdateSeat(menu);
+            // seated, the body is put on its seat again now that the player is (UpdateModelPose ran before the seat moved
+            // the player with the car: the body, and the view held to it, trailed by a frame's drive — the car shook)
+            if (SeatIndex >= 0) FollowRig();
             Crouching = Motor.IsCrouching;
             SyncLookPitch();
 
@@ -461,9 +500,14 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            if (HackTarget != null && !HackNeedsKeyboard && holdE && m_HackHeld.Hold(HackTarget, WorkDt, m_Interaction.HackHoldTime))
+            // the upgraded screwdriver (once per house): a robot or a device is taken apart instead of hacked — off for good,
+            // no hack slot, its innards fall out (a hack is the keyboard's: two slots, three with the upgraded one)
+            Unscrewing = HackTarget != null && CanUnscrew(m_Inventory);
+            // (a hack needs the keyboard in the hand; taking a device apart needs only the screwdriver)
+            if (HackTarget != null && !HackNeedsKeyboard && holdE && m_HackHeld.Hold(HackTarget, WorkDt, HackHoldTime))
             {
-                Link.SendHack(HackTarget);
+                if (Unscrewing) Link.SendGear(GearAction.Unscrew, HackTarget, HackTarget.Position);
+                else Link.SendHack(HackTarget);
             }
             HackProgress = m_HackHeld.Of(HackTarget);
 

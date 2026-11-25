@@ -10,5 +10,9 @@ namespace Stealth.Configs
         public RunSettings Rules = new();
         [Tooltip("How the team's pickup drives in the sewer.")]
         public Stealth.Vehicles.CarSettings Car = new();
+        [Tooltip("The garage's car upgrade bench: the engine's fuel cut, the recipes' sizes, the kennel's box.")]
+        public Stealth.Vehicles.CarUpgradeSettings Upgrades = new();
+        [Tooltip("Linus the mule: how he turns his head to the team while he sits and waits.")]
+        public MuleSettings Mule = new();
     }
 }

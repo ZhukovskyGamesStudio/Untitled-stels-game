@@ -231,6 +231,15 @@ class Poser:
         self.rebend(f"shin.{sd}", fwd=-math.degrees(fold - (rest_ahead - rest_shin)))
         self.sole(sd, heel=heel, out=out)
 
+    def plant(self, sd, ball, heel=0.0, out=0.0):
+        """`step`, with the thigh swung out (or in) as far as puts the ball of the foot at `ball` sideways too: `step`
+        solves the leg in the plane the pelvis faces, so a pelvis drifting sideways carried the feet with it. For a
+        foot that stays where it stands while the body moves over it."""
+        def miss(spread):
+            self.step(sd, ball, heel=heel, out=out, spread=spread)
+            return self.soles(sd)[1].x - ball[0]       # (the sole under the ball: what step puts at `ball`)
+        self.solve(miss, -20.0, 20.0)
+
     def stand(self, feet="LR"):
         """The pelvis moved up or down so the lower sole (of these feet) stands on the floor — the feet neither sink
         into it nor hang over it."""
@@ -276,6 +285,10 @@ RUN_AHEAD, RUN_BEHIND = 0.38, 0.55      # a run's planted foot: from this far ah
 RUN_PLANTED = 0.29                      # the share of the run's cycle a foot is planted (under a half: a flight)
 CROUCH_STEP = 0.56                      # a crouched step's length on the floor, metres
 CROUCH_PLANTED = 0.58                   # the share of the crouched walk's cycle a foot is planted
+IDLE_STANCE = 0.10                      # standing: the balls of the feet this far either side of the middle, metres
+IDLE_SWAY = 0.022                       # standing: the pelvis drifts this far over the leg that carries it, metres
+IDLE_SOFT = 0.014                       # standing: the pelvis this much under the rest pose's height (soft knees), metres
+IDLE_HEEL = 8.0                         # standing: the free foot's heel lifts this many degrees off the floor
 
 
 # A step's phase: the leg is furthest ahead at 90° and furthest behind at 270° — planted on the way back, in the air on
@@ -337,21 +350,23 @@ def animate(rig):
 
     def idle(t):
         """Standing at ease: the weight drifts from one leg to the other and back, the chest breathes twice, the head
-        glances aside once — slow enough to loop unnoticed (8 s)."""
+        glances aside once — slow enough to loop unnoticed (8 s). The balls of the feet stay where they stand
+        (Poser.step, IDLE_STANCE): the pelvis sways over them, the free leg's knee softens and its heel lifts — a figure
+        bending its legs over planted feet, not legs swinging under a pinned body (the feet used to skate 7 cm)."""
         shift = math.sin(t * two_pi)                       # + on the left leg
         b = breathe(t, 1.0, 3.0)
-        P.move(dx=0.014 * shift, dz=-0.004 * abs(shift))
-        P.lean("hips", side_=-1.6 * shift, turn=1.0 * shift)
-        P.lean("spine", side_=1.2 * shift)
-        P.lean("chest", side_=0.8 * shift, turn=-1.2 * shift)
+        # (a little under the rest pose's height: the knees are never locked, so the legs reach the floor all the time)
+        P.move(dx=IDLE_SWAY * shift, dz=-IDLE_SOFT - 0.004 * abs(shift))
+        P.lean("hips", side_=-1.6 * shift)                 # (no turn: a turning pelvis swings the heels about the balls)
+        P.lean("spine", side_=1.4 * shift)
+        P.lean("chest", side_=0.9 * shift, turn=-1.2 * shift)
         glance = math.sin(_ease(max(0.0, min(1.0, (t - 0.55) / 0.3))) * math.pi)
         P.lean("neck", fwd=1.5 - 0.6 * b)
         P.lean("head", turn=14 * glance - 2.0 * shift, fwd=2 - 0.8 * b, side_=-0.8 * shift)
+        ball = rig.data.bones["toe.L"].head_local.y
         for s, sg in (("L", 1.0), ("R", -1.0)):
             w = max(0.0, -shift * sg)                      # this leg is the free one
-            P.bend(f"thigh.{s}", fwd=2 + 5 * w, out=1.5 + 1.6 * shift * sg)
-            P.bend(f"shin.{s}", fwd=-(3 + 9 * w))
-            P.bend(f"foot.{s}", fwd=1 + 4 * w, out=5)
+            P.plant(s, (IDLE_STANCE * sg, ball, 0.0), heel=IDLE_HEEL * w, out=5)
         arms(fwd=2, spread=6, elbow=16 + 1.5 * b, sway=1.5 * shift, hand=16)
 
     def gait(t, stride, knee, arm, elbow, lean, bob, sway, crouch=0.0, toe_off=18.0, twist=7.0, fist=16.0, flight=None):
@@ -430,7 +445,6 @@ def animate(rig):
         the left hand low in front for balance, the right drawn back by the hip."""
         crouched(t)
         sh = math.sin(t * two_pi)
-        P.move(dx=0.008 * sh)
         P.lean("hips", turn=-8)
         P.lean("chest", turn=10 + 2 * sh)
         P.bend("thigh.L", fwd=96, out=10)                 # the leading leg: its foot flat on the floor
@@ -444,6 +458,11 @@ def animate(rig):
             P.sole("R", heel=48, out=4)
             return P.low("R") - P.low("L")
         P.solve(trailing, 40, 150)
+        # the stance found, the pelvis sways over it: the feet stay where it put them (they used to slide with it)
+        feet = {s: P.soles(s)[1] for s in "LR"}
+        P.move(dx=0.008 * sh)
+        P.plant("L", (feet["L"].x, feet["L"].y, 0.0), out=6)
+        P.plant("R", (feet["R"].x, feet["R"].y, 0.0), heel=48, out=4)
         P.reach("L", fwd=52, spread=10, twist=-10)
         P.bend("forearm.L", fwd=38)
         P.bend("fingers.L", fwd=22)

@@ -13,9 +13,45 @@ namespace Stealth.Game
     /// </summary>
     public sealed class TeamStash
     {
-        public const int Width = 8, Height = 4;
+        /// <summary>The storage robot's box with its backpack at level 0 (Vehicles.CarUpgradeSettings.KennelStash).</summary>
+        public const int Width = 5, Height = 3;
+        /// <summary>The biggest box (the backpack's top level): the stash board and the pack's load are built for it.</summary>
+        public const int MaxWidth = 7, MaxHeight = 6;
 
         readonly List<InventoryEntry> m_Items = new();
+
+        /// <summary>This grid's size in cells (the storage robot's box: by its backpack's level; the car's workbench: 4 x 4).</summary>
+        public int Columns { get; private set; }
+        public int Rows { get; private set; }
+
+        /// <summary>
+        /// The grid's size now (the storage robot's box grows with its backpack: Vehicles.CarUpgrades.StashSize). It never
+        /// shrinks under a thing lying in it: those columns and rows stay until it is empty.
+        /// </summary>
+        public void SetSize(int columns, int rows)
+        {
+            int right = 0, lowest = 0;
+            foreach (var e in m_Items)
+                foreach (var c in e.Cells)
+                {
+                    right = Mathf.Max(right, e.X + c.x + 1);
+                    lowest = Mathf.Max(lowest, e.Y + c.y + 1);
+                }
+            columns = Mathf.Max(Mathf.Max(1, columns), right);
+            rows = Mathf.Max(Mathf.Max(1, rows), lowest);
+            if (columns == Columns && rows == Rows) return;
+            Columns = columns;
+            Rows = rows;
+            Version++;
+        }
+
+        public TeamStash() : this(Width, Height) { }
+
+        public TeamStash(int columns, int rows)
+        {
+            Columns = columns;
+            Rows = rows;
+        }
 
         public IReadOnlyList<InventoryEntry> Items => m_Items;
         /// <summary>Bumped on every change (the network twin replicates on change).</summary>
@@ -31,7 +67,7 @@ namespace Stealth.Game
             }
         }
 
-        public static bool IsCell(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
+        public bool IsCell(int x, int y) => x >= 0 && y >= 0 && x < Columns && y < Rows;
 
         HashSet<Vector2Int> Occupied(int ignoreIndex)
         {
@@ -86,8 +122,8 @@ namespace Stealth.Game
         public bool FindSpot(int shape, out byte x, out byte y, out byte rot)
         {
             for (int r = 0; r < 4; r++)
-                for (int yy = 0; yy < Height; yy++)
-                    for (int xx = 0; xx < Width; xx++)
+                for (int yy = 0; yy < Rows; yy++)
+                    for (int xx = 0; xx < Columns; xx++)
                         if (CanPlace(shape, r, xx, yy))
                         {
                             x = (byte)xx; y = (byte)yy; rot = (byte)r;

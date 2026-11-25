@@ -20,6 +20,15 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void HeadTurnsWhereTheHeldBodysOwnerLooks()
+        {
+            Assert.AreEqual(-80f, HumanMath.HeadYaw(-80f, BodyPose.Ladder, false), 1e-4f, "on the ladder: the head turns as the player looks");
+            Assert.AreEqual(HumanMath.MaxHeadYaw, HumanMath.HeadYaw(170f, BodyPose.None, false), 1e-4f, "never round the back");
+            Assert.AreEqual(0f, HumanMath.HeadYaw(60f, BodyPose.None, true), "lying: still");
+            Assert.AreEqual(0f, HumanMath.HeadYaw(60f, BodyPose.Terminal, false), "at a terminal the take moves the head");
+        }
+
+        [Test]
         public void ASeatedBodyDoesNotWalk()
         {
             Assert.AreEqual(0f, HumanMath.WalkSpeed(9f, true), "riding in the car is not walking");
@@ -214,6 +223,56 @@ namespace Stealth.Tests
             }
         }
 
+        /// <summary>
+        /// Standing still (Idle, CrouchIdle) through the humanoid retargeting onto each person: the balls of the feet stay
+        /// where they stand while the body sways over them. (The Idle take bent the legs by their angles under a drifting
+        /// pelvis: the feet skated 7 cm to and fro and the start screen's row floated, its legs dangling; without Foot IK on
+        /// the legs' states the retargeting alone still slid them 2-3 cm. What is left is the ball's bone as the heel lifts.)
+        /// </summary>
+        [Test]
+        public void TheFeetStayPutStandingStill([Values(0, 1, 2, 3)] int department, [Values(false, true)] bool crouching)
+        {
+            var prefab = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.PlayerHumans[department];
+            var go = Object.Instantiate(prefab);
+            try
+            {
+                go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                var rig = go.GetComponent<HumanRig>();
+                var animator = rig.Animator;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // (no camera sees it here: culled, the bones stood still)
+                animator.Rebind();
+                animator.SetBool("Crouch", crouching);
+                animator.Update(0f);
+                animator.Update(1f); // (into the crouch: past its transition)
+                var feet = new[] { rig.ToeL, rig.ToeR };
+                var start = feet.Select(f => new Vector2(f.position.x, f.position.z)).ToArray();
+                float worst = 0f;
+                for (int i = 0; i < 48; i++) // the whole 8 s of Idle (CrouchIdle: three of its cycles)
+                {
+                    animator.Update(1f / 6f);
+                    for (int s = 0; s < 2; s++) worst = Mathf.Max(worst, Vector2.Distance(start[s], new Vector2(feet[s].position.x, feet[s].position.z)));
+                }
+                Assert.Less(worst * 100f, 0.5f, $"a foot slides {worst * 100f:0.0} cm over the floor while the body stands still");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        /// <summary>The wrist behind the rim it holds (towards the driver) and a little out from the hub: the rim in the palm.</summary>
+        [Test]
+        public void TheWristIsBehindTheRimItHolds()
+        {
+            var hub = new Vector3(0.4f, 1.1f, 0.5f);
+            var column = new Vector3(0f, 0.42f, -0.9f).normalized;
+            var rim = hub + Vector3.Cross(column, Vector3.right).normalized * -0.18f;
+            var wrist = HumanMath.WheelWrist(rim, hub, column, 1f);
+            Assert.AreEqual(HumanMath.WheelWristBack, Vector3.Dot(wrist - rim, column), 1e-4f, "towards the driver along the column");
+            Assert.Greater(Vector3.Distance(wrist, hub), Vector3.Distance(rim, hub), "out from the hub, not into the wheel");
+            Assert.AreEqual(2f * Vector3.Distance(wrist, rim), Vector3.Distance(HumanMath.WheelWrist(rim, hub, column, 2f), rim), 1e-4f, "by the person's size");
+        }
+
         [Test]
         public void EveryStyleShowsTheDepartments()
         {
@@ -330,6 +389,7 @@ namespace Stealth.Tests
                 // standing: the Animator itself plays the Idle state through the humanoid Avatar (the retargeting is what is
                 // checked: a wrong T-pose in the Avatar's description twists the arms out or up)
                 var animator = go.GetComponent<HumanRig>().Animator;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate; // (no camera sees it here: culled, it kept the rest pose)
                 animator.Rebind();
                 animator.Update(0f);
                 animator.Update(0.5f);

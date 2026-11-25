@@ -685,6 +685,13 @@ namespace Stealth.Level
         /// <summary>The smallest the point of interest is made to fit a piece's place, while a bigger piece is to be had.</summary>
         public const float MinPointScale = 0.85f;
 
+        /// <summary>
+        /// Points of interest that are never made smaller (the garage's car upgrade station, 4.8 m with its gantry): put
+        /// where they fit whole — against the wall of the piece they replace, inside its room, clear of the other furniture
+        /// and of the doors. Shrunk to a tyre rack's footprint it was a toy among the furniture.
+        /// </summary>
+        public static readonly HashSet<PropKind> FullSize = new() { PropKind.Workbench };
+
         public static void PointOfInterest(LevelLayout l)
         {
             if (PointOfInterestKind(LocationOf(l.Kind)) is not PropKind kind) return;
@@ -703,6 +710,11 @@ namespace Stealth.Level
             }
             // big enough first (a sofa's or a shelf's footprint shrank the medical table to a toy): at most a little smaller
             // than the place, then away from the hatch where the house allows it (a small first house has no "far")
+            bool full = FullSize.Contains(kind);
+            // the furnisher stood it whole against a wall already (Furnisher.Station)
+            int placed = full ? l.Props.FindIndex(p => p.Kind == kind) : -1;
+            if (placed >= 0) { l.PointOfInterest = placed; return; }
+            if (full && PlaceWhole(l, kind, need, rng, AtWindow)) return;
             foreach (float least in new[] { MinPointScale, 0f })
             foreach (float away in new[] { 6f, 2.5f })
             // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
@@ -730,6 +742,99 @@ namespace Stealth.Level
                 return;
             }
         }
+
+        /// <summary>The pieces a whole point of interest may take the place of (any that stands against a wall).</summary>
+        static readonly PropKind[] WholeOver =
+        {
+            PropKind.TireRack, PropKind.PaintRack, PropKind.WorkTable, PropKind.MetalShelving, PropKind.Shelf, PropKind.StorageRack,
+            PropKind.Credenza, PropKind.LabBench, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.HallBench, PropKind.Sofa,
+            PropKind.ReceptionDesk, PropKind.BarCounter, PropKind.MeetingTable, PropKind.ConferenceTable, PropKind.DiningTable,
+        };
+
+        /// <summary>
+        /// A <see cref="FullSize"/> point of interest at full size in the place of a piece (see <see cref="WholeAt"/>), away
+        /// from the hatch where it can be; false: nowhere whole (the caller falls back to a smaller one).
+        /// </summary>
+        static bool PlaceWhole(LevelLayout l, PropKind kind, Rect need, System.Random rng, System.Func<Vector3, bool> atWindow)
+        {
+            foreach (float away in new[] { 6f, 2.5f, 0f })
+            {
+                var options = new List<(int index, Vector3 at)>();
+                for (int i = 0; i < l.Props.Count; i++)
+                {
+                    var p = l.Props[i];
+                    if (System.Array.IndexOf(WholeOver, p.Kind) < 0 || l.IsClimbPiece(p.Position) || (p.Position - l.HatchPosition).magnitude <= away) continue;
+                    if (WholeAt(l, i, need) is not Vector3 at || (Furnisher.Tall.Contains(kind) && atWindow(at))) continue;
+                    options.Add((i, at));
+                }
+                if (options.Count == 0) continue;
+                var (pick, spot) = options[rng.Next(options.Count)];
+                var piece = l.Props[pick];
+                piece.Kind = kind;
+                piece.Scale = 1f;
+                piece.Position = spot;
+                l.Props[pick] = piece;
+                l.PointOfInterest = pick;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Where a whole piece of footprint <paramref name="need"/> stands in the place of prop <paramref name="index"/>, or
+        /// null if it does not fit (pure): its back against the same wall (the footprints' backs, local −Z, lined up), its
+        /// middle on the old piece's; every point of it in that piece's room, no other piece's footprint on it, no doorway
+        /// or hatch within reach of its front.
+        /// </summary>
+        public static Vector3? WholeAt(LevelLayout l, int index, Rect need)
+        {
+            var p = l.Props[index];
+            var have = Furnisher.FootprintOf(p.Kind);
+            float s = p.Scale > 0f ? p.Scale : 1f;
+            var turn = Quaternion.Euler(0f, p.RotationY, 0f);
+            var at = p.Position + turn * new Vector3(have.center.x * s - need.center.x, 0f, have.yMin * s - need.yMin);
+            var room = l.Plan?.RoomAt(p.Position + Vector3.up * 0.3f);
+            if (room == null) return null;
+            // every point of it in the room (an L-shaped room's box is not the room)
+            const int n = 6;
+            for (int i = 0; i <= n; i++)
+                for (int k = 0; k <= 2; k++)
+                {
+                    var local = new Vector3(Mathf.Lerp(need.xMin, need.xMax, i / (float)n), 0.3f, Mathf.Lerp(need.yMin, need.yMax, k / 2f));
+                    var q = l.Plan.RoomAt(at + turn * local);
+                    if (q == null || q.Id != room.Id) return null;
+                }
+            var box = Box(at, turn, need, 1f);
+            for (int j = 0; j < l.Props.Count; j++)
+            {
+                if (j == index) continue;
+                var o = l.Props[j];
+                if (Mathf.Abs(o.Position.y - p.Position.y) > 1.5f) continue;
+                var ob = Box(o.Position, Quaternion.Euler(0f, o.RotationY, 0f), Furnisher.FootprintOf(o.Kind), o.Scale > 0f ? o.Scale : 1f);
+                if (ob.Overlaps(Shrink(box, 0.03f))) return null;
+            }
+            var front = Shrink(box, -0.9f);                                // a step round it: doors open, hatches are reached
+            foreach (var d in l.AutoDoors)
+                if (Mathf.Abs(d.position.y - p.Position.y) < 1.5f && front.Contains(new Vector2(d.position.x, d.position.z))) return null;
+            foreach (var h in new[] { l.HatchPosition, l.ExitHatchPosition })
+                if (Mathf.Abs(h.y - p.Position.y) < 1.5f && front.Contains(new Vector2(h.x, h.z))) return null;
+            return at;
+        }
+
+        /// <summary>A footprint turned and placed, as a box in world x/z (its turn is in steps of 90° in a plan).</summary>
+        static Rect Box(Vector3 at, Quaternion turn, Rect foot, float scale)
+        {
+            float x0 = float.MaxValue, x1 = float.MinValue, z0 = float.MaxValue, z1 = float.MinValue;
+            foreach (var c in new[] { new Vector3(foot.xMin, 0f, foot.yMin), new Vector3(foot.xMax, 0f, foot.yMin), new Vector3(foot.xMin, 0f, foot.yMax), new Vector3(foot.xMax, 0f, foot.yMax) })
+            {
+                var w = at + turn * (c * scale);
+                x0 = Mathf.Min(x0, w.x); x1 = Mathf.Max(x1, w.x);
+                z0 = Mathf.Min(z0, w.z); z1 = Mathf.Max(z1, w.z);
+            }
+            return Rect.MinMaxRect(x0, z0, x1, z1);
+        }
+
+        static Rect Shrink(Rect r, float by) => Rect.MinMaxRect(r.xMin + by, r.yMin + by, r.xMax - by, r.yMax - by);
 
         // ------------------------------------------------------------------ wardens and lures
 

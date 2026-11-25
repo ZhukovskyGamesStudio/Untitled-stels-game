@@ -23,6 +23,9 @@ namespace Stealth.EditorTools
             public string Name;
             public float Speed, Climb, Time;
             public bool Crouch, Down, Sit, Hold, NoIK, Close;
+            /// <summary>In the driver's seat of the car with the wheel turned <see cref="Wheel"/> degrees (+ right); <see cref="Side"/>: seen from the side.</summary>
+            public bool Drive, Side;
+            public float Wheel;
             /// <summary>The thing in the hand (an ItemCatalog shape; -1: nothing) and its colour.</summary>
             public int Item, Color;
             public BodyPose Pose;
@@ -42,6 +45,12 @@ namespace Stealth.EditorTools
             new() { Name = "crouch_hold", Crouch = true, Hold = true, Time = 1f, Item = ItemCatalogShape.Radio },
             new() { Name = "crouch_walk_hold", Crouch = true, Speed = 1.3f, Hold = true, Time = 0.9f, Item = ItemCatalogShape.Tablet },
             new() { Name = "sit", Sit = true, Time = 1f },
+            // the driver's hands on the wheel, turning with it (only the wheel of the car is shown)
+            new() { Name = "drive", Sit = true, Drive = true, Time = 1f },
+            new() { Name = "drive_side", Sit = true, Drive = true, Side = true, Time = 1f },
+            new() { Name = "drive_left", Sit = true, Drive = true, Wheel = -60f, Time = 1f },
+            new() { Name = "drive_right", Sit = true, Drive = true, Wheel = 60f, Time = 1f },
+            new() { Name = "drive_full_lock", Sit = true, Drive = true, Wheel = 136f, Time = 1f },
             new() { Name = "down", Down = true, Time = 1.5f },
             new() { Name = "climb", Pose = BodyPose.Ladder, Climb = 1f, Time = 0.8f },
             new() { Name = "terminal", Pose = BodyPose.Terminal, Time = 1f },
@@ -105,6 +114,7 @@ namespace Stealth.EditorTools
                     var shot = Shots[i];
                     var go = Object.Instantiate(prefab);
                     var rig = go.GetComponent<HumanRig>();
+                    var car = shot.Drive ? Driving(go, rig, shot.Wheel) : null;
                     var animator = rig.Animator;
                     var ik = animator.GetComponent<HumanIK>();
                     if (ik != null) ik.enabled = !shot.NoIK;
@@ -130,6 +140,14 @@ namespace Stealth.EditorTools
                     var look = shot.Close ? palm : shot.Down ? new Vector3(0f, 0.3f, 0f) : new Vector3(0f, shot.Sit || shot.Crouch ? 0.65f : 0.95f, 0f);
                     cam.transform.position = look + (shot.Close ? new Vector3(0.75f, 0.3f, 0.8f) : shot.Down ? new Vector3(2.4f, 2.6f, 2.6f) : new Vector3(1.7f, 0.45f, 3.3f));
                     cam.transform.LookAt(look);
+                    if (car != null)
+                    {
+                        // the wheel and the hands from the front, over the dashboard (or from the passenger's side)
+                        var hub = car.Steering.position;
+                        var body = go.transform;
+                        cam.transform.position = hub + (shot.Side ? body.right * 1.3f + body.up * 0.15f - body.forward * 0.25f : body.forward * 1.25f + body.up * 0.45f + body.right * 0.35f);
+                        cam.transform.LookAt(hub - body.forward * 0.18f + body.up * (shot.Side ? 0.05f : 0.08f));
+                    }
                     cam.Render();
                     RenderTexture.active = rt;
                     tex.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
@@ -138,12 +156,38 @@ namespace Stealth.EditorTools
                     File.WriteAllBytes(Path.Combine(dir, $"{i:00}_{shot.Name}.png"), tex.EncodeToPNG());
                     Object.DestroyImmediate(go);
                     if (thing != null) Object.DestroyImmediate(thing);
+                    if (car != null) Object.DestroyImmediate(car.gameObject);
                 }
                 Debug.Log($"[Poses] {who}: {Shots.Length} pictures in {dir}");
             }
             cam.targetTexture = null;
             Object.DestroyImmediate(rt);
             Object.DestroyImmediate(tex);
+        }
+
+        /// <summary>
+        /// The car (only its steering wheel shown) with this body in the driver's seat as the game seats it
+        /// (<see cref="PlayerController.SeatDrop"/> under the seat), the wheel turned <paramref name="wheel"/> degrees and the
+        /// hands on it the way <c>PlayerController.HoldTheWheel</c> puts them.
+        /// </summary>
+        static Vehicles.Car Driving(GameObject body, HumanRig rig, float wheel)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<Vehicles.Car>("Assets/_Game/Prefabs/Vehicles/Car.prefab");
+            var car = Object.Instantiate(prefab);
+            car.ApplySides(Resources.Load<GameConfig>(GameConfig.ResourcePath).Run.Car);
+            foreach (var r in car.GetComponentsInChildren<Renderer>(true)) r.enabled = r.transform.IsChildOf(car.Steering);
+            foreach (var l in car.GetComponentsInChildren<Light>(true)) l.enabled = false;
+            body.transform.SetPositionAndRotation(car.Seats[0].position - Vector3.up * PlayerController.SeatDrop, car.transform.rotation);
+            car.WheelGrip(0f, 0f, out _, out _); // (the car reads the wheel's rest pose here, before it is turned)
+            car.Steering.localRotation = car.Steering.localRotation * Vehicles.CarLook.SteeringWheel(wheel, 1f);
+            float turn = Vehicles.CarLook.HandTurn(wheel), at = Vehicles.CarLook.HandsAt;
+            var a = car.WheelGrip(-at, turn, out var hub, out var column);
+            var b = car.WheelGrip(at, turn, out _, out _);
+            var a0 = car.WheelGrip(-at, 0f, out _, out _);
+            var b0 = car.WheelGrip(at, 0f, out _, out _);
+            if (Vector3.Dot(a0 - hub, body.transform.right) > 0f) { (a, b) = (b, a); (a0, b0) = (b0, a0); }
+            rig.HoldWheel(a, b, a0, b0, hub, column);
+            return car;
         }
 
         /// <summary>A held thing as the game shows it: an anchor at the palm facing the body's way, the model or the piece inside.</summary>

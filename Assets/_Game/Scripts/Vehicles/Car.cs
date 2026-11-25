@@ -87,6 +87,9 @@ namespace Stealth.Vehicles
         /// <summary>The engine's hopper on the hood (things dragged onto it burn into fuel).</summary>
         public CarHopper Hopper => m_Hopper != null ? m_Hopper : m_Hopper = GetComponentInChildren<CarHopper>();
         CarHopper m_Hopper;
+        /// <summary>The workbench in the bed (the team's bench: <see cref="Game.GameManager.Bench"/>).</summary>
+        public CarWorkbench Bench => m_Bench != null ? m_Bench : m_Bench = GetComponentInChildren<CarWorkbench>();
+        CarWorkbench m_Bench;
         static readonly RaycastHit[] s_Hits = new RaycastHit[16];
         static readonly Collider[] s_Overlaps = new Collider[16];
 
@@ -107,15 +110,50 @@ namespace Stealth.Vehicles
         {
             Active = this;
             m_Physics = new CarPhysics(Tuning.Run.Car);
-            if (CarLook.NeedsMirror(m_Physics.Settings)) MirrorSides();
+            ApplySides(m_Physics.Settings);
             m_WheelRest = new Quaternion[Wheels.Length];
             for (int i = 0; i < Wheels.Length; i++) if (Wheels[i] != null) m_WheelRest[i] = Wheels[i].localRotation;
-            if (Steering != null) m_SteeringRest = Steering.localRotation;
+            ReadSteeringRest();
             if (Grinder != null) m_GrinderRest = Grinder.localRotation;
             if (Body != null) m_BodyRest = Body.localPosition;
             m_LastPos = transform.position;
             m_LastYaw = transform.eulerAngles.y;
             if (Engine != null) { Engine.loop = true; Engine.volume = 0f; if (Engine.clip != null) Engine.Play(); }
+        }
+
+        bool m_SteeringRestRead;
+
+        /// <summary>The steering wheel's pose with the front wheels straight (once, after the mirror; editor pictures read it lazily).</summary>
+        void ReadSteeringRest()
+        {
+            if (m_SteeringRestRead || Steering == null) return;
+            m_SteeringRest = Steering.localRotation;
+            m_SteeringRestRead = true;
+        }
+
+        /// <summary>How far the steering wheel is turned now, degrees (+ clockwise as the driver sees it: a right turn).</summary>
+        public float WheelTurn => m_Physics == null ? 0f : SteerAngle * Settings.SteeringRatio;
+
+        /// <summary>
+        /// Where a driver's hand holds the steering wheel, in the world: the rim's point <paramref name="rimDegrees"/> clockwise
+        /// from its top as the driver sees it (<see cref="CarLook.RimPoint"/>), the wheel turned <paramref name="turn"/> degrees
+        /// — the point as the model shows it, mirrored car or not (through the wheel's own rest pose and scale). Also the hub
+        /// and the steering column there (from the wheel's face to the driver).
+        /// </summary>
+        public Vector3 WheelGrip(float rimDegrees, float turn, out Vector3 hub, out Vector3 column)
+        {
+            ReadSteeringRest();
+            var parent = Steering.parent;
+            Vector3 Local(Vector3 v) => Steering.localPosition + m_SteeringRest * (CarLook.SteeringWheel(turn, 1f) * Vector3.Scale(Steering.localScale, v));
+            hub = parent.TransformPoint(Steering.localPosition);
+            column = parent.TransformVector(m_SteeringRest * Vector3.Scale(Steering.localScale, CarLook.SteeringAxis)).normalized;
+            return parent.TransformPoint(Local(CarLook.RimPoint(rimDegrees)));
+        }
+
+        /// <summary>The wheel on the side the settings want (<see cref="CarLook.NeedsMirror"/>): in Awake, or for an editor picture.</summary>
+        public void ApplySides(CarSettings settings)
+        {
+            if (CarLook.NeedsMirror(settings)) MirrorSides();
         }
 
         /// <summary>The steering wheel to the other side: the model mirrored, the driver's and the passenger's seats swapped.</summary>
@@ -244,7 +282,7 @@ namespace Stealth.Vehicles
                 k = k * k * (3f - 2f * k);
                 m_DrivePose = new Pose(m_DrivePose.position + m_DriveOffset * k, Quaternion.Slerp(Quaternion.identity, m_DriveTurn, k) * m_DrivePose.rotation);
             }
-            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !StylePanel.IsOpen && !scripted;
+            bool drive = LocalDriver && !GameMenu.IsOpen && !CheatPanel.IsOpen && !scripted;
             m_Input = drive
                 ? new CarInput
                 {

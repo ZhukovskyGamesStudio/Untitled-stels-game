@@ -84,7 +84,10 @@ namespace Stealth.Player
         float GroundAccel => m_S.GroundAccel;
         float GroundDecel => m_S.GroundDecel;
         float AirAccel => m_S.AirAccel;
-        float JumpHeight => m_S.JumpHeight;
+        float JumpHeight => JumpHeightOverride > 0f ? JumpHeightOverride : m_S.JumpHeight;
+
+        /// <summary>A higher jump than the tuned one (0: the tuned one): the jump boots.</summary>
+        public float JumpHeightOverride { get; set; }
         float CoyoteTime => m_S.CoyoteTime;
         float JumpBuffer => m_S.JumpBuffer;
         float GroundSnapDistance => m_S.GroundSnapDistance;
@@ -145,6 +148,29 @@ namespace Stealth.Player
         public float FovBoost { get; set; }
         /// <summary>Sitting in the car: no walking, falling or crouching (the car carries the player).</summary>
         public bool Seated { get; set; }
+
+        /// <summary>
+        /// The body held facing <see cref="HoldYaw"/> (on the ladder: the rungs; in a seat: the road): the mouse turns the
+        /// head up to <see cref="HoldHead"/> degrees to either side and the body a share of it up to <see cref="HoldBody"/>
+        /// (<see cref="LookLimits"/>), never round the back. Let go, the body turns to where the head looked.
+        /// </summary>
+        public bool LookHeld { get; set; }
+        public float HoldYaw { get; set; }
+        public float HoldHead { get; set; } = 90f;
+        public float HoldBody { get; set; }
+        /// <summary>Held: the head's turn off the body, and the body's off <see cref="HoldYaw"/>, degrees (0 when free).</summary>
+        public float HeadYaw { get; private set; }
+        public float BodyYaw { get; private set; }
+
+        float m_Look;          // held: the look's degrees off HoldYaw
+        bool m_WasHeld;
+
+        /// <summary>The held look straight at the anchor (sitting down: eyes on the road).</summary>
+        public void ResetLook()
+        {
+            m_Look = 0f;
+            HeadYaw = BodyYaw = 0f;
+        }
         public const float HatchEyeHeight = 0.24f;
 
         /// <summary>Crouched at once (pulled up into a duct: no room to stand); it stays crouched until there is (BlockedByCeiling).</summary>
@@ -171,7 +197,23 @@ namespace Stealth.Player
 
             // Raw mouse delta, no smoothing: the camera reacts on the same frame.
             float sens = GameSettings.Sensitivity;
-            transform.Rotate(0f, input.Look.x * sens, 0f);
+            float turn = input.Look.x * sens;
+            if (LookHeld)
+            {
+                // the body faces its anchor (a share of the look at most), the head turns within its limit
+                if (!m_WasHeld) m_Look = LookLimits.Take(transform.eulerAngles.y + HeadYaw, HoldYaw, HoldHead, HoldBody);
+                m_Look = LookLimits.Turn(m_Look, turn, HoldHead, HoldBody);
+                BodyYaw = LookLimits.Body(m_Look, HoldHead, HoldBody);
+                HeadYaw = m_Look - BodyYaw;
+                transform.rotation = Quaternion.Euler(0f, HoldYaw + BodyYaw, 0f);
+            }
+            else
+            {
+                if (m_WasHeld && HeadYaw != 0f) transform.Rotate(0f, HeadYaw, 0f); // let go: the body turns to where the head looked (the view stays)
+                HeadYaw = BodyYaw = 0f;
+                transform.Rotate(0f, turn, 0f);
+            }
+            m_WasHeld = LookHeld;
             m_Pitch = Mathf.Clamp(m_Pitch - input.Look.y * sens * (GameSettings.InvertY ? -1f : 1f), -88f, 88f);
 
             if (input.CrouchToggle) m_CrouchToggled = !m_CrouchToggled;
@@ -274,7 +316,7 @@ namespace Stealth.Player
             head.localPosition = new Vector3(bob.x, m_HeadHeight + bob.y + m_Dip, 0);
             m_Trauma = Mathf.Max(0f, m_Trauma - dt * 1.6f);
             var shake = MovementMath.Shake(m_Trauma, Time.time, 6f);
-            head.localRotation = Quaternion.Euler(m_Pitch + shake.x, shake.y, (downed ? 25f : 0f) + shake.z);
+            head.localRotation = Quaternion.Euler(m_Pitch + shake.x, HeadYaw + shake.y, (downed ? 25f : 0f) + shake.z);
 
             // Field of view: a subtle widening while actually running fast.
             bool fast = IsSprinting && HorizontalSpeed > WalkSpeed + 0.5f;
