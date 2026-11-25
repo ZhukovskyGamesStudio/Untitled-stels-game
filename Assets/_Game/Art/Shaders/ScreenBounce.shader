@@ -9,6 +9,10 @@
 // level a room's own burning lamps leave in it, read from the plan's cells by where the surface is and which way it
 // faces — steady, the same from every side, and shut in by the room's walls (a cell's neighbour counts only where
 // nothing stands between them). Strength: StyleGrade.RoomFill (_RoomFillStrength).
+// Contact shadows (ContactShadows.cs) ride the same pass: from every pixel a short walk towards each of the nearest
+// ceiling lamps over the screen's depth; where something stands in the way close by — a box on a desk, too thin for the
+// lamp's shadow map — the pixel loses that lamp's share of its light. No noise: the same steps for every pixel.
+// Strength: StyleGrade.Contact (_ContactStrength).
 Shader "Stealth/ScreenBounce"
 {
     SubShader
@@ -93,6 +97,51 @@ Shader "Stealth/ScreenBounce"
                 return lerp(lerp(c, cx, t.x), lerp(cz, cd, t.x), t.y);
             }
 
+            #define CONTACT_LAMPS 8
+            #define CONTACT_STEPS 12
+            #define CONTACT_REACH 0.12
+            #define CONTACT_THICK 0.06
+            float4 _ContactLamps[CONTACT_LAMPS]; // where a lamp hangs (world), how bright it burns
+            int _ContactCount;
+            float _ContactStrength;
+
+            // the share of the lamps' light on this point that something close by stands in the way of
+            float ContactShade(float3 p, float3 n, float eye)
+            {
+                float lit = 1e-4, shaded = 0;
+                float3 from = p + n * (0.012 + 0.002 * eye);
+                float bias = 0.008 + 0.004 * eye;
+                for (int i = 0; i < _ContactCount && i < CONTACT_LAMPS; i++)
+                {
+                    float3 to = _ContactLamps[i].xyz - p;
+                    if (to.y < 0.05 || to.y > 3.4) continue; // a lamp of another storey
+                    float dist = length(to);
+                    float3 dir = to / dist;
+                    float facing = dot(n, dir);
+                    if (facing <= 0.05) continue;
+                    float weight = _ContactLamps[i].w * facing / (dist * dist + 1.0);
+                    lit += weight;
+                    // (a lamp that only skims the surface: its ray runs along it and hits the surface itself)
+                    if (facing <= 0.3) continue;
+                    float reach = min(CONTACT_REACH, dist * 0.8);
+                    float hit = 0;
+                    for (int k = 1; k <= CONTACT_STEPS; k++)
+                    {
+                        float t = (float)k / CONTACT_STEPS;
+                        float3 s = from + dir * (reach * t * t); // (denser near the surface: thin things)
+                        float4 clip = TransformWorldToHClip(s);
+                        if (clip.w <= 0.05) break;
+                        float2 at = ComputeNormalizedDeviceCoordinates(s, UNITY_MATRIX_VP);
+                        if (any(at < 0.001) || any(at > 0.999)) break;
+                        float behind = clip.w - LinearEyeDepth(SampleSceneDepth(at), _ZBufferParams);
+                        // (only what stands right there: a thing a hand's width in front of the ray is in front of it, not on it)
+                        if (behind > bias && behind < CONTACT_THICK) { float f = 1.0 - t; hit = f * f; break; } // (nearer things shade harder, at the reach nothing)
+                    }
+                    shaded += weight * hit;
+                }
+                return shaded / lit;
+            }
+
             #define TAPS 24
             #define GOLDEN 2.39996323
 
@@ -120,10 +169,17 @@ Shader "Stealth/ScreenBounce"
                 float3 colour = SAMPLE_TEXTURE2D_X_LOD(_BlitTexture, sampler_LinearClamp, uv, 0).rgb;
                 float depth = SampleSceneDepth(uv);
                 bool fills = _RoomFillStrength > 0.001 && _RoomFillGrid.z > 0.5;
-                if ((_BounceStrength <= 0.001 && !fills) || IsSky(depth)) return half4(colour, 1);
+                bool contact = _ContactStrength > 0.001 && _ContactCount > 0;
+                if ((_BounceStrength <= 0.001 && !fills && !contact) || IsSky(depth)) return half4(colour, 1);
 
                 float3 p = WorldAt(uv, depth);
                 float3 n = SampleSceneNormals(uv);
+                if (contact)
+                {
+                    // what glows of itself (a lamp's glass, a screen) is not lit by the lamps: nothing to take away
+                    float own = saturate((1.6 - dot(colour, float3(0.299, 0.587, 0.114))) * 2.5);
+                    colour *= 1.0 - _ContactStrength * own * ContactShade(p, n, LinearEyeDepth(depth, _ZBufferParams));
+                }
                 // what this surface makes of the light that falls on it: its own hue where it is lit, grey where one cannot tell
                 float luma = dot(colour, float3(0.299, 0.587, 0.114));
                 float3 hue = lerp(float3(1, 1, 1), colour / max(luma, 1e-4), saturate(luma * 12.0));

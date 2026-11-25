@@ -21,6 +21,10 @@ namespace Stealth.Player
         public static float MasterVolume { get; set; } = DefaultVolume;
         /// <summary>Music volume (0..1), on top of the master volume.</summary>
         public static float MusicVolume { get; set; } = DefaultMusicVolume;
+        /// <summary>How edges are smoothed (<see cref="SmoothingRules"/>).</summary>
+        public static Smoothing Smoothing { get; set; } = SmoothingRules.Default;
+        /// <summary>Frames wait for the screen's refresh: no tearing.</summary>
+        public static bool VSync { get; set; } = true;
 
         static bool s_Loaded;
 
@@ -41,6 +45,8 @@ namespace Stealth.Player
             CrouchToggle = PlayerPrefs.GetInt(Prefix + "crouchToggle", 0) == 1;
             MasterVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "volume", DefaultVolume));
             MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "music", DefaultMusicVolume));
+            Smoothing = SmoothingRules.Clamp(PlayerPrefs.GetInt(Prefix + "smoothing", (int)SmoothingRules.Default));
+            VSync = PlayerPrefs.GetInt(Prefix + "vsync", 1) == 1;
         }
 
         public static void Save()
@@ -52,6 +58,8 @@ namespace Stealth.Player
             PlayerPrefs.SetInt(Prefix + "crouchToggle", CrouchToggle ? 1 : 0);
             PlayerPrefs.SetFloat(Prefix + "volume", MasterVolume);
             PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
+            PlayerPrefs.SetInt(Prefix + "smoothing", (int)Smoothing);
+            PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
             Controls.Save();
             PlayerPrefs.Save();
         }
@@ -65,6 +73,8 @@ namespace Stealth.Player
             CrouchToggle = false;
             MasterVolume = DefaultVolume;
             MusicVolume = DefaultMusicVolume;
+            Smoothing = SmoothingRules.Default;
+            VSync = true;
         }
     }
 }

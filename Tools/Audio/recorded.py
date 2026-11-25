@@ -471,12 +471,21 @@ def alarm():
 
 # ---------------------------------------------------------------- the list: (group/name, recipe, peak)
 
-def ladder_rung(i):
-    """A hand and a boot on a steel rung: the bar's short ring (thinner than a grate's: higher), the glove's slap, the sole after it."""
-    bar = norm(pitch(src("metalsteps/metal_steps_%s" % ["03", "07", "14", "19"][i]), 1.22))
-    hand = norm(lp(src("rpg50/cloth%d" % (1 + i % 4)), 2600))
-    sole = norm(lp(src(KENNEY[[2, 5, 1, 6][i]]), 3200))
-    return step(mix((hand[:int(0.12 * SR)], 0, 0.35), (bar, 0.01, 0.8), (sole, 0.09, 0.45)), 0.36, 0.13)
+def ladder_foot(i):
+    """A boot set on a round steel rung: the sole's dull knock first, the bar ringing briefly under it, a little of the
+    rail it is welded to. (Played as the climber's foot comes to rest on the rung.)"""
+    sole = norm(lp(pitch(src(KENNEY[[2, 5, 1, 6][i]]), 0.9), 2400))
+    bar = norm(lp(hp(pitch(src("metalsteps/metal_steps_%s" % ["03", "07", "14", "19"][i]), 0.92), 180), 5200))
+    rail = norm(lp(src("metalwood/metal_sheet_0%d" % [2, 4, 1, 5][i]), 1400))
+    return step(mix((sole, 0, 0.9), (bar, 0.006, 0.6), (rail[:int(0.22 * SR)], 0.01, 0.14)), 0.34, 0.13)
+
+
+def ladder_hand(i):
+    """A hand closing on a rung: the palm's soft pat and the faintest tick of the bar; no ring: skin damps steel.
+    (Played as the climber's hand closes on the rung.)"""
+    pat = norm(lp(hp(src("rpg50/cloth%d" % (1 + i % 4)), 180), 1900))
+    tick = norm(lp(hp(pitch(src("metalsteps/metal_steps_%s" % ["11", "24", "09", "25"][i]), 1.35), 500), 3600))
+    return step(mix((pat[:int(0.11 * SR)], 0, 1.0), (tick[:int(0.05 * SR)], 0.012, 0.10)), 0.16, 0.07)
 
 
 def tone(freq, dur, attack=0.004):
@@ -536,8 +545,10 @@ CLIPS += [
     ("Items/safe_tick", safe_tick, 0.45), ("Items/clank", clank, 0.85), ("Items/latch", latch, 0.6), ("Items/terminal_key", terminal_key, 0.5),
     ("Items/pickup", pickup, 0.55), ("Items/drop", drop, 0.65), ("Items/stash", stash, 0.55),
     ("Items/heal", heal, 0.6), ("Items/bandage", bandage, 0.35), ("Items/drink", drink, 0.55), ("Items/craft", craft, 0.75), ("Items/stun_blast", stun_blast, 0.9),
-    ("Player/ladder_rung_0", lambda: ladder_rung(0), None), ("Player/ladder_rung_1", lambda: ladder_rung(1), None),
-    ("Player/ladder_rung_2", lambda: ladder_rung(2), None), ("Player/ladder_rung_3", lambda: ladder_rung(3), None),
+    ("Player/ladder_foot_0", lambda: ladder_foot(0), None), ("Player/ladder_foot_1", lambda: ladder_foot(1), None),
+    ("Player/ladder_foot_2", lambda: ladder_foot(2), None), ("Player/ladder_foot_3", lambda: ladder_foot(3), None),
+    ("Player/ladder_hand_0", lambda: ladder_hand(0), None), ("Player/ladder_hand_1", lambda: ladder_hand(1), None),
+    ("Player/ladder_hand_2", lambda: ladder_hand(2), None), ("Player/ladder_hand_3", lambda: ladder_hand(3), None),
     ("Items/terminal_granted", terminal_granted, 0.7), ("Items/terminal_hack_done", terminal_hack_done, 0.65),
     ("Items/console_solved", console_solved, 0.75), ("Items/vault_unlocked", vault_unlocked, 0.9),
     ("Robots/robot_hacked", robot_hacked, 0.8), ("Robots/guard_patrol", guard_patrol, 0.55), ("Robots/guard_chase", guard_chase, 0.65),

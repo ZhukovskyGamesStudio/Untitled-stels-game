@@ -92,6 +92,9 @@ namespace Stealth.UI
         public Slider Music;
         [Tooltip("Cycles the languages of the texts (Loc.All); its label names the current one.")]
         public Button Language;
+        [Tooltip("Cycles the ways edges are smoothed (SmoothingRules); its label names the current one.")]
+        public Button Smoothing;
+        public Toggle VSync;
         public Button Defaults;
         public Button Done;
 
@@ -185,6 +188,8 @@ namespace Stealth.UI
             Done.onClick.AddListener(CloseSettings);
             WireVoice();
             if (Language != null) Language.onClick.AddListener(NextLanguage);
+            if (Smoothing != null) Smoothing.onClick.AddListener(() => GameSettings.Smoothing = SmoothingRules.Next(GameSettings.Smoothing));
+            if (VSync != null) VSync.onValueChanged.AddListener(v => GameSettings.VSync = v);
         }
 
         /// <summary>The next language of <see cref="Loc.All"/> (saved at once; every label follows it).</summary>
@@ -293,6 +298,7 @@ namespace Stealth.UI
             InvertY.SetIsOnWithoutNotify(GameSettings.InvertY);
             HeadBob.SetIsOnWithoutNotify(GameSettings.HeadBob);
             CrouchToggle.SetIsOnWithoutNotify(GameSettings.CrouchToggle);
+            if (VSync != null) VSync.SetIsOnWithoutNotify(GameSettings.VSync);
             Volume.SetValueWithoutNotify(GameSettings.MasterVolume);
             Music.SetValueWithoutNotify(GameSettings.MusicVolume);
             if (MicSensitivity != null) MicSensitivity.SetValueWithoutNotify(VoicePrefs.Sensitivity);
@@ -353,6 +359,7 @@ namespace Stealth.UI
             VolumeLabel.text = Loc.F("menu.volume", GameSettings.MasterVolume * 100f);
             MusicLabel.text = Loc.F("menu.music", GameSettings.MusicVolume * 100f);
             UpdateVoiceLabels();
+            if (Smoothing != null) SetLabel(Smoothing, Loc.F("menu.smoothing", Loc.T(SmoothingRules.Key(GameSettings.Smoothing))));
             if (Language != null)
             {
                 var label = Language.GetComponentInChildren<Text>();

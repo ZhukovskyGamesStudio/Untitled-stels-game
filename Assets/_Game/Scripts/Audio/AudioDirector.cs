@@ -48,7 +48,7 @@ namespace Stealth.Audio
         float m_BannerMuteUntil;
         bool m_WasCursor;
 
-        class Walker { public Vector3 Pos; public float NextStep; public float Climb; public readonly AirState Air = new(); public bool Downed; public float NextGas; }
+        class Walker { public Vector3 Pos; public float NextStep; public float Climb; public bool Climbing; public readonly AirState Air = new(); public bool Downed; public float NextGas; }
         float m_NextHostage;
         int m_HostageSaid, m_HostageLast = -1;
         class Watched
@@ -289,13 +289,21 @@ namespace Stealth.Audio
                 // riding in the car (or on a ladder) the body moves without its feet: no steps, no jumps
                 if (p.Pose == Stealth.Player.BodyPose.Ladder)
                 {
-                    // on a ladder: a hand and a boot on every rung passed, softer on the way down
-                    // (the height climbed this frame: delta's own y is flattened above for the steps)
-                    for (int rungs = AudioRules.Rungs(ref w.Climb, vy * dt); rungs > 0; rungs--)
-                        Sfx.At(SoundBank.Any(Bank.LadderRung), pos + Vector3.up * 0.9f, volume * (vy < 0f ? 0.6f : 0.85f), Sfx.Group.Footsteps,
-                            0.94f + 0.12f * ((Time.frameCount + rungs) % 3) / 2f);
+                    // on a ladder: a boot on the rung as the climber's foot gets there, the soft pat of a hand as it
+                    // closes on its own — by the body's own take, not by the metres (softer on the way down)
+                    float phase = p.ClimbPhase;
+                    if (!w.Climbing) { w.Climb = phase; w.Climbing = true; }
+                    var (feet, hands) = Stealth.Player.HumanMath.ClimbContacts(w.Climb, phase);
+                    float way = phase < w.Climb ? m_Mix.LadderDown : 1f;
+                    w.Climb = phase;
+                    for (; feet > 0; feet--)
+                        Sfx.At(SoundBank.Any(Bank.LadderFoot), pos + Vector3.up * 0.25f, volume * m_Mix.LadderFeet * way, Sfx.Group.Footsteps,
+                            0.95f + 0.1f * ((Time.frameCount + feet) % 3) / 2f);
+                    for (; hands > 0; hands--)
+                        Sfx.At(SoundBank.Any(Bank.LadderHand), pos + Vector3.up * 1.7f, volume * m_Mix.LadderHands * way, Sfx.Group.Footsteps,
+                            0.95f + 0.1f * ((Time.frameCount + hands + 1) % 3) / 2f);
                 }
-                else w.Climb = 0f;
+                else w.Climbing = false;
                 if (p.SeatIndex >= 0 || p.Pose == Stealth.Player.BodyPose.Ladder) { w.NextStep = Time.time + 0.3f; continue; }
                 switch (w.Air.Step(vy, dt, Time.time))
                 {

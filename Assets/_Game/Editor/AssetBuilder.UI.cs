@@ -989,6 +989,8 @@ namespace Stealth.EditorTools
             menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", L("menu.crouch_toggle"));
             Spacer(sc, 10);
             menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
+            menu.Smoothing = ButtonIn(e, sc, "Smoothing", "", 30); // the label names the mode: set by GameMenu
+            menu.VSync = ToggleIn(e, sc, "VSync", L("menu.vsync"));
             Spacer(sc, 14);
             BuildVoiceSettings(e, menu, settings);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);

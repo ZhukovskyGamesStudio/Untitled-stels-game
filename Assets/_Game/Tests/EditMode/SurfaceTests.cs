@@ -176,7 +176,7 @@ namespace Stealth.Tests
             Assert.IsTrue((pass.requirements & UnityEngine.Rendering.Universal.ScriptableRenderPassInput.Normal) != 0 && (pass.requirements & UnityEngine.Rendering.Universal.ScriptableRenderPassInput.Depth) != 0);
             foreach (var style in Styles.Styles)
             {
-                if (style.name == "S16_Derelict") Assert.That(style.Grade.Bounce, Is.InRange(0.3f, 2f), "the default style bounces light");
+                if (style.name == "S16_Derelict") Assert.That(style.Grade.Bounce, Is.InRange(0f, 2f), "the default style may bounce light (off while the pass has no blur)");
                 else Assert.AreEqual(0f, style.Grade.Bounce, $"{style.name}: a drawn style has its own shading");
                 Assert.Greater(style.Grade.BounceReach, 1f);
                 // the steady half of it: a room's own lamps fill its shadows (RoomFill)

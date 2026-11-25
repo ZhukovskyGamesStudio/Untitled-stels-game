@@ -51,7 +51,7 @@ namespace Stealth.EditorTools
                 var file = Path.GetFileNameWithoutExtension(path);
                 bool pixel = path.StartsWith(PixelTextures);
                 var type = file == "normal" ? TextureImporterType.NormalMap : TextureImporterType.Default;
-                bool srgb = file != "mask" && file != "normal" && file != "relief";
+                bool srgb = file != "mask" && file != "normal" && file != "relief" && file != "height";
                 if (file == "relief" && imp.textureCompression != TextureImporterCompression.Uncompressed) // slopes of a degree or two: no blocks
                 {
                     imp.textureCompression = TextureImporterCompression.Uncompressed;
@@ -95,6 +95,36 @@ namespace Stealth.EditorTools
             m.SetFloat("_Metallic", 0f);
             if (mask != null) { m.EnableKeyword("_METALLICSPECGLOSSMAP"); m.EnableKeyword("_OCCLUSIONMAP"); }
             else { m.DisableKeyword("_METALLICSPECGLOSSMAP"); m.DisableKeyword("_OCCLUSIONMAP"); }
+            // depth where the surface has some (brick joints, panelling, plank gaps): the height worked out of the normal map
+            float depth = ParallaxOf(folder);
+            var height = depth > 0f ? Tex($"{folder}/height.png") : null;
+            m.SetTexture("_ParallaxMap", height);
+            m.SetFloat("_Parallax", height != null ? depth : 0.005f); // (a share of one repeat of the texture)
+            if (height != null) m.EnableKeyword("_PARALLAXMAP"); else m.DisableKeyword("_PARALLAXMAP");
+        }
+
+        static readonly Dictionary<string, Dictionary<string, float>> s_Heights = new();
+
+        /// <summary>
+        /// How deep a texture folder's relief is, as a share of one repeat (Tools/Art/generate_heights.py writes heights.csv
+        /// beside the folders and height.png in them); 0 — flat, no parallax.
+        /// </summary>
+        public static float ParallaxOf(string folder)
+        {
+            string set = Path.GetDirectoryName(folder)!.Replace('\\', '/');
+            if (!s_Heights.TryGetValue(set, out var table))
+            {
+                s_Heights[set] = table = new Dictionary<string, float>();
+                string csv = Path.Combine(Directory.GetCurrentDirectory(), set, "heights.csv");
+                if (File.Exists(csv))
+                    foreach (var line in File.ReadAllLines(csv).Skip(1))
+                    {
+                        var cells = line.Split(',');
+                        if (cells.Length == 2 && float.TryParse(cells[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+                            table[cells[0]] = v;
+                    }
+            }
+            return table.TryGetValue(Path.GetFileName(folder), out float depth) ? depth : 0f;
         }
 
         /// <summary>

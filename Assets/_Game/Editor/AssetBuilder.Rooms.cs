@@ -258,6 +258,7 @@ namespace Stealth.EditorTools
                     if (kind == PropKind.LowShelf) CubeThings(go);
                     if (kind == PropKind.BookCart) CartBooks(go);
                     if (kind == PropKind.HallHooks) HookGarments(go, "hall_hooks_bare");
+                    if (FurnitureLamps.TryGetValue(kind, out var lamp)) FurnitureLamp(go, lamp);
                     return go;
                 });
                 list.Add(new PropPrefab { Kind = kind, Prefab = prefab });
@@ -265,6 +266,47 @@ namespace Stealth.EditorTools
             if (art.RoomProps != null && art.RoomProps.Length == list.Count && art.RoomProps.Zip(list, (a, b) => a.Kind == b.Kind && a.Prefab == b.Prefab).All(x => x)) return;
             art.RoomProps = list.ToArray();
             EditorUtility.SetDirty(art);
+        }
+
+        /// <summary>A lamp that is part of a piece of furniture: its light (GlowLamp).</summary>
+        readonly struct LampLook
+        {
+            public readonly Color Colour;
+            public readonly float Intensity, Range, Angle, Lift;
+            public readonly bool Shadows;
+            public LampLook(Color colour, float intensity, float range, float angle, float lift, bool shadows)
+            { Colour = colour; Intensity = intensity; Range = range; Angle = angle; Lift = lift; Shadows = shadows; }
+        }
+
+        /// <summary>
+        /// Furniture with a lamp of its own, and the light it gives. A table lamp's light is shadowed (it stands by a wall:
+        /// without shadows its pool lay on the neighbour's floor too); a light strip's is a short shadowless spot.
+        /// </summary>
+        static readonly Dictionary<PropKind, LampLook> FurnitureLamps = new()
+        {
+            [PropKind.NightTable] = new LampLook(new Color(1f, 0.82f, 0.55f), 0.9f, 2.6f, 120f, 0.55f, true),
+            [PropKind.SideTable] = new LampLook(new Color(1f, 0.82f, 0.55f), 0.9f, 2.6f, 120f, 0.55f, true),
+            [PropKind.ReadingTable] = new LampLook(new Color(1f, 0.86f, 0.6f), 1f, 2.8f, 130f, 0.6f, true),
+            [PropKind.SleepPod] = new LampLook(new Color(0.85f, 0.92f, 1f), 0.5f, 1.6f, 130f, 0.3f, false),
+        };
+
+        /// <summary>Hangs a small light over the glowing parts (Eye*) of a piece of furniture: a pool under its lamp, seen by robots.</summary>
+        static void FurnitureLamp(GameObject go, LampLook look)
+        {
+            var bulbs = go.GetComponentsInChildren<Renderer>(true).Where(r => r.name.StartsWith("Eye")).ToArray();
+            if (bulbs.Length == 0) { Debug.LogWarning($"[Builder] {go.name}: nothing glows — no lamp"); return; }
+            var box = bulbs[0].bounds;
+            foreach (var b in bulbs) box.Encapsulate(b.bounds);
+            var lamp = Lamp(go.transform, "Light", GlowLamp.Above(box, look.Lift), Quaternion.Euler(90f, 0f, 0f), LightType.Spot, look.Colour, look.Intensity, look.Range,
+                look.Shadows ? LightShadows.Soft : LightShadows.None, UnityEngine.Rendering.Universal.UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow); // small: low maps (LightBudget.Cost)
+            lamp.spotAngle = look.Angle;
+            lamp.innerSpotAngle = look.Angle * 0.3f;
+            if (look.Shadows)
+                foreach (var b in bulbs) b.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // (the shade does not shadow the light that stands for its bulb)
+            var glow = go.AddComponent<GlowLamp>();
+            glow.Lamp = lamp;
+            glow.Bulbs = bulbs;
+            glow.Lift = look.Lift;
         }
 
         static bool HasModel(string file)

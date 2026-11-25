@@ -34,6 +34,8 @@ namespace Stealth.Level
         Color m_BaseColor, m_LitColor;
         float m_BaseIntensity, m_LitIntensity;
         int m_Room = -1;
+        /// <summary>The room it lights (its id in the plan; −1: none).</summary>
+        public int Room => m_Room;
         bool m_Dark;
         MaterialPropertyBlock m_Block, m_GlowBlock;
 

@@ -30,7 +30,9 @@ namespace Stealth.EditorTools
             RenderSettings.skybox = null;
             RenderSettings.fog = false;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.26f, 0.26f, 0.27f);
+            // DIM=0.1: the studio at a tenth of its light — what glows of itself (a lampshade) as in a dim room
+            if (!float.TryParse(System.Environment.GetEnvironmentVariable("DIM"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float dim)) dim = 1f;
+            RenderSettings.ambientLight = new Color(0.26f, 0.26f, 0.27f) * dim;
             RenderSettings.reflectionIntensity = 0f;
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.transform.localScale = Vector3.one * 4f;
@@ -40,7 +42,7 @@ namespace Stealth.EditorTools
             floor.GetComponent<Renderer>().sharedMaterial = paint;
             var key = new GameObject("Key").AddComponent<Light>();
             key.type = LightType.Directional;
-            key.intensity = 1.7f;
+            key.intensity = 1.7f * dim;
             key.color = new Color(1f, 0.96f, 0.9f);
             key.shadows = LightShadows.Soft;
             key.transform.rotation = Quaternion.Euler(48f, 205f, 0f);
@@ -89,6 +91,7 @@ namespace Stealth.EditorTools
                             var mf = r.GetComponent<MeshFilter>();
                             mf.sharedMesh = ScreenFaces.Of(mf.sharedMesh, picture);
                         }
+                foreach (var glow in go.GetComponentsInChildren<ShadeGlow>(true)) glow.Apply(); // (a lamp's shade by its bulb: no OnEnable here)
                 var bounds = new Bounds();
                 bool first = true;
                 foreach (var r in go.GetComponentsInChildren<Renderer>())

@@ -78,7 +78,8 @@ namespace Stealth.Audio
         [Tooltip("The robots' electronic lock: working at it (a relay, a probe on its board) and its bolt drawn once it is hacked.")]
         public AudioClip[] WorkUnit = new AudioClip[0];
         public AudioClip UnlockUnit;
-        [Tooltip("A hand and a boot on a ladder's rung (one of them per rung climbed)")] public AudioClip[] LadderRung = new AudioClip[0];
+        [Tooltip("On a ladder: a boot set on a steel rung; a hand closing on one (each as the climber's own foot or hand gets there)")]
+        public AudioClip[] LadderFoot = new AudioClip[0], LadderHand = new AudioClip[0];
         [Tooltip("The storage door's terminal lets go; a robot taken over from the hacking terminal; one vault console solved; the vault's bolts drawn after the last one")]
         public AudioClip TerminalGranted, TerminalHackDone, ConsoleSolved, VaultUnlocked;
         [Tooltip("A safe's dial going over a mark; a wrong try's clank; a number found; a key of a terminal or a lock panel.")]

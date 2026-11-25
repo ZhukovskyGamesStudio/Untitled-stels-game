@@ -153,7 +153,7 @@ namespace Stealth.EditorTools
         static AudioClip[] Takes(string path, int count) => Enumerable.Range(0, count).Select(i => Clip($"{path}_{i}")).ToArray();
 
         static bool RecordedClipsMissing(SoundBank b) =>
-            new[] { b.StepConcrete, b.StepTile, b.StepWood, b.StepSoft, b.StepCarpet, b.StepMetal, b.StepWet, b.GasCough, b.WorkHack, b.WorkPick, b.WorkScrew, b.WorkUnit, b.LadderRung }
+            new[] { b.StepConcrete, b.StepTile, b.StepWood, b.StepSoft, b.StepCarpet, b.StepMetal, b.StepWet, b.GasCough, b.WorkHack, b.WorkPick, b.WorkScrew, b.WorkUnit, b.LadderFoot, b.LadderHand }
                 .Any(a => a == null || a.Length == 0 || a.Any(c => c == null))
             || new[] { b.UnlockUnit, b.DoorHeavyOpen, b.DoorHeavyShut, b.DrawerOpen, b.DrawerClose, b.SteelDrawerOpen, b.SteelDrawerClose, b.CupboardOpen, b.CupboardClose,
                 b.SteelCupboardOpen, b.SteelCupboardClose, b.SwitchOn, b.SwitchOff, b.HatchOpen, b.GrilleOff, b.SafeTick, b.Clank, b.Latch, b.TerminalKey, b.Bandage, b.Drink,
@@ -176,7 +176,8 @@ namespace Stealth.EditorTools
             b.WorkScrew = Takes("Items/work_screw", 3);
             b.WorkUnit = Takes("Items/work_unit", 3);
             b.UnlockUnit = Clip("Items/unlock_unit");
-            b.LadderRung = Takes("Player/ladder_rung", 4);
+            b.LadderFoot = Takes("Player/ladder_foot", 4);
+            b.LadderHand = Takes("Player/ladder_hand", 4);
             b.TerminalGranted = Clip("Items/terminal_granted");
             b.TerminalHackDone = Clip("Items/terminal_hack_done");
             b.ConsoleSolved = Clip("Items/console_solved");

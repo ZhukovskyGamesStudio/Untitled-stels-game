@@ -16,6 +16,8 @@ namespace Stealth.Enemies
     {
         /// <summary>No eye to glow (blind: it feels its webs).</summary>
         public override bool GlowEyes => false;
+        /// <summary>Armed, tripped or hacked shows on its glowing parts (it neither sees nor hears: no light cast).</summary>
+        public override float StateLine => 1f;
 
         [Tooltip("Tuning (SpiderProfile) — a separate asset next to the prefab.")]
         public SpiderProfile Profile;

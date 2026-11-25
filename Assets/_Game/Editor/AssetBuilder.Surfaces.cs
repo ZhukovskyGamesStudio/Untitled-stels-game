@@ -110,7 +110,7 @@ namespace Stealth.EditorTools
             // paper, boards and signs
             ["Flipchart/Trim"] = ("paper", null), ["NoticeBoard/Body"] = ("cardboard", "8C6A42"), ["MapBoard/Body"] = ("cardboard", "8C6A42"),
             ["MapBoard/Trim"] = ("paper", null), ["Whiteboard/Body"] = ("gloss", "D8DAD8"), ["MobileWhiteboard/Trim"] = ("gloss", "D8DAD8"), ["ProjectorScreen/Trim"] = ("cloth", "DCDCD8"),
-            ["DirectoryBoard/Trim"] = ("paper", null), ["WallClock/Body"] = ("plastic", null), ["DartBoard/Accent"] = ("felt", null),
+            ["DirectoryBoard/Trim"] = ("gloss", null), ["WallClock/Body"] = ("plastic", null), ["DartBoard/Accent"] = ("felt", null),
             // glazed ware and enamel
             ["WashBasin/Body"] = ("ceramic", "DDDDD8"), ["Urinal/Body"] = ("ceramic", "DDDDD8"), ["HomeToilet/"] = ("ceramic", "DDDDD8"), ["Bathtub/"] = ("ceramic", "DDDDD8"),
             ["MirrorSink/Body"] = ("ceramic", "DDDDD8"), ["MirrorSink/BodyDoor"] = ("laminate", "D2D2CC"), ["ToiletStall/Accent"] = ("ceramic", "DDDDD8"), ["BathVanity/Body"] = ("laminate", "D2D2CC"),

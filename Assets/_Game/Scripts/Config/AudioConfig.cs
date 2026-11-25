@@ -34,6 +34,12 @@ namespace Stealth.Configs
         public float ThroughFloor = 0.12f;
         [Tooltip("Doors opening and shutting (robots work them all the time: not too loud).")]
         public float Doors = 0.35f;
+        [Tooltip("On a ladder: a boot on a rung, of a footstep's volume.")]
+        public float LadderFeet = 0.9f;
+        [Tooltip("On a ladder: a hand closing on a rung, of a footstep's volume (soft: skin on steel).")]
+        public float LadderHands = 0.5f;
+        [Tooltip("On the way down a ladder the feet and hands are this much quieter (the body lowers itself onto them).")]
+        public float LadderDown = 0.75f;
 
         [Header("Footsteps")]
         [Tooltip("Metres per step: the faster you go, the quicker the steps.")]

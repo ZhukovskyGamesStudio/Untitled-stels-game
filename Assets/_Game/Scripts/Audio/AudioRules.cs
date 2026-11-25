@@ -28,7 +28,7 @@ namespace Stealth.Audio
         public static MusicTrack ChooseMusic(bool inGame, float secondsSinceDanger, float chaseHold, bool levelMusic = true) =>
             !inGame ? MusicTrack.Menu : !levelMusic ? MusicTrack.None : secondsSinceDanger <= chaseHold ? MusicTrack.Chase : MusicTrack.Explore;
 
-        /// <summary>Rungs of a ladder are this far apart, metres: a hand and a boot sound on each.</summary>
+        /// <summary>Rungs of a ladder are this far apart, metres: robots hear a noise on each (people hear the climber's own feet and hands: HumanMath.ClimbContacts).</summary>
         public const float RungSpacing = 0.3f;
 
         /// <summary>

@@ -174,7 +174,13 @@ namespace Stealth.Player
         /// reviving a teammate, anything held with E).
         /// </summary>
         public BodyPose Pose { get; private set; }
-        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil, m_RungCarry;
+        float m_ClimbSpeed, m_LastPoseY, m_WorkingUntil, m_RungCarry, m_ClimbPhase;
+
+        /// <summary>
+        /// Where the body's climbing take is, cycles since it took the ladder (HumanRig.ClimbPhase; with no rigged body —
+        /// the same count from the climbing speed): the feet and hands on the rungs sound by it (AudioDirector).
+        /// </summary>
+        public float ClimbPhase => m_Rig != null ? m_Rig.ClimbPhase : m_ClimbPhase;
         Vector4 m_HoldWas;
 
         void UpdateBodyPose()
@@ -184,8 +190,9 @@ namespace Stealth.Player
             float climb = dt > 0f ? Mathf.Clamp((y - m_LastPoseY) / dt, -4f, 4f) : 0f;
             m_LastPoseY = y;
             m_ClimbSpeed = Pose == BodyPose.Ladder ? Mathf.Lerp(m_ClimbSpeed, climb, 1f - Mathf.Exp(-12f * dt)) : 0f;
+            m_ClimbPhase = Pose == BodyPose.Ladder ? m_ClimbPhase + HumanMath.ClimbCycles(HumanMath.ClimbRate(m_ClimbSpeed), dt) : 0f;
             if (!IsOwner) return;
-            // a rung of a ladder is heard by the robots (the same rungs the others hear: AudioDirector)
+            // a rung of a ladder is heard by the robots (people hear each foot and hand on it: AudioDirector)
             if (Pose != BodyPose.Ladder) m_RungCarry = 0f;
             else if (Audio.AudioRules.Rungs(ref m_RungCarry, climb * dt) > 0 && IsSpawned && Tuning.Player.Noise.LadderRadius > 0f) EmitNoise(Tuning.Player.Noise.LadderRadius);
             var hold = new Vector4(HackTarget != null ? HackProgress : 0f, DoorTarget != null ? DoorProgress : 0f,

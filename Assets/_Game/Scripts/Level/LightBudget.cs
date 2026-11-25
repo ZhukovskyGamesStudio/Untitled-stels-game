@@ -57,6 +57,7 @@ namespace Stealth.Level
 
         static readonly List<float> s_Costs = new();
         RoomFillField m_Fill;
+        readonly RoomProbeField m_Probes = new();
 
         void OnDestroy() => m_Fill?.Dispose();
         bool[] m_On = new bool[0];
@@ -79,6 +80,8 @@ namespace Stealth.Level
             var cam = PlayerController.Local != null && PlayerController.Local.Camera != null ? PlayerController.Local.Camera : Camera.main;
             if (cam == null) return;
             var eye = cam.transform.position;
+            ContactShadows.Tick(eye); // (the lamps the picture's contact shadows walk towards)
+            m_Probes.Tick(Time.time, eye); // (the rooms' reflections: one picture at a time, near the camera)
             m_Order.Clear();
             for (int i = 0; i < m_Lights.Count; i++)
                 if (m_Lights[i].Light != null) m_Order.Add(((m_Lights[i].Light.transform.position - eye).sqrMagnitude, i));

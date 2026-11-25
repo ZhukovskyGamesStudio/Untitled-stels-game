@@ -135,6 +135,18 @@ namespace Stealth.EditorTools
             Mat(env, "ExitSign", new Color(0.1f, 0.75f, 0.3f), new Color(0.15f, 2.2f, 0.55f));
             Mat(env, "ExitSignMark", new Color(0.95f, 1f, 0.95f), new Color(1.3f, 1.4f, 1.3f));
             Mat(props, "LampShade", new Color(0.9f, 0.84f, 0.7f), new Color(0.39f, 0.32f, 0.18f), smoothness: 0.1f); // decor glows dimly (LightLeakTests.DimDecor)
+            // lit from inside: the glow falls off from the bulb (Art/Shaders/Shade.shader, ShadeGlow on the lamps)
+            var shadeShader = Shader.Find("Stealth/Shade");
+            if (shadeShader != null && (s_Mats["LampShade"].shader != shadeShader || s_Mats["LampShade"].GetFloat("_InnerPeak") != 3.4f))
+            {
+                var shade = s_Mats["LampShade"];
+                shade.shader = shadeShader;
+                // the cloth itself is darker than its glow: lit by the room alone it must not look as bright as by its bulb
+                shade.SetColor("_BaseColor", new Color(0.55f, 0.5f, 0.4f));
+                shade.SetFloat("_InnerPeak", 3.4f);
+                shade.SetFloat("_InnerFloor", 0.12f);
+                EditorUtility.SetDirty(shade);
+            }
             Mat(props, "LampBulb", new Color(1f, 0.9f, 0.7f), new Color(0.9f, 0.75f, 0.48f));
 
             Mat(props, "PingPong", new Color(0.08f, 0.35f, 0.25f), smoothness: 0.4f);

@@ -23,6 +23,13 @@ namespace Stealth.EditorTools
         [MenuItem("Stealth/Surface Room Pictures")]
         public static void Render()
         {
+            var steps = Steps();
+            while (steps.MoveNext()) { }
+        }
+
+        /// <summary>The work in steps: a reflection probe is taken up by the engine only on its next tick (the batch run waits one, the menu does not).</summary>
+        static System.Collections.IEnumerator Steps()
+        {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var config = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles;
             var style = config.Default;
@@ -55,6 +62,14 @@ namespace Stealth.EditorTools
                 g.GetComponent<Renderer>().sharedMaterial = m;
             }
             // the walls and the ceiling of an office: quads with UVs in metres, as the game's finishes have them
+            static Material Kit(string kit)
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Data/Styles/Kit/{kit}.mat");
+                if (System.Environment.GetEnvironmentVariable("PARALLAX") != "0") return m;
+                m = new Material(m);
+                m.DisableKeyword("_PARALLAXMAP");
+                return m;
+            }
             var faces = new List<(MeshRenderer r, string kit, Color flat)>();
             void Face(Vector3 at, Vector3 normal, float fw, float fh, string kit, Color flat)
             {
@@ -67,10 +82,12 @@ namespace Stealth.EditorTools
                 faces.Add((g.GetComponent<MeshRenderer>(), kit, flat));
             }
             var beige = new Color(0.62f, 0.55f, 0.47f);
-            Face(new Vector3(0f, 1.375f, -2.94f), Vector3.forward, 7f, 2.75f, "Real_BeigeWall", beige);
-            Face(new Vector3(0f, 1.375f, 2.94f), Vector3.back, 7f, 2.75f, "Real_BeigeWall", beige);
-            Face(new Vector3(-3.44f, 1.375f, 0f), Vector3.right, 6f, 2.75f, "Real_BeigeWall", beige);
-            Face(new Vector3(3.44f, 1.375f, 0f), Vector3.left, 6f, 2.75f, "Real_BeigeWall", beige);
+            // WALL=Real_Brick: the walls in another finish; PARALLAX=0: its relief without depth, to set the two side by side
+            string wallKit = System.Environment.GetEnvironmentVariable("WALL") ?? "Real_BeigeWall";
+            Face(new Vector3(0f, 1.375f, -2.94f), Vector3.forward, 7f, 2.75f, wallKit, beige);
+            Face(new Vector3(0f, 1.375f, 2.94f), Vector3.back, 7f, 2.75f, wallKit, beige);
+            Face(new Vector3(-3.44f, 1.375f, 0f), Vector3.right, 6f, 2.75f, wallKit, beige);
+            Face(new Vector3(3.44f, 1.375f, 0f), Vector3.left, 6f, 2.75f, wallKit, beige);
             Face(new Vector3(0f, 2.75f, 0f), Vector3.down, 7f, 6f, "Real_CeilingTiles", new Color(0.48f, 0.43f, 0.4f));
             var wall = Lit(new Color(0.55f, 0.53f, 0.49f), 0.15f);
             Box(new Vector3(0f, -0.05f, 0f), new Vector3(7f, 0.1f, 6f), AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Data/Styles/Kit/Real_Laminate.mat"));
@@ -80,16 +97,18 @@ namespace Stealth.EditorTools
             Box(new Vector3(-3.5f, 1.5f, 0f), new Vector3(0.1f, 3f, 6f), wall);
             Box(new Vector3(3.5f, 1.5f, 0f), new Vector3(0.1f, 3f, 6f), wall);
             var warm = new Color(1f, 0.95f, 0.88f);
+            // LAMPS=0.15: the room dim (a dim room of the game: what is left when the lamps are not what one sees by)
+            float dim = float.TryParse(System.Environment.GetEnvironmentVariable("LAMPS"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lampScale) ? lampScale : 1f;
             foreach (float x in new[] { -1.6f, 1.6f })
                 foreach (float z in new[] { -1.2f, 1.4f })
                 {
-                    Box(new Vector3(x, 2.73f, z), new Vector3(1.2f, 0.04f, 0.3f), Lit(Color.white, 0.1f, warm * 2.5f));
+                    Box(new Vector3(x, 2.73f, z), new Vector3(1.2f, 0.04f, 0.3f), Lit(Color.white, 0.1f, warm * (2.5f * dim)));
                     var l = new GameObject("Lamp").AddComponent<Light>();
                     l.type = LightType.Spot;
                     l.spotAngle = 160f;
                     l.innerSpotAngle = 60f;
                     l.range = 9f;
-                    l.intensity = 8f;
+                    l.intensity = 8f * dim;
                     l.color = warm;
                     l.shadows = LightShadows.Soft;
                     l.transform.SetPositionAndRotation(new Vector3(x, 2.65f, z), Quaternion.Euler(90f, 0f, 0f));
@@ -105,12 +124,15 @@ namespace Stealth.EditorTools
             VisualStyles.Bounce(float.TryParse(System.Environment.GetEnvironmentVariable("BOUNCE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bounce) ? bounce : style.Grade.Bounce, style.Grade.BounceReach);
             // the room's fill, as a house would give it: one room of the plan under these four lamps (FILL=0: without)
             RoomFillField.Strength = float.TryParse(System.Environment.GetEnvironmentVariable("FILL"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float fill) ? fill : style.Grade.RoomFill;
+            // CONTACT=0: without the contact shadows, to set the two side by side
+            ContactShadows.Strength = float.TryParse(System.Environment.GetEnvironmentVariable("CONTACT"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float contact) ? contact : style.Grade.Contact;
+            ContactShadows.Show(Object.FindObjectsByType<Light>().Where(l => l.name == "Lamp").Select(l => (l.transform.position, 1f)).ToList(), Vector3.zero);
             var plan = new HousePlan(1, 14, 12);
             for (int cz = 0; cz < 12; cz++) for (int cx = 0; cx < 14; cx++) plan.Set(0, cx, cz, CellKind.Room, 0);
             plan.Rooms.Add(new PlanRoom { Id = 0, Area = 42f });
             bool lampsOff = System.Environment.GetEnvironmentVariable("DARK") == "1";
             // (a room this size has two ceiling lamps in the game)
-            using var field = RoomFillField.Show(plan, new[] { RoomFill.Level(lampsOff ? Color.black : warm.linear * (2f * LightMath.RoomIntensity), 42f, 1f) }, new Vector2(-3.5f, -3f));
+            using var field = RoomFillField.Show(plan, new[] { RoomFill.Level(lampsOff ? Color.black : warm.linear * (2f * LightMath.RoomIntensity * dim), 42f, 1f) }, new Vector2(-3.5f, -3f));
             var volume = new GameObject("Volume").AddComponent<Volume>();
             volume.isGlobal = true;
             volume.sharedProfile = profile;
@@ -145,12 +167,77 @@ namespace Stealth.EditorTools
                 tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
                 RenderTexture.active = null;
                 Debug.Log($"[Surfaces] dark room: brightest pixel {tex.GetPixels().Max(c => c.maxColorComponent):0.000}");
-                return;
+                yield break;
             }
 
+            if (System.Environment.GetEnvironmentVariable("DEVICES") == "1") // the devices with no eye and no ear: armed, tripped, hacked — side by side
+            {
+                foreach (var (r, kit, _) in faces) r.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Data/Styles/Kit/{kit}.mat");
+                var idleOf = typeof(Enemies.SecurityDevice).GetProperty("IdleColor", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                foreach (var (name, path, y, flip) in new[]
+                {
+                    ("plate", "Sensors/SensorPlate", 0f, false), ("lidar", "Sensors/SensorLidar", 0f, false),
+                    ("vacuum", "Robots/RobotVacuum", 1.6f, false), ("spider", "Robots/RobotSpider", 0f, false),
+                })
+                {
+                    var made = new List<GameObject>();
+                    for (int state = 0; state < 3; state++)
+                    {
+                        var go = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/{path}.prefab"));
+                        SurfaceSheet.Dress(go, config, style, null, true);
+                        go.transform.position = new Vector3(-1.6f + state * 1.6f, y, -0.6f);
+                        var d = go.GetComponent<Enemies.Detector>();
+                        var idle = (Color)idleOf.GetValue(d);
+                        var colour = state == 0 ? idle : state == 1 ? Enemies.SecurityPalette.Alarm : Enemies.SecurityPalette.Hacked;
+                        d.Status.Apply(colour, state == 0, d.GlowEyes, d.GlowEars);
+                        if (!d.GlowEyes && !d.GlowEars && d.StateLine > 0f) d.Status.Line(colour, state == 2 ? 0f : d.StateLine);
+                        foreach (var l in go.GetComponentsInChildren<LineRenderer>(true)) l.enabled = false;
+                        made.Add(go);
+                    }
+                    foreach (var (view, at, look) in new[]
+                    {
+                        ("far", new Vector3(0f, 1.6f, 2.7f), new Vector3(0f, y + 0.2f, -0.6f)),
+                        ("near", new Vector3(-1.6f, y + 1.1f, 0.7f), new Vector3(-0.8f, y + 0.1f, -0.6f)),
+                    })
+                    {
+                        cam.transform.position = at;
+                        cam.transform.LookAt(look);
+                        cam.fieldOfView = 50f;
+                        for (int i = 0; i < 4; i++) cam.Render();
+                        RenderTexture.active = rt;
+                        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                        tex.Apply();
+                        RenderTexture.active = null;
+                        File.WriteAllBytes(Path.Combine(dir, $"device_{name}_{view}{(string.IsNullOrEmpty(tag) ? "" : "_" + tag)}.png"), tex.EncodeToPNG());
+                    }
+                    foreach (var go in made) Object.DestroyImmediate(go);
+                }
+                Debug.Log("[Surfaces] the devices' pictures in Logs/surfaces");
+                yield break;
+            }
+
+            // PROBE=1: the room's own reflections, as a house gives them (RoomProbe) — a cube picture of the room from
+            // its middle, box-projected onto its walls
+            ReflectionProbe roomProbe = null;
+            if (System.Environment.GetEnvironmentVariable("PROBE") == "1")
+            {
+                QualitySettings.realtimeReflectionProbes = true;
+                var pgo = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Level/RoomProbe.prefab"));
+                roomProbe = pgo.GetComponent<ReflectionProbe>();
+                pgo.transform.position = new Vector3(0f, 1.5f, 0f);
+                roomProbe.center = Vector3.zero;
+                roomProbe.size = new Vector3(7f, 3f, 6f);
+                yield return null;
+            }
+
+            // VIEWS=cooler,cabinet: only these frames; HOUSE=office: only this house, dressed
+            string[] only = System.Environment.GetEnvironmentVariable("VIEWS")?.Split(',');
+            string onlyHouse = System.Environment.GetEnvironmentVariable("HOUSE");
+            bool split = System.Environment.GetEnvironmentVariable("SPLIT") == "1";
             foreach (var (house, kind) in new[] { ("office", HouseKind.Office), ("facility", HouseKind.Abandoned) })
                 foreach (bool after in new[] { false, true })
                 {
+                    if (onlyHouse != null && (house != onlyHouse || !after)) continue;
                     var made = new List<GameObject>();
                     void Put(string p, float x, float z, float yaw)
                     {
@@ -180,7 +267,7 @@ namespace Stealth.EditorTools
                     Put("SynthStand", -0.4f, 2.3f, 180f);
                     Put("NoticeBoard", 0.3f, -2.91f, 0f);
                     foreach (var (r, kit, flat) in faces) // (before: the old paint was one flat colour, like this)
-                        r.sharedMaterial = after ? AssetDatabase.LoadAssetAtPath<Material>($"Assets/_Game/Data/Styles/Kit/{kit}.mat") : Lit(flat, 0.35f);
+                        r.sharedMaterial = after ? Kit(kit) : Lit(flat, 0.35f);
                     var visuals = AssetDatabase.LoadAssetAtPath<ItemVisuals>("Assets/_Game/Data/ItemVisuals.asset");
                     void Item(int shape, float x, float y, float z, float yaw)
                     {
@@ -194,6 +281,13 @@ namespace Stealth.EditorTools
                     Item(ItemCatalog.Radio + 3, -0.75f, 0.77f, -0.85f, -20f);
                     Item(ItemCatalog.Flashlight, -0.35f, 0.77f, -0.75f, 40f);
                     Item(ItemCatalog.Cans, -0.4f, 0.77f, -1f, 10f);
+                    if (roomProbe != null)
+                    {
+                        int id = roomProbe.RenderProbe();
+                        for (int t = 0; t < 200 && !roomProbe.IsFinishedRendering(id); t++) yield return null;
+                        Debug.Log($"[Surfaces] probe rendered: {roomProbe.IsFinishedRendering(id)}, texture {roomProbe.texture}");
+                        yield return null;
+                    }
                     foreach (var (view, at, look, fov) in new[]
                     {
                         ("room", new Vector3(1.4f, 1.6f, 2.5f), new Vector3(-0.1f, 0.8f, -1.6f), 60f),
@@ -205,8 +299,11 @@ namespace Stealth.EditorTools
                         ("board", new Vector3(0.5f, 1.6f, -1.6f), new Vector3(0.3f, 1.5f, -2.9f), 55f),
                         ("stand", new Vector3(0.3f, 1.5f, 1.2f), new Vector3(-0.4f, 0.75f, 2.4f), 50f),
                         ("flash", new Vector3(1.2f, 1.6f, 0.9f), new Vector3(2.2f, 0.9f, 2.6f), 60f),
+                        ("cooler", new Vector3(1.05f, 1.25f, 1.8f), new Vector3(1.4f, 1.0f, 2.6f), 40f),
+                        ("cabinet", new Vector3(-1.45f, 1.3f, -1.5f), new Vector3(-1.9f, 0.7f, -2.4f), 50f),
                     })
                     {
+                        if (only != null && !only.Contains(view)) continue;
                         cam.transform.position = at;
                         cam.transform.LookAt(look);
                         cam.fieldOfView = fov;
@@ -233,25 +330,95 @@ namespace Stealth.EditorTools
                             so.ApplyModifiedPropertiesWithoutUndo();
                             beam.transform.SetPositionAndRotation(cam.transform.TransformPoint(0.15f, -0.19f, 0.48f), cam.transform.rotation);
                         }
-                        for (int i = 0; i < 4; i++) cam.Render();
+                        // SPLIT=1: the same frame with and without the room's reflections and the contact shadows, to tell whose a flaw is
+                        float contactWas = ContactShadows.Strength, probeWas = roomProbe != null ? roomProbe.intensity : 0f;
+                        foreach (var (part, probes, contacts) in split
+                            ? new[] { ("", true, true), ("_noprobe", false, true), ("_nocontact", true, false), ("_neither", false, false) }
+                            : new[] { ("", true, true) })
+                        {
+                            if (roomProbe != null)
+                            {
+                                roomProbe.intensity = probes ? probeWas : 0f;
+                                yield return null; // (the engine takes a probe's change up on its next tick)
+                            }
+                            ContactShadows.Strength = contacts ? contactWas : 0f;
+                            // AA=none|smaa|taa, FXAA=0, BACK=metres (the same view from further away), FRAMES=n (frames before the
+                            // picture: the temporal filter needs its history), STEP=metres (the camera walks sideways this much a
+                            // frame), PAIR=1 (the frame before the last one too: what changes between two frames)
+                            string aa = System.Environment.GetEnvironmentVariable("AA") ?? "none";
+                            var camData = cam.GetUniversalAdditionalCameraData();
+                            camData.antialiasing = aa == "taa" ? AntialiasingMode.TemporalAntiAliasing : aa == "smaa" ? AntialiasingMode.SubpixelMorphologicalAntiAliasing : AntialiasingMode.None;
+                            camData.antialiasingQuality = AntialiasingQuality.High;
+                            if (aa == "taa")
+                            {
+                                var tuning = new Stealth.Player.SmoothingSettings();
+                                camData.taaSettings.quality = (TemporalAAQuality)tuning.Quality;
+                                camData.taaSettings.baseBlendFactor = tuning.History;
+                                camData.taaSettings.varianceClampScale = tuning.Clamp;
+                                camData.taaSettings.contrastAdaptiveSharpening = Env("SHARPEN", tuning.Sharpen);
+                            }
+                            Shader.SetGlobalFloat("_FxaaOff", System.Environment.GetEnvironmentVariable("FXAA") == "0" ? 1f : 0f);
+                            cam.transform.position -= cam.transform.forward * Env("BACK", 0f);
+                            int frames = (int)Env("FRAMES", 4f);
+                            float step = Env("STEP", 0f);
+                            bool pair = System.Environment.GetEnvironmentVariable("PAIR") == "1";
+                            var taaField = typeof(UniversalAdditionalCameraData).GetField("m_TaaSettings", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                            int stalled = 0, counterWas = Time.frameCount;
+                            for (int i = 0; i < frames; i++)
+                            {
+                                if (aa == "taa" || step != 0f)
+                                {
+                                    // (the filter steps its shake and its "frame before" by the engine's frame counter, which stands
+                                    // still between the editor's ticks: a player-loop update is asked for, and where the counter still
+                                    // did not move, the shake is stepped by hand)
+                                    int counter = Time.frameCount;
+                                    EditorApplication.QueuePlayerLoopUpdate();
+                                    yield return null;
+                                    if (Time.frameCount == counter) stalled++;
+                                    object boxed = taaField.GetValue(camData);
+                                    boxed.GetType().GetField("jitterFrameCountOffset", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(boxed, stalled);
+                                    taaField.SetValue(camData, boxed);
+                                }
+                                if (i > 0) cam.transform.position += cam.transform.right * step;
+                                cam.Render();
+                                if (pair && i == frames - 2)
+                                {
+                                    RenderTexture.active = rt;
+                                    tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                                    tex.Apply();
+                                    RenderTexture.active = null;
+                                    File.WriteAllBytes(Path.Combine(dir, $"room_{house}_{view}_{(after ? "after" : "before")}{part}{(string.IsNullOrEmpty(tag) ? "" : "_" + tag)}_prev.png"), tex.EncodeToPNG());
+                                }
+                            }
+                            if (frames > 4) Debug.Log($"[Surfaces] {view} {aa}: the frame counter moved {Time.frameCount - counterWas} times in {frames} frames");
+                            RenderTexture.active = rt;
+                            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+                            tex.Apply();
+                            RenderTexture.active = null;
+                            File.WriteAllBytes(Path.Combine(dir, $"room_{house}_{view}_{(after ? "after" : "before")}{part}{(string.IsNullOrEmpty(tag) ? "" : "_" + tag)}.png"), tex.EncodeToPNG());
+                        }
+                        if (roomProbe != null) roomProbe.intensity = probeWas;
+                        ContactShadows.Strength = contactWas;
                         if (beam != null) Object.DestroyImmediate(beam.gameObject);
                         foreach (var l in lamps) l.enabled = true;
-                        RenderTexture.active = rt;
-                        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-                        tex.Apply();
-                        RenderTexture.active = null;
-                        File.WriteAllBytes(Path.Combine(dir, $"room_{house}_{view}_{(after ? "after" : "before")}{(string.IsNullOrEmpty(tag) ? "" : "_" + tag)}.png"), tex.EncodeToPNG());
                     }
                     foreach (var go in made) Object.DestroyImmediate(go);
                 }
             Debug.Log("[Surfaces] the room's pictures in Logs/surfaces");
         }
 
+        static float Env(string name, float fallback) =>
+            float.TryParse(System.Environment.GetEnvironmentVariable(name), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : fallback;
+
         /// <summary>For the command line (with graphics).</summary>
         public static void Batch()
         {
-            try { Render(); EditorApplication.Exit(0); }
-            catch (System.Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+            var steps = Steps(); // (run without -quit: it leaves by itself)
+            EditorApplication.update += () =>
+            {
+                try { if (!steps.MoveNext()) EditorApplication.Exit(0); }
+                catch (System.Exception e) { Debug.LogException(e); EditorApplication.Exit(1); }
+            };
         }
     }
 }

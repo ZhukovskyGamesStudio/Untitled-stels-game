@@ -187,6 +187,7 @@ namespace Stealth.EditorTools
                     LightShadows.Soft, UniversalAdditionalLightData.AdditionalLightsShadowResolutionTierLow); // small: low maps (LightBudget.Cost)
                 lamp.spotAngle = 96f;
                 lamp.innerSpotAngle = 24f;
+                LitFromInside(go);
                 return go;
             });
             var pFloorLamp = Prefab(p + "FloorLamp.prefab", () =>
@@ -196,6 +197,7 @@ namespace Stealth.EditorTools
                     LightShadows.Soft);
                 lamp.spotAngle = 160f;
                 lamp.innerSpotAngle = 90f;
+                LitFromInside(go);
                 return go;
             });
 
@@ -262,6 +264,7 @@ namespace Stealth.EditorTools
                 art.VendingMachine = pVendingMachine;
             });
             // fields newer than the asset: filled without overwriting the rest
+            Link(levelArt, ref levelArt.RoomProbe, Prefab($"{LevelPrefabs}/RoomProbe.prefab", BuildRoomProbe));
             Link(levelArt, ref levelArt.BreachFrame, breach);
             Link(levelArt, ref levelArt.HoleFrame, hole);
             Link(levelArt, ref levelArt.InnerWindowFrame, innerWindow);
@@ -1218,6 +1221,38 @@ namespace Stealth.EditorTools
                 EditorUtility.SetDirty(m);
             }
             return m;
+        }
+
+        /// <summary>A lamp's shade (its Accent parts) glows by its bulb (the Eye parts): ShadeGlow.</summary>
+        static void LitFromInside(GameObject lamp)
+        {
+            var glow = lamp.AddComponent<ShadeGlow>();
+            var all = lamp.GetComponentsInChildren<Renderer>();
+            glow.Shades = all.Where(r => r.name.StartsWith("Accent")).ToArray();
+            glow.Bulbs = all.Where(r => r.name.StartsWith("Eye")).ToArray();
+        }
+
+        /// <summary>A room's reflection probe (RoomProbes): the engine takes its cube picture when asked, a face a frame.</summary>
+        static GameObject BuildRoomProbe()
+        {
+            var root = new GameObject("RoomProbe");
+            var probe = root.AddComponent<ReflectionProbe>();
+            probe.mode = UnityEngine.Rendering.ReflectionProbeMode.Realtime;
+            probe.refreshMode = UnityEngine.Rendering.ReflectionProbeRefreshMode.ViaScripting;
+            probe.timeSlicingMode = UnityEngine.Rendering.ReflectionProbeTimeSlicingMode.IndividualFaces;
+            probe.boxProjection = true;
+            probe.blendDistance = 0f;
+            probe.resolution = 128;
+            probe.hdr = true;
+            probe.clearFlags = UnityEngine.Rendering.ReflectionProbeClearFlags.SolidColor;
+            probe.backgroundColor = Color.black;
+            probe.nearClipPlane = 0.05f;
+            probe.farClipPlane = 30f;
+            probe.shadowDistance = 30f;
+            // not the player's own body, the X-ray silhouettes and world-space text
+            probe.cullingMask = ~LayerMask.GetMask("OwnBody", "Marked", "MarkedThing", "WorldText", "UI", "TransparentFX");
+            root.AddComponent<RoomProbe>().Probe = probe;
+            return root;
         }
 
         static GameObject BuildRoomLight()

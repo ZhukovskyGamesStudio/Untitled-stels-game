@@ -15,7 +15,7 @@ namespace Stealth.Enemies
         public PressurePlateProfile Profile;
         protected override DeviceProfile Device => Profile;
 
-        protected override Color IdleColor => new(0.35f, 0.5f, 0.55f);
+        protected override Color IdleColor => new(0.62f, 0.3f, 1f); // violet: no other state wears it (the old grey-blue read as white steel)
 
         /// <summary>Feet on the plate (horizontal overlap with the player's capsule, standing on its surface).</summary>
         public static bool Steps(Vector3 plate, float halfSize, Vector3 feet, float radius = 0.3f) =>

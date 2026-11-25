@@ -20,6 +20,7 @@ Shader "Stealth/ScreenFxaa"
             #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
 
             float _StyOn;
+            float _FxaaOff;    // the player chose a smoothing without this pass (ScreenSmoothing)
             float4 _StyPixel;  // x block size in pixels at 720p
             float4 _StyDither; // x 1-bit on
 
@@ -33,7 +34,7 @@ Shader "Stealth/ScreenFxaa"
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 float2 uv = input.texcoord;
                 float3 rgbM = Tap(uv);
-                if (_StyOn > 0.5 && (_StyPixel.x > 1.01 || _StyDither.x > 0)) return half4(rgbM, 1);
+                if (_FxaaOff > 0.5 || (_StyOn > 0.5 && (_StyPixel.x > 1.01 || _StyDither.x > 0))) return half4(rgbM, 1);
 
                 float2 px = _BlitTexture_TexelSize.xy;
                 float lM = LumaOf(rgbM);

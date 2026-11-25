@@ -92,6 +92,13 @@ namespace Stealth.Tests
             Assert.IsFalse(plate.GlowEyes, "it does not see");
             Assert.That(plate.StateLine, Is.InRange(1f, 2f), "its line really glows: armed and dead must not look alike");
             Assert.IsNotEmpty(plate.Status.Renderers, "nothing to show its state on");
+            foreach (var path in new[] { "Sensors/SensorLidar", "Robots/RobotVacuum", "Robots/RobotSpider" }) // the others with no eye and no ear
+            {
+                var d = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/{path}.prefab").GetComponent<Detector>();
+                Assert.IsFalse(d.GlowEyes || d.GlowEars, path);
+                Assert.That(d.StateLine, Is.InRange(0.8f, 2f), $"{path}: armed and hacked must not look alike");
+                Assert.IsNotEmpty(d.Status.Renderers, $"{path}: nothing to show its state on");
+            }
         }
 
         [Test]
@@ -139,6 +146,36 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void FeetAndHandsOnALadderSoundAsTheClimbersOwnGetThere()
+        {
+            // one cycle of the take: each foot once, each hand once, a foot first and the opposite hand right after it
+            Assert.AreEqual((2, 2), Stealth.Player.HumanMath.ClimbContacts(0f, 1f));
+            Assert.AreEqual((1, 0), Stealth.Player.HumanMath.ClimbContacts(0.2f, 0.28f), "the foot is on its rung…");
+            Assert.AreEqual((0, 1), Stealth.Player.HumanMath.ClimbContacts(0.28f, 0.35f), "…then the hand closes");
+            Assert.AreEqual((1, 1), Stealth.Player.HumanMath.ClimbContacts(0.7f, 0.85f), "the other pair, half a cycle on");
+            Assert.AreEqual((0, 0), Stealth.Player.HumanMath.ClimbContacts(0.4f, 0.6f), "between the steps: silence");
+            Assert.AreEqual((0, 0), Stealth.Player.HumanMath.ClimbContacts(0.3f, 0.3f), "hanging still is silent");
+            Assert.AreEqual((2, 2), Stealth.Player.HumanMath.ClimbContacts(1f, 0f), "the way down: the same moments, played back");
+            Assert.AreEqual((1, 0), Stealth.Player.HumanMath.ClimbContacts(-0.7f, -0.8f), "below where the climb began, too");
+            Assert.AreEqual((0, 0), Stealth.Player.HumanMath.ClimbContacts(0f, 9f), "another ladder: no drum roll");
+            // frame by frame nothing is lost and nothing doubles: 3 m of ladder is five cycles
+            float phase = 0f;
+            int feet = 0, hands = 0;
+            for (int frame = 0; frame < 300; frame++)
+            {
+                float next = phase + Stealth.Player.HumanMath.ClimbCycles(Stealth.Player.HumanMath.ClimbRate(0.5f), 0.02f);
+                var (f, h) = Stealth.Player.HumanMath.ClimbContacts(phase, next);
+                feet += f;
+                hands += h;
+                phase = next;
+            }
+            Assert.AreEqual(3f / Stealth.Player.HumanMath.ClimbCycle, phase, 0.01f, "the take's own speed: a cycle every 0.6 m");
+            Assert.AreEqual(10, feet, "a foot on a rung every 0.3 m");
+            Assert.AreEqual(10, hands);
+            Assert.Less(new Stealth.Configs.AudioMix().LadderHands, new Stealth.Configs.AudioMix().LadderFeet, "a hand is softer than a boot");
+        }
+
+        [Test]
         public void EveryRungOfALadderSoundsAndRobotsHearIt()
         {
             float carried = 0f;
@@ -155,8 +192,9 @@ namespace Stealth.Tests
             Assert.LessOrEqual(Stealth.Audio.AudioRules.Rungs(ref carried, 40f), 3, "a teleport is no drum roll");
             Assert.Greater(new Stealth.Player.NoiseSettings().LadderRadius, 0f, "robots hear a climb");
             var bank = AssetDatabase.LoadAssetAtPath<Stealth.Audio.SoundBank>("Assets/_Game/Data/SoundBank.asset");
-            Assert.AreEqual(4, bank.LadderRung.Length);
-            Assert.IsTrue(bank.LadderRung.All(c => c != null));
+            Assert.AreEqual(4, bank.LadderFoot.Length);
+            Assert.AreEqual(4, bank.LadderHand.Length);
+            Assert.IsTrue(bank.LadderFoot.Concat(bank.LadderHand).All(c => c != null));
             foreach (var clip in new[] { bank.TerminalGranted, bank.TerminalHackDone, bank.ConsoleSolved, bank.VaultUnlocked }) Assert.IsNotNull(clip, "a terminal's work ends with a sound");
         }
     }

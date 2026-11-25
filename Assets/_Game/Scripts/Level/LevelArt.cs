@@ -105,6 +105,8 @@ namespace Stealth.Level
         [Tooltip("The office's glass sliding door (server rooms, labs, control rooms: DoorKind.Slide).")]
         public GameObject AutoDoor;
         public GameObject RoomLight;
+        [Tooltip("A room's reflection probe (RoomProbe): one per room.")]
+        public GameObject RoomProbe;
         [Tooltip("Facade window: frame, glass, blinds on the interior side (local +Z).")]
         public GameObject Window;
         [Tooltip("Green exit sign over every door, with a small light: the only light in a dark room besides the lamps.")]

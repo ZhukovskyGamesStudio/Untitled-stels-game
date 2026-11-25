@@ -192,6 +192,10 @@ namespace Stealth.Configs
         [Range(0.5f, 6f), Tooltip("How far a surface throws its bounced light, metres")] public float BounceReach = 4.5f;
         [Range(0, 3), Tooltip("Room fill: the soft light a room's burning lamps leave in it after bouncing off its walls — shadows in a lit room are not black (0 = none). Never crosses a wall; a room with its lamps off gets nothing. A picture only")]
         public float RoomFill;
+        [Range(0, 2), Tooltip("The rooms' own reflections: every room has a reflection probe, so gloss and metal mirror the room and not only what is on the screen (0 = none). A picture only.")]
+        public float Probes;
+        [Range(0, 1), Tooltip("Contact shadows: small things on a desk get a shadow where they touch, which the lamps' shadow maps are too coarse for (0 = none). A picture only.")]
+        public float Contact;
         [Range(-1, 1)] public float LensDistortion;
 
         public StyleGrade Clone() => (StyleGrade)MemberwiseClone();

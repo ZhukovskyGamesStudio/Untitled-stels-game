@@ -77,6 +77,12 @@ namespace Stealth.Player
         /// <summary>The held thing is a compact one: it lies in the open palm (a long one goes through the fist).</summary>
         [System.NonSerialized] public bool Cupped;
 
+        /// <summary>
+        /// Where the Climb take is, cycles since the body took the ladder (down counts back): the rate the animator plays
+        /// it at, summed — what the feet and hands on the rungs are heard by (HumanMath.ClimbContacts).
+        /// </summary>
+        public float ClimbPhase { get; private set; }
+
         float m_Pitch, m_Ground, m_Hold;
         bool m_Planted, m_Holding;
         static readonly RaycastHit[] s_Floor = new RaycastHit[6];
@@ -90,7 +96,11 @@ namespace Stealth.Player
             m_Holding = HumanMath.Carries(holding, downed, seated, pose);
             m_Hold = Mathf.MoveTowards(m_Hold, m_Holding ? 1f : 0f, Time.deltaTime * 4f);
             m_Pitch = HumanMath.HeadPitch(pitch, HumanMath.HeadShare(HeadFollow, pose), downed);
-            if (Animator == null || !Animator.isActiveAndEnabled) return;
+            if (Animator == null || !Animator.isActiveAndEnabled)
+            {
+                ClimbPhase = pose == BodyPose.Ladder ? ClimbPhase + HumanMath.ClimbCycles(HumanMath.ClimbRate(climb), Time.deltaTime) : 0f;
+                return;
+            }
             // in a seat the body rides with the car: its speed is the car's, not a walk
             float walk = HumanMath.WalkSpeed(speed, seated || pose != BodyPose.None);
             Animator.SetFloat(SpeedId, walk, 0.1f, Time.deltaTime);
@@ -101,6 +111,7 @@ namespace Stealth.Player
             Animator.SetBool(SitId, seated && !downed);
             Animator.SetInteger(PoseId, (int)pose);
             Animator.SetFloat(ClimbId, HumanMath.ClimbRate(climb), 0.08f, Time.deltaTime);
+            ClimbPhase = pose == BodyPose.Ladder ? ClimbPhase + HumanMath.ClimbCycles(Animator.GetFloat(ClimbId), Time.deltaTime) : 0f;
             if (Animator.layerCount > HumanLayers.RightHand) Animator.SetLayerWeight(HumanLayers.RightHand, m_Hold);
             Animator.SetFloat(CupId, Cupped ? 1f : 0f, 0.08f, Time.deltaTime);
         }
@@ -246,6 +257,34 @@ namespace Stealth.Player
         /// </summary>
         public static float ClimbRate(float metresPerSecond) =>
             Mathf.Abs(metresPerSecond) < 0.03f ? 0f : Mathf.Clamp(metresPerSecond / ClimbTakeSpeed, -3f, 3f);
+
+        /// <summary>
+        /// Where in the Climb take (cycles: one is a step of each hand and foot) a foot comes to rest on its rung and,
+        /// a moment later, the opposite hand closes on its own; the other foot and hand do it half a cycle on. Played
+        /// backwards (the way down) they are the same moments: a foot comes down on the lower rung as the other leaves
+        /// the upper one. (Tools/Blender/humanlib/anim.py, climb: the leg is highest at a quarter, the fingers close 1.2
+        /// radians of phase after the arm starts down.)
+        /// </summary>
+        public const float ClimbFootAt = 0.25f, ClimbHandAt = 0.31f;
+
+        /// <summary>How far the take goes for a rate held for a while: cycles (the rate is the animator's own, damped as it plays).</summary>
+        public static float ClimbCycles(float rate, float dt) => rate * dt * ClimbTakeSpeed / ClimbCycle;
+
+        /// <summary>
+        /// The feet that came to rest on a rung and the hands that closed on one while the Climb take went from one phase
+        /// to another (cycles, either way). A jump of the phase (a new ladder) is no drum roll.
+        /// </summary>
+        public static (int feet, int hands) ClimbContacts(float from, float to)
+        {
+            if (Mathf.Abs(to - from) > 1.5f) return (0, 0);
+            return (Marks(from, to, ClimbFootAt), Marks(from, to, ClimbHandAt));
+        }
+
+        static int Marks(float from, float to, float at)
+        {
+            float a = Mathf.Min(from, to), b = Mathf.Max(from, to);
+            return Mathf.FloorToInt((b - at) * 2f) - Mathf.FloorToInt((a - at) * 2f); // (a mark every half cycle)
+        }
 
         /// <summary>
         /// How much of the look pitch the head follows in a pose: on a ladder the eyes go where the player looks; at a

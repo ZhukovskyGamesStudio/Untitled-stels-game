@@ -413,7 +413,8 @@ namespace Stealth.Game
             // Night: no fill light from nowhere, no sky reflections — only the lamps and the moon light anything up.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = Stealth.Level.LightMath.NightAmbient;
-            RenderSettings.reflectionIntensity = 0f;
+            RenderSettings.reflectionIntensity = 0f; // (the sky mirrors nothing; the rooms' probes do not depend on it)
+            QualitySettings.realtimeReflectionProbes = true; // the rooms' reflections (RoomProbes)
         }
 
         void StartLevel(int index, int lane, int houseSeed = 0)

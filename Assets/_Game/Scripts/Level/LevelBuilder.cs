@@ -305,6 +305,12 @@ namespace Stealth.Level
                 yield return true;
             }
             foreach (var r in l.Rooms) BuildLights(r);
+            if (m_Art.RoomProbe != null)
+                foreach (var r in l.Rooms) // the room's own reflections (RoomProbes): a picture, robots do not read it
+                {
+                    var (eye, centre, size) = RoomProbes.Box(r);
+                    Place(m_Art.RoomProbe, $"Probe_{r.Id}", eye, Quaternion.identity).GetComponent<RoomProbe>().Setup(r.Id, eye, centre, size);
+                }
             foreach (var s in l.Stairs) BuildStair(s);
             yield return true;
             for (int i = 0; i < l.AutoDoors.Count; i++)
@@ -1156,7 +1162,7 @@ namespace Stealth.Level
             foreach (var p in LightSpots(m_Layout, r))
             {
                 var go = Place(m_Art.RoomLight, $"Light_{r.Id}_{k}", new Vector3(p.x, ceiling, p.y), Quaternion.identity);
-                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f, r.Id, r.Dark, litColor, litIntensity);
+                go.GetComponent<RoomLight>().Init(color, intensity, r.Flicker, r.Id * 3.7f + k * 1.9f, r.Id, r.Dark && !m_Layout.DarkRoomsDim, litColor, litIntensity); // a dim room's lamps are on: its switch puts them out
                 k++;
             }
         }
@@ -1238,7 +1244,7 @@ namespace Stealth.Level
                 var s = spots[i];
                 var room = m_Layout.Plan.Rooms.Find(r => r.Id == s.Room);
                 var go = Place(m_Art.LightSwitch, $"LightSwitch_{i}", s.Position, Quaternion.LookRotation(s.Facing));
-                if (go.TryGetComponent<LightSwitch>(out var sw)) sw.Setup(i, s.Room, room != null && room.Dark);
+                if (go.TryGetComponent<LightSwitch>(out var sw)) sw.Setup(i, s.Room, room != null && room.Dark && !m_Layout.DarkRoomsDim);
             }
         }
 

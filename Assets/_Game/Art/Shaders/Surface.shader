@@ -35,6 +35,7 @@ Shader "Stealth/Surface"
         _Contact("Darker at the floor and the ceiling (walls)", Range(0, 1)) = 0
         _RoomHeight("From a floor to its ceiling, metres", Float) = 2.75
         _DirtColor("Dirt", Color) = (0.36, 0.32, 0.27, 1)
+        [ToggleOff] _EnvironmentReflections("Mirrors its room", Float) = 1
         [HideInInspector] _Cull("__cull", Float) = 2
     }
     SubShader
@@ -66,6 +67,10 @@ Shader "Stealth/Surface"
             #pragma multi_compile_fragment _ _LIGHT_COOKIES
             #pragma multi_compile _ _LIGHT_LAYERS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_BOX_PROJECTION
+            #pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS
+            #pragma shader_feature_local_fragment _ENVIRONMENTREFLECTIONS_OFF
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
@@ -125,6 +130,18 @@ Shader "Stealth/Surface"
             #pragma multi_compile_instancing
             #include "SurfaceInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/Shaders/LitDepthNormalsPass.hlsl"
+            ENDHLSL
+        }
+        // Where each pixel was a frame ago: the temporal smoothing follows what moves (a drawer, a door) instead of smearing it.
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode" = "MotionVectors" }
+            ColorMask RG
+            HLSLPROGRAM
+            #pragma shader_feature_local_vertex _ADD_PRECOMPUTED_VELOCITY
+            #include "SurfaceInput.hlsl"
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ObjectMotionVectors.hlsl"
             ENDHLSL
         }
     }

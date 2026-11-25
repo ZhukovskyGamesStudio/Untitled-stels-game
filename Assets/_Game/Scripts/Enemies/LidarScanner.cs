@@ -9,6 +9,8 @@ namespace Stealth.Enemies
     {
         /// <summary>No eye to glow (its laser line is what senses: no other glow).</summary>
         public override bool GlowEyes => false;
+        /// <summary>Armed, tripped or hacked shows on its glowing parts (it neither sees nor hears: no light cast).</summary>
+        public override float StateLine => 1.2f;
 
         [Tooltip("Tuning (LidarProfile) — a separate asset next to the prefab.")]
         public LidarProfile Profile;

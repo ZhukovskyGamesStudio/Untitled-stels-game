@@ -17,5 +17,7 @@ namespace Stealth.Configs
         public InteractionSettings Interaction = new();
         [Tooltip("Pings, marking robots, how far the map reveals.")]
         public TeamSettings Team = new();
+        [Tooltip("Smoothing of edges over time (temporal anti-aliasing).")]
+        public SmoothingSettings Picture = new();
     }
 }
