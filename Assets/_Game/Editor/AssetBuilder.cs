@@ -95,6 +95,7 @@ namespace Stealth.EditorTools
                 BuildSceneAndSession(art, actors, ui, car);
                 BuildRoomsTest();
                 SharpPrints();
+                Shapes();
                 OnlyGlossMirrors();
                 AssetDatabase.SaveAssets();
                 Debug.Log($"[Builder] Assets built ({(force ? "overwrite" : "missing only")})");

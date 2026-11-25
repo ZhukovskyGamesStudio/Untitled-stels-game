@@ -1280,6 +1280,7 @@ namespace Stealth.EditorTools
             rl.Lamp = light;
             rl.Cookie = light.cookie;
             rl.SoftCookie = LampCookie(SoftLampCookiePath, LightMath.SoftCeilingShare);
+            rl.PoolCookie = LampCookie(PoolLampCookiePath, LightMath.SoftCeilingShare, true);
             rl.Panels = panels.ToArray();
             // The soft look (where the style asks: LightSource.CeilingGlow; hidden otherwise): a hot middle just under
             // each diffuser, fading to its edges, and the light the fixture throws on the ceiling round it — glow over
@@ -1305,13 +1306,14 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        const string LampCookiePath = SpritesDir + "/LampCookie.cubemap", SoftLampCookiePath = SpritesDir + "/LampCookieSoft.cubemap";
+        const string LampCookiePath = SpritesDir + "/LampCookie.cubemap", SoftLampCookiePath = SpritesDir + "/LampCookieSoft.cubemap",
+            PoolLampCookiePath = SpritesDir + "/LampCookiePool.cubemap";
 
         /// <summary>
         /// Cube cookie of the ceiling lamps: full light downwards and sideways, fading out above the horizon (no light onto
         /// the ceiling it hangs from).
         /// </summary>
-        static Cubemap LampCookie(string path, float up)
+        static Cubemap LampCookie(string path, float up, bool pool = false)
         {
             var cookie = AssetDatabase.LoadAssetAtPath<Cubemap>(path);
             if (cookie != null && !s_Force) return cookie;
@@ -1324,7 +1326,8 @@ namespace Stealth.EditorTools
                 for (int y = 0; y < size; y++)
                     for (int x = 0; x < size; x++)
                     {
-                        float v = LightMath.Cookie(CubeDirection(face, (x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f).normalized.y, up);
+                        float dirY = CubeDirection(face, (x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f).normalized.y;
+                        float v = pool ? LightMath.PoolCookie(dirY, up) : LightMath.Cookie(dirY, up);
                         px[y * size + x] = new Color(v, v, v, v);
                     }
                 cube.SetPixels(px, face);
@@ -1434,7 +1437,7 @@ namespace Stealth.EditorTools
                 var screens = model.GetComponentsInChildren<MeshCollider>(true).Where(c => c.name.StartsWith("Eye")).Cast<Collider>().ToArray();
                 if (screens.Length > 0) root.AddComponent<PassableForPlayers>().Parts = screens;
             }
-            return root;
+            return root; // (no maps wired here: the styles' dressing tells each part the slice of the mesh it shows)
         }
 
         /// <summary>Desks that carry screens: the screens are <see cref="PassableForPlayers"/>.</summary>

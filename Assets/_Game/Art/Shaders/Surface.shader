@@ -36,6 +36,10 @@ Shader "Stealth/Surface"
         _RoomHeight("From a floor to its ceiling, metres", Float) = 2.75
         _DirtColor("Dirt", Color) = (0.36, 0.32, 0.27, 1)
         [ToggleOff] _EnvironmentReflections("Mirrors its room", Float) = 1
+        // a model's own baked maps over its second UV set (Tools/Blender/shapebake.py; set per renderer by ShapeMaps)
+        _ShapeSlice("The model's own maps: their slice in the shared arrays (-1 none)", Float) = -1
+        _ShapeUv("…and the UV set they lie over (1 the second, 2 the third)", Float) = 1
+        _ShapeInVertices("A mesh merged of many models: each vertex names its maps", Float) = 0
         [HideInInspector] _Cull("__cull", Float) = 2
     }
     SubShader
@@ -56,7 +60,7 @@ Shader "Stealth/Surface"
             Cull Back
             HLSLPROGRAM
             #pragma target 4.5
-            #pragma vertex LitPassVertex
+            #pragma vertex SurfaceVertex
             #pragma fragment SurfaceFragment
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #pragma multi_compile _ _ADDITIONAL_LIGHTS

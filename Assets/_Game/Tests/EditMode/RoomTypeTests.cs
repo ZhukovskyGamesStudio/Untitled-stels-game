@@ -235,7 +235,6 @@ namespace Stealth.Tests
             }
             Assert.That(typed, Is.GreaterThan(houses * 3));
             Assert.That(storage, Is.GreaterThanOrEqualTo(houses * 7 / 10), $"a dead end becomes the storage room ({storage} of {houses})");
-            Assert.IsFalse(LevelGenerator.Classic, "off by default");
         }
 
         [Test]

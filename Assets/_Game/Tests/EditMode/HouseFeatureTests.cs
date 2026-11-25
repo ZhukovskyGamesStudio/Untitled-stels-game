@@ -108,7 +108,7 @@ namespace Stealth.Tests
         public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
         {
             int wardens = 0;
-            // wardens are the old enemies' (LevelGenerator.ClassicEnemies)
+            // wardens are the old enemies' (LevelGenerator.Generate's classicEnemies)
             foreach (var (seed, level) in TestHouses.SampleKeys)
             {
                 var l = LevelGenerator.Generate(seed, level, null, null, 1, null, false, true);

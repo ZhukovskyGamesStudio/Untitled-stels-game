@@ -322,9 +322,9 @@ def circuits():
 def boxlabel(k):
     c = Cell(128, 64, (238, 234, 222))
     c.rect(2, 2, 126, 62, outline=(60, 60, 60), width=1.5)
-    c.text(12, 22, ("WINTER", "CABLES")[k], "arialbd.ttf", 22, (40, 44, 60), "lm")
-    c.line([(12, 42), (112, 42)], (60, 90, 150), 1.5)
-    c.line([(12, 52), (84, 52)], (60, 90, 150), 1.5)
+    # one word as large as the card takes (a letter under a centimetre and a half is a smudge from two metres away)
+    c.fit(64, 27, ("WINTER", "CABLES")[k], "arialbd.ttf", 106, 44, (30, 34, 50))
+    c.line([(12, 51), (116, 51)], (60, 90, 150), 2)
     return c
 
 
@@ -600,8 +600,8 @@ def displays():
         elif name == "kiosk":
             c.text(128, 32, "WELCOME", mid, 32, WH)
             for k in range(3):
-                c.rect(30, 56 + k * 32, 226, 82 + k * 32, fill=(30, 70, 120), r=6)
-                c.text(128, 69 + k * 32, ("Floors", "People", "Exit")[k], mid, 18, WH)
+                c.rect(30, 54 + k * 33, 226, 83 + k * 33, fill=(30, 70, 120), r=6)
+                c.text(128, 68 + k * 33, ("Floors", "People", "Exit")[k], mid, 23, WH)
         elif name == "game":                             # a console's paused game
             c.rect(0, 0, W, H, fill=(14, 10, 34))
             for k in range(9):

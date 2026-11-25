@@ -33,11 +33,19 @@ namespace Stealth.Level
             if (mesh == null || s_Copies.Contains(mesh) || !mesh.isReadable) return mesh;
             int key = ((sheet.Cols * 31 + sheet.Rows) * 31 + sheet.Cell) * 31 + sheet.Rest + (sheet.Lying ? 1 << 20 : 0);
             if (s_Pictures.TryGetValue((mesh, key), out var known) && known != null) return known;
-            var uv = Fit(mesh.vertices, mesh.triangles, sheet.MinSide, sheet.Lying, true);
+            var vertices = mesh.vertices;
+            var triangles = mesh.triangles;
+            var uv = Fit(vertices, triangles, sheet.MinSide, sheet.Lying, true);
             float w = 1f / sheet.Cols, h = 1f / sheet.Rows;
             var rest = new Vector2((sheet.Rest % sheet.Cols + 0.5f) * w, 1f - (sheet.Rest / sheet.Cols + 0.5f) * h);
             float x = sheet.Cell % sheet.Cols * w, y = 1f - (sheet.Cell / sheet.Cols + 1) * h;
-            for (int i = 0; i < uv.Length; i++) uv[i] = uv[i].x < 0f ? rest : new Vector2(x + (0.02f + 0.96f * uv[i].x) * w, y + (0.02f + 0.96f * uv[i].y) * h);
+            // the bevel and the sides of a display's glass lie on its own picture's margin (its background), not on the
+            // plain lit cell: a bright rim a few millimetres wide round a dark screen was a line thinner than a pixel from
+            // across a room — it broke into pieces and flickered as the player walked
+            var rims = sheet.Lying ? Rims(vertices, triangles, uv) : null;
+            var margin = new Vector2(x + RimAt * w, y + RimAt * h);
+            for (int i = 0; i < uv.Length; i++)
+                uv[i] = uv[i].x < 0f ? (rims != null && rims[i] ? margin : rest) : new Vector2(x + (0.02f + 0.96f * uv[i].x) * w, y + (0.02f + 0.96f * uv[i].y) * h);
             var copy = Object.Instantiate(mesh);
             copy.name = mesh.name;
             copy.hideFlags = HideFlags.DontSave;
@@ -46,6 +54,43 @@ namespace Stealth.Level
             s_Copies.Add(copy);
             VisualStyles.KnowCopy(copy, mesh);
             return copy;
+        }
+
+        /// <summary>Where in a picture's cell its margin is read (the pictures are drawn with a plain border this wide and more).</summary>
+        public const float RimAt = 0.012f;
+
+        /// <summary>
+        /// The vertices that show no picture but belong to a piece of the mesh that does (pure): the edges of a screen's
+        /// glass. A piece is whatever hangs together by its corners; a lamp or a strip of light beside the screen is
+        /// another piece and stays what it was.
+        /// </summary>
+        /// <param name="uv">As <see cref="Fit"/> marks it: x under 0 where no picture lies.</param>
+        public static bool[] Rims(Vector3[] v, int[] tris, Vector2[] uv)
+        {
+            var parent = new int[v.Length];
+            var at = new Dictionary<Vector3Int, int>();
+            for (int i = 0; i < v.Length; i++)
+            {
+                var key = Vector3Int.RoundToInt(v[i] * 2000f);   // (half a millimetre: the corners of a hard edge are separate vertices)
+                parent[i] = at.TryGetValue(key, out int first) ? first : (at[key] = i);
+            }
+            int Root(int i)
+            {
+                while (parent[i] != i) i = parent[i] = parent[parent[i]];
+                return i;
+            }
+            for (int t = 0; t + 2 < tris.Length; t += 3)
+            {
+                int a = Root(tris[t]);
+                parent[Root(tris[t + 1])] = a;
+                parent[Root(tris[t + 2])] = a;
+            }
+            var shows = new HashSet<int>();
+            for (int i = 0; i < v.Length; i++)
+                if (uv[i].x >= 0f) shows.Add(Root(i));
+            var rims = new bool[v.Length];
+            for (int i = 0; i < v.Length; i++) rims[i] = uv[i].x < 0f && shows.Contains(Root(i));
+            return rims;
         }
 
         /// <summary>The mesh with its screens' pictures fitted (made once; the mesh itself when it already is, or cannot be read).</summary>

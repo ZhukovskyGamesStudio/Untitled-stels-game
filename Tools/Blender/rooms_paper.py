@@ -344,6 +344,8 @@ def model_copier():
     c = (0.02 + n[0] * 0.0175, -0.28 + n[1] * 0.0175, 0.985 + n[2] * 0.0175)
     screen = s.rbox((0.2, 0.08, 0.008), c, r=0.002, seg=1, rot=panel_rot)
     s.part("Eye", [screen])
+    import shapebake
+    shapebake.detail("copier", [], waves=0.0)                   # (its baked maps: rounded edges, occlusion)
     return export("copier")
 
 

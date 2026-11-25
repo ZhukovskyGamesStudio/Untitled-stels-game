@@ -35,6 +35,54 @@ namespace Stealth.Level
         static StyleWorld s_HouseWorld;
         static (VisualStyle style, HouseLook look) s_HouseWorldOf;
 
+        /// <summary>The player asked for the style's light and colour as they were before the rework (<see cref="StyleOldLook"/>). Picture only.</summary>
+        public static bool OldLook
+        {
+            get => s_OldLook;
+            set
+            {
+                if (s_OldLook == value) return;
+                s_OldLook = value;
+                s_HouseWorld = null;
+                s_OldWorld = null;
+                if (!s_Active) return;
+                ApplyVolume(s_Current);
+                ApplyWorld(World);
+            }
+        }
+        static bool s_OldLook;
+        static StyleWorld s_OldWorld;
+        static StyleGrade s_OldGrade;
+        static VisualStyle s_OldOf;
+
+        /// <summary>The style's own air, or as it was before the rework.</summary>
+        static StyleWorld OwnWorld(VisualStyle style)
+        {
+            if (!s_OldLook || style.Old == null || !style.Old.Has) return style.World;
+            if (s_OldWorld == null || s_OldOf != style)
+            {
+                s_OldWorld = style.World.Clone();
+                s_OldWorld.Ambient = style.Old.Ambient;
+                s_OldWorld.LampPool = style.Old.LampPool;
+                s_OldGrade = style.Grade.Clone();
+                s_OldGrade.Tonemap = style.Old.Tonemap;
+                s_OldGrade.Exposure = style.Old.Exposure;
+                s_OldGrade.Contrast = style.Old.Contrast;
+                s_OldGrade.Saturation = style.Old.Saturation;
+                s_OldGrade.RoomFill = style.Old.RoomFill;
+                s_OldOf = style;
+            }
+            return s_OldWorld;
+        }
+
+        /// <summary>The style's own grade, or as it was before the rework.</summary>
+        static StyleGrade OwnGrade(VisualStyle style)
+        {
+            if (!s_OldLook || style.Old == null || !style.Old.Has) return style.Grade;
+            OwnWorld(style);
+            return s_OldGrade;
+        }
+
         /// <summary>The air of the current style (the defaults when there is none) in the house now standing.</summary>
         public static StyleWorld World
         {
@@ -42,10 +90,10 @@ namespace Stealth.Level
             {
                 if (s_Current == null) return s_DefaultWorld;
                 var look = Look;
-                if (look == null) return s_Current.World;
+                if (look == null) return OwnWorld(s_Current);
                 if (s_HouseWorld == null || s_HouseWorldOf != (s_Current, look))
                 {
-                    s_HouseWorld = look.Air.Over(s_Current.World);
+                    s_HouseWorld = look.Air.Over(OwnWorld(s_Current));
                     s_HouseWorldOf = (s_Current, look);
                 }
                 return s_HouseWorld;
@@ -212,6 +260,7 @@ namespace Stealth.Level
             LightSource.VisualScale = 1f;
             LightSource.GlowScale = 1f;
             LightSource.CeilingGlow = 0f;
+            LightSource.LampPool = 0f;
             s_Current = s_Default;
             s_Active = false;
         }
@@ -491,6 +540,8 @@ namespace Stealth.Level
                 if (target != m) { mats[i] = target; changed = true; }
             }
             if (changed) r.sharedMaterials = mats;
+            // the maps of the mesh now shown, if it has any (after the materials: only those that read the maps are told)
+            if (model != null && Config != null && Config.Shapes != null) ShapeMaps.Tag(r, Config.Shapes);
         }
 
         /// <summary>The object a renderer belongs to: the scene root's child it is under (a prop of the house), or its own root.</summary>
@@ -563,7 +614,7 @@ namespace Stealth.Level
             if (s_Profile == null) s_Profile = Object.Instantiate(s_BaseProfile);
             s_GradeShare = HouseShare;
             var look = Look;
-            var g = look != null ? look.Grade.Over(style.Grade, s_GradeShare) : style.Grade;
+            var g = look != null ? look.Grade.Over(OwnGrade(style), s_GradeShare) : OwnGrade(style);
 
             var bloom = Get<Bloom>(s_Profile);
             bloom.intensity.Override(g.BloomIntensity);
@@ -735,6 +786,7 @@ namespace Stealth.Level
             LightSource.VisualScale = LampScale(w);
             LightSource.GlowScale = s_Current != null && w.LampGlow >= 0f ? w.LampGlow : 1f;
             LightSource.CeilingGlow = s_Current != null ? Mathf.Max(0f, w.CeilingGlow) : 0f;
+            LightSource.LampPool = s_Current != null ? Mathf.Max(0f, w.LampPool) : 0f;
         }
 
         // ------------------------------------------------------------------ palette

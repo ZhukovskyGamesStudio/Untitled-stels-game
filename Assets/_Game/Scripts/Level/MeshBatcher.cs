@@ -38,6 +38,8 @@ namespace Stealth.Level
     /// <summary>One merged mesh: a submesh per material, drawn the way <see cref="Look"/> says.</summary>
     public struct BakedBatch
     {
+        /// <summary>Its vertices name the models' own baked maps (<see cref="ShapeMaps"/>): the renderer must say so to the shader.</summary>
+        public bool Shaped;
         public Mesh Mesh;
         public Material[] Materials;
         public BatchLook Look;
@@ -64,13 +66,15 @@ namespace Stealth.Level
             public bool Projected;
             public WallProjection Projection;
             public Matrix4x4 World;
+            /// <summary>The slice of the model's own baked maps (<see cref="ShapeMaps"/>), −1: none; and the UV set of the mesh they lie over.</summary>
+            public int Slice, ShapeChannel;
         }
 
         sealed class Source
         {
             public Vector3[] Vertices, Normals;
             public Vector4[] Tangents;
-            public Vector2[] Uv;
+            public Vector2[] Uv, Uv2, Uv3;
             public int[][] Indices;
             /// <summary>Per submesh: the vertices its triangles use (first, count).</summary>
             public (int first, int count)[] Ranges;
@@ -101,11 +105,25 @@ namespace Stealth.Level
             return true;
         }
 
+        /// <summary>
+        /// The renderer has a property block of its own: it draws itself (a drawer that moves, a shade that glows by its
+        /// bulb, a lamp that follows the alarm). The blocks on its materials are another matter — there a model's own baked
+        /// maps are named (<see cref="ShapeMaps"/>), and the merged mesh carries those in its vertices.
+        /// </summary>
+        public static bool DrawsItself(Renderer r)
+        {
+            if (!r.HasPropertyBlock()) return false;
+            r.GetPropertyBlock(s_Probe);
+            return !s_Probe.isEmpty;
+        }
+
+        static readonly MaterialPropertyBlock s_Probe = new();
+
         /// <summary>A renderer as it is drawn now can be merged (its mesh can, no material is see-through, nothing animates it).</summary>
         public static bool CanMerge(MeshRenderer r, out Mesh mesh)
         {
             mesh = null;
-            if (r == null || !r.enabled || r.forceRenderingOff || !r.gameObject.activeInHierarchy || r.isPartOfStaticBatch || r.HasPropertyBlock()) return false;
+            if (r == null || !r.enabled || r.forceRenderingOff || !r.gameObject.activeInHierarchy || r.isPartOfStaticBatch || DrawsItself(r)) return false;
             if (!r.TryGetComponent<MeshFilter>(out var mf) || !CanMerge(mf.sharedMesh)) return false;
             foreach (var m in r.sharedMaterials)
                 if (m == null || m.renderQueue >= (int)RenderQueue.Transparent) return false;
@@ -117,7 +135,7 @@ namespace Stealth.Level
         /// <param name="tiling">Texture tiling of this part (as a _BaseMap_ST); folded into the UVs against the material's own.</param>
         /// <param name="projection">UVs from the world like the wall finish (instead of the mesh's own).</param>
         public void Add(Vector3Int chunk, BatchLook look, Material material, Mesh mesh, int subMesh, Matrix4x4 world, Vector4? tiling = null,
-            WallProjection? projection = null)
+            WallProjection? projection = null, int slice = -1, int shapeChannel = 1)
         {
             if (material == null || mesh == null || Mathf.Abs(world.determinant) < 1e-12f) return;
             var key = (chunk, look);
@@ -131,7 +149,7 @@ namespace Stealth.Level
             {
                 Mesh = mesh, SubMesh = Mathf.Clamp(subMesh, 0, mesh.subMeshCount - 1), Matrix = m_ToRoot * world,
                 Tiled = tiling.HasValue, Tiling = tiling ?? default,
-                Projected = projection.HasValue, Projection = projection ?? default, World = world,
+                Projected = projection.HasValue, Projection = projection ?? default, World = world, Slice = slice, ShapeChannel = shapeChannel,
             });
             Parts++;
         }
@@ -143,7 +161,8 @@ namespace Stealth.Level
             var chunk = ChunkOf(r.bounds.center);
             var look = BatchLook.Of(r);
             var m = r.transform.localToWorldMatrix;
-            for (int i = 0; i < mats.Length; i++) Add(chunk, look, mats[i], mesh, i, m);
+            int slice = ShapeMaps.SliceOf(r), channel = ShapeMaps.ChannelOf(r);
+            for (int i = 0; i < mats.Length; i++) Add(chunk, look, mats[i], mesh, i, m, null, null, slice, channel);
         }
 
         /// <summary>The merged meshes (the caller owns them and destroys them with the level).</summary>
@@ -154,16 +173,23 @@ namespace Stealth.Level
             var normals = new List<Vector3>();
             var tangents = new List<Vector4>();
             var uv = new List<Vector2>();
+            var uv2 = new List<Vector2>();   // the models' own maps: where each vertex lies on its model's pictures…
+            var shape = new List<Vector2>(); // …and which pictures (x: slice + 1, 0 none; y: −1 where the part is mirrored)
             foreach (var key in m_Order)
             {
-                vertices.Clear(); normals.Clear(); tangents.Clear(); uv.Clear();
+                vertices.Clear(); normals.Clear(); tangents.Clear(); uv.Clear(); uv2.Clear(); shape.Clear();
+                bool shaped = false;
                 var subMeshes = new List<List<int>>();
                 var materials = new List<Material>();
                 foreach (var (material, parts) in m_Groups[key])
                 {
                     var indices = new List<int>();
                     var materialTiling = material.HasProperty(BaseMapSt) ? material.GetVector(BaseMapSt) : new Vector4(1, 1, 0, 0);
-                    foreach (var p in parts) Append(p, materialTiling, vertices, normals, tangents, uv, indices);
+                    foreach (var p in parts)
+                    {
+                        Append(p, materialTiling, vertices, normals, tangents, uv, indices);
+                        shaped |= AppendShape(p, uv2, shape);
+                    }
                     if (indices.Count == 0) continue;
                     subMeshes.Add(indices);
                     materials.Add(material);
@@ -178,10 +204,15 @@ namespace Stealth.Level
                 mesh.SetNormals(normals);
                 mesh.SetTangents(tangents);
                 mesh.SetUVs(0, uv);
+                if (shaped)
+                {
+                    mesh.SetUVs(1, uv2);
+                    mesh.SetUVs(3, shape);
+                }
                 mesh.subMeshCount = subMeshes.Count;
                 for (int i = 0; i < subMeshes.Count; i++) mesh.SetTriangles(subMeshes[i], i, false);
                 mesh.RecalculateBounds();
-                result.Add(new BakedBatch { Mesh = mesh, Materials = materials.ToArray(), Look = key.look, Chunk = key.chunk });
+                result.Add(new BakedBatch { Mesh = mesh, Materials = materials.ToArray(), Look = key.look, Chunk = key.chunk, Shaped = shaped });
             }
             m_Sources.Clear();
             return result;
@@ -202,6 +233,7 @@ namespace Stealth.Level
                 go.GetComponent<MeshFilter>().sharedMesh = b.Mesh;
                 var r = go.GetComponent<MeshRenderer>();
                 r.sharedMaterials = b.Materials;
+                if (b.Shaped) ShapeMaps.MarkMerged(r);
                 r.shadowCastingMode = b.Look.Shadows;
                 r.receiveShadows = b.Look.ReceiveShadows;
                 r.renderingLayerMask = b.Look.RenderingLayers;
@@ -251,6 +283,22 @@ namespace Stealth.Level
             }
         }
 
+        /// <summary>The part's second UV set and its maps' slice, vertex for vertex with <see cref="Append"/>; false: it has no maps of its own.</summary>
+        bool AppendShape(Part p, List<Vector2> uv2, List<Vector2> shape)
+        {
+            var s = SourceOf(p.Mesh);
+            var (first, count) = s.Ranges[p.SubMesh];
+            var own = p.ShapeChannel == 2 ? s.Uv3 : s.Uv2;        // (the set the model's maps were baked over)
+            bool has = p.Slice >= 0 && own != null;
+            var id = has ? new Vector2(p.Slice + 1, p.Matrix.determinant < 0f ? -1f : 1f) : Vector2.zero;
+            for (int i = first; i < first + count; i++)
+            {
+                uv2.Add(has ? own[i] : Vector2.zero);
+                shape.Add(id);
+            }
+            return has;
+        }
+
         /// <summary>The texture coordinate of a world point (with its normal) under a wall projection (before the material's tiling).</summary>
         public static Vector2 Project(WallProjection p, Vector3 world, Vector3 normal)
         {
@@ -272,6 +320,10 @@ namespace Stealth.Level
             s.Normals = normals.Length == s.Vertices.Length ? normals : null;
             s.Tangents = tangents.Length == s.Vertices.Length ? tangents : null;
             s.Uv = uv.Length == s.Vertices.Length ? uv : null;
+            var second = mesh.uv2;
+            s.Uv2 = second.Length == s.Vertices.Length ? second : null;
+            var third = mesh.uv3;
+            s.Uv3 = third.Length == s.Vertices.Length ? third : null;
             for (int i = 0; i < mesh.subMeshCount; i++)
             {
                 s.Indices[i] = mesh.GetIndices(i); // with the base vertex applied: indices into the whole buffer

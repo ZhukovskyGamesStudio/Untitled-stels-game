@@ -88,6 +88,8 @@ namespace Stealth.Tests
                     Assert.GreaterOrEqual(imp.anisoLevel, 8, $"{path}: a tilted label breaks up");
                     Assert.AreEqual(TextureImporterCompression.CompressedHQ, imp.textureCompression, $"{path}: small letters turn to blotches");
                     Assert.AreEqual(TextureImporterNPOTScale.None, imp.npotScale, $"{path}: stretched to a power of two, every letter resampled");
+                    Assert.AreEqual(-0.5f, imp.mipMapBias, 1e-4f, $"{path}: read at the plain detail level, small letters are a smudge from two metres");
+                    Assert.AreEqual(TextureImporterMipFilter.KaiserFilter, imp.mipmapFilter, $"{path}: the box filter greys thin strokes out of the reduced levels");
                 }
         }
 
@@ -99,6 +101,38 @@ namespace Stealth.Tests
                 string text = File.ReadAllText($"Assets/_Game/Art/Shaders/{shader}.shader");
                 StringAssert.Contains("\"LightMode\" = \"MotionVectors\"", text, $"{shader}: a drawer or a door of this material smears as it moves");
             }
+        }
+    
+        [Test]
+        public void LightingAndTexturesAreSetApartAndBothStartNew()
+        {
+            bool lighting = GameSettings.NewLighting, textures = GameSettings.NewTextures;
+            try
+            {
+                GameSettings.NewLighting = GameSettings.NewTextures = false;
+                GameSettings.ResetToDefaults();
+                Assert.IsTrue(GameSettings.NewLighting, "the reworked light is the default");
+                Assert.IsTrue(GameSettings.NewTextures, "the models' maps and the 2K scans are the default");
+                GameSettings.NewLighting = false;
+                Assert.IsTrue(GameSettings.NewTextures, "one does not move the other");
+            }
+            finally
+            {
+                GameSettings.NewLighting = lighting;
+                GameSettings.NewTextures = textures;
+            }
+            foreach (string key in new[] { "menu.lighting_new", "menu.lighting_old", "menu.textures_new", "menu.textures_old" })
+                Assert.AreNotEqual(key, Loc.T(key), $"{key}: no name in the tables");
+        }
+
+        [Test]
+        public void TheDefaultStyleRemembersTheLookItHadBefore()
+        {
+            var style = Resources.Load<GameConfig>(GameConfig.ResourcePath).Styles.Default;
+            Assert.IsTrue(style.Old.Has, $"{style.name}: \"old style\" in the settings would change nothing");
+            Assert.AreNotEqual(style.Grade.Tonemap, style.Old.Tonemap);
+            Assert.AreEqual(0f, style.Old.LampPool, "the old lamps lit their rooms evenly");
+            Assert.Greater(style.Old.RoomFill, style.Grade.RoomFill);
         }
     }
 }

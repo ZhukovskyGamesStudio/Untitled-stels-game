@@ -1,6 +1,6 @@
 """Downloads the CC0 assets of the realistic visual styles from Poly Haven (polyhaven.com, all assets CC0).
 
-Run:  python Tools/Art/fetch_cc0.py
+Run:  python Tools/Art/fetch_cc0.py        (RES=2k: 2K textures; ONLY=textures: no models; HAVE=1: only the textures the project has)
 
 1. Raw downloads go to Tools/Art/cache/ (ignored by git): textures (1k jpg: diffuse, OpenGL normal, ARM) and models
    (1k glTF with their textures).
@@ -23,6 +23,9 @@ CACHE = os.path.join(ROOT, "Tools", "Art", "cache")
 OUT_TEX = os.path.join(ROOT, "Assets", "_Game", "Art", "External", "Textures")
 CREDITS = os.path.join(ROOT, "Assets", "_Game", "Art", "External", "CREDITS.md")
 UA = {"User-Agent": "stealth-prototype-asset-fetch"}
+RES = os.environ.get("RES", "1k").lower()               # 1k, 2k: the size of the textures
+ONLY = os.environ.get("ONLY", "")                        # "textures": the models are left alone
+HAVE = os.environ.get("HAVE", "") == "1"                 # only the textures whose folder the project already has
 
 # Surfaces of the styles (floors, walls, ceilings, trims, furniture materials).
 TEXTURES = [
@@ -91,10 +94,10 @@ def convert(diff, nor, arm, out_dir):
 
 def fetch_texture(asset):
     f = files(asset)
-    cache = os.path.join(CACHE, "textures", asset)
-    diff = get(f["Diffuse"]["1k"]["jpg"]["url"], os.path.join(cache, "diff.jpg"))
-    nor = get(f["nor_gl"]["1k"]["jpg"]["url"], os.path.join(cache, "nor_gl.jpg"))
-    arm = get(f["arm"]["1k"]["jpg"]["url"], os.path.join(cache, "arm.jpg")) if "arm" in f else None
+    cache = os.path.join(CACHE, "textures" if RES == "1k" else "textures" + RES, asset)
+    diff = get(f["Diffuse"][RES]["jpg"]["url"], os.path.join(cache, "diff.jpg"))
+    nor = get(f["nor_gl"][RES]["jpg"]["url"], os.path.join(cache, "nor_gl.jpg"))
+    arm = get(f["arm"][RES]["jpg"]["url"], os.path.join(cache, "arm.jpg")) if "arm" in f else None
     convert(diff, nor, arm, os.path.join(OUT_TEX, asset))
 
 
@@ -110,19 +113,23 @@ def fetch_model(asset):
 def main():
     done = []
     for t in TEXTURES:
+        if HAVE and not os.path.isdir(os.path.join(OUT_TEX, t)):
+            continue
         try:
             fetch_texture(t)
             done.append(("texture", t))
             print("texture", t)
         except Exception as e:  # noqa: BLE001 — report and go on
             print("FAILED texture", t, e)
-    for m in MODELS:
+    for m in ({} if ONLY == "textures" else MODELS):
         try:
             fetch_model(m)
             done.append(("model", m))
             print("model", m)
         except Exception as e:  # noqa: BLE001
             print("FAILED model", m, e)
+    if ONLY or HAVE:
+        return                                           # (a partial run: the list of credits stays whole)
     os.makedirs(os.path.dirname(CREDITS), exist_ok=True)
     with open(CREDITS, "w", encoding="utf-8") as c:
         c.write("# External assets\n\nAll from [Poly Haven](https://polyhaven.com), licence [CC0](https://polyhaven.com/license) "

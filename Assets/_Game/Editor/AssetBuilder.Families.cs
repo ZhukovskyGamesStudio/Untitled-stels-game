@@ -60,7 +60,7 @@ namespace Stealth.EditorTools
                 var filter = pixel ? FilterMode.Point : FilterMode.Trilinear;
                 bool decal = path.StartsWith(DerelictDecals);            // single images with edges: never repeat
                 var wrap = decal ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
-                int maxSize = decal ? 2048 : 1024;                       // decals are single big images: keep their detail
+                int maxSize = 2048;                                      // the scans come at 2K (what is smaller stays as it is)
                 if (imp.textureType == type && imp.sRGBTexture == srgb && imp.filterMode == filter && imp.wrapMode == wrap &&
                     imp.mipmapEnabled == !pixel && imp.maxTextureSize == maxSize && imp.alphaIsTransparency == decal) continue;
                 imp.textureType = type;

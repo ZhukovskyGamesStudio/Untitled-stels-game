@@ -72,6 +72,14 @@ Material:
         m_Texture: {fileID: 2800000, guid: 27ade1d9bc3a5294b90c926b3dae1b0f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _ShapeMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ShapeNormal:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -129,6 +137,10 @@ Material:
     - _Scratches: 0.45
     - _ScreenSpaceReflections: 1
     - _ScreenSpaceReflectionsContributeTransparent: 1
+    - _ShapeInVertices: 0
+    - _ShapeOn: 0
+    - _ShapeSlice: -1
+    - _ShapeUv: 1
     - _Smoothness: 1
     - _SmoothnessTextureChannel: 0
     - _Smudges: 0.5

@@ -99,6 +99,24 @@ namespace Stealth.EditorTools
             var warm = new Color(1f, 0.95f, 0.88f);
             // LAMPS=0.15: the room dim (a dim room of the game: what is left when the lamps are not what one sees by)
             float dim = float.TryParse(System.Environment.GetEnvironmentVariable("LAMPS"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float lampScale) ? lampScale : 1f;
+            // REAL=1: the game's own ceiling lamps (two of the prefab, as a room this size has) with the style's look of them —
+            // POOL / SCALE / GLOW override the style's LampPool / LightScale / CeilingGlow; without it, four plain spots
+            bool real = System.Environment.GetEnvironmentVariable("REAL") == "1";
+            if (real)
+            {
+                LightSource.CeilingGlow = Env("GLOW", style.World.CeilingGlow);
+                LightSource.LampPool = Env("POOL", style.World.LampPool);
+                LightSource.GlowScale = style.World.LampGlow >= 0f ? style.World.LampGlow : 1f;
+                // (no LateUpdate here: the lamp's share for the eye — a pooled lamp's boost — is applied by hand)
+                float scale = Env("SCALE", style.World.LightScale) * (LightSource.LampPool > 0f ? Mathf.Lerp(1f, LightMath.PoolBoost, Mathf.Clamp01(LightSource.LampPool)) : 1f);
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Level/RoomLight.prefab");
+                foreach (float x in new[] { -1.7f, 1.7f })
+                {
+                    var lamp = Object.Instantiate(prefab, new Vector3(x, 2.75f, 0.1f), Quaternion.identity);
+                    lamp.GetComponent<RoomLight>().Init(warm, LightMath.RoomIntensity * dim * scale, false, 0f);
+                }
+            }
+            else
             foreach (float x in new[] { -1.6f, 1.6f })
                 foreach (float z in new[] { -1.2f, 1.4f })
                 {
@@ -114,8 +132,25 @@ namespace Stealth.EditorTools
                     l.transform.SetPositionAndRotation(new Vector3(x, 2.65f, z), Quaternion.Euler(90f, 0f, 0f));
                 }
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            profile.Add<Tonemapping>(true).mode.Override(TonemappingMode.Neutral);
-            profile.Add<ColorAdjustments>(true).postExposure.Override(style.Grade.Exposure);
+            // the style's own grade (TONE=aces|neutral, EXPOSURE, CONTRAST, SATURATION override it; without REAL the tool's
+            // old neutral curve with nothing else, as its earlier pictures were made)
+            var grade = style.Grade;
+            string tone = System.Environment.GetEnvironmentVariable("TONE") ?? (real && grade.Tonemap == StyleTonemap.Aces ? "aces" : "neutral");
+            profile.Add<Tonemapping>(true).mode.Override(tone == "aces" ? TonemappingMode.ACES : TonemappingMode.Neutral);
+            var adjust = profile.Add<ColorAdjustments>(true);
+            adjust.postExposure.Override(Env("EXPOSURE", grade.Exposure));
+            adjust.contrast.Override(Env("CONTRAST", real ? grade.Contrast : 0f));
+            adjust.saturation.Override(Env("SATURATION", real ? grade.Saturation : 0f));
+            if (real)
+            {
+                var toning = profile.Add<SplitToning>(true);
+                toning.shadows.Override(grade.SplitShadows);
+                toning.highlights.Override(grade.SplitHighlights);
+                toning.balance.Override(grade.SplitBalance);
+                profile.Add<WhiteBalance>(true).temperature.Override(grade.Temperature);
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = style.World.Ambient * Env("AMBIENT", 1f);
+            }
             var bloom = profile.Add<Bloom>(true);
             bloom.intensity.Override(style.Grade.BloomIntensity);
             bloom.threshold.Override(style.Grade.BloomThreshold);
@@ -249,6 +284,9 @@ namespace Stealth.EditorTools
                         }
                         foreach (var l in go.GetComponentsInChildren<Light>(true)) l.enabled = false;
                         SurfaceSheet.Dress(go, config, style, config.LookOf(kind), after);
+                        // SHAPES=0: without the models' own baked maps (ShapeMaps), to set the two side by side
+                        if (System.Environment.GetEnvironmentVariable("SHAPES") != "0")
+                            ShapeMaps.Tag(go, config.Shapes);
                         go.transform.SetPositionAndRotation(new Vector3(x, 0f, z), Quaternion.Euler(0f, yaw, 0f));
                         made.Add(go);
                     }

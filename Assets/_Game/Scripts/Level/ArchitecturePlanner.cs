@@ -57,9 +57,10 @@ namespace Stealth.Level
         {
             var list = new List<DecorPiece>();
             if (shell == null || g == null) return list;
+            var switches = layout != null ? UtilityPlan.SwitchSpots(layout, shell) : null;
             foreach (var face in shell.Walls)
                 if (InVault(face, layout)) PlanVaultFace(list, face);
-                else PlanFace(list, face, shell, g, LookOf(face, layout, g));
+                else PlanFace(list, face, shell, g, LookOf(face, layout, g), switches);
             PlanPosts(list, shell, g, layout);
             foreach (var o in shell.Openings) PlanOpening(list, o, g, layout);
             if (g.Wall != null || (g.RoomLooks != null && g.RoomLooks.Length > 0))
@@ -522,7 +523,31 @@ namespace Stealth.Level
             (f.CornerA ? (f.StraightA ? -T / 2f : -T) : f.JointA ? -T / 2f : 0f,
              f.Length + (f.CornerB ? (f.StraightB ? T / 2f : T) : f.JointB ? T / 2f : 0f));
 
-        static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g, int lookIndex = -1)
+        /// <summary>A chair rail's half height and how far a light switch's plate reaches up and down and to each side (kit_rail, the LightSwitch prefab).</summary>
+        public const float RailHalf = 0.035f, SwitchHalfHeight = 0.0625f, SwitchHalfWidth = 0.0425f;
+        /// <summary>The rail ends this far short of a switch's plate, and no shorter stub of it is left by a doorway.</summary>
+        public const float SwitchClear = 0.03f, RailStub = 0.2f;
+
+        /// <summary>
+        /// Along-wall spans of this face where a light switch's plate sits across a rail at <paramref name="y"/> above the
+        /// floor: the rail stops short of the plate (it ran over it — only the plate's top edge showed above the rail).
+        /// </summary>
+        static List<(float, float)> SwitchSpans(WallFace f, List<SwitchSpot> switches, float y)
+        {
+            var spans = new List<(float, float)>();
+            if (switches == null) return spans;
+            foreach (var s in switches)
+            {
+                if (Vector3.Dot(s.Facing, f.Normal) < 0.9f || Mathf.Abs(s.Position.y - f.A.y - y) > SwitchHalfHeight + RailHalf + 0.01f) continue;
+                var d = new Vector3(s.Position.x - f.A.x, 0f, s.Position.z - f.A.z);
+                if (Mathf.Abs(Vector3.Dot(d, f.Normal) - T / 2f) > 0.05f) continue; // another wall (the plate is on the face, A on the wall's axis)
+                float u = Vector3.Dot(d, f.Along), half = SwitchHalfWidth + SwitchClear;
+                if (u + half > -T && u - half < f.Length + T) spans.Add((u - half, u + half));
+            }
+            return spans;
+        }
+
+        static void PlanFace(List<DecorPiece> list, WallFace f, LevelShell shell, StyleGeometry g, int lookIndex = -1, List<SwitchSpot> switches = null)
         {
             var look = lookIndex >= 0 ? g.RoomLooks[lookIndex] : default;
             bool plain = lookIndex >= 0 && look.Plain, tiled = lookIndex >= 0 && look.Lower != null;
@@ -543,13 +568,25 @@ namespace Stealth.Level
                 list.Add(new DecorPiece { Kind = kind, Position = At((a + b) / 2f, y), Rotation = rot, Scale = new Vector3(b - a, 1f, 1f) });
             }
 
+            // a rail stops short of a light switch whose plate sits at its height (and leaves no stub between it and the door)
+            void Rail(float y)
+            {
+                var across = SwitchSpans(f, switches, y);
+                foreach (var (a, b) in low)
+                {
+                    if (across.Count == 0) { Run(DecorKind.Rail, y, a, b); continue; }
+                    foreach (var (c, d) in Around(a, b, across))
+                        if (d - c >= RailStub || (c <= a + 0.001f && d >= b - 0.001f)) Run(DecorKind.Rail, y, c, d);
+                }
+            }
+
             // under a vent the panels must clear its bottom flange too
             bool wainscot = !plain && fullHeight && g.WainscotHeight > 0f && f.Y1 >= g.WainscotHeight + (toTop ? 0.02f : FrameReach);
             if (fullHeight && g.Baseboard && !wainscot && !tiled && f.Y1 >= 0.2f) foreach (var (a, b) in low) Run(DecorKind.Baseboard, 0f, a, b);
             if (g.Crown && toTop) Run(DecorKind.Crown, LevelMetrics.WallHeight, u0, u1);
-            if (!plain && fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, g.RailHeight, a, b);
+            if (!plain && fullHeight && g.RailHeight > 0f && f.Y1 >= g.RailHeight + 0.1f) Rail(g.RailHeight);
             // tiles (padding) up to some height: a cap rail along their top edge
-            if (tiled && fullHeight && f.Y1 >= look.LowerHeight + 0.1f) foreach (var (a, b) in low) Run(DecorKind.Rail, look.LowerHeight, a, b);
+            if (tiled && fullHeight && f.Y1 >= look.LowerHeight + 0.1f) Rail(look.LowerHeight);
             if (wainscot)
                 foreach (var (a, b) in low)
                 {

@@ -36,6 +36,8 @@ namespace Stealth.Configs
         public PropReplacement[] Props = new PropReplacement[0];
         [Tooltip("Models designed for one style (Art/Models/Styles/PerStyle/<style>, Styles/Players)")]
         public StyleMeshes[] StyleModels = new StyleMeshes[0];
+        [Tooltip("The models' own baked maps (rounded edges, detail, occlusion): whatever mesh a part shows is told its slice of them.")]
+        public Stealth.Level.ShapeLibrary Shapes;
         [Tooltip("Draws a merged mesh of the house (style architecture, furniture): MeshFilter + MeshRenderer, nothing else")]
         public GameObject Batch;
         [Tooltip("The players as rigged humans, one per department (PlayerLooks.Department; Tools/Blender/human.py): shown in every style that has no rigged human of its own (StyleGeometry.PlayerRig)")]

@@ -393,8 +393,7 @@ namespace Stealth.Game
             LevelRandom.Begin(info.Seed);
             UnityEngine.Random.InitState(LevelRandom.Mix(info.Seed, (int)RandomChannel.Engine, 0));
             var level = Tuning.Level;
-            var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features,
-                LevelGenerator.Classic, info.ClassicEnemies);
+            var layout = TakePrepared(info) ?? LevelGenerator.Generate(info.Seed, info.Index, level.Building, level.Security, Mathf.Max(1, info.Players), level.Features);
             foreach (var _ in ActiveLevel.LoadSteps(layout, Art)) yield return null;
             Exploration = new ExplorationMap(layout);
             Pings.Clear();
@@ -453,7 +452,7 @@ namespace Stealth.Game
             int seed = houseSeed != 0 ? houseSeed : Route.Node(index, lane).Seed;
             // The house is sized for the team that is here now (friends who join later raise only the quota).
             int players = TeamSize;
-            var info = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed, ClassicEnemies = LevelGenerator.ClassicEnemies };
+            var info = new LevelInfo { Seed = seed, Index = index, Players = players, Lane = lane, RunSeed = m_RunSeed };
             if (!arriving) m_Prepared = null; // (a house started some other way: nothing generated for it)
             var build = BuildLocalSteps(info);
             while (build.MoveNext()) if (arriving) yield return null;

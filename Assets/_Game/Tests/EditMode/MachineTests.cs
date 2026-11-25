@@ -121,6 +121,34 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void TheEdgesOfADisplaysGlassAreNoBrightRim()
+        {
+            // the play of 2026-11-25: the bevel of the kiosk's screen lay on the plain lit cell — a bright line 4 mm wide
+            // round a dark screen, thinner than a pixel from across the lobby: it broke up and flickered in motion.
+            // Pure: a screen (a face, a bevel strip joined to it by its corners) and a lamp apart from it
+            var v = new[]
+            {
+                new Vector3(-0.2f, 0f, 0f), new Vector3(0.2f, 0f, 0f), new Vector3(0.2f, 0.3f, 0f), new Vector3(-0.2f, 0.3f, 0f),               // the face
+                new Vector3(-0.2f, 0.3f, 0f), new Vector3(0.2f, 0.3f, 0f), new Vector3(0.2f, 0.304f, 0.004f), new Vector3(-0.2f, 0.304f, 0.004f), // its top bevel
+                new Vector3(0.5f, 0f, 0f), new Vector3(0.505f, 0f, 0f), new Vector3(0.505f, 0.005f, 0f), new Vector3(0.5f, 0.005f, 0f),         // a lamp
+            };
+            var t = new[] { 0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 10, 9, 8, 11, 10 };
+            var uv = ScreenFaces.Fit(v, t, ScreenFaces.DisplaySide, true, true);
+            Assert.GreaterOrEqual(uv[0].x, 0f, "the face shows the picture");
+            var rims = ScreenFaces.Rims(v, t, uv);
+            for (int i = 0; i < 4; i++) Assert.IsFalse(rims[i], "the face itself is no rim");
+            for (int i = 4; i < 8; i++) Assert.IsTrue(rims[i], "the bevel of the glass belongs to the screen");
+            for (int i = 8; i < 12; i++) Assert.IsFalse(rims[i], "a lamp beside the screen stays lit");
+            // the kiosk itself: everything of its screen lies in its own picture's cell
+            int picture = ScreenLooks.DisplayOf(PropKind.InfoKiosk);
+            float w = 1f / ScreenLooks.DisplayCols, h = 1f / ScreenLooks.DisplayRows;
+            var cell = new Rect(picture % ScreenLooks.DisplayCols * w, 1f - (picture / ScreenLooks.DisplayCols + 1) * h, w, h);
+            foreach (var r in Art.Prop(PropKind.InfoKiosk).GetComponentsInChildren<MeshRenderer>(true).Where(r => r.sharedMaterial == Art.Screens[0]))
+                foreach (var u in ScreenFaces.Of(r.GetComponent<MeshFilter>().sharedMesh, picture).uv)
+                    Assert.IsTrue(cell.Contains(u), $"a part of the kiosk's screen shows another picture ({u}): a rim of another colour round it");
+        }
+
+        [Test]
         public void ADisplayOnAPanelIsTheRightWayRoundForWhoeverStandsBeforeIt()
         {
             // a face lying flat, seen from +Z (the front): its left is +X, its bottom the near edge

@@ -537,6 +537,8 @@ def export_fbx(path, objs=None):
     """FBX in the game's orientation (Blender -Y front -> Unity +Z), modifiers applied, custom normals kept."""
     import os
     objs = objs or [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    import shapebake
+    shapebake.for_export(path, objs)   # (the pilot models: a second UV set and their own baked maps)
     for o in bpy.context.scene.objects:
         o.select_set(o in objs)
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

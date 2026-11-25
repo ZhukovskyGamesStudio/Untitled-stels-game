@@ -29,10 +29,9 @@ Saved 2026-11-16. Branch `Gameplay_rooms_test`, nothing committed yet. The desig
   footprint is sized from them (+20 % corridors), free rectangles are cut into exactly those rooms (treemap, rooms ≥ 4 m
   wide); linked houses pack up to 3 rooms per block, the storage room alone in a dead-end block. A typed room is never
   below its type's minimum (`RoomRules.Enforce`).
-- **Classic generator** (switch): BSP split into rooms of any size, then each room's type guessed from size and
+- **Classic generator** (no longer offered by the game: its menu switch and `-classicrooms` were removed 2026-11-25; the code stays for the tests): BSP split into rooms of any size, then each room's type guessed from size and
   proportions (`PlanGenerator.GenerateClassic`, `AssignTypes`/`Fit`). The storage room is a dead end picked afterwards.
-  Turn on with the **"Classic generator" toggle in the main menu** or **`-classicrooms`**; like test rooms it is not
-  replicated, every peer must match. Plan pictures: `PLANCLASSIC=1 PLANS="7:2" Tools/dev.sh plans`.
+  Plan pictures: `PLANCLASSIC=1 PLANS="7:2" Tools/dev.sh plans`.
 
 ### Zoning (step 1 of the roadmap — done)
 - `Zoning.Arrange` on the finished plan, both modes: themed rooms over their cap become an everyday type; rooms of a

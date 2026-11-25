@@ -25,6 +25,8 @@ namespace Stealth.Level
 
         /// <summary>The soft look of the ceiling lamps in the current style (<see cref="Configs.StyleWorld.CeilingGlow"/>): 0 none. Visual only.</summary>
         public static float CeilingGlow;
+        /// <summary>The ceiling lamps gather their light under them in the current style (<see cref="Configs.StyleWorld.LampPool"/>): 0 an even room. Visual only.</summary>
+        public static float LampPool;
 
         /// <summary>
         /// How much of this light is shown to the eye (1: all of it), on top of the style's scale: a lamp a hand's breadth from

@@ -42,23 +42,74 @@ half OuterEdge(float2 uv, float3 positionWS)
     return smoothstep(0.22, 0.75, best) * (1.0 - smoothstep(1.45, 1.6, best)) * (1.0 - rod) * fade;
 }
 
+// The lit pass's vertices and, with them, where the model's own baked maps lie: its second UV set and which slice of the
+// shared arrays is its own — from the renderer (_ShapeSlice) or, in a mesh merged of many models, from each vertex.
+struct SurfaceAttributes
+{
+    Attributes lit;
+    float2 shapeId : TEXCOORD3;         // merged meshes: x slice + 1 (0 none), y −1 where the part was mirrored
+};
+
+struct SurfaceVaryings
+{
+    Varyings lit;
+    float4 shape : TEXCOORD12;          // xy the second UV set, z the slice (−1 none), w the frame's sign
+};
+
+SurfaceVaryings SurfaceVertex(SurfaceAttributes input)
+{
+    SurfaceVaryings o;
+    o.lit = LitPassVertex(input.lit);
+    // Whose maps: a mesh merged of many models says so itself (_ShapeInVertices, set on the merged mesh's renderer) and
+    // then each vertex names them; any other mesh has no such data — what is read from a stream a mesh does not have
+    // is not zeros (parts of a model picked another model's maps and a mirrored frame) — and is told by its renderer.
+    bool merged = _ShapeInVertices > 0.5;
+    float slice = merged ? input.shapeId.x - 1.0 : _ShapeSlice;
+    float mirrored = merged ? (input.shapeId.y < 0.0 ? -1.0 : 1.0) : unity_WorldTransformParams.w;
+    // (the mesh's second UV set, or its third where the part came with a spare one: nothing here is lightmapped; a
+    // merged mesh always carries them as its second)
+    float2 own = !merged && _ShapeUv > 1.5 ? input.lit.dynamicLightmapUV : input.lit.staticLightmapUV;
+    o.shape = float4(own, slice, mirrored);
+    return o;
+}
+
 void SurfaceFragment(
-    Varyings input
+    SurfaceVaryings sv
     , out half4 outColor : SV_Target0
 #ifdef _WRITE_RENDERING_LAYERS
     , out uint outRenderingLayers : SV_Target1
 #endif
 )
 {
+    Varyings input = sv.lit;
     UNITY_SETUP_INSTANCE_ID(input);
     UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+    // The model's own maps (nothing where it has none). Their normals are in the tangent space of the second UV set,
+    // which no vertex carries: its frame is found from how the place and that UV change across the pixel — right
+    // whatever was merged or turned on the way here.
+    float2 uv1 = sv.shape.xy;
+    float slice = floor(sv.shape.z + 0.5);
+    half shapeOn = (slice >= 0.0 ? 1.0 : 0.0) * _ShapesBound * (1.0 - _ShapesOff);
+    half3 shape = lerp(half3(1.0, 1.0, 1.0), SAMPLE_TEXTURE2D_ARRAY(_ShapeMasks, sampler_ShapeMasks, uv1, max(slice, 0.0)).rgb, shapeOn);
+    half2 shapeXY = SAMPLE_TEXTURE2D_ARRAY(_ShapeNormals, sampler_ShapeNormals, uv1, max(slice, 0.0)).rg * 2.0 - 1.0;
+    float3 faceN = normalize(input.normalWS);
+    float3 dpx = ddx(input.positionWS), dpy = ddy(input.positionWS);
+    float2 dux = ddx(uv1), duy = ddy(uv1);
+    float3 perpY = cross(dpy, faceN), perpX = cross(faceN, dpx);
+    float3 shapeT = perpY * dux.x + perpX * duy.x, shapeB = perpY * dux.y + perpX * duy.y;
+    float shapeScale = rsqrt(max(max(dot(shapeT, shapeT), dot(shapeB, shapeB)), 1e-20));
+    // (the sign: our models are imported mirrored in X, their UVs are not, and the bake never flips an island — so the
+    // frame found this way is the mirror of the one the map was baked in: without the minus every rib was a slot,
+    // checked on a picture; an object mirrored once more by its scale turns it back)
+    half3 shapeBend = -(shapeT * shapeXY.x + shapeB * shapeXY.y) * shapeScale * shapeOn * sv.shape.w;
 
     half4 base = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
     half4 mask = SampleMetallicSpecGloss(input.uv, 1.0);
     half3 albedo = base.rgb * _BaseColor.rgb;
     half metal = mask.r;
     half smooth = mask.a;
-    half occlusion = LerpWhiteTo(mask.g, _OcclusionStrength);
+    half occlusion = LerpWhiteTo(mask.g, _OcclusionStrength) * shape.r;
 
     // the wear, at its own scale: turned a little against the surface's tile, so the two never repeat together
     float2 metres = input.uv / max(abs(_BaseMap_ST.xy), 1e-4);
@@ -97,8 +148,9 @@ void SurfaceFragment(
     float2 screenUv = GetNormalizedScreenSpaceUV(input.positionCS);
     half edge = 0.0;
     #if defined(_SCREEN_SPACE_OCCLUSION)                                // (its normals are there only with it)
-    if (_EdgeWear > 0.0) edge = OuterEdge(screenUv, input.positionWS);
+    if (_EdgeWear > 0.0 && shapeOn < 0.5) edge = OuterEdge(screenUv, input.positionWS);
     #endif
+    edge = max(edge, saturate((1.0 - shape.g) * 1.7));                 // the model's own edges: the same from any distance
     half rub = saturate(wear2.b * 1.3 + wear.r * 0.6 + wear2.g * 0.5);
     half worn = edge * smoothstep(0.95 - _EdgeWear, 1.45 - 0.6 * _EdgeWear, 0.35 + rub);
     albedo = lerp(albedo, _WearColor.rgb, worn);
@@ -112,12 +164,14 @@ void SurfaceFragment(
     half corner = saturate((1.0 - SampleAmbientOcclusion(screenUv)) * 2.0);
     dirt += corner * _Corners * (0.45 + 0.55 * rub);
     #endif
+    dirt += (1.0 - shape.b) * _Corners * (0.5 + 0.5 * rub);            // the model's own cavities
     half low = saturate(1.0 - over / 0.28);
     dirt += low * low * _FloorDirt * (0.35 + 0.65 * saturate(wear.b + wear2.a + wear.r * 0.5));
     dirt = saturate(dirt) * (1.0 - 0.75 * worn);
     albedo = lerp(albedo, albedo * _DirtColor.rgb, dirt);
     smooth *= 1.0 - 0.55 * dirt;
     metal *= 1.0 - 0.5 * dirt;
+    albedo *= lerp(1.0, shape.r, 0.55);                                 // where its parts shut the light out, whatever lamp shines
     albedo *= 1.0 - _Contact * saturate(exp(-over / 0.18) + exp(-max(_RoomHeight - over, 0.0) / 0.22)); // less light gets into a corner
 
     SurfaceData s = (SurfaceData)0;
@@ -132,6 +186,7 @@ void SurfaceFragment(
 
     InputData inputData;
     InitializeInputData(input, s.normalTS, inputData);
+    inputData.normalWS = normalize(inputData.normalWS + shapeBend);
     InitializeBakedGIData(input, inputData);
     half4 color = UniversalFragmentPBR(inputData, s);
     color.rgb = MixFog(color.rgb, inputData.fogCoord);

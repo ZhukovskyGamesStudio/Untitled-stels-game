@@ -334,23 +334,17 @@ namespace Stealth.Level
         public static class Timing { [System.ThreadStatic] public static long Plan, Check, Furnish, Walk, Grid, Flood, Reach, Barrier, Rounds; public static void Reset() => Plan = Check = Furnish = Walk = Grid = Flood = Reach = Barrier = Rounds = 0; }
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
-        /// <summary>
-        /// The classic generator (the main menu's switch, "-classicrooms"): the plan is cut into rooms first and each room's
-        /// type guessed from its size and proportions (<see cref="PlanGenerator.GenerateClassic"/>), instead of the room
-        /// program deciding the rooms first. Off by default; set before a game starts — every peer must match.
-        /// </summary>
-        public static bool Classic;
-
-        /// <summary>
-        /// The old enemies (the main menu's switch, "-classicenemies"): guards patrol, wardens guard loot rooms, hounds and
-        /// the hunter come. Off (the new mode): guards rest in the robots' charging room until an alarm, no hounds, hunter
-        /// or wardens — traps guard the rich rooms (<see cref="Wards"/>). The host decides (<c>LevelInfo.ClassicEnemies</c>).
-        /// </summary>
-        public static bool ClassicEnemies;
-
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, Classic, ClassicEnemies);
+            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, false, false);
 
+        /// <summary>
+        /// As above, with the two older ways the game no longer offers (their switches left the menu; the tests still
+        /// compare them with what the game builds).
+        /// </summary>
+        /// <param name="classic">The classic generator: the plan is cut into rooms first and each room's type guessed from
+        /// its size and proportions (<see cref="PlanGenerator.GenerateClassic"/>), instead of the room program deciding the rooms.</param>
+        /// <param name="classicEnemies">The old enemies: guards patrol, wardens guard loot rooms, hounds and the hunter come;
+        /// otherwise guards rest in the charging room until an alarm and traps guard the rich rooms (<see cref="Wards"/>).</param>
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
             FeatureSettings features, bool classic, bool classicEnemies = false)
         {

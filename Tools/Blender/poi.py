@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir, category(), set_pivot(), ITEM_CELL)
 import meshfix  # noqa: E402
 import printed  # noqa: E402
+import shapebake  # noqa: E402
 import shapes as s  # noqa: E402
 
 MOVING = ("AccentWheel", "AccentHead", "AccentLid")  # parts the game moves: meshfix must not shift them off their pivots
@@ -443,6 +444,14 @@ def model_programmer_console():
         d = w - (Vector((-0.64 + 0.64 * k, 0.415, 1.73)) + n * 0.024)
         u = min(1.0, max(0.0, d.x / 0.54 + 0.5))
         uv[loop.index].uv = ((k + u) / 3.0, min(1.0, max(0.0, d.dot(up) / 0.3 + 0.5)))
+    # what only its baked maps show (shapebake): screws in the corners of the back panel and of the desk's front,
+    # louvres pressed into the cabinet's sides, the sheet a little uneven
+    extra = shapebake.rivets([(x, 0.45, z) for x in (-0.94, -0.32, 0.32, 0.94) for z in (1.02, 1.95)], "-Y", r=0.005, h=0.0015)
+    extra += shapebake.rivets([(x, -0.39, z) for x in (-0.76, 0.76) for z in (0.06, 0.72)], "-Y", r=0.005, h=0.0015)
+    for sx, axis in ((-1, "-X"), (1, "X")):
+        for i in range(9):
+            extra.append(shapebake.plate((0.3, 0.014), (sx * 0.98, 0.215, 0.28 + i * 0.045), axis, proud=0.0015))
+    shapebake.detail("programmer_console", extra, waves=0.0004, wavy=("Body",))
     return export("programmer_console")
 
 

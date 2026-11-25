@@ -1,7 +1,7 @@
 """Downloads the scanned CC0 textures the surfaces are made of (Tools/Art/generate_surfaces.py) into Tools/Art/cache/surfaces
 (ignored by git): <id>/color.jpg, normal.jpg (OpenGL), rough.jpg and what else the set has (metal.jpg, ao.jpg).
 
-Run:  python -I Tools/Art/fetch_surfaces.py
+Run:  python -I Tools/Art/fetch_surfaces.py               (RES=2k: the 2K sets, into Tools/Art/cache/surfaces2k)
 
 Sources: ambientCG (1K-JPG zips) and Poly Haven (1k jpg: diffuse, OpenGL normal, ARM). Both are CC0: free, commercial use
 included, no attribution required (listed in Art/Textures/Surfaces/CREDITS.md all the same).
@@ -12,7 +12,8 @@ import urllib.request
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-CACHE = os.path.join(ROOT, "Tools", "Art", "cache", "surfaces")
+RES = os.environ.get("RES", "1k").lower()               # 1k, 2k: the size of the sets
+CACHE = os.path.join(ROOT, "Tools", "Art", "cache", "surfaces" if RES == "1k" else "surfaces" + RES)
 CREDITS = os.path.join(ROOT, "Assets", "_Game", "Art", "Textures", "Surfaces", "CREDITS.md")
 UA = {"User-Agent": "game-texture-fetch/1.0"}
 
@@ -35,7 +36,7 @@ def ambientcg(name):
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, name + ".zip")
     with open(path, "wb") as f:
-        f.write(get(f"https://ambientcg.com/get?file={name}_1K-JPG.zip"))
+        f.write(get(f"https://ambientcg.com/get?file={name}_{RES.upper()}-JPG.zip"))
     with zipfile.ZipFile(path) as z:
         for n in z.namelist():                           # only the named maps, under our own names: nothing else is unpacked
             base = os.path.splitext(os.path.basename(n))[0]
@@ -57,16 +58,23 @@ def polyhaven(name):
     for key, ours in (("Diffuse", "color"), ("nor_gl", "normal"), ("arm", "arm")):
         if key in files:
             with open(os.path.join(folder, ours + ".jpg"), "wb") as f:
-                f.write(get(files[key]["1k"]["jpg"]["url"]))
+                f.write(get(files[key][RES]["jpg"]["url"]))
     open(os.path.join(folder, ".done"), "w").close()
     print(name, sorted(os.listdir(folder)))
 
 
 if __name__ == "__main__":
+    import sys
+    only = set(sys.argv[1:])                             # names given: only those sets (and the credits are left alone)
     for a in AMBIENTCG:
-        ambientcg(a)
+        if not only or a in only:
+            ambientcg(a)
     for p in POLYHAVEN:
-        polyhaven(p)
+        if not only or p in only:
+            polyhaven(p)
+    if only:
+        print("DONE")
+        raise SystemExit
     os.makedirs(os.path.dirname(CREDITS), exist_ok=True)
     with open(CREDITS, "w", encoding="utf-8", newline="\n") as c:
         c.write("# Scanned sources of the surfaces\n\nAll CC0 (public domain: free, commercial use included, no attribution required — listed for "

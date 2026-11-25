@@ -23,6 +23,10 @@ namespace Stealth.Player
         public static float MusicVolume { get; set; } = DefaultMusicVolume;
         /// <summary>How edges are smoothed (<see cref="SmoothingRules"/>).</summary>
         public static Smoothing Smoothing { get; set; } = SmoothingRules.Default;
+        /// <summary>The style's light and colour after their rework (off: as they were before it). Picture only.</summary>
+        public static bool NewLighting { get; set; } = true;
+        /// <summary>The models' own baked maps and the 2K surface scans (off: without the maps, the scans as they were at 1K). Picture only.</summary>
+        public static bool NewTextures { get; set; } = true;
         /// <summary>Frames wait for the screen's refresh: no tearing.</summary>
         public static bool VSync { get; set; } = true;
 
@@ -47,6 +51,8 @@ namespace Stealth.Player
             MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "music", DefaultMusicVolume));
             Smoothing = SmoothingRules.Clamp(PlayerPrefs.GetInt(Prefix + "smoothing", (int)SmoothingRules.Default));
             VSync = PlayerPrefs.GetInt(Prefix + "vsync", 1) == 1;
+            NewLighting = PlayerPrefs.GetInt(Prefix + "lighting", 1) == 1;
+            NewTextures = PlayerPrefs.GetInt(Prefix + "textures", 1) == 1;
         }
 
         public static void Save()
@@ -60,6 +66,8 @@ namespace Stealth.Player
             PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
             PlayerPrefs.SetInt(Prefix + "smoothing", (int)Smoothing);
             PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "lighting", NewLighting ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "textures", NewTextures ? 1 : 0);
             Controls.Save();
             PlayerPrefs.Save();
         }
@@ -75,6 +83,8 @@ namespace Stealth.Player
             MusicVolume = DefaultMusicVolume;
             Smoothing = SmoothingRules.Default;
             VSync = true;
+            NewLighting = true;
+            NewTextures = true;
         }
     }
 }

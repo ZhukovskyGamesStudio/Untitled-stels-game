@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generate_models as g  # noqa: E402  (out_dir from the first argument after --)
 import keyboard  # noqa: E402
 import meshfix  # noqa: E402
+import shapebake  # noqa: E402
 import shapes as s  # noqa: E402
 
 E = 0.005  # how deep an attached piece sinks into its carrier
@@ -208,6 +209,7 @@ def model_info_kiosk():
     s.part("Accent", [plate, bezel, slot])
     screen = s.rbox((0.48, 0.006, 0.34), tuple(mid + n * 0.0115), r=0.004, seg=1, rot=(tilt, 0, 0))
     s.part("Eye", [screen])
+    shapebake.detail("info_kiosk", [], waves=0.0003)          # (its baked maps: rounded edges, occlusion; sheet a little uneven)
     return export("info_kiosk")
 
 
@@ -479,6 +481,21 @@ def model_filing_cabinet():
         s.part(f"BodyDrawer{k}", drawer)
     s.part("Body", body)
     s.part("Accent", acc)
+    # what only its baked maps show (shapebake): pressed drawer fronts with a screw each side of the label, two pressed
+    # ribs and rows of spot welds on each side, the sheet a little uneven
+    extra = []
+    for k in range(4):
+        bot = 0.05 + k * 0.31
+        top = bot + 0.296
+        extra.append(shapebake.plate((0.385, 0.25), (0, -0.275, (top + bot) / 2), "-Y"))
+        extra += shapebake.rivets([(x, -0.2762, top - 0.11) for x in (-0.075, 0.075)], "-Y", r=0.0035, h=0.001)
+    for sx, axis in ((-1, "-X"), (1, "X")):
+        for y in (-0.12, 0.16):
+            extra.append(shapebake.plate((0.06, 1.08), (sx * 0.23, y, 0.675), axis, proud=0.0007))
+        for z in (0.075, 1.262):
+            extra += shapebake.rivets([(sx * 0.23, -0.215 + i * 0.066, z) for i in range(8)], axis, r=0.0032, h=0.0007)
+        extra += shapebake.rivets([(sx * 0.23, -0.236, 0.2 + i * 0.155) for i in range(7)], axis, r=0.0032, h=0.0007)
+    shapebake.detail("filing_cabinet", extra, waves=0.0005, wavy=("Body",))
     return export("filing_cabinet")
 
 
@@ -499,6 +516,7 @@ def model_credenza():
     s.part("Body", body)
     s.part("Accent", acc)
     s.part("Trim", [s.rbox((1.6, 0.46, 0.032), (0, 0, 0.734), r=0.008, seg=2)])
+    shapebake.detail("credenza", [], waves=0.0)          # (its baked maps: rounded edges, occlusion; sheet a little uneven)
     return export("credenza")
 
 

@@ -18,6 +18,8 @@ namespace Stealth.Configs
         [TextArea(2, 5), Tooltip("The idea in two sentences")]
         public string Pitch = "";
 
+        [Tooltip("The look the style had before its light was reworked (Settings → Look sets the two side by side).")]
+        public StyleOldLook Old = new();
         public StyleGrade Grade = new();
         public StyleScreen Screen = new();
         public StyleWorld World = new();
@@ -26,6 +28,19 @@ namespace Stealth.Configs
     }
 
     public enum StyleTonemap { Neutral, Aces, None }
+
+    /// <summary>
+    /// What a style's light and colour were before they were reworked — only the numbers that changed: the player can
+    /// switch back to see the difference (Settings → Look; <see cref="Stealth.Level.VisualStyles.OldLook"/>).
+    /// </summary>
+    [System.Serializable]
+    public class StyleOldLook
+    {
+        [Tooltip("The style has such a look (off: old and new are the same)")] public bool Has;
+        public StyleTonemap Tonemap = StyleTonemap.Neutral;
+        public float Exposure, Contrast, Saturation, RoomFill, LampPool;
+        public Color Ambient = Color.black;
+    }
 
     /// <summary>
     /// The modelling language of a style (Tools/Blender/style_families.py rebuilds every model per family; the realistic
@@ -280,6 +295,8 @@ namespace Stealth.Configs
         public float LampGlow = 1f;
         [Tooltip("The soft look of a ceiling lamp (0 = none: a flat glowing panel): a hot middle on each diffuser fading to its edges, and a pool of light on the ceiling round the fixture, fading out. 1 = full. Visual only (no light is cast)")]
         public float CeilingGlow;
+        [Tooltip("A ceiling lamp gathers its light under itself (0 = it shines as much sideways as down: an even room; 1 = a pool of light under each lamp, the walls and the corners between lamps dimmer). Visual only: robots still see the real, even light — keep LightScale so that what is under a lamp is not much brighter than it is for them")]
+        public float LampPool;
         [Tooltip("A faint light round the player's own eyes, its strength (0 = none): what is right before the player — the inside of a drawer, a corner in his own shadow — is never pitch black. Only its owner sees it; robots do not (visual only)")]
         public float EyeGlow;
         [Tooltip("How far the light round the eyes reaches, metres")]

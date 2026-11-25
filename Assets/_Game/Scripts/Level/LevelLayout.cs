@@ -371,7 +371,7 @@ namespace Stealth.Level
         public Vector3 CageKeySpot;
         public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
-        /// <summary>The old enemies (LevelGenerator.ClassicEnemies): wardens, hounds, the hunter, guards on patrol, no wards.</summary>
+        /// <summary>The old enemies (LevelGenerator.Generate's classicEnemies; the game no longer builds such houses): wardens, hounds, the hunter, guards on patrol, no wards.</summary>
         public bool ClassicEnemies;
         /// <summary>The robots' charging room (a human tech room they took over), or −1; its docks (guards rest there).</summary>
         public int ChargingRoom = -1;

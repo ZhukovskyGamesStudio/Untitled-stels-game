@@ -17,9 +17,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
-N = 1024
+N = int(os.environ.get("SURFACE_SIZE", "1024"))         # (2048 only for the scanned surfaces: the drawn ones take their relief from pixel steps)
 BASE = 0.86
-SCANS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "surfaces")
+SCANS = os.environ.get("SURFACE_SCANS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "surfaces")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "_Game", "Art", "Textures", "Surfaces")
 Y, X = np.mgrid[0:N, 0:N] / N
 FX = np.fft.fftfreq(N) * N

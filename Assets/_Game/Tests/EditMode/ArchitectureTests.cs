@@ -376,6 +376,33 @@ namespace Stealth.Tests
                     "a pilaster stops under the cornice, which runs on over its capital");
         }
 
+        [TestCase(1.1f)]
+        [TestCase(1.2f)]
+        [TestCase(0.9f)]
+        public void ARailStopsShortOfALightSwitchAtItsHeight(float height)
+        {
+            // the play of 2026-11-25: the rail that caps a room's lower band ran over the switch by its door
+            var shell = Shell(out var layout);
+            var rails = ArchitecturePlanner.Plan(shell, layout, new StyleGeometry { RailHeight = height }).Where(p => p.Kind == DecorKind.Rail).ToList();
+            Assert.IsNotEmpty(rails);
+            var switches = UtilityPlan.SwitchSpots(layout, shell);
+            Assert.IsNotEmpty(switches);
+            int near = 0;
+            foreach (var s in switches)
+                foreach (var p in rails)
+                {
+                    var normal = p.Rotation * Vector3.forward;
+                    var d = s.Position - p.Position;
+                    if (Vector3.Dot(normal, s.Facing) < 0.9f || Mathf.Abs(Vector3.Dot(d, normal)) > 0.05f) continue; // another wall
+                    float along = Mathf.Abs(Vector3.Dot(d, p.Rotation * Vector3.right)) - p.Scale.x / 2f;
+                    if (along > 1f) continue;
+                    near++;
+                    bool across = Mathf.Abs(d.y) < ArchitecturePlanner.SwitchHalfHeight + ArchitecturePlanner.RailHalf;
+                    if (across) Assert.Greater(along, ArchitecturePlanner.SwitchHalfWidth, $"the rail at {p.Position} runs over the light switch at {s.Position}");
+                }
+            Assert.Greater(near, 0, "rails beside switches were checked");
+        }
+
         [Test]
         public void TheArchsSpandrelsContinueTheWallsFinishWithoutASeam()
         {

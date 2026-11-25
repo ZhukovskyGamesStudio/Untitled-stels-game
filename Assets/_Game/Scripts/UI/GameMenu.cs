@@ -44,10 +44,6 @@ namespace Stealth.UI
         public Button HostLocal;
         [Tooltip("Main game (off) or the test rooms (on): small houses of 3–4 rooms with no guards, to tune rooms in.")]
         public Toggle TestRooms;
-        [Tooltip("The classic generator: rooms cut first, their types guessed from size (LevelGenerator.Classic).")]
-        public Toggle ClassicRooms;
-        [Tooltip("The old enemies: guards on patrol, wardens, hounds, the hunter (LevelGenerator.ClassicEnemies).")]
-        public Toggle ClassicEnemies;
         public InputField Address;
         public Button Join;
         public Text NetStatus;
@@ -94,6 +90,10 @@ namespace Stealth.UI
         public Button Language;
         [Tooltip("Cycles the ways edges are smoothed (SmoothingRules); its label names the current one.")]
         public Button Smoothing;
+        [Tooltip("The style's light and colour, new or as before the rework (GameSettings.NewLighting); its label names the current one.")]
+        public Button Lighting;
+        [Tooltip("The models' baked maps and the 2K scans, new or old (GameSettings.NewTextures); its label names the current one.")]
+        public Button Textures;
         public Toggle VSync;
         public Button Defaults;
         public Button Done;
@@ -127,20 +127,6 @@ namespace Stealth.UI
             {
                 Configs.Tuning.SetTestRooms(true);
                 Level.VisualStyles.UseConfig(Configs.Tuning.Styles);
-            }
-            // "-classicrooms": the classic generator (every peer passes it, like the switch itself)
-            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-classicrooms") >= 0) Level.LevelGenerator.Classic = true;
-            if (ClassicRooms != null)
-            {
-                ClassicRooms.SetIsOnWithoutNotify(Level.LevelGenerator.Classic);
-                ClassicRooms.onValueChanged.AddListener(on => Level.LevelGenerator.Classic = on);
-            }
-            // "-classicenemies": the old enemies (the host's choice travels with the house to every peer)
-            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-classicenemies") >= 0) Level.LevelGenerator.ClassicEnemies = true;
-            if (ClassicEnemies != null)
-            {
-                ClassicEnemies.SetIsOnWithoutNotify(Level.LevelGenerator.ClassicEnemies);
-                ClassicEnemies.onValueChanged.AddListener(on => Level.LevelGenerator.ClassicEnemies = on);
             }
             if (TestRooms != null)
             {
@@ -190,6 +176,8 @@ namespace Stealth.UI
             if (Language != null) Language.onClick.AddListener(NextLanguage);
             if (Smoothing != null) Smoothing.onClick.AddListener(() => GameSettings.Smoothing = SmoothingRules.Next(GameSettings.Smoothing));
             if (VSync != null) VSync.onValueChanged.AddListener(v => GameSettings.VSync = v);
+            if (Lighting != null) Lighting.onClick.AddListener(() => GameSettings.NewLighting = !GameSettings.NewLighting);
+            if (Textures != null) Textures.onClick.AddListener(() => GameSettings.NewTextures = !GameSettings.NewTextures);
         }
 
         /// <summary>The next language of <see cref="Loc.All"/> (saved at once; every label follows it).</summary>
@@ -360,6 +348,8 @@ namespace Stealth.UI
             MusicLabel.text = Loc.F("menu.music", GameSettings.MusicVolume * 100f);
             UpdateVoiceLabels();
             if (Smoothing != null) SetLabel(Smoothing, Loc.F("menu.smoothing", Loc.T(SmoothingRules.Key(GameSettings.Smoothing))));
+            if (Lighting != null) SetLabel(Lighting, Loc.T(GameSettings.NewLighting ? "menu.lighting_new" : "menu.lighting_old"));
+            if (Textures != null) SetLabel(Textures, Loc.T(GameSettings.NewTextures ? "menu.textures_new" : "menu.textures_old"));
             if (Language != null)
             {
                 var label = Language.GetComponentInChildren<Text>();

@@ -13,12 +13,19 @@ namespace Stealth.EditorTools
         public const int PrintAniso = 8;
 
         /// <summary>
+        /// A printed picture is read half a detail level finer than its size on the screen asks for: the temporal smoothing
+        /// gathers the extra detail over frames instead of letting it crawl, and small letters keep their strokes (at the
+        /// plain level a drawer label two metres away was a grey smudge).
+        /// </summary>
+        public const float PrintBias = -0.5f;
+
+        /// <summary>
         /// Printed pictures stay readable from across a room. Words are the first thing to break up when a texture is
         /// read small: with plain bilinear filtering the detail level snaps as the player walks (the letters jump), with
         /// no anisotropic filtering a tilted label is read from a level far too coarse or far too fine, the default block
         /// compression turns small high-contrast letters into blotches at the reduced levels, and a size that is not a
         /// power of two was stretched to one on import (every letter resampled). So: trilinear, anisotropic, the
-        /// high-quality compression, their own size.
+        /// high-quality compression, their own size, sharper reduced levels read a little finer (<see cref="PrintBias"/>).
         /// </summary>
         static void SharpPrints()
         {
@@ -31,12 +38,15 @@ namespace Stealth.EditorTools
                     string path = file.Replace('\\', '/');
                     if (AssetImporter.GetAtPath(path) is not TextureImporter imp || imp.textureType != TextureImporterType.Default) continue;
                     if (imp.mipmapEnabled && imp.filterMode == FilterMode.Trilinear && imp.anisoLevel == PrintAniso
-                        && imp.textureCompression == TextureImporterCompression.CompressedHQ && imp.npotScale == TextureImporterNPOTScale.None) continue;
+                        && imp.textureCompression == TextureImporterCompression.CompressedHQ && imp.npotScale == TextureImporterNPOTScale.None
+                        && Mathf.Approximately(imp.mipMapBias, PrintBias) && imp.mipmapFilter == TextureImporterMipFilter.KaiserFilter) continue;
                     imp.mipmapEnabled = true;
                     imp.filterMode = FilterMode.Trilinear;
                     imp.anisoLevel = PrintAniso;
                     imp.textureCompression = TextureImporterCompression.CompressedHQ;
                     imp.npotScale = TextureImporterNPOTScale.None;
+                    imp.mipMapBias = PrintBias;
+                    imp.mipmapFilter = TextureImporterMipFilter.KaiserFilter; // (the reduced levels keep their edges: the box filter greys thin strokes out)
                     imp.SaveAndReimport();
                     changed++;
                 }

@@ -15,7 +15,7 @@ namespace Stealth.Game
     /// </summary>
     public static class ScreenSmoothing
     {
-        static readonly int FinalPassOffId = Shader.PropertyToID("_FxaaOff");
+        static readonly int FinalPassOffId = Shader.PropertyToID("_FxaaOff"), ShapesOffId = Shader.PropertyToID("_ShapesOff");
 
         static int s_Sync = -1;
         static RenderObjects s_WorldText;
@@ -54,6 +54,10 @@ namespace Stealth.Game
         {
             if (!Application.isPlaying) return;
             GameSettings.EnsureLoaded();
+            // the look the player chose: the light of the style before or after its rework, the models' own maps on or off
+            VisualStyles.OldLook = !GameSettings.NewLighting;
+            Shader.SetGlobalFloat(ShapesOffId, GameSettings.NewTextures ? 0f : 1f);
+            ShapeLibrary.Detail = GameSettings.NewTextures;
             var style = VisualStyles.Current;
             bool fits = TemporalFits(style != null ? style.Screen : null);
             var choice = GameSettings.Smoothing;

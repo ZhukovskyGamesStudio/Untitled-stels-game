@@ -25,12 +25,15 @@ namespace Stealth.Level
         public Renderer Halo;
         [Tooltip("The lamp's cookies: none of its light goes up (a recessed panel), and — where the style has soft lamps — a share of it does: the lamp lights its own ceiling and the tops of its walls, with shadows, so nothing of it reaches the next room.")]
         public Texture Cookie, SoftCookie;
+        [Tooltip("The soft cookie with the light gathered under the lamp (the style's LampPool): less of it goes sideways.")]
+        public Texture PoolCookie;
 
         static readonly int EmissionId = Shader.PropertyToID("_EmissionColor"), BaseColorId = Shader.PropertyToID("_BaseColor");
         static readonly Color AlarmColor = new(1f, 0.15f, 0.1f);
 
 
         Light m_Light;
+        LightSource m_Source;
         Color m_BaseColor, m_LitColor;
         float m_BaseIntensity, m_LitIntensity;
         int m_Room = -1;
@@ -95,8 +98,13 @@ namespace Stealth.Level
             float lit = Mathf.Clamp01(intensity / LightMath.RoomIntensity);
             float glow = lit * LightSource.GlowScale; // the style's look of the diffusers
             float soft = lit * LightSource.CeilingGlow;
-            var cookie = LightSource.CeilingGlow > 0f && SoftCookie != null ? SoftCookie : Cookie;
+            bool pooled = LightSource.LampPool > 0f && PoolCookie != null;
+            var cookie = pooled ? PoolCookie : LightSource.CeilingGlow > 0f && SoftCookie != null ? SoftCookie : Cookie;
             if (cookie != null && m_Light.cookie != cookie) m_Light.cookie = cookie;
+            // a pooled lamp looks brighter under itself by what its cookie takes from the sides (the eye's only: robots read
+            // the lamp as the game set it)
+            if (m_Source == null) m_Source = m_Light.GetComponent<LightSource>();
+            if (m_Source != null) m_Source.VisualShare = pooled ? Mathf.Lerp(1f, LightMath.PoolBoost, Mathf.Clamp01(LightSource.LampPool)) : 1f;
             if (Mathf.Abs(glow - m_LastGlow) < 0.02f && Mathf.Abs(soft - m_LastSoft) < 0.02f && color == m_LastColor) return;
             m_LastGlow = glow;
             m_LastSoft = soft;
@@ -155,6 +163,22 @@ namespace Stealth.Level
 
         /// <summary>A lamp's cookie in a direction (pure): full down and sideways, <paramref name="up"/> of it above the horizon.</summary>
         public static float Cookie(float dirY, float up) => Mathf.Lerp(up, 1f, CookieUpFade(dirY));
+
+        /// <summary>How much of a pooled lamp's light goes level with it, share of what goes straight down.</summary>
+        public const float PoolSide = 0.42f;
+        /// <summary>How much brighter a pooled lamp looks straight under itself than an even one (what its cookie takes from the sides, given back below).</summary>
+        public const float PoolBoost = 1.4f;
+
+        /// <summary>
+        /// A pooled lamp's cookie in a direction (pure): a real ceiling panel throws most of its light down — full straight
+        /// down, <see cref="PoolSide"/> of it level with the lamp, falling off between as a flat diffuser's does; above the
+        /// horizon the soft lamp's share of that. A room lit by such lamps has pools of light and dimmer walls between them.
+        /// </summary>
+        public static float PoolCookie(float dirY, float up)
+        {
+            float down = Mathf.Clamp01(-dirY);
+            return Cookie(dirY, up) * Mathf.Lerp(PoolSide, 1f, Mathf.Pow(down, 1.4f));
+        }
 
         /// <summary>An additive glow's colour (linear, alpha 1): the lamp's colour at this strength.</summary>
         public static Vector4 Glow(Color linear, float strength) => new(linear.r * strength, linear.g * strength, linear.b * strength, 1f);

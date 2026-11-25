@@ -62,6 +62,7 @@ namespace Stealth.Level
         public static void Clear()
         {
             s_Run++;
+            ShapeMaps.Prune();                                 // (the parts of a house taken down)
             foreach (var r in s_Hidden)
                 if (r != null) r.forceRenderingOff = false;
             foreach (var go in s_Batches)

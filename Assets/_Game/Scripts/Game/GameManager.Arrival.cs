@@ -49,7 +49,6 @@ namespace Stealth.Game
             return new LevelInfo
             {
                 Seed = Route.Node(index, lane).Seed, Index = index, Players = TeamSize, Lane = lane, RunSeed = Level.RunSeed,
-                ClassicEnemies = m_IsServer ? LevelGenerator.ClassicEnemies : Level.ClassicEnemies,
             };
         }
 
@@ -67,11 +66,11 @@ namespace Stealth.Game
                 m_Prepared = null; // another way chosen meanwhile (or the team changed): that one finishes unused
             }
             var level = Tuning.Level;
-            var (building, security, features, classic) = (level.Building, level.Security, level.Features, LevelGenerator.Classic);
+            var (building, security, features) = (level.Building, level.Security, level.Features);
             m_PreparedFor = info;
             m_Prepared = Task.Run(() =>
             {
-                try { return LevelGenerator.Generate(info.Seed, info.Index, building, security, Mathf.Max(1, info.Players), features, classic, info.ClassicEnemies); }
+                try { return LevelGenerator.Generate(info.Seed, info.Index, building, security, Mathf.Max(1, info.Players), features); }
                 catch (System.Exception e)
                 {
                     Debug.LogWarning($"[Game] The next house did not generate in the background ({e.Message}): it is generated when it is built");

@@ -912,8 +912,6 @@ namespace Stealth.EditorTools
             menu.LocalCaption = ColumnText(col, "LocalCaption", "LAN", 14, Color.white, 22);
             menu.HostLocal = ButtonIn(e, col, "HostLocal", L("menu.host_local"), 36);
             menu.TestRooms = ToggleIn(e, col, "TestRooms", L("menu.test_rooms")); // off: the main game
-            menu.ClassicRooms = ToggleIn(e, col, "ClassicRooms", L("menu.classic_rooms")); // off: the room program
-            menu.ClassicEnemies = ToggleIn(e, col, "ClassicEnemies", L("menu.classic_enemies")); // off: the new enemies
             var row = R(col, "JoinRow", Center, Center, Vector2.zero, Vector2.zero);
             Fixed(row, 34);
             var hr = row.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -991,6 +989,8 @@ namespace Stealth.EditorTools
             menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
             menu.Smoothing = ButtonIn(e, sc, "Smoothing", "", 30); // the label names the mode: set by GameMenu
             menu.VSync = ToggleIn(e, sc, "VSync", L("menu.vsync"));
+            menu.Lighting = ButtonIn(e, sc, "Lighting", "", 30); // the labels name the choice: set by GameMenu
+            menu.Textures = ButtonIn(e, sc, "Textures", "", 30);
             Spacer(sc, 14);
             BuildVoiceSettings(e, menu, settings);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);

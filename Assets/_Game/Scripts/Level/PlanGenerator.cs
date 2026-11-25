@@ -75,7 +75,7 @@ namespace Stealth.Level
         }
 
         /// <summary>
-        /// The classic way (the menu's switch, <see cref="LevelGenerator.Classic"/>): no room program — the mass of about
+        /// The classic way (no longer offered by the game; the tests compare it): no room program — the mass of about
         /// <paramref name="area"/> m² a floor is cut into rooms of every size (BSP, <see cref="Split"/>), then each room's
         /// type is guessed from its size and proportions by the weights (<see cref="AssignTypes"/>, <see cref="Fit"/>).
         /// </summary>

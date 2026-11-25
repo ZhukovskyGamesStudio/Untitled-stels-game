@@ -190,6 +190,9 @@ def export(filename):
     folder = os.path.join(ROOT, "Styles", family.capitalize(), g.category(filename))
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{filename}__{family}.fbx")
+    import shapebake
+    shapebake.for_export(path, [o for o in bpy.context.selected_objects if o.type == "MESH"])  # (its own baked maps: SHAPEBAKE=all)
+    bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.fbx(filepath=path, use_selection=True, apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z",
                              axis_up="Y", bake_space_transform=True, object_types={"MESH"}, use_mesh_modifiers=True,
                              mesh_smooth_type="FACE", add_leaf_bones=False)

@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Stealth.Tests
 {
     /// <summary>
-    /// The new enemy mode against the old one (LevelGenerator.ClassicEnemies): no hounds, hunters or wardens; guards rest on
+    /// The new enemy mode against the old one (LevelGenerator.Generate's classicEnemies): no hounds, hunters or wardens; guards rest on
     /// the docks of the robots' charging room — a human tech room the robots took over — until an alarm, hunt, and go
     /// back; traps guard the valuable rooms.
     /// </summary>

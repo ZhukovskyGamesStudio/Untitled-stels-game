@@ -58,7 +58,7 @@ namespace Stealth.EditorTools
             if (!System.Enum.TryParse<HouseKind>(System.Environment.GetEnvironmentVariable("HOUSE"), out var house)) house = HouseKind.Office;
             if (!int.TryParse(System.Environment.GetEnvironmentVariable("SEED"), out int seed)) seed = 77;
             string suffix = System.Environment.GetEnvironmentVariable("HOUSE") != null || System.Environment.GetEnvironmentVariable("SEED") != null ? $"_{house}_{seed}" : "";
-            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs/Props", "Assets/_Game/Prefabs/StyleKit/Things", "Assets/_Game/Prefabs/Items" }).Concat(AssetDatabase.FindAssets("ElectricPanel t:Prefab")))
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/_Game/Prefabs/Props", "Assets/_Game/Prefabs/StyleKit/Things", "Assets/_Game/Prefabs/StyleKit/Scanned", "Assets/_Game/Prefabs/Items" }).Concat(AssetDatabase.FindAssets("ElectricPanel t:Prefab")))
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
                 if (only.Length > 0 && !only.Contains(prefab.name)) continue;
@@ -92,6 +92,9 @@ namespace Stealth.EditorTools
                             mf.sharedMesh = ScreenFaces.Of(mf.sharedMesh, picture);
                         }
                 foreach (var glow in go.GetComponentsInChildren<ShadeGlow>(true)) glow.Apply(); // (a lamp's shade by its bulb: no OnEnable here)
+                // SHAPES=0: without the models' own baked maps, to set the two side by side
+                if (System.Environment.GetEnvironmentVariable("SHAPES") != "0")
+                    ShapeMaps.Tag(go, config.Shapes);
                 var bounds = new Bounds();
                 bool first = true;
                 foreach (var r in go.GetComponentsInChildren<Renderer>())
@@ -111,7 +114,7 @@ namespace Stealth.EditorTools
                     tex.ReadPixels(new Rect(0, 0, size, size), 0, 0);
                     tex.Apply();
                     RenderTexture.active = null;
-                    File.WriteAllBytes(Path.Combine(dir, prefab.name + suffix + ".png"), tex.EncodeToPNG());
+                    File.WriteAllBytes(Path.Combine(dir, prefab.name + suffix + (System.Environment.GetEnvironmentVariable("TAG") is { Length: > 0 } tag ? "_" + tag : "") + ".png"), tex.EncodeToPNG());
                     n++;
                 }
                 Object.DestroyImmediate(go);

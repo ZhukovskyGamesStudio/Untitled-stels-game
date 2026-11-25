@@ -17,6 +17,7 @@ namespace Stealth.Player
         TaaFxaa,
     }
 
+
     /// <summary>What the camera itself does about edges.</summary>
     public enum CameraSmoothing { None, Smaa, Temporal }
 

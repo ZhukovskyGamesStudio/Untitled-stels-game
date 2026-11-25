@@ -501,7 +501,15 @@ namespace Stealth.EditorTools
                     // surface bloomed. The colours are the materials' own — the grade was taking a third of the
                     // saturation and tinting what was left green, the palette half of the rest: every room one grey-green.
                     var g = s.Grade;
-                    g.Tonemap = StyleTonemap.Neutral; g.Exposure = 0.9f; g.Contrast = -4f; g.Saturation = -8f;
+                    // A film curve and muted colour over lamps that pool their light (LampPool): with the neutral curve, even
+                    // lamps and the materials' full colours every room was lit like a toy shop — flat, clean, no depth
+                    // (the user: "feels cartoonish"; the same models, relit, did not). Not the old burnt-out look: the
+                    // exposure is set so that nothing under a lamp clips and what a lamp does not reach still shows.
+                    // (first try: exposure 1.15, contrast +8, fill 0.35 — dark and dim rooms sank to black again; lifted)
+                    g.Tonemap = StyleTonemap.Aces; g.Exposure = 1.35f; g.Contrast = 0f; g.Saturation = -20f;
+                    // the look before it, kept to set the two side by side (Settings → Look)
+                    s.Old.Has = true; s.Old.Tonemap = StyleTonemap.Neutral; s.Old.Exposure = 0.9f; s.Old.Contrast = -4f; s.Old.Saturation = -8f;
+                    s.Old.RoomFill = 0.6f; s.Old.LampPool = 0f; s.Old.Ambient = C(0.10f, 0.103f, 0.108f);
                     // (no green in it: that is the abandoned station's alone, its HouseLook)
                     g.ColorFilter = C(1f, 1f, 1f); g.Temperature = 3f; g.Tint = 0f;
                     g.SplitShadows = C(0.47f, 0.49f, 0.53f); g.SplitHighlights = C(0.55f, 0.52f, 0.47f); g.SplitBalance = 0f; // cool shadows under warm lamps
@@ -511,10 +519,10 @@ namespace Stealth.EditorTools
                     g.Bounce = 0f; g.BounceReach = 1.6f; // off: unblurred, it drew a grainy halo round every glowing lampshade; the room fill does the soft light
                     g.Contact = 0.5f; // small things are grounded where they touch (ContactShadows)
                     g.Probes = 0.6f; // gloss and metal mirror their room (RoomProbes); matt things do not (RoomProbes.Mirrors)
-                    g.RoomFill = 0.6f; // and the room's own lamps fill its shadows (RoomFill): never through a wall
+                    g.RoomFill = 0.45f; // and the room's own lamps fill its shadows (RoomFill): never through a wall; low — shadows have weight
                     // a small fill everywhere (sRGB: about 1 % of white) — a room whose lamps are off is dark, a flashlight's
                     // job; a lit room's fill is its own lamps' (CeilingGlow: they light its ceiling and the tops of its walls)
-                    s.World.Ambient = C(0.10f, 0.103f, 0.108f);
+                    s.World.Ambient = C(0.12f, 0.123f, 0.129f); // (0.10 under the neutral curve; the film curve takes some of it back — still under the guard: a room with its lamps off needs a flashlight)
                     s.World.IndoorFog = C(0.014f, 0.016f, 0.019f); s.World.IndoorFogDensity = 0.02f;
                     s.World.LightScale = 1f;
                     // (what was tuned under the old exposure keeps its look: the tunnels' lamps, the gas and the sky outside)
@@ -522,6 +530,7 @@ namespace Stealth.EditorTools
                     // soft ceiling lamps: the diffusers glow evenly and low (not burnt-out white rectangles), hot only in
                     // their middle, with a pool of light on the ceiling round the fixture
                     s.World.LampGlow = 0.12f; s.World.CeilingGlow = 1f;
+                    s.World.LampPool = 1f; // …and most of their light goes down: pools under the lamps, dimmer walls between
                     s.World.EyeGlow = 0.09f; s.World.EyeGlowRange = 3.2f; // what is right before the player is never pitch black
                     s.World.Sky = DerelictSky(); // a dead city under toxic clouds, above the gas
                     var p = s.Palette;

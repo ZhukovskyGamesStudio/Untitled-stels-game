@@ -14,10 +14,8 @@ namespace Stealth.Net
         public int Index;
         public byte Players;
         public byte Lane;
-        public byte ClassicEnemies;
         public int RunSeed;
-        public bool Equals(NetLevelInfo o) => Seed == o.Seed && Index == o.Index && Players == o.Players && Lane == o.Lane && RunSeed == o.RunSeed
-            && ClassicEnemies == o.ClassicEnemies;
+        public bool Equals(NetLevelInfo o) => Seed == o.Seed && Index == o.Index && Players == o.Players && Lane == o.Lane && RunSeed == o.RunSeed;
     }
 
     /// <summary>Wire format of a vote for the next house.</summary>
@@ -157,7 +155,6 @@ namespace Stealth.Net
             {
                 Seed = m_Game.Level.Seed, Index = m_Game.Level.Index, Players = (byte)Mathf.Clamp(m_Game.Level.Players, 0, 255),
                 Lane = (byte)Mathf.Clamp(m_Game.Level.Lane, 0, 255), RunSeed = m_Game.Level.RunSeed,
-                ClassicEnemies = (byte)(m_Game.Level.ClassicEnemies ? 1 : 0),
             });
             NetSync.Set(m_Quota, m_Game.Quota);
             NetSync.Set(m_Collected, m_Game.Collected);
@@ -262,7 +259,7 @@ namespace Stealth.Net
         void Pull()
         {
             var l = m_Level.Value;
-            m_Game.ApplyReplicated(new LevelInfo { Seed = l.Seed, Index = l.Index, Players = l.Players, Lane = l.Lane, RunSeed = l.RunSeed, ClassicEnemies = l.ClassicEnemies != 0 },
+            m_Game.ApplyReplicated(new LevelInfo { Seed = l.Seed, Index = l.Index, Players = l.Players, Lane = l.Lane, RunSeed = l.RunSeed },
                 m_Quota.Value, m_Collected.Value, m_RunTotal.Value, m_Phase.Value, m_AlarmUntil.Value, m_LeaveAt.Value, m_GoAt.Value, m_Chosen.Value);
             PullExplored(); // the house may have just been built
         }
