@@ -200,6 +200,11 @@ namespace Stealth.Tests
             var keyless = new PromptContext { CanHack = true, NeedsKeyboard = true };
             Assert.AreEqual(ReticleIcon.Hack, ReticleRules.Choose(keyless).Icon);
             Assert.IsFalse(ReticleRules.Choose(keyless).Available, "robots and sensors: not without the keyboard");
+            // the upgraded screwdriver takes a robot or a sensor apart: not a hack — no keyboard, its own word
+            var apart = new PromptContext { CanHack = true, NeedsKeyboard = true, Unscrew = true };
+            Assert.IsTrue(ReticleRules.Choose(apart).Available, "taking apart needs no keyboard");
+            CollectionAssert.Contains(Hints(apart).Select(h => h.Text), Loc.T("hint.take_apart"));
+            CollectionAssert.DoesNotContain(Hints(apart).Select(h => h.Text), Loc.T("hint.hack"));
         }
 
         [Test]

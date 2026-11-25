@@ -90,7 +90,7 @@ namespace Stealth.Player
         public float HackShare => HackProgress / HackHoldTime;
         /// <summary>Seconds of E the target in reach takes: a hack, or the upgraded screwdriver taking a device apart.</summary>
         float HackHoldTime => Unscrewing ? Configs.Tuning.Items.Crafted.UnscrewTime : m_Interaction.HackHoldTime;
-        /// <summary>Owner: E at <see cref="HackTarget"/> takes it apart with the upgraded screwdriver (not a hack).</summary>
+        /// <summary>Owner: E at <see cref="HackTarget"/> (a robot or a device) takes it apart with the upgraded screwdriver (not a hack).</summary>
         public bool Unscrewing { get; private set; }
         public float HackReach => m_Interaction.HackReach;
         public float Height => Crouching ? CrouchHeight : StandHeight;
@@ -469,8 +469,9 @@ namespace Stealth.Player
             // Hack: hold E next to a device, or behind a robot that is not chasing you.
             // Walking away keeps the progress on that machine: coming back goes on from there.
             HackTarget = ReviveTarget == null ? FindHackTarget() : null;
-            // the upgraded screwdriver (once per house): a device is taken apart instead — off for good, its innards fall out
-            Unscrewing = HackTarget is SecurityDevice && CanUnscrew(m_Inventory);
+            // the upgraded screwdriver (once per house): a robot or a device is taken apart instead of hacked — off for good,
+            // no hack slot, its innards fall out (a hack is the keyboard's: two slots, three with the upgraded one)
+            Unscrewing = HackTarget != null && CanUnscrew(m_Inventory);
             // (a hack needs the keyboard in the hand; taking a device apart needs only the screwdriver)
             if (HackTarget != null && !HackNeedsKeyboard && holdE && m_HackHeld.Hold(HackTarget, WorkDt, HackHoldTime))
             {

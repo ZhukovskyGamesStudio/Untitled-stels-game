@@ -13,7 +13,7 @@ namespace Stealth.Game
     /// The car's workbench and what it makes (server-decided, replicated by the network twin): the bench's 4 x 4 grid
     /// (<see cref="Bench"/>), «combine» (<see cref="CombineServer"/>, <see cref="BenchRules"/>) and the recipes the team has
     /// made this run (<see cref="KnownRecipes"/>); the blueprints and chess pieces a house gets; the double espresso's ram,
-    /// the upgraded screwdriver's unscrewed devices, the hammer's holes, the robot sensors lying on the floor.
+    /// the robots and devices the upgraded screwdriver took apart, the hammer's holes, the robot sensors lying on the floor.
     /// </summary>
     public partial class GameManager
     {
@@ -108,7 +108,7 @@ namespace Stealth.Game
         }
 
         /// <summary>
-        /// Server: the upgraded screwdriver took a device apart — it is off for good (it never wakes, it takes no slot) and
+        /// Server: the upgraded screwdriver took a robot or a device apart (not a hack) — it is off for good (it never wakes, it takes no slot) and
         /// its innards fall out (a circuit board, wires, a chip: fuel).
         /// </summary>
         public bool UnscrewServer(PlayerController player, Detector device)

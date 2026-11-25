@@ -7,10 +7,10 @@ namespace Stealth.Items
     [System.Serializable]
     public class CraftedSettings
     {
-        [Header("Upgraded screwdriver: once per house unscrews any device for good")]
-        [Tooltip("Seconds of holding E at a device.")]
+        [Header("Upgraded screwdriver: once per house takes any robot or device apart for good")]
+        [Tooltip("Seconds of holding E at a robot or a device.")]
         public float UnscrewTime = 2.5f;
-        [Tooltip("Things an unscrewed device drops (min, max): a circuit board, a bundle of wires, a chip.")]
+        [Tooltip("Things a robot or a device taken apart drops (min, max): a circuit board, a bundle of wires, a chip.")]
         public Vector2Int UnscrewDrops = new(1, 2);
 
         [Header("Upgraded keyboard")]
@@ -79,7 +79,7 @@ namespace Stealth.Items
 
         public static bool IsUsedIn(byte color, int house) => color != 0 && color == UsedIn(house);
 
-        /// <summary>What an unscrewed device drops: one to a few of a circuit board, a bundle of wires and a chip.</summary>
+        /// <summary>What a robot or a device taken apart drops: one to a few of a circuit board, a bundle of wires and a chip.</summary>
         public static List<byte> UnscrewDrops(System.Random rng, CraftedSettings s)
         {
             int n = rng.Next(Mathf.Max(1, s.UnscrewDrops.x), Mathf.Max(s.UnscrewDrops.x, s.UnscrewDrops.y) + 1);

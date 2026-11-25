@@ -153,7 +153,7 @@ namespace Stealth.Player
                     gm.RamServer(this, target, Crafted.RamStun);
                     break;
                 case GearAction.Unscrew:
-                    if (target is not SecurityDevice || !CanUnscrew(inv)) return;
+                    if (target == null || !CanUnscrew(inv)) return; // a robot or a device
                     if (!target.CanBeHackedFrom(transform.position, m_Interaction.HackReach + 0.5f)) return;
                     if (!target.ReachableFrom(Hands)) return;
                     if (!gm.UnscrewServer(this, target)) return;
@@ -168,7 +168,7 @@ namespace Stealth.Player
             }
         }
 
-        /// <summary>The upgraded screwdriver in the hand, not yet used in this house: it can unscrew a device.</summary>
+        /// <summary>The upgraded screwdriver in the hand, not yet used in this house: it can take a robot or a device apart.</summary>
         public bool CanUnscrew(PlayerInventory inv)
         {
             var gm = GameManager.Instance;

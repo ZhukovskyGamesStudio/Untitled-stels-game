@@ -313,7 +313,7 @@ namespace Stealth.UI
             if (c.CursorMode) return default;
             if (c.CanRevive) return new Hint(e, Loc.T("hint.revive"));
             if (c.CanHack && c.NeedsKeyboard && !c.Unscrew) return new Hint(e, Loc.T("hint.need_keyboard"), true);
-            if (c.CanHack) return new Hint(e, Loc.T(c.Unscrew ? "hint.unscrew" : c.SearchOnly ? "hint.search" : "hint.hack"));
+            if (c.CanHack) return new Hint(e, Loc.T(c.Unscrew ? "hint.take_apart" : c.SearchOnly ? "hint.search" : "hint.hack"));
             if (c.LockedDoor) return new Hint(e, Loc.T(c.LockedByUnit ? "hint.hack" : "hint.pick_lock"));
             if (c.SafeNear) return new Hint(e, Loc.T("hint.safe"));
             if (c.Storage != null) return new Hint(e, c.Storage);

@@ -66,7 +66,7 @@ LaserGate — отдельная ловушка (не детектор); луч 
 между руками и целью (`Perception.ReachClear`, `IHackable.ReachableFrom`). **Взлом навсегда**: робот или устройство, взломанные руками или
 с терминала (`GameManager.TeamHackServer`, `GameManager.Hacks.cs`), выключены, пока команда держит не больше `InteractionSettings.MaxHacked` (2);
 взлом сверх лимита будит первого (`Detector.WakeServer`); занятые слоты — ключи `OpenKeys.HackSlot` в `Opened`, в HUD — значки слева снизу (`GameHUD.HackSlots`).
-**Клавиатура нужна для всего, что взламывают руками** — роботов и датчиков (разбирать устройство улучшенной отвёрткой её не нужно: `HackNeedsKeyboard` учитывает `Unscrewing`; `PlayerController.CanHackByHand`, проверяет сервер в `OnHackRequest`; без неё робота с ношей можно только обыскать): прицел на такой цели тусклый, подсказка «нужна клавиатура» (`PromptContext.NeedsKeyboard`, `HackNeedsKeyboard`); терминал взлома работает у всех.
+**Клавиатура нужна для всего, что взламывают руками** — роботов и датчиков (разбирать робота или устройство улучшенной отвёрткой её не нужно — это не взлом, слот не занимает; слоты взлома: 2, с улучшенной клавиатурой у кого-то в команде — 3: `HackNeedsKeyboard` учитывает `Unscrewing`; `PlayerController.CanHackByHand`, проверяет сервер в `OnHackRequest`; без неё робота с ношей можно только обыскать): прицел на такой цели тусклый, подсказка «нужна клавиатура» (`PromptContext.NeedsKeyboard`, `HackNeedsKeyboard`); терминал взлома работает у всех.
 Выключенный робот осел — его капсула идёт за телом до пола (`RobotAnimator.FitCapsule`), а его коллайдеры становятся триггерами — игроки проходят сквозь (`RobotAnimator.PassThrough`). **Переподключение** — `GameManager.Reconnect.cs`:
 
 ## Датчики движения

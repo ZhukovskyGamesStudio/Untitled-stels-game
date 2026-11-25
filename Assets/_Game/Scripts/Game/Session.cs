@@ -143,7 +143,7 @@ namespace Stealth.Game
         void SendHitFeedback(Vector3 awayFromSource);
         /// <summary>Owner → server: I fell from too high (it hurts).</summary>
         void SendFallHurt();
-        /// <summary>The workbench's things: ram a robot (double espresso), unscrew a device (upgraded screwdriver), break the floor (hammer).</summary>
+        /// <summary>The workbench's things: ram a robot (double espresso), take a robot or a device apart (upgraded screwdriver), break the floor (hammer).</summary>
         void SendGear(GearAction action, Detector target, Vector3 point);
         /// <summary>Owner → server: the class and the extra item picked on the run's start screen, and whether I am ready.</summary>
         void SendLoadout(byte cls, byte item, bool ready);
