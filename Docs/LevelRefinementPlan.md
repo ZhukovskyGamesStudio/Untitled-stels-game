@@ -272,3 +272,17 @@ The partition and the corridors stack through the floors; what a block becomes i
 ("before" is before step 1, when the houses were half the size.) Known weak points: a quarter of the one-door rooms end up with a
 second door or a door off the corridor (where the corridor's wall had no room for a door); about half of the patient rooms get
 their beds and headwalls (the slab's 4 m rooms always did); the station's rooms are big (labs).
+
+**After the hospital play (2026-11-26):** "a bit chaotic, but not so repetitive". Calmer: one room width per building
+(`BlockPlan.Module`, 4–5 m; a double room now and then, more on the hospital's top floor for its theatres), back-to-back
+rows split down the middle, fewer pinwheel and cluster blocks in the hospital, whole-wall open passages only between rooms
+that are open by nature. The hospital's furniture: no arcade machines, egg chairs, robot arms or 3D printers (`Furnisher.Belongs`);
+its lab gets a fridge, a medicine cabinet and a sink. A theatre may be left out where its one door would shut a room in
+(two in at least 70 % of hospitals). Hospital, 40 houses: alike 8 % → 9 %, robot loops 0.26 → 0.28 per 10 rooms, median room 43 m².
+
+**Upper floors of their own (2026-11-26):** the user saw one floor four times. Now only the stair halls stack: every upper
+floor cuts its own blocks and grows its own corridors from the stair hall it arrives in (`BlockPlan.Floors`, `PlanFloor`),
+and has a character — mostly rows, mostly clusters, or mixed (`Character`, each once before any repeats). The nurse station
+waits for a corridor (its open wall) and prefers rooms 5 m deep (the counter and the chairs behind it); a patient room may be
+up to 60 m² (four beds). Hospital, 40 houses: same type one floor below 58 % → 27 %, rooms 128 → 116, robot loops 0.28 → 0.22
+per 10 rooms, dead ends 50 % → 57 %; station 50 % → 31 %.

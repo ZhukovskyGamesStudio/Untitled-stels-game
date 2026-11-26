@@ -129,7 +129,8 @@ namespace Stealth.Tests
                 {
                     Assert.Greater(r.Area, 5f, $"seed {l.Seed}: {r.Type} of {r.Area} m²");
                     Assert.AreEqual(r, l.RoomAt(r.Center), $"seed {l.Seed}: the centre of {r.Type} is on its floor");
-                    Assert.GreaterOrEqual(Mathf.Min(r.Bounds.width, r.Bounds.height), 2.5f, $"seed {l.Seed}: {r.Type} too narrow");
+                    // (the corridors of a building of blocks are 2 m: a straight one is that narrow end to end)
+                    Assert.GreaterOrEqual(Mathf.Min(r.Bounds.width, r.Bounds.height), r.Type == RoomType.Corridor ? 2f : 2.5f, $"seed {l.Seed}: {r.Type} too narrow");
                 }
         }
 

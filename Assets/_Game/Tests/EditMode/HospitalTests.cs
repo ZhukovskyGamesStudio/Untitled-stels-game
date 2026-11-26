@@ -26,7 +26,7 @@ namespace Stealth.Tests
         [Test]
         public void TheHospitalHasItsDepartmentsOnCorridorsThatTurn()
         {
-            int stations = 0, wardFloors = 0;
+            int stations = 0, wardFloors = 0, pairs = 0, houses = 0;
             foreach (var l in Hospitals())
             {
                 string name = $"{l.Seed}/{l.LevelIndex}";
@@ -46,8 +46,13 @@ namespace Stealth.Tests
                     Assert.LessOrEqual(l.Rooms.Count(r => r.Type == RoomType.NurseStation && r.Floor == f), 1, $"{name}: one nurse station at most on floor {f}");
                     stations += l.Rooms.Count(r => r.Type == RoomType.NurseStation && r.Floor == f); wardFloors++;
                 }
-                Assert.AreEqual(2, l.Rooms.Count(r => r.Type == RoomType.Operating && r.Floor == l.Floors - 1), $"{name}: two theatres on the top floor");
+                // a theatre's one door must not shut a room in: now and then only one fits
+                int theatres = l.Rooms.Count(r => r.Type == RoomType.Operating && r.Floor == l.Floors - 1);
+                Assert.That(theatres, Is.InRange(1, 2), $"{name}: theatres on the top floor");
+                houses++;
+                if (theatres == 2) pairs++;
             }
+            Assert.GreaterOrEqual(pairs, houses * 0.7f, $"two theatres on the top floor: {pairs} of {houses}");
             Assert.GreaterOrEqual(stations, wardFloors * 0.7f, $"nurse stations on the ward floors: {stations} of {wardFloors}");
         }
 

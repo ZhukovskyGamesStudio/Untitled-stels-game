@@ -1528,6 +1528,15 @@ namespace Stealth.Level
                 var reached = new HashSet<int> { start };
                 var done = new HashSet<(int, int)>();
 
+                // a building of blocks: a whole wall left open only between rooms that are open by nature (a scanner
+                // or a theatre stood open to the staff lounge); the rest get doors
+                static bool OpenFits(HousePlan plan, (int, int) key)
+                {
+                    static bool Open(RoomType t) => t is RoomType.Corridor or RoomType.Hall or RoomType.Lobby or RoomType.Lounge or RoomType.OpenSpace
+                        or RoomType.Kitchen or RoomType.NurseStation;
+                    return Open(plan.Rooms[key.Item1].Type) && Open(plan.Rooms[key.Item2].Type);
+                }
+
                 bool TryOpen((int, int) key, EdgeType kind)
                 {
                     var walls = new List<int>(pairs[key]);
@@ -1593,10 +1602,13 @@ namespace Stealth.Level
                         if (plan.Rooms[s].Cluster >= 0 && !IsCirculation(plan, s == key.Item1 ? key.Item2 : key.Item1)) continue; // (its hall, not a room of its cluster)
                         // the nurse station is open to its corridor (the whole wall), every other one-door room has a door
                         var way = Touches(plan, key, RoomType.NurseStation) && Touches(plan, key, RoomType.Corridor) ? EdgeType.Open : EdgeType.Door;
-                        if (TryOpen(key, way)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
+                        // (a station waits for its corridor: its one way in is the open wall its counter faces; the passes
+                        // after this one still give it a door if no corridor touches it)
+                        if (plan.Rooms[s].Type == RoomType.NurseStation && way != EdgeType.Open) continue;
+                        if (TryOpen(key, way) || (way == EdgeType.Open && TryOpen(key, EdgeType.Door))) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
                         continue;
                     }
-                    bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key) && FlatAllows(plan, key, EdgeType.Open);
+                    bool open = rng.NextDouble() < b.OpenPassageChance && !IsHall(plan, key) && FlatAllows(plan, key, EdgeType.Open) && (c.Blocks == null || OpenFits(plan, key));
                     if ((open && TryOpen(key, EdgeType.Open)) || TryOpen(key, EdgeType.Door))
                     {
                         done.Add(key);
@@ -1619,7 +1631,7 @@ namespace Stealth.Level
                 // groups still apart (only short walls between them): an open passage on any walkable wall between them
                 foreach (var (key, _) in order)
                 {
-                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key) || !FlatAllows(plan, key, EdgeType.Open)) continue;
+                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key) || !FlatAllows(plan, key, EdgeType.Open) || (c.Blocks != null && !OpenFits(plan, key))) continue;
                     foreach (int wi in pairs[key])
                     {
                         var w = plan.Walls[wi];

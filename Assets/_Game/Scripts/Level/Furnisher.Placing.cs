@@ -116,6 +116,9 @@ namespace Stealth.Level
                     if (tall || i == 0) return false;
                     b.Pieces.RemoveAt(i);
                 }
+            // what the house would not have (a hospital's arcade machine, its robot arm)
+            foreach (var p in b.Pieces)
+                if (!Belongs(m_L.PlanKind, p.Kind)) return false;
             // one water cooler, one clock… per room
             foreach (var p in b.Pieces)
             {

@@ -643,6 +643,13 @@ namespace Stealth.Level
                     if (roll < 90) return Hung(PropKind.MapBoard, 2.05f);
                     return Hung(PropKind.AlarmPanel, 0.85f);
                 case RoomType.Lab:
+                    // a hospital's lab: samples (a fridge), reagents (a medicine cabinet), a sink — besides the benches and the hood
+                    if (m_L.PlanKind == HouseKind.Hospital && roll >= 26 && roll < 50)
+                    {
+                        if (roll < 34) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                        if (roll < 42) return Single(PropKind.Fridge, 0.75f);
+                        return Single(PropKind.MirrorSink, 0.75f);
+                    }
                     if (roll < 26)
                     {
                         b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);

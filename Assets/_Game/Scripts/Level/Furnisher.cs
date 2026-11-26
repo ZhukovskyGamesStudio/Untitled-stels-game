@@ -310,6 +310,16 @@ namespace Stealth.Level
         /// How many of a kind one room takes (twice that in a hall of a room, over 70 m²): one water cooler, one clock, one
         /// safe… — three coolers along one wall read as a mistake, not as an office.
         /// </summary>
+        /// <summary>
+        /// Whether a piece belongs in a house of this kind at all (pure). The rooms' tables are the office's; a hospital
+        /// shares its room types (a staff lounge, a lab, offices) but not their toys and workshop: no arcade machines,
+        /// egg chairs or bean bags in its lounges, no robot arms, 3D printers or electronics in its labs.
+        /// </summary>
+        public static bool Belongs(HouseKind house, PropKind k) => house != HouseKind.Hospital || k is not (
+            PropKind.ArcadeMachine or PropKind.Pinball or PropKind.Jukebox or PropKind.DartBoard or PropKind.BeanBag or PropKind.EggChair or
+            PropKind.Hammock or PropKind.FloorCushions or PropKind.FloorLamp or PropKind.RobotArm or PropKind.RobotTable or PropKind.Printer3d or
+            PropKind.ComponentShelf or PropKind.PartsCabinet or PropKind.ScopeCart);
+
         public static int CapOf(PropKind k) => k switch
         {
             PropKind.DoubleBed or PropKind.Wardrobe or PropKind.Dresser or PropKind.Bathtub or PropKind.HomeToilet or PropKind.BathVanity or

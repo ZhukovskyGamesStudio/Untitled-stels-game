@@ -67,7 +67,8 @@ namespace Stealth.Tests
             string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
             Directory.CreateDirectory(dir);
             int n = 0;
-            for (int seed = 1; n < 4 && seed < 400; seed++)
+            if (!int.TryParse(System.Environment.GetEnvironmentVariable("PLANCOUNT"), out int count)) count = 4; // PLANCOUNT=8: more of them
+            for (int seed = 1; n < count && seed < 2000; seed++)
             {
                 int house = 1 + seed % 4;
                 if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;

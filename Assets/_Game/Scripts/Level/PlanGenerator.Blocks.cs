@@ -19,6 +19,10 @@ namespace Stealth.Level
         {
             public int W, D;
             public bool Station;
+            /// <summary>The width of a room in a row, metres: one through the building, its rhythm (a double room is two).</summary>
+            public int Module = 5;
+            /// <summary>How often a row has a double room (the top floor of a hospital more: its theatres).</summary>
+            public double Doubles = 0.12;
             public bool[,] In;          // [x, z] metre cell inside the building
             public int[,] Block;        // [x, z] metre cell -> block (−1 outside)
             public readonly List<bool> Reserved = new(); // the lobby's and the stair halls' blocks: never cut, never crossed
@@ -26,10 +30,20 @@ namespace Stealth.Level
             public bool[,] Corridor;    // [x, z] plan cell
             public bool[,] Main;        // [x, z] plan cell of the main way (3 m)
             public int Loops, Halls, Unreached;
+            /// <summary>Each upper floor's own blocks and corridors (index = floor; [0] is this one): only the stair halls stack.</summary>
+            public BlockPlan[] Floors;
+            /// <summary>What an upper floor is mostly made of (<see cref="Character"/>): rows, clusters, or as it comes.</summary>
+            public Character Kind;
+
+            /// <summary>The plan of a floor.</summary>
+            public BlockPlan On(int floor) => Floors != null && floor < Floors.Length && Floors[floor] != null ? Floors[floor] : this;
         }
 
         /// <summary>Corridors: the main way and the rest, plan cells (3 m and 2 m), on whole metres (no strip of half a metre is left beside one).</summary>
         const int MainCells = 6, LaneCells = 4;
+
+        /// <summary>A floor's character: mostly rows of rooms along the corridors, mostly clusters (departments), or mixed.</summary>
+        enum Character : byte { Mixed, Rows, Clusters }
 
         // ------------------------------------------------------------------ the mass
 
@@ -149,7 +163,7 @@ namespace Stealth.Level
             int seed = rng.Next();
             var first = BlockShape(kind, new System.Random(seed), 1f);
             float s = Mathf.Clamp(Mathf.Sqrt(area / Mathf.Max(1f, UnionArea(first))), 0.55f, 2.4f);
-            c.Blocks = new BlockPlan { Station = station };
+            c.Blocks = new BlockPlan { Station = station, Module = 4 + new System.Random(seed ^ 0x40D).Next(2) };
             return BlockShape(kind, new System.Random(seed), s);
         }
 
@@ -157,9 +171,34 @@ namespace Stealth.Level
 
         static void PlanBlocks(Ctx c)
         {
-            var bp = c.Blocks;
+            var ground = c.Blocks;
+            ground.Floors = new BlockPlan[c.Floors];
+            ground.Floors[0] = ground;
+            PlanFloor(c, ground, -1, c.Rng(0xB10C));
+            // the floors above: the same stair core, their own blocks and corridors (a building's partitions are not its
+            // structure: the same plan on every floor read as one floor four times)
+            var characters = new List<Character> { Character.Rows, Character.Clusters, Character.Mixed };
+            var pick = c.Rng(0xB10E);
+            for (int f = 1; f < c.Floors; f++)
+            {
+                var up = new BlockPlan { Station = ground.Station, Module = ground.Module, Doubles = ground.Doubles };
+                if (characters.Count == 0) characters.AddRange(new[] { Character.Rows, Character.Clusters, Character.Mixed });
+                int k = pick.Next(characters.Count);
+                up.Kind = characters[k];
+                characters.RemoveAt(k);
+                PlanFloor(c, up, f, c.Rng(0xB10C, f));
+                ground.Floors[f] = up;
+                ground.Unreached += up.Unreached;
+            }
+        }
+
+        /// <summary>
+        /// One floor's blocks and corridors (<paramref name="floor"/> −1: the ground floor, from the lobby; above it from the
+        /// stair hall it arrives in, the halls of that floor kept whole).
+        /// </summary>
+        static void PlanFloor(Ctx c, BlockPlan bp, int floor, System.Random rng)
+        {
             int W = bp.W = c.Plan.NX / M, D = bp.D = c.Plan.NZ / M;
-            var rng = c.Rng(0xB10C);
             bp.In = new bool[W, D];
             bp.Block = new int[W, D];
             for (int x = 0; x < W; x++)
@@ -177,11 +216,20 @@ namespace Stealth.Level
                     for (int z = cells.yMin / M; z < Mathf.CeilToInt(cells.yMax / (float)M); z++)
                         if (x >= 0 && z >= 0 && x < W && z < D && bp.In[x, z] && bp.Block[x, z] < 0) bp.Block[x, z] = id;
             }
-            Reserve(c.Lobby);
-            bp.LobbyBlock = 0;
-            foreach (var h in c.Halls) Reserve(h.hall);
+            if (floor < 0)
+            {
+                Reserve(c.Lobby);
+                bp.LobbyBlock = 0;
+                foreach (var h in c.Halls) Reserve(h.hall);
+            }
+            else
+            {
+                // the halls of this floor: the one from below first (the corridors start there)
+                foreach (var h in c.Halls) if (h.floor + 1 == floor) { bp.LobbyBlock = bp.Reserved.Count; Reserve(h.hall); }
+                foreach (var h in c.Halls) if (h.floor == floor) { if (bp.LobbyBlock < 0) bp.LobbyBlock = bp.Reserved.Count; Reserve(h.hall); }
+            }
             // the rest: the biggest rectangles, each cut on its own (so the cut lines do not run through)
-            var lo = 8; var hi = bp.Station ? 16 : 15;
+            int lo = 8, hi = bp.Station ? 16 : 15;
             while (true)
             {
                 var q = BiggestFree(bp);
@@ -709,7 +757,7 @@ namespace Stealth.Level
 
         static void ZoneBlocks(Ctx c, int f, List<Region> regions, int[,] owner, System.Func<RectInt, Region, int> claim)
         {
-            var bp = c.Blocks;
+            var bp = c.Blocks.On(f);
             int nx = c.Plan.NX, nz = c.Plan.NZ;
             var rng = c.Rng(0xB10D, f);
             // the corridors (on a floor they reach into what is free: the halls of other floors are rooms here)
@@ -761,6 +809,7 @@ namespace Stealth.Level
                     var mine = new HashSet<Vector2Int>();
                     for (int x = q.xMin; x < q.xMax; x++) for (int z = q.yMin; z < q.yMax; z++) mine.Add(new Vector2Int(x, z));
                     var sides = Contact(bp, mine, q);
+                    bp.Doubles = !bp.Station && f == c.Floors - 1 && f > 0 ? 0.35 : 0.12; // (a hospital's top floor: room for two theatres)
                     foreach (var (r, piece, cl) in Treat(bp, q, mine, sides, rng, ref cluster, !bp.Station && f > 0))
                     {
                         var reg = new Region
@@ -811,14 +860,43 @@ namespace Stealth.Level
             // which rooms share a wall of 2 m with a corridor (a cluster's hall too): the ones a one-door room may be
             var borders = Borders(owner, nx, nz);
             var onCorridor = new HashSet<Region>();
+            var nearCorridor = new HashSet<Region>(); // (3 m: a theatre's one door with its margins, where 4 m is not to be had)
             foreach (var kv in borders)
             {
-                if (kv.Value < 4 * M) continue; // (4 m of wall: a door and its margins, whatever the wall's corners)
+                if (kv.Value < 3 * M) continue;
                 var (a, b) = kv.Key;
-                if (regions[a].Type == RoomType.Corridor && regions[b].Type != RoomType.Corridor) onCorridor.Add(regions[b]);
-                if (regions[b].Type == RoomType.Corridor && regions[a].Type != RoomType.Corridor) onCorridor.Add(regions[a]);
+                var into = kv.Value >= 4 * M ? onCorridor : null; // (4 m of wall: a door and its margins, whatever the wall's corners)
+                if (regions[a].Type == RoomType.Corridor && regions[b].Type != RoomType.Corridor) { nearCorridor.Add(regions[b]); into?.Add(regions[b]); }
+                if (regions[b].Type == RoomType.Corridor && regions[a].Type != RoomType.Corridor) { nearCorridor.Add(regions[a]); into?.Add(regions[a]); }
             }
-            if (bp.Station) TypeStation(c, f, regions, rng); else TypeHospital(c, f, regions, rng, onCorridor);
+            // a hospital's top floor: two theatres want two plain rooms 5.5 m across on a corridor — two rooms of a row join
+            // into one where there are not enough
+            if (!bp.Station && f == c.Floors - 1 && f > 0)
+            {
+                bool Theatre(Region r) => r.Cells.Count > 0 && r.Type != RoomType.Corridor && !r.Fixed && Square(r) && Thin(r) >= 11 && AreaOf(r) >= 26f && AreaOf(r) <= 80f && nearCorridor.Contains(r);
+                int have = 0;
+                foreach (var r in regions) if (Theatre(r)) have++;
+                var near = Borders(owner, nx, nz);
+                foreach (var kv in near)
+                {
+                    if (have >= 2) break;
+                    var (i, j) = kv.Key;
+                    var a = regions[i]; var b2 = regions[j];
+                    if (a.Cells.Count == 0 || b2.Cells.Count == 0 || a.Fixed || b2.Fixed || a.Type == RoomType.Corridor || b2.Type == RoomType.Corridor) continue;
+                    if (!nearCorridor.Contains(a) && !nearCorridor.Contains(b2) || Theatre(a) || Theatre(b2)) continue;
+                    var ba = BoundsOf(a.Cells); var bb = BoundsOf(b2.Cells);
+                    var u = new RectInt(Mathf.Min(ba.xMin, bb.xMin), Mathf.Min(ba.yMin, bb.yMin), 0, 0);
+                    u.xMax = Mathf.Max(ba.xMax, bb.xMax); u.yMax = Mathf.Max(ba.yMax, bb.yMax);
+                    float sum = AreaOf(a) + AreaOf(b2);
+                    // together a plain rectangle, wide enough for the table and its machines
+                    if (u.width * u.height != a.Cells.Count + b2.Cells.Count || Mathf.Min(u.width, u.height) < 11 || sum < 26f || sum > 80f) continue;
+                    if (!nearCorridor.Contains(a)) { (i, j) = (j, i); (a, b2) = (b2, a); }
+                    Absorb(regions, owner, j, i);
+                    if (Theatre(a)) have++;
+                }
+                borders = Borders(owner, nx, nz);
+            }
+            if (bp.Station) TypeStation(c, f, regions, rng); else TypeHospital(c, f, regions, rng, onCorridor, nearCorridor);
             KeepReachable(regions, borders);
             // a region's rectangles are its cells' (absorbed scraps brought rectangles bigger than what they gave)
             foreach (var reg in regions)
@@ -939,7 +1017,7 @@ namespace Stealth.Level
             for (int s = 0; s < 4; s++) { if (on[s] >= 2) sides |= 1 << s; if (on[s] > on[front]) front = s; }
             bool opposite = (sides & 3) == 3 && q.width >= 9 || (sides & 12) == 12 && q.height >= 9;
             // weights by the kind of building
-            float single = bp.Station ? 3.5f : 0.4f, rows = 0f, back = bp.Station ? 1f : 4f, clu = bp.Station ? 3f : 4f, pin = 3f, open = bp.Station ? 1f : 0.5f;
+            float single = bp.Station ? 3.5f : 0.4f, rows = 0f, back = bp.Station ? 1f : 5f, clu = bp.Station ? 3f : 2.5f, pin = bp.Station ? 3f : 1f, open = bp.Station ? 1f : 0.5f;
             if (area < 64 || m < 4) { o.Add((q, Piece.Single, -1)); return o; }
             if (m <= 8 && area > (bp.Station ? 170 : 75)) single = 0f;
             if (m <= 8) { rows = 4f; single = area < 110 || bp.Station ? 1f : 0.15f; back = clu = pin = open = 0f; }
@@ -952,6 +1030,8 @@ namespace Stealth.Level
                 if (area > 150 && !bp.Station) single = 0.25f;
             }
             if (wards) { back *= 2f; pin *= 0.5f; open *= 0.3f; }
+            if (bp.Kind == Character.Rows) { back *= 2f; rows *= 2f; clu *= 0.3f; pin *= 0.3f; }
+            else if (bp.Kind == Character.Clusters) { clu *= wards ? 1.8f : 3f; pin *= 1.5f; back *= wards ? 0.8f : 0.5f; } // (a ward floor keeps its rows on the facade)
             float total = single + rows + back + clu + pin + open, roll = (float)rng.NextDouble() * total;
             int id = cluster++;
             if ((roll -= single) < 0f)
@@ -962,24 +1042,24 @@ namespace Stealth.Level
                 {
                     var (W, D, f) = Orient(q, front);
                     int k = D / 2 + rng.Next(-1, 2);
-                    Slices(o, f(0, 0, W, k), front >= 2, rng, Piece.Single);
-                    Slices(o, f(0, k, W, D - k), front >= 2, rng, Piece.Single);
+                    Slices(o, f(0, 0, W, k), front >= 2, rng, Piece.Single, module: bp.Module, doubles: bp.Doubles);
+                    Slices(o, f(0, k, W, D - k), front >= 2, rng, Piece.Single, module: bp.Module, doubles: bp.Doubles);
                 }
             }
-            else if ((roll -= rows) < 0f) Slices(o, q, front >= 2, rng);
+            else if ((roll -= rows) < 0f) Slices(o, q, front >= 2, rng, module: bp.Module, doubles: bp.Doubles);
             else if ((roll -= back) < 0f)
             {
                 if ((sides & 3) == 3 && q.width >= 9 && !((sides & 12) == 12 && q.height >= 9 && rng.Next(2) == 0))
                 {
-                    int k = rng.Next(4, q.width - 3);
-                    Slices(o, new RectInt(q.x, q.y, k, q.height), false, rng);
-                    Slices(o, new RectInt(q.x + k, q.y, q.width - k, q.height), false, rng);
+                    int k = q.width / 2; // (back to back down the middle: both rows as deep)
+                    Slices(o, new RectInt(q.x, q.y, k, q.height), false, rng, module: bp.Module, doubles: bp.Doubles);
+                    Slices(o, new RectInt(q.x + k, q.y, q.width - k, q.height), false, rng, module: bp.Module, doubles: bp.Doubles);
                 }
                 else
                 {
-                    int k = rng.Next(4, q.height - 3);
-                    Slices(o, new RectInt(q.x, q.y, q.width, k), true, rng);
-                    Slices(o, new RectInt(q.x, q.y + k, q.width, q.height - k), true, rng);
+                    int k = q.height / 2;
+                    Slices(o, new RectInt(q.x, q.y, q.width, k), true, rng, module: bp.Module, doubles: bp.Doubles);
+                    Slices(o, new RectInt(q.x, q.y + k, q.width, q.height - k), true, rng, module: bp.Module, doubles: bp.Doubles);
                 }
             }
             else if ((roll -= clu) < 0f) Cluster(bp, o, q, front, rng, id);
@@ -1002,14 +1082,15 @@ namespace Stealth.Level
         }
 
         /// <summary>Rooms side by side across a strip: along x when <paramref name="alongX"/>.</summary>
-        static void Slices(List<(RectInt, Piece, int)> o, RectInt q, bool alongX, System.Random rng, Piece piece = Piece.Row, int cluster = -1)
+        static void Slices(List<(RectInt, Piece, int)> o, RectInt q, bool alongX, System.Random rng, Piece piece = Piece.Row, int cluster = -1, int module = 0, double doubles = 0.12)
         {
             int L = alongX ? q.width : q.height, at = 0;
             while (at < L)
             {
-                int t = rng.Next(4, 7);
-                if (rng.NextDouble() < 0.18) t = Mathf.RoundToInt(t * 1.8f);
-                if (L - at - t < 3) t = L - at;
+                // the building's rhythm: rooms of one width, now and then a double one (calmer than every room its own width)
+                int t = module > 0 ? (rng.NextDouble() < doubles ? 2 * module : module) : rng.Next(4, 7);
+                if (module <= 0 && rng.NextDouble() < 0.18) t = Mathf.RoundToInt(t * 1.8f);
+                if (L - at - t < (module > 0 ? module : 3)) t = L - at;
                 o.Add((alongX ? new RectInt(q.x + at, q.y, t, q.height) : new RectInt(q.x, q.y + at, q.width, t), piece, cluster));
                 at += t;
             }
@@ -1059,8 +1140,8 @@ namespace Stealth.Level
             }
             if (u < 0 || W < 9 || D < 8)
             {
-                if (D > 9) { int k = D / 2; Slices(o, f(0, 0, W, k), side >= 2, rng); Slices(o, f(0, k, W, D - k), side >= 2, rng); }
-                else Slices(o, q, side >= 2, rng);
+                if (D > 9) { int k = D / 2; Slices(o, f(0, 0, W, k), side >= 2, rng, module: bp.Module, doubles: bp.Doubles); Slices(o, f(0, k, W, D - k), side >= 2, rng, module: bp.Module, doubles: bp.Doubles); }
+                else Slices(o, q, side >= 2, rng, module: bp.Module, doubles: bp.Doubles);
                 return;
             }
             const int hw = 3; // the private hall, 3 m wide (2.5 m once the walls are in)
@@ -1135,7 +1216,7 @@ namespace Stealth.Level
         /// floors above its wards (patient rooms on the facade, a nurse station on a corridor in the middle), the top floor
         /// its theatres; toilets by the stairs on every floor.
         /// </summary>
-        static void TypeHospital(Ctx c, int f, List<Region> regions, System.Random rng, HashSet<Region> onCorridor)
+        static void TypeHospital(Ctx c, int f, List<Region> regions, System.Random rng, HashSet<Region> onCorridor, HashSet<Region> nearCorridor)
         {
             var rooms = Typeable(regions);
             bool top = f == c.Floors - 1 && f > 0;
@@ -1175,14 +1256,14 @@ namespace Stealth.Level
             }
             else
             {
-                if (top) Take(RoomType.Operating, 2, r => Size(r, 26f, 80f) + Door(r) + (Thin(r) < 11 || !Square(r) ? float.MinValue : 0f) - Facade(c, r) * 0.5f + (r.Cluster >= 0 ? 6f : 0f) + AreaOf(r) * 0.1f);
+                if (top) Take(RoomType.Operating, 2, r => Size(r, 26f, 80f) + (nearCorridor.Contains(r) ? 0f : float.MinValue) + (Thin(r) < 11 || !Square(r) ? float.MinValue : 0f) - Facade(c, r) * 0.5f + (r.Cluster >= 0 ? 6f : 0f) + AreaOf(r) * 0.1f);
                 if (top) Take(RoomType.Imaging, 1, r => Size(r, 22f, 70f) + Door(r) + (Thin(r) < 9 || !Square(r) ? float.MinValue : Thin(r) < 13 ? -50f : 0f) - Facade(c, r));
                 // the nurse station: on a corridor, in the middle of the floor
                 var mid = Middle(rooms);
-                Take(RoomType.NurseStation, 1, r => Size(r, 10f, 30f) + Door(r) + (r.Cluster >= 0 ? -20f : 0f) + (r.Piece is Piece.Row or Piece.Single ? 0f : -20f) - (new Vector2(Mean(r).x, Mean(r).y) - mid).magnitude * 0.05f);
+                Take(RoomType.NurseStation, 1, r => Size(r, 10f, 34f) + Door(r) + (Thin(r) >= 10 ? 0f : -15f) /* (5 m: the counter and the chairs behind it) */ + (r.Cluster >= 0 ? -20f : 0f) + (r.Piece is Piece.Row or Piece.Single ? 0f : -20f) - (new Vector2(Mean(r).x, Mean(r).y) - mid).magnitude * 0.05f);
                 // patient rooms: on the facade (their windows), as many as hold beds
                 foreach (var r in rooms)
-                    if (!r.Typed && AreaOf(r) >= 12f && AreaOf(r) <= 50f && Facade(c, r) >= 2f && r.Piece != Piece.Open && onCorridor.Contains(r)) { r.Type = RoomType.Ward; r.Typed = true; }
+                    if (!r.Typed && AreaOf(r) >= 12f && AreaOf(r) <= 60f && Facade(c, r) >= 2f && r.Piece != Piece.Open && onCorridor.Contains(r)) { r.Type = RoomType.Ward; r.Typed = true; }
                 Take(RoomType.Lounge, 1, r => r.Piece == Piece.Open ? 10f : Size(r, 30f, 200f));
                 Take(RoomType.Infirmary, 2, r => Size(r, 12f, 32f) - Facade(c, r));
             }
@@ -1240,7 +1321,7 @@ namespace Stealth.Level
                 Take(RoomType.Library, 1, r => Size(r, 22f, 80f) + (float)rng.NextDouble());
                 // the quarters: the clusters' rooms and the rows on the facade
                 foreach (var r in rooms)
-                    if (!r.Typed && AreaOf(r) >= 9f && AreaOf(r) <= 26f && (r.Cluster >= 0 || Facade(c, r) >= 2.5f)) { r.Type = RoomType.Bedroom; r.Typed = true; }
+                    if (!r.Typed && AreaOf(r) >= 9f && AreaOf(r) <= 36f && (r.Cluster >= 0 || Facade(c, r) >= 2.5f)) { r.Type = RoomType.Bedroom; r.Typed = true; }
                 foreach (var r in rooms) if (!r.Typed && AreaOf(r) >= 24f) { r.Type = RoomType.Lab; r.Typed = true; }
             }
             foreach (var r in rooms) { if (r.Typed) continue; r.Type = RoomType.Office; r.Typed = true; }

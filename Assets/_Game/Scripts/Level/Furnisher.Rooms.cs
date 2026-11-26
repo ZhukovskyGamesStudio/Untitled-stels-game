@@ -394,7 +394,7 @@ namespace Stealth.Level
                 across.Normalize();
                 var along = Vector3.Cross(Vector3.up, across);
                 float yaw = Mathf.Atan2(-across.x, -across.z) * Mathf.Rad2Deg; // its front to the corridor
-                foreach (float depth in new[] { 4.6f, 4.0f, 3.2f, 2.6f }) // past the room's middle: the floor before it stays open to the corridor
+                foreach (float depth in new[] { 4.6f, 4.0f, 3.2f, 2.6f, 2.1f, 1.7f }) // past the room's middle: the floor before it stays open to the corridor (a shallow station: nearer the open wall)
                 {
                     var p = d.Position + across * depth;
                     p.y = LevelLayout.FloorY(room.Floor);
