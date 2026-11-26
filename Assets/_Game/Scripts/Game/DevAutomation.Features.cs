@@ -13,7 +13,7 @@ namespace Stealth.Game
         /// <summary>
         /// The special places of a house (<c>SEED=7 LEVEL=3 Tools/dev.sh run features</c>): the location's point of
         /// interest, a crate searched, the key door and its key, the hidden room seen from outside and from inside,
-        /// a warden drawn off by a lure speaker (and back at its post), the stun cube, the legs of a walking player.
+        /// the stun cube, the legs of a walking player.
         /// </summary>
         IEnumerator FeaturesScenario()
         {
@@ -24,7 +24,7 @@ namespace Stealth.Game
             yield return new WaitForSeconds(1f);
             Me.SetHatch(false);
             yield return new WaitForSeconds(0.5f);
-            Log($"house: {HouseKinds.Title(l.Seed, l.Kind)} ({l.Location}), POI {(l.PointOfInterest >= 0 ? l.Props[l.PointOfInterest].Kind.ToString() : "none")}, crates {l.Crates.Count}, key doors {l.KeyDoors.Count}, hidden room {l.HiddenRoom}, wardens {l.Wardens.Count}, lures {l.LureSpots.Count}");
+            Log($"house: {HouseKinds.Title(l.Seed, l.Kind)} ({l.Location}), POI {(l.PointOfInterest >= 0 ? l.Props[l.PointOfInterest].Kind.ToString() : "none")}, crates {l.Crates.Count}, key doors {l.KeyDoors.Count}, hidden room {l.HiddenRoom}");
 
             Vector3 Front(PropPlacement p, float d) => p.Position + Quaternion.Euler(0f, p.RotationY, 0f) * Vector3.forward * d + Vector3.up * 0.05f;
             if (l.PointOfInterest >= 0)
@@ -113,39 +113,6 @@ namespace Stealth.Game
                 var room = plan.RoomAt(Me.transform.position + Vector3.up * 0.3f);
                 Log($"hidden room: walked through the illusion into room {room?.Id} (hidden {l.HiddenRoom}), map sees through it {plan.SightShare(w.Floor, mid - into * 1.5f, mid + into * 1.5f) > 0.99f}");
                 yield return Shot("06_inside_hidden_room");
-            }
-
-            if (l.Wardens.Count > 0)
-            {
-                DevFlags.Peaceful = false;
-                DevFlags.SkipGracePeriod = true;
-                var post = l.Wardens[0];
-                var warden = RobotController.Robots.Where(r => r.Kind == RobotKind.Warden).OrderBy(r => (r.transform.position - post.A).sqrMagnitude).FirstOrDefault();
-                if (warden != null)
-                {
-                    var lureAt = post.A + post.Facing * 6f;
-                    Me.TeleportOwner(lureAt - post.Facing * 0.8f + Vector3.up * 0.05f, Quaternion.LookRotation(post.Facing));
-                    Me.CheatServer(Cheat.Invisible, true); // the warden must go for the lure, not for us
-                    yield return new WaitForSeconds(0.3f);
-                    inv.GiveServer(ItemCatalog.Speaker, 1);
-                    inv.DropServer(inv.Items.Count - 1, lureAt + Vector3.up * 0.05f, 0f);
-                    float t0 = Time.time;
-                    float closest = float.MaxValue;
-                    var lure = WorldItem.All.LastOrDefault(i => i.Shape == ItemCatalog.Speaker);
-                    while (Time.time - t0 < 25f && lure != null && (lure.IsPlaying || Time.time - t0 < 2.5f))
-                    {
-                        closest = Mathf.Min(closest, (warden.transform.position - lureAt).magnitude);
-                        yield return null;
-                    }
-                    Log($"lure: warden came within {closest:0.0} m, switched off after {Time.time - t0:0.0} s (playing {lure != null && lure.IsPlaying})");
-                    LookAtFrom(new Pose(lureAt + new Vector3(2f, 0.05f, 2f), Quaternion.identity), warden.transform.position + Vector3.up);
-                    yield return new WaitForSeconds(0.3f);
-                    yield return Shot("07_warden_at_lure");
-                    t0 = Time.time;
-                    while (Time.time - t0 < 25f && (warden.transform.position - post.A).magnitude > 2.2f && (warden.transform.position - post.B).magnitude > 2.2f) yield return null;
-                    Log($"warden: back at its post after {Time.time - t0:0.0} s ({(warden.transform.position - post.A).magnitude:0.0} m), state {warden.State}");
-                    Me.CheatServer(Cheat.Invisible, false);
-                }
             }
 
             inv.GiveServer(ItemCatalog.Stun, 2);

@@ -14,6 +14,8 @@ namespace Stealth.Items
         public int ItemsPerHouse = 2;
         [Tooltip("One more item per this many rooms of the building.")]
         public int RoomsPerExtraItem = 3;
+        [Tooltip("How dense the loot lies by team size (1, 2, 3, 4… players; the last repeats).")]
+        public float[] ByPlayers = { 1f, 1.15f, 1.3f, 1.45f };
         [Tooltip("Items never lie closer than this, meters.")]
         public float MinSpacing = 1.5f;
         [Tooltip("Chance of an item to be hidden in a drawer or a locker instead (it appears when that part is opened).")]
@@ -61,6 +63,7 @@ namespace Stealth.Items
             s ??= new LootSettings();
             int count = s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
             if (l.Location == Location.Office) count = Mathf.RoundToInt(count * s.OfficeItems);
+            count = Mathf.RoundToInt(count * TeamShare.Of(s.ByPlayers, l.Players));
             // the budget is the value the tetris loot had: fewer items when the table's are worth more, more when less
             return Mathf.RoundToInt(count * ItemCatalog.ItemsPerOldItem());
         }
@@ -68,8 +71,9 @@ namespace Stealth.Items
         /// <summary>
         /// Picks loot positions: round-robin over floors (every floor gets loot), never closer than
         /// <see cref="LootSettings.MinSpacing"/> to each other. Value bonus: higher floors and dark rooms are richer.
+        /// Never worth less than <paramref name="minValue"/> (the house holds its quota twice over): more things, then better ones.
         /// </summary>
-        public static List<Loot> Plan(LevelLayout l, System.Random rng, LootSettings s = null)
+        public static List<Loot> Plan(LevelLayout l, System.Random rng, LootSettings s = null, float minValue = 0f)
         {
             s ??= new LootSettings();
             float spacing = s.MinSpacing;
@@ -157,7 +161,81 @@ namespace Stealth.Items
                 }
                 misses = placed ? 0 : misses + 1;
             }
+            Enrich(l, rng, result, byFloor, onFloor, spacing, minValue, Shape);
             return result;
+        }
+
+        /// <summary>What these things burn for.</summary>
+        public static int ValueOf(List<Loot> loot)
+        {
+            int total = 0;
+            foreach (var t in loot) total += ItemCatalog.Value(t.Shape, t.Color);
+            return total;
+        }
+
+        /// <summary>Brings the loot up to <paramref name="minValue"/>: more things on spots still free, then the cheapest ones exchanged for better.</summary>
+        static void Enrich(LevelLayout l, System.Random rng, List<Loot> loot, List<List<Vector3>> byFloor, List<List<Vector3>> onFloor,
+            float spacing, float minValue, System.Func<Vector3, int> shapeAt)
+        {
+            int total = ValueOf(loot);
+            if (total >= minValue) return;
+            var free = new List<Vector3>();
+            foreach (var spots in byFloor) free.AddRange(spots);
+            foreach (var spots in onFloor) free.AddRange(spots);
+            void Fill()
+            {
+                while (total < minValue && free.Count > 0)
+                {
+                    int i = rng.Next(free.Count);
+                    var p = free[i];
+                    free.RemoveAt(i);
+                    if (loot.Exists(r => (r.Position - p).sqrMagnitude < spacing * spacing)) continue;
+                    int shape = shapeAt(p);
+                    var thing = new Loot { Position = p, Shape = shape, Color = ItemCatalog.FreshColor(shape, 0) };
+                    loot.Add(thing);
+                    total += ItemCatalog.Value(thing.Shape, thing.Color);
+                }
+            }
+            Fill();
+            // no spot left: the best of a few draws in place of the cheapest, round after round
+            for (int round = 0; round < 4 && total < minValue; round++)
+            {
+                var order = new List<int>();
+                for (int i = 0; i < loot.Count; i++) order.Add(i);
+                order.Sort((a, b) =>
+                {
+                    int by = ItemCatalog.Value(loot[a].Shape, loot[a].Color).CompareTo(ItemCatalog.Value(loot[b].Shape, loot[b].Color));
+                    return by != 0 ? by : a.CompareTo(b);
+                });
+                foreach (int i in order)
+                {
+                    if (total >= minValue) break;
+                    var t = loot[i];
+                    int was = ItemCatalog.Value(t.Shape, t.Color), best = was;
+                    var room = l.Plan.RoomAt(t.Position + Vector3.up * 0.3f)?.Type;
+                    var rule = RoomRules.For(room ?? RoomType.Office, l.RoomRules);
+                    for (int k = 0; k < 8; k++)
+                    {
+                        int shape = ItemCatalog.LootShape(rng, room);
+                        if (!RoomRules.LootFits(rule, ItemCatalog.Cells(shape))) continue;
+                        byte color = (byte)ItemCatalog.FreshColor(shape, 0);
+                        int value = ItemCatalog.Value(shape, color);
+                        if (value <= best) continue;
+                        best = value;
+                        t.Shape = shape;
+                        t.Color = color;
+                    }
+                    if (best <= was) continue;
+                    loot[i] = t;
+                    total += best - was;
+                }
+            }
+            if (total >= minValue || l.Plan == null) return;
+            // a small house and a big team: more of the rooms' open floor
+            foreach (var r in l.Plan.Rooms)
+                if (r.Id != l.LobbyRoom && r.Id != l.StorageRoom && r.Id != l.VaultRoom && r.Area >= 6f)
+                    free.AddRange(FloorSpots(l, new HashSet<int> { r.Id }, Mathf.CeilToInt(r.Area / 12f), spacing));
+            Fill();
         }
 
         /// <summary>

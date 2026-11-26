@@ -413,7 +413,6 @@ namespace Stealth.Audio
             var (clip, volume) = d.Kind switch
             {
                 RobotKind.Spider => (Bank.SpiderStep, 0.35f),
-                RobotKind.Hound => (Bank.StepLight, 0.45f),
                 _ => (Bank.RobotStep, 0.6f),
             };
             Sfx.At(clip != null ? clip : Bank.RobotStep, foot, volume, Sfx.Group.Robots, Stealth.Level.LevelRandom.Shared(Stealth.Level.RandomChannel.Audio).Range(0.92f, 1.08f));

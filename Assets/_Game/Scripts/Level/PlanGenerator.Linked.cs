@@ -28,18 +28,6 @@ namespace Stealth.Level
         /// <summary>Gap kept between blocks and corridors that are not linked (metres): the yard runs between them.</summary>
         const int LinkClearance = 2;
 
-        /// <summary>How many blocks a house of this floor area gets (the room limits, if any, decide for the rooms test).</summary>
-        public static int LinkedBlocks(System.Random rng, float area, int floors, BuildingSettings b)
-        {
-            int halls = Mathf.Max(0, floors - 1);
-            if (b.RoomCountMax > 0)
-            {
-                int lo = Mathf.Max(2, b.RoomCountMin), hi = Mathf.Max(lo, b.RoomCountMax);
-                return rng.Next(lo, hi + 1) + halls;
-            }
-            return Mathf.Clamp(Mathf.RoundToInt(area * 0.85f / 110f), 3, 14) + halls;
-        }
-
         /// <summary>The links, corridor lengths and placed blocks of a linked house, or null if none could be laid out (pure).</summary>
         public static LinkedMass Linked(System.Random rng, int blocks, int floors, BuildingSettings b)
         {

@@ -86,9 +86,8 @@ namespace Stealth.Level
         public virtual bool WarmLight => true;
 
         /// <summary>The location's own plan settings shared by all of them: a single block, no atriums, rotundas or cut corners.</summary>
-        protected static void SingleBlock(BuildingSettings s, int[] floors)
+        protected static void SingleBlock(BuildingSettings s)
         {
-            s.FloorsPerHouse = floors;
             s.LinkedChance = 0f;
             s.AtriumChance = 0f;
             s.RotundaChance = 0f;
@@ -129,10 +128,11 @@ namespace Stealth.Level
             // a slab: the corridor down its length, rooms on both sides; two or three floors (the theatres on top)
             if (b.EveryRoomType) { s.CorridorChance = 1f; return; }
             s.Hospital = true;
-            SingleBlock(s, new[] { 2, 2, 3, 3, 3 });
+            SingleBlock(s);
         }
 
         public override float DoorChance(LevelLayout l, Doorway d, float chance) => Mathf.Max(chance, 0.6f); // wards, theatres and the corridor's swing doors
+        public override bool RetypesRooms => false; // its departments are laid out by its plan (PlanGenerator.Blocks)
 
         public override DoorKind InnerDoor(LevelLayout l, Doorway d, PlanRoom a, PlanRoom b)
         {
@@ -155,7 +155,7 @@ namespace Stealth.Level
             // a box of a building: the hall two storeys high, the block beside it two floors, square rooms
             if (b.EveryRoomType) return;
             s.Garage = true;
-            SingleBlock(s, new[] { 2 });
+            SingleBlock(s);
             s.DarkChance = b.DarkChance + 0.08f;
         }
 
@@ -187,7 +187,7 @@ namespace Stealth.Level
             // one entrance, one stairwell, a few flats a floor: more storeys than any other house
             if (b.EveryRoomType) return;
             s.Apartments = true;
-            SingleBlock(s, new[] { 4, 4, 5, 5, 6 });
+            SingleBlock(s);
         }
 
         public override float DoorChance(LevelLayout l, Doorway d, float chance) =>
@@ -212,7 +212,7 @@ namespace Stealth.Level
         public override bool WarmLight => false; // what still burns here burns cold
         public override PropKind? PointOfInterest => null; // its find is the station itself: dark, rotten, the robots at home
         public override DoorKind? StreetDoor => DoorKind.Steel;
-        public override bool RetypesRooms => false; // the station's program is laid out by its plan
+        public override bool RetypesRooms => false; // the station's program is laid out by its plan (PlanGenerator.Blocks)
 
         public override void Shape(BuildingSettings s, BuildingSettings b)
         {
@@ -220,7 +220,7 @@ namespace Stealth.Level
             // mostly out (more dark rooms)
             if (b.EveryRoomType) { s.CorridorChance = 1f; return; }
             s.Station = true;
-            SingleBlock(s, new[] { 2, 2, 3, 3, 3 });
+            SingleBlock(s);
             s.DarkChance = Mathf.Min(0.9f, b.DarkChance + 0.25f);
         }
 

@@ -395,7 +395,11 @@ namespace Stealth.EditorTools
                 On(icon.Glyph, shape == 3);
                 (shape switch { 0 => icon.Arrow, 1 => icon.Dot, 2 => icon.Diamond, _ => icon.Glyph }).color = c;
                 On(icon.Label, label != null);
-                if (label != null) { icon.Label.text = label; icon.Label.color = UiPalette.Ink; }
+                if (label != null)
+                {
+                    icon.Label.text = label; icon.Label.color = UiPalette.Ink;
+                    MapView.PlaceLabel(icon, MapView.LabelPlace(at * scale, new Vector2(layout.SizeX, layout.SizeZ) * scale, icon.Label.preferredWidth / 2f));
+                }
             }
             Icon(new Vector2(layout.HatchPosition.x, layout.HatchPosition.z), UiPalette.MarkBlue, "вход", 2);
             Icon(new Vector2(layout.ExitHatchPosition.x, layout.ExitHatchPosition.z), UiPalette.MarkGreen, "выход", 2);

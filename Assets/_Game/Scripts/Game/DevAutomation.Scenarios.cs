@@ -25,7 +25,6 @@ namespace Stealth.Game
             m_Scenarios["vent"] = VentScenario;
             m_Scenarios["perf"] = PerfScenario;
             m_Scenarios["gallery"] = GalleryScenario;
-            m_Scenarios["hunter"] = HunterScenario;
             m_Scenarios["lasers"] = LasersScenario;
             m_Scenarios["radio"] = RadioScenario;
             m_Scenarios["hack"] = HackScenario;

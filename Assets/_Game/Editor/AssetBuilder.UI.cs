@@ -1256,11 +1256,11 @@ namespace Stealth.EditorTools
             menu.Leave = ButtonIn(e, pc, "Leave", L("menu.leave"), 34);
             BuildControlsPanel(e, menu, root.transform);
 
-            // Settings: two sheets side by side, the game's and the voice chat's.
+            // Settings: two sheets side by side, the game's and the voice chat's with the picture's under it (all within 720 high).
             var settings = Stretch(root.transform, "Settings");
             menu.SettingsPage = settings.gameObject;
             Img(settings, UiPalette.Veil.A(0.9f)).raycastTarget = true;
-            Sheet(settings, "SheetGame", TopCenter, TopCenter, new Vector2(-250, -40), new Vector2(500, 630));
+            Sheet(settings, "SheetGame", TopCenter, TopCenter, new Vector2(-250, -40), new Vector2(500, 570));
             var sc = Column(settings, "Column", new Vector2(-250, -60), 440);
             ColumnTitle(sc, L("menu.settings"), 26);
             Spacer(sc, 8);
@@ -1281,10 +1281,6 @@ namespace Stealth.EditorTools
             menu.CrouchToggle = ToggleIn(e, sc, "CrouchToggle", L("menu.crouch_toggle"));
             Spacer(sc, 10);
             menu.Language = ButtonIn(e, sc, "Language", "", 30); // the label names the language: set by GameMenu
-            menu.Smoothing = ButtonIn(e, sc, "Smoothing", "", 30); // the label names the mode: set by GameMenu
-            menu.VSync = ToggleIn(e, sc, "VSync", L("menu.vsync"));
-            menu.Lighting = ButtonIn(e, sc, "Lighting", "", 30); // the labels name the choice: set by GameMenu
-            menu.Textures = ButtonIn(e, sc, "Textures", "", 30);
             Spacer(sc, 14);
             BuildVoiceSettings(e, menu, settings);
             var buttons = R(sc, "Buttons", Center, Center, Vector2.zero, Vector2.zero);
@@ -1302,10 +1298,10 @@ namespace Stealth.EditorTools
             return root;
         }
 
-        /// <summary>The voice chat sheet of the settings page (GameMenu: mode, microphone, sensitivity with a live meter, noise suppression, volume).</summary>
+        /// <summary>The voice chat sheet of the settings page (GameMenu: mode, microphone, sensitivity with a live meter, noise suppression, volume), and the picture under it (smoothing, VSync, lighting, textures).</summary>
         static void BuildVoiceSettings(UiElements e, GameMenu menu, Transform settings)
         {
-            var (sheet, _) = Sheet(settings, "SheetVoice", TopCenter, TopCenter, new Vector2(250, -40), new Vector2(500, 430), UiPalette.CarbonYellow);
+            var (sheet, _) = Sheet(settings, "SheetVoice", TopCenter, TopCenter, new Vector2(250, -40), new Vector2(500, 640), UiPalette.CarbonYellow);
             sheet.localEulerAngles = new Vector3(0, 0, -0.5f);
             var vc = Column(settings, "Voice", new Vector2(250, -60), 440);
             ColumnTitle(vc, L("menu.voice_title"), 26);
@@ -1324,6 +1320,14 @@ namespace Stealth.EditorTools
             Spacer(vc, 8);
             menu.VoiceVolumeLabel = ColumnText(vc, "VoiceVolumeLabel", "", 15, 22);
             menu.VoiceVolume = SliderIn(e, vc, "VoiceVolume", 0f, 2f, false);
+            // the picture: on this sheet, the game's would not fit the screen
+            Spacer(vc, 14);
+            ColumnTitle(vc, L("menu.picture_title"), 20);
+            Spacer(vc, 4);
+            menu.Smoothing = ButtonIn(e, vc, "Smoothing", "", 30); // the label names the mode: set by GameMenu
+            menu.VSync = ToggleIn(e, vc, "VSync", L("menu.vsync"));
+            menu.Lighting = ButtonIn(e, vc, "Lighting", "", 30); // the labels name the choice: set by GameMenu
+            menu.Textures = ButtonIn(e, vc, "Textures", "", 30);
         }
 
         /// <summary>

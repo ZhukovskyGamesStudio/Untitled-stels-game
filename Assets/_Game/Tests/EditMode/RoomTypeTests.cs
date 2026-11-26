@@ -208,27 +208,6 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void TheClassicGeneratorGuessesTypesAndStillHasItsStorageRoom()
-        {
-            var f = new FeatureSettings { StorageChance = 1f, StorageFromHouse = 0 };
-            int storage = 0, houses = 0, typed = 0;
-            for (int seed = 1; seed <= 10; seed++)
-            {
-                var l = TestHouses.Make(seed * 6151, 1, null, null, 1, f, classic: true);
-                var program = TestHouses.Make(seed * 6151, 1, null, null, 1, f, classic: false);
-                if (HouseKinds.OwnPlan(l.Kind)) continue; // a location's own plan: the classic switch is about the office generator
-                houses++;
-                if (l.StorageRoom >= 0) storage++;
-                foreach (var r in l.Rooms) if (r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby)) typed++;
-                Assert.That(l.Rooms.Count, Is.GreaterThan(3), $"seed {seed}: a house of rooms");
-                Assert.IsFalse(l.Rooms.Select(r => (r.Type, r.Area)).SequenceEqual(program.Rooms.Select(r => (r.Type, r.Area))),
-                    $"seed {seed}: the classic plan is its own");
-            }
-            Assert.That(typed, Is.GreaterThan(houses * 3));
-            Assert.That(storage, Is.GreaterThanOrEqualTo(houses * 7 / 10), $"a dead end becomes the storage room ({storage} of {houses})");
-        }
-
-        [Test]
         public void TheStorageDoorOpensFromInsideOnly()
         {
             var door = new Vector3(5f, 0f, 5f);

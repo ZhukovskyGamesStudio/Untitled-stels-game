@@ -6,23 +6,20 @@ namespace Stealth.Level
     /// <summary>Every kind of robot and security device. Index into GameManager.RobotPrefabs.</summary>
     public enum RobotKind
     {
-        Guard,          // legs, camera eye, weak hearing
-        Listener,       // wheels, blind, microphones
-        Drone,          // flies, downward camera, raises alarms
-        Spider,         // crawls on walls, ambushes from above
-        Vacuum,         // rides the ceiling, scans the floor with a laser line
-        Turret,         // stationary, aims and shoots
-        Thumper,        // tracks, feels footsteps through the floor (seismic)
-        Hound,          // legs, follows the scent trail
-        Sorter,         // sees only players carrying loot of its colour
-        Worker,         // harmless, but snitches (alarm)
-        Hunter,         // arrives after alarms, no sensors: runs to whoever the others have spotted
-        Lidar,          // floor pole, spinning laser line at knee height
-        MotionSensor,   // wall PIR: notices fast movement
-        PressurePlate,  // floor tile: stepping on it raises an alarm
-        Camera,         // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
-        Sweeper,        // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk
-        Warden,         // guards the doorway of a loot room (placed by HouseFeatures, not the roster); sharp eyes, raises the alarm — distract it
+        Guard = 0,              // legs, camera eye, weak hearing
+        Listener = 1,           // wheels, blind, microphones
+        Drone = 2,              // flies, downward camera, raises alarms
+        Spider = 3,             // crawls on walls, ambushes from above
+        Vacuum = 4,             // rides the ceiling, scans the floor with a laser line
+        Turret = 5,             // stationary, aims and shoots
+        Thumper = 6,            // tracks, feels footsteps through the floor (seismic)
+        Sorter = 8,             // sees only players carrying loot of its colour
+        Worker = 9,             // harmless, but snitches (alarm)
+        Lidar = 11,             // floor pole, spinning laser line at knee height
+        MotionSensor = 12,      // wall PIR: notices fast movement
+        PressurePlate = 13,     // floor tile: stepping on it raises an alarm
+        Camera = 14,            // wall camera sweeping left-right, raises alarms (placed by the camera spots, not the roster)
+        Sweeper = 15,           // floor cleaner, blind; a lidar spins at ankle height — stand on a chair or a desk
     }
 
     /// <summary>One line of the security roster: from which house a kind appears and how often.</summary>
@@ -48,7 +45,10 @@ namespace Stealth.Level
     /// <summary>Which robots appear on which level (weights, unlock depth). Pure, unit tested.</summary>
     public static class RobotRoster
     {
-        public static readonly int KindCount = System.Enum.GetValues(typeof(RobotKind)).Length;
+        /// <summary>Slots of a table by kind (the numbers are saved and travel: 7, 10 and 16 were robots the game no longer has).</summary>
+        public const int KindCount = 16;
+
+        public static readonly RobotKind[] Kinds = (RobotKind[])System.Enum.GetValues(typeof(RobotKind));
 
         static readonly RosterSettings s_Default = new();
 
@@ -65,7 +65,6 @@ namespace Stealth.Level
             new(RobotKind.Thumper, 2, 2f),
             new(RobotKind.Sorter, 2, 1.5f),
             new(RobotKind.Turret, 2, 1.5f),
-            new(RobotKind.Hound, 3, 2f),
         };
 
         public static RosterEntry[] DefaultDevices() => new RosterEntry[]
@@ -75,20 +74,12 @@ namespace Stealth.Level
             new(RobotKind.Lidar, 1, 1.5f),
         };
 
-        /// <summary>How many extra robots have come into the house <paramref name="elapsed"/> seconds after it started (pure).</summary>
-        public static int ReinforcementsDue(float elapsed, float first, float second, float every)
-        {
-            if (elapsed < first) return 0;
-            if (elapsed < first + second) return 1;
-            return 2 + Mathf.FloorToInt((elapsed - first - second) / Mathf.Max(1f, every));
-        }
-
-        /// <summary>A kind that may come in as a reinforcement: a robot of the house's table, unlocked — not a harmless worker, not a device, the hunter or a warden.</summary>
+        /// <summary>A kind that may come in as a reinforcement: a robot of the house's table, unlocked — not a harmless worker, not a device.</summary>
         public static RobotKind PickReinforcement(RosterEntry[] table, int level, System.Random rng)
         {
             var allowed = new System.Collections.Generic.List<RosterEntry>();
             foreach (var e in table)
-                if (e.MinLevel <= level && e.Weight > 0f && !IsDevice(e.Kind) && e.Kind is not (RobotKind.Worker or RobotKind.Hunter or RobotKind.Warden or RobotKind.Camera))
+                if (e.MinLevel <= level && e.Weight > 0f && !IsDevice(e.Kind) && e.Kind is not (RobotKind.Worker or RobotKind.Camera))
                     allowed.Add(e);
             if (allowed.Count == 0) return RobotKind.Guard;
             return Pick(allowed.ToArray(), level, rng);
@@ -98,23 +89,12 @@ namespace Stealth.Level
 
         /// <summary>Robots with legs / propellers can change floors; wheels, tracks and fixed devices cannot.</summary>
         public static bool CanUseStairs(RobotKind k) =>
-            k == RobotKind.Guard || k == RobotKind.Drone || k == RobotKind.Hound || k == RobotKind.Hunter || k == RobotKind.Sorter;
+            k is RobotKind.Guard or RobotKind.Drone or RobotKind.Sorter;
 
         public static RobotKind PickRobot(int level, System.Random rng, RosterSettings roster = null) => Pick((roster ?? s_Default).Robots, level, rng);
 
-        /// <summary>A robot from this table (the new enemy mode's, see <see cref="NewEnemies"/>).</summary>
+        /// <summary>A robot from this table.</summary>
         public static RobotKind PickRobot(RosterEntry[] table, int level, System.Random rng) => Pick(table, level, rng);
-
-        /// <summary>Who never comes in the new enemy mode: the hound, the hunter and the warden (traps guard the rich rooms instead).</summary>
-        public static bool OldOnly(RobotKind k) => k is RobotKind.Hound or RobotKind.Hunter or RobotKind.Warden;
-
-        /// <summary>The robot table without the old-mode kinds (<see cref="OldOnly"/>).</summary>
-        public static RosterEntry[] NewEnemies(RosterEntry[] table)
-        {
-            var list = new List<RosterEntry>();
-            foreach (var e in table) if (!OldOnly(e.Kind)) list.Add(e);
-            return list.Count > 0 ? list.ToArray() : table;
-        }
 
         /// <summary>Kinds that first appear on this house: each of them is placed at least once there, so players meet it.</summary>
         public static List<RobotKind> Newcomers(RosterEntry[] table, int level)
@@ -130,7 +110,7 @@ namespace Stealth.Level
             roster ??= s_Default;
             foreach (var e in roster.Robots) if (e.Kind == k) return level >= e.MinLevel;
             foreach (var e in roster.Devices) if (e.Kind == k) return level >= e.MinLevel;
-            return false; // Hunter: spawned by alarms; cameras: own spots — never picked from the roster
+            return false; // cameras: own spots — never picked from the roster
         }
 
         static RobotKind Pick(RosterEntry[] table, int level, System.Random rng)

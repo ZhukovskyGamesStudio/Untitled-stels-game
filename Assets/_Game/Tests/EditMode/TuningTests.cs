@@ -44,7 +44,7 @@ namespace Stealth.Tests
                 Assert.AreEqual(System.IO.Path.GetDirectoryName(path), System.IO.Path.GetDirectoryName(configPath), $"{path}: config lies next to the prefab");
                 Assert.AreEqual(System.IO.Path.GetFileNameWithoutExtension(path) + "Config", System.IO.Path.GetFileNameWithoutExtension(configPath));
             }
-            Assert.AreEqual(RobotRoster.KindCount + 1, count, "every kind and the laser gate");
+            Assert.AreEqual(RobotRoster.Kinds.Length + 1, count, "every kind and the laser gate");
         }
 
         [Test]
@@ -64,18 +64,18 @@ namespace Stealth.Tests
         public void EveryMobileRobotHasItsOwnProfile()
         {
             var profiles = AssetDatabase.FindAssets("t:RobotProfile", new[] { "Assets/_Game/Prefabs/Robots" });
-            Assert.GreaterOrEqual(profiles.Length, 8, "guard, listener, drone, thumper, hound, sorter, worker, hunter");
+            Assert.GreaterOrEqual(profiles.Length, 7, "guard, listener, drone, thumper, sorter, worker, sweeper");
             var guard = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Robots/RobotGuard.prefab").GetComponent<RobotController>();
-            var hound = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Robots/RobotHound.prefab").GetComponent<RobotController>();
-            Assert.AreNotSame(guard.Profile, hound.Profile);
+            var listener = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Robots/RobotListener.prefab").GetComponent<RobotController>();
+            Assert.AreNotSame(guard.Profile, listener.Profile);
             Assert.IsTrue(guard.Senses.HasEyes);
-            Assert.Greater(hound.Senses.SmellRange, 0f);
+            Assert.Greater(listener.Senses.HearingMultiplier, 0f);
         }
 
         [Test]
         public void BuildingFollowsItsSettings()
         {
-            var b = new BuildingSettings { FloorsPerHouse = new[] { 4 }, BaseRooms = 4, RoomsPerHouse = 0, VentsPerRoom = 0f, AutoDoorChance = 0f };
+            var b = new BuildingSettings { Sizes = HouseSize.Every(1600f, 4), VentsPerRoom = 0f, AutoDoorChance = 0f };
             int seed0 = Enumerable.Range(5, 50).First(x => HouseKinds.Of(x, 0) == HouseKind.Office); // an office: a hospital and a shop choose their floors
             var l = TestHouses.Make(seed0, 0, b);
             Assert.AreEqual(4, l.Floors);
@@ -111,17 +111,17 @@ namespace Stealth.Tests
         [Test]
         public void SecurityCountsAndRosterFollowTheSettings()
         {
-            var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0,
+            var calm = new SecuritySettings { Robots = 0, RobotsPer1000 = 0f, RobotsPer1000PerHouse = 0f, Devices = 0, DevicesPer1000PerHouse = 0f, Cameras = 0, CamerasPer1000PerHouse = 0f, Lasers = 0, LasersPer1000PerHouse = 0f,
                 SleepingGuards = 0, Wards = new WardSettings { Rooms = 0, RoomsPerHouse = 0, MaxRooms = 0 } };
             var l = TestHouses.Make(9, 1, null, calm);
-            // only wardens (HouseFeatures, the old mode) and the traps of the vault or the hidden room (Wards, they are always guarded)
-            Assert.AreEqual(0, l.RobotSpawns.Count(r => r.Kind != RobotKind.Warden && !l.WardedRooms.Contains(l.Plan.RoomAt(new Vector3(r.Position.x, LevelLayout.FloorY(r.Floor) + 0.3f, r.Position.z))?.Id ?? -1)), "only wardens and wards");
+            // only the traps of the vault or the hidden room (Wards, they are always guarded)
+            Assert.AreEqual(0, l.RobotSpawns.Count(r => !l.WardedRooms.Contains(l.Plan.RoomAt(new Vector3(r.Position.x, LevelLayout.FloorY(r.Floor) + 0.3f, r.Position.z))?.Id ?? -1)), "only wards");
             Assert.AreEqual(0, l.CameraSpots.Count);
             Assert.AreEqual(0, l.LaserSpots.Count);
 
             var drones = new SecuritySettings { SleepingGuards = 0, Roster = new RosterSettings { Robots = new[] { new RosterEntry(RobotKind.Drone, 0, 1f) } } };
             var d = TestHouses.Make(9, 0, null, drones);
-            foreach (var spawn in d.RobotSpawns.Where(s => !RobotRoster.IsDevice(s.Kind) && s.Kind != RobotKind.Warden)) Assert.AreEqual(RobotKind.Drone, spawn.Kind);
+            foreach (var spawn in d.RobotSpawns.Where(s => !RobotRoster.IsDevice(s.Kind))) Assert.AreEqual(RobotKind.Drone, spawn.Kind);
         }
 
         [Test]
@@ -135,10 +135,6 @@ namespace Stealth.Tests
         [Test]
         public void RunRulesFollowTheSettings()
         {
-            var impatient = new RunSettings { HunterAlarmsFirstHouse = 1 };
-            Assert.IsTrue(RunState.HunterDue(1, 0f, 0, 0, impatient));
-            Assert.IsFalse(RunState.HunterDue(1, 0f, 0, 0));
-            Assert.Greater(RunState.QuotaFor(1000, 0, 0, new RunSettings { QuotaShare = 0.6f }), RunState.QuotaFor(1000, 0, 0));
             var run = new RunState(new RunSettings { AlarmDuration = 1f });
             run.RaiseAlarm(0.0);
             Assert.IsFalse(run.AlarmActive(1.5));

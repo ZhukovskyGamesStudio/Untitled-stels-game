@@ -44,14 +44,12 @@ namespace Stealth.Game
             return list;
         }
 
-        /// <summary>Server: the tools of the house at the start — keys, lures, the stun cubes (one per player); the wardens' posts.
+        /// <summary>Server: the tools of the house at the start — keys, the stun cubes (one per player).
         /// Returns the value hidden in crates (it counts towards the house's loot).</summary>
         int SpawnFeatures(LevelLayout l)
         {
             foreach (var k in l.KeyDoors) SpawnItemServer(ItemCatalog.Key, 4, k.Key + Vector3.up * 0.02f, 0f);
             bool gadgets = HouseLevel.Features.Gadgets;
-            if (gadgets)
-                for (int i = 0; i < l.LureSpots.Count; i++) SpawnItemServer(ItemCatalog.Speaker, 1, l.LureSpots[i] + Vector3.up * 0.02f, i * 70f);
             if (gadgets && l.PointOfInterest >= 0 && l.Props[l.PointOfInterest].Kind == PropKind.Programmer)
             {
                 var p = l.Props[l.PointOfInterest];
@@ -69,14 +67,6 @@ namespace Stealth.Game
             foreach (int c in l.Crates)
                 foreach (var (shape, color) in CrateContents(l, c, Gadgets, HouseLevel.Loot)) value += ItemCatalog.Value(shape, color);
             return value;
-        }
-
-        /// <summary>Server: the wardens just spawned get their posts (in the order of the layout).</summary>
-        void PostWardens(LevelLayout l, List<GameObject> wardens)
-        {
-            for (int i = 0; i < wardens.Count && i < l.Wardens.Count; i++)
-                if (wardens[i] != null && wardens[i].TryGetComponent<RobotController>(out var rc))
-                    rc.SetPost(l.Wardens[i].A, l.Wardens[i].B, l.Wardens[i].Facing);
         }
 
         // ------------------------------------------------------------------ using things

@@ -294,22 +294,33 @@ namespace Stealth.UI
             bool on = gm.Phase == RunPhase.Playing && gm.HouseClockAt > 0;
             Ui.Show(ClockPanel, on);
             if (!on) return;
-            var r = Tuning.Run.Rules;
             float t = gm.HouseClock;
-            float next = HouseClockRules.NextAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
-            float prev = HouseClockRules.PreviousAt(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
-            int came = RobotRoster.ReinforcementsDue(t, r.ReinforceFirst, r.ReinforceSecond, r.ReinforceEvery);
+            var clock = Tuning.Run.Rules.ReinforcementsFor(FloorArea());
+            float next = clock.NextAt(t), prev = clock.PreviousAt(t);
+            int came = clock.Due(t);
             var color = UiPalette.HeatPaper(HouseClockRules.Heat(came));
             if (ClockPanel.color != color) ClockPanel.color = color;
-            string time = HouseClockRules.Format(t), at = HouseClockRules.Format(next);
+            string time = HouseClockRules.Format(t), at = next < 0f ? "" : HouseClockRules.Format(next); // (no more of them: nothing)
             if (ClockTime.text != time) ClockTime.text = time;
             if (ClockNext.text != at) ClockNext.text = at;
-            if (ClockBar != null) ClockBar.Set(Mathf.InverseLerp(prev, next, t), came > 0 ? UiPalette.Stamp.A(0.75f) : UiPalette.MarkPink);
+            if (ClockBar != null) ClockBar.Set(next < 0f ? 1f : Mathf.InverseLerp(prev, next, t), came > 0 ? UiPalette.Stamp.A(0.75f) : UiPalette.MarkPink);
             if (ClockCount != null)
             {
                 string n = came > 0 ? "+" + came : "";
                 if (ClockCount.text != n) ClockCount.text = n;
             }
+        }
+
+        LevelLayout m_AreaOf;
+        float m_Area;
+
+        /// <summary>The house's floor area (its rooms are summed once per house).</summary>
+        float FloorArea()
+        {
+            var l = ActiveLevel.Layout;
+            if (l == null) return 0f;
+            if (m_AreaOf != l) (m_AreaOf, m_Area) = (l, l.FloorArea);
+            return m_Area;
         }
 
         double m_ClockSeen = -1;

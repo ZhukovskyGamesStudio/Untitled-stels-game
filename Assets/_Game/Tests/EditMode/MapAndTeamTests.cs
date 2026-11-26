@@ -12,68 +12,6 @@ namespace Stealth.Tests
     /// <summary>Houses that grow with the run and the team, the shared map, pings and rebindable controls.</summary>
     public class MapAndTeamTests
     {
-        // ------------------------------------------------------------------ size and quota
-
-        [Test]
-        public void HousesKeepGrowingDuringARun()
-        {
-            var b = new BuildingSettings();
-            int prev = 0;
-            for (int house = 0; house < 12; house++)
-            {
-                var g = b.GridFor(house, 1);
-                Assert.GreaterOrEqual(g.x, g.y, "wider than deep");
-                Assert.GreaterOrEqual(g.x * g.y, prev, $"house {house}");
-                prev = g.x * g.y;
-            }
-            Assert.AreEqual(new Vector2Int(3, 3), b.GridFor(0, 1), "the first house: 3 x 3");
-            Assert.Greater(b.GridFor(8, 1).x * b.GridFor(8, 1).y, 20, "later houses are bigger than the old cap (5 x 4)");
-            Assert.LessOrEqual(prev, Mathf.CeilToInt(b.MaxRooms), "never above the cap");
-        }
-
-        [Test]
-        public void ABiggerTeamGetsABiggerHouseButNotTimesN()
-        {
-            var b = new BuildingSettings();
-            for (int house = 0; house < 4; house++)
-            {
-                int solo = Area(b.GridFor(house, 1)), four = Area(b.GridFor(house, 4));
-                Assert.Greater(four, solo, $"house {house}");
-                Assert.Less(four, solo * 2.1f, "much softer than x4");
-            }
-            var small = TestHouses.Get(42, 2);
-            var big = TestHouses.Get(42, 2, 4);
-            Assert.AreEqual(4, big.Players);
-            Assert.Greater(big.RoomUnits, small.RoomUnits);
-            Assert.Greater(big.RobotSpawns.Count, small.RobotSpawns.Count, "more rooms, more guards");
-        }
-
-        static int Area(Vector2Int g) => g.x * g.y;
-
-        [Test]
-        public void QuotaGrowsSoftlyWithTheTeam()
-        {
-            int solo = RunState.QuotaFor(1000, 1, 0), duo = RunState.QuotaFor(1000, 1, 0, null, 2), four = RunState.QuotaFor(1000, 1, 0, null, 4);
-            Assert.Greater(duo, solo);
-            Assert.Greater(four, duo);
-            Assert.Less(four, solo * 1.5f, "the share grows softly (the bigger house adds the loot)");
-            Assert.AreEqual(RunState.QuotaFor(1000, 1, 0, null, 4), RunState.QuotaFor(1000, 1, 0, null, 9), "the last entry repeats");
-        }
-
-        [Test]
-        public void QuotaFollowsTheTeamDuringAHouse()
-        {
-            var run = new RunState();
-            run.BeginLevel(0, 1000, 1);
-            int solo = run.Quota;
-            Assert.IsTrue(run.SetPlayers(3), "a friend joined");
-            Assert.AreEqual(RunState.QuotaFor(1000, 0, 0, null, 3), run.Quota);
-            Assert.Greater(run.Quota, solo);
-            Assert.IsFalse(run.SetPlayers(3), "no change");
-            run.SetPlayers(1);
-            Assert.AreEqual(solo, run.Quota, "and back when they leave");
-        }
-
         [Test]
         public void TheTeamSizeIsPartOfTheHouse()
         {
@@ -349,6 +287,15 @@ namespace Stealth.Tests
             {
                 Controls.ResetToDefaults();
             }
+        }
+
+        [Test]
+        public void MapLabelsByTheEdgeLeanInwards()
+        {
+            var extent = new Vector2(800f, 600f);
+            Assert.AreEqual((0, false), Stealth.UI.MapView.LabelPlace(new Vector2(400f, 300f), extent, 30f), "in the middle: centred under the icon");
+            Assert.AreEqual((1, true), Stealth.UI.MapView.LabelPlace(new Vector2(10f, 10f), extent, 30f), "bottom left corner: to the right, above");
+            Assert.AreEqual((-1, false), Stealth.UI.MapView.LabelPlace(new Vector2(790f, 590f), extent, 30f), "top right corner: to the left, under");
         }
     }
 }

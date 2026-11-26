@@ -544,7 +544,7 @@ def attach_mic(L):
 
 
 DESIGNS = {
-    "robot_guard": guard, "robot_hunter": hunter, "robot_hound": hound, "robot_spider": spider,
+    "robot_guard": guard, "robot_spider": spider,
     "robot_listener": listener, "robot_worker": worker, "robot_sweeper": sweeper, "robot_thumper": thumper,
     "robot_sorter": sorter, "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
     "sensor_plate": plate, "attach_mic": attach_mic,

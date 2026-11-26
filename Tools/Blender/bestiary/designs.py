@@ -583,9 +583,9 @@ def attach_nose(L):
 
 # name of the original model -> design
 DESIGNS = {
-    "robot_guard": guard, "robot_hound": hound, "robot_spider": spider, "robot_listener": listener,
+    "robot_guard": guard, "robot_spider": spider, "robot_listener": listener,
     "robot_worker": worker, "robot_sweeper": sweeper, "robot_thumper": thumper, "robot_sorter": sorter,
-    "robot_hunter": hunter, "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
+    "robot_drone": drone, "robot_turret": turret, "robot_vacuum": vacuum,
     "sensor_lidar": lidar, "sensor_pir": pir, "sensor_plate": plate, "security_camera": security_camera,
     "laser_emitter": laser_emitter, "attach_eye": attach_eye, "attach_mic": attach_mic,
     "attach_seismic": attach_seismic, "attach_nose": attach_nose, "worker_lift": worker_lift,

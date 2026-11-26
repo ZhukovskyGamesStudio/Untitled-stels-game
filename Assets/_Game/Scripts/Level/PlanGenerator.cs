@@ -35,7 +35,7 @@ namespace Stealth.Level
 
         sealed class Ctx
         {
-            public int Seed, House, Floors;
+            public int Seed, Floors;
             public BuildingSettings B;
             public HousePlan Plan;
             public bool[,] Footprint;                // [x, z] cells inside the building
@@ -46,7 +46,7 @@ namespace Stealth.Level
             public readonly List<int> StairRooms = new();  // per hall: room on the lower floor, then on the upper
             public LinkedMass Linked;                       // a house of blocks joined by corridors (null: one mass)
             public GarageLayout Garage;                     // the auto repair shop's parts (null: any other house)
-            public HospitalLayout Hospital;                 // the hospital's corridor and bands (null: any other house)
+            public BlockPlan Blocks;                        // a building of blocks and corridors between them (the hospital, the station)
             public ApartmentLayout Apartments;              // the apartment block's landing and bands (null: any other house)
             public RoomProgram Program;                     // the rooms the house is to have (decided first)
             public readonly List<RectInt> LinkBlocks = new();    // cells
@@ -57,8 +57,8 @@ namespace Stealth.Level
         }
 
         /// <summary>A house of about <paramref name="area"/> m² of rooms per floor (its program drawn here: no storage room).</summary>
-        public static Output Generate(int seed, int house, int floors, float area, BuildingSettings b) =>
-            Generate(seed, house, floors, RoomProgram.Make(seed, floors, area * RoomShareOfArea, b, false), b);
+        public static Output Generate(int seed, int floors, float area, BuildingSettings b) =>
+            Generate(seed, floors, RoomProgram.Make(seed, floors, area * RoomShareOfArea, b, false), b);
 
         /// <summary>Of a floor's area, the share that is rooms (the rest: corridors, the lobby, the stair halls).</summary>
         public const float RoomShareOfArea = 0.75f;
@@ -67,25 +67,16 @@ namespace Stealth.Level
         /// The plan of a house that has the rooms of <paramref name="program"/>: the building is sized for them, every room
         /// gets a place of at least its type's smallest size and keeps its type.
         /// </summary>
-        public static Output Generate(int seed, int house, int floors, RoomProgram program, BuildingSettings b)
+        public static Output Generate(int seed, int floors, RoomProgram program, BuildingSettings b)
         {
-            var c = new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b, Program = program };
+            var c = new Ctx { Seed = seed, Floors = Mathf.Max(1, floors), B = b, Program = program };
             foreach (var list in program.Floors) for (int i = 0; i < list.Count; i++) { var r = list[i]; r.Block = -1; list[i] = r; }
             return Build(c, FootprintArea(program, b));
         }
 
-        /// <summary>
-        /// The classic way (no longer offered by the game; the tests compare it): no room program — the mass of about
-        /// <paramref name="area"/> m² a floor is cut into rooms of every size (BSP, <see cref="Split"/>), then each room's
-        /// type is guessed from its size and proportions by the weights (<see cref="AssignTypes"/>, <see cref="Fit"/>).
-        /// </summary>
-        public static Output GenerateClassic(int seed, int house, int floors, float area, BuildingSettings b) =>
-            Build(new Ctx { Seed = seed, House = house, Floors = Mathf.Max(1, floors), B = b }, area);
-
         static Output Build(Ctx c, float area)
         {
             var b = c.B;
-            int house = c.House;
             var program = c.Program;
             var o = new Output();
             // first of all: does this house have corridors between its rooms? Then the links and corridor lengths come
@@ -95,13 +86,9 @@ namespace Stealth.Level
             var linkRng = c.Rng(0x11CC);
             if (!b.Garage && !b.Hospital && !b.Station && !b.Apartments && b.LinkedChance > 0f && linkRng.NextDouble() < b.LinkedChance)
             {
-                if (program != null)
-                {
-                    var (sizes, storage) = LinkedSizes(linkRng, c);
-                    c.Linked = Linked(linkRng, sizes, storage, c.Floors, b);
-                }
-                else c.Linked = Linked(linkRng, LinkedBlocks(linkRng, area, c.Floors, b), c.Floors, b);
-                if (c.Linked == null && program != null) foreach (var list in program.Floors) for (int i = 0; i < list.Count; i++) { var r = list[i]; r.Block = -1; list[i] = r; }
+                var (sizes, storage) = LinkedSizes(linkRng, c);
+                c.Linked = Linked(linkRng, sizes, storage, c.Floors, b);
+                if (c.Linked == null) foreach (var list in program.Floors) for (int i = 0; i < list.Count; i++) { var r = list[i]; r.Block = -1; list[i] = r; }
                 if (c.Linked != null)
                 {
                     wings = new List<RectInt>(c.Linked.Blocks);
@@ -109,10 +96,10 @@ namespace Stealth.Level
                     o.Mass = "linked";
                 }
             }
-            wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), out o.Mass)
-                : b.Hospital || b.Station ? HospitalMass(c, c.Rng(0xA55), area, Mathf.Clamp(b.HospitalSize, 0.1f, 1f), out o.Mass, b.Station)
+            wings ??= b.Garage ? GarageMass(c, c.Rng(0xA55), area, out o.Mass)
+                : b.Hospital || b.Station ? BlockMass(c, c.Rng(0xA55), area, b.Station, out o.Mass)
                 : b.Apartments ? ApartmentsMass(c, c.Rng(0xA55), out o.Mass)
-                : Mass(c.Rng(0xA55), area, house, b, out o.Mass);
+                : Mass(c.Rng(0xA55), area, b, out o.Mass);
             foreach (var w in wings) o.Wings.Add(w);
             int maxX = 0, maxZ = 0;
             foreach (var w in wings) { maxX = Mathf.Max(maxX, w.xMax); maxZ = Mathf.Max(maxZ, w.yMax); }
@@ -133,12 +120,12 @@ namespace Stealth.Level
             CarveCourtyards(c, wings);
 
             if (c.Garage != null) ReserveGarage(c);
-            else if (c.Hospital != null) ReserveHospital(c);
             else if (c.Apartments != null) ReserveApartments(c);
             else
             {
                 ReserveLobby(c);
                 ReserveHalls(c);
+                if (c.Blocks != null) PlanBlocks(c);
             }
             for (int f = 0; f < c.Floors; f++) ZoneFloor(c, f);
             var plan = c.Plan;
@@ -201,10 +188,10 @@ namespace Stealth.Level
         /// floor area, plus sometimes an annex sticking out. Wings overlap where they meet. Public for the tests: the
         /// variety of masses is a property of this function alone.
         /// </summary>
-        public static List<RectInt> Mass(System.Random rng, float area, int house, out string kind) => Mass(rng, area, house, new BuildingSettings(), out kind);
+        public static List<RectInt> Mass(System.Random rng, float area, out string kind) => Mass(rng, area, new BuildingSettings(), out kind);
 
         /// <summary>The mass with the weights of kinds and the annex chance of these settings (the rooms test: a bar only).</summary>
-        public static List<RectInt> Mass(System.Random rng, float area, int house, BuildingSettings b, out string kind)
+        public static List<RectInt> Mass(System.Random rng, float area, BuildingSettings b, out string kind)
         {
             var list = new List<RectInt>();
             int Even(float v) => Mathf.Max(2, Mathf.RoundToInt(v / 2f) * 2);
@@ -516,6 +503,8 @@ namespace Stealth.Level
             public readonly List<RectInt> Rects = new();
             public int Levels = 1;
             public int Flat = -1;        // the apartment block: which flat the room belongs to
+            public int Cluster = -1;     // a building of blocks: the cluster (a private hall and its rooms) the room belongs to
+            public Piece Piece;          // a building of blocks: what part of its block the room is
         }
 
         static void ZoneFloor(Ctx c, int f)
@@ -589,9 +578,9 @@ namespace Stealth.Level
                 ZoneGarage(c, f, regions, owner, Claim);
                 return;
             }
-            if (c.Hospital != null)
+            if (c.Blocks != null)
             {
-                ZoneHospital(c, f, regions, owner, Claim);
+                ZoneBlocks(c, f, regions, owner, Claim);
                 return;
             }
             if (c.Apartments != null)
@@ -684,8 +673,8 @@ namespace Stealth.Level
                     regions.Add(reg);
                 }
 
-            // What is left: rectangles, cut into the program's rooms of this floor (the classic way: into rooms of any size).
-            Cut(c, f, Rectangles(owner, nx, nz), Claim, c.Rng(0x5D1, f));
+            // What is left: rectangles, cut into the program's rooms of this floor.
+            Fill(c, f, Rectangles(owner, nx, nz), Claim, c.Rng(0x5D1, f));
 
             Cleanup(regions, owner, nx, nz);
             Merge(regions, owner, nx, nz, c.Rng(0x3E6, f));
@@ -804,7 +793,7 @@ namespace Stealth.Level
                     for (int z = 0; z < nz; z++) mask[x, z] = block.Contains(new Vector2Int(x, z)) && owner[x, z] == -1 ? -1 : -2;
                 rects.AddRange(Rectangles(mask, nx, nz));
             }
-            Cut(c, f, rects, claim, c.Rng(0x5D1, f));
+            Fill(c, f, rects, claim, c.Rng(0x5D1, f));
             Cleanup(regions, owner, nx, nz);
             for (int settle = 0; settle < 2; settle++)
             {
@@ -838,16 +827,6 @@ namespace Stealth.Level
                 if (RoomRules.MinArea(t, b.RoomTypeRules) <= area) return t;
             }
             return RoomType.Office;
-        }
-
-        /// <summary>
-        /// Free rectangles into rooms: the program's rooms of the floor (<see cref="Fill"/>), or the classic way — split
-        /// until room-sized, the types guessed afterwards (<see cref="Split"/>, <see cref="AssignTypes"/>).
-        /// </summary>
-        static void Cut(Ctx c, int f, List<RectInt> rects, System.Func<RectInt, Region, int> claim, System.Random rng)
-        {
-            if (c.Program != null) { Fill(c, f, rects, claim, rng); return; }
-            foreach (var rect in rects) Split(rect, rng, c.House, c.B, r => claim(r, new Region { Shape = RoomShape.Rect }));
         }
 
         /// <summary>Width of a wing per corridor (metres): rooms on both sides about 8 m deep.</summary>
@@ -912,38 +891,6 @@ namespace Stealth.Level
             return list;
         }
 
-        /// <summary>Splits a rectangle in two until the pieces are room-sized; sizes of every kind, from closets to halls.</summary>
-        static void Split(RectInt r, System.Random rng, int house, BuildingSettings b, System.Action<RectInt> room)
-        {
-            float scale = b.RoomSizeScale;
-            float area = r.width * r.height / (float)(M * M);
-            double roll = rng.NextDouble();
-            float want = roll < 0.28 ? 9f + (float)rng.NextDouble() * 10f        // small: closets, offices, toilets
-                       : roll < 0.7 ? 20f + (float)rng.NextDouble() * 25f        // medium
-                       : 45f + (float)rng.NextDouble() * (60f + house * 8f);    // large: open spaces, halls
-            want *= scale;
-            // room area limits (the rooms test: 30..200 m²): aim inside them, never cut into pieces below the smallest
-            if (b.RoomAreaMax > 0f) want = Mathf.Min(want, b.RoomAreaMax / 1.3f);
-            if (b.RoomAreaMin > 0f) want = Mathf.Max(want, b.RoomAreaMin * 1.4f);
-            bool canX = r.width >= 2 * MinSide, canZ = r.height >= 2 * MinSide;
-            if (b.RoomAreaMin > 0f && area < b.RoomAreaMin * 2f && (b.RoomAreaMax <= 0f || area <= b.RoomAreaMax)) { room(r); return; }
-            if (area <= want * 1.25f || (!canX && !canZ)) { room(r); return; }
-            bool cutX = canX && (!canZ || (r.width > r.height * 1.25f || (r.height <= r.width * 1.25f && rng.Next(2) == 0)));
-            int side = cutX ? r.width : r.height;
-            float k = 0.3f + (float)rng.NextDouble() * 0.4f;
-            int at = Mathf.Clamp(Mathf.RoundToInt(side * k / M) * M, MinSide, side - MinSide);
-            if (cutX)
-            {
-                Split(new RectInt(r.x, r.y, at, r.height), rng, house, b, room);
-                Split(new RectInt(r.x + at, r.y, r.width - at, r.height), rng, house, b, room);
-            }
-            else
-            {
-                Split(new RectInt(r.x, r.y, r.width, at), rng, house, b, room);
-                Split(new RectInt(r.x, r.y + at, r.width, r.height - at), rng, house, b, room);
-            }
-        }
-
         /// <summary>Shared border length (cells) between every pair of regions.</summary>
         static Dictionary<(int, int), int> Borders(int[,] owner, int nx, int nz)
         {
@@ -1006,7 +953,7 @@ namespace Stealth.Level
         /// along (a strip left between a corridor and a facade, the arm of a merged room) goes to the neighbour it touches
         /// most. Repeated until nothing moves; reserved rooms (lobby, stair halls) never give or take cells.
         /// </summary>
-        static void Slim(List<Region> regions, int[,] owner, int nx, int nz)
+        static void Slim(List<Region> regions, int[,] owner, int nx, int nz, int corridorMin = 5)
         {
             var movedOnce = new HashSet<Vector2Int>();
             int Run(int x, int z, int id, int dx, int dz, int limit)
@@ -1026,7 +973,7 @@ namespace Stealth.Level
                         if (id < 0 || regions[id].Fixed) continue;
                         var cell = new Vector2Int(x, z);
                         if (movedOnce.Contains(cell)) continue;
-                        int min = regions[id].Type == RoomType.Corridor ? 5 : 4;
+                        int min = regions[id].Type == RoomType.Corridor ? corridorMin : 4;
                         if (Run(x, z, id, 1, 0, min) >= min && Run(x, z, id, 0, 1, min) >= min) continue;
                         // the neighbour this cell would be widest in (as if it were already theirs)
                         int best = -1, bestScore = -1;
@@ -1216,7 +1163,7 @@ namespace Stealth.Level
                 float area = r.Cells.Count / (float)(M * M);
                 bool kind = r.Type is RoomType.Lobby or RoomType.OpenSpace or RoomType.Lounge or RoomType.Meeting
                     or RoomType.Library or RoomType.GameRoom or RoomType.Gym;
-                if (!kind || r.Hall >= 0 || area < 45f || area > 260f || made >= 1 + c.House / 3) continue;
+                if (!kind || r.Hall >= 0 || area < 45f || area > 260f || made >= 1 + plan.NX * plan.NZ / (M * M * 2500)) continue;
                 if (rng.NextDouble() > c.B.AtriumChance) continue;
                 int levels = f + 2 < c.Floors && rng.NextDouble() < 0.3 ? 3 : 2;
                 // no stair hall above, and the floors above stay in one piece around the void
@@ -1280,7 +1227,8 @@ namespace Stealth.Level
             {
                 var reg = regions[i];
                 if (reg.Cells.Count == 0) continue;
-                var room = new PlanRoom { Id = plan.Rooms.Count, Floor = f, Type = reg.Type, Shape = reg.Shape, Levels = reg.Levels, Flat = reg.Flat };
+                var room = new PlanRoom { Id = plan.Rooms.Count, Floor = f, Type = reg.Type, Shape = reg.Shape, Levels = reg.Levels, Flat = reg.Flat,
+                    Cluster = reg.Cluster, ClusterDoor = reg.Piece is Piece.ClusterHall or Piece.Anteroom };
                 room.Rects.AddRange(reg.Rects);
                 plan.Rooms.Add(room);
                 for (int lv = 0; lv < reg.Levels; lv++)
@@ -1628,6 +1576,7 @@ namespace Stealth.Level
                     // (the shop's paint booth too: sealed, its one door onto the workshop when it can)
                     float w = IsStorage(plan, kv.Key) ? (OwnDoor(plan, kv.Key) ? -0.5f : -1f) : (circulation ? 10f : 0f) + (float)rng.NextDouble();
                     if (Touches(plan, kv.Key, RoomType.FlatHall)) w += 5f; // a flat's rooms open off its hallway, not through each other
+                    if (SameCluster(plan, kv.Key)) w += 5f; // a cluster's rooms off its hall
                     order.Add((kv.Key, w));
                 }
                 order.Sort((p, q) => q.weight.CompareTo(p.weight));
@@ -1636,10 +1585,12 @@ namespace Stealth.Level
                 {
                     if (Find(key.Item1) == Find(key.Item2)) continue;
                     if (!FlatAllows(plan, key, EdgeType.Door)) continue; // the apartment block: flats apart, one door each onto the landing
+                    if (!ClusterAllows(plan, key)) continue; // a cluster: one way in, through its hall
                     if (IsStorage(plan, key))
                     {
                         int s = OneDoor(plan.Rooms[key.Item1].Type) ? key.Item1 : key.Item2;
                         if (storageDoor.Contains(s) || (OneDoor(plan.Rooms[key.Item1].Type) && OneDoor(plan.Rooms[key.Item2].Type))) continue;
+                        if (plan.Rooms[s].Cluster >= 0 && !IsCirculation(plan, s == key.Item1 ? key.Item2 : key.Item1)) continue; // (its hall, not a room of its cluster)
                         // the nurse station is open to its corridor (the whole wall), every other one-door room has a door
                         var way = Touches(plan, key, RoomType.NurseStation) && Touches(plan, key, RoomType.Corridor) ? EdgeType.Open : EdgeType.Door;
                         if (TryOpen(key, way)) { storageDoor.Add(s); done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
@@ -1652,6 +1603,19 @@ namespace Stealth.Level
                         groupOf[Find(key.Item1)] = Find(key.Item2);
                     }
                 }
+                // still apart: a door where a cluster would not have one (a room of it its hall does not reach)
+                foreach (var (key, _) in order)
+                {
+                    if (Find(key.Item1) == Find(key.Item2) || IsStorage(plan, key) || !FlatAllows(plan, key, EdgeType.Door) || ClusterAllows(plan, key)) continue;
+                    if (TryOpen(key, EdgeType.Door)) { done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
+                }
+                // a building of blocks: a room still apart rather gets a second door (a one-door room's) than stays shut in
+                if (c.Blocks != null)
+                    foreach (var (key, _) in order)
+                    {
+                        if (Find(key.Item1) == Find(key.Item2) || !FlatAllows(plan, key, EdgeType.Door)) continue;
+                        if (TryOpen(key, EdgeType.Door)) { done.Add(key); groupOf[Find(key.Item1)] = Find(key.Item2); }
+                    }
                 // groups still apart (only short walls between them): an open passage on any walkable wall between them
                 foreach (var (key, _) in order)
                 {

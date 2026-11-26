@@ -13,20 +13,60 @@ namespace Stealth.Level
         public RoomWeight(RoomType room, int weight) { Room = room; Weight = weight; }
     }
 
-    /// <summary>Tuning of the building (LevelConfig): size by depth, rooms, light, doors and vents.</summary>
+    /// <summary>How big a kind of building is: its floor area (all floors together) and its floors.</summary>
+    [System.Serializable]
+    public struct HouseSize
+    {
+        public HouseKind Kind;
+        [Tooltip("Floor area of all floors together, m².")]
+        public float MinArea, MaxArea;
+        public int MinFloors, MaxFloors;
+
+        public HouseSize(HouseKind kind, float minArea, float maxArea, int minFloors, int maxFloors)
+        {
+            Kind = kind;
+            MinArea = minArea;
+            MaxArea = maxArea;
+            MinFloors = minFloors;
+            MaxFloors = maxFloors;
+        }
+
+        /// <summary>
+        /// Big facilities from the first house on. The apartment block and the repair shop are as big as their one layout
+        /// goes (the area of the block is its flats': only its floors count).
+        /// </summary>
+        public static HouseSize[] Defaults() => new HouseSize[]
+        {
+            new(HouseKind.Office, 5000f, 9000f, 2, 4),
+            new(HouseKind.Business, 5000f, 9000f, 2, 4),
+            new(HouseKind.DataCenter, 5000f, 9000f, 2, 4),
+            new(HouseKind.Warehouse, 5000f, 9000f, 2, 3),
+            new(HouseKind.Headquarters, 5000f, 9000f, 2, 4),
+            new(HouseKind.Hospital, 4500f, 6400f, 3, 4),
+            new(HouseKind.Abandoned, 4500f, 6400f, 3, 4),
+            new(HouseKind.Garage, 1800f, 2400f, 2, 2),
+            new(HouseKind.Apartments, 1500f, 2700f, 5, 8),
+            new(HouseKind.TestRooms, 320f, 320f, 1, 1),
+        };
+
+        /// <summary>One size for every kind (tests).</summary>
+        public static HouseSize[] Every(float area, int floors) => new HouseSize[] { new(HouseKind.Office, area, area, floors, floors) };
+
+        public static HouseSize Of(HouseSize[] sizes, HouseKind kind)
+        {
+            if (sizes == null || sizes.Length == 0) sizes = Defaults();
+            foreach (var s in sizes) if (s.Kind == kind) return s;
+            return sizes[0];
+        }
+    }
+
+    /// <summary>Tuning of the building (LevelConfig): size by kind, rooms, light, doors and vents.</summary>
     [System.Serializable]
     public class BuildingSettings : System.ICloneable
     {
-        [Header("Size by house (0-based); the last entry repeats")]
-        public int[] FloorsPerHouse = { 2, 2, 3, 3, 3, 4 };
-        [Tooltip("Rooms per floor in the first house (9 = 3 x 3): enough room for the generator to vary even the first house.")]
-        public float BaseRooms = 9f;
-        [Tooltip("Every next house has this many more rooms per floor: the longer the run, the bigger the house.")]
-        public float RoomsPerHouse = 3.5f;
-        [Tooltip("Rooms per floor never go above this (54 = 9 x 6).")]
-        public float MaxRooms = 54f;
-        [Tooltip("Floor area by team size (1, 2, 3, 4… players; the last repeats): a bigger team gets a bigger house, much softer than ×N.")]
-        public float[] AreaByPlayers = { 1f, 1.25f, 1.45f, 1.6f };
+        [Header("Size (by the kind of building and its seed only: not by the house's number, not by the team)")]
+        [Tooltip("Floor area of all floors together, m², and floors, each drawn between its two ends. A kind not listed is as the first one.")]
+        public HouseSize[] Sizes = HouseSize.Defaults();
 
         [Header("Rooms")]
         public RoomWeight[] RoomWeights =
@@ -218,12 +258,10 @@ namespace Stealth.Level
         [System.NonSerialized] public bool Garage;
 
         /// <summary>
-        /// The hospital's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Hospital"/>, never saved): a slab
-        /// with a corridor down its length and rooms on both sides, admissions below, wards above, theatres on top (PlanGenerator.Hospital.cs).
+        /// The hospital's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Hospital"/>, never saved): a building
+        /// of blocks with corridors that turn between them, admissions below, wards above, theatres on top (PlanGenerator.Blocks.cs).
         /// </summary>
         [System.NonSerialized] public bool Hospital;
-        [Tooltip("The hospital's slab against the area an office of the same house would have (0.6: 40% smaller); its robots and devices stay as many as for the full size.")]
-        public float HospitalSize = 0.6f;
         /// <summary>
         /// The apartment block's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Apartments"/>, never
         /// saved): one entrance, the landing and the stairwell, a few flats a floor (<see cref="PlanGenerator"/>.Apartments).
@@ -231,8 +269,8 @@ namespace Stealth.Level
         [System.NonSerialized] public bool Apartments;
         /// <summary>
         /// The abandoned research station's plan (set by <see cref="HouseKinds.Apply"/> for <see cref="HouseKind.Abandoned"/>,
-        /// never saved): the hospital's slab with a spine corridor, labs, servers and control below, quarters above
-        /// (<see cref="PlanGenerator"/>.Station).
+        /// never saved): a building of blocks like the hospital's, labs, servers and control below, quarters above
+        /// (PlanGenerator.Blocks.cs).
         /// </summary>
         [System.NonSerialized] public bool Station;
 
@@ -245,28 +283,14 @@ namespace Stealth.Level
         [Tooltip("The lift: seconds its doors take to close or to open.")]
         public float LiftDoorTime = 0.9f;
 
-        public int FloorsFor(int house) => FloorsPerHouse.Length == 0 ? 2 : FloorsPerHouse[Mathf.Clamp(house, 0, FloorsPerHouse.Length - 1)];
-
-        public float AreaFor(int players) =>
-            AreaByPlayers == null || AreaByPlayers.Length == 0 ? 1f : AreaByPlayers[Mathf.Clamp(players - 1, 0, AreaByPlayers.Length - 1)];
-
-        /// <summary>Target rooms per floor: grows with every house and (softly) with the team.</summary>
-        public float RoomsFor(int house, int players) => Mathf.Min(MaxRooms, (BaseRooms + RoomsPerHouse * Mathf.Max(0, house)) * AreaFor(players));
-
-        /// <summary>Rooms along X and Z for a house: the grid closest to <see cref="RoomsFor"/> (never less than 2 x 2, X ≥ Z).</summary>
-        public Vector2Int GridFor(int house, int players) => GridOf(RoomsFor(house, players));
-
-        public static Vector2Int GridOf(float rooms)
+        /// <summary>The size of a house (pure): drawn from its kind's range by its own stream of the seed.</summary>
+        public (float area, int floors) SizeOf(HouseKind kind, int seed)
         {
-            int w = 2, h = 2;
-            while (w * h < 400)
-            {
-                int nw = w <= h ? w + 1 : w, nh = w <= h ? h : h + 1;
-                if (Mathf.Abs(nw * nh - rooms) > Mathf.Abs(w * h - rooms)) break; // the next size is further from the target
-                w = nw;
-                h = nh;
-            }
-            return new Vector2Int(w, h);
+            var size = HouseSize.Of(Sizes, kind);
+            var rng = new System.Random(LevelRandom.Mix(seed, Salt.HouseSize, 0));
+            float area = Mathf.Lerp(size.MinArea, size.MaxArea, (float)rng.NextDouble());
+            int floors = rng.Next(Mathf.Max(1, size.MinFloors), Mathf.Max(size.MinFloors, size.MaxFloors) + 1);
+            return (Mathf.Max(100f, area), floors);
         }
 
         public RoomType PickRoom(System.Random rng)
@@ -283,6 +307,13 @@ namespace Stealth.Level
         }
     }
 
+    /// <summary>A multiplier by the team's size (1, 2, 3, 4… players; the last entry repeats).</summary>
+    public static class TeamShare
+    {
+        public static float Of(float[] byPlayers, int players) =>
+            byPlayers == null || byPlayers.Length == 0 ? 1f : byPlayers[Mathf.Clamp(players - 1, 0, byPlayers.Length - 1)];
+    }
+
     /// <summary>Tuning of the guards (LevelConfig): how many robots, devices, cameras and lasers per house.</summary>
     [System.Serializable]
     public class SecuritySettings
@@ -290,31 +321,33 @@ namespace Stealth.Level
         [Tooltip("Guards at all: off = no robots, devices, cameras, lasers or terminals in the house (a quiet test level).")]
         public bool Enemies = true;
 
-        [Header("Counts: base + per house")]
-        public int Robots = 1;
-        public int RobotsPerHouse = 1;
-        [Tooltip("Extra robots per floor above the ground floor.")]
-        public int RobotsPerExtraFloor = 1;
+        [Header("Counts: a base and so many per 1000 m² of floor, more with every house and with the team")]
+        public int Robots = 0;
+        public float RobotsPer1000 = 0.8f, RobotsPer1000PerHouse = 0.15f;
         [Tooltip("Robots keep to the rooms deep inside: the deepest room is (1 + this) times as likely as one by the lobby (RoomDepth).")]
         public float DeepRoomWeight = 2f;
         public int Devices = 0;
-        public int DevicesPerHouse = 1;
+        public float DevicesPer1000 = 0f, DevicesPer1000PerHouse = 0.17f;
         public int Cameras = 1;
-        public int CamerasPerHouse = 1;
+        public float CamerasPer1000 = 0f, CamerasPer1000PerHouse = 0.17f;
         public int Lasers = 0;
-        public int LasersPerHouse = 1;
-        [Tooltip("A bigger team gets a bigger house: one more robot per this many rooms it adds (all floors).")]
-        public int TeamRoomsPerExtraRobot = 10;
+        public float LasersPer1000 = 0f, LasersPer1000PerHouse = 0.17f;
+        [Tooltip("The counts above by team size (1, 2, 3, 4… players; the last repeats).")]
+        public float[] ByPlayers = { 1f, 1.15f, 1.3f, 1.45f };
 
-        /// <summary>Mobile robots in a house: base, per house, per floor above the ground and per rooms a bigger team adds.</summary>
-        public int RobotsFor(int house, int floors, int teamRooms) =>
-            Robots + house * RobotsPerHouse + (floors - 1) * RobotsPerExtraFloor + teamRooms / Mathf.Max(1, TeamRoomsPerExtraRobot);
-        [Tooltip("…and one more device per this many.")]
-        public int TeamRoomsPerExtraDevice = 15;
+        /// <summary>A count for a house (pure): the base and its share of the floor area, by the house's number and the team.</summary>
+        public int CountFor(int count, float per1000, float perHouse, float area, int house, int players) =>
+            count + Mathf.RoundToInt(area / 1000f * (per1000 + perHouse * Mathf.Max(0, house)) * TeamShare.Of(ByPlayers, players));
+
+        public int RobotsFor(float area, int house, int players) => CountFor(Robots, RobotsPer1000, RobotsPer1000PerHouse, area, house, players);
+        public int DevicesFor(float area, int house, int players) => CountFor(Devices, DevicesPer1000, DevicesPer1000PerHouse, area, house, players);
+        public int CamerasFor(float area, int house, int players) => CountFor(Cameras, CamerasPer1000, CamerasPer1000PerHouse, area, house, players);
+        public int LasersFor(float area, int house, int players) => CountFor(Lasers, LasersPer1000, LasersPer1000PerHouse, area, house, players);
+
         [Tooltip("House (0-based) from which lasers can move up and down.")]
         public int MovingLasersFromHouse = 2;
 
-        [Header("New enemy mode")]
+        [Header("Docked guards and traps")]
         [Tooltip("Guards resting in the charging room, at least (more come from the roster).")]
         public int SleepingGuards = 2;
         [Tooltip("Traps on the valuable rooms (Wards).")]
@@ -347,18 +380,7 @@ namespace Stealth.Level
 
         /// <summary>Generates a house. Without settings the defaults are used (tests); the game passes LevelConfig.</summary>
         public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null) => Generate(seed, levelIndex, building, security, players, features, false, false);
-
-        /// <summary>
-        /// As above, with the two older ways the game no longer offers (their switches left the menu; the tests still
-        /// compare them with what the game builds).
-        /// </summary>
-        /// <param name="classic">The classic generator: the plan is cut into rooms first and each room's type guessed from
-        /// its size and proportions (<see cref="PlanGenerator.GenerateClassic"/>), instead of the room program deciding the rooms.</param>
-        /// <param name="classicEnemies">The old enemies: guards patrol, wardens guard loot rooms, hounds and the hunter come;
-        /// otherwise guards rest in the charging room until an alarm and traps guard the rich rooms (<see cref="Wards"/>).</param>
-        public static LevelLayout Generate(int seed, int levelIndex, BuildingSettings building, SecuritySettings security, int players,
-            FeatureSettings features, bool classic, bool classicEnemies = false)
+            FeatureSettings features = null)
         {
             var kind = HouseKinds.Of(seed, levelIndex);
             var h = new House
@@ -367,8 +389,6 @@ namespace Stealth.Level
                 LevelIndex = levelIndex,
                 Players = players,
                 Kind = kind,
-                Classic = classic,
-                ClassicEnemies = classicEnemies,
                 Building = HouseKinds.Apply(kind, building ?? new BuildingSettings()),
                 Security = security ?? new SecuritySettings(),
                 Features = features ?? new FeatureSettings(),
@@ -383,7 +403,6 @@ namespace Stealth.Level
         {
             public int Seed, LevelIndex, Players;
             public HouseKind Kind;
-            public bool Classic, ClassicEnemies;
             public BuildingSettings Building;
             public SecuritySettings Security;
             public FeatureSettings Features;
@@ -414,7 +433,7 @@ namespace Stealth.Level
             Ducts,           // the crawl ducts over the ceilings and the ways up to their grates
             Furnish,         // patrol points kept free, every room furnished, then walkable
             Guards,          // guards, devices, lasers, terminals (or the quiet house's own doors)
-            Extras,          // key doors, crates, the point of interest, wardens, the main job's finish, the shelter map
+            Extras,          // key doors, crates, the point of interest, the main job's finish, the shelter map
             DoorKinds,       // every door's kind, its way and hinges, round the furniture now there
             Finish,          // the building's bounds, windows, dimming
         };
@@ -422,10 +441,10 @@ namespace Stealth.Level
         static void DrawPlan(House h)
         {
             var building = h.Building;
-            int floors = building.FloorsFor(h.LevelIndex);
+            var (area, floors) = building.SizeOf(h.Kind, h.Seed);
             // what the house is made of comes first: its rooms, their types and sizes (corridors not counted); the plan is
             // then laid out to hold them. A storage room (it brings the workers) is decided here, from the house's own stream.
-            float roomArea = building.RoomsFor(h.LevelIndex, h.Players) * 100f * PlanGenerator.RoomShareOfArea;
+            float roomArea = area / floors * PlanGenerator.RoomShareOfArea;
             h.Storage = building.EveryRoomType || (h.Features.StorageChance > 0f && h.LevelIndex >= h.Features.StorageFromHouse
                 && new System.Random(LevelRandom.Mix(h.Seed, Salt.StorageRoom, 0)).NextDouble() < h.Features.StorageChance);
             // Generate and check: a plan where some room cannot be walked to (a doorway that did not fit, a sealed
@@ -436,14 +455,11 @@ namespace Stealth.Level
             for (int attempt = 0; attempt < attempts; attempt++)
             {
                 int planSeed = attempt == 0 ? h.Seed : LevelRandom.Mix(h.Seed, Salt.PlanAttempt, attempt);
-                var o = h.Classic
-                    ? PlanGenerator.GenerateClassic(planSeed, h.LevelIndex, floors, building.RoomsFor(h.LevelIndex, h.Players) * 100f, building)
-                    : PlanGenerator.Generate(planSeed, h.LevelIndex, floors, RoomProgram.Make(planSeed, floors, roomArea, building, h.Storage), building);
+                var o = PlanGenerator.Generate(planSeed, floors, RoomProgram.Make(planSeed, floors, roomArea, building, h.Storage), building);
                 var l = h.L = new LevelLayout
                 {
                     Seed = h.Seed,
                     LevelIndex = h.LevelIndex,
-                    ClassicEnemies = h.ClassicEnemies,
                     Players = Mathf.Max(1, h.Players),
                     Floors = floors,
                     Plan = o.Plan,
@@ -623,7 +639,7 @@ namespace Stealth.Level
             }
         }
 
-        /// <summary>The storage room's finish, key doors, crates, the point of interest, wardens, the main job's finish, the shelter map.</summary>
+        /// <summary>The storage room's finish, key doors, crates, the point of interest, the main job's finish, the shelter map.</summary>
         static void Extras(House h)
         {
             var l = h.L;
@@ -632,7 +648,6 @@ namespace Stealth.Level
             HouseFeatures.KeyDoors(l, f);
             HouseFeatures.Crates(l, f);
             HouseFeatures.PointOfInterest(l);
-            if (h.Security.Enemies && l.ClassicEnemies) HouseFeatures.Wardens(l, f); // a quiet house (rooms test): no guards with keys either; the new mode: traps instead
             HouseFeatures.FinishObjective(l);
             HouseFeatures.PlanShelterMap(l);
             DropFailedClimbs(l); // (and anything since that changed their pieces)
@@ -1140,14 +1155,9 @@ namespace Stealth.Level
             var open = candidates.FindAll(r => r.Id != l.VaultRoom && r.Id != l.HiddenRoom);
             if (open.Count == 0) open = candidates;
 
-            // A bigger team gets a bigger house — and the guards to go with it.
-            float solo = b.RoomsFor(level, 1) * l.Floors * PlanGenerator.RoomShareOfArea; // rooms only, like RoomUnits
-            // (a hospital is built smaller than its area, BuildingSettings.HospitalSize: its guards are counted for the full size)
-            float size = b.Hospital || b.Station ? Mathf.Clamp(b.HospitalSize, 0.1f, 1f) : 1f;
-            int teamRooms = Mathf.Max(0, Mathf.RoundToInt(l.RoomUnits / size - solo));
-            int robots = s.RobotsFor(level, l.Floors, teamRooms);
-            // the new mode: no hounds, hunters or wardens; the guards rest on their docks (at least SleepingGuards of them)
-            var table = l.ClassicEnemies ? s.Roster.Robots : RobotRoster.NewEnemies(s.Roster.Robots);
+            int robots = s.RobotsFor(l.FloorArea, level, l.Players);
+            // the guards rest on their docks (at least SleepingGuards of them)
+            var table = s.Roster.Robots;
             var freshRobots = RobotRoster.Newcomers(table, level);
             var freshDevices = RobotRoster.Newcomers(s.Roster.Devices, level);
             for (int i = 0; i < robots; i++)
@@ -1170,7 +1180,7 @@ namespace Stealth.Level
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = Quaternion.Euler(0, rng.Next(360), 0) });
             }
             StorageWorkers(l, rng, s, open, storageWorkers, freshRobots.Count);
-            if (!l.ClassicEnemies) DockGuards(l, s);
+            DockGuards(l, s);
 
             // Doorways between rooms: pressure plates lie in some of them, lasers guard others.
             var doors = new List<LaserSpot>();
@@ -1181,11 +1191,11 @@ namespace Stealth.Level
                 if (d.Kind == EdgeType.Door && !d.Exterior && i != l.BoothDoorway && !DoorRules.Always(l, d))
                     doors.Add(new LaserSpot { Position = d.Position, Rotation = d.Rotation, Width = ClearWidth(DoorWidth) });
             }
-            // the new mode: the valuable rooms are guarded by traps first (their doorways get no sliding door)
-            if (!l.ClassicEnemies && !b.EveryRoomType) Wards.Place(l, doors, s.Wards, s.MovingLasersFromHouse); // (the rooms test: workers only)
+            // the valuable rooms are guarded by traps first (their doorways get no sliding door)
+            if (!b.EveryRoomType) Wards.Place(l, doors, s.Wards, s.MovingLasersFromHouse); // (the rooms test: workers only)
 
             // Fixed security devices: pressure plates in doorways, motion sensors on walls, lidar poles.
-            int devices = s.Devices + level * s.DevicesPerHouse + teamRooms / Mathf.Max(1, s.TeamRoomsPerExtraDevice);
+            int devices = s.DevicesFor(l.FloorArea, level, l.Players);
             var hatch = l.HatchPosition;
             for (int i = 0; i < devices; i++)
             {
@@ -1226,7 +1236,7 @@ namespace Stealth.Level
                 l.RobotSpawns.Add(new RobotSpawn { Kind = kind, Floor = room.Floor, Position = pos, Rotation = rot });
             }
 
-            int cameras = s.Cameras + level * s.CamerasPerHouse;
+            int cameras = s.CamerasFor(l.FloorArea, level, l.Players);
             var used = new HashSet<int>();
             for (int i = 0; i < cameras && used.Count < candidates.Count; i++)
             {
@@ -1238,7 +1248,7 @@ namespace Stealth.Level
                 l.CameraSpots.Add(new Pose(pos, Quaternion.LookRotation(inward)));
             }
 
-            int lasers = s.Lasers + level * s.LasersPerHouse;
+            int lasers = s.LasersFor(l.FloorArea, level, l.Players);
             while (l.LaserSpots.Count < lasers && doors.Count > 0)
             {
                 int idx = rng.Next(doors.Count);

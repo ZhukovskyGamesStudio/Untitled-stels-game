@@ -52,9 +52,7 @@ namespace Stealth.Net
         readonly NetworkVariable<double> m_LeaveAt = new();
         readonly NetworkVariable<double> m_GoAt = new();
         readonly NetworkVariable<sbyte> m_Chosen = new(-1);
-        readonly NetworkVariable<double> m_HunterAt = new();
         readonly NetworkVariable<sbyte> m_Style = new(-1);
-        readonly NetworkVariable<sbyte> m_HunterAlarms = new(-1);
         NetworkList<int> m_Opened;
         NetworkList<NetVote> m_Votes;
         int m_PushedOpened = -1, m_PushedVotes = -1;
@@ -111,9 +109,6 @@ namespace Stealth.Net
             m_LeaveAt.OnValueChanged += (_, _) => Pull();
             m_GoAt.OnValueChanged += (_, _) => Pull();
             m_Chosen.OnValueChanged += (_, _) => Pull();
-            m_HunterAt.OnValueChanged += (_, _) => PullHunter();
-            m_HunterAlarms.OnValueChanged += (_, _) => PullHunter();
-            PullHunter();
             m_Style.OnValueChanged += (_, v) => m_Game.ApplyStyle(v);
             m_Game.ApplyStyle(m_Style.Value); // a late joiner sees what the team sees
             PullOpened();
@@ -181,10 +176,7 @@ namespace Stealth.Net
             NetSync.Set(m_LeaveAt, m_Game.LeaveAt);
             NetSync.Set(m_GoAt, m_Game.GoAt);
             NetSync.Set(m_Chosen, (sbyte)Mathf.Clamp(m_Game.ChosenLane, -1, 127));
-            // Whole seconds are enough for a countdown (and keep the variable from changing every frame).
-            NetSync.Set(m_HunterAt, m_Game.HunterAt <= 0 ? 0 : System.Math.Round(m_Game.HunterAt));
             NetSync.Set(m_Style, (sbyte)Mathf.Clamp(m_Game.StyleIndex, -1, 127));
-            NetSync.Set(m_HunterAlarms, (sbyte)Mathf.Clamp(m_Game.HunterAlarmsLeft, -1, 127));
             NetSync.SetList(m_Opened, ref m_PushedOpened, m_Game.OpenedVersion, m_Game.Opened, k => k);
             NetSync.SetList(m_Votes, ref m_PushedVotes, m_Game.Votes.Version, m_Game.Votes.All, v => new NetVote { Client = v.Key, Lane = (byte)v.Value });
             PushExplored();
@@ -236,8 +228,6 @@ namespace Stealth.Net
             if (map == null || m_Explored.Count != map.ChunkCount + 1 || m_Explored[0] != (uint)map.Seed) return;
             for (int i = 0; i < map.ChunkCount; i++) map.Merge(i, m_Explored[i + 1]);
         }
-
-        void PullHunter() => m_Game.ApplyHunter(m_HunterAt.Value, m_HunterAlarms.Value);
 
         void PullOpened()
         {

@@ -51,7 +51,7 @@ namespace Stealth.Tests
             var b = Settings();
             for (int seed = 0; seed < 40; seed++)
             {
-                var o = PlanGenerator.Generate(seed, 0, 1 + seed % 2, 900f, b);
+                var o = PlanGenerator.Generate(seed, 1 + seed % 2, 900f, b);
                 Assert.AreEqual("linked", o.Mass, $"seed {seed}");
                 Assert.AreEqual(0, o.Unreached, $"seed {seed}: every room reached");
             }

@@ -109,11 +109,6 @@ namespace Stealth.EditorTools
                 t.PatrolSpeed = 1.2f; t.InvestigateSpeed = 2.2f; t.ChaseSpeed = 3f; t.AttackRange = 1.9f;
                 t.SuspicionDecay = 0.12f; // waves come seconds apart: it keeps what it felt between them
             }));
-            Robot(RobotKind.Hound, RobotPrefabs + "/RobotHound.prefab", () => MobileRobot("RobotHound", "robot_hound", "HoundBody", 0.4f, new Vector3(0, 0.9f, 0.9f), ripple, (s, t, anim) =>
-            {
-                s.HasEyes = false; s.HearingMultiplier = 0.6f; s.SmellRange = 3f; s.SmellSpeed = 0.8f; s.DetectionSpeed = 0.4f;
-                t.PatrolSpeed = 1.5f; t.InvestigateSpeed = 2.3f; t.ChaseSpeed = 3.6f; t.LoseTargetAfter = 6f; t.WarningTime = 2.5f; t.SuspicionDecay = 0.5f; t.SniffEvery = 3.5f; t.SniffTime = 1.4f;
-            }));
             Robot(RobotKind.Sorter, RobotPrefabs + "/RobotSorter.prefab", () => MobileRobot("RobotSorter", "robot_sorter", "SorterBody", 0.35f, new Vector3(0, 1.25f, 0.3f), ripple, (s, t, anim) =>
             {
                 s.ColorSorter = true; s.ViewDistance = 16f; s.ViewAngle = 160f; s.DetectionSpeed = 0.9f; s.HearingMultiplier = 0.3f;
@@ -178,14 +173,6 @@ namespace Stealth.EditorTools
                 rc.Lidar = lidar;
                 return go;
             });
-            Robot(RobotKind.Hunter, RobotPrefabs + "/RobotHunter.prefab", () => MobileRobot("RobotHunter", "robot_hunter", "HunterBody", 0.45f, new Vector3(0, 1.9f, 0.3f), ripple, (s, t, anim) =>
-            {
-                // no sensors at all: it runs to whoever the other robots and cameras are seeing (RobotSenses.FollowsSightings)
-                s.HasEyes = false; s.FollowsSightings = true; s.HearingMultiplier = 0f; s.SeismicRange = 0f; s.SmellRange = 0f;
-                t.PatrolSpeed = 3.2f; t.InvestigateSpeed = 5.2f; t.ChaseSpeed = 6.2f; t.LoseTargetAfter = 3f; t.AttackCooldown = 1.5f; t.WarningTime = 0.3f;
-            }));
-
-            Robot(RobotKind.Warden, RobotPrefabs + "/RobotWarden.prefab", () => BuildWarden(ripple));
             Robot(RobotKind.Turret, RobotPrefabs + "/RobotTurret.prefab", () => Device<SentryTurret>("RobotTurret", "robot_turret", "TurretBody", false, false, (root, t) =>
             {
                 t.Profile = Profile<TurretProfile>("RobotTurret", p => p.ForgetRate = 0.6f);
@@ -524,15 +511,14 @@ namespace Stealth.EditorTools
         /// <summary>Every kind of robot hums in its own way: joints of the legged ones, tracks, brush, turbine, rotor, wheels.</summary>
         static AudioClip MotorFor(string name, bool hover) => hover ? s_Bank.DroneRotor : name switch
         {
-            "RobotGuard" or "RobotHound" => s_Bank.MotorServo,
+            "RobotGuard" => s_Bank.MotorServo,
             "RobotThumper" or "RobotWorker" => s_Bank.MotorTracks,
             "RobotSweeper" => s_Bank.MotorBrush,
-            "RobotHunter" => s_Bank.MotorTurbine,
             _ => s_Bank.RobotMotor,
         };
 
         /// <summary>
-        /// Every kind of sensor mount on the model (camera eye, two microphones, two ground probes, a snout);
+        /// Every kind of sensor mount on the model (camera eye, two microphones, two ground probes);
         /// <see cref="SensorRig"/> keeps only those the robot's senses use.
         /// </summary>
         static void BuildSensorRig(GameObject root, GameObject model, RobotController rc, string bodyMat, Vector3 eye, float radius)
@@ -563,7 +549,6 @@ namespace Stealth.EditorTools
                 Mount("attach_seismic", "SensorGroundL", new Vector3(-side, 0, radius + 0.1f), Quaternion.identity),
                 Mount("attach_seismic", "SensorGroundR", new Vector3(side, 0, radius + 0.1f), Quaternion.identity),
             };
-            rig.Noses = new[] { Mount("attach_nose", "SensorNose", eye + new Vector3(0, -0.15f, 0.12f), Quaternion.identity) };
         }
 
         /// <summary>Robot / device with its own movement script (<see cref="SecurityDevice"/>).</summary>

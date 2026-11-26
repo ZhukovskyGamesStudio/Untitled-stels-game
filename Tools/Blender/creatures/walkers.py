@@ -269,4 +269,4 @@ def small_wheel(c, r, w):
     return [tyre, s.rcyl(r * .64, w * .86, c, axis="X", seg=16, r=.004, bevel_seg=1)]
 
 
-DESIGNS = {"robot_guard": guard, "robot_hound": hound, "robot_hunter": hunter, "robot_warden": warden}
+DESIGNS = {"robot_guard": guard, }

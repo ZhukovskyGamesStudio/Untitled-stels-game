@@ -17,26 +17,24 @@ namespace Stealth.Tests
     /// </summary>
     public static class TestHouses
     {
-        /// <summary>One house to make: the arguments of <see cref="LevelGenerator.Generate(int,int,BuildingSettings,SecuritySettings,int,FeatureSettings,bool,bool)"/>.</summary>
+        /// <summary>One house to make: the arguments of <see cref="LevelGenerator.Generate(int,int,BuildingSettings,SecuritySettings,int,FeatureSettings)"/>.</summary>
         public readonly struct Spec
         {
             public readonly int Seed, Level, Players;
             public readonly BuildingSettings Building;
             public readonly SecuritySettings Security;
             public readonly FeatureSettings Features;
-            public readonly bool Classic, ClassicEnemies;
 
             public Spec(int seed, int level, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-                FeatureSettings features = null, bool classic = false, bool classicEnemies = false)
+                FeatureSettings features = null)
             {
                 Seed = seed; Level = level; Players = players; Building = building; Security = security; Features = features;
-                Classic = classic; ClassicEnemies = classicEnemies;
             }
 
             /// <summary>The house's key: no settings and the default settings make the same house (the generator takes the defaults for null).</summary>
-            public string Key => $"{Seed}|{Level}|{Players}|{Classic}|{ClassicEnemies}|{Json(Building, s_Building)}|{Json(Security, s_Security)}|{Json(Features, s_Features)}";
+            public string Key => $"{Seed}|{Level}|{Players}|{Json(Building, s_Building)}|{Json(Security, s_Security)}|{Json(Features, s_Features)}";
 
-            public LevelLayout Generate() => LevelGenerator.Generate(Seed, Level, Building, Security, Players, Features, Classic, ClassicEnemies);
+            public LevelLayout Generate() => LevelGenerator.Generate(Seed, Level, Building, Security, Players, Features);
         }
 
         static readonly Dictionary<string, LevelLayout> s_Cache = new();
@@ -83,12 +81,12 @@ namespace Stealth.Tests
         }
 
         /// <summary>
-        /// <see cref="LevelGenerator.Generate(int,int,BuildingSettings,SecuritySettings,int,FeatureSettings,bool,bool)"/>,
+        /// <see cref="LevelGenerator.Generate(int,int,BuildingSettings,SecuritySettings,int,FeatureSettings)"/>,
         /// generated once per run for the same arguments (the settings are compared by their contents).
         /// </summary>
         public static LevelLayout Make(int seed, int levelIndex, BuildingSettings building = null, SecuritySettings security = null, int players = 1,
-            FeatureSettings features = null, bool classic = false, bool classicEnemies = false) =>
-            Many(new[] { new Spec(seed, levelIndex, building, security, players, features, classic, classicEnemies) })[0];
+            FeatureSettings features = null) =>
+            Many(new[] { new Spec(seed, levelIndex, building, security, players, features) })[0];
 
         static readonly string s_Building = JsonUtility.ToJson(new BuildingSettings()), s_Security = JsonUtility.ToJson(new SecuritySettings()),
             s_Features = JsonUtility.ToJson(new FeatureSettings());
@@ -127,15 +125,15 @@ namespace Stealth.Tests
         public const int CorpusSize = 48;
 
         /// <summary>
-        /// The first <paramref name="count"/> houses of the shared set (<see cref="CorpusKey"/>), with the default settings
-        /// (or the classic plan generator, or the old enemy mode): the tests that measure "most houses" or "every house"
+        /// The first <paramref name="count"/> houses of the shared set (<see cref="CorpusKey"/>), with the default settings:
+        /// the tests that measure "most houses" or "every house"
         /// draw from it, so a house made for one of them serves all the others.
         /// </summary>
-        public static List<LevelLayout> Corpus(int count, bool classic = false, bool classicEnemies = false) =>
+        public static List<LevelLayout> Corpus(int count) =>
             Many(Enumerable.Range(0, count).Select(k =>
             {
                 var (seed, level, players) = CorpusKey(k);
-                return new Spec(seed, level, players: players, classic: classic, classicEnemies: classicEnemies);
+                return new Spec(seed, level, players: players);
             }));
 
         /// <summary>How many offices the office generator's statistics look at (<see cref="Offices"/>).</summary>
@@ -147,14 +145,14 @@ namespace Stealth.Tests
         /// house): the statistics of the office generator's plan — depth, zoning, ways in — draw from it. A house's kind
         /// comes from its seed, so the others are skipped without being generated.
         /// </summary>
-        public static List<LevelLayout> Offices(int count = OfficeCount, bool classic = false)
+        public static List<LevelLayout> Offices(int count = OfficeCount)
         {
             var specs = new List<Spec>();
             for (int k = 0; specs.Count < count && k < 100000; k++)
             {
                 var (seed, level, players) = CorpusKey(k);
                 if (level == 0 || HouseKinds.OwnPlan(HouseKinds.Of(seed, level))) continue;
-                specs.Add(new Spec(seed, level, players: players, classic: classic));
+                specs.Add(new Spec(seed, level, players: players));
             }
             return Many(specs);
         }

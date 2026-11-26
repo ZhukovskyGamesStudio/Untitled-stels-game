@@ -12,7 +12,6 @@ namespace Stealth.Game
         {
             if (Arg("-hostile") == null) return;
             if (kind == RobotKind.Thumper) steps.Add(SneakCheck(kind, obj, crouch: true));
-            if (kind == RobotKind.Hound) { steps.Add(TrailCheck(obj)); return; }
             if (kind == RobotKind.Sorter) steps.Add(SorterCheck(obj));
             if (kind == RobotKind.Vacuum || kind == RobotKind.Lidar) { steps.Add(CrossLineCheck(kind, obj)); return; }
             if (kind == RobotKind.PressurePlate) { steps.Add(PlateCheck(obj)); return; }
@@ -161,64 +160,6 @@ namespace Stealth.Game
             // Give the player an item of the sorter's colour; the detection check that follows must now succeed.
             if (Me.IsServer) inv.GiveServer(0, (byte)robot.ColorFilter);
             yield return new WaitForSeconds(0.3f);
-        }
-
-        /// <summary>The player walks past the hound's nose and away out of the room; the hound must follow the trail.</summary>
-        IEnumerator TrailCheck(GameObject obj)
-        {
-            var robot = obj.GetComponent<RobotController>();
-            var p = obj.transform.position;
-            var start = new Vector3(p.x, 0.05f, p.z) + Flat(obj.transform.right).normalized * 1.5f;
-            Me.TeleportOwner(start, Quaternion.LookRotation(Flat(-obj.transform.forward)));
-            // Walk away (towards the lobby side) for ~2.5 s, leaving a trail, with the robot still frozen.
-            Drive(Vector2.up);
-            yield return new WaitForSeconds(2.5f);
-            Release();
-            float before = Vector3.Distance(Flat(p), Flat(Me.transform.position));
-            DevFlags.FreezeRobots = false;
-            float t0 = Time.time;
-            while (Time.time - t0 < 8f && robot.State != RobotState.Chase) yield return null;
-            float tChase = Time.time - t0;
-            yield return new WaitForSeconds(2f);
-            float after = Vector3.Distance(Flat(obj.transform.position), Flat(Me.transform.position));
-            yield return Shot("kind_Hound_tracking");
-            Log($"hound: started tracking after {tChase:0.0}s, state={robot.State}, distance {before:0.0} -> {after:0.0} m");
-            DevFlags.FreezeRobots = true;
-            if (Me.IsServer) Me.ResetForLevelServer();
-        }
-
-        /// <summary>Three alarms → the hunter arrives.</summary>
-        IEnumerator HunterScenario()
-        {
-            var gm = GameManager.Instance;
-            DevFlags.SkipGracePeriod = true;
-            var far = ActiveLevel.Layout.HatchPosition + Vector3.forward * 100f;
-            for (int i = 0; i < 3; i++)
-            {
-                gm.RaiseAlarmServer(far, 1f);
-                yield return new WaitForSeconds(4.3f);
-            }
-            yield return new WaitForSeconds(0.5f);
-            RobotController hunter = null;
-            foreach (var r in RobotController.Robots) if (r.name.Contains("Hunter")) hunter = r;
-            Log($"hunter: present={hunter != null}" + (hunter != null ? $" at {hunter.transform.position}, state {hunter.State}" : ""));
-            if (hunter != null)
-            {
-                // asleep: it stays where it came in, and standing next to it (others hacked, nobody sees us) does not wake it
-                var came = hunter.transform.position;
-                yield return new WaitForSeconds(3f);
-                Log($"hunter asleep: moved {Vector3.Distance(came, hunter.transform.position):0.00} m in 3 s, state {hunter.State}");
-                foreach (var d in Detector.All) if (d != hunter) d.HackServer(60f);
-                Me.TeleportOwner(came + hunter.transform.forward * 0.9f + Vector3.up * 0.05f, Quaternion.LookRotation(-hunter.transform.forward));
-                yield return new WaitForSeconds(3f);
-                Log($"hunter next to the player: moved {Vector3.Distance(came, hunter.transform.position):0.00} m, state {hunter.State} → " +
-                    (hunter.State == RobotState.Patrol ? "SLEEPS" : "WOKE UP"));
-                DevFlags.FreezeRobots = true;
-                var hp = hunter.transform.position;
-                LookAtFrom(ViewPoint(hp, 3.5f), hp + Vector3.up * 1.4f);
-                yield return new WaitForSeconds(0.8f);
-                yield return Shot("hunter");
-            }
         }
 
         /// <summary>The three laser gate kinds side by side (static low beam, blinking, moving).</summary>

@@ -57,8 +57,8 @@ namespace Stealth.Level
         static List<RectInt> ApartmentsMass(Ctx c, System.Random rng, out string kind)
         {
             int depthCells = Mathf.RoundToInt(FlatDepth * M) * 2 + LandingDepth * M;
-            // wider in later houses: the back flat from 9 m to 12 m (two rooms: 54–72 m²), the front ones 8 to 9.5 m (48–57 m²)
-            int side = Mathf.Clamp(9 + c.House / 2 + rng.Next(2) * 2, 9, 12);
+            // the back flat from 9 m to 12 m (two rooms: 54–72 m²), the front ones 8 to 9.5 m (48–57 m²)
+            int side = 9 + rng.Next(4);
             // a lift beside the stairs: always in a tall block, sometimes in a lower one (its own stream)
             bool lift = c.Floors >= c.B.LiftAlwaysFrom || c.Rng(0x11F7).NextDouble() < c.B.LiftChance;
             int liftW = lift ? LiftWidth : 0;

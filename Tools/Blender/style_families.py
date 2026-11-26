@@ -208,7 +208,7 @@ for mod in (g, r):
     mod.box, mod.cylinder, mod.sphere, mod.merge, mod.export = box, cylinder, sphere, merge, export
 
 MODEL_FUNCS = [getattr(g, n) for n in dir(g) if n.startswith("model_")]
-ROBOT_FUNCS = [r.drone, r.spider, r.vacuum, r.turret, r.thumper, r.hound, r.sorter, r.worker, r.hunter, r.scanner, r.pir,
+ROBOT_FUNCS = [r.drone, r.spider, r.vacuum, r.turret, r.thumper, r.sorter, r.worker, r.scanner, r.pir,
                r.plate, r.attach_eye, r.attach_mic, r.attach_seismic, r.attach_nose]
 
 for family in FAMILIES:

@@ -17,7 +17,7 @@ namespace Stealth.Tests
             foreach (float area in new[] { 800f, 1500f, 2500f })
                 for (int seed = 0; seed < 200; seed++)
                 {
-                    var wings = PlanGenerator.Mass(new System.Random(seed), area, 3, out string kind);
+                    var wings = PlanGenerator.Mass(new System.Random(seed), area, out string kind);
                     kinds.Add(kind);
                     Assert.IsNotEmpty(wings);
                     foreach (var w in wings) Assert.IsTrue(w.xMin >= 0 && w.yMin >= 0 && w.width > 0 && w.height > 0, $"{kind}: wing {w}");

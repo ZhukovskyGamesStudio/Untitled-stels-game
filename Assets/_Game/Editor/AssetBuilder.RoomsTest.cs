@@ -43,11 +43,7 @@ namespace Stealth.EditorTools
                 if (source != null) AssetDatabase.CopyAsset(source, levelPath);
                 level = AssetDatabase.LoadAssetAtPath<LevelConfig>(levelPath) ?? TuningAsset<LevelConfig>(levelPath);
                 var b = level.Building;
-                b.FloorsPerHouse = new[] { 1 };
-                b.BaseRooms = 3.2f;            // ≈ 320 m² of floor: 3–4 rooms of 30..200 m² and maybe a corridor
-                b.RoomsPerHouse = 0f;
-                b.MaxRooms = 3.2f;
-                b.AreaByPlayers = new[] { 1f };
+                b.Sizes = Stealth.Level.HouseSize.Every(320f, 1); // 3–4 rooms of 30..200 m² and maybe a corridor
                 b.MassWeights = new[] { 1, 0, 0, 0, 0, 0 };
                 b.AnnexChance = 0f;
                 b.AtriumChance = 0f;
@@ -76,10 +72,10 @@ namespace Stealth.EditorTools
                 };
                 var s = level.Security;
                 s.Enemies = false;             // a quiet house: no guards at all
-                s.Robots = 1; s.RobotsPerHouse = 0; s.RobotsPerExtraFloor = 0;
-                s.Devices = 1; s.DevicesPerHouse = 0;
-                s.Cameras = 1; s.CamerasPerHouse = 0;
-                s.Lasers = 1; s.LasersPerHouse = 0;
+                s.Robots = 1; s.RobotsPer1000 = s.RobotsPer1000PerHouse = 0f;
+                s.Devices = 1; s.DevicesPer1000 = s.DevicesPer1000PerHouse = 0f;
+                s.Cameras = 1; s.CamerasPer1000 = s.CamerasPer1000PerHouse = 0f;
+                s.Lasers = 1; s.LasersPer1000 = s.LasersPer1000PerHouse = 0f;
                 EditorUtility.SetDirty(level);
             }
 

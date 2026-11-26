@@ -37,7 +37,6 @@ namespace Stealth.Tests
             Assert.IsTrue(HouseKinds.Apply(HouseKind.Garage, b).Garage);
             Assert.IsTrue(HouseKinds.Apply(HouseKind.Hospital, b).Hospital);
             Assert.IsTrue(HouseKinds.Apply(HouseKind.Apartments, b).Apartments);
-            Assert.AreEqual(new[] { 2 }, HouseKinds.Apply(HouseKind.Garage, b).FloorsPerHouse);
             var every = new BuildingSettings { EveryRoomType = true };
             foreach (var k in new[] { HouseKind.Garage, HouseKind.Hospital, HouseKind.Apartments })
             {

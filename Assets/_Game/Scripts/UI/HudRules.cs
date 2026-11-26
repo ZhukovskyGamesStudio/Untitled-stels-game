@@ -333,7 +333,6 @@ namespace Stealth.UI
         }
     }
 
-    /// <summary>The hunter line under the fuel bar (pure, unit tested): when it comes, or that it is in the house.</summary>
     /// <summary>
     /// The team's hack slots in the HUD, left to right: the free ones first (a blue bolt each), then what is switched off,
     /// oldest first (a grey picture of its kind) — the leftmost is always the next to go: a free slot is taken before
@@ -402,24 +401,6 @@ namespace Stealth.UI
         {
             int s = Mathf.Max(0, Mathf.FloorToInt(seconds));
             return $"{s / 60}:{s % 60:00}";
-        }
-
-        /// <summary>The clock's second at which the next reinforcement comes (after <paramref name="elapsed"/>).</summary>
-        public static float NextAt(float elapsed, float first, float second, float every)
-        {
-            if (elapsed < first) return first;
-            if (elapsed < first + second) return first + second;
-            every = Mathf.Max(1f, every);
-            return first + second + (Mathf.Floor((elapsed - first - second) / every) + 1f) * every;
-        }
-
-        /// <summary>The clock's second the previous reinforcement came (0 before the first).</summary>
-        public static float PreviousAt(float elapsed, float first, float second, float every)
-        {
-            if (elapsed < first) return 0f;
-            if (elapsed < first + second) return first;
-            every = Mathf.Max(1f, every);
-            return first + second + Mathf.Floor((elapsed - first - second) / every) * every;
         }
 
         /// <summary>How hot the clock is, 0..1: the share of <paramref name="hottestAt"/> reinforcements already come (capped).</summary>

@@ -104,27 +104,6 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void WardensStandBeforeTheOnlyDoorOfALootRoomWithLuresAround()
-        {
-            int wardens = 0;
-            // wardens are the old enemies' (LevelGenerator.Generate's classicEnemies)
-            foreach (var (seed, level) in TestHouses.SampleKeys)
-            {
-                var l = TestHouses.Make(seed, level, null, null, 1, null, false, true);
-                foreach (var w in l.Wardens)
-                {
-                    wardens++;
-                    var room = l.Rooms[w.Room];
-                    Assert.AreNotEqual(room.Id, l.Plan.RoomAt(w.A + Vector3.up * 0.3f)?.Id, "outside the room it guards");
-                    Assert.LessOrEqual((w.A - l.Doorways[w.Door].Position).magnitude, 3f);
-                }
-                Assert.AreEqual(l.Wardens.Count, l.RobotSpawns.Count(r => r.Kind == RobotKind.Warden));
-                Assert.GreaterOrEqual(l.LureSpots.Count, l.Wardens.Count);
-            }
-            Assert.Greater(wardens, 0, "the shared houses have wardens");
-        }
-
-        [Test]
         public void DiamondsAreWorthMoreThanTheirCellAndToolsBurnGrey()
         {
             Assert.Greater(ItemCatalog.Value(ItemCatalog.Diamond, 1), ItemCatalog.Value(3, 1), "a one-cell diamond is worth more than a 4-cell thing of its colour");
@@ -197,7 +176,7 @@ namespace Stealth.Tests
             Assert.AreEqual(1f, AudioRules.FloorFactor(1.6f, 2.9f, 0.12f), "a ceiling robot of this floor");
             Assert.Greater(PlayerRules.LegSwing(6f, false), PlayerRules.LegSwing(2f, false), "running: wider strides");
             Assert.Less(PlayerRules.LegSwing(3f, true), PlayerRules.LegSwing(3f, false), "crouched: shorter");
-            Assert.AreNotEqual(AudioRules.VoicePitch(RobotKind.Hunter), AudioRules.VoicePitch(RobotKind.Drone), "robots speak in their own voices");
+            Assert.AreNotEqual(AudioRules.VoicePitch(RobotKind.Thumper), AudioRules.VoicePitch(RobotKind.Drone), "robots speak in their own voices");
         }
     
         [Test]

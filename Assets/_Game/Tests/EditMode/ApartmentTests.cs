@@ -32,7 +32,7 @@ namespace Stealth.Tests
             {
                 string name = $"{l.Seed}/{l.LevelIndex}";
                 Assert.AreEqual("apartments", l.Mass, name);
-                Assert.That(l.Floors, Is.InRange(4, 6), $"{name}: more storeys than an office");
+                Assert.That(l.Floors, Is.InRange(5, 8), $"{name}: more storeys than an office");
                 for (int f = 0; f < l.Floors; f++)
                 {
                     int flats = l.Rooms.Where(r => r.Floor == f && r.Flat >= 0).Select(r => r.Flat).Distinct().Count();

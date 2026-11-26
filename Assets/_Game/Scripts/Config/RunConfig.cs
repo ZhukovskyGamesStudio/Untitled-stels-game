@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Stealth.Configs
 {
-    /// <summary>Balance of a run: fuel for the drives (the quota), penalties, alarms, grace period, hunter, the car. Edit Data/Config/Run.asset.</summary>
+    /// <summary>Balance of a run: fuel for the drives (the quota), penalties, alarms, grace period, reinforcements, the car. Edit Data/Config/Run.asset.</summary>
     [CreateAssetMenu(menuName = "Stealth/Config/Run", fileName = "Run")]
     public class RunConfig : ScriptableObject
     {

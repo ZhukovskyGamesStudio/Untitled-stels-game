@@ -102,7 +102,7 @@ namespace Stealth.Tests
         [Test]
         public void InACalmHouseTheCageKeyLiesSomewhere()
         {
-            var calm = new SecuritySettings { Robots = 0, RobotsPerHouse = 0, RobotsPerExtraFloor = 0, Devices = 0, DevicesPerHouse = 0, Cameras = 0, CamerasPerHouse = 0, Lasers = 0, LasersPerHouse = 0 };
+            var calm = new SecuritySettings { Robots = 0, RobotsPer1000 = 0f, RobotsPer1000PerHouse = 0f, Devices = 0, DevicesPer1000PerHouse = 0f, Cameras = 0, CamerasPer1000PerHouse = 0f, Lasers = 0, LasersPer1000PerHouse = 0f };
             int found = 0;
             // one calm house (its own generation): the first seed whose choice is the hostage
             for (int seed = 1; seed < 40 && found < 1; seed++)

@@ -36,7 +36,14 @@ namespace Stealth.Game
         readonly Dictionary<int, int> m_Lanes = new();
         readonly Dictionary<int, List<int>[]> m_Edges = new();
 
-        public RunMap(int runSeed) => m_RunSeed = runSeed;
+        readonly LateHouse[] m_Late;
+
+        /// <param name="late">Kinds that come only from a house on (the same on every peer: the run's settings).</param>
+        public RunMap(int runSeed, LateHouse[] late = null)
+        {
+            m_RunSeed = runSeed;
+            m_Late = late;
+        }
 
         /// <summary>
         /// The run's seed when a house starts: the forced one (command line), else the run's own — only a run that has none
@@ -67,6 +74,10 @@ namespace Stealth.Game
         {
             int seed = LevelRandom.LevelSeed(m_RunSeed, depth);
             if (lane > 0) seed = (LevelRandom.Mix(seed, RouteSalt, lane) & int.MaxValue) | 1;
+            // too early for its kind: the next seed whose house may come
+            int drawn = seed;
+            for (int k = 1; k < 1000 && !LateHouse.Allowed(m_Late, HouseKinds.Of(seed, depth), depth); k++)
+                seed = (LevelRandom.Mix(drawn, Salt.RouteLate, k) & int.MaxValue) | 1;
             return new RouteNode(depth, lane, seed, HouseKinds.Of(seed, depth));
         }
 

@@ -22,8 +22,6 @@ namespace Stealth.Enemies
         public GameObject[] Microphones;
         [Tooltip("Ground probes: shown when the robot feels footsteps through the floor.")]
         public GameObject[] GroundProbes;
-        [Tooltip("Sniffer snout: shown when the robot follows scent trails.")]
-        public GameObject[] Noses;
 
         /// <summary>A mount sinks this far into the surface it found (no hairline gap under it).</summary>
         const float Embed = 0.02f;
@@ -35,13 +33,13 @@ namespace Stealth.Enemies
         float m_NextCheck;
 
         /// <summary>Which mounts a robot with these senses shows (pure).</summary>
-        public static (bool eyes, bool ears, bool ground, bool nose) Mounts(RobotSenses s) =>
-            (s.HasEyes, s.HearingMultiplier > 0f, s.SeismicRange > 0f, s.SmellRange > 0f);
+        public static (bool eyes, bool ears, bool ground) Mounts(RobotSenses s) =>
+            (s.HasEyes, s.HearingMultiplier > 0f, s.SeismicRange > 0f);
 
         void Start()
         {
             if (Robot != null && Robot.Profile != null) Apply(Robot.Senses);
-            foreach (var group in new[] { Eyes, Microphones, GroundProbes, Noses })
+            foreach (var group in new[] { Eyes, Microphones, GroundProbes })
                 if (group != null)
                     foreach (var m in group) if (m != null) m_Rest[m] = m.transform.localPosition;
             Seat();
@@ -49,11 +47,10 @@ namespace Stealth.Enemies
 
         public void Apply(RobotSenses senses)
         {
-            var (eyes, ears, ground, nose) = Mounts(senses);
+            var (eyes, ears, ground) = Mounts(senses);
             Show(Eyes, eyes);
             Show(Microphones, ears);
             Show(GroundProbes, ground);
-            Show(Noses, nose);
         }
 
         static void Show(GameObject[] parts, bool on)
@@ -71,7 +68,7 @@ namespace Stealth.Enemies
 
         bool IsMount(Transform t)
         {
-            foreach (var group in new[] { Eyes, Microphones, GroundProbes, Noses })
+            foreach (var group in new[] { Eyes, Microphones, GroundProbes })
                 if (group != null)
                     foreach (var m in group) if (m != null && t.IsChildOf(m.transform)) return true;
             return false;
@@ -144,7 +141,6 @@ namespace Stealth.Enemies
                     }
                 }
             SeatFront(Eyes, 0f);
-            SeatFront(Noses, 0f);
 
             void SeatFront(GameObject[] group, float lift)
             {

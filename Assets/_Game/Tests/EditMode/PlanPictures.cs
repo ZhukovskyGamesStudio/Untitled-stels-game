@@ -39,11 +39,9 @@ namespace Stealth.Tests
             var config = System.Environment.GetEnvironmentVariable("PLANCONFIG");
             var level = string.IsNullOrEmpty(config) ? null
                 : UnityEditor.AssetDatabase.LoadAssetAtPath<Stealth.Configs.LevelConfig>($"Assets/_Game/Data/Config/{config}/Level.asset");
-            // PLANCLASSIC=1 draws the classic generator's houses (rooms cut first, types guessed), else the room program's
-            bool classic = System.Environment.GetEnvironmentVariable("PLANCLASSIC") == "1";
             foreach (var (seed, house) in list)
-                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}{(classic ? "_classic" : "")}.png"),
-                    Draw(LevelGenerator.Generate(seed, house, level != null ? level.Building : null, level != null ? level.Security : null, 1, null, classic)));
+                File.WriteAllBytes(Path.Combine(dir, $"plan_{seed}_{house}.png"),
+                    Draw(LevelGenerator.Generate(seed, house, level != null ? level.Building : null, level != null ? level.Security : null, 1, null)));
         }
 
         /// <summary>Logs/plans/garage_&lt;seed&gt;_&lt;house&gt;.png — the first auto repair shops of the seeds.</summary>
@@ -57,7 +55,7 @@ namespace Stealth.Tests
             {
                 int house = 1 + seed % 4;
                 if (HouseKinds.Of(seed, house) != HouseKind.Garage) continue;
-                File.WriteAllBytes(Path.Combine(dir, $"garage_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                File.WriteAllBytes(Path.Combine(dir, $"garage_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null)));
                 n++;
             }
         }
@@ -73,7 +71,23 @@ namespace Stealth.Tests
             {
                 int house = 1 + seed % 4;
                 if (HouseKinds.Of(seed, house) != HouseKind.Hospital) continue;
-                File.WriteAllBytes(Path.Combine(dir, $"hospital_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                File.WriteAllBytes(Path.Combine(dir, $"hospital_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null)));
+                n++;
+            }
+        }
+
+        /// <summary>Logs/plans/station_&lt;seed&gt;_&lt;house&gt;.png — the first abandoned stations of the seeds.</summary>
+        [Test, Explicit("writes pictures")]
+        public void WriteStationPlans()
+        {
+            string dir = Path.Combine(Application.dataPath, "..", "Logs", "plans");
+            Directory.CreateDirectory(dir);
+            int n = 0;
+            for (int seed = 1; n < 4 && seed < 1000; seed++)
+            {
+                int house = 3 + seed % 3;
+                if (HouseKinds.Of(seed, house) != HouseKind.Abandoned) continue;
+                File.WriteAllBytes(Path.Combine(dir, $"station_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null)));
                 n++;
             }
         }
@@ -89,7 +103,7 @@ namespace Stealth.Tests
             {
                 int house = seed % 5;
                 if (HouseKinds.Of(seed, house) != HouseKind.Apartments) continue;
-                File.WriteAllBytes(Path.Combine(dir, $"apartments_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null, false)));
+                File.WriteAllBytes(Path.Combine(dir, $"apartments_{seed}_{house}.png"), Draw(LevelGenerator.Generate(seed, house, null, null, 1, null)));
                 n++;
             }
         }

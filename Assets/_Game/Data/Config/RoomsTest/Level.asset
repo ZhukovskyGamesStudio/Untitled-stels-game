@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: Level
   m_EditorClassIdentifier: Stealth.Game::Stealth.Configs.LevelConfig
   Building:
-    FloorsPerHouse: 01000000i
-    BaseRooms: 3.2
-    RoomsPerHouse: 0
-    MaxRooms: 3.2
-    AreaByPlayers:
-    - 1
+    Sizes:
+    - Kind: 9
+      MinArea: 320
+      MaxArea: 320
+      MinFloors: 1
+      MaxFloors: 1
     RoomWeights:
     - Room: 1
       Weight: 28
@@ -71,16 +71,19 @@ MonoBehaviour:
   Security:
     Enemies: 1
     Robots: 1
-    RobotsPerHouse: 0
-    RobotsPerExtraFloor: 0
+    RobotsPer1000: 0
+    RobotsPer1000PerHouse: 0
     Devices: 0
-    DevicesPerHouse: 0
+    DevicesPer1000: 0
+    DevicesPer1000PerHouse: 0
     Cameras: 0
-    CamerasPerHouse: 0
+    CamerasPer1000: 0
+    CamerasPer1000PerHouse: 0
     Lasers: 0
-    LasersPerHouse: 0
-    TeamRoomsPerExtraRobot: 10
-    TeamRoomsPerExtraDevice: 15
+    LasersPer1000: 0
+    LasersPer1000PerHouse: 0
+    ByPlayers:
+    - 1
     MovingLasersFromHouse: 2
     CameraTerminals: 0
     HackTerminals: 0
@@ -92,6 +95,8 @@ MonoBehaviour:
       Devices: []
   Loot:
     BaseItems: 6
+    ByPlayers:
+    - 1
     Table:
     - Item: shovel
       Weight: 5
@@ -110,6 +115,3 @@ MonoBehaviour:
     Gadgets: 0
     ObjectivesFromHouse: 999
     StorageChance: 1
-    Wardens: 0
-    WardensPerHouse: 0
-    ExtraLures: 0

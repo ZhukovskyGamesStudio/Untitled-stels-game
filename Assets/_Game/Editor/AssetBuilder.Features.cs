@@ -848,33 +848,5 @@ namespace Stealth.EditorTools
             }
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
         }
-
-        /// <summary>The warden: a tall sentinel on wheels with a floodlight head; it watches a doorway and raises the alarm.</summary>
-        static GameObject BuildWarden(RadioRipple ripple)
-        {
-            Mat("Robots", "WardenBody", new Color(0.18f, 0.42f, 0.62f), smoothness: 0.45f);
-            var go = MobileRobot("RobotWarden", "robot_warden", "WardenBody", 0.42f, new Vector3(0, 1.55f, 0.27f), ripple, (s, t, anim) =>
-            {
-                // sharp eyes on the doorway, keen ears (that is how it is drawn away), no fighting: it calls the others
-                s.ViewDistance = 10f; s.ViewAngle = 110f; s.DetectionSpeed = 1.1f; s.PeripheralDistance = 3f;
-                s.HearingMultiplier = 1.8f;
-                t.CanAttack = false;
-                t.AlarmOnDetect = true;
-                t.AlarmRadius = 30f;
-                t.CanUseStairs = false;
-                t.PatrolSpeed = 1.1f; t.InvestigateSpeed = 2.6f; t.ChaseSpeed = 2.6f;
-                t.WarningTime = 0.8f;
-                t.PatrolWaitMin = 1.5f; t.PatrolWaitMax = 3f;
-            });
-            // the floodlight and the beacon turn with the head
-            var head = Find(go, "AccentHead" + RobotAnimator.PivotSuffix) ?? Find(go, "AccentHead");
-            if (head != null)
-                foreach (var n in new[] { "EyeLens", "EyeBeacon" })
-                {
-                    var part = Find(go, n);
-                    if (part != null) part.SetParent(head, true);
-                }
-            return go;
-        }
     }
 }

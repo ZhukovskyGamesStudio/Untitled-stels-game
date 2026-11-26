@@ -69,7 +69,6 @@ namespace Stealth.Enemies
         readonly List<(Transform t, Quaternion rest)> m_Eyes = new();
         readonly List<(Transform t, Quaternion rest)> m_Mics = new();
         readonly List<(Transform t, Vector3 rest)> m_Probes = new();
-        readonly List<(Transform t, Quaternion rest)> m_Noses = new();
         Quaternion m_ModelRest;
         float m_Seed, m_LastYaw, m_TurnRate;
         float m_Recoil, m_Stomp, m_Slump, m_EyeYaw;
@@ -130,7 +129,6 @@ namespace Stealth.Enemies
                 if (t.name.StartsWith("SensorEye")) m_Eyes.Add((t, t.localRotation));
                 else if (t.name.StartsWith("SensorMic")) m_Mics.Add((t, t.localRotation));
                 else if (t.name.StartsWith("SensorGround")) m_Probes.Add((t, t.localPosition));
-                else if (t.name.StartsWith("SensorNose")) m_Noses.Add((t, t.localRotation));
                 if (!t.name.EndsWith(PivotSuffix)) continue;
                 if (t.name.StartsWith("AccentRotor")) m_Rotors.Add(t);
                 else if (t.name.StartsWith("AccentWheel")) m_Wheels.Add(t);
@@ -254,7 +252,7 @@ namespace Stealth.Enemies
 
         /// <summary>
         /// The sensor attachments live: the camera eye sweeps while idle and tracks the player it notices, the microphones
-        /// twitch, the floor probes punch on a stomp, the nose sniffs. Everything droops when hacked.
+        /// twitch, the floor probes punch on a stomp. Everything droops when hacked.
         /// </summary>
         void AnimateSensors(float dt, bool hacked, RobotState state)
         {
@@ -278,8 +276,6 @@ namespace Stealth.Enemies
                 mic.localRotation = rest * Quaternion.Euler(Mathf.Sin(t * 3.1f) * 6f * (1f - m_Slump) - m_Slump * 30f, 0f, 0f);
             foreach (var (probe, rest) in m_Probes)
                 probe.localPosition = rest + Vector3.down * (m_Stomp * 0.08f);
-            foreach (var (nose, rest) in m_Noses)
-                nose.localRotation = rest * Quaternion.Euler(Mathf.Sin(t * 7f) * 4f * (1f - m_Slump) + m_Slump * 25f, 0f, 0f);
         }
     }
 }

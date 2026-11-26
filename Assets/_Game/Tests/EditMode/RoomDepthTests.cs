@@ -44,7 +44,7 @@ namespace Stealth.Tests
                 foreach (var s in l.RobotSpawns)
                 {
                     var room = l.Plan.RoomAt(s.Position + Vector3.up * 0.3f);
-                    if (room == null || s.Kind is not (RobotKind.Guard or RobotKind.Listener or RobotKind.Hound)) continue;
+                    if (room == null || s.Kind is not (RobotKind.Guard or RobotKind.Listener)) continue;
                     if (room.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby) continue; // like with like: the rooms' depth below leaves these out too
                     robots += l.DepthShare(room.Id);
                     nr++;

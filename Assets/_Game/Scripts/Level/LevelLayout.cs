@@ -10,7 +10,7 @@ namespace Stealth.Level
         Workshop, PaintBooth,
         // the plant room off the lobby at the outer wall: where the building's drain leaves for the street sewer — the entry hatch (PlanGenerator.UtilityCorner)
         Utility,
-        // the hospital (HouseKind.Hospital, PlanGenerator.Hospital): patient rooms, the nurse station open to the corridor, theatres, X-ray and CT rooms
+        // the hospital (HouseKind.Hospital, PlanGenerator.Blocks): patient rooms, the nurse station open to the corridor, theatres, X-ray and CT rooms
         Ward, NurseStation, Operating, Imaging,
         // the apartment block (HouseKind.Apartments, PlanGenerator.Apartments): a flat's hallway, living room, bedroom and bathroom (its kitchen is a Kitchen)
         FlatHall, Living, Bedroom, Bathroom,
@@ -345,10 +345,6 @@ namespace Stealth.Level
         public readonly List<KeyDoor> KeyDoors = new();
         /// <summary>Searchable crates: indices in <see cref="Props"/>.</summary>
         public readonly List<int> Crates = new();
-        /// <summary>Wardens' posts (their robots are in <see cref="RobotSpawns"/> too).</summary>
-        public readonly List<WardenPost> Wardens = new();
-        /// <summary>Where lure speakers lie when the house starts.</summary>
-        public readonly List<Vector3> LureSpots = new();
         /// <summary>The location's point of interest: index in <see cref="Props"/>, -1 if none.</summary>
         public int PointOfInterest = -1;
         /// <summary>The house's main job (<see cref="HouseFeatures.Objective"/>).</summary>
@@ -371,8 +367,6 @@ namespace Stealth.Level
         public Vector3 CageKeySpot;
         public Location Location => HouseFeatures.LocationOf(Kind);
         public readonly List<RobotSpawn> RobotSpawns = new();
-        /// <summary>The old enemies (LevelGenerator.Generate's classicEnemies; the game no longer builds such houses): wardens, hounds, the hunter, guards on patrol, no wards.</summary>
-        public bool ClassicEnemies;
         /// <summary>The robots' charging room (a human tech room they took over), or −1; its docks (guards rest there).</summary>
         public int ChargingRoom = -1;
         /// <summary>What the charging room was before the robots took it (its remnant shows it).</summary>
@@ -415,6 +409,17 @@ namespace Stealth.Level
                 float a = 0f;
                 foreach (var r in Plan.Rooms) if (r.Type is not (RoomType.Corridor or RoomType.Hall)) a += r.Area;
                 return a / 100f;
+            }
+        }
+
+        /// <summary>Floor area of the whole house, m² (all floors, corridors too): what the guards, the loot and the reinforcements are counted by.</summary>
+        public float FloorArea
+        {
+            get
+            {
+                float a = 0f;
+                foreach (var r in Plan.Rooms) a += r.Area;
+                return a;
             }
         }
 

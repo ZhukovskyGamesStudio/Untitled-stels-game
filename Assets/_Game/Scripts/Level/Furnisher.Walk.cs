@@ -304,6 +304,12 @@ namespace Stealth.Level
                 if (m_GroupOf[i] >= 0 && groups.Contains(m_GroupOf[i]))
                 {
                     LastCut.Add((m_L.Props[i].Kind, m_L.Props[i].Position));
+                    // a storage rack taken out takes its places for loot with it
+                    if (m_L.Props[i].Kind == PropKind.StorageRack)
+                    {
+                        var at = m_L.Props[i].Position;
+                        m_L.StorageDrops.RemoveAll(d => d.Shelf && Mathf.Abs(d.Spot.y - at.y) < 2f && new Vector2(d.Spot.x - at.x, d.Spot.z - at.z).magnitude < 1.3f);
+                    }
                     m_L.Props.RemoveAt(i);
                     m_GroupOf.RemoveAt(i);
                 }

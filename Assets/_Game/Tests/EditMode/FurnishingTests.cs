@@ -46,10 +46,12 @@ namespace Stealth.Tests
             // nine houses of the office generator (the locations' are checked by their own tests), whatever share of the
             // seeds the other kinds take
             int removed = 0, houses = 0;
+            float area = 0f;
             foreach (var l in TestHouses.Offices(9))
             {
                 houses++;
                 removed += TestHouses.Removed(l);
+                area += l.FloorArea;
             }
             Assert.AreEqual(9, houses);
             // it used to take out three groups a house: meeting tables (their middle is the table) and whatever stood
@@ -57,8 +59,8 @@ namespace Stealth.Tests
             // (the ways up to the vent grates — crates and a desk set first in their room — make it a little busier)
             // (walls 0.3 m thick leave a little less room: a few more; grates kept clear of the lamps put a few ways up in tighter corners)
             // (the exit hatch on the plan's cells, its well through the floor: its spot moved 15 cm, a couple more)
-            // (houses half as big again since R16 — more rooms, more groups: the share per room is what it was)
-            Assert.That(removed, Is.LessThanOrEqualTo(houses * 12 / 5), $"{removed} groups taken out in {houses} houses");
+            // (houses differ in size: per 1000 m² of them, as many as it was)
+            Assert.That(removed, Is.LessThanOrEqualTo(area / 1000f * 0.6f), $"{removed} groups taken out in {houses} houses of {area:0} m²");
         }
     }
 }

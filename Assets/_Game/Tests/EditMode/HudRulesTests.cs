@@ -83,19 +83,6 @@ namespace Stealth.Tests
             Assert.AreEqual("Пылесос 3", HackListRules.Label("Пылесос", kinds, 5, k => k));
         }
 
-        [Test]
-        public void HunterForecastCountsDownToTheRule()
-        {
-            var s = new Stealth.Game.RunSettings();
-            var (seconds, alarms) = Stealth.Game.RunState.HunterForecast(1, 100f, 0, 0, s);
-            Assert.AreEqual(s.HunterTime - 100f, seconds, 1e-3f);
-            Assert.AreEqual(s.HunterAlarmsFirstHouse - 1, alarms);
-            Assert.IsFalse(Stealth.Game.RunState.HunterDue(1, 100f, 0, 0, s));
-            Assert.IsTrue(Stealth.Game.RunState.HunterDue(s.HunterAlarmsFirstHouse, 100f, 0, 0, s), "enough alarms");
-            Assert.IsTrue(Stealth.Game.RunState.HunterDue(0, s.HunterTime, 0, 0, s), "lingered too long");
-            Assert.AreEqual(-1, Stealth.Game.RunState.HunterForecast(0, 0f, 0, 1, s).alarms, "the only hunter of the first house came");
-        }
-
         static List<Hint> Hints(in PromptContext c) => HintRules.Collect(c, new List<Hint>());
 
         [Test]

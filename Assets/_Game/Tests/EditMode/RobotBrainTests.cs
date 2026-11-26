@@ -318,34 +318,5 @@ namespace Stealth.Tests
             Spot();
             Assert.AreEqual(3, changes, "suspicious, alerted, chase");
         }
-
-        [Test]
-        public void TheHunterSleepsUntilSomeoneElseSpotsAPlayer()
-        {
-            m_Senses.FollowsSightings = true;
-            m_Senses.HearingMultiplier = 0f;
-            m_Brain = new RobotBrain(m_Senses, m_Traits, m_Body, new System.Random(1));
-            Wait(3f);
-            Assert.AreEqual(RobotState.Patrol, m_Brain.State);
-            Assert.IsTrue(m_Brain.Asleep);
-            Assert.IsTrue(m_Body.Stopped, "does not walk around while asleep");
-
-            Sense(0f, 2f);
-            Assert.IsTrue(m_Brain.Asleep, "standing right next to it does not wake it");
-            m_Brain.Investigate(new Vector3(5, 0, 5), true, m_Now);
-            m_Brain.OnFelt(new Vector3(5, 0, 5), 1f, m_Player, m_Now);
-            Wait(1f);
-            Assert.IsTrue(m_Brain.Asleep, "alarms, radio calls and footsteps do not wake it");
-            Assert.IsTrue(m_Body.Stopped);
-
-            Spot(); // a relayed sighting: some other detector sees the player
-            Assert.AreEqual(RobotState.Chase, m_Brain.State, "wakes up and runs to the spotted player");
-            Assert.IsFalse(m_Body.Stopped);
-
-            m_Body.Arrived = true;
-            Wait(m_Traits.LoseTargetAfter + m_Traits.InvestigateLookTime + 30f);
-            Assert.IsTrue(m_Brain.Asleep, "lost them: falls asleep again where it is");
-            Assert.IsTrue(m_Body.Stopped);
-        }
     }
 }

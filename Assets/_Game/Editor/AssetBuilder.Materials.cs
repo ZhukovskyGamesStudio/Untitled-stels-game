@@ -279,10 +279,8 @@ namespace Stealth.EditorTools
             Mat(robots, "ListenerBody", new Color(0.95f, 0.55f, 0.15f), smoothness: 0.5f);
             Mat(robots, "DroneBody", new Color(0.25f, 0.27f, 0.32f), smoothness: 0.7f);
             Mat(robots, "ThumperBody", new Color(0.55f, 0.5f, 0.2f), smoothness: 0.3f);
-            Mat(robots, "HoundBody", new Color(0.45f, 0.2f, 0.2f), smoothness: 0.4f);
             Mat(robots, "SorterBody", new Color(0.9f, 0.9f, 0.85f), smoothness: 0.8f);
             Mat(robots, "WorkerBody", new Color(0.95f, 0.8f, 0.1f), smoothness: 0.4f);
-            Mat(robots, "HunterBody", new Color(0.12f, 0.12f, 0.14f), smoothness: 0.85f);
             Mat(robots, "TurretBody", new Color(0.3f, 0.35f, 0.3f), smoothness: 0.6f);
             Mat(robots, "SpiderBody", new Color(0.15f, 0.12f, 0.12f), smoothness: 0.7f);
             Mat(robots, "VacuumBody", new Color(0.2f, 0.2f, 0.22f), smoothness: 0.8f);

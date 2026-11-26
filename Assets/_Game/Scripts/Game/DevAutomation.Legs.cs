@@ -48,7 +48,7 @@ namespace Stealth.Game
             var layout = ActiveLevel.Layout;
             var room = layout.Lobby.Center;
 
-            foreach (var kind in new[] { RobotKind.Guard, RobotKind.Hound })
+            foreach (var kind in new[] { RobotKind.Guard })
             {
                 var from = room + new Vector3(-3.5f, 0f, 1.5f);
                 var obj = gm.SpawnRobotServer(kind, from, Quaternion.LookRotation(Vector3.right));

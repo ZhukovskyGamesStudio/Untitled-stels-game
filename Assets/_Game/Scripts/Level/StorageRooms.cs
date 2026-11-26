@@ -32,7 +32,7 @@ namespace Stealth.Level
                 l.StorageDoorway = door;
             }
             if (!wanted || l.StorageRoom >= 0) return;
-            // no storage room planned (the classic generator guesses the types, or the planned one did not hold): a dead end
+            // no storage room (the planned one did not hold): a dead end
             // of the plan becomes one — behind a single door, nothing else into it; the ground floor first, then about 20 m²
             PlanRoom best = null;
             int bestDoor = -1;

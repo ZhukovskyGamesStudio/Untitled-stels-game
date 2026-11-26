@@ -236,7 +236,7 @@ def attach_nose():
 
 if __name__ == "__main__":
     clear_scene()
-    for fn in (drone, spider, vacuum, turret, thumper, hound, sorter, worker, hunter, scanner, pir, plate,
+    for fn in (drone, spider, vacuum, turret, thumper, sorter, worker, scanner, pir, plate,
                attach_eye, attach_mic, attach_seismic, attach_nose):
         fn()
     print("ROBOTS DONE")

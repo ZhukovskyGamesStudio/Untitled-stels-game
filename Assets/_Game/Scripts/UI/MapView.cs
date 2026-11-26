@@ -56,6 +56,7 @@ namespace Stealth.UI
         int m_DrawnVersion = -1, m_DrawnFloor = -1, m_DrawnSeed;
         float m_NextDraw;
         float m_Fit = 1f;
+        Vector2 m_Extent; // the shown floor's size in metres (labels keep inside it)
 
         /// <summary>The floor shown; -1 = the player's floor (the big map can browse others).</summary>
         public int ViewFloor { get; set; } = -1;
@@ -98,6 +99,7 @@ namespace Stealth.UI
             var size = Viewport.rect.size;
             float scale = Scale;
             var layout = map.Layout;
+            m_Extent = new Vector2(layout.SizeX, layout.SizeZ);
             if (!FollowPlayer)
             {
                 // The whole floor fits the view.
@@ -296,6 +298,33 @@ namespace Stealth.UI
             string text = label == null ? null : itsFloor == floor ? label : $"{label} {(itsFloor > floor ? "↑" : "↓")}";
             Ui.Show(icon.Label, text != null);
             if (text != null) Ui.Set(icon.Label, text, UiPalette.Ink.A(Mathf.Max(0.6f, color.a))); // labels in ink: a pale fill colour does not read as text
+            if (text == null) return;
+            // a label by the building's edge leans inwards (a corner's "way out" was cut by the outer wall)
+            PlaceLabel(icon, FollowPlayer ? (0, false) : LabelPlace(pos * scale, m_Extent * scale, icon.Label.preferredWidth * size / 2f));
+        }
+
+        /// <summary>Puts an icon's label where <see cref="LabelPlace"/> said (the editor's picture of the map does the same).</summary>
+        public static void PlaceLabel(MapIconView icon, (int side, bool above) place)
+        {
+            var rt = icon.Label.rectTransform;
+            float half = rt.sizeDelta.x / 2f;
+            rt.anchoredPosition = new Vector2(place.side * (half - 4f), place.above ? LabelDrop : -LabelDrop);
+            icon.Label.alignment = place.side > 0 ? TextAnchor.MiddleLeft : place.side < 0 ? TextAnchor.MiddleRight : TextAnchor.MiddleCenter;
+        }
+
+        const float LabelDrop = 14f; // the label's distance under (or over) its icon, in the icon's units
+
+        /// <summary>
+        /// Where an icon's label goes so it stays inside the floor drawn (both in map pixels, the floor from 0 to
+        /// <paramref name="extent"/>): side 0 centred under the icon, 1 starting at it to the right, -1 ending at it to
+        /// the left; above when the icon sits by the bottom edge.
+        /// </summary>
+        public static (int side, bool above) LabelPlace(Vector2 at, Vector2 extent, float halfWidth)
+        {
+            const float Pad = 14f; // (the outer wall's ink and a little air)
+            int side = at.x - halfWidth < Pad ? 1 : at.x + halfWidth > extent.x - Pad ? -1 : 0;
+            bool above = at.y - LabelDrop - 10f < Pad + 10f;
+            return (side, above);
         }
     }
 }

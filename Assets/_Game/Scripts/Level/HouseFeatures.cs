@@ -6,16 +6,6 @@ namespace Stealth.Level
     /// <summary>The kinds of place a house can be; each has its own unique feature (append only: the byte travels).</summary>
     public enum Location : byte { Office, Hospital, Garage, Apartments, Abandoned }
 
-    /// <summary>
-    /// A warden's post (<see cref="RobotKind.Warden"/>): in front of the only doorway of a loot room, walking a few steps
-    /// between <see cref="A"/> and <see cref="B"/> and watching <see cref="Facing"/>. Distract it to get past.
-    /// </summary>
-    public struct WardenPost
-    {
-        public Vector3 A, B, Facing;
-        public int Room, Door;
-    }
-
     /// <summary>A door opened only with a key block: it closes off a part of the house; the key lies somewhere else.</summary>
     public struct KeyDoor
     {
@@ -26,7 +16,7 @@ namespace Stealth.Level
         public List<int> Rooms;
     }
 
-    /// <summary>Tuning of the special places of a house (LevelConfig): hidden rooms, key doors, crates, wardens, lures.</summary>
+    /// <summary>Tuning of the special places of a house (LevelConfig): hidden rooms, key doors, crates, the main job, the storage room.</summary>
     [System.Serializable]
     public class FeatureSettings
     {
@@ -54,17 +44,6 @@ namespace Stealth.Level
         public int Crates = 3;
         public float CratesPerHouse = 1f;
         public int MaxCrates = 8;
-
-        [Header("Wardens (guard a loot room's doorway; distract them to get in)")]
-        public int Wardens = 1;
-        public float WardensPerHouse = 0.5f;
-        public int MaxWardens = 3;
-        [Tooltip("Lure speakers lying near each warden.")]
-        public int LuresPerWarden = 2;
-        [Tooltip("Lure speakers anywhere else in the house.")]
-        public int ExtraLures = 1;
-        [Tooltip("Lures lie this far from the warden's post, metres (min, max).")]
-        public Vector2 LureDistance = new(6f, 14f);
 
         [Header("Main job (optional; shown on the tunnel's panel in the sewer)")]
         [Tooltip("From which house every house has one (0 = the first).")]
@@ -632,7 +611,7 @@ namespace Stealth.Level
                 if (l.RobotSpawns[i].Kind == RobotKind.Guard) carriers.Add(i);
             if (carriers.Count == 0)
                 for (int i = 0; i < l.RobotSpawns.Count; i++)
-                    if (!RobotRoster.IsDevice(l.RobotSpawns[i].Kind) && l.RobotSpawns[i].Kind != RobotKind.Hunter) carriers.Add(i);
+                    if (!RobotRoster.IsDevice(l.RobotSpawns[i].Kind)) carriers.Add(i);
             if (carriers.Count > 0) { l.KeyCarrier = carriers[rng.Next(carriers.Count)]; return; }
             // no robots at all (a calm house): the key lies in the room farthest from the cage
             var cage = l.Props[l.Cage].Position;
@@ -836,77 +815,5 @@ namespace Stealth.Level
 
         static Rect Shrink(Rect r, float by) => Rect.MinMaxRect(r.xMin + by, r.yMin + by, r.xMax - by, r.yMax - by);
 
-        // ------------------------------------------------------------------ wardens and lures
-
-        /// <summary>
-        /// Wardens: in front of the only doorway of a room with loot in it (a dead end), outside, a few steps either way
-        /// along the wall, watching the way in. Lure speakers lie a little away from them (to switch on and draw them off),
-        /// and a few more anywhere. After the furniture (it needs the loot spots).
-        /// </summary>
-        public static void Wardens(LevelLayout l, FeatureSettings s)
-        {
-            if (s == null) return;
-            int want = Mathf.Min(s.MaxWardens, s.Wardens + Mathf.FloorToInt(l.LevelIndex * s.WardensPerHouse));
-            var rng = new System.Random(LevelRandom.Mix(l.Seed, Salt.Wardens, 0));
-            var plan = l.Plan;
-            var rooms = new List<PlanRoom>();
-            foreach (var r in plan.Rooms)
-            {
-                if (r.Id == l.LobbyRoom || r.Id == l.HiddenRoom || r.Levels > 1 || r.Type is RoomType.Corridor or RoomType.Hall) continue;
-                int spots = 0;
-                foreach (var p in l.ItemSpots) if (plan.RoomAt(p + Vector3.up * 0.3f) == r) spots++;
-                if (spots >= 2) rooms.Add(r);
-            }
-            Shuffle(rooms, rng);
-            var posts = new List<Vector3>();
-            foreach (var r in rooms)
-            {
-                if (l.Wardens.Count >= want) break;
-                int only = -1, count = 0;
-                for (int i = 0; i < l.Doorways.Count; i++)
-                {
-                    var d = l.Doorways[i];
-                    if (d.RoomA != r.Id && d.RoomB != r.Id) continue;
-                    if (d.Kind is EdgeType.Door or EdgeType.Open or EdgeType.Breach) { only = i; count++; }
-                }
-                if (count != 1) continue;
-                var door = l.Doorways[only];
-                int outsideRoom = door.RoomA == r.Id ? door.RoomB : door.RoomA;
-                if (outsideRoom < 0) continue;
-                var across = door.Rotation * Vector3.forward;
-                var outward = plan.RoomAt(door.Position + across * 0.8f + Vector3.up * 0.3f)?.Id == outsideRoom ? across : -across;
-                var along = door.Rotation * Vector3.right;
-                var post = door.Position + outward * 2.0f;
-                bool Free(Vector3 p) => plan.RoomAt(p + Vector3.up * 0.3f)?.Id == outsideRoom && !l.NearStair(door.Floor, p, 0.6f) && plan.IsFloor(door.Floor, new Vector2(p.x, p.z));
-                if (!Free(post) || (post - l.HatchPosition).magnitude < 13f || (post - l.ExitHatchPosition).magnitude < 9f) continue;
-                bool overlaps = false;
-                foreach (var other in posts) if ((other - post).magnitude < 6f) overlaps = true;
-                if (overlaps) continue;
-                var a = post - along * 1.3f;
-                var b = post + along * 1.3f;
-                if (!Free(a) || !Free(b)) a = b = post;
-                posts.Add(post);
-                l.Wardens.Add(new WardenPost { A = a, B = b, Facing = outward, Room = r.Id, Door = only });
-                l.RobotSpawns.Add(new RobotSpawn { Kind = RobotKind.Warden, Floor = door.Floor, Position = post, Rotation = Quaternion.LookRotation(outward) });
-
-                // lures around it on its floor, outside the room it guards
-                var near = new List<Vector3>();
-                foreach (var p in l.PatrolPoints)
-                {
-                    float dist = (p - post).magnitude;
-                    if (LevelLayout.FloorOf(p.y) == door.Floor && dist >= s.LureDistance.x && dist <= s.LureDistance.y && plan.RoomAt(p + Vector3.up * 0.3f)?.Id != r.Id)
-                        near.Add(p + Vector3.up * 0.02f);
-                }
-                Shuffle(near, rng);
-                for (int k = 0; k < Mathf.Min(s.LuresPerWarden, near.Count); k++) l.LureSpots.Add(near[k] + Quaternion.Euler(0, k * 120f, 0) * Vector3.forward * 0.9f);
-            }
-            var anywhere = new List<Vector3>(l.ItemSpots);
-            Shuffle(anywhere, rng);
-            for (int k = 0; k < Mathf.Min(s.ExtraLures, anywhere.Count); k++)
-            {
-                l.LureSpots.Add(anywhere[k]);
-                l.ItemSpots.Remove(anywhere[k]);
-            }
-        }
     }
 }

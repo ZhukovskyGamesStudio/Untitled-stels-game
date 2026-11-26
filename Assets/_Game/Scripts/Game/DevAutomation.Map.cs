@@ -26,7 +26,7 @@ namespace Stealth.Game
             bool expectClients = Me.IsServer && Arg("-autotest-linger") != null;
             while (expectClients && PlayerController.All.Count < 2 && Time.time - t0 < 25f) yield return null;
             yield return new WaitForSeconds(1f);
-            Log($"players {PlayerController.All.Count}, quota now {gm.Quota} (team {gm.Run.Players})");
+            Log($"players {PlayerController.All.Count}, quota now {gm.Quota}");
 
             if (!Me.IsServer)
             {

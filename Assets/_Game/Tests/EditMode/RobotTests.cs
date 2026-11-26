@@ -12,11 +12,9 @@ namespace Stealth.Tests
         public void SensorMountsFollowTheSenses()
         {
             var guard = new RobotSenses { HasEyes = true, HearingMultiplier = 0.8f };
-            Assert.AreEqual((true, true, false, false), SensorRig.Mounts(guard));
+            Assert.AreEqual((true, true, false), SensorRig.Mounts(guard));
             var thumper = new RobotSenses { HasEyes = false, HearingMultiplier = 0f, SeismicRange = 10f };
-            Assert.AreEqual((false, false, true, false), SensorRig.Mounts(thumper));
-            var hound = new RobotSenses { HasEyes = false, HearingMultiplier = 0.6f, SmellRange = 3f };
-            Assert.AreEqual((false, true, false, true), SensorRig.Mounts(hound));
+            Assert.AreEqual((false, false, true), SensorRig.Mounts(thumper));
         }
 
         [Test]
@@ -30,10 +28,9 @@ namespace Stealth.Tests
                 var rig = go.GetComponent<SensorRig>();
                 Assert.IsNotNull(rig, $"{go.name} has a sensor rig");
                 Assert.AreSame(rc, rig.Robot);
-                var (eyes, ears, ground, nose) = SensorRig.Mounts(rc.Senses);
+                var (eyes, ears, ground) = SensorRig.Mounts(rc.Senses);
                 bool lidar = rc.Senses.LidarRange > 0f && rc.Lidar != null && rc.Lidar.Head != null; // the spinning puck shows itself
-                if (rc.Senses.FollowsSightings) { Assert.IsFalse(eyes || ears || ground || nose, $"{go.name} has no sensors of its own and shows none"); continue; }
-                Assert.IsTrue(eyes || ears || ground || nose || lidar, $"{go.name} shows at least one sensor");
+                Assert.IsTrue(eyes || ears || ground || lidar, $"{go.name} shows at least one sensor");
                 foreach (var r in rig.Eyes[0].GetComponentsInChildren<Renderer>())
                     if (r.name.StartsWith("Eye")) CollectionAssert.Contains(rc.Status.Renderers, r, $"{go.name}: the eye lens glows in the status colour");
             }
@@ -52,11 +49,9 @@ namespace Stealth.Tests
             var first = Kinds(0);
             var deep = Kinds(6);
             Assert.IsTrue(first.Contains(RobotKind.Guard) && first.Contains(RobotKind.Listener));
-            Assert.IsFalse(first.Contains(RobotKind.Hound), "hounds come later");
             Assert.Greater(deep.Count, first.Count);
             foreach (RobotKind k in System.Enum.GetValues(typeof(RobotKind)))
-                if (k != RobotKind.Hunter && k != RobotKind.Camera && k != RobotKind.Warden) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
-            Assert.IsFalse(deep.Contains(RobotKind.Hunter), "hunters are never placed, they arrive");
+                if (k != RobotKind.Camera) Assert.IsTrue(deep.Contains(k), $"{k} appears on deep levels");
         }
 
         [Test]
@@ -77,7 +72,6 @@ namespace Stealth.Tests
             int devices = 0, robots = 0;
             foreach (var r in l.RobotSpawns)
             {
-                if (r.Kind == RobotKind.Warden) continue; // placed at loot rooms by HouseFeatures, not by the roster
                 Assert.IsTrue(RobotRoster.IsUnlocked(r.Kind, l.LevelIndex), r.Kind.ToString());
                 if (RobotRoster.IsDevice(r.Kind)) devices++; else robots++;
             }
@@ -93,19 +87,6 @@ namespace Stealth.Tests
             Assert.IsFalse(Perception.InCone(Vector3.zero, Vector3.forward, new Vector3(0, 0, 11), 10, 60));
             Assert.IsTrue(Perception.InFlatCone(Vector3.zero, Vector3.forward, new Vector3(0, 5, 3), 10, 60), "flat ignores height");
             Assert.IsFalse(Perception.InCone(Vector3.zero, Vector3.forward, new Vector3(0, 5, 3), 10, 60));
-        }
-
-        [Test]
-        public void ScentTrailLeadsTowardsThePlayer()
-        {
-            ScentTrail.Clear();
-            for (int i = 0; i <= 20; i++) ScentTrail.Record(7, new Vector3(i, 0, 0), i * 0.5f); // walked 20 m along +X
-            Assert.Greater(ScentTrail.Smell(7, new Vector3(2, 0, 1), 3f, 10f), 0.5f, "fresh scent near the start");
-            Assert.AreEqual(0f, ScentTrail.Smell(7, new Vector3(2, 0, 10), 3f, 10f), "nothing far from the trail");
-            Assert.IsTrue(ScentTrail.NextAlongTrail(7, new Vector3(3, 0, 0), 7f, out var next));
-            Assert.Greater(next.x, 3f, "the next breadcrumb is further along (newer)");
-            Assert.AreEqual(0f, ScentTrail.Smell(7, Vector3.zero, 3f, 200f), "scent fades");
-            ScentTrail.Clear();
         }
 
         [Test]
@@ -299,7 +280,7 @@ namespace Stealth.Tests
             (eye, ear, light, lit) = SecurityPalette.Glow(calm, true, false, false);
             Assert.AreEqual(SecurityPalette.Off, eye);
             Assert.AreEqual(SecurityPalette.Off, ear);
-            Assert.IsFalse(lit, "no sensors (a lidar, the hunter): nothing glows, no light");
+            Assert.IsFalse(lit, "no sensors (a lidar): nothing glows, no light");
             (eye, ear, _, _) = SecurityPalette.Glow(SecurityPalette.Alarm, false, true, true);
             Assert.AreEqual(SecurityPalette.Alarm, eye, "the alarm shows on what it has");
             Assert.AreEqual(SecurityPalette.Alarm, ear);
@@ -308,7 +289,7 @@ namespace Stealth.Tests
         [Test]
         public void TheMobileRobotsGlowByTheirSenses()
         {
-            foreach (var name in new[] { "RobotGuard", "RobotListener", "RobotHound", "RobotSweeper", "RobotHunter", "RobotWorker" })
+            foreach (var name in new[] { "RobotGuard", "RobotListener", "RobotSweeper", "RobotSorter", "RobotWorker" })
             {
                 var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Prefabs/Robots/{name}.prefab");
                 var rc = prefab.GetComponent<RobotController>();
@@ -362,14 +343,8 @@ namespace Stealth.Tests
         }
     
         [Test]
-        public void ReinforcementsComeInAtThreeThenTwoThenEveryMinute()
+        public void ReinforcementsAreNeverHarmlessOnes()
         {
-            Assert.AreEqual(0, RobotRoster.ReinforcementsDue(179f, 180f, 120f, 60f));
-            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(180f, 180f, 120f, 60f), "3 minutes in");
-            Assert.AreEqual(1, RobotRoster.ReinforcementsDue(299f, 180f, 120f, 60f));
-            Assert.AreEqual(2, RobotRoster.ReinforcementsDue(300f, 180f, 120f, 60f), "2 minutes after the first");
-            Assert.AreEqual(3, RobotRoster.ReinforcementsDue(360f, 180f, 120f, 60f), "then one a minute");
-            Assert.AreEqual(12, RobotRoster.ReinforcementsDue(900f, 180f, 120f, 60f), "for good");
             var table = RobotRoster.DefaultRobots();
             for (int i = 0; i < 200; i++)
             {

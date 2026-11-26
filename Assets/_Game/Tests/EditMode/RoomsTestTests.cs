@@ -134,20 +134,5 @@ namespace Stealth.Tests
             Assert.AreEqual(houses, withCorridor, $"every house has a corridor between its rooms ({withCorridor} of {houses})");
             Assert.IsTrue(new BuildingSettings { RoomAreaMin = 30f }.HasRoomLimits);
         }
-
-        [Test]
-        public void NoHunterAndNoCountdown()
-        {
-            // the test rooms play by the game's run rules: its hunter by time and alarms is off (the reinforcements took its place)
-            var main = Resources.Load<GameConfig>(GameConfig.ResourcePath);
-            Assert.IsFalse(main.Run.Rules.Hunter, "no hunter in the game");
-            for (int house = 0; house < 4; house++)
-            {
-                Assert.AreEqual((-1f, -1), Stealth.Game.RunState.HunterForecast(0, 9999f, house, 0, main.Run.Rules), "no countdown");
-                Assert.IsFalse(Stealth.Game.RunState.HunterDue(10, 9999f, house, 0, main.Run.Rules), "the hunter never comes");
-            }
-            // the rule still works when on
-            Assert.IsTrue(Stealth.Game.RunState.HunterDue(0, 9999f, 0, 0, new Stealth.Game.RunSettings()), "on, it would come");
-        }
     }
 }

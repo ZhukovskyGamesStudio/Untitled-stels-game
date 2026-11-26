@@ -8,33 +8,20 @@ using UnityEngine;
 namespace Stealth.Tests
 {
     /// <summary>
-    /// The new enemy mode against the old one (LevelGenerator.Generate's classicEnemies): no hounds, hunters or wardens; guards rest on
+    /// The house's own robots: guards rest on
     /// the docks of the robots' charging room — a human tech room the robots took over — until an alarm, hunt, and go
     /// back; traps guard the valuable rooms.
     /// </summary>
     public class EnemyModeTests
     {
-        // houses 2 … 5 of the shared set: the new mode is the default one; the old mode is the same houses with its robots
-        static IEnumerable<LevelLayout> Houses(bool classicEnemies, int count = 18) =>
-            TestHouses.Corpus(27, classicEnemies: classicEnemies).Where(l => l.LevelIndex >= 2).Take(count); // (the first 27 keys hold 18 such)
-
-        [Test]
-        public void TheNewModeHasNoHoundsHuntersOrWardens()
-        {
-            foreach (var l in Houses(false))
-            {
-                Assert.IsFalse(l.ClassicEnemies);
-                Assert.IsFalse(l.RobotSpawns.Any(r => RobotRoster.OldOnly(r.Kind)), $"seed {l.Seed}: an old-mode robot");
-                Assert.AreEqual(0, l.Wardens.Count, $"seed {l.Seed}: warden posts");
-            }
-            // the old mode still has them somewhere
-            Assert.IsTrue(Houses(true).Any(l => l.RobotSpawns.Any(r => r.Kind is RobotKind.Hound or RobotKind.Warden)), "the old mode lost its hounds and wardens");
-        }
+        // houses 2 … 5 of the shared set
+        static IEnumerable<LevelLayout> Houses(int count = 18) =>
+            TestHouses.Corpus(27).Where(l => l.LevelIndex >= 2).Take(count); // (the first 27 keys hold 18 such)
 
         [Test]
         public void EveryHouseHasAChargingRoomTakenFromTheHumans()
         {
-            foreach (var l in Houses(false))
+            foreach (var l in Houses())
             {
                 Assert.GreaterOrEqual(l.ChargingRoom, 0, $"seed {l.Seed}: no charging room");
                 var room = l.Plan.Rooms[l.ChargingRoom];
@@ -55,7 +42,7 @@ namespace Stealth.Tests
         [Test]
         public void GuardsRestOnTheDocks()
         {
-            foreach (var l in Houses(false))
+            foreach (var l in Houses())
             {
                 var guards = l.RobotSpawns.Where(r => r.Kind == RobotKind.Guard).ToList();
                 Assert.GreaterOrEqual(guards.Count, 2, $"seed {l.Seed}: sleeping guards");
@@ -65,14 +52,12 @@ namespace Stealth.Tests
                     Assert.AreEqual(l.ChargingRoom, l.Plan.RoomAt(g.Position + Vector3.up * 0.3f)?.Id, $"seed {l.Seed}: a guard rests outside the charging room");
                 }
             }
-            foreach (var l in Houses(true, 6))
-                Assert.IsFalse(l.RobotSpawns.Any(r => r.Docked), "the old mode's guards patrol");
         }
 
         [Test]
         public void TheValuableRoomsAreGuardedByTraps()
         {
-            foreach (var l in Houses(false))
+            foreach (var l in Houses())
             {
                 // (the rooms by the team's way in get no ward: Wards.NearHatch)
                 int candidates = Wards.Ranked(l).Count(r => r.Floor != 0 || Vector3.Distance(r.Center, l.HatchPosition) >= Wards.NearHatch);
@@ -150,24 +135,6 @@ namespace Stealth.Tests
             body.Arrived = true;
             brain.Tick(113f, 0.1f);
             Assert.IsTrue(brain.Resting, "back on its dock");
-        }
-
-        [Test]
-        public void WhenTheTimeIsUpItLeavesItsDockForGood()
-        {
-            var body = new FakeBody { Position = Vector3.zero, Arrived = true };
-            var traits = new RobotTraits { AlarmHuntTime = 10f };
-            var brain = new RobotBrain(new RobotSenses(), traits, body, new System.Random(1));
-            brain.SetDock(Vector3.zero, Vector3.forward, 0f);
-            brain.WakeForGood(5f);
-            Assert.IsFalse(brain.Docked);
-            Assert.IsFalse(brain.Resting);
-            Assert.Greater(body.PatrolRequests, 0, "it sets off on patrol");
-            // no hunt timer runs out any more: it never heads home
-            for (float t = 5f; t < 100f; t += 0.5f) brain.Tick(t, 0.5f);
-            Assert.IsFalse(brain.Resting, "it never rests again");
-            brain.OnSensed(new Sighting { Target = new FakeIntruder { Position = new Vector3(0, 0, 2) }, Rate = 5f }, 100f, 0.5f);
-            Assert.Greater(brain.Suspicion, 0f, "and it sees again");
         }
 
         [Test]

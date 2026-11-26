@@ -9,9 +9,6 @@ namespace Stealth.Tests
     /// <summary>Zoning: work rooms on the facade, service rooms inside, toilets by the stairs, themed rooms capped.</summary>
     public class ZoningTests
     {
-        /// <summary>Houses of the classic plan generator to measure (the first of the shared set's keys).</summary>
-        const int ClassicHouses = 12;
-
         [Test]
         public void ATypeScoresBestInItsZone()
         {
@@ -34,12 +31,11 @@ namespace Stealth.Tests
             Assert.AreEqual(1, RoomRules.For(RoomType.Infirmary, new BuildingSettings().RoomTypeRules).PerHouse, "the settings it came from keep theirs");
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void RoomsThatBelongTogetherAreNextDoor(bool classic)
+        [Test]
+        public void RoomsThatBelongTogetherAreNextDoor()
         {
             int kitchens = 0, kitchenGood = 0, naps = 0, napNoisy = 0;
-            foreach (var l in TestHouses.Offices(classic ? ClassicHouses : TestHouses.OfficeCount, classic))
+            foreach (var l in TestHouses.Offices())
                 {
                     if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own, no open space (PlanGenerator.Garage/Hospital)
                     var plan = l.Plan;
@@ -56,12 +52,11 @@ namespace Stealth.Tests
             Assert.That(napNoisy, Is.LessThanOrEqualTo(naps / 10), $"nap rooms next to noise: {napNoisy} of {naps}");
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void HousesAreZonedAndCapped(bool classic)
+        [Test]
+        public void HousesAreZonedAndCapped()
         {
             int work = 0, workDark = 0, service = 0, serviceIn = 0, wc = 0, wcCore = 0;
-            foreach (var l in TestHouses.Offices(classic ? ClassicHouses : TestHouses.OfficeCount, classic))
+            foreach (var l in TestHouses.Offices())
                 {
                     if (HouseKinds.OwnPlan(l.Kind)) continue; // a plan of its own (PlanGenerator.Garage/Hospital): its zones are its layout
                     var plan = l.Plan;

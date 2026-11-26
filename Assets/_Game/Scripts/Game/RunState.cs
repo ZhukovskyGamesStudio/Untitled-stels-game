@@ -22,19 +22,35 @@ namespace Stealth.Game
             Seed == other.Seed && Index == other.Index && Players == other.Players && Lane == other.Lane && RunSeed == other.RunSeed;
     }
 
-    /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, hunters.</summary>
+    /// <summary>A kind of house the route offers only from a house on.</summary>
+    [Serializable]
+    public struct LateHouse
+    {
+        public Stealth.Level.HouseKind Kind;
+        public int FromHouse;
+        public LateHouse(Stealth.Level.HouseKind kind, int fromHouse) { Kind = kind; FromHouse = fromHouse; }
+
+        /// <summary>The kind may come as house <paramref name="house"/> (0-based).</summary>
+        public static bool Allowed(LateHouse[] late, Stealth.Level.HouseKind kind, int house)
+        {
+            if (late != null) foreach (var l in late) if (l.Kind == kind && house < l.FromHouse) return false;
+            return true;
+        }
+    }
+
+    /// <summary>Tuning of a run (RunConfig): quota, penalties, alarms, reinforcements.</summary>
     [Serializable]
     public class RunSettings
     {
         [Header("Quota")]
-        [Tooltip("Share of all loot value in a house that the quota asks for (first house).")]
-        public float QuotaShare = 0.35f;
-        [Tooltip("The share grows by this much with every house.")]
-        public float QuotaShareGrowth = 0.04f;
-        [Tooltip("The share never goes above this.")]
-        public float MaxQuotaShare = 0.85f;
-        [Tooltip("Share multiplier by team size (1, 2, 3, 4… players; the last repeats). The bigger house of a bigger team already holds more loot, so this stays mild.")]
-        public float[] QuotaByPlayers = { 1f, 1.1f, 1.18f, 1.25f };
+        [Tooltip("The fuel the drive on from each house asks for (the first house first): fixed numbers, whatever lies in the house.")]
+        public int[] Quotas = { 240, 320, 420, 540, 680 };
+        [Tooltip("Every house after the last of those asks for this much more than the one before it.")]
+        public int QuotaGrowth = 160;
+        [Tooltip("Every player after the first adds this share of the quota (0.5: two players × 1.5, four × 2.5).")]
+        public float QuotaPerExtraPlayer = 0.5f;
+        [Tooltip("A house always holds loot worth at least this many times its quota.")]
+        public float LootPerQuota = 2f;
         [Tooltip("Quota increase per teammate left down at the end of the previous house.")]
         public float DeathPenalty = 0.15f;
         [Tooltip("What the drive costs by the way the team takes, as a share of the house's quota: every tunnel out of the sewer gets one of these (shuffled by the run's seed), so the ways on differ in fuel.")]
@@ -43,41 +59,41 @@ namespace Stealth.Game
         [Header("Leaving a house")]
         [Tooltip("Seconds the car must stand in a tunnel with the whole team in it before it goes (the countdown on the HUD).")]
         public float VoteDelay = 3f;
-        [Tooltip("Reinforcements: seconds from the house's start to the first extra robot coming in, then to the second, then between every one after (forever).")]
+        [Tooltip("Reinforcements: seconds from the house's start to the first extra robot coming in, then to the second, then between every one after.")]
         public float ReinforceFirst = 180f, ReinforceSecond = 120f, ReinforceEvery = 60f;
+        [Tooltip("Those times are for a house of this floor area, m²: a bigger one is slower by as much (up to ReinforceSlowest times), never faster.")]
+        public float ReinforceArea = 2500f;
+        public float ReinforceSlowest = 3f;
+        [Tooltip("No more extra robots than this in one house.")]
+        public int ReinforceMax = 8;
+
+        [Header("Houses that come only later in a run")]
+        [Tooltip("From which house on (0 = the first) the route offers these kinds; the rest from the start.")]
+        public LateHouse[] LateHouses = { new(Stealth.Level.HouseKind.Abandoned, 3) };
         [Tooltip("The shortest drive to the next house, seconds, before the car changes into the basement's approach (GameManager.Arrival, Level.DrivePath): the house is built meanwhile, a slow build makes it longer.")]
         public float DriveTime = 6.5f;
         [Tooltip("Seconds of warning before the run ends when the team cannot get the fuel for any way on.")]
         public float StrandedGrace = 12f;
 
+        /// <summary>The reinforcements of a house of this floor area.</summary>
+        public ReinforcementClock ReinforcementsFor(float area)
+        {
+            float slower = ReinforceArea > 0f ? Mathf.Clamp(area / ReinforceArea, 1f, Mathf.Max(1f, ReinforceSlowest)) : 1f;
+            return new ReinforcementClock(ReinforceFirst * slower, ReinforceSecond * slower, ReinforceEvery * slower, ReinforceMax);
+        }
+
         [Header("Alarms")]
         [Tooltip("Seconds an alarm lasts (red lights, robots come running).")]
         public float AlarmDuration = 6f;
-        [Tooltip("Alarms closer together than this count once towards the hunter.")]
+        [Tooltip("Alarms closer together than this count once.")]
         public float AlarmCountSpacing = 4f;
         [Tooltip("Sensors are off for this long after a house starts.")]
         public float GracePeriod = 8f;
-
-        [Header("Hunter")]
-        [Tooltip("The hunter at all: off = it never comes and there is no countdown on the screen (a quiet test level).")]
-        public bool Hunter = true;
-        [Tooltip("Alarms that bring the hunter in the first house.")]
-        public int HunterAlarmsFirstHouse = 3;
-        [Tooltip("Alarms that bring the hunter in later houses.")]
-        public int HunterAlarmsLater = 2;
-        [Tooltip("Seconds in a house after which the hunter comes anyway (first house).")]
-        public float HunterTime = 360f;
-        [Tooltip("The time limit shrinks by this much per house…")]
-        public float HunterTimeStepPerHouse = 20f;
-        [Tooltip("…but never below this.")]
-        public float HunterMinTime = 180f;
-        [Tooltip("One more hunter is allowed every this many houses.")]
-        public int HousesPerExtraHunter = 3;
     }
 
     /// <summary>
     /// Rules of a run (pure, unit tested): the fuel of the car, what the drive on costs (the "quota" of a house), death
-    /// penalties, alarms and hunters, how a level ends. The tank (<see cref="Collected"/>) keeps its fuel for the whole
+    /// penalties, alarms, how a level ends. The tank (<see cref="Collected"/>) keeps its fuel for the whole
     /// run: loot is fed into the engine, every drive to the next house burns <see cref="Quota"/> of it.
     /// <see cref="GameManager"/> owns one on the server and replicates the public state.
     /// </summary>
@@ -98,21 +114,24 @@ namespace Stealth.Game
         public RunPhase Phase { get; private set; }
         public double AlarmUntil { get; private set; }
         public int Alarms { get; private set; }
-        public int Hunters { get; private set; }
         /// <summary>Players down at the end of the previous house: each one raises this house's quota.</summary>
         public int Penalties { get; private set; }
 
         double m_LastAlarmCounted = double.NegativeInfinity;
 
-        /// <summary>Quota for a level: a share of the loot value that grows with depth, plus death penalties.</summary>
-        public static int QuotaFor(int totalValue, int levelIndex, int penalties, RunSettings s = null, int players = 1)
+        /// <summary>The quota of a house (0-based): its fixed number, more for every player after the first and for every teammate left down in the house before.</summary>
+        public static int QuotaFor(int house, int penalties, RunSettings s = null, int players = 1)
         {
             s ??= new RunSettings();
-            var byTeam = s.QuotaByPlayers;
-            float team = byTeam == null || byTeam.Length == 0 ? 1f : byTeam[Mathf.Clamp(players - 1, 0, byTeam.Length - 1)];
-            float share = Mathf.Min(s.MaxQuotaShare, (s.QuotaShare + s.QuotaShareGrowth * levelIndex) * team);
-            return Mathf.Max(10, Mathf.RoundToInt(totalValue * share * (1f + s.DeathPenalty * penalties) / 5f) * 5);
+            int n = s.Quotas?.Length ?? 0, last = n > 0 ? s.Quotas[n - 1] : 0;
+            house = Mathf.Max(0, house);
+            int quota = house < n ? s.Quotas[house] : last + s.QuotaGrowth * (house - n + 1);
+            float team = 1f + s.QuotaPerExtraPlayer * Mathf.Max(0, players - 1);
+            return Mathf.Max(10, Mathf.RoundToInt(quota * team * (1f + s.DeathPenalty * Mathf.Max(0, penalties)) / 5f) * 5);
         }
+
+        /// <summary>The least the loot of a house is worth: its quota so many times over (<see cref="RunSettings.LootPerQuota"/>).</summary>
+        public int LootFor(int house, int players = 1) => Mathf.CeilToInt(QuotaFor(house, Penalties, m_S, players) * m_S.LootPerQuota);
 
         /// <summary>The fuel a drive costs by a way whose share of the quota is <paramref name="share"/> (none while the quota is none: the first drive).</summary>
         public static int RouteCost(int quota, float share) => quota <= 0 ? 0 : Mathf.Max(5, Mathf.RoundToInt(quota * share / 5f) * 5);
@@ -136,55 +155,27 @@ namespace Stealth.Game
             return shares[order[((lane % order.Length) + order.Length) % order.Length]];
         }
 
-        /// <summary>Does a hunter come now? After enough alarms, or when the team lingers too long.</summary>
-        public static bool HunterDue(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
-        {
-            var (seconds, alarmsLeft) = HunterForecast(alarms, elapsed, levelIndex, huntersSoFar, s);
-            return alarmsLeft == 0 || seconds == 0f;
-        }
-
-        /// <summary>
-        /// When the next hunter comes: seconds left until it comes anyway and alarms left that would bring it sooner
-        /// (both -1 when no more hunters come to this house). Shown to the players, so it is never a surprise.
-        /// </summary>
-        public static (float seconds, int alarms) HunterForecast(int alarms, float elapsed, int levelIndex, int huntersSoFar, RunSettings s = null)
-        {
-            s ??= new RunSettings();
-            if (!s.Hunter || huntersSoFar >= 1 + levelIndex / Mathf.Max(1, s.HousesPerExtraHunter)) return (-1f, -1);
-            int alarmLimit = (levelIndex == 0 ? s.HunterAlarmsFirstHouse : s.HunterAlarmsLater) * (huntersSoFar + 1);
-            float timeLimit = Mathf.Max(s.HunterMinTime, s.HunterTime - levelIndex * s.HunterTimeStepPerHouse) * (huntersSoFar + 1);
-            return (Mathf.Max(0f, timeLimit - elapsed), Mathf.Max(0, alarmLimit - alarms));
-        }
-
-        /// <summary>This house's forecast of the next hunter (see <see cref="HunterForecast(int,float,int,int,RunSettings)"/>).</summary>
-        public (float seconds, int alarms) HunterForecast(float elapsed) =>
-            Phase == RunPhase.Playing ? HunterForecast(Alarms, elapsed, LevelIndex, Hunters, m_S) : (-1f, -1);
-
         /// <summary>A new run begins in the sewer, before the first house: an empty tank, the first drive is free.</summary>
         public void BeginRun()
         {
             LevelIndex = RunMap.StartDepth;
-            LootValue = 0;
             Quota = 0;
             Collected = 0;
             Penalties = 0;
             Phase = RunPhase.Sewer;
             AlarmUntil = 0;
             Alarms = 0;
-            Hunters = 0;
         }
 
-        /// <summary>A new house begins with this much loot in it.</summary>
-        public void BeginLevel(int index, int lootValue, int players = 1)
+        /// <summary>A new house begins.</summary>
+        public void BeginLevel(int index, int players = 1)
         {
             LevelIndex = index;
-            LootValue = lootValue;
             Players = Mathf.Max(1, players);
-            Quota = QuotaFor(lootValue, index, Penalties, m_S, Players);
+            Quota = QuotaFor(index, Penalties, m_S, Players);
             Phase = RunPhase.Playing; // the tank keeps what is in it
             AlarmUntil = 0;
             Alarms = 0;
-            Hunters = 0;
             m_LastAlarmCounted = double.NegativeInfinity;
         }
 
@@ -195,10 +186,7 @@ namespace Stealth.Game
         }
 
         public bool QuotaMet => Collected >= Quota;
-
-        /// <summary>Loot value of the current house (the quota is a share of it).</summary>
-        public int LootValue { get; private set; }
-        /// <summary>Players in the team now: the quota follows them (friends join a house that is already running).</summary>
+        /// <summary>Players in the team now: the quota follows them.</summary>
         public int Players { get; private set; } = 1;
 
         /// <summary>The team grew or shrank during a house: its quota follows. Returns true if it changed.</summary>
@@ -207,13 +195,13 @@ namespace Stealth.Game
             players = Mathf.Max(1, players);
             if (players == Players || Phase != RunPhase.Playing) return false;
             Players = players;
-            Quota = QuotaFor(LootValue, LevelIndex, Penalties, m_S, Players);
+            Quota = QuotaFor(LevelIndex, Penalties, m_S, Players);
             return true;
         }
 
         public bool AlarmActive(double now) => now < AlarmUntil;
 
-        /// <summary>An alarm goes off. Alarms within a few seconds of each other count once (towards the hunter).</summary>
+        /// <summary>An alarm goes off. Alarms within a few seconds of each other count once.</summary>
         public void RaiseAlarm(double now)
         {
             if (now - m_LastAlarmCounted > m_S.AlarmCountSpacing)
@@ -226,10 +214,6 @@ namespace Stealth.Game
 
         /// <summary>End the current alarm at once (the red lights go off).</summary>
         public void CalmDown() => AlarmUntil = 0;
-
-        public bool ShouldSendHunter(float elapsed) => Phase == RunPhase.Playing && HunterDue(Alarms, elapsed, LevelIndex, Hunters, m_S);
-
-        public void HunterSent() => Hunters++;
 
         public enum Exit { Ignored, Failed, NextLevel }
 

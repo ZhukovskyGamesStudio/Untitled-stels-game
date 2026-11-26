@@ -43,7 +43,6 @@ namespace Stealth.Tests
         }
 
         [TestCase("RobotGuard", 2)]
-        [TestCase("RobotHound", 4)]
         [TestCase("RobotSpider", 8)]
         public void WalkersHaveALegRig(string prefab, int count)
         {

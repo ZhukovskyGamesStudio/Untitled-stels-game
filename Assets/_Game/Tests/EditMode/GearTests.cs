@@ -117,16 +117,6 @@ namespace Stealth.Tests
         }
 
         [Test]
-        public void ASnifferStopsNowAndThen()
-        {
-            Assert.IsFalse(RobotBrain.Sniffing(1f, 3f, 1f), "walks first");
-            Assert.IsTrue(RobotBrain.Sniffing(3.5f, 3f, 1f), "then sniffs");
-            Assert.IsFalse(RobotBrain.Sniffing(4.5f, 3f, 1f), "walks again");
-            Assert.IsTrue(RobotBrain.Sniffing(7.2f, 3f, 1f), "and sniffs again");
-            Assert.IsFalse(RobotBrain.Sniffing(100f, 0f, 1f), "0: never stops");
-        }
-
-        [Test]
         public void TheTeamStandsInARowFacingTheCamera()
         {
             var car = new Vector3(10f, 0f, 5f);
@@ -193,11 +183,6 @@ namespace Stealth.Tests
         {
             Assert.AreEqual("0:00", HouseClockRules.Format(0f));
             Assert.AreEqual("2:05", HouseClockRules.Format(125.9f));
-            Assert.AreEqual(180f, HouseClockRules.NextAt(0f, 180f, 120f, 60f), "at the start: the 3rd minute");
-            Assert.AreEqual(180f, HouseClockRules.NextAt(120f, 180f, 120f, 60f), "two minutes in: still the 3rd minute");
-            Assert.AreEqual(300f, HouseClockRules.NextAt(200f, 180f, 120f, 60f));
-            Assert.AreEqual(360f, HouseClockRules.NextAt(300f, 180f, 120f, 60f));
-            Assert.AreEqual(300f, HouseClockRules.PreviousAt(330f, 180f, 120f, 60f));
             Assert.AreEqual(0f, HouseClockRules.Heat(0));
             Assert.AreEqual(1f, HouseClockRules.Heat(20), "capped: it never gets redder than this");
             var calm = HouseClockRules.ColorOf(0f);

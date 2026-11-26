@@ -92,6 +92,10 @@ namespace Stealth.EditorTools
                             mf.sharedMesh = ScreenFaces.Of(mf.sharedMesh, picture);
                         }
                 foreach (var glow in go.GetComponentsInChildren<ShadeGlow>(true)) glow.Apply(); // (a lamp's shade by its bulb: no OnEnable here)
+                // OPEN=0.3: drawers pulled out that far (towards the front), to look into them
+                if (float.TryParse(System.Environment.GetEnvironmentVariable("OPEN"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float open))
+                    foreach (var tr in go.GetComponentsInChildren<Transform>(true))
+                        if (tr.name.StartsWith("BodyDrawer") && tr.parent != null && !tr.parent.name.StartsWith("BodyDrawer")) tr.position += go.transform.forward * open;
                 // SHAPES=0: without the models' own baked maps, to set the two side by side
                 if (System.Environment.GetEnvironmentVariable("SHAPES") != "0")
                     ShapeMaps.Tag(go, config.Shapes);
@@ -107,7 +111,10 @@ namespace Stealth.EditorTools
                 {
                     float radius = Mathf.Max(0.15f, bounds.extents.magnitude);
                     var from = new Vector3(0.55f, 0.38f, 1f).normalized;
-                    cam.transform.position = bounds.center + from * (radius / Mathf.Sin(13f * Mathf.Deg2Rad) * 0.92f);
+                    // CLOSE=0.3: that share of the distance (a close look), HIGH=1.2: looking down more
+                    if (!float.TryParse(System.Environment.GetEnvironmentVariable("CLOSE"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float close)) close = 1f;
+                    if (float.TryParse(System.Environment.GetEnvironmentVariable("HIGH"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float high)) from = new Vector3(from.x, high, from.z).normalized;
+                    cam.transform.position = bounds.center + from * (radius / Mathf.Sin(13f * Mathf.Deg2Rad) * 0.92f * close);
                     cam.transform.LookAt(bounds.center);
                     for (int i = 0; i < 2; i++) cam.Render();
                     RenderTexture.active = rt;

@@ -174,9 +174,10 @@ namespace Stealth.UI
         {
             var me = Me;
             if (GameManager.Instance != null && GameManager.Instance.Picking) me = null; // the start screen: no backpack, no hand
-            Ui.Show(Panel, me != null);
+            bool atTerminal = me != null && me.UsingTerminal != null; // its screen fills the view (the map terminal's sheet sat under the backpack)
+            Ui.Show(Panel, me != null && !atTerminal);
             m_Tooltip = null;
-            if (me == null || Mouse.current == null)
+            if (me == null || Mouse.current == null || atTerminal)
             {
                 CancelDrag();
                 m_Hover = null; m_HoverCargo = null;

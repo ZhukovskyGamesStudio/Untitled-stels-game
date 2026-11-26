@@ -89,10 +89,17 @@ namespace Stealth.Tests
                 {
                     if (p.propertyType != SerializedPropertyType.ObjectReference || p.name == "m_Script") continue;
                     string id = $"{c.GetType().Name}.{p.propertyPath}";
-                    if (Optional.Contains(id)) continue;
+                    if (Optional.Contains(id) || IsGap(id)) continue;
                     Assert.IsNotNull(p.objectReferenceValue, $"{path}: {c.name}/{id} is not assigned");
                 }
             }
+        }
+
+        /// <summary>A slot of a table by robot kind whose number no robot has any more (<see cref="RobotRoster.KindCount"/>).</summary>
+        static bool IsGap(string id)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(id, @"^(GameManager.RobotPrefabs|GameHUD.HackKindIcons|GameHUD.HackKindPictures|MapView.KindIcons)\.Array\.data\[(\d+)\]$");
+            return m.Success && !RobotRoster.Kinds.Contains((RobotKind)int.Parse(m.Groups[2].Value));
         }
 
         [Test]
@@ -100,10 +107,11 @@ namespace Stealth.Tests
         {
             var gm = Load($"{Prefabs}/Network/Session.prefab").GetComponent<GameManager>();
             Assert.AreEqual(RobotRoster.KindCount, gm.RobotPrefabs.Length);
-            for (int i = 0; i < gm.RobotPrefabs.Length; i++)
+            foreach (var kind in RobotRoster.Kinds)
             {
-                Assert.IsNotNull(gm.RobotPrefabs[i], $"{(RobotKind)i} has a prefab");
-                Assert.AreEqual((RobotKind)i, gm.RobotPrefabs[i].GetComponent<Detector>().Kind, $"{gm.RobotPrefabs[i].name} is tagged with its kind");
+                var robot = gm.RobotPrefabs[(int)kind];
+                Assert.IsNotNull(robot, $"{kind} has a prefab");
+                Assert.AreEqual(kind, robot.GetComponent<Detector>().Kind, $"{robot.name} is tagged with its kind");
             }
             Assert.IsNotNull(gm.ItemPrefab);
             Assert.IsNotNull(gm.LaserPrefab);

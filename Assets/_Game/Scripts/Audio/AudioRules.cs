@@ -90,11 +90,9 @@ namespace Stealth.Audio
         /// <summary>Every kind of robot speaks in its own voice: the same phrases, pitched to its size.</summary>
         public static float VoicePitch(Stealth.Level.RobotKind kind) => kind switch
         {
-            Stealth.Level.RobotKind.Hunter => 0.78f,
             Stealth.Level.RobotKind.Thumper => 0.84f,
             Stealth.Level.RobotKind.Listener => 0.92f,
             Stealth.Level.RobotKind.Sorter => 1.08f,
-            Stealth.Level.RobotKind.Hound => 1.14f,
             Stealth.Level.RobotKind.Worker => 1.2f,
             Stealth.Level.RobotKind.Sweeper => 1.26f,
             Stealth.Level.RobotKind.Drone => 1.32f,

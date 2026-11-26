@@ -801,10 +801,10 @@ UPGRADES = {"upgrade_engine": upgrade_engine, "upgrade_trunk": upgrade_trunk, "u
 
 ROBOTS = {
     "robot_guard": robot_guard, "robot_listener": robot_listener, "robot_drone": robot_drone, "robot_spider": robot_spider,
-    "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, "robot_hound": robot_hound,
-    "robot_sorter": robot_sorter, "robot_worker": robot_worker, "robot_hunter": robot_hunter, "robot_lidar": robot_lidar,
+    "robot_vacuum": robot_vacuum, "robot_turret": robot_turret, "robot_thumper": robot_thumper, 
+    "robot_sorter": robot_sorter, "robot_worker": robot_worker, "robot_lidar": robot_lidar,
     "robot_motionsensor": robot_motionsensor, "robot_pressureplate": robot_pressureplate, "robot_camera": robot_camera,
-    "robot_sweeper": robot_sweeper, "robot_warden": robot_warden,
+    "robot_sweeper": robot_sweeper, 
 }
 
 

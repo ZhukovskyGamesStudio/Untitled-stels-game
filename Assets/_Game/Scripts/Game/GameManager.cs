@@ -15,7 +15,7 @@ namespace Stealth.Game
 {
     /// <summary>
     /// Session state, spawned by the host on the Session prefab. Owns the level lifecycle: generation (on every peer
-    /// from a shared seed), navmesh + content spawning (server), quota, alarms and hunters. The rules are in
+    /// from a shared seed), navmesh + content spawning (server), quota, alarms and reinforcements. The rules are in
     /// <see cref="RunState"/>; the network twin (GameManagerNet) replicates <see cref="Level"/> and the run state and
     /// carries requests and banners (<see cref="IGameLink"/>).
     /// </summary>
@@ -34,7 +34,7 @@ namespace Stealth.Game
 
         /// <summary>
         /// Server: someone climbed up into the house (out of the basement or up the exit's ladder): its clock runs from then
-        /// on without a break, wherever the team goes (the sewer under it included) — the hunter, the guards waking and the
+        /// on without a break, wherever the team goes (the sewer under it included) — the
         /// reinforcements count on it (<see cref="HouseTime"/>).
         /// </summary>
         bool m_HouseEntered;
@@ -79,7 +79,6 @@ namespace Stealth.Game
         RunState m_Run = new();
         readonly List<GameObject> m_Spawned = new();
         /// <summary>The new enemy mode: this house's time is up and its guards are off their docks for good.</summary>
-        bool m_GuardsAwake;
         IGameLink m_Link;
         IGameLink m_Offline;
         /// <summary>Requests and broadcasts: through the network twin, or (no twin) handled right here.</summary>
@@ -184,11 +183,6 @@ namespace Stealth.Game
         public int RunTotal => m_Run.RunTotal;
         public RunPhase Phase => m_Run.Phase;
         public double AlarmUntil => m_Run.AlarmUntil;
-        /// <summary>Server time the next hunter comes anyway (0 = no more hunters in this house).</summary>
-        public double HunterAt { get; private set; }
-        /// <summary>Alarms that would bring the next hunter sooner (-1 = no more hunters in this house).</summary>
-        public int HunterAlarmsLeft { get; private set; } = -1;
-        bool m_HunterWarned;
         public bool AlarmActive => m_Run.AlarmActive(Session.ServerTime);
 
         /// <summary>The visual style the team looks at (index in <see cref="VisualStyles.All"/>, -1 = each its own default).</summary>
@@ -247,13 +241,6 @@ namespace Stealth.Game
             SyncLocation();
         }
 
-        /// <summary>Client: the server's forecast of the next hunter.</summary>
-        public void ApplyHunter(double at, int alarmsLeft)
-        {
-            HunterAt = at;
-            HunterAlarmsLeft = alarmsLeft;
-        }
-
         /// <summary>Client: the server's hacked doors and cracked safes.</summary>
         public void ApplyOpened(IEnumerable<int> keys)
         {
@@ -264,7 +251,7 @@ namespace Stealth.Game
 
         void EnsureRoute(int runSeed)
         {
-            if (Route == null || Route.RunSeed != runSeed) Route = new RunMap(runSeed);
+            if (Route == null || Route.RunSeed != runSeed) Route = new RunMap(runSeed, Tuning.Run.Rules.LateHouses);
         }
 
         // ------------------------------------------------------------------ the sewer between houses
@@ -452,7 +439,6 @@ namespace Stealth.Game
                 Session.Despawn(item.gameObject);
                 if (arriving && FrameBudget.Over) yield return null;
             }
-            ScentTrail.Clear();
             m_RunSeed = RunMap.SeedFor(m_RunSeed, DevFlags.ForcedSeed, () => new System.Random().Next(1, int.MaxValue));
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);
@@ -496,9 +482,8 @@ namespace Stealth.Game
             FrameBudget.Step = "the house's content spawned (robots, loot)";
             foreach (var _ in SpawnContentSteps(layout, seed, counted)) if (arriving) yield return null; // (a piece of a frame at a time)
             int totalValue = counted[0];
-            m_Run.BeginLevel(index, totalValue, players);
+            m_Run.BeginLevel(index, players);
             LevelStartTime = Time.time;
-            m_GuardsAwake = false;
             m_Reinforcements = 0;
             if (arriving) { Stash.Clear(); ExitStash.Clear(); } // (the bed is unloaded when the car stops: the team watches it on the drive)
             else UnloadCarServer();
@@ -521,7 +506,7 @@ namespace Stealth.Game
 
         /// <summary>
         /// Server: the house's loot, features, main job, robots, cameras and lasers, a piece of a frame at a time
-        /// (<see cref="FrameBudget"/>: on the drive); the loot's value (the quota counts on it) into <paramref name="counted"/>[0].
+        /// (<see cref="FrameBudget"/>: on the drive); the loot's value into <paramref name="counted"/>[0].
         /// </summary>
         IEnumerable<bool> SpawnContentSteps(LevelLayout layout, int seed, int[] counted)
         {
@@ -542,7 +527,7 @@ namespace Stealth.Game
             int total = 0;
             var lootSettings = HouseLevel.Loot;
             float inStorage = lootSettings.InStorageChance;
-            var planned = LootPlanner.Plan(layout, rng, lootSettings);
+            var planned = LootPlanner.Plan(layout, rng, lootSettings, m_Run.LootFor(layout.LevelIndex, TeamSize));
             foreach (var loot in planned)
             {
                 float yaw = rng.Next(4) * 90f + (float)rng.NextDouble() * 20f;
@@ -550,7 +535,7 @@ namespace Stealth.Game
                 int key = Items.StorageMath.Hide(free, hideRng, inStorage, k => parts[k].storage.Fits(parts[k].part, loot.Shape));
                 if (key >= 0)
                 {
-                    // hidden in a drawer or a locker: it appears when that part is first opened (it still counts for the quota)
+                    // hidden in a drawer or a locker: it appears when that part is first opened (it still counts)
                     m_Hidden[key] = ((byte)loot.Shape, (byte)loot.Color);
                     total += ItemCatalog.Value(loot.Shape, loot.Color);
                     continue;
@@ -561,11 +546,10 @@ namespace Stealth.Game
             total += SpawnFeatures(layout);
             total += SpawnCraftingLoot(layout, seed, planned);
             yield return true;
-            SpawnObjective(layout); // not in the total: the main job is optional, the quota does not count on it
+            SpawnObjective(layout); // not in the total: the main job is optional
             counted[0] = total;
             yield return true;
 
-            var wardens = new List<GameObject>();
             for (int si = 0; si < layout.RobotSpawns.Count; si++)
             {
                 var spawn = layout.RobotSpawns[si];
@@ -573,13 +557,11 @@ namespace Stealth.Game
                 bool onFloor = !RobotRoster.IsDevice(spawn.Kind) || spawn.Kind == RobotKind.Lidar;
                 if (onFloor && NavMesh.SamplePosition(spawn.Position, out var hit, 2f, NavMesh.AllAreas)) pos = hit.position;
                 var robot = SpawnRobotServer(spawn.Kind, pos, spawn.Rotation);
-                if (spawn.Kind == RobotKind.Warden) wardens.Add(robot);
                 // (its exact spot at the dock, not the navmesh's nearest: the dock's own carving would push it aside)
                 if (spawn.Docked && robot != null && robot.TryGetComponent<RobotController>(out var docked)) docked.DockServer(spawn.Position, spawn.Rotation * Vector3.forward);
                 GiveCageKey(layout, si, robot);
                 if (FrameBudget.Over) yield return true;
             }
-            PostWardens(layout, wardens);
 
             foreach (var pose in layout.CameraSpots)
             {
@@ -685,8 +667,6 @@ namespace Stealth.Game
             UpdateShredderServer();
             if (m_Run.SetPlayers(TeamSize))
                 Banner(Loc.Pack("banner.team_quota", m_Run.Players, Quota));
-            foreach (var p in PlayerController.All)
-                if (!p.Downed && !p.Invisible) ScentTrail.Record(p.ClientId, p.transform.position, Time.time);
             UpdateStatsServer();
             if (Phase == RunPhase.Sewer) { UpdatePickingServer(); UpdateSewer(); return; }
             if (Phase != RunPhase.Playing || PlayerController.All.Count == 0) return;
@@ -701,17 +681,6 @@ namespace Stealth.Game
             UpdateHouseEntry();
             if (m_Sewer != null && m_Sewer.UnderHouse && m_Sewer.Built && ActiveLevel.Ready) UpdateRouteServer(); // (may drive off)
             if (Phase != RunPhase.Playing) return;
-            // the new enemy mode has no hunter: the alarm wakes the guards in the charging room instead
-            bool classic = ActiveLevel.Layout == null || ActiveLevel.Layout.ClassicEnemies;
-            if (classic && m_HouseEntered && !InGracePeriod && m_Run.ShouldSendHunter(HouseTime)) SpawnHunter();
-            // the new mode: when the house's time is up (the hunter's timer) the guards leave their docks for good
-            if (!classic && m_HouseEntered && !m_GuardsAwake && m_Run.HunterForecast(HouseTime).seconds == 0f)
-            {
-                m_GuardsAwake = true;
-                foreach (var robot in RobotController.Robots) if (robot.Docked) robot.WakeForGoodServer();
-                Banner(Loc.Pack("banner.guards_awake"));
-            }
-            UpdateHunterForecast();
             UpdateReinforcements();
             foreach (var p in PlayerController.All)
                 if (!p.KnockedOut) return; // lying with HP left is not out: they get up
@@ -759,23 +728,11 @@ namespace Stealth.Game
             Audio.Sfx.Ui(kind is PingKind.Enemy or PingKind.Thing ? bank?.Mark : bank?.Ping, 0.8f);
         }
 
-        /// <summary>Server: publish when the next hunter comes, and warn the team a minute before.</summary>
-        void UpdateHunterForecast()
-        {
-            var (seconds, alarms) = m_Run.HunterForecast(HouseTime);
-            HunterAt = seconds < 0f ? 0 : Session.ServerTime + seconds;
-            HunterAlarmsLeft = alarms;
-            if (seconds < 0f || seconds > HunterWarning) { m_HunterWarned = false; return; }
-            if (m_HunterWarned) return;
-            m_HunterWarned = true;
-            Banner(Loc.Pack("banner.hunter_soon"));
-        }
-
         int m_Reinforcements;
 
         /// <summary>
-        /// Server: the house sends more robots the longer the team stays — one 3 minutes in, the next 2 minutes later, then one
-        /// a minute for good (<see cref="RobotRoster.ReinforcementsDue"/>, RunSettings); any kind of the house's table but a
+        /// Server: the house sends more robots the longer the team stays, slower in a bigger house and not without end
+        /// (<see cref="ReinforcementClock"/>, RunSettings); any kind of the house's table but a
         /// harmless one, coming in through the furthest room of the ground floor from the players.
         /// </summary>
         void UpdateReinforcements()
@@ -783,13 +740,12 @@ namespace Stealth.Game
             var layout = ActiveLevel.Layout;
             if (layout == null || layout.PatrolPoints.Count == 0 || DriveUntil > 0 || !m_HouseEntered) return;
             var s = m_Run.Settings;
-            int due = RobotRoster.ReinforcementsDue(HouseTime, s.ReinforceFirst, s.ReinforceSecond, s.ReinforceEvery);
+            int due = s.ReinforcementsFor(layout.FloorArea).Due(HouseTime);
             if (m_Reinforcements >= due) return;
             var rng = new System.Random(LevelRandom.Mix(layout.Seed, Salt.Reinforcements, m_Reinforcements));
             m_Reinforcements++;
             var roster = HouseLevel.Security.Roster.Robots;
-            var table = layout.ClassicEnemies ? roster : RobotRoster.NewEnemies(roster);
-            var kind = RobotRoster.PickReinforcement(table, layout.LevelIndex, rng);
+            var kind = RobotRoster.PickReinforcement(roster, layout.LevelIndex, rng);
             var at = FurthestEntry(layout);
             if (SpawnRobotServer(kind, at, Quaternion.identity) == null) return;
             Banner(Loc.Pack("banner.reinforcement"));
@@ -810,31 +766,6 @@ namespace Stealth.Game
             }
             if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
             return best;
-        }
-
-        /// <summary>Seconds before the hunter comes that the team is warned.</summary>
-        const float HunterWarning = 60f;
-
-        /// <summary>The hunter enters through the furthest room of the ground floor from the players.</summary>
-        void SpawnHunter()
-        {
-            m_Run.HunterSent();
-            var layout = ActiveLevel.Layout;
-            Vector3 best = layout.PatrolPoints[0];
-            float bestScore = -1f;
-            foreach (var p in layout.PatrolPoints)
-            {
-                if (LevelLayout.FloorOf(p.y) != 0) continue;
-                float score = float.MaxValue;
-                foreach (var pl in PlayerController.All) score = Mathf.Min(score, Vector3.Distance(p, pl.transform.position));
-                if (score > bestScore) { bestScore = score; best = p; }
-            }
-            if (NavMesh.SamplePosition(best, out var hit, 3f, NavMesh.AllAreas)) best = hit.position;
-            var obj = SpawnRobotServer(RobotKind.Hunter, best, Quaternion.identity);
-            if (obj == null) return;
-            // it sleeps where it came in until someone else spots a player (RobotSenses.FollowsSightings)
-            Banner(Loc.Pack("banner.hunter_in"));
-            Debug.Log($"[Game] Hunter spawned at {best} (alarms {m_Run.Alarms})");
         }
 
         // ------------------------------------------------------------------ requests
@@ -884,7 +815,6 @@ namespace Stealth.Game
             foreach (var obj in m_Spawned) Session.Despawn(obj);
             m_Spawned.Clear();
             foreach (var item in WorldItem.All.ToArray()) Session.Despawn(item.gameObject);
-            ScentTrail.Clear();
             m_RunSeed = DevFlags.ForcedSeed != 0 ? DevFlags.ForcedSeed : new System.Random().Next(1, int.MaxValue);
             DevFlags.ForcedSeed = 0;
             EnsureRoute(m_RunSeed);

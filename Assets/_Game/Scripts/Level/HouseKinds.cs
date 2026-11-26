@@ -105,7 +105,7 @@ namespace Stealth.Level
                 HouseKind.Headquarters => t switch { RoomType.Office => 2.2f, RoomType.Meeting => 2f, RoomType.Lounge => 1.3f, RoomType.Storage => 0.5f,
                     RoomType.Library => 2f, RoomType.ControlRoom => 1.5f, RoomType.Studio => 1.5f, _ => 1f },
                 // wards and surgeries off long corridors, waiting rooms, toilets, stores of supplies
-                // the hospital's own plan lays out the wards, the station, the theatres and imaging (PlanGenerator.Hospital); what
+                // the hospital's own plan lays out the wards, the station, the theatres and imaging (PlanGenerator.Blocks); what
                 // is left over: examination rooms, doctors' offices, toilets, stores, the lab, the staff's rooms
                 HouseKind.Hospital => t switch { RoomType.Office => 1.4f, RoomType.Restroom => 1f, RoomType.Infirmary => 2f, RoomType.Storage => 1f,
                     RoomType.LockerRoom => 1f, RoomType.Lab => 1f, RoomType.Kitchen => 1f, RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, _ => 0f },
@@ -115,7 +115,7 @@ namespace Stealth.Level
                     RoomType.Lounge => 0.8f, RoomType.ControlRoom => 1f, RoomType.Storage => 1f, _ => 0f },
                 // the block's own plan lays out every flat (PlanGenerator.Apartments): the program only says whether it has a store
                 HouseKind.Apartments => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, _ => 0f },
-                // the station's own plan lays out its labs, servers, control and quarters (PlanGenerator.Station): what is
+                // the station's own plan lays out its labs, servers, control and quarters (PlanGenerator.Blocks): what is
                 // left over is offices, stores and the robots' room
                 HouseKind.Abandoned => t switch { RoomType.Office => 1f, RoomType.Storage => 1f, RoomType.Lab => 1f, RoomType.ControlRoom => 1f, _ => 0f },
                 _ => 1f,

@@ -1277,7 +1277,6 @@ MODELS = {
     "programmer_console": model_programmer_console,
     "crate": model_crate,
     "key_lock": model_key_lock,
-    "robot_warden": model_robot_warden,
     "item_shovel_model": model_item_shovel_model,
     "item_flashlight_model": model_item_flashlight_model,
     "item_battery_model": model_item_battery_model,

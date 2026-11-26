@@ -13,6 +13,28 @@ namespace Stealth.Tests
     public class RouteAndLocksTests
     {
         [Test]
+        public void LateHousesWaitTheirTurnOnTheRoute()
+        {
+            var late = new RunSettings().LateHouses;
+            Assert.IsTrue(late.Any(l => l.Kind == HouseKind.Abandoned && l.FromHouse > 0), "the abandoned station is a late house");
+            bool came = false;
+            for (int run = 1; run <= 60; run++)
+            {
+                var map = new RunMap(run * 7919, late);
+                for (int depth = 0; depth < 7; depth++)
+                    for (int lane = 0; lane < map.LanesAt(depth); lane++)
+                    {
+                        var node = map.Node(depth, lane);
+                        Assert.IsTrue(LateHouse.Allowed(late, node.Kind, depth), $"run {run}: {node.Kind} at house {depth}");
+                        Assert.AreEqual(HouseKinds.Of(node.Seed, depth), node.Kind);
+                        Assert.AreEqual(node.Seed, new RunMap(run * 7919, late).Node(depth, lane).Seed, "every peer agrees");
+                        came |= node.Kind == HouseKind.Abandoned;
+                    }
+            }
+            Assert.IsTrue(came, "and comes later");
+        }
+
+        [Test]
         public void TheHouseBuiltIsTheOneTheTunnelShowed()
         {
             // the run keeps its seed on the way from the sewer to the first house (it used to draw a new one there:
