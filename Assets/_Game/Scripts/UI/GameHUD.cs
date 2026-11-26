@@ -101,6 +101,8 @@ namespace Stealth.UI
         [Tooltip("Its time card: from plain paper through the pink copy to a reddish sheet as extra robots come.")]
         public Image ClockPanel;
         public Text ClockTime, ClockNext, ClockCount;
+        [Tooltip("The frame rate and the frame's time (Settings: show FPS), top middle")]
+        public Text FpsLabel;
         [Tooltip("From the last extra robot to the next.")]
         public BarView ClockBar;
         [Header("The team comes up into the house")]
@@ -234,6 +236,7 @@ namespace Stealth.UI
                 if (gm != null) gm.OnBanner += ShowBanner;
                 m_Subscribed = gm;
             }
+            ShowFps();
             var me = PlayerController.Local;
             bool active = gm != null && me != null;
             if (gm != null) ShowLoadingFade(gm, me); // black from the first frame of a session until the player stands in place
@@ -288,6 +291,20 @@ namespace Stealth.UI
         /// shows when the next extra robot comes (not a countdown: the clock's second it comes at) with a bar to it, and the
         /// card gets redder with every robot that has come (<see cref="HouseClockRules.Heat"/>, <see cref="UiPalette.HeatPaper"/>).
         /// </summary>
+        readonly FrameMeter m_Frames = new();
+
+        /// <summary>The frame rate and the frame's time, if the player asked for them: a fresh pair twice a second.</summary>
+        void ShowFps()
+        {
+            if (FpsLabel == null) return;
+            bool on = GameSettings.ShowFps;
+            Ui.Show(FpsLabel, on);
+            if (!on) { m_Frames.Reset(); return; }
+            if (!m_Frames.Add(Time.unscaledDeltaTime)) return;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            FpsLabel.text = Loc.F("hud.fps", m_Frames.Fps.ToString("0", inv), m_Frames.Milliseconds.ToString("0.0", inv));
+        }
+
         void ShowHouseClock(GameManager gm)
         {
             if (ClockPanel == null) return;

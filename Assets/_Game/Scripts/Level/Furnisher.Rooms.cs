@@ -44,6 +44,7 @@ namespace Stealth.Level
             m_Table = false;
             m_InRoom.Clear();
             m_Cap = room.Area > 70f ? 2 : 1;
+            m_Practice = PracticeOf(m_L.Seed, room.Id);
             m_Windows ??= WindowStrips();
             BeginRoomWalk(room);
             if (room.Id == m_L.VaultRoom) { VaultRoom(room); return; }
@@ -201,11 +202,11 @@ namespace Stealth.Level
         /// </summary>
         public static readonly Dictionary<RoomType, PropKind[]> Signatures = new()
         {
-            [RoomType.Office] = new[] { PropKind.Desk, PropKind.ExecutiveDesk, PropKind.StandingDesk, PropKind.Terminal, PropKind.ConsoleDesk, PropKind.SupervisorDesk },
+            [RoomType.Office] = new[] { PropKind.Desk, PropKind.ExecutiveDesk, PropKind.StandingDesk, PropKind.Terminal, PropKind.ConsoleDesk, PropKind.SupervisorDesk, PropKind.DoctorDesk },
             [RoomType.OpenSpace] = new[] { PropKind.Desk, PropKind.StandingDesk, PropKind.Terminal },
             [RoomType.Server] = new[] { PropKind.ServerRack, PropKind.NetworkCabinet, PropKind.TapeLibrary },
             [RoomType.Meeting] = new[] { PropKind.MeetingTable, PropKind.RoundTable, PropKind.ConferenceTable },
-            [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.RobotTable, PropKind.WorkTable },
+            [RoomType.Lab] = new[] { PropKind.LabBench, PropKind.RobotTable, PropKind.WorkTable, PropKind.ClinicBench },
             [RoomType.Infirmary] = new[] { PropKind.HospitalBed, PropKind.ExamTable },
         };
 
@@ -216,7 +217,8 @@ namespace Stealth.Level
         /// </summary>
         void Signature(PlanRoom room)
         {
-            if (!Signatures.TryGetValue(room.Type, out var kinds)) return;
+            var kinds = SignaturesOf(m_L, room);
+            if (kinds == null) return;
             foreach (var k in kinds) if (m_InRoom.ContainsKey(k)) return;
             Anchor(room, Option.Signature, 3, false, 0.7f); // a small room with doors on every wall: a narrower way past it
         }
@@ -559,6 +561,30 @@ namespace Stealth.Level
                     b.Add(PropKind.OperatorChair, f.P(0, BackOf(PropKind.Terminal) + 0.85f), f.Back);
                     return 1.7f;
                 case (RoomType.ControlRoom, Option.VideoWall): return Single(PropKind.MonitorWall, 2.45f);
+                // a hospital's lab (Clinic): the bench with its microscope and centrifuge, the sample fridge, the reagents
+                case (RoomType.Lab, Option.Biggest) when Clinic:
+                case (RoomType.Lab, Option.Signature) when Clinic:
+                    b.Add(PropKind.ClinicBench, f.P(0, BackOf(PropKind.ClinicBench)), f.Face);
+                    b.Add(PropKind.BarStool, f.P(R(-0.3f, 0.3f), 1.05f), f.Back);
+                    b.Item(f.P(R(-0.35f, 0.35f), BackOf(PropKind.ClinicBench) + 0.2f, 0.91f));
+                    return 1.85f;
+                case (RoomType.Lab, Option.Smaller) when Clinic: return Single(PropKind.MedFridge, 0.75f);
+                case (RoomType.Lab, Option.Smallest) when Clinic: { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                case (RoomType.Lab, Option.Signature + 1) when Clinic: return Single(PropKind.ClinicBench, 1.85f);
+                // a hospital's offices (Practice): the doctor's desk with a chair for the patient, the on-call room's bed
+                case (RoomType.Office, >= Option.Signature) when Clinic && m_Practice == Practice.Consulting:
+                    b.Add(PropKind.DoctorDesk, f.P(0, BackOf(PropKind.DoctorDesk)), f.Face);
+                    b.Add(PropKind.Chair, f.P(-0.3f, 1.1f), f.Back);
+                    b.Item(f.P(0.35f, BackOf(PropKind.DoctorDesk) + 0.1f, 0.765f));
+                    if (option != Option.Signature) return 1.45f;
+                    b.Add(PropKind.GuestChair, f.P(1.1f, BackOf(PropKind.GuestChair)), f.Face);
+                    return 2.55f;
+                case (RoomType.Office, >= Option.Signature) when Clinic && m_Practice == Practice.OnCall:
+                    b.Add(PropKind.Daybed, f.P(option == Option.Signature ? -0.3f : 0f, BackOf(PropKind.Daybed)), f.Face);
+                    if (option != Option.Signature) return 2.05f;
+                    b.Add(PropKind.NightTable, f.P(1.0f, BackOf(PropKind.NightTable)), f.Face);
+                    b.Item(f.P(1.0f, BackOf(PropKind.NightTable), 0.405f));
+                    return 2.6f;
                 case (RoomType.Lab, Option.Biggest):
                     b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);
                     b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.LabBench) + 0.1f, 0.91f));
@@ -879,6 +905,23 @@ namespace Stealth.Level
                         b.Item(f.P(R(-0.6f, 0.6f), 0.2f, 1.105f));
                     }
                     break;
+                case RoomType.Lab when Clinic:
+                    if (roll < 0.65)
+                    {   // the lab's island: two benches back to back, a stool at each
+                        b.Add(PropKind.ClinicBench, f.P(0, 0.4f), f.Face);
+                        b.Add(PropKind.ClinicBench, f.P(0, -0.4f), f.Back);
+                        b.Add(PropKind.BarStool, f.P(R(-0.3f, 0.3f), 1.1f), f.Back);
+                        b.Add(PropKind.BarStool, f.P(R(-0.3f, 0.3f), -1.1f), f.Face);
+                        b.Item(f.P(R(-0.35f, 0.35f), Chance(0.5) ? 0.62f : -0.62f, 0.91f));
+                    }
+                    else
+                    {   // a bench alone, the trolley of samples at its end
+                        b.Add(PropKind.ClinicBench, f.P(0, 0), f.Face);
+                        b.Add(PropKind.BarStool, f.P(R(-0.3f, 0.3f), 0.75f), f.Back);
+                        b.Add(PropKind.MedicationCart, f.P(1.5f, 0), f.Face - 90f);
+                        b.Item(f.P(R(-0.35f, 0.35f), 0.2f, 0.91f));
+                    }
+                    break;
                 case RoomType.Lab:
                     if (roll < 0.45)
                     {   // two benches back to back
@@ -1034,8 +1077,8 @@ namespace Stealth.Level
                     }
                     else
                     {
-                        b.Add(PropKind.WaitingSeats, f.P(0, 0.35f), f.Back);
-                        b.Add(PropKind.WaitingSeats, f.P(0, -0.35f), f.Face);
+                        b.Add(PropKind.WaitingSeats, f.P(0, 0.35f), f.Face); // (each looks away from the other: they stood face to face, seat into seat)
+                        b.Add(PropKind.WaitingSeats, f.P(0, -0.35f), f.Back);
                     }
                     break;
                 case RoomType.Lobby when m_L.PlanKind == HouseKind.Garage:
@@ -1070,6 +1113,28 @@ namespace Stealth.Level
                         b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
                         b.Add(PropKind.Armchair, f.P(-1.1f, 0), f.Face + 90f);
                         b.Add(PropKind.Armchair, f.P(1.1f, 0), f.Face - 90f);
+                        b.Item(f.P(0, 0, 0.42f));
+                    }
+                    break;
+                case RoomType.Office when Clinic:
+                    if (m_Practice == Practice.Consulting)
+                    {   // the examination couch behind its screen
+                        b.Add(PropKind.ExamTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.PrivacyScreen, f.P(0.75f, 0), f.Face + 90f);
+                        b.Item(f.P(0, 0.3f, 0.725f));
+                    }
+                    else if (m_Practice == Practice.Records)
+                    {   // the clerk's desk in the middle: the clerk behind it, a visitor in front
+                        b.Add(PropKind.Desk, f.P(0, 0), f.Back);
+                        b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
+                        b.Add(PropKind.GuestChair, f.P(0, 0.9f), f.Back);
+                        b.Item(f.P(R(-0.5f, 0.5f), 0.1f, DeskTop + 0.005f));
+                    }
+                    else
+                    {   // the on-call room: two armchairs at a low table
+                        b.Add(PropKind.CoffeeTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Armchair, f.P(0, 0.85f), f.Back);
+                        b.Add(PropKind.Armchair, f.P(0, -0.85f), f.Face);
                         b.Item(f.P(0, 0, 0.42f));
                     }
                     break;

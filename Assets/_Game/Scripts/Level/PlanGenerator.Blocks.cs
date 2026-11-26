@@ -1267,12 +1267,18 @@ namespace Stealth.Level
                 Take(RoomType.Lounge, 1, r => r.Piece == Piece.Open ? 10f : Size(r, 30f, 200f));
                 Take(RoomType.Infirmary, 2, r => Size(r, 12f, 32f) - Facade(c, r));
             }
-            // the rest: doctors' offices; the big ones a seminar room, a lab, a treatment room
+            // the rest: the doctors' rooms (an Office here is a consulting room, the records office or the on-call room:
+            // Furnisher.Practice) and treatment rooms; of the big ones one lab a floor, then a staff lounge or a treatment
+            // hall (no meeting rooms, no second and third lab: a floor of them read as an office with a workshop)
+            int labs = 0;
+            foreach (var r in rooms) if (r.Typed && r.Type == RoomType.Lab) labs++;
             foreach (var r in rooms)
             {
                 if (r.Typed) continue;
                 float area = AreaOf(r);
-                r.Type = area <= 40f ? RoomType.Office : area <= 60f ? (rng.Next(3) == 0 ? RoomType.Meeting : RoomType.Infirmary) : RoomType.Lab;
+                if (area <= 40f) r.Type = area >= 14f && rng.Next(4) == 0 ? RoomType.Infirmary : RoomType.Office;
+                else if (labs == 0 && (area > 60f || rng.Next(3) == 0)) { r.Type = RoomType.Lab; labs++; }
+                else r.Type = area > 60f && rng.Next(2) == 0 ? RoomType.Lounge : RoomType.Infirmary;
                 r.Typed = true;
             }
         }

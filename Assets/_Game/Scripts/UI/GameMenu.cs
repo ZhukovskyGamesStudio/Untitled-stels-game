@@ -95,6 +95,8 @@ namespace Stealth.UI
         [Tooltip("How big the textures are read: full, half or a quarter (GameSettings.TextureSize); its label names the current one.")]
         public Button TextureSize;
         public Toggle VSync;
+        [Tooltip("The frame rate and the frame's time on screen (GameHUD.FpsLabel)")]
+        public Toggle ShowFps;
         public Button Defaults;
         public Button Done;
 
@@ -161,6 +163,7 @@ namespace Stealth.UI
             if (Language != null) Language.onClick.AddListener(NextLanguage);
             if (Smoothing != null) Smoothing.onClick.AddListener(() => GameSettings.Smoothing = SmoothingRules.Next(GameSettings.Smoothing));
             if (VSync != null) VSync.onValueChanged.AddListener(v => GameSettings.VSync = v);
+            if (ShowFps != null) ShowFps.onValueChanged.AddListener(v => GameSettings.ShowFps = v);
             if (Lighting != null) Lighting.onClick.AddListener(() => GameSettings.NewLighting = !GameSettings.NewLighting);
             if (Textures != null) Textures.onClick.AddListener(() => GameSettings.NewTextures = !GameSettings.NewTextures);
             if (TextureSize != null) TextureSize.onClick.AddListener(() => GameSettings.TextureSize = TextureSizeRules.Next(GameSettings.TextureSize));
@@ -273,6 +276,7 @@ namespace Stealth.UI
             HeadBob.SetIsOnWithoutNotify(GameSettings.HeadBob);
             CrouchToggle.SetIsOnWithoutNotify(GameSettings.CrouchToggle);
             if (VSync != null) VSync.SetIsOnWithoutNotify(GameSettings.VSync);
+            if (ShowFps != null) ShowFps.SetIsOnWithoutNotify(GameSettings.ShowFps);
             Volume.SetValueWithoutNotify(GameSettings.MasterVolume);
             Music.SetValueWithoutNotify(GameSettings.MusicVolume);
             if (MicSensitivity != null) MicSensitivity.SetValueWithoutNotify(VoicePrefs.Sensitivity);

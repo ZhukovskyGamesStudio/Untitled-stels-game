@@ -75,11 +75,12 @@ namespace Stealth.Level
             LiveScreens.Tick(Time.time); // (the house's screens of static: this runs wherever a house stands)
             (m_Fill ??= new RoomFillField()).Tick(Time.time); // (and the soft light its lamps leave in their rooms)
             if (Time.time >= m_NextScan) Scan();
-            if (Time.time < m_NextSort) return;
-            m_NextSort = Time.time + 0.2f;
             var cam = PlayerController.Local != null && PlayerController.Local.Camera != null ? PlayerController.Local.Camera : Camera.main;
             if (cam == null) return;
             var eye = cam.transform.position;
+            RoomCulling.Tick(eye, Time.time); // (the furniture of rooms the camera does not see into is not drawn)
+            if (Time.time < m_NextSort) return;
+            m_NextSort = Time.time + 0.2f;
             ContactShadows.Tick(eye); // (the lamps the picture's contact shadows walk towards)
             m_Probes.Tick(Time.time, eye); // (the rooms' reflections: one picture at a time, near the camera)
             m_Order.Clear();

@@ -256,6 +256,8 @@ namespace Stealth.Level
             [PropKind.WaitingSeats] = Rect.MinMaxRect(-1.23f, -0.31f, 1.23f, 0.31f),
             [PropKind.VitalsMonitor] = Rect.MinMaxRect(-0.3f, -0.3f, 0.3f, 0.3f),
             [PropKind.HandSanitizer] = Rect.MinMaxRect(-0.06f, -0.06f, 0.06f, 0.06f),
+            [PropKind.ClinicBench] = Rect.MinMaxRect(-0.9f, -0.375f, 0.9f, 0.375f),
+            [PropKind.MedFridge] = Rect.MinMaxRect(-0.35f, -0.36f, 0.35f, 0.36f),
             // the apartment block (Tools/Blender/apartments.py)
             [PropKind.DoubleBed] = Rect.MinMaxRect(-0.8f, -1.025f, 0.8f, 1.025f),
             [PropKind.Wardrobe] = Rect.MinMaxRect(-0.6f, -0.3f, 0.6f, 0.31f),
@@ -293,7 +295,7 @@ namespace Stealth.Level
             PropKind.ChargingDock, PropKind.BatteryStack, PropKind.Generator, PropKind.ScrapShrine,
             PropKind.LiftCar, PropKind.LiftEmpty, PropKind.TireChanger, PropKind.ToolChest, PropKind.TireRack, PropKind.EngineHoist, PropKind.PaintRack, PropKind.GarageDoor,
             PropKind.BedCurtain, PropKind.Gurney, PropKind.AnesthesiaMachine, PropKind.XrayMachine, PropKind.CtScanner,
-            PropKind.Wardrobe, PropKind.ElevatorDoors, PropKind.HallHooks, PropKind.BathVanity,
+            PropKind.Wardrobe, PropKind.ElevatorDoors, PropKind.HallHooks, PropKind.BathVanity, PropKind.MedFridge,
         };
 
         /// <summary>Pieces that hang on the wall itself: never on a window's glass or its frame.</summary>
@@ -336,7 +338,7 @@ namespace Stealth.Level
                 PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
                 PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
                 PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist or PropKind.CtScanner or PropKind.XrayMachine or
-                PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink => 1,
+                PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink or PropKind.MedFridge => 1,
             // (drawers: a wall of them in one room was a chore to open, and most were empty)
             PropKind.Cabinet or PropKind.FilingCabinet or PropKind.FilePedestal or
             PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or

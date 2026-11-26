@@ -603,6 +603,9 @@ namespace Stealth.EditorTools
             // over everything, outside Content (which fades out on its own while the drive scene plays)
             hud.LoadingFade = Img(Stretch(root.transform, "LoadingFade"), Color.black);
             hud.LoadingFade.raycastTarget = false;
+            // the frame rate and the frame's time (Settings: off by default): top middle, over everything, outside Content too
+            hud.FpsLabel = WorldTxt(R(root.transform, "Fps", TopCenter, TopCenter, new Vector2(0, -4), new Vector2(260, 18)), "", 13, TextAnchor.UpperCenter, Face.Mono);
+            hud.FpsLabel.gameObject.SetActive(false);
             return root;
         }
     }

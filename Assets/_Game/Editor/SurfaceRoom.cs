@@ -36,6 +36,11 @@ namespace Stealth.EditorTools
             string dir = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "surfaces");
             Directory.CreateDirectory(dir);
             string tag = System.Environment.GetEnvironmentVariable("TAG");
+            // SKIP=1 / 2: the texture size setting (half, a quarter), to see what it costs the picture (the editor saves
+            // the limit into ProjectSettings/QualitySettings.asset: revert that file after a run with SKIP)
+            int skip = (int)Env("SKIP", 0f);
+            QualitySettings.globalTextureMipmapLimit = skip;
+            Stealth.Level.ShapeLibrary.Skip = skip;
             RenderSettings.skybox = null;
             RenderSettings.fog = false;
             RenderSettings.ambientMode = AmbientMode.Flat;
@@ -350,7 +355,7 @@ namespace Stealth.EditorTools
                         cam.transform.position = at;
                         cam.transform.LookAt(look);
                         cam.fieldOfView = fov;
-                        bool flash = view is "flash" or "drawer"; // the lamps off, the player's flashlight on
+                        bool flash = view is "flash" or "drawer" || Env("FLASH", 0f) > 0f; // the lamps off, the player's flashlight on (FLASH=1: in every view)
                         var lamps = Object.FindObjectsByType<Light>().Where(l => l.name == "Lamp").ToList();
                         foreach (var l in lamps) l.enabled = !flash;
                         Light beam = null;

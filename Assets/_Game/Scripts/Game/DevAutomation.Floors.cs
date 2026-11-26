@@ -177,10 +177,70 @@ namespace Stealth.Game
             Release();
             Log($"perf walking: {profile.Summary()}");
             foreach (var line in profile.Top(18)) Log("perf top: " + line);
-            // the first view again with one thing off at a time: what the frame's GPU time goes to
-            Me.TeleportOwner(views[0].position, views[0].rotation);
+            // the sweep: the corridors, halls and biggest rooms of every floor, eight ways each — where the frame is worst
+            // (a house drops frames looking one way: down its long axis everything behind the walls is still in the frustum)
+            var counters = new (string label, Unity.Profiling.ProfilerRecorder rec)[]
+            {
+                ("batches", Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Batches Count")),
+                ("setpass", Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "SetPass Calls Count")),
+                ("tris", Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Triangles Count")),
+                ("shadow casters", Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Shadow Casters Count")),
+            };
+            var spots = l.Rooms.Where(r => r.Type is RoomType.Corridor or RoomType.Hall or RoomType.Lobby).OrderByDescending(r => r.Area).Take(14)
+                .Concat(l.Rooms.Where(r => r.Type is not (RoomType.Corridor or RoomType.Hall or RoomType.Lobby)).OrderByDescending(r => r.Area).Take(8)).ToList();
+            var worstPose = views[0];
+            float worstMs = 0f;
+            var sweep = new System.Collections.Generic.List<(float ms, string line)>();
+            foreach (var room in spots)
+                for (int k = 0; k < 8; k++)
+                {
+                    var pose = new Pose(room.Center + Vector3.up * 0.05f, Quaternion.Euler(0f, k * 45f, 0f));
+                    Me.TeleportOwner(pose.position, pose.rotation);
+                    Me.Motor.SetPitch(0);
+                    yield return new WaitForSeconds(0.3f);
+                    int frames = 0;
+                    float t0 = Time.realtimeSinceStartup;
+                    profile.Begin();
+                    while (Time.realtimeSinceStartup - t0 < 0.5f) { frames++; profile.Sample(); yield return null; }
+                    float ms = (Time.realtimeSinceStartup - t0) * 1000f / Mathf.Max(1, frames);
+                    string line = $"{ms:0.0} ms ({1000f / ms:0} fps) floor {room.Floor} room {room.Id} {room.Type} {room.Area:0} m2 yaw {k * 45}: {profile.Summary()}; " +
+                        string.Join(", ", counters.Select(c => $"{c.label} {(c.rec.Valid ? c.rec.LastValue : -1)}"));
+                    sweep.Add((ms, line));
+                    if (ms > worstMs) { worstMs = ms; worstPose = pose; }
+                }
+            sweep.Sort((x, y) => y.ms.CompareTo(x.ms));
+            for (int i = 0; i < sweep.Count; i++) if (i < 12 || i >= sweep.Count - 4 || i == sweep.Count / 2) Log($"perf sweep #{i + 1} of {sweep.Count}: {sweep[i].line}");
+            // the worst view: what its frame goes to, then one thing off at a time
+            Me.TeleportOwner(worstPose.position, worstPose.rotation);
             Me.Motor.SetPitch(0);
             yield return new WaitForSeconds(0.5f);
+            using (var worstProfile = new PerfProfile())
+            {
+                worstProfile.Begin();
+                float t2 = Time.realtimeSinceStartup;
+                while (Time.realtimeSinceStartup - t2 < 3f) { worstProfile.Sample(); yield return null; }
+                Log($"perf worst view: {worstProfile.Summary()}; " + string.Join(", ", counters.Select(c => $"{c.label} {(c.rec.Valid ? c.rec.LastValue : -1)}")));
+                foreach (var line in worstProfile.Top(24)) Log("perf worst top: " + line);
+            }
+            // what the worst view draws, by the kind of thing: triangles and renderers in sight of a camera or a shadow map
+            var drawn = new System.Collections.Generic.Dictionary<string, (long tris, int renderers)>();
+            foreach (var r in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || r.forceRenderingOff || !r.isVisible || !r.TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null) continue;
+                long tris = 0;
+                for (int i = 0; i < filter.sharedMesh.subMeshCount; i++) tris += filter.sharedMesh.GetIndexCount(i) / 3;
+                var top = r.transform;
+                while (top.parent != null && top.parent != ActiveLevel.Root.transform) top = top.parent;
+                string kind = System.Text.RegularExpressions.Regex.Replace(top.name, @"[_\-\d]+$|\(Clone\)", "");
+                drawn[kind] = drawn.TryGetValue(kind, out var was) ? (was.tris + tris, was.renderers + 1) : (tris, 1);
+            }
+            Log($"perf worst view draws {drawn.Values.Sum(v => v.tris) / 1000} k triangles in {drawn.Values.Sum(v => v.renderers)} renderers (once each; shadows and passes draw them again): " +
+                string.Join(", ", drawn.OrderByDescending(kv => kv.Value.tris).Take(14).Select(kv => $"{kv.Key} {kv.Value.tris / 1000} k in {kv.Value.renderers}")));
+            int lights = 0, shadowed = 0;
+            foreach (var light in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+                if (light.enabled && light.gameObject.activeInHierarchy && light.cullingMask != 0) { lights++; if (light.shadows != LightShadows.None) shadowed++; }
+            Log($"perf worst view: {lights} lights on, {shadowed} with shadows; rooms not drawn: {RoomCulling.Hidden} of {RoomCulling.Rooms}");
+            foreach (var c in counters) c.rec.Dispose();
             foreach (var (label, off) in PerfToggles())
             {
                 var undo = off();
@@ -200,6 +260,7 @@ namespace Stealth.Game
         static System.Collections.Generic.IEnumerable<(string, System.Func<System.Action>)> PerfToggles()
         {
             yield return ("nothing", () => null);
+            yield return ("room culling (everything drawn)", () => { RoomCulling.Enabled = false; return () => RoomCulling.Enabled = true; });
             var asset = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
             var field = typeof(UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset).GetField("m_RendererDataList",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

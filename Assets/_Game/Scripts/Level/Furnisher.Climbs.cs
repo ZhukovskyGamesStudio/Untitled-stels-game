@@ -20,8 +20,9 @@ namespace Stealth.Level
         }
 
         /// <summary>The way up that belongs in a room of this type (pure).</summary>
-        public static ClimbSet ClimbOf(RoomType t) => t switch
+        public static ClimbSet ClimbOf(RoomType t, HouseKind house = HouseKind.Office) => t switch
         {
+            RoomType.Server or RoomType.Lab or RoomType.Office when house == HouseKind.Hospital => new ClimbSet(PropKind.LowShelf, PropKind.DoctorDesk), // (no electronics' parts cabinet, no clerk's desk in a consulting room)
             RoomType.Storage or RoomType.Utility or RoomType.Workshop => new ClimbSet(PropKind.CrateStack, PropKind.WorkTable),
             RoomType.Office or RoomType.OpenSpace or RoomType.CopyRoom or RoomType.Meeting => new ClimbSet(PropKind.FilingCabinet, PropKind.Desk, true),
             RoomType.Server or RoomType.Lab => new ClimbSet(PropKind.PartsCabinet, PropKind.Desk),
@@ -40,9 +41,9 @@ namespace Stealth.Level
         /// The pieces of a way up (pure): the top right under the grate, its front (doors, drawers) across the way up — to one
         /// side or, with <paramref name="flip"/>, the other —, the step beside it towards <paramref name="side"/>.
         /// </summary>
-        public static List<(PropKind kind, Vector3 pos, float yaw)> ClimbPieces(RoomType type, Vector3 under, Vector3 side, bool flip)
+        public static List<(PropKind kind, Vector3 pos, float yaw)> ClimbPieces(RoomType type, Vector3 under, Vector3 side, bool flip, HouseKind house = HouseKind.Office)
         {
-            var set = ClimbOf(type);
+            var set = ClimbOf(type, house);
             var across = new Vector3(-side.z, 0f, side.x) * (flip ? -1f : 1f);
             float yaw = Mathf.Atan2(side.x, side.z) * Mathf.Rad2Deg, acrossYaw = Mathf.Atan2(across.x, across.z) * Mathf.Rad2Deg;
             float topYaw = set.Top == PropKind.CrateStack ? yaw : acrossYaw; // (a stack is as wide as it is across)
@@ -79,7 +80,7 @@ namespace Stealth.Level
             foreach (bool flip in new[] { false, true })
             {
                 bool all = true;
-                foreach (var (kind, pos, yaw) in ClimbPieces(type, under, side, flip))
+                foreach (var (kind, pos, yaw) in ClimbPieces(type, under, side, flip, l.PlanKind))
                 {
                     bool here = false;
                     foreach (var p in l.Props) here |= p.Kind == kind && (p.Position - pos).sqrMagnitude < 0.01f && Mathf.Abs(Mathf.DeltaAngle(p.RotationY, yaw)) < 1f;
@@ -102,7 +103,7 @@ namespace Stealth.Level
             if (!Climbs.TryGetValue(room.Id, out var c)) return;
             foreach (bool flip in new[] { false, true })
             {
-                var pieces = ClimbPieces(room.Type, c.under, c.side, flip);
+                var pieces = ClimbPieces(room.Type, c.under, c.side, flip, m_L.PlanKind);
                 var b = new Batch();
                 foreach (var (kind, pos, yaw) in pieces) b.Add(kind, pos, yaw);
                 if (!TryCommit(room, b, 0.0f)) continue;

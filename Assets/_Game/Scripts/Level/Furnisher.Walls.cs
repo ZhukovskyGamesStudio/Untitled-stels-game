@@ -320,6 +320,56 @@ namespace Stealth.Level
                     if (roll < 80) return Row(f, b, PropKind.InfoKiosk, 2, 0.7f);
                     if (roll < 90) return Single(PropKind.PlanterLarge, 1.05f);
                     return Single(PropKind.DirectoryBoard, 0.85f);
+                case RoomType.Office when Clinic && m_Practice == Practice.Consulting:
+                    // a doctor's consulting room: the desk and a chair for the patient, the couch, a screen, a basin, the scales
+                    if (roll < 22)
+                    {
+                        b.Add(PropKind.DoctorDesk, f.P(-0.5f, BackOf(PropKind.DoctorDesk)), f.Face);
+                        b.Add(PropKind.Chair, f.P(-0.8f, 1.1f), f.Back);
+                        b.Add(PropKind.GuestChair, f.P(0.6f, BackOf(PropKind.GuestChair)), f.Face);
+                        b.Item(f.P(-0.15f, BackOf(PropKind.DoctorDesk) + 0.1f, 0.765f));
+                        return Clock(2.1f);
+                    }
+                    if (roll < 36) { float w = Along(PropKind.ExamTable); b.Item(f.P(0, 0.35f + WallGap, 0.725f)); return w; }
+                    if (roll < 45 && !m_InRoom.ContainsKey(PropKind.PrivacyScreen)) { b.Add(PropKind.PrivacyScreen, f.P(0, 0.35f), f.Face); return 1.65f; }
+                    if (roll < 56) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                    if (roll < 64 && !m_InRoom.ContainsKey(PropKind.MirrorSink)) return Single(PropKind.MirrorSink, 0.75f); // (one basin, one screen)
+                    if (roll < 71) return Single(PropKind.WeighingScale, 0.45f);
+                    if (roll < 80) return Row(f, b, PropKind.GuestChair, 2, 0.65f);
+                    if (roll < 87) { Single(PropKind.FilingCabinet, 0.5f); b.Item(f.P(0, BackOf(PropKind.FilingCabinet), 1.305f)); return 0.5f; }
+                    if (roll < 93) return Single(PropKind.CoatRack, 0.9f);
+                    return Single(PropKind.Plant, 0.75f);
+                case RoomType.Office when Clinic && m_Practice == Practice.Records:
+                    // the records office: the clerk's desk, files along the walls, the copier
+                    if (roll < 20)
+                    {
+                        b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face);
+                        b.Add(PropKind.Chair, f.P(R(-0.1f, 0.1f), 1.2f), f.Back + R(-15f, 15f));
+                        b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f));
+                        return 1.65f;
+                    }
+                    if (roll < 46) { Row(f, b, PropKind.FilingCabinet, 3, 0.5f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.FilingCabinet), 1.305f)); return Clock(1.55f); }
+                    if (roll < 62) { Single(PropKind.Shelf, 2.05f); if (Chance(0.6)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[m_Rng.Next(3)])); return 2.05f; }
+                    if (roll < 72) { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
+                    if (roll < 81) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
+                    if (roll < 90) return Row(f, b, PropKind.GuestChair, 2, 0.65f);
+                    return Single(PropKind.Plant, 0.75f);
+                case RoomType.Office when Clinic:
+                    // the on-call room: a bed to lie down on, the staff's lockers, an armchair, water
+                    if (roll < 26)
+                    {
+                        b.Add(PropKind.Daybed, f.P(-0.3f, BackOf(PropKind.Daybed)), f.Face);
+                        b.Add(PropKind.NightTable, f.P(1.0f, BackOf(PropKind.NightTable)), f.Face);
+                        b.Item(f.P(1.0f, BackOf(PropKind.NightTable), 0.405f));
+                        return 2.6f;
+                    }
+                    if (roll < 46) return Row(f, b, PropKind.Lockers, 2, 1.05f);
+                    if (roll < 58) return Single(PropKind.Armchair, 0.9f);
+                    if (roll < 68) return Single(PropKind.CoatRack, 0.9f);
+                    if (roll < 76) return Single(PropKind.WaterCooler, 0.4f);
+                    if (roll < 86) { Single(PropKind.Bookshelf, 1.05f); return Clock(1.05f); }
+                    if (roll < 93) return Single(PropKind.MirrorSink, 0.75f);
+                    return Single(PropKind.Plant, 0.75f);
                 case RoomType.Office:
                     if (roll < 20)
                     {   // a work desk against the wall
@@ -642,10 +692,24 @@ namespace Stealth.Level
                     }
                     if (roll < 90) return Hung(PropKind.MapBoard, 2.05f);
                     return Hung(PropKind.AlarmPanel, 0.85f);
+                case RoomType.Lab when Clinic:
+                    // a hospital's lab: benches with a microscope and a centrifuge, the sample fridge, a steel sink, the fume
+                    // hood, reagents behind glass, supplies (the research lab's electronics and the kitchen's fridge read wrong here)
+                    if (roll < 34)
+                    {
+                        b.Add(PropKind.ClinicBench, f.P(0, BackOf(PropKind.ClinicBench)), f.Face);
+                        b.Add(PropKind.BarStool, f.P(R(-0.3f, 0.3f), 1.05f), f.Back);
+                        b.Item(f.P(R(-0.35f, 0.35f), BackOf(PropKind.ClinicBench) + 0.2f, 0.91f));
+                        return 1.85f;
+                    }
+                    if (roll < 46) return Single(PropKind.MedFridge, 0.75f);
+                    if (roll < 56) return Single(PropKind.ScrubSink, 1.6f);
+                    if (roll < 67) { Single(PropKind.FumeHood, 1.55f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.FumeHood) + 0.05f, 0.935f)); return 1.55f; }
+                    if (roll < 78) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
+                    if (roll < 87) { Single(PropKind.SupplyShelf, 1.05f); b.Item(f.P(R(-0.3f, 0.3f), BackOf(PropKind.SupplyShelf), 0.915f)); return 1.05f; }
+                    if (roll < 93) return Single(PropKind.MedicationCart, 1.05f);
+                    return Single(PropKind.TrashBin, 0.45f);
                 case RoomType.Lab:
-                    // a hospital's lab: reagents in a medicine cabinet (its fridge and sink wait for models of their own: the
-                    // kitchen's fridge and the washroom's mirror over a basin read as a kitchen in the lab)
-                    if (m_L.PlanKind == HouseKind.Hospital && roll >= 26 && roll < 40) { Single(PropKind.MedicineCabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.MedicineCabinet), 1.65f)); return 0.95f; }
                     if (roll < 26)
                     {
                         b.Add(PropKind.LabBench, f.P(0, BackOf(PropKind.LabBench)), f.Face);

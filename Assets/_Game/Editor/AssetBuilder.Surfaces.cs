@@ -133,7 +133,7 @@ namespace Stealth.EditorTools
             ["DrumKit/Body"] = ("gloss", "C8C6C0"), ["Sculpture/Body"] = ("stone", "C6C4BC"), ["CarOnStands/Body"] = ("gloss", "C4C6C8"), ["GarageDoor/Body"] = ("powdercoat", "B6B8B8"),
             ["Programmer/Body"] = ("powdercoat", null), ["Cage/"] = (null, null),
             // the hospital's scrub trough is stainless steel (it was the dark grey of plastic)
-            ["ScrubSink/Body"] = ("steel", "B6BABC"),
+            ["ScrubSink/Body"] = ("steel", "B6BABC"), ["ClinicBench/Body"] = ("laminate", "D2D4D0"), ["MedFridge/Body"] = ("powdercoat", "D6D8D6"),
         };
 
         /// <summary>The surface in a house long left (nothing: the house's own paint, with its own wear, stays).</summary>

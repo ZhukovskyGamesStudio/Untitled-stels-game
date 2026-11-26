@@ -869,6 +869,173 @@ def model_hand_sanitizer():
     return export("hand_sanitizer")
 
 
+def _turned(bms, loc, angle):
+    """Shapes built round the origin, turned about z and moved to loc."""
+    for b in bms:
+        s.place(b, loc, (0, 0, angle))
+    return bms
+
+
+def model_clinic_bench():
+    """Clinical lab bench 1.8 x 0.75, the worktop at 0.9: a stack of four drawers on the left, a double-door cupboard
+    on the right and a knee space between them under a thick dark resin top with a raised lip; along the back a
+    service strip with sockets and, on two stout posts, two full-width reagent shelves (jars, a wash bottle, a
+    canister, boxes of gloves and tips). On the top a binocular microscope turned to show its profile (left) and a
+    low benchtop centrifuge (right), a rack of sample tubes between them. The front of the top stays clear in the
+    middle (loot lies there). The back is flush (Blender +y)."""
+    p = Parts()
+    top = 0.9
+    # the worktop: thick, a lip at the back and the sides
+    p.add("Accent", s.rbox((1.8, 0.75, 0.04), (0, 0, top - 0.02), r=0.008, seg=2))
+    p.add("Accent", s.rbox((1.8, 0.03, 0.07), (0, 0.36, top + 0.03), r=0.006, seg=1))
+    for sx in (-1, 1):
+        p.add("Accent", s.rbox((0.025, 0.4, 0.035), (sx * 0.8875, 0.175, top + 0.012), r=0.005, seg=1))
+    # the units: drawers on the left, doors on the right; a recessed toe-kick under each
+    for sx in (-1, 1):
+        p.add("Body", s.rbox((0.56, 0.66, 0.76), (sx * 0.61, 0.025, 0.11 + 0.38), r=0.012, seg=2))
+        p.add("Accent", s.rbox((0.52, 0.54, 0.12), (sx * 0.61, 0.07, 0.06), r=0.006, seg=1))
+    for k in range(4):                                             # four drawer fronts, a bar handle on each
+        z = 0.2 + k * 0.176
+        p.add("Body", s.rbox((0.52, 0.02, 0.16), (-0.61, -0.312, z + 0.07), r=0.006, seg=1))
+        p.add("Trim", s.rbox((0.26, 0.022, 0.016), (-0.61, -0.33, z + 0.115), r=0.005, seg=1))
+    for sd in (-1, 1):                                             # two doors, their handles at the meeting edges
+        p.add("Body", s.rbox((0.255, 0.02, 0.69), (0.61 + sd * 0.1325, -0.312, 0.505), r=0.006, seg=1))
+        p.add("Trim", s.rbox((0.016, 0.022, 0.22), (0.61 + sd * 0.03, -0.33, 0.66), r=0.005, seg=1))
+    p.add("Body", s.rbox((0.72, 0.02, 0.3), (0, 0.33, 0.72), r=0.006, seg=1))   # a rail between the units, high at the back
+    # the service strip and the shelves on their posts
+    p.add("Body", s.rbox((1.72, 0.05, 0.13), (0, 0.345, top + 0.13), r=0.008, seg=1))
+    for x in (-0.55, -0.25, 0.25, 0.55):
+        p.add("Accent", s.rbox((0.07, 0.012, 0.07), (x, 0.318, top + 0.13), r=0.004, seg=1))
+    for sx in (-1, 1):
+        p.add("Body", s.rbox((0.05, 0.06, 0.74), (sx * 0.86, 0.34, top + 0.37), r=0.008, seg=1))
+    shelves = (1.3, 1.52)
+    for z in shelves:
+        p.add("Body", s.rbox((1.76, 0.22, 0.028), (0, 0.262, z), r=0.007, seg=1))
+        p.add("Trim", s.rbox((1.7, 0.008, 0.03), (0, 0.156, z + 0.026), r=0.003, seg=1))
+
+    def jar(x, z, rad, h, role="Trim"):
+        p.add(role, s.lathe([(0, 0), (rad, 0), (rad, h * 0.74), (rad * 0.6, h * 0.86), (rad * 0.6, h * 0.94), (0, h * 0.94)], seg=16, loc=(x, 0.27, z)))
+        p.add("Accent", s.rcyl(rad * 0.68, h * 0.1, (x, 0.27, z + h * 0.95), seg=14, r=0.003, bevel_seg=1))
+
+    def box(x, z, w, h, d=0.14):
+        p.add("Body", s.rbox((w, d, h), (x, 0.27, z + h / 2), r=0.006, seg=1))
+        p.add("Accent", s.rbox((w * 0.5, 0.006, h * 0.4), (x, 0.27 - d / 2 - 0.001, z + h / 2), r=0.002, seg=1))
+
+    z0, z1 = shelves[0] + 0.012, shelves[1] + 0.012
+    jar(-0.7, z0, 0.065, 0.17, "Accent"); jar(-0.52, z0, 0.045, 0.15); box(-0.28, z0, 0.24, 0.09); jar(-0.04, z0, 0.04, 0.13)
+    jar(0.1, z0, 0.04, 0.16); box(0.36, z0, 0.2, 0.13); jar(0.62, z0, 0.065, 0.17, "Accent"); jar(0.77, z0, 0.035, 0.12)
+    box(-0.62, z1, 0.26, 0.1); jar(-0.36, z1, 0.05, 0.18); jar(-0.2, z1, 0.05, 0.14, "Accent"); box(0.12, z1, 0.3, 0.08, 0.16)
+    jar(0.72, z1, 0.06, 0.17)
+    # a wash bottle: its bent spout
+    wx = 0.5
+    p.add("Body", s.lathe([(0, 0), (0.04, 0), (0.04, 0.11), (0.018, 0.14), (0.018, 0.155), (0, 0.155)], seg=14, loc=(wx, 0.27, z1)))
+    p.add("Trim", s.tube([(wx, 0.27, z1 + 0.15), (wx, 0.27, z1 + 0.185), (wx - 0.02, 0.27, z1 + 0.195), (wx - 0.07, 0.27, z1 + 0.17)], 0.005, smooth=True, segments_per=6))
+    # the rack of sample tubes
+    p.add("Body", s.rbox((0.3, 0.1, 0.07), (0.02, 0.22, top + 0.033), r=0.008, seg=1))
+    for i in range(7):
+        x = -0.1 + i * 0.04
+        p.add("Trim", s.rcyl(0.011, 0.1, (x, 0.22, top + 0.085), seg=8, r=0.003, bevel_seg=1))
+        p.add("Accent", s.rcyl(0.013, 0.016, (x, 0.22, top + 0.141), seg=8, r=0.003, bevel_seg=1))
+    # the microscope (its front along -y here, then turned): a heavy foot, a C-arm, the stage with the light under it,
+    # the nosepiece with three objectives, a binocular head leaning to the user, a focus knob each side
+    m = []
+    roles = []
+
+    def mic(role, *bms):
+        for b in bms:
+            m.append(b); roles.append(role)
+
+    mic("Accent", s.rbox((0.2, 0.27, 0.045), (0, 0, 0.022), r=0.014, seg=2))
+    mic("Body", s.loft([(0.0, 0.055, 0.06, 3, 0, 0.085), (0.1, 0.05, 0.05, 3, 0, 0.1), (0.2, 0.05, 0.05, 3, 0, 0.095),
+                        (0.27, 0.055, 0.07, 3, 0, 0.05), (0.3, 0.055, 0.075, 3, 0, 0.02)], seg=16, round_caps=0.012, loc=(0, 0, 0.04)))
+    mic("Accent", s.rbox((0.17, 0.17, 0.016), (0, -0.02, 0.165), r=0.004, seg=1))
+    mic("Trim", s.rcyl(0.035, 0.03, (0, -0.02, 0.06), seg=14, r=0.004, bevel_seg=1))
+    mic("Trim", s.rcyl(0.038, 0.03, (0, -0.02, 0.29), seg=14, r=0.004, bevel_seg=1))
+    for a in (-1, 0, 1):
+        mic("Trim", s.rcyl(0.012, 0.06 - abs(a) * 0.012, (a * 0.024, -0.02 - (1 - abs(a)) * 0.014, 0.245 + abs(a) * 0.006), seg=10, r=0.002, bevel_seg=1))
+    mic("Body", s.rbox((0.13, 0.12, 0.075), (0, -0.005, 0.345), r=0.02, seg=2, rot=(math.radians(-20), 0, 0)))
+    lean = math.radians(-40)
+    for sx in (-1, 1):
+        mic("Body", s.rcyl(0.02, 0.1, (sx * 0.034, -0.085, 0.395), seg=12, r=0.003, bevel_seg=1, rot=(lean, 0, 0)))
+        mic("Accent", s.rcyl(0.025, 0.03, (sx * 0.034, -0.122, 0.44), seg=12, r=0.005, bevel_seg=1, rot=(lean, 0, 0)))
+        mic("Accent", s.rcyl(0.03, 0.035, (sx * 0.07, 0.085, 0.12), axis="X", seg=14, r=0.005, bevel_seg=1))
+    _turned(m, (-0.63, 0.14, top), math.radians(-50))
+    for role, b in zip(roles, m):
+        p.add(role, b)
+    # the centrifuge: low and wide, a flat lid with a round port, the hinge at the back, a sloped fascia with its display
+    cx, cy = 0.66, 0.17
+    p.add("Body", s.rbox((0.42, 0.36, 0.2), (cx, cy, top + 0.1), r=0.03, seg=2))
+    p.add("Accent", s.rbox((0.4, 0.3, 0.04), (cx, cy + 0.025, top + 0.21), r=0.014, seg=2))
+    p.add("Trim", s.rcyl(0.07, 0.014, (cx, cy + 0.03, top + 0.233), seg=20, r=0.003, bevel_seg=1))
+    p.add("Body", s.rbox((0.3, 0.05, 0.05), (cx, cy + 0.165, top + 0.2), r=0.015, seg=2))
+    p.add("Accent", s.rbox((0.4, 0.05, 0.09), (cx, cy - 0.165, top + 0.135), r=0.008, seg=1, rot=(math.radians(25), 0, 0)))
+    p.add("Eye", s.rbox((0.15, 0.012, 0.05), (cx - 0.09, cy - 0.185, top + 0.142), r=0.004, seg=1, rot=(math.radians(25), 0, 0)))
+    p.add("Trim", s.rcyl(0.02, 0.02, (cx + 0.1, cy - 0.19, top + 0.14), axis="Y", seg=12, r=0.004, bevel_seg=1, rot=(math.radians(25), 0, 0)))
+    p.finish()
+    return export("clinic_bench")
+
+
+def model_med_fridge():
+    """Medical refrigerator 0.7 x 0.68 x 2.0 on four castor feet: a white cabinet, a tall control header with a big
+    temperature readout, a lock and an alarm beacon on top; a door with a broad frame round its window, a long bar
+    handle on standoffs; behind the glass four shelves of boxes and vial trays. Roles here: Trim is the glass, Accent
+    the dark metal and plastic, Eye the readout."""
+    p = Parts()
+    w, d, h = 0.7, 0.66, 1.95
+    z0 = 0.09
+    case = s.rbox((w, d - 0.04, h - z0), (0, 0.02, z0 + (h - z0) / 2), r=0.02, seg=2)
+    hole = s.rbox((w - 0.1, d - 0.1, 1.42), (0, -0.05, 0.93), r=0.01, seg=1)
+    case = s.boolean(case, hole, "DIFFERENCE")
+    s.bevel_edges(case, 0.004, 1, angle=50)
+    p.add("Body", case)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            p.add("Accent", s.rcyl(0.035, 0.1, (sx * 0.27, 0.02 + sy * 0.23, 0.05), seg=12, r=0.006, bevel_seg=1))
+    p.add("Accent", s.grille((0, -0.293, 0.155), 0.5, 0.07, n=5, axis="-Y"))
+    # the header: readout, lock, two keys; the beacon on top
+    zh = h - 0.15
+    p.add("Accent", s.rbox((w - 0.06, 0.016, 0.22), (0, -0.292, zh), r=0.01, seg=1))
+    p.add("Eye", s.rbox((0.26, 0.01, 0.1), (-0.13, -0.302, zh), r=0.006, seg=1))
+    p.add("Body", s.rcyl(0.02, 0.014, (0.14, -0.3, zh + 0.03), axis="Y", seg=12, r=0.003, bevel_seg=1),
+          s.rbox((0.05, 0.012, 0.025), (0.23, -0.3, zh + 0.03), r=0.004, seg=1),
+          s.rbox((0.05, 0.012, 0.025), (0.23, -0.3, zh - 0.03), r=0.004, seg=1),
+          s.rbox((0.05, 0.012, 0.025), (0.14, -0.3, zh - 0.03), r=0.004, seg=1))
+    p.add("Accent", s.rcyl(0.04, 0.02, (0.2, 0.05, h + 0.008), seg=14, r=0.004, bevel_seg=1))
+    p.add("Eye", s.lathe([(0, 0), (0.032, 0), (0.032, 0.03), (0.02, 0.05), (0, 0.055)], seg=14, loc=(0.2, 0.05, h + 0.015)))
+    # shelves and what stands on them
+    for k, z in enumerate((0.36, 0.7, 1.04, 1.36)):
+        p.add("Accent", s.rbox((w - 0.11, d - 0.16, 0.012), (0, -0.01, z), r=0.003, seg=1))
+        for i in range(3):
+            x = -0.19 + i * 0.19
+            kind = (i + k) % 3
+            if kind == 0:
+                p.add("Body", s.rbox((0.15, 0.2, 0.11), (x, -0.05, z + 0.062), r=0.008, seg=1))
+                p.add("Accent", s.rbox((0.152, 0.03, 0.03), (x, -0.138, z + 0.07), r=0.004, seg=1))
+            elif kind == 1:
+                p.add("Accent", s.rbox((0.16, 0.24, 0.035), (x, -0.05, z + 0.024), r=0.006, seg=1))
+                for j in range(3):
+                    for mm in range(4):
+                        p.add("Body", s.rcyl(0.014, 0.07, (x - 0.045 + j * 0.045, -0.135 + mm * 0.055, z + 0.07), seg=8, r=0.003, bevel_seg=1))
+            else:
+                p.add("Body", s.rbox((0.13, 0.13, 0.19), (x, -0.01, z + 0.102), r=0.01, seg=1))
+                p.add("Body", s.rbox((0.13, 0.1, 0.1), (x, -0.14, z + 0.057), r=0.008, seg=1))
+    # the door: a broad frame round the window, the glass, the handle on its standoffs
+    yd = -0.313
+    door = s.rbox((w - 0.02, 0.045, 1.5), (0, yd, 0.93), r=0.012, seg=2)
+    window = s.rbox((w - 0.18, 0.2, 1.32), (0, yd, 0.93), r=0.045, seg=3, vertical_only=False)
+    door = s.boolean(door, window, "DIFFERENCE")
+    s.bevel_edges(door, 0.004, 1, angle=50)
+    p.add("Body", door)
+    p.add("Trim", s.rbox((w - 0.14, 0.012, 1.36), (0, yd, 0.93), r=0.002, seg=1))
+    hx = w / 2 - 0.05
+    p.add("Accent", s.rbox((0.026, 0.026, 0.62), (hx, yd - 0.06, 1.0), r=0.008, seg=2),
+          s.rbox((0.024, 0.06, 0.03), (hx, yd - 0.04, 1.27), r=0.005, seg=1),
+          s.rbox((0.024, 0.06, 0.03), (hx, yd - 0.04, 0.73), r=0.005, seg=1))
+    recentre(p)
+    p.finish()
+    return export("med_fridge")
+
+
 MODELS = {
     "bed_headwall": model_bed_headwall,
     "bed_curtain": model_bed_curtain,
@@ -886,6 +1053,8 @@ MODELS = {
     "waiting_seats": model_waiting_seats,
     "vitals_monitor": model_vitals_monitor,
     "hand_sanitizer": model_hand_sanitizer,
+    "clinic_bench": model_clinic_bench,
+    "med_fridge": model_med_fridge,
 }
 
 

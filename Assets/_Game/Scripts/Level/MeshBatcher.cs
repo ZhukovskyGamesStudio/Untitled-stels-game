@@ -155,10 +155,12 @@ namespace Stealth.Level
         }
 
         /// <summary>Adds a renderer the way it draws now (every material on its submesh); see <see cref="CanMerge(MeshRenderer, out Mesh)"/>.</summary>
-        public void Add(MeshRenderer r, Mesh mesh)
+        public void Add(MeshRenderer r, Mesh mesh) => Add(r, mesh, ChunkOf(r.bounds.center));
+
+        /// <summary>The same into a group the caller names (<paramref name="chunk"/> is only its key).</summary>
+        public void Add(MeshRenderer r, Mesh mesh, Vector3Int chunk)
         {
             var mats = r.sharedMaterials;
-            var chunk = ChunkOf(r.bounds.center);
             var look = BatchLook.Of(r);
             var m = r.transform.localToWorldMatrix;
             int slice = ShapeMaps.SliceOf(r), channel = ShapeMaps.ChannelOf(r);

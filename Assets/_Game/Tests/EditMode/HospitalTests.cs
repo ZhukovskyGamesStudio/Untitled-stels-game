@@ -113,6 +113,70 @@ namespace Stealth.Tests
             Assert.GreaterOrEqual(scanners, rooms * 0.6f, $"scanners in the imaging rooms ({scanners} of {rooms})");
         }
 
+        /// <summary>
+        /// A hospital shares the office's room types but not its rooms: the lab is a clinical one (no electronics bench, no
+        /// robot, no kitchen fridge), one a floor; no meeting rooms; its offices are consulting rooms, the records and
+        /// on-call rooms — not one desk room repeated.
+        /// </summary>
+        [Test]
+        public void TheLabsAndOfficesAreTheHospitalsOwn()
+        {
+            int labs = 0, benched = 0, consulting = 0, withDesk = 0;
+            var practices = new HashSet<Practice>();
+            foreach (var l in Hospitals())
+            {
+                string name = $"{l.Seed}/{l.LevelIndex}";
+                List<PropKind> In(PlanRoom r) => l.Props.Where(p => l.Plan.RoomAt(p.Position + Vector3.up * 0.3f) == r).Select(p => p.Kind).ToList();
+                Assert.AreEqual(0, l.Rooms.Count(r => r.Type == RoomType.Meeting), $"{name}: meeting rooms");
+                for (int f = 0; f < l.Floors; f++)
+                    Assert.LessOrEqual(l.Rooms.Count(r => r.Type == RoomType.Lab && r.Floor == f), 1, $"{name}: labs on floor {f}");
+                foreach (var p in l.Props)
+                    Assert.IsFalse(p.Kind is PropKind.LabBench or PropKind.RobotTable or PropKind.RobotArm or PropKind.ScopeCart or PropKind.ExecutiveDesk or PropKind.ConferenceTable,
+                        $"{name}: {p.Kind} at {p.Position}");
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.Lab))
+                {
+                    var kinds = In(r);
+                    labs++;
+                    if (kinds.Contains(PropKind.ClinicBench)) benched++;
+                    Assert.IsFalse(kinds.Contains(PropKind.Fridge), $"{name}: the kitchen's fridge in the lab {r.Id}");
+                }
+                foreach (var r in l.Rooms.Where(r => r.Type == RoomType.Office && r.Area >= 10f && r.Id != l.VaultRoom))
+                {
+                    var practice = Furnisher.PracticeOf(l.Seed, r.Id);
+                    practices.Add(practice);
+                    if (practice != Practice.Consulting) continue;
+                    consulting++;
+                    if (In(r).Contains(PropKind.DoctorDesk)) withDesk++;
+                }
+            }
+            Assert.Greater(labs, 0, "labs");
+            Assert.GreaterOrEqual(benched, labs * 0.9f, $"labs with a clinical bench: {benched} of {labs}");
+            Assert.AreEqual(3, practices.Count, "every practice among the offices");
+            Assert.GreaterOrEqual(withDesk, consulting * 0.8f, $"consulting rooms with the doctor's desk: {withDesk} of {consulting}");
+        }
+
+        /// <summary>The lobby's rows of waiting seats in the middle stand back to back, not seat into seat.</summary>
+        [Test]
+        public void WaitingSeatsInTheMiddleStandBackToBack()
+        {
+            int pairs = 0;
+            foreach (var l in Hospitals())
+            {
+                var seats = l.Props.Where(p => p.Kind == PropKind.WaitingSeats).ToList();
+                for (int i = 0; i < seats.Count; i++)
+                    for (int j = i + 1; j < seats.Count; j++)
+                    {
+                        var d = seats[j].Position - seats[i].Position;
+                        if (Mathf.Abs(d.y) > 0.5f || d.magnitude > 0.75f) continue;
+                        // the model's front is its +z in the game: each looks away from the other
+                        var front = Quaternion.Euler(0f, seats[i].RotationY, 0f) * Vector3.forward;
+                        Assert.Less(Vector3.Dot(front, d.normalized), -0.9f, $"{l.Seed}/{l.LevelIndex}: seats at {seats[i].Position} face the row behind them");
+                        pairs++;
+                    }
+            }
+            Assert.Greater(pairs, 0, "rows back to back in the corpus");
+        }
+
         [Test]
         public void TheHospitalIsDressedAsOneInEveryStyle()
         {

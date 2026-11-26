@@ -9,7 +9,7 @@ namespace Stealth.Level
     {
         // the house and its plan
         public const int HouseKind = 0x4B1D, HouseKindSeed = 0x5EED, HouseTitle = 0x4E41, HouseSize = 0x512E, Program = 0x9206, PlanAttempt = 0xBAD;
-        public const int Furniture = 0xF0E, StorageRoom = 0x5702, RaisedVents = 0x4856, Terminals = 0x7E41, Locks = 0x10C4;
+        public const int Furniture = 0xF0E, Practice = 0xD0C7, StorageRoom = 0x5702, RaisedVents = 0x4856, Terminals = 0x7E41, Locks = 0x10C4;
         public const int ChargingRoom = 0xC4A6, Wards = 0x3A2D, Vents = 0x7E47, VentLids = 0x6A7E, VentClimbs = 0xC1B;
         public const int Utilities = 0x51E7, City = 0xC17E, CityDetail = 0xC1D7, Decor = 0x0DECA7, StreetDoors = 0xD00E;
         public const int Railings = 0x57A1, StairLooks = 0x57A3, PropVariants = 0x7A21, SpiderWebs = 0x5E8, Screens = 0x5C4E, Pictures = 0x91C7, Ruins = 0x2B1C, RoomLooks = 0x100C, WallThings = 0x7B19;

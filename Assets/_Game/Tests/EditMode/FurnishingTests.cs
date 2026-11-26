@@ -22,7 +22,8 @@ namespace Stealth.Tests
             foreach (var l in Houses())
                 foreach (var r in l.Plan.Rooms)
                 {
-                    if (!Furnisher.Signatures.TryGetValue(r.Type, out var kinds) || r.Id == l.VaultRoom) continue;
+                    var kinds = Furnisher.SignaturesOf(l, r); // (a hospital's office by its practice)
+                    if (kinds == null || r.Id == l.VaultRoom) continue;
                     rooms[r.Type] = (rooms.TryGetValue(r.Type, out var n) ? n : 0) + 1;
                     bool has = l.Props.Any(p => kinds.Contains(p.Kind) && l.Plan.RoomAt(p.Position + Vector3.up * 0.3f) == r);
                     if (!has) without[r.Type] = (without.TryGetValue(r.Type, out var m) ? m : 0) + 1;

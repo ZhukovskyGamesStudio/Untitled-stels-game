@@ -29,6 +29,8 @@ namespace Stealth.Player
         public static bool NewTextures { get; set; } = true;
         /// <summary>How big the textures are read (<see cref="TextureSizeRules"/>). Picture only.</summary>
         public static TextureSize TextureSize { get; set; } = TextureSizeRules.Default;
+        /// <summary>The frame rate and the frame's time in a corner of the screen (<see cref="FrameMeter"/>).</summary>
+        public static bool ShowFps { get; set; }
         /// <summary>Frames wait for the screen's refresh: no tearing.</summary>
         public static bool VSync { get; set; } = true;
 
@@ -53,6 +55,7 @@ namespace Stealth.Player
             MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "music", DefaultMusicVolume));
             Smoothing = SmoothingRules.Clamp(PlayerPrefs.GetInt(Prefix + "smoothing", (int)SmoothingRules.Default));
             VSync = PlayerPrefs.GetInt(Prefix + "vsync", 1) == 1;
+            ShowFps = PlayerPrefs.GetInt(Prefix + "showFps", 0) == 1;
             NewLighting = PlayerPrefs.GetInt(Prefix + "lighting", 1) == 1;
             NewTextures = PlayerPrefs.GetInt(Prefix + "textures", 1) == 1;
             TextureSize = TextureSizeRules.Clamp(PlayerPrefs.GetInt(Prefix + "textureSize", (int)TextureSizeRules.Default));
@@ -69,6 +72,7 @@ namespace Stealth.Player
             PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
             PlayerPrefs.SetInt(Prefix + "smoothing", (int)Smoothing);
             PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "showFps", ShowFps ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "lighting", NewLighting ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "textures", NewTextures ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "textureSize", (int)TextureSize);
@@ -87,6 +91,7 @@ namespace Stealth.Player
             MusicVolume = DefaultMusicVolume;
             Smoothing = SmoothingRules.Default;
             VSync = true;
+            ShowFps = false;
             NewLighting = true;
             NewTextures = true;
             TextureSize = TextureSizeRules.Default;

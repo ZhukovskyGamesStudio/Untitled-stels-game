@@ -364,6 +364,8 @@ namespace Stealth.Level
         float m_Way = 1f; // a both-ways door: +1 opens to +Z, −1 to −Z
         bool m_Mirrored;
         public bool IsOpen => m_Open.Value > 0.5f;
+        /// <summary>Shut all the way, both leaves: nothing is seen past it (<see cref="RoomCulling"/>; a door on its way counts as open).</summary>
+        public bool Shut => m_Open.Value <= 0f && m_OpenB.Value <= 0f && m_Spin <= 0f;
         /// <summary>The vault's door a player has opened (unlocking alone does not move it).</summary>
         public bool SwungOpen => Vault && World.IsOpened(OpenKeys.Stage(JobStage.VaultOpen));
         public float OpenAmount => m_Open.Value;

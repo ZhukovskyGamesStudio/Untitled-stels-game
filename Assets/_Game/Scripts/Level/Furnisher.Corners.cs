@@ -55,6 +55,8 @@ namespace Stealth.Level
                         RoomType.Lounge => Pick(PropKind.FloorLamp, PropKind.Plant, PropKind.PlanterLarge),
                         RoomType.Lobby => Pick(PropKind.FloorLamp, PropKind.PlanterLarge, PropKind.UmbrellaStand),
                         RoomType.Hall => Pick(PropKind.PlanterLarge, PropKind.UmbrellaStand, PropKind.Plant),
+                        RoomType.Office when Clinic => Pick(PropKind.Plant, PropKind.CoatRack, PropKind.TrashBin),
+                        RoomType.Lab when Clinic => Pick(PropKind.TrashBin, PropKind.BarStool),
                         RoomType.Office => Pick(PropKind.Plant, PropKind.CoatRack, PropKind.FilingCabinet),
                         RoomType.OpenSpace => Pick(PropKind.Plant, PropKind.TrashBin, PropKind.FilePedestal),
                         RoomType.Meeting => Pick(PropKind.Plant, PropKind.Flipchart),

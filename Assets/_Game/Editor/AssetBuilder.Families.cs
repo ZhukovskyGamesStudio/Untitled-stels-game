@@ -519,6 +519,14 @@ namespace Stealth.EditorTools
             list.AddRange(BuildDerelictProps());
             if (!AssetDatabase.IsValidFolder(ExternalModels)) return list.ToArray();
             EnsureFolder($"{KitPrefabsDir}/Scanned");
+            // the scans are heavy (the potted plant 70 thousand triangles, a box 17): the importer makes their lower
+            // levels of detail, the renderer picks one by the size on screen — a room of plants was a third of a frame's triangles
+            foreach (var path in Directory.GetFiles(ExternalModels, "*.fbx"))
+                if (AssetImporter.GetAtPath(path.Replace('\\', '/')) is ModelImporter scan && !scan.generateMeshLods)
+                {
+                    scan.generateMeshLods = true;
+                    scan.SaveAndReimport();
+                }
             foreach (var (id, ours) in RealisticProps)
             {
                 var fbx = $"{ExternalModels}/{id}.fbx";
