@@ -92,6 +92,8 @@ namespace Stealth.UI
         public Button Lighting;
         [Tooltip("The models' baked maps and the 2K scans, new or old (GameSettings.NewTextures); its label names the current one.")]
         public Button Textures;
+        [Tooltip("How big the textures are read: full, half or a quarter (GameSettings.TextureSize); its label names the current one.")]
+        public Button TextureSize;
         public Toggle VSync;
         public Button Defaults;
         public Button Done;
@@ -161,6 +163,7 @@ namespace Stealth.UI
             if (VSync != null) VSync.onValueChanged.AddListener(v => GameSettings.VSync = v);
             if (Lighting != null) Lighting.onClick.AddListener(() => GameSettings.NewLighting = !GameSettings.NewLighting);
             if (Textures != null) Textures.onClick.AddListener(() => GameSettings.NewTextures = !GameSettings.NewTextures);
+            if (TextureSize != null) TextureSize.onClick.AddListener(() => GameSettings.TextureSize = TextureSizeRules.Next(GameSettings.TextureSize));
         }
 
         /// <summary>The next language of <see cref="Loc.All"/> (saved at once; every label follows it).</summary>
@@ -333,6 +336,7 @@ namespace Stealth.UI
             if (Smoothing != null) SetLabel(Smoothing, Loc.F("menu.smoothing", Loc.T(SmoothingRules.Key(GameSettings.Smoothing))));
             if (Lighting != null) SetLabel(Lighting, Loc.T(GameSettings.NewLighting ? "menu.lighting_new" : "menu.lighting_old"));
             if (Textures != null) SetLabel(Textures, Loc.T(GameSettings.NewTextures ? "menu.textures_new" : "menu.textures_old"));
+            if (TextureSize != null) SetLabel(TextureSize, Loc.T(TextureSizeRules.Key(GameSettings.TextureSize)));
             if (Language != null)
             {
                 var label = Language.GetComponentInChildren<Text>();

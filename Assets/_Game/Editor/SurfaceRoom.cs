@@ -291,6 +291,10 @@ namespace Stealth.EditorTools
                         made.Add(go);
                     }
                     Put("FilingCabinet", -1.9f, -2.5f, 0f);
+                    // the view "drawer": its drawers pulled out, as a player leaves them searching
+                    if (only != null && only.Contains("drawer"))
+                        foreach (var tr in made[made.Count - 1].GetComponentsInChildren<Transform>(true))
+                            if (tr.name.StartsWith("BodyDrawer") && tr.parent != null && !tr.parent.name.StartsWith("BodyDrawer")) tr.position += tr.root.forward * 0.4f;
                     Put("Credenza", -0.4f, -2.5f, 0f);
                     Put("MirrorSink", 1.1f, -2.5f, 0f);
                     Put("VendingMachine", 2.4f, -2.4f, 0f);
@@ -339,13 +343,14 @@ namespace Stealth.EditorTools
                         ("flash", new Vector3(1.2f, 1.6f, 0.9f), new Vector3(2.2f, 0.9f, 2.6f), 60f),
                         ("cooler", new Vector3(1.05f, 1.25f, 1.8f), new Vector3(1.4f, 1.0f, 2.6f), 40f),
                         ("cabinet", new Vector3(-1.45f, 1.3f, -1.5f), new Vector3(-1.9f, 0.7f, -2.4f), 50f),
+                        ("drawer", new Vector3(-1.8f, 1.95f, -1.55f), new Vector3(-1.9f, 0.95f, -2.25f), 60f),
                     })
                     {
                         if (only != null && !only.Contains(view)) continue;
                         cam.transform.position = at;
                         cam.transform.LookAt(look);
                         cam.fieldOfView = fov;
-                        bool flash = view == "flash"; // the lamps off, the player's flashlight on
+                        bool flash = view is "flash" or "drawer"; // the lamps off, the player's flashlight on
                         var lamps = Object.FindObjectsByType<Light>().Where(l => l.name == "Lamp").ToList();
                         foreach (var l in lamps) l.enabled = !flash;
                         Light beam = null;
@@ -359,12 +364,12 @@ namespace Stealth.EditorTools
                             beam.intensity = 8f;
                             beam.color = new Color(1f, 0.93f, 0.8f);
                             beam.shadows = LightShadows.Soft;
-                            beam.shadowBias = 0.03f;
-                            beam.shadowNormalBias = 0.2f;
+                            beam.shadowBias = Env("BIAS", 0.03f);          // BIAS / NBIAS: to try other shadow biases
+                            beam.shadowNormalBias = Env("NBIAS", 0.2f);
                             var data = beam.gameObject.AddComponent<UniversalAdditionalLightData>();
                             var so = new SerializedObject(data);
                             so.FindProperty("m_UsePipelineSettings").boolValue = false;
-                            so.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue = after ? 2 : 1;
+                            so.FindProperty("m_AdditionalLightsShadowResolutionTier").intValue = (int)Env("TIER", after ? 2 : 1); // (TIER=1: the game's flashlight)
                             so.ApplyModifiedPropertiesWithoutUndo();
                             beam.transform.SetPositionAndRotation(cam.transform.TransformPoint(0.15f, -0.19f, 0.48f), cam.transform.rotation);
                         }

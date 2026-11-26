@@ -27,6 +27,8 @@ namespace Stealth.Player
         public static bool NewLighting { get; set; } = true;
         /// <summary>The models' own baked maps and the 2K surface scans (off: without the maps, the scans as they were at 1K). Picture only.</summary>
         public static bool NewTextures { get; set; } = true;
+        /// <summary>How big the textures are read (<see cref="TextureSizeRules"/>). Picture only.</summary>
+        public static TextureSize TextureSize { get; set; } = TextureSizeRules.Default;
         /// <summary>Frames wait for the screen's refresh: no tearing.</summary>
         public static bool VSync { get; set; } = true;
 
@@ -53,6 +55,7 @@ namespace Stealth.Player
             VSync = PlayerPrefs.GetInt(Prefix + "vsync", 1) == 1;
             NewLighting = PlayerPrefs.GetInt(Prefix + "lighting", 1) == 1;
             NewTextures = PlayerPrefs.GetInt(Prefix + "textures", 1) == 1;
+            TextureSize = TextureSizeRules.Clamp(PlayerPrefs.GetInt(Prefix + "textureSize", (int)TextureSizeRules.Default));
         }
 
         public static void Save()
@@ -68,6 +71,7 @@ namespace Stealth.Player
             PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "lighting", NewLighting ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "textures", NewTextures ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "textureSize", (int)TextureSize);
             Controls.Save();
             PlayerPrefs.Save();
         }
@@ -85,6 +89,7 @@ namespace Stealth.Player
             VSync = true;
             NewLighting = true;
             NewTextures = true;
+            TextureSize = TextureSizeRules.Default;
         }
     }
 }

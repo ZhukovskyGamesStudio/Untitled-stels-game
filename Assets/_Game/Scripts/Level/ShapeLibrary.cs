@@ -33,6 +33,27 @@ namespace Stealth.Level
         static ShapeLibrary s_Bound;
         static Texture2DArray s_Normals, s_Masks;
         static bool s_Detail = true;
+        static int s_Skip;
+
+        /// <summary>
+        /// The detail levels of the baked maps left out from the top (Settings → Picture: texture size; 0 the full 2K).
+        /// A change packs the arrays again, from the level it names down. The pictures themselves ignore the engine's
+        /// global limit (the builder imports them so): the level is chosen here.
+        /// </summary>
+        public static int Skip
+        {
+            get => s_Skip;
+            set
+            {
+                value = Mathf.Max(0, value);
+                if (s_Skip == value) return;
+                s_Skip = value;
+                var bound = s_Bound;
+                if (bound == null) return;
+                s_Bound = null;
+                bound.Bind();
+            }
+        }
 
         /// <summary>
         /// The models and surfaces at their new detail (Settings → Look: "new models"). Off, the 2K surface textures are
@@ -84,20 +105,24 @@ namespace Stealth.Level
             s_Bound = this;
             Sharpen();
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null || SystemInfo.copyTextureSupport == CopyTextureSupport.None) return; // (tests, a server: nothing draws)
-            s_Normals = Pack(Normals, "ShapeNormals");
-            s_Masks = Pack(Masks, "ShapeMasks");
+            if (s_Normals != null) Destroy(s_Normals);
+            if (s_Masks != null) Destroy(s_Masks);
+            s_Normals = Pack(Normals, "ShapeNormals", s_Skip);
+            s_Masks = Pack(Masks, "ShapeMasks", s_Skip);
             if (s_Normals == null || s_Masks == null) return;
             Shader.SetGlobalTexture(NormalsId, s_Normals);
             Shader.SetGlobalTexture(MasksId, s_Masks);
             Shader.SetGlobalFloat(BoundId, 1f);
         }
 
-        static Texture2DArray Pack(Texture2D[] pictures, string name)
+        static Texture2DArray Pack(Texture2D[] pictures, string name, int skip)
         {
             Texture2D first = null;
             foreach (var p in pictures) if (p != null) { first = p; break; }
             if (first == null) return null;
-            var array = new Texture2DArray(first.width, first.height, pictures.Length, first.graphicsFormat, TextureCreationFlags.MipChain)
+            skip = Mathf.Clamp(skip, 0, Mathf.Max(0, first.mipmapCount - 3)); // (blocks of 4 pixels: the last levels stay)
+            int levels = first.mipmapCount - skip;
+            var array = new Texture2DArray(Mathf.Max(1, first.width >> skip), Mathf.Max(1, first.height >> skip), pictures.Length, first.graphicsFormat, TextureCreationFlags.MipChain, levels)
             {
                 name = name, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4, hideFlags = HideFlags.HideAndDontSave,
             };
@@ -110,7 +135,7 @@ namespace Stealth.Level
                     Debug.LogWarning($"[Shapes] {p.name}: {p.width}×{p.height} {p.graphicsFormat}, the others are {first.width}×{first.height} {first.graphicsFormat} — its model goes without its maps");
                     continue;
                 }
-                for (int mip = 0; mip < p.mipmapCount; mip++) Graphics.CopyTexture(p, 0, mip, array, i, mip); // (level by level: the whole-element copy left the smaller levels unwritten)
+                for (int mip = 0; mip < levels; mip++) Graphics.CopyTexture(p, 0, mip + skip, array, i, mip); // (level by level: the whole-element copy left the smaller levels unwritten)
             }
             return array;
         }
@@ -119,6 +144,7 @@ namespace Stealth.Level
         static void Reset()
         {
             s_Bound = null;
+            s_Skip = 0;
             s_Normals = s_Masks = null;
             Shader.SetGlobalFloat(BoundId, 0f);
         }

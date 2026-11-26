@@ -36,10 +36,11 @@ namespace Stealth.Level
         /// <summary>The piece keeps the floor before its front clear: it opens there, or it is looked at from there.</summary>
         public static bool NeedsFront(PropKind k) => Opens.Contains(k) || Faced.Contains(k);
 
-        /// <summary>Things one shoves aside to get at a door or a drawer: they may stand in front of it.</summary>
+        /// <summary>Things one shoves aside to get at a door or a drawer: they may stand in front of it (not an armchair: a
+        /// row of them in front of a cupboard read as the cupboard opening into them).</summary>
         static readonly HashSet<PropKind> Shoved = new()
         {
-            PropKind.Chair, PropKind.GuestChair, PropKind.MeetingChair, PropKind.OperatorChair, PropKind.BarStool, PropKind.Wheelchair,
+            PropKind.Chair, PropKind.MeetingChair, PropKind.OperatorChair, PropKind.BarStool, PropKind.Wheelchair,
             PropKind.TrashBin, PropKind.PaperBin, PropKind.SanitaryBin,
         };
 

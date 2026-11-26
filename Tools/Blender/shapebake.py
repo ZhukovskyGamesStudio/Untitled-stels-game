@@ -16,12 +16,16 @@ the model that exists only for the bake —
 The detailed version: a copy of every part, cut fine and pushed about by a low wave where the part is sheet (waves=),
 plus the detail meshes. The game mesh only says where the pixels are.
 
-The first UV set stays as it was (metres: the tiling materials go on tiling); the FBX carries both. Faces nobody can
-see while everything is shut (the inside of a carcass, of a drawer) get a third of the texels' size.
+The first UV set stays as it was (metres: the tiling materials go on tiling); the FBX carries both. Every face gets the
+same texel size, those nobody sees while everything is shut (the inside of a drawer, of a stall's door) too: shrunk to a
+third, their islands read their neighbours' pictures a few mip levels down and stretched them over the whole drawer floor.
+Islands keep MARGIN pixels apart and the bake extends each MARGIN out, so the game's lower mip levels (and its half and
+quarter resolutions) stay inside an island. Those hidden faces are baked as if open: their occlusion is only the tight
+corners (the cavity), not the shut carcass around them — an opened drawer was a dark box.
 
 A model's script names its details before it exports:   shapebake.detail("filing_cabinet", [bmesh, …], waves=0.0005)
 shapes.export_fbx bakes the models named in PILOT (or all with SHAPEBAKE=all, none with SHAPEBAKE=0); the pictures go
-to <models root>/../Textures/Shapes. Size: SHAPEBAKE_SIZE, or by the model's seen area (TEXELS per metre, 512..2048).
+to <models root>/../Textures/Shapes. Size: SHAPEBAKE_SIZE, else SIZE (2048: the game reads it full, half or a quarter).
 """
 import math
 import os
@@ -41,12 +45,15 @@ EDGE_REACH = 0.006   # how near an outer edge counts as edge, metres (under the 
 CAVITY_REACH = 0.05  # how tight a corner counts as cavity, metres
 AO_REACH = 0.6       # how far the occlusion looks, metres
 TEXELS = 800         # texels per metre wanted on what is seen
-HIDDEN = 0.3         # the texel size of what is never seen while all is shut, of the seen
+HIDDEN = 1.0         # the texel size of what is never seen while all is shut, of the seen (0.3 leaked: see the top)
+SIZE = 2048          # the pictures' side
+MARGIN = 16          # pixels between islands and of the bake's extension past them (a quarter of it at a quarter's mip 2)
 SAMPLES = 32
 CAGE = 0.004         # how far off the game mesh the detailed version is looked for, metres (details stand out less)
 WAVE = 0.35          # metres across a wave of sheet metal
 
 _details = {}        # model name -> (list of bmeshes, waves amplitude in metres, names of the parts that wave)
+_last_hidden = []    # per object of the last unwrap, per face: never seen while all is shut
 
 
 def detail(name, bms=(), waves=0.0, wavy=("Body",)):
@@ -107,8 +114,9 @@ def _hidden(objs, floor):
 
 def unwrap(objs, size, floor=True):
     """The second UV set of all the objects together: islands by angle, one texel density (hidden faces a third of
-    it), packed into one square. Returns the seen area, metres²."""
-    margin = 6.0 / size
+    it), packed into one square. Returns the seen area, metres²; the hidden faces' flags are left in _last_hidden."""
+    global _last_hidden
+    margin = float(MARGIN) / size
     for o in objs:
         me = o.data
         if LAYER in me.uv_layers:
@@ -138,7 +146,8 @@ def unwrap(objs, size, floor=True):
     edit(project)
 
     seen = 0.0
-    for o, flags in zip(objs, _hidden(objs, floor)):
+    _last_hidden = _hidden(objs, floor)
+    for o, flags in zip(objs, _last_hidden):
         uv = o.data.uv_layers[LAYER].data
         for p, hidden in zip(o.data.polygons, flags):
             if not hidden:
@@ -256,15 +265,10 @@ def _detailed(objs, name):
 def bake(objs, name, out_dir, size=None, floor=True):
     """Unwraps and bakes (see the module's text). Returns the paths of the two pictures."""
     objs = list(objs)
-    probe = 1024
-    seen = unwrap(objs, probe, floor)
     if size is None:
         env = os.environ.get("SHAPEBAKE_SIZE")
-        hidden = sum(p.area for o in objs for p in o.data.polygons) - seen
-        side = math.sqrt((seen + hidden * HIDDEN * HIDDEN) / 0.6) * TEXELS    # (the packing fills about six tenths of the square)
-        size = int(env) if env else min(2048, max(512, 1 << int(math.ceil(math.log2(max(side, 1.0))))))
-    if size != probe:
-        unwrap(objs, size, floor)
+        size = int(env) if env else SIZE
+    seen = unwrap(objs, size, floor)
 
     s = bpy.context.scene
     was_engine = s.render.engine
@@ -279,7 +283,7 @@ def bake(objs, name, out_dir, size=None, floor=True):
     bk.use_cage = False
     bk.cage_extrusion = CAGE
     bk.max_ray_distance = CAGE * 2
-    bk.margin = 4
+    bk.margin = MARGIN
     bk.margin_type = "EXTEND"
     bk.use_clear = False
     bk.normal_space = "TANGENT"
@@ -337,6 +341,10 @@ def bake(objs, name, out_dir, size=None, floor=True):
     mask[..., 0] = np.clip(px(images["ao"])[..., 0], 0, 1)
     mask[..., 1] = np.clip(px(images["edge"])[..., 0], 0, 1)
     mask[..., 2] = np.clip(px(images["cavity"])[..., 0], 0, 1)
+    # the hidden faces as if open: their occlusion only the tight corners, on their islands and the margins round them
+    hidden, shown = _cover(objs, size)
+    near = _grow(hidden, MARGIN) & ~shown
+    mask[..., 0] = np.where(near, np.clip(0.35 + 0.65 * mask[..., 2], 0, 1), mask[..., 0])
     os.makedirs(out_dir, exist_ok=True)
     paths = []
     for suffix, data in (("n", nrm), ("m", mask)):
@@ -370,6 +378,44 @@ def bake(objs, name, out_dir, size=None, floor=True):
     s.render.engine = was_engine
     print(f"SHAPEBAKE {name}: {size} px, {seen:.2f} m2 seen -> {paths[0]}")
     return paths
+
+
+def _cover(objs, size):
+    """Which pixels the hidden faces' islands cover, and which the seen faces' (the Shape UV set, rows from the bottom)."""
+    hidden = np.zeros((size, size), bool)
+    shown = np.zeros((size, size), bool)
+    for o, flags in zip(objs, _last_hidden):
+        me = o.data
+        uv = me.uv_layers[LAYER].data
+        me.calc_loop_triangles()
+        for tri in me.loop_triangles:
+            into = hidden if flags[tri.polygon_index] else shown
+            p = np.array([uv[i].uv[:] for i in tri.loops]) * size
+            lo = np.floor(p.min(0)).astype(int).clip(0, size - 1)
+            hi = np.ceil(p.max(0)).astype(int).clip(0, size - 1)
+            xs, ys = np.meshgrid(np.arange(lo[0], hi[0] + 1) + 0.5, np.arange(lo[1], hi[1] + 1) + 0.5)
+            a, b, c = p
+            d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
+            if abs(d) < 1e-12:
+                continue
+            w0 = ((b[1] - c[1]) * (xs - c[0]) + (c[0] - b[0]) * (ys - c[1])) / d
+            w1 = ((c[1] - a[1]) * (xs - c[0]) + (a[0] - c[0]) * (ys - c[1])) / d
+            inside = (w0 >= -0.01) & (w1 >= -0.01) & (1 - w0 - w1 >= -0.01)
+            into[(ys[inside] - 0.5).astype(int), (xs[inside] - 0.5).astype(int)] = True
+    return hidden, shown
+
+
+def _grow(m, n):
+    """A pixel mask grown by n pixels (square steps)."""
+    g = m.copy()
+    for _ in range(n):
+        h = g.copy()
+        h[1:, :] |= g[:-1, :]
+        h[:-1, :] |= g[1:, :]
+        h[:, 1:] |= g[:, :-1]
+        h[:, :-1] |= g[:, 1:]
+        g = h
+    return g
 
 
 def for_export(path, objs):

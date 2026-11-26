@@ -13,7 +13,7 @@ namespace Stealth.EditorTools
         const string ShapeLibraryPath = DataDir + "/ShapeLibrary.asset";
 
         /// <summary>The side of every model's normals and of its masks in the game (the arrays want one size each; a picture baked bigger is brought down).</summary>
-        public const int ShapeNormalSize = 1024, ShapeMaskSize = 512;
+        public const int ShapeNormalSize = 2048, ShapeMaskSize = 1024;
 
         static ShapeLibrary s_Shapes;
 
@@ -93,7 +93,8 @@ namespace Stealth.EditorTools
             if (AssetImporter.GetAtPath(path) is not TextureImporter imp) return;
             var platform = imp.GetPlatformTextureSettings("Standalone");
             if (imp.textureType == TextureImporterType.Default && !imp.sRGBTexture && imp.mipmapEnabled && imp.wrapMode == TextureWrapMode.Clamp
-                && platform.overridden && platform.format == format && platform.maxTextureSize == size && imp.npotScale == TextureImporterNPOTScale.ToNearest) return;
+                && platform.overridden && platform.format == format && platform.maxTextureSize == size && imp.npotScale == TextureImporterNPOTScale.ToNearest
+                && imp.ignoreMipmapLimit) return;
             imp.textureType = TextureImporterType.Default;
             imp.sRGBTexture = false;
             imp.mipmapEnabled = true;
@@ -102,6 +103,7 @@ namespace Stealth.EditorTools
             imp.wrapMode = TextureWrapMode.Clamp;
             imp.npotScale = TextureImporterNPOTScale.ToNearest;
             imp.maxTextureSize = size;
+            imp.ignoreMipmapLimit = true; // (ShapeLibrary packs the arrays from the level the texture size setting names)
             imp.SetPlatformTextureSettings(new TextureImporterPlatformSettings
             {
                 name = "Standalone", overridden = true, maxTextureSize = size, format = format, textureCompression = TextureImporterCompression.CompressedHQ,

@@ -58,6 +58,10 @@ namespace Stealth.Game
             VisualStyles.OldLook = !GameSettings.NewLighting;
             Shader.SetGlobalFloat(ShapesOffId, GameSettings.NewTextures ? 0f : 1f);
             ShapeLibrary.Detail = GameSettings.NewTextures;
+            // the texture size: every texture's top levels skipped, the models' baked maps packed from the same level
+            int skip = TextureSizeRules.Skip(GameSettings.TextureSize);
+            if (QualitySettings.globalTextureMipmapLimit != skip) QualitySettings.globalTextureMipmapLimit = skip;
+            ShapeLibrary.Skip = skip;
             var style = VisualStyles.Current;
             bool fits = TemporalFits(style != null ? style.Screen : null);
             var choice = GameSettings.Smoothing;

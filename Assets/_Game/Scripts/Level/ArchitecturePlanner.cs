@@ -485,6 +485,10 @@ namespace Stealth.Level
             void Spot(Vector3 at, float half) => list.Add((LevelLayout.FloorOf(at.y), new Rect(at.x - half, at.z - half, 2f * half, 2f * half)));
             foreach (var s in UtilityPlan.SwitchSpots(layout, shell)) Spot(s.Position, 0.08f);
             foreach (var (at, _) in UtilityPlan.PanelSpots(layout, shell)) Spot(at, 0.36f);
+            // what the house puts on its walls besides (the vault's consoles with their levers and lock display), and the
+            // flights of stairs that run along a wall (a poster there was half behind the steps)
+            foreach (var c in layout.VaultConsoles) Spot(c.position, 0.6f);
+            foreach (var s in layout.Stairs) list.Add((s.Floor, PlanGenerator.StairArea(s, 0.2f)));
             return list;
         }
 

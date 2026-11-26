@@ -789,6 +789,13 @@ def model_workbench():
     return export("workbench")
 
 
+# the programming console's docking shelf (lost in the george merge)
+SHELF_TOP = 1.0
+SLOT_PITCH = 0.47
+SLOT_Y = 0.215
+SLOTS_X = [(-1.5 + k) * SLOT_PITCH for k in range(4)]  # -0.705, -0.235, 0.235, 0.705
+
+
 def model_programmer_console():
     """Robot programming terminal: a sloped control desk (keyboard, joystick, buttons, a docked robot arm in its
     cradle) in front of a long shelf at z = 1.0 with four docking slots for 0.43 m cubes, three monitors above them."""
