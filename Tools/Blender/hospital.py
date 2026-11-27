@@ -1036,6 +1036,93 @@ def model_med_fridge():
     return export("med_fridge")
 
 
+def model_med_workstation():
+    """A hospital's computer: a workstation on wheels, 0.6 x 0.68 x 1.5 — not an office desk. A chunky moulded base with
+    the battery in it (a charge strip glows on its nose) on four big hooded castors, a broad two-stage column with a
+    collar, one deep moulded head (two locked medication drawers in its face, the keyboard on a tray pulled out of it, a
+    work mat on top) with a push rail wrapped round its back, a monitor with a thick bezel on a stout arm (a patient's
+    chart: a header, rows, a pane, bars — Eye), a wire basket with a sharps bin on the column's front, a hand scanner
+    in its cradle and a pump bottle on the top. The nurse stands at -Y."""
+    p = Parts()
+    # the base: one moulded wedge, the battery's hump at its back, big castors under hoods
+    p.add("Body", s.rbox((0.5, 0.56, 0.1), (0, 0.02, 0.15), r=0.04, seg=3, taper=(0.8, 0.86)))
+    p.add("Body", s.rbox((0.32, 0.2, 0.1), (0, 0.17, 0.235), r=0.03, seg=3, taper=(0.86, 0.8)))
+    p.add("Eye", s.rbox((0.16, 0.022, 0.008), (0, -0.19, 0.2), r=0.003, seg=1))
+    p.add("Accent", s.rbox((0.42, 0.012, 0.03), (0, -0.262, 0.125), r=0.005, seg=1))            # the kick strip
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            x, y = sx * 0.21, 0.02 + sy * 0.23
+            hcaster(p, x, y, 0.1, r=0.055, w=0.04)
+            p.add("Body", s.rbox((0.1, 0.15, 0.05), (x, y, 0.125), r=0.022, seg=2))
+    # the column: a broad outer stage, the collar, the inner stage up into the head
+    p.add("Body", s.rbox((0.17, 0.12, 0.5), (0, 0.08, 0.47), r=0.04, seg=3, vertical_only=True))
+    p.add("Accent", s.rbox((0.19, 0.14, 0.045), (0, 0.08, 0.73), r=0.04, seg=2))
+    p.add("Trim", s.rbox((0.125, 0.085, 0.22), (0, 0.08, 0.84), r=0.03, seg=2, vertical_only=True))
+    p.add("Accent", s.rbox((0.014, 0.06, 0.02), (0.1, 0.05, 0.735), r=0.005, seg=1))             # the height lever
+    # the head: one deep moulded unit
+    top = 1.06
+    p.add("Body", s.rbox((0.58, 0.46, 0.15), (0, 0.04, top - 0.075), r=0.04, seg=3, taper=(0.97, 0.97)))
+    p.add("Accent", s.rbox((0.44, 0.3, 0.008), (0, 0.02, top + 0.002), r=0.012, seg=1))          # the work mat
+    yf = -0.19                                                                                    # its face
+    for k in range(2):
+        z = top - 0.04 - k * 0.05
+        p.add("Body", s.rbox((0.44, 0.012, 0.042), (0, yf - 0.004, z), r=0.005, seg=1))
+        p.add("Accent", s.rbox((0.14, 0.016, 0.012), (-0.07, yf - 0.014, z + 0.006), r=0.004, seg=1))
+        p.add("Trim", s.rcyl(0.008, 0.012, (0.17, yf - 0.012, z), axis="Y", seg=10, r=0.002, bevel_seg=1))
+    # the keyboard's tray out of the head's foot, a lip at its front
+    tz = top - 0.132
+    p.add("Body", s.rbox((0.5, 0.26, 0.028), (0, -0.26, tz), r=0.012, seg=2))
+    p.add("Body", s.rbox((0.5, 0.016, 0.02), (0, -0.382, tz + 0.016), r=0.006, seg=1))
+    keyboard.add("Keys", (0, -0.28, tz + 0.014), light=True, mouse=0.0)
+    # the push rail round the back, on four posts
+    rz = top + 0.07
+    p.add("Trim", s.tube([(-0.31, -0.08, rz), (-0.31, 0.2, rz), (-0.24, 0.3, rz), (0.24, 0.3, rz), (0.31, 0.2, rz), (0.31, -0.08, rz)], 0.015, smooth=False))
+    for x, y in ((-0.3, -0.06), (0.3, -0.06), (-0.22, 0.27), (0.22, 0.27)):
+        p.add("Trim", rod((x * 0.95, y * 0.93, top - 0.03), (x * 1.02, y * 1.05, rz), 0.011, seg=8))
+    # the monitor: a stout post from the head's back, a knuckle, a thick bezel round an inset screen, tipped back
+    p.add("Trim", s.rbox((0.085, 0.06, 0.24), (0, 0.2, top + 0.11), r=0.02, seg=2, vertical_only=True))
+    p.add("Accent", s.rcyl(0.04, 0.1, (0, 0.2, top + 0.24), axis="X", seg=16, r=0.008, bevel_seg=1))
+    p.add("Trim", s.rbox((0.07, 0.12, 0.05), (0, 0.16, top + 0.27), r=0.012, seg=2, rot=(math.radians(18), 0, 0)))
+    mz, my, tilt = top + 0.3, 0.1, math.radians(-8)
+
+    def on_head(x, ly, lz, w, d, h, r=0.002):
+        """A box in the monitor's own frame: ly from its middle towards its back, lz up its tipped face."""
+        yy, zz = ly * math.cos(tilt) - lz * math.sin(tilt), ly * math.sin(tilt) + lz * math.cos(tilt)
+        return s.rbox((w, d, h), (x, my + yy, mz + zz), r=r, seg=1, rot=(tilt, 0, 0))
+    mw, mh = 0.42, 0.27
+    p.add("Accent", s.rbox((mw, 0.04, mh), (0, my, mz), r=0.014, seg=3, rot=(tilt, 0, 0)))
+    p.add("Accent", on_head(0, 0.03, -0.01, 0.2, 0.03, 0.14, r=0.012))                            # the hump at its back
+    for sz in (-1, 1):
+        p.add("Body", on_head(0, -0.024, sz * (mh / 2 - 0.011), mw, 0.014, 0.024, r=0.005))       # the bezel: light, as the cart
+    for sx in (-1, 1):
+        p.add("Body", on_head(sx * (mw / 2 - 0.011), -0.024, 0, 0.024, 0.014, mh, r=0.005))
+
+    def lit(x, lz, w, h):
+        return on_head(x, -0.0215, lz, w, 0.004, h, r=0.0015)
+    p.add("Eye", lit(0, 0.092, 0.35, 0.026))                                                      # the header: the patient's name
+    for k in range(4):                                                                             # the chart's rows, a tick box each
+        p.add("Eye", lit(-0.06, 0.05 - k * 0.032, 0.2, 0.012), lit(-0.172, 0.05 - k * 0.032, 0.013, 0.013))
+    p.add("Eye", lit(0.118, 0.035, 0.11, 0.06))                                                   # a picture's pane
+    for k, h in enumerate((0.016, 0.03, 0.022, 0.038, 0.026)):                                    # a small chart of bars under it
+        p.add("Eye", lit(0.072 + k * 0.023, -0.07 + h / 2, 0.013, h))
+    p.add("Eye", lit(-0.085, -0.095, 0.18, 0.018))                                                # the bar of buttons
+    # the wire basket on the column's front, the sharps bin in it
+    p.add("Trim", s.rbox((0.06, 0.05, 0.04), (0, 0.0, 0.56), r=0.008, seg=1))
+    p.add("Trim", hollow_box((0.36, 0.2, 0.16), (0, -0.09, 0.56), 0.007))
+    p.add("Accent", s.rbox((0.15, 0.14, 0.2), (-0.08, -0.09, 0.6), r=0.02, seg=2, taper=(0.88, 0.88)))
+    p.add("Body", s.rbox((0.14, 0.13, 0.025), (-0.08, -0.09, 0.712), r=0.01, seg=1))
+    # on the top: the hand scanner in its cradle, the pump bottle
+    p.add("Trim", s.rbox((0.07, 0.07, 0.03), (0.21, 0.13, top + 0.015), r=0.01, seg=1))
+    p.add("Accent", s.rbox((0.036, 0.046, 0.11), (0.21, 0.13, top + 0.07), r=0.012, seg=2))
+    p.add("Accent", s.rbox((0.06, 0.1, 0.05), (0.21, 0.1, top + 0.14), r=0.016, seg=2, rot=(math.radians(-25), 0, 0)))
+    p.add("Eye", s.rbox((0.04, 0.006, 0.022), (0.21, 0.05, top + 0.118), r=0.003, seg=1, rot=(math.radians(-25), 0, 0)))
+    p.add("Body", s.rcyl(0.036, 0.13, (-0.21, 0.14, top + 0.065), seg=14, r=0.01, bevel_seg=2))
+    p.add("Accent", s.rcyl(0.014, 0.04, (-0.21, 0.14, top + 0.148), seg=10, r=0.003, bevel_seg=1))
+    p.add("Accent", s.rbox((0.016, 0.06, 0.012), (-0.21, 0.115, top + 0.17), r=0.004, seg=1))
+    p.finish()
+    return export("med_workstation")
+
+
 MODELS = {
     "bed_headwall": model_bed_headwall,
     "bed_curtain": model_bed_curtain,
@@ -1055,6 +1142,7 @@ MODELS = {
     "hand_sanitizer": model_hand_sanitizer,
     "clinic_bench": model_clinic_bench,
     "med_fridge": model_med_fridge,
+    "med_workstation": model_med_workstation,
 }
 
 

@@ -310,6 +310,10 @@ namespace Stealth.EditorTools
                     Put("SectionalSofa", -1.9f, 1.6f, 120f);
                     Put("TrashBin", 0.2f, -2.4f, 0f);
                     Put("Cabinet", 2.4f, 2.5f, 180f);
+                    // the view "tray": the office cabinet's drawers pulled out too (a look down into a tray)
+                    if (only != null && only.Contains("tray"))
+                        foreach (var tr in made[made.Count - 1].GetComponentsInChildren<Transform>(true))
+                            if (tr.name.StartsWith("BodyDrawer") && tr.parent != null && !tr.parent.name.StartsWith("BodyDrawer")) tr.position += tr.root.forward * 0.4f;
                     Put("WaterCooler", 1.4f, 2.6f, 180f);
                     Put("SynthStand", -0.4f, 2.3f, 180f);
                     Put("NoticeBoard", 0.3f, -2.91f, 0f);
@@ -349,6 +353,7 @@ namespace Stealth.EditorTools
                         ("cooler", new Vector3(1.05f, 1.25f, 1.8f), new Vector3(1.4f, 1.0f, 2.6f), 40f),
                         ("cabinet", new Vector3(-1.45f, 1.3f, -1.5f), new Vector3(-1.9f, 0.7f, -2.4f), 50f),
                         ("drawer", new Vector3(-1.8f, 1.95f, -1.55f), new Vector3(-1.9f, 0.95f, -2.25f), 60f),
+                        ("tray", new Vector3(2.0f, 1.75f, 1.45f), new Vector3(2.4f, 1.0f, 2.15f), 60f),
                     })
                     {
                         if (only != null && !only.Contains(view)) continue;

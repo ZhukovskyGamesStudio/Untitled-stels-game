@@ -579,6 +579,15 @@ namespace Stealth.Level
                     if (option != Option.Signature) return 1.45f;
                     b.Add(PropKind.GuestChair, f.P(1.1f, BackOf(PropKind.GuestChair)), f.Face);
                     return 2.55f;
+                case (RoomType.Office, >= Option.Signature) when Clinic && m_Practice == Practice.Records:
+                    // the records office: the computer on wheels by a row of files (no clerk's desk with a PC)
+                    // (two cabinets: the cap of drawers a room; the smaller options are the computer alone, then the files alone)
+                    if (option == Option.Signature + 1) return Single(PropKind.MedWorkstation, 0.85f);
+                    if (option != Option.Signature) { Row(f, b, PropKind.FilingCabinet, 2, 0.5f); b.Item(f.P(R(-0.2f, 0.2f), BackOf(PropKind.FilingCabinet), 1.305f)); return 1.05f; }
+                    b.Add(PropKind.MedWorkstation, f.P(-0.6f, BackOf(PropKind.MedWorkstation)), f.Face);
+                    foreach (float u in new[] { 0.2f, 0.7f }) b.Add(PropKind.FilingCabinet, f.P(u, BackOf(PropKind.FilingCabinet)), f.Face);
+                    b.Item(f.P(0.45f, BackOf(PropKind.FilingCabinet), 1.305f));
+                    return 2.0f;
                 case (RoomType.Office, >= Option.Signature) when Clinic && m_Practice == Practice.OnCall:
                     b.Add(PropKind.Daybed, f.P(option == Option.Signature ? -0.3f : 0f, BackOf(PropKind.Daybed)), f.Face);
                     if (option != Option.Signature) return 2.05f;
@@ -1124,11 +1133,11 @@ namespace Stealth.Level
                         b.Item(f.P(0, 0.3f, 0.725f));
                     }
                     else if (m_Practice == Practice.Records)
-                    {   // the clerk's desk in the middle: the clerk behind it, a visitor in front
-                        b.Add(PropKind.Desk, f.P(0, 0), f.Back);
-                        b.Add(PropKind.Chair, f.P(0, -0.85f), f.Face);
-                        b.Add(PropKind.GuestChair, f.P(0, 0.9f), f.Back);
-                        b.Item(f.P(R(-0.5f, 0.5f), 0.1f, DeskTop + 0.005f));
+                    {   // the sorting table in the middle: files are laid out on it, a chair at either side
+                        b.Add(PropKind.ReadingTable, f.P(0, 0), f.Face);
+                        b.Add(PropKind.Chair, f.P(R(-0.4f, 0.4f), 0.75f), f.Back);
+                        b.Add(PropKind.Chair, f.P(R(-0.4f, 0.4f), -0.75f), f.Face);
+                        b.Item(f.P(R(-0.6f, 0.6f), R(-0.15f, 0.15f), 0.765f));
                     }
                     else
                     {   // the on-call room: two armchairs at a low table

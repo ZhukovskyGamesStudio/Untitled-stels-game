@@ -22,7 +22,8 @@ namespace Stealth.Level
         /// <summary>The way up that belongs in a room of this type (pure).</summary>
         public static ClimbSet ClimbOf(RoomType t, HouseKind house = HouseKind.Office) => t switch
         {
-            RoomType.Server or RoomType.Lab or RoomType.Office when house == HouseKind.Hospital => new ClimbSet(PropKind.LowShelf, PropKind.DoctorDesk), // (no electronics' parts cabinet, no clerk's desk in a consulting room)
+            RoomType.Server or RoomType.Lab or RoomType.Office or RoomType.OpenSpace or RoomType.CopyRoom or RoomType.Meeting when house == HouseKind.Hospital
+                => new ClimbSet(PropKind.LowShelf, PropKind.DoctorDesk), // (no electronics' parts cabinet, no clerk's desk in a consulting room)
             RoomType.Storage or RoomType.Utility or RoomType.Workshop => new ClimbSet(PropKind.CrateStack, PropKind.WorkTable),
             RoomType.Office or RoomType.OpenSpace or RoomType.CopyRoom or RoomType.Meeting => new ClimbSet(PropKind.FilingCabinet, PropKind.Desk, true),
             RoomType.Server or RoomType.Lab => new ClimbSet(PropKind.PartsCabinet, PropKind.Desk),
@@ -34,6 +35,7 @@ namespace Stealth.Level
             RoomType.Gym or RoomType.LockerRoom or RoomType.Restroom => new ClimbSet(PropKind.LowShelf, PropKind.Bench),
             RoomType.Infirmary or RoomType.Ward or RoomType.Operating or RoomType.Imaging or RoomType.NurseStation => new ClimbSet(PropKind.LowShelf, PropKind.DoctorDesk),
             RoomType.Lounge or RoomType.Living or RoomType.GameRoom or RoomType.NapRoom => new ClimbSet(PropKind.LowShelf, PropKind.RoundTable),
+            _ when house == HouseKind.Hospital => new ClimbSet(PropKind.LowShelf, PropKind.DoctorDesk), // (no office desk with its PC in a hospital)
             _ => new ClimbSet(PropKind.LowShelf, PropKind.Desk),
         };
 

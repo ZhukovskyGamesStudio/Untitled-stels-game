@@ -50,6 +50,21 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void APlayersBodyGoesThroughATerminalsMonitors()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/Terminal.prefab");
+            var passable = prefab.GetComponent<PassableForPlayers>();
+            Assert.IsNotNull(passable, "no PassableForPlayers");
+            // the cases, the stands and the screens of the console's monitors: everything over the desk's top but the low panel
+            Assert.AreEqual(3, passable.Parts.Length, "the monitors' cases, their stands and their screens");
+            Assert.IsTrue(passable.Parts.All(c => c != null));
+            var console = prefab.transform.Find("Console");
+            foreach (var c in console.GetComponentsInChildren<MeshCollider>(true))
+                if (!passable.Has(c)) Assert.Less(c.sharedMesh.bounds.max.y, 0.95f, $"{c.name} stands solid over the desk: in the way into the duct");
+            Assert.IsTrue(console.GetComponentsInChildren<Collider>(true).Any(c => !passable.Has(c)), "the desk itself is solid");
+        }
+
+        [Test]
         public void TheHandShowsOnlyOnWhatOpens()
         {
             var go = Object.Instantiate(Prop("MedicineCabinet"));

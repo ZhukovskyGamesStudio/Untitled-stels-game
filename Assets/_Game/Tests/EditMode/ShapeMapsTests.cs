@@ -51,12 +51,19 @@ namespace Stealth.Tests
             var styles = AssetDatabase.LoadAssetAtPath<Stealth.Configs.StyleConfig>("Assets/_Game/Data/Styles/Styles.asset");
             Assert.AreSame(library, styles.Shapes, "the styles' dressing does not know the library: no part would be told its maps");
             var seen = new System.Collections.Generic.HashSet<int>();
+            var fileOf = new System.Collections.Generic.Dictionary<int, string>();
             for (int i = 0; i < library.Meshes.Length; i++)
             {
                 var mesh = library.Meshes[i];
                 Assert.IsNotNull(mesh);
                 string model = library.Models[library.Slices[i]];
-                StringAssert.EndsWith($"/{model}.fbx", AssetDatabase.GetAssetPath(mesh), $"{mesh.name}: another model's maps");
+                string file = AssetDatabase.GetAssetPath(mesh);
+                StringAssert.EndsWith($"/{model}.fbx", file, $"{mesh.name}: another model's maps");
+                // (a style's own furniture has the base model's file name and is another model: the base model's maps
+                // must not land on its UVs)
+                if (fileOf.TryGetValue(library.Slices[i], out string first))
+                    Assert.AreEqual(first, file, $"{model}: two different files share the maps baked for one of them");
+                else fileOf[library.Slices[i]] = file;
                 Assert.AreEqual(library.Slices[i], library.SliceOf(mesh));
                 seen.Add(library.Slices[i]);
                 if (!ShapeMaps.Takes(mesh.name)) continue;      // (a screen, a print: never read with the maps)
@@ -85,7 +92,7 @@ namespace Stealth.Tests
             ShapeMaps.Tag(renderer, library);
             Assert.AreEqual(library.SliceOf(baked), ShapeMaps.SliceOf(renderer));
             renderer.GetPropertyBlock(block, 0);
-            Assert.AreEqual(library.SliceOf(baked), (int)block.GetFloat(sliceId), "its slice travels in the block of the material that reads it while it is drawn alone");
+            Assert.AreEqual(library.SliceOf(baked) + 1, (int)block.GetFloat(sliceId), "its slice (+ 1: zero is nobody's) travels in the block of the material that reads it while it is drawn alone");
             renderer.GetPropertyBlock(block, 1);
             Assert.IsTrue(block.isEmpty, "a material that does not read the maps is told nothing");
             Assert.IsFalse(MeshBatcher.DrawsItself(renderer), "the renderer's own block is not ours to take: it is the sign of a part that draws itself");
@@ -185,9 +192,9 @@ namespace Stealth.Tests
             var ids = new System.Collections.Generic.List<Vector2>();
             mesh.GetUVs(3, ids);
             Assert.AreEqual(12, ids.Count, "every vertex names its maps");
-            for (int i = 0; i < 4; i++) Assert.AreEqual(new Vector2(4f, 1f), ids[i], "slice 3, as it stands");
+            for (int i = 0; i < 4; i++) Assert.AreEqual(new Vector2(4f, 2f), ids[i], "slice 3, as it stands");
             for (int i = 4; i < 8; i++) Assert.AreEqual(Vector2.zero, ids[i], "no maps of its own");
-            for (int i = 8; i < 12; i++) Assert.AreEqual(new Vector2(4f, -1f), ids[i], "slice 3, mirrored: its frame turns over");
+            for (int i = 8; i < 12; i++) Assert.AreEqual(new Vector2(4f, -2f), ids[i], "slice 3, mirrored: its frame turns over");
             Assert.AreEqual(new Vector2(0.2f, 0.2f), mesh.uv2[3]);
             Object.DestroyImmediate(mesh);
             Object.DestroyImmediate(material);
@@ -202,7 +209,16 @@ namespace Stealth.Tests
             Assert.IsNotNull(shader);
             Assert.GreaterOrEqual(shader.FindPropertyIndex("_ShapeSlice"), 0, "Stealth/Surface has no _ShapeSlice");
             var material = new Material(shader);
-            Assert.AreEqual(-1f, material.GetFloat("_ShapeSlice"), "a model without maps of its own is shaded as before");
+            // zero is nobody's: a value that never reached a draw reads as zero, and must not be the first model's maps
+            // (drawers and stall doors wore the acoustic panel's relief)
+            Assert.AreEqual(0f, material.GetFloat("_ShapeSlice"), "a model without maps of its own is shaded as before");
+            string code = System.IO.File.ReadAllText("Assets/_Game/Art/Shaders/SurfaceForward.hlsl");
+            StringAssert.Contains("_ShapeSlice) : 0.0) - 1.0", code, "the shader no longer reads the number as the slice + 1");
+            foreach (var path in AssetDatabase.FindAssets("t:Material", new[] { "Assets/_Game" }).Select(AssetDatabase.GUIDToAssetPath))
+            {
+                var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (m != null && m.shader == shader) Assert.LessOrEqual(m.GetFloat("_ShapeSlice"), 0f, $"{path}: a material names maps for everything it paints");
+            }
             Object.DestroyImmediate(material);
         }
     }

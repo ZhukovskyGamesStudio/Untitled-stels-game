@@ -340,14 +340,9 @@ namespace Stealth.Level
                     if (roll < 93) return Single(PropKind.CoatRack, 0.9f);
                     return Single(PropKind.Plant, 0.75f);
                 case RoomType.Office when Clinic && m_Practice == Practice.Records:
-                    // the records office: the clerk's desk, files along the walls, the copier
-                    if (roll < 20)
-                    {
-                        b.Add(PropKind.Desk, f.P(0, 0.4f + WallGap), f.Face);
-                        b.Add(PropKind.Chair, f.P(R(-0.1f, 0.1f), 1.2f), f.Back + R(-15f, 15f));
-                        b.Item(f.P(R(-0.5f, 0.5f), 0.5f, DeskTop + 0.005f));
-                        return 1.65f;
-                    }
+                    // the records office: the computer on wheels, files along the walls, the copier
+                    if (roll < 14) return Single(PropKind.MedWorkstation, 0.85f);
+                    if (roll < 20) return Row(f, b, PropKind.GuestChair, 2, 0.65f);
                     if (roll < 46) { Row(f, b, PropKind.FilingCabinet, 3, 0.5f); b.Item(f.P(R(-0.4f, 0.4f), BackOf(PropKind.FilingCabinet), 1.305f)); return Clock(1.55f); }
                     if (roll < 62) { Single(PropKind.Shelf, 2.05f); if (Chance(0.6)) b.Item(f.P(R(-0.6f, 0.6f), BackOf(PropKind.Shelf), ShelfLevels[m_Rng.Next(3)])); return 2.05f; }
                     if (roll < 72) { Single(PropKind.Copier, 1.0f); b.Item(f.P(0.2f, BackOf(PropKind.Copier), 1.05f)); return 1.0f; }
@@ -519,6 +514,7 @@ namespace Stealth.Level
                     if (roll < 86) return Single(PropKind.Wheelchair, 0.75f);
                     return Single(PropKind.IvStand, 0.5f);
                 case RoomType.NurseStation:
+                    if (roll < 12) return Single(PropKind.MedWorkstation, 0.85f);
                     if (roll < 30) { Single(PropKind.MedicationCart, 1.05f); b.Item(f.P(0, BackOf(PropKind.MedicationCart), 1.06f)); return 1.05f; }
                     if (roll < 50) return Single(PropKind.LinenCart, 0.75f);
                     if (roll < 70) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
@@ -531,7 +527,9 @@ namespace Stealth.Level
                     if (roll < 88) return Single(PropKind.LinenCart, 0.75f);
                     return Hung(PropKind.HandSanitizer, 0.3f);
                 case RoomType.Imaging:
-                    if (roll < 35) { Single(PropKind.Desk, 1.45f); b.Item(f.P(R(-0.4f, 0.4f), 0.4f + WallGap, DeskTop + 0.005f)); return 1.45f; }
+                    // (the operator's computer: one, on wheels — three office desks with PCs stood here)
+                    if (roll < 22) return Single(PropKind.MedWorkstation, 0.85f);
+                    if (roll < 35) return Single(PropKind.GuestChair, 0.7f);
                     if (roll < 60) { Single(PropKind.Cabinet, 0.95f); b.Item(f.P(0, BackOf(PropKind.Cabinet), CabinetTop)); return 0.95f; }
                     if (roll < 80) return Single(PropKind.Wheelchair, 0.75f);
                     return Hung(PropKind.HandSanitizer, 0.3f);

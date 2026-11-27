@@ -47,7 +47,7 @@ half OuterEdge(float2 uv, float3 positionWS)
 struct SurfaceAttributes
 {
     Attributes lit;
-    float2 shapeId : TEXCOORD3;         // merged meshes: x slice + 1 (0 none), y −1 where the part was mirrored
+    float2 shapeId : TEXCOORD3;         // merged meshes: x slice + 1 (0 none), y ±2 (−2 where the part was mirrored)
 };
 
 struct SurfaceVaryings
@@ -63,8 +63,13 @@ SurfaceVaryings SurfaceVertex(SurfaceAttributes input)
     // Whose maps: a mesh merged of many models says so itself (_ShapeInVertices, set on the merged mesh's renderer) and
     // then each vertex names them; any other mesh has no such data — what is read from a stream a mesh does not have
     // is not zeros (parts of a model picked another model's maps and a mirrored frame) — and is told by its renderer.
+    // Nothing names a slice by saying nothing: the number is the slice + 1, so a value that arrives as zero — a block
+    // that did not reach the draw, a stream the mesh does not have — means no maps (as −1 it was the first model's:
+    // drawers and stall doors, parts with a block of their own, wore the acoustic panel's relief in the build). And a
+    // vertex names maps only with its sign of two: a stream of ones is not a name either.
     bool merged = _ShapeInVertices > 0.5;
-    float slice = merged ? input.shapeId.x - 1.0 : _ShapeSlice;
+    bool named = !merged || abs(abs(input.shapeId.y) - 2.0) < 0.25;
+    float slice = (named ? (merged ? input.shapeId.x : _ShapeSlice) : 0.0) - 1.0;
     float mirrored = merged ? (input.shapeId.y < 0.0 ? -1.0 : 1.0) : unity_WorldTransformParams.w;
     // (the mesh's second UV set, or its third where the part came with a spare one: nothing here is lightmapped; a
     // merged mesh always carries them as its second)

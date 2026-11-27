@@ -50,7 +50,7 @@ namespace Stealth.Level
             return RectAt(Rect.MinMaxRect(r.xMin, Mathf.Min(r.yMin + 0.3f, r.yMax - 0.02f), r.xMax, r.yMax), p, yaw);
         }
 
-        static Rect RectAt(Rect r, Vector3 p, float yaw)
+        public static Rect RectAt(Rect r, Vector3 p, float yaw)
         {
             var q = Quaternion.Euler(0, yaw, 0);
             Vector2 min = new(float.MaxValue, float.MaxValue), max = new(float.MinValue, float.MinValue);
@@ -98,6 +98,16 @@ namespace Stealth.Level
             return true;
         }
 
+        /// <summary>
+        /// The part of a piece that reaches the ceiling, in its own frame (x right, y forward; our models are mirrored in X
+        /// at import): the X-ray's tube column with its ceiling rail, beside the table. The room's lamps hang clear of it
+        /// (<see cref="LevelBuilder.LightSpots"/>: the column ran up into one).
+        /// </summary>
+        public static readonly Dictionary<PropKind, Rect> ToCeiling = new()
+        {
+            [PropKind.XrayMachine] = Rect.MinMaxRect(-0.72f, -1.55f, -0.36f, 1.55f),
+        };
+
         /// <summary>Commits a batch if every solid piece stands on the room's floor and clear of everything else.</summary>
         bool TryCommit(PlanRoom room, Batch b, float gap = 0.04f, float aisle = 0f, Vector3? front = null)
         {
@@ -118,7 +128,7 @@ namespace Stealth.Level
                 }
             // what the house would not have (a hospital's arcade machine, its robot arm)
             foreach (var p in b.Pieces)
-                if (!Belongs(m_L.PlanKind, p.Kind)) return false;
+                if (!Belongs(m_L.PlanKind, p.Kind) || !BelongsIn(m_L.PlanKind, room.Type, p.Kind)) return false;
             // one water cooler, one clock… per room
             foreach (var p in b.Pieces)
             {
@@ -196,7 +206,6 @@ namespace Stealth.Level
         public void PlaceVentDesks()
         {
             float face = LevelMetrics.WallThickness / 2f;
-            float half = Foot[PropKind.Desk].height / 2f;
             foreach (var d in m_L.Doorways)
             {
                 if (!d.High) continue;
@@ -204,11 +213,14 @@ namespace Stealth.Level
                 foreach (float side in new[] { -1f, 1f })
                 {
                     var n = across * side;
-                    var pos = d.Position + n * (face + WallGap + half);
-                    var room = m_P.RoomAt(pos + Vector3.up * 0.1f);
+                    var room = m_P.RoomAt(d.Position + n * (face + WallGap + Foot[PropKind.Desk].height / 2f) + Vector3.up * 0.1f);
                     if (room == null) continue;
+                    // (a hospital's medical room has no office desk with its PC: the doctor's desk, as high, stands there)
+                    var kind = BelongsIn(m_L.PlanKind, room.Type, PropKind.Desk) ? PropKind.Desk : PropKind.DoctorDesk;
+                    float half = Foot[kind].height / 2f;
+                    var pos = d.Position + n * (face + WallGap + half);
                     float yaw = Mathf.Atan2(n.x, n.z) * Mathf.Rad2Deg; // its front (+Z) to the room, its back to the wall
-                    Put(room, PropKind.Desk, pos, yaw);
+                    Put(room, kind, pos, yaw);
                     Keep(d.Floor, pos + n * half - d.Rotation * Vector3.right * 0.9f, pos + n * (half + LevelMetrics.VentDeskAisle) + d.Rotation * Vector3.right * 0.9f);
                 }
             }

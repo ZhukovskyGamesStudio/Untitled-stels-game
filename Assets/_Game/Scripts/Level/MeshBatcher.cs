@@ -176,7 +176,7 @@ namespace Stealth.Level
             var tangents = new List<Vector4>();
             var uv = new List<Vector2>();
             var uv2 = new List<Vector2>();   // the models' own maps: where each vertex lies on its model's pictures…
-            var shape = new List<Vector2>(); // …and which pictures (x: slice + 1, 0 none; y: −1 where the part is mirrored)
+            var shape = new List<Vector2>(); // …and which pictures (x: slice + 1, 0 none; y: ±2, −2 where the part is mirrored)
             foreach (var key in m_Order)
             {
                 vertices.Clear(); normals.Clear(); tangents.Clear(); uv.Clear(); uv2.Clear(); shape.Clear();
@@ -286,13 +286,17 @@ namespace Stealth.Level
         }
 
         /// <summary>The part's second UV set and its maps' slice, vertex for vertex with <see cref="Append"/>; false: it has no maps of its own.</summary>
+        /// <summary>What a merged vertex that names its model's maps carries beside the slice (negative: the part is mirrored); the shader knows it.</summary>
+        public const float ShapeSign = 2f;
+
         bool AppendShape(Part p, List<Vector2> uv2, List<Vector2> shape)
         {
             var s = SourceOf(p.Mesh);
             var (first, count) = s.Ranges[p.SubMesh];
             var own = p.ShapeChannel == 2 ? s.Uv3 : s.Uv2;        // (the set the model's maps were baked over)
             bool has = p.Slice >= 0 && own != null;
-            var id = has ? new Vector2(p.Slice + 1, p.Matrix.determinant < 0f ? -1f : 1f) : Vector2.zero;
+            // (the sign is two, not one: a stream a mesh does not have may read as ones — that must not name the first model)
+            var id = has ? new Vector2(p.Slice + 1, p.Matrix.determinant < 0f ? -ShapeSign : ShapeSign) : Vector2.zero;
             for (int i = first; i < first + count; i++)
             {
                 uv2.Add(has ? own[i] : Vector2.zero);

@@ -1209,11 +1209,19 @@ namespace Stealth.Level
                 if (net.Floor == r.Floor + r.Levels - 1)
                     foreach (var g in net.Grates)
                         if (g.Room == r.Id) grates.Add(g.Cell);
-            for (int i = 0; i < list.Count && grates.Count > 0; i++)
+            // and what stands up to the ceiling in the room (the X-ray's column, Furnisher.ToCeiling): the lamp hangs beside it
+            var columns = new List<Rect>();
+            foreach (var prop in l.Props)
+                if (Furnisher.ToCeiling.TryGetValue(prop.Kind, out var part) && LevelLayout.FloorOf(prop.Position.y + 0.1f) == r.Floor + r.Levels - 1
+                    && l.Plan.RoomAt(prop.Position + Vector3.up * 0.3f) == r)
+                    columns.Add(Furnisher.RectAt(part, prop.Position, prop.RotationY));
+            for (int i = 0; i < list.Count && (grates.Count > 0 || columns.Count > 0); i++)
             {
                 bool Clear(Vector2 p)
                 {
                     foreach (var c in grates) if (VentPlan.ClashesLamp(c, new List<Vector2> { p })) return false;
+                    const float half = VentPlan.LampHalf + 0.08f;
+                    foreach (var c in columns) if (c.Overlaps(Rect.MinMaxRect(p.x - half, p.y - half, p.x + half, p.y + half))) return false;
                     return true;
                 }
                 if (Clear(list[i])) continue;

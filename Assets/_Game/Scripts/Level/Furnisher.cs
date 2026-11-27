@@ -258,6 +258,7 @@ namespace Stealth.Level
             [PropKind.HandSanitizer] = Rect.MinMaxRect(-0.06f, -0.06f, 0.06f, 0.06f),
             [PropKind.ClinicBench] = Rect.MinMaxRect(-0.9f, -0.375f, 0.9f, 0.375f),
             [PropKind.MedFridge] = Rect.MinMaxRect(-0.35f, -0.36f, 0.35f, 0.36f),
+            [PropKind.MedWorkstation] = Rect.MinMaxRect(-0.33f, -0.33f, 0.33f, 0.39f), // (its keyboard's tray out in front)
             // the apartment block (Tools/Blender/apartments.py)
             [PropKind.DoubleBed] = Rect.MinMaxRect(-0.8f, -1.025f, 0.8f, 1.025f),
             [PropKind.Wardrobe] = Rect.MinMaxRect(-0.6f, -0.3f, 0.6f, 0.31f),
@@ -322,6 +323,16 @@ namespace Stealth.Level
             PropKind.Hammock or PropKind.FloorCushions or PropKind.FloorLamp or PropKind.RobotArm or PropKind.RobotTable or PropKind.Printer3d or
             PropKind.ComponentShelf or PropKind.PartsCabinet or PropKind.ScopeCart);
 
+        /// <summary>
+        /// Whether a piece belongs in a room of this type in a house of this kind (pure): no office desk with its PC in a
+        /// hospital's medical rooms, whatever table the room's furniture came from — their computer is the workstation on
+        /// wheels, their desk the doctor's.
+        /// </summary>
+        public static bool BelongsIn(HouseKind house, RoomType room, PropKind k) =>
+            house != HouseKind.Hospital
+            || k is not (PropKind.Desk or PropKind.StandingDesk or PropKind.ExecutiveDesk or PropKind.SupervisorDesk)
+            || room is not (RoomType.Imaging or RoomType.Infirmary or RoomType.Ward or RoomType.Operating or RoomType.NurseStation or RoomType.Lab or RoomType.Office);
+
         public static int CapOf(PropKind k) => k switch
         {
             PropKind.DoubleBed or PropKind.Wardrobe or PropKind.Dresser or PropKind.Bathtub or PropKind.HomeToilet or PropKind.BathVanity or
@@ -338,7 +349,8 @@ namespace Stealth.Level
                 PropKind.GamingCorner or PropKind.BarCounter or PropKind.KitchenSink or PropKind.MobileWhiteboard or PropKind.SofaPod or
                 PropKind.DisplayCase or PropKind.CracUnit or PropKind.TapeLibrary or PropKind.TireChanger or PropKind.WheelBalancer or
                 PropKind.AirCompressor or PropKind.WeldingCart or PropKind.EngineHoist or PropKind.CtScanner or PropKind.XrayMachine or
-                PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink or PropKind.MedFridge => 1,
+                PropKind.SurgicalTable or PropKind.AnesthesiaMachine or PropKind.NurseStationDesk or PropKind.ScrubSink or PropKind.MedFridge or
+                PropKind.DoctorDesk or PropKind.MedWorkstation => 1, // (one desk, one computer a room: a medical room is not an office)
             // (drawers: a wall of them in one room was a chore to open, and most were empty)
             PropKind.Cabinet or PropKind.FilingCabinet or PropKind.FilePedestal or
             PropKind.TrashBin or PropKind.SanitaryBin or PropKind.FireCabinet or PropKind.FloorLamp or PropKind.IvStand or PropKind.PunchingBag or

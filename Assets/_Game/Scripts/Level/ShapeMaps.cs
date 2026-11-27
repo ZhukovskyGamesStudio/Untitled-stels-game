@@ -95,7 +95,7 @@ namespace Stealth.Level
                     continue;
                 }
                 r.GetPropertyBlock(s_Block);
-                s_Block.SetFloat(SliceId, slice);
+                s_Block.SetFloat(SliceId, slice + 1); // (the slice + 1: zero, what a value lost on the way reads as, is "none")
                 s_Block.SetFloat(UvId, channel);
                 r.SetPropertyBlock(s_Block, i);
             }

@@ -37,7 +37,7 @@ Shader "Stealth/Surface"
         _DirtColor("Dirt", Color) = (0.36, 0.32, 0.27, 1)
         [ToggleOff] _EnvironmentReflections("Mirrors its room", Float) = 1
         // a model's own baked maps over its second UV set (Tools/Blender/shapebake.py; set per renderer by ShapeMaps)
-        _ShapeSlice("The model's own maps: their slice in the shared arrays (-1 none)", Float) = -1
+        _ShapeSlice("The model's own maps: their slice in the shared arrays + 1 (0 or less: none)", Float) = 0
         _ShapeUv("…and the UV set they lie over (1 the second, 2 the third)", Float) = 1
         _ShapeInVertices("A mesh merged of many models: each vertex names its maps", Float) = 0
         [HideInInspector] _Cull("__cull", Float) = 2

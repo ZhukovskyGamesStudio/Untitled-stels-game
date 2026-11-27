@@ -57,6 +57,7 @@ namespace Stealth.UI
         float m_NextDraw;
         float m_Fit = 1f;
         Vector2 m_Extent; // the shown floor's size in metres (labels keep inside it)
+        readonly List<Rect> m_Walls = new(); // the drawn floor's walls and doors in map pixels (a label of a fixed mark keeps off them)
 
         /// <summary>The floor shown; -1 = the player's floor (the big map can browse others).</summary>
         public int ViewFloor { get; set; } = -1;
@@ -183,11 +184,11 @@ namespace Stealth.UI
                     Icon(Flat(d.Position), floor, floor, me, scale, radius, turn, DoorColor, null, IconShape.Diamond, 0.7f, 0f);
             if (floor == 0)
             {
-                Icon(Flat(l.HatchPosition), 0, 0, me, scale, radius, turn, EntryColor, Loc.T("map.entry"), IconShape.Diamond, 1f, 0f);
-                Icon(Flat(l.ExitHatchPosition), 0, 0, me, scale, radius, turn, ExitColor, Loc.T("map.exit"), IconShape.Diamond, 1.1f, 0f);
+                Icon(Flat(l.HatchPosition), 0, 0, me, scale, radius, turn, EntryColor, Loc.T("map.entry"), IconShape.Diamond, 1f, 0f, still: true);
+                Icon(Flat(l.ExitHatchPosition), 0, 0, me, scale, radius, turn, ExitColor, Loc.T("map.exit"), IconShape.Diamond, 1.1f, 0f, still: true);
             }
             if (l.StorageRoom >= 0 && l.StorageRoom < l.Rooms.Count && l.Rooms[l.StorageRoom].Floor == floor)
-                Icon(Flat(l.Rooms[l.StorageRoom].Center), floor, floor, me, scale, radius, turn, StorageColor, Loc.T("map.storage"), IconShape.Diamond, 1f, 0f);
+                Icon(Flat(l.Rooms[l.StorageRoom].Center), floor, floor, me, scale, radius, turn, StorageColor, Loc.T("map.storage"), IconShape.Diamond, 1f, 0f, still: true);
             foreach (var t in SecurityTerminal.All)
             {
                 if (t.Index < 0 || LevelLayout.FloorOf(t.transform.position.y) != floor) continue;
@@ -249,6 +250,7 @@ namespace Stealth.UI
         void Draw(ExplorationMap map, int floor, float scale)
         {
             MapSketch.Build(map, floor, ActiveLevel.Shell?.Props, m_Rects);
+            InkOf(m_Rects, scale, m_Walls);
             m_Images.Begin();
             foreach (var r in m_Rects)
             {
@@ -269,7 +271,7 @@ namespace Stealth.UI
         enum IconShape { Arrow, Dot, Diamond, Glyph }
 
         void Icon(Vector2 at, int itsFloor, int floor, Vector2 me, float scale, float radius, float turn, Color color, string label,
-            IconShape shape, float size, float yaw, Sprite glyph = null)
+            IconShape shape, float size, float yaw, Sprite glyph = null, bool still = false)
         {
             if (shape == IconShape.Glyph && glyph == null) shape = IconShape.Dot;
             var pos = at;
@@ -299,32 +301,103 @@ namespace Stealth.UI
             Ui.Show(icon.Label, text != null);
             if (text != null) Ui.Set(icon.Label, text, UiPalette.Ink.A(Mathf.Max(0.6f, color.a))); // labels in ink: a pale fill colour does not read as text
             if (text == null) return;
-            // a label by the building's edge leans inwards (a corner's "way out" was cut by the outer wall)
-            PlaceLabel(icon, FollowPlayer ? (0, false) : LabelPlace(pos * scale, m_Extent * scale, icon.Label.preferredWidth * size / 2f));
+            // a label by the building's edge leans inwards (a corner's "way out" was cut by the outer wall); the label of a
+            // mark that stands still also keeps off the walls' ink (the wall under a hatch's mark ran through its words) —
+            // a moving mark's label stays under it: it would jump from side to side as its robot walks
+            PlaceLabel(icon, FollowPlayer ? (0, -1) : LabelPlace(pos * scale, m_Extent * scale, icon.Label.preferredWidth * size / 2f, size, still ? m_Walls : null));
         }
 
         /// <summary>Puts an icon's label where <see cref="LabelPlace"/> said (the editor's picture of the map does the same).</summary>
-        public static void PlaceLabel(MapIconView icon, (int side, bool above) place)
+        public static void PlaceLabel(MapIconView icon, (int side, int row) place)
         {
             var rt = icon.Label.rectTransform;
             float half = rt.sizeDelta.x / 2f;
-            rt.anchoredPosition = new Vector2(place.side * (half - 4f), place.above ? LabelDrop : -LabelDrop);
+            rt.anchoredPosition = new Vector2(place.side * (place.row == 0 ? half + LabelGap : half - LabelLean), place.row * LabelDrop);
             icon.Label.alignment = place.side > 0 ? TextAnchor.MiddleLeft : place.side < 0 ? TextAnchor.MiddleRight : TextAnchor.MiddleCenter;
         }
 
-        const float LabelDrop = 14f; // the label's distance under (or over) its icon, in the icon's units
+        // a label about its icon, in the icon's units: its distance under (or over) the icon; how far a label level with
+        // the icon starts from it; how far back a leaning label starts; half its line's height
+        const float LabelDrop = 14f, LabelGap = 10f, LabelLean = 4f, LabelHalfHeight = 6.5f;
 
         /// <summary>
-        /// Where an icon's label goes so it stays inside the floor drawn (both in map pixels, the floor from 0 to
-        /// <paramref name="extent"/>): side 0 centred under the icon, 1 starting at it to the right, -1 ending at it to
-        /// the left; above when the icon sits by the bottom edge.
+        /// The places a label tries, the best first: under its icon, over it, level with it to a side, leaning to a side
+        /// under and over — then a line further off (a hatch in a shaft's closet has walls on every side of it).
         /// </summary>
-        public static (int side, bool above) LabelPlace(Vector2 at, Vector2 extent, float halfWidth)
+        static readonly (int side, int row)[] LabelPlaces =
         {
-            const float Pad = 14f; // (the outer wall's ink and a little air)
-            int side = at.x - halfWidth < Pad ? 1 : at.x + halfWidth > extent.x - Pad ? -1 : 0;
-            bool above = at.y - LabelDrop - 10f < Pad + 10f;
-            return (side, above);
+            (0, -1), (0, 1), (1, 0), (-1, 0), (1, -1), (-1, -1), (1, 1), (-1, 1),
+            (0, -2), (0, 2), (1, -2), (-1, -2), (1, 2), (-1, 2), (0, -3), (0, 3), (1, -3), (-1, -3), (1, 3), (-1, 3),
+        };
+
+        /// <summary>The words' box for a place (map pixels): <paramref name="at"/> the icon, <paramref name="size"/> its scale.</summary>
+        public static Rect LabelBox(Vector2 at, (int side, int row) place, float halfWidth, float size = 1f)
+        {
+            float start = place.side == 0 ? -halfWidth
+                : place.row == 0 ? (place.side > 0 ? LabelGap * size : -LabelGap * size - 2f * halfWidth)
+                : place.side > 0 ? -LabelLean * size : LabelLean * size - 2f * halfWidth;
+            return new Rect(at.x + start, at.y + place.row * LabelDrop * size - LabelHalfHeight * size, 2f * halfWidth, 2f * LabelHalfHeight * size);
+        }
+
+        /// <summary>
+        /// Where an icon's label goes (both in map pixels, the floor from 0 to <paramref name="extent"/>): side 0 centred
+        /// on the icon, 1 starting at it to the right, -1 ending at it to the left; row -1 under the icon, 1 over it,
+        /// 0 level with it, ±2 and ±3 a line or two further off. The first of <see cref="LabelPlaces"/> that lies inside the floor drawn and on no wall's ink
+        /// (<paramref name="walls"/>, map pixels; none given: only the edge counts); none is free — the one that covers least.
+        /// </summary>
+        public static (int side, int row) LabelPlace(Vector2 at, Vector2 extent, float halfWidth, float size = 1f, IReadOnlyList<Rect> walls = null)
+        {
+            const float Pad = 14f;      // (the outer wall's ink and a little air)
+            const float InkWeight = 3f; // (words across a wall are worse than words past the house's edge: there is paper there)
+            var inside = Rect.MinMaxRect(Pad, Pad, extent.x - Pad, extent.y - Pad);
+            var best = LabelPlaces[0];
+            float least = float.MaxValue;
+            foreach (var place in LabelPlaces)
+            {
+                var box = LabelBox(at, place, halfWidth, size);
+                float cost = box.width * box.height - Shared(box, inside);
+                if (walls != null)
+                    for (int i = 0; i < walls.Count && cost < least; i++) cost += InkWeight * Shared(box, walls[i]);
+                if (cost >= least) continue;
+                best = place;
+                least = cost;
+                if (cost <= 0.01f) break;
+            }
+            return best;
+        }
+
+        static float Shared(Rect a, Rect b)
+        {
+            float w = Mathf.Min(a.xMax, b.xMax) - Mathf.Max(a.xMin, b.xMin), h = Mathf.Min(a.yMax, b.yMax) - Mathf.Max(a.yMin, b.yMin);
+            return w > 0f && h > 0f ? w * h : 0f;
+        }
+
+        /// <summary>
+        /// The ink a label keeps off, in map pixels: the walls and the doors of a sketch (a turned one — a diagonal, an
+        /// arc's piece — by the box round it), each with a little air.
+        /// </summary>
+        public static void InkOf(IReadOnlyList<MapRect> sketch, float scale, List<Rect> walls)
+        {
+            const float Air = 1.5f;
+            walls.Clear();
+            foreach (var r in sketch)
+            {
+                if (r.Part is not (MapPart.Wall or MapPart.Door)) continue;
+                var min = r.Area.min * scale;
+                var size = Vector2.Max(r.Area.size * scale, Vector2.one * 1.5f);
+                float x0 = min.x, x1 = min.x, y0 = min.y, y1 = min.y;
+                if (Mathf.Approximately(r.Angle, 0f)) { x1 += size.x; y1 += size.y; }
+                else
+                {
+                    var turn = Quaternion.Euler(0f, 0f, r.Angle);
+                    foreach (var corner in new[] { new Vector2(size.x, 0f), new Vector2(0f, size.y), size })
+                    {
+                        Vector2 p = min + (Vector2)(turn * corner);
+                        x0 = Mathf.Min(x0, p.x); x1 = Mathf.Max(x1, p.x); y0 = Mathf.Min(y0, p.y); y1 = Mathf.Max(y1, p.y);
+                    }
+                }
+                walls.Add(Rect.MinMaxRect(x0 - Air, y0 - Air, x1 + Air, y1 + Air));
+            }
         }
     }
 }

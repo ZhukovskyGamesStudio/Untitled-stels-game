@@ -152,6 +152,10 @@ namespace Stealth.EditorTools
                 var go = PropObject("Terminal", "terminal_console", "PropBody", "PropAccent", "Keypad");
                 var console = go.transform.GetChild(0).gameObject;
                 console.name = "Console";
+                // its three monitors (cases, stands, screens: parts of their own): a player's body goes through them, as
+                // through a desk's — they stood in the way into the duct over the terminal
+                go.AddComponent<PassableForPlayers>().Parts = console.GetComponentsInChildren<MeshCollider>(true)
+                    .Where(c => c.name.StartsWith("BodyMonitors") || c.name.StartsWith("AccentMonitors") || c.name.StartsWith("EyeScreen")).Cast<Collider>().ToArray();
                 var access = Model("terminal_access");
                 access.name = "Access";
                 access.transform.SetParent(go.transform, false);

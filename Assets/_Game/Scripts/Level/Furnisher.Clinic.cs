@@ -11,7 +11,9 @@ namespace Stealth.Level
     /// The hospital's own rooms under the office's room types. A hospital shares the types (an office, a lab) with the
     /// other houses, but not their furniture: its lab is a clinical one (benches with a microscope and a centrifuge, the
     /// sample fridge, a steel sink), its offices are the doctors' and the staff's (<see cref="Practice"/>). The groups
-    /// themselves stand in the furnisher's tables, as cases <c>when Clinic</c> before the office's.
+    /// themselves stand in the furnisher's tables, as cases <c>when Clinic</c> before the office's. No office desk with its
+    /// PC stands in a hospital: a room's computer is the workstation on wheels (<see cref="PropKind.MedWorkstation"/>),
+    /// one a room, as the doctor's desk is.
     /// </summary>
     public sealed partial class Furnisher
     {
@@ -22,7 +24,8 @@ namespace Stealth.Level
         Practice m_Practice;
 
         /// <summary>The pieces a consulting room and an on-call room are known by (instead of the office's desks).</summary>
-        static readonly PropKind[] ConsultingSignatures = { PropKind.DoctorDesk }, OnCallSignatures = { PropKind.Daybed };
+        static readonly PropKind[] ConsultingSignatures = { PropKind.DoctorDesk }, OnCallSignatures = { PropKind.Daybed },
+            RecordsSignatures = { PropKind.MedWorkstation, PropKind.FilingCabinet };
 
         /// <summary>
         /// The pieces that make this room what it is (pure; null: its type has none): <see cref="Signatures"/> by its type,
@@ -32,7 +35,7 @@ namespace Stealth.Level
         {
             if (!Signatures.TryGetValue(room.Type, out var kinds)) return null;
             if (l.PlanKind != HouseKind.Hospital || room.Type != RoomType.Office) return kinds;
-            return PracticeOf(l.Seed, room.Id) switch { Practice.Consulting => ConsultingSignatures, Practice.OnCall => OnCallSignatures, _ => kinds };
+            return PracticeOf(l.Seed, room.Id) switch { Practice.Consulting => ConsultingSignatures, Practice.OnCall => OnCallSignatures, _ => RecordsSignatures };
         }
 
         /// <summary>

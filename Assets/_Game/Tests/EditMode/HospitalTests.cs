@@ -157,6 +157,99 @@ namespace Stealth.Tests
 
         /// <summary>The lobby's rows of waiting seats in the middle stand back to back, not seat into seat.</summary>
         [Test]
+        public void NoOfficeDeskWithItsPcStandsInAMedicalRoom()
+        {
+            // the play's note: three desks with PCs in an X-ray room, PCs in the treatment rooms — a room's computer is the
+            // workstation on wheels, one a room, as the doctor's desk is
+            var medical = new[] { RoomType.Imaging, RoomType.Infirmary, RoomType.Ward, RoomType.Operating, RoomType.NurseStation, RoomType.Lab, RoomType.Office };
+            var office = new[] { PropKind.Desk, PropKind.StandingDesk, PropKind.ExecutiveDesk, PropKind.SupervisorDesk };
+            int carts = 0;
+            foreach (var l in TestHouses.First(HouseKind.Hospital, 6, seed => 1 + seed % 4))
+            {
+                var inRoom = new Dictionary<int, List<PropKind>>();
+                foreach (var p in l.Props)
+                {
+                    var room = l.Plan.RoomAt(p.Position + Vector3.up * 0.3f);
+                    if (room == null || System.Array.IndexOf(medical, room.Type) < 0) continue;
+                    if (!inRoom.TryGetValue(room.Id, out var list)) inRoom[room.Id] = list = new List<PropKind>();
+                    // (the desk under a high vent or a ceiling grate is a way up, not the room's desk)
+                    if (p.Kind == PropKind.DoctorDesk && l.IsClimbPiece(p.Position)) continue;
+                    if (p.Kind == PropKind.DoctorDesk && l.Doorways.Any(d => d.High && new Vector2(d.Position.x - p.Position.x, d.Position.z - p.Position.z).magnitude < 0.9f
+                                                                             && LevelLayout.FloorOf(d.Position.y) == LevelLayout.FloorOf(p.Position.y + 0.1f))) continue;
+                    list.Add(p.Kind);
+                }
+                foreach (var (id, kinds) in inRoom)
+                {
+                    var room = l.Plan.Rooms[id];
+                    foreach (var k in office) Assert.IsFalse(kinds.Contains(k), $"seed {l.Seed}: {k} in {room.Type} {id}");
+                    int cap = room.Area > 70f ? 2 : 1; // (a hall of a room may have two of a kind: Furnisher's cap)
+                    Assert.LessOrEqual(kinds.Count(k => k == PropKind.DoctorDesk), cap, $"seed {l.Seed}: doctor's desks in {room.Type} {id}");
+                    Assert.LessOrEqual(kinds.Count(k => k == PropKind.MedWorkstation), cap, $"seed {l.Seed}: workstations in {room.Type} {id}");
+                    carts += kinds.Count(k => k == PropKind.MedWorkstation);
+                }
+            }
+            Assert.Greater(carts, 6, "the hospital's own computer hardly ever stands anywhere");
+        }
+
+        [Test]
+        public void TheXraysColumnStandsClearOfTheLamps()
+        {
+            // the model: the part declared as reaching the ceiling is where the prefab's tall parts are
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Prefabs/Props/XrayMachine.prefab");
+            var part = Furnisher.ToCeiling[PropKind.XrayMachine];
+            int tall = 0;
+            foreach (var mf in prefab.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mesh = mf.sharedMesh;
+                var to = prefab.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                foreach (var v in mesh.vertices)
+                {
+                    var p = to.MultiplyPoint3x4(v);
+                    if (p.y < 2.6f) continue; // (the detector's wall stand is 2.2 m: well under a lamp)
+                    tall++;
+                    Assert.IsTrue(part.Contains(new Vector2(p.x, p.z)), $"{mf.name}: a point {p} above 2.6 m outside the part that reaches the ceiling");
+                }
+            }
+            Assert.Greater(tall, 8, "the X-ray machine has no column to the ceiling");
+            // the houses: no lamp over it
+            int machines = 0;
+            foreach (var l in TestHouses.First(HouseKind.Hospital, 8, seed => 1 + seed % 4))
+                foreach (var p in l.Props)
+                {
+                    if (p.Kind != PropKind.XrayMachine) continue;
+                    machines++;
+                    var room = l.Plan.RoomAt(p.Position + Vector3.up * 0.3f);
+                    var column = Furnisher.RectAt(part, p.Position, p.RotationY);
+                    foreach (var lamp in LevelBuilder.LightSpots(l, room))
+                        Assert.IsFalse(column.Overlaps(Rect.MinMaxRect(lamp.x - VentPlan.LampHalf, lamp.y - VentPlan.LampHalf, lamp.x + VentPlan.LampHalf, lamp.y + VentPlan.LampHalf)),
+                            $"seed {l.Seed}: the X-ray's column in room {room.Id} runs up into a lamp");
+                }
+            Assert.Greater(machines, 2, "hardly an X-ray machine in eight hospitals");
+        }
+
+        [Test]
+        public void TheMedicalTableStandsWherePatientsAreTreated()
+        {
+            // the play's note: the healing station stood in a staff lounge
+            int houses = 0, treated = 0;
+            foreach (var l in TestHouses.First(HouseKind.Hospital, 10, seed => 1 + seed % 4))
+            {
+                if (l.PointOfInterest < 0) continue;
+                houses++;
+                var p = l.Props[l.PointOfInterest];
+                Assert.AreEqual(PropKind.MedTable, p.Kind);
+                var room = l.Plan.RoomAt(p.Position + Vector3.up * 0.3f);
+                if (room != null && HouseFeatures.Treatment(l, room))
+                {
+                    treated++;
+                    Assert.AreEqual(1f, p.Scale > 0f ? p.Scale : 1f, 1e-3f, $"seed {l.Seed}: the table in a treatment room is not whole");
+                }
+            }
+            Assert.Greater(houses, 7);
+            Assert.GreaterOrEqual(treated, houses * 8 / 10, $"the medical table in a treatment room in {treated} of {houses} hospitals");
+        }
+
+        [Test]
         public void WaitingSeatsInTheMiddleStandBackToBack()
         {
             int pairs = 0;

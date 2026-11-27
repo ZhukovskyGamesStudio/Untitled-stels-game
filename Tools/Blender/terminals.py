@@ -8,7 +8,9 @@ Look: blender.exe -b --factory-startup --python Tools/Blender/review.py -- sheet
 Conventions (generate_models): metres, front faces Blender -Y (Unity +Z: the operator's side), z up, origin on the floor
 in the middle of the footprint (a desk's: 1.6 x 0.8 — both replace a desk of the plan). Parts: Body (the furniture),
 Accent (keys, stands, trims), Eye (the buttons and lamps: SecurityTerminal tints them by the terminal's kind), EyeScreen
-(the monitors' screens, each UV-mapped 0..1 on its own: SecurityTerminal shows the kind's picture on them).
+(the monitors' screens, each UV-mapped 0..1 on its own: SecurityTerminal shows the kind's picture on them). The console's
+monitors are parts of their own — BodyMonitors (the cases), AccentMonitors (feet and necks): with the screens they are
+what a player's body goes through (PassableForPlayers: they stood in the way into the duct over the desk).
 """
 import math
 import os
@@ -54,6 +56,7 @@ def model_terminal_console():
     """The robots' control console: a steel desk on two pedestals, three monitors in an arc at its back, a keyboard, a
     console panel of chunky buttons and a joystick to the right, a cable trunk at the back; screens in one Eye part."""
     body, accent, eye, screens, frames = [], [], [], [], []
+    cases, stands = [], []                          # the monitors: parts of their own (a player's body goes through them)
     body.append(s.rbox((1.6, 0.8, 0.04), (0, 0, DESK_TOP - 0.02), r=0.01, seg=2))                  # top
     for x in (-0.58, 0.58):
         body.append(s.rbox((0.42, 0.72, DESK_TOP - 0.06), (x, 0.02, (DESK_TOP - 0.04) / 2), r=0.012, seg=2))   # pedestals
@@ -61,7 +64,7 @@ def model_terminal_console():
         accent.append(s.rbox((0.36, 0.01, 0.012), (x, -0.345, 0.24), r=0.003, seg=1))
     body.append(s.rbox((0.74, 0.02, 0.4), (0, 0.36, 0.42), r=0.004, seg=1))                         # modesty panel
     for x, y, yaw in ((-0.5, 0.18, -22), (0.0, 0.24, 0), (0.5, 0.18, 22)):
-        _monitor(x, y, yaw, body, accent, screens, frames=frames)
+        _monitor(x, y, yaw, cases, stands, screens, frames=frames)
     keyboard.add("Keys", (-0.1, -0.2, DESK_TOP - 0.0005), mouse=0.0)
     # the console panel: a sloped box with buttons and a joystick
     body.append(s.rbox((0.3, 0.22, 0.06), (0.5, -0.2, DESK_TOP + 0.03), r=0.01, seg=2, rot=(math.radians(12), 0, 0)))
@@ -75,6 +78,8 @@ def model_terminal_console():
     s.part("Body", body)
     s.part("Accent", accent)
     s.part("Eye", eye)
+    s.part("BodyMonitors", cases)
+    s.part("AccentMonitors", stands)
     screen_uvs(s.part("EyeScreen", screens), frames)
     return rs.export("terminal_console")
 

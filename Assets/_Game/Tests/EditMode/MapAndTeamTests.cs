@@ -293,9 +293,61 @@ namespace Stealth.Tests
         public void MapLabelsByTheEdgeLeanInwards()
         {
             var extent = new Vector2(800f, 600f);
-            Assert.AreEqual((0, false), Stealth.UI.MapView.LabelPlace(new Vector2(400f, 300f), extent, 30f), "in the middle: centred under the icon");
-            Assert.AreEqual((1, true), Stealth.UI.MapView.LabelPlace(new Vector2(10f, 10f), extent, 30f), "bottom left corner: to the right, above");
-            Assert.AreEqual((-1, false), Stealth.UI.MapView.LabelPlace(new Vector2(790f, 590f), extent, 30f), "top right corner: to the left, under");
+            Assert.AreEqual((0, -1), Stealth.UI.MapView.LabelPlace(new Vector2(400f, 300f), extent, 30f), "in the middle: centred under the icon");
+            Assert.AreEqual((1, 1), Stealth.UI.MapView.LabelPlace(new Vector2(10f, 10f), extent, 30f), "bottom left corner: to the right, above");
+            Assert.AreEqual((-1, -1), Stealth.UI.MapView.LabelPlace(new Vector2(790f, 590f), extent, 30f), "top right corner: to the left, under");
+        }
+
+        [Test]
+        public void AMapLabelKeepsOffTheWallsInk()
+        {
+            var extent = new Vector2(800f, 600f);
+            var at = new Vector2(400f, 300f);
+            // a wall running under the mark, where the words would go: they go over it instead
+            var under = new System.Collections.Generic.List<Rect> { new(300f, 282f, 200f, 6f) };
+            Assert.AreEqual((0, 1), Stealth.UI.MapView.LabelPlace(at, extent, 30f, 1f, under), "a wall under the mark: the words over it");
+            // walls under and over: level with the mark, to the right
+            var both = new System.Collections.Generic.List<Rect> { new(300f, 282f, 200f, 6f), new(300f, 311f, 200f, 6f) };
+            Assert.AreEqual((1, 0), Stealth.UI.MapView.LabelPlace(at, extent, 30f, 1f, both), "walls under and over: to the right");
+            // and a wall to the right as well: to the left
+            both.Add(new Rect(420f, 290f, 6f, 20f));
+            Assert.AreEqual((-1, 0), Stealth.UI.MapView.LabelPlace(at, extent, 30f, 1f, both), "and one to the right: to the left");
+            // wherever it lands, the words' box shares nothing with the ink
+            foreach (var walls in new[] { under, both })
+            {
+                var box = Stealth.UI.MapView.LabelBox(at, Stealth.UI.MapView.LabelPlace(at, extent, 30f, 1f, walls), 30f);
+                Assert.IsFalse(walls.Any(w => w.Overlaps(box)), "the words lie on a wall");
+            }
+        }
+
+        [Test]
+        public void TheHatchesLabelsOnTheMapOfAWholeHouseLieOnNoWall()
+        {
+            // the play's case: "way in" and "way out" ran across the black wall lines of the map terminal's plan
+            int crossed = 0, marks = 0;
+            foreach (var l in TestHouses.Corpus(12))
+            {
+                var map = new ExplorationMap(l);
+                map.RevealAll();
+                var sketch = new System.Collections.Generic.List<MapRect>();
+                MapSketch.Build(map, 0, null, sketch);
+                float scale = Mathf.Min(900f / l.SizeX, 600f / l.SizeZ) * 0.92f;
+                var walls = new System.Collections.Generic.List<Rect>();
+                Stealth.UI.MapView.InkOf(sketch, scale, walls);
+                Assert.IsNotEmpty(walls);
+                foreach (var hatch in new[] { l.HatchPosition, l.ExitHatchPosition })
+                {
+                    var at = new Vector2(hatch.x, hatch.z) * scale;
+                    var extent = new Vector2(l.SizeX, l.SizeZ) * scale;
+                    var box = Stealth.UI.MapView.LabelBox(at, Stealth.UI.MapView.LabelPlace(at, extent, 22f, 1f, walls), 22f);
+                    marks++;
+                    // (the ink itself: the list has a pixel and a half of air round every wall)
+                    var words = Rect.MinMaxRect(box.xMin + 2f, box.yMin + 2f, box.xMax - 2f, box.yMax - 2f);
+                    if (walls.Any(w => w.Overlaps(words))) crossed++;
+                }
+            }
+            // (a hatch in a closet may have no free side at all: rare)
+            Assert.LessOrEqual(crossed, marks / 10, $"{crossed} of {marks} hatch labels lie across a wall");
         }
     }
 }

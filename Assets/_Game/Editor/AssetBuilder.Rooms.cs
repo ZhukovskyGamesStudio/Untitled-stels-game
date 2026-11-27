@@ -214,6 +214,7 @@ namespace Stealth.EditorTools
             (PropKind.HandSanitizer, "hand_sanitizer", "Ceiling", "PropAccent", "Metal", "PropScreen"),
             (PropKind.ClinicBench, "clinic_bench", "Ceiling", "Rack", "Metal", "PropScreen"),
             (PropKind.MedFridge, "med_fridge", "Ceiling", "Rack", "StairGlass", "PropScreen"), // (its Trim is the door's glass)
+            (PropKind.MedWorkstation, "med_workstation", "Ceiling", "Rack", "Metal", "PropScreen"), // the hospital's computer: on wheels
             // the apartment block (Tools/Blender/apartments.py)
             (PropKind.DoubleBed, "double_bed", "Wood", "Fabric", "Metal", "PropScreen"),
             (PropKind.Wardrobe, "wardrobe", "Wood", "Metal", "Metal", "PropScreen"),

@@ -694,6 +694,9 @@ namespace Stealth.Level
             int placed = full ? l.Props.FindIndex(p => p.Kind == kind) : -1;
             if (placed >= 0) { l.PointOfInterest = placed; return; }
             if (full && PlaceWhole(l, kind, need, rng, AtWindow)) return;
+            // the hospital's medical table belongs where patients are treated (it stood in a staff lounge, in a sofa's
+            // place): whole, in the place of a piece at a wall of a treatment or consulting room, where one has the room
+            if (kind == PropKind.MedTable && PlaceWhole(l, kind, need, rng, AtWindow, TreatmentOver, r => Treatment(l, r))) return;
             foreach (float least in new[] { MinPointScale, 0f })
             foreach (float away in new[] { 6f, 2.5f })
             // pieces that stand alone first: a table gives its place too, but its chairs stay around whatever replaces it
@@ -730,31 +733,54 @@ namespace Stealth.Level
             PropKind.ReceptionDesk, PropKind.BarCounter, PropKind.MeetingTable, PropKind.ConferenceTable, PropKind.DiningTable,
         };
 
+        /// <summary>The pieces at a wall of a treatment room the medical table may take the place of (not the room's own: the doctor's desk, the couch).</summary>
+        static readonly PropKind[] TreatmentOver =
+        {
+            PropKind.MedicineCabinet, PropKind.Cabinet, PropKind.FilingCabinet, PropKind.SupplyShelf, PropKind.Shelf, PropKind.MedicationCart,
+            PropKind.PrivacyScreen, PropKind.MirrorSink, PropKind.GuestChair, PropKind.WeighingScale, PropKind.CoatRack, PropKind.Plant,
+            PropKind.Wheelchair, PropKind.IvStand, PropKind.VitalsMonitor, PropKind.LinenCart, PropKind.TrashBin, PropKind.MedWorkstation,
+        };
+
+        /// <summary>A room where patients are treated (pure): a treatment room, or a hospital's consulting room.</summary>
+        public static bool Treatment(LevelLayout l, PlanRoom r) =>
+            r.Type == RoomType.Infirmary
+            || (r.Type == RoomType.Office && l.PlanKind == HouseKind.Hospital && Furnisher.PracticeOf(l.Seed, r.Id) == Practice.Consulting);
+
         /// <summary>
         /// A <see cref="FullSize"/> point of interest at full size in the place of a piece (see <see cref="WholeAt"/>), away
         /// from the hatch where it can be; false: nowhere whole (the caller falls back to a smaller one).
         /// </summary>
-        static bool PlaceWhole(LevelLayout l, PropKind kind, Rect need, System.Random rng, System.Func<Vector3, bool> atWindow)
+        static bool PlaceWhole(LevelLayout l, PropKind kind, Rect need, System.Random rng, System.Func<Vector3, bool> atWindow,
+            PropKind[] over = null, System.Func<PlanRoom, bool> inRoom = null)
         {
+            over ??= WholeOver;
             foreach (float away in new[] { 6f, 2.5f, 0f })
             {
                 var options = new List<(int index, Vector3 at)>();
                 for (int i = 0; i < l.Props.Count; i++)
                 {
                     var p = l.Props[i];
-                    if (System.Array.IndexOf(WholeOver, p.Kind) < 0 || l.IsClimbPiece(p.Position) || (p.Position - l.HatchPosition).magnitude <= away) continue;
+                    if (System.Array.IndexOf(over, p.Kind) < 0 || l.IsClimbPiece(p.Position) || (p.Position - l.HatchPosition).magnitude <= away) continue;
+                    if (inRoom != null && (l.Plan.RoomAt(p.Position + Vector3.up * 0.3f) is not PlanRoom its || !inRoom(its))) continue;
                     if (WholeAt(l, i, need) is not Vector3 at || (Furnisher.Tall.Contains(kind) && atWindow(at))) continue;
                     options.Add((i, at));
                 }
                 if (options.Count == 0) continue;
-                var (pick, spot) = options[rng.Next(options.Count)];
-                var piece = l.Props[pick];
-                piece.Kind = kind;
-                piece.Scale = 1f;
-                piece.Position = spot;
-                l.Props[pick] = piece;
-                l.PointOfInterest = pick;
-                return true;
+                int first = rng.Next(options.Count);
+                for (int k = 0; k < options.Count; k++)
+                {
+                    var (pick, spot) = options[(first + k) % options.Count];
+                    var was = l.Props[pick];
+                    var piece = was;
+                    piece.Kind = kind;
+                    piece.Scale = 1f;
+                    piece.Position = spot;
+                    l.Props[pick] = piece;
+                    // among a room's own furniture (a treatment room's): never in front of what opens beside it
+                    if (inRoom != null && Furnisher.OpeningClashes(l).Exists(c => c.prop == pick || c.other == pick)) { l.Props[pick] = was; continue; }
+                    l.PointOfInterest = pick;
+                    return true;
+                }
             }
             return false;
         }

@@ -197,7 +197,7 @@ namespace Stealth.Tests
                     // a desk on each side, back to the wall under the hole
                     var w = l.Plan.Walls[o.Wall];
                     var mid = w.At(o.At);
-                    int desks = l.Props.Count(p => p.Kind is PropKind.Desk or PropKind.Terminal &&
+                    int desks = l.Props.Count(p => p.Kind is PropKind.Desk or PropKind.Terminal or PropKind.DoctorDesk && // (the doctor's: a hospital's medical room)
                         (new Vector2(p.Position.x, p.Position.z) - mid).magnitude < 0.75f && LevelLayout.FloorOf(p.Position.y) == w.Floor);
                     Assert.AreEqual(2, desks, $"seed {seed}: desks under the high vent at {mid}");
                     high++;

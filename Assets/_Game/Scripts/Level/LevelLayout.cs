@@ -105,7 +105,7 @@ namespace Stealth.Level
         // a chest-high cube shelf (Tools/Blender/low_shelf.py): the way up to a ceiling grate where filing cabinets or crates do not belong
         LowShelf,
         // the hospital's clinical lab (Tools/Blender/hospital.py): the bench with its microscope and centrifuge, the sample fridge
-        ClinicBench, MedFridge }
+        ClinicBench, MedFridge, MedWorkstation }
 
     /// <summary>The house's main job, optional, known from the sewer already: a vault behind three locks, or a hostage in a cage.</summary>
     public enum ObjectiveKind : byte { None, Vault, Hostage }

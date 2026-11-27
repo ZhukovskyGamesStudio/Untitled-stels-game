@@ -385,6 +385,10 @@ namespace Stealth.EditorTools
             Call(map, "Draw", full, 0, scale);
             map.Content.anchoredPosition = -new Vector2(layout.SizeX, layout.SizeZ) / 2f * scale;
             map.Caption.text = "Этаж 1 из " + full.Floors;
+            var sketch = new System.Collections.Generic.List<MapRect>();
+            MapSketch.Build(full, 0, null, sketch);
+            var walls = new System.Collections.Generic.List<Rect>();
+            MapView.InkOf(sketch, scale, walls);
             void Icon(Vector2 at, Color c, string label, int shape)
             {
                 var icon = Add(map.IconPrefab, map.IconLayer);
@@ -398,7 +402,7 @@ namespace Stealth.EditorTools
                 if (label != null)
                 {
                     icon.Label.text = label; icon.Label.color = UiPalette.Ink;
-                    MapView.PlaceLabel(icon, MapView.LabelPlace(at * scale, new Vector2(layout.SizeX, layout.SizeZ) * scale, icon.Label.preferredWidth / 2f));
+                    MapView.PlaceLabel(icon, MapView.LabelPlace(at * scale, new Vector2(layout.SizeX, layout.SizeZ) * scale, icon.Label.preferredWidth / 2f, 1f, walls));
                 }
             }
             Icon(new Vector2(layout.HatchPosition.x, layout.HatchPosition.z), UiPalette.MarkBlue, "вход", 2);

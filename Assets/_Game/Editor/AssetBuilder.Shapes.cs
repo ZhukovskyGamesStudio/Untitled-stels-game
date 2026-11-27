@@ -11,6 +11,8 @@ namespace Stealth.EditorTools
         /// <summary>Where the models' own baked maps are (Tools/Blender/shapebake.py): &lt;model&gt;_n.png and _m.png.</summary>
         public const string ShapeTextures = Root + "/Art/Textures/Shapes";
         const string ShapeLibraryPath = DataDir + "/ShapeLibrary.asset";
+        /// <summary>The styles' own furniture: models of their own under the base models' file names (no baked maps).</summary>
+        const string StylePropsDir = ModelsDir + "/StyleProps";
 
         /// <summary>The side of every model's normals and of its masks in the game (the arrays want one size each; a picture baked bigger is brought down).</summary>
         public const int ShapeNormalSize = 2048, ShapeMaskSize = 1024;
@@ -40,8 +42,11 @@ namespace Stealth.EditorTools
             var highRes = AssetDatabase.FindAssets("t:Texture2D", new[] { SurfaceTextures, ExternalDir + "/Textures" }.Where(AssetDatabase.IsValidFolder).ToArray())
                 .Select(g => AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(g))).Where(t => t != null && t.width >= 2048)
                 .OrderBy(t => AssetDatabase.GetAssetPath(t), System.StringComparer.Ordinal).ToArray();
-            // every mesh of every baked model (its file, wherever under the models it lies: a base model, a style's variant)
-            var files = Directory.GetFiles(Root + "/Art/Models", "*.fbx", SearchOption.AllDirectories).ToLookup(f => Path.GetFileNameWithoutExtension(f), f => f.Replace('\\', '/'));
+            // every mesh of every baked model (its file, wherever under the models it lies: a base model, a style's variant).
+            // A style's own furniture (StyleProps: the derelict set) is another model under the base model's file name and
+            // was never baked: it must never be given the base model's maps
+            var files = Directory.GetFiles(ModelsDir, "*.fbx", SearchOption.AllDirectories).Select(f => f.Replace('\\', '/'))
+                .Where(f => !f.StartsWith(StylePropsDir + "/")).ToLookup(f => Path.GetFileNameWithoutExtension(f));
             var meshes = new System.Collections.Generic.List<Mesh>();
             var slices = new System.Collections.Generic.List<int>();
             var channels = new System.Collections.Generic.List<int>();

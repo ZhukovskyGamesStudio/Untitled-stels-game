@@ -12,8 +12,8 @@ namespace Stealth.Items
         public int BaseItems = 6;
         [Tooltip("More items per house.")]
         public int ItemsPerHouse = 2;
-        [Tooltip("One more item per this many rooms of the building.")]
-        public int RoomsPerExtraItem = 3;
+        [Tooltip("One more item per this many hundreds of m² of rooms (corridors and halls not counted). At 3 a hospital of 5800 m² had a thing per 137 m² of floor, half as dense as the garage: the first quota was 27 rooms of searching.")]
+        public float RoomsPerExtraItem = 1.5f;
         [Tooltip("How dense the loot lies by team size (1, 2, 3, 4… players; the last repeats).")]
         public float[] ByPlayers = { 1f, 1.15f, 1.3f, 1.45f };
         [Tooltip("Items never lie closer than this, meters.")]
@@ -61,7 +61,7 @@ namespace Stealth.Items
         public static int ItemCount(LevelLayout l, LootSettings s = null)
         {
             s ??= new LootSettings();
-            int count = s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.RoundToInt(l.RoomUnits) / Mathf.Max(1, s.RoomsPerExtraItem);
+            int count = s.BaseItems + l.LevelIndex * s.ItemsPerHouse + Mathf.FloorToInt(l.RoomUnits / Mathf.Max(0.1f, s.RoomsPerExtraItem));
             if (l.Location == Location.Office) count = Mathf.RoundToInt(count * s.OfficeItems);
             count = Mathf.RoundToInt(count * TeamShare.Of(s.ByPlayers, l.Players));
             // the budget is the value the tetris loot had: fewer items when the table's are worth more, more when less
