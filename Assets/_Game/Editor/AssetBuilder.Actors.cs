@@ -100,6 +100,7 @@ namespace Stealth.EditorTools
                 anim.Lean = 14f;
                 s.ViewDistance = 11f; s.ViewAngle = 120f; s.EyePitch = 35f; s.HearingMultiplier = 0.5f; // looks down-forward
                 t.HoverHeight = 2.1f; t.AlarmOnDetect = true;
+                t.AttacksPerCharge = 1; t.RechargeTime = 10f; // one net: thrown, the alarm, off to a charging dock for a new one
                 t.PatrolSpeed = 2.6f; t.InvestigateSpeed = 3.6f; t.ChaseSpeed = 4.7f; t.AttackRange = 1.4f;
             }));
             Robot(RobotKind.Thumper, RobotPrefabs + "/RobotThumper.prefab", () => MobileRobot("RobotThumper", "robot_thumper", "ThumperBody", 0.7f, new Vector3(0, 0.3f, 0.8f), ripple, (s, t, anim) =>

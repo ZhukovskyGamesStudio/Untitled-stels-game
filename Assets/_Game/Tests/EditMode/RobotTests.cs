@@ -368,7 +368,11 @@ namespace Stealth.Tests
                 var w = web[i];
                 Assert.AreEqual(w.A.x, w.B.x, 1e-4f, "across the shorter side");
                 Assert.Less(w.A.y, 0.1f, "from the floor…");
-                Assert.Greater(w.Top, LevelMetrics.WallHeight - 0.2f, "…up to the ceiling: a whole sheet");
+                Assert.Greater(w.Top, LevelMetrics.WallHeight, "…up into the ceiling: a whole sheet, anchored in it");
+                // its wall end a little into the wall (the face is half a wall in from the rect), its gap end free
+                float wallFace = LevelMetrics.WallThickness / 2f;
+                float wallEnd = i % 2 == 0 ? w.A.z - room.yMin : room.yMax - w.B.z;
+                Assert.That(wallEnd, Is.InRange(wallFace - 0.08f, wallFace - 0.01f), $"wire {i}: spun from inside the wall");
                 // a gap at alternating ends: the way through zig-zags
                 bool gapAtFar = w.B.z < room.yMax - 0.5f;
                 Assert.AreEqual(i % 2 == 0, gapAtFar, $"wire {i}");

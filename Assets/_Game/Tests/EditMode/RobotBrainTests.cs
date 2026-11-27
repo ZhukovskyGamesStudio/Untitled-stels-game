@@ -238,6 +238,51 @@ namespace Stealth.Tests
         }
 
         [Test]
+        public void ADroneThrowsItsOneNetRaisesTheAlarmAndFliesOffToRecharge()
+        {
+            m_Traits.CanAttack = true;
+            m_Traits.Attack = AttackKind.Net;
+            m_Traits.AttacksPerCharge = 1;
+            m_Traits.RechargeTime = 10f;
+            m_Traits.WarningTime = 0.5f;
+            m_Player.Position = new Vector3(0, 0, 1f);
+            Sense(5f, 2f);
+            Assert.AreEqual(RobotState.Chase, m_Brain.State);
+            int alarms = m_Body.Alarms.Count;
+            var dock = new Vector3(20, 0, 5);
+            m_Brain.Spend(dock, m_Now); // the net is thrown
+            Assert.AreEqual(alarms + 1, m_Body.Alarms.Count, "the alarm goes up");
+            Assert.AreEqual(RobotState.Patrol, m_Brain.State, "it leaves the netted player");
+            Assert.AreEqual(RechargeStep.Going, m_Brain.Recharge);
+            Assert.AreEqual(dock, m_Body.Destination, "off to the charging dock");
+
+            m_Body.Arrived = false;
+            Sense(5f, 3f); // a player right before it on the way: nothing — it has no net
+            Assert.AreEqual(RobotState.Patrol, m_Brain.State, "blind and deaf on its way");
+            Assert.AreEqual(0f, m_Brain.Suspicion);
+            m_Brain.OnNoise(m_Player.Position, 1f, m_Player, m_Now);
+            Assert.AreEqual(RobotState.Patrol, m_Brain.State);
+
+            m_Body.Position = dock;
+            m_Body.Arrived = true;
+            Wait(1f);
+            Assert.AreEqual(RechargeStep.Charging, m_Brain.Recharge, "at the dock: charging");
+            int patrols = m_Body.PatrolRequests;
+            Wait(9.5f);
+            Assert.AreEqual(RechargeStep.None, m_Brain.Recharge, "a new net after RechargeTime");
+            Assert.Greater(m_Body.PatrolRequests, patrols, "and back on its rounds");
+            Sense(5f, 2f);
+            Assert.AreNotEqual(RobotState.Patrol, m_Brain.State, "it notices players again");
+        }
+
+        [Test]
+        public void ARobotWithoutAChargeLimitNeverRecharges()
+        {
+            m_Brain.Spend(new Vector3(9, 0, 9), m_Now);
+            Assert.AreEqual(RechargeStep.None, m_Brain.Recharge);
+        }
+
+        [Test]
         public void ASlowEarNeedsFourTimesTheNoise()
         {
             var slow = new RobotBrain(new RobotSenses { HearingMultiplier = 1f, HearingSpeed = 0.25f }, m_Traits, new FakeBody(), new System.Random(1));

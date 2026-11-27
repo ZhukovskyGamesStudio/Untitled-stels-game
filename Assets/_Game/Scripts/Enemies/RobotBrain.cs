@@ -101,6 +101,10 @@ namespace Stealth.Enemies
         public int RoleLimit;
         [Tooltip("What it does to the player it has caught up with (AttackKind): AttackRange and AttackCooldown are its reach and pace.")]
         public AttackKind Attack;
+        [Tooltip("Attacks it has before it must recharge (0 = no limit): a drone carries one net — thrown, it raises the alarm and flies off to a charging dock.")]
+        public int AttacksPerCharge;
+        [Tooltip("Seconds it stays at the charging dock to make its attacks again (a new net).")]
+        public float RechargeTime = 10f;
 
         [Header("Carrying players")]
         [Tooltip("A player it knocks out (or one lying near, put down by its side) it lifts and carries away: a servant to the prison, a renegade to its lair.")]
@@ -151,6 +155,12 @@ namespace Stealth.Enemies
     /// </summary>
     public enum GuardShift : byte { Resting, Hunting, Returning }
 
+    /// <summary>
+    /// A robot whose attacks ran out (<see cref="RobotTraits.AttacksPerCharge"/>: a drone's net thrown): flying to a charging
+    /// dock, deaf and blind to everything on the way; charging there for <see cref="RobotTraits.RechargeTime"/>; or neither.
+    /// </summary>
+    public enum RechargeStep : byte { None, Going, Charging }
+
     /// <summary>Strongest sensor contact of one frame (computed by the robot's sensors).</summary>
     public struct Sighting
     {
@@ -195,6 +205,62 @@ namespace Stealth.Enemies
 
         public event Action<RobotState> StateChanged;
 
+        /// <summary>Its attacks ran out and it is off to recharge (<see cref="RechargeStep"/>).</summary>
+        public RechargeStep Recharge { get; private set; }
+        public bool Recharging => Recharge != RechargeStep.None;
+        Vector3 m_ChargeSpot;
+        float m_ChargeAt;
+        int m_Spent;
+
+        /// <summary>The longest it flies to its dock, seconds: a way it cannot finish — it charges where it got to.</summary>
+        public const float RechargeTrip = 40f;
+
+        /// <summary>
+        /// Its body made an attack that spends a charge (a net thrown). The last one of the charge: it raises the alarm where
+        /// the target is, forgets whom it was after and flies off to recharge at <paramref name="dock"/>.
+        /// </summary>
+        public void Spend(Vector3 dock, float now)
+        {
+            if (m_Traits.AttacksPerCharge <= 0 || Recharging || ++m_Spent < m_Traits.AttacksPerCharge) return;
+            m_Spent = 0;
+            m_Body.RaiseAlarm(Target != null ? Target.Position : LastKnown, m_Traits.AlarmRadius);
+            Target = null;
+            Suspect = null;
+            Suspicion = 0f;
+            SetState(RobotState.Patrol, now);
+            Recharge = RechargeStep.Going;
+            m_ChargeSpot = dock;
+            m_ChargeAt = now;
+            m_Body.MoveTo(dock, m_Traits.InvestigateSpeed);
+        }
+
+        /// <summary>The recharge's part of a tick; true while it drives the body (flying to the dock, charging there).</summary>
+        bool TickRecharge(float now, float dt)
+        {
+            switch (Recharge)
+            {
+                case RechargeStep.Going:
+                    var flat = m_ChargeSpot - m_Body.Position;
+                    flat.y = 0f;
+                    bool there = m_Body.Arrived && (flat.magnitude < 1.5f || now - m_ChargeAt > 1f); // (as near as its way goes)
+                    if (there || now - m_ChargeAt > RechargeTrip)
+                    {
+                        Recharge = RechargeStep.Charging;
+                        m_ChargeAt = now;
+                        m_Body.Stop();
+                    }
+                    else m_Body.Move(m_Traits.InvestigateSpeed);
+                    return true;
+                case RechargeStep.Charging:
+                    m_Body.Stop();
+                    if (now - m_ChargeAt < m_Traits.RechargeTime) return true;
+                    Recharge = RechargeStep.None; // charged: its rounds again
+                    NextPatrolPoint();
+                    return true;
+            }
+            return false;
+        }
+
         /// <summary>Docked (a charging dock to rest at): the shift below drives it; otherwise it patrols as always.</summary>
         public bool Docked { get; private set; }
         public GuardShift Shift { get; private set; }
@@ -237,6 +303,7 @@ namespace Stealth.Enemies
         public void Alarm(Vector3 position, float now)
         {
             if (!Docked) { Investigate(position, true, now); return; }
+            if (Recharging) return;
             m_HuntUntil = now + m_Traits.AlarmHuntTime;
             Shift = GuardShift.Hunting;
             if (State == RobotState.Chase || State == RobotState.Alerted) return;
@@ -306,7 +373,7 @@ namespace Stealth.Enemies
         public void OnSensed(in Sighting s, float now, float dt)
         {
             if (Resting) return; // asleep on its dock
-            if (s.Target == null)
+            if (s.Target == null || Recharging) // (off to recharge: nothing else matters)
             {
                 if (State != RobotState.Alerted) Suspicion = Mathf.Max(0f, Suspicion - m_Traits.SuspicionDecay * dt);
                 return;
@@ -347,7 +414,7 @@ namespace Stealth.Enemies
 
         void OnStimulus(Vector3 position, float suspicion, IIntruder source, float now)
         {
-            if (suspicion <= 0f || Resting) return;
+            if (suspicion <= 0f || Resting || Recharging) return;
             if (State == RobotState.Chase)
             {
                 if (source != null && source == Target)
@@ -370,7 +437,7 @@ namespace Stealth.Enemies
         /// <summary>Go and check a spot (radio call, alarm, noise). Ignored once it has detected someone.</summary>
         public void Investigate(Vector3 position, bool alarm, float now)
         {
-            if (State == RobotState.Chase || State == RobotState.Alerted || Resting) return;
+            if (State == RobotState.Chase || State == RobotState.Alerted || Resting || Recharging) return;
             BeginInvestigation(position, alarm, now);
         }
 
@@ -436,6 +503,7 @@ namespace Stealth.Enemies
 
         public void Tick(float now, float dt)
         {
+            if (TickRecharge(now, dt)) return;
             if (TickShift(now, dt)) return;
             switch (State)
             {

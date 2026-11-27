@@ -20,8 +20,13 @@ namespace Stealth.Enemies
             public float Height => Top - A.y;
         }
 
-        /// <summary>The sheets hang this far over the floor and stop this far under the ceiling.</summary>
-        public const float Foot = 0.03f, UnderCeiling = 0.05f;
+        /// <summary>The sheets hang this far over the floor.</summary>
+        public const float Foot = 0.03f;
+        /// <summary>
+        /// How far a sheet's edges go into the wall it is spun from and into the ceiling, metres: anchored in them, as a real
+        /// web looks (stopping short of them it hung in the air like a curtain).
+        /// </summary>
+        public const float IntoWall = 0.04f, IntoCeiling = 0.04f;
 
         /// <summary>
         /// The wires of a room (<paramref name="room"/> in x/z, its floor at <paramref name="floorY"/>): across the shorter
@@ -35,7 +40,8 @@ namespace Stealth.Enemies
             bool alongX = room.width >= room.height;
             float length = alongX ? room.width : room.height, across = alongX ? room.height : room.width;
             if (length < 3f || across < gap + 1.2f) return list;
-            const float inset = 0.2f;
+            // (the room's rect runs along the walls' middles: their faces are half a wall in)
+            const float inset = Stealth.Level.LevelMetrics.WallThickness / 2f - IntoWall;
             int n = Mathf.Min(max, Mathf.FloorToInt((length - spacing) / spacing));
             float start = (length - (n - 1) * spacing) / 2f;
             for (int i = 0; i < n; i++)
@@ -54,7 +60,7 @@ namespace Stealth.Enemies
                 bool nearDoor = false;
                 foreach (var d in doors)
                     if (Mathf.Abs(d.y - floorY) < 1.5f && DistanceToSegment(new Vector2(d.x, d.z), new Vector2(a.x, a.z), new Vector2(b.x, b.z)) < 1.5f) { nearDoor = true; break; }
-                if (!nearDoor) list.Add(new Strand { A = a, B = b, Top = floorY + ceiling - UnderCeiling });
+                if (!nearDoor) list.Add(new Strand { A = a, B = b, Top = floorY + ceiling + IntoCeiling });
             }
             return list;
         }

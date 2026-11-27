@@ -63,6 +63,7 @@ namespace Stealth.Enemies
                     if (player == null || player.Netted) return;
                     player.NetServer();
                     Pulse(PulseNet);
+                    m_Brain.Spend(ChargeSpotServer(), Time.time); // (a drone's one net: off to recharge)
                     return;
                 case AttackKind.Pester:
                     NoiseSystem.EmitServer(transform.position, Traits.RoleRadius);
@@ -88,8 +89,28 @@ namespace Stealth.Enemies
                     target.HitServer(transform.position, Cause);
                     break;
             }
+            m_Brain.Spend(ChargeSpotServer(), Time.time);
             // down at once: it takes the body away itself
             if (Traits.CarriesPlayers && player != null && player.CanBeCarried) FetchServer(player);
+        }
+
+        /// <summary>
+        /// Server: where it recharges its attacks — the nearest charging dock of the house (one on its own floor before one
+        /// on another), else where it was put into the house; on the navmesh.
+        /// </summary>
+        Vector3 ChargeSpotServer()
+        {
+            var layout = ActiveLevel.Layout;
+            var at = transform.position;
+            var best = m_Home;
+            float bestScore = float.PositiveInfinity;
+            if (layout != null)
+                foreach (var dock in layout.ChargingDocks)
+                {
+                    float score = Vector3.Distance(dock.position, at) + (Perception.SameFloor(dock.position, at) ? 0f : 25f);
+                    if (score < bestScore) { bestScore = score; best = dock.position; }
+                }
+            return NavMesh.SamplePosition(best, out var hit, 2f, m_Agent.areaMask) ? hit.position : best;
         }
 
         // ------------------------------------------------------------------ roles

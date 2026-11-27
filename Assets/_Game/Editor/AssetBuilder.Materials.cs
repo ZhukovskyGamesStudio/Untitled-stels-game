@@ -17,27 +17,21 @@ namespace Stealth.EditorTools
         static Material M(string name) =>
             s_Mats.TryGetValue(name, out var m) ? m : throw new KeyNotFoundException($"Material {name} is not registered in BuildMaterials");
 
-        /// <summary>The spider's web threads (Tools/Blender/web.py): pale silk with a faint glow.</summary>
+        /// <summary>The spider's web threads (Tools/Blender/web.py): grey dusty silk, a little see-through, lit like anything else.</summary>
         static Material WebMaterial()
         {
-            // the threads are geometry (Tools/Blender/web.py): opaque silk with a faint glow, so a careful player sees them
-            // in a dark room. (An alpha card of hair-thin threads read as a milky sheet: its mipmaps blend threads and air.)
+            // the threads are geometry (Tools/Blender/web.py): grey silk, a touch see-through, no glow of its own (it was a bright
+            // blue neon; a dim glow is not allowed — LightLeakTests: lit, or really glowing), seen by the light of the room or a
+            // flashlight. (An alpha card of hair-thin threads read as a milky sheet: its mipmaps blend threads and air — the
+            // threads stay geometry, only blended a little.)
             var mat = M("Web");
             mat.SetTexture("_BaseMap", null);
             mat.SetTexture("_EmissionMap", null);
-            mat.SetColor("_BaseColor", new Color(0.86f, 0.92f, 0.95f, 1f));
-            mat.SetColor("_EmissionColor", new Color(0.55f, 0.85f, 1f) * 1.2f);
-            mat.EnableKeyword("_EMISSION");
-            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.BakedEmissive;
-            mat.SetFloat("_Surface", 0f);
-            mat.SetOverrideTag("RenderType", "Opaque");
-            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
-            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.Zero);
-            mat.SetFloat("_ZWrite", 1f);
-            mat.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Back);
-            mat.DisableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            mat.renderQueue = -1;
-            EditorUtility.SetDirty(mat);
+            mat.SetColor("_BaseColor", new Color(0.56f, 0.57f, 0.58f, 0.82f));
+            mat.SetColor("_EmissionColor", Color.black);
+            mat.DisableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
+            Translucent(mat);
             return mat;
         }
 
@@ -271,8 +265,8 @@ namespace Stealth.EditorTools
             Mat(props, "RobotShell", new Color(0.08f, 0.09f, 0.12f), smoothness: 0.85f);
             Mat(props, "RobotFlesh", new Color(0.42f, 0.2f, 0.3f), smoothness: 0.55f);
             Mat(props, "RobotGlow", new Color(0.3f, 1f, 0.6f), new Color(0.6f, 2.6f, 1.3f));
-            // the spider's web wires: thin and glowing, so a careful player can see them in a dark room
-            Mat(props, "Web", new Color(0.7f, 0.95f, 1f), new Color(0.9f, 1.6f, 1.8f));
+            // the spider's web wires: grey, thin, a touch see-through (WebMaterial)
+            Mat(props, "Web", new Color(0.56f, 0.57f, 0.58f));
 
             Mat(robots, "RobotBody", new Color(0.86f, 0.87f, 0.9f), smoothness: 0.6f);
             Mat(robots, "RobotAccent", new Color(0.18f, 0.19f, 0.22f), smoothness: 0.5f);
