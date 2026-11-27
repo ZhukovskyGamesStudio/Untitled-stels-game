@@ -306,7 +306,21 @@ namespace Stealth.Enemies
             var colour = IsHacked ? SecurityPalette.Hacked : StatusColor;
             Status.Apply(colour, !IsHacked && AtEase, GlowEyes, GlowEars);
             if (!GlowEyes && !GlowEars && StateLine > 0f) Status.Line(colour, IsHacked ? 0f : StateLine);
+            ShowPower();
             OnStatusChanged();
+        }
+
+        Audio.LoopSound[] m_Loops;
+
+        /// <summary>
+        /// Every peer: hacked — from the terminal, by hand, taken apart with the screwdriver, any way — it is powered down,
+        /// and its own hum (a motor, a brush, a rotor: <see cref="Audio.LoopSound"/>) goes quiet with it; back on, it hums again.
+        /// </summary>
+        void ShowPower()
+        {
+            m_Loops ??= GetComponentsInChildren<Audio.LoopSound>(true);
+            foreach (var loop in m_Loops)
+                if (loop != null) loop.SetActive(!IsHacked);
         }
 
         /// <summary>Extra visuals after the status colour changed (spot lights, beams).</summary>

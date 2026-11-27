@@ -113,7 +113,11 @@ namespace Stealth.Enemies
         protected override void OnHackedServer()
         {
             m_Brain?.Reset(Time.time);
-            if (m_Agent != null && m_Agent.isOnNavMesh) m_Agent.isStopped = true;
+            if (m_Agent != null && m_Agent.isOnNavMesh)
+            {
+                m_Agent.isStopped = true;
+                m_Agent.velocity = Vector3.zero; // dead where it stands: no rolling on (the agent would brake slowly)
+            }
             DropHauledServer(); // the body on its back falls where it stands
             EndRoleErrand();
             EndLootErrand(); // whatever it was lifting or lowering falls in front of it

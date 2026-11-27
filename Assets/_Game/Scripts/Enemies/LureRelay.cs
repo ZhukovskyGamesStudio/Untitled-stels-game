@@ -98,6 +98,7 @@ namespace Stealth.Enemies
 
         protected override void TickLocal()
         {
+            if (IsHacked) m_Words.Clear(); // hacked mid-call: the rest of the words are never said
             if (m_Words.Count == 0 || Voice == null) return;
             m_WordsClock += Time.unscaledDeltaTime;
             int due = Mathf.FloorToInt(m_WordsClock / VoiceMemory.FrameSeconds) + WordsAhead;

@@ -75,8 +75,9 @@ namespace Stealth.EditorTools
                 // no motor hum of the old guard: its own voice says what it does (GuardSounds)
                 foreach (var loop in go.GetComponents<Stealth.Audio.LoopSound>())
                 {
-                    if (loop.Source != null) Object.DestroyImmediate(loop.Source, true);
-                    Object.DestroyImmediate(loop, true);
+                    var source = loop.Source;
+                    Object.DestroyImmediate(loop, true); // first: it requires its source, which could not go before it
+                    if (source != null) Object.DestroyImmediate(source, true);
                 }
                 // its own voice: charging on its dock, walking its rounds, chasing (GuardSounds)
                 var voice = Child(go.transform, "GuardVoice", new Vector3(0f, 1.6f, 0f));

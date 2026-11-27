@@ -31,7 +31,10 @@ namespace Stealth.Audio
             Source.Play();
         }
 
-        /// <summary>Muted while switched off (a hacked robot, a laser that is off).</summary>
+        /// <summary>Sounding now (not switched off).</summary>
+        public bool On => m_On;
+
+        /// <summary>Muted while switched off (a hacked robot: <see cref="Enemies.Detector"/> switches it).</summary>
         public void SetActive(bool on)
         {
             if (m_On == on) return;

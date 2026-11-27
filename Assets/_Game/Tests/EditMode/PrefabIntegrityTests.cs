@@ -195,5 +195,45 @@ namespace Stealth.Tests
                 EditorSceneManager.CloseScene(scene, true);
             }
         }
+
+        /// <summary>
+        /// Every robot and device, hacked any way (the state comes the same to every peer): its own hum goes quiet, and comes
+        /// back when it wakes; and every sound source on it belongs to something that falls silent while it is hacked (its
+        /// loop, a guard's voice loop, a relay's loudspeaker) — a new sound on a robot cannot go on humming after a hack.
+        /// </summary>
+        [Test]
+        public void EveryRobotAndDeviceFallsSilentWhenHacked()
+        {
+            int robots = 0;
+            var folders = new[] { "Assets/_Game/Prefabs/Robots", "Assets/_Game/Prefabs/Sensors" };
+            foreach (var path in AssetDatabase.FindAssets("t:Prefab", folders).Select(AssetDatabase.GUIDToAssetPath))
+            {
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null || prefab.GetComponent<Detector>() == null) continue;
+                var loops = prefab.GetComponentsInChildren<Stealth.Audio.LoopSound>(true);
+                var owned = new HashSet<AudioSource>(loops.Select(l => l.Source));
+                foreach (var g in prefab.GetComponentsInChildren<Stealth.Audio.GuardSounds>(true)) owned.Add(g.Source);
+                foreach (var v in prefab.GetComponentsInChildren<Stealth.Audio.VoicePlayback>(true)) owned.Add(v.Source);
+                foreach (var source in prefab.GetComponentsInChildren<AudioSource>(true))
+                    Assert.IsTrue(owned.Contains(source), $"{path}: {source.name}'s sound is nobody's — it would play on after a hack");
+
+                var go = Object.Instantiate(prefab);
+                try
+                {
+                    var detector = go.GetComponent<Detector>();
+                    var mine = go.GetComponentsInChildren<Stealth.Audio.LoopSound>(true);
+                    var state = DetectorSnapshot.Initial;
+                    state.Hacked = true;
+                    detector.ApplyReplicated(state);
+                    foreach (var loop in mine) Assert.IsFalse(loop.On, $"{path}: hacked, {loop.name} still hums");
+                    state.Hacked = false;
+                    detector.ApplyReplicated(state);
+                    foreach (var loop in mine) Assert.IsTrue(loop.On, $"{path}: awake again, {loop.name} hums again");
+                    robots++;
+                }
+                finally { Object.DestroyImmediate(go); }
+            }
+            Assert.Greater(robots, 20, "every robot and device was looked at");
+        }
     }
 }

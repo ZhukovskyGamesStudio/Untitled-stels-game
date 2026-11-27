@@ -240,8 +240,9 @@ namespace Stealth.EditorTools
                 // a crate does not hum
                 foreach (var loop in go.GetComponents<Stealth.Audio.LoopSound>())
                 {
-                    if (loop.Source != null) Object.DestroyImmediate(loop.Source, true);
-                    Object.DestroyImmediate(loop, true);
+                    var source = loop.Source;
+                    Object.DestroyImmediate(loop, true); // first: it requires its source, which could not go before it
+                    if (source != null) Object.DestroyImmediate(source, true);
                 }
                 return go;
             });

@@ -183,10 +183,10 @@ namespace Stealth.Enemies
             FitCapsule();
             PassThrough(hacked && m_Robot != null);
             float power = 1f - m_Slump; // a hacked robot winds down: rotors, wheels and legs stop
-            foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * Mathf.Max(power, 0.05f), 0f, Space.Self);
+            foreach (var r in m_Rotors) r.Rotate(0f, RotorSpeed * dt * power, 0f, Space.Self); // (hacked: to a standstill)
             foreach (var w in m_Wheels) w.Rotate(m_Speed / 0.12f * Mathf.Rad2Deg * dt, 0f, 0f, Space.Self);
             float drill = state is RobotState.Chase or RobotState.Alerted ? 1f : 0.18f;
-            foreach (var bit in m_Drills) bit.Rotate(0f, 0f, RotorSpeed * 0.6f * drill * dt * Mathf.Max(power, 0.02f), Space.Self);
+            foreach (var bit in m_Drills) bit.Rotate(0f, 0f, RotorSpeed * 0.6f * drill * dt * power, Space.Self);
             m_Climb = Mathf.MoveTowards(m_Climb, m_Robot != null && m_Robot.ClimbingShown && !hacked ? 1f : 0f, dt * 0.9f);
             float swing = Mathf.Clamp01(m_Speed / 2f) * LegSwing;
             foreach (var (leg, phase) in m_Legs)
